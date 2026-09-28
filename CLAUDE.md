@@ -1532,9 +1532,10 @@ sharing one grouping in the first place --- length alone doesn't say so, but
 two independent nouns joined by "and", a vague catch-all title, or
 non-building sections do.
 Covers the Quarto-specific consequences too: `title` is already the page's
-h1, `revealjs` slide boundaries move with heading levels, a fragment-repo's
-`{#sec-...}` ids must survive a restructure or a page split, and Quarto's own
-responsive navbar already collapses to a hamburger menu on narrow screens.
+h1, `revealjs` slide boundaries move with heading levels, and a
+fragment-repo's `{#sec-...}` ids must survive a restructure or a page split.
+The navbar test is structural (does this dropdown have a sibling), never a
+question of screen width or how much room the bar has.
 
 ## Challenge ambiguous phrasing and terminology in review
 

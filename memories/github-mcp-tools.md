@@ -1219,7 +1219,7 @@ GitHub refuses both merge routes the MCP server offers once it treats a PR as pa
 `merge_pull_request` returns `403 Merging stacked PRs via this endpoint is not supported. Use the asynchronous merge endpoint instead.`,
 and `enable_pr_auto_merge` returns `Auto-merge is not supported for stacked pull requests.`
 Measured on Morrison-Lab/mln#164, 2026-09-28: the bottom of a five-PR stack, based on `main`, fully clean, and still refused.
-The user merged it with the web UI's Merge button, which uses the asynchronous endpoint.
+The user merged it with the web UI's Merge button.
 
 - **Do:** when a merge you are authorized to make is refused this way, report it as ready and link it for the user to click Merge.
 - **Do:** say which other PRs in the stack will hit the same refusal, so the user expects one click per PR.

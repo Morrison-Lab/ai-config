@@ -767,7 +767,10 @@ This grants no merge authority: the strict merge policy below still applies.
   A PR that also touches content (lecture notes, assessments, package code) is not infrastructure.
   Every PR in `Morrison-Lab/gha` or `Morrison-Lab/ai-config` counts as infrastructure,
   including one that changes what their consumers run:
-  both are infrastructure repos (user, 2026-09-28, "let's say that everything in gha is infra"; "so is ai-config").
+  both are infrastructure repos,
+  which is why ai-config already carries its own standing grant
+  (user, 2026-09-28: "let's say that everything in gha is infra",
+  "so is ai-config", "that's why we have a standing mwc for ai-config").
   `hooks/no-unauthorized-merge.py` cannot classify a diff yet ([#4039](https://github.com/Morrison-Lab/ai-config/issues/4039)),
   so where the hook is active, clear it with `ALLOW_MERGE=1` on that one merge command, and say in the reply why the PR qualified.
   Do not enable a session-wide `/mwc` for it: that marker authorizes every merge in the session, not only infrastructure PRs.

@@ -106,9 +106,16 @@ state.)
 
 ## Site navigation
 
-The same test applies one level up, to a site's navbar instead of a page's
-headings, and it is a test on **each** dropdown, not on whether the navbar
-has any.
+The same test applies one level up, to a site's navbar and sidebar instead of
+a page's headings.
+Two separate questions follow from that: whether a grouping earns its place
+(below), and, once it does, what order its items and its groups come in
+(further below).
+
+### Grouping
+
+The grouping test applies to **each** dropdown or sidebar section, not to
+whether the navbar or sidebar has any.
 A dropdown is a grouping level, so it needs a sibling the same way a heading
 does: a dropdown grouping several pages into a real topical section is fine,
 and so are several such dropdowns side by side.
@@ -155,6 +162,91 @@ page names --- Notation, Proof Writing, Algebra, Calculus, Linear Algebra,
 Vector Calculus --- behind the site's only dropdown, exactly the one-member
 grouping this section's test rejects.
 Read this as that history, not as mds's current state.)
+
+The same grouping test carries over to a sidebar's collapsible sections, not
+just a navbar's dropdowns: group pages into a section only where the site's
+topics actually fall into several such groups, and never collapse a sidebar
+to a single catch-all section, the same defect a lone catch-all navbar
+dropdown has.
+A site can use dropdowns, a sidebar, or both for the same grouping --- the
+test is about whether the grouping divides something, not about which
+control renders it.
+
+Showing the same grouping in both a sidebar and navbar dropdowns is fine, but
+the target is that the two lists **agree** --- Quarto does not derive one from
+the other, so nothing enforces that on its own.
+A `# keep in sync with navbar.left` comment beside the sidebar's YAML (and its
+mirror, `# keep in sync with the sidebar`, beside the navbar's) is only a
+reminder to check, not the thing being checked: a comment added once and never
+revisited satisfies "there is a comment" forever, even after the two lists
+have drifted apart, which is exactly the gap a rule stated as "mark it" leaves
+open.
+An edit to either list that leaves the other unchanged violates this rule,
+even with the comment sitting right next to that edited list.
+So treat a change to the navbar's list as an occasion to diff it against the
+sidebar's list, and a change to the sidebar's list as an occasion to diff it
+against the navbar's, before committing or approving either change.
+The comment is there only to make that diff easy to find, not to replace it.
+
+- **Do:** treat a dropdown or a collapsible sidebar section as optional ---
+  you may group pages into one, or both, where the site's pages fall into
+  real topical groups, but neither is required.
+- **Do:** keep a mirrored navbar dropdown and sidebar section in agreement,
+  and diff one against the other whenever either changes --- not just add a
+  keep-in-sync comment and stop there.
+- **Don't:** collapse a sidebar to a single catch-all section --- the same
+  defect a single catch-all navbar dropdown has.
+- **Don't:** treat a keep-in-sync comment as having discharged the rule; the
+  rule is that the lists agree, and a comment with no diff behind it can sit
+  beside two lists that have already drifted apart.
+
+(User clarification, 2026-09-28: "if there's natural grouping, you can use
+drop-downs to group them, both in sidebars and menu bars.")
+
+### Order
+
+Grouping is not the only question a navbar or sidebar raises --- once the
+items and the groups are settled, their order is a separate question, and it
+has the same answer as the rest of this document: derive it, don't inherit
+it.
+Menu items follow "the natural progression of topics as much as possible",
+so each item comes after what it builds on.
+Extending that rule to sidebar items and to the groups themselves is
+inferred, not quoted: the directive names only "menu bars", but the user's
+separate sidebar clarification above treats a sidebar and a navbar as the
+same kind of thing for grouping purposes, and nothing suggests ordering
+should split the two where grouping does not.
+Find that progression from the dependencies among the pages --- which page's
+content a reader needs before another page's makes sense --- rather than from
+the order the pages were created in or from the alphabet, neither of which
+tracks what a reader needs first.
+"As much as possible" is doing real work, not softening the rule into
+politeness.
+When no dependency runs between two items in either direction, this rule has
+nothing to say about their relative order.
+That is the case where neither page's content is a prerequisite for the
+other's.
+Creation order, the alphabet, or any other tiebreak is fine for that pair.
+
+- **Do:** derive a menu's order, item by item and group by group, from the
+  dependencies among the pages it lists, so each item comes after the
+  content it builds on.
+- **Do:** leave the order between two items undictated when neither depends
+  on the other, rather than forcing a dependency-based rationale where none
+  exists.
+- **Don't:** order menu items by creation date or alphabetically and call
+  that the natural order for items where a real dependency exists --- neither
+  tracks what a reader needs first.
+
+(Repo owner directive, 2026-09-28: "the ordering of items in the menu bars
+should follow the natural progression of topics as much as possible."
+Example, inferred: `Morrison-Lab/mds`'s navbar placed "Proof Writing" second
+--- ahead of "Algebra", "Calculus", "Linear Algebra", and "Vector Calculus"
+--- although the page's own worked example derives a linear-algebra result
+(the hat matrix's idempotence) and links into `linear-algebra.qmd` for the
+definitions and facts it uses, so a reader reached that example before the
+page introducing the objects in it.
+See `Morrison-Lab/mds`#13.)
 
 ## Page scope
 

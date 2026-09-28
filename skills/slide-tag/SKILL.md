@@ -53,6 +53,15 @@ echo "Commits being added:"
 git log --oneline <tag>..<target> | head -20
 ```
 
+Before sliding, confirm that every review this session requested or is waiting on for those commits' PRs has returned a verdict,
+and that no review check run on them is still pending.
+A PR can be merged by another session while this one is still waiting on its review, and a slide publishes that unreviewed change to every consumer of the tag;
+see [`revert-premature-merge`](../../shared/workflow/revert-premature-merge.md)'s pending-review section.
+The gate applies however the slide is done:
+Morrison-Lab/gha slides by dispatching its `slide-major-tag.yml` workflow rather than by the `git push` in step 4,
+and gha's own `CLAUDE.md` tag-slide bar does not yet carry this gate
+([Morrison-Lab/gha#977](https://github.com/Morrison-Lab/gha/issues/977)).
+
 ### 4. Slide the tag
 
 ```bash

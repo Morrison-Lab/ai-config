@@ -351,6 +351,27 @@ invalid escapes.
 - **Don't:** silence the flagged escape by doubling it while leaving the
   literal non-raw, which repairs the visible half and hides the other.
 
+The same valid-escape trap hits a regex word boundary, and there it changes
+what the pattern matches rather than how a docstring reads.
+`\b` in a non-raw string, f-strings included, is a backspace character, so
+`f'<(?:{tags})\b'` compiles to a pattern that never matches real HTML, and
+no warning fires.
+The boundary is needed at all because an alternation of tag names is a
+prefix match: `<(?:p|h[1-6]|li)[^>]*>` matches `<pre ...>` through its `p`.
+(Morrison-Lab/mds#22 and Morrison-Lab/gha#976, 2026-09-28: the defect was
+a MISSING `\b`, which let `<p` match `<pre>` and swallow widget JSON up to
+the next `</p>`, hanging a preview highlighter.
+The backspace trap was avoided while writing the fix: it uses `rf''`,
+because a plain f-string would have turned the new `\b` into a backspace.
+See [`reviewing-prs.md`](reviewing-prs.md) for the review side.)
+
+- **Do:** end a tag-name alternation with `\b`, and write the literal as
+  `r''` or `rf''` so the `\b` reaches `re` intact.
+- **Do:** test the pattern against a tag that shares a prefix with one in the
+  alternation, such as `<pre>` for `p`.
+- **Don't:** interpolate tag names into a plain `f''` pattern that carries
+  `\b`, where it silently becomes a backspace.
+
 ## `Path.write_text` writes CRLF on Windows, and `read_text` hides it
 
 `pathlib.Path.write_text("a\nb\n")` writes `b"a\r\nb\r\n"` on Windows, so any tool that reads those bytes without normalizing --- `grep`, `awk`, a shell anchor match, a later regex against LF-normalized text --- sees content the script never intended to write.

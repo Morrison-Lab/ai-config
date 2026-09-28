@@ -295,7 +295,7 @@ So whatever that field means for the target, it did not give *this* session a ro
 This is also the case where this file's standing advice for a quiet peer, to ask the session directly (`SendMessage` to its id), has no route.
 Fall back to observation instead.
 What was observed working from the cloud is polling `get_session`:
-between two reads, `session_status` went from `IDLE` to `RUNNING`, `updated_at` moved, and the title changed once the user pasted tasks into the local session.
+between two reads, `session_status` went from `IDLE` to `RUNNING`, `updated_at` moved, and the title changed.
 Watching the forge for the PR the local session opens is the natural complement, since that is where its work lands.
 
 A second wall sits behind the first.
@@ -303,7 +303,8 @@ The cloud session runs in its own container, so it has no access to the user's `
 That is inferred from where the session runs, not measured.
 On that reading, a change to local settings (such as `autoMode.environment`) has to be made on the user's machine.
 
-- **Do:** tell the user plainly, on the first failed send, that this session cannot reach their Remote Control session, and say why.
+- **Do:** tell the user plainly, on the first failed send, that this session cannot reach their Remote Control session, and say why,
+  as the `ListAgents` description's account rather than a confirmed cause.
 - **Do:** hand them paste-ready instructions (the exact commands or the exact settings edit) to run in the local session themselves.
 - **Do:** follow the local session by polling `get_session` (`session_status`, `status_bucket`, `updated_at`, title) and by watching the forge for the PR it opens.
 - **Don't:** read `get_session`'s `connection_status: "connected"`, or `cross_session_inbound: "available"`, as reachability from this session;
@@ -313,11 +314,11 @@ On that reading, a change to local settings (such as `autoMode.environment`) has
   and on the `ListAgents` description's account no spelling can fix it.
 
 (Measured 2026-09-28 in a claude.ai cloud session, ai-config#4064.
-The first `get_session` on the user's session returned `connection_status: "connected"`, `session_status: IDLE`, origin `claude_code_cli`, and the title "xps8950-frolicking-rabbit".
+The first `get_session` on the user's session returned `connection_status: "connected"`, `session_status: IDLE`, origin `claude_code_cli`, and the session's default title (the machine name).
 `ListAgents` listed only the cloud session's own subagent.
 `SendMessage` failed with "No agent named '<title>' is reachable" by the session title and again by the raw `session_...` id.
 A second `get_session` at 10:52 UTC returned `connection_status: "connected"`, `session_status: RUNNING`, `status_bucket: WORKING`, `updated_at` 10:51:12Z, `environment_kind: "bridge"`, tags `["remote-control-repl"]` and `external_metadata.cross_session_inbound: "available"`,
-and the title had changed to "Settings merge and MCMC books PR" after the user pasted tasks into it.
+and the title had changed to "Settings merge and MCMC books PR" after the user pasted tasks into it (per the user).
 `ListAgents` from the cloud session still listed only subagents.)
 
 ## A subagent that has REPORTED COMPLETION can still be resumed, so its worktree is not yours to work in

@@ -544,3 +544,43 @@ consuming repos.
 (Both measured 2026-09-15 on
 [machine_learning_lecture_materials#2](https://github.com/Morrison-Lab/machine_learning_lecture_materials/pull/2);
 tracked as [ai-config#3717](https://github.com/Morrison-Lab/ai-config/issues/3717).)
+
+## `Rscript pipe is being closed (os error 232)` from Quarto means read the full log for the missing-package message
+
+`quarto render` shells out to an `Rscript` it resolves itself, and when that
+`Rscript` belongs to an R installation whose library lacks a package the
+render needs (`knitr`, `rmarkdown`), Quarto's own top-level error is
+
+```
+Error executing Rscript: The pipe is being closed (os error 232)
+```
+
+That line names the symptom (the child process's stdout pipe closed because
+Rscript exited early) rather than the cause, and reads like an OS-level or
+IPC fault --- nothing in it mentions a package.
+The actual reason is further down the same log, as an ordinary R
+`there is no package called 'knitr'` (or `rmarkdown`) error from the
+`Rscript` child before it exited.
+
+On a machine with more than one R installation, Quarto's own R discovery can
+resolve an `Rscript` whose library was never set up for this project ---
+independent of whichever R version `Rscript` on `PATH` would report.
+`QUARTO_R` overrides that resolution: point it at the `Rscript.exe` (or
+`Rscript`) belonging to the R installation that actually has the project's
+packages, and Quarto uses that one instead of whatever it would otherwise
+have picked.
+
+- **Do:** read the full render log past Quarto's own `Error executing
+  Rscript: ...` line rather than debugging the pipe/OS-error message itself
+  --- the real cause is the R error underneath it.
+- **Do:** set `QUARTO_R` to the correct `Rscript` path when a machine has
+  more than one R installation and Quarto is resolving the wrong one.
+- **Don't:** read "pipe is being closed (os error 232)" as an environment or
+  IPC problem to work around --- it is Quarto's generic wrapper for "the R
+  child process exited," and the specific reason is a missing-package error
+  a few lines earlier in the same log.
+
+(Measured 2026-09-28 on a Windows machine with multiple R installations,
+working in `Morrison-Lab/mln`; the local, machine-specific `QUARTO_R` path
+and R-version details live in that machine's own Claude Code project memory,
+not here, since they are not reusable across machines.)

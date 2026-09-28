@@ -182,9 +182,10 @@ _DENIAL_ISSUED: list[bool] = [False]
 # `NOT_CLEAN`, which a reviewer briefed in the payload's terms writes on its
 # verdict line too. Accepting only the prose form refused a genuinely clean
 # review (2026-09-28: three reviewer rounds on one diff, none recognized, and
-# the push was left for the user; ai-config#3991). `NOT[ _-]?CLEAN` is tried
-# before `CLEAN` so the negative form is never read as its own suffix, and the
-# trailing `\b` keeps `CLEANUP` from matching.
+# the push was left for the user; ai-config#3991). The alternation is anchored
+# right after `Verdict:`, so `NOT_CLEAN` can never match as `CLEAN`; the
+# trailing `\b` keeps `CLEANUP` from matching, and `_verdict_from_match` reads
+# only an exact `clean` (or `ready...`) as clean.
 VERDICT_LINE = re.compile(
     r"^[ \t]{0,3}(?:#{1,6}[ \t]*)?Verdict[ \t]*:[ \t]*(?:\*\*)?"
     r"(Ready for merge|Needs (?:more )?work|NOT[ _-]?CLEAN|CLEAN)\b",

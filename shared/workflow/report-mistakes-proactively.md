@@ -5,6 +5,13 @@ of scope for your current task.
 An observation that lives only in the conversation is lost when the session
 ends; the issue is what makes it durable.
 
+The same holds for an idea --- an improvement, a follow-up, a mechanism that
+would prevent a recurrence, or a proposal with nothing currently broken.
+File it the moment it is formed, on the same terms as a mistake:
+immediately, in the owning tracker, without waiting to be asked.
+See "An idea is filed the same way a mistake is" below for the boundary
+and the incident that produced this extension.
+
 Worked-example case records for the rules below live in
 [`report-mistakes-proactively.cases.md`](report-mistakes-proactively.cases.md), moved out of the auto-loaded context.
 
@@ -51,6 +58,93 @@ a product one.
    `CLAUDE.md`'s "Link PRs in tables" section covers the mechanics for any
    forge artifact, issues included: the link belongs in the comment itself,
    not merely in a later chat recap the PR thread never sees.
+
+## An idea is filed the same way a mistake is
+
+The procedure above is written around a mistake: something is wrong, and
+filing it is the obvious next step.
+An idea has no defect to point at --- nothing is broken, so filing reads as
+optional in a way a bug report does not.
+That reading is the gap this section closes: the Do above (file
+proactively) is a user directive, stated in exactly those terms, and it
+covers ideas as much as mistakes.
+
+A `⚠️ **FLAG**` or a `💡 **OFFER**` (per `CLAUDE.md`'s chat-output-tagging
+convention) is a heads-up in chat, not a filing.
+Ending either one with the idea still unfiled repeats the exact failure
+"Filing is not gated on approval" above already names for a noticed
+mistake --- a proposal floated in conversation dies with the conversation,
+and "worth doing, say the word" just moves the filing decision onto the
+user.
+
+- **Do:** file a concrete, actionable idea --- a mechanism, an improvement, a
+  follow-up --- the moment it is *noticed*, in the owning tracker, and
+  mention it in the reply with the issue link.
+  (User directive, verbatim: "cai: always file ideas proactively.")
+- **Don't:** raise an idea only as a chat-only `⚠️ **FLAG**` or
+  `💡 **OFFER**`, or wait for the user to ask whether it is worth filing,
+  before recording it.
+  This is keyed to *noticing*, not to *saying*: noticing a defect, in this
+  repo or another, and leaving it unfiled is the violation, whether or not
+  it was ever mentioned in the reply.
+  Staying silent about a noticed defect is the same violation, not a way to
+  comply with it --- a rule worded around what gets said, rather than what
+  gets noticed, rewards silence about exactly the defects a session would
+  rather not deal with.
+  (Inferred from the incidents below: nothing in the existing rules names
+  this failure directly, because an idea reads as outside the "mistake"
+  rules above.)
+
+**The boundary.**
+This covers a concrete, actionable idea that is the lab's
+own work to do --- a mechanism, a follow-up, an improvement with a next step.
+It does not license filing passing speculation, a musing with no shape yet,
+or someone else's roadmap item.
+[`triage-backlog`](triage-backlog.md) remains the counterweight for volume,
+exactly as it is for mistakes: a filed idea still gets triaged to
+`P1`/`P2`/`P3` or closed as not-planned, and that pass --- not the filing
+moment --- is where volume gets decided.
+
+(Directive from the user, 2026-09-28, verbatim: "cai: always file ideas
+proactively."
+The incident: a session found that the lab's website template,
+`Morrison-Lab/qwt`, lacked the `ai-config` plugin declaration, so
+repositories created from it lacked it too.
+It ended its reply with a chat-only `⚠️ FLAG` proposing two ideas ---
+sweeping existing repos for the missing declaration, and adding a
+mechanism to propagate template changes into repos already created from a
+template --- and filed neither.
+The user had to ask "should we file any of those ideas about templates and
+repo sweeps?" before the session filed them, as
+[ai-config#4035](https://github.com/Morrison-Lab/ai-config/issues/4035) and
+[ai-config#4036](https://github.com/Morrison-Lab/ai-config/issues/4036).
+`hooks/flag-cop-out-offer.py` did not fire on the FLAG, because it matches
+an offer's closing phrasing, not an idea proposed and left unfiled;
+neither `no-unfiled-finding.py` nor `flag-unfiled-issue.py` fired either,
+because both are keyed to a *mistake* being described as unfiled, and a
+proposal is not phrased as a defect.
+`hooks/flag-idea-without-issue.py` is the mechanism this incident
+prompted: see its docstring for what it does and does not catch.)
+
+(A second incident, minutes later on the same day, shows the gap is not
+limited to a FLAG or an OFFER block, because the violation is noticing and
+not filing, whatever the reply's shape.
+The orchestrator told the user, in a plain ✅ **ANSWER** block, that a
+`pds` section carrying informal, prose-only definitions "was ported from
+rme's notation chapter nearly verbatim."
+Saying that is itself evidence the session had *noticed* that
+`Morrison-Lab/rme` carried the same defect; it filed nothing for `rme`.
+The user asked "when you noticed issues, aren't you supposed to file them
+immediately?
+does that apply to the informal definitions you found in rme?"
+It was then filed as
+[rme#1209](https://github.com/Morrison-Lab/rme/issues/1209).
+No hook covers this one: an ANSWER block carries no marker for
+`flag-idea-without-issue.py` to key on, and the noticing happened in
+plain prose describing one repo's content while working in another, which
+is not lexically distinguishable from an ordinary factual aside.
+The rule itself still covers it, because the rule is keyed to noticing a
+defect, not to how --- or whether --- that noticing gets put into words.)
 
 ## Filing is not gated on approval
 
@@ -714,3 +808,13 @@ So when you cite your own earlier filing as an example, re-read that filing agai
   Every medium enumerated above is a thing, so nothing here fires on a
   behaviour, and the deliverable differs too: a filed issue there, one
   sentence at the actionable moment here.
+- [`no-cop-out-offers`](no-cop-out-offers.md) governs a 💡 **OFFER** whose
+  work already has authorization to proceed --- the failure there is asking
+  permission for something that needs none.
+  "An idea is filed the same way a mistake is" above governs the same
+  chat-output-tagging convention's ⚠️ **FLAG** and 💡 **OFFER** one step
+  earlier: before authorization is even the question, the idea itself has to
+  exist somewhere durable.
+  The two compose: file the idea, and only then does
+  whether to act on it become the question `no-cop-out-offers` covers.
+  [`triage-backlog`](triage-backlog.md) is the counterweight for both.

@@ -757,11 +757,11 @@ A new symptom of a tracked defect family is a comment on that family's issue, no
 `scripts/triage-backlog.py` is the instrument and the `triage` skill runs it.
 (Measured 2026-09-03: 15 to 410 open issues in six weeks with 14 not-planned closes in the repo's history, ai-config#3134.)
 
-## If you see something, say something — file an issue for every noticed mistake
+## If you see something, say something --- file an issue for every noticed mistake or idea
 
 [shared/workflow/report-mistakes-proactively.md](shared/workflow/report-mistakes-proactively.md)
 
-The proactive counterpart to issue-first above: when a mistake shows up in any medium (code, prose, AI-config files, `gha` workflows, snapshot and other generated files, or anything else),
+The proactive counterpart to issue-first above: when a mistake shows up in any medium (code, prose, AI-config files, `gha` workflows, or other generated files),
 even if it is out of scope for the current task, flag it in chat (`⚠️ **FLAG** ---`),
 and file a tracking issue immediately, in a repo we administrate.
 Never file autonomously in an external repo; the upstream-issues ladder governs that case.

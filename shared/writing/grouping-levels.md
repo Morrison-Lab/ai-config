@@ -54,10 +54,14 @@ lower-level content --- a `# References` heading following a run of `##`
 sections reads as a step back up the outline, not a new top-level part.
 
 **Exception:** a trailing, unnumbered References or Further-reading section
-may stand alone at the same level as the page's content sections, even
-though it never gets a sibling.
-It closes the document rather than organizing it, so the "needs a sibling"
+may stand alone at the content-section level --- `## References`, a sibling
+of the page's other `##` sections, never a `#` --- even though it never gets
+a sibling of its own.
+It closes the document instead of organizing it, so the "needs a sibling"
 test does not apply to it.
+This exception licenses a `##` at that level with no sibling; it says nothing
+about the `# References` shape the paragraph above already rules out, which
+stays wrong regardless of where in the document it sits.
 
 ### Preserve crossref ids and anchors when restructuring
 
@@ -76,7 +80,7 @@ auto-generated slug the restructuring removed:
   `{#sec-...}` id near it.
 - Where a heading carries no explicit id, promoting or demoting it changes
   Pandoc's auto-generated slug, which silently breaks any link built from
-  the old text rather than from a stable id.
+  the old text instead of from a stable id.
 
 ### In `revealjs` output, heading levels are slide boundaries
 
@@ -93,20 +97,25 @@ most often.
 one first-level header; should the header levels for that page be adjusted?
 in general, don't headers only make sense in a document when there are
 multiple at the same level (nested within the prior level)?"
-Answer: yes.)
+Answer: yes --- as of 2026-09-28, before `Morrison-Lab/mds`#11's commit
+`c21197a` fixed it, `_algebra.qmd` was exactly this shape: a lone
+`## Elementary Algebra` wrapping every `### Equalities`, `### Inequalities`,
+and so on.
+Read this section's worked example as that history, not as mds's current
+state.)
 
 ## Site navigation
 
-The same test applies one level up, to a site's navbar rather than to a
-page's headings, and it is a test on **each** dropdown, not on whether the
-navbar has any.
+The same test applies one level up, to a site's navbar instead of a page's
+headings, and it is a test on **each** dropdown, not on whether the navbar
+has any.
 A dropdown is a grouping level, so it needs a sibling the same way a heading
 does: a dropdown grouping several pages into a real topical section is fine,
 and so are several such dropdowns side by side.
 What fails the test is a dropdown with no sibling of its own kind --- a navbar
 whose only items are "Home" plus one catch-all dropdown ("Notes",
-"Chapters"), where that single dropdown groups *everything else on the site*
-rather than dividing anything.
+"Chapters"), where that single dropdown groups *everything else on the
+site* and divides nothing.
 That is the lone-wrapper-heading defect one level up: a grouping level with
 exactly one member.
 
@@ -139,18 +148,19 @@ shouldn't we only use drop downs when the menu bar would be too cluttered
 otherwise?"
 Answer, refined after a follow-up clarification: "it's also ok to group
 pages into sections with drop-down menus; we just don't want the only menu
-bar items to be 'home' and 'chapters' etc" --- see `Morrison-Lab/mds`'s
-`_quarto-website.yml`, whose `navbar.left` renders as "Home | Notes" with a
-dropdown arrow, hiding six page names --- Notation, Proof Writing, Algebra,
-Calculus, Linear Algebra, Vector Calculus --- behind the site's only
-dropdown, which is exactly the one-member grouping this section's test
-rejects.)
+bar items to be 'home' and 'chapters' etc" --- as of 2026-09-28, before
+`Morrison-Lab/mds`#11's commit `18734ee` fixed it, `_quarto-website.yml`'s
+`navbar.left` rendered as "Home | Notes" with a dropdown arrow, hiding six
+page names --- Notation, Proof Writing, Algebra, Calculus, Linear Algebra,
+Vector Calculus --- behind the site's only dropdown, exactly the one-member
+grouping this section's test rejects.
+Read this as that history, not as mds's current state.)
 
 ## Page scope
 
-The test above also runs in reverse, on a page rather than on a section
+The test above also runs in reverse, on a page instead of on a section
 within it: a title, or a table of contents, can signal that a page is
-carrying two topics rather than one --- a grouping that never earned its
+carrying two topics instead of one --- a grouping that never earned its
 place because it should not exist at all.
 
 Length alone is a weak signal.
@@ -169,12 +179,13 @@ Three signals are reliable instead:
 - **A vague catch-all title**, such as "Basic Statistical Methods", that
   names no specific concept a reader could look up.
 - **A table of contents with many top-level sections that do not build on
-  each other** --- each section standing alone rather than the later ones
-  depending on the earlier ones.
+  each other** --- each section stands alone; none of the later ones
+  depends on an earlier one.
 
 Splitting a page adds a navbar entry, so re-apply the navigation test above
-after a split: past what a flat bar can hold, group the new pages by topic or
-move them to a sidebar rather than defaulting straight to a dropdown.
+after a split: group the new pages into topical dropdowns where that fits
+the site's structure, and avoid reducing the navbar to a single catch-all
+dropdown the way the test above rules out.
 Where another site links to the page as a submodule, its `#id` anchors move
 with the content that carries them, so every cross-page and cross-repo link
 into the split page needs updating, not just the navbar entry.
@@ -182,8 +193,8 @@ into the split page needs updating, not just the navbar entry.
 - **Do:** split a page whose title joins two independent nouns with "and",
   or whose title is a vague catch-all, or whose sections do not build on
   each other.
-- **Do:** re-check the navbar test above after a split, rather than
-  defaulting to a dropdown for the new pages.
+- **Do:** re-check the navbar test above after a split, instead of assuming
+  the new pages need a dropdown of their own.
 - **Don't:** split a page merely because its title or table of contents is
   long --- check for independence, vagueness, or non-building sections
   first.

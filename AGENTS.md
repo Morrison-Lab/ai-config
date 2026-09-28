@@ -703,6 +703,13 @@ This grants no merge authority: the strict merge policy below still applies.
 
 (User directive, 2026-08-23: "always yes".)
 
+The push permission extends beyond Morrison-Lab:
+non-force pushes to any repository the owner has push access to,
+new branches included,
+for every agent and every project
+([`standing-authorizations`](shared/workflow/standing-authorizations.md), 2026-09-28).
+Force pushes still need explicit permission for the specific push.
+
 ## Strict Merge Control Policy
 
 - **NEVER merge any Pull Request or Merge Request without explicit user permission.**

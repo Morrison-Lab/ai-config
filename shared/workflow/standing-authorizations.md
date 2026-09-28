@@ -20,3 +20,6 @@ Granted by the user (dougmor@gmail.com) on 2026-09-28, for all sessions and all 
 - **Do:** push, and open the PR, without asking,
   and say in the same reply what you pushed and where.
 - **Don't:** read "push" as covering a force push, a merge, or bypassing a tool's permission check.
+
+The push grant applies to every agent, so `AGENTS.md`'s "Default to action without asking" states it too;
+the `.claude/settings.json` grant concerns Claude Code alone.

@@ -46,12 +46,21 @@ In every session --- at session start, and again periodically during long sessio
    `claude plugin update <plugin>` (verified present in `claude plugin --help` output on this machine) is the remedy once staleness is confirmed --- run it per scope (`claude plugin update ai-config@Morrison-Lab`, and `claude plugin update --scope project ai-config@Morrison-Lab` from each affected project/worktree), then restart the session to pick up the refreshed cache path.
    [ai-config#2439](https://github.com/Morrison-Lab/ai-config/issues/2439) tracks making this check itself part of the session-start sweep rather than something a session discovers by symptom.
 
+   **When a guard's refusal matches the shape of an already-fixed issue, check the installed build before treating it as a live bug or a classifier problem to work around.**
+   Measured 2026-09-28 (Claude Code desktop, `Morrison-Lab/mln`): `hooks/no-push-without-self-review.py` refused a push after a foreground `adversarial-reviewer` had returned its CLEAN verdict via `SubagentHandback`, and `ALLOW_UNREVIEWED_PUSH=1` was then denied by the auto-mode classifier's `[Safety Bypass Flag]` --- the exact deadlock shape [`mistake-patterns.md`](../../memories/mistake-patterns.md) Pattern 43 already names.
+   The session re-dispatched the reviewer twice more (roughly 160k tokens each) before checking versions.
+   The installed plugin build was `6a4f97ebfc79` against `origin/main`'s `09fdd8c0`: grepping the cached hook for `SubagentHandback` returned 0 hits, where `origin/main`'s copy returns 21 --- the fix for [ai-config#3945](https://github.com/Morrison-Lab/ai-config/issues/3945) (closed 2026-09-26).
+   `claude plugin marketplace update Morrison-Lab` then `claude plugin update ai-config@Morrison-Lab` advanced the pin, and a plain `git push` succeeded immediately afterward in the same session.
+   See [`mistake-patterns.cases.md`](../../memories/mistake-patterns.cases.md), Pattern 43's 6th occurrence, for the full record --- including a data point against this file's own restart requirement two paragraphs above, which a single measurement does not settle either way.
+
    - **Do:** count commits from the active scope's pinned `gitCommitSha` to `origin/main`, rather than trusting the auto-update mechanism to have already run.
    - **Do:** run `claude plugin update` (per scope) once staleness is confirmed, then restart to apply it.
    - **Do:** confirm a CLI remedy exists (`claude plugin --help`) on the machine in question before writing that none does.
+   - **Do:** when a guard's refusal resembles a specific fixed issue, grep the cached hook for a string that issue's fix introduced, before re-dispatching an expensive reviewer or reaching for an override.
    - **Don't:** read "auto-updates at session start" as meaning the currently-running session's cache is already current --- that is exactly the claim this check tests.
    - **Don't:** read `installed_plugins.json`'s `lastUpdated` field as a freshness measure.
      It says when the pin was last written, and nothing about how many commits `origin/main` has gained since the pinned SHA.
+   - **Don't:** re-run an expensive dispatch against a guard, or reach for its override, without first checking whether the installed plugin is current for the specific behaviour the guard is enforcing.
 
    `shared/`, `hooks/`, and `memories/` have no plugin-equivalent replacement yet ([#2352](https://github.com/Morrison-Lab/ai-config/issues/2352)), so anyone relying on `~/.claude/shared`, `~/.claude/hooks`, or `~/.claude/memories` today is on a symlink or copy placed by an install predating that change, or by a manual step --- `bootstrap.sh` no longer places any of them.
    **`skills/` belongs in that sweep too, and the plugin serving them is not a reason to skip it.**

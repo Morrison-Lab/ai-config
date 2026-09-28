@@ -89,6 +89,7 @@ CASES = [
     ),
     ([TOOL, say("I haven't filed an issue about it.")], True, "haven't filed an issue alone blocks"),
     ([TOOL, say("I can file an issue for the flaky test.")], True, "i can file an issue statement blocks"),
+    ([TOOL, say("I haven\u2019t filed an issue about it.")], True, "curly-apostrophe haven't filed blocks"),
     (
         [TOOL, say("The memory entry would cover this. Just say the word.")],
         True,
@@ -132,13 +133,13 @@ CASES = [
     ),
     (
         [TOOL, say("Since this is already tracked, I haven't filed a new issue for it.")],
-        False,
-        "tracker explanation before the not-filed clause does not block",
+        True,
+        "an unlinked 'already tracked' decline blocks",
     ),
     (
         [TOOL, say("Because #123 already covers this, I didn't file a duplicate issue.")],
         False,
-        "duplicate explanation before a didn't-file clause does not block",
+        "a #N reference before a didn't-file clause does not block",
     ),
     (
         [TOOL, say(
@@ -168,10 +169,52 @@ CASES = [
     (
         [TOOL, say(
             "I haven't filed an issue for the other hooks (e.g. the Stop guards) "
-            "because gha#981 already covers them."
+            "because Morrison-Lab/gha#981 already covers them."
         )],
         False,
         "an e.g. abbreviation does not end the sentence",
+    ),
+    (
+        [TOOL, say("Because Morrison-Lab/gha#981 covers this, I didn't file a duplicate.")],
+        False,
+        "owner/repo#N decline does not block",
+    ),
+    (
+        [TOOL, say("Because Morrison-Lab/gha#981 covers this, I didn't file a duplicate issue.")],
+        False,
+        "owner/repo#N decline naming a duplicate issue does not block",
+    ),
+    (
+        [TOOL, say(
+            "I didn't file an issue: "
+            "https://gitlab.com/group/proj/-/issues/12 covers it."
+        )],
+        False,
+        "a GitLab issue URL in the same sentence does not block",
+    ),
+    (
+        [TOOL, say(
+            "The retry loop already had a lock, and I have not filed an issue "
+            "about the race condition, since I want to keep this PR small."
+        )],
+        True,
+        "comma-joined unrelated 'already' does not excuse the clause",
+    ),
+    (
+        [TOOL, say(
+            "Because we already discussed this earlier, and here is context; "
+            "I have not filed an issue for the timeout bug, but that is intentional for now."
+        )],
+        True,
+        "semicolon-joined unrelated 'already' does not excuse the clause",
+    ),
+    (
+        [TOOL, say(
+            "See https://github.com/Morrison-Lab/gha/issues/981 for context. "
+            "I haven't filed an issue about the lint gap."
+        )],
+        True,
+        "a link in a different sentence does not excuse the clause",
     ),
     (
         [TOOL, say("Since the test passes now, I haven't filed an issue about it.")],

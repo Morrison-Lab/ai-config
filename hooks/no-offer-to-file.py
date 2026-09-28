@@ -50,18 +50,23 @@ PATTERNS = [
 RX = re.compile("|".join(PATTERNS), re.I)
 
 # "I haven't filed an issue" is an offer in waiting unless the same sentence
-# says why none is needed. The reason can come before or after the clause
-# ("Since this is already tracked, I haven't filed ..."), so it is checked in
-# code rather than by a one-sided lookahead. The window is the sentence, not
-# the line: a paragraph has no internal newlines, so a line-wide scan let an
-# unrelated "already" three sentences away excuse the clause.
+# cites the existing tracker concretely: an issue/PR/MR URL, owner/repo#N, or
+# #N. An excuse KEYWORD ("already", "tracked", ...) is not enough -- it can sit
+# in an unrelated clause, and every narrower keyword window (forward-only,
+# line, sentence) was evaded by the next-coarser clause join. A link is the
+# thing a legitimate decline has and an unfiled observation does not. The
+# window is the sentence: a paragraph has no internal newlines, so a line-wide
+# scan would let a link three sentences away excuse the clause.
 NOT_FILED_RX = re.compile(
     r"i (haven['\u2019]t|have not|didn['\u2019]t|did not) (yet )?file[d]? "
     r"(an?|the) [^.!?,;\n]{0,40}?\b(issue|follow-?up|bug)(?![\w-])",
     re.I,
 )
-NOT_FILED_EXCUSE_RX = re.compile(
-    r"\b(already|duplicate|dupe|covers|covered|tracks|tracked)\b", re.I
+TRACKER_REF_RX = re.compile(
+    r"https?://[^\s/]+/[^\s]*?/(issues|pull|pulls|merge_requests)/\d+"
+    r"|\b[\w.-]+/[\w.-]+#\d+\b"
+    r"|(?<![\w/#&])#\d+\b",
+    re.I,
 )
 # A sentence ends at a newline, or at terminal punctuation followed by
 # whitespace or the end of text -- so the dots inside a URL
@@ -88,7 +93,7 @@ def find_offer(prose):
     if hit:
         return hit
     for m in NOT_FILED_RX.finditer(prose):
-        if not NOT_FILED_EXCUSE_RX.search(sentence_around(prose, m.start(), m.end())):
+        if not TRACKER_REF_RX.search(sentence_around(prose, m.start(), m.end())):
             return m
     return None
 

@@ -41,6 +41,7 @@ gh pr view N --json reviews --jq '.reviews[] | select(.state == "CHANGES_REQUEST
 gh api repos/<owner>/<repo>/pulls/N/comments --jq '.[] | "\(.path):\(.line // .original_line // "?") \(.user.login) \(.body)"'
 ```
 A `CHANGES_REQUESTED` state is blocking regardless of whether an automated re-review later says "Ready for merge" --- that bot verdict doesn't clear a human's own review state, which only the human (or an explicit dismissal) can resolve.
+It feeds the merge gate directly, so it binds under `mwc` as much as under any other grant.
 The unfiltered listing comes first: the state filter answers only whether a review *state* blocks the merge button, which the forge lets `CHANGES_REQUESTED` alone do.
 
 - **Do:** read every formal review's state and body, whoever posted it, and treat a finding in a review body --- a collapsed suppression block included --- as blocking.

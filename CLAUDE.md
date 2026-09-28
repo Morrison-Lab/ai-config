@@ -33,11 +33,9 @@ Detail, rationale, and cases: [`shared/writing/record-pattern-and-anti-pattern.m
 
 ## No empty promises
 
-[`shared/workflow/no-empty-promises.md`](shared/workflow/no-empty-promises.md)
-
 A commitment about your own future behaviour ships an implemented mechanism in the same turn (a memory entry at minimum, a hook, a filed issue, or an armed wake for an owed action), or is not made;
 `hooks/no-empty-promise.py` guards it.
-Detail, rationale, and cases: [`shared/workflow/no-empty-promises.rationale.md`](shared/workflow/no-empty-promises.rationale.md).
+Detail, rationale, and cases: [`shared/workflow/no-empty-promises.md`](shared/workflow/no-empty-promises.md).
 
 ## Generalize instructions to every AI agent by default
 
@@ -231,11 +229,11 @@ So `#316 session title convention`, not `PR #316 session title convention` or `P
 
 ## Re-check for latest review findings before reporting PR status
 
-[`shared/workflow/recheck-review-findings.md`](shared/workflow/recheck-review-findings.md)
-
 Before reporting on a PR, pull every review round, formal review state and body, and inline comment fresh;
 green checks, a login-filtered query, or a later clean bot verdict over a human's `CHANGES_REQUESTED` are not a clean review.
-Detail, rationale, and cases: [`shared/workflow/recheck-review-findings.rationale.md`](shared/workflow/recheck-review-findings.rationale.md).
+(A specific case of the standing **never assume;
+always verify** rule in `memories/preferences.md` --- confirm the verdict with a fresh query, don't recall it.)
+Detail, rationale, and cases: [`shared/workflow/recheck-review-findings.md`](shared/workflow/recheck-review-findings.md).
 
 ## Post in-chat feedback to the PR
 

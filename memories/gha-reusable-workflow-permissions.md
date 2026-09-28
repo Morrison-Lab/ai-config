@@ -336,3 +336,18 @@ Bypass mechanisms for emergency slides:
 - `slide-major-tag.yml` input `force: true`.
 - Environment/repo variable `ALLOW_BREAKING_SLIDE=1`.
 
+
+## `claude-code-review.yml@v2` can 403 on `commits/<sha>/check-runs` even when the caller grants `checks: read`
+
+Measured 2026-09-28 on `Morrison-Lab/mln`, [mln#221](https://github.com/Morrison-Lab/mln/pull/221): a consumer's `claude-review.yml` called `Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2` with `checks: read` set in its own `permissions:` block, and the review job still 403'd fetching `commits/<sha>/check-runs`.
+The reviewer turned that 403 into a `NOT_CLEAN` finding on a diff with nothing wrong in it --- the finding was the tooling failure, not the code.
+
+The caller's `permissions:` block is not the whole story for a reusable `workflow_call`: the **callee** (`claude-code-review.yml`) has its own `permissions:` block on the calling job, and at `@v2` that block lacked `checks: read` even though the workflow's steps call the check-runs endpoint.
+Granting the permission on the caller side cannot widen what the callee requests --- a `workflow_call` job's effective permission is the callee's own declared set, not the caller's.
+The fix was bumping the pin to `@v3`, where gha added `checks: read` to the callee (tracked as [`Morrison-Lab/gha#833`](https://github.com/Morrison-Lab/gha/issues/833)).
+
+- **Do:** when a review's only finding is a 403 on a GitHub API call the reviewer itself makes, check the **callee** workflow's pinned tag and its own `permissions:` block, not the caller's.
+- **Do:** bump the consumer's pin (`@v2` -> `@v3` or later) rather than widening the caller's `permissions:`, which cannot fix a callee-side gap.
+- **Don't:** assume a caller granting a permission is sufficient for a reusable workflow to use it --- the callee's own job-level `permissions:` is what the token is actually minted from.
+
+(ai-config UMS pass, 2026-09-28 09:18 PT, from a session on `Morrison-Lab/mln`.)

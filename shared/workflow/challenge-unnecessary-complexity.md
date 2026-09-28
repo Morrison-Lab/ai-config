@@ -54,6 +54,42 @@ Silence on a needlessly complex passage reads as "this is as simple as it
 needs to be" --- don't let a correct-but-bloated derivation or a
 three-layer wrapper through unchallenged just because it isn't wrong.
 
+## Your own work: an idiom is not a workaround
+
+The check applies to what you are about to build, not only to what you review.
+The check slips most often at the word "workaround".
+Call a language's idiomatic syntax a workaround,
+and the label alone seems to license machinery to remove it.
+Every agent briefed with that word then builds on it.
+
+- **Do:** before building tooling to eliminate a construct,
+  ask whether the construct is idiomatic in its ecosystem.
+  Weigh the machinery the tooling adds against what it removes.
+- **Do:** prefer the stock engine or tool plus the idiom,
+  and fix any real side benefit of the tooling with its own plain fix.
+- **Don't:** write "workaround" in a brief or PR for idiomatic syntax;
+  name what the construct does instead, so the reader can judge it.
+- **Don't:** spread new infrastructure to more files
+  before someone has asked whether it was needed at all.
+
+Measured case (Morrison-Lab/mln, 2026-09-28).
+Julia chunks ran through JuliaCall's stock knitr engine,
+which prints every top-level value.
+So assignments ended in `;`, Julia's own idiom for suppressing display.
+Briefs called the semicolons a workaround.
+A custom 50-line knitr engine was merged to remove them
+([mln#197](https://github.com/Morrison-Lab/mln/pull/197)),
+and two more PRs were opened to spread it
+([mln#202](https://github.com/Morrison-Lab/mln/pull/202),
+[mln#205](https://github.com/Morrison-Lab/mln/pull/205)).
+The user asked what was wrong with the semicolons.
+Nothing was.
+The engine's two real benefits had plain fixes:
+CI already set `R_LD_LIBRARY_PATH` for a libunwind segfault,
+and `global` in a loop handles soft scope.
+The engine was dropped, and mln#202 and mln#205 were closed unmerged.
+The same rule as [`dont-reinvent-wheel.md`](../principles/dont-reinvent-wheel.md), applied to your own work.
+
 ## Relationship to other rules
 
 [`challenge-redundant-content.md`](challenge-redundant-content.md) covers a

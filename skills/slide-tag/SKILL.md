@@ -45,6 +45,11 @@ git push origin <tag>   # PUSH
 
 ### 3. Show what's moving
 
+Before sliding, confirm that every review gating the commits being added has returned a verdict.
+A PR can be merged by another session while this one is still waiting on its review, and a slide publishes that unreviewed change to every consumer of the tag;
+see [`revert-premature-merge`](../../shared/workflow/revert-premature-merge.md)'s pending-review section.
+
+
 Display the before/after so the user can sanity-check:
 ```bash
 echo "Current: $(git log --oneline -1 <tag>)"

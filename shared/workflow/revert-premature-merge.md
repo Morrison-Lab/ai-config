@@ -105,3 +105,25 @@ So the revert was the strictly worse action, and
 [#3681](https://github.com/Morrison-Lab/ai-config/issues/3681) ->
 [#3682](https://github.com/Morrison-Lab/ai-config/pull/3682) closed all seven on
 `main` instead.)
+
+## A merge that lands while your review is pending is not the verdict
+
+Another session, or automation acting as the same account, can merge a PR that this session is still gating on a review.
+The merge ends nothing: the review was the evidence the change was safe, and it is still missing.
+Worse, the merge makes every follow-on action look unblocked, because each one only asks whether the change is on `main`.
+Sliding a floating tag is the costly one, since it publishes the unreviewed change to every consumer pinned to that tag.
+
+So keep the review running to its verdict, and hold anything that builds on the merge until the verdict is back.
+Then act on the verdict as though the merge had just happened:
+a clean verdict releases the held steps,
+and findings go through the choice the section above sets out, which for a fix to a live defect usually means a follow-up PR rather than a revert.
+
+- **Do:** let the pending review finish, and read its verdict before any follow-on step.
+- **Do:** hold follow-on actions, such as sliding a tag or repointing consumers, until that verdict is back.
+- **Do:** fix any findings in a follow-up PR (or revert, per the section above), filed against `main`.
+- **Don't:** treat the merge as the review verdict, or cancel the review because the PR is `MERGED`.
+- **Don't:** slide a tag over a merge whose review has not returned.
+
+(Morrison-Lab/gha#976, 2026-09-28: merged by the same account from another session while this session was waiting on an independent re-review.
+The re-review then found the fix addressed the symptom rather than the cause;
+see [`memories/reviewing-prs.md`](../../memories/reviewing-prs.md).)

@@ -34,6 +34,12 @@ The Jules reviewer's own misfires live in [`jules-review.md`](jules-review.md).
   #60 fixed the trigger;
   #61 was the zero-diff verification PR.
   On 2026-08-28, `Test Coverage` triggered the trusted reporter only after #60 reached `main`, and #61 then produced the expected child run and sticky coverage comment.)
+- **A `workflow_run` receiver's runs carry the default branch's `head_sha` and `head_branch`, whatever triggered them.**
+  A receiver that checks each PR's preview build therefore lists every run under `main`, so a run history filtered to `main` alternates pass and fail by PR and says nothing about `main` itself.
+  This defeats the "is it pre-existing?" recipe in [`debugging.md`](debugging.md) (filter `list_workflow_runs` to `main`) for exactly this class of workflow.
+  **Do:** read a receiver run's triggering PR from its `workflow_run` payload or its logs, and establish `main`'s status by reproducing on `main` directly: render `main`, or run the checker over `main`'s own output.
+  **Don't:** read a `workflow_run` run listed under `main` as `main`'s status, or a red one there as a pre-existing failure.
+  (Morrison-Lab/mln `check-site.yml`, 2026-09-28: every run showed `main`, whichever PR's preview build had triggered it.)
 - **`${{ env.PATH }}` evaluates to an empty string in step `env:` context.**
   Setting `env: PATH: ${{ github.workspace }}/bin:${{ env.PATH }}` in Actions step context overwrites `PATH` with only that directory (dropping `/usr/bin`, `/bin`, etc.), causing `command not found` (exit code 127).
   Use `echo "${GITHUB_WORKSPACE}/bin" >> "$GITHUB_PATH"` in a setup step to

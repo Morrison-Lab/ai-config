@@ -257,3 +257,27 @@ An overstated claim discredits the rebuttal even when the bottom-line architectu
 - **Do:** run individual reproducer commands against the external or shared code for each specific defect named in the finding, and quote the exact output.
 - **Do:** correct an overstated claim immediately when scrutinized rather than defending it.
 - **Don't:** assume two related defects (e.g. two heredoc tag syntax variants) share the same code path or failure mode in a third-party or shared module without verification.
+
+## A hang or crash fix needs a behaviour test on real data, not only equivalence checks
+
+A fix that stops a hang or a crash by skipping some inputs can pass every equivalence check and still be wrong.
+Byte-identity and fuzz checks show the output is unchanged where the skip does not fire.
+They say nothing about whether the skip fires on real inputs, where it silently drops the work the tool exists to do.
+So a reviewer rating such a fix must run the tool's own job on a real input and check that the job still gets done.
+
+Morrison-Lab/mds#22 and Morrison-Lab/gha#976, 2026-09-28:
+a preview highlighter hung, and the fix skipped any element that embeds `<script>`.
+The review bot rated both PRs "Ready for merge" several times, on byte-identity and fuzz evidence.
+An independent adversarial reviewer took a real page, edited one sentence, and showed the edit went unhighlighted.
+It then found the real cause:
+the element regex `<(?:p|h[1-6]|li|blockquote)[^>]*>` had no word boundary,
+so `<p` matched `<pre ...>` and the match swallowed widget JSON up to the next `</p>`.
+The fix author had stated a different root cause, confidently and wrongly,
+and nothing in the equivalence checks could contradict it.
+(The regex half of this lesson is in [`python.md`](python.md)'s valid-escape section.)
+
+- **Do:** for a "stop the hang or crash" fix, make a change on a real input that the tool should detect (edit a sentence, add a row), and confirm it is still detected.
+- **Do:** require separate evidence that a skip, backstop or fallback never fires on real inputs, such as a count of how often it fired over a real corpus.
+- **Do:** test the author's stated root cause against the input that hung, rather than accepting it because the symptom stopped.
+- **Don't:** rate a fix ready because its output is byte-identical on inputs where the new skip does not fire.
+- **Don't:** treat "the hang is gone" as evidence of the cause the author named.

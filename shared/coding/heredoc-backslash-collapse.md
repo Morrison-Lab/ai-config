@@ -5,6 +5,35 @@ The move changed three things and nothing else: two relative links were repointe
 
 The sibling of the backtick hazard that `CLAUDE.md`'s "PowerShell CLI Command Safety" section covers, and the same class: content silently transformed between what you type and what the interpreter receives.
 
+## Default: carry content with the Write tool, not a heredoc
+
+When a command needs file content --- a commit message, a PR or comment body, a patch script, a test fixture --- write it with the Write tool (or Edit, for a change to an existing file) to a uniquely named scratchpad file, then point the command at that file: `git commit -F`, `gh ... --body-file`, `python3 script.py`.
+The Write tool passes bytes through unchanged, and it succeeds or fails on its own.
+
+A heredoc fails in two ways the Write tool cannot:
+
+- **The body is transformed.**
+  Doubled backslashes collapse in transit (everything below this section).
+- **The body is silently never written.**
+  When a hook denies the Bash call carrying the heredoc, no segment of that call runs, so the file keeps whatever an earlier step left there.
+  A later `-F` then ships that stale content (see [`claude-code-hooks.md`](../../memories/claude-code-hooks.md)'s whole-call deny section).
+
+Both happened in one session on 2026-09-28: a regex patch to a hook aborted on a collapsed backslash, and a commit landed with an unrelated earlier script's text as its message.
+The same edit made through Edit, and the same message through Write, went through first time.
+
+A heredoc stays fine for a short, plain-ASCII body with no backslashes and no backticks, such as a one-line status note.
+
+- **Do:** use Write or Edit for any content carrying a backslash, a backtick, code, or more than a few lines, and hand the command a file path.
+- **Do:** give the scratch file a unique, task-specific name, so a denied or skipped write can never hand a later command a stale file.
+- **Don't:** embed a patch script, regex, commit message or PR body in a heredoc.
+- **Don't:** treat the `chr(92)` workarounds below as the default route.
+  They are for the rare case where a heredoc is genuinely unavoidable.
+
+(2026-09-28: the user asked whether heredocs should be avoided, since they kept mangling content, and handed the call over with `daytb`.
+Both sides of the pair are inferred from that session's two failures.)
+
+## The collapse, measured
+
 Inside a Bash-tool heredoc with a **quoted** delimiter (`<<'PY'`), which should be entirely literal, a doubled backslash `\\` arrives as a single `\`.
 A single `\` survives intact.
 So one level of unescaping is applied somewhere in transport.

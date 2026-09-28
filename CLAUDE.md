@@ -1358,7 +1358,13 @@ It fails silently and plausibly: the worst case is not a failed assert but a cor
 **It is a property of the environment, not of heredocs**, so measure yours rather than trusting either answer --- it reproduced on Windows MINGW64, and did not reproduce either in a GitHub Actions Linux runner or in a Linux remote Claude Code container --- two different environments, and the second is where many sessions actually execute.
 Knowing the rule also does not stop you tripping it, since nothing about typing an escape sequence announces itself as the trigger.
 
-- **Do:** build the character with `chr(92)` or a placeholder token before it enters a heredoc body, and print `repr()` of the constructed string.
+**So the default is not to carry content in a heredoc at all.**
+Write it with the Write tool (Edit for an existing file) to a uniquely named scratchpad file, and hand the command the path (`git commit -F`, `--body-file`, `python3 script.py`).
+The Write tool passes bytes unchanged, and it cannot be silently skipped the way a heredoc inside a hook-denied Bash call is.
+
+- **Do:** use Write or Edit for any content with a backslash, a backtick, code, or more than a few lines.
+- **Don't:** embed a patch script, regex, commit message or PR body in a heredoc.
+- **Do:** where a heredoc is genuinely unavoidable, build the character with `chr(92)` or a placeholder token before it enters the body, and print `repr()` of the constructed string.
 - **Do:** parse-check or read back any file a heredoc just wrote with escapes in it.
 - **Don't:** type a doubled backslash directly inside a heredoc body, quoted delimiter or not.
 - **Don't:** treat having read this rule as the check --- it was loaded, and the collapse happened anyway.

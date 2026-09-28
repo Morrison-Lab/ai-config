@@ -1299,7 +1299,8 @@ Its "new repo" counterpart: a brand-new repository gets gha-backed CI (the basel
 
 Detect bad state early and stop with a clear error rather than proceeding on it.
 Never swallow an error into a silent fallback (a bare `except:`, a `tryCatch` returning `NULL`, a shell `|| true`).
-A genuinely wanted fallback must be explicit, bounded, and observable, and flagged the same way in review.
+A genuinely wanted fallback must be explicit, bounded, and observable.
+Error handling that hides failure is a review finding, with the same weight as any other standing review check.
 
 [`shared/principles/fail-fast.md`](shared/principles/fail-fast.md)
 
@@ -1325,7 +1326,7 @@ Investigate independently via deterministic queries, source inspection, or clari
 
 ## Get under the hood --- inspect source code and raw output
 
-When trying to understand what a process is doing, diagnose an unexpected failure, or determine the behavior of a tool, library, or harness, find and inspect the actual source code, raw logs, job output, and live execution paths rather than treating the component as an opaque black box.
+To understand a process, diagnose a failure, or determine a tool's behavior, inspect the actual source code, raw logs, job output, and live execution paths rather than treat it as an opaque black box.
 
 [`shared/principles/get-under-the-hood.md`](shared/principles/get-under-the-hood.md)
 

@@ -156,6 +156,35 @@ Vector Calculus --- behind the site's only dropdown, exactly the one-member
 grouping this section's test rejects.
 Read this as that history, not as mds's current state.)
 
+### Order
+
+Grouping is not the only question a navbar or sidebar raises --- once the
+items and the groups are settled, their order is a separate question, and it
+has the same answer as the rest of this document: derive it, don't inherit
+it.
+Menu and sidebar items, and the groups themselves, follow the natural
+progression of topics, so each item comes after what it builds on.
+Find that progression from the dependencies among the pages --- which page's
+content a reader needs before another page's makes sense --- rather than from
+the order the pages were created in or from the alphabet, neither of which
+tracks what a reader needs first.
+
+- **Do:** derive a menu's order, item by item and group by group, from the
+  dependencies among the pages it lists, so each item comes after the
+  content it builds on.
+- **Don't:** order menu items by creation date or alphabetically and call
+  that the natural order --- neither tracks what a reader needs first.
+
+(Repo owner directive, 2026-09-28: "the ordering of items in the menu bars
+should follow the natural progression of topics as much as possible."
+Example, inferred: `Morrison-Lab/mds`'s navbar placed "Proof Writing" second
+--- ahead of "Algebra", "Calculus", "Linear Algebra", and "Vector Calculus"
+--- although the page's own worked example derives a linear-algebra result
+(the hat matrix's idempotence) and links into `linear-algebra.qmd` for the
+definitions and facts it uses, so a reader reached that example before the
+page introducing the objects in it.
+See `Morrison-Lab/mds`#13.)
+
 ## Page scope
 
 The test above also runs in reverse, on a page instead of on a section

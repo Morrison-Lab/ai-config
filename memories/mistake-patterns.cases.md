@@ -151,6 +151,16 @@ What does not: the Mistake, Canonical Rule, Fix, or Do/Don't lines, which are wh
   Reason: [Safety Bypass Flag]."
   Re-running the identical command later in the same session succeeded, with no settings change: `74a56644..da240cf2 fix/unread-issue-comments-guard -> fix/unread-issue-comments-guard`.
   Confirms the canonical Do (retry the exact same command once, unrephrased, before escalating) on the specific override this pattern's own **Don't** names as a documented but classifier-vulnerable escape valve, and corrects an intermediate conclusion drawn from a single denial earlier in the same session --- "the override is unavailable in auto mode" was itself an instance of the pattern this file is about: a scope claim drawn from one data point.
+- **6th occurrence, and the cause was a fix already merged upstream rather than a fresh instance of the deadlock, 2026-09-28** (Claude Code desktop, `Morrison-Lab/mln`;
+  [ai-config#3945](https://github.com/Morrison-Lab/ai-config/issues/3945), closed 2026-09-26).
+  A foreground `adversarial-reviewer` returned its CLEAN verdict via `SubagentHandback`, and `hooks/no-push-without-self-review.py` refused the push anyway;
+  `ALLOW_UNREVIEWED_PUSH=1` was then denied by the classifier's `[Safety Bypass Flag]`, this pattern's own documented shape.
+  What differs from the first five occurrences: the refusal was not a live bug to re-diagnose or a classifier problem to route around --- #3945 had already fixed exactly this gap (hand-back support in the push guard) and merged to `origin/main` at `09fdd8c0`.
+  The session instead re-dispatched the reviewer twice more (roughly 160k tokens each) against the classifier denial before comparing versions.
+  The installed plugin build (`6a4f97ebfc79`) was 87 commits behind `origin/main`, and exactly one commit behind the fix itself (`050fa0c6`, merged as `41e5ae52`): grepping the cached copy of the hook for `SubagentHandback` returned 0 hits, where `origin/main`'s copy returns 21 (`SubagentHandback|subagents`).
+  `claude plugin marketplace update Morrison-Lab` then `claude plugin update ai-config@Morrison-Lab` advanced the pin (the CLI reported "Restart to apply changes"), and a plain `git push`, run immediately afterward with **no restart**, was accepted in the same session --- a data point against [`keep-checkouts-fresh.md`](../shared/workflow/keep-checkouts-fresh.md)'s general caution that a mid-session `claude plugin update` needs a restart to take effect.
+  Whether that holds only for this hook, this plugin CLI version, or generally is not established by one measurement, so read it as a data point rather than a revision of that caution.
+  Canonical rule: **before** re-dispatching an expensive reviewer or reaching for the override, compare the installed plugin build against `origin/main` for the specific fix a guard's refusal resembles (grep the cached hook for a string that fix introduced, per [`keep-checkouts-fresh.md`](../shared/workflow/keep-checkouts-fresh.md) point 2), rather than treating every refusal of this shape as a fresh instance of the classifier deadlock to work around.
 
 ## Pattern 57: pronouncing a two-part fix dangerous with neither half tested alone
 

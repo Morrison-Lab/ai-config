@@ -223,6 +223,20 @@ rather than offering to do it.
 - **Don't:** ask questions or present choices without declaring your recommended path.
 - **Don't:** use "Let me know if..." to offer already-authorized work instead of performing it ([`shared/workflow/no-cop-out-offers.md`](shared/workflow/no-cop-out-offers.md)).
 
+**A question carried in a status list is still a question.**
+Once a decision is parked under "work remaining" or a stopping-point declaration,
+it reads as status rather than as a question,
+so it gets restated turn after turn with no recommendation attached,
+including in the reply that links the user to the material they need to decide.
+Attach the recommendation the first time the decision is raised,
+and repeat it, in one line, every time the item is restated.
+
+- **Do:** write every pending-decision line as "decide X --- I recommend Y, because Z".
+- **Don't:** list "your call on X" as a bare status item.
+
+(User correction, 2026-09-28, on Morrison-Lab/mln#186:
+"haven't I told you to always provide a recommendation when you ask me for input?")
+
 ## Run UMS when work is scrutinized
 
 When you read a review of your work, receive critical feedback on it,

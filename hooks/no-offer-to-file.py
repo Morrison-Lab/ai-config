@@ -11,6 +11,9 @@ Two distinct shapes, both matched below:
   1. a pure offer   -- "worth saving as a memory?"
   2. a bundled one  -- "want me to file the issue and open that PR?", where a
      genuinely discretionary action (the PR) carries an ungated one (the issue)
+  3. a statement   -- "I can also file an issue about X. Say if you want it."
+     or "I haven't filed an issue about it. Say if you want one." -- the same
+     offer with no question mark, which the question-form patterns missed
 
 Fires once per distinct message (sentinel keyed by content hash) so a block
 cannot loop. Fails OPEN: a guard that wedges the session costs more than the
@@ -32,8 +35,67 @@ PATTERNS = [
     r"worth (an issue|filing|a memory|saving|capturing|recording)\b[^.]*\?",
     r"(let me know|tell me) if you('d| would) like me to (file|record|save)",
     r"i (could|can) file (an|a) (issue|follow-?up)[^.]*\?",
+    # Statement-shaped offers: no question mark, same intent. Each needs a
+    # filing/recording word in view so a report of work done cannot match.
+    # The gap before the noun stops at a comma or semicolon, and the noun must
+    # end there, so "file a ticket, but ... GitHub issues" and "file an
+    # issue-tracking script" are not read as the filing idiom.
+    r"i can (also )?file (an?|the) [^.!?,;\n]{0,60}?\b(issue|follow-?up|bug)(?![\w-])",
+    r"\b(file|filing|issue|memory|memories|record|recording)\b[^\n]{0,240}?"
+    r"\b(say|tell me|let me know) (if|whether) you('d| would)? (want|like) "
+    r"((it|one|them)(?=\s*([.!?)\n]|$))|me to (file|record|save|capture|note|open an issue))",
+    r"\b(file|filing|issue|memory|memories|record|recording)\b[^\n]{0,240}?"
+    r"\b(just )?say the word\b",
 ]
 RX = re.compile("|".join(PATTERNS), re.I)
+
+# "I haven't filed an issue" is an offer in waiting unless the same sentence
+# cites the existing tracker concretely: an issue/PR/MR URL, owner/repo#N, or
+# #N. An excuse KEYWORD ("already", "tracked", ...) is not enough -- it can sit
+# in an unrelated clause, and every narrower keyword window (forward-only,
+# line, sentence) was evaded by the next-coarser clause join. A link is the
+# thing a legitimate decline has and an unfiled observation does not. The
+# window is the sentence: a paragraph has no internal newlines, so a line-wide
+# scan would let a link three sentences away excuse the clause.
+NOT_FILED_RX = re.compile(
+    r"i (haven['\u2019]t|have not|didn['\u2019]t|did not) (yet )?file[d]? "
+    r"(an?|the) [^.!?,;\n]{0,40}?\b(issue|follow-?up|bug)(?![\w-])",
+    re.I,
+)
+TRACKER_REF_RX = re.compile(
+    r"https?://[^\s/]+/[^\s]*?/(issues|pull|pulls|merge_requests)/\d+"
+    r"|\b[\w.-]+/[\w.-]+#\d+\b"
+    r"|(?<![\w/#&])#\d+\b",
+    re.I,
+)
+# A sentence ends at a newline, or at terminal punctuation followed by
+# whitespace or the end of text -- so the dots inside a URL
+# ("github.com/.../issues/981") do not end one -- unless the punctuation
+# closes a common abbreviation ("e.g.", "i.e.", "etc.", "vs.", "cf.").
+SENTENCE_END_RX = re.compile(
+    r"\n|(?<!\be\.g)(?<!\bi\.e)(?<!\betc)(?<!\bvs)(?<!\bcf)[.!?]+(?=\s|$)",
+    re.I,
+)
+
+
+def sentence_around(text, start, end):
+    """The sentence of `text` containing the span [start, end)."""
+    s_start = 0
+    for b in SENTENCE_END_RX.finditer(text, 0, start):
+        s_start = b.end()
+    after = SENTENCE_END_RX.search(text, end)
+    return text[s_start:after.start() if after else len(text)]
+
+
+def find_offer(prose):
+    """The first offer-shaped match in `prose`, or None."""
+    hit = RX.search(prose)
+    if hit:
+        return hit
+    for m in NOT_FILED_RX.finditer(prose):
+        if not TRACKER_REF_RX.search(sentence_around(prose, m.start(), m.end())):
+            return m
+    return None
 
 
 # In a project-thread session every user-visible sentence is the `text` input
@@ -134,7 +196,7 @@ def main() -> int:
         return 0
 
     prose = strip_code(text)
-    hit = RX.search(prose)
+    hit = find_offer(prose)
     if not hit:
         return 0
 

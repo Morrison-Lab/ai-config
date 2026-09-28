@@ -1494,15 +1494,15 @@ It is also the natural shape to write when the facts were discovered in
 that order, which is why it survives self-review: the prose narrates the
 author's own path rather than exposing the subject to a reader who never
 walked it.
-Lead with what is actually the case, and present an idealization or a
+Lead with what is the case, and present an idealization or a
 prior approach afterward as an extension, not a correction --- except when
 the **reader** already holds the wrong model and the passage exists to
 correct it, in which case presenting it first is the point.
 
 [shared/writing/no-rug-pulls.md](shared/writing/no-rug-pulls.md)
 
-Check this at composition time as much as in review: the order is fixed while drafting,
-and a read-through inspects each sentence rather than the sequence.
+Check this at composition time, not only in review: drafting fixes the order,
+and a read-through inspects sentences, not the sequence.
 
 ## Writing style: semantic line breaks in prose
 
@@ -1592,20 +1592,18 @@ self-review confirms the claim, which was never the defect.
 
 [shared/workflow/check-the-renders.md](shared/workflow/check-the-renders.md)
 
-Where a repo publishes a website or a book, the deliverable is the rendered
-page, and a correct source diff is not evidence the published page is
+A repo that publishes a website or book has the rendered page as its
+deliverable; a correct source diff is not evidence the published page is
 correct.
 An unexpanded macro, a citation key pandoc renders as `key?`, a crossref
 resolving to nothing, a list that lost its blank line, a swallowed KaTeX
 error --- none shows in the diff, none makes CI red.
-The worst case is a fixed source over an unfixed deployed page, served from a
-stale render cache; every other check in this corpus passes on it.
-`python3 scripts/check-rendered-page.py <url-or-file>` is the instrument for
-the pattern failures, taking a preview URL, a published URL, or a local
-`_site/` file.
-It cannot detect staleness, which is a relation between a page and a commit
-rather than a property of the page: for that, grep the render for the exact
-text the diff added and removed.
+The worst case is a fixed source over an unfixed deployed page from a stale
+render cache, which every other check here passes.
+`python3 scripts/check-rendered-page.py <url-or-file>` checks the pattern
+failures, given a preview URL, a published URL, or a local `_site/` file; it
+cannot detect staleness (a relation between page and commit, not a page
+property) --- for that, grep the render for the diff's added/removed text.
 
 - **Do:** check the rendered page, and the deployed preview rather than only a
   local render where the repo caches renders.
@@ -1618,16 +1616,15 @@ books, always check the renders".)
 
 [`shared/writing/fact-check-prose.md`](shared/writing/fact-check-prose.md)
 
-When running `code-review` or the `ard`/`ardi` loop on a diff that touches prose, apply this policy in addition to the normal review — those skills don't name it internally, but this CLAUDE.md directive governs regardless.
+Apply this during `code-review`/`ard`/`ardi` review of a prose diff, alongside the normal review.
+Those skills don't name it, but this directive still governs.
 
 ## Writing style: timestamp factual claims about conditions that can change
 
-The complement to the fact-check above: a claim can be *true* yet still decay
-into a confident falsehood if it's stated as timeless present-tense fact when
-its truth is time-dependent (a package's CRAN status, a "current" version, a
-count).
-Attach the time the claim was true so a later reader knows to
-re-verify it.
+The complement to the fact-check above: a *true* claim decays into a
+confident falsehood when stated as timeless present-tense fact but its truth
+is time-dependent (a package's CRAN status, a "current" version, a count).
+Attach the time it was true so a later reader knows to re-verify it.
 
 [shared/writing/timestamp-volatile-claims.md](shared/writing/timestamp-volatile-claims.md)
 
@@ -1657,6 +1654,10 @@ exactly as it applies to `<m:oMath>` versus `<m:oMathPara>` in Word/OOXML.
 
 When running `code-review` or the `ard`/`ardi` loop on a diff that touches
 math, apply this in addition to the fact-check above.
+
+## Writing style: models vs. inference methods
+
+[`shared/writing/models-vs-inference.md`](shared/writing/models-vs-inference.md): a model is never "Bayesian"; only how it is fitted is.
 
 ## Hyperlink technical terms and results; no forward references
 

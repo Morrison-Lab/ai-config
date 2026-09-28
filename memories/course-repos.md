@@ -141,6 +141,6 @@ gap in chat.
 [#12](https://github.com/Morrison-Lab/mlr/issues/12), 2026-09-28, for Robert &
 Casella's *Monte Carlo Statistical Methods*, Gelman & Rubin (1992), and Brooks
 & Gelman (1998) respectively.
-#10 was later found to rest on a truncated search --- the book is present
+Issue #10 was later found to rest on a truncated search --- the book is present
 under a search that was not cut short --- and was corrected rather than left
 standing; see the timeout section linked above.)

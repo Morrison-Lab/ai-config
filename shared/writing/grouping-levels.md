@@ -173,21 +173,30 @@ test is about whether the grouping divides something, not about which
 control renders it.
 
 Showing the same grouping in both a sidebar and navbar dropdowns is fine, but
-the two lists then have to be kept in step by hand --- Quarto does not derive
-one from the other --- so mark each with a comment pointing at its
-counterpart, for example `# keep in sync with navbar.left` beside the
-sidebar's YAML and `# keep in sync with the sidebar` beside the navbar's, so
-an edit to one is not missed in the other.
+the target is that the two lists **agree** --- Quarto does not derive one from
+the other, so nothing enforces that on its own.
+A `# keep in sync with navbar.left` comment beside the sidebar's YAML (and its
+mirror, `# keep in sync with the sidebar`, beside the navbar's) is only a
+reminder to check, not the thing being checked: a comment added once and never
+revisited satisfies "there is a comment" forever, even after the two lists
+have drifted apart, which is exactly the gap a rule stated as "mark it" leaves
+open.
+An edit to either list that leaves the other unchanged violates this rule
+even with the comment sitting right next to it, so treat a change to either
+list as an occasion to diff it against its counterpart before committing or
+approving, with the comment there only to make that check easy to find.
 
-- **Do:** use a dropdown, a collapsible sidebar section, or both, wherever
-  the site's pages fall into a real topical group.
-- **Do:** mark a navbar dropdown and a sidebar section that mirror the same
-  grouping with a comment pointing at each other, so an edit to one is not
-  missed in the other.
+- **Do:** treat a dropdown or a collapsible sidebar section as optional ---
+  you may group pages into one, or both, where the site's pages fall into
+  real topical groups, but neither is required.
+- **Do:** keep a mirrored navbar dropdown and sidebar section in agreement,
+  and diff one against the other whenever either changes --- not just add a
+  keep-in-sync comment and stop there.
 - **Don't:** collapse a sidebar to a single catch-all section --- the same
   defect a single catch-all navbar dropdown has.
-- **Don't:** let a mirrored sidebar section and navbar dropdown drift apart
-  silently.
+- **Don't:** treat a keep-in-sync comment as having discharged the rule; the
+  rule is that the lists agree, and a comment with no diff behind it can sit
+  beside two lists that have already drifted apart.
 
 (User clarification, 2026-09-28: "if there's natural grouping, you can use
 drop-downs to group them, both in sidebars and menu bars.")
@@ -199,17 +208,27 @@ items and the groups are settled, their order is a separate question, and it
 has the same answer as the rest of this document: derive it, don't inherit
 it.
 Menu and sidebar items, and the groups themselves, follow the natural
-progression of topics, so each item comes after what it builds on.
+progression of topics **as much as possible**, so each item comes after what
+it builds on.
 Find that progression from the dependencies among the pages --- which page's
 content a reader needs before another page's makes sense --- rather than from
 the order the pages were created in or from the alphabet, neither of which
 tracks what a reader needs first.
+"As much as possible" is doing real work, not softening the rule into
+politeness: when no dependency runs between two items in either direction ---
+neither page's content is a prerequisite for the other's --- this rule has
+nothing to say about their relative order, and creation order, the alphabet,
+or any other tiebreak is fine for that pair.
 
 - **Do:** derive a menu's order, item by item and group by group, from the
   dependencies among the pages it lists, so each item comes after the
   content it builds on.
+- **Do:** leave the order between two items undictated when neither depends
+  on the other, rather than forcing a dependency-based rationale where none
+  exists.
 - **Don't:** order menu items by creation date or alphabetically and call
-  that the natural order --- neither tracks what a reader needs first.
+  that the natural order for items where a real dependency exists --- neither
+  tracks what a reader needs first.
 
 (Repo owner directive, 2026-09-28: "the ordering of items in the menu bars
 should follow the natural progression of topics as much as possible."

@@ -37,10 +37,10 @@ PATTERNS = [
     r"i (could|can) file (an|a) (issue|follow-?up)[^.]*\?",
     # Statement-shaped offers: no question mark, same intent. Each needs a
     # filing/recording word in view so a report of work done cannot match.
-    r"i can (also )?file (an?|the) [^.!?\n]{0,60}?\b(issue|follow-?up|bug)",
-    r"i (haven['\u2019]t|have not|didn['\u2019]t|did not) (yet )?file[d]? "
-    r"(an?|the) [^.!?\n]{0,40}?\b(issue|follow-?up|bug)\b"
-    r"(?![^\n]{0,200}?\b(already|duplicate|dupe|covers|covered|tracks|tracked)\b)",
+    # The gap before the noun stops at a comma or semicolon, and the noun must
+    # end there, so "file a ticket, but ... GitHub issues" and "file an
+    # issue-tracking script" are not read as the filing idiom.
+    r"i can (also )?file (an?|the) [^.!?,;\n]{0,60}?\b(issue|follow-?up|bug)(?![\w-])",
     r"\b(file|filing|issue|memory|memories|record|recording)\b[^\n]{0,240}?"
     r"\b(say|tell me|let me know) (if|whether) you('d| would)? (want|like) "
     r"((it|one|them)(?=\s*([.!?)\n]|$))|me to (file|record|save|capture|note|open an issue))",
@@ -48,6 +48,33 @@ PATTERNS = [
     r"\b(just )?say the word\b",
 ]
 RX = re.compile("|".join(PATTERNS), re.I)
+
+# "I haven't filed an issue" is an offer in waiting unless the same line says
+# why none is needed. The reason can come before or after the clause ("Since
+# this is already tracked, I haven't filed ..."), so it is checked over the
+# whole line in code rather than by a one-sided lookahead.
+NOT_FILED_RX = re.compile(
+    r"i (haven['\u2019]t|have not|didn['\u2019]t|did not) (yet )?file[d]? "
+    r"(an?|the) [^.!?,;\n]{0,40}?\b(issue|follow-?up|bug)(?![\w-])",
+    re.I,
+)
+NOT_FILED_EXCUSE_RX = re.compile(
+    r"\b(already|duplicate|dupe|covers|covered|tracks|tracked)\b", re.I
+)
+
+
+def find_offer(prose):
+    """The first offer-shaped match in `prose`, or None."""
+    hit = RX.search(prose)
+    if hit:
+        return hit
+    for m in NOT_FILED_RX.finditer(prose):
+        start = prose.rfind("\n", 0, m.start()) + 1
+        end = prose.find("\n", m.end())
+        line = prose[start:] if end < 0 else prose[start:end]
+        if not NOT_FILED_EXCUSE_RX.search(line):
+            return m
+    return None
 
 
 # In a project-thread session every user-visible sentence is the `text` input
@@ -148,7 +175,7 @@ def main() -> int:
         return 0
 
     prose = strip_code(text)
-    hit = RX.search(prose)
+    hit = find_offer(prose)
     if not hit:
         return 0
 

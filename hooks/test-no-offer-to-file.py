@@ -131,6 +131,31 @@ CASES = [
         "say if you want it <verb> after a filing report does not block",
     ),
     (
+        [TOOL, say("Since this is already tracked, I haven't filed a new issue for it.")],
+        False,
+        "tracker explanation before the not-filed clause does not block",
+    ),
+    (
+        [TOOL, say("Because #123 already covers this, I didn't file a duplicate issue.")],
+        False,
+        "duplicate explanation before a didn't-file clause does not block",
+    ),
+    (
+        [TOOL, say("Since the test passes now, I haven't filed an issue about it.")],
+        True,
+        "a non-excuse reason before the not-filed clause still blocks",
+    ),
+    (
+        [TOOL, say("I can file an issue-tracking script that automates this, if that's useful context.")],
+        False,
+        "issue as part of a compound noun does not block",
+    ),
+    (
+        [TOOL, say("I can also file a ticket in Jira, but this repo only uses GitHub issues.")],
+        False,
+        "issues as an ordinary noun past a comma does not block",
+    ),
+    (
         [TOOL, say("The hook matches `I can also file a gha issue` statements now.")],
         False,
         "statement pattern quoted in a code span does not block",

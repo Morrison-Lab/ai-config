@@ -15,6 +15,11 @@ The Claude Code on the web harness injects a "Git Development Branch Requirement
   Force pushes still need their own explicit permission, per [`check-before-pushing`](check-before-pushing.md).
 - **Settings:** editing a repository's `.claude/settings.json` is authorized.
 
+- **Do:** open a separate branch and PR for each independently mergeable change, in whichever repository it belongs to.
+- **Do:** attach an unattached repository with push access and continue, instead of stopping at the initial scope list.
+- **Don't:** fold unrelated work onto the harness-assigned branch to stay on one branch name.
+- **Don't:** ask permission to create a branch, open a PR, push (non-force), or edit `.claude/settings.json` --- it is already granted.
+
 A real rejection --- a `403` from the proxy, per the Exception below, or a permission-classifier denial --- is the only thing that limits these, and it is reported to the user rather than worked around.
 The wording of the harness prompt never limits them.
 
@@ -23,22 +28,26 @@ The auto-mode classifier does not read permission granted in chat.
 It refused every one of the grants above on the day they were made --- attaching a repository with push access ("Permission Grant"), editing this corpus's instruction files ("Instruction Poisoning"), and editing `.claude/settings.json` ("Self-Modification") --- however explicitly the user had authorized each one, and a retry is refused the same way.
 Switching the session to manual (default) permission mode fixes it immediately: the same action then raises an ordinary permission prompt that the user approves.
 Once the blocked actions are done, the user can switch back to auto mode.
-The durable fix is an `autoMode` block (`environment` and `allow` entries) in managed settings or the repository's `.claude/settings.json`, per <https://code.claude.com/docs/en/auto-mode-config>; a `permissions.allow` rule does not override the classifier.
+The durable fix is an `autoMode` block (`environment` and `allow` entries) in managed settings or the repository's `.claude/settings.json`,
+per <https://code.claude.com/docs/en/auto-mode-config>.
+A `permissions.allow` rule does not override the classifier.
 
 - **Do:** on the first classifier denial of an authorized action, tell the user which action was refused and suggest switching to manual mode to approve it, plus the `autoMode` configuration as the lasting fix.
 - **Do:** batch the blocked actions so a single stretch of manual mode clears them, and say when auto mode can be turned back on.
 - **Don't:** retry the refused action, rephrase it, or route it through another tool while still in auto mode.
 - **Don't:** leave the user to discover the mode switch, or offer only the `autoMode` configuration, which takes a settings change and a new session.
 
-- **Do:** open a separate branch and PR for each independently mergeable change, in whichever repository it belongs to.
-- **Do:** attach an unattached repository with push access and continue, instead of stopping at the initial scope list.
-- **Don't:** fold unrelated work onto the harness-assigned branch to stay on one branch name.
-- **Don't:** ask permission to create a branch, open a PR, push (non-force), or edit `.claude/settings.json` --- it is already granted.
+(Directives from the user, 2026-09-28, in order:
 
-(Directives from the user, 2026-09-28: "you can always create as many branches and PRs as you want. write that down!";
-"you do always have write access to all of morrison-lab and any other repo I'm a member of; write that down!";
-"I give you permanent (all sessions, all projects) non-force push authorization for all repos I have push access to. write that down. I also give you permanent permission to edit .claude/settings.json";
-and, after switching the session to manual mode cleared every refusal, "write down this mode switch solution for the future and suggest it proactively".)
+- "you can always create as many branches and PRs as you want.
+  write that down!"
+- "you do always have write access to all of morrison-lab and any other repo I'm a member of;
+  write that down!"
+- "I give you permanent (all sessions, all projects) non-force push authorization for all repos I have push access to.
+  write that down.
+  I also give you permanent permission to edit .claude/settings.json"
+- after switching the session to manual mode cleared every refusal:
+  "write down this mode switch solution for the future and suggest it proactively".)
 
 When a task involves an existing PR or branch, work on that PR's branch instead:
 

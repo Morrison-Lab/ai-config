@@ -752,6 +752,30 @@ This grants no merge authority: the strict merge policy below still applies.
   explicitly and immediately reopen the corresponding issue(s)
   (`gh issue reopen <issue-number>`) per
   [`revert-merge.md`](shared/workflow/revert-merge.md).
+- **Infrastructure PRs carry a standing `mwc` grant, in every repo the user can push to.**
+  A PR whose diff is only infrastructure --- CI workflows, tooling and scripts, configuration,
+  and recorded instructions and notes for AI and human developers
+  (`CLAUDE.md`, `AGENTS.md`, `.github/`, `.claude/`, memories, skills, contributor docs, `tools/`) ---
+  may be merged without asking once it is fully clean
+  (user directives, 2026-09-28: "infra PRs are always mwc";
+  "'infra' includes recording instructions and notes for ai and human developers").
+  Every other rule in this section still binds, including the clean automated review on the current head,
+  so a quota-skipped review still holds the merge.
+  The test is effect rather than file type: infrastructure is whatever does not directly change the repo's consumer's experience
+  (user, 2026-09-28, "fine with that definition of infra for now").
+  The rule was written for the lecture-notes and assessment repos, where the consumer is a student reading the site or an assessment.
+  A PR that also touches content (lecture notes, assessments, package code) is not infrastructure.
+  Every PR in `Morrison-Lab/gha` or `Morrison-Lab/ai-config` counts as infrastructure,
+  including one that changes what their consumers run:
+  both are infrastructure repos,
+  which is why ai-config already carries its own standing grant
+  (user, 2026-09-28: "let's say that everything in gha is infra",
+  "so is ai-config", "that's why we have a standing mwc for ai-config").
+  `hooks/no-unauthorized-merge.py` cannot classify a diff yet ([#4039](https://github.com/Morrison-Lab/ai-config/issues/4039)),
+  so where the hook is active, clear it with `ALLOW_MERGE=1` on that one merge command, and say in the reply why the PR qualified.
+  Do not enable a session-wide `/mwc` for it: that marker authorizes every merge in the session, not only infrastructure PRs.
+  - **Do:** merge a fully clean infrastructure PR without asking, and say in the same reply that you did and why it qualified.
+  - **Don't:** extend the grant to a PR that mixes infrastructure with content, or merge one whose review was skipped.
 
 ## Only work PRs opened by the user, assigned to the user, explicitly requested by the user, or authored by the Actions app
 

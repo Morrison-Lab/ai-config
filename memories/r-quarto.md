@@ -332,6 +332,20 @@ on this runtime.)
     ([Morrison-Lab/wai#177](https://github.com/Morrison-Lab/wai/issues/177), 2026-09-01: 191 raw hits on the chapters, of which
     the include paths were the bulk; `spell_check_package()` had never scanned
     them because they are not vignettes.)
+  - **That same scope fact is a false-negative trap, not only the
+    false-positive one above.**
+    Because book chapters are not vignettes, a word's presence in a `.qmd`
+    chapter of a repo whose CI is green is no evidence that the word passes
+    Spellcheck --- that chapter was never read.
+    - **Do:** settle a WORDLIST question by running
+      `spelling::spell_check_package(".")`, whose file set is the authority.
+    - **Don't:** conclude a word is safe because `git grep` finds it elsewhere
+      in the repo.
+    (Recorded again 2026-09-27 with the consequence inverted, on
+    [Morrison-Lab/qbt#79](https://github.com/Morrison-Lab/qbt/pull/79):
+    a new README section used `submodule`, which `chapter2.qmd` already carried
+    on a green `main`, so no WORDLIST change looked needed; `Spellcheck` --- a
+    required context --- then went red on the PR.)
 - **Regenerating `man/*.Rd`: run `devtools::document()` (or
   `roxygen2::roxygenise()`) --- never hand-edit the `.Rd`.** A `docs-check` /
   `R-check-docs` job runs `roxygenize()` then `git diff --exit-code man/`, so a
@@ -640,6 +654,43 @@ staying in sync is on the author.
 ([`UCD-SERG/serocalculator#605`](https://github.com/UCD-SERG/serocalculator/pull/605), 2026-07-25: a one-sentence README link fix,
 verified this way and merged; the reviewer independently confirmed the two
 files stayed consistent.)
+
+## `--wrap=preserve` when a line-break gate reads the generated `README.md`
+
+The section above reproduces pandoc's default reflow (`--wrap=auto
+--columns=72`).
+That reflow is also why a semantic-line-break checker can be silently useless
+on a generated README.
+The checker reads `README.md`; pandoc rewrites every paragraph to its own
+column width on the way there, so the line structure written in `README.Rmd`
+never reaches the file being checked.
+Prose written with correct breaks arrives re-joined, and prose written as one
+long paragraph arrives looking compliant.
+
+Setting the output option makes the generated file mirror its source, so the
+file a human edits is the one the gate can see:
+
+```yaml
+output:
+  github_document:
+    pandoc_args: ["--wrap=preserve"]
+```
+
+- **Do:** pair it with pointing the checker at the source
+  (`globs: '*.md *.Rmd'`).
+  `--wrap=preserve` only keeps the two files agreeing about where lines break;
+  it does not decide which file is read.
+- **Don't:** rewrite prose into one-sentence paragraphs to satisfy a gate that
+  is reflowing it anyway --- that contorts the document around a check which is
+  not measuring what it appears to.
+
+Expect a one-time whole-file reflow in the `README.md` diff, and expect the
+newly-visible lines to fail: turning the gate on for real surfaces whatever it
+never checked.
+([Morrison-Lab/qbt#78](https://github.com/Morrison-Lab/qbt/pull/78), 2026-09-27:
+the gate had been reporting success on that README while examining **0 files**,
+confirmed from CI's own log before and after; five previously-unchecked lines
+then needed fixing, one of them a stale list of required status checks.)
 
 ## Rex + base regex engines in R
 

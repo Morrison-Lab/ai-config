@@ -1129,3 +1129,14 @@ It has two concrete consequences worth keeping straight:
 - **Do:** write an aggregator job with `if: always()` and an explicit per-dependency result check, never a bare `needs:` with no result inspection.
 - **Don't:** assume `skipped` is safely distinct from `success` for a required check --- GitHub treats them the same for merge-gating purposes.
 - **Don't:** let a job rename/split ship without a same-change audit of every ruleset/branch-protection rule that names the old job.
+
+- **A workflow filtered with `on.pull_request.branches` does not run for a PR targeting any other branch, so a stacked PR's required contexts can simply never report.**
+  Stacking PR B on PR A's branch keeps B's diff reviewable, but every workflow whose trigger reads `pull_request: {branches: [main]}` is skipped entirely while B targets A.
+  Those checks read *not reported* rather than failing.
+  That is not a false green --- a required context that never reports still blocks the merge --- but B can look close to mergeable while two of its gates have never executed.
+  Retargeting B after A merges does **not** fix it: the base change is a `pull_request.edited` event, and the default trigger types are `opened`, `synchronize` and `reopened`, so nothing re-runs.
+  - **Do:** once the base retargets, merge the base branch into B and push.
+    That is a `synchronize` event, it re-runs the branch-filtered workflows, and it is the base-sync the PR wanted anyway.
+  - **Don't:** reach for an empty commit or a close-and-reopen to kick CI, and don't read "all required contexts green" without confirming each one actually reported on the current head.
+  ([Morrison-Lab/qbt#80](https://github.com/Morrison-Lab/qbt/pull/80), 2026-09-27: `check-spelling.yaml` and `check-non-standard-chars.yml` both declare `branches: [main]`.
+  While the PR was stacked neither reported, and the base-sync merge push took `check / check-chars` from *not reported* to green.)

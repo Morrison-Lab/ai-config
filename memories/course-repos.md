@@ -76,7 +76,8 @@ just don't leak solutions ACCIDENTALLY.";
 The user keeps a collection of textbook PDFs in `G:\My Drive\Texts 2` on their Windows machine (the XPS).
 A cloud session cannot read that folder, but the user can open a Remote Control session there on request.
 Copying a book from it into a course's reading-shelf repository (`Morrison-Lab/mlr` for the machine learning course) is pre-authorized, as needed.
-The user, 2026-09-28: "G:\My Drive\Texts 2 has a collection of book pdfs; you can copy them to mlr as needed".
+The user, 2026-09-28: "G:\My Drive\Texts 2 has a collection of book pdfs;
+you can copy them to mlr as needed".
 Only the reading-shelf repo, never the notes or graded-material repos, since the books are copyrighted.
 
 - **Do:** ask the user for the Remote Control session when a task needs a book's text, and copy just the books the task needs into the reading-shelf repo.

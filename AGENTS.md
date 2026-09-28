@@ -52,6 +52,10 @@ and standing authorization to open PRs or file issues
 do not grant permission to communicate with a non-member repository.
 This gate takes precedence
 over automatic filing, PR-opening, review, and follow-up rules.
+One exception, granted by the user on 2026-09-28:
+push access the user holds counts as positive verification for non-force pushes and PRs,
+per [`use-existing-pr-branch`](shared/workflow/use-existing-pr-branch.md)'s standing permissions.
+Comments, issues and other communication still need membership or explicit approval.
 
 ## Graph and display equation defaults
 

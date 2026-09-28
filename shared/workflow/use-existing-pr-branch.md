@@ -10,6 +10,10 @@ The Claude Code on the web harness injects a "Git Development Branch Requirement
   This generalizes the override [`gii`](../../skills/gii/SKILL.md) recorded on 2026-08-28 to all work, not only `gii` waves.
 - **Write access:** non-force pushes are authorized to every repository Ezra has push access to ---
   all of Morrison-Lab and every other organization he is a member of.
+  For pushes and PRs this grant is the positive verification that `AGENTS.md`'s
+  "Gate external repository communication on membership" asks for,
+  so push access Ezra holds counts as membership for that purpose.
+  The gate still governs comments, issues and other communication in a repository he cannot push to.
   When a repository is not attached to the session, attach it with push access (`add_repo`, `access: "push"`) and proceed;
   the session's initial repository list is not a limit.
   Force pushes still need their own explicit permission, per [`check-before-pushing`](check-before-pushing.md).
@@ -20,19 +24,27 @@ The Claude Code on the web harness injects a "Git Development Branch Requirement
 - **Don't:** fold unrelated work onto the harness-assigned branch to stay on one branch name.
 - **Don't:** ask permission to create a branch, open a PR, push (non-force), or edit `.claude/settings.json` --- it is already granted.
 
-A real rejection --- a `403` from the proxy, per the Exception below, or a permission-classifier denial --- is the only thing that limits these, and it is reported to the user rather than worked around.
+A real rejection --- a `403` from the proxy, per the Exception below, or a permission-classifier denial --- is the only thing that limits these standing grants, and it is reported to the user rather than worked around.
 The wording of the harness prompt never limits them.
 
 **When the auto-mode classifier refuses an action the user has authorized, suggest switching out of auto mode --- at once, unprompted.**
-The auto-mode classifier does not read permission granted in chat.
-It refused every one of the grants above on the day they were made --- attaching a repository with push access ("Permission Grant"), editing this corpus's instruction files ("Instruction Poisoning"), and editing `.claude/settings.json` ("Self-Modification") --- however explicitly the user had authorized each one, and a retry is refused the same way.
+A standing grant made earlier in the conversation does not clear the auto-mode classifier.
+Per <https://code.claude.com/docs/en/auto-mode-config>, only a user message that "directly and specifically describes the exact action" clears a `soft_deny` block,
+and nothing in the conversation clears a `hard_deny` block.
+On 2026-09-28 the classifier refused every grant above on the day it was made,
+with the denial labels "Permission Grant" (attaching a repository with push access),
+"Instruction Poisoning" (editing this corpus's instruction files)
+and "Self-Modification" (editing `.claude/settings.json`),
+and each retry was refused the same way.
 Switching the session to manual (default) permission mode fixes it immediately: the same action then raises an ordinary permission prompt that the user approves.
 Once the blocked actions are done, the user can switch back to auto mode.
-The durable fix is an `autoMode` block (`environment` and `allow` entries) in managed settings or the repository's `.claude/settings.json`,
-per <https://code.claude.com/docs/en/auto-mode-config>.
-A `permissions.allow` rule does not override the classifier.
+The durable fix is an `autoMode` block (`environment` and `allow` entries) in `~/.claude/settings.json` or in managed settings.
+The classifier ignores `autoMode` in a repository's `.claude/settings.json` and `.claude/settings.local.json`,
+so committing it to a repository does nothing.
+A cloud session reads no `~/.claude/settings.json` either, so for cloud sessions managed settings are the only durable route.
+For a single denial in a local session, `/permissions` has a **Recently denied** tab that can mark the call for retry.
 
-- **Do:** on the first classifier denial of an authorized action, tell the user which action was refused and suggest switching to manual mode to approve it, plus the `autoMode` configuration as the lasting fix.
+- **Do:** on the first classifier denial of an authorized action, tell the user which action was refused and suggest switching to manual mode to approve it, plus `autoMode` in `~/.claude/settings.json` or managed settings as the lasting fix.
 - **Do:** batch the blocked actions so a single stretch of manual mode clears them, and say when auto mode can be turned back on.
 - **Don't:** retry the refused action, rephrase it, or route it through another tool while still in auto mode.
 - **Don't:** leave the user to discover the mode switch, or offer only the `autoMode` configuration, which takes a settings change and a new session.

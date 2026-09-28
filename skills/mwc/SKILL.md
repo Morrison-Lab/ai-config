@@ -24,7 +24,8 @@ without asking confirmation before every merge.
   DOES NOT grant permission to merge.
   One repository is exempted standing --- see "The standing per-repository
   grant" below --- and so are infra-only PRs in any Morrison-Lab repository
-  --- see "The standing infra-PR grant". The Scope Limit binds both.
+  --- see "The standing infra-PR grant".
+  The Scope Limit binds both.
 - **MWC Override Scope**: When the user explicitly issues `/mwc`, the bare word `mwc`, "merge when confident", "merge at will", or "maw", that baseline prohibition is suspended for the current session only.
   The bare word is listed here, not only in `CLAUDE.md`'s general "Bare keyword directives" convention, so this file is self-contained: a slash command is routed to this skill by the harness itself, while a bare word in prose is a convention the model must recognize on its own, and it recognizes it most reliably when the file governing the mechanics (`enable-mwc`, `check-mwc`, the Scope Limit) names the exact form it will see rather than only implying it maps here.
 - **Scope Limit**: An MWC grant applies ONLY to PRs that are 100% clean
@@ -529,7 +530,8 @@ Run `check-pr-fully-clean.py` first.
 
 - **Do:** merge a fully clean infra PR with the PR number and `-R` in the command (`gh pr merge 15 -R Morrison-Lab/pds --squash`), or through the MCP merge tool with `owner`, `repo` and `pullNumber`.
 - **Do:** push nothing between the clean check and the merge.
-  The file list is read at merge time, but a push landing between that read and the merge is not seen; `--match-head-commit <sha>` closes that window.
+  The file list is read at merge time, but a push landing between that read and the merge is not seen.
+  `--match-head-commit <sha>` closes that window.
 - **Don't:** read a refusal as the PR not being infra until the command names one PR number and one target.
 - **Don't:** expect this grant to clear Claude Code's own auto-mode permission checker, which is separate from this hook and may still need a permission rule.
 

@@ -311,6 +311,33 @@ Full statement:
 [`algorithmatize-checks`](../workflow/algorithmatize-checks.md)
 (predates this catalog, so it lives in `shared/workflow/`).
 
+## No gameable rules --- avoid loopholes, perverse incentives, and monkey-paw phrasing
+
+A rule, instruction, metric, hook condition, or checklist item has to
+target the outcome it actually cares about, so that no behaviour can
+satisfy its letter while defeating its purpose.
+Three named aspects of one failure: a **loophole** is satisfied by an
+unwanted behaviour, including by omission; a **perverse incentive**
+rewards the unwanted behaviour, e.g. a penalty for *mentioning* a
+defect makes silence the cheapest way to comply; **monkey-paw
+phrasing** grants the request in a way that defeats it.
+The shared check: key a rule to the state it cares about (noticed,
+true, done), not to a visible proxy (mentioned, reported), and say so
+explicitly when an instrument can only ever see the proxy.
+
+Related but distinct: malicious compliance is this failure done on
+purpose (the principle also covers the unintentional, lazier version);
+specification gaming and Goodhart's law name the same shape in
+optimization systems and metrics respectively; "letter vs. spirit"
+is the everyday phrase for the same gap.
+
+Full statement: [`no-gameable-rules`](no-gameable-rules.md), including
+the incident that prompted it (a Don't keyed to "mentioning" a defect
+rather than "noticing" one) and its relation to the falsifiability
+requirement in CLAUDE.md's "Record both the pattern and the
+anti-pattern" and to the gameable-instrument cases in
+[`algorithmatize-checks`](../workflow/algorithmatize-checks.md).
+
 ## Automate everything -- and build the missing instruments
 
 Never do by hand any work that can be automated.

@@ -1297,41 +1297,44 @@ Its "new repo" counterpart: a brand-new repository gets gha-backed CI (the basel
 
 ## Fail fast — no silent failures
 
-Detect bad state early and stop with a clear error rather than proceeding on it; never swallow an error into a silent fallback (a bare `except:`, a `tryCatch` returning `NULL`, a shell `|| true`), and make any genuinely wanted fallback explicit, bounded, and observable.
-Apply this in review too: error handling that hides failure is a review finding, the same weight as any other standing review check.
+Detect bad state early and stop with a clear error rather than proceeding on it.
+Never swallow an error into a silent fallback (a bare `except:`, a `tryCatch` returning `NULL`, a shell `|| true`).
+A genuinely wanted fallback must be explicit, bounded, and observable.
+Error handling that hides failure is a review finding, with the same weight as any other standing review check.
 
 [`shared/principles/fail-fast.md`](shared/principles/fail-fast.md)
 
 ## Specific beats general
 
-When two instructions, policies, configurations, or design rules apply to the same decision, the narrower, more specific rule takes precedence over the broader, general one.
-Explicit human user instructions in a specific session override general repository defaults, narrow subsystem and file configs override repository-wide policies, and targeted types and condition handlers beat generic catch-alls in code.
+When two instructions, policies, configurations, or design rules apply to the same decision, the narrower, more specific rule wins: explicit user instructions over repository defaults, subsystem configs over repo-wide policies, targeted handlers over generic catch-alls.
 
 [`shared/principles/specific-beats-general.md`](shared/principles/specific-beats-general.md)
 
 ## Think outside the box --- distinguish real from artificial limitations
 
-Do not make unnecessary assumptions about structural limitations;
-consider which limitations are real (hard architectural, mathematical, security, or physical bounds)
-and which are artificial (inherited conventions, unexamined defaults, or local scoping traps).
-When a task or design becomes awkward or overly complex, test the assumed constraints empirically
-and reframe or dissolve problems rather than building intricate workarounds inside an unnecessary box.
+Do not assume a limitation is real without checking: test whether it is a hard architectural, mathematical, security, or physical bound, or an artificial one (inherited convention, unexamined default, local scoping trap).
+When a design becomes awkward, reframe the problem rather than building a workaround inside an unnecessary box.
 
 [`shared/principles/think-outside-the-box.md`](shared/principles/think-outside-the-box.md)
 
 ## Don't take anyone's word for it --- independent verification and constructive pushback
 
-Never accept factual assertions, technical recommendations, or stated preferences blindly.
-Everyone makes mistakes --- humans, AI models, peer agents, and experts alike.
-Always investigate assertions independently via deterministic queries, source inspection, or clarifying questions, and push back constructively whenever you suspect an error or unsound reasoning.
+Never accept factual assertions, technical recommendations, or stated preferences blindly --- everyone makes mistakes, humans and AI models alike.
+Investigate independently via deterministic queries, source inspection, or clarifying questions, and push back when you suspect an error.
 
 [`shared/principles/dont-take-my-word-for-it.md`](shared/principles/dont-take-my-word-for-it.md)
 
 ## Get under the hood --- inspect source code and raw output
 
-When trying to understand what a process is doing, diagnose an unexpected failure, or determine the behavior of a tool, library, or harness, find and inspect the actual source code, raw logs, job output, and live execution paths rather than treating the component as an opaque black box.
+To understand a process, diagnose a failure, or determine a tool's behavior, inspect the actual source code, raw logs, job output, and live execution paths rather than treat it as an opaque black box.
 
 [`shared/principles/get-under-the-hood.md`](shared/principles/get-under-the-hood.md)
+
+## No gameable rules --- loopholes, perverse incentives, monkey-paw phrasing
+
+A rule, metric, or hook condition must target the outcome it cares about, so no behaviour can satisfy its letter while defeating its purpose --- key it to the state (noticed, true, done), not a visible proxy (mentioned, reported).
+
+[`shared/principles/no-gameable-rules.md`](shared/principles/no-gameable-rules.md)
 
 ## Coding: KISS is the umbrella principle
 

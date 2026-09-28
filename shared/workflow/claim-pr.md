@@ -348,7 +348,8 @@ It is the weaker and more useful fact already recorded in
 "not tracked here", never "does not exist".
 A peer outside whatever the harness currently tracks is invisible to it, and
 the listing cannot tell you which case you are in.
-A cloud session could not even message the user's own Remote Control session when measured;
+A cloud session could not even message the user's own Remote Control session when measured,
+though that session could message it;
 see "A cloud session cannot message the user's Remote Control session" in
 [`subagent-worktrees.md`](../../memories/subagent-worktrees.md).
 

@@ -284,7 +284,7 @@ Two walls stand between the cloud session and a local one.
 
 The first is name resolution.
 Sent by the session's title or by its raw `session_...` id, `SendMessage` failed with "No agent named ... is reachable",
-because the target was not in the cloud session's `ListAgents`.
+and the target was absent from the cloud session's `ListAgents`, which is consistent with the error.
 That failure was measured against two different local Remote Control sessions.
 
 The second is the credential.
@@ -306,8 +306,10 @@ only local Remote Control sessions were tried, so that wider reach is inferred f
 The "yet" suggests the limit may be lifted later, so re-test before relying on it.
 
 Messages flow the other way.
-The second local session addressed the cloud session by its `ListAgents` name.
-The cloud session's own `ListAgents` printed that name, of the form `<name> [<ref>]`, as "the name other sessions use to message it".
+The message arrived, `from-name` the second session's title;
+which address the local session used was not observed from here.
+The cloud session's own `ListAgents` printed its name followed verbatim by "the name other sessions use to message it";
+the name itself is replaced here by the placeholder `<name> [<ref>]`.
 The cloud session could read the message that arrived, and could not answer it.
 
 Not even the session record's inbound-messaging field settles reachability.

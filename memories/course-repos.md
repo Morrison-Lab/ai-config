@@ -50,3 +50,35 @@ until someone makes that decision and retires the graded item.
 (Ezra, 2026-09-28: "it's ok for exercises to migrate from mlg to the lecture-notes repos, if we think they would be better to include in the notes than reserve them for evaluation materials";
 "and not just from mlg; from any evaluation-material repo (e.g. epi204)";
 "we just need to be intentional about what we migrate, and not do it accidentally".)
+
+## The leak check covers what we grade, not what another class assigned
+
+What goes in the notes and what is held back for assessment is our decision.
+The leak check protects the items we grade --- this course's current and planned homework, quizzes and exams --- from being answered by accident.
+A third party's assessment material kept in an evaluation repo for reference,
+such as the Stanford CS229 problem sets and keys in `mlg`,
+is not a constraint on the notes: that another class assigned a problem does not stop us teaching it.
+CS229's keys in particular have been public online for years,
+so there is nothing about them left to protect.
+
+On 2026-09-28 a session recommending a lecture exercise reported that it had checked the exercise against mlg's text and PDFs, CS229's problem sets included,
+as if a match there would have ruled it out.
+The user: "it's up to us to decide what content to put in the lecture notes versus saving for exams/hw/etc;
+what another class did doesn't matter.
+just don't leak solutions ACCIDENTALLY.";
+"the stanford cs229 materials are particularly useless to protect, since they're available online".
+
+- **Do:** check new notes content against the items this course grades, and decide what to hold back on the merits.
+- **Don't:** treat another class's problem sets or keys as ruling content out of the notes, or present such a check as a gate.
+
+## Where the book PDFs for a course's reading shelf come from
+
+The user keeps a collection of textbook PDFs in `G:\My Drive\Texts 2` on their Windows machine (the XPS).
+A cloud session cannot read that folder, but the user can open a Remote Control session there on request.
+Copying a book from it into a course's reading-shelf repository (`Morrison-Lab/mlr` for the machine learning course) is pre-authorized, as needed.
+The user, 2026-09-28: "G:\My Drive\Texts 2 has a collection of book pdfs;
+you can copy them to mlr as needed".
+Only the reading-shelf repo, never the notes or graded-material repos, since the books are copyrighted.
+
+- **Do:** ask the user for the Remote Control session when a task needs a book's text, and copy just the books the task needs into the reading-shelf repo.
+- **Don't:** copy a book into the notes repo or the graded-material repo.

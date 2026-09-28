@@ -912,3 +912,13 @@ When adding or updating a skill definition, remember to re-run `python3 scripts/
 - **Don't:** assert that a skill consumes or uses an agent in `agents.qmd` without wiring that relationship into the skill itself.
 (Morrison-Lab/ai-config#3619, 2026-09-12.)
 
+
+## Route a finding to the agent that owns the PR's branch, read from the PR
+
+When several agents each own one PR of a split task, relay a review finding by the PR's head branch, not by the part you remember it being.
+On 2026-09-28 a finding on Morrison-Lab/mln#192 was sent to the part-A agent because #192 was recalled as part A;
+its head branch was `claude/executed-chunks-c`, and the part-A agent had to bounce it back.
+The query that settles it is one call: `pull_request_read` `get`, field `head.ref`.
+
+- **Do:** read the PR's `head.ref` before relaying a finding, and name the branch in the message.
+- **Don't:** route by the order the PRs were opened or by a remembered part label.

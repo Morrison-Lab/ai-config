@@ -1225,3 +1225,18 @@ The user merged it with the web UI's Merge button.
 - **Do:** say which other PRs in the stack will hit the same refusal, so the user expects one click per PR.
 - **Don't:** push the merge commit to the default branch yourself to get around it without the user's go-ahead,
   since that skips the repository's merge path.
+
+## `subscribe_pr_activity` can refuse a PR, and the refusal is silent
+
+On 2026-09-28, `subscribe_pr_activity` returned `Could not subscribe to this PR.` for four Morrison-Lab/mln PRs opened by `claude[bot]` from another session (mln#168, #170, #171, #156),
+while PRs in the same repo opened under the user's account subscribed fine.
+The cause (author, app installation or something else) is not established.
+Four refusals and three successes is a pattern, not a rule.
+The session had taken over six mln PRs from that other session, including mln#166, whose subscription apparently hit the same refusal.
+The refusals went unnoticed, and the user merged mln#166 with no event reaching the session;
+the user had to report the merge.
+
+- **Do:** read each `subscribe_pr_activity` result, and when it refuses, poll the PR from a scheduled check-in instead and say so.
+- **Do:** tell a subagent that it must report a refused subscription, not carry on as if subscribed.
+- **Don't:** assume a PR is watched because you asked for it to be,
+  since a refusal is silent unless the result is read.

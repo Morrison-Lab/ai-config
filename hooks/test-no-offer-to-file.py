@@ -72,6 +72,176 @@ CASES = [
     ([TOOL, say("I could file an issue about this?")], True, "i could file an issue blocks"),
     ([TOOL, say("Want me to file the issue and open that PR?")], True, "bundled offer blocks"),
 
+    # Statement-shaped offers (no question mark): both let through before
+    (
+        [TOOL, say(
+            "I can also file a gha issue about the `@claude` job committing "
+            "leftover session files onto PR branches, since that will happen "
+            "again whenever someone writes \"@claude review\". Say if you want it."
+        )],
+        True,
+        "statement offer 'I can also file ... Say if you want it' blocks",
+    ),
+    (
+        [TOOL, say("I haven't filed an issue about it. Say if you want one.")],
+        True,
+        "statement offer 'I haven't filed an issue ... Say if you want one' blocks",
+    ),
+    ([TOOL, say("I haven't filed an issue about it.")], True, "haven't filed an issue alone blocks"),
+    ([TOOL, say("I can file an issue for the flaky test.")], True, "i can file an issue statement blocks"),
+    ([TOOL, say("I haven\u2019t filed an issue about it.")], True, "curly-apostrophe haven't filed blocks"),
+    (
+        [TOOL, say("The memory entry would cover this. Just say the word.")],
+        True,
+        "say the word near a memory mention blocks",
+    ),
+    (
+        [TOOL, say("This deserves an issue. Let me know if you want me to file it.")],
+        True,
+        "let me know if you want me to file blocks",
+    ),
+
+    # Legitimate reports that share vocabulary with the statement patterns
+    (
+        [TOOL, say("I filed https://github.com/Morrison-Lab/gha/issues/981 about it.")],
+        False,
+        "report of a filed issue by URL does not block",
+    ),
+    (
+        [TOOL, say(
+            "I haven't filed an issue because "
+            "https://github.com/Morrison-Lab/gha/issues/981 already tracks it."
+        )],
+        False,
+        "not filing a duplicate does not block",
+    ),
+    (
+        [TOOL, say(
+            "Filed https://github.com/Morrison-Lab/gha/issues/981. "
+            "Say if you want me to open a PR for the fix."
+        )],
+        False,
+        "discretionary PR offer after a filed issue does not block",
+    ),
+    (
+        [TOOL, say(
+            "Filed https://github.com/Morrison-Lab/gha/issues/981 and recorded "
+            "the lesson in memories/hooks.md. Say if you want it closed once the PR merges."
+        )],
+        False,
+        "say if you want it <verb> after a filing report does not block",
+    ),
+    (
+        [TOOL, say("Since this is already tracked, I haven't filed a new issue for it.")],
+        True,
+        "an unlinked 'already tracked' decline blocks",
+    ),
+    (
+        [TOOL, say("Because #123 already covers this, I didn't file a duplicate issue.")],
+        False,
+        "a #N reference before a didn't-file clause does not block",
+    ),
+    (
+        [TOOL, say(
+            "The root cause is a race condition in the retry loop that was already "
+            "present before this change, and the fix here just adds a lock. "
+            "I haven't filed an issue about the retry-loop race, since it's out of "
+            "scope for this PR and not something I want to track right now."
+        )],
+        True,
+        "unrelated excuse word in an earlier sentence does not excuse the clause",
+    ),
+    (
+        [TOOL, say(
+            "I haven't filed an issue. The flaky test was already fixed upstream."
+        )],
+        True,
+        "excuse word in the next sentence does not excuse the clause",
+    ),
+    (
+        [TOOL, say(
+            "Tests pass. I haven't filed an issue since "
+            "https://github.com/Morrison-Lab/gha/issues/981 already tracks it."
+        )],
+        False,
+        "excuse after a URL in the same sentence does not block",
+    ),
+    (
+        [TOOL, say(
+            "I haven't filed an issue for the other hooks (e.g. the Stop guards) "
+            "because Morrison-Lab/gha#981 already covers them."
+        )],
+        False,
+        "an e.g. abbreviation does not end the sentence",
+    ),
+    (
+        [TOOL, say("Because Morrison-Lab/gha#981 covers this, I didn't file a duplicate.")],
+        False,
+        "owner/repo#N decline does not block",
+    ),
+    (
+        [TOOL, say("Because Morrison-Lab/gha#981 covers this, I didn't file a duplicate issue.")],
+        False,
+        "owner/repo#N decline naming a duplicate issue does not block",
+    ),
+    (
+        [TOOL, say(
+            "I didn't file an issue: "
+            "https://gitlab.com/group/proj/-/issues/12 covers it."
+        )],
+        False,
+        "a GitLab issue URL in the same sentence does not block",
+    ),
+    (
+        [TOOL, say(
+            "The retry loop already had a lock, and I have not filed an issue "
+            "about the race condition, since I want to keep this PR small."
+        )],
+        True,
+        "comma-joined unrelated 'already' does not excuse the clause",
+    ),
+    (
+        [TOOL, say(
+            "Because we already discussed this earlier, and here is context; "
+            "I have not filed an issue for the timeout bug, but that is intentional for now."
+        )],
+        True,
+        "semicolon-joined unrelated 'already' does not excuse the clause",
+    ),
+    (
+        [TOOL, say(
+            "See https://github.com/Morrison-Lab/gha/issues/981 for context. "
+            "I haven't filed an issue about the lint gap."
+        )],
+        True,
+        "a link in a different sentence does not excuse the clause",
+    ),
+    (
+        [TOOL, say("Since the test passes now, I haven't filed an issue about it.")],
+        True,
+        "a non-excuse reason before the not-filed clause still blocks",
+    ),
+    (
+        [TOOL, say("I can file an issue-tracking script that automates this, if that's useful context.")],
+        False,
+        "issue as part of a compound noun does not block",
+    ),
+    (
+        [TOOL, say("I can also file a ticket in Jira, but this repo only uses GitHub issues.")],
+        False,
+        "issues as an ordinary noun past a comma does not block",
+    ),
+    (
+        [TOOL, say("The hook matches `I can also file a gha issue` statements now.")],
+        False,
+        "statement pattern quoted in a code span does not block",
+    ),
+    (
+        [TOOL, say("I can't file an issue in that repo: the token lacks access.")],
+        False,
+        "reporting inability to file does not block",
+    ),
+
     # Negative cases: trigger phrases quoted inside inline code spans
     (
         [TOOL, say("We shouldn't add a hook for `want me to file` because it is too broad.")],

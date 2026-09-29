@@ -34,6 +34,12 @@ The Jules reviewer's own misfires live in [`jules-review.md`](jules-review.md).
   #60 fixed the trigger;
   #61 was the zero-diff verification PR.
   On 2026-08-28, `Test Coverage` triggered the trusted reporter only after #60 reached `main`, and #61 then produced the expected child run and sticky coverage comment.)
+- **A `workflow_run` receiver's runs carry the default branch's `head_sha` and `head_branch`, whatever triggered them.**
+  A receiver that checks each PR's preview build therefore lists every run under `main`, so a run history filtered to `main` alternates pass and fail by PR and says nothing about `main` itself.
+  This defeats the "is it pre-existing?" recipe in [`debugging.md`](debugging.md) (filter `list_workflow_runs` to `main`) for exactly this class of workflow.
+  **Do:** read a receiver run's triggering PR from its `workflow_run` payload or its logs, and establish `main`'s status by reproducing on `main` directly: render `main`, or run the checker over `main`'s own output.
+  **Don't:** read a `workflow_run` run listed under `main` as `main`'s status, or a red one there as a pre-existing failure.
+  (Morrison-Lab/mln `check-site.yml`, 2026-09-28: every run showed `main`, whichever PR's preview build had triggered it.)
 - **`${{ env.PATH }}` evaluates to an empty string in step `env:` context.**
   Setting `env: PATH: ${{ github.workspace }}/bin:${{ env.PATH }}` in Actions step context overwrites `PATH` with only that directory (dropping `/usr/bin`, `/bin`, etc.), causing `command not found` (exit code 127).
   Use `echo "${GITHUB_WORKSPACE}/bin" >> "$GITHUB_PATH"` in a setup step to
@@ -1123,3 +1129,14 @@ It has two concrete consequences worth keeping straight:
 - **Do:** write an aggregator job with `if: always()` and an explicit per-dependency result check, never a bare `needs:` with no result inspection.
 - **Don't:** assume `skipped` is safely distinct from `success` for a required check --- GitHub treats them the same for merge-gating purposes.
 - **Don't:** let a job rename/split ship without a same-change audit of every ruleset/branch-protection rule that names the old job.
+
+- **A workflow filtered with `on.pull_request.branches` does not run for a PR targeting any other branch, so a stacked PR's required contexts can simply never report.**
+  Stacking PR B on PR A's branch keeps B's diff reviewable, but every workflow whose trigger reads `pull_request: {branches: [main]}` is skipped entirely while B targets A.
+  Those checks read *not reported* rather than failing.
+  That is not a false green --- a required context that never reports still blocks the merge --- but B can look close to mergeable while two of its gates have never executed.
+  Retargeting B after A merges does **not** fix it: the base change is a `pull_request.edited` event, and the default trigger types are `opened`, `synchronize` and `reopened`, so nothing re-runs.
+  - **Do:** once the base retargets, merge the base branch into B and push.
+    That is a `synchronize` event, it re-runs the branch-filtered workflows, and it is the base-sync the PR wanted anyway.
+  - **Don't:** reach for an empty commit or a close-and-reopen to kick CI, and don't read "all required contexts green" without confirming each one actually reported on the current head.
+  ([Morrison-Lab/qbt#80](https://github.com/Morrison-Lab/qbt/pull/80), 2026-09-27: `check-spelling.yaml` and `check-non-standard-chars.yml` both declare `branches: [main]`.
+  While the PR was stacked neither reported, and the base-sync merge push took `check / check-chars` from *not reported* to green.)

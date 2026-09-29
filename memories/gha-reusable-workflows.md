@@ -77,7 +77,13 @@ Generic Actions-authoring material stays there.
   So if a consumer PR's `claude-code-review.yml` run first ran while `@v2` still pointed at a broken gha commit, re-running that same run (whether via the Actions UI "Re-run failed jobs" or a bot re-dispatch that happens to target the existing run rather than creating a new one) reproduces the identical pre-fix failure forever, no matter how many times you retry or how long ago the tag was fixed.
   **Diagnose by checking `run_attempt`** (> 1 means this is a re-run, not a fresh dispatch) **and `created_at`** (`mcp__github__actions_get`, `method: get_workflow_run` --- compare against when the fix landed), then read `referenced_workflows[].sha` in the same response --- it shows the ACTUAL resolved commit for that run, which you can diff against the tag's current `get_tag` SHA to confirm staleness.
   **Only a genuinely NEW run (a new `run_id`) re-resolves the tag fresh** --- a new commit (`pull_request: synchronize`) is the reliable trigger;
-  an `@claude review` comment sometimes causes the bot to re-run the existing stale run instead of dispatching a new one (observed on UCD-SERG/serodynamics#193 --- a direct `workflow_dispatch` via `actions_run_trigger` would have sidestepped this, but that call 403s in these sessions too, per the note above).
+  an `@claude review` comment sometimes causes the bot to re-run the existing stale run instead of dispatching a new one (observed on UCD-SERG/serodynamics#193 --- a direct `workflow_dispatch` via `actions_run_trigger` would have sidestepped this, but that call 403s in these sessions too, per the 403 caveat below).
+  Counter-measurement, 2026-09-28, in a claude.ai cloud session: `mcp__github__actions_run_trigger` worked.
+  `run_workflow` dispatched gha's `slide-major-tag.yml` on `main`, and `rerun_failed_jobs` re-ran failed jobs on Morrison-Lab/gha#976 (run 36420813293) and on Morrison-Lab/mds#21 (run 36413136527).
+  So the 403 looks like a property of some sessions' scope rather than of the tool
+  (inferred from one session of each kind).
+  Try the call once before routing around it.
+  The throwaway-branch rule in [`github-remote-sessions.md`](github-remote-sessions.md) leans on this.
 - **Testing a reusable workflow that calls `anthropics/claude-code-action` (a review or agent workflow) before merge is DOUBLY constrained -- a branch-pinned caller cannot exercise the change even when it runs.**
   Two independent mechanisms both defeat the obvious "point a caller at the test branch and dispatch it" approach:
   1. **The action's own workflow-validation guard refuses to run unless the CALLER's workflow file is byte-identical to that repo's DEFAULT branch** (`Workflow validation failed ... must exist and have identical content to the version on the repository's default branch`).
@@ -287,6 +293,16 @@ so the pattern is load-bearing rather than a workaround invented for this PR.
   - **Don't:** write a changelog bullet as one unbroken line on the reasoning that it is "just a changelog" and outside the line-break convention's scope.
   (2nd occurrence, 2026-09-24 on [Morrison-Lab/gha#931](https://github.com/Morrison-Lab/gha/issues/931) ([PR #933](https://github.com/Morrison-Lab/gha/pull/933));
   prior: 2026-09-02 on [Morrison-Lab/gha#826](https://github.com/Morrison-Lab/gha/pull/826).)
+
+- **Run a reusable check locally with the *caller's* inputs, not the action's defaults --- otherwise the local run and CI are different configurations.**
+  A reusable workflow's behaviour is set by the caller's `with:` block, and a bare local invocation silently substitutes defaults for every input the caller overrode.
+  `check-new-line-breaks` is the sharp case, because two of its inputs decide the *file set* rather than the strictness: `paths-ignore` removes files, and `globs` (default `'*.md'`) decides what is eligible at all.
+  A caller that ignores `README.md` without adding `*.Rmd` to `globs` covers neither the generated file nor its source, so the job reports success having examined nothing --- while a local run without `NLB_PATHS_IGNORE` examines the file and reports success for the opposite reason.
+  Both are green, and they mean opposite things.
+  - **Do:** read the caller's `with:` block and pass every input it sets, e.g. `NLB_GLOBS='*.md *.Rmd' NLB_PATHS_IGNORE='README.md' NLB_BASE_REF=origin/main python3 check-new-line-breaks/check-new-line-breaks.py`, and read the job log's `Examined N added line(s) across M file(s)` line rather than the exit status alone.
+  - **Don't:** describe what CI checked from a local run whose inputs you did not match.
+  ([Morrison-Lab/qbt#78](https://github.com/Morrison-Lab/qbt/pull/78), 2026-09-27: a PR asserted the gate had been "passing vacuously" on a reflowed `README.md`.
+  The review showed it had never run on that file at all, and CI's log read `Examined 0 added line(s) across 0 file(s)` on both the PR head and its base.)
 
 - **Historically, `check-new-line-breaks` did not see a sentence that opens with a digit or an opening parenthesis, so a two-sentence line passed silently.**
   Its `_SENT_BREAK_RE` lookahead class was `` [A-Z"'`*\[] ``, which admitted an uppercase letter or a markup character --- and neither a digit nor `(`.

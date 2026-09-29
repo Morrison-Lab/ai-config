@@ -711,3 +711,34 @@ a review-request event.
   stay withdrawn.
 - **Don't:** read "removed then re-added" as the workflow creating requests
   --- it is restoring what it cleared.
+
+## CI/review lifecycle state read as a review finding produces a loop no round can close
+
+Measured 2026-09-28 on `Morrison-Lab/mln`, on [mln#218](https://github.com/Morrison-Lab/mln/pull/218) (fixed in [mln#225](https://github.com/Morrison-Lab/mln/pull/225)): once on `claude-code-review.yml@v3`, the reviewer runs `check-pr-fully-clean.py` inside its own review job as part of its process, and recorded two things it observed there as findings: a sibling build still in progress, and its **own** in-progress review job plus a `require-clean-verdict` check failing on the **prior** round's verdict.
+Three consecutive rounds came back `NOT_CLEAN` on an unchanged, clean diff --- every round's finding was about CI/review lifecycle timing, not about the code, and re-requesting review could never close the loop because the next round would observe the same kind of in-flight state (now caused by itself) and report it again.
+
+This is the CI-side twin of [`recheck-review-findings.md`](../shared/workflow/recheck-review-findings.md)'s "green checks is not a review verdict" trap, but inverted: there the risk is treating passing CI as a clean verdict, here the reviewer treated its own run's transient CI state as a *defect to report*.
+Neither direction is correct --- `check-pr-fully-clean.py`'s job is to authoritatively read verdicts and check state for a human or session to act on, not to hand the reviewer's own mid-run snapshot back as a finding about the PR.
+
+The local fix was a prompt-addendum paragraph, "CI state is not a finding," telling the reviewer not to report its own or a sibling job's in-progress status, a superseded-round's stale check, or a require-clean-verdict result that predates the current head, as a review finding.
+Filed upstream as [`Morrison-Lab/gha#978`](https://github.com/Morrison-Lab/gha/issues/978) and [`Morrison-Lab/gha#979`](https://github.com/Morrison-Lab/gha/issues/979) for the canonical prompt.
+
+- **Do:** when consecutive review rounds return `NOT_CLEAN` with findings that are only about CI/check/review-job state (in progress, stale, superseded), stop re-requesting review --- the loop cannot close by running it again.
+- **Do:** fix the reviewer's own instructions (a prompt addendum, or the upstream template) rather than treating it as a normal finding to Address/Rebut/Defer.
+- **Don't:** let the reviewer's internal use of `check-pr-fully-clean.py` (or an equivalent state check) leak its own transient run state back out as a finding about the diff.
+
+(ai-config UMS pass, 2026-09-28 09:18 PT, from a session on `Morrison-Lab/mln`.)
+
+## An "@claude review" comment can also wake the general agent, whose residual auto-commit can push a scratch file onto the PR branch
+
+Measured 2026-09-28 on `Morrison-Lab/mln` (tracked upstream as [`Morrison-Lab/gha#981`](https://github.com/Morrison-Lab/gha/issues/981)): a repo carrying both `claude-bot.yml` (the general `@claude` agent, calling gha's `claude.yml`) and a review workflow can have an `@claude review` comment trigger **both** --- the review-dispatch path this file otherwise documents, and the general agent's own `issue_comment` trigger, since `claude-bot.yml`'s mention gate matches any `@claude`-prefixed comment body, not just ones asking for a review specifically.
+The general agent then ran its normal residual-auto-commit step (see [`claude-bot-workflows.md`](claude-bot-workflows.md)'s "@claude CI action" section for the mechanism), and this time the residual state it committed was a real leftover file the agent's own investigation had created, `.tmp_find_claude.py`, which it pushed onto the PR branch as `claude[bot]`.
+The next review round then flagged that scratch file as a finding, on a PR whose author never touched it.
+
+This is a different failure from the config-file-revert bug that section already tracks and fixes: here the auto-commit did exactly what it is designed to do (commit real residual changes), the residual just happened to be debris the agent should have cleaned up before finishing, not a protected-config revert to guard against.
+
+- **Do:** after posting an "@claude review" comment in a repo with both a general agent workflow and a review workflow, check the branch for new bot commits (`git log --oneline -5`, or the PR's commit list) before treating the next round's diff as author-only.
+- **Do:** if a scratch/temp file shows up as `claude[bot]`-committed, remove it and treat it as a workflow bug to report ([gha#981](https://github.com/Morrison-Lab/gha/issues/981)), not as a genuine review finding to Address.
+- **Don't:** assume "@claude review" only ever dispatches the review workflow --- in a repo running both workflows off the same mention prefix, it can wake the general agent too.
+
+(ai-config UMS pass, 2026-09-28 09:18 PT, from a session on `Morrison-Lab/mln`.)

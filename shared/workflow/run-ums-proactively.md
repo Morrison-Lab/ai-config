@@ -43,6 +43,10 @@ Run the pass, then report it in the past tense, and put any genuine sequencing q
 - **Don't:** attach a user-conditional to a stated intention to run it.
 - **Don't:** read "I will" as sufficient --- the trailing clause is what decides it.
 
+(Recurrence, 2026-09-28, a `gia` session on `Morrison-Lab/pds` with no ai-config loaded (ai-config#3948): the wave's four PRs merged and no pass ran at any checkpoint.
+The session's closing summary then listed the missing pass as a loose end and ended "say if you want it done anyway", the offer form this section rules out.
+The user's reply was "always do the lessons-learned pass!")
+
 **A new instruction arriving at a checkpoint does not cancel the checkpoint.**
 The bullet above covers the pass you *announce* and never run; this is the one you never announce at all, because something else arrived first.
 A merge or clean verdict is usually the exact moment I report back, so it is also the moment the next request lands.

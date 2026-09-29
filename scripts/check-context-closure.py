@@ -33,16 +33,27 @@ Per `shared/workflow/algorithmatize-checks.md`, "how many bytes does this
 repo load before it starts" is decidable over data already on disk, so it
 belongs in an instrument rather than in anyone's periodic judgment.
 
+Threshold rationale (`--total-char-limit` and `--repo-margin`):
+
+  The closure's size is not only our budget to set: Claude Code itself
+  warns at launch when the instruction files it loads add up past a limit
+  it derives from the model's context window (ai-config#4061). The formula,
+  read out of the CLI bundle, is under CLI_TOTAL_FLOOR_CHARS below. Every
+  model gets a total limit of at least 120,000 characters, so the closure
+  is gated at that floor LESS a margin for the repo `CLAUDE.md` the CLI
+  loads alongside this one. The gate counts characters the way the CLI
+  does (`cli_char_count`), and it FAILS rather than warns: the CLI's
+  warning is printed at every launch of every session until the file
+  shrinks, which is the cost the check exists to prevent.
+
 Threshold rationale (`--budget`, default below):
 
-  200,000 bytes is roughly 50k tokens, a quarter of a 200k-token context
-  window. The closure is a tax levied before any work happens, so the
-  question the budget answers is how much of the window remains for the
-  task -- the files an agent must actually read, its tool output, and the
-  conversation. Leaving three quarters is a defensible line; leaving half
-  would be generous for a fixed overhead that grows monotonically. Both this
-  and `--bytes-per-token` are parameters rather than literals, per
-  `shared/coding/configurable-parameters.md`.
+  The advisory byte budget is the older, softer line, kept because the
+  pin-bump report (`--compare`) is denominated in bytes. Its default
+  mirrors the character gate (the 120,000-char floor less the 20,000-char
+  margin), since this corpus is nearly pure ASCII and bytes track
+  characters. Both it and `--bytes-per-token` are parameters rather than
+  literals, per `shared/coding/configurable-parameters.md`.
 
 Threshold rationale (`--fragment-cap`, default below):
 
@@ -77,13 +88,16 @@ line is a prompt to decide what comes out, not a defect that should block an
 unrelated PR. Under `--strict` in `--compare` mode, a bump that would cross
 the budget fails too, even while the current pin is under it.
 
-**One limit here is not advisory**, and it is not ours. The root file also
-has the Claude Code harness's own hard cap, stated in CHARACTERS, past which
-it is not auto-loaded whole (`--root-char-cap`, default 150,000). That is a
-defect rather than a size finding, so it fails regardless of `--strict`,
-like a dangling anchored import -- and it fails silently everywhere else,
-since a rule that never loaded and a rule that loaded and was followed look
-identical from the outside. The count is reported on every run, passing or
+**Two limits here are not advisory**, and neither is ours. The closure's
+total is gated against the CLI's own total limit (above). The root file
+also has the CLI's per-file limit, stated in CHARACTERS (`--root-char-cap`,
+default 150,000, the per-file limit on a 1M-context current model). Both
+fail regardless of `--strict`, like a dangling anchored import. The CLI
+2.1.283 only WARNS past either limit and still loads the file (measured
+2026-09-28, ai-config#4061); earlier notes here said the file was not
+loaded whole, which that version does not do. The warning is still the
+thing to prevent, since it is printed on every launch and nothing in the
+repo reports it. The count is reported on every run, passing or
 failing, with a warning band below the cap, because on a file that has grown
 thousands of characters in a day the remaining headroom is the actionable
 number (ai-config#897, #1258).
@@ -101,36 +115,144 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 from fences import (  # noqa: E402
     count_unbalanced_fences,
+    find_fence_spans,
     strip_code as _shared_strip_code,
 )
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-DEFAULT_BUDGET_BYTES = 200_000
 DEFAULT_ROOT = "CLAUDE.md"
 
-# The root file has a SECOND limit, and it differs from the budget above in
-# kind rather than in size. The budget is ours: a soft target over the whole
-# closure, advisory by design (ai-config#695). This is the Claude Code
-# harness's own hard cap on the auto-loaded `CLAUDE.md`, denominated in
-# CHARACTERS rather than bytes, which the harness reports as e.g.
+# --- Claude Code's own instruction-file limits -------------------------------
+# Read out of the Claude Code 2.1.283 bundle on 2026-09-28 (ai-config#4061).
+# Minified, so the names are the bundle's own:
+#
+#   var bEn=0.05, wEn=40000;
+#   function $2e(e){ let n=<context window of model e>, r=n>0?n:R$e;  // R$e=200000
+#     return Math.max(wEn, Math.round(r*bEn*Yy(e))) }                  // per-file
+#   var vEn=120000;
+#   function TEn(e){ return Math.max(vEn, $2e(e)) }                    // total
+#   function Yy(e){ if(!e) return 4; ...; return ux.has(family)?4:3 }  // chars/token
+#
+# `ux` lists the pre-4.7 families (claude-3-*, opus and sonnet 4.0-4.6,
+# haiku-4-5), so every current model counts 3 characters per token. That
+# makes the per-file limit 40,000 on a 200k-context model (30,000, raised
+# to the floor) and 150,000 on a 1M-context one; the total limit is
+# 120,000 and 150,000 respectively.
+#
+# What the CLI counts: JS `string.length` (UTF-16 code units) of each
+# CLAUDE.md-type file (User, Project, Local, Managed, and every `@`-import;
+# not AGENTS.md, not auto-memory) after its YAML frontmatter and block-level
+# HTML comments are stripped. A file over the per-file limit is left out of
+# the total comparison, since it gets its own warning. Both are warnings
+# ("will impact performance"); nothing is truncated.
+CLI_PER_FILE_FLOOR_CHARS = 40_000
+CLI_CONTEXT_FRACTION = 0.05
+CLI_TOTAL_FLOOR_CHARS = 120_000
+CLI_DEFAULT_CONTEXT_TOKENS = 200_000
+CLI_CHARS_PER_TOKEN = 3
+CLI_CHARS_PER_TOKEN_LEGACY = 4
+
+# The gate uses the floor: it is the smallest total limit any model gets,
+# so a closure under it never trips the total warning on its own. The
+# margin is for the repo `CLAUDE.md` the CLI loads alongside the user-wide
+# one, measured on each repo's `main` on 2026-09-28: mln 18,242 chars;
+# sparta 30,367 (CLAUDE.md plus the one memory file its imports reach);
+# gha 331,426, over every limit on its own, so no margin here can cover it.
+# 20,000 covers mln-sized repos under the floor, and leaves sparta-sized
+# ones under the 150,000 a 1M-context model gets.
+DEFAULT_TOTAL_CHAR_LIMIT = CLI_TOTAL_FLOOR_CHARS
+DEFAULT_REPO_MARGIN_CHARS = 20_000
+
+DEFAULT_BUDGET_BYTES = DEFAULT_TOTAL_CHAR_LIMIT - DEFAULT_REPO_MARGIN_CHARS
+
+
+def cli_limits(
+    context_tokens: int = CLI_DEFAULT_CONTEXT_TOKENS,
+    chars_per_token: int = CLI_CHARS_PER_TOKEN,
+) -> tuple[int, int]:
+    """(per-file, total) character limits the CLI uses for one model.
+
+    `Math.round` rounds half up, unlike Python's `round`, so it is spelled
+    out rather than delegated.
+    """
+    scaled = int(context_tokens * CLI_CONTEXT_FRACTION * chars_per_token + 0.5)
+    per_file = max(CLI_PER_FILE_FLOOR_CHARS, scaled)
+    return per_file, max(CLI_TOTAL_FLOOR_CHARS, per_file)
+
+
+_FRONTMATTER_RE = re.compile(r"\A---[ \t]*\r?\n.*?^---[ \t]*(?:\r?\n|\Z)", re.S | re.M)
+_HTML_COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
+_BLOCK_COMMENT_OPEN_RE = re.compile(r"^ {0,3}<!--")
+
+
+def strip_block_html_comments(text: str) -> str:
+    """Drop block-level HTML comments the way the CLI's loader does.
+
+    The CLI lexes the file with `marked` and, for each block-level `html`
+    token that starts with `<!--` and contains `-->`, removes every comment
+    in it, dropping the token (with its trailing blank lines) when nothing
+    else is left. This approximates that lexer: a block starts on a line
+    opening with `<!--` outside a code fence and runs to the line holding
+    `-->`. A comment inside a paragraph is not a block and is kept, as the
+    CLI keeps it. Fences come from the shared `lib/fences.py` tracker, and
+    an unclosed fence runs to the end of the file, as `marked` reads it.
+    """
+    lines = text.split("\n")
+    fenced, _unclosed, _orphans = find_fence_spans(text, swallow_unclosed=True)
+    last = len(lines) - 1
+    out: list[str] = []
+    i = 0
+    while i <= last:
+        if i not in fenced and _BLOCK_COMMENT_OPEN_RE.match(lines[i]):
+            j = i
+            while j <= last and "-->" not in lines[j]:
+                j += 1
+            if j <= last:
+                j += 1
+                while j <= last and not lines[j].strip():
+                    j += 1
+                block = "\n".join(lines[i:j]) + ("\n" if j <= last else "")
+                rest = _HTML_COMMENT_RE.sub("", block)
+                if rest.strip():
+                    out.append(rest)
+                i = j
+                continue
+        out.append(lines[i] + ("\n" if i < last else ""))
+        i += 1
+    return "".join(out)
+
+
+def cli_char_count(text: str) -> int:
+    """Characters the CLI counts for one instruction file.
+
+    Frontmatter and block-level HTML comments are stripped first, and the
+    length is in UTF-16 code units (JS `string.length`), so a character
+    outside the Basic Multilingual Plane, such as most emoji, counts twice.
+    """
+    text = _FRONTMATTER_RE.sub("", text, count=1)
+    text = strip_block_html_comments(text)
+    return len(text.encode("utf-16-le")) // 2
+
+
+# The root file has a per-file limit as well. This is the CLI's per-file
+# limit on a 1M-context current model (`cli_limits(1_000_000)`), which the
+# CLI reports as e.g.
 #
 #     /Users/<u>/.claude/CLAUDE.md is over the 150.0k-char limit (150.9k chars)
 #
-# Crossing it is not a prompt to consider splitting. It is a file the harness
-# will not load whole, which fails silently: a rule that never loaded and a
-# rule that loaded and was followed look identical from the outside. So it
-# fails regardless of `--strict`, like a dangling anchored import, rather
-# than joining the advisory budget (ai-config#897, #1258).
+# On a 200k-context model the same limit is 40,000, which this corpus's root
+# file cannot meet, so the gate sits at the larger figure. It fails
+# regardless of `--strict`, like a dangling anchored import, rather than
+# joining the advisory budget (ai-config#897, #1258, #4061).
 DEFAULT_ROOT_CHAR_CAP = 150_000
 
 # Measured 2026-08-07: at 153,217 raw characters the harness reported
-# "150.9k", so its count runs about 2,300 below a raw `len()` of the decoded
-# text. What it excludes is NOT established -- HTML comments (2,750 chars)
-# and `@import` lines (2,839) were each checked and neither matches the gap.
-# Gating on the raw count is the conservative direction under that
-# uncertainty, since raw >= the harness's figure in the one case measured.
-# Re-derive rather than trusting this note if the margin ever matters.
+# "150.9k", so its count ran about 2,300 below a raw `len()` of the decoded
+# text. HTML comments (2,750 chars in all) were checked then and did not
+# match; the 2.1.283 bundle (ai-config#4061) shows why -- the CLI strips
+# only BLOCK-level comments, not ones inside a paragraph. The count here is
+# now `cli_char_count`, which applies the same stripping.
 #
 # The warning band exists because the cap is a cliff: at the corpus's
 # observed growth this file can cross it between one session and the next,
@@ -676,7 +798,7 @@ def root_char_count(base: Path, root: str) -> int | None:
     by every multi-byte glyph in the file.
     """
     try:
-        return len((base / root).read_text(encoding="utf-8"))
+        return cli_char_count((base / root).read_text(encoding="utf-8"))
     except OSError:
         return None
 
@@ -699,7 +821,7 @@ def root_char_count_at(base: Path, root: str, rev: str) -> int | None:
     if blob is None:
         return None
     try:
-        return len(blob.decode("utf-8"))
+        return cli_char_count(blob.decode("utf-8"))
     except UnicodeDecodeError:
         return None
 
@@ -788,6 +910,51 @@ def render_root_growth(before, after, root, cap, fraction):
         f"companion file (ai-config#1259), or trim an equivalent amount of "
         f"prose elsewhere in {root}."
     )
+
+
+def render_total_chars(file_chars, limit, margin):
+    """(over, text) for the CLI total-limit gate on the whole closure.
+
+    `file_chars` is a list of (path, chars) in the CLI's own count. Always
+    reports the total and the headroom, passing or failing, so a closure
+    that is about to cross reads differently from one that is comfortable.
+    """
+    total = sum(chars for _, chars in file_chars)
+    gate = limit - margin
+    per_200k, _ = cli_limits(CLI_DEFAULT_CONTEXT_TOKENS)
+    per_1m, total_1m = cli_limits(1_000_000)
+    lines = [
+        "",
+        f"  Claude Code instruction-file total: {total:,} chars (the CLI's count) "
+        f"across {len(file_chars)} file(s).",
+        f"  Gate: {gate:,} = the CLI's {limit:,}-char total floor less "
+        f"{margin:,} for a repo CLAUDE.md loaded alongside.",
+        f"  (Per-file limit {per_200k:,} on a 200k-context model, "
+        f"{per_1m:,} on a 1M-context one; total {total_1m:,} on the latter.)",
+    ]
+    if total > gate:
+        lines.append(
+            f"  OVER THE CLI TOTAL-LIMIT GATE by {total - gate:,} chars. Move "
+            f"whole sections out of the closure into linked (not @-imported)"
+        )
+        lines.append(
+            "  fragments, keeping each rule's one-sentence core inline "
+            "(ai-config#4061)."
+        )
+        return True, "\n".join(lines)
+    lines.append(f"  Under the gate by {gate - total:,} chars.")
+    return False, "\n".join(lines)
+
+
+def non_negative_int(value: str) -> int:
+    """An argparse type for a count that may be zero but not negative."""
+    try:
+        parsed = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{value!r} is not an integer")
+    if parsed < 0:
+        raise argparse.ArgumentTypeError(f"must be zero or more, got {parsed}")
+    return parsed
 
 
 def unit_fraction(value: str) -> float:
@@ -927,6 +1094,26 @@ def main(argv=None) -> int:
         "as the honest spelling of 'off' -- an out-of-range fraction is not.",
     )
     parser.add_argument(
+        "--total-char-limit",
+        type=positive_int,
+        default=DEFAULT_TOTAL_CHAR_LIMIT,
+        help=(
+            "the CLI's total instruction-file limit to gate the closure "
+            f"against, failing regardless of --strict (default: "
+            f"{DEFAULT_TOTAL_CHAR_LIMIT:,}, the floor every model gets)"
+        ),
+    )
+    parser.add_argument(
+        "--repo-margin",
+        type=non_negative_int,
+        default=DEFAULT_REPO_MARGIN_CHARS,
+        help=(
+            "characters of --total-char-limit reserved for a repo CLAUDE.md "
+            "loaded alongside this closure; pass 0 when measuring a repo's "
+            f"own file (default: {DEFAULT_REPO_MARGIN_CHARS:,})"
+        ),
+    )
+    parser.add_argument(
         "--fragment-cap",
         type=positive_int,
         default=DEFAULT_FRAGMENT_CAP_BYTES,
@@ -951,6 +1138,14 @@ def main(argv=None) -> int:
         print(
             "error: --baseline and --compare answer different questions "
             "(this repo's own change vs a submodule pin bump); pass one.",
+            file=sys.stderr,
+        )
+        return 2
+    if args.repo_margin >= args.total_char_limit:
+        # A margin that eats the whole limit leaves a gate of zero or less,
+        # which fails every closure while printing a reason about size.
+        print(
+            "error: --repo-margin must be smaller than --total-char-limit.",
             file=sys.stderr,
         )
         return 2
@@ -991,6 +1186,17 @@ def main(argv=None) -> int:
 
     frag_over, frag_text = render_fragment_caps(files, args.fragment_cap)
     print(frag_text)
+
+    reader = local_reader(base)
+    total_over, total_text = render_total_chars(
+        [
+            (path, cli_char_count(reader(path).decode("utf-8", errors="replace")))
+            for path, _size, _depth in files
+        ],
+        args.total_char_limit,
+        args.repo_margin,
+    )
+    print(total_text)
 
     total = sum(size for _, size, _ in files)
     after_total = None
@@ -1161,6 +1367,10 @@ def main(argv=None) -> int:
     if frag_over:
         # Same stance as root_over above, and NOT gated on --strict. See
         # DEFAULT_FRAGMENT_CAP_BYTES for why this one fails rather than warns.
+        return 1
+    if total_over:
+        # The CLI's own total limit, so the same stance as root_over: not
+        # gated on --strict. See DEFAULT_TOTAL_CHAR_LIMIT.
         return 1
     if root_growth_over:
         # NOT gated on --strict, and not on --max-growth either. This one

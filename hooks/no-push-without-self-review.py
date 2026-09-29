@@ -176,11 +176,27 @@ _DENIAL_ISSUED: list[bool] = [False]
 # Anchored at line start, optionally as a Markdown heading. Anchoring is what
 # separates a verdict from a sentence quoting one, which a bare `Verdict:`
 # search cannot do -- see this module's docstring.
+#
+# Two vocabularies name the same verdict: the persona's prose form (`Ready for
+# merge` / `Needs more work`) and the review-data payload's `CLEAN` /
+# `NOT_CLEAN`, which a reviewer briefed in the payload's terms writes on its
+# verdict line too. Accepting only the prose form refused a genuinely clean
+# review (2026-09-28: three reviewer rounds on one diff, none recognized, and
+# the push was left for the user; ai-config#3991). The alternation is anchored
+# right after `Verdict:`, so `NOT_CLEAN` can never match as `CLEAN`; the
+# trailing `\b` keeps `CLEANUP` from matching, and `_verdict_from_match` reads
+# only an exact `clean` (or `ready...`) as clean.
 VERDICT_LINE = re.compile(
     r"^[ \t]{0,3}(?:#{1,6}[ \t]*)?Verdict[ \t]*:[ \t]*(?:\*\*)?"
-    r"(Ready for merge|Needs (?:more )?work)\b",
+    r"(Ready for merge|Needs (?:more )?work|NOT[ _-]?CLEAN|CLEAN)\b",
     re.I | re.M,
 )
+
+
+def _verdict_from_match(word: str) -> str:
+    """Map a VERDICT_LINE capture onto "clean" or "needs_work"."""
+    w = word.lower()
+    return "clean" if w.startswith("ready") or w == "clean" else "needs_work"
 
 # A fenced block is quoted material, so a verdict inside one is an example
 # rather than a verdict. Blanking fences before matching is what makes the
@@ -2030,7 +2046,7 @@ def parse_report_all(text: str) -> tuple[str | None, list[str]]:
     if not matches:
         return None, []
     last = matches[-1]
-    verdict = "clean" if last.group(1).lower().startswith("ready") else "needs_work"
+    verdict = _verdict_from_match(last.group(1))
     shas: list[str] = []
     seen: set[str] = set()
     for m in REVIEWED_COMMIT.finditer(blanked, last.end()):

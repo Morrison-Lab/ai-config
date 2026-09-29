@@ -1164,10 +1164,11 @@ Neither error leads to the other, and `ubuntu-latest` CI does not hit the panic,
   Returns exit code 0 only when fully clean.
   Must be executed synchronously in the foreground turn before declaring any ARDI loop complete or unclaiming a PR.
 
-## check-context-closure.py is advisory; its test pins ai-config's own import count
+## check-context-closure.py's byte budget is advisory; its test pins ai-config's own import count
 
 - **Editing the `@`-import list in ai-config's own `CLAUDE.md` changes a number that [scripts/test_check_context_closure.py](../scripts/test_check_context_closure.py) asserts, so that edit must bump the pin and must be verified with the TEST, not the script.**
-  [scripts/check-context-closure.py](../scripts/check-context-closure.py) reports and exits 0 even while over budget and even while reporting an unbalanced fence, deliberately (see its `validate.yml` step comment).
+  [scripts/check-context-closure.py](../scripts/check-context-closure.py) reports and exits 0 even while over its byte budget and even while reporting an unbalanced fence, deliberately (see its `validate.yml` step comment).
+  Its size gates (the CLI total limit, the root character cap, the fragment cap) do fail.
   Its test file is a separate `validate` step in the same job, and that one hard-fails: it pins the exact number of anchored imports the repo's `CLAUDE.md` yields.
   So adding one `@shared/...` line turns `validate` red with a message naming a count, and the advisory script says nothing about it either way.
   Bump the pin in the same commit, and record the bump in the annotation style the pin's own comment already uses (each past bump names the PR and the import that caused it).

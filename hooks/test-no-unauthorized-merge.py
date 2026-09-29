@@ -15,6 +15,13 @@ HOOK = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("-") else
 if not os.path.isfile(HOOK):
     sys.exit(f"FATAL: hook not found at {HOOK}")
 
+# The standing infra-PR grant reads a PR's file list from GitHub. Every
+# subprocess case below inherits this, so none depends on a live PR's files
+# (`gh pr merge 1352 -R Morrison-Lab/gha` must BLOCK whatever gha#1352
+# changes). The variable can only turn that grant off. The grant's own logic
+# is tested in-process at the end of this file, with the fetch stubbed.
+os.environ["NO_UNAUTHORIZED_MERGE_DISABLE_INFRA_GRANT"] = "1"
+
 BLOCK = [
     ("gh pr merge 411 --squash", "bare gh pr merge"),
     ('bash -c "gh pr merge 411 --squash"', "subshell bash -c gh pr merge inside double quotes"),
@@ -1237,6 +1244,133 @@ _span_check("an unclosed region's delimiter is blanked, so an earlier "
 _span_check("the blanking stops AT the body, so the body's first character "
             "is still legible",
             "<(bash<", [(2, 7)])
+
+# ------------------------------------------------ standing infra-PR grant
+#
+# In-process, with the GitHub fetch stubbed, so each case controls exactly
+# which files the PR has. `calls` records every fetch, which is how the
+# cases that must deny BEFORE fetching (wrong owner, no PR number) show it.
+print("\nstanding infra-PR grant:")
+
+INFRA_FILES = [".github/workflows/ci.yml", "CLAUDE.md", ".claude/settings.json"]
+_real_fetch = _guard.fetch_pr_changed_paths
+_disable = _guard.INFRA_GRANT_DISABLE_ENV
+
+
+def _infra_case(desc, want, files, command=None, mcp=None, disabled=False):
+    global checks, wrong
+    calls = []
+
+    def fake_fetch(target, number):
+        calls.append((target, number))
+        return files
+
+    _guard.fetch_pr_changed_paths = fake_fetch
+    saved = os.environ.pop(_disable, None)
+    if disabled:
+        os.environ[_disable] = "1"
+    try:
+        if mcp is not None:
+            hit = _guard.check_mcp_merge({"tool_name": mcp[0], "tool_input": mcp[1]})
+        else:
+            hit = _guard.offending(command)
+    finally:
+        _guard.fetch_pr_changed_paths = _real_fetch
+        os.environ.pop(_disable, None)
+        if saved is not None:
+            os.environ[_disable] = saved
+    got = "allow" if hit is None else "BLOCK"
+    checks += 1
+    ok = got == want
+    wrong += not ok
+    print(f"  {got if ok else 'WRONG':<6} {desc}  (fetches: {calls})")
+
+
+_MCP = "mcp__github__merge_pull_request"
+
+# The grant itself.
+_infra_case("gh pr merge of an all-infra PR", "allow", INFRA_FILES,
+            "gh pr merge 15 -R Morrison-Lab/pds --squash")
+_infra_case("REST PR merge of an all-infra PR", "allow", INFRA_FILES,
+            "gh api -X PUT repos/Morrison-Lab/pds/pulls/15/merge -f merge_method=squash")
+_infra_case("MCP merge of an all-infra PR", "allow", INFRA_FILES,
+            mcp=(_MCP, {"owner": "Morrison-Lab", "repo": "pds", "pullNumber": 15}))
+_infra_case("nested CLAUDE.md and the lint/spell/link config are infra", "allow",
+            ["sub/dir/CLAUDE.md", "AGENTS.md", ".lintr", ".lintr.R",
+             "lychee.toml", "_typos.toml", "inst/WORDLIST"],
+            "gh pr merge 15 -R Morrison-Lab/pds")
+
+# What the grant must not cover.
+_infra_case("one content file among infra files", "BLOCK",
+            INFRA_FILES + ["_subfiles/_def-probability.qmd"],
+            "gh pr merge 15 -R Morrison-Lab/pds")
+_infra_case("a rename whose previous path is content", "BLOCK",
+            [".github/moved.qmd", "_subfiles/_def-probability.qmd"],
+            "gh pr merge 15 -R Morrison-Lab/pds")
+_infra_case("a top-level scripts/ file is not infra", "BLOCK",
+            ["scripts/analysis.R"], "gh pr merge 15 -R Morrison-Lab/pds")
+_infra_case("a path only resembling .github is not infra", "BLOCK",
+            ["x.github/ci.yml"], "gh pr merge 15 -R Morrison-Lab/pds")
+_infra_case("a failed fetch denies", "BLOCK", None,
+            "gh pr merge 15 -R Morrison-Lab/pds")
+_infra_case("an empty file list denies", "BLOCK", [],
+            "gh pr merge 15 -R Morrison-Lab/pds")
+_infra_case("a repo outside INFRA_GRANT_OWNERS, without fetching", "BLOCK", INFRA_FILES,
+            "gh pr merge 15 -R Other-Owner/pds")
+_infra_case("no PR number (the current branch's PR), without fetching", "BLOCK",
+            INFRA_FILES, "gh pr merge -R Morrison-Lab/pds --squash")
+_infra_case("a PR URL is not read as a number", "BLOCK", INFRA_FILES,
+            "gh pr merge https://github.com/Morrison-Lab/pds/pull/15 -R Morrison-Lab/pds")
+_infra_case("a number forged inside a double-quoted --body", "BLOCK", INFRA_FILES,
+            'gh pr merge -R Morrison-Lab/pds --body "see 12"')
+_infra_case("a number forged inside a single-quoted --subject", "BLOCK", INFRA_FILES,
+            "gh pr merge -R Morrison-Lab/pds --subject '12'")
+_infra_case("two different PR numbers are not a determination", "BLOCK", INFRA_FILES,
+            "gh pr merge 15 16 -R Morrison-Lab/pds")
+_infra_case("a REST path and a positional naming different PRs", "BLOCK", INFRA_FILES,
+            "gh api -X PUT repos/Morrison-Lab/pds/pulls/15/merge pr merge 16")
+_infra_case("a quoted single-token REST path is the real operand", "allow", INFRA_FILES,
+            "gh api -X PUT 'repos/Morrison-Lab/pds/pulls/15/merge'")
+_infra_case("a bare number among words of a --body payload", "BLOCK", INFRA_FILES,
+            "gh pr merge -R Morrison-Lab/pds --body 'a 12 b'")
+_infra_case("a pulls/N/merge path forged inside a --body payload", "BLOCK", INFRA_FILES,
+            'gh pr merge -R Morrison-Lab/pds --body "x pulls/12/merge"')
+_infra_case("a number inside a -t payload", "BLOCK", INFRA_FILES,
+            'gh pr merge -R Morrison-Lab/pds -t "a 12 b"')
+_infra_case("gh pr merge --auto merges later contents", "BLOCK", INFRA_FILES,
+            "gh pr merge 15 -R Morrison-Lab/pds --auto --squash")
+_infra_case("a repository BRANCH merge is never a PR merge", "BLOCK", INFRA_FILES,
+            "gh api -X POST repos/Morrison-Lab/pds/merges -f base=main -f head=x")
+_infra_case("the disable variable turns the grant off", "BLOCK", INFRA_FILES,
+            "gh pr merge 15 -R Morrison-Lab/pds", disabled=True)
+_infra_case("MCP auto-merge is not covered", "BLOCK", INFRA_FILES,
+            mcp=("mcp__github__enable_pr_auto_merge",
+                 {"owner": "Morrison-Lab", "repo": "pds", "pullNumber": 15}))
+_infra_case("MCP merge of a PR with a content file", "BLOCK",
+            INFRA_FILES + ["R/foo.R"],
+            mcp=(_MCP, {"owner": "Morrison-Lab", "repo": "pds", "pullNumber": 15}))
+_infra_case("MCP merge with a non-numeric PR number", "BLOCK", INFRA_FILES,
+            mcp=(_MCP, {"owner": "Morrison-Lab", "repo": "pds", "pullNumber": "15; x"}))
+
+# The fetch budget must end before the hook's own timeout: a hook killed by
+# its timeout does not deny, so a longer budget fails OPEN on a slow network.
+# Read the registered timeout rather than restating it, so the two cannot drift.
+_hooks_json = json.loads((Path(HOOK).parent / "hooks.json").read_text())
+_timeouts = [h.get("timeout") for entries in _hooks_json.get("hooks", {}).values()
+             for e in entries for h in e.get("hooks", [])
+             if h.get("script") == "no-unauthorized-merge.py"]
+checks += 1
+_ok = bool(_timeouts) and all(t and _guard.INFRA_FETCH_BUDGET_S + 2 <= t for t in _timeouts)
+wrong += not _ok
+print(f"  {'allow' if _ok else 'WRONG':<6} the fetch budget ({_guard.INFRA_FETCH_BUDGET_S}s) "
+      f"leaves 2s under every registered hook timeout ({_timeouts})")
+
+# merge_pr_number directly: the flag-value exclusion, which no verdict case
+# above can separate from the two-numbers rule on its own.
+checks += 1
+_n = _guard.merge_pr_number("gh pr merge -R Morrison-Lab/pds --match-head-commit 1234 15")
+wrong += _n != 15
+print(f"  {'allow' if _n == 15 else 'WRONG':<6} a flag's numeric value is not the PR number (got {_n})")
 
 total = checks
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))

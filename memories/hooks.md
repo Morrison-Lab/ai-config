@@ -115,7 +115,7 @@ Blocking hooks prevent the turn from ending until the missing artifact or requir
 
 | Hook Script | Type | Trigger / Purpose | Proactive Compliance Rule | Override / Escape Valve |
 |---|---|---|---|---|
-| [`no-offer-to-file.py`](../hooks/no-offer-to-file.py) | **Block** | Blocks responses that offer to file an issue, update memory, or write a skill instead of doing it. | Perform authorized actions directly: file the issue (`gh issue create -R ...`) or commit the memory/skill update in the same turn, and report what was completed. | None. |
+| [`no-offer-to-file.py`](../hooks/no-offer-to-file.py) | **Block** | Blocks responses that offer to file an issue, update memory, or write a skill instead of doing it, whether phrased as a question or as a statement ("I can also file an issue ... Say if you want it"). A "haven't filed an issue" clause passes only when the same sentence links the existing issue (URL, owner/repo#N, or #N). | Perform authorized actions directly: file the issue (`gh issue create -R ...`) or commit the memory/skill update in the same turn, and report what was completed. | None. |
 | [`no-empty-promise.py`](../hooks/no-empty-promise.py) | **Block** | Blocks replies committing to future behavior without an implemented mechanism in the same turn. | When committing to a rule or action, ship the written rule/memory/hook in the current turn, arm a scheduled timer/monitor for owed actions, or state plain facts without future-tense promises. | None. |
 | [`no-unfiled-finding.py`](../hooks/no-unfiled-finding.py) | **Block** | Blocks declarative statements that an issue or finding is "worth filing" without having filed it. | File the tracking issue immediately before concluding the turn. | None. |
 | [`no-stale-pr-status.py`](../hooks/no-stale-pr-status.py) | **Block** | Blocks replies declaring PR check status based on readings taken prior to the latest push. | Always query fresh PR status (`gh pr checks <N> -R ...`) after any `git push` before stating check results. | None. |
@@ -451,6 +451,20 @@ The session did not take the unguarded path;
 it retried the override and reported the corrected scope rather than the first, more alarming reading.)
 
 ---
+
+## 4.9 A guard that calls the network has to finish well inside its registered timeout
+
+A command hook killed at its `hooks.json` `timeout` does not emit a deny, and the harness treats a hook failure other than an explicit deny as non-blocking.
+So a PreToolUse guard that makes a network call inherits a fail-open path the moment the call can outlast the timeout: a slow network turns a refusal into an allowed action.
+
+`no-unauthorized-merge.py`'s infra-PR grant (ai-config#4085) reads a PR's file list with two `gh api` calls under a hook registered at `timeout: 10`.
+The first draft gave each call its own 20-second timeout, a combined 40 seconds against a 10-second kill, found only on an adversarial re-read before push.
+The shipped version shares one 6-second budget across both calls, returns "no determination" (which denies) when it runs out, and a test reads the registered timeout from `hooks.json` and fails if the budget comes within 2 seconds of it.
+
+- **Do:** give every network call in a guard one shared deadline, and make running out of it deny.
+- **Do:** pin the budget against the registered timeout in a test that reads `hooks.json`, so raising one without the other fails CI.
+- **Don't:** give each call its own timeout.
+  The sum is what the kill measures.
 
 ## 5. Adding & Modifying Hooks: Checklist
 

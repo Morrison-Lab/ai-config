@@ -2,7 +2,7 @@
 
 The rule lives in [`issue-first`](issue-first.md)'s "Label an agent-filed issue with its authorship and its model" section.
 This fragment carries the mechanics.
-It is linked rather than `@`-imported, because `issue-first.md` is imported into `CLAUDE.md` wholesale and the always-loaded pool is budgeted --- run `python3 scripts/check-context-closure.py` before moving anything back.
+It is linked rather than `@`-imported, and so is `issue-first.md` itself, because the always-loaded pool is budgeted --- run `python3 scripts/check-context-closure.py` before `@`-importing anything into `CLAUDE.md`.
 
 ## Scope
 

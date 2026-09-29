@@ -627,7 +627,7 @@ _f, _m, _i, _amb = ccc.walk_closure(
 check("walk_closure surfaces the ambiguous file", _amb == [("root.md", 1)])
 
 # This repo's own CLAUDE.md is the real instance, so pin it: the count must
-# stay at 4 anchored imports whatever the fence handling does. (Was 69 until
+# stay at 0 anchored imports whatever the fence handling does. (Was 69 until
 # ai-config#1065 added @shared/workflow/learn-from-review-findings.md; 70 until
 # ai-config#1205 added @shared/workflow/agent-teams.md; 71 until ai-config#1325
 # added @shared/writing/ambiguous-reference.md; 72 until ai-config#1334 moved
@@ -645,7 +645,9 @@ check("walk_closure surfaces the ambiguous file", _amb == [("root.md", 1)])
 # 20 heavy @shared fragments to on-demand markdown links; 8 after consolidating
 # overhead context across AI models; 4 after ai-config#2393 converted four more
 # heavy workflow imports to on-demand markdown links; 5 after ai-config#2652
-# added @shared/workflow/revert-merge.md.)
+# added @shared/workflow/revert-merge.md; 0 after ai-config#4061 converted
+# the last five workflow imports to linked summaries, to fit Claude Code's
+# always-loaded instruction limit.)
 #
 # The pin is deliberately a magic number rather than a value derived from
 # CLAUDE.md. Deriving it would make the guard vacuous, since it would then
@@ -654,12 +656,12 @@ check("walk_closure surfaces the ambiguous file", _amb == [("root.md", 1)])
 # so the assertion name below carries that remedy: `check` prints only the
 # name, and this is the failure an import-list edit actually produces.
 check(
-    "this repo's CLAUDE.md still yields 5 anchored imports "
+    "this repo's CLAUDE.md still yields 0 anchored imports "
     "(adding or removing an @-import bumps this pin -- update the count and "
     "record the bump in the annotation style of the comment above)",
     len(ccc.import_paths(
         (ccc.REPO_ROOT / "CLAUDE.md").read_text(encoding="utf-8")
-    )[0]) == 5,
+    )[0]) == 0,
 )
 
 # --- round-6 review findings ------------------------------------------------
@@ -775,7 +777,14 @@ check(
 # measured closure.
 files, missing, inline, _amb = ccc.walk_closure("CLAUDE.md", ccc.local_reader(ccc.REPO_ROOT))
 check("this repo's own closure has no dangling imports", not missing)
-check("this repo's own closure resolves more than just the root", len(files) > 1)
+# Since ai-config#4061 the root imports nothing, so its closure is the root
+# alone. Asserting that (rather than `len(files) > 1`, which held while the
+# root imported fragments) still catches a walk that silently resolves a
+# prose @token into a counted file.
+check(
+    "this repo's own closure is exactly its root file",
+    [path for path, _size, _depth in files] == ["CLAUDE.md"],
+)
 
 # The inline matcher runs against a corpus full of `@claude` bot mentions and
 # email addresses. It must find the real imports without turning that prose
@@ -1266,6 +1275,101 @@ with tempfile.TemporaryDirectory() as tmp:
         "moving prose from the root into a fragment passes the ratchet",
         ccc.main(gate + ["--baseline", rev]) == 0,
     )
+
+# --- the CLI's own instruction-file limits (ai-config#4061) -------------------
+# The formula read out of the Claude Code 2.1.283 bundle. Pinned at the three
+# settings that matter here: a current model at 200k and 1M context, and a
+# legacy (4 chars/token) model at 1M.
+check(
+    "a 200k-context current model: per-file 40,000 (floor), total 120,000",
+    ccc.cli_limits(200_000, 3) == (40_000, 120_000),
+)
+check(
+    "a 1M-context current model: per-file and total both 150,000",
+    ccc.cli_limits(1_000_000, 3) == (150_000, 150_000),
+)
+check(
+    "a 1M-context legacy model counts 4 chars/token: 200,000 each",
+    ccc.cli_limits(1_000_000, 4) == (200_000, 200_000),
+)
+check(
+    "Math.round rounds half up, unlike Python's round()",
+    # 813,310 * 0.05 * 3 = 121,996.5: JS Math.round gives 121,997 (checked
+    # with node), Python's round() gives the even 121,996.
+    ccc.cli_limits(813_310, 3)[0] == 121_997,
+)
+
+# What the CLI counts: frontmatter and BLOCK-level HTML comments are stripped,
+# a comment inside a paragraph is kept, and the length is in UTF-16 units.
+check(
+    "a block-level HTML comment and its trailing blank line are not counted",
+    ccc.cli_char_count("a\n\n<!--\nhidden\n-->\n\nb\n") == len("a\n\nb\n"),
+)
+check(
+    "an HTML comment inside a paragraph IS counted, as the CLI keeps it",
+    ccc.cli_char_count("text <!-- c --> more\n") == len("text <!-- c --> more\n"),
+)
+check(
+    "a comment inside a code fence is code, not a comment",
+    ccc.cli_char_count("```\n<!-- c -->\n```\n") == len("```\n<!-- c -->\n```\n"),
+)
+check(
+    "a backtick line whose info string holds a backtick opens no fence",
+    # Not a CommonMark fence opener, so the comment below it is a block
+    # comment and is stripped. Checked against marked's lexer.
+    ccc.cli_char_count("```a`b\n<!-- c -->\n") == len("```a`b\n"),
+)
+check(
+    "an unclosed fence runs to the end of the file, as marked reads it",
+    ccc.cli_char_count("x\n\n```\n<!-- c -->\n") == len("x\n\n```\n<!-- c -->\n"),
+)
+check(
+    "text after the comment on its closing line is kept",
+    ccc.cli_char_count("<!-- c --> tail\n") == len(" tail\n"),
+)
+check(
+    "YAML frontmatter is not counted",
+    ccc.cli_char_count("---\npaths: x\n---\nbody\n") == len("body\n"),
+)
+check(
+    "a character outside the BMP counts as two UTF-16 units",
+    # U+1F600, written as an escape per the ascii-punctuation rule.
+    ccc.cli_char_count("\U0001F600") == 2,
+)
+
+# The gate fails regardless of --strict, and the margin is subtracted from
+# the limit rather than added to it.
+with tempfile.TemporaryDirectory() as tmp:
+    base = Path(tmp)
+    (base / "CLAUDE.md").write_text("@frag.md\n" + "x" * 90 + "\n", encoding="utf-8")
+    (base / "frag.md").write_text("y" * 50, encoding="utf-8")
+    # 10 + 91 + 50 = 151 chars across the closure.
+    common = ["--base", str(base), "--budget", "100000000"]
+    check(
+        "a closure over the CLI total-limit gate exits 1 without --strict",
+        ccc.main(common + ["--total-char-limit", "200", "--repo-margin", "60"]) == 1,
+    )
+    check(
+        "the same closure under the gate exits 0",
+        ccc.main(common + ["--total-char-limit", "200", "--repo-margin", "40"]) == 0,
+    )
+    check(
+        "a margin that eats the whole limit is a usage error, not a size finding",
+        ccc.main(common + ["--total-char-limit", "200", "--repo-margin", "200"]) == 2,
+    )
+    over, text = ccc.render_total_chars([("CLAUDE.md", 101), ("frag.md", 50)], 200, 60)
+    check(
+        "the gate report names the total, the gate, and the overshoot",
+        over and "151 chars" in text and "Gate: 140" in text and "by 11 chars" in text,
+    )
+    over, text = ccc.render_total_chars([("CLAUDE.md", 101)], 200, 60)
+    check("an under-gate report says how much room is left",
+          not over and "Under the gate by 39 chars" in text)
+
+check(
+    "this repo's own closure is under the CLI total-limit gate",
+    ccc.main([]) == 0,
+)
 
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

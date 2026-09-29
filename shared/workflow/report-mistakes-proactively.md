@@ -12,6 +12,19 @@ immediately, in the owning tracker, without waiting to be asked.
 See "An idea is filed the same way a mistake is" below for the boundary
 and the incident that produced this extension.
 
+Two more kinds are filed on the same terms
+(user directive, 2026-09-28: "always open issues for all your ideas, concerns, mistakes, etc"):
+
+- **A concern:** a risk, gap or doubt where nothing is broken yet.
+  Examples: a guard that may fail open under a timeout, a check that fails intermittently, or a rule a session could not follow.
+- **Your own mistake,** including one you already corrected in the session.
+  Examples: a wrong claim you later retracted, or a guessed identifier you acted on.
+  The fix is in the conversation, but the lesson is not.
+  The issue records what went wrong and what would have prevented it.
+
+- **Do:** file the concern or your own mistake before the report that mentions it, and link the issue from that report.
+- **Don't:** leave a concern or a self-correction only in chat because it seems minor, already fixed, or not yet a bug.
+
 Worked-example case records for the rules below live in
 [`report-mistakes-proactively.cases.md`](report-mistakes-proactively.cases.md), moved out of the auto-loaded context.
 
@@ -539,6 +552,19 @@ A predicted number written into a memory entry or a corpus fragment is the same 
 the issue that call actually created was `#3449`.
 Caught and corrected before the entry was committed, but nothing in the repo would have caught it afterward --- a wrong issue reference passes every existing check, since nothing resolves an `ai-config#NNNN` citation against the tracker to confirm it names what the text claims it names.
 Whether that gap is worth a dedicated checker, rather than only this rule, is its own open question, tracked separately rather than decided here.)
+
+**Parallel tool batches make the predicted number feel known, and the rule above did not stop it when it was not loaded (recurrence, 2026-09-28).**
+One cloud session on `Morrison-Lab/pds`, with no ai-config loaded (ai-config#3948), cited or acted on a created object's number before the create call returned it five times:
+
+- `subscribe_pr_activity` batched with `create_pull_request` on a predicted pds#16 --- the call returned #18, so the session watched another session's PR;
+- a pds#15 comment and an ai-config#4039 comment each citing an issue filed in the same batch (#4091, #4092) --- both guesses happened to hold;
+- a qwt#144 body citing "mds#27" and "sds#15" for issues created in the next call as mds#26 and sds#16 --- both wrong, in opposite directions, because issues and PRs share one number sequence.
+
+The last two came after the session had already filed ai-config#4090 about the first.
+Knowing the rule in the moment did not stop it once a parallel batch put the create and the citation side by side, which is the case for the mechanical check the paragraph above leaves open.
+
+- **Do:** put the create call in its own batch, and the citation, subscription or link-back in a later one that reads the returned number.
+- **Don't:** batch a create with anything that names what the create will return --- a subscription, a comment, another issue's body.
 
 ## A dupe-check chained into the same call as the create gates nothing
 

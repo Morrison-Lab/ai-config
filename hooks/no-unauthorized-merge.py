@@ -6,11 +6,13 @@ Prohibits commands or MCP tool calls attempting to merge PRs/MRs (e.g. `gh pr me
 `enablePullRequestAutoMerge`, or GitHub MCP `mcp__github__merge_pull_request` and
 defensive auto-merge tool variants)
 unless explicit authorization is present via ALLOW_MERGE=1, --allow-merge, active /mwc,
-or standing per-repository grant.
+a standing per-repository grant, or the standing infra-PR grant.
 
-Three authorization paths, narrowest last: the per-command ALLOW_MERGE=1 /
---allow-merge override, an active session `/mwc` grant, and a STANDING
-per-repository grant for PRs targeting a repo in STANDING_MERGE_GRANT_REPOS.
+Four authorization paths: the per-command ALLOW_MERGE=1 / --allow-merge
+override, an active session `/mwc` grant, a STANDING per-repository grant for
+PRs targeting a repo in STANDING_MERGE_GRANT_REPOS, and a STANDING infra-PR
+grant for PRs in an INFRA_GRANT_OWNERS repo whose every changed path matches
+INFRA_PATH_PATTERNS.
 """
 from __future__ import annotations
 
@@ -1529,14 +1531,182 @@ def standing_grant_target(masked_seg: str, inert_seg: str) -> bool:
     `repos/.../` path forged inside a `--body` or a trailing `#` comment
     cannot supply one.
     """
+    target = granted_merge_target(masked_seg, inert_seg)
+    return target is not None and target in STANDING_MERGE_GRANT_REPOS
+
+
+def granted_merge_target(masked_seg: str, inert_seg: str) -> str | None:
+    """The one repository this segment's PR merge lands in, or None.
+
+    The shared half of both standing grants: the merge-type and target
+    ambiguity tests `standing_grant_target` documents. None means "not a
+    determination", and every caller denies on it.
+    """
     labels = matched_merge_labels(masked_seg, inert_seg)
     if not labels or not labels <= STANDING_GRANT_LABELS:
-        return False
+        return None
     targets = {m.group(1).lower() for m in REPO_FLAG.finditer(masked_seg)}
     targets |= {m.group(1).lower() for m in REPO_API_PATH.finditer(masked_seg)}
     if len(targets) != 1:
+        return None
+    return next(iter(targets))
+
+
+# --- Standing infra-PR merge grant ---------------------------------------
+#
+# The user granted a second STANDING merge permission: "a standing infra-PR
+# mwc grant", for PRs in any Morrison-Lab repository whose changes are all
+# tooling or agent configuration. Unlike the per-repository grant above, this
+# one is decided by WHAT the PR changes, so the guard has to read the PR's
+# file list from GitHub. Everything below fails closed: an unreadable PR
+# number, a failed or timed-out fetch, an empty or truncated file list, or
+# any one path outside INFRA_PATH_PATTERNS denies.
+#
+# Like STANDING_MERGE_GRANT_REPOS, the owner set and the path list are NOT
+# env-configurable: widening either is a code change, reviewed as one.
+INFRA_GRANT_OWNERS = frozenset({"morrison-lab"})
+
+# Matched with fullmatch against every changed path, and against a renamed
+# file's previous path too, so moving a content file under `.github/` is not
+# infra. The two groups are the ones the user chose:
+#   - tooling: CI workflows, reusable actions and their scripts, dependabot,
+#     and lint, spell and link-check configuration;
+#   - agent configuration: CLAUDE.md, AGENTS.md and GEMINI.md at any depth,
+#     `.claude/`, and Copilot's instructions (both under `.github/`).
+# A top-level `scripts/` is deliberately absent: in a content repository it
+# can hold analysis code, not tooling.
+INFRA_PATH_PATTERNS = tuple(re.compile(p) for p in (
+    r"\.github/.+",
+    r"\.claude/.+",
+    r"(?:.+/)?(?:CLAUDE|AGENTS|GEMINI)\.md",
+    r"\.lintr(?:\.R)?",
+    r"lychee\.toml",
+    r"_typos\.toml",
+    r"inst/WORDLIST",
+))
+
+# Setting this only ever DENIES (the infra grant stops firing), so unlike an
+# allowlist it cannot widen the guard. The subprocess test suite sets it so
+# no case depends on a live PR's files; the grant's own logic is tested
+# in-process with the fetch stubbed.
+INFRA_GRANT_DISABLE_ENV = "NO_UNAUTHORIZED_MERGE_DISABLE_INFRA_GRANT"
+# ONE budget shared by both GitHub calls, and well under the 10s `timeout`
+# hooks.json gives this hook. A hook killed by its timeout does not deny, so a
+# fetch allowed to outlast it would turn a slow network into an allowed merge;
+# running out of budget here returns None, which denies.
+INFRA_FETCH_BUDGET_S = 6.0
+# GitHub's "list pull request files" endpoint returns at most 3000 files, so
+# a list that long may be truncated and cannot prove every file is infra.
+GITHUB_PR_FILES_CAP = 3000
+
+# Flags of `gh pr merge` (and gh's global `-R`) that take a value, so a bare
+# number right after one is that value, not the PR number.
+_GH_PR_MERGE_VALUE_FLAGS = frozenset({
+    "-R", "--repo", "-t", "--subject", "-b", "--body", "-F", "--body-file",
+    "-A", "--author-email", "--match-head-commit",
+})
+_PULLS_MERGE_NUMBER = re.compile(r"(?:^|[\s/'\"])pulls/(\d+)/merge\b")
+
+
+def is_infra_path(path: str) -> bool:
+    return any(p.fullmatch(path) for p in INFRA_PATH_PATTERNS)
+
+
+def merge_pr_number(inert_seg: str) -> int | None:
+    """The one PR number this segment's merge names, or None.
+
+    Read from the QUOTE-MASKED segment. The payload-masked one keeps the text
+    of a double-quoted `--body`, so a number forged there (`gh pr merge -R o/r
+    --body "see 12"`, merging the current branch's PR) would otherwise be read
+    as the PR whose files get checked. A quoted single-token REST path is
+    not a payload: `unquote_words` has already removed its quotes, so it is
+    read as the real operand it is.
+
+    Only a bare decimal number counts. A PR URL or branch name, or no
+    argument at all (the current branch's PR), is not a number and denies.
+    """
+    numbers = set(m.group(1) for m in _PULLS_MERGE_NUMBER.finditer(inert_seg))
+    m = re.search(r"\bpr\s+(?:\S+\s+)*?merge\b(.*)$", inert_seg)
+    if m:
+        tokens = m.group(1).split()
+        for i, tok in enumerate(tokens):
+            if tok.isdigit() and not (i and tokens[i - 1] in _GH_PR_MERGE_VALUE_FLAGS):
+                numbers.add(tok)
+    if len(numbers) != 1:
+        return None
+    return int(next(iter(numbers)))
+
+
+def fetch_pr_changed_paths(target: str, number: int) -> list | None:
+    """Every changed path of PR `number` in `target`, renames' old paths included.
+
+    None on any failure, and on any list that cannot be shown complete: a
+    mismatch with the PR's own `changed_files` count, or a list at the API's
+    cap.
+    """
+    deadline = time.monotonic() + INFRA_FETCH_BUDGET_S
+
+    def gh_api(*args: str) -> str | None:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return None
+        try:
+            out = subprocess.run(
+                ["gh", "api", *args], capture_output=True, text=True,
+                timeout=remaining, check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return None
+        return out.stdout if out.returncode == 0 else None
+
+    count = gh_api(f"repos/{target}/pulls/{number}", "--jq", ".changed_files")
+    listing = gh_api(
+        "--paginate", f"repos/{target}/pulls/{number}/files?per_page=100",
+        "--jq", r'.[] | "F\t\(.filename)", (.previous_filename // empty | "P\t\(.)")',
+    )
+    if count is None or listing is None or not count.strip().isdigit():
+        return None
+    current, previous = [], []
+    for line in listing.splitlines():
+        kind, _, path = line.partition("\t")
+        if kind == "F" and path:
+            current.append(path)
+        elif kind == "P" and path:
+            previous.append(path)
+        elif line.strip():
+            return None
+    if not current or len(current) >= GITHUB_PR_FILES_CAP or len(current) != int(count):
+        return None
+    return current + previous
+
+
+def infra_grant_applies(target: str | None, number: int | None) -> bool:
+    """True only when PR `number` in `target` is provably an infra PR."""
+    if os.environ.get(INFRA_GRANT_DISABLE_ENV):
         return False
-    return next(iter(targets)) in STANDING_MERGE_GRANT_REPOS
+    if not target or number is None or number <= 0:
+        return False
+    owner, _, name = target.lower().partition("/")
+    if owner not in INFRA_GRANT_OWNERS or not name:
+        return False
+    paths = fetch_pr_changed_paths(target.lower(), number)
+    return bool(paths) and all(is_infra_path(p) for p in paths)
+
+
+def standing_infra_grant(masked_seg: str, inert_seg: str) -> bool:
+    """True when this segment merges an infra PR in an INFRA_GRANT_OWNERS repo.
+
+    The target and merge-type tests are `granted_merge_target`'s, unchanged;
+    this adds only the PR number and the file-list classification.
+    """
+    target = granted_merge_target(masked_seg, inert_seg)
+    if target is None:
+        return False
+    # `--auto` merges whatever the PR holds once its checks pass, not what it
+    # holds now, so the file list read here would prove nothing about it.
+    if re.search(r"(?:^|\s)--auto\b", inert_seg):
+        return False
+    return infra_grant_applies(target, merge_pr_number(inert_seg))
 
 
 def sanitize(name: str) -> str:
@@ -1701,6 +1871,8 @@ def offending(command: str, payload: dict | None = None):
             continue  # Allowed via active MWC session grant
         if standing_grant_target(masked_command[start:end], inert_command[start:end]):
             continue  # Allowed via the standing per-repository grant
+        if standing_infra_grant(masked_command[start:end], inert_command[start:end]):
+            continue  # Allowed via the standing infra-PR grant
         # Report every interpretation this segment matches, not just the
         # first: `hit` alone can name the wrong merge type when a segment
         # satisfies several patterns at once (ai-config#1362) -- a real
@@ -1738,6 +1910,13 @@ def check_mcp_merge(payload: dict) -> tuple[str, str] | None:
             return None
 
     pull_num = tool_input.get("pull_number") or tool_input.get("pullNumber") or tool_input.get("number") or ""
+    # The infra-PR grant covers the merge tool only: enabling auto-merge
+    # merges whatever the PR holds when checks pass, not what it holds now.
+    if (tool_name.lower().endswith("merge_pull_request")
+            and isinstance(owner, str) and isinstance(repo, str)
+            and str(pull_num).strip().isdigit()
+            and infra_grant_applies(f"{owner.strip()}/{repo.strip()}", int(str(pull_num).strip()))):
+        return None
     segment = f"{tool_name}(owner='{owner}', repo='{repo}', pull='{pull_num}')"
     return tool_name, segment
 
@@ -1816,7 +1995,8 @@ def main() -> int:
         f"    Offending call/segment: {segment}\n\n"
         "AI agents are mechanistically forbidden from merging PRs/MRs unless explicitly instructed "
         "by the user, executing under an explicit override (e.g. ALLOW_MERGE=1 or active /mwc), or "
-        "merging a PR whose target repo carries a standing grant (see STANDING_MERGE_GRANT_REPOS)."
+        "merging a PR whose target repo carries a standing grant (see STANDING_MERGE_GRANT_REPOS), "
+        "or merging an infra-only PR under the standing infra-PR grant (see INFRA_PATH_PATTERNS)."
     )
     print(json.dumps({
         "hookSpecificOutput": {

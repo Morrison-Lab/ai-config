@@ -178,6 +178,30 @@ To validate a heap-flag change without a 20-minute
   `quarto render <file>.qmd` for per-document work (chunk output, per-format
   `echo`, figures) where the project config is not involved.
 
+## Phone-width overflow: a callout's flex body stretches to its widest child
+
+A Quarto HTML page that scrolls sideways on a phone usually does not owe it to the wide element itself.
+`.callout-body-container` is a flex item, and a flex item's default `min-width: auto` lets any wide child stretch it, so one wide display equation, code span or URL inside a theorem, definition or example callout widens the callout, and the callout widens the page.
+Measured on `Morrison-Lab/pds` at 390px before `pds#18`: 7 of 9 pages overflowed, up to 1258px, and paragraphs of short text reported widths near 1000px because their callout had been stretched.
+
+The fix is four rules in `styles.css` (`pds#18`, verbatim in `Morrison-Lab/qwt#144`):
+`min-width: 0` on `.callout-body-container`;
+display math as its own scroll box (`mjx-container[display="true"]` with `max-width: 100%`, `overflow-x: auto`, and `min-width: 0 !important`, because MathJax writes an inline `min-width` on numbered equations);
+`overflow-wrap: break-word` on `main a`, which unlike `anywhere` leaves table column sizing alone;
+and `display: block; overflow-x: auto` on `main table` below Bootstrap's `sm` breakpoint only, since on wider screens it shrinks full-width tables.
+
+**Measure with MathJax rendered, or the widths are wrong.**
+Unrendered TeX is long plain text, so a page can read as overflowing when it is not, or the reverse.
+In a claude.ai cloud session `cdn.jsdelivr.net` is blocked by the network policy, so MathJax never loads.
+Install `mathjax@4` and `@mathjax/mathjax-newcm-font` from npm into the scratchpad, and have Playwright `route()` every `https://cdn.jsdelivr.net/npm/<pkg>@<ver>/<path>` request to the matching `node_modules/<pkg>/<path>`.
+Launch Chromium with `--ignore-certificate-errors` so the proxy's certificate does not block the web fonts, which also change widths.
+Then wait on `MathJax.startup.promise` before reading `document.documentElement.scrollWidth`.
+
+- **Do:** walk up from an overflowing leaf to the first ancestor wider than its parent.
+  That ancestor names the cause.
+- **Do:** check vertical clipping by glyph boxes (`mjx-c`, `mjx-mo`, `mjx-line`), not by `scrollHeight`, which counts the line box's invisible strut.
+- **Don't:** report widths from a page whose `mjx-container` count is zero.
+
 ## Quarto crossref labels are PAGE-scoped, so an include fragment can only reference labels on its own including page
 
 In a Quarto **website** project a `@sec-` (or `@fig-`, `@tbl-`) label resolves
@@ -544,3 +568,44 @@ consuming repos.
 (Both measured 2026-09-15 on
 [machine_learning_lecture_materials#2](https://github.com/Morrison-Lab/machine_learning_lecture_materials/pull/2);
 tracked as [ai-config#3717](https://github.com/Morrison-Lab/ai-config/issues/3717).)
+
+## `Rscript pipe is being closed (os error 232)` from Quarto means read the full log for the missing-package message
+
+`quarto render` shells out to an `Rscript` it resolves itself, and when that
+`Rscript` belongs to an R installation whose library lacks a package the
+render needs (`knitr`, `rmarkdown`), Quarto's own top-level error is
+
+```
+Error executing Rscript: The pipe is being closed (os error 232)
+```
+
+That line names the symptom (the child process's stdout pipe closed because
+Rscript exited early) rather than the cause, and reads like an OS-level or
+IPC fault --- nothing in it mentions a package.
+The actual reason is in the block Quarto prints right after that line:
+an `R installation:` summary listing `knitr: (None)` and `rmarkdown: (None)`,
+then `The knitr package is not available in this R installation.`
+
+On a machine with more than one R installation, Quarto's own R discovery can
+resolve an `Rscript` whose library was never set up for this project ---
+independent of whichever R version `Rscript` on `PATH` would report.
+`QUARTO_R` overrides that resolution.
+Quarto's documentation gives it as the R installation's `bin` directory;
+pointing it at the `Rscript.exe` inside that directory also worked on
+2026-09-28, with Quarto 1.x on Windows.
+Use the directory form, since it is the documented one.
+
+- **Do:** read the full render log past Quarto's own `Error executing
+  Rscript: ...` line rather than debugging the pipe/OS-error message itself
+  --- the real cause is the R error underneath it.
+- **Do:** set `QUARTO_R` to the right R installation's `bin` directory when
+  a machine has more than one R and Quarto resolves the wrong one.
+- **Don't:** read "pipe is being closed (os error 232)" as an environment or
+  IPC problem to work around --- it is Quarto's generic wrapper for "the R
+  child process exited," and the specific reason is the missing-package
+  report printed right after it.
+
+(Measured 2026-09-28 on a Windows machine with multiple R installations,
+working in `Morrison-Lab/mln`; the local, machine-specific `QUARTO_R` path
+and R-version details live in that machine's own Claude Code project memory,
+not here, since they are not reusable across machines.)

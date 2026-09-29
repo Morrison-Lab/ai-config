@@ -844,8 +844,8 @@ def render_root_chars(chars: int | None, root: str, cap: int, warn_fraction: flo
             f"against the harness's {cap:,} ({pct:.1f}%),\n"
             f"  so it is over by {chars - cap:,}. The harness will not load it "
             f"whole, and nothing else reports that.\n"
-            f"  Move content into an @-imported fragment or a linked companion "
-            f"file (see ai-config#1259 for the pattern)."
+            f"  Move content into a linked companion file (plain link, not an "
+            f"@-import; ai-config#1259, #4061) or an on-demand memory file."
         )
     text = (
         f"\n  {root}: {chars:,} characters against the harness's {cap:,}-char "
@@ -906,8 +906,8 @@ def render_root_growth(before, after, root, cap, fraction):
         f"cap), and this branch adds {delta:+,} more.\n"
         f"{headroom} Near the cap the file may shrink or hold, "
         f"not grow.\n"
-        f"  Move this section into an @-imported fragment or a linked "
-        f"companion file (ai-config#1259), or trim an equivalent amount of "
+        f"  Move this section into a linked companion file (plain link, not an "
+        f"@-import; ai-config#1259, #4061), or trim an equivalent amount of "
         f"prose elsewhere in {root}."
     )
 

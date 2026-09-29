@@ -37,6 +37,7 @@ field (e.g. "grab an issue", "drive to clean", "update memories and skills").
 | [`pr-status`](skills/pr-status/SKILL.md) | | Report the current PR's CI and review state |
 | [`pr-status-all`](skills/pr-status-all/SKILL.md) | | Report status across all open PRs |
 | [`stack-prs`](skills/stack-prs/SKILL.md) | | Branch a new PR off an unmerged base PR, keep it in sync, and re-target it to `main` once the base merges |
+| [`steward`](skills/steward/SKILL.md) | | Repo-level PR conventions the PR-activity harness reads: posture, findings, CI pitfalls, merging |
 
 ### Issue management
 

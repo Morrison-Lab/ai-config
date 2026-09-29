@@ -941,6 +941,80 @@ def _paths_overlap(p1, p2):
         return False
 
 
+def _normalize_dir_key(d):
+    """Normalize a directory path string for dictionary keying."""
+    if not d:
+        return ""
+    try:
+        d_real = os.path.realpath(d) if os.path.exists(d) else d
+    except Exception:
+        d_real = d
+    return os.path.normcase(os.path.normpath(d_real))
+
+
+def _canonical_dir(d, worktree_paths=None):
+    """Map directory path d to its canonical worktree root or normalized path."""
+    if not d:
+        return ""
+    norm = _normalize_dir_key(d)
+    if not norm:
+        return ""
+    if worktree_paths:
+        best_wt = None
+        best_len = -1
+        for wt_p in worktree_paths:
+            if not wt_p:
+                continue
+            if norm == wt_p or norm.startswith(wt_p + os.sep) or norm.startswith(wt_p + "/"):
+                if len(wt_p) > best_len:
+                    best_len = len(wt_p)
+                    best_wt = wt_p
+        if best_wt is not None:
+            return best_wt
+    return norm
+
+
+def _lookup_dir_branches(branches_by_dir, d, worktree_paths=None):
+    """Lookup the set of recent branches for a directory."""
+    canon = _canonical_dir(d, worktree_paths)
+    if canon in branches_by_dir:
+        return branches_by_dir[canon]
+    if not worktree_paths:
+        best_key = None
+        best_len = -1
+        for known_key in branches_by_dir:
+            if not known_key:
+                continue
+            if canon.startswith(known_key + os.sep) or canon.startswith(known_key + "/"):
+                if len(known_key) > best_len:
+                    best_len = len(known_key)
+                    best_key = known_key
+        if best_key is not None:
+            return branches_by_dir[best_key]
+    if "" in branches_by_dir:
+        return branches_by_dir[""]
+    return set()
+
+
+def _update_dir_branches(branches_by_dir, d, branches, worktree_paths=None):
+    """Update the set of recent branches for a directory."""
+    canon = _canonical_dir(d, worktree_paths)
+    if not worktree_paths and canon not in branches_by_dir:
+        best_key = None
+        best_len = -1
+        for known_key in branches_by_dir:
+            if not known_key:
+                continue
+            if canon.startswith(known_key + os.sep) or canon.startswith(known_key + "/"):
+                if len(known_key) > best_len:
+                    best_len = len(known_key)
+                    best_key = known_key
+        if best_key is not None:
+            branches_by_dir[best_key] = set(branches)
+            return
+    branches_by_dir[canon] = set(branches)
+
+
 def _extract_dispatch_text(inp):
     """Flatten all string fields in a tool input dict/list for pattern matching."""
     texts = []
@@ -1039,11 +1113,12 @@ def _is_dispatch_relevant(inp, tool_name, harness_dirs, cur_dir, target_cwd_real
     return True
 
 
-def _process_bash_tool_use(inp, cur_dir, recent_branches, target_cwd_real, target_branch,
-                           head_sha, other_branches, effective_cwd, current_repo_branch, guard):
+def _process_bash_tool_use(inp, cur_dir, branches_by_dir, target_cwd_real, target_branch,
+                           head_sha, other_branches, effective_cwd, current_repo_branch,
+                           guard, worktree_paths=None):
     """Process a bash/command invocation for commits, directory moves, and reviewer dispatches.
 
-    Returns (new_cur_dir, new_recent_branches, commit_seen, dispatch_seen).
+    Returns (new_cur_dir, commit_seen, dispatch_seen).
     """
     harness_dirs, harness_cwd = set(), None
     if isinstance(inp, dict):
@@ -1057,7 +1132,7 @@ def _process_bash_tool_use(inp, cur_dir, recent_branches, target_cwd_real, targe
     cmd = str(inp.get("command") or inp.get("cmd") or inp.get("CommandLine") or inp.get("script") or "") if isinstance(inp, dict) else ""
     command = unwrap_command(cmd)
     scanned = strip_quoted(command)
-    start_dir = harness_cwd or cur_dir
+    start_dir = harness_cwd or cur_dir or effective_cwd
 
     commit_seen = False
     for commit in COMMIT.finditer(scanned):
@@ -1065,17 +1140,25 @@ def _process_bash_tool_use(inp, cur_dir, recent_branches, target_cwd_real, targe
         invocation = scanned[commit.start():commit.end()]
         commit_paths = harness_dirs | extract_named_paths(invocation)
         commit_dir = absolute_dir(shell_dir_after(before, start_dir))
-        commit_branches = branches_after(before, recent_branches)
+        dir_before = commit_dir or start_dir
+        dir_branches = _lookup_dir_branches(branches_by_dir, dir_before, worktree_paths)
+        commit_branches = branches_after(before, dir_branches)
         if _is_commit_relevant(harness_dirs, commit_dir, commit_paths, commit_branches,
                                target_cwd_real, target_branch, effective_cwd=effective_cwd):
             commit_seen = True
 
-    new_recent_branches = branches_after(scanned, recent_branches)
-    new_cur_dir = absolute_dir(shell_dir_after(scanned, start_dir, parent_only=True))
+    end_dir = absolute_dir(shell_dir_after(scanned, start_dir, parent_only=True))
+    target_update_dir = end_dir or start_dir
+    dir_branches = _lookup_dir_branches(branches_by_dir, target_update_dir, worktree_paths)
+    new_dir_branches = branches_after(scanned, dir_branches)
+    _update_dir_branches(branches_by_dir, target_update_dir, new_dir_branches, worktree_paths)
+
+    new_cur_dir = end_dir
 
     dispatch_seen = False
     if guard.external_reviewer_command(cmd) or "pre-push-review" in cmd:
-        dispatch_branches = branches_after(scanned, recent_branches)
+        dispatch_dir = end_dir or start_dir
+        dispatch_branches = _lookup_dir_branches(branches_by_dir, dispatch_dir, worktree_paths)
         if _is_dispatch_relevant(inp, "bash", harness_dirs, cur_dir, target_cwd_real,
                                 target_branch, head_sha, other_branches,
                                 effective_cwd=effective_cwd,
@@ -1083,12 +1166,12 @@ def _process_bash_tool_use(inp, cur_dir, recent_branches, target_cwd_real, targe
                                 current_repo_branch=current_repo_branch):
             dispatch_seen = True
 
-    return new_cur_dir, new_recent_branches, commit_seen, dispatch_seen
+    return new_cur_dir, commit_seen, dispatch_seen
 
 
-def _process_agent_tool_use(inp, tool_name, cur_dir, recent_branches, target_cwd_real,
+def _process_agent_tool_use(inp, tool_name, cur_dir, branches_by_dir, target_cwd_real,
                             target_branch, head_sha, other_branches, effective_cwd,
-                            current_repo_branch, guard):
+                            current_repo_branch, guard, worktree_paths=None):
     """Process an agent/subagent tool use for reviewer dispatch.
 
     Returns True if this invocation is a relevant reviewer dispatch.
@@ -1099,15 +1182,21 @@ def _process_agent_tool_use(inp, tool_name, cur_dir, recent_branches, target_cwd
         return False
 
     agent_dirs = set()
+    agent_cwd = None
     for key in ("cwd", "workdir", "Cwd", "WorkingDirectory", "path"):
         val = inp.get(key)
         if isinstance(val, str) and val:
             agent_dirs.add(val)
+            if agent_cwd is None:
+                agent_cwd = val
+
+    dispatch_dir = agent_cwd or cur_dir or effective_cwd
+    dispatch_branches = _lookup_dir_branches(branches_by_dir, dispatch_dir, worktree_paths)
 
     return _is_dispatch_relevant(inp, tool_name, agent_dirs, cur_dir, target_cwd_real,
                                 target_branch, head_sha, other_branches,
                                 effective_cwd=effective_cwd,
-                                dispatch_branches=recent_branches,
+                                dispatch_branches=dispatch_branches,
                                 current_repo_branch=current_repo_branch)
 
 
@@ -1160,17 +1249,29 @@ def is_pre_push_review_in_flight(cwd, path, branch=None, session_cwd=None):
     target_branch = branch or current_repo_branch
     head_sha = _rev_parse(cwd, target_branch or "HEAD") if cwd else None
 
-    # Collect known other branches to disambiguate dispatches
+    # Collect known other branches and worktree paths to disambiguate dispatches
     other_branches = set()
+    worktree_paths = set()
     if cwd:
         try:
             for wt in list_worktrees(cwd):
                 b = wt.get("branch")
                 if b and b != target_branch:
                     other_branches.add(b)
+                p = wt.get("path")
+                if p:
+                    worktree_paths.add(_normalize_dir_key(p))
             for b, _, _ in list_local_branches(cwd):
                 if b != target_branch:
                     other_branches.add(b)
+        except Exception:
+            pass
+    if session_cwd:
+        try:
+            for wt in list_worktrees(session_cwd):
+                p = wt.get("path")
+                if p:
+                    worktree_paths.add(_normalize_dir_key(p))
         except Exception:
             pass
 
@@ -1194,7 +1295,7 @@ def is_pre_push_review_in_flight(cwd, path, branch=None, session_cwd=None):
     ambiguous_omo_names = set()
     omo_seq = 0
     seq = 0
-    recent_branches, cur_dir = set(), None
+    branches_by_dir, cur_dir = {}, None
 
     try:
         with open(path, encoding="utf-8", errors="ignore") as stream:
@@ -1220,18 +1321,20 @@ def is_pre_push_review_in_flight(cwd, path, branch=None, session_cwd=None):
                         pending_omo_uses.setdefault(name, []).append(call_id)
                         inp = record.get("tool_input")
                         if name in {"bash", "run_command", "terminal", "execute_command", "shell"}:
-                            cur_dir, recent_branches, commit_seen, dispatch_seen = _process_bash_tool_use(
-                                inp, cur_dir, recent_branches, target_cwd_real, target_branch,
-                                head_sha, other_branches, effective_cwd, current_repo_branch, guard)
+                            cur_dir, commit_seen, dispatch_seen = _process_bash_tool_use(
+                                inp, cur_dir, branches_by_dir, target_cwd_real, target_branch,
+                                head_sha, other_branches, effective_cwd, current_repo_branch, guard,
+                                worktree_paths=worktree_paths)
                             if commit_seen:
                                 last_commit_seq = seq
                             if dispatch_seen:
                                 last_dispatch_seq = seq
                                 reviewer_call_ids.add(call_id)
-                        elif _process_agent_tool_use(inp, name, cur_dir, recent_branches,
+                        elif _process_agent_tool_use(inp, name, cur_dir, branches_by_dir,
                                                      target_cwd_real, target_branch, head_sha,
                                                      other_branches, effective_cwd,
-                                                     current_repo_branch, guard):
+                                                     current_repo_branch, guard,
+                                                     worktree_paths=worktree_paths):
                             last_dispatch_seq = seq
                             reviewer_call_ids.add(call_id)
                     else:
@@ -1282,19 +1385,21 @@ def is_pre_push_review_in_flight(cwd, path, branch=None, session_cwd=None):
                         inp = b.get("input") or {}
 
                         if tool_name in {"bash", "run_command", "terminal", "execute_command", "shell"}:
-                            cur_dir, recent_branches, commit_seen, dispatch_seen = _process_bash_tool_use(
-                                inp, cur_dir, recent_branches, target_cwd_real, target_branch,
-                                head_sha, other_branches, effective_cwd, current_repo_branch, guard)
+                            cur_dir, commit_seen, dispatch_seen = _process_bash_tool_use(
+                                inp, cur_dir, branches_by_dir, target_cwd_real, target_branch,
+                                head_sha, other_branches, effective_cwd, current_repo_branch, guard,
+                                worktree_paths=worktree_paths)
                             if commit_seen:
                                 last_commit_seq = seq
                             if dispatch_seen:
                                 last_dispatch_seq = seq
                                 if call_id:
                                     reviewer_call_ids.add(call_id)
-                        elif _process_agent_tool_use(inp, tool_name, cur_dir, recent_branches,
+                        elif _process_agent_tool_use(inp, tool_name, cur_dir, branches_by_dir,
                                                      target_cwd_real, target_branch, head_sha,
                                                      other_branches, effective_cwd,
-                                                     current_repo_branch, guard):
+                                                     current_repo_branch, guard,
+                                                     worktree_paths=worktree_paths):
                             last_dispatch_seq = seq
                             if call_id:
                                 reviewer_call_ids.add(call_id)

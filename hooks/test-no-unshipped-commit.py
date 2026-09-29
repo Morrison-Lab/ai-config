@@ -1606,4 +1606,62 @@ assert subject.is_pre_push_review_in_flight(sw_iso_root, path_sw, branch="main",
 reason_sw = subject.decide(sw_iso_root, path_sw)
 assert reason_sw and "feat-a" in reason_sw, reason_sw
 
+# Case 9: Interleaved branch switch in sibling worktree directory (ai-config#4109 round 3)
+# An interleaved Bash call in another worktree (wt_b running git checkout -b feat-a)
+# must not corrupt branches_by_dir for root, which would cause a generic reviewer
+# dispatch in root (on main) to be misattributed to feat-a and falsely suppress
+# feat-a's unreviewed, unpushed commit.
+wt_interleave_root, wt_interleave_bare, wt_interleave_run = gitrepo(
+    BASE,
+    "git remote add origin BARE",
+    "git push -q -u origin main",
+    "git checkout -q -b feat-a",
+    "git push -q -u origin feat-a",
+    HOOK,
+    "git checkout -q main",
+)
+wt_interleave_b = tempfile.mkdtemp()
+wt_interleave_run(f"git worktree add -q -b feat-b {wt_interleave_b} main")
+wt_interleave_run(HOOK, cwd=wt_interleave_b)
+
+h_interleave, path_interleave = tempfile.mkstemp()
+with os.fdopen(h_interleave, "w") as stream:
+    # 1. Commit on feat-a in root
+    stream.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t_int1", "name": "Bash", "input": {
+            "cwd": wt_interleave_root, "command": "git checkout -b feat-a && git commit -m 'commit on feat-a'"
+        }}]}
+    }) + "\n")
+    # 2. Switch to main in root
+    stream.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t_int2", "name": "Bash", "input": {
+            "cwd": wt_interleave_root, "command": "git checkout main"
+        }}]}
+    }) + "\n")
+    # 3. Interleaved tool call in sibling worktree wt_b switching to feat-a
+    stream.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t_int3", "name": "Bash", "input": {
+            "cwd": wt_interleave_b, "command": "git checkout -b feat-a"
+        }}]}
+    }) + "\n")
+    # 4. Generic review dispatch in root (on main; does not name feat-a)
+    stream.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t_int4", "name": "Agent", "input": {
+            "cwd": wt_interleave_root, "subagent_type": "adversarial-reviewer",
+            "prompt": "Review the current diff for bugs"
+        }}]}
+    }) + "\n")
+
+# Review is in flight for main in root, but NOT for feat-a
+assert subject.is_pre_push_review_in_flight(wt_interleave_root, path_interleave, branch="feat-a", session_cwd=wt_interleave_root) is False
+assert subject.is_pre_push_review_in_flight(wt_interleave_root, path_interleave, branch="main", session_cwd=wt_interleave_root) is True
+
+# decide() must STILL block because feat-a has an unpushed, unreviewed commit
+reason_interleave = subject.decide(wt_interleave_root, path_interleave)
+assert reason_interleave and "feat-a" in reason_interleave, reason_interleave
+
 print("PASS: pre-push review in flight suppresses unpushed commit block until verdict arrives (ai-config#4109)")

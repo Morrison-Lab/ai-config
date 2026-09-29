@@ -1007,6 +1007,11 @@ When suppressing the unpushed-commit Stop hook (`no-unshipped-commit.py`) becaus
   track the checked-out branch at dispatch time (`dispatch_branches` from `branches_after`),
   and do not attribute a generic reviewer dispatch to a switched-away branch
   unless that branch was actually checked out at dispatch time or named in the prompt.
+- **Track checked-out branches per directory/worktree, not globally:**
+  A single transcript-wide `recent_branches` cursor is corrupted by interleaved commands
+  running in different worktrees or checkouts (e.g. `git checkout -b branch` in `wt_b`).
+  Maintain branch tracking keyed by normalized directory (`branches_by_dir`)
+  so branch switches in one worktree directory never corrupt the tracked branch of another.
 - **Correlate OMO flat-record tool results to reviewer dispatches:**
   In OpenCode flat-record transcripts (`tool_use` / `tool_result` records),
   track pending dispatches in a FIFO queue per tool name and match `tool_result` against `reviewer_call_ids`.

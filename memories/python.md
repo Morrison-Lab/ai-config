@@ -417,3 +417,27 @@ Learned 2026-09-21 on ai-config#3827, #3829, and #3848.
 
 - **Do:** check for `Path(sys.executable).with_name("pythonw.exe")` or `shutil.which("pythonw")` and pass `CREATE_NO_WINDOW` to child subprocesses when spawning background processes on Windows.
 - **Don't:** invoke bare `"python3"` in `subprocess.Popen` on Windows for background processes.
+
+## `Path.read_text` and `Path.write_text` default to system encoding on Windows (cp1252)
+
+In Python versions prior to 3.15,
+`pathlib.Path.read_text()` and `Path.write_text()` without an explicit `encoding` argument
+default to `locale.getpreferredencoding(False)`.
+On Windows without `PYTHONUTF8=1`,
+this is typically `cp1252` (Windows-1252).
+
+Reading or writing a file that contains UTF-8 characters
+(e.g. smart quotes, em dashes, non-ASCII Unicode characters)
+using bare `Path.read_text()` or `Path.write_text()`
+fails with `UnicodeDecodeError: 'charmap' codec can't decode byte 0x... in position ...` or `UnicodeEncodeError`.
+
+Always pass `encoding="utf-8"` explicitly when calling `Path.read_text()` or `Path.write_text()`,
+even in internal scripts and CLI helpers that run primarily on developer machines.
+When running existing scripts that lack explicit encodings,
+setting `PYTHONUTF8=1` or invoking `python -X utf8` forces UTF-8 mode on Windows.
+
+- **Do:** pass `encoding="utf-8"` explicitly to `Path.read_text()` and `Path.write_text()` whenever reading or writing text files.
+- **Don't:** call bare `p.read_text()` or `p.write_text(content)` without an explicit `encoding` argument on cross-platform code.
+
+(Measured 2026-09-29 when running `scripts/install-hooks.py` on Windows, where reading UTF-8 characters in `hooks/hooks.json` raised `UnicodeDecodeError` in `cp1252`;
+repo-wide audit and lint guard tracked in #4121.)

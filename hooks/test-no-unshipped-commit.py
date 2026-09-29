@@ -1429,4 +1429,136 @@ with open(path_verdict, "r") as src, os.fdopen(h_recommit, "w") as dst:
 assert subject.is_pre_push_review_in_flight(rev_root, path_recommit) is False
 assert "1 commit(s) on HEAD are not on its upstream" in subject.decide(rev_root, path_recommit)
 
+# Case 6: Multi-worktree isolation
+# An in-flight review on worktree B must NOT suppress an unpushed commit block on worktree A.
+# A subsequent commit on worktree A must NOT cancel worktree B's in-flight review.
+wt_iso_root, wt_iso_bare, wt_iso_run = gitrepo(
+    BASE,
+    "git remote add origin BARE",
+    "git push -q -u origin main",
+    HOOK,
+)
+wt_iso_b = tempfile.mkdtemp()
+wt_iso_run(f"git worktree add -q -b feat-iso-b {wt_iso_b} main")
+wt_iso_run("git push -q -u origin feat-iso-b", cwd=wt_iso_b)
+wt_iso_run(HOOK, cwd=wt_iso_b)
+
+iso_b_head = subject._rev_parse(wt_iso_b, "HEAD")
+iso_a_head = subject._rev_parse(wt_iso_root, "HEAD")
+assert iso_b_head is not None and iso_a_head is not None
+
+h_iso, path_iso = tempfile.mkstemp()
+with os.fdopen(h_iso, "w") as stream:
+    # 1. Commit on worktree A
+    stream.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t_a1", "name": "Bash", "input": {
+            "cwd": wt_iso_root, "command": "git commit -m 'hook in a'"
+        }}]}
+    }) + "\n")
+    # 2. Commit on worktree B
+    stream.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t_b1", "name": "Bash", "input": {
+            "cwd": wt_iso_b, "command": "git commit -m 'hook in b'"
+        }}]}
+    }) + "\n")
+    # 3. Dispatch review for worktree B
+    stream.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t_b2", "name": "Agent", "input": {
+            "cwd": wt_iso_b, "subagent_type": "adversarial-reviewer",
+            "prompt": f"Review branch feat-iso-b commit {iso_b_head}"
+        }}]}
+    }) + "\n")
+    # 4. Async launch result for worktree B
+    stream.write(json.dumps({
+        "type": "user",
+        "message": {"content": [{"type": "tool_result", "tool_use_id": "t_b2", "content": "agentId: agent-iso-b"}]}
+    }) + "\n")
+
+# Review is in flight for worktree B, but NOT for worktree A
+assert subject.is_pre_push_review_in_flight(wt_iso_b, path_iso, branch="feat-iso-b", session_cwd=wt_iso_root) is True
+assert subject.is_pre_push_review_in_flight(wt_iso_root, path_iso, branch="main", session_cwd=wt_iso_root) is False
+
+# Worktree A still blocks in decide()
+reason_iso = subject.decide(wt_iso_root, path_iso)
+assert reason_iso and "commit(s)" in reason_iso, reason_iso
+
+# Subsequent commit on worktree A does NOT cancel worktree B's in-flight review
+h_iso2, path_iso2 = tempfile.mkstemp()
+with open(path_iso, "r") as src, os.fdopen(h_iso2, "w") as dst:
+    dst.write(src.read())
+    dst.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t_a2", "name": "Bash", "input": {
+            "cwd": wt_iso_root, "command": "git commit -m 'second commit in a'"
+        }}]}
+    }) + "\n")
+
+assert subject.is_pre_push_review_in_flight(wt_iso_b, path_iso2, branch="feat-iso-b", session_cwd=wt_iso_root) is True
+assert subject.is_pre_push_review_in_flight(wt_iso_root, path_iso2, branch="main", session_cwd=wt_iso_root) is False
+
+# Case 7: OMO flat records and ambiguity poisoning
+# Unrelated tool output with verdict text does not clear in-flight status
+h_omo, path_omo = tempfile.mkstemp()
+with os.fdopen(h_omo, "w") as stream:
+    # 1. Commit
+    stream.write(json.dumps({
+        "type": "tool_use", "tool_name": "bash",
+        "tool_input": {"command": "git commit -m 'unpushed commit'"}
+    }) + "\n")
+    # 2. OMO tool use for reviewer dispatch
+    stream.write(json.dumps({
+        "type": "tool_use", "tool_name": "task",
+        "tool_input": {"subagent_type": "adversarial-reviewer", "prompt": "Review changes on HEAD"}
+    }) + "\n")
+
+assert subject.is_pre_push_review_in_flight(rev_root, path_omo) is True
+
+# 3. Unrelated tool output with verdict text
+h_omo_unrelated, path_omo_unrelated = tempfile.mkstemp()
+with open(path_omo, "r") as src, os.fdopen(h_omo_unrelated, "w") as dst:
+    dst.write(src.read())
+    dst.write(json.dumps({
+        "type": "tool_use", "tool_name": "bash",
+        "tool_input": {"command": "git status"}
+    }) + "\n")
+    dst.write(json.dumps({
+        "type": "tool_result", "tool_name": "bash",
+        "tool_output": f"### Verdict: Ready for merge\n\nReviewed-Commit: {rev_head}\n"
+    }) + "\n")
+
+# Unrelated tool output must NOT clear the in-flight review status
+assert subject.is_pre_push_review_in_flight(rev_root, path_omo_unrelated) is True
+
+# 4. Ambiguity poisoning: a second pending task dispatch poisons the tool name
+h_omo_poison, path_omo_poison = tempfile.mkstemp()
+with open(path_omo_unrelated, "r") as src, os.fdopen(h_omo_poison, "w") as dst:
+    dst.write(src.read())
+    # Second task tool_use before first has returned
+    dst.write(json.dumps({
+        "type": "tool_use", "tool_name": "task",
+        "tool_input": {"subagent_type": "adversarial-reviewer", "prompt": "Review changes round 2"}
+    }) + "\n")
+    # Result arrives, but queue was ambiguous so name is poisoned
+    dst.write(json.dumps({
+        "type": "tool_result", "tool_name": "task",
+        "tool_output": f"### Verdict: Ready for merge\n\nReviewed-Commit: {rev_head}\n"
+    }) + "\n")
+
+# Poisoned queue must not clear in-flight status
+assert subject.is_pre_push_review_in_flight(rev_root, path_omo_poison) is True
+
+# 5. Clean, unambiguous OMO reviewer result DOES clear in-flight status
+h_omo_clean, path_omo_clean = tempfile.mkstemp()
+with open(path_omo, "r") as src, os.fdopen(h_omo_clean, "w") as dst:
+    dst.write(src.read())
+    dst.write(json.dumps({
+        "type": "tool_result", "tool_name": "task",
+        "tool_output": f"### Verdict: Ready for merge\n\nReviewed-Commit: {rev_head}\n"
+    }) + "\n")
+
+assert subject.is_pre_push_review_in_flight(rev_root, path_omo_clean) is False
+
 print("PASS: pre-push review in flight suppresses unpushed commit block until verdict arrives (ai-config#4109)")

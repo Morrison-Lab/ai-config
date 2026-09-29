@@ -995,3 +995,18 @@ When a PreToolUse hook decides to deny an action (such as an unreviewed git push
   log the full denial reason to stderr and exit with code 2.
   Harnesses (such as Claude Code) treat exit code 2 as a hook execution failure and block the tool,
   preventing a silent bypass when output streaming is broken.
+
+## In-flight review detection in Stop hooks must be scoped per worktree and branch (#4109)
+
+When suppressing the unpushed-commit Stop hook (`no-unshipped-commit.py`) because an adversarial review of HEAD is in flight:
+- **Scope commit and dispatch attribution to target worktree and branch:**
+  In multi-worktree or multi-branch repositories,
+  an in-flight review dispatched for worktree A must never suppress the unpushed-commit block
+  for unrelated, unreviewed commits in worktree B or on a switched-away branch.
+  Attribute commits and reviewer dispatches by matching working directories (`cwd`)
+  and branch references before comparing sequence numbers.
+- **Correlate OMO flat-record tool results to reviewer dispatches:**
+  In OpenCode flat-record transcripts (`tool_use` / `tool_result` records),
+  track pending dispatches in a FIFO queue per tool name and match `tool_result` against `reviewer_call_ids`.
+  Never treat arbitrary non-errored tool outputs with verdict-shaped strings
+  as review verdicts without verifying dispatch correlation.

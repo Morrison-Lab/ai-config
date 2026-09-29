@@ -714,13 +714,18 @@ the fix is likewise the user's to run.
 
 So the token has to be minted by the user, in their own terminal, and handed
 back.
-`scripts/rotate-claude-token.py` is written for exactly that -- it reads a
-token on stdin, so the user runs
-`claude setup-token | python3 scripts/rotate-claude-token.py --apply`
-themselves.
+`scripts/refresh-claude-org-token.sh` is written for exactly that: the user
+runs it in a real terminal, it runs `claude setup-token`, and the token goes
+in at a hidden prompt.
+Neither `!` nor a pipe works.
+`!` gives the command stdin `/dev/null`, so it hangs (ai-config#4127).
+A pipe captures the whole screen of output rather than the token, which on
+2026-09-29 stored 2039 characters of prose as the org secret
+(ai-config#4129).
 
-- **Do:** ask the user to run `claude setup-token` in their own terminal, with
-  the `! ` prefix when its output should land in the session.
+- **Do:** ask the user to run `scripts/refresh-claude-org-token.sh` (or
+  `claude setup-token` followed by `rotate-claude-token.py --apply`) in a
+  real terminal, never through `!`.
 - **Don't:** run it from an agent session behind a timeout, an `alarm`, a
   closed stdin, or a subshell -- none of those stop the browser.
 - **Don't:** read a bounded probe's empty output as evidence it did nothing.

@@ -120,16 +120,30 @@ satisfied.
 The full record is in
 [`memories/claude-code.md`](../../memories/claude-code.md).
 
-**Never have the user run it bare.**
-It prints a live, long-lived OAuth token to stdout,
+**Never have the user run it through `!`, bare or piped.**
+It prints a live, long-lived OAuth token,
 so a bare `! claude setup-token` puts that credential into the agent's
-context and into the persisted session transcript.
-Pipe it into the consumer instead, so the value is never displayed --
-which is the same reason the script itself refuses the token on `argv`:
+context and the persisted session transcript.
+Piped through `!` it never finishes:
+Claude Code runs `!` commands with stdin set to `/dev/null`,
+so the auth-code read blocks exactly as it does for an agent (ai-config#4127).
 
+Piping its stdout into a consumer is not safe either.
+It writes its whole screen to stdout, not just the token,
+and on 2026-09-29 that stored 2039 characters of prose as the org secret,
+breaking review on every repo reading it (ai-config#4129).
+`rotate-claude-token.py` now refuses any value that is not one `sk-ant-...` token.
+
+Have the user run the wrapper **in a real terminal**:
+
+```bash
+scripts/refresh-claude-org-token.sh [org]     # org defaults to Morrison-Lab
 ```
-! cd <ai-config-checkout> && claude setup-token | python3 scripts/rotate-claude-token.py --apply
-```
+
+It runs `claude setup-token` on the terminal,
+then asks for the token at a hidden prompt,
+rejoins a token that wrapped across lines,
+and rotates through the script.
 
 **Mind which account is logged in, without minting anything to find out.**
 The command mints from whichever account the local CLI is currently
@@ -146,16 +160,17 @@ claude auth status
 
 ### 3. Rotate
 
-Pipe the token straight in.
-Never paste it as an argument:
+Never pass the token as an argument:
 `argv` is visible to anyone who can run `ps`,
 and it lands in shell history.
+The user runs the wrapper from step 2, which covers this step too.
+Across every owner rather than one org, the equivalent is:
 
 ```bash
-claude setup-token | python3 scripts/rotate-claude-token.py --apply
+claude setup-token
+python3 scripts/rotate-claude-token.py --apply    # prompts for the token, hidden
 ```
 
-The user runs that pipeline themselves, for the reason in step 2.
 When the token is already in the environment, the agent can run:
 
 ```bash

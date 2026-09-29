@@ -64,7 +64,8 @@ memories/claude-code.md, "`claude setup-token` opens a browser first".
 Usage:
 
     python3 scripts/rotate-claude-token.py                  # preview
-    claude setup-token | python3 scripts/rotate-claude-token.py --apply
+    python3 scripts/rotate-claude-token.py --apply          # hidden token prompt
+    scripts/refresh-claude-org-token.sh [org]               # mint + rotate one org
     CLAUDE_CODE_OAUTH_TOKEN=... python3 scripts/rotate-claude-token.py --apply
 """
 from __future__ import annotations
@@ -72,11 +73,17 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import json
+import getpass
 import os
+import re
 import subprocess
 import sys
 
 DEFAULT_SECRET = "CLAUDE_CODE_OAUTH_TOKEN"
+# One OAuth token and nothing else. `claude setup-token` writes its whole
+# screen to stdout, so piping it in once stored 2039 characters of prose as
+# the org secret (ai-config#4129).
+OAUTH_TOKEN_SHAPE = re.compile(r"sk-ant-[A-Za-z0-9_-]+")
 DEFAULT_WORKERS = 8
 
 
@@ -359,24 +366,38 @@ def rotate(repo: str, secret: str, token: str, previous: str) -> str:
     return current
 
 
-def read_token(env_var: str) -> str:
-    """The token, from `env_var` or stdin. Exits rather than return empty."""
-    token = (os.environ.get(env_var) or "").strip()
-    if token:
-        return token
-    if sys.stdin.isatty():
-        sys.exit(
-            "No token supplied. Either pipe one in:\n"
-            "    claude setup-token | python3 scripts/rotate-claude-token.py --apply\n"
-            f"or export it:\n"
-            f"    export {env_var}=...\n"
-            "The token is never accepted as a command-line argument, because "
-            "argv is visible in `ps` and recorded in shell history."
-        )
-    token = sys.stdin.read().strip()
+def normalize_token(raw: str, env_var: str) -> str:
+    """Join a token wrapped across lines, then refuse anything not token-shaped.
+
+    A token never contains whitespace, so removing all of it repairs a paste
+    that wrapped in the terminal. Anything left that is not a single
+    `sk-ant-...` value is refused rather than written, and never echoed.
+    """
+    token = "".join(raw.split())
     if not token:
-        sys.exit("Empty token on stdin; refusing to write an empty secret.")
+        sys.exit("Empty token; refusing to write an empty secret.")
+    if env_var == DEFAULT_SECRET and not OAUTH_TOKEN_SHAPE.fullmatch(token):
+        sys.exit(
+            f"The value supplied for {env_var} is not a single `sk-ant-...` "
+            f"token ({len(token)} characters after removing whitespace); "
+            "refusing to write it. Supply only the token, not the full "
+            "output of `claude setup-token`."
+        )
     return token
+
+
+def read_token(env_var: str) -> str:
+    """The token, from `env_var`, stdin, or a hidden prompt on a terminal."""
+    from_env = os.environ.get(env_var) or ""
+    if from_env.strip():
+        return normalize_token(from_env, env_var)
+    if sys.stdin.isatty():
+        # getpass reads from the terminal without echoing, so the token is
+        # never displayed, never in argv, and never in shell history.
+        return normalize_token(
+            getpass.getpass(f"Paste the new {env_var} (input hidden): "), env_var
+        )
+    return normalize_token(sys.stdin.read(), env_var)
 
 
 def collect_repos(args: argparse.Namespace) -> tuple[list[str], list[str]]:

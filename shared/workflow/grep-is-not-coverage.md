@@ -225,6 +225,17 @@ The verification half of the same incident --- attempting the base form of a
 command and generalizing to a flag never passed --- is recorded separately in
 Morrison-Lab/ai-config#1174.)
 
+**`AGENTS.md` is part of the policy corpus, and a permission question has to search it.**
+(2026-09-28, ai-config#4092.)
+Asked "don't you have standing permission to mwc infra PRs?", a session grepped `skills/mwc/SKILL.md`, `memories/`, `shared/` and `skills/`, found only the ai-config repo grant, and answered no.
+`AGENTS.md`'s Strict Merge Control Policy had carried "Infrastructure PRs carry a standing `mwc` grant" since that morning, and ai-config#4039 proposed the hook change.
+The same session then built and merged a narrower grant (ai-config#4085) without a tracker search, and asked the user to choose a scope they had already set.
+
+- **Do:** include `AGENTS.md` and `CLAUDE.md` in any search that answers whether an agent is permitted to do something.
+- **Do:** search the tracker before implementing a capability request, however fresh and explicit the request.
+- **Don't:** ask the user to choose a design an existing directive already fixes.
+  Show them the directive instead.
+
 ### The same failure has a same-repo sibling: the wrong directory
 
 The section above routes between repos;

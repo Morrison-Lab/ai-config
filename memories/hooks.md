@@ -452,6 +452,20 @@ it retried the override and reported the corrected scope rather than the first, 
 
 ---
 
+## 4.9 A guard that calls the network has to finish well inside its registered timeout
+
+A command hook killed at its `hooks.json` `timeout` does not emit a deny, and the harness treats a hook failure other than an explicit deny as non-blocking.
+So a PreToolUse guard that makes a network call inherits a fail-open path the moment the call can outlast the timeout: a slow network turns a refusal into an allowed action.
+
+`no-unauthorized-merge.py`'s infra-PR grant (ai-config#4085) reads a PR's file list with two `gh api` calls under a hook registered at `timeout: 10`.
+The first draft gave each call its own 20-second timeout, a combined 40 seconds against a 10-second kill, found only on an adversarial re-read before push.
+The shipped version shares one 6-second budget across both calls, returns "no determination" (which denies) when it runs out, and a test reads the registered timeout from `hooks.json` and fails if the budget comes within 2 seconds of it.
+
+- **Do:** give every network call in a guard one shared deadline, and make running out of it deny.
+- **Do:** pin the budget against the registered timeout in a test that reads `hooks.json`, so raising one without the other fails CI.
+- **Don't:** give each call its own timeout.
+  The sum is what the kill measures.
+
 ## 5. Adding & Modifying Hooks: Checklist
 
 When authoring a new hook:

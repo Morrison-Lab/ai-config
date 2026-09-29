@@ -1056,6 +1056,10 @@ and a read-through inspects sentences, not the sequence.
 
 [`shared/writing/quarto-revealjs-div-styling.md`](shared/writing/quarto-revealjs-div-styling.md)
 
+## Quarto: remarks for commentary on the math, callouts for guidance to the reader
+
+[`shared/writing/quarto-remarks-vs-callouts.md`](shared/writing/quarto-remarks-vs-callouts.md)
+
 ## Writing style: a grouping level must earn its place
 
 [`shared/writing/grouping-levels.md`](shared/writing/grouping-levels.md)

@@ -439,19 +439,14 @@ A clean automated review from every available provider evaluating the current HE
 - **Mistake**: Writing a `git push` guarded by `hooks/no-push-without-self-review.py` in a form the guard cannot resolve to a real commit or a real repo --- a trailing redirection/pipe, or an unexpanded shell variable in a `-C` argument --- then reading the resulting refusal as a real review-state problem and re-dispatching a review that already exists.
 - **Example (1st occurrence)**: 2026-08-27, ai-config#2477: `git push origin cursor/ums-wrap-2272-32a3 2>&1 | tail -3` was blocked twice by the hook tokenizing the raw shell command line and treating the `2` from `2>&1` as a commit-ish push argument.
   The identical push with the redirection/pipe stripped succeeded immediately against an existing clean verdict.
-- **Example (2nd occurrence)**: 2026-09-04, ai-config#3279: `git -C "$W" push origin <sha>:refs/heads/<branch>` was refused with "`<sha>` could not be resolved to a commit," even though a matching clean verdict existed and `git cat-file -t <sha>` succeeded in the session's own shell.
-  The guard inspects command text, so it saw the literal string `"$W"` rather than the path it holds, and the refusal named the ref while the actual unresolvable token was the `-C` argument.
-  Writing the same worktree path out literally made the identical push succeed on the first attempt.
-  The trap compounds: the natural response to a refusal that misattributes its cause is to re-dispatch the reviewer in a loop that can never succeed, and from there to reach for `ALLOW_UNREVIEWED_PUSH=1` --- waving a correctly-reviewed push through the override path.
+- **Occurrence ledger**: occurrences 2 and 3 are in
+  [`mistake-patterns.cases.md`](mistake-patterns.cases.md).
 - **Canonical Rule**: [`no-push-without-self-review.py`](../hooks/no-push-without-self-review.py) parses the raw Bash command line, not a shell-expanded or otherwise resolved argument list.
 - **Fix**: Run a bare `git push origin <branch>` with no `2>&1`, no pipe, and no trailing redirection in a guarded repo.
   Write every `git -C <path> push` with the path spelled out literally, never as a shell variable.
   Before assuming the review state itself is stale, read the guard's refusal for a resolution error naming a suspicious token (a bare digit, a stray file target, an unexpanded `$VAR`).
 - **Do**: write literal paths in every `git -C ... push` this guard sees, and read a "could not be resolved to a commit" refusal as a possible command-text parsing failure before treating it as a stale or missing review.
 - **Don't**: pass a shell variable to `git -C` in a guarded push, and don't respond to a resolution-failure refusal by re-dispatching the reviewer or reaching for `ALLOW_UNREVIEWED_PUSH=1` --- neither addresses a parsing failure the review itself never caused.
-- **Example (3rd occurrence, mechanism unconfirmed)**: 2026-09-14, proposed on Morrison-Lab/ai-config#3657: a bare `git push -u origin <literal-branch-name>` (no pipe, no `$VAR`, no `-C`) was refused twice in a row, both times citing the literal branch name itself as unresolvable to a commit, while `git rev-parse <branch>` succeeded in the same shell throughout.
-  No suspicious token is visible in the refused command text, unlike the first two examples, so the underlying cause is not the one this pattern's canonical rule names, and is recorded here only as a third symptom-alike rather than as a diagnosed mechanism.
-  This bullet is a case of the very "Don't" two lines above: the resolution failure did not clear on retry and no textual fix (unlike examples 1 and 2) was available to try, so `ALLOW_UNREVIEWED_PUSH=1` was used after a genuine foreground adversarial review had already returned clean against the exact pushed commit -- an exception made because the alternative recommended by this pattern (find and fix the offending token) had nothing to find, not a case of the guard being routinely worked around.
 
 ## Pattern 22: A Background-Dispatched Review Verdict Is Invisible to Older Push Guard Revisions
 - **Mistake**: Dispatching the final adversarial-reviewer round with `run_in_background: true` (or resuming a completed reviewer via `SendMessage`) and then pushing on the strength of its clean report, when older revisions of `hooks/no-push-without-self-review.py` only scanned the foreground tool results and missed background task notifications / TaskOutput.
@@ -1135,22 +1130,7 @@ Pattern 34's `\u0061` example and this one's `\u0077` are the same trick.
 - **Direction of failure**: fail-open into the corpus.
   The false claim was the entry's whole thesis, so shipping it would have
   taught every later reader a wrong lesson from a "reproduction" that never ran.
-- **Example**: 2026-09-09,
-  [#3379](https://github.com/Morrison-Lab/ai-config/pull/3379).
-  The brief asserted that an unpinned `npx markdownlint-cli2` matched no files
-  and that `Summary: 0 issues in 0 files` was the tell.
-  Reproduction disproved both: an unpinned run lints the whole corpus exactly
-  as a pinned one does, and that string is a later version's wording for the
-  same clean verdict, appearing over 752 files and over an empty match alike.
-  Scope lives on the `Linting:` line above it, and this was caught before
-  review.
-- **A second, narrower miss rode along**, caught by a reviewer rather than by
-  me: the dupe-check grepped only the two files the brief named, missing
-  `shared/principles/fail-fast.rationale.md` and
-  `memories/nested-worktree-instrument-inflation.md`, which already carried the
-  lesson.
-  [`grep-is-not-coverage.md`](../shared/workflow/grep-is-not-coverage.md) names
-  the shape; the specific error was letting the brief set the search scope.
+- **Example**: see [`mistake-patterns.cases.md`](mistake-patterns.cases.md) Pattern 54 for the 2026-09-09 case (PR #3379).
 - **Fix**: treat "measured" in a brief as a claim to re-measure, and scope a
   dupe-check to the corpus rather than to the files a brief happens to name.
 
@@ -1243,10 +1223,15 @@ Pattern 34's `\u0061` example and this one's `\u0077` are the same trick.
 
 ## Pattern 60: Non-Discriminative Regression Tests That Pass Against Pre-Fix Code
 
-- **Mistake**: writing regression tests for a defect or feature that also pass against the pre-change codebase, providing no signal when the defect recurs or when the fix is reverted.
-- **Direction of failure**: false confidence in test coverage. When a bug fix relies on a new mechanism (e.g. timestamp-based comparison or URL-based deduplication), authoring test fixtures where pre-existing fallbacks (such as list-order tie-breaking or benign duplicates) already pass produces green tests that fail to exercise the new code path.
+- **Mistake**: writing regression tests for a defect or feature that also pass against the pre-change codebase,
+  providing no signal when the defect recurs or when the fix is reverted.
+- **Direction of failure**: false confidence in test coverage.
+  When a bug fix relies on a new mechanism (e.g. timestamp-based comparison or URL-based deduplication),
+  authoring test fixtures where pre-existing fallbacks (such as list-order tie-breaking or benign duplicates) already pass produces green tests that fail to exercise the new code path.
 - **Example**: 2026-09-29, PR [#4113](https://github.com/Morrison-Lab/ai-config/pull/4113) / issue [#4112](https://github.com/Morrison-Lab/ai-config/issues/4112) (`enforce-mwc-review-gate.py`).
-  New tests for REST check-run deduplication and timestamp extraction placed the cancelled run before the success run, which the pre-fix code already cleared via index-ordering fallback (`0 < 1`), and passed an identical duplicate whose conclusion was `success`.
+  New tests for REST check-run deduplication and timestamp extraction placed the cancelled run before the success run,
+  which the pre-fix code already cleared via index-ordering fallback (`0 < 1`),
+  and passed an identical duplicate whose conclusion was `success`.
   Local adversarial review flagged that reverting the entire production change still resulted in 199/199 passing tests.
 - **Fix**: author tests specifically structured to fail against the pre-fix code:
   1. For timestamp-based precedence/superseding, place the newer success run *first* and the older cancelled run *second* so list-index order fails without timestamps.

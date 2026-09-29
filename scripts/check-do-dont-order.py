@@ -59,7 +59,37 @@ except ImportError:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from lib.fences import find_fence_spans
 
-DO_DONT_BULLET_RE = re.compile(r"^- \*\*(Do|Don't):\*\*")
+DO_DONT_BULLET_RE = re.compile(
+    r"^- \*\*(Do|Don't)"
+    r"(?:"
+    r"(?:\s*\((?P<paren_in>[^)]*)\))?:\*\*"
+    r"|"
+    r"(?:\s*\((?P<paren_in2>[^)]*)\))?\*\*\s*(?:\((?P<paren_out>[^)]*)\))?\s*:"
+    r")"
+)
+
+
+def parse_bullet(line: str) -> tuple[str, str] | None:
+    """Match line against Do/Don't bullet regex and return (kind, form), or None.
+
+    kind: "Do" or "Don't"
+    form: "inside_colon", "outside_colon", or "parenthetical"
+    """
+    m = DO_DONT_BULLET_RE.match(line)
+    if not m:
+        return None
+    kind = m.group(1)
+    if (
+        m.group("paren_in") is not None
+        or m.group("paren_in2") is not None
+        or m.group("paren_out") is not None
+    ):
+        form = "parenthetical"
+    elif line[m.start():m.end()].endswith(":**"):
+        form = "inside_colon"
+    else:
+        form = "outside_colon"
+    return kind, form
 
 IGNORED_DIRS = {
     ".git",
@@ -84,12 +114,17 @@ class Bullet(NamedTuple):
     line_number: int
     kind: str  # "Do" or "Don't"
     text: str
+    form: str = "inside_colon"  # "inside_colon", "outside_colon", or "parenthetical"
 
 
 class Block(NamedTuple):
     start_line: int
     end_line: int
     bullets: list[Bullet]
+
+    @property
+    def forms(self) -> set[str]:
+        return {b.form for b in self.bullets}
 
 
 class Violation(NamedTuple):
@@ -126,12 +161,12 @@ def extract_blocks_from_text(content: str) -> list[Block]:
                 cur_bullets = []
             continue
 
-        m_bullet = DO_DONT_BULLET_RE.match(line)
-        if m_bullet:
-            kind = m_bullet.group(1)
+        parsed = parse_bullet(line)
+        if parsed:
+            kind, form = parsed
             if not cur_bullets:
                 block_start = idx
-            cur_bullets.append(Bullet(idx, kind, line))
+            cur_bullets.append(Bullet(idx, kind, line, form))
         elif (line.startswith("  ") or line.startswith("\t")) and cur_bullets:
             # Continuation line of current bullet
             continue
@@ -264,6 +299,16 @@ def run_check(
     total_blocks = 0
     bad_blocks_count = 0
     violations: list[Violation] = []
+    blocks_by_form = {
+        "inside_colon": 0,
+        "outside_colon": 0,
+        "parenthetical": 0,
+    }
+    bullets_by_form = {
+        "inside_colon": 0,
+        "outside_colon": 0,
+        "parenthetical": 0,
+    }
 
     for file_path in target_files:
         try:
@@ -298,6 +343,11 @@ def run_check(
 
             file_has_blocks = True
             total_blocks += 1
+            for b in block.bullets:
+                bullets_by_form[b.form] = bullets_by_form.get(b.form, 0) + 1
+            for f in block.forms:
+                blocks_by_form[f] = blocks_by_form.get(f, 0) + 1
+
             block_violations = check_block(rel_str, block)
             if block_violations:
                 bad_blocks_count += 1
@@ -310,6 +360,8 @@ def run_check(
         "files_examined": files_examined,
         "files_with_blocks": files_with_blocks,
         "blocks_examined": total_blocks,
+        "blocks_by_form": blocks_by_form,
+        "bullets_by_form": bullets_by_form,
         "bad_blocks_count": bad_blocks_count,
         "misplaced_do_count": len(violations),
         "violations": [v.to_dict() for v in violations],
@@ -323,9 +375,14 @@ def format_text_report(report: dict, limit: int = 50) -> str:
     blocks_n = report["blocks_examined"]
     bad_n = report["bad_blocks_count"]
     misplaced_n = report["misplaced_do_count"]
+    by_form = report.get("blocks_by_form", {})
+    inside_n = by_form.get("inside_colon", 0)
+    outside_n = by_form.get("outside_colon", 0)
+    paren_n = by_form.get("parenthetical", 0)
 
     lines.append(
-        f"Checked {files_n} file(s), {blocks_n} Do/Don't block(s)."
+        f"Checked {files_n} file(s), {blocks_n} Do/Don't block(s). "
+        f"({inside_n} inside-colon, {outside_n} outside-colon, {paren_n} parenthetical)"
     )
 
     if bad_n == 0:

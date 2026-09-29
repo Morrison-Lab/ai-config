@@ -1367,9 +1367,9 @@ Write it with the Write tool (Edit for an existing file) to a uniquely named scr
 The Write tool passes bytes unchanged, and it cannot be silently skipped the way a heredoc inside a hook-denied Bash call is.
 
 - **Do:** use Write or Edit for any content with a backslash, a backtick, code, or more than a few lines.
-- **Don't:** embed a patch script, regex, commit message or PR body in a heredoc.
 - **Do:** where a heredoc is genuinely unavoidable, build the character with `chr(92)` or a placeholder token before it enters the body, and print `repr()` of the constructed string.
 - **Do:** parse-check or read back any file a heredoc just wrote with escapes in it.
+- **Don't:** embed a patch script, regex, commit message or PR body in a heredoc.
 - **Don't:** type a doubled backslash directly inside a heredoc body, quoted delimiter or not.
 - **Don't:** treat having read this rule as the check --- it was loaded, and the collapse happened anyway.
 

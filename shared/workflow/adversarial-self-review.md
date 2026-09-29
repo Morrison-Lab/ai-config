@@ -931,9 +931,9 @@ Measured 2026-09-04: a dispatched reviewer returned a full report ending "No fin
 The fix is the same one this section already gives: state the required line explicitly in the brief, as a literal `### Verdict: Ready for merge` outside any code fence or HTML comment, and require the `review-data` payload to agree with it --- the two representations disagreeing (a `### Verdict: Ready for merge` line paired with a `review-data` payload naming findings) is itself a defect in the report, per this file's "Structured review data" section below.
 
 - **Do:** treat a report with no verdict line at all as the identical failure to a heading-separated one --- both leave the guard holding a stale prior verdict.
-- **Don't:** assume a report that "sounds clean" (ends in "No findings.", carries a clean JSON payload) discharges the guard without the literal verdict line the parser requires.
 - **Do:** leave the verdict's wording to the persona, or quote its phrases (`Ready for merge`, `Needs more work`) exactly when a brief has to mention them.
 - **Do:** dispatch one reviewer per repository, and push each repository before dispatching the next review.
+- **Don't:** assume a report that "sounds clean" (ends in "No findings.", carries a clean JSON payload) discharges the guard without the literal verdict line the parser requires.
 - **Don't:** ask the reviewer for a verdict in your own vocabulary ("end with clean / not clean") --- the brief overrides the persona's format, the reviewer answers `### Verdict: clean`, and that parses as no verdict.
 - **Don't:** review two repositories in one dispatch --- `parse_report` returns one `(verdict, Reviewed-Commit)` pair per report, so one report cannot clear both pushes.
 

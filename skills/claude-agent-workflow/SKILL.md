@@ -55,7 +55,11 @@ jobs:
       id-token: write
       actions: write
     uses: Morrison-Lab/gha/.github/workflows/claude.yml@v2
-    secrets: inherit
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      SUBMODULES_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}
+      WORKFLOW_TOKEN: ${{ secrets.WORKFLOW_TOKEN }}
     with:
       setup-r: false
       eager-pr: true
@@ -90,7 +94,10 @@ the consumer repo automatically inherits:
 2. Add the caller stub at `.github/workflows/claude.yml`.
    Diff it against gha's `examples/claude.yml` at the tag you pin, not against another consumer's caller:
    see [`gha-reusable-workflows.md`](../../memories/gha-reusable-workflows.md)'s "Template propagation hazard".
-3. Ensure required permissions (`contents: write`, `pull-requests: write`, `issues: write`, `id-token: write`, `actions: write`) are declared on the caller job.
+3. Ensure required permissions (`contents: write`, `pull-requests: write`, `issues: write`, `id-token: write`, `actions: write`) and named secrets (`CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`, `SUBMODULES_TOKEN`, `WORKFLOW_TOKEN`) are declared on the caller job.
+   Pass secrets explicitly rather than via `secrets: inherit`:
+   GitHub only inherits secrets into a reusable workflow owned by the same organization or user,
+   and naming secrets satisfies zizmor's default `secrets-inherit` rule so no ignore rule is needed in `.github/zizmor.yml`.
 4. Configure appropriate inputs (`setup-r`, `review-workflow-file`, etc.).
 
 ## Relationship to other skills

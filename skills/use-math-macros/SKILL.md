@@ -219,6 +219,22 @@ Commit the rewritten `.qmd`, the `include` line, the submodule pointer, and the
 - **`ardi` / `request-pr-review`** — used to ship and clean the PR this skill
   produces.
 
+## Macros that `\renewcommand` a standard command take a mandatory argument
+
+`macros.qmd` redefines `\exp` (`\renewcommand{\exp}[1]{\operatorname{exp}\cb{#1}}`), `\vec`, and `\v` with one mandatory argument each.
+A bare `$\exp$` (the function name, no argument) makes the macro swallow the closing math delimiter as its argument, which leaves `\cb`'s `\left`/`\right` unbalanced.
+MathJax renders that without complaint; lualatex fails with `Missing \right. inserted`.
+So an HTML render is no evidence that the PDF builds.
+
+Measured 2026-09-28 on `Morrison-Lab/pds`: Quarto Publish run 36516449603 failed on `$\exp$` in `_subfiles/_sec-distributions.qmd`.
+Fixed by Morrison-Lab/pds#34, which spelled out "the exponential function"; the zero-argument `\expt` also works.
+Tracked in Morrison-Lab/pds#33.
+
+- **Do:** name the function in prose, or use a zero-argument form (`\expt`), when no argument is meant.
+- **Do:** grep for bare uses, e.g. `grep -rnE '\\(exp|vec|v)([^a-zA-Z{]|$)' --include='*.qmd'`, and render the PDF target when touching math.
+- **Don't:** write a bare `$\exp$` (or `\vec`, `\v`).
+- **Don't:** treat a clean HTML render as evidence the PDF builds.
+
 ## Anti-patterns
 
 - ❌ Inventing a macro name not defined in `macros.qmd` — it silently breaks the

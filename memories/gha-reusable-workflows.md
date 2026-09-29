@@ -318,6 +318,14 @@ so the pattern is load-bearing rather than a workaround invented for this PR.
   Resolved 2026-09-19: [Morrison-Lab/gha#884](https://github.com/Morrison-Lab/gha/pull/884) widened `_SENT_BREAK_RE` to `(?=[A-Z0-9\"'`*\[(_])`,
   and [Morrison-Lab/ai-config#3789](https://github.com/Morrison-Lab/ai-config/issues/3789) vendored the update.)
 
+- **`check-new-line-breaks` in `gha` flags lines packing multiple sentences onto a single source line, including rhetorical questions immediately followed by their answer.**
+  The diff-scoped semantic line break check flags lines where terminal punctuation (`? `, `. `, `! `) is followed on the same line by a sentence opener (such as uppercase letters, digits, or markup).
+  Writing a rhetorical question and immediately answering it on the same line (e.g. `...feet? Zero.`) trips the check as a multi-sentence line.
+  Always place each sentence on its own source line in Markdown and Quarto files (`.md`, `.qmd`).
+  - **Do:** break rhetorical questions and their answers onto separate source lines, keeping each sentence isolated on its own line.
+  - **Don't:** pack a question and its immediate answer onto a single source line.
+  (Measured 2026-09-29 on [Morrison-Lab/lds#264](https://github.com/Morrison-Lab/lds/pull/264).)
+
 - **A `changelog.d/<slug>.<category>.md` fragment is also linted by markdownlint-cli2 and fails on multiple trailing blanks (MD012).**
   In Morrison-Lab/gha, `selftest` runs `lint-markdown` over all tracked markdown files using `.markdownlint.default.jsonc`.
   Leaving extra blank lines at the end of a changelog fragment triggers `MD012/no-multiple-blanks Multiple consecutive blank lines [Expected: 1; Actual: 2]`.

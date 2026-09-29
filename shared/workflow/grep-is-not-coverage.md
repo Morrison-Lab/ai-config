@@ -1018,7 +1018,7 @@ truncation point is hardest to predict.
 2`, a Google Drive streaming mount with 1700+ book folders, was killed by a
 300-400 second `timeout` partway through.
 Its truncated output held no match for Robert & Casella's *Monte Carlo
-Statistical Methods*, which was then reported as "not in the library" and
+Statistical Methods*, which was then reported as "not present" and
 filed as an access-request issue.
 A subsequent top-level listing of the mount's `Texts_by_Title` index folder
 --- run once the recursive crawl itself was recognized as the wrong approach,

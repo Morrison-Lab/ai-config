@@ -752,7 +752,10 @@
   Bot reviews (automated `@claude` review) alone leave `mergeable_state: blocked`.
   Request a human reviewer once the bot gives a clean verdict. (Learned on lab-manual#360.)
 
-- When wiring a new `shared/workflow/*.md` (or `shared/coding/*.md`, `shared/writing/*.md`) fragment into `CLAUDE.md` or `AGENTS.md`, use a plain Markdown link rather than an `@shared/...` import directive to avoid inflating the closure total-limit gate (`scripts/check-context-closure.py`), and keep the `<!-- Shared with the lab manual; edit shared/<dir>/<name>.md, not here. -->` note where appropriate. (Learned on ai-config#297, updated on ai-config#4049 and ai-config#4116.)
+- When wiring a new `shared/workflow/*.md` (or `shared/coding/*.md`, `shared/writing/*.md`) fragment into `CLAUDE.md` or `AGENTS.md`,
+  use a plain Markdown link rather than an `@shared/...` import directive to avoid inflating the closure total-limit gate (`scripts/check-context-closure.py`),
+  and keep the `<!-- Shared with the lab manual; edit shared/<dir>/<name>.md, not here. -->` note where appropriate.
+  (Learned on ai-config#297, updated on ai-config#4049 and ai-config#4116.)
 - The `<!-- Shared with the lab manual -->` comment is aspirational, not a guarantee: check whether the fragment is actually transcluded in `lab-manual`'s matching `.qmd` chapter before asserting it is.
   On ai-config#336, two of three existing `shared/coding/*.md` fragments carried the comment but were never added to `coding-style.qmd` (only `avoid-nesting.md` was) --- the gap survived because the tracking issue (UCD-SERG/lab-manual#328) was closed "completed" with an unchecked follow-up box.
   Don't let a new PR's scope grow to fix an unrelated pre-existing gap like this; file a follow-up issue instead (UCD-SERG/lab-manual#377) and note it in the PR thread.

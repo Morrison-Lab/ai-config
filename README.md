@@ -1060,9 +1060,9 @@ manual](https://ucd-serg.github.io/lab-manual/) (coding style, writing style,
 PR/agent workflow). Each fragment is the one source of truth for its topic, and
 two consumers pull it in:
 
-- **`CLAUDE.md` and `AGENTS.md`** reference it with plain Markdown links (e.g.
-  `[shared/writing/plain-prose.md](shared/writing/plain-prose.md)`). Harness-only specifics (skill names, queue
-  keywords) stay inline around the link.
+- **`CLAUDE.md` and `AGENTS.md`** reference it with plain Markdown links
+  (e.g. `[shared/writing/plain-prose.md](shared/writing/plain-prose.md)`).
+  Harness-only specifics (skill names, queue keywords) stay inline around the link.
 - **The lab manual** transcludes the same file with `{{< include
   .ai-config/shared/<area>/<topic>.md >}}` (e.g.
   `.ai-config/shared/writing/plain-prose.md`), via its `.ai-config` git
@@ -1092,8 +1092,8 @@ UCD-SERG lab's "Working with AI" notes, migrated out of the lab manual once
 they outgrew a single chapter. This repo can't add wai as a submodule — wai
 already submodules this repo, and a mutual submodule would recurse — so
 it keeps a pinned **copy** under `shared/vendored/`, recorded in
-`shared/vendored/MANIFEST.json` (source repo, per-file commit, and content
-`sha256`). `CLAUDE.md` `@`-imports the copies the same way as any other fragment.
+`shared/vendored/MANIFEST.json` (source repo, per-file commit, and content `sha256`).
+`CLAUDE.md` and `AGENTS.md` reference the copies with plain Markdown links the same way as any other fragment.
 
 Don't edit the vendored copies here — edit them in wai.
 `scripts/check-vendored-drift.py` (run by `validate.yml`) recomputes each copy's

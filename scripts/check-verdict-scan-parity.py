@@ -73,7 +73,7 @@ def load_rev(rev: str, name: str = "base_checker"):
         )
     src = result.stdout
     tmp = Path(tempfile.mkdtemp()) / "base_checker.py"
-    tmp.write_text(src)
+    tmp.write_text(src, encoding="utf-8")
     return load_module(tmp, name)
 
 
@@ -437,7 +437,7 @@ def build_corpus(
     if getattr(args, "corpus", None):
         real_bodies = []
         for path in args.corpus:
-            for record in json.loads(Path(path).read_text()):
+            for record in json.loads(Path(path).read_text(encoding="utf-8")):
                 real_bodies.append(record["body"])
         arm_counts["real"] = len(real_bodies)
         corpus.extend([("real", b) for b in real_bodies])

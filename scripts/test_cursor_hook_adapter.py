@@ -393,8 +393,8 @@ count_py = """\
 import json, os, sys
 from pathlib import Path
 p = Path(os.environ["COUNT_FILE"])
-n = int(p.read_text()) if p.exists() else 0
-p.write_text(str(n + 1))
+n = int(p.read_text(encoding="utf-8")) if p.exists() else 0
+p.write_text(str(n + 1), encoding="utf-8")
 print(json.dumps({}))
 """
 
@@ -404,7 +404,7 @@ import json, sys
 from pathlib import Path
 payload = json.load(sys.stdin)
 raw = payload.get("transcript_path") or ""
-text = Path(raw).read_text() if raw and Path(raw).is_file() else ""
+text = Path(raw).read_text(encoding="utf-8") if raw and Path(raw).is_file() else ""
 if '"name": "Bash"' in text or '"name":"Bash"' in text:
     print(json.dumps({
         "hookSpecificOutput": {
@@ -592,8 +592,9 @@ with tempfile.TemporaryDirectory() as raw:
     check("warn-only Agent launch is allowed", warned.get("permission") == "allow")
     check(
         "Task runs a dual Agent/Task script once",
-        count_file.read_text() == "1",
+        count_file.read_text(encoding="utf-8") == "1",
     )
+
     replayed = run_adapter(
         "postToolUse",
         {

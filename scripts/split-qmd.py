@@ -104,7 +104,7 @@ def div_end(body, i, path, opened):
 
 def split(path):
     path = Path(path)
-    lines = path.read_text().split("\n")
+    lines = path.read_text(encoding="utf-8").split("\n")
     # front matter
     if lines[0] != "---" or "---" not in lines[1:]:
         sys.exit(f"{path}:1: expected YAML front matter between two --- lines")
@@ -172,11 +172,11 @@ def split(path):
     subdir.mkdir(parents=True, exist_ok=True)
     for fname, text in files.items():
         target = subdir / fname
-        if target.exists() and target.read_text() != text:
+        if target.exists() and target.read_text(encoding="utf-8") != text:
             sys.exit(f"refusing to overwrite {target}: it exists with other content")
     for fname, text in files.items():
-        (subdir / fname).write_text(text)
-    path.write_text("\n".join(spine))
+        (subdir / fname).write_text(text, encoding="utf-8")
+    path.write_text("\n".join(spine), encoding="utf-8")
     return files
 
 

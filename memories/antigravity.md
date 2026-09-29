@@ -225,9 +225,13 @@ The [`google-antigravity/antigravity-sdk-python`](https://github.com/google-anti
   otherwise, benign concurrency cancellation permanently blocks automated merge under MWC.
   (Observed in live Antigravity sessions 2026-09-19 on PR #3797.)
 - **No parentheses in `gh pr merge` commit subjects or arguments:**
-  `enforce-mwc-review-gate.py` bans command-chaining and substitution characters in `CHAIN_CHARS` (including semicolons, ampersands, pipes, newlines, dollar-parentheses, backticks, and parentheses).
-  Passing parenthetical issue references in arguments (such as `--subject "fix: description (#1234)"`) trips the guard and blocks the merge.
+  `plugins/ai-config/enforce-mwc-review-gate.py` bans command-chaining and substitution characters in `` CHAIN_CHARS = (";", "&", "|", "\n", "$(", "`", "(") ``.
+  Passing parenthetical issue references in arguments (such as `--subject "fix: description (#1234)"` or `--body "(closes #1234)"`) trips the guard and blocks the merge.
   Execute `gh pr merge -R <repo> <PR> --squash --delete-branch` without parentheses.
+  Splitting on chain characters can also unbalance quotes and cause `shlex.split` to raise `ValueError`,
+  which routes through the fail-closed fallback whenever both `"gh"` and `"merge"` appear in the command line
+  (e.g. a `git commit -m` quoting the phrase alongside parentheses).
+  (Observed in live Antigravity sessions 2026-09-23 in [#3916](https://github.com/Morrison-Lab/ai-config/pull/3916), and 2026-09-29 on PR [#4119](https://github.com/Morrison-Lab/ai-config/pull/4119).)
 - **Rerun cancelled concurrency checks to unblock fully-clean rollup:**
   When a prior workflow run is cancelled by a higher-priority check or concurrency group (e.g. `review / preempt-previous`), it registers as `cancelled` in the statusCheckRollup, blocking `check-pr-fully-clean.py` and MWC merge.
   Rerunning the failed/cancelled job via `gh run rerun -R <repo> <run-id> --failed` re-executes the check and clears the cancelled status without requiring a new commit or push.

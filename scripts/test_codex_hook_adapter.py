@@ -37,9 +37,9 @@ assert mod.matcher_hits("Edit|Write|NotebookEdit", "apply_patch")
 assert mod.matcher_hits("mcp__github__.*", "mcp__github__pr_comment")
 assert not mod.matcher_hits("Bash", "apply_patch")
 
-plugin_manifest = json.loads((ROOT / ".codex-plugin/plugin.json").read_text())
+plugin_manifest = json.loads((ROOT / ".codex-plugin/plugin.json").read_text(encoding="utf-8"))
 assert plugin_manifest["skills"] == "codex-skills"
-plugin_hooks = json.loads((ROOT / "plugins/ai-config/codex-hooks.json").read_text())
+plugin_hooks = json.loads((ROOT / "plugins/ai-config/codex-hooks.json").read_text(encoding="utf-8"))
 assert "${PLUGIN_ROOT}" in json.dumps(plugin_hooks)
 assert plugin_manifest["hooks"] == "./plugins/ai-config/codex-hooks.json"
 for stop_group in plugin_hooks["hooks"]["Stop"]:

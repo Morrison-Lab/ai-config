@@ -1383,7 +1383,9 @@ def fetch_pr_data(cmd, cwd):
     Returns (pr_data, error_reason). Comments come from the paginated REST
     endpoint so a long thread cannot truncate away the latest verdict. Check-runs
     come from the commit check-runs REST endpoint to detect copilot-pull-request-reviewer
-    which is dropped by GraphQL statusCheckRollup (ai-config#3570).
+    which is dropped by GraphQL statusCheckRollup (ai-config#3570). Check-runs already
+    present in the GraphQL rollup are deduplicated by detailsUrl, and timestamps are
+    propagated so cancel-in-progress runs are properly superseded (ai-config#4112).
     """
     api_match = GH_API_MERGE_RE.search(cmd)
     if api_match:

@@ -2092,11 +2092,13 @@ class TestMain(unittest.TestCase):
         view_payload = {k: state[k] for k in
                         ("url", "author", "reviews", "statusCheckRollup",
                          "headRefOid", "reviewRequests") if k in state}
-        # REST returns the exact same run with details_url matching detailsUrl
+        # REST returns a copy of the same run by details_url but marked cancelled.
+        # Without deduplication, this duplicate appends and denies merge.
+        # With deduplication by detailsUrl, it is skipped and merge allows.
         rest_check_runs = [{
             "name": "validate",
             "status": "completed",
-            "conclusion": "success",
+            "conclusion": "cancelled",
             "details_url": "https://github.com/Lacaedemon/sparta/runs/101",
             "completed_at": "2026-09-29T08:00:00Z",
         }]
@@ -2114,19 +2116,21 @@ class TestMain(unittest.TestCase):
         view_payload = {k: state[k] for k in
                         ("url", "author", "reviews", "statusCheckRollup",
                          "headRefOid", "reviewRequests") if k in state}
-        # REST returns an older cancelled run and a newer successful run
+        # REST returns the newer successful run FIRST and older cancelled run SECOND.
+        # Without timestamps, index ordering (0 vs 1) fails the superseded check.
+        # With timestamps extracted, 08:10 > 08:00 clears the cancelled run.
         rest_check_runs = [
-            {
-                "name": "custom-ci",
-                "status": "completed",
-                "conclusion": "cancelled",
-                "completed_at": "2026-09-29T08:00:00Z",
-            },
             {
                 "name": "custom-ci",
                 "status": "completed",
                 "conclusion": "success",
                 "completed_at": "2026-09-29T08:10:00Z",
+            },
+            {
+                "name": "custom-ci",
+                "status": "completed",
+                "conclusion": "cancelled",
+                "completed_at": "2026-09-29T08:00:00Z",
             },
         ]
         decision, _ = self.run_main(

@@ -233,6 +233,7 @@ Tracked in Morrison-Lab/pds#33.
 
 - **Do:** name the function in prose, or use a zero-argument form (`\expt`), when no argument is meant.
 - **Do:** grep for bare uses, e.g. `grep -rnE '\\(exp|vec|v)([^a-zA-Z{]|$)' --include='*.qmd'`, and render the PDF target when touching math.
+  The grep is a candidate finder: it also flags valid space-separated arguments (`\vec \beta`) and the definitions themselves, so read each hit.
 - **Don't:** write a bare `$\exp$` (or `\vec`, `\v`).
 - **Don't:** treat a clean HTML render as evidence the PDF builds.
 

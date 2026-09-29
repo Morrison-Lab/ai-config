@@ -124,9 +124,10 @@ The full record is in
 It prints a live, long-lived OAuth token,
 so a bare `! claude setup-token` puts that credential into the agent's
 context and the persisted session transcript.
-Piped through `!` it never finishes:
-Claude Code runs `!` commands with stdin set to `/dev/null`,
-so the auth-code read blocks exactly as it does for an agent (ai-config#4127).
+Piped through `!` it never finishes either.
+Claude Code runs `!` commands with stdin set to `/dev/null` and no terminal,
+and on 2026-09-29 the pipeline was still running minutes later (ai-config#4127).
+Why a `/dev/null` stdin hangs rather than failing on EOF is not established.
 
 Piping its stdout into a consumer is not safe either.
 It writes its whole screen to stdout, not just the token,

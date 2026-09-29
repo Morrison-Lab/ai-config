@@ -375,8 +375,13 @@ def normalize_token(raw: str, env_var: str) -> str:
     """
     token = "".join(raw.split())
     if not token:
-        sys.exit("Empty token; refusing to write an empty secret.")
-    if env_var == DEFAULT_SECRET and not OAUTH_TOKEN_SHAPE.fullmatch(token):
+        sys.exit(
+            "Empty token; refusing to write an empty secret. Run this in a "
+            f"real terminal to be prompted for it, or export {env_var}=..."
+        )
+    if env_var == DEFAULT_SECRET and (
+        not OAUTH_TOKEN_SHAPE.fullmatch(token) or token.count("sk-ant-") != 1
+    ):
         sys.exit(
             f"The value supplied for {env_var} is not a single `sk-ant-...` "
             f"token ({len(token)} characters after removing whitespace); "

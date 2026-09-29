@@ -498,6 +498,7 @@ check(
     _exits(f"Opening browser to sign in...\nYour OAuth token:\n\n{TOK}\n\nStore it safely.\n"),
 )
 check("read_token refuses a non-token value", _exits("piped-token"))
+check("read_token refuses a token pasted twice", _exits(TOK + TOK))
 check(
     "read_token applies the sk-ant- shape only to the OAuth secret",
     not _exits("some-other-value", "OTHER_SECRET"),

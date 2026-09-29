@@ -718,7 +718,9 @@ back.
 runs it in a real terminal, it runs `claude setup-token`, and the token goes
 in at a hidden prompt.
 Neither `!` nor a pipe works.
-`!` gives the command stdin `/dev/null`, so it hangs (ai-config#4127).
+`!` runs the command with stdin `/dev/null` and no terminal, and the
+pipeline was observed still running minutes later (ai-config#4127);
+why it hangs rather than failing on EOF is not established.
 A pipe captures the whole screen of output rather than the token, which on
 2026-09-29 stored 2039 characters of prose as the org secret
 (ai-config#4129).

@@ -701,5 +701,5 @@ paragraph — its own fragment file in this directory, wired into
 (`[shared/principles/<name>.md](shared/principles/<name>.md)`),
 not an `@` import.
 An `@` import auto-loads the fragment into every session's context,
-which trips the context-closure size ratchet in
-`scripts/check-context-closure.py`.
+counting it against the closure total-limit gate (and per-fragment cap)
+in `scripts/check-context-closure.py`.

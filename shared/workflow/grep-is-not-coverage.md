@@ -1022,7 +1022,7 @@ truncation point is hardest to predict.
   the absence conclusion from that bounded query's complete result.
 - **Don't:** file an issue, close a task, or report a "not found" finding on
   the strength of a search that was killed by its own timeout.
-- **Don't:** treat a partial listing's clean formatting as evidence it
+- **Don't:** treat a partial listing's clean formatting as evidence the search
   finished --- a killed walk's output looks identical to a complete one.
 
 (Morrison-Lab/mlr#10, 2026-09-28: a recursive `find` over `G:\My Drive\Texts

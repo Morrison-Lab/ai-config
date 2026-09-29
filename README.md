@@ -1060,9 +1060,9 @@ manual](https://ucd-serg.github.io/lab-manual/) (coding style, writing style,
 PR/agent workflow). Each fragment is the one source of truth for its topic, and
 two consumers pull it in:
 
-- **`CLAUDE.md`** imports it with Claude Code's `@path` syntax (e.g.
-  `@shared/writing/plain-prose.md`). Harness-only specifics (skill names, queue
-  keywords) stay inline in `CLAUDE.md` around the import.
+- **`CLAUDE.md` and `AGENTS.md`** reference it with plain Markdown links (e.g.
+  `[shared/writing/plain-prose.md](shared/writing/plain-prose.md)`). Harness-only specifics (skill names, queue
+  keywords) stay inline around the link.
 - **The lab manual** transcludes the same file with `{{< include
   .ai-config/shared/<area>/<topic>.md >}}` (e.g.
   `.ai-config/shared/writing/plain-prose.md`), via its `.ai-config` git
@@ -1077,8 +1077,8 @@ Conventions for fragments:
 - Keep them **ASCII** — write `---` for em-dashes and straight quotes — so the
   lab manual's non-standard-character check passes when it includes them.
 
-A session working in this repo's own checkout resolves `@shared/...` imports against the repo root directly (as `CLAUDE.md` does for this very session).
-A **global** `~/.claude/CLAUDE.md` that imports these fragments needs `~/.claude/shared/` to exist, which `bootstrap.sh` no longer places there (see its header comment) --- until a replacement lands ([#2352](https://github.com/Morrison-Lab/ai-config/issues/2352)), symlink `shared/` there by hand.
+A session working in this repo's own checkout resolves relative links against the repo root directly.
+A **global** `~/.claude/CLAUDE.md` that references or imports these fragments needs `~/.claude/shared/` to exist, which `bootstrap.sh` no longer places there (see its header comment) --- until a replacement lands ([#2352](https://github.com/Morrison-Lab/ai-config/issues/2352)), symlink `shared/` there by hand.
 Symlink rather than copy: a symlink tracks the checkout, while a copy goes stale with nothing to say so.
 When an ai-config plugin is enabled, `python3 scripts/doctor.py` follows that split: it reports a `~/.claude/shared` copy as a leftover and exempts a symlink that resolves into an ai-config checkout.
 It skips the sweep entirely otherwise, since a `~/.claude` copy may then be the machine's only install.

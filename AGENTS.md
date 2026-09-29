@@ -409,7 +409,7 @@ After adding or editing a skill, regenerate the wrappers before pushing.
 
 ## Shared fragments have two consumers
 
-Fragments under `shared/` are imported by `CLAUDE.md` (`@path`) and transcluded by the UCD-SERG lab manual via its `.ai-config` submodule.
+Fragments under `shared/` are referenced by `CLAUDE.md` and `AGENTS.md` (via plain Markdown links) and transcluded by the UCD-SERG lab manual via its `.ai-config` submodule.
 Edit the fragment, never an inline copy in `CLAUDE.md`.
 Keep fragments ASCII (write `---` for em-dashes, straight quotes) so the lab manual's non-standard-character check passes, and keep them audience-neutral: no first person, no harness-specific framing inside the body.
 
@@ -423,7 +423,7 @@ Never activate a hook before its PR merges: writing and testing the script is au
 
 `CLAUDE.md` plus the transitive closure of its `@path` imports loads in full at every session start.
 The closure's total against the Claude Code CLI's own instruction limit, the root file's character cap, a per-fragment cap, and a near-cap growth ratchet on the root file all gate CI (`scripts/check-context-closure.py`), so an addition there can redden an unrelated-feeling PR.
-The ratchet is the one that bites in normal authoring: once `CLAUDE.md` is at 90% of its cap it may shrink or hold but not grow, so a new section has to go into an `@`-imported fragment or trade against prose trimmed from the root.
+The ratchet is the one that bites in normal authoring: once `CLAUDE.md` is at 90% of its cap it may shrink or hold but not grow, so a new section has to trade against prose trimmed from the root or move to an on-demand memory file or linked companion file (plain Markdown link, not an `@` import).
 Prefer an on-demand memory file under `memories/`.
 
 ## Worktree isolation

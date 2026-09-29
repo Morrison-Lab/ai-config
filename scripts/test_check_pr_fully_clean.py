@@ -1555,6 +1555,144 @@ def main() -> int:
             "## Code review\n\nNo issues found. Checked for bugs and CLAUDE.md compliance once tests pass."
         ) == "",
     )
+    # Bold-label **Verdict:** No blocking issues (closes #4107, qmt#8 real fixture)
+    check(
+        "classify_verdict: bold-label '**Verdict:** No blocking issues' is clean (closes #4107)",
+        checker.classify_verdict(
+            "### Review of PR #8\n\n**Verdict:** No blocking issues."
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: bold-label '**Verdict:** No blocking issues, and I have no line-specific findings...' (qmt#8 real fixture) is clean",
+        checker.classify_verdict(
+            "**Claude finished @d-morrison's task in 10s** \u2014\u2014 [View job](https://github.com/Morrison-Lab/qmt/actions/runs/36534122023)\n\n"
+            "---\n### Review of PR #8\n\n"
+            "**Verdict:** No blocking issues, and I have no line-specific findings, so I posted no inline comments. "
+            "I read the diff (`git diff origin/main...HEAD`) and did not render anything.\n\n"
+            "**Minor, non-blocking**\n- Note about preview"
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: unbolded 'Verdict: No blocking issues' is clean",
+        checker.classify_verdict(
+            "Verdict: No blocking issues."
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: bold variation '**Verdict**: No blocking issues' (colon outside bold) is clean",
+        checker.classify_verdict(
+            "**Verdict**: No blocking issues."
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: italic label '_Verdict:_ No blocking issues' is clean",
+        checker.classify_verdict(
+            "_Verdict:_ No blocking issues."
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: bold-label '**Verdict:** No blocking issues found' is clean",
+        checker.classify_verdict(
+            "**Verdict:** No blocking issues found."
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: bold-label '**Verdict:** No blocking issues' with trailing qualifier is NOT clean",
+        checker.classify_verdict(
+            "**Verdict:** No blocking issues once the auth bug is resolved."
+        ) == "",
+    )
+    check(
+        "classify_verdict: bold-label '**Verdict:** No blocking issues yet' is NOT clean (disqualified by 'yet')",
+        checker.classify_verdict(
+            "**Verdict:** No blocking issues yet; I have not finished the review."
+        ) == "",
+    )
+    check(
+        "classify_verdict: bold-label '**Verdict:** No blocking issues found so far' is NOT clean (disqualified by 'so far')",
+        checker.classify_verdict(
+            "**Verdict:** No blocking issues found so far."
+        ) == "",
+    )
+    check(
+        "classify_verdict: bold-italic '***Verdict:*** No blocking issues' is clean",
+        checker.classify_verdict(
+            "***Verdict:*** No blocking issues."
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: negative control bold-label '**Verdict:** Blocking issues remain' is not-clean",
+        checker.classify_verdict(
+            "**Verdict:** Blocking issues remain. Please fix auth token handling."
+        ) == "not-clean",
+    )
+    check(
+        "classify_verdict: negative control unbolded 'Verdict: Blocking issues remain' is not-clean",
+        checker.classify_verdict(
+            "Verdict: Blocking issues remain."
+        ) == "not-clean",
+    )
+    check(
+        "classify_verdict: negative control bold label '**Verdict:** Rejected' is not-clean",
+        checker.classify_verdict(
+            "**Verdict:** Rejected -- changes requested."
+        ) == "not-clean",
+    )
+    # End-to-end check that findings in **Minor, non-blocking** win over clean verdict
+    qmt8_body = (
+        "**Claude finished @d-morrison's task in 10s** \u2014\u2014 [View job](https://github.com/Morrison-Lab/qmt/actions/runs/36534122023)\n\n"
+        "---\n### Review of PR #8\n\n"
+        "**Verdict:** No blocking issues, and I have no line-specific findings, so I posted no inline comments. "
+        "I read the diff (`git diff origin/main...HEAD`) and did not render anything.\n\n"
+        "**Minor, non-blocking**\n- Note about preview"
+    )
+    check(
+        "_unresolved_finding_pattern: **Minor, non-blocking** with items is recognized as unresolved finding",
+        bool(checker._unresolved_finding_pattern(qmt8_body)),
+    )
+    qmt8_items = [("comment", "2026-09-29T07:00:40Z", qmt8_body, "", "", "github-actions")]
+    qmt8_ok, qmt8_issues = checker.check_latest_verdict(qmt8_items)
+    check(
+        "check_latest_verdict: findings under **Minor, non-blocking** veto clean verdict (findings win)",
+        (not qmt8_ok) and any("NOT clean" in i for i in qmt8_issues),
+    )
+    # Regression test for reviewer template (Critical Finding 1 from review)
+    adv_template_body = (
+        "Verdict: Ready for merge\n\n"
+        "### Critical Findings\n\nNone.\n\n"
+        "### Observations & Non-Blocking Suggestions\n\nNone.\n"
+    )
+    check(
+        "_unresolved_finding_pattern: adversarial review template with None observations is not flagged",
+        checker._unresolved_finding_pattern(adv_template_body) is None,
+    )
+    # Regression test for prose mentioning resolved/absent minor items (Critical Finding 2 from review)
+    check(
+        "_unresolved_finding_pattern: 'The minor issues from round 2 are all fixed' is not flagged",
+        checker._unresolved_finding_pattern("**Verdict:** Clean. The minor issues from round 2 are all fixed.") is None,
+    )
+    check(
+        "_unresolved_finding_pattern: 'zero optional suggestions' is not flagged",
+        checker._unresolved_finding_pattern("**Verdict:** Clean. There are zero optional suggestions.") is None,
+    )
+
+    # But clean review without finding section passes check_latest_verdict cleanly
+    clean_qmt8_body = (
+        "**Claude finished @d-morrison's task in 10s**\n\n"
+        "### Review of PR #8\n\n"
+        "**Verdict:** No blocking issues, and I have no line-specific findings, so I posted no inline comments.\n\n"
+        "**Checked**\n- Registration: ok"
+    )
+    check(
+        "_unresolved_finding_pattern: clean review without findings section returns None",
+        checker._unresolved_finding_pattern(clean_qmt8_body) is None,
+    )
+    clean_qmt8_items = [("comment", "2026-09-29T07:00:40Z", clean_qmt8_body, "", "", "github-actions")]
+    clean_qmt8_ok, clean_qmt8_issues = checker.check_latest_verdict(clean_qmt8_items)
+    check(
+        "check_latest_verdict: clean review with **Verdict:** No blocking issues and no findings is clean",
+        clean_qmt8_ok and clean_qmt8_issues == [],
+    )
     # Where the vocabulary guards are still load-bearing after the position
     # guard: this corpus writes semantic line breaks, so a negation or hedge
     # routinely sits at the END of the PREVIOUS line, leaving the phrase itself

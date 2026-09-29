@@ -1467,7 +1467,7 @@ def fetch_pr_data(cmd, cwd):
     if head_oid:
         check_runs_result = run_gh(
             ["api", f"repos/{url_match.group(1)}/commits/{head_oid}/check-runs",
-             "--paginate", "--jq", "[.check_runs[]? | {name: .name, status: (.status // \"\"), conclusion: (.conclusion // \"\")}]"],
+             "--paginate", "--jq", "[.check_runs[]? | {name: .name, status: (.status // \"\"), conclusion: (.conclusion // \"\"), completed_at: (.completed_at // \"\"), started_at: (.started_at // \"\"), details_url: (.details_url // \"\"), html_url: (.html_url // \"\")}]"],
             cwd,
         )
         if check_runs_result.returncode != 0:
@@ -1477,11 +1477,20 @@ def fetch_pr_data(cmd, cwd):
             )
         check_runs = _merge_paginated_json(check_runs_result.stdout.strip(), decoder)
         existing_rollup = pr_data.get("statusCheckRollup") or []
+        existing_urls = {
+            c.get("detailsUrl") for c in existing_rollup if c.get("detailsUrl")
+        }
         for cr in check_runs:
+            details = cr.get("details_url") or cr.get("html_url") or ""
+            if details and details in existing_urls:
+                continue
             existing_rollup.append({
                 "name": cr.get("name") or "",
                 "status": (cr.get("status") or "").upper(),
                 "conclusion": (cr.get("conclusion") or "").upper(),
+                "completedAt": cr.get("completed_at") or "",
+                "startedAt": cr.get("started_at") or "",
+                "detailsUrl": details,
             })
         pr_data["statusCheckRollup"] = existing_rollup
     return pr_data, None

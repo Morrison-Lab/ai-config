@@ -2079,6 +2079,95 @@ class TestMain(unittest.TestCase):
         self.assertEqual(decision["decision"], "deny")
         self.assertIn("copilot-pull-request-reviewer", decision["reason"])
 
+    def test_check_runs_from_rest_deduplicates_against_existing_rollup(self):
+        existing_run = {
+            "name": "validate",
+            "status": "COMPLETED",
+            "conclusion": "SUCCESS",
+            "workflowName": "validate",
+            "detailsUrl": "https://github.com/Lacaedemon/sparta/runs/101",
+            "completedAt": "2026-09-29T08:00:00Z",
+        }
+        state = pr(comments=[CLEAN_VERDICT], checks=[existing_run])
+        view_payload = {k: state[k] for k in
+                        ("url", "author", "reviews", "statusCheckRollup",
+                         "headRefOid", "reviewRequests") if k in state}
+        # REST returns the exact same run with details_url matching detailsUrl
+        rest_check_runs = [{
+            "name": "validate",
+            "status": "completed",
+            "conclusion": "success",
+            "details_url": "https://github.com/Lacaedemon/sparta/runs/101",
+            "completed_at": "2026-09-29T08:00:00Z",
+        }]
+        decision, _ = self.run_main(
+            self.payload(MERGE_CMD),
+            side_effect=[gh_result(stdout=json.dumps(view_payload)),
+                         gh_result(stdout=json.dumps(state["comments"])),
+                         gh_result(stdout=json.dumps([])),
+                         gh_result(stdout=json.dumps(rest_check_runs))],
+        )
+        self.assertEqual(decision["decision"], "allow")
+
+    def test_check_runs_from_rest_superseded_cancelled_run_with_timestamp_allows(self):
+        state = pr(comments=[CLEAN_VERDICT], checks=[])
+        view_payload = {k: state[k] for k in
+                        ("url", "author", "reviews", "statusCheckRollup",
+                         "headRefOid", "reviewRequests") if k in state}
+        # REST returns an older cancelled run and a newer successful run
+        rest_check_runs = [
+            {
+                "name": "custom-ci",
+                "status": "completed",
+                "conclusion": "cancelled",
+                "completed_at": "2026-09-29T08:00:00Z",
+            },
+            {
+                "name": "custom-ci",
+                "status": "completed",
+                "conclusion": "success",
+                "completed_at": "2026-09-29T08:10:00Z",
+            },
+        ]
+        decision, _ = self.run_main(
+            self.payload(MERGE_CMD),
+            side_effect=[gh_result(stdout=json.dumps(view_payload)),
+                         gh_result(stdout=json.dumps(state["comments"])),
+                         gh_result(stdout=json.dumps([])),
+                         gh_result(stdout=json.dumps(rest_check_runs))],
+        )
+        self.assertEqual(decision["decision"], "allow")
+
+    def test_check_runs_from_rest_unresolved_cancelled_run_denies(self):
+        state = pr(comments=[CLEAN_VERDICT], checks=[])
+        view_payload = {k: state[k] for k in
+                        ("url", "author", "reviews", "statusCheckRollup",
+                         "headRefOid", "reviewRequests") if k in state}
+        # REST returns an older successful run followed by a newer cancelled run
+        rest_check_runs = [
+            {
+                "name": "custom-ci",
+                "status": "completed",
+                "conclusion": "success",
+                "completed_at": "2026-09-29T08:00:00Z",
+            },
+            {
+                "name": "custom-ci",
+                "status": "completed",
+                "conclusion": "cancelled",
+                "completed_at": "2026-09-29T08:10:00Z",
+            },
+        ]
+        decision, _ = self.run_main(
+            self.payload(MERGE_CMD),
+            side_effect=[gh_result(stdout=json.dumps(view_payload)),
+                         gh_result(stdout=json.dumps(state["comments"])),
+                         gh_result(stdout=json.dumps([])),
+                         gh_result(stdout=json.dumps(rest_check_runs))],
+        )
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("custom-ci", decision["reason"])
+
     def test_repo_flag_forwarded(self):
         _, run_mock = self.run_main(
             self.payload("gh pr merge 9 -R Morrison-Lab/ai-config --squash"),

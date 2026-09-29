@@ -75,4 +75,4 @@ the lab's Quarto sites adopted it in Morrison-Lab/pds#29 and the matching PRs.
 "let's style remarks like definitions (not foldable, no color bar)?",
 "(across all our quarto repos?)",
 and "and when should we use remarks vs callouts?",
-the last answered on 2026-09-29 with "dyatb" (sic: the `daytb` keyword) to the proposal above.)
+the last answered with "dyatb" (sic: the `daytb` keyword) to the proposal above.)

@@ -50,7 +50,7 @@ a concrete instance is an example div.
 A remark is read alongside the definitions and results around it,
 so it should look like them:
 a minimal callout with only its colored left border,
-no shaded title band (the "color bar" in the directive below),
+no shaded title band (what the user called the "color bar"),
 and no fold toggle.
 With the `callouty-theorem` extension, the `remark` entry matches `def`:
 

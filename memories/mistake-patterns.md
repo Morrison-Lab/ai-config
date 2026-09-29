@@ -1240,3 +1240,16 @@ Pattern 34's `\u0061` example and this one's `\u0077` are the same trick.
 - **Do:** run an active task and subagent sweep (`manage_task(Action='list')`, `manage_subagents(Action='list')`) before declaring a milestone or session complete.
 - **Don't:** leave broad searches running in the background after moving on to fixing the code or writing documentation.
 - **Don't:** answer "session done" or conclude a session while transient background tasks are still running.
+
+## Pattern 60: Non-Discriminative Regression Tests That Pass Against Pre-Fix Code
+
+- **Mistake**: writing regression tests for a defect or feature that also pass against the pre-change codebase, providing no signal when the defect recurs or when the fix is reverted.
+- **Direction of failure**: false confidence in test coverage. When a bug fix relies on a new mechanism (e.g. timestamp-based comparison or URL-based deduplication), authoring test fixtures where pre-existing fallbacks (such as list-order tie-breaking or benign duplicates) already pass produces green tests that fail to exercise the new code path.
+- **Example**: 2026-09-29, PR [#4113](https://github.com/Morrison-Lab/ai-config/pull/4113) / issue [#4112](https://github.com/Morrison-Lab/ai-config/issues/4112) (`enforce-mwc-review-gate.py`).
+  New tests for REST check-run deduplication and timestamp extraction placed the cancelled run before the success run, which the pre-fix code already cleared via index-ordering fallback (`0 < 1`), and passed an identical duplicate whose conclusion was `success`.
+  Local adversarial review flagged that reverting the entire production change still resulted in 199/199 passing tests.
+- **Fix**: author tests specifically structured to fail against the pre-fix code:
+  1. For timestamp-based precedence/superseding, place the newer success run *first* and the older cancelled run *second* so list-index order fails without timestamps.
+  2. For deduplication, give the duplicate a blocking/failing status so failure to deduplicate denies and fails the test.
+- **Do:** verify that new regression tests fail when the fix is reverted before committing.
+- **Don't:** write tests where arbitrary list position or harmless duplicate properties satisfy assertions without exercising the fix.

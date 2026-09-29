@@ -1968,7 +1968,7 @@ VERDICT_NOT_CLEAN_PATTERNS = [
     # is handled by NOT_CLEAN_NEGATION_PREFIX below -- the mechanism that
     # already existed for `no changes requested`.
     r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
-    r"Verdict:\s*(?:Ready after addressing findings|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock|Partial review)",
+    r"(?:[*_]{1,3})?Verdict(?:[*_]{1,3})?:(?:[*_]{1,3})?\s*(?:Ready after addressing findings|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock|Partial review)",
     r"(?<!\bno-)changes\s+requested\b",
     _BARE_REJECTION,
     r"\[FINDINGS_COUNT:\s*[1-9]\d*\]",  # Machine-readable finding count > 0
@@ -2042,7 +2042,7 @@ FINDING_HEADING_NEGATION_SUFFIX = re.compile(
 # success, not the absence of failure" applied to a verdict.
 VERDICT_CLEAN_PATTERNS = [
     r"\bReady\s+for\s+merge\b",
-    r"Verdict:\s*(?:Clean|Approved|Ready)\b",
+    r"(?:[*_]{1,3})?Verdict(?:[*_]{1,3})?:(?:[*_]{1,3})?\s*(?:Clean|Approved|Ready|No\s+blocking\s+issues?(?:\s+(?:found|identified))?)\b",
     r"\bApproved\s+for\s+merge\b",
     # Anthropic code-review plugin clean template (closes #2147).
     r"^[ \t]*(?:\*{1,3})?No\s+issues\s+found\.(?:\*{1,3})?\s+Checked\s+for\s+bugs\s+and\s+(?:CLAUDE|AGENTS)\.md\s+compliance\.",
@@ -2083,10 +2083,10 @@ FINDING_PATTERNS = [
     r"#+\s*Remaining",
     r"#+\s*Nits?\b",
     r"(?:^|\n)[ \t]*\*\*Nits?\*\*",
-    r"#+\s*Non-blocking\b",
-    r"(?:^|\n)[ \t]*\*\*Non-blocking\*\*",
+    r"#+\s*(?:Minor,?\s+)?Non-blocking\b",
+    r"(?:^|\n)[ \t]*\*\*(?:Minor,?\s+)?Non-blocking\*\*",
     r"\*\*Location:\*\*",
-    r"Verdict:\s*(?:Ready after addressing findings|Needs work|Needs more work|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock|Partial review)",
+    r"(?:[*_]{1,3})?Verdict(?:[*_]{1,3})?:(?:[*_]{1,3})?\s*(?:Ready after addressing findings|Needs work|Needs more work|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock|Partial review)",
     r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
     r"(?<!\bno-)changes\s+requested\b",
     _BARE_REJECTION,
@@ -2104,8 +2104,8 @@ FINDING_HEADING_PATTERNS = {
     r"#+\s*Remaining",
     r"#+\s*Nits?\b",
     r"(?:^|\n)[ \t]*\*\*Nits?\*\*",
-    r"#+\s*Non-blocking\b",
-    r"(?:^|\n)[ \t]*\*\*Non-blocking\*\*",
+    r"#+\s*(?:Minor,?\s+)?Non-blocking\b",
+    r"(?:^|\n)[ \t]*\*\*(?:Minor,?\s+)?Non-blocking\*\*",
 }
 
 # The primary guard is POSITION, not vocabulary. A qualifier list cannot be
@@ -2147,7 +2147,8 @@ CLEAN_NEGATION_PREFIX = re.compile(
 CLEAN_QUALIFIER = re.compile(
     r"\b(?:once|after|when|if|unless|pending|provided|assuming"
     r"|subject\s+to|as\s+soon\s+as|contingent|but|however|except|though|although"
-    r"|aside\s+from|other\s+than|apart\s+from|save\s+for|modulo|barring)\b",
+    r"|aside\s+from|other\s+than|apart\s+from|save\s+for|modulo|barring"
+    r"|yet|so\s+far)\b",
     re.IGNORECASE,
 )
 # A BARE newline does not end a sentence in this corpus, which writes semantic

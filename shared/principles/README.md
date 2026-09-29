@@ -697,4 +697,9 @@ When a new big-picture principle emerges (from review feedback, a
 correction, a recurring pattern), add it here: a short statement, links
 to whatever operationalizes it, and — if it needs more than a
 paragraph — its own fragment file in this directory, wired into
-`CLAUDE.md` with an `@shared/principles/...` reference.
+`CLAUDE.md` (or `AGENTS.md` if cross-agent) with a plain Markdown link
+(`[shared/principles/<name>.md](shared/principles/<name>.md)`),
+not an `@` import.
+An `@` import auto-loads the fragment into every session's context,
+counting it against the closure total-limit gate (and per-fragment cap)
+in `scripts/check-context-closure.py`.

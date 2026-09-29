@@ -1010,3 +1010,11 @@ When suppressing the unpushed-commit Stop hook (`no-unshipped-commit.py`) becaus
   track pending dispatches in a FIFO queue per tool name and match `tool_result` against `reviewer_call_ids`.
   Never treat arbitrary non-errored tool outputs with verdict-shaped strings
   as review verdicts without verifying dispatch correlation.
+- **PowerShell environment prefix syntax for hook overrides:**
+  When passing environment variables to `git push` (such as `ALLOW_UNREVIEWED_PUSH=1`),
+  never use `$env:VAR=val; git push` in PowerShell.
+  The semicolon `;` is detected as command chaining by `_is_plain_command`,
+  which immediately rejects the push as non-plain.
+  Use `env VAR=val git push` instead,
+  which matches `COMMAND_WRAPPERS` in `_strip_env` and is evaluated as a single simple command.
+

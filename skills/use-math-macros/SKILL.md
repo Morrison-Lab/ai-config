@@ -227,7 +227,8 @@ MathJax renders that without complaint; lualatex fails with `Missing \right. ins
 So an HTML render is no evidence that the PDF builds.
 
 Measured 2026-09-28 on `Morrison-Lab/pds`: Quarto Publish run 36516449603 failed on `$\exp$` in `_subfiles/_sec-distributions.qmd`.
-Fixed by Morrison-Lab/pds#34, which spelled out "the exponential function"; the zero-argument `\expt` also works.
+Fixed by Morrison-Lab/pds#34, which spelled out "the exponential function";
+the zero-argument `\expt` also works.
 Tracked in Morrison-Lab/pds#33.
 
 - **Do:** name the function in prose, or use a zero-argument form (`\expt`), when no argument is meant.

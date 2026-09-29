@@ -995,3 +995,33 @@ When a PreToolUse hook decides to deny an action (such as an unreviewed git push
   log the full denial reason to stderr and exit with code 2.
   Harnesses (such as Claude Code) treat exit code 2 as a hook execution failure and block the tool,
   preventing a silent bypass when output streaming is broken.
+
+## In-flight review detection in Stop hooks must be scoped per worktree and branch (#4109)
+
+When suppressing the unpushed-commit Stop hook (`no-unshipped-commit.py`) because an adversarial review of HEAD is in flight:
+- **Scope commit and dispatch attribution to target worktree and branch:**
+  In multi-worktree or multi-branch repositories,
+  an in-flight review dispatched for worktree A must never suppress the unpushed-commit block
+  for unrelated, unreviewed commits in worktree B or on a switched-away branch.
+  Matching working directory (`cwd`) alone is insufficient when branches are switched within the same worktree:
+  track the checked-out branch at dispatch time (`dispatch_branches` from `branches_after`),
+  and do not attribute a generic reviewer dispatch to a switched-away branch
+  unless that branch was actually checked out at dispatch time or named in the prompt.
+- **Track checked-out branches per directory/worktree, not globally:**
+  A single transcript-wide `recent_branches` cursor is corrupted by interleaved commands
+  running in different worktrees or checkouts (e.g. `git checkout -b branch` in `wt_b`).
+  Maintain branch tracking keyed by normalized directory (`branches_by_dir`)
+  so branch switches in one worktree directory never corrupt the tracked branch of another.
+- **Correlate OMO flat-record tool results to reviewer dispatches:**
+  In OpenCode flat-record transcripts (`tool_use` / `tool_result` records),
+  track pending dispatches in a FIFO queue per tool name and match `tool_result` against `reviewer_call_ids`.
+  Never treat arbitrary non-errored tool outputs with verdict-shaped strings
+  as review verdicts without verifying dispatch correlation.
+- **PowerShell environment prefix syntax for hook overrides:**
+  When passing environment variables to `git push` (such as `ALLOW_UNREVIEWED_PUSH=1`),
+  never use `$env:VAR=val; git push` in PowerShell.
+  The semicolon `;` is detected as command chaining by `_is_plain_command`,
+  which immediately rejects the push as non-plain.
+  Use `env VAR=val git push` instead,
+  which matches `COMMAND_WRAPPERS` in `_strip_env` and is evaluated as a single simple command.
+

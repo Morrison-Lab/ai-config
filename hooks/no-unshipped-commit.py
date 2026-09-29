@@ -857,6 +857,601 @@ PUSH_REMEDY = ("Push the branch, open or verify its PR, then report status. "
                "The standing rule is executable work, not a handoff item.")
 
 
+_REVIEW_GUARD = None
+_REVIEW_GUARD_LOADED = False
+
+
+def _load_review_guard():
+    global _REVIEW_GUARD, _REVIEW_GUARD_LOADED
+    if _REVIEW_GUARD_LOADED:
+        return _REVIEW_GUARD
+    _REVIEW_GUARD_LOADED = True
+    path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "no-push-without-self-review.py")
+    if not os.path.isfile(path):
+        return None
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("no_push_without_self_review", path)
+        if spec is None or spec.loader is None:
+            return None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _REVIEW_GUARD = module
+        return module
+    except Exception as exc:
+        print(f"no-unshipped-commit: cannot load no-push-without-self-review.py ({exc})",
+              file=sys.stderr)
+        return None
+
+
+def _rev_parse(cwd, rev="HEAD"):
+    """40-hex commit SHA of rev in cwd, or None."""
+    if not cwd or not os.path.exists(cwd):
+        return None
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", rev],
+            cwd=cwd, capture_output=True, text=True, timeout=5)
+        if result.returncode == 0:
+            sha = result.stdout.strip().lower()
+            if re.fullmatch(r"[0-9a-f]{40}", sha):
+                return sha
+    except Exception:
+        pass
+    return None
+
+
+def _current_branch(cwd):
+    """The current branch name in cwd, or None if detached or unavailable."""
+    if not cwd or not os.path.exists(cwd):
+        return None
+    try:
+        res = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=cwd, capture_output=True, text=True, timeout=5)
+        if res.returncode == 0:
+            out = res.stdout.strip()
+            if out and out != "HEAD":
+                return out
+    except Exception:
+        pass
+    return None
+
+
+def _paths_overlap(p1, p2):
+    """True if path p1 is equal to or a parent/child directory of p2."""
+    if not p1 or not p2:
+        return False
+    try:
+        p1_real = os.path.realpath(p1) if os.path.exists(p1) else p1
+    except Exception:
+        p1_real = p1
+    try:
+        p2_real = os.path.realpath(p2) if os.path.exists(p2) else p2
+    except Exception:
+        p2_real = p2
+    p1_norm = os.path.normcase(os.path.normpath(p1_real))
+    p2_norm = os.path.normcase(os.path.normpath(p2_real))
+    if p1_norm == p2_norm:
+        return True
+    try:
+        cp = os.path.normcase(os.path.commonpath([p1_norm, p2_norm]))
+        return cp in (p1_norm, p2_norm)
+    except Exception:
+        return False
+
+
+def _normalize_dir_key(d):
+    """Normalize a directory path string for dictionary keying."""
+    if not d:
+        return ""
+    try:
+        d_real = os.path.realpath(d) if os.path.exists(d) else d
+    except Exception:
+        d_real = d
+    return os.path.normcase(os.path.normpath(d_real))
+
+
+def _canonical_dir(d, worktree_paths=None):
+    """Map directory path d to its canonical worktree root or normalized path."""
+    if not d:
+        return ""
+    norm = _normalize_dir_key(d)
+    if not norm:
+        return ""
+    if worktree_paths:
+        best_wt = None
+        best_len = -1
+        for wt_p in worktree_paths:
+            if not wt_p:
+                continue
+            if norm == wt_p or norm.startswith(wt_p + os.sep) or norm.startswith(wt_p + "/"):
+                if len(wt_p) > best_len:
+                    best_len = len(wt_p)
+                    best_wt = wt_p
+        if best_wt is not None:
+            return best_wt
+    return norm
+
+
+def _lookup_dir_branches(branches_by_dir, d, worktree_paths=None):
+    """Lookup the set of recent branches for a directory."""
+    canon = _canonical_dir(d, worktree_paths)
+    if canon in branches_by_dir:
+        return branches_by_dir[canon]
+    if not worktree_paths:
+        best_key = None
+        best_len = -1
+        for known_key in branches_by_dir:
+            if not known_key:
+                continue
+            if canon.startswith(known_key + os.sep) or canon.startswith(known_key + "/"):
+                if len(known_key) > best_len:
+                    best_len = len(known_key)
+                    best_key = known_key
+        if best_key is not None:
+            return branches_by_dir[best_key]
+    if "" in branches_by_dir:
+        return branches_by_dir[""]
+    return set()
+
+
+def _update_dir_branches(branches_by_dir, d, branches, worktree_paths=None):
+    """Update the set of recent branches for a directory."""
+    canon = _canonical_dir(d, worktree_paths)
+    if not worktree_paths and canon not in branches_by_dir:
+        best_key = None
+        best_len = -1
+        for known_key in branches_by_dir:
+            if not known_key:
+                continue
+            if canon.startswith(known_key + os.sep) or canon.startswith(known_key + "/"):
+                if len(known_key) > best_len:
+                    best_len = len(known_key)
+                    best_key = known_key
+        if best_key is not None:
+            branches_by_dir[best_key] = set(branches)
+            return
+    branches_by_dir[canon] = set(branches)
+
+
+def _extract_dispatch_text(inp):
+    """Flatten all string fields in a tool input dict/list for pattern matching."""
+    texts = []
+    if isinstance(inp, dict):
+        for v in inp.values():
+            if isinstance(v, str):
+                texts.append(v)
+            elif isinstance(v, (list, dict)):
+                texts.append(_extract_dispatch_text(v))
+    elif isinstance(inp, list):
+        for item in inp:
+            if isinstance(item, str):
+                texts.append(item)
+            elif isinstance(item, (list, dict)):
+                texts.append(_extract_dispatch_text(item))
+    elif isinstance(inp, str):
+        texts.append(inp)
+    return " ".join(texts)
+
+
+def _is_commit_relevant(harness_dirs, commit_dir, named_paths, commit_branches, target_cwd_real, target_branch, effective_cwd=None):
+    """True if a commit event is attributed to the target worktree or branch."""
+    if target_cwd_real is None and target_branch is None:
+        return True
+
+    cwd_matches = False
+    if target_cwd_real:
+        all_paths = set(harness_dirs) | set(named_paths)
+        if commit_dir:
+            all_paths.add(commit_dir)
+        elif effective_cwd:
+            all_paths.add(effective_cwd)
+        for p in all_paths:
+            if _paths_overlap(p, target_cwd_real):
+                cwd_matches = True
+                break
+
+    branch_matches = False
+    if target_branch:
+        if target_branch in commit_branches:
+            branch_matches = True
+
+    if target_cwd_real and target_branch:
+        if commit_branches and target_branch not in commit_branches:
+            return False
+        return cwd_matches or branch_matches
+    elif target_cwd_real:
+        return cwd_matches
+    elif target_branch:
+        return branch_matches
+    return False
+
+
+def _is_dispatch_relevant(inp, tool_name, harness_dirs, cur_dir, target_cwd_real, target_branch,
+                          head_sha, other_branches, effective_cwd=None, dispatch_branches=None,
+                          current_repo_branch=None):
+    """True if a reviewer dispatch targets this worktree, branch, or HEAD SHA."""
+    if target_cwd_real is None and target_branch is None:
+        return True
+
+    text = _extract_dispatch_text(inp)
+    text_lower = text.lower()
+
+    if head_sha and head_sha[:7].lower() in text_lower:
+        return True
+
+    if target_branch and target_branch in text:
+        return True
+
+    if other_branches and any(ob in text for ob in other_branches):
+        return False
+
+    all_paths = set(harness_dirs)
+    if cur_dir:
+        all_paths.add(cur_dir)
+    elif effective_cwd:
+        all_paths.add(effective_cwd)
+
+    if isinstance(inp, dict):
+        for k in ("Workspace", "workspace", "dir", "directory", "cwd", "Cwd"):
+            v = inp.get(k)
+            if isinstance(v, str) and v and v != "inherit":
+                all_paths.add(v)
+
+    if target_cwd_real:
+        if not any(_paths_overlap(p, target_cwd_real) for p in all_paths):
+            return False
+
+    if target_branch:
+        if dispatch_branches:
+            if target_branch not in dispatch_branches:
+                return False
+        elif current_repo_branch and target_branch != current_repo_branch:
+            return False
+
+    return True
+
+
+def _process_bash_tool_use(inp, cur_dir, branches_by_dir, target_cwd_real, target_branch,
+                           head_sha, other_branches, effective_cwd, current_repo_branch,
+                           guard, worktree_paths=None):
+    """Process a bash/command invocation for commits, directory moves, and reviewer dispatches.
+
+    Returns (new_cur_dir, commit_seen, dispatch_seen).
+    """
+    harness_dirs, harness_cwd = set(), None
+    if isinstance(inp, dict):
+        for key in ("cwd", "workdir", "Cwd", "WorkingDirectory", "path"):
+            val = inp.get(key)
+            if isinstance(val, str) and val:
+                harness_dirs.add(val)
+                if harness_cwd is None:
+                    harness_cwd = val
+
+    cmd = str(inp.get("command") or inp.get("cmd") or inp.get("CommandLine") or inp.get("script") or "") if isinstance(inp, dict) else ""
+    command = unwrap_command(cmd)
+    scanned = strip_quoted(command)
+    start_dir = harness_cwd or cur_dir or effective_cwd
+
+    commit_seen = False
+    for commit in COMMIT.finditer(scanned):
+        before = scanned[:commit.start()]
+        invocation = scanned[commit.start():commit.end()]
+        commit_paths = harness_dirs | extract_named_paths(invocation)
+        commit_dir = absolute_dir(shell_dir_after(before, start_dir))
+        dir_before = commit_dir or start_dir
+        dir_branches = _lookup_dir_branches(branches_by_dir, dir_before, worktree_paths)
+        commit_branches = branches_after(before, dir_branches)
+        if _is_commit_relevant(harness_dirs, commit_dir, commit_paths, commit_branches,
+                               target_cwd_real, target_branch, effective_cwd=effective_cwd):
+            commit_seen = True
+
+    end_dir = absolute_dir(shell_dir_after(scanned, start_dir, parent_only=True))
+    target_update_dir = end_dir or start_dir
+    dir_branches = _lookup_dir_branches(branches_by_dir, target_update_dir, worktree_paths)
+    new_dir_branches = branches_after(scanned, dir_branches)
+    _update_dir_branches(branches_by_dir, target_update_dir, new_dir_branches, worktree_paths)
+
+    new_cur_dir = end_dir
+
+    dispatch_seen = False
+    if guard.external_reviewer_command(cmd) or "pre-push-review" in cmd:
+        dispatch_dir = end_dir or start_dir
+        dispatch_branches = _lookup_dir_branches(branches_by_dir, dispatch_dir, worktree_paths)
+        if _is_dispatch_relevant(inp, "bash", harness_dirs, cur_dir, target_cwd_real,
+                                target_branch, head_sha, other_branches,
+                                effective_cwd=effective_cwd,
+                                dispatch_branches=dispatch_branches,
+                                current_repo_branch=current_repo_branch):
+            dispatch_seen = True
+
+    return new_cur_dir, commit_seen, dispatch_seen
+
+
+def _process_agent_tool_use(inp, tool_name, cur_dir, branches_by_dir, target_cwd_real,
+                            target_branch, head_sha, other_branches, effective_cwd,
+                            current_repo_branch, guard, worktree_paths=None):
+    """Process an agent/subagent tool use for reviewer dispatch.
+
+    Returns True if this invocation is a relevant reviewer dispatch.
+    """
+    if not (tool_name in guard.AGENT_TOOLS and tool_name not in guard.TASK_OUTPUT_TOOLS):
+        return False
+    if not (isinstance(inp, dict) and guard._is_reviewer_dispatch(inp)):
+        return False
+
+    agent_dirs = set()
+    agent_cwd = None
+    for key in ("cwd", "workdir", "Cwd", "WorkingDirectory", "path"):
+        val = inp.get(key)
+        if isinstance(val, str) and val:
+            agent_dirs.add(val)
+            if agent_cwd is None:
+                agent_cwd = val
+
+    dispatch_dir = agent_cwd or cur_dir or effective_cwd
+    dispatch_branches = _lookup_dir_branches(branches_by_dir, dispatch_dir, worktree_paths)
+
+    return _is_dispatch_relevant(inp, tool_name, agent_dirs, cur_dir, target_cwd_real,
+                                target_branch, head_sha, other_branches,
+                                effective_cwd=effective_cwd,
+                                dispatch_branches=dispatch_branches,
+                                current_repo_branch=current_repo_branch)
+
+
+def is_pre_push_review_in_flight(cwd, path, branch=None, session_cwd=None):
+    """True if an adversarial pre-push review of HEAD is in flight.
+
+    When Claude Code or Antigravity backgrounds an Agent or subagent review
+    dispatch (e.g. Remote Control active or background agent isolation), the
+    tool result is an async launch stub (e.g. `agentId: ...` or `status: running`),
+    and task `output_file` remains at 0 bytes while running. Polling `output_file`
+    for `Reviewed-Commit` never matches. The verdict arrives only via a subagent
+    hand-back message after the turn ends.
+    Meanwhile `no-unshipped-commit.py` as a Stop hook detects unpushed commits and
+    blocks the turn from ending. The agent then attempts `git push`, which is refused
+    by `no-push-without-self-review.py` ("no verdict came back as that call's own result").
+    This creates an infinite deadlock loop (ai-config#4109).
+
+    This predicate detects when a reviewer dispatch has occurred after the latest
+    commit, and no review verdict (CLEAN or NEEDS WORK) covering the current HEAD has
+    arrived yet. If so, `decide()` allows the turn to stop cleanly so the background
+    reviewer can complete and deliver its verdict.
+
+    Scoped per worktree and branch: commits and dispatches only affect the
+    calculation for the specific worktree or branch they target, tracking
+    working directories and checked-out branches to prevent cross-worktree or
+    cross-branch suppression.
+    """
+    if not path or not os.path.isfile(path):
+        return False
+    guard = _load_review_guard()
+    if guard is None:
+        return False
+
+    target_cwd_real = None
+    if cwd:
+        try:
+            target_cwd_real = os.path.realpath(cwd) if os.path.exists(cwd) else cwd
+        except Exception:
+            target_cwd_real = cwd
+
+    effective_cwd = None
+    ref_cwd = session_cwd or cwd
+    if ref_cwd:
+        try:
+            effective_cwd = os.path.realpath(ref_cwd) if os.path.exists(ref_cwd) else ref_cwd
+        except Exception:
+            effective_cwd = ref_cwd
+
+    current_repo_branch = _current_branch(cwd) if cwd else None
+    target_branch = branch or current_repo_branch
+    head_sha = _rev_parse(cwd, target_branch or "HEAD") if cwd else None
+
+    # Collect known other branches and worktree paths to disambiguate dispatches
+    other_branches = set()
+    worktree_paths = set()
+    if cwd:
+        try:
+            for wt in list_worktrees(cwd):
+                b = wt.get("branch")
+                if b and b != target_branch:
+                    other_branches.add(b)
+                p = wt.get("path")
+                if p:
+                    worktree_paths.add(_normalize_dir_key(p))
+            for b, _, _ in list_local_branches(cwd):
+                if b != target_branch:
+                    other_branches.add(b)
+        except Exception:
+            pass
+    if session_cwd:
+        try:
+            for wt in list_worktrees(session_cwd):
+                p = wt.get("path")
+                if p:
+                    worktree_paths.add(_normalize_dir_key(p))
+        except Exception:
+            pass
+
+    # If read_latest_review already found a verdict covering current HEAD, review completed.
+    if head_sha:
+        try:
+            verdict, reviewed_commits, _ = guard.read_latest_review(path)
+            if verdict in ("clean", "needs_work"):
+                if any(sha.startswith(head_sha[:7]) or head_sha.startswith(sha[:7]) for sha in reviewed_commits):
+                    return False
+        except Exception:
+            pass
+
+    # Scan the transcript to check if a reviewer dispatch occurred after the latest commit
+    last_commit_seq = None
+    last_dispatch_seq = None
+    last_verdict_seq = None
+    reviewer_call_ids = set()
+    active_reviewer_task_ids = set()
+    pending_omo_uses = {}
+    ambiguous_omo_names = set()
+    omo_seq = 0
+    seq = 0
+    branches_by_dir, cur_dir = {}, None
+
+    try:
+        with open(path, encoding="utf-8", errors="ignore") as stream:
+            for line in stream:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    record = json.loads(line)
+                except Exception:
+                    continue
+                if not isinstance(record, dict):
+                    continue
+
+                r_type = record.get("type")
+                omo_name = record.get("tool_name")
+                if r_type in ("tool_use", "tool_result") and isinstance(omo_name, str):
+                    name = omo_name.lower()
+                    if r_type == "tool_use":
+                        seq += 1
+                        omo_seq += 1
+                        call_id = f"omo-{omo_seq}"
+                        pending_omo_uses.setdefault(name, []).append(call_id)
+                        inp = record.get("tool_input")
+                        if name in {"bash", "run_command", "terminal", "execute_command", "shell"}:
+                            cur_dir, commit_seen, dispatch_seen = _process_bash_tool_use(
+                                inp, cur_dir, branches_by_dir, target_cwd_real, target_branch,
+                                head_sha, other_branches, effective_cwd, current_repo_branch, guard,
+                                worktree_paths=worktree_paths)
+                            if commit_seen:
+                                last_commit_seq = seq
+                            if dispatch_seen:
+                                last_dispatch_seq = seq
+                                reviewer_call_ids.add(call_id)
+                        elif _process_agent_tool_use(inp, name, cur_dir, branches_by_dir,
+                                                     target_cwd_real, target_branch, head_sha,
+                                                     other_branches, effective_cwd,
+                                                     current_repo_branch, guard,
+                                                     worktree_paths=worktree_paths):
+                            last_dispatch_seq = seq
+                            reviewer_call_ids.add(call_id)
+                    else:
+                        queue = pending_omo_uses.get(name) or []
+                        if len(queue) > 1 or name in ambiguous_omo_names:
+                            ambiguous_omo_names.add(name)
+                            pending_omo_uses[name] = []
+                            continue
+                        call_id = queue.pop(0) if queue else None
+                        if call_id is not None and call_id in reviewer_call_ids:
+                            seq += 1
+                            if not record.get("is_error"):
+                                out_text = guard._result_text({"content": record.get("tool_output")})
+                                found, shas = guard.parse_report_all(out_text)
+                                if found:
+                                    if not head_sha or not shas or any(s.startswith(head_sha[:7]) or head_sha.startswith(s[:7]) for s in shas):
+                                        last_verdict_seq = seq
+                    continue
+
+                if guard._is_reviewer_record(record):
+                    seq += 1
+                    msg_text = guard._result_text(
+                        record.get("message") if isinstance(record.get("message"), dict) else record
+                    )
+                    if msg_text:
+                        found, shas = guard.parse_report_all(msg_text)
+                        if found:
+                            if not head_sha or not shas or any(s.startswith(head_sha[:7]) or head_sha.startswith(s[:7]) for s in shas):
+                                last_verdict_seq = seq
+
+                origin = record.get("origin")
+                if isinstance(origin, dict) and origin.get("kind") in ("task-notification", "task_notification"):
+                    seq += 1
+                    origin_ids = guard._task_ids(origin, guard.TASK_ID_KEYS_ORIGIN)
+                    sender_id = str(record.get("sender") or "")
+                    if any(t in active_reviewer_task_ids for t in origin_ids) or (sender_id and sender_id in active_reviewer_task_ids):
+                        content_text = str(record.get("content") or record.get("text") or "")
+                        found, shas = guard.parse_report_all(content_text)
+                        if found:
+                            if not head_sha or not shas or any(s.startswith(head_sha[:7]) or head_sha.startswith(s[:7]) for s in shas):
+                                last_verdict_seq = seq
+
+                for b in guard._iter_blocks(record):
+                    b_type = b.get("type")
+                    if b_type == "tool_use":
+                        tool_name = (b.get("name") or "").lower()
+                        call_id = b.get("id")
+                        inp = b.get("input") or {}
+
+                        if tool_name in {"bash", "run_command", "terminal", "execute_command", "shell"}:
+                            cur_dir, commit_seen, dispatch_seen = _process_bash_tool_use(
+                                inp, cur_dir, branches_by_dir, target_cwd_real, target_branch,
+                                head_sha, other_branches, effective_cwd, current_repo_branch, guard,
+                                worktree_paths=worktree_paths)
+                            if commit_seen:
+                                last_commit_seq = seq
+                            if dispatch_seen:
+                                last_dispatch_seq = seq
+                                if call_id:
+                                    reviewer_call_ids.add(call_id)
+                        elif _process_agent_tool_use(inp, tool_name, cur_dir, branches_by_dir,
+                                                     target_cwd_real, target_branch, head_sha,
+                                                     other_branches, effective_cwd,
+                                                     current_repo_branch, guard,
+                                                     worktree_paths=worktree_paths):
+                            last_dispatch_seq = seq
+                            if call_id:
+                                reviewer_call_ids.add(call_id)
+                        elif tool_name == "send_message" and guard._is_reviewer_record(record):
+                            seq += 1
+                            msg_text = str(inp.get("Message") or inp.get("message") or "")
+                            if msg_text:
+                                found, shas = guard.parse_report_all(msg_text)
+                                if found:
+                                    if not head_sha or not shas or any(s.startswith(head_sha[:7]) or head_sha.startswith(s[:7]) for s in shas):
+                                        last_verdict_seq = seq
+
+                    elif b_type == "tool_result":
+                        call_id = b.get("tool_use_id")
+                        if call_id and call_id in reviewer_call_ids:
+                            seq += 1
+                            if b.get("is_error"):
+                                if last_dispatch_seq is not None:
+                                    last_dispatch_seq = None
+                            else:
+                                res_text = guard._result_text(b)
+                                try:
+                                    res_data = json.loads(res_text)
+                                    if isinstance(res_data, dict):
+                                        for tid in guard._registrable_task_ids(res_data):
+                                            active_reviewer_task_ids.add(tid)
+                                except Exception:
+                                    pass
+                                tid_match = re.search(r"\b(?:task[-_ ]?id|conversationId|agentId)[:=]\s*[`\"']?([\w-]+)", res_text, re.I)
+                                if tid_match:
+                                    active_reviewer_task_ids.add(tid_match.group(1))
+
+                                found, shas = guard.parse_report_all(res_text)
+                                if not found:
+                                    handback_text = guard._handback_report_text(path, call_id, res_text)
+                                    if handback_text:
+                                        found, shas = guard.parse_report_all(handback_text)
+                                if found:
+                                    if not head_sha or not shas or any(s.startswith(head_sha[:7]) or head_sha.startswith(s[:7]) for s in shas):
+                                        last_verdict_seq = seq
+    except Exception:
+        return False
+
+    if last_dispatch_seq is None:
+        return False
+    if last_commit_seq is not None and last_commit_seq > last_dispatch_seq:
+        return False
+    if last_verdict_seq is not None and last_verdict_seq >= last_dispatch_seq:
+        return False
+    return True
+
+
 def decide(cwd, path):
     """The Stop verdict: the block reason, or "" to allow the stop.
 
@@ -879,6 +1474,8 @@ def decide(cwd, path):
     if not cwd:
         if not pending:
             return ""
+        if is_pre_push_review_in_flight(cwd, path):
+            return ""
         return ("A commit was made with no later push or PR creation, and "
                 "repository state is unavailable to check. " + PUSH_REMEDY)
 
@@ -890,10 +1487,14 @@ def decide(cwd, path):
         if count is None:
             if not pending:
                 return ""
+            if is_pre_push_review_in_flight(cwd, path):
+                return ""
             return ("The unshipped count for this branch is undefined --- no "
                     "upstream is configured, or git failed to answer --- and the "
                     "transcript shows a commit with no later push or PR "
                     "creation. " + PUSH_REMEDY)
+        if is_pre_push_review_in_flight(cwd, path):
+            return ""
         return f"{count} commit(s) on HEAD are not on its upstream. {PUSH_REMEDY}"
 
     unpushed_wts = []
@@ -942,9 +1543,11 @@ def decide(cwd, path):
             checked_out_branches.add(wt_branch)
         count = unpushed_count(wt_path)
         if count is not None and count > 0:
-            unpushed_wts.append((wt, count))
+            if not is_pre_push_review_in_flight(wt_path, path, branch=wt_branch, session_cwd=cwd):
+                unpushed_wts.append((wt, count))
         elif count is None:
-            undefined_wts.append(wt)
+            if not is_pre_push_review_in_flight(wt_path, path, branch=wt_branch, session_cwd=cwd):
+                undefined_wts.append(wt)
 
     # Check switched-away branches (local branches this session committed on,
     # not checked out in any worktree)
@@ -958,11 +1561,13 @@ def decide(cwd, path):
             if upstream:
                 b_count = unpushed_count_branch(cwd, branch, upstream)
                 if b_count is not None and b_count > 0:
-                    unpushed_branches.append((branch, b_count))
+                    if not is_pre_push_review_in_flight(cwd, path, branch=branch, session_cwd=cwd):
+                        unpushed_branches.append((branch, b_count))
             elif pending:
                 b_count = unpushed_commits_against_remotes(cwd, branch)
                 if b_count is not None and b_count > 0:
-                    unpushed_branches.append((branch, b_count))
+                    if not is_pre_push_review_in_flight(cwd, path, branch=branch, session_cwd=cwd):
+                        unpushed_branches.append((branch, b_count))
 
     if unpushed_wts or unpushed_branches or (pending and undefined_wts):
         if len(unpushed_wts) == 1 and not unpushed_branches and not (pending and undefined_wts):

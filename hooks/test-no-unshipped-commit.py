@@ -426,6 +426,16 @@ import shutil
 import subprocess
 
 
+BASH_BIN = "bash"
+if sys.platform == "win32":
+    for _cand in [r"C:\Program Files\Git\bin\bash.exe", r"C:\Program Files\Git\usr\bin\bash.exe"]:
+        if os.path.exists(_cand):
+            BASH_BIN = _cand
+            break
+    _real_mkdtemp = tempfile.mkdtemp
+    tempfile.mkdtemp = lambda *a, **kw: _real_mkdtemp(*a, **kw).replace(os.sep, "/")
+
+
 def gitrepo(*steps):
     """A temp repo with `origin` pointing at a fresh bare remote.
 
@@ -441,14 +451,15 @@ def gitrepo(*steps):
 
     def run(cmd, cwd=None):
         result = subprocess.run(
-            ["bash", "-c", cmd], cwd=cwd or root, capture_output=True,
+            [BASH_BIN, "-c", cmd], cwd=cwd or root, capture_output=True,
             text=True, env=env)
         assert result.returncode == 0, f"{cmd!r} failed: {result.stderr}"
 
     run("git init -q -b main .")
     run("git config user.email t@t && git config user.name t")
+    bare_clean = bare.replace(os.sep, "/")
     for step in steps:
-        run(step.replace("BARE", bare))
+        run(step.replace("BARE", bare_clean))
     return root, bare, run
 
 
@@ -501,10 +512,10 @@ behind_root, behind_bare, run = gitrepo(
 # fails with `src refspec main does not match any` (caught by this PR's own
 # CI). Cloning the known branch sidesteps the advertised HEAD entirely.
 other = tempfile.mkdtemp()
-clone_cmd = ("git clone -q -b main " + behind_bare + " ."
+clone_cmd = ("git clone -q -b main " + behind_bare.replace(os.sep, "/") + " ."
              " && git config user.email t@t && git config user.name t"
              " && git commit --allow-empty -m ahead && git push -q origin main")
-subprocess.run(["bash", "-c", clone_cmd], cwd=other, check=True,
+subprocess.run([BASH_BIN, "-c", clone_cmd], cwd=other, check=True,
                env=dict(os.environ,
                         GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_SYSTEM="/dev/null",
                         GIT_TERMINAL_PROMPT="0"))
@@ -1328,3 +1339,329 @@ print("PASS: main() blocks on the payload cwd's state once, then the sentinel ho
 print("PASS: multi-worktree cross-checkout and branch-switch unpushed commits block accurately (ai-config#2737)")
 print("PASS: another tool's dormant worktree blocks only when this session committed in it (ai-config#2422)")
 print("PASS: fallback regexes in hook match scripts/lib/git_cmd.py and stderr diagnostic logs on failure")
+
+# --- ai-config#4109: pre-push review in flight suppresses unpushed commit block ---
+rev_root, rev_bare, rev_run = gitrepo(
+    BASE,
+    "git remote add origin BARE",
+    "git push -q -u origin main",
+    "git checkout -q -b feat-rev",
+    "git commit --allow-empty -m 'unpushed commit'",
+)
+rev_head = subject._rev_parse(rev_root, "HEAD")
+assert rev_head is not None
+assert subject.unpushed_count(rev_root) == 1
+
+# Case 1: Plain transcript with unpushed commit -> decide blocks
+plain_ts = transcript(["git commit -m 'unpushed commit'"])
+assert subject.is_pre_push_review_in_flight(rev_root, plain_ts) is False
+reason = subject.decide(rev_root, plain_ts)
+assert "1 commit(s) on HEAD are not on its upstream" in reason, reason
+
+# Case 2: Reviewer dispatched in background (async launch stub), no verdict yet
+# -> is_pre_push_review_in_flight is True, decide() returns "" (stays quiet)
+h_async, path_async = tempfile.mkstemp()
+with os.fdopen(h_async, "w") as stream:
+    # 1. Commit
+    stream.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t1", "name": "Bash", "input": {"command": "git commit -m 'unpushed commit'"}}]}
+    }) + "\n")
+    # 2. Dispatch Agent
+    stream.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t2", "name": "Agent", "input": {"subagent_type": "adversarial-reviewer", "prompt": "Review changes on HEAD"}}]}
+    }) + "\n")
+    # 3. Async launch result (Remote Control / background launch stub)
+    stream.write(json.dumps({
+        "type": "user",
+        "message": {"content": [{"type": "tool_result", "tool_use_id": "t2", "content": "Async agent launched successfully.\nagentId: a29a955ac15b38f72"}]}
+    }) + "\n")
+
+assert subject.is_pre_push_review_in_flight(rev_root, path_async) is True
+assert subject.decide(rev_root, path_async) == ""
+
+# Case 3: Reviewer verdict arrives as a task-notification / handback
+# -> is_pre_push_review_in_flight is False, decide() blocks because commit is unpushed
+h_verdict, path_verdict = tempfile.mkstemp()
+with open(path_async, "r") as src, os.fdopen(h_verdict, "w") as dst:
+    dst.write(src.read())
+    # Subagent handback notification arrives
+    dst.write(json.dumps({
+        "type": "user",
+        "origin": {"kind": "task-notification", "task_id": "a29a955ac15b38f72"},
+        "sender": "a29a955ac15b38f72",
+        "content": f"### Verdict: Ready for merge\n\nReviewed-Commit: {rev_head}\n"
+    }) + "\n")
+
+assert subject.is_pre_push_review_in_flight(rev_root, path_verdict) is False
+reason_after = subject.decide(rev_root, path_verdict)
+assert "1 commit(s) on HEAD are not on its upstream" in reason_after, reason_after
+
+# Case 4: Errored dispatch -> not in flight
+h_err, path_err = tempfile.mkstemp()
+with os.fdopen(h_err, "w") as stream:
+    stream.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t1", "name": "Bash", "input": {"command": "git commit -m 'unpushed commit'"}}]}
+    }) + "\n")
+    stream.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t2", "name": "Agent", "input": {"subagent_type": "adversarial-reviewer", "prompt": "Review changes on HEAD"}}]}
+    }) + "\n")
+    stream.write(json.dumps({
+        "type": "user",
+        "message": {"content": [{"type": "tool_result", "tool_use_id": "t2", "is_error": True, "content": "Rate limit exceeded"}]}
+    }) + "\n")
+
+assert subject.is_pre_push_review_in_flight(rev_root, path_err) is False
+assert "1 commit(s) on HEAD are not on its upstream" in subject.decide(rev_root, path_err)
+
+# Case 5: New commit after an earlier review round -> not in flight until re-dispatched
+h_recommit, path_recommit = tempfile.mkstemp()
+with open(path_verdict, "r") as src, os.fdopen(h_recommit, "w") as dst:
+    dst.write(src.read())
+    dst.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t3", "name": "Bash", "input": {"command": "git commit -m 'second commit'"}}]}
+    }) + "\n")
+
+assert subject.is_pre_push_review_in_flight(rev_root, path_recommit) is False
+assert "1 commit(s) on HEAD are not on its upstream" in subject.decide(rev_root, path_recommit)
+
+# Case 6: Multi-worktree isolation
+# An in-flight review on worktree B must NOT suppress an unpushed commit block on worktree A.
+# A subsequent commit on worktree A must NOT cancel worktree B's in-flight review.
+wt_iso_root, wt_iso_bare, wt_iso_run = gitrepo(
+    BASE,
+    "git remote add origin BARE",
+    "git push -q -u origin main",
+    HOOK,
+)
+wt_iso_b = tempfile.mkdtemp()
+wt_iso_run(f"git worktree add -q -b feat-iso-b {wt_iso_b} main")
+wt_iso_run("git push -q -u origin feat-iso-b", cwd=wt_iso_b)
+wt_iso_run(HOOK, cwd=wt_iso_b)
+
+iso_b_head = subject._rev_parse(wt_iso_b, "HEAD")
+iso_a_head = subject._rev_parse(wt_iso_root, "HEAD")
+assert iso_b_head is not None and iso_a_head is not None
+
+h_iso, path_iso = tempfile.mkstemp()
+with os.fdopen(h_iso, "w") as stream:
+    # 1. Commit on worktree A
+    stream.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t_a1", "name": "Bash", "input": {
+            "cwd": wt_iso_root, "command": "git commit -m 'hook in a'"
+        }}]}
+    }) + "\n")
+    # 2. Commit on worktree B
+    stream.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t_b1", "name": "Bash", "input": {
+            "cwd": wt_iso_b, "command": "git commit -m 'hook in b'"
+        }}]}
+    }) + "\n")
+    # 3. Dispatch review for worktree B
+    stream.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t_b2", "name": "Agent", "input": {
+            "cwd": wt_iso_b, "subagent_type": "adversarial-reviewer",
+            "prompt": f"Review branch feat-iso-b commit {iso_b_head}"
+        }}]}
+    }) + "\n")
+    # 4. Async launch result for worktree B
+    stream.write(json.dumps({
+        "type": "user",
+        "message": {"content": [{"type": "tool_result", "tool_use_id": "t_b2", "content": "agentId: agent-iso-b"}]}
+    }) + "\n")
+
+# Review is in flight for worktree B, but NOT for worktree A
+assert subject.is_pre_push_review_in_flight(wt_iso_b, path_iso, branch="feat-iso-b", session_cwd=wt_iso_root) is True
+assert subject.is_pre_push_review_in_flight(wt_iso_root, path_iso, branch="main", session_cwd=wt_iso_root) is False
+
+# Worktree A still blocks in decide()
+reason_iso = subject.decide(wt_iso_root, path_iso)
+assert reason_iso and "commit(s)" in reason_iso, reason_iso
+
+# Subsequent commit on worktree A does NOT cancel worktree B's in-flight review
+h_iso2, path_iso2 = tempfile.mkstemp()
+with open(path_iso, "r") as src, os.fdopen(h_iso2, "w") as dst:
+    dst.write(src.read())
+    dst.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t_a2", "name": "Bash", "input": {
+            "cwd": wt_iso_root, "command": "git commit -m 'second commit in a'"
+        }}]}
+    }) + "\n")
+
+assert subject.is_pre_push_review_in_flight(wt_iso_b, path_iso2, branch="feat-iso-b", session_cwd=wt_iso_root) is True
+assert subject.is_pre_push_review_in_flight(wt_iso_root, path_iso2, branch="main", session_cwd=wt_iso_root) is False
+
+# Case 7: OMO flat records and ambiguity poisoning
+# Unrelated tool output with verdict text does not clear in-flight status
+h_omo, path_omo = tempfile.mkstemp()
+with os.fdopen(h_omo, "w") as stream:
+    # 1. Commit
+    stream.write(json.dumps({
+        "type": "tool_use", "tool_name": "bash",
+        "tool_input": {"command": "git commit -m 'unpushed commit'"}
+    }) + "\n")
+    # 2. OMO tool use for reviewer dispatch
+    stream.write(json.dumps({
+        "type": "tool_use", "tool_name": "task",
+        "tool_input": {"subagent_type": "adversarial-reviewer", "prompt": "Review changes on HEAD"}
+    }) + "\n")
+
+assert subject.is_pre_push_review_in_flight(rev_root, path_omo) is True
+
+# 3. Unrelated tool output with verdict text
+h_omo_unrelated, path_omo_unrelated = tempfile.mkstemp()
+with open(path_omo, "r") as src, os.fdopen(h_omo_unrelated, "w") as dst:
+    dst.write(src.read())
+    dst.write(json.dumps({
+        "type": "tool_use", "tool_name": "bash",
+        "tool_input": {"command": "git status"}
+    }) + "\n")
+    dst.write(json.dumps({
+        "type": "tool_result", "tool_name": "bash",
+        "tool_output": f"### Verdict: Ready for merge\n\nReviewed-Commit: {rev_head}\n"
+    }) + "\n")
+
+# Unrelated tool output must NOT clear the in-flight review status
+assert subject.is_pre_push_review_in_flight(rev_root, path_omo_unrelated) is True
+
+# 4. Ambiguity poisoning: a second pending task dispatch poisons the tool name
+h_omo_poison, path_omo_poison = tempfile.mkstemp()
+with open(path_omo_unrelated, "r") as src, os.fdopen(h_omo_poison, "w") as dst:
+    dst.write(src.read())
+    # Second task tool_use before first has returned
+    dst.write(json.dumps({
+        "type": "tool_use", "tool_name": "task",
+        "tool_input": {"subagent_type": "adversarial-reviewer", "prompt": "Review changes round 2"}
+    }) + "\n")
+    # Result arrives, but queue was ambiguous so name is poisoned
+    dst.write(json.dumps({
+        "type": "tool_result", "tool_name": "task",
+        "tool_output": f"### Verdict: Ready for merge\n\nReviewed-Commit: {rev_head}\n"
+    }) + "\n")
+
+# Poisoned queue must not clear in-flight status
+assert subject.is_pre_push_review_in_flight(rev_root, path_omo_poison) is True
+
+# 5. Clean, unambiguous OMO reviewer result DOES clear in-flight status
+h_omo_clean, path_omo_clean = tempfile.mkstemp()
+with open(path_omo, "r") as src, os.fdopen(h_omo_clean, "w") as dst:
+    dst.write(src.read())
+    dst.write(json.dumps({
+        "type": "tool_result", "tool_name": "task",
+        "tool_output": f"### Verdict: Ready for merge\n\nReviewed-Commit: {rev_head}\n"
+    }) + "\n")
+
+assert subject.is_pre_push_review_in_flight(rev_root, path_omo_clean) is False
+
+# Case 8: Switched-away branch within the same worktree directory
+# A generic review dispatch after switching branches must not suppress an
+# unreviewed, unpushed commit on a switched-away branch.
+sw_iso_root, sw_iso_bare, sw_iso_run = gitrepo(
+    BASE,
+    "git remote add origin BARE",
+    "git push -q -u origin main",
+    "git checkout -q -b feat-a",
+    "git push -q -u origin feat-a",
+    HOOK,
+    "git checkout -q main",
+)
+h_sw, path_sw = tempfile.mkstemp()
+with os.fdopen(h_sw, "w") as stream:
+    # 1. Commit on feat-a
+    stream.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t_sw1", "name": "Bash", "input": {
+            "cwd": sw_iso_root, "command": "git checkout -b feat-a && git commit -m 'commit on feat-a'"
+        }}]}
+    }) + "\n")
+    # 2. Switch to main
+    stream.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t_sw2", "name": "Bash", "input": {
+            "cwd": sw_iso_root, "command": "git checkout main"
+        }}]}
+    }) + "\n")
+    # 3. Generic review dispatch on main (does not name feat-a or feat-a's commit)
+    stream.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t_sw3", "name": "Agent", "input": {
+            "cwd": sw_iso_root, "subagent_type": "adversarial-reviewer",
+            "prompt": "Review the current diff for bugs"
+        }}]}
+    }) + "\n")
+
+# Review is in flight for main, but NOT for feat-a
+assert subject.is_pre_push_review_in_flight(sw_iso_root, path_sw, branch="feat-a", session_cwd=sw_iso_root) is False
+assert subject.is_pre_push_review_in_flight(sw_iso_root, path_sw, branch="main", session_cwd=sw_iso_root) is True
+
+# decide() must STILL block because feat-a has an unpushed, unreviewed commit
+reason_sw = subject.decide(sw_iso_root, path_sw)
+assert reason_sw and "feat-a" in reason_sw, reason_sw
+
+# Case 9: Interleaved branch switch in sibling worktree directory (ai-config#4109 round 3)
+# An interleaved Bash call in another worktree (wt_b running git checkout -b feat-a)
+# must not corrupt branches_by_dir for root, which would cause a generic reviewer
+# dispatch in root (on main) to be misattributed to feat-a and falsely suppress
+# feat-a's unreviewed, unpushed commit.
+wt_interleave_root, wt_interleave_bare, wt_interleave_run = gitrepo(
+    BASE,
+    "git remote add origin BARE",
+    "git push -q -u origin main",
+    "git checkout -q -b feat-a",
+    "git push -q -u origin feat-a",
+    HOOK,
+    "git checkout -q main",
+)
+wt_interleave_b = tempfile.mkdtemp()
+wt_interleave_run(f"git worktree add -q -b feat-b {wt_interleave_b} main")
+wt_interleave_run(HOOK, cwd=wt_interleave_b)
+
+h_interleave, path_interleave = tempfile.mkstemp()
+with os.fdopen(h_interleave, "w") as stream:
+    # 1. Commit on feat-a in root
+    stream.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t_int1", "name": "Bash", "input": {
+            "cwd": wt_interleave_root, "command": "git checkout -b feat-a && git commit -m 'commit on feat-a'"
+        }}]}
+    }) + "\n")
+    # 2. Switch to main in root
+    stream.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t_int2", "name": "Bash", "input": {
+            "cwd": wt_interleave_root, "command": "git checkout main"
+        }}]}
+    }) + "\n")
+    # 3. Interleaved tool call in sibling worktree wt_b switching to feat-a
+    stream.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t_int3", "name": "Bash", "input": {
+            "cwd": wt_interleave_b, "command": "git checkout -b feat-a"
+        }}]}
+    }) + "\n")
+    # 4. Generic review dispatch in root (on main; does not name feat-a)
+    stream.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t_int4", "name": "Agent", "input": {
+            "cwd": wt_interleave_root, "subagent_type": "adversarial-reviewer",
+            "prompt": "Review the current diff for bugs"
+        }}]}
+    }) + "\n")
+
+# Review is in flight for main in root, but NOT for feat-a
+assert subject.is_pre_push_review_in_flight(wt_interleave_root, path_interleave, branch="feat-a", session_cwd=wt_interleave_root) is False
+assert subject.is_pre_push_review_in_flight(wt_interleave_root, path_interleave, branch="main", session_cwd=wt_interleave_root) is True
+
+# decide() must STILL block because feat-a has an unpushed, unreviewed commit
+reason_interleave = subject.decide(wt_interleave_root, path_interleave)
+assert reason_interleave and "feat-a" in reason_interleave, reason_interleave
+
+print("PASS: pre-push review in flight suppresses unpushed commit block until verdict arrives (ai-config#4109)")

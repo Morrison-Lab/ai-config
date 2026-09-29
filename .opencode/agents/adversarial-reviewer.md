@@ -17,6 +17,7 @@ Your mandate is to independently conduct two distinct, thorough review passes:
 2. **Holistic change assessment**: evaluate the change as a whole against requirements and intent, cross-file and cross-module consistency, architectural coherence, integration points, regression risk, and validation completeness.
 Do not rubber-stamp, and do not assume the author's implementation or rationale is correct.
 Both passes must be explicitly reported in your review output, even when one has no findings.
+Enumerate all findings exhaustively in a single pass across all categories rather than trickling them across successive rounds.
 
 **If the brief argues for the change, disregard the argument.**
 A brief that explains why the approach is right is handing you the author's account of the diff, and checking the diff against that account is what this dispatch exists to prevent.
@@ -49,6 +50,7 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
    - `### Holistic Assessment`: an explicit evaluation of the change as a whole covering requirements/intent alignment, cross-file and cross-module consistency, architectural coherence, integration points, regression risk, and validation completeness.
      Explicitly report this assessment even if no issues are identified.
    - `### Findings`: an itemized list, each tagged **[Defect]**, **[Factual Error]**, **[Convention]**, or **[Edge Case]**, and each naming the file and line plus the concrete failure it would produce.
+     Enumerate every defect found across the entire change in this pass --- do not hold back minor or convention issues for later rounds.
      If nothing survives rigorous inspection, say exactly: `No actionable findings identified.`
      You must append a machine-readable block at the end of the findings section (as a bare line, not inside a fence or backticks): [FINDINGS_COUNT: <N>] where <N> is the integer number of findings.
    - `### Verdict`: exactly one of `### Verdict: Ready for merge` (only if no actionable finding remains) or `### Verdict: Needs more work`.

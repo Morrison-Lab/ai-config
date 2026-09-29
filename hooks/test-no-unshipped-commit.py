@@ -426,6 +426,16 @@ import shutil
 import subprocess
 
 
+BASH_BIN = "bash"
+if sys.platform == "win32":
+    for _cand in [r"C:\Program Files\Git\bin\bash.exe", r"C:\Program Files\Git\usr\bin\bash.exe"]:
+        if os.path.exists(_cand):
+            BASH_BIN = _cand
+            break
+    _real_mkdtemp = tempfile.mkdtemp
+    tempfile.mkdtemp = lambda *a, **kw: _real_mkdtemp(*a, **kw).replace(os.sep, "/")
+
+
 def gitrepo(*steps):
     """A temp repo with `origin` pointing at a fresh bare remote.
 
@@ -441,14 +451,15 @@ def gitrepo(*steps):
 
     def run(cmd, cwd=None):
         result = subprocess.run(
-            ["bash", "-c", cmd], cwd=cwd or root, capture_output=True,
+            [BASH_BIN, "-c", cmd], cwd=cwd or root, capture_output=True,
             text=True, env=env)
         assert result.returncode == 0, f"{cmd!r} failed: {result.stderr}"
 
     run("git init -q -b main .")
     run("git config user.email t@t && git config user.name t")
+    bare_clean = bare.replace(os.sep, "/")
     for step in steps:
-        run(step.replace("BARE", bare))
+        run(step.replace("BARE", bare_clean))
     return root, bare, run
 
 
@@ -501,10 +512,10 @@ behind_root, behind_bare, run = gitrepo(
 # fails with `src refspec main does not match any` (caught by this PR's own
 # CI). Cloning the known branch sidesteps the advertised HEAD entirely.
 other = tempfile.mkdtemp()
-clone_cmd = ("git clone -q -b main " + behind_bare + " ."
+clone_cmd = ("git clone -q -b main " + behind_bare.replace(os.sep, "/") + " ."
              " && git config user.email t@t && git config user.name t"
              " && git commit --allow-empty -m ahead && git push -q origin main")
-subprocess.run(["bash", "-c", clone_cmd], cwd=other, check=True,
+subprocess.run([BASH_BIN, "-c", clone_cmd], cwd=other, check=True,
                env=dict(os.environ,
                         GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_SYSTEM="/dev/null",
                         GIT_TERMINAL_PROMPT="0"))
@@ -1328,3 +1339,94 @@ print("PASS: main() blocks on the payload cwd's state once, then the sentinel ho
 print("PASS: multi-worktree cross-checkout and branch-switch unpushed commits block accurately (ai-config#2737)")
 print("PASS: another tool's dormant worktree blocks only when this session committed in it (ai-config#2422)")
 print("PASS: fallback regexes in hook match scripts/lib/git_cmd.py and stderr diagnostic logs on failure")
+
+# --- ai-config#4109: pre-push review in flight suppresses unpushed commit block ---
+rev_root, rev_bare, rev_run = gitrepo(
+    BASE,
+    "git remote add origin BARE",
+    "git push -q -u origin main",
+    "git checkout -q -b feat-rev",
+    "git commit --allow-empty -m 'unpushed commit'",
+)
+rev_head = subject._rev_parse(rev_root, "HEAD")
+assert rev_head is not None
+assert subject.unpushed_count(rev_root) == 1
+
+# Case 1: Plain transcript with unpushed commit -> decide blocks
+plain_ts = transcript(["git commit -m 'unpushed commit'"])
+assert subject.is_pre_push_review_in_flight(rev_root, plain_ts) is False
+reason = subject.decide(rev_root, plain_ts)
+assert "1 commit(s) on HEAD are not on its upstream" in reason, reason
+
+# Case 2: Reviewer dispatched in background (async launch stub), no verdict yet
+# -> is_pre_push_review_in_flight is True, decide() returns "" (stays quiet)
+h_async, path_async = tempfile.mkstemp()
+with os.fdopen(h_async, "w") as stream:
+    # 1. Commit
+    stream.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t1", "name": "Bash", "input": {"command": "git commit -m 'unpushed commit'"}}]}
+    }) + "\n")
+    # 2. Dispatch Agent
+    stream.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t2", "name": "Agent", "input": {"subagent_type": "adversarial-reviewer", "prompt": "Review changes on HEAD"}}]}
+    }) + "\n")
+    # 3. Async launch result (Remote Control / background launch stub)
+    stream.write(json.dumps({
+        "type": "user",
+        "message": {"content": [{"type": "tool_result", "tool_use_id": "t2", "content": "Async agent launched successfully.\nagentId: a29a955ac15b38f72"}]}
+    }) + "\n")
+
+assert subject.is_pre_push_review_in_flight(rev_root, path_async) is True
+assert subject.decide(rev_root, path_async) == ""
+
+# Case 3: Reviewer verdict arrives as a task-notification / handback
+# -> is_pre_push_review_in_flight is False, decide() blocks because commit is unpushed
+h_verdict, path_verdict = tempfile.mkstemp()
+with open(path_async, "r") as src, os.fdopen(h_verdict, "w") as dst:
+    dst.write(src.read())
+    # Subagent handback notification arrives
+    dst.write(json.dumps({
+        "type": "user",
+        "origin": {"kind": "task-notification", "task_id": "a29a955ac15b38f72"},
+        "sender": "a29a955ac15b38f72",
+        "content": f"### Verdict: Ready for merge\n\nReviewed-Commit: {rev_head}\n"
+    }) + "\n")
+
+assert subject.is_pre_push_review_in_flight(rev_root, path_verdict) is False
+reason_after = subject.decide(rev_root, path_verdict)
+assert "1 commit(s) on HEAD are not on its upstream" in reason_after, reason_after
+
+# Case 4: Errored dispatch -> not in flight
+h_err, path_err = tempfile.mkstemp()
+with os.fdopen(h_err, "w") as stream:
+    stream.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t1", "name": "Bash", "input": {"command": "git commit -m 'unpushed commit'"}}]}
+    }) + "\n")
+    stream.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t2", "name": "Agent", "input": {"subagent_type": "adversarial-reviewer", "prompt": "Review changes on HEAD"}}]}
+    }) + "\n")
+    stream.write(json.dumps({
+        "type": "user",
+        "message": {"content": [{"type": "tool_result", "tool_use_id": "t2", "is_error": True, "content": "Rate limit exceeded"}]}
+    }) + "\n")
+
+assert subject.is_pre_push_review_in_flight(rev_root, path_err) is False
+assert "1 commit(s) on HEAD are not on its upstream" in subject.decide(rev_root, path_err)
+
+# Case 5: New commit after an earlier review round -> not in flight until re-dispatched
+h_recommit, path_recommit = tempfile.mkstemp()
+with open(path_verdict, "r") as src, os.fdopen(h_recommit, "w") as dst:
+    dst.write(src.read())
+    dst.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t3", "name": "Bash", "input": {"command": "git commit -m 'second commit'"}}]}
+    }) + "\n")
+
+assert subject.is_pre_push_review_in_flight(rev_root, path_recommit) is False
+assert "1 commit(s) on HEAD are not on its upstream" in subject.decide(rev_root, path_recommit)
+
+print("PASS: pre-push review in flight suppresses unpushed commit block until verdict arrives (ai-config#4109)")

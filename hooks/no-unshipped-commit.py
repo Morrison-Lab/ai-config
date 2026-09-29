@@ -857,6 +857,215 @@ PUSH_REMEDY = ("Push the branch, open or verify its PR, then report status. "
                "The standing rule is executable work, not a handoff item.")
 
 
+_REVIEW_GUARD = None
+_REVIEW_GUARD_LOADED = False
+
+
+def _load_review_guard():
+    global _REVIEW_GUARD, _REVIEW_GUARD_LOADED
+    if _REVIEW_GUARD_LOADED:
+        return _REVIEW_GUARD
+    _REVIEW_GUARD_LOADED = True
+    path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "no-push-without-self-review.py")
+    if not os.path.isfile(path):
+        return None
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("no_push_without_self_review", path)
+        if spec is None or spec.loader is None:
+            return None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _REVIEW_GUARD = module
+        return module
+    except Exception as exc:
+        print(f"no-unshipped-commit: cannot load no-push-without-self-review.py ({exc})",
+              file=sys.stderr)
+        return None
+
+
+def _rev_parse(cwd, rev="HEAD"):
+    """40-hex commit SHA of rev in cwd, or None."""
+    if not cwd or not os.path.exists(cwd):
+        return None
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", rev],
+            cwd=cwd, capture_output=True, text=True, timeout=5)
+        if result.returncode == 0:
+            sha = result.stdout.strip().lower()
+            if re.fullmatch(r"[0-9a-f]{40}", sha):
+                return sha
+    except Exception:
+        pass
+    return None
+
+
+def is_pre_push_review_in_flight(cwd, path, branch=None):
+    """True if an adversarial pre-push review of HEAD is in flight.
+
+    When Claude Code or Antigravity backgrounds an Agent or subagent review
+    dispatch (e.g. Remote Control active or background agent isolation), the
+    tool result is an async launch stub (e.g. `agentId: ...` or `status: running`),
+    and task `output_file` remains at 0 bytes while running. Polling `output_file`
+    for `Reviewed-Commit` never matches. The verdict arrives only via a subagent
+    hand-back message after the turn ends.
+    Meanwhile `no-unshipped-commit.py` as a Stop hook detects unpushed commits and
+    blocks the turn from ending. The agent then attempts `git push`, which is refused
+    by `no-push-without-self-review.py` ("no verdict came back as that call's own result").
+    This creates an infinite deadlock loop (ai-config#4109).
+
+    This predicate detects when a reviewer dispatch has occurred after the latest
+    commit, and no review verdict (CLEAN or NEEDS WORK) covering the current HEAD has
+    arrived yet. If so, `decide()` allows the turn to stop cleanly so the background
+    reviewer can complete and deliver its verdict.
+    """
+    if not path or not os.path.isfile(path):
+        return False
+    guard = _load_review_guard()
+    if guard is None:
+        return False
+
+    head_sha = _rev_parse(cwd, "HEAD") if cwd else None
+
+    # If read_latest_review already found a verdict covering current HEAD, review completed.
+    if head_sha:
+        try:
+            verdict, reviewed_commits, _ = guard.read_latest_review(path)
+            if verdict in ("clean", "needs_work"):
+                if any(sha.startswith(head_sha[:7]) or head_sha.startswith(sha[:7]) for sha in reviewed_commits):
+                    return False
+        except Exception:
+            pass
+
+    # Scan the transcript to check if a reviewer dispatch occurred after the latest commit
+    last_commit_seq = None
+    last_dispatch_seq = None
+    last_verdict_seq = None
+    reviewer_call_ids = set()
+    active_reviewer_task_ids = set()
+    seq = 0
+
+    try:
+        with open(path, encoding="utf-8", errors="ignore") as stream:
+            for line in stream:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    record = json.loads(line)
+                except Exception:
+                    continue
+                if not isinstance(record, dict):
+                    continue
+
+                r_type = record.get("type")
+                omo_name = record.get("tool_name")
+                if r_type in ("tool_use", "tool_result") and isinstance(omo_name, str):
+                    seq += 1
+                    name = omo_name.lower()
+                    if r_type == "tool_use":
+                        inp = record.get("tool_input")
+                        if (name in guard.AGENT_TOOLS and name not in guard.TASK_OUTPUT_TOOLS
+                                and isinstance(inp, dict) and guard._is_reviewer_dispatch(inp)):
+                            last_dispatch_seq = seq
+                    else:
+                        if not record.get("is_error"):
+                            out_text = guard._result_text({"content": record.get("tool_output")})
+                            found, _ = guard.parse_report_all(out_text)
+                            if found:
+                                last_verdict_seq = seq
+                    continue
+
+                if guard._is_reviewer_record(record):
+                    seq += 1
+                    msg_text = guard._result_text(
+                        record.get("message") if isinstance(record.get("message"), dict) else record
+                    )
+                    if msg_text:
+                        found, _ = guard.parse_report_all(msg_text)
+                        if found:
+                            last_verdict_seq = seq
+
+                origin = record.get("origin")
+                if isinstance(origin, dict) and origin.get("kind") in ("task-notification", "task_notification"):
+                    seq += 1
+                    origin_ids = guard._task_ids(origin, guard.TASK_ID_KEYS_ORIGIN)
+                    sender_id = str(record.get("sender") or "")
+                    if any(t in active_reviewer_task_ids for t in origin_ids) or (sender_id and sender_id in active_reviewer_task_ids):
+                        content_text = str(record.get("content") or record.get("text") or "")
+                        found, _ = guard.parse_report_all(content_text)
+                        if found:
+                            last_verdict_seq = seq
+
+                for b in guard._iter_blocks(record):
+                    b_type = b.get("type")
+                    if b_type == "tool_use":
+                        seq += 1
+                        tool_name = (b.get("name") or "").lower()
+                        call_id = b.get("id")
+                        inp = b.get("input") or {}
+
+                        if tool_name in {"bash", "run_command", "terminal", "execute_command", "shell"}:
+                            cmd = str(inp.get("command") or inp.get("cmd") or inp.get("CommandLine") or inp.get("script") or "")
+                            scanned = strip_quoted(unwrap_command(cmd))
+                            if COMMIT.search(scanned):
+                                last_commit_seq = seq
+                            elif guard.external_reviewer_command(cmd) or "pre-push-review" in cmd:
+                                last_dispatch_seq = seq
+                                if call_id:
+                                    reviewer_call_ids.add(call_id)
+                        elif tool_name in guard.AGENT_TOOLS and tool_name not in guard.TASK_OUTPUT_TOOLS:
+                            if guard._is_reviewer_dispatch(inp):
+                                last_dispatch_seq = seq
+                                if call_id:
+                                    reviewer_call_ids.add(call_id)
+                        elif tool_name == "send_message" and guard._is_reviewer_record(record):
+                            msg_text = str(inp.get("Message") or inp.get("message") or "")
+                            if msg_text:
+                                found, _ = guard.parse_report_all(msg_text)
+                                if found:
+                                    last_verdict_seq = seq
+
+                    elif b_type == "tool_result":
+                        seq += 1
+                        call_id = b.get("tool_use_id")
+                        if call_id and call_id in reviewer_call_ids:
+                            if b.get("is_error"):
+                                if last_dispatch_seq is not None:
+                                    last_dispatch_seq = None
+                            else:
+                                res_text = guard._result_text(b)
+                                try:
+                                    res_data = json.loads(res_text)
+                                    if isinstance(res_data, dict):
+                                        for tid in guard._registrable_task_ids(res_data):
+                                            active_reviewer_task_ids.add(tid)
+                                except Exception:
+                                    pass
+                                tid_match = re.search(r"\b(?:task[-_ ]?id|conversationId|agentId)[:=]\s*[`\"']?([\w-]+)", res_text, re.I)
+                                if tid_match:
+                                    active_reviewer_task_ids.add(tid_match.group(1))
+
+                                found, _ = guard.parse_report_all(res_text)
+                                if not found:
+                                    handback_text = guard._handback_report_text(path, call_id, res_text)
+                                    if handback_text:
+                                        found, _ = guard.parse_report_all(handback_text)
+                                if found:
+                                    last_verdict_seq = seq
+    except Exception:
+        return False
+
+    if last_dispatch_seq is None:
+        return False
+    if last_commit_seq is not None and last_commit_seq > last_dispatch_seq:
+        return False
+    if last_verdict_seq is not None and last_verdict_seq >= last_dispatch_seq:
+        return False
+    return True
+
+
 def decide(cwd, path):
     """The Stop verdict: the block reason, or "" to allow the stop.
 
@@ -879,6 +1088,8 @@ def decide(cwd, path):
     if not cwd:
         if not pending:
             return ""
+        if is_pre_push_review_in_flight(cwd, path):
+            return ""
         return ("A commit was made with no later push or PR creation, and "
                 "repository state is unavailable to check. " + PUSH_REMEDY)
 
@@ -890,10 +1101,14 @@ def decide(cwd, path):
         if count is None:
             if not pending:
                 return ""
+            if is_pre_push_review_in_flight(cwd, path):
+                return ""
             return ("The unshipped count for this branch is undefined --- no "
                     "upstream is configured, or git failed to answer --- and the "
                     "transcript shows a commit with no later push or PR "
                     "creation. " + PUSH_REMEDY)
+        if is_pre_push_review_in_flight(cwd, path):
+            return ""
         return f"{count} commit(s) on HEAD are not on its upstream. {PUSH_REMEDY}"
 
     unpushed_wts = []
@@ -942,9 +1157,11 @@ def decide(cwd, path):
             checked_out_branches.add(wt_branch)
         count = unpushed_count(wt_path)
         if count is not None and count > 0:
-            unpushed_wts.append((wt, count))
+            if not is_pre_push_review_in_flight(wt_path, path, branch=wt_branch):
+                unpushed_wts.append((wt, count))
         elif count is None:
-            undefined_wts.append(wt)
+            if not is_pre_push_review_in_flight(wt_path, path, branch=wt_branch):
+                undefined_wts.append(wt)
 
     # Check switched-away branches (local branches this session committed on,
     # not checked out in any worktree)
@@ -958,11 +1175,13 @@ def decide(cwd, path):
             if upstream:
                 b_count = unpushed_count_branch(cwd, branch, upstream)
                 if b_count is not None and b_count > 0:
-                    unpushed_branches.append((branch, b_count))
+                    if not is_pre_push_review_in_flight(cwd, path, branch=branch):
+                        unpushed_branches.append((branch, b_count))
             elif pending:
                 b_count = unpushed_commits_against_remotes(cwd, branch)
                 if b_count is not None and b_count > 0:
-                    unpushed_branches.append((branch, b_count))
+                    if not is_pre_push_review_in_flight(cwd, path, branch=branch):
+                        unpushed_branches.append((branch, b_count))
 
     if unpushed_wts or unpushed_branches or (pending and undefined_wts):
         if len(unpushed_wts) == 1 and not unpushed_branches and not (pending and undefined_wts):

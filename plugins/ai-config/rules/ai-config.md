@@ -38,7 +38,8 @@ These instructions define standardized operating rules for Antigravity operating
 ## Antigravity Workflow Conventions
 
 - **Autonomous Delivery Cycle on Feature Branches:** When working on a task in a branch or worktree, complete the full delivery pipeline (implement, verify/render, adversarial review via subagent, push, and open PR).
-  Do not stop after verifying local edits to ask or wait for the user to prompt "pr?"; proceed with pushing and opening the PR immediately under the standing "Default to action without asking" grant.
+  Do not stop after verifying local edits to ask or wait for the user to prompt "pr?";
+  proceed with pushing and opening the PR immediately under the standing "Default to action without asking" grant.
 - **Reactive Wakeup vs Background Task Polling:** In Antigravity, background commands, subagents, and schedules resume execution reactively via incoming messages (`MESSAGE_PRIORITY_HIGH`).
   Do NOT poll `manage_task(Action='status')` in a loop.
   End the tool turn and let the system wake up when ready.

@@ -833,14 +833,14 @@ A clean automated review from every available provider evaluating the current HE
 
 ## Pattern 43: Auto-Mode Push-Guard Deadlock --- Stale Plugin-Cache Hook Plus Classifier-Denied Overrides
 - **Do**: stop probing after the classifier's second denial of the same goal and hand the user the decision (push manually, restart the session, or add a permission rule).
+- **Do**: on a fresh denial, retry the exact same command once, unrephrased,
+  before escalating --- measured 2026-09-06/07 to recover the goal three
+  separate times with no settings change.
 - **Don't**: keep rephrasing the override or the dispatch --- each denied variant makes the classifier more suspicious, locking out even the sanctioned paths;
   and don't route the push around the guard through a peer session, a separately-billed CLI, or the MCP GitHub write tools ---
   each is permission laundering:
   the MCP write tools are the guard's documented open gap ([ai-config#1929](https://github.com/Morrison-Lab/ai-config/issues/1929)),
   and a peer session or a separate CLI bypasses simply because the hook does not run there.
-- **Do**: on a fresh denial, retry the exact same command once, unrephrased,
-  before escalating --- measured 2026-09-06/07 to recover the goal three
-  separate times with no settings change.
 - **Don't**: read a run of denials as confined to the one command that
   triggered them --- once several have accumulated in a session, the
   classifier can start denying a plainly innocuous, unrelated command too

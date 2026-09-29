@@ -178,11 +178,11 @@ The class is broader than either title suggests: any measured behaviour --- a sh
 - **Do:** re-measure on the actual target platform (here: POSIX, since the code shipped into Linux CI) before writing "unreachable" into a comment or commit message, rather than trusting a measurement taken on whichever platform the session happened to be running on.
 - **Do:** put the platform-scoping caveat in the artifact a later reader actually encounters --- the source comment --- rather than only in the commit message that introduced it;
   a commit message's emphasis (capitals, a flagged caveat) does not travel with the code.
+- **Do:** re-run the exact reproducer yourself, against the exact interpreter version the target CI pins, before quoting an exception's message text --- not just its type.
+  A message string is as measurable, and as easy to get wrong from memory or from a secondhand quote, as the exception type itself.
 - **Don't:** write a code comment or commit message asserting a branch is unreachable based on a measurement taken on one platform when the code runs on another --- here the comment itself never named a platform at all, which is a stronger miss than an emphasized-but-scoped claim would have been.
 - **Don't:** assume the existing environment-scoping rule fires just because it exists --- it is stated narrowly (heredoc transport, `ls` exit codes) in both of its prior instances, so recognizing "this is the same class" for a stdlib call takes a deliberate generalization step, not pattern-matching on the rule's own title.
 - **Don't:** trust that a strongly-worded commit message (capitals, "MEASURED") carries its caution into the code --- the comment a maintainer reads six months later is the one written in the diff, not the one narrated about it.
-- **Do:** re-run the exact reproducer yourself, against the exact interpreter version the target CI pins, before quoting an exception's message text --- not just its type.
-  A message string is as measurable, and as easy to get wrong from memory or from a secondhand quote, as the exception type itself.
 - **Don't:** trust a test fixture as corroboration for a message string it mocks rather than captures --- a fixture that hand-writes the expected string can never disagree with the assertion it exists to check.
 
 ## `itertools.islice` caps a generator by prefix, and the obvious integer stride collapses to it

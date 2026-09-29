@@ -43,6 +43,8 @@ When a new entry lands after `main` has appended one of its own, take the next n
   The fix was recorded verbally but not persisted.
   Re-hit 2026-08-31 (Antigravity session, working `ucdavis/matt.contracts`): formatted Statistical Analysis Plan, ran tests and verified renders, generated walkthrough artifact, but presented summary recap to the user instead of automatically completing the delivery cycle (issue creation, commit, adversarial review subagent, push, and opening PR).
   Corrected by user with `cai: you should have pushed a PR without me having to tell you`.
+  Re-hit 2026-09-29 (Antigravity session, working `Morrison-Lab/lds` [PR #265](https://github.com/Morrison-Lab/lds/pull/265)): updated syllabus links to mds, pds, sds, and lds, verified renders across HTML, revealjs, and PDF, but presented stopping point recap without committing, pushing, or opening a PR until user asked "pr?".
+  Corrected by user with `cai: you should have created that PR without me having to ask`.
 - **Canonical Rule**: `AGENTS.md` ("Deliver completed implementation work"): commit → push → PR → share link, as one automatic sequence.
 - **Fix**: Before acting on a task, grep AGENTS.md and project CLAUDE.md for rules that apply.
   After a correction, record it in mistake-patterns.md (don't just say you'll remember --- the next session won't have this conversation).

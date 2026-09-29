@@ -32,9 +32,13 @@ These instructions define standardized operating rules for Antigravity operating
     Always consider whether you agree before responding and/or acting.
 15. **Terminate superseded background tasks:** Actively kill diagnostic commands, searches, and jobs once answered or superseded;
     sweep active tasks before declaring completion.
+16. **Deliver completed implementation work:** When asked to implement, edit, or write up a change on a feature branch, do not stop at an uncommitted or unpushed worktree.
+    Complete the delivery cycle: commit scoped changes, run adversarial self-review to a clean verdict, push the branch, and open or update its Pull Request automatically without waiting for the user to ask.
 
 ## Antigravity Workflow Conventions
 
+- **Autonomous Delivery Cycle on Feature Branches:** When working on a task in a branch or worktree, complete the full delivery pipeline (implement, verify/render, adversarial review via subagent, push, and open PR).
+  Do not stop after verifying local edits to ask or wait for the user to prompt "pr?"; proceed with pushing and opening the PR immediately under the standing "Default to action without asking" grant.
 - **Reactive Wakeup vs Background Task Polling:** In Antigravity, background commands, subagents, and schedules resume execution reactively via incoming messages (`MESSAGE_PRIORITY_HIGH`).
   Do NOT poll `manage_task(Action='status')` in a loop.
   End the tool turn and let the system wake up when ready.

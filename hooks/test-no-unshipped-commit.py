@@ -1561,4 +1561,49 @@ with open(path_omo, "r") as src, os.fdopen(h_omo_clean, "w") as dst:
 
 assert subject.is_pre_push_review_in_flight(rev_root, path_omo_clean) is False
 
+# Case 8: Switched-away branch within the same worktree directory
+# A generic review dispatch after switching branches must not suppress an
+# unreviewed, unpushed commit on a switched-away branch.
+sw_iso_root, sw_iso_bare, sw_iso_run = gitrepo(
+    BASE,
+    "git remote add origin BARE",
+    "git push -q -u origin main",
+    "git checkout -q -b feat-a",
+    "git push -q -u origin feat-a",
+    HOOK,
+    "git checkout -q main",
+)
+h_sw, path_sw = tempfile.mkstemp()
+with os.fdopen(h_sw, "w") as stream:
+    # 1. Commit on feat-a
+    stream.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t_sw1", "name": "Bash", "input": {
+            "cwd": sw_iso_root, "command": "git checkout -b feat-a && git commit -m 'commit on feat-a'"
+        }}]}
+    }) + "\n")
+    # 2. Switch to main
+    stream.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t_sw2", "name": "Bash", "input": {
+            "cwd": sw_iso_root, "command": "git checkout main"
+        }}]}
+    }) + "\n")
+    # 3. Generic review dispatch on main (does not name feat-a or feat-a's commit)
+    stream.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t_sw3", "name": "Agent", "input": {
+            "cwd": sw_iso_root, "subagent_type": "adversarial-reviewer",
+            "prompt": "Review the current diff for bugs"
+        }}]}
+    }) + "\n")
+
+# Review is in flight for main, but NOT for feat-a
+assert subject.is_pre_push_review_in_flight(sw_iso_root, path_sw, branch="feat-a", session_cwd=sw_iso_root) is False
+assert subject.is_pre_push_review_in_flight(sw_iso_root, path_sw, branch="main", session_cwd=sw_iso_root) is True
+
+# decide() must STILL block because feat-a has an unpushed, unreviewed commit
+reason_sw = subject.decide(sw_iso_root, path_sw)
+assert reason_sw and "feat-a" in reason_sw, reason_sw
+
 print("PASS: pre-push review in flight suppresses unpushed commit block until verdict arrives (ai-config#4109)")

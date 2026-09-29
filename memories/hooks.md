@@ -1003,8 +1003,10 @@ When suppressing the unpushed-commit Stop hook (`no-unshipped-commit.py`) becaus
   In multi-worktree or multi-branch repositories,
   an in-flight review dispatched for worktree A must never suppress the unpushed-commit block
   for unrelated, unreviewed commits in worktree B or on a switched-away branch.
-  Attribute commits and reviewer dispatches by matching working directories (`cwd`)
-  and branch references before comparing sequence numbers.
+  Matching working directory (`cwd`) alone is insufficient when branches are switched within the same worktree:
+  track the checked-out branch at dispatch time (`dispatch_branches` from `branches_after`),
+  and do not attribute a generic reviewer dispatch to a switched-away branch
+  unless that branch was actually checked out at dispatch time or named in the prompt.
 - **Correlate OMO flat-record tool results to reviewer dispatches:**
   In OpenCode flat-record transcripts (`tool_use` / `tool_result` records),
   track pending dispatches in a FIFO queue per tool name and match `tool_result` against `reviewer_call_ids`.

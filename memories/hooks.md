@@ -457,7 +457,7 @@ it retried the override and reported the corrected scope rather than the first, 
 A command hook killed at its `hooks.json` `timeout` does not emit a deny, and the harness treats a hook failure other than an explicit deny as non-blocking.
 So a PreToolUse guard that makes a network call inherits a fail-open path the moment the call can outlast the timeout: a slow network turns a refusal into an allowed action.
 
-`no-unauthorized-merge.py`'s infra-PR grant (ai-config#4085) reads a PR's file list with two `gh api` calls under a hook registered at `timeout: 10`.
+`no-unauthorized-merge.py`'s infra-PR grant (ai-config#4085, #4088) reads a PR's head SHA and file list with two `gh api` calls under a hook registered at `timeout: 10`.
 The first draft gave each call its own 20-second timeout, a combined 40 seconds against a 10-second kill, found only on an adversarial re-read before push.
 The shipped version shares one 6-second budget across both calls, returns "no determination" (which denies) when it runs out, and a test reads the registered timeout from `hooks.json` and fails if the budget comes within 2 seconds of it.
 
@@ -1027,5 +1027,10 @@ When suppressing the unpushed-commit Stop hook (`no-unshipped-commit.py`) becaus
 - **Cross-platform absolute path resolution for Windows drive paths:** On POSIX/Linux systems, Python's `os.path.isabs("C:/path")` returns `False`.
   Helpers resolving `cd` targets (`resolve_cd_target`) must check Windows drive paths (`^[A-Za-z]:[/\\]`) as absolute across platforms before calling `os.path.join(cur_dir, target)`, preventing mangled joined paths (e.g. `/cur/dir/C:/path`).
 - **Agent ID regex prefix consumption:** When extracting agent IDs from tool result text to construct `.meta.json` paths, patterns matching `agent_id:` must consume optional leading `agent-` prefixes (`(?:agent-)?([\w-]+)`), avoiding doubled prefixes like `agent-agent-<id>.meta.json`.
+- **Attached key-value command flag parsing:**
+  When extracting values from compound attached CLI flags like `--field=key=val` or `--raw-field=key=val`,
+  never use `tok.split("=", 1)[1]`,
+  which splits at the flag's own `=` delimiter and yields `key=val` rather than `val`.
+  Use `tok.partition("key=")[2]` or `tok.rsplit("=", 1)[1]` to cleanly extract the target value across both attached (`--field=key=val`) and detached (`-f key=val`) spellings.
 
 

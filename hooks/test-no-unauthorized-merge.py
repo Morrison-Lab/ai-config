@@ -1253,17 +1253,21 @@ _span_check("the blanking stops AT the body, so the body's first character "
 print("\nstanding infra-PR grant:")
 
 INFRA_FILES = [".github/workflows/ci.yml", "CLAUDE.md", ".claude/settings.json"]
+TEST_HEAD_SHA = "a" * 40
+WRONG_HEAD_SHA = "b" * 40
 _real_fetch = _guard.fetch_pr_changed_paths
 _disable = _guard.INFRA_GRANT_DISABLE_ENV
 
 
-def _infra_case(desc, want, files, command=None, mcp=None, disabled=False):
+def _infra_case(desc, want, files, command=None, mcp=None, disabled=False, head_sha=TEST_HEAD_SHA):
     global checks, wrong
     calls = []
 
     def fake_fetch(target, number):
         calls.append((target, number))
-        return files
+        if files is None:
+            return None
+        return (files, head_sha)
 
     _guard.fetch_pr_changed_paths = fake_fetch
     saved = os.environ.pop(_disable, None)
@@ -1288,69 +1292,93 @@ def _infra_case(desc, want, files, command=None, mcp=None, disabled=False):
 
 _MCP = "mcp__github__merge_pull_request"
 
-# The grant itself.
-_infra_case("gh pr merge of an all-infra PR", "allow", INFRA_FILES,
+# The grant itself: requires pinned matching head commit SHA.
+_infra_case("gh pr merge of an all-infra PR with matching pinned SHA", "allow", INFRA_FILES,
+            f"gh pr merge 15 -R Morrison-Lab/pds --squash --match-head-commit {TEST_HEAD_SHA}")
+_infra_case("gh pr merge of an all-infra PR with attached --match-head-commit=", "allow", INFRA_FILES,
+            f"gh pr merge 15 -R Morrison-Lab/pds --squash --match-head-commit={TEST_HEAD_SHA}")
+_infra_case("gh pr merge of an all-infra PR without pinned SHA denies", "BLOCK", INFRA_FILES,
             "gh pr merge 15 -R Morrison-Lab/pds --squash")
-_infra_case("REST PR merge of an all-infra PR", "allow", INFRA_FILES,
+_infra_case("gh pr merge of an all-infra PR with wrong pinned SHA denies", "BLOCK", INFRA_FILES,
+            f"gh pr merge 15 -R Morrison-Lab/pds --squash --match-head-commit {WRONG_HEAD_SHA}")
+_infra_case("REST PR merge of an all-infra PR with pinned SHA", "allow", INFRA_FILES,
+            f"gh api -X PUT repos/Morrison-Lab/pds/pulls/15/merge -f merge_method=squash -f sha={TEST_HEAD_SHA}")
+_infra_case("REST PR merge with --field=sha= attached", "allow", INFRA_FILES,
+            f"gh api -X PUT repos/Morrison-Lab/pds/pulls/15/merge --field=sha={TEST_HEAD_SHA}")
+_infra_case("REST PR merge with -fsha= attached", "allow", INFRA_FILES,
+            f"gh api -X PUT repos/Morrison-Lab/pds/pulls/15/merge -fsha={TEST_HEAD_SHA}")
+_infra_case("REST PR merge with bare sha= parameter", "allow", INFRA_FILES,
+            f"gh api -X PUT repos/Morrison-Lab/pds/pulls/15/merge sha={TEST_HEAD_SHA}")
+_infra_case("REST PR merge of an all-infra PR without pinned SHA denies", "BLOCK", INFRA_FILES,
             "gh api -X PUT repos/Morrison-Lab/pds/pulls/15/merge -f merge_method=squash")
-_infra_case("MCP merge of an all-infra PR", "allow", INFRA_FILES,
+_infra_case("REST PR merge of an all-infra PR with wrong pinned SHA denies", "BLOCK", INFRA_FILES,
+            f"gh api -X PUT repos/Morrison-Lab/pds/pulls/15/merge -f merge_method=squash -f sha={WRONG_HEAD_SHA}")
+_infra_case("MCP merge of an all-infra PR with expectedHeadSha", "allow", INFRA_FILES,
+            mcp=(_MCP, {"owner": "Morrison-Lab", "repo": "pds", "pullNumber": 15, "expectedHeadSha": TEST_HEAD_SHA}))
+_infra_case("MCP merge of an all-infra PR with snake_case expected_head_sha", "allow", INFRA_FILES,
+            mcp=(_MCP, {"owner": "Morrison-Lab", "repo": "pds", "pullNumber": 15, "expected_head_sha": TEST_HEAD_SHA}))
+_infra_case("MCP merge of an all-infra PR without expectedHeadSha denies", "BLOCK", INFRA_FILES,
             mcp=(_MCP, {"owner": "Morrison-Lab", "repo": "pds", "pullNumber": 15}))
+_infra_case("MCP merge of an all-infra PR with wrong expectedHeadSha denies", "BLOCK", INFRA_FILES,
+            mcp=(_MCP, {"owner": "Morrison-Lab", "repo": "pds", "pullNumber": 15, "expectedHeadSha": WRONG_HEAD_SHA}))
+_infra_case("gh pr merge of an all-infra PR with 12-char prefix SHA", "allow", INFRA_FILES,
+            f"gh pr merge 15 -R Morrison-Lab/pds --squash --match-head-commit {TEST_HEAD_SHA[:12]}")
 _infra_case("nested CLAUDE.md and the lint/spell/link config are infra", "allow",
             ["sub/dir/CLAUDE.md", "AGENTS.md", ".lintr", ".lintr.R",
              "lychee.toml", "_typos.toml", "inst/WORDLIST"],
-            "gh pr merge 15 -R Morrison-Lab/pds")
+            f"gh pr merge 15 -R Morrison-Lab/pds --match-head-commit {TEST_HEAD_SHA}")
 
 # What the grant must not cover.
 _infra_case("one content file among infra files", "BLOCK",
             INFRA_FILES + ["_subfiles/_def-probability.qmd"],
-            "gh pr merge 15 -R Morrison-Lab/pds")
+            f"gh pr merge 15 -R Morrison-Lab/pds --match-head-commit {TEST_HEAD_SHA}")
 _infra_case("a rename whose previous path is content", "BLOCK",
             [".github/moved.qmd", "_subfiles/_def-probability.qmd"],
-            "gh pr merge 15 -R Morrison-Lab/pds")
+            f"gh pr merge 15 -R Morrison-Lab/pds --match-head-commit {TEST_HEAD_SHA}")
 _infra_case("a top-level scripts/ file is not infra", "BLOCK",
-            ["scripts/analysis.R"], "gh pr merge 15 -R Morrison-Lab/pds")
+            ["scripts/analysis.R"], f"gh pr merge 15 -R Morrison-Lab/pds --match-head-commit {TEST_HEAD_SHA}")
 _infra_case("a path only resembling .github is not infra", "BLOCK",
-            ["x.github/ci.yml"], "gh pr merge 15 -R Morrison-Lab/pds")
+            ["x.github/ci.yml"], f"gh pr merge 15 -R Morrison-Lab/pds --match-head-commit {TEST_HEAD_SHA}")
 _infra_case("a failed fetch denies", "BLOCK", None,
-            "gh pr merge 15 -R Morrison-Lab/pds")
+            f"gh pr merge 15 -R Morrison-Lab/pds --match-head-commit {TEST_HEAD_SHA}")
 _infra_case("an empty file list denies", "BLOCK", [],
-            "gh pr merge 15 -R Morrison-Lab/pds")
+            f"gh pr merge 15 -R Morrison-Lab/pds --match-head-commit {TEST_HEAD_SHA}")
 _infra_case("a repo outside INFRA_GRANT_OWNERS, without fetching", "BLOCK", INFRA_FILES,
-            "gh pr merge 15 -R Other-Owner/pds")
+            f"gh pr merge 15 -R Other-Owner/pds --match-head-commit {TEST_HEAD_SHA}")
 _infra_case("no PR number (the current branch's PR), without fetching", "BLOCK",
-            INFRA_FILES, "gh pr merge -R Morrison-Lab/pds --squash")
+            INFRA_FILES, f"gh pr merge -R Morrison-Lab/pds --squash --match-head-commit {TEST_HEAD_SHA}")
 _infra_case("a PR URL is not read as a number", "BLOCK", INFRA_FILES,
-            "gh pr merge https://github.com/Morrison-Lab/pds/pull/15 -R Morrison-Lab/pds")
+            f"gh pr merge https://github.com/Morrison-Lab/pds/pull/15 -R Morrison-Lab/pds --match-head-commit {TEST_HEAD_SHA}")
 _infra_case("a number forged inside a double-quoted --body", "BLOCK", INFRA_FILES,
-            'gh pr merge -R Morrison-Lab/pds --body "see 12"')
+            f'gh pr merge -R Morrison-Lab/pds --body "see 12" --match-head-commit {TEST_HEAD_SHA}')
 _infra_case("a number forged inside a single-quoted --subject", "BLOCK", INFRA_FILES,
-            "gh pr merge -R Morrison-Lab/pds --subject '12'")
+            f"gh pr merge -R Morrison-Lab/pds --subject '12' --match-head-commit {TEST_HEAD_SHA}")
 _infra_case("two different PR numbers are not a determination", "BLOCK", INFRA_FILES,
-            "gh pr merge 15 16 -R Morrison-Lab/pds")
+            f"gh pr merge 15 16 -R Morrison-Lab/pds --match-head-commit {TEST_HEAD_SHA}")
 _infra_case("a REST path and a positional naming different PRs", "BLOCK", INFRA_FILES,
-            "gh api -X PUT repos/Morrison-Lab/pds/pulls/15/merge pr merge 16")
+            f"gh api -X PUT repos/Morrison-Lab/pds/pulls/15/merge pr merge 16 -f sha={TEST_HEAD_SHA}")
 _infra_case("a quoted single-token REST path is the real operand", "allow", INFRA_FILES,
-            "gh api -X PUT 'repos/Morrison-Lab/pds/pulls/15/merge'")
+            f"gh api -X PUT 'repos/Morrison-Lab/pds/pulls/15/merge' -f sha={TEST_HEAD_SHA}")
 _infra_case("a bare number among words of a --body payload", "BLOCK", INFRA_FILES,
-            "gh pr merge -R Morrison-Lab/pds --body 'a 12 b'")
+            f"gh pr merge -R Morrison-Lab/pds --body 'a 12 b' --match-head-commit {TEST_HEAD_SHA}")
 _infra_case("a pulls/N/merge path forged inside a --body payload", "BLOCK", INFRA_FILES,
-            'gh pr merge -R Morrison-Lab/pds --body "x pulls/12/merge"')
+            f'gh pr merge -R Morrison-Lab/pds --body "x pulls/12/merge" --match-head-commit {TEST_HEAD_SHA}')
 _infra_case("a number inside a -t payload", "BLOCK", INFRA_FILES,
-            'gh pr merge -R Morrison-Lab/pds -t "a 12 b"')
+            f'gh pr merge -R Morrison-Lab/pds -t "a 12 b" --match-head-commit {TEST_HEAD_SHA}')
 _infra_case("gh pr merge --auto merges later contents", "BLOCK", INFRA_FILES,
-            "gh pr merge 15 -R Morrison-Lab/pds --auto --squash")
+            f"gh pr merge 15 -R Morrison-Lab/pds --auto --squash --match-head-commit {TEST_HEAD_SHA}")
 _infra_case("a repository BRANCH merge is never a PR merge", "BLOCK", INFRA_FILES,
-            "gh api -X POST repos/Morrison-Lab/pds/merges -f base=main -f head=x")
+            f"gh api -X POST repos/Morrison-Lab/pds/merges -f base=main -f head=x -f sha={TEST_HEAD_SHA}")
 _infra_case("the disable variable turns the grant off", "BLOCK", INFRA_FILES,
-            "gh pr merge 15 -R Morrison-Lab/pds", disabled=True)
+            f"gh pr merge 15 -R Morrison-Lab/pds --match-head-commit {TEST_HEAD_SHA}", disabled=True)
 _infra_case("MCP auto-merge is not covered", "BLOCK", INFRA_FILES,
             mcp=("mcp__github__enable_pr_auto_merge",
-                 {"owner": "Morrison-Lab", "repo": "pds", "pullNumber": 15}))
+                 {"owner": "Morrison-Lab", "repo": "pds", "pullNumber": 15, "expectedHeadSha": TEST_HEAD_SHA}))
 _infra_case("MCP merge of a PR with a content file", "BLOCK",
             INFRA_FILES + ["R/foo.R"],
-            mcp=(_MCP, {"owner": "Morrison-Lab", "repo": "pds", "pullNumber": 15}))
+            mcp=(_MCP, {"owner": "Morrison-Lab", "repo": "pds", "pullNumber": 15, "expectedHeadSha": TEST_HEAD_SHA}))
 _infra_case("MCP merge with a non-numeric PR number", "BLOCK", INFRA_FILES,
-            mcp=(_MCP, {"owner": "Morrison-Lab", "repo": "pds", "pullNumber": "15; x"}))
+            mcp=(_MCP, {"owner": "Morrison-Lab", "repo": "pds", "pullNumber": "15; x", "expectedHeadSha": TEST_HEAD_SHA}))
 
 # The fetch budget must end before the hook's own timeout: a hook killed by
 # its timeout does not deny, so a longer budget fails OPEN on a slow network.
@@ -1371,6 +1399,52 @@ checks += 1
 _n = _guard.merge_pr_number("gh pr merge -R Morrison-Lab/pds --match-head-commit 1234 15")
 wrong += _n != 15
 print(f"  {'allow' if _n == 15 else 'WRONG':<6} a flag's numeric value is not the PR number (got {_n})")
+
+# merge_pinned_sha directly
+checks += 1
+_s1 = _guard.merge_pinned_sha(f"gh pr merge 15 -R Morrison-Lab/pds --match-head-commit {TEST_HEAD_SHA}")
+wrong += _s1 != TEST_HEAD_SHA
+print(f"  {'allow' if _s1 == TEST_HEAD_SHA else 'WRONG':<6} merge_pinned_sha extracts bare --match-head-commit")
+
+checks += 1
+_s2 = _guard.merge_pinned_sha(f"gh pr merge 15 -R Morrison-Lab/pds --match-head-commit={TEST_HEAD_SHA}")
+wrong += _s2 != TEST_HEAD_SHA
+print(f"  {'allow' if _s2 == TEST_HEAD_SHA else 'WRONG':<6} merge_pinned_sha extracts attached --match-head-commit=")
+
+checks += 1
+_s3 = _guard.merge_pinned_sha(f"gh api -X PUT repos/Morrison-Lab/pds/pulls/15/merge -f sha={TEST_HEAD_SHA}")
+wrong += _s3 != TEST_HEAD_SHA
+print(f"  {'allow' if _s3 == TEST_HEAD_SHA else 'WRONG':<6} merge_pinned_sha extracts -f sha= in REST merge")
+
+checks += 1
+_s4 = _guard.merge_pinned_sha('gh pr merge 15 -R Morrison-Lab/pds --body "--match-head-commit ' + TEST_HEAD_SHA + '"')
+wrong += _s4 is not None
+print(f"  {'allow' if _s4 is None else 'WRONG':<6} merge_pinned_sha ignores --match-head-commit forged inside --body payload")
+
+checks += 1
+_s5 = _guard.merge_pinned_sha(f"gh pr merge 15 -R Morrison-Lab/pds --match-head-commit {TEST_HEAD_SHA} --match-head-commit {WRONG_HEAD_SHA}")
+wrong += _s5 is not None
+print(f"  {'allow' if _s5 is None else 'WRONG':<6} merge_pinned_sha rejects two different SHAs as ambiguous")
+
+checks += 1
+_s6 = _guard.merge_pinned_sha(f"gh api -X PUT repos/Morrison-Lab/pds/pulls/15/merge --field=sha={TEST_HEAD_SHA}")
+wrong += _s6 != TEST_HEAD_SHA
+print(f"  {'allow' if _s6 == TEST_HEAD_SHA else 'WRONG':<6} merge_pinned_sha extracts --field=sha=")
+
+checks += 1
+_s7 = _guard.merge_pinned_sha(f"gh api -X PUT repos/Morrison-Lab/pds/pulls/15/merge --raw-field=sha={TEST_HEAD_SHA}")
+wrong += _s7 != TEST_HEAD_SHA
+print(f"  {'allow' if _s7 == TEST_HEAD_SHA else 'WRONG':<6} merge_pinned_sha extracts --raw-field=sha=")
+
+checks += 1
+_s8 = _guard.merge_pinned_sha(f"gh api -X PUT repos/Morrison-Lab/pds/pulls/15/merge -fsha={TEST_HEAD_SHA}")
+wrong += _s8 != TEST_HEAD_SHA
+print(f"  {'allow' if _s8 == TEST_HEAD_SHA else 'WRONG':<6} merge_pinned_sha extracts -fsha=")
+
+checks += 1
+_s9 = _guard.merge_pinned_sha(f"gh api -X PUT repos/Morrison-Lab/pds/pulls/15/merge sha={TEST_HEAD_SHA}")
+wrong += _s9 != TEST_HEAD_SHA
+print(f"  {'allow' if _s9 == TEST_HEAD_SHA else 'WRONG':<6} merge_pinned_sha extracts bare sha=")
 
 total = checks
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))

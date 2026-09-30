@@ -519,7 +519,7 @@ def main():
                     "claude agent means a live pid holds it\n\n"
                     "If it is still running, declare "
                     "`**Stopping Point**: Not a clean stopping point / work remains "
-                    "queued: <agent> still running`. Never `--force` a worktree "
+                    "queued: session not done; <agent> still running`. Never `--force` a worktree "
                     "removal to make the signal go away -- see "
                     "skills/clean-worktrees/SKILL.md; read the lock itself per "
                       "memories/subagent-worktrees.md."

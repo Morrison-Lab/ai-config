@@ -618,7 +618,7 @@ cases = [
         [
             dispatch(),
             notification(),
-            assistant("Say `**Stopping Point**: Clean stopping point reached` at the end."),
+            assistant("Say `**Stopping Point**: Clean stopping point reached --- session done; UMS executed; no follow-up items pending` at the end."),
         ],
         False,
     ),

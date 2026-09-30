@@ -177,7 +177,7 @@ When the loop ends, print a summary:
 2. [#31](url) — feat: retry logic (stacked on #30)
 3. [#32](url) — docs: v3 migration guide
 
-**Stopping Point**: All 3 issues completed / backlog clear. Clean stopping point reached.
+**Stopping Point**: All 3 issues completed / backlog clear. Clean stopping point reached --- session done; UMS executed; no follow-up items pending.
 ```
 
 ## Relationship to other skills

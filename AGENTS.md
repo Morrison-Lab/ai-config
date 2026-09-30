@@ -299,7 +299,7 @@ without searching open issues and PRs risks duplicating existing work
 (such as #4085 duplicating already-open #4039).
 An open issue or PR often contains requirements, allowlists,
 or prior user directives that define the necessary scope.
-See [`shared/workflow/search-before-building-or-denying.md`](shared/workflow/search-before-building-or-denying.md).
+See [`shared/workflow/grep-is-not-coverage.md`](shared/workflow/grep-is-not-coverage.md).
 
 - **Do:** search `AGENTS.md`, `CLAUDE.md`, `memories/`, `shared/`,
   and open issues before answering "no" to whether a policy or permission exists.

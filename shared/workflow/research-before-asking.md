@@ -26,7 +26,7 @@ its own.
 Similarly, when asked whether a policy, standing grant, or permission exists,
 search the full policy corpus (`AGENTS.md`, `CLAUDE.md`, `memories/`, `shared/`,
 and open issues) before answering "no" --- never falsely deny an existing policy
-because of a partial search (see [`search-before-building-or-denying`](search-before-building-or-denying.md)).
+because of a partial search (see [`grep-is-not-coverage`](grep-is-not-coverage.md)).
 
 This is the question-asking-specific instance of
 [`growth-mindset`](growth-mindset.md)'s broader "go get the resource instead

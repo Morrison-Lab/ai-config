@@ -146,8 +146,7 @@ An existing open issue or PR may already track the request,
 carry the user's intended scope, or establish an agreed allowlist.
 Implementing without searching the tracker duplicates work
 and often leads to an implementation narrower than what was already specified
-(as observed when PR #4085 duplicated open Issue #4039 for the infra-PR merge grant).
-See [`search-before-building-or-denying`](search-before-building-or-denying.md).
+See [`grep-is-not-coverage`](grep-is-not-coverage.md).
 
 When the issue is a **bug report**, include a minimal reproducible example
 (a reprex --- <https://reprex.tidyverse.org/>) whenever you can. A reprex is

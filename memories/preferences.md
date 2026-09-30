@@ -433,7 +433,7 @@
   show the user the directive and ask whether it still stands,
   rather than asking them to choose from scratch.
   (Learned on `Morrison-Lab/pds`, Issue #4092, 2026-09-28).
-  See [`shared/workflow/search-before-building-or-denying.md`](../shared/workflow/search-before-building-or-denying.md).
+  See [`shared/workflow/grep-is-not-coverage.md`](../shared/workflow/grep-is-not-coverage.md).
 - Always run /ums (Update Memories and Skills) after finishing a task --- don't wait to be asked.
 - After a PR/MR merges, run the `post-merge` skill: verify the merge actually landed, tidy the local branch (checkout main, pull, `git branch -d`), confirm any deferred items are tracked, then run UMS to capture what the PR's review lifecycle taught --- mistakes corrected and guidance given along the way.
   A merge is the natural checkpoint to bank lessons before context is lost.

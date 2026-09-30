@@ -15,10 +15,13 @@ import tempfile
 
 HOOK = sys.argv[1]
 
-CLEAN = "All merged.\n\n**Stopping Point**: Clean stopping point reached"
+CLEAN = (
+    "All merged.\n\n**Stopping Point**: Clean stopping point reached --- "
+    "session done; UMS executed; no follow-up items pending"
+)
 NOT_CLEAN = (
     "Still going.\n\n**Stopping Point**: Not a clean stopping point / "
-    "work remains queued: PR 1 open."
+    "work remains queued: session not done; PR 1 open."
 )
 
 

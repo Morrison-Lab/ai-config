@@ -14,7 +14,8 @@ it; use the correct private tracker and redact sensitive details when needed.
 
 ## Examine the transcript for stalls, freezes, and dropped balls
 
-When a user asks for a "status update", "status?", or "how is it going", the inquiry is often prompted because the agent stopped responding, lost momentum, or paused unexpectedly. Never limit a status check to passive reporting or live forge polling alone: examine the conversation transcript and turn history to determine if the agent got stuck, frozen, or dropped the ball.
+When a user asks for a "status update", "status?", or "how is it going", the inquiry is often prompted because the agent stopped responding, lost momentum, or paused unexpectedly.
+Never limit a status check to passive reporting or live forge polling alone: examine the conversation transcript and turn history to determine if the agent got stuck, frozen, or dropped the ball.
 
 Check for these dropped-ball patterns in recent turns:
 1. **Unhandled tool failure or denial:** A command or tool call errored (e.g. auth failure, rate limit, permission denial, syntax error) and the agent stopped without diagnosing, fixing, or retrying it.
@@ -25,7 +26,8 @@ Check for these dropped-ball patterns in recent turns:
 
 When a stall or dropped ball is discovered:
 - **Diagnose the failure:** Name what failed and why progress halted.
-- **Resume immediately:** Do not ask for permission to continue or end the turn with a passive status report. Perform the dropped or next concrete action in that very same turn.
+- **Resume immediately:** Do not ask for permission to continue or end the turn with a passive status report.
+  Perform the dropped or next concrete action in that very same turn.
 
 - **Do:** examine recent transcript turns and tool results to detect whether previous turns froze, errored, or dropped the ball before reporting status.
 - **Do:** resume stalled or dropped work immediately in the same turn instead of waiting for a separate user prompt.

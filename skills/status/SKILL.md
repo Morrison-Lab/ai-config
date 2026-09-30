@@ -11,7 +11,8 @@ allowed-tools:
 
 # status (Status Update and Recovery)
 
-Inspect conversation history, active processes, and live repository/forge state to deliver an authentic status update. If the agent became stuck, frozen, or dropped the ball in previous turns, diagnose the stall and resume the dropped work immediately.
+Inspect conversation history, active processes, and live repository/forge state to deliver an authentic status update.
+If the agent became stuck, frozen, or dropped the ball in previous turns, diagnose the stall and resume the dropped work immediately.
 
 ## When this fires
 
@@ -32,7 +33,8 @@ Before polling forge or CI state, review recent session turns in the conversatio
 
 If any dropped ball or stall occurred:
 - State what failed or where execution paused.
-- **Resume immediately:** In this very same turn, re-run the failed step, resolve the error, or continue the interrupted workflow. Never make status report-only when work was dropped.
+- **Resume immediately:** In this very same turn, re-run the failed step, resolve the error, or continue the interrupted workflow.
+  Never make status report-only when work was dropped.
 
 ### 2. Inspect live workspace and git state
 

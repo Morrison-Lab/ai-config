@@ -126,6 +126,9 @@ This ensures restoring original slidebreaks, exercises, or derivations requires 
 - **Do:** place commented-out, escaped includes (`<!-- {{</* include outtakes/_name.qmd */>}} -->`) at the exact positions where the content was removed.
 - **Don't:** use a generic folder or prose comment (such as `see chapters/outtakes/...`) in place of per-file escaped includes when moving subfiles to outtakes.
 
+(The Do side is the user's, 2026-09-23, documented in `CLAUDE.md`: "When good content is removed, move it to an outtakes file rather than deleting it... with its include left disabled where the content used to be, escaped as well as commented out: `<!-- {{</* include outtakes/_name.qmd */>}} -->`";
+the Don't side is inferred from the automated review on lds#273, 2026-09-29.)
+
 ## Sequence cross-repository content migrations recipient-first
 
 When migrating content across repositories (e.g. migrating math refreshers from `lds` to `mds`/`pds`):
@@ -134,5 +137,8 @@ Automated code review checks resolve external links against the live published s
 
 - **Do:** drive recipient PRs (`mds`, `pds`) to full clean status first, merge them to `main`, and verify GitHub Pages deployment before expecting external link checks on the referencing PR (`lds`) to pass clean.
 - **Don't:** attempt to merge the referencing PR before the recipient PRs have merged and deployed, or treat the resulting external link failures as anchor mismatches in the downstream PR.
+
+(The Do and Don't sides are inferred from the cross-repo review failures on lds#273, 2026-09-29, where external anchors were rejected because recipient PRs mds#48 and pds#43 had not yet merged and deployed to Pages.)
+
 
 

@@ -1783,7 +1783,7 @@ with open(ts_wt_path, encoding="utf-8") as f:
     for line in f:
         scanner_wt.scan_record(json.loads(line))
 
-assert scanner_wt.is_in_flight() is True, "Review dispatch naming worktree path must be in-flight"
+assert scanner_wt.is_in_flight() is True, f"Review dispatch naming worktree path must be in-flight (commit_seq={scanner_wt.last_commit_seq}, dispatch_seq={scanner_wt.last_dispatch_seq}, verdict_seq={scanner_wt.last_verdict_seq})"
 print("PASS: review dispatch naming worktree in prompt recognized in-flight (ai-config#4130)")
 
 # And when SubagentHandback message arrives with verdict:

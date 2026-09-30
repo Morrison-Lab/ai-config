@@ -281,7 +281,8 @@ def subagenthandback_use(message_text: str, call_id=None):
 def run_hook_handback(cmd: str, agent_id: str, subagent_events: list,
                       agent_type: str = "adversarial-reviewer",
                       main_events_before=None, tool_use_id: str | None = None,
-                      meta_overrides: dict | None = None) -> tuple[int, dict]:
+                      meta_overrides: dict | None = None,
+                      pointer_text: str | None = None) -> tuple[int, dict]:
     """Run the hook against a main transcript whose reviewer dispatch result
     is hand-back-only, plus the sibling `subagents/agent-<id>.jsonl` and
     `.meta.json` files Claude Code actually writes the report to
@@ -295,7 +296,7 @@ def run_hook_handback(cmd: str, agent_id: str, subagent_events: list,
     call_id = _fresh_id()
     main_events = list(main_events_before or []) + [
         agent_call(call_id=call_id),
-        agent_result(call_id, handback_pointer(agent_id)),
+        agent_result(call_id, pointer_text if pointer_text is not None else handback_pointer(agent_id)),
     ]
 
     tmpdir = tempfile.mkdtemp(prefix="npwsr-handback-")
@@ -2659,6 +2660,15 @@ def handback_cases() -> tuple[int, int]:
     rc, out = run_hook(PUSH, events_spoof)
     check("a user message without handback markers or tracked sender cannot authorize",
           rc == 0 and blocked_of(out), reason_of(out)[:200])
+
+    # 11. An agent_id text pointer carrying leading 'agent-' matches without doubling prefix (ai-config#4130)
+    rc, out = run_hook_handback(
+        PUSH, "hb0011agent", [subagenthandback_use(body())],
+        tool_use_id="toolu_unrelated_0011",
+        pointer_text="agent_id: agent-hb0011agent"
+    )
+    check("a hand-back located by agent_id text carrying leading 'agent-' matches without doubling prefix",
+          rc == 0 and not blocked_of(out), reason_of(out)[:200])
 
     return failures, ran
 

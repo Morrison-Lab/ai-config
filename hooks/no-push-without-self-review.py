@@ -1066,7 +1066,8 @@ def _resolve_cd_target(rest: list[str], cur_dir: str | None) -> str | None:
     # normalized into a drive-less path nothing downstream could repair.
     target = _native_path(target)
     was_windows_drive_forward = bool(re.match(r"^[A-Za-z]:/", target))
-    resolved = os.path.normpath(os.path.join(cur_dir, target) if cur_dir is not None else target)
+    is_abs = os.path.isabs(target) or bool(re.match(r"^[A-Za-z]:[/\\]", target))
+    resolved = os.path.normpath(target if is_abs or cur_dir is None else os.path.join(cur_dir, target))
     if was_windows_drive_forward:
         resolved = resolved.replace("\\", "/")
     return resolved
@@ -2168,7 +2169,7 @@ def _is_reviewer_record(record: dict) -> bool:
 # dispatch's own `toolUseId`. `[\w-]+` matches the same id shape
 # `TASK_ID_KEYS`' own text-mined fallback already accepts elsewhere in this
 # file.
-AGENT_ID_IN_TEXT = re.compile(r"\bagent[-_ ]?id[:=]\s*[`\"']?([\w-]+)", re.I)
+AGENT_ID_IN_TEXT = re.compile(r"\bagent[-_ ]?id[:=]\s*[`\"']?(?:agent-)?([\w-]+)", re.I)
 AGENT_ID_FROM_PROSE = re.compile(r"message from [`\"']?agent-?([\w-]+)[`\"']?", re.I)
 
 
@@ -2289,7 +2290,10 @@ def _handback_report_text(transcript_path: str, call_id, res_text: str) -> str |
         agent_id_match = AGENT_ID_IN_TEXT.search(res_text) or AGENT_ID_FROM_PROSE.search(res_text)
         if not agent_id_match:
             return None
-        candidate = os.path.join(subagents_dir, f"agent-{agent_id_match.group(1)}.meta.json")
+        raw_id = agent_id_match.group(1)
+        if raw_id.lower().startswith("agent-"):
+            raw_id = raw_id[len("agent-"):]
+        candidate = os.path.join(subagents_dir, f"agent-{raw_id}.meta.json")
         if os.path.isfile(candidate):
             meta_path = candidate
 

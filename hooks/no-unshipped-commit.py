@@ -346,7 +346,7 @@ def absolute_dir(path):
     back as the literal the user typed (`hooks`), which no worktree path can
     be compared against. Dropping it is the honest answer.
     """
-    return path if path and os.path.isabs(path) else None
+    return path if path and (os.path.isabs(path) or bool(re.match(r"^[A-Za-z]:[/\\]", path))) else None
 
 
 def extract_named_paths(command):
@@ -1111,19 +1111,6 @@ def _is_dispatch_relevant(inp, tool_name, harness_dirs, cur_dir, target_cwd_real
     if target_branch and target_branch in text:
         return True
 
-    if target_cwd_real and isinstance(inp, dict):
-        prompt_text = str(
-            inp.get("prompt") or inp.get("Prompt") or
-            inp.get("command") or inp.get("cmd") or inp.get("CommandLine") or ""
-        )
-        prompt_text_lower = prompt_text.lower()
-        norm_target = _normalize_dir_key(target_cwd_real)
-        if norm_target and (norm_target.lower() in prompt_text_lower or norm_target.replace("\\", "/").lower() in prompt_text_lower):
-            return True
-        base_target = os.path.basename(norm_target)
-        if base_target and len(base_target) > 3 and base_target.lower() in prompt_text_lower:
-            return True
-
     if other_branches and any(ob in text for ob in other_branches):
         return False
 
@@ -1135,11 +1122,23 @@ def _is_dispatch_relevant(inp, tool_name, harness_dirs, cur_dir, target_cwd_real
     elif effective_cwd:
         all_paths.add(effective_cwd)
 
+    prompt_targets_worktree = False
     if isinstance(inp, dict):
         for k in ("Workspace", "workspace", "dir", "directory", "cwd", "Cwd"):
             v = inp.get(k)
             if isinstance(v, str) and v and v != "inherit":
                 all_paths.add(v)
+        prompt_text = str(
+            inp.get("prompt") or inp.get("Prompt") or
+            inp.get("command") or inp.get("cmd") or inp.get("CommandLine") or ""
+        )
+        prompt_text_lower = prompt_text.lower()
+        norm_target = _normalize_dir_key(target_cwd_real)
+        norm_target_slash = norm_target.replace("\\", "/").lower()
+        prompt_slash = prompt_text.replace("\\", "/").lower()
+        if norm_target_slash and norm_target_slash in prompt_slash:
+            all_paths.add(norm_target)
+            prompt_targets_worktree = True
 
     target_common = _git_common_dir(target_cwd_real) if target_cwd_real else ""
     cwd_matches = False
@@ -1154,20 +1153,12 @@ def _is_dispatch_relevant(inp, tool_name, harness_dirs, cur_dir, target_cwd_real
         if not cwd_matches:
             return False
 
-    if target_branch:
-        different_worktree = bool(
-            dispatch_dir and target_cwd_real and
-            _normalize_dir_key(dispatch_dir) != _normalize_dir_key(target_cwd_real)
-        )
+    if target_branch and not prompt_targets_worktree:
         if dispatch_branches:
             if target_branch not in dispatch_branches:
-                if not (different_worktree and dispatch_branches <= {"main", "master"} and
-                        last_commit_dir and _paths_overlap(last_commit_dir, target_cwd_real)):
-                    return False
-        elif current_repo_branch and target_branch != current_repo_branch:
-            if not (different_worktree and current_repo_branch in ("main", "master") and
-                    last_commit_dir and _paths_overlap(last_commit_dir, target_cwd_real)):
                 return False
+        elif current_repo_branch and target_branch != current_repo_branch:
+            return False
 
     return True
 

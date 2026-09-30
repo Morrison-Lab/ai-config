@@ -12,6 +12,23 @@ Write every cross-reference by name, never by position.
 A record here and the entry it belongs to sit in different files, so "above" and "below" are false the moment a record moves --- and they stay present while becoming false, which is why a content comparison cannot catch them.
 What does not: the Mistake, Canonical Rule, Fix, or Do/Don't lines, which are what a reader consults the entry for.
 
+## Pattern 12: Arming Auto-Merge While Review Findings Are Still Open or at an Unreviewed Head After Sync
+
+- **1st occurrence, 2026-08-26** on `ai-config#2226`:
+  armed `--squash --auto` while round-1 findings were open and the reviewer was quota-skipping.
+  Hours later a push turned `validate` green,
+  auto-merge fired at 04:30Z,
+  and it merged over an explicit Needs-more-work verdict ---
+  requiring revert (#2268) plus reland-with-fixes (#2269).
+- **2nd occurrence, 2026-08-28** on `ai-config#2556` (Issue #2558):
+  verified fully clean at `2c1ae45d` (checker exit 0, verdict `Ready for merge` at that exact SHA, zero unresolved threads).
+  A direct merge was refused because `main` had moved (`the head branch is not up to date with the base branch`).
+  Merged `origin/main` in and pushed `54874be0`,
+  then armed `--auto` reasoning that the merge was already verified.
+  A clean review verdict for `54874be0` landed at 22:18:44Z and auto-merge fired at 22:20:29Z;
+  had auto-merge fired before the review posted,
+  it would have merged an unreviewed head.
+
 ## Pattern 15: Widening a Fail-Closed Instrument's Exemption Without a Base-Parity Proof
 
 - **2nd occurrence of the class, 2026-08-28** (ai-config#2449 / PR #2515, after #2419 in [`mistake-patterns.md`](mistake-patterns.md)), and the near-miss Pattern 15's entry did not previously name: the base-parity proof WAS built, and was constructed over the wrong quantity.

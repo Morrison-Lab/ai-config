@@ -390,6 +390,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-unparseable-staged-config.py\"'",
+            "timeout": 15,
+            "script": "warn-unparseable-staged-config.py",
+            "why": "ai-config#4086 -- PreToolUse hook on git commit that parses staged .toml, .json, and .yaml/.yml config files (tomllib, json, yaml.safe_load) and warns with the parser error when any fails to load, catching syntax errors (such as invalid TOML escapes) before commit."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-delete-branch-under-stacked-pr.py\"'",
             "timeout": 25,
             "script": "no-delete-branch-under-stacked-pr.py",

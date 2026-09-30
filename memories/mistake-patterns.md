@@ -218,21 +218,7 @@ When a new entry lands after `main` has appended one of its own, take the next n
   which is why it does not feel like a new head needing a new review verdict,
   but auto-merge fires the instant CI finishes,
   before any reviewer can evaluate the new head.
-- **Example**:
-  - 2026-08-26 on `ai-config#2226`:
-    armed `--squash --auto` while round-1 findings were open and the reviewer was quota-skipping.
-    Hours later a push turned `validate` green,
-    auto-merge fired at 04:30Z,
-    and it merged over an explicit Needs-more-work verdict ---
-    requiring revert (#2268) plus reland-with-fixes (#2269).
-  - 2026-08-28 on `ai-config#2556` (Issue #2558):
-    verified fully clean at `2c1ae45d` (checker exit 0, verdict `Ready for merge` at that exact SHA, zero unresolved threads).
-    A direct merge was refused because `main` had moved (`the head branch is not up to date with the base branch`).
-    Merged `origin/main` in and pushed `54874be0`,
-    then armed `--auto` reasoning that the merge was already verified.
-    A clean review verdict for `54874be0` landed at 22:18:44Z and auto-merge fired at 22:20:29Z;
-    had auto-merge fired before the review posted,
-    it would have merged an unreviewed head.
+- **Example**: see [`mistake-patterns.cases.md`](mistake-patterns.cases.md) Pattern 12 for the 2026-08-26 (`ai-config#2226`) and 2026-08-28 (`ai-config#2556`) cases.
 - **Canonical Rule**: [`fully-clean.md`](../shared/workflow/fully-clean.md).
   See also [`check-before-pushing.md`](../shared/workflow/check-before-pushing.md)
   and [`sync-with-main.md`](../shared/workflow/sync-with-main.md):
@@ -1240,3 +1226,19 @@ Pattern 34's `\u0061` example and this one's `\u0077` are the same trick.
   2. For deduplication, give the duplicate a blocking/failing status so failure to deduplicate denies and fails the test.
 - **Do:** verify that new regression tests fail when the fix is reverted before committing.
 - **Don't:** write tests where arbitrary list position or harmless duplicate properties satisfy assertions without exercising the fix.
+
+## Pattern 61: Scanning Unbounded argv Tokens for Global Flags Across Subcommands
+
+- **Mistake**: scanning a tool's entire `argv` for global command-line options (such as `git -C <dir>`) without bounding the scan to tokens preceding the subcommand.
+  When a subcommand accepts an option with the same flag name (such as `git commit -C <commit>` to reuse a commit message), the subcommand argument is misparsed as the global option, redirecting or corrupting execution context (e.g. setting `target_cwd` to a nonexistent path and silently suppressing validation).
+- **Direction of failure**: fail-open for pre-commit guards and linters.
+  By redirecting the target working directory to an invalid path derived from a subcommand option, git commands in the hook fail or exit early, suppressing warnings on genuine defects.
+- **Example**: 2026-09-30, PR [#4148](https://github.com/Morrison-Lab/ai-config/pull/4148) (`hooks/warn-unparseable-staged-config.py`).
+  `find_commit_invocations` looped through all `argv` tokens looking for `-C`, causing `git commit -C HEAD` to treat `HEAD` as the repository working directory instead of a commit reference.
+- **Fix**: bound option parsing by subcommand position via `scripts/lib/shellcmd.py`'s `git_subcommand()`.
+  Delegate subcommand detection to `git_subcommand(argv)` and inspect `argv[:subcmd_idx]` for pre-subcommand global flags rather than hand-rolling an option loop (DRW).
+- **Do:** delegate subcommand parsing to `git_subcommand()` and bound global option parsing before its boundary.
+- **Do:** test subcommand options that share names with global options (e.g. `git commit -C HEAD`).
+- **Don't:** scan the entire `argv` list for global flags with a simple loop over `enumerate(argv)`.
+- **Don't:** hand-roll an option scanner when `shellcmd.git_subcommand` is already available in the repo.
+

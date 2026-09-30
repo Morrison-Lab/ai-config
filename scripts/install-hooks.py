@@ -96,7 +96,7 @@ def load_manifest() -> list[dict]:
     if not MANIFEST.is_file():
         sys.exit(f"FATAL: manifest not found at {MANIFEST}")
     try:
-        data = json.loads(MANIFEST.read_text())
+        data = json.loads(MANIFEST.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
         sys.exit(f"FATAL: {MANIFEST} is not valid JSON: {exc}")
     hooks = data.get("hooks")
@@ -130,7 +130,7 @@ def load_settings(path: Path) -> dict:
     if not path.is_file():
         return {}
     try:
-        return json.loads(path.read_text())
+        return json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
         # a malformed settings.json silently disables EVERY setting in it, so
         # this must abort rather than be repaired blind
@@ -502,7 +502,7 @@ def main() -> int:
             print(f"  STALE {entry['script']} names a path that does not exist "
                   "-- left alone; fix the install, not settings.json")
 
-    settings_path.write_text(json.dumps(settings, indent=2) + "\n")
+    settings_path.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
     print(f"\nadded {added} hook(s) to {settings_path}")
     print("Hooks connect at session start -- restart before expecting them to run.")
     # a stale entry is still broken after --fix, and --fix deliberately does not

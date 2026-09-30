@@ -469,19 +469,65 @@ check(
 
 real_stdin = sys.stdin
 
-sys.stdin = io.StringIO("  piped-token\n")
+TOK = "sk-ant-oat01-" + "Ab_c-9" * 16
+sys.stdin = io.StringIO(f"  {TOK}\n")
 check(
     "read_token strips whitespace from a piped token",
-    rct.read_token("SOME_UNSET_VAR_FOR_TESTS") == "piped-token",
+    rct.read_token(rct.DEFAULT_SECRET) == TOK,
 )
 
-sys.stdin = io.StringIO("   \n")
+sys.stdin = io.StringIO(f"{TOK[:40]}\n   {TOK[40:]}\n")
+check(
+    "read_token rejoins a token wrapped across lines",
+    rct.read_token(rct.DEFAULT_SECRET) == TOK,
+)
+
+
+def _exits(text: str, name: str = rct.DEFAULT_SECRET) -> bool:
+    sys.stdin = io.StringIO(text)
+    try:
+        rct.read_token(name)
+    except SystemExit:
+        return True
+    return False
+
+
+check("read_token exits rather than write an empty secret", _exits("   \n"))
+check(
+    "read_token refuses setup-token's full screen output (ai-config#4129)",
+    _exits(f"Opening browser to sign in...\nYour OAuth token:\n\n{TOK}\n\nStore it safely.\n"),
+)
+check("read_token refuses a non-token value", _exits("piped-token"))
+check("read_token refuses a token pasted twice", _exits(TOK + TOK))
+check(
+    "read_token applies the sk-ant- shape only to the OAuth secret",
+    not _exits("some-other-value", "OTHER_SECRET"),
+)
+
+class _Tty(io.StringIO):
+    def isatty(self) -> bool:
+        return True
+
+
+_real_getpass = rct.getpass.getpass
+_prompts: list[str] = []
+
+
+def _fake_getpass(prompt: str = "") -> str:
+    _prompts.append(prompt)
+    return f"{TOK[:50]}\n  {TOK[50:]}"
+
+
+rct.getpass.getpass = _fake_getpass
+sys.stdin = _Tty("")
 try:
-    rct.read_token("SOME_UNSET_VAR_FOR_TESTS")
-    empty_exited = False
-except SystemExit:
-    empty_exited = True
-check("read_token exits rather than write an empty secret", empty_exited)
+    tty_token = rct.read_token(rct.DEFAULT_SECRET)
+finally:
+    rct.getpass.getpass = _real_getpass
+check(
+    "read_token prompts (hidden) on a terminal and normalizes the paste",
+    tty_token == TOK and len(_prompts) == 1 and rct.DEFAULT_SECRET in _prompts[0],
+)
 
 sys.stdin = io.StringIO("piped")
 import os  # noqa: E402 -- deferred so the env var is set only for this case

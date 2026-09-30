@@ -97,7 +97,7 @@ def test_frontmatter_is_stripped() -> None:
         f = Path(tmp) / "SKILL.md"
         f.write_text(
             "---\nname: fixture\ndescription: SENTINEL_IN_FRONTMATTER_ONLY\n---\n\n# Body\n\nreal prose here.\n"
-        )
+        , encoding="utf-8")
         body, _ = fnd.body_of(f)
 
     check("frontmatter delimiter is gone from the body", not body.lstrip().startswith("---"))

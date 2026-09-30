@@ -138,6 +138,16 @@ discussion board instead, per
 one" here as "file one in the right venue", which for actionable work is the
 tracker.
 
+## Search the tracker before implementing a capability request
+
+When the user asks to add or implement a capability, grant, or policy directly,
+do not jump straight to writing code or authoring an issue without searching first.
+An existing open issue or PR may already track the request,
+carry the user's intended scope, or establish an agreed allowlist.
+Implementing without searching the tracker duplicates work
+and often leads to an implementation narrower than what was already specified.
+See [`grep-is-not-coverage`](grep-is-not-coverage.md).
+
 When the issue is a **bug report**, include a minimal reproducible example
 (a reprex --- <https://reprex.tidyverse.org/>) whenever you can. A reprex is
 what a maintainer needs to confirm and fix the bug, and it's what they'll ask

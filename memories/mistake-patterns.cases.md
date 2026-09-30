@@ -12,6 +12,23 @@ Write every cross-reference by name, never by position.
 A record here and the entry it belongs to sit in different files, so "above" and "below" are false the moment a record moves --- and they stay present while becoming false, which is why a content comparison cannot catch them.
 What does not: the Mistake, Canonical Rule, Fix, or Do/Don't lines, which are what a reader consults the entry for.
 
+## Pattern 12: Arming Auto-Merge While Review Findings Are Still Open or at an Unreviewed Head After Sync
+
+- **1st occurrence, 2026-08-26** on `ai-config#2226`:
+  armed `--squash --auto` while round-1 findings were open and the reviewer was quota-skipping.
+  Hours later a push turned `validate` green,
+  auto-merge fired at 04:30Z,
+  and it merged over an explicit Needs-more-work verdict ---
+  requiring revert (#2268) plus reland-with-fixes (#2269).
+- **2nd occurrence, 2026-08-28** on `ai-config#2556` (Issue #2558):
+  verified fully clean at `2c1ae45d` (checker exit 0, verdict `Ready for merge` at that exact SHA, zero unresolved threads).
+  A direct merge was refused because `main` had moved (`the head branch is not up to date with the base branch`).
+  Merged `origin/main` in and pushed `54874be0`,
+  then armed `--auto` reasoning that the merge was already verified.
+  A clean review verdict for `54874be0` landed at 22:18:44Z and auto-merge fired at 22:20:29Z;
+  had auto-merge fired before the review posted,
+  it would have merged an unreviewed head.
+
 ## Pattern 15: Widening a Fail-Closed Instrument's Exemption Without a Base-Parity Proof
 
 - **2nd occurrence of the class, 2026-08-28** (ai-config#2449 / PR #2515, after #2419 in [`mistake-patterns.md`](mistake-patterns.md)), and the near-miss Pattern 15's entry did not previously name: the base-parity proof WAS built, and was constructed over the wrong quantity.
@@ -59,6 +76,26 @@ What does not: the Mistake, Canonical Rule, Fix, or Do/Don't lines, which are wh
   A principle stated in one part of a file and contradicted by practice in another part of the same file is itself a signal worth reading, independent of the round count.
   Canonical rule: not a wider or narrower version of the failing test, but a test on a different axis --- structural or positional (does the body carry its own verdict heading at all) rather than lexical (which words appear).
   See also [`learn-from-review-findings.md`](../shared/workflow/learn-from-review-findings.md)'s "A finding class that RECURS is evidence about your instrument, not about its threshold" section, which this occurrence specializes: the replacement axis, not just the recurrence signal.
+
+## Pattern 21: The Self-Review Guard Reads Command Text, Not a Resolved Shell Command
+
+- **2nd occurrence, 2026-09-04** (ai-config#3279): `git -C "$W" push origin <sha>:refs/heads/<branch>` was refused with "`<sha>` could not be resolved to a commit,"
+  even though a matching clean verdict existed and `git cat-file -t <sha>` succeeded in the session's own shell.
+  The guard inspects command text, so it saw the literal string `"$W"` rather than the path it holds,
+  and the refusal named the ref while the actual unresolvable token was the `-C` argument.
+  Writing the same worktree path out literally made the identical push succeed on the first attempt.
+  The trap compounds: the natural response to a refusal that misattributes its cause is to re-dispatch the reviewer in a loop that can never succeed,
+  and from there to reach for `ALLOW_UNREVIEWED_PUSH=1` --- waving a correctly-reviewed push through the override path.
+- **3rd occurrence (mechanism unconfirmed), 2026-09-14** (proposed on Morrison-Lab/ai-config#3657): a bare `git push -u origin <literal-branch-name>` (no pipe, no `$VAR`, no `-C`) was refused twice in a row,
+  both times citing the literal branch name itself as unresolvable to a commit, while `git rev-parse <branch>` succeeded in the same shell throughout.
+  No suspicious token is visible in the refused command text, unlike the first two examples,
+  so the underlying cause is not the one this pattern's canonical rule names,
+  and is recorded here only as a third symptom-alike rather than as a diagnosed mechanism.
+  This bullet is a case of the very "Don't" in [`mistake-patterns.md`](mistake-patterns.md):
+  the resolution failure did not clear on retry and no textual fix (unlike examples 1 and 2) was available to try,
+  so `ALLOW_UNREVIEWED_PUSH=1` was used after a genuine foreground adversarial review had already returned clean against the exact pushed commit ---
+  an exception made because the alternative recommended by this pattern (find and fix the offending token) had nothing to find,
+  not a case of the guard being routinely worked around.
 
 ## Pattern 25: Pushing Prose Without Running the Diff-Scoped `new-line-breaks` Check First
 
@@ -191,6 +228,22 @@ So the blanket "do not make this unprompted" blocked a change measurement showed
 
   `\u0077` is `w`, so PyYAML and GitHub Actions both resolve the key, while the raw text never carries it.
   An added `checks: read` job permission passed the guard.
+
+## Pattern 54: A Briefed "Measured" Claim Ships Unverified Because It Already Sounds Checked
+
+- **1st occurrence, 2026-09-09** ([#3379](https://github.com/Morrison-Lab/ai-config/pull/3379)).
+  The brief asserted that an unpinned `npx markdownlint-cli2` matched no files
+  and that `Summary: 0 issues in 0 files` was the tell.
+  Reproduction disproved both: an unpinned run lints the whole corpus exactly
+  as a pinned one does, and that string is a later version's wording for the
+  same clean verdict, appearing over 752 files and over an empty match alike.
+  Scope lives on the `Linting:` line above it, and this was caught before review.
+  A second, narrower miss rode along, caught by a reviewer rather than by me:
+  the dupe-check grepped only the two files the brief named, missing
+  `shared/principles/fail-fast.rationale.md` and
+  `memories/nested-worktree-instrument-inflation.md`, which already carried the lesson.
+  [`grep-is-not-coverage.md`](../shared/workflow/grep-is-not-coverage.md) names the shape;
+  the specific error was letting the brief set the search scope.
 
 ## Pattern 55: A baseline/floor abstraction's "covers everything" claim needs domain verification
 

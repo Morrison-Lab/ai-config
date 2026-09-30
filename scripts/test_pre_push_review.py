@@ -114,7 +114,10 @@ class TestPrePushReview(unittest.TestCase):
             "posted-by footer": "\n\n_Posted by Claude Code (AI agent) --- not written by a human._",
             "rule line": "\n\n====================",
             "status line": "\n\nStatus: all checks green",
-            "stopping point": "\n\n**Stopping Point**: Clean stopping point reached",
+            "stopping point": (
+                "\n\n**Stopping Point**: Clean stopping point reached --- "
+                "session done; UMS executed; no follow-up items pending"
+            ),
             "heading verdict": "\n\n### Verdict: Ready for merge",
             "summary verdict": "\n\nSummary Verdict: Ready for merge",
             "trailing whitespace": "\n\n   \n",

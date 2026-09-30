@@ -32,13 +32,13 @@ def make_repo(dirty, untracked=False):
     run("init", "-q")
     run("config", "user.email", "t@t")
     run("config", "user.name", "t")
-    open(os.path.join(d, "f.txt"), "w").write("one\n")
+    open(os.path.join(d, "f.txt"), "w", encoding="utf-8").write("one\n")
     run("add", "-A")
     run("commit", "-qm", "init")
     if dirty:
-        open(os.path.join(d, "f.txt"), "w").write("two\n")
+        open(os.path.join(d, "f.txt"), "w", encoding="utf-8").write("two\n")
     if untracked:
-        open(os.path.join(d, "build_output.log"), "w").write("cruft\n")
+        open(os.path.join(d, "build_output.log"), "w", encoding="utf-8").write("cruft\n")
     return d
 
 
@@ -122,7 +122,7 @@ def main():
 
     # The manifest must bind BOTH names, or the code accepting them is
     # unreachable for the one it is not registered under.
-    man = json.load(open(os.path.join(os.path.dirname(HOOK), "hooks.json")))
+    man = json.load(open(os.path.join(os.path.dirname(HOOK), "hooks.json"), encoding="utf-8"))
     bound = {e["matcher"] for group in man["hooks"].values() for e in group
              for h in e["hooks"]
              if h.get("script") == os.path.basename(HOOK)}
@@ -174,7 +174,7 @@ def main():
     # it: the budget is a relation between two files, and asserting a number
     # typed here would pass while the manifest said something else. An
     # earlier version asserted <= 20 under a name claiming 10.
-    manifest = json.load(open(os.path.join(os.path.dirname(HOOK), "hooks.json")))
+    manifest = json.load(open(os.path.join(os.path.dirname(HOOK), "hooks.json"), encoding="utf-8"))
     registered = [h["timeout"]
                   for group in manifest["hooks"].values()
                   for entry in group

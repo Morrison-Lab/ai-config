@@ -85,24 +85,36 @@ def reply_transcript(reply_text, narration_text=None):
 
 cases = [
     ("Completed the checks.", True),
-    ("Completed the checks.\n\n**Stopping Point**: Clean stopping point reached.", False),
-    ("Completed the task.\n\n- **Stopping Point**: Clean stopping point reached.", False),
-    ("Indented list:\n  - **Stopping Point**: Clean stopping point reached.", False),
-    ("Colon inside bold:\n**Stopping Point:** Clean stopping point reached.", False),
-    ("### Stopping Point: Clean stopping point reached.", False),
-    ("**Stopping Point**: Not a clean stopping point / work remains queued: finish X.", False),
-    ("**Stopping Point**: Not clean --- CI is still running.", False),
-    ("This PR adds a hook that requires text like `**Stopping Point**: Clean stopping point reached` in every final reply.", True),
-    ("Discussion of rule:\n```\n**Stopping Point**: Clean stopping point reached\n```\nStill working on task.", True),
-    ("Discussion of rule:\n```markdown\n**Stopping Point**: Clean stopping point reached\n```\nDone with task.\n\n**Stopping Point**: Clean stopping point reached.", False),
+    ("Completed the checks.\n\n**Stopping Point**: Clean stopping point reached.", True),
+    ("Completed the checks.\n\n**Stopping Point**: Clean stopping point reached --- session done.", False),
+    ("Completed the task.\n\n- **Stopping Point**: Clean stopping point reached --- session done.", False),
+    ("Indented list:\n  - **Stopping Point**: Clean stopping point reached --- session done.", False),
+    ("Colon inside bold:\n**Stopping Point:** Clean stopping point reached --- session done.", False),
+    ("### Stopping Point: Clean stopping point reached --- session done.", False),
+    ("**Stopping Point**: Not a clean stopping point / work remains queued: finish X.", True),
+    ("**Stopping Point**: Not a clean stopping point / work remains queued: session not done; finish X.", False),
+    ("**Stopping Point**: Not clean --- CI is still running.", True),
+    ("**Stopping Point**: Not clean --- session not done; CI is still running.", False),
+    ("**Stopping Point**: Clean stopping point reached --- session done; UMS executed; no follow-up items pending.", False),
+    ("**Stopping Point**: Not a clean stopping point / work remains queued: session not done; PR #123 is waiting on CI.", False),
+    ("**Stopping Point**: Clean stopping point reached.\n\nThe session is done; UMS was run and all follow-ups are filed.", False),
+    ("**Stopping Point**: Not a clean stopping point / work remains queued:\n\nSession not done; PR #4136 is waiting on CI.", False),
+    ("**Stopping Point**: Clean stopping point reached.\n\n## Next Steps\nSession done.", True),
+    ("**Stopping Point**: Clean stopping point reached.\n\n- Next item: session done.", True),
+    ("**Stopping Point**: Clean stopping point reached.\n\n* Next item: session done.", True),
+    ("**Stopping Point**: Clean stopping point reached.\n\n+ Next item: session done.", True),
+    ("**Stopping Point**: Clean stopping point reached.\n\n1. Next item: session done.", True),
+    ("This PR adds a hook that requires text like `**Stopping Point**: Clean stopping point reached --- session done` in every final reply.", True),
+    ("Discussion of rule:\n```\n**Stopping Point**: Clean stopping point reached --- session done\n```\nStill working on task.", True),
+    ("Discussion of rule:\n```markdown\n**Stopping Point**: Clean stopping point reached --- session done\n```\nDone with task.\n\n**Stopping Point**: Clean stopping point reached --- session done.", False),
     ("**Stopping Point**: Cleanup pending, more work needed.", True),
-    ("To open a fence type ``` on its own line.\n\n**Stopping Point**: Clean stopping point reached\n\n```\ncode\n```", False),
-    ("Don't write a bare declaration like this:\n```\n**Stopping Point**: Clean stopping point reached\n```\nI have not actually finished; more work remains.\n\nAlso, here's a separate unrelated snippet I was about to show:\n```\n", True),
-    ("```\n**Stopping Point**: Clean stopping point reached\n```\n```\n", True),
+    ("To open a fence type ``` on its own line.\n\n**Stopping Point**: Clean stopping point reached --- session done\n\n```\ncode\n```", False),
+    ("Don't write a bare declaration like this:\n```\n**Stopping Point**: Clean stopping point reached --- session done\n```\nI have not actually finished; more work remains.\n\nAlso, here's a separate unrelated snippet I was about to show:\n```\n", True),
+    ("```\n**Stopping Point**: Clean stopping point reached --- session done\n```\n```\n", True),
     # ai-config#3748: unterminated fence must not swallow subsequent declaration
-    ("Snippet below:\n```python\nprint(1)\n\n**Stopping Point**: Clean stopping point reached.", False),
+    ("Snippet below:\n```python\nprint(1)\n\n**Stopping Point**: Clean stopping point reached --- session done.", False),
     # ai-config#3748: 4-backtick fence wrapping 3-backtick fence
-    ("Code sample:\n````markdown\n```\n**Stopping Point**: Clean stopping point reached\n```\n````\nStill working.", True),
+    ("Code sample:\n````markdown\n```\n**Stopping Point**: Clean stopping point reached --- session done\n```\n````\nStill working.", True),
 ]
 
 failed = 0
@@ -146,7 +158,7 @@ for key in ("transcriptPath", "transcript", "history_file"):
         failed += 1
 
 # Reply-tool visibility tests (ai-config#3798 / #3804)
-CLEAN_DECL = "**Stopping Point**: Clean stopping point reached."
+CLEAN_DECL = "**Stopping Point**: Clean stopping point reached --- session done; UMS executed; no follow-up items pending."
 MISSING_DECL = "Completed the task successfully without a stopping point."
 
 if reply_transcript(CLEAN_DECL):

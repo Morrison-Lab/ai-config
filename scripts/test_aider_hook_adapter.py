@@ -277,7 +277,7 @@ class TestCLI(unittest.TestCase):
     """Test CLI execution and arguments."""
 
     def test_cli_parse_only(self):
-        with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as f:
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".md", delete=False) as f:
             f.write("# aider chat started at 2026-08-31 10:00:00\n\n#### hello\n\nHi there!\n")
             f_path = f.name
 

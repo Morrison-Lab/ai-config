@@ -272,7 +272,7 @@ def write_transcript(recs):
 
 
 def append_records(tpath, recs):
-    with open(tpath, "a") as fh:
+    with open(tpath, "a", encoding="utf-8") as fh:
         for r in recs:
             fh.write(json.dumps(r) + "\n")
 

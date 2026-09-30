@@ -80,7 +80,7 @@ def stub_dir(exit_code):
     """
     d = tempfile.mkdtemp()
     p = os.path.join(d, "python3")
-    with open(p, "w") as fh:
+    with open(p, "w", encoding="utf-8") as fh:
         fh.write(
             "#!/bin/sh\n"
             '[ "$1" = -c ] || exit 90\n'
@@ -170,7 +170,7 @@ indirect = os.path.join(hook_dir, os.pardir, os.path.basename(hook_dir),
                         os.path.basename(HOOK))
 rc, out = run([d], hook=indirect, py_arg_file=arg_file)
 check("exit 0", rc == 0)
-with open(arg_file) as fh:
+with open(arg_file, encoding="utf-8") as fh:
     probed = fh.read()
 check("hands python3 the path it was invoked with, byte for byte",
       probed == indirect)

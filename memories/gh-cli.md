@@ -1075,3 +1075,10 @@ The same reasoning covers the `gh api .../pulls/N/merge` form, which names the r
 - **Don't:** read the refusal as a missing grant --- check first whether the command names the repo the grant is scoped to.
 
 (Measured 2026-09-14 merging ai-config#3635.)
+
+## Antigravity `gh pr merge` gate bans parentheses in arguments
+
+In Antigravity sessions, `gh pr merge` is governed by `plugins/ai-config/enforce-mwc-review-gate.py`,
+which checks the raw command string against `CHAIN_CHARS` (`` (";", "&", "|", "\n", "$(", "`", "(") ``).
+Parentheses in `--subject` or `--body` trip this check;
+see [`antigravity.md`](antigravity.md).

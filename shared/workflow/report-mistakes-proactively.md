@@ -553,6 +553,21 @@ the issue that call actually created was `#3449`.
 Caught and corrected before the entry was committed, but nothing in the repo would have caught it afterward --- a wrong issue reference passes every existing check, since nothing resolves an `ai-config#NNNN` citation against the tracker to confirm it names what the text claims it names.
 Whether that gap is worth a dedicated checker, rather than only this rule, is its own open question, tracked separately rather than decided here.)
 
+**Parallel tool batches make the predicted number feel known, and the rule above did not stop it when it was not loaded (recurrence, 2026-09-28).**
+One cloud session on `Morrison-Lab/pds`, with no ai-config loaded (ai-config#3948), cited or acted on a created object's number before the create call returned it five times:
+
+- `subscribe_pr_activity` batched with `create_pull_request` on a predicted pds#16 --- the call returned #18, so the session watched another session's PR;
+- a pds#15 comment and an ai-config#4039 comment each citing an issue filed in the same batch (#4091, #4092) --- both guesses happened to hold;
+- a qwt#144 body citing "mds#27" and "sds#15" for issues created in the next call as mds#26 and sds#16 --- both wrong, in opposite directions, because issues and PRs share one number sequence.
+
+The last two came after the session had already filed ai-config#4090 about the first.
+Knowing the rule in the moment did not stop it once a parallel batch put the create and the citation side by side, which is the case for the mechanical check the paragraph above leaves open.
+
+- **Do:** put the create call in its own batch, and the citation, subscription or link-back in a later one that reads the returned number.
+- **Don't:** batch a create with anything that names what the create will return --- a subscription, a comment, another issue's body.
+
+See also [`watch-and-ardi`](watch-and-ardi.md) for PR subscriptions specifically.
+
 ## A dupe-check chained into the same call as the create gates nothing
 
 The section above rules out announcing step 2's outcome before step 2 has

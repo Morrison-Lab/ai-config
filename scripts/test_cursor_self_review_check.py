@@ -202,13 +202,13 @@ with tempfile.TemporaryDirectory() as tmp:
 
     subprocess.run(["git", "clone", "-q", str(remote), str(work)],  # unpinned ok
                    env=env, check=True)
-    (work / "f.txt").write_text("one\n")
+    (work / "f.txt").write_text("one\n", encoding="utf-8")
     git("add", "f.txt")
     git("commit", "-q", "-m", "init")
     git("branch", "-M", "main")
     git("push", "-q", "-u", "origin", "main")
     git("checkout", "-q", "-b", "feature")
-    (work / "f.txt").write_text("two\n")
+    (work / "f.txt").write_text("two\n", encoding="utf-8")
     git("commit", "-q", "-am", "change")
     head = git("rev-parse", "HEAD").stdout.strip()
 
@@ -219,7 +219,7 @@ with tempfile.TemporaryDirectory() as tmp:
     check("gates: carve-out note names a non-empty diff",
           "a review is owed" in r.stdout, r.stdout)
 
-    (work / "dirty.txt").write_text("x\n")
+    (work / "dirty.txt").write_text("x\n", encoding="utf-8")
     r = run_cli("gates", "--recorded-head", head,
                 "--recorded-branch", "feature", "-C", str(work))
     check("gates: dirty tree refuses (exit 1)", r.returncode == 1, r.stdout)
@@ -260,7 +260,7 @@ with tempfile.TemporaryDirectory() as tmp:
     work2 = Path(tmp) / "work2"
     subprocess.run(["git", "clone", "-q", str(remote), str(work2)],  # unpinned ok
                    env=env, check=True)
-    (work2 / "f.txt").write_text("three\n")
+    (work2 / "f.txt").write_text("three\n", encoding="utf-8")
     git("commit", "-q", "-am", "remote moved", cwd=str(work2))
     git("push", "-q", "origin", "main", cwd=str(work2))
     r = run_cli("gates", "--recorded-head", head,

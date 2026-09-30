@@ -178,11 +178,11 @@ The class is broader than either title suggests: any measured behaviour --- a sh
 - **Do:** re-measure on the actual target platform (here: POSIX, since the code shipped into Linux CI) before writing "unreachable" into a comment or commit message, rather than trusting a measurement taken on whichever platform the session happened to be running on.
 - **Do:** put the platform-scoping caveat in the artifact a later reader actually encounters --- the source comment --- rather than only in the commit message that introduced it;
   a commit message's emphasis (capitals, a flagged caveat) does not travel with the code.
+- **Do:** re-run the exact reproducer yourself, against the exact interpreter version the target CI pins, before quoting an exception's message text --- not just its type.
+  A message string is as measurable, and as easy to get wrong from memory or from a secondhand quote, as the exception type itself.
 - **Don't:** write a code comment or commit message asserting a branch is unreachable based on a measurement taken on one platform when the code runs on another --- here the comment itself never named a platform at all, which is a stronger miss than an emphasized-but-scoped claim would have been.
 - **Don't:** assume the existing environment-scoping rule fires just because it exists --- it is stated narrowly (heredoc transport, `ls` exit codes) in both of its prior instances, so recognizing "this is the same class" for a stdlib call takes a deliberate generalization step, not pattern-matching on the rule's own title.
 - **Don't:** trust that a strongly-worded commit message (capitals, "MEASURED") carries its caution into the code --- the comment a maintainer reads six months later is the one written in the diff, not the one narrated about it.
-- **Do:** re-run the exact reproducer yourself, against the exact interpreter version the target CI pins, before quoting an exception's message text --- not just its type.
-  A message string is as measurable, and as easy to get wrong from memory or from a secondhand quote, as the exception type itself.
 - **Don't:** trust a test fixture as corroboration for a message string it mocks rather than captures --- a fixture that hand-writes the expected string can never disagree with the assertion it exists to check.
 
 ## `itertools.islice` caps a generator by prefix, and the obvious integer stride collapses to it
@@ -417,3 +417,26 @@ Learned 2026-09-21 on ai-config#3827, #3829, and #3848.
 
 - **Do:** check for `Path(sys.executable).with_name("pythonw.exe")` or `shutil.which("pythonw")` and pass `CREATE_NO_WINDOW` to child subprocesses when spawning background processes on Windows.
 - **Don't:** invoke bare `"python3"` in `subprocess.Popen` on Windows for background processes.
+
+## `Path.read_text`, `Path.write_text`, and `open` default to system encoding on Windows (cp1252)
+
+In Python versions prior to 3.15, `pathlib.Path.read_text()`, `Path.write_text()`, and built-in `open()` without an explicit `encoding` argument default to `locale.getpreferredencoding(False)`.
+On Windows without `PYTHONUTF8=1`,
+this is typically `cp1252` (Windows-1252).
+
+Reading or writing a file that contains UTF-8 characters (e.g. smart quotes, em dashes, non-ASCII Unicode characters) using bare `Path.read_text()`, `Path.write_text()`, or `open()` fails with `UnicodeDecodeError: 'charmap' codec can't decode byte 0x... in position ...` or `UnicodeEncodeError`.
+Likewise, printing non-ASCII glyphs (e.g. `✓` checkmarks) to stdout fails on Windows with cp1252;
+scripts should use pure ASCII markers (e.g. `ok:`) per [`shared/coding/ascii-punctuation-in-source.md`](../shared/coding/ascii-punctuation-in-source.md).
+
+Always pass `encoding="utf-8"` explicitly when calling `open()`, `Path.open()`, `Path.read_text()`, `Path.write_text()`, or `tempfile.NamedTemporaryFile("w")`, even in internal scripts, test fixtures, and CLI helpers that run primarily on developer machines.
+When scanning trees for ignored directories (e.g. `IGNORED_DIRS`), test relative path components rather than absolute path strings, so directory names present in the parent path hierarchy (such as `.gemini`) are not falsely treated as ignored targets.
+Mechanical enforcement is provided by `scripts/check-text-encoding.py` and gated in CI (`validate.yml`).
+
+- **Do:** pass `encoding="utf-8"` explicitly to `open()`, `Path.open()`, `Path.read_text()`, `Path.write_text()`, and `tempfile.NamedTemporaryFile("w")` whenever reading or writing text files.
+- **Do:** print ASCII markers (`ok:`) rather than Unicode checkmarks in CLI script output.
+- **Do:** check relative path segments against `IGNORED_DIRS` rather than absolute paths.
+- **Don't:** call bare `open()`, `p.read_text()`, or `p.write_text(content)` without an explicit `encoding` argument or with `encoding=None` on cross-platform code.
+
+(Measured 2026-09-29 when running `scripts/install-hooks.py` on Windows, where reading UTF-8 characters in `hooks/hooks.json` raised `UnicodeDecodeError` in `cp1252`;
+repo-wide audit and mechanical lint guard shipped in #4121.)
+

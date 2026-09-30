@@ -87,6 +87,8 @@ rather than through `.cmd` or `.bat` batch wrappers.
   - `invoke_subagent` passes an array `{"Subagents": [{"TypeName": "...", "Workspace": "...", "Prompt": "..."}]}`.
     A bridge adapter evaluates all subagents in the list against `Agent` PreToolUse hooks.
     If any subagent triggers `deny`, the whole tool execution is denied.
+    Subagent isolation requires passing `Workspace: "branch"` in `invoke_subagent`, which `claude-hook-adapter` maps to Claude Code's `isolation: "worktree"` enum (`hooks/flag-unassigned-worktree.py`).
+    On Windows, ensure `~/.gemini/config/plugins/ai-config/claude-hook-adapter.py` is kept synced with `plugins/ai-config/claude-hook-adapter.py`.
   - `send_message` maps to `SendMessage`.
   - `define_subagent` maps to `Task`.
   - Claude PreToolUse hooks may also return a top-level `systemMessage` (shown to the user, independent of the `hookSpecificOutput.permissionDecision` deny/allow verdict).
@@ -203,6 +205,17 @@ The [`google-antigravity/antigravity-sdk-python`](https://github.com/google-anti
   So where `agy` is available, dispatching the review that way discharges the guard directly and needs no override at all.
   The override above is for the case where it is not.
   No other delegation CLI is recognized, so `codex`, `opencode` and `adv` still need the override.
+- In Windows PowerShell sessions, running
+  `$env:ALLOW_UNREVIEWED_PUSH="1"; git push ...` is split on the semicolon
+  and rejected as a chained command by `hooks/no-push-without-self-review.py`.
+  Run `env ALLOW_UNREVIEWED_PUSH=1 git push ...`
+  (using Git's bundled `usr/bin/env.exe`) instead
+  so the assignment precedes `git` in a single simple command without chaining.
+  (Measured 2026-09-30 in an Antigravity Windows PowerShell session.)
+- In PowerShell, passing multiline markdown with quotes to `gh pr create --body`
+  can cause quote delimiter errors (`unknown arguments [...]`);
+  writing the body to a unique scratch file and passing `--body-file`
+  avoids argument corruption.
 
 ## Antigravity hook runner 30s timeout and adapter parallelism
 
@@ -225,9 +238,13 @@ The [`google-antigravity/antigravity-sdk-python`](https://github.com/google-anti
   otherwise, benign concurrency cancellation permanently blocks automated merge under MWC.
   (Observed in live Antigravity sessions 2026-09-19 on PR #3797.)
 - **No parentheses in `gh pr merge` commit subjects or arguments:**
-  `enforce-mwc-review-gate.py` bans command-chaining and substitution characters in `CHAIN_CHARS` (including semicolons, ampersands, pipes, newlines, dollar-parentheses, backticks, and parentheses).
-  Passing parenthetical issue references in arguments (such as `--subject "fix: description (#1234)"`) trips the guard and blocks the merge.
+  `plugins/ai-config/enforce-mwc-review-gate.py` bans command-chaining and substitution characters in `` CHAIN_CHARS = (";", "&", "|", "\n", "$(", "`", "(") ``.
+  Passing parenthetical issue references in arguments (such as `--subject "fix: description (#1234)"` or `--body "(closes #1234)"`) trips the guard and blocks the merge.
   Execute `gh pr merge -R <repo> <PR> --squash --delete-branch` without parentheses.
+  Splitting on chain characters can also unbalance quotes and cause `shlex.split` to raise `ValueError`,
+  which routes through the fail-closed fallback whenever both `"gh"` and `"merge"` appear in the command line
+  (e.g. a `git commit -m` quoting the phrase alongside parentheses).
+  (Observed in live Antigravity sessions 2026-09-23 in [#3916](https://github.com/Morrison-Lab/ai-config/pull/3916), and 2026-09-29 on PR [#4119](https://github.com/Morrison-Lab/ai-config/pull/4119).)
 - **Rerun cancelled concurrency checks to unblock fully-clean rollup:**
   When a prior workflow run is cancelled by a higher-priority check or concurrency group (e.g. `review / preempt-previous`), it registers as `cancelled` in the statusCheckRollup, blocking `check-pr-fully-clean.py` and MWC merge.
   Rerunning the failed/cancelled job via `gh run rerun -R <repo> <run-id> --failed` re-executes the check and clears the cancelled status without requiring a new commit or push.

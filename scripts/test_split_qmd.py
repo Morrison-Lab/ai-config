@@ -80,48 +80,48 @@ def check(name: str, condition: bool, detail: str = "") -> None:
 
 def expand(spine: Path) -> str:
     out = []
-    for line in spine.read_text().split("\n"):
+    for line in spine.read_text(encoding="utf-8").split("\n"):
         m = re.match(r"\{\{< include (_subfiles/\S+) >\}\}$", line)
-        out.append((spine.parent / m.group(1)).read_text().rstrip("\n") if m else line)
+        out.append((spine.parent / m.group(1)).read_text(encoding="utf-8").rstrip("\n") if m else line)
     return "\n".join(out)
 
 
 def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         chapter = Path(tmp) / "fixture.qmd"
-        chapter.write_text(CHAPTER)
+        chapter.write_text(CHAPTER, encoding="utf-8")
         files = split_qmd.split(chapter)
         check("writes subfiles", len(files) >= 4, str(sorted(files)))
         check("names divs by id", {"_exr-first.qmd", "_sol-first.qmd", "_def-thing.qmd"} <= set(files))
         check("names a bare-class div by its class", any(f.endswith("-center.qmd") for f in files), str(sorted(files)))
         check("round-trips every line, blank lines included", expand(chapter) == CHAPTER)
-        spine = chapter.read_text()
+        spine = chapter.read_text(encoding="utf-8")
         check("keeps headings in the spine", "# First section" in spine and "# Second section" in spine)
         check("keeps {#refs} in the spine", "::: {#refs}" in spine)
 
         again = split_qmd.split(chapter)
         check("rerun on the spine writes nothing", again == {}, str(sorted(again)))
-        check("rerun leaves the spine unchanged", chapter.read_text() == spine)
+        check("rerun leaves the spine unchanged", chapter.read_text(encoding="utf-8") == spine)
 
         clash = Path(tmp) / "clash.qmd"
-        clash.write_text(CHAPTER)
+        clash.write_text(CHAPTER, encoding="utf-8")
         sub = Path(tmp) / "_subfiles" / "clash"
         sub.mkdir(parents=True)
-        (sub / "_exr-first.qmd").write_text("other content\n")
+        (sub / "_exr-first.qmd").write_text("other content\n", encoding="utf-8")
         try:
             split_qmd.split(clash)
             refused = False
         except SystemExit:
             refused = True
         check("refuses to overwrite a different subfile", refused)
-        check("leaves the chapter untouched on refusal", clash.read_text() == CHAPTER)
+        check("leaves the chapter untouched on refusal", clash.read_text(encoding="utf-8") == CHAPTER)
 
         for label, tail in [("div", "::: {#exr-open}\nNo close.\n"),
                             ("code fence", "```{python}\nx = 1\n"),
                             ("HTML comment", "<!-- never closed\n")]:
             broken = Path(tmp) / f"broken-{label.replace(' ', '-')}.qmd"
             text = CHAPTER + tail
-            broken.write_text(text)
+            broken.write_text(text, encoding="utf-8")
             try:
                 split_qmd.split(broken)
                 message = ""
@@ -129,7 +129,7 @@ def main() -> int:
                 message = str(err.code)
             check(f"names an unclosed {label}", "unclosed" in message, message)
             check(f"writes nothing for an unclosed {label}",
-                  broken.read_text() == text
+                  broken.read_text(encoding="utf-8") == text
                   and not (Path(tmp) / "_subfiles" / broken.stem).exists())
     print(f"{len(FAILURES)} failure(s)")
     return 1 if FAILURES else 0

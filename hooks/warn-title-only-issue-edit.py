@@ -479,7 +479,7 @@ def main() -> int:
                 if os.path.exists(sentinel):
                     continue
                 try:
-                    open(sentinel, "w").close()
+                    open(sentinel, "w", encoding="utf-8").close()
                 except Exception:
                     pass
             to_report.append(call)

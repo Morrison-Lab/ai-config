@@ -21,9 +21,12 @@ import json
 import os
 import platform
 import re
+import shutil
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 # A command word begins only at a *command position*. Segments reaching
@@ -1598,6 +1601,7 @@ INFRA_FETCH_BUDGET_S = 6.0
 # GitHub's "list pull request files" endpoint returns at most 3000 files, so
 # a list that long may be truncated and cannot prove every file is infra.
 GITHUB_PR_FILES_CAP = 3000
+INFRA_FETCH_USER_AGENT = "ai-config-infra-grant"
 
 # Flags of `gh pr merge` (and gh's global `-R`) that take a value, so a bare
 # number right after one is that value, not the PR number.
@@ -1637,67 +1641,268 @@ def merge_pr_number(inert_seg: str) -> int | None:
     return int(next(iter(numbers)))
 
 
-def fetch_pr_changed_paths(target: str, number: int) -> list | None:
-    """Every changed path of PR `number` in `target`, renames' old paths included.
+def merge_pinned_sha(inert_seg: str) -> str | None:
+    """The one commit SHA this segment's merge pins, or None.
 
-    None on any failure, and on any list that cannot be shown complete: a
-    mismatch with the PR's own `changed_files` count, or a list at the API's
-    cap.
+    Read from the quote-masked segment. A pinned commit SHA is read from
+    `--match-head-commit <sha>` or `--match-head-commit=<sha>` in `gh pr merge`,
+    or `-f sha=<sha>`, `-F sha=<sha>`, `--field sha=<sha>`, `--raw-field sha=<sha>`,
+    or bare `sha=<sha>` in `gh api .../pulls/N/merge`.
+
+    Any value forged inside `--body` or `--subject` has been blanked out in
+    `inert_seg`. Only a valid hex SHA (7 to 64 chars) counts.
+    Multiple different pinned SHAs or an unparseable/missing value denies.
     """
-    deadline = time.monotonic() + INFRA_FETCH_BUDGET_S
+    shas = set()
+    m = re.search(r"\bpr\s+(?:\S+\s+)*?merge\b(.*)$", inert_seg)
+    if m:
+        tokens = m.group(1).split()
+        for i, tok in enumerate(tokens):
+            if tok == "--match-head-commit":
+                if i > 0 and tokens[i - 1] in _GH_PR_MERGE_VALUE_FLAGS:
+                    continue
+                if i + 1 < len(tokens):
+                    val = tokens[i + 1].strip('"\'')
+                    if re.fullmatch(r"[0-9a-fA-F]{7,64}", val):
+                        shas.add(val)
+                    else:
+                        return None
+                else:
+                    return None
+            elif tok.startswith("--match-head-commit="):
+                if i > 0 and tokens[i - 1] in _GH_PR_MERGE_VALUE_FLAGS:
+                    continue
+                val = tok.split("=", 1)[1].strip('"\'')
+                if re.fullmatch(r"[0-9a-fA-F]{7,64}", val):
+                    shas.add(val)
+                else:
+                    return None
 
-    def gh_api(*args: str) -> str | None:
+    if _PULLS_MERGE_NUMBER.search(inert_seg):
+        tokens = inert_seg.split()
+        for i, tok in enumerate(tokens):
+            if tok in ("-f", "-F", "--field", "--raw-field"):
+                if i + 1 < len(tokens):
+                    field_arg = tokens[i + 1].strip('"\'')
+                    if field_arg.startswith("sha="):
+                        val = field_arg.split("=", 1)[1].strip('"\'')
+                        if re.fullmatch(r"[0-9a-fA-F]{7,64}", val):
+                            shas.add(val)
+                        else:
+                            return None
+            elif any(tok.startswith(prefix) for prefix in ("-fsha=", "-Fsha=", "--field=sha=", "--raw-field=sha=")):
+                val = tok.partition("sha=")[2].strip('"\'')
+                if re.fullmatch(r"[0-9a-fA-F]{7,64}", val):
+                    shas.add(val)
+                else:
+                    return None
+            elif tok.startswith("sha=") and not (i > 0 and tokens[i - 1] in ("-f", "-F", "--field", "--raw-field", *list(_GH_PR_MERGE_VALUE_FLAGS))):
+                val = tok.split("=", 1)[1].strip('"\'')
+                if re.fullmatch(r"[0-9a-fA-F]{7,64}", val):
+                    shas.add(val)
+                else:
+                    return None
+
+    if len(shas) != 1:
+        return None
+    return next(iter(shas))
+
+
+def _fetch_pr_via_rest(target: str, number: int, deadline: float) -> tuple[list[str], str] | None:
+    """Fetch changed paths and head commit SHA directly via GitHub REST API.
+
+    Used as fallback when `gh` is not installed on PATH (e.g. in cloud/web sessions)
+    or when subprocess invocation fails with OSError.
+    """
+    if number <= 0:
+        return None
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    headers = {
+        "User-Agent": INFRA_FETCH_USER_AGENT,
+        "Accept": "application/vnd.github+json",
+    }
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        return None
+
+    info_url = f"https://api.github.com/repos/{target}/pulls/{number}"
+    req = urllib.request.Request(info_url, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=remaining) as resp:
+            info_data = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        try:
+            exc.close()
+        except OSError:
+            pass
+        return None
+    except (urllib.error.URLError, TimeoutError, ValueError, OSError):
+        return None
+
+    if not isinstance(info_data, dict):
+        return None
+
+    changed_files = info_data.get("changed_files")
+    if not isinstance(changed_files, int) or changed_files <= 0 or changed_files >= GITHUB_PR_FILES_CAP:
+        return None
+
+    head = info_data.get("head")
+    if not isinstance(head, dict):
+        return None
+    head_sha = head.get("sha")
+    if not isinstance(head_sha, str) or not re.fullmatch(r"[0-9a-fA-F]{40,64}", head_sha):
+        return None
+
+    current: list[str] = []
+    previous: list[str] = []
+    page = 1
+
+    while True:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             return None
+
+        files_url = f"https://api.github.com/repos/{target}/pulls/{number}/files?per_page=100&page={page}"
+        req = urllib.request.Request(files_url, headers=headers)
         try:
-            out = subprocess.run(
-                ["gh", "api", *args], capture_output=True, text=True,
-                timeout=remaining, check=False,
+            with urllib.request.urlopen(req, timeout=remaining) as resp:
+                page_data = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            try:
+                exc.close()
+            except OSError:
+                pass
+            return None
+        except (urllib.error.URLError, TimeoutError, ValueError, OSError):
+            return None
+
+        if not isinstance(page_data, list):
+            return None
+        if not page_data:
+            break
+
+        for item in page_data:
+            if not isinstance(item, dict):
+                return None
+            fn = item.get("filename")
+            if not isinstance(fn, str) or not fn:
+                return None
+            current.append(fn)
+            prev = item.get("previous_filename")
+            if prev is not None:
+                if not isinstance(prev, str) or not prev:
+                    return None
+                previous.append(prev)
+
+        if len(current) >= GITHUB_PR_FILES_CAP:
+            return None
+        if len(page_data) < 100 or len(current) >= changed_files:
+            break
+        page += 1
+
+    if not current or len(current) >= GITHUB_PR_FILES_CAP or len(current) != changed_files:
+        return None
+    return current + previous, head_sha
+
+
+def fetch_pr_changed_paths(target: str, number: int) -> tuple[list[str], str] | None:
+    """Every changed path and the head commit SHA of PR `number` in `target`.
+
+    Returns (paths, head_sha), or None on any failure, malformed output, or any list
+    that cannot be shown complete (a mismatch with changed_files or hitting cap).
+    Uses `gh api` when available on PATH; falls back to direct REST via urllib
+    when `gh` is not installed or raises OSError (e.g. in cloud sessions).
+    """
+    if number <= 0:
+        return None
+    deadline = time.monotonic() + INFRA_FETCH_BUDGET_S
+
+    if shutil.which("gh"):
+        def gh_api(*args: str) -> tuple[bool, str | None]:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return True, None
+            try:
+                out = subprocess.run(
+                    ["gh", "api", *args], capture_output=True, text=True,
+                    timeout=remaining, check=False,
+                )
+            except OSError:
+                return False, None
+            except subprocess.SubprocessError:
+                return True, None
+            return True, (out.stdout if out.returncode == 0 else None)
+
+        gh_runnable, info = gh_api(f"repos/{target}/pulls/{number}", "--jq", r".changed_files, .head.sha")
+        if not gh_runnable:
+            pass
+        elif info is None:
+            return None
+        else:
+            info_lines = info.strip().splitlines()
+            if len(info_lines) != 2:
+                return None
+            count_str, head_sha = info_lines[0].strip(), info_lines[1].strip()
+            if not count_str.isdigit() or not re.fullmatch(r"[0-9a-fA-F]{40,64}", head_sha):
+                return None
+            gh_runnable, listing = gh_api(
+                "--paginate", f"repos/{target}/pulls/{number}/files?per_page=100",
+                "--jq", r'.[] | "F\t\(.filename)", (.previous_filename // empty | "P\t\(.)")',
             )
-        except (OSError, subprocess.SubprocessError):
-            return None
-        return out.stdout if out.returncode == 0 else None
+            if not gh_runnable:
+                pass
+            elif listing is None:
+                return None
+            else:
+                current, previous = [], []
+                for line in listing.splitlines():
+                    kind, _, path = line.partition("\t")
+                    if kind == "F" and path:
+                        current.append(path)
+                    elif kind == "P" and path:
+                        previous.append(path)
+                    elif line.strip():
+                        return None
+                if not current or len(current) >= GITHUB_PR_FILES_CAP or len(current) != int(count_str):
+                    return None
+                return current + previous, head_sha
 
-    count = gh_api(f"repos/{target}/pulls/{number}", "--jq", ".changed_files")
-    listing = gh_api(
-        "--paginate", f"repos/{target}/pulls/{number}/files?per_page=100",
-        "--jq", r'.[] | "F\t\(.filename)", (.previous_filename // empty | "P\t\(.)")',
-    )
-    if count is None or listing is None or not count.strip().isdigit():
-        return None
-    current, previous = [], []
-    for line in listing.splitlines():
-        kind, _, path = line.partition("\t")
-        if kind == "F" and path:
-            current.append(path)
-        elif kind == "P" and path:
-            previous.append(path)
-        elif line.strip():
-            return None
-    if not current or len(current) >= GITHUB_PR_FILES_CAP or len(current) != int(count):
-        return None
-    return current + previous
+    return _fetch_pr_via_rest(target, number, deadline)
 
 
-def infra_grant_applies(target: str | None, number: int | None) -> bool:
-    """True only when PR `number` in `target` is provably an infra PR."""
+def infra_grant_applies(target: str | None, number: int | None, pinned_sha: str | None) -> bool:
+    """True only when PR `number` in `target` is provably an infra PR and `pinned_sha` matches."""
     if os.environ.get(INFRA_GRANT_DISABLE_ENV):
         return False
-    if not target or number is None or number <= 0:
+    if not target or number is None or number <= 0 or not pinned_sha:
         return False
     owner, _, name = target.lower().partition("/")
     if owner not in INFRA_GRANT_OWNERS or not name:
         return False
-    paths = fetch_pr_changed_paths(target.lower(), number)
-    return bool(paths) and all(is_infra_path(p) for p in paths)
+    res = fetch_pr_changed_paths(target.lower(), number)
+    if not res:
+        return False
+    if isinstance(res, tuple):
+        paths, head_sha = res
+    else:
+        paths, head_sha = res, ""
+    if not paths or not all(is_infra_path(p) for p in paths):
+        return False
+    if not head_sha:
+        return False
+    p_sha = pinned_sha.lower()
+    h_sha = head_sha.lower()
+    return p_sha == h_sha or (len(p_sha) >= 7 and h_sha.startswith(p_sha))
 
 
 def standing_infra_grant(masked_seg: str, inert_seg: str) -> bool:
     """True when this segment merges an infra PR in an INFRA_GRANT_OWNERS repo.
 
     The target and merge-type tests are `granted_merge_target`'s, unchanged;
-    this adds only the PR number and the file-list classification.
+    this adds only the PR number, pinned SHA, and the file-list classification.
     """
     target = granted_merge_target(masked_seg, inert_seg)
     if target is None:
@@ -1706,7 +1911,10 @@ def standing_infra_grant(masked_seg: str, inert_seg: str) -> bool:
     # holds now, so the file list read here would prove nothing about it.
     if re.search(r"(?:^|\s)--auto\b", inert_seg):
         return False
-    return infra_grant_applies(target, merge_pr_number(inert_seg))
+    pinned_sha = merge_pinned_sha(inert_seg)
+    if not pinned_sha:
+        return False
+    return infra_grant_applies(target, merge_pr_number(inert_seg), pinned_sha)
 
 
 def sanitize(name: str) -> str:
@@ -1910,12 +2118,14 @@ def check_mcp_merge(payload: dict) -> tuple[str, str] | None:
             return None
 
     pull_num = tool_input.get("pull_number") or tool_input.get("pullNumber") or tool_input.get("number") or ""
+    mcp_sha = tool_input.get("expectedHeadSha") or tool_input.get("expected_head_sha") or ""
     # The infra-PR grant covers the merge tool only: enabling auto-merge
     # merges whatever the PR holds when checks pass, not what it holds now.
     if (tool_name.lower().endswith("merge_pull_request")
             and isinstance(owner, str) and isinstance(repo, str)
             and str(pull_num).strip().isdigit()
-            and infra_grant_applies(f"{owner.strip()}/{repo.strip()}", int(str(pull_num).strip()))):
+            and isinstance(mcp_sha, str) and mcp_sha.strip()
+            and infra_grant_applies(f"{owner.strip()}/{repo.strip()}", int(str(pull_num).strip()), mcp_sha.strip())):
         return None
     segment = f"{tool_name}(owner='{owner}', repo='{repo}', pull='{pull_num}')"
     return tool_name, segment

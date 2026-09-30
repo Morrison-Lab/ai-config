@@ -4,14 +4,14 @@ Place it on one line, at the natural end of that turn's recap (or immediately be
 Don't interrupt mid-task to say it.
 
 **Always state whether or not the session is at a clean stopping point.**
-The last message you post before stopping MUST explicitly state whether or not this is a clean stopping point for the session
-(though for non-clean stopping points, the declaration need not be the absolute final line of the message)
-(e.g. `**Stopping Point**: Clean stopping point reached` or `**Stopping Point**: Not a clean stopping point / work remains queued: ...`).
-Whenever ending a session, completing a turn, or wrapping up work
-(whether finishing a single task, a multi-issue backlog loop like `gii`/`gia`, a PR stack sweep, or an automated session wrap-up like `mwc`/`wrap-up`),
-ALWAYS include an explicit `**Stopping Point**` declaration.
+The last message you post before stopping MUST explicitly state whether or not this is a clean stopping point for the session (though for non-clean stopping points, the declaration need not be the absolute final line of the message) (e.g. `**Stopping Point**: Clean stopping point reached --- session done; UMS executed; no follow-up items pending` or `**Stopping Point**: Not a clean stopping point / work remains queued: session not done; ...`).
+Whenever ending a session, completing a turn, or wrapping up work (whether finishing a single task, a multi-issue backlog loop like `gii`/`gia`, a PR stack sweep, or an automated session wrap-up like `mwc`/`wrap-up`), ALWAYS include an explicit `**Stopping Point**` declaration that says whether the session is done or not.
+When reporting stopping point status:
+- Explicitly state whether the session is done or not.
+- Include running UMS (or confirming no new learnings accumulated since the last pass).
+- Confirm that any follow-up items noticed during the turn or task have been filed.
 Never leave the user guessing whether additional tasks remain queued or if a clean stopping point has been reached.
-(User corrections / directives, 2026-08-17, 2026-08-18.)
+(User corrections / directives, 2026-08-17, 2026-08-18, 2026-09-29.)
 
 **Arm resumption before every non-clean pause.**
 Whenever work remains at a pause, create a timer or equivalent wake mechanism
@@ -90,10 +90,12 @@ An untracked local change --- a dotfile repaired, a scratch script written --- i
 The remedy converts it rather than excusing it: file it or commit it, and it becomes something nameable.
 
 - **Do:** name the specific thing that finished, in the declaration itself.
+- **Do:** state explicitly whether the session is done or not, including running UMS and filing any noticed follow-up items.
 - **Do:** run both checks --- boxed markers in this turn, and the commit range plus tree state --- before writing the word clean.
 - **Don't:** read "none of the disqualifiers apply" as "clean" --- that list is necessary and not sufficient.
 - **Don't:** declare a clean stopping point in a turn that also posts a `QUESTION`, `OFFER`, or `BLOCKER` box.
 - **Don't:** count exploration, diagnosis, or an uncommitted local change as a completion.
+- **Don't:** end a turn without declaring whether the session is done or ongoing.
 
 (Directive from the user, 2026-08-19:
 "cai: that wasn't a real stopping point; you haven't finished anything".

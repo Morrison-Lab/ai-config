@@ -184,6 +184,115 @@ Morrison-Lab/mln's [`AUTHORING.md`](https://github.com/Morrison-Lab/mln/blob/mai
 is the canonical statement.
 This skill is how that rule is checked.
 
+## Worked before-and-after example: tightening definitions and extracting formal theorems
+
+A definition should be as clear, explicit, structured, and concise as possible:
+state what the concept is without redundant phrasing,
+and elevate mathematical consequences or equivalences into formal, citable theorems.
+The refactor in
+[`Morrison-Lab/pds#22`](https://github.com/Morrison-Lab/pds/pull/22)
+demonstrates both techniques:
+
+### Tightening `def-probability` by eliminating redundant conditions
+
+The probability measure definition was originally written with an unnecessary
+preamble and redundant bulleted conditions:
+
+**Before (redundant and cluttered):**
+
+```markdown
+A **probability measure** on a [sample space](#def-sample-space) $\Omega$,
+often denoted $\Pr()$ or $\P()$,
+is a function that assigns a number $\Pr(A)$ to each [event](#def-event) $A$
+and satisfies:
+
+- $\Pr$ is a [measure](#def-measure) on the events of $\Omega$.
+- The whole sample space has probability 1: $\Pr(\Omega) = 1$.
+```
+
+*Critique*:
+"is a function that assigns a number $\Pr(A)$ to each event $A$" is redundant
+because being a measure on events already means assigning a value to each event.
+Furthermore, having only a single condition left beyond being a measure
+($\Pr(\Omega) = 1$) makes a bulleted list unnecessary scaffolding.
+
+**After (concise and explicit):**
+
+```markdown
+A **probability measure** on a [sample space](#def-sample-space) $\Omega$,
+often denoted $\Pr()$ or $\P()$,
+is a [measure](#def-measure) on the [events](#def-event) of $\Omega$
+that gives the whole sample space probability 1:
+
+$$\Pr(\Omega) = 1$$
+```
+
+*Improvement*:
+The definition states the concept in one direct sentence,
+embeds the condition as a prominent display equation,
+and eliminates the redundant clause and bullet list.
+
+### Elevating informal equivalence notes into a citable theorem
+
+In the same file, the notes after the definition previously made an informal,
+un-citable claim:
+
+**Before (informal equivalence in notes):**
+
+```markdown
+::: notes
+
+Many sources state this definition as three axioms instead
+(the Kolmogorov axioms):
+
+1. For any event $A$, $\Pr(A) \ge 0$.
+2. The probability of the whole sample space is 1:
+   $$\Pr(\Omega) = 1$$
+3. $\Pr$ is [countably additive](#def-countable-additivity):
+   for any [mutually exclusive](#def-mutually-exclusive) events $A_1, A_2, \ldots$,
+   $$\Pr\!\left(\bigcup_{i=1}^{\infty} A_i\right) = \sum_{i=1}^{\infty} \Pr(A_i)$$
+
+The two forms are equivalent.
+The axioms do not list $\Pr(\emptyset) = 0$, but they imply it...
+:::
+```
+
+*Critique*:
+Claiming "the two forms are equivalent" in informal running notes gives
+downstream proofs and notes no stable id to cite,
+leaves the equivalence unproven,
+and clutters the definition notes with a major mathematical result.
+
+**After (formal theorem with two-direction proof):**
+
+```markdown
+:::{#thm-kolmogorov-axioms}
+#### Kolmogorov axioms
+
+A function $\Pr$ that assigns a real number $\Pr(A)$ to each [event](#def-event) $A$
+of a sample space $\Omega$
+is a [probability measure](#def-probability) if and only if it satisfies:
+
+1. For any event $A$, $\Pr(A) \ge 0$.
+2. The probability of the whole sample space is 1:
+   $$\Pr(\Omega) = 1$$
+3. $\Pr$ is [countably additive](#def-countable-additivity):
+   for any [mutually exclusive](#def-mutually-exclusive) events $A_1, A_2, \ldots$,
+   $$\Pr\!\left(\bigcup_{i=1}^{\infty} A_i\right) = \sum_{i=1}^{\infty} \Pr(A_i)$$
+
+:::
+
+::: proof
+Suppose $\Pr$ is a probability measure...
+Conversely, suppose $\Pr$ satisfies the three axioms...
+:::
+```
+
+*Improvement*:
+The equivalence becomes a formal, citable theorem with a complete proof,
+and downstream references (such as in `rme` or course notes) can cite
+`@thm-kolmogorov-axioms` directly.
+
 ## Relationship to other checks
 
 - **[`definition-crossrefs.md`](definition-crossrefs.md)** --- assumes the

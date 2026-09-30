@@ -239,7 +239,7 @@ def _is_push(command):
 
 
 def records(path):
-    with open(path, errors="ignore") as fh:
+    with open(path, encoding="utf-8", errors="ignore") as fh:
         for line in fh:
             try:
                 yield json.loads(line)

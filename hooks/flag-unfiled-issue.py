@@ -184,7 +184,7 @@ def main() -> int:
     if os.path.exists(sentinel):
         return 0
     try:
-        open(sentinel, "w").close()
+        open(sentinel, "w", encoding="utf-8").close()
     except Exception:
         pass
 

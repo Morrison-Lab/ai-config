@@ -251,7 +251,7 @@ def main():
     # Exit codes are the contract for CI use.
     import tempfile, os, subprocess
     fd, p = tempfile.mkstemp(suffix=".html"); os.close(fd)
-    open(p, "w").write(UNRESOLVED_CITE)
+    open(p, "w", encoding="utf-8").write(UNRESOLVED_CITE)
     rc = subprocess.run([sys.executable, str(Path(__file__).parent / "check-rendered-page.py"), p],
                         capture_output=True).returncode
     os.unlink(p)

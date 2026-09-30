@@ -2586,7 +2586,7 @@ def main():
 
     def once(events, transcript_name):
         p = os.path.join(tmp, transcript_name)
-        with open(p, "w") as fh:
+        with open(p, "w", encoding="utf-8") as fh:
             for e in events:
                 fh.write(json.dumps(e) + "\n")
         out = subprocess.run(

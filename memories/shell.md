@@ -13,6 +13,10 @@ Because the pattern is a substring of the searcher's own `argv`, this causes sil
 3. **Self-inflicted process termination**:
    Running `pkill -f 'pgrep -f "task.sh"'` matches the executing shell itself and terminates the calling session mid-command (a 128-plus-signal exit status) before any cleanup or follow-up runs.
 
+Recurrence, 2026-09-28 (a cloud session on `Morrison-Lab/pds`, no ai-config loaded, ai-config#3948): `pkill -f probe2.mjs; cat > probe3.mjs <<EOF` killed its own Bash call (exit 144), so the heredoc never wrote and the next step failed on a missing file.
+Minutes later, `for p in $(pgrep -f 'scripts/test_hooks.py'); do [ "$p" != "$$" ] && kill $p; done` killed its own background task the same way: `$$` excludes the shell, not the command-substitution child whose argv carries the pattern.
+Evidence recorded on ai-config#2915.
+
 ### Robust remedies
 
 - **Poll a done-marker file**:

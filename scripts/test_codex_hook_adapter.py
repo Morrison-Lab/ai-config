@@ -37,9 +37,9 @@ assert mod.matcher_hits("Edit|Write|NotebookEdit", "apply_patch")
 assert mod.matcher_hits("mcp__github__.*", "mcp__github__pr_comment")
 assert not mod.matcher_hits("Bash", "apply_patch")
 
-plugin_manifest = json.loads((ROOT / ".codex-plugin/plugin.json").read_text())
+plugin_manifest = json.loads((ROOT / ".codex-plugin/plugin.json").read_text(encoding="utf-8"))
 assert plugin_manifest["skills"] == "codex-skills"
-plugin_hooks = json.loads((ROOT / "plugins/ai-config/codex-hooks.json").read_text())
+plugin_hooks = json.loads((ROOT / "plugins/ai-config/codex-hooks.json").read_text(encoding="utf-8"))
 assert "${PLUGIN_ROOT}" in json.dumps(plugin_hooks)
 assert plugin_manifest["hooks"] == "./plugins/ai-config/codex-hooks.json"
 for stop_group in plugin_hooks["hooks"]["Stop"]:
@@ -56,7 +56,7 @@ assert malformed and "systemMessage" in malformed
 original_manifest = mod.MANIFEST
 mod.MANIFEST = ROOT / "does-not-exist-hooks.json"
 assert mod.dispatch("PreToolUse", {"tool_name": "Bash"})["decision"] == "block"
-with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as invalid_catalog:
+with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", suffix=".json", delete=False) as invalid_catalog:
     invalid_catalog.write(json.dumps({"hooks": [{"hooks": [{"command": "", "timeout": 0}]}]}))
     invalid_catalog_path = invalid_catalog.name
 mod.MANIFEST = Path(invalid_catalog_path)
@@ -122,7 +122,7 @@ stop_block = run("Stop", {"session_id": f"stop-block-{os.getpid()}", "cwd": str(
                            "turn_id": "one"})
 assert stop_block.get("decision") == "block"
 
-with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as transcript:
+with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", suffix=".jsonl", delete=False) as transcript:
     transcript.write(json.dumps({"type": "assistant", "message": {
         "role": "assistant", "content": [{"type": "text",
         "text": "I will always do this going forward."}]}}) + "\n")

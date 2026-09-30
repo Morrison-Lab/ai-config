@@ -281,7 +281,7 @@ def run(events, commit_cmd=COMMIT, env=None, path=None, tool="Bash",
     if not keep:
         fd, path = tempfile.mkstemp(suffix=".jsonl")
         os.close(fd)
-    with open(path, "w") as fh:
+    with open(path, "w", encoding="utf-8") as fh:
         for e in events:
             fh.write(json.dumps(e) + "\n")
     try:

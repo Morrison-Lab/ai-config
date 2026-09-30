@@ -178,6 +178,30 @@ To validate a heap-flag change without a 20-minute
   `quarto render <file>.qmd` for per-document work (chunk output, per-format
   `echo`, figures) where the project config is not involved.
 
+## Phone-width overflow: a callout's flex body stretches to its widest child
+
+A Quarto HTML page that scrolls sideways on a phone usually does not owe it to the wide element itself.
+`.callout-body-container` is a flex item, and a flex item's default `min-width: auto` lets any wide child stretch it, so one wide display equation, code span or URL inside a theorem, definition or example callout widens the callout, and the callout widens the page.
+Measured on `Morrison-Lab/pds` at 390px before `pds#18`: 7 of 9 pages overflowed, up to 1258px, and paragraphs of short text reported widths near 1000px because their callout had been stretched.
+
+The fix is four rules in `styles.css` (`pds#18`, verbatim in `Morrison-Lab/qwt#144`):
+`min-width: 0` on `.callout-body-container`;
+display math as its own scroll box (`mjx-container[display="true"]` with `max-width: 100%`, `overflow-x: auto`, and `min-width: 0 !important`, because MathJax writes an inline `min-width` on numbered equations);
+`overflow-wrap: break-word` on `main a`, which unlike `anywhere` leaves table column sizing alone;
+and `display: block; overflow-x: auto` on `main table` below Bootstrap's `sm` breakpoint only, since on wider screens it shrinks full-width tables.
+
+**Measure with MathJax rendered, or the widths are wrong.**
+Unrendered TeX is long plain text, so a page can read as overflowing when it is not, or the reverse.
+In a claude.ai cloud session `cdn.jsdelivr.net` is blocked by the network policy, so MathJax never loads.
+Install `mathjax@4` and `@mathjax/mathjax-newcm-font` from npm into the scratchpad, and have Playwright `route()` every `https://cdn.jsdelivr.net/npm/<pkg>@<ver>/<path>` request to the matching `node_modules/<pkg>/<path>`.
+Launch Chromium with `--ignore-certificate-errors` so the proxy's certificate does not block the web fonts, which also change widths.
+Then wait on `MathJax.startup.promise` before reading `document.documentElement.scrollWidth`.
+
+- **Do:** walk up from an overflowing leaf to the first ancestor wider than its parent.
+  That ancestor names the cause.
+- **Do:** check vertical clipping by glyph boxes (`mjx-c`, `mjx-mo`, `mjx-line`), not by `scrollHeight`, which counts the line box's invisible strut.
+- **Don't:** report widths from a page whose `mjx-container` count is zero.
+
 ## Quarto crossref labels are PAGE-scoped, so an include fragment can only reference labels on its own including page
 
 In a Quarto **website** project a `@sec-` (or `@fig-`, `@tbl-`) label resolves

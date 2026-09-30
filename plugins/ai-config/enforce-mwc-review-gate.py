@@ -1383,7 +1383,9 @@ def fetch_pr_data(cmd, cwd):
     Returns (pr_data, error_reason). Comments come from the paginated REST
     endpoint so a long thread cannot truncate away the latest verdict. Check-runs
     come from the commit check-runs REST endpoint to detect copilot-pull-request-reviewer
-    which is dropped by GraphQL statusCheckRollup (ai-config#3570).
+    which is dropped by GraphQL statusCheckRollup (ai-config#3570). Check-runs already
+    present in the GraphQL rollup are deduplicated by detailsUrl, and timestamps are
+    propagated so cancel-in-progress runs are properly superseded (ai-config#4112).
     """
     api_match = GH_API_MERGE_RE.search(cmd)
     if api_match:
@@ -1467,7 +1469,7 @@ def fetch_pr_data(cmd, cwd):
     if head_oid:
         check_runs_result = run_gh(
             ["api", f"repos/{url_match.group(1)}/commits/{head_oid}/check-runs",
-             "--paginate", "--jq", "[.check_runs[]? | {name: .name, status: (.status // \"\"), conclusion: (.conclusion // \"\")}]"],
+             "--paginate", "--jq", "[.check_runs[]? | {name: .name, status: (.status // \"\"), conclusion: (.conclusion // \"\"), completed_at: (.completed_at // \"\"), started_at: (.started_at // \"\"), details_url: (.details_url // \"\"), html_url: (.html_url // \"\")}]"],
             cwd,
         )
         if check_runs_result.returncode != 0:
@@ -1477,11 +1479,20 @@ def fetch_pr_data(cmd, cwd):
             )
         check_runs = _merge_paginated_json(check_runs_result.stdout.strip(), decoder)
         existing_rollup = pr_data.get("statusCheckRollup") or []
+        existing_urls = {
+            c.get("detailsUrl") for c in existing_rollup if c.get("detailsUrl")
+        }
         for cr in check_runs:
+            details = cr.get("details_url") or cr.get("html_url") or ""
+            if details and details in existing_urls:
+                continue
             existing_rollup.append({
                 "name": cr.get("name") or "",
                 "status": (cr.get("status") or "").upper(),
                 "conclusion": (cr.get("conclusion") or "").upper(),
+                "completedAt": cr.get("completed_at") or "",
+                "startedAt": cr.get("started_at") or "",
+                "detailsUrl": details,
             })
         pr_data["statusCheckRollup"] = existing_rollup
     return pr_data, None

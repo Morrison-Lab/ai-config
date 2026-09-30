@@ -219,11 +219,11 @@ def _scratch_repo(cap_before, cap_after):
     git("init", "-q", "-b", "main")
     os.makedirs(os.path.join(repo, "data-raw"))
     target = os.path.join(repo, "data-raw", "ab507bs-imp.sbatch")
-    with open(target, "w") as fh:
+    with open(target, "w", encoding="utf-8") as fh:
         fh.write(STALE_FILE.format(cap=cap_before))
     git("add", "-A")
     git("commit", "-q", "-m", "init")
-    with open(target, "w") as fh:
+    with open(target, "w", encoding="utf-8") as fh:
         fh.write(STALE_FILE.format(cap=cap_after))
     git("add", "-A")
     return repo
@@ -286,7 +286,7 @@ MUTATIONS = [
 
 
 def run_mutations(baseline):
-    src = open(SUBJECT).read()
+    src = open(SUBJECT, encoding="utf-8").read()
     failures = 0
     for label, old, new, expected_flips in MUTATIONS:
         if src.count(old) != 1:
@@ -294,7 +294,7 @@ def run_mutations(baseline):
                   f"{src.count(old)} times, expected 1")
             failures += 1
             continue
-        tmp = tempfile.NamedTemporaryFile("w", suffix=".py", delete=False)
+        tmp = tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".py", delete=False)
         tmp.write(src.replace(old, new))
         tmp.close()
         try:

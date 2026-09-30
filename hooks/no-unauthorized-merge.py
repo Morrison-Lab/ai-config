@@ -1637,12 +1637,78 @@ def merge_pr_number(inert_seg: str) -> int | None:
     return int(next(iter(numbers)))
 
 
-def fetch_pr_changed_paths(target: str, number: int) -> list | None:
-    """Every changed path of PR `number` in `target`, renames' old paths included.
+def merge_pinned_sha(inert_seg: str) -> str | None:
+    """The one commit SHA this segment's merge pins, or None.
 
-    None on any failure, and on any list that cannot be shown complete: a
-    mismatch with the PR's own `changed_files` count, or a list at the API's
-    cap.
+    Read from the quote-masked segment. A pinned commit SHA is read from
+    `--match-head-commit <sha>` or `--match-head-commit=<sha>` in `gh pr merge`,
+    or `-f sha=<sha>`, `-F sha=<sha>`, `--field sha=<sha>`, `--raw-field sha=<sha>`,
+    or bare `sha=<sha>` in `gh api .../pulls/N/merge`.
+
+    Any value forged inside `--body` or `--subject` has been blanked out in
+    `inert_seg`. Only a valid hex SHA (7 to 64 chars) counts.
+    Multiple different pinned SHAs or an unparseable/missing value denies.
+    """
+    shas = set()
+    m = re.search(r"\bpr\s+(?:\S+\s+)*?merge\b(.*)$", inert_seg)
+    if m:
+        tokens = m.group(1).split()
+        for i, tok in enumerate(tokens):
+            if tok == "--match-head-commit":
+                if i > 0 and tokens[i - 1] in _GH_PR_MERGE_VALUE_FLAGS:
+                    continue
+                if i + 1 < len(tokens):
+                    val = tokens[i + 1].strip('"\'')
+                    if re.fullmatch(r"[0-9a-fA-F]{7,64}", val):
+                        shas.add(val)
+                    else:
+                        return None
+                else:
+                    return None
+            elif tok.startswith("--match-head-commit="):
+                if i > 0 and tokens[i - 1] in _GH_PR_MERGE_VALUE_FLAGS:
+                    continue
+                val = tok.split("=", 1)[1].strip('"\'')
+                if re.fullmatch(r"[0-9a-fA-F]{7,64}", val):
+                    shas.add(val)
+                else:
+                    return None
+
+    if _PULLS_MERGE_NUMBER.search(inert_seg):
+        tokens = inert_seg.split()
+        for i, tok in enumerate(tokens):
+            if tok in ("-f", "-F", "--field", "--raw-field"):
+                if i + 1 < len(tokens):
+                    field_arg = tokens[i + 1].strip('"\'')
+                    if field_arg.startswith("sha="):
+                        val = field_arg.split("=", 1)[1].strip('"\'')
+                        if re.fullmatch(r"[0-9a-fA-F]{7,64}", val):
+                            shas.add(val)
+                        else:
+                            return None
+            elif any(tok.startswith(prefix) for prefix in ("-fsha=", "-Fsha=", "--field=sha=", "--raw-field=sha=")):
+                val = tok.partition("sha=")[2].strip('"\'')
+                if re.fullmatch(r"[0-9a-fA-F]{7,64}", val):
+                    shas.add(val)
+                else:
+                    return None
+            elif tok.startswith("sha=") and not (i > 0 and tokens[i - 1] in ("-f", "-F", "--field", "--raw-field", *list(_GH_PR_MERGE_VALUE_FLAGS))):
+                val = tok.split("=", 1)[1].strip('"\'')
+                if re.fullmatch(r"[0-9a-fA-F]{7,64}", val):
+                    shas.add(val)
+                else:
+                    return None
+
+    if len(shas) != 1:
+        return None
+    return next(iter(shas))
+
+
+def fetch_pr_changed_paths(target: str, number: int) -> tuple[list[str], str] | None:
+    """Every changed path and the head commit SHA of PR `number` in `target`.
+
+    Returns (paths, head_sha), or None on any failure, malformed output, or any list
+    that cannot be shown complete (a mismatch with changed_files or hitting cap).
     """
     deadline = time.monotonic() + INFRA_FETCH_BUDGET_S
 
@@ -1659,12 +1725,21 @@ def fetch_pr_changed_paths(target: str, number: int) -> list | None:
             return None
         return out.stdout if out.returncode == 0 else None
 
-    count = gh_api(f"repos/{target}/pulls/{number}", "--jq", ".changed_files")
+    info = gh_api(f"repos/{target}/pulls/{number}", "--jq", r".changed_files, .head.sha")
+    if info is None:
+        return None
+    info_lines = info.strip().splitlines()
+    if len(info_lines) != 2:
+        return None
+    count_str, head_sha = info_lines[0].strip(), info_lines[1].strip()
+    if not count_str.isdigit() or not re.fullmatch(r"[0-9a-fA-F]{40,64}", head_sha):
+        return None
+
     listing = gh_api(
         "--paginate", f"repos/{target}/pulls/{number}/files?per_page=100",
         "--jq", r'.[] | "F\t\(.filename)", (.previous_filename // empty | "P\t\(.)")',
     )
-    if count is None or listing is None or not count.strip().isdigit():
+    if listing is None:
         return None
     current, previous = [], []
     for line in listing.splitlines():
@@ -1675,29 +1750,41 @@ def fetch_pr_changed_paths(target: str, number: int) -> list | None:
             previous.append(path)
         elif line.strip():
             return None
-    if not current or len(current) >= GITHUB_PR_FILES_CAP or len(current) != int(count):
+    if not current or len(current) >= GITHUB_PR_FILES_CAP or len(current) != int(count_str):
         return None
-    return current + previous
+    return current + previous, head_sha
 
 
-def infra_grant_applies(target: str | None, number: int | None) -> bool:
-    """True only when PR `number` in `target` is provably an infra PR."""
+def infra_grant_applies(target: str | None, number: int | None, pinned_sha: str | None) -> bool:
+    """True only when PR `number` in `target` is provably an infra PR and `pinned_sha` matches."""
     if os.environ.get(INFRA_GRANT_DISABLE_ENV):
         return False
-    if not target or number is None or number <= 0:
+    if not target or number is None or number <= 0 or not pinned_sha:
         return False
     owner, _, name = target.lower().partition("/")
     if owner not in INFRA_GRANT_OWNERS or not name:
         return False
-    paths = fetch_pr_changed_paths(target.lower(), number)
-    return bool(paths) and all(is_infra_path(p) for p in paths)
+    res = fetch_pr_changed_paths(target.lower(), number)
+    if not res:
+        return False
+    if isinstance(res, tuple):
+        paths, head_sha = res
+    else:
+        paths, head_sha = res, ""
+    if not paths or not all(is_infra_path(p) for p in paths):
+        return False
+    if not head_sha:
+        return False
+    p_sha = pinned_sha.lower()
+    h_sha = head_sha.lower()
+    return p_sha == h_sha or (len(p_sha) >= 7 and h_sha.startswith(p_sha))
 
 
 def standing_infra_grant(masked_seg: str, inert_seg: str) -> bool:
     """True when this segment merges an infra PR in an INFRA_GRANT_OWNERS repo.
 
     The target and merge-type tests are `granted_merge_target`'s, unchanged;
-    this adds only the PR number and the file-list classification.
+    this adds only the PR number, pinned SHA, and the file-list classification.
     """
     target = granted_merge_target(masked_seg, inert_seg)
     if target is None:
@@ -1706,7 +1793,10 @@ def standing_infra_grant(masked_seg: str, inert_seg: str) -> bool:
     # holds now, so the file list read here would prove nothing about it.
     if re.search(r"(?:^|\s)--auto\b", inert_seg):
         return False
-    return infra_grant_applies(target, merge_pr_number(inert_seg))
+    pinned_sha = merge_pinned_sha(inert_seg)
+    if not pinned_sha:
+        return False
+    return infra_grant_applies(target, merge_pr_number(inert_seg), pinned_sha)
 
 
 def sanitize(name: str) -> str:
@@ -1910,12 +2000,14 @@ def check_mcp_merge(payload: dict) -> tuple[str, str] | None:
             return None
 
     pull_num = tool_input.get("pull_number") or tool_input.get("pullNumber") or tool_input.get("number") or ""
+    mcp_sha = tool_input.get("expectedHeadSha") or tool_input.get("expected_head_sha") or ""
     # The infra-PR grant covers the merge tool only: enabling auto-merge
     # merges whatever the PR holds when checks pass, not what it holds now.
     if (tool_name.lower().endswith("merge_pull_request")
             and isinstance(owner, str) and isinstance(repo, str)
             and str(pull_num).strip().isdigit()
-            and infra_grant_applies(f"{owner.strip()}/{repo.strip()}", int(str(pull_num).strip()))):
+            and isinstance(mcp_sha, str) and mcp_sha.strip()
+            and infra_grant_applies(f"{owner.strip()}/{repo.strip()}", int(str(pull_num).strip()), mcp_sha.strip())):
         return None
     segment = f"{tool_name}(owner='{owner}', repo='{repo}', pull='{pull_num}')"
     return tool_name, segment

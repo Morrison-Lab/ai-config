@@ -3555,7 +3555,8 @@ def exempt_repo_cases() -> tuple[int, int]:
     hook_env = {k: v for k, v in os.environ.items()
                 if k not in mod.TRANSPORT_ENV}
     hook_env.update({"GIT_CONFIG_GLOBAL": os.devnull,
-                     "GIT_CONFIG_SYSTEM": os.devnull})
+                     "GIT_CONFIG_SYSTEM": os.devnull,
+                     "GIT_CONFIG_NOSYSTEM": "1"})
     mln = "https://github.com/Morrison-Lab/mln.git"
     other = "https://github.com/Morrison-Lab/other.git"
 
@@ -3676,6 +3677,9 @@ def exempt_repo_cases() -> tuple[int, int]:
         ("`http.sslVerify=false` in config disqualifies an exempt push",
          origin_mln, [["http.sslVerify", "false"]], "push origin main",
          None, "{git}", True),
+        ("`http.sslVerify=true` in config does not disqualify an exempt push",
+         origin_mln, [["http.sslVerify", "true"]], "push origin feature",
+         None, "{git}", False),
         ("a URL-scoped `http.<url>.sslVerify` disqualifies an exempt push",
          origin_mln, [["http.https://github.com/.sslVerify", "false"]],
          "push origin main", None, "{git}", True),

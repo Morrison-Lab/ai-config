@@ -1065,14 +1065,12 @@ def _resolve_cd_target(rest: list[str], cur_dir: str | None) -> str | None:
     # False, so a Git Bash drive path was joined onto `cur_dir` and then
     # normalized into a drive-less path nothing downstream could repair.
     target = _native_path(target)
-    was_forward = (
-        (target and target.startswith("/"))
-        or bool(re.match(r"^[A-Za-z]:/", target))
-        or bool(cur_dir and cur_dir.startswith("/"))
-    )
     is_abs = os.path.isabs(target) or bool(re.match(r"^[A-Za-z]:[/\\]", target))
+    was_windows_drive_forward = bool(re.match(r"^[A-Za-z]:/", target or "")) or (
+        bool(re.match(r"^[A-Za-z]:/", cur_dir or "")) and not is_abs
+    )
     resolved = os.path.normpath(target if is_abs or cur_dir is None else os.path.join(cur_dir, target))
-    if was_forward:
+    if was_windows_drive_forward:
         resolved = resolved.replace("\\", "/")
     return resolved
 
@@ -1746,8 +1744,24 @@ def _is_plain_push(directory: str | None, argv: list[str],
         # prefixes that can only mean these two (`--rec`, `--ex`).
         if tok.startswith(("--rec", "--ex")):
             return False
-    return not _run_git(directory, env, "config", "--get-regexp",
-                        TRANSPORT_CONFIG)
+    cfg_out = _run_git(directory, env, "config", "--get-regexp",
+                       TRANSPORT_CONFIG)
+    if not cfg_out:
+        return True
+    for line in cfg_out.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        key, _, val = line.partition(" ")
+        key = key.lower()
+        val = val.strip().lower()
+        if re.match(r"^http\.(.*\.)?sslverify$", key):
+            # Only disabling TLS verification (false/0/no/off) is disqualifying
+            if val in ("false", "0", "no", "off"):
+                return False
+        else:
+            return False
+    return True
 
 
 def push_is_exempt(directory: str | None, argv: list[str],

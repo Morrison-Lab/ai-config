@@ -607,14 +607,12 @@ def resolve_cd_target(rest: list[str], cur_dir: str | None) -> str | None:
     # False, so a Git Bash drive path was joined onto `cur_dir` and then
     # normalized into a drive-less path nothing downstream could repair.
     target = native_path(target)
-    was_forward = (
-        (target and target.startswith("/"))
-        or bool(re.match(r"^[A-Za-z]:/", target))
-        or bool(cur_dir and cur_dir.startswith("/"))
-    )
     is_abs = os.path.isabs(target) or bool(re.match(r"^[A-Za-z]:[/\\]", target))
+    was_windows_drive_forward = bool(re.match(r"^[A-Za-z]:/", target or "")) or (
+        bool(re.match(r"^[A-Za-z]:/", cur_dir or "")) and not is_abs
+    )
     resolved = os.path.normpath(target if is_abs or cur_dir is None else os.path.join(cur_dir, target))
-    if was_forward:
+    if was_windows_drive_forward:
         resolved = resolved.replace("\\", "/")
     return resolved
 

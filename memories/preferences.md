@@ -664,6 +664,10 @@
   Also: don't give the code chunk *inside* a `#fig-`/`#tbl-` div a `fig-`/`tbl-`-prefixed `#| label:` --- that registers a second, redundant cross-reference id.
   Give the enclosed chunk a plain label and let the div own the `@fig-`/`@tbl-` reference.
   Refs: <https://quarto.org/docs/authoring/figures.html#figure-divs>; ucdavis/bcs#220, #223.
+- **Cross-repository anchor placement interface**:
+  When establishing an anchor (such as `[]{#sec-...}`) representing a concept or section for cross-repository links (e.g. from `lds` or `mlds` into `pds`), place the anchor at the beginning of the concept's definition or section heading (e.g. immediately before `:::{#def-cind}` or the section title), NOT inside or immediately before a later worked example, remark, or subsection.
+  Anchors named for a concept serve as navigation targets for external repositories; placing them at a downstream worked example drops readers past the formal definition and introductory context.
+  ([`Morrison-Lab/pds#43`](https://github.com/Morrison-Lab/pds/pull/43), 2026-09-29.)
 - When a memory, skill, or doc entry points at a location in *another* file, don't cite a specific line number --- it goes stale the moment that file changes, and a later reader who looks it up comes up empty.
   Quote the section heading or symbol name (e.g. the `## Foo` heading) or use a vaguer reference instead.
   This shares the same root principle as the inline-R-expressions rule above: don't bake a volatile value into prose.
@@ -952,6 +956,13 @@ The `use-math-macros` (alias `macroize`) skill is the executable procedure.
 
 Two gotchas: `git submodule update --remote` bumps the tracked gitlink, which dirties `git diff HEAD` --- do it in a worktree, never a checkout running provenance-stamped SLURM jobs.
 And custom macro command-names leak into `spelling::spell_check_package()` for `.qmd` files under `vignettes/` (the spelling filter strips common LaTeX like `\text`/`\frac` but not custom macros), so add every macro name used, plus genuine terms, to `inst/WORDLIST`; files under `inst/analyses/` are not spell-checked.
+
+In `Morrison-Lab/pds` (and lab probability manuscripts), observe the strict notation distinction between discrete PMFs, continuous PDFs, and event probabilities:
+- **PMF** (probability mass function for discrete variables) uses the macro `\P(...)` (e.g. `\P(x)`, `\P(x, y)`, `\P(d=1)`).
+- **PDF** (probability density function for continuous variables) uses the macro `\p(...)` (e.g. `\p(x)`, `\p(y)`, `\p(x, y)`).
+- **Probability of an event** uses `\Pr(...)` (e.g. `\Pr(X \in \mathbb{A})`).
+- **Never use bare un-macroed italic `p(...)`** for PMFs or PDFs in `pds`.
+([`Morrison-Lab/pds#43`](https://github.com/Morrison-Lab/pds/pull/43), 2026-09-29.)
 
 This is the author-side half; the review-side counterpart is
 `Morrison-Lab/gha`'s `claude-code-review.yml` `check-latex-macros` opt-in input

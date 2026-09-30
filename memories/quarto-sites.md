@@ -261,6 +261,20 @@ belonging to `pr-workflow-with-agents.qmd` by topic, but referenced
 Including it from the PR-workflow chapter would have emitted two broken
 `?@sec-` refs, so it was transcluded from `coding-agents.qmd` instead.)
 
+## Place cross-repository concept anchors at the concept definition or heading, not downstream in worked examples
+
+When establishing an anchor (such as `[]{#sec-...}`) representing a concept or section target for cross-repository links (such as linking from `lds` or `mlds` into `pds`):
+- **Place the anchor at the start of the concept's definition or section heading** (e.g., immediately before `:::{#def-cind}` or the section heading).
+- **Never place the anchor inside or immediately before a later worked example, remark, or subsection.**
+
+Downstream examples or applications are not the concept definition interface.
+An anchor named for a concept (`#sec-conditional-independence`) placed mid-section before a worked example causes incoming cross-repository links to scroll past the definition and introductory exposition, landing readers mid-chapter without context.
+
+- **Do:** place concept-level anchors at the definition boundary (`[]{#sec-concept}` immediately before `:::{#def-concept}`) or directly at the section heading that introduces the topic.
+- **Don't:** place a concept anchor immediately before a later worked example, calculation, or subsection.
+
+([`Morrison-Lab/pds#43`](https://github.com/Morrison-Lab/pds/pull/43), 2026-09-29.)
+
 ## A project's `_quarto.yml` `format:` block is not the set of formats the project renders
 
 Per-document front matter **overrides** the project-level `format:` key rather than adding to it, so a project declaring `format: html` alone can still render PDF, docx, and revealjs --- and will, on any document whose own front matter says so.
@@ -609,3 +623,17 @@ Use the directory form, since it is the documented one.
 working in `Morrison-Lab/mln`; the local, machine-specific `QUARTO_R` path
 and R-version details live in that machine's own Claude Code project memory,
 not here, since they are not reusable across machines.)
+
+## Notation macros in probability course sites: PMFs, PDFs, and events (`Morrison-Lab/pds`)
+
+In `Morrison-Lab/pds` and related course sites, adhere to the strict macro-level notation distinctions:
+- **PMF** (probability mass function for discrete variables): use `\P(...)` (e.g. `\P(x)`, `\P(x, y)`, `\P(d=1)`).
+- **PDF** (probability density function for continuous variables): use `\p(...)` (e.g. `\p(x)`, `\p(y)`, `\p(x, y)`).
+- **Event probability**: use `\Pr(...)` (e.g. `\Pr(X \in \mathbb{A})`).
+- **Never use bare un-macroed italic `p(...)`** for PMFs or PDFs in `pds`.
+Bare italic `p(x)` creates notation inconsistency across chapters and subfiles and bypasses repository macro definitions.
+
+- **Do:** use `\P(...)` for discrete distributions and `\p(...)` for continuous densities.
+- **Don't:** write un-macroed italic `p(x)` or `p(x, y)` when defining or evaluating PMFs or PDFs.
+
+([`Morrison-Lab/pds#43`](https://github.com/Morrison-Lab/pds/pull/43), 2026-09-29.)

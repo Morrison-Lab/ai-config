@@ -254,6 +254,9 @@
 - After creating, pushing to, or being handed a PR, immediately arm a persistent monitoring loop using whatever wake this session has, without asking first.
   A PR-activity subscription is not a loop.
   Treat a "are you monitoring?" question as a status check that starts the loop if it is not running.
+- **Examine Transcript for Stalls and Dropped Balls on Status Inquiries**: When asked for a "status update", "status?", or "how is it going", inspect the conversation transcript and turn history to check if the agent got stuck, frozen, or dropped the ball (unhandled tool errors, forgotten subagents or background tasks, unarmed pauses, or unfulfilled next steps).
+  Diagnose what stalled and immediately resume the dropped work in that very same turn rather than reporting passive, report-only status.
+  (User directive, 2026-09-29, ai-config#4126; see [`shared/workflow/status-requests-act.md`](../shared/workflow/status-requests-act.md).)
 - **Always Keep a Scheduled Monitor Timer Running for In-Flight Work**: Whenever ending a turn after code pushes or while background CI, `@claude review`, or async jobs are executing on active PRs under `mwc` / `ARDI`, ALWAYS launch a `schedule` timer (e.g. 120s) before ending the turn.
   If no review has arrived when the timer expires, verify that review workflow runs are still active in CI (via `gh run list` / `gh pr view --json statusCheckRollup`).
   If the reviewer failed, was canceled, skipped with no replacement, or produced a stub review with no stated verdict, invoke `self-review-fallback` per [`shared/workflow/self-review-fallback.md`](../shared/workflow/self-review-fallback.md).

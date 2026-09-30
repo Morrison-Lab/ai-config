@@ -63,7 +63,7 @@ larger in-scope outcome clear.
 
 ## Status requests do not make issues report-only
 
-A request for status means inspect live state and finish every safe, in-scope fix it reveals before reporting, and file every noticed issue, however small, in its owning tracker.
+A request for status means examine the transcript to check if the agent got stuck, frozen, or dropped the ball, inspect live state, finish every safe, in-scope fix it reveals before reporting, resume stalled work immediately, and file every noticed issue, however small, in its owning tracker.
 Detail, rationale, and cases: [`shared/workflow/status-requests-act.md`](shared/workflow/status-requests-act.md).
 
 ## Flag good moments to `/clear` in long-running sessions

@@ -322,9 +322,14 @@ See [`shared/workflow/user-profanity-signal.md`](shared/workflow/user-profanity-
 ## Status and diagnostic requests do not make issues report-only
 
 Treat any request for status or diagnostic inquiry
-("why did X happen?", "why did you do Y?", "did you do Z?")
+("why did X happen?", "why did you do Y?", "did you do Z?", "status update?", "status?")
 as a mandate to inspect live state, diagnose the root cause,
 and complete every safe, in-scope, concrete repair in that very same turn.
+When asked for a status update, examine the conversation transcript and turn history
+to verify whether the agent got stuck, frozen, or dropped the ball
+(unhandled tool errors, forgotten background tasks or subagents, unarmed pauses, or unfulfilled next steps);
+diagnose what stalled, resume the dropped work immediately in that same turn,
+and report what was recovered.
 A report or explanation is the recap after the work is shipped,
 not a substitute for it or an intermediate stop that waits for a follow-up "fix it" prompt.
 When an issue cannot be fixed directly in the session,
@@ -332,6 +337,7 @@ carry it forward with an actual next action.
 Every issue noticed, however small or outside the current task's scope,
 must at minimum be filed in the owning GitHub, GitLab, or equivalent tracker.
 File it before reporting it.
+See [`shared/workflow/status-requests-act.md`](shared/workflow/status-requests-act.md).
 
 ## Upgrade a repo to `Morrison-Lab/gha` when it would benefit
 

@@ -74,11 +74,12 @@ try:
         "scripts", "lib")
     if _LIB not in sys.path:
         sys.path.insert(0, _LIB)
-    from shellcmd import git_subcommand, native_path, simple_commands
+    from shellcmd import GIT_VALUE_OPTS, git_subcommand, native_path, simple_commands, strip_env
 except Exception as _exc:
     print(f"warn-unparseable-staged-config: cannot load scripts/lib/shellcmd.py "
           f"({_exc}); not evaluating", file=sys.stderr)
-    git_subcommand = native_path = simple_commands = None
+    GIT_VALUE_OPTS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path"}
+    git_subcommand = native_path = simple_commands = strip_env = None
 
 CONFIG_EXTS = {".toml", ".json", ".yaml", ".yml"}
 OVERRIDE = "ALLOW_UNPARSEABLE_CONFIG"
@@ -231,16 +232,29 @@ def find_commit_invocations(command: str, session_cwd: str | None) -> list[tuple
     for argv in cmds:
         if not argv:
             continue
-        cdirs = []
-        for i, tok in enumerate(argv):
-            if tok == "-C" and i + 1 < len(argv):
-                cdirs.append(argv[i + 1])
-        res = git_subcommand(argv)
-        if res is None:
+        env_tokens, argv_rest = strip_env(argv) if strip_env else ([], argv)
+        if not argv_rest or argv_rest[0] != "git":
             continue
-        subcmd, rest, env_tokens = res
+
+        cdirs = []
+        i = 1
+        while i < len(argv_rest) and argv_rest[i].startswith("-"):
+            tok = argv_rest[i]
+            if tok == "-C" and i + 1 < len(argv_rest):
+                cdirs.append(argv_rest[i + 1])
+                i += 2
+                continue
+            if GIT_VALUE_OPTS and tok in GIT_VALUE_OPTS:
+                i += 2
+                continue
+            i += 1
+        if i >= len(argv_rest):
+            continue
+        subcmd = argv_rest[i]
         if subcmd != "commit":
             continue
+
+        rest = argv_rest[i + 1:]
 
         if any(tok in ("-h", "--help") for tok in rest):
             continue

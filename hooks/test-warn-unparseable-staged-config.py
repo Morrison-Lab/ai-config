@@ -116,6 +116,13 @@ CASES = {
         "git commit -a -m 'test'",
         "git commit -a picks up unstaged modification in tracked TOML",
     ),
+    # Subcommand -C option must not collide with global git -C
+    "W_commit_reuse_msg": (
+        "bad.toml",
+        b'regex = "a\\.b"\n',
+        "git commit -C HEAD -m 'test'",
+        "git commit -C HEAD does not treat -C as change-directory option",
+    ),
 }
 
 EXPECTED = {
@@ -133,6 +140,7 @@ EXPECTED = {
     "S_non_commit_cmd": False,
     "S_override_env": False,
     "W_commit_dash_a": True,
+    "W_commit_reuse_msg": True,
 }
 
 
@@ -155,6 +163,15 @@ def run_case_in_repo(hook_path: str, case_id: str, extra_env: dict[str, str] | N
             # Modify on disk without git add
             with open(full_path, "wb") as f:
                 f.write(content)
+        elif case_id == "W_commit_reuse_msg":
+            seed_file = os.path.join(td, "seed.txt")
+            with open(seed_file, "w", encoding="utf-8") as f:
+                f.write("initial\n")
+            subprocess.run(["git", "add", "seed.txt"], cwd=td, check=True)
+            subprocess.run(["git", "commit", "-m", "seed commit"], cwd=td, check=True, capture_output=True)
+            with open(full_path, "wb") as f:
+                f.write(content)
+            subprocess.run(["git", "add", rel_path], cwd=td, check=True)
         else:
             with open(full_path, "wb") as f:
                 f.write(content)
@@ -291,7 +308,7 @@ def main() -> int:
             "removing TOML validation silences TOML errors",
             [("    if ext == \".toml\":\n        return check_toml(content_bytes)",
               "    if ext == \".toml\":\n        return None")],
-            {"W_toml_escape", "W_toml_syntax", "W_commit_dash_a"},
+            {"W_toml_escape", "W_toml_syntax", "W_commit_dash_a", "W_commit_reuse_msg"},
         ),
         "M2_json_parser": (
             "removing JSON validation silences JSON errors",
@@ -310,7 +327,7 @@ def main() -> int:
             [("        if subcmd != \"commit\":\n            continue",
               "        if subcmd != \"not-a-commit\":\n            continue")],
             {"W_toml_escape", "W_toml_syntax", "W_json_syntax", "W_json_unclosed",
-             "W_yaml_syntax", "W_yml_syntax", "W_commit_dash_a"},
+             "W_yaml_syntax", "W_yml_syntax", "W_commit_dash_a", "W_commit_reuse_msg"},
         ),
         "M5_override_ignored": (
             "ignoring override causes override case to warn",
@@ -323,6 +340,12 @@ def main() -> int:
             [("        stages_tracked = any(",
               "        stages_tracked = False and any(")],
             {"W_commit_dash_a"},
+        ),
+        "M7_cdir_unbounded": (
+            "scanning whole argv for -C treats git commit -C HEAD as cd HEAD and suppresses warning",
+            [("        cdirs = []\n        i = 1\n        while i < len(argv_rest) and argv_rest[i].startswith(\"-\"):\n            tok = argv_rest[i]\n            if tok == \"-C\" and i + 1 < len(argv_rest):\n                cdirs.append(argv_rest[i + 1])\n                i += 2\n                continue\n            if GIT_VALUE_OPTS and tok in GIT_VALUE_OPTS:\n                i += 2\n                continue\n            i += 1\n        if i >= len(argv_rest):\n            continue\n        subcmd = argv_rest[i]\n        if subcmd != \"commit\":\n            continue\n\n        rest = argv_rest[i + 1:]",
+              "        cdirs = [argv_rest[j + 1] for j, tok in enumerate(argv_rest) if tok == \"-C\" and j + 1 < len(argv_rest)]\n        subcmd = \"commit\" if \"commit\" in argv_rest else \"\"\n        rest = argv_rest[argv_rest.index(\"commit\") + 1:] if \"commit\" in argv_rest else []\n        if subcmd != \"commit\":\n            continue")],
+            {"W_commit_reuse_msg"},
         ),
     }
 

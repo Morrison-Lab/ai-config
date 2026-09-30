@@ -404,6 +404,11 @@
   Include a "Notes for Automated Reviewers" section for any recurring false positives.
 - When noticing potential improvements to the codebase while working, proactively suggest them (don't wait to be asked).
   The user wants to hear about improvements as they come up.
+- **Proactively suggest better alternatives to proposed approaches**:
+  "if there's another way to accomplish the same goal, I'm always open to suggestions" (User directive, Issue #4095).
+  When the user or a task specifies a particular implementation approach or mechanism to achieve a goal, do not treat the mechanism as an immutable requirement when a simpler, cleaner, more idiomatic, or upstream alternative reaches the same objective.
+  Distinguish the underlying goal from candidate mechanisms, evaluate alternatives against DRW (upstream tools), KISS (simplicity), YAGNI (minimal code), and systemic maintainability, and proactively present and recommend the better approach.
+  See [`shared/principles/proactively-suggest-alternatives.md`](../shared/principles/proactively-suggest-alternatives.md).
 - Always run /ums (Update Memories and Skills) after finishing a task --- don't wait to be asked.
 - After a PR/MR merges, run the `post-merge` skill: verify the merge actually landed, tidy the local branch (checkout main, pull, `git branch -d`), confirm any deferred items are tracked, then run UMS to capture what the PR's review lifecycle taught --- mistakes corrected and guidance given along the way.
   A merge is the natural checkpoint to bank lessons before context is lost.

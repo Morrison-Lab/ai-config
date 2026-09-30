@@ -343,8 +343,8 @@ def main() -> int:
         ),
         "M7_cdir_unbounded": (
             "scanning whole argv for -C treats git commit -C HEAD as cd HEAD and suppresses warning",
-            [("        cdirs = []\n        i = 1\n        while i < len(argv_rest) and argv_rest[i].startswith(\"-\"):\n            tok = argv_rest[i]\n            if tok == \"-C\" and i + 1 < len(argv_rest):\n                cdirs.append(argv_rest[i + 1])\n                i += 2\n                continue\n            if GIT_VALUE_OPTS and tok in GIT_VALUE_OPTS:\n                i += 2\n                continue\n            i += 1\n        if i >= len(argv_rest):\n            continue\n        subcmd = argv_rest[i]\n        if subcmd != \"commit\":\n            continue\n\n        rest = argv_rest[i + 1:]",
-              "        cdirs = [argv_rest[j + 1] for j, tok in enumerate(argv_rest) if tok == \"-C\" and j + 1 < len(argv_rest)]\n        subcmd = \"commit\" if \"commit\" in argv_rest else \"\"\n        rest = argv_rest[argv_rest.index(\"commit\") + 1:] if \"commit\" in argv_rest else []\n        if subcmd != \"commit\":\n            continue")],
+            [("        global_opts = argv[:subcmd_idx]",
+              "        global_opts = argv")],
             {"W_commit_reuse_msg"},
         ),
     }

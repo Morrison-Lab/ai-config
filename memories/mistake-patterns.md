@@ -1235,9 +1235,10 @@ Pattern 34's `\u0061` example and this one's `\u0077` are the same trick.
   By redirecting the target working directory to an invalid path derived from a subcommand option, git commands in the hook fail or exit early, suppressing warnings on genuine defects.
 - **Example**: 2026-09-30, PR [#4148](https://github.com/Morrison-Lab/ai-config/pull/4148) (`hooks/warn-unparseable-staged-config.py`).
   `find_commit_invocations` looped through all `argv` tokens looking for `-C`, causing `git commit -C HEAD` to treat `HEAD` as the repository working directory instead of a commit reference.
-- **Fix**: bound option parsing by subcommand position.
-  Parse global options sequentially from index 1 until the first non-option token (the subcommand), and treat all subsequent options as arguments to that subcommand.
-- **Do:** stop global option parsing at the subcommand boundary when analyzing command lines.
+- **Fix**: bound option parsing by subcommand position via `scripts/lib/shellcmd.py`'s `git_subcommand()`.
+  Delegate subcommand detection to `git_subcommand(argv)` and inspect `argv[:subcmd_idx]` for pre-subcommand global flags rather than hand-rolling an option loop (DRW).
+- **Do:** delegate subcommand parsing to `git_subcommand()` and bound global option parsing before its boundary.
 - **Do:** test subcommand options that share names with global options (e.g. `git commit -C HEAD`).
 - **Don't:** scan the entire `argv` list for global flags with a simple loop over `enumerate(argv)`.
+- **Don't:** hand-roll an option scanner when `shellcmd.git_subcommand` is already available in the repo.
 

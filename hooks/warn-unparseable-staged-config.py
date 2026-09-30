@@ -74,12 +74,11 @@ try:
         "scripts", "lib")
     if _LIB not in sys.path:
         sys.path.insert(0, _LIB)
-    from shellcmd import GIT_VALUE_OPTS, git_subcommand, native_path, simple_commands, strip_env
+    from shellcmd import git_subcommand, native_path, simple_commands
 except Exception as _exc:
     print(f"warn-unparseable-staged-config: cannot load scripts/lib/shellcmd.py "
           f"({_exc}); not evaluating", file=sys.stderr)
-    GIT_VALUE_OPTS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path"}
-    git_subcommand = native_path = simple_commands = strip_env = None
+    git_subcommand = native_path = simple_commands = None
 
 CONFIG_EXTS = {".toml", ".json", ".yaml", ".yml"}
 OVERRIDE = "ALLOW_UNPARSEABLE_CONFIG"
@@ -232,32 +231,24 @@ def find_commit_invocations(command: str, session_cwd: str | None) -> list[tuple
     for argv in cmds:
         if not argv:
             continue
-        env_tokens, argv_rest = strip_env(argv) if strip_env else ([], argv)
-        if not argv_rest or argv_rest[0] != "git":
+        res = git_subcommand(argv)
+        if res is None:
             continue
-
-        cdirs = []
-        i = 1
-        while i < len(argv_rest) and argv_rest[i].startswith("-"):
-            tok = argv_rest[i]
-            if tok == "-C" and i + 1 < len(argv_rest):
-                cdirs.append(argv_rest[i + 1])
-                i += 2
-                continue
-            if GIT_VALUE_OPTS and tok in GIT_VALUE_OPTS:
-                i += 2
-                continue
-            i += 1
-        if i >= len(argv_rest):
-            continue
-        subcmd = argv_rest[i]
+        subcmd, rest, env_tokens = res
         if subcmd != "commit":
             continue
 
-        rest = argv_rest[i + 1:]
-
         if any(tok in ("-h", "--help") for tok in rest):
             continue
+
+        # Global options precede the subcommand word in argv
+        subcmd_idx = len(argv) - len(rest) - 1
+        global_opts = argv[:subcmd_idx]
+        cdirs = [
+            global_opts[j + 1]
+            for j, tok in enumerate(global_opts)
+            if tok == "-C" and j + 1 < len(global_opts)
+        ]
 
         target_cwd = session_cwd
         for cdir in cdirs:

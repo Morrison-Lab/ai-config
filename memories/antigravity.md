@@ -211,7 +211,7 @@ The [`google-antigravity/antigravity-sdk-python`](https://github.com/google-anti
   Run `env ALLOW_UNREVIEWED_PUSH=1 git push ...`
   (using Git's bundled `usr/bin/env.exe`) instead
   so the assignment precedes `git` in a single simple command without chaining.
-  (Learned 2026-09-30 on PR #4142).
+  (Measured 2026-09-30 in an Antigravity Windows PowerShell session.)
 - In PowerShell, passing multiline markdown with quotes to `gh pr create --body`
   can cause quote delimiter errors (`unknown arguments [...]`);
   writing the body to a unique scratch file and passing `--body-file`

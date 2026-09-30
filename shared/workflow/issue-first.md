@@ -145,7 +145,7 @@ do not jump straight to writing code or authoring an issue without searching fir
 An existing open issue or PR may already track the request,
 carry the user's intended scope, or establish an agreed allowlist.
 Implementing without searching the tracker duplicates work
-and often leads to an implementation narrower than what was already specified
+and often leads to an implementation narrower than what was already specified.
 See [`grep-is-not-coverage`](grep-is-not-coverage.md).
 
 When the issue is a **bug report**, include a minimal reproducible example

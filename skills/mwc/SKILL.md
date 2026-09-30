@@ -509,7 +509,9 @@ An infra PR is one where every changed path is tooling or agent configuration
 
 A top-level `scripts/` is deliberately absent, because in a content repository it can hold analysis code.
 
-The grant is decided by what the PR changes, so the guard reads the PR's file list from GitHub (`gh api .../pulls/N/files`).
+The grant is decided by what the PR changes,
+so the guard reads the PR's file list from GitHub (`gh api .../pulls/N/files`,
+or direct REST via `urllib` when `gh` is not on `PATH`).
 It checks every changed path, and a renamed file's previous path as well, so moving a content file under `.github/` does not qualify.
 Every doubt denies:
 

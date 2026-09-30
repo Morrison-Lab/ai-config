@@ -1446,6 +1446,265 @@ _s9 = _guard.merge_pinned_sha(f"gh api -X PUT repos/Morrison-Lab/pds/pulls/15/me
 wrong += _s9 != TEST_HEAD_SHA
 print(f"  {'allow' if _s9 == TEST_HEAD_SHA else 'WRONG':<6} merge_pinned_sha extracts bare sha=")
 
+# REST fallback tests for cloud sessions (where gh is not on PATH or raises OSError)
+print("\nstanding infra-PR grant REST fallback (cloud sessions):")
+
+import urllib.error
+import urllib.request
+from unittest.mock import patch
+
+
+class _MockHTTPResponse:
+    def __init__(self, data: bytes, code: int = 200):
+        self._data = data
+        self.code = code
+
+    def read(self) -> bytes:
+        return self._data
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        pass
+
+
+def _run_rest_test(name, expected, routes, pr_number=15, target="Morrison-Lab/pds",
+                   token=None, gh_token=None, deadline_offset=5.0):
+    global checks, wrong
+    recorded_reqs = []
+
+    def mock_urlopen(req, timeout=None):
+        if timeout is not None and timeout <= 0:
+            raise TimeoutError("Deadline exceeded")
+        url = req.full_url if hasattr(req, "full_url") else str(req)
+        recorded_reqs.append(req)
+        if url in routes:
+            resp = routes[url]
+            if isinstance(resp, Exception):
+                raise resp
+            if isinstance(resp, (dict, list)):
+                return _MockHTTPResponse(json.dumps(resp).encode("utf-8"))
+            if isinstance(resp, bytes):
+                return _MockHTTPResponse(resp)
+        raise urllib.error.HTTPError(url, 404, "Not Found", {}, None)
+
+    env_overrides = {}
+    if token is not None:
+        env_overrides["GITHUB_TOKEN"] = token
+    if gh_token is not None:
+        env_overrides["GH_TOKEN"] = gh_token
+
+    saved_env = {k: os.environ.get(k) for k in ("GITHUB_TOKEN", "GH_TOKEN")}
+    for k in ("GITHUB_TOKEN", "GH_TOKEN"):
+        os.environ.pop(k, None)
+    for k, v in env_overrides.items():
+        os.environ[k] = v
+
+    try:
+        with patch.object(_guard.urllib.request, "urlopen", side_effect=mock_urlopen):
+            deadline = _guard.time.monotonic() + deadline_offset
+            res = _guard._fetch_pr_via_rest(target, pr_number, deadline)
+    finally:
+        for k in ("GITHUB_TOKEN", "GH_TOKEN"):
+            os.environ.pop(k, None)
+        for k, v in saved_env.items():
+            if v is not None:
+                os.environ[k] = v
+
+    checks += 1
+    ok = res == expected
+    wrong += not ok
+    print(f"  {'allow' if ok else 'WRONG':<6} {name}")
+    return recorded_reqs
+
+
+_routes_happy = {
+    "https://api.github.com/repos/Morrison-Lab/pds/pulls/15": {
+        "changed_files": 2,
+        "head": {"sha": TEST_HEAD_SHA},
+    },
+    "https://api.github.com/repos/Morrison-Lab/pds/pulls/15/files?per_page=100&page=1": [
+        {"filename": ".github/workflows/ci.yml"},
+        {"filename": "CLAUDE.md"},
+    ],
+}
+_run_rest_test("REST fallback: single page with all infra files",
+               ([".github/workflows/ci.yml", "CLAUDE.md"], TEST_HEAD_SHA),
+               _routes_happy)
+
+_routes_rename = {
+    "https://api.github.com/repos/Morrison-Lab/pds/pulls/15": {
+        "changed_files": 1,
+        "head": {"sha": TEST_HEAD_SHA},
+    },
+    "https://api.github.com/repos/Morrison-Lab/pds/pulls/15/files?per_page=100&page=1": [
+        {"filename": ".github/workflows/ci.yml", "previous_filename": ".github/old.yml", "status": "renamed"},
+    ],
+}
+_run_rest_test("REST fallback: file rename includes previous_filename",
+               ([".github/workflows/ci.yml", ".github/old.yml"], TEST_HEAD_SHA),
+               _routes_rename)
+
+_p1_files = [{"filename": f".github/f{i}.yml"} for i in range(100)]
+_p2_files = [{"filename": f".github/f{i}.yml"} for i in range(100, 105)]
+_routes_paginated = {
+    "https://api.github.com/repos/Morrison-Lab/pds/pulls/15": {
+        "changed_files": 105,
+        "head": {"sha": TEST_HEAD_SHA},
+    },
+    "https://api.github.com/repos/Morrison-Lab/pds/pulls/15/files?per_page=100&page=1": _p1_files,
+    "https://api.github.com/repos/Morrison-Lab/pds/pulls/15/files?per_page=100&page=2": _p2_files,
+}
+_run_rest_test("REST fallback: paginates multiple pages to completion",
+               ([f".github/f{i}.yml" for i in range(105)], TEST_HEAD_SHA),
+               _routes_paginated)
+
+_reqs_ghp = _run_rest_test("REST fallback: GITHUB_TOKEN sent as Bearer authorization",
+                           ([".github/workflows/ci.yml", "CLAUDE.md"], TEST_HEAD_SHA),
+                           _routes_happy, token="ghp_test_secret_123")
+checks += 1
+_has_bearer = any(r.get_header("Authorization") == "Bearer ghp_test_secret_123" for r in _reqs_ghp)
+wrong += not _has_bearer
+print(f"  {'allow' if _has_bearer else 'WRONG':<6} Authorization header carries GITHUB_TOKEN")
+
+_reqs_gh = _run_rest_test("REST fallback: GH_TOKEN used when GITHUB_TOKEN absent",
+                          ([".github/workflows/ci.yml", "CLAUDE.md"], TEST_HEAD_SHA),
+                          _routes_happy, gh_token="ghu_test_secret_456")
+checks += 1
+_has_gh_bearer = any(r.get_header("Authorization") == "Bearer ghu_test_secret_456" for r in _reqs_gh)
+wrong += not _has_gh_bearer
+print(f"  {'allow' if _has_gh_bearer else 'WRONG':<6} Authorization header carries GH_TOKEN")
+
+_reqs_none = _run_rest_test("REST fallback: unauthenticated when neither token set",
+                            ([".github/workflows/ci.yml", "CLAUDE.md"], TEST_HEAD_SHA),
+                            _routes_happy)
+checks += 1
+_no_auth = all(r.get_header("Authorization") is None for r in _reqs_none)
+wrong += not _no_auth
+print(f"  {'allow' if _no_auth else 'WRONG':<6} no Authorization header when tokens absent")
+
+_run_rest_test("REST fallback: HTTP 404 on PR info returns None", None, {})
+_run_rest_test("REST fallback: HTTP 500 on files returns None", None, {
+    "https://api.github.com/repos/Morrison-Lab/pds/pulls/15": {
+        "changed_files": 1,
+        "head": {"sha": TEST_HEAD_SHA},
+    },
+    "https://api.github.com/repos/Morrison-Lab/pds/pulls/15/files?per_page=100&page=1":
+        urllib.error.HTTPError("https://api.github.com/...", 500, "Server Error", {}, None),
+})
+_run_rest_test("REST fallback: network URLError returns None", None, {
+    "https://api.github.com/repos/Morrison-Lab/pds/pulls/15": urllib.error.URLError("Connection refused"),
+})
+_run_rest_test("REST fallback: TimeoutError returns None", None, {
+    "https://api.github.com/repos/Morrison-Lab/pds/pulls/15": TimeoutError("timed out"),
+})
+_run_rest_test("REST fallback: malformed JSON returns None", None, {
+    "https://api.github.com/repos/Morrison-Lab/pds/pulls/15": b"{bad json",
+})
+_run_rest_test("REST fallback: non-dict PR response returns None", None, {
+    "https://api.github.com/repos/Morrison-Lab/pds/pulls/15": ["not", "a", "dict"],
+})
+_run_rest_test("REST fallback: changed_files <= 0 returns None", None, {
+    "https://api.github.com/repos/Morrison-Lab/pds/pulls/15": {
+        "changed_files": 0,
+        "head": {"sha": TEST_HEAD_SHA},
+    },
+})
+_run_rest_test("REST fallback: changed_files >= cap (3000) returns None", None, {
+    "https://api.github.com/repos/Morrison-Lab/pds/pulls/15": {
+        "changed_files": 3000,
+        "head": {"sha": TEST_HEAD_SHA},
+    },
+})
+_run_rest_test("REST fallback: malformed head SHA returns None", None, {
+    "https://api.github.com/repos/Morrison-Lab/pds/pulls/15": {
+        "changed_files": 1,
+        "head": {"sha": "not-a-valid-sha"},
+    },
+})
+_run_rest_test("REST fallback: changed_files count mismatch returns None", None, {
+    "https://api.github.com/repos/Morrison-Lab/pds/pulls/15": {
+        "changed_files": 5,
+        "head": {"sha": TEST_HEAD_SHA},
+    },
+    "https://api.github.com/repos/Morrison-Lab/pds/pulls/15/files?per_page=100&page=1": [
+        {"filename": ".github/workflows/ci.yml"},
+    ],
+})
+_run_rest_test("REST fallback: expired budget returns None", None, _routes_happy, deadline_offset=-1.0)
+_run_rest_test("REST fallback: non-positive PR number returns None", None, _routes_happy, pr_number=0)
+
+# fetch_pr_changed_paths integration tests
+checks += 1
+with patch.object(_guard.shutil, "which", return_value=None):
+    with patch.object(_guard, "_fetch_pr_via_rest", return_value=(INFRA_FILES, TEST_HEAD_SHA)) as _m_rest:
+        _res_del = _guard.fetch_pr_changed_paths("Morrison-Lab/pds", 15)
+        _ok_del = _res_del == (INFRA_FILES, TEST_HEAD_SHA) and _m_rest.called
+wrong += not _ok_del
+print(f"  {'allow' if _ok_del else 'WRONG':<6} fetch_pr_changed_paths delegates to REST when shutil.which('gh') is None")
+
+checks += 1
+with patch.object(_guard.shutil, "which", return_value="/bin/gh"):
+    with patch.object(_guard.subprocess, "run", side_effect=FileNotFoundError("gh not found")):
+        with patch.object(_guard, "_fetch_pr_via_rest", return_value=(INFRA_FILES, TEST_HEAD_SHA)) as _m_rest2:
+            _res_fb = _guard.fetch_pr_changed_paths("Morrison-Lab/pds", 15)
+            _ok_fb = _res_fb == (INFRA_FILES, TEST_HEAD_SHA) and _m_rest2.called
+wrong += not _ok_fb
+print(f"  {'allow' if _ok_fb else 'WRONG':<6} fetch_pr_changed_paths falls back to REST when gh raises OSError")
+
+# End-to-end grant evaluation in simulated cloud session (no gh on PATH)
+def _rest_infra_case(desc, want, files, command=None, mcp=None, head_sha=TEST_HEAD_SHA):
+    global checks, wrong
+    routes = {
+        "https://api.github.com/repos/morrison-lab/pds/pulls/15": {
+            "changed_files": len(files) if files is not None else 0,
+            "head": {"sha": head_sha},
+        },
+    }
+    if files is not None:
+        routes["https://api.github.com/repos/morrison-lab/pds/pulls/15/files?per_page=100&page=1"] = [
+            {"filename": f} for f in files
+        ]
+
+    saved_disable = os.environ.pop(_disable, None)
+    try:
+        with patch.object(_guard.shutil, "which", return_value=None):
+            def mock_urlopen(req, timeout=None):
+                url = req.full_url if hasattr(req, "full_url") else str(req)
+                if url in routes:
+                    resp = routes[url]
+                    return _MockHTTPResponse(json.dumps(resp).encode("utf-8"))
+                raise urllib.error.HTTPError(url, 404, "Not Found", {}, None)
+
+            with patch.object(_guard.urllib.request, "urlopen", side_effect=mock_urlopen):
+                if mcp is not None:
+                    hit = _guard.check_mcp_merge({"tool_name": mcp[0], "tool_input": mcp[1]})
+                else:
+                    hit = _guard.offending(command)
+    finally:
+        if saved_disable is not None:
+            os.environ[_disable] = saved_disable
+
+    got = "allow" if hit is None else "BLOCK"
+    checks += 1
+    ok = got == want
+    wrong += not ok
+    print(f"  {got if ok else 'WRONG':<6} {desc}")
+
+_rest_infra_case("REST fallback e2e: all-infra PR with matching pinned SHA allows",
+                 "allow", INFRA_FILES,
+                 command=f"gh pr merge 15 -R Morrison-Lab/pds --match-head-commit {TEST_HEAD_SHA}")
+_rest_infra_case("REST fallback e2e: PR with content file blocks",
+                 "BLOCK", INFRA_FILES + ["R/analysis.R"],
+                 command=f"gh pr merge 15 -R Morrison-Lab/pds --match-head-commit {TEST_HEAD_SHA}")
+_rest_infra_case("REST fallback e2e: PR with wrong pinned SHA blocks",
+                 "BLOCK", INFRA_FILES,
+                 command=f"gh pr merge 15 -R Morrison-Lab/pds --match-head-commit {WRONG_HEAD_SHA}")
+_rest_infra_case("REST fallback e2e: MCP merge with expectedHeadSha allows",
+                 "allow", INFRA_FILES,
+                 mcp=(_MCP, {"owner": "Morrison-Lab", "repo": "pds", "pullNumber": 15, "expectedHeadSha": TEST_HEAD_SHA}))
+
 total = checks
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
 sys.exit(1 if wrong else 0)

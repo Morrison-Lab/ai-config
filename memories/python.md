@@ -435,7 +435,7 @@ Mechanical enforcement is provided by `scripts/check-text-encoding.py` and gated
 - **Do:** pass `encoding="utf-8"` explicitly to `open()`, `Path.open()`, `Path.read_text()`, `Path.write_text()`, and `tempfile.NamedTemporaryFile("w")` whenever reading or writing text files.
 - **Do:** print ASCII markers (`ok:`) rather than Unicode checkmarks in CLI script output.
 - **Do:** check relative path segments against `IGNORED_DIRS` rather than absolute paths.
-- **Don't:** call bare `open()`, `p.read_text()`, or `p.write_text(content)` without an explicit `encoding` argument on cross-platform code.
+- **Don't:** call bare `open()`, `p.read_text()`, or `p.write_text(content)` without an explicit `encoding` argument or with `encoding=None` on cross-platform code.
 
 (Measured 2026-09-29 when running `scripts/install-hooks.py` on Windows, where reading UTF-8 characters in `hooks/hooks.json` raised `UnicodeDecodeError` in `cp1252`;
 repo-wide audit and mechanical lint guard shipped in #4121.)

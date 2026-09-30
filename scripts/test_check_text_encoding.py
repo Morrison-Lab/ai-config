@@ -119,9 +119,43 @@ def main() -> int:
         code, out, err = run_script(str(d / "bad_tempfile_kw.py"))
         check("bare tempfile.NamedTemporaryFile(mode='w') is flagged", code == 1)
 
+        # 1b. Positive tests: explicit encoding=None or positional None is rejected
+        write_file(d, "bad_read_text_none_kw.py", "content = p.read_text(encoding=None)\n")
+        code, out, err = run_script(str(d / "bad_read_text_none_kw.py"))
+        check("read_text(encoding=None) is flagged", code == 1)
+        check("error mentions encoding=None", "encoding=None" in err)
+
+        write_file(d, "bad_read_text_none_pos.py", "content = p.read_text(None)\n")
+        code, out, err = run_script(str(d / "bad_read_text_none_pos.py"))
+        check("read_text(None) is flagged", code == 1)
+
+        write_file(d, "bad_write_text_none_kw.py", 'p.write_text("x", encoding=None)\n')
+        code, out, err = run_script(str(d / "bad_write_text_none_kw.py"))
+        check("write_text(..., encoding=None) is flagged", code == 1)
+
+        write_file(d, "bad_write_text_none_pos.py", 'p.write_text("x", None)\n')
+        code, out, err = run_script(str(d / "bad_write_text_none_pos.py"))
+        check("write_text(..., None) is flagged", code == 1)
+
+        write_file(d, "bad_open_none_kw.py", 'open("f.txt", encoding=None).close()\n')
+        code, out, err = run_script(str(d / "bad_open_none_kw.py"))
+        check("open(..., encoding=None) is flagged", code == 1)
+
+        write_file(d, "bad_open_none_pos.py", 'open("f.txt", "w", -1, None).close()\n')
+        code, out, err = run_script(str(d / "bad_open_none_pos.py"))
+        check("open(..., None) positional is flagged", code == 1)
+
+        write_file(d, "bad_path_open_none.py", 'with p.open(encoding=None) as f:\n    pass\n')
+        code, out, err = run_script(str(d / "bad_path_open_none.py"))
+        check("path.open(encoding=None) is flagged", code == 1)
+
+        write_file(d, "bad_tempfile_none.py", 'import tempfile\ntf = tempfile.NamedTemporaryFile("w", encoding=None)\n')
+        code, out, err = run_script(str(d / "bad_tempfile_none.py"))
+        check("tempfile.NamedTemporaryFile('w', encoding=None) is flagged", code == 1)
+
         # 2. Negative tests: operations with explicit encoding or binary mode pass
         clean_code = (
-            'import io, tempfile\n'
+            'import io, tempfile, zipfile\n'
             'with open("file.txt", encoding="utf-8") as f: pass\n'
             'with open("file.txt", "w", encoding="utf-8") as f: pass\n'
             'with open("file.bin", "rb") as f: pass\n'
@@ -142,6 +176,12 @@ def main() -> int:
             'tf5 = tempfile.TemporaryFile("w", encoding="utf-8")\n'
             'with open("f.txt") as f: pass  # noqa: text-encoding\n'
             'with open("f.txt") as f: pass  # pragma: no-encoding\n'
+            'def zf_read(zf):\n'
+            '    return zf.open("readme.txt")\n'
+            'def zf_bin(zf):\n'
+            '    return zf.open("binary_file.dat")\n'
+            'def arch_open(archive, name):\n'
+            '    return archive.open(name)\n'
         )
         write_file(d, "clean_all.py", clean_code)
         code, out, err = run_script(str(d / "clean_all.py"))

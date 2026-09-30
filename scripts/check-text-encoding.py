@@ -93,6 +93,60 @@ def has_exemption(line: str) -> bool:
     return "# noqa: text-encoding" in line or "# pragma: no-encoding" in line
 
 
+VALID_MODE_CHARS = set("rwa+btU")
+
+NON_PATH_RECEIVERS = {
+    "os", "tarfile", "zipfile", "gzip", "bz2", "lzma", "shutil",
+    "zf", "tf", "archive", "zip_file", "tar_file",
+    "client", "session", "app", "window", "driver", "browser", "page",
+}
+
+
+def is_valid_mode_string(s: str) -> bool:
+    """Return True if s is a plausible Python file mode string."""
+    if not s or len(s) > 5:
+        return False
+    if not all(c in VALID_MODE_CHARS for c in s):
+        return False
+    return any(c in "rwax" for c in s)
+
+
+def is_none_literal(node: ast.AST) -> bool:
+    """Return True if AST node represents a literal None."""
+    if isinstance(node, ast.Constant) and node.value is None:
+        return True
+    if sys.version_info < (3, 8):
+        name_const = getattr(ast, "NameConstant", None)
+        if name_const and isinstance(node, name_const) and node.value is None:
+            return True
+    return False
+
+
+def get_call_encoding_arg(node: ast.Call, pos_idx: Optional[int] = None) -> Optional[ast.AST]:
+    """Return the AST expression passed for encoding (keyword or positional), if any."""
+    for kw in node.keywords:
+        if kw.arg == "encoding":
+            return kw.value
+    if pos_idx is not None and len(node.args) > pos_idx:
+        return node.args[pos_idx]
+    return None
+
+
+def is_explicit_encoding_provided(node: ast.Call, pos_idx: Optional[int] = None) -> Tuple[bool, bool]:
+    """Check if encoding is provided and whether it is None.
+
+    Returns (has_encoding, is_explicit_none).
+    has_encoding is True only if a non-None encoding is provided.
+    is_explicit_none is True if encoding argument was explicitly provided as literal None.
+    """
+    enc_arg = get_call_encoding_arg(node, pos_idx)
+    if enc_arg is None:
+        return False, False
+    if is_none_literal(enc_arg):
+        return False, True
+    return True, False
+
+
 class TextIOVisitor(ast.NodeVisitor):
     """AST visitor that checks for text-mode I/O calls lacking explicit encoding."""
 
@@ -121,15 +175,20 @@ class TextIOVisitor(ast.NodeVisitor):
         # 1. read_text: Path.read_text(encoding=None, errors=None)
         if isinstance(node.func, ast.Attribute) and node.func.attr == "read_text":
             self.calls_count += 1
-            has_enc = any(kw.arg == "encoding" for kw in node.keywords) or len(node.args) >= 1
+            has_enc, is_none = is_explicit_encoding_provided(node, pos_idx=0)
             if not has_enc:
+                msg = (
+                    "read_text() with explicit encoding=None (requires concrete encoding)"
+                    if is_none
+                    else "bare read_text() without explicit encoding"
+                )
                 self.violations.append(
                     Violation(
                         file_path=self.file_path,
                         line_number=lineno,
                         column_number=col,
                         call_kind="read_text",
-                        message="bare read_text() without explicit encoding",
+                        message=msg,
                         line_content=line_text.strip(),
                         end_line_number=end_lineno,
                     )
@@ -138,15 +197,20 @@ class TextIOVisitor(ast.NodeVisitor):
         # 2. write_text: Path.write_text(data, encoding=None, errors=None, newline=None)
         elif isinstance(node.func, ast.Attribute) and node.func.attr == "write_text":
             self.calls_count += 1
-            has_enc = any(kw.arg == "encoding" for kw in node.keywords) or len(node.args) >= 2
+            has_enc, is_none = is_explicit_encoding_provided(node, pos_idx=1)
             if not has_enc:
+                msg = (
+                    "write_text() with explicit encoding=None (requires concrete encoding)"
+                    if is_none
+                    else "bare write_text() without explicit encoding"
+                )
                 self.violations.append(
                     Violation(
                         file_path=self.file_path,
                         line_number=lineno,
                         column_number=col,
                         call_kind="write_text",
-                        message="bare write_text() without explicit encoding",
+                        message=msg,
                         line_content=line_text.strip(),
                         end_line_number=end_lineno,
                     )
@@ -156,21 +220,43 @@ class TextIOVisitor(ast.NodeVisitor):
         elif (isinstance(node.func, ast.Name) and node.func.id == "open") or (
             isinstance(node.func, ast.Attribute)
             and node.func.attr == "open"
-            and not (
-                isinstance(node.func.value, ast.Name)
-                and node.func.value.id in ("os", "tarfile", "zipfile")
-            )
         ):
-            is_path_open = isinstance(node.func, ast.Attribute) and node.func.attr == "open" and not (
-                isinstance(node.func.value, ast.Name) and node.func.value.id == "io"
+            is_built_in_open = isinstance(node.func, ast.Name) and node.func.id == "open"
+            is_io_open = (
+                isinstance(node.func, ast.Attribute)
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "io"
             )
+            is_path_open = False
+
+            if not is_built_in_open and not is_io_open:
+                # receiver.open(...)
+                # Exclude known non-Path receivers (os, tarfile, zipfile, zf, archive, etc.)
+                receiver = node.func.value
+                if isinstance(receiver, ast.Name):
+                    rec_id = receiver.id.lower()
+                    if rec_id in NON_PATH_RECEIVERS or rec_id.endswith(("_zip", "_tar", "_archive")):
+                        self.generic_visit(node)
+                        return
+                # If first positional argument exists and is a string literal, it must be a valid mode string for Path.open
+                if len(node.args) >= 1:
+                    first_arg = node.args[0]
+                    if isinstance(first_arg, ast.Constant) and isinstance(first_arg.value, str):
+                        if not is_valid_mode_string(first_arg.value):
+                            # First argument is a filename or archive member, not a mode string (e.g. zf.open("file.txt"))
+                            self.generic_visit(node)
+                            return
+                is_path_open = True
+
             mode_val: Optional[str] = None
             mode_pos_idx = 0 if is_path_open else 1
             enc_pos_idx = 2 if is_path_open else 3
 
             # Check positional mode argument
             if len(node.args) > mode_pos_idx and isinstance(node.args[mode_pos_idx], ast.Constant) and isinstance(node.args[mode_pos_idx].value, str):
-                mode_val = node.args[mode_pos_idx].value
+                val = node.args[mode_pos_idx].value
+                if is_valid_mode_string(val):
+                    mode_val = val
 
             # Check keyword mode argument
             for kw in node.keywords:
@@ -179,17 +265,21 @@ class TextIOVisitor(ast.NodeVisitor):
 
             if not is_binary_mode(mode_val):
                 self.calls_count += 1
-                has_enc = any(kw.arg == "encoding" for kw in node.keywords) or len(node.args) > enc_pos_idx
+                has_enc, is_none = is_explicit_encoding_provided(node, pos_idx=enc_pos_idx)
                 if not has_enc:
                     kind = "path.open" if is_path_open else "open"
                     mode_desc = f"mode={mode_val!r}" if mode_val is not None else "default mode='r'"
+                    if is_none:
+                        msg = f"{kind}() in text mode ({mode_desc}) with explicit encoding=None"
+                    else:
+                        msg = f"bare {kind}() in text mode ({mode_desc}) without explicit encoding"
                     self.violations.append(
                         Violation(
                             file_path=self.file_path,
                             line_number=lineno,
                             column_number=col,
                             call_kind=kind,
-                            message=f"bare {kind}() in text mode ({mode_desc}) without explicit encoding",
+                            message=msg,
                             line_content=line_text.strip(),
                             end_line_number=end_lineno,
                         )
@@ -215,16 +305,20 @@ class TextIOVisitor(ast.NodeVisitor):
             # Default mode for tempfile is 'w+b' (binary). Only check if text mode is requested.
             if mode_val is not None and not is_binary_mode(mode_val):
                 self.calls_count += 1
-                has_enc = any(kw.arg == "encoding" for kw in node.keywords)
+                has_enc, is_none = is_explicit_encoding_provided(node, pos_idx=2)
                 if not has_enc:
                     func_name = node.func.attr if isinstance(node.func, ast.Attribute) else node.func.id
+                    if is_none:
+                        msg = f"tempfile.{func_name}() in text mode ({mode_val!r}) with explicit encoding=None"
+                    else:
+                        msg = f"bare tempfile.{func_name}() in text mode ({mode_val!r}) without explicit encoding"
                     self.violations.append(
                         Violation(
                             file_path=self.file_path,
                             line_number=lineno,
                             column_number=col,
                             call_kind=f"tempfile.{func_name}",
-                            message=f"bare tempfile.{func_name}() in text mode ({mode_val!r}) without explicit encoding",
+                            message=msg,
                             line_content=line_text.strip(),
                             end_line_number=end_lineno,
                         )

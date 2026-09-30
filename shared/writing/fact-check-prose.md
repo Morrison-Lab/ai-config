@@ -1586,3 +1586,28 @@ team found out.
 A related, narrower finding from the same rounds: a secrets listing returns
 names, not scopes, so it cannot support "no secret here can do X" --- name the
 specific secret the consumer reads instead.)
+
+## Read a config list's own comment before stating why an entry belongs on it
+
+Before proposing to add an item to an allowlist, blocklist, or exclusion list,
+or asserting in prose or comments what its entries have in common,
+read the comment or documentation defining that list.
+Inferring a list's purpose from its identifier name
+or from the immediate error or outage you want to bypass
+produces claims about code intent that contradict the code itself.
+An exclusion list usually exists for one narrow, permanent property
+(such as an entry lacking a DOI or requiring a custom fixture),
+not for transient failure modes (such as an upstream 503 HTTP outage).
+A claim about why an entry belongs on a config list
+needs the defining comment or documentation as its source.
+
+- **Do:** read the comment or documentation defining an allowlist or exclusion list
+  before proposing an entry or describing what entries have in common.
+- **Do:** verify that an entry satisfies the list's defining criteria
+  rather than matching the error symptom currently blocking CI.
+- **Don't:** infer a list's purpose from its identifier name
+  or from the immediate fix you want to land.
+- **Don't:** use an exclusion list meant for missing identifiers
+  to silence transient upstream outages for valid entries.
+
+(Case record: [`fact-check-prose.cases.md`](fact-check-prose.cases.md).)

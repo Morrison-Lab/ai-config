@@ -434,6 +434,12 @@
   rather than asking them to choose from scratch.
   (Learned on `Morrison-Lab/pds`, Issue #4092, 2026-09-28).
   See [`shared/workflow/grep-is-not-coverage.md`](../shared/workflow/grep-is-not-coverage.md).
+- Read a config list's defining comment or documentation before proposing an entry
+  or explaining what its entries have in common;
+  do not infer the list's purpose from its identifier name
+  or from the immediate error you want to silence
+  (Issue #4091, 2026-09-28 on Morrison-Lab/pds).
+  See [`shared/writing/fact-check-prose.md`](../shared/writing/fact-check-prose.md).
 - Always run /ums (Update Memories and Skills) after finishing a task --- don't wait to be asked.
 - After a PR/MR merges, run the `post-merge` skill: verify the merge actually landed, tidy the local branch (checkout main, pull, `git branch -d`), confirm any deferred items are tracked, then run UMS to capture what the PR's review lifecycle taught --- mistakes corrected and guidance given along the way.
   A merge is the natural checkpoint to bank lessons before context is lost.

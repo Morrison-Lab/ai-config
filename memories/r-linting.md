@@ -217,3 +217,11 @@ short assignment-shaped fragment.
   ([`d-morrison/altdoc#7`](https://github.com/d-morrison/altdoc/pull/7): `continue-on-error: true` masked a `.jarlignore`
   that did nothing; removing the flag immediately reproduced the
   `unused_function` failure it was supposed to prevent.)
+
+## lintr — `lint_dir()` natively merges `.lintr.R` exclusions; avoid manual extraction scripts
+
+- In Quarto repositories using `lintr`, `lintr::lint_dir()` (with its default `parse_settings = TRUE`) automatically merges `settings$exclusions` defined in `.lintr.R` (`exclusions <- c(exclusions, settings$exclusions)`).
+- **Avoid manual extraction via `sys.source`**: parsing `.lintr.R` in CI scripts and passing `names(cfg_env$exclusions)` into `exclusions_list` flattens structured per-linter exclusions (such as `list("data-raw" = list(pipe_consistency_linter = Inf))`) into blanket whole-file exclusions, silently disabling all linters for those paths.
+- **Set file exclusions directly in `.lintr.R`**: files or non-R scripts needing exclusion (such as non-R OJS widgets or external assets) should be added directly to the `exclusions` list in `.lintr.R`.
+  `lint_dir()` will naturally merge them without bespoke extraction wrappers in CI workflows.
+  ([`Morrison-Lab/pds#43`](https://github.com/Morrison-Lab/pds/pull/43), 2026-09-29.)

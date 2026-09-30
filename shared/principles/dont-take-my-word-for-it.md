@@ -174,6 +174,10 @@ concrete evidence:
   before executing them.
   This principle provides the foundational epistemic rule governing all
   interactions, factual claims, and recommendations.
+- **[`proactively-suggest-alternatives`](proactively-suggest-alternatives.md):**
+  Extends independent verification from factual claims to technical approaches:
+  interrogating whether a proposed mechanism is the best way to accomplish the
+  underlying goal, and proactively suggesting simpler or upstream alternatives.
 - **[`fail-fast`](fail-fast.md):**
   Loudly identifying and surfacing an error or contradiction immediately rather
   than letting it pass downstream as silent corruption.

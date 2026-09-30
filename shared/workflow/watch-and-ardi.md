@@ -26,6 +26,25 @@ Only post the mention when a round pushed no code (all Rebut/Defer).
 Surface to me only when an item is ambiguous, architecturally significant, or deadlocked (the `ardi` skill's escalation rule still applies), or when the PR is clean.
 Stop watching only when the PR merges or closes, or I tell you to back off.
 
+**Subscribe only with the returned PR number, never a predicted one.**
+Subscribe to a newly opened PR only after `create_pull_request` returns,
+using the exact number or URL it returned.
+Never batch `subscribe_pr_activity` with `create_pull_request`,
+and never predict or compute the PR number in advance (such as "last PR + 1").
+Issues and PRs share a single monotonic numbering sequence in GitHub,
+and concurrent sessions or human maintainers open items in the same repository
+simultaneously.
+Batching a subscription call on a predicted number results in silently
+subscribing to another session's PR,
+leaving the intended PR unwatched and unaware of CI failures or review findings
+(Issue #4090, 2026-09-28 on Morrison-Lab/pds).
+See also [`report-mistakes-proactively`](report-mistakes-proactively.md).
+
+- **Do:** invoke `subscribe_pr_activity` only after `create_pull_request` returns,
+  passing the exact number returned by the create call.
+- **Don't:** batch a PR subscription tool call with the PR creation call.
+- **Don't:** compute or predict a PR number based on recent repo activity.
+
 **Review-only.**
 Do not start ARDI, do not push fixes, and do not merge.
 Leave the findings and stop unless asked to iterate.

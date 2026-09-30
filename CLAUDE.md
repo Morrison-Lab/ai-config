@@ -244,7 +244,9 @@ Detail, rationale, and cases: [`shared/workflow/post-feedback-to-pr.md`](shared/
 
 ## Subscribe to PR updates automatically
 
-When opening or taking over a PR in any repo, subscribe/watch that PR's activity immediately using the available GitHub notification/subscription mechanism. If the current session's tools cannot subscribe, say so explicitly and fall back to active polling for reviews, comments, and checks during the session.
+When opening or taking over a PR in any repo, subscribe/watch that PR's activity immediately using the available GitHub notification/subscription mechanism.
+Subscribe only after the PR creation call returns, using the returned number or URL --- never batch subscription with creation or predict the number.
+If the current session's tools cannot subscribe, say so explicitly and fall back to active polling for reviews, comments, and checks during the session.
 
 ## Monitor every pushed PR head to completion
 

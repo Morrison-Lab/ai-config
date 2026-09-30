@@ -118,6 +118,13 @@ A verified clean stopping point needs no timer because no work remains to resume
 Do not substitute a promise to return for a mechanism that will actually fire.
 See `shared/workflow/flag-session-boundaries.md`.
 
+## Say whether the session is done when reporting stopping point status
+
+When ending a turn and reporting stopping point status, explicitly state whether the session is done or not, including confirming that UMS has run (or no new learnings accumulated) and that all follow-up items noticed during the turn or task have been filed.
+- If done: state that the session is done, UMS was run (or no new learnings accumulated), and any follow-up items are filed.
+- If not done: state that the session is not done and what concrete steps remain queued.
+See `shared/workflow/flag-session-boundaries.md`.
+
 ## Terminate superseded and abandoned background tasks
 
 When background tasks, asynchronous command executions, monitors, or subagents are dispatched to inspect, search, or diagnose an issue, actively terminate them as soon as their purpose is fulfilled, their findings are superseded, or the session moves on.

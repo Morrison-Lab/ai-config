@@ -34,6 +34,7 @@ These instructions define standardized operating rules for Antigravity operating
     sweep active tasks before declaring completion.
 16. **Deliver completed implementation work:** When asked to implement, edit, or write up a change on a feature branch, do not stop at an uncommitted or unpushed worktree.
     Complete the delivery cycle: commit scoped changes, run adversarial self-review to a clean verdict, push the branch, and open or update its Pull Request automatically without waiting for the user to ask.
+17. **Say whether the session is done when reporting stopping point status:** When ending a turn and reporting stopping point status, explicitly state whether the session is done or not, including running UMS (or confirming no new learnings accumulated) and filing noticed follow-up items.
 
 ## Antigravity Workflow Conventions
 

@@ -41,6 +41,11 @@ RX_LINE = re.compile(
     r"^\s*(?:[-*]\s+|\d+\.\s+|#{1,6}\s+)?(?:\*\*)?Stopping Point:?(?:\*\*)?:?\s*(?:Clean\b|Not (?:a )?clean\b)",
     re.IGNORECASE,
 )
+RX_SESSION_STATUS = re.compile(
+    r"\bsession\s+(?:is\s+)?(?:not\s+done|done|not\s+finished|finished|not\s+complete|complete|ongoing|in\s+progress)\b",
+    re.IGNORECASE,
+)
+RX_SECTION_BREAK = re.compile(r"^(?:#{1,6}\s+|[-*+]\s+|\d+\.\s+)")
 RX_INDENTED_CODE = re.compile(r"^(?: {4,}|\t)(?![-*]\s+|\d+\.\s+)")
 INLINE_CODE_RX = re.compile(r"`[^`\n]+`")
 
@@ -67,12 +72,23 @@ def has_stopping_point_declaration(text: str) -> bool:
         stripped = strip_fences(text, swallow_unclosed=False)
     else:
         stripped = text
-    for line in stripped.splitlines():
+    lines = stripped.splitlines()
+    for i, line in enumerate(lines):
         if RX_INDENTED_CODE.match(line):
             continue
         line_no_inline = INLINE_CODE_RX.sub("", line)
         if RX_LINE.search(line_no_inline):
-            return True
+            combined_parts = [line_no_inline]
+            for j in range(i + 1, min(len(lines), i + 6)):
+                nxt = INLINE_CODE_RX.sub("", lines[j]).strip()
+                if not nxt:
+                    continue
+                if RX_SECTION_BREAK.match(nxt) and not RX_LINE.search(nxt):
+                    break
+                combined_parts.append(nxt)
+            combined = " ".join(combined_parts)
+            if RX_SESSION_STATUS.search(combined):
+                return True
     return False
 
 
@@ -256,8 +272,9 @@ def main() -> int:
             {
                 "decision": "block",
                 "reason": (
-                    "State `**Stopping Point**: Clean stopping point reached` or "
-                    "`**Stopping Point**: Not a clean stopping point / work remains queued: <details>` "
+                    "State whether the session is done or not using "
+                    "`**Stopping Point**: Clean stopping point reached --- session done; UMS executed; no follow-up items pending` or "
+                    "`**Stopping Point**: Not a clean stopping point / work remains queued: session not done; <details>` "
                     "before ending the turn."
                 ),
             }

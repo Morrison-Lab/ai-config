@@ -70,7 +70,8 @@ Detail, rationale, and cases: [`shared/workflow/status-requests-act.md`](shared/
 
 [`shared/workflow/flag-session-boundaries.md`](shared/workflow/flag-session-boundaries.md) (linked, not imported: read it before declaring a stopping point)
 
-Every message that ends a turn or a stretch of work states `**Stopping Point**: Clean stopping point reached` or `**Stopping Point**: Not a clean stopping point / work remains queued: ...`.
+Every message that ends a turn or a stretch of work states `**Stopping Point**: Clean stopping point reached --- session done; UMS executed; no follow-up items pending` or `**Stopping Point**: Not a clean stopping point / work remains queued: session not done; ...`.
+State explicitly whether the session is done or not, confirm UMS pass, and confirm noticed follow-up items are filed.
 Before every non-clean pause, arm a timer or other wake that resumes the next step, and report when it fires.
 Exception: when a harness posts the final message somewhere and no person reads the session turn by turn (a CI or `@claude` workflow run), put the declaration inside the substantive reply or omit it, never after it, since the harness keeps only the last message ([rme#1081](https://github.com/d-morrison/rme/issues/1081)).
 Proactively flag a good stopping point with the `⚠️ **FLAG** ---` tag.

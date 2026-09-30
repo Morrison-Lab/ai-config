@@ -1105,4 +1105,14 @@ Hit on [wai#128](https://github.com/Morrison-Lab/wai/issues/128) (byok ITPM/budg
   Early binding caches an uninitialized environment that shadows subsequent Python evaluations.
   Assign `py <- reticulate::py` inside or immediately following the chunk where Python code runs
   so inline expressions (` `r py$var` `) access live variables.
+- **Observable JS (OJS) table header background in dark-themed Quarto documents**:
+  In Quarto documents with Observable JS (OJS) widgets embedded in light panel containers (`.widget-panel`) with hardcoded dark text (`color: #222`):
+  Quarto's dark theme injects `div.observablehq table thead tr th { background-color: var(--bs-body-bg); }`,
+  which resolves `--bs-body-bg` to `#222`,
+  creating invisible black-on-black table headers inside the light panel.
+  Overriding this in `custom.scss` with
+  `.widget-panel table thead tr th { background-color: transparent; color: #222; }`
+  overrides the dark theme rule cleanly
+  without needing redundant container selectors or unused Bootstrap table custom properties.
+
 

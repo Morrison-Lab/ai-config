@@ -69,6 +69,7 @@ class Violation(NamedTuple):
     call_kind: str
     message: str
     line_content: str
+    end_line_number: int = 0
 
 
 class ScanResult(NamedTuple):
@@ -108,11 +109,12 @@ class TextIOVisitor(ast.NodeVisitor):
 
     def visit_Call(self, node: ast.Call) -> None:
         lineno = getattr(node, "lineno", 0)
+        end_lineno = getattr(node, "end_lineno", lineno)
         col = getattr(node, "col_offset", 0)
         line_text = self._line_text(lineno)
 
-        # Check for inline exemption
-        if has_exemption(line_text):
+        # Check for inline exemption across all lines spanning the call
+        if any(has_exemption(self._line_text(l)) for l in range(lineno, end_lineno + 1)):
             self.generic_visit(node)
             return
 
@@ -129,6 +131,7 @@ class TextIOVisitor(ast.NodeVisitor):
                         call_kind="read_text",
                         message="bare read_text() without explicit encoding",
                         line_content=line_text.strip(),
+                        end_line_number=end_lineno,
                     )
                 )
 
@@ -145,6 +148,7 @@ class TextIOVisitor(ast.NodeVisitor):
                         call_kind="write_text",
                         message="bare write_text() without explicit encoding",
                         line_content=line_text.strip(),
+                        end_line_number=end_lineno,
                     )
                 )
 
@@ -187,6 +191,7 @@ class TextIOVisitor(ast.NodeVisitor):
                             call_kind=kind,
                             message=f"bare {kind}() in text mode ({mode_desc}) without explicit encoding",
                             line_content=line_text.strip(),
+                            end_line_number=end_lineno,
                         )
                     )
 
@@ -221,6 +226,7 @@ class TextIOVisitor(ast.NodeVisitor):
                             call_kind=f"tempfile.{func_name}",
                             message=f"bare tempfile.{func_name}() in text mode ({mode_val!r}) without explicit encoding",
                             line_content=line_text.strip(),
+                            end_line_number=end_lineno,
                         )
                     )
 
@@ -407,8 +413,11 @@ def get_untracked_python_files(repo_root: Path) -> List[Path]:
         rel = line.strip()
         if not rel:
             continue
+        rel_p = Path(rel)
+        if any(part in IGNORED_DIRS for part in rel_p.parts) or "scripts/vendor/" in rel:
+            continue
         p = repo_root / rel
-        if p.is_file() and not any(part in IGNORED_DIRS for part in p.parts):
+        if p.is_file():
             untracked.append(p)
     return untracked
 
@@ -443,9 +452,10 @@ def scan_diff(repo_root: Path, base_ref: str) -> ScanResult:
     for rel_path, added_set in file_added_lines.items():
         if not rel_path.endswith(".py"):
             continue
-        p = repo_root / rel_path
-        if any(part in IGNORED_DIRS for part in p.parts) or "scripts/vendor/" in rel_path:
+        rel_p = Path(rel_path)
+        if any(part in IGNORED_DIRS for part in rel_p.parts) or "scripts/vendor/" in rel_path:
             continue
+        p = repo_root / rel_path
 
         total_scanned_files.add(rel_path)
         total_added_lines += len(added_set)
@@ -454,7 +464,8 @@ def scan_diff(repo_root: Path, base_ref: str) -> ScanResult:
         if error:
             errors.append(error)
         for v in file_violations:
-            if v.line_number in added_set:
+            end_l = v.end_line_number or v.line_number
+            if any(l in added_set for l in range(v.line_number, end_l + 1)):
                 violations.append(v)
 
     for p in untracked_files:
@@ -544,9 +555,15 @@ def main(argv: Optional[List[str]] = None) -> int:
         action="store_true",
         help="Quiet mode (only report errors/violations)",
     )
+    parser.add_argument(
+        "--repo-root",
+        type=Path,
+        default=ROOT,
+        help="Repository root (default: directory containing scripts/)",
+    )
     args = parser.parse_args(argv)
 
-    repo_root = ROOT
+    repo_root = args.repo_root
 
     if args.diff:
         try:

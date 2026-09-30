@@ -176,6 +176,64 @@ def main() -> int:
         check("json status is clean", clean_data["status"] == "clean")
         check("json has zero violations", clean_data["violations_count"] == 0)
 
+        # 6. Diff mode tests in a test git repo fixture
+        # (Path explicitly contains '.gemini' segment to prevent regression of Finding 1)
+        repo_dir = d / ".gemini" / "test_repo"
+        repo_dir.mkdir(parents=True)
+        subprocess.run(["git", "init"], cwd=repo_dir, capture_output=True, check=True)
+        subprocess.run(["git", "config", "user.name", "Tester"], cwd=repo_dir, capture_output=True, check=True)
+        subprocess.run(["git", "config", "user.email", "tester@example.com"], cwd=repo_dir, capture_output=True, check=True)
+
+        # Base commit on main
+        write_file(repo_dir, "initial.py", 'with open("file.txt", encoding="utf-8") as f:\n    pass\n')
+        subprocess.run(["git", "add", "initial.py"], cwd=repo_dir, capture_output=True, check=True)
+        subprocess.run(["git", "commit", "-m", "init"], cwd=repo_dir, capture_output=True, check=True)
+
+        # Clean change in diff
+        write_file(repo_dir, "clean_change.py", 'with open("c.txt", encoding="utf-8") as f:\n    pass\n')
+        subprocess.run(["git", "add", "clean_change.py"], cwd=repo_dir, capture_output=True, check=True)
+        proc = subprocess.run(
+            [sys.executable, str(SCRIPT), "--diff", "--base", "HEAD", "--repo-root", str(repo_dir)],
+            cwd=repo_dir,
+            capture_output=True,
+            text=True,
+        )
+        check("diff mode clean change passes", proc.returncode == 0)
+        check("diff mode clean reports verified", "explicit encoding verified" in proc.stdout)
+
+        # Bad change in diff
+        write_file(repo_dir, "bad_change.py", 'with open("b.txt") as f:\n    pass\n')
+        proc = subprocess.run(
+            [sys.executable, str(SCRIPT), "--diff", "--base", "HEAD", "--repo-root", str(repo_dir)],
+            cwd=repo_dir,
+            capture_output=True,
+            text=True,
+        )
+        check("diff mode flags uncommitted bad text I/O", proc.returncode == 1)
+        check("diff mode error names bare open", "bare open()" in proc.stderr)
+
+        # Multi-line call in diff where only later lines are in diff
+        write_file(repo_dir, "multiline.py", 'content = (\n    p\n    .read_text()\n)\n')
+        proc = subprocess.run(
+            [sys.executable, str(SCRIPT), "--diff", "--base", "HEAD", "--repo-root", str(repo_dir)],
+            cwd=repo_dir,
+            capture_output=True,
+            text=True,
+        )
+        check("diff mode flags multi-line bare read_text", proc.returncode == 1)
+
+        # Multi-line with exemption comment on later line
+        write_file(repo_dir, "multiline_exempt.py", 'content = (\n    p\n    .read_text()  # noqa: text-encoding\n)\n')
+        (repo_dir / "bad_change.py").unlink(missing_ok=True)
+        (repo_dir / "multiline.py").unlink(missing_ok=True)
+        proc = subprocess.run(
+            [sys.executable, str(SCRIPT), "--diff", "--base", "HEAD", "--repo-root", str(repo_dir)],
+            cwd=repo_dir,
+            capture_output=True,
+            text=True,
+        )
+        check("diff mode honors multi-line exemption comment", proc.returncode == 0)
+
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

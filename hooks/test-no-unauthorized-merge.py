@@ -1681,6 +1681,34 @@ with patch.object(_guard.shutil, "which", return_value="/bin/gh"):
 wrong += not _ok_malformed
 print(f"  {'allow' if _ok_malformed else 'WRONG':<6} fetch_pr_changed_paths fails closed on malformed gh listing without REST fallback")
 
+checks += 1
+with patch.object(_guard.shutil, "which", return_value="/bin/gh"):
+    def _fake_run_bad_meta(args, **kwargs):
+        class _Out:
+            returncode = 0
+            stdout = "not-a-count\n" + TEST_HEAD_SHA + "\n"
+        return _Out()
+    with patch.object(_guard.subprocess, "run", side_effect=_fake_run_bad_meta):
+        with patch.object(_guard, "_fetch_pr_via_rest") as _m_rest_fail3:
+            _res_bad_meta = _guard.fetch_pr_changed_paths("Morrison-Lab/pds", 15)
+            _ok_bad_meta = _res_bad_meta is None and not _m_rest_fail3.called
+wrong += not _ok_bad_meta
+print(f"  {'allow' if _ok_bad_meta else 'WRONG':<6} fetch_pr_changed_paths fails closed on non-numeric gh metadata count without REST fallback")
+
+checks += 1
+with patch.object(_guard.shutil, "which", return_value="/bin/gh"):
+    def _fake_run_bad_sha(args, **kwargs):
+        class _Out:
+            returncode = 0
+            stdout = "1\nnot-a-valid-sha\n"
+        return _Out()
+    with patch.object(_guard.subprocess, "run", side_effect=_fake_run_bad_sha):
+        with patch.object(_guard, "_fetch_pr_via_rest") as _m_rest_fail4:
+            _res_bad_sha = _guard.fetch_pr_changed_paths("Morrison-Lab/pds", 15)
+            _ok_bad_sha = _res_bad_sha is None and not _m_rest_fail4.called
+wrong += not _ok_bad_sha
+print(f"  {'allow' if _ok_bad_sha else 'WRONG':<6} fetch_pr_changed_paths fails closed on invalid gh head SHA without REST fallback")
+
 # End-to-end grant evaluation in simulated cloud session (no gh on PATH)
 def _rest_infra_case(desc, want, files, command=None, mcp=None, head_sha=TEST_HEAD_SHA):
     global checks, wrong

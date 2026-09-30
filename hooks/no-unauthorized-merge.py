@@ -1837,38 +1837,38 @@ def fetch_pr_changed_paths(target: str, number: int) -> tuple[list[str], str] | 
             return True, (out.stdout if out.returncode == 0 else None)
 
         gh_runnable, info = gh_api(f"repos/{target}/pulls/{number}", "--jq", r".changed_files, .head.sha")
-        if gh_runnable and info is not None:
-            info_lines = info.strip().splitlines()
-            if len(info_lines) == 2:
-                count_str, head_sha = info_lines[0].strip(), info_lines[1].strip()
-                if count_str.isdigit() and re.fullmatch(r"[0-9a-fA-F]{40,64}", head_sha):
-                    gh_runnable, listing = gh_api(
-                        "--paginate", f"repos/{target}/pulls/{number}/files?per_page=100",
-                        "--jq", r'.[] | "F\t\(.filename)", (.previous_filename // empty | "P\t\(.)")',
-                    )
-                    if gh_runnable and listing is not None:
-                        current, previous = [], []
-                        valid = True
-                        for line in listing.splitlines():
-                            kind, _, path = line.partition("\t")
-                            if kind == "F" and path:
-                                current.append(path)
-                            elif kind == "P" and path:
-                                previous.append(path)
-                            elif line.strip():
-                                valid = False
-                                break
-                        if valid and current and len(current) < GITHUB_PR_FILES_CAP and len(current) == int(count_str):
-                            return current + previous, head_sha
-                        return None
-                    elif not gh_runnable:
-                        pass
-                    else:
-                        return None
-            else:
-                return None
-        elif gh_runnable:
+        if not gh_runnable:
+            pass
+        elif info is None:
             return None
+        else:
+            info_lines = info.strip().splitlines()
+            if len(info_lines) != 2:
+                return None
+            count_str, head_sha = info_lines[0].strip(), info_lines[1].strip()
+            if not count_str.isdigit() or not re.fullmatch(r"[0-9a-fA-F]{40,64}", head_sha):
+                return None
+            gh_runnable, listing = gh_api(
+                "--paginate", f"repos/{target}/pulls/{number}/files?per_page=100",
+                "--jq", r'.[] | "F\t\(.filename)", (.previous_filename // empty | "P\t\(.)")',
+            )
+            if not gh_runnable:
+                pass
+            elif listing is None:
+                return None
+            else:
+                current, previous = [], []
+                for line in listing.splitlines():
+                    kind, _, path = line.partition("\t")
+                    if kind == "F" and path:
+                        current.append(path)
+                    elif kind == "P" and path:
+                        previous.append(path)
+                    elif line.strip():
+                        return None
+                if not current or len(current) >= GITHUB_PR_FILES_CAP or len(current) != int(count_str):
+                    return None
+                return current + previous, head_sha
 
     return _fetch_pr_via_rest(target, number, deadline)
 

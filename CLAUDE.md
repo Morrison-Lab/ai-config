@@ -1208,6 +1208,15 @@ math, apply this in addition to the fact-check above.
 
 A model is never "Bayesian"; only how it is fitted is.
 
+## Hyperlink liberally: make it easy for readers to find more information
+
+[`shared/writing/hyperlink-liberally.md`](shared/writing/hyperlink-liberally.md)
+
+When authoring documentation, guides, READMEs, rules, skills, memories, PR descriptions, issue comments, commit explanations, or agent replies, connect named concepts, tools, artifacts, and references to clickable URLs rather than leaving them as plain text that forces the reader to search.
+
+- **Do:** hyperlink tools, libraries, internal rules, forge artifacts, and technical terms to their canonical URLs or relative paths.
+- **Don't:** leave references to external packages, internal policies, or forge items as plain unlinked text.
+
 ## Hyperlink technical terms and results; no forward references
 
 [shared/writing/definition-crossrefs.md](shared/writing/definition-crossrefs.md)

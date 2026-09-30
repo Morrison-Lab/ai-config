@@ -139,7 +139,7 @@ EXPECTED = {
 def run_case_in_repo(hook_path: str, case_id: str, extra_env: dict[str, str] | None = None) -> tuple[bool, dict]:
     rel_path, content, command, _desc = CASES[case_id]
     with tempfile.TemporaryDirectory() as td:
-        subprocess.run(["git", "init"], cwd=td, check=True, capture_output=True)
+        subprocess.run(["git", "init", "-b", "main"], cwd=td, check=True, capture_output=True)
         subprocess.run(["git", "config", "user.name", "Test User"], cwd=td, check=True)
         subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=td, check=True)
 

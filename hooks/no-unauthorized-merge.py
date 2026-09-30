@@ -1860,6 +1860,7 @@ def fetch_pr_changed_paths(target: str, number: int) -> tuple[list[str], str] | 
                                 break
                         if valid and current and len(current) < GITHUB_PR_FILES_CAP and len(current) == int(count_str):
                             return current + previous, head_sha
+                        return None
                     elif not gh_runnable:
                         pass
                     else:

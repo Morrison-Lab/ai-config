@@ -1653,6 +1653,34 @@ with patch.object(_guard.shutil, "which", return_value="/bin/gh"):
 wrong += not _ok_fb
 print(f"  {'allow' if _ok_fb else 'WRONG':<6} fetch_pr_changed_paths falls back to REST when gh raises OSError")
 
+checks += 1
+with patch.object(_guard.shutil, "which", return_value="/bin/gh"):
+    def _fake_run_mismatch(args, **kwargs):
+        class _Out:
+            returncode = 0
+            stdout = "2\n" + TEST_HEAD_SHA + "\n" if "repos/" in args[2] and "files" not in args[2] else "F\t.github/ci.yml\n"
+        return _Out()
+    with patch.object(_guard.subprocess, "run", side_effect=_fake_run_mismatch):
+        with patch.object(_guard, "_fetch_pr_via_rest") as _m_rest_fail:
+            _res_mismatch = _guard.fetch_pr_changed_paths("Morrison-Lab/pds", 15)
+            _ok_mismatch = _res_mismatch is None and not _m_rest_fail.called
+wrong += not _ok_mismatch
+print(f"  {'allow' if _ok_mismatch else 'WRONG':<6} fetch_pr_changed_paths fails closed when gh listing validation fails without REST fallback")
+
+checks += 1
+with patch.object(_guard.shutil, "which", return_value="/bin/gh"):
+    def _fake_run_malformed(args, **kwargs):
+        class _Out:
+            returncode = 0
+            stdout = "1\n" + TEST_HEAD_SHA + "\n" if "repos/" in args[2] and "files" not in args[2] else "UNEXPECTED_FORMAT\n"
+        return _Out()
+    with patch.object(_guard.subprocess, "run", side_effect=_fake_run_malformed):
+        with patch.object(_guard, "_fetch_pr_via_rest") as _m_rest_fail2:
+            _res_malformed = _guard.fetch_pr_changed_paths("Morrison-Lab/pds", 15)
+            _ok_malformed = _res_malformed is None and not _m_rest_fail2.called
+wrong += not _ok_malformed
+print(f"  {'allow' if _ok_malformed else 'WRONG':<6} fetch_pr_changed_paths fails closed on malformed gh listing without REST fallback")
+
 # End-to-end grant evaluation in simulated cloud session (no gh on PATH)
 def _rest_infra_case(desc, want, files, command=None, mcp=None, head_sha=TEST_HEAD_SHA):
     global checks, wrong

@@ -968,9 +968,10 @@ check(
 
 with tempfile.TemporaryDirectory() as tmp:
     base = Path(tmp)
-    (base / "CLAUDE.md").write_text("@frag.md\n", encoding="utf-8")
-    (base / "frag.md").write_text("short", encoding="utf-8")
+    (base / "CLAUDE.md").write_bytes(b"@frag.md\n")
+    (base / "frag.md").write_bytes(b"short")
     subprocess.run(["git", "init", "-q", "-b", "main"], cwd=base, check=True)
+    subprocess.run(["git", "config", "core.autocrlf", "false"], cwd=base, check=True)
     subprocess.run(["git", "config", "user.email", "t@t.com"], cwd=base, check=True)
     subprocess.run(["git", "config", "user.name", "t"], cwd=base, check=True)
     subprocess.run(["git", "add", "-A"], cwd=base, check=True)
@@ -979,7 +980,7 @@ with tempfile.TemporaryDirectory() as tmp:
         ["git", "rev-parse", "HEAD"], cwd=base, capture_output=True, text=True
     ).stdout.strip()
     # Grow the fragment in the working tree only; the baseline rev keeps "short".
-    (base / "frag.md").write_text("a considerably longer fragment", encoding="utf-8")
+    (base / "frag.md").write_bytes(b"a considerably longer fragment")
 
     at_base, _, _, _ = ccc.walk_closure("CLAUDE.md", ccc.baseline_reader(base, first))
     in_tree, _, _, _ = ccc.walk_closure("CLAUDE.md", ccc.local_reader(base))
@@ -1370,6 +1371,38 @@ check(
     "this repo's own closure is under the CLI total-limit gate",
     ccc.main([]) == 0,
 )
+
+# --- AGENTS.md Codex 32 KiB byte gate (ai-config#4066) -----------------------
+
+over, text = ccc.render_agents_md_cap(30_000, 32_768)
+check(
+    "render_agents_md_cap under cap reports headroom",
+    not over and "30,000 bytes against Codex's 32,768-byte cap" in text and "2,768 to spare" in text,
+)
+
+over, text = ccc.render_agents_md_cap(33_000, 32_768)
+check(
+    "render_agents_md_cap over cap reports overshoot and companion recommendation",
+    over and "OVER THE CODEX AGENTS.MD CAP by 232 bytes" in text and "AGENTS.cases.md" in text,
+)
+
+with tempfile.TemporaryDirectory() as tmp:
+    base = Path(tmp)
+    (base / "CLAUDE.md").write_text("intro\n", encoding="utf-8")
+    (base / "AGENTS.md").write_text("x" * 150, encoding="utf-8")
+    common = ["--base", str(base), "--budget", "100000000"]
+    check(
+        "AGENTS.md over cap exits 1 without --strict",
+        ccc.main(common + ["--agents-md-cap", "100"]) == 1,
+    )
+    check(
+        "AGENTS.md over cap exits 0 when --no-agents-md-gate is passed",
+        ccc.main(common + ["--agents-md-cap", "100", "--no-agents-md-gate"]) == 0,
+    )
+    check(
+        "AGENTS.md under cap exits 0",
+        ccc.main(common + ["--agents-md-cap", "200"]) == 0,
+    )
 
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

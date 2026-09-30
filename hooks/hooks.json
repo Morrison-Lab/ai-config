@@ -513,6 +513,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-recursive-search-cloud-mount.py\"",
+            "timeout": 10,
+            "script": "warn-recursive-search-cloud-mount.py",
+            "why": "memories/course-repos.md 'List a cloud-sync mount's top level before searching it' (ai-config#4072). A recursive search (find, grep -r, rg, fd, ls -R, glob **) over a cloud-sync or network mount (Google Drive G:\\My Drive, /g/My Drive, OneDrive, Dropbox, SMB UNC shares) faults in and streams every folder it touches, causing severe system lag, client disconnects, and false-negative timeout truncations. Warns to list the top level first (e.g. find -maxdepth 1, ls, or a top-level index like Texts_by_Title) and descend only into specific folders."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-push-without-self-review.py\"",
             "timeout": 10,
             "script": "no-push-without-self-review.py",

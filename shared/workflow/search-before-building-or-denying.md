@@ -67,10 +67,14 @@ Whenever evaluating permissions or starting capability work:
    - `shared/` (shared workflow guides, principles, and writing standards)
    - Open tracker issues and discussions
 2. **When asked to create, add, or adjust a capability or policy:**
-   Always run an issue tracker search first (per [`issue-first`](issue-first.md)):
+   Always run an issue tracker search first (per [`issue-first`](issue-first.md)),
+   raising `--limit` well past plausible match counts
+   so closed issues do not crowd out open ones:
    ```bash
-   gh issue list --state all --limit 100 --search "<keywords>"
+   gh issue list --state all --limit 300 --search "<keywords>"
    ```
+   If the returned count equals the limit,
+   raise `--limit` again until the result is uncapped.
    Check if an open issue or PR already tracks the request,
    articulates technical requirements,
    or provides an existing allowlist.

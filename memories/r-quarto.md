@@ -1104,15 +1104,19 @@ Hit on [wai#128](https://github.com/Morrison-Lab/wai/issues/128) (byok ITPM/budg
   do not assign `py <- reticulate::py` in an early knitr setup chunk before Python runs.
   Early binding caches an uninitialized environment that shadows subsequent Python evaluations.
   Assign `py <- reticulate::py` inside or immediately following the chunk where Python code runs
-  so inline expressions (` `r py$var` `) access live variables.
-- **Observable JS (OJS) table header background in dark-themed Quarto documents**:
-  In Quarto documents with Observable JS (OJS) widgets embedded in light panel containers (`.widget-panel`) with hardcoded dark text (`color: #222`):
-  Quarto's dark theme injects `div.observablehq table thead tr th { background-color: var(--bs-body-bg); }`,
-  which resolves `--bs-body-bg` to `#222`,
-  creating invisible black-on-black table headers inside the light panel.
-  Overriding this in `custom.scss` with
-  `.widget-panel table thead tr th { background-color: transparent; color: #222; }`
-  overrides the dark theme rule cleanly
-  without needing redundant container selectors or unused Bootstrap table custom properties.
-
-
+  so inline expressions (`` `r py$var` ``) access live variables.
+- **Observable JS (OJS) table header background in dark-themed Quarto documents (unverified)**:
+  In `Morrison-Lab/mds` PR #52, a `.widget-panel` OJS panel with hardcoded dark text (`color: #222`)
+  showed a suspected dark-theme contrast issue on table headers,
+  attributed to an assumed Quarto dark-theme rule
+  (`div.observablehq table thead tr th { background-color: var(--bs-body-bg); }`)
+  resolving `--bs-body-bg` to `#222` and producing black-on-black headers.
+  That CSS-variable-resolution claim was never confirmed against Quarto's own source,
+  and no `.widget-panel` in `mds` actually renders a table yet, so the fix is unexercised.
+  The `custom.scss` change merged in mds#52 is broader than a single selector:
+  it sets `.widget-panel table`, `.widget-panel table thead tr th`,
+  and `.widget-panel table th, .widget-panel table td` together,
+  overriding `color`/`background-color` alongside the Bootstrap table custom properties
+  `--bs-table-color`, `--bs-table-bg`, `--bs-table-border-color`,
+  `--bs-table-striped-color`, and `--bs-table-striped-bg`.
+  Treat this as unverified until a real rendered table in a `.widget-panel` confirms it.

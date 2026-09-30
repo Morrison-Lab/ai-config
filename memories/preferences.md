@@ -421,6 +421,19 @@
   Grounding instructions in real lab PRs and edits makes guidance concrete,
   relatable, and directly actionable.
   See [`shared/principles/use-real-world-examples.md`](../shared/principles/use-real-world-examples.md).
+- **Search the tracker and AGENTS.md before building or denying a policy**:
+  When asked whether a permission, policy, or standing grant exists,
+  search the full policy corpus (`AGENTS.md`, `CLAUDE.md`, `memories/`, `shared/`,
+  and open issues) before answering "no" --- `AGENTS.md` is the universal contract
+  and defines cross-repo standing grants (such as the infra-PR `mwc` grant)
+  that are not duplicated in `skills/` or `memories/`.
+  Before implementing a capability request, run an all-state tracker search
+  to avoid duplicating existing open work (as occurred when #4085 duplicated #4039).
+  If an existing directive covers a design or scope question,
+  show the user the directive and ask whether it still stands,
+  rather than asking them to choose from scratch.
+  (Learned on `Morrison-Lab/pds`, Issue #4092, 2026-09-28).
+  See [`shared/workflow/grep-is-not-coverage.md`](../shared/workflow/grep-is-not-coverage.md).
 - Always run /ums (Update Memories and Skills) after finishing a task --- don't wait to be asked.
 - After a PR/MR merges, run the `post-merge` skill: verify the merge actually landed, tidy the local branch (checkout main, pull, `git branch -d`), confirm any deferred items are tracked, then run UMS to capture what the PR's review lifecycle taught --- mistakes corrected and guidance given along the way.
   A merge is the natural checkpoint to bank lessons before context is lost.

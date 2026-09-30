@@ -309,9 +309,9 @@ check("and still records its value",
 # here rather than left to that hook's own suite.
 
 check("an absolute target is the new directory",
-      shellcmd.resolve_cd_target(["cd", "/srv/repo"], "/home/me"), "/srv/repo")
+      shellcmd.resolve_cd_target(["cd", "/srv/repo"], "/home/me"), os.path.normpath("/srv/repo"))
 check("a relative target resolves against where the shell stood",
-      shellcmd.resolve_cd_target(["cd", "hooks"], "/srv/repo"), "/srv/repo/hooks")
+      shellcmd.resolve_cd_target(["cd", "hooks"], "/srv/repo"), os.path.normpath("/srv/repo/hooks"))
 check("`cd -` is indeterminate, not unchanged",
       shellcmd.resolve_cd_target(["cd", "-"], "/srv/repo"), None)
 check("`popd` is indeterminate without a simulated stack",
@@ -321,7 +321,7 @@ check("`popd -n` moves nothing",
 check("bare `cd` goes home rather than staying put",
       shellcmd.resolve_cd_target(["cd"], "/srv/repo"), os.path.expanduser("~"))
 check("`pushd <dir>` moves like `cd`",
-      shellcmd.resolve_cd_target(["pushd", "/srv/other"], "/srv/repo"), "/srv/other")
+      shellcmd.resolve_cd_target(["pushd", "/srv/other"], "/srv/repo"), os.path.normpath("/srv/other"))
 check("an unexpanded variable target is indeterminate",
       shellcmd.resolve_cd_target(["cd", "$WT"], "/srv/repo"), None)
 

@@ -218,21 +218,7 @@ When a new entry lands after `main` has appended one of its own, take the next n
   which is why it does not feel like a new head needing a new review verdict,
   but auto-merge fires the instant CI finishes,
   before any reviewer can evaluate the new head.
-- **Example**:
-  - 2026-08-26 on `ai-config#2226`:
-    armed `--squash --auto` while round-1 findings were open and the reviewer was quota-skipping.
-    Hours later a push turned `validate` green,
-    auto-merge fired at 04:30Z,
-    and it merged over an explicit Needs-more-work verdict ---
-    requiring revert (#2268) plus reland-with-fixes (#2269).
-  - 2026-08-28 on `ai-config#2556` (Issue #2558):
-    verified fully clean at `2c1ae45d` (checker exit 0, verdict `Ready for merge` at that exact SHA, zero unresolved threads).
-    A direct merge was refused because `main` had moved (`the head branch is not up to date with the base branch`).
-    Merged `origin/main` in and pushed `54874be0`,
-    then armed `--auto` reasoning that the merge was already verified.
-    A clean review verdict for `54874be0` landed at 22:18:44Z and auto-merge fired at 22:20:29Z;
-    had auto-merge fired before the review posted,
-    it would have merged an unreviewed head.
+- **Example**: see [`mistake-patterns.cases.md`](mistake-patterns.cases.md) Pattern 12 for the 2026-08-26 (`ai-config#2226`) and 2026-08-28 (`ai-config#2556`) cases.
 - **Canonical Rule**: [`fully-clean.md`](../shared/workflow/fully-clean.md).
   See also [`check-before-pushing.md`](../shared/workflow/check-before-pushing.md)
   and [`sync-with-main.md`](../shared/workflow/sync-with-main.md):

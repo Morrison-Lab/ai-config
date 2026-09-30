@@ -1095,3 +1095,14 @@ Hit on [wai#128](https://github.com/Morrison-Lab/wai/issues/128) (byok ITPM/budg
   upstream or suggested R package, unit tests must verify full `formals()`
   equality (both argument names and default values) and output equivalence
   across every supported target format, rather than testing only `names(formals())`.
+- **`QUARTO_R` on Windows**:
+  When Quarto fails to discover an installed R binary on Windows for knitr execution,
+  set `$env:QUARTO_R = "C:\Program Files\R\R-4.5.1\bin\x64\R.exe"` (or the appropriate R executable path)
+  in the execution session.
+- **Reticulate `py` binding in Quarto documents**:
+  In Quarto documents mixing R and Python via `reticulate`,
+  do not assign `py <- reticulate::py` in an early knitr setup chunk before Python runs.
+  Early binding caches an uninitialized environment that shadows subsequent Python evaluations.
+  Assign `py <- reticulate::py` inside or immediately following the chunk where Python code runs
+  so inline expressions (` `r py$var` `) access live variables.
+

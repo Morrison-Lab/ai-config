@@ -180,7 +180,7 @@ def main() -> int:
         # (Path explicitly contains '.gemini' segment to prevent regression of Finding 1)
         repo_dir = d / ".gemini" / "test_repo"
         repo_dir.mkdir(parents=True)
-        subprocess.run(["git", "init"], cwd=repo_dir, capture_output=True, check=True)
+        subprocess.run(["git", "init", "-b", "main"], cwd=repo_dir, capture_output=True, check=True)
         subprocess.run(["git", "config", "user.name", "Tester"], cwd=repo_dir, capture_output=True, check=True)
         subprocess.run(["git", "config", "user.email", "tester@example.com"], cwd=repo_dir, capture_output=True, check=True)
 

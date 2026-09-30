@@ -153,7 +153,10 @@ CASES = [
     (
         [
             bash_tool("git checkout -q origin/main -- website/"),
-            say_claude("**Stopping Point**: Not a clean stopping point / work remains queued."),
+            say_claude(
+                "**Stopping Point**: Not a clean stopping point / "
+                "work remains queued: session not done; PR 1 open."
+            ),
         ],
         False,
         "Negated stopping point ('Not a clean stopping point') does not warn",

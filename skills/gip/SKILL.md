@@ -165,6 +165,7 @@ and the default branch for each issue:
 >    `git commit --allow-empty -m "start: <title> (closes #<N>)"`,
 >    then `git push -u origin HEAD` (retry with backoff on a network error),
 >    then `gh pr create --draft …` (or `mcp__github__create_pull_request` with `draft: true`).
+>    If drafting the PR body in a temporary file, use a unique per-agent path (e.g. `pr-<N>.md` or `mktemp`) per [`use-subagents`](../../shared/workflow/use-subagents.md), never a shared static path like `pr.md`.
 >    A draft doesn't trigger the review bot on an empty diff.
 > 6. **Implement** the change.
 >    Keep the diff focused on this issue only — do **not** touch files another issue owns.
@@ -198,6 +199,9 @@ remainder without pausing for merges — a clean-but-unmerged base is stacked on
 not waited on (see [`stack-dont-pause`](../../shared/workflow/stack-dont-pause.md)).
 
 ### 6. Combined report (orchestrator)
+
+Before assembling the report, **verify cross-agent artifacts post-batch**:
+inspect each opened or updated PR's body (`gh pr view <PR> --json body`) to confirm that issue references (`Closes #<N>`) and cited files match `<owner>/<repo>`, verifying that no parallel worker clobbered another worker's temporary PR body in a shared scratchpad (per [`use-subagents`](../../shared/workflow/use-subagents.md)).
 
 Collect each subagent's returned row and print one summary:
 

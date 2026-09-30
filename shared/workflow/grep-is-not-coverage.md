@@ -225,7 +225,8 @@ The verification half of the same incident --- attempting the base form of a
 command and generalizing to a flag never passed --- is recorded separately in
 Morrison-Lab/ai-config#1174.)
 
-**`AGENTS.md` is part of the policy corpus, and a permission question has to search it.**
+### AGENTS.md is part of the policy corpus, and a permission question has to search it
+
 (2026-09-28, ai-config#4092.)
 Asked "don't you have standing permission to mwc infra PRs?", a session grepped `skills/mwc/SKILL.md`, `memories/`, `shared/` and `skills/`, found only the ai-config repo grant, and answered no.
 `AGENTS.md`'s Strict Merge Control Policy had carried "Infrastructure PRs carry a standing `mwc` grant" since that morning, and ai-config#4039 proposed the hook change.

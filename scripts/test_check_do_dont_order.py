@@ -189,6 +189,86 @@ Here is an example code block quoting bad bullets:
         self.assertEqual(len(blocks[0].bullets), 1)
         self.assertEqual(checker.check_block("test.md", blocks[0]), [])
 
+    def test_form_outside_colon(self):
+        text = """
+- **Do**: good 1.
+- **Do**: good 2.
+- **Don't**: bad 1.
+"""
+        blocks = checker.extract_blocks_from_text(text)
+        self.assertEqual(len(blocks), 1)
+        self.assertEqual(len(blocks[0].bullets), 3)
+        self.assertEqual(blocks[0].bullets[0].form, "outside_colon")
+        self.assertEqual(blocks[0].forms, {"outside_colon"})
+        violations = checker.check_block("test.md", blocks[0])
+        self.assertEqual(violations, [])
+
+    def test_form_parenthetical_outside_colon(self):
+        text = """
+- **Do** (the repo owner's words, 2026-09-28): good 1.
+- **Don't** (inferred): bad 1.
+"""
+        blocks = checker.extract_blocks_from_text(text)
+        self.assertEqual(len(blocks), 1)
+        self.assertEqual(len(blocks[0].bullets), 2)
+        self.assertEqual(blocks[0].bullets[0].form, "parenthetical")
+        self.assertEqual(blocks[0].forms, {"parenthetical"})
+        violations = checker.check_block("test.md", blocks[0])
+        self.assertEqual(violations, [])
+
+    def test_form_parenthetical_inside_colon(self):
+        text = """
+- **Do (user's words):** good 1.
+- **Don't (inferred):** bad 1.
+"""
+        blocks = checker.extract_blocks_from_text(text)
+        self.assertEqual(len(blocks), 1)
+        self.assertEqual(len(blocks[0].bullets), 2)
+        self.assertEqual(blocks[0].bullets[0].form, "parenthetical")
+        self.assertEqual(blocks[0].forms, {"parenthetical"})
+        violations = checker.check_block("test.md", blocks[0])
+        self.assertEqual(violations, [])
+
+    def test_mixed_forms_in_block_clean(self):
+        text = """
+- **Do:** standard inside-colon.
+- **Do**: outside-colon.
+- **Do** (user words): parenthetical.
+- **Don't:** bad inside.
+- **Don't**: bad outside.
+- **Don't** (inferred): bad paren.
+"""
+        blocks = checker.extract_blocks_from_text(text)
+        self.assertEqual(len(blocks), 1)
+        self.assertEqual(len(blocks[0].bullets), 6)
+        self.assertEqual(blocks[0].forms, {"inside_colon", "outside_colon", "parenthetical"})
+        violations = checker.check_block("test.md", blocks[0])
+        self.assertEqual(violations, [])
+
+    def test_mixed_forms_ordering_violation(self):
+        text = """
+- **Do** (user words): good.
+- **Don't**: bad.
+- **Do**: misplaced good.
+- **Don't** (inferred): trailing bad.
+"""
+        blocks = checker.extract_blocks_from_text(text)
+        self.assertEqual(len(blocks), 1)
+        violations = checker.check_block("test.md", blocks[0])
+        self.assertEqual(len(violations), 1)
+        self.assertEqual(violations[0].line_number, 4)
+        self.assertEqual(violations[0].first_dont_line, 3)
+
+    def test_non_guidance_bullets_not_matched(self):
+        text = """
+- **Don't emulate the test run by sourcing R/.**
+- **Download a user-pasted PR screenshot with curl.**
+- **Do NOT grant id-token: write on the review job.**
+- **Downstream pipeline slow:** wait up to 10 minutes.
+"""
+        blocks = checker.extract_blocks_from_text(text)
+        self.assertEqual(len(blocks), 0)
+
 
 class TestCLIAndModes(unittest.TestCase):
     def setUp(self):
@@ -211,6 +291,7 @@ class TestCLIAndModes(unittest.TestCase):
         )
         self.assertEqual(proc.returncode, 0)
         self.assertIn("Checked 1 file(s), 1 Do/Don't block(s).", proc.stdout)
+        self.assertIn("(1 inside-colon, 0 outside-colon, 0 parenthetical)", proc.stdout)
         self.assertIn("No Do/Don't ordering violations found.", proc.stdout)
 
     def test_cli_violation_advisory_vs_strict(self):
@@ -254,9 +335,48 @@ class TestCLIAndModes(unittest.TestCase):
         self.assertEqual(data["blocks_examined"], 1)
         self.assertEqual(data["bad_blocks_count"], 1)
         self.assertEqual(data["misplaced_do_count"], 1)
+        self.assertEqual(data["blocks_by_form"]["inside_colon"], 1)
+        self.assertEqual(data["blocks_by_form"]["outside_colon"], 0)
+        self.assertEqual(data["blocks_by_form"]["parenthetical"], 0)
+        self.assertEqual(data["bullets_by_form"]["inside_colon"], 3)
         self.assertEqual(len(data["violations"]), 1)
         self.assertEqual(data["violations"][0]["line"], 3)
         self.assertEqual(data["violations"][0]["first_dont_line"], 2)
+
+    def test_cli_form_reporting_multiple_forms(self):
+        multi_file = self.tmp_path / "multi.md"
+        multi_file.write_text(
+            "- **Do:** inside.\n"
+            "- **Don't:** inside.\n\n"
+            "- **Do**: outside.\n"
+            "- **Don't**: outside.\n\n"
+            "- **Do** (user words): paren.\n"
+            "- **Don't** (inferred): paren.\n",
+            encoding="utf-8",
+        )
+        proc = subprocess.run(
+            [sys.executable, str(SCRIPT_PATH), "--json", str(multi_file)],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(proc.returncode, 0)
+        data = json.loads(proc.stdout)
+        self.assertEqual(data["blocks_examined"], 3)
+        self.assertEqual(data["blocks_by_form"]["inside_colon"], 1)
+        self.assertEqual(data["blocks_by_form"]["outside_colon"], 1)
+        self.assertEqual(data["blocks_by_form"]["parenthetical"], 1)
+        self.assertEqual(data["bullets_by_form"]["inside_colon"], 2)
+        self.assertEqual(data["bullets_by_form"]["outside_colon"], 2)
+        self.assertEqual(data["bullets_by_form"]["parenthetical"], 2)
+
+        proc_text = subprocess.run(
+            [sys.executable, str(SCRIPT_PATH), str(multi_file)],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(proc_text.returncode, 0)
+        self.assertIn("Checked 1 file(s), 3 Do/Don't block(s).", proc_text.stdout)
+        self.assertIn("(1 inside-colon, 1 outside-colon, 1 parenthetical)", proc_text.stdout)
 
     def test_ignored_directories_skipped(self):
         # Create files in various ignored directory paths

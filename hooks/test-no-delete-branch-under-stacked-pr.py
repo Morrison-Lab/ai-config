@@ -78,12 +78,12 @@ def run(command, mode="child", with_gh=True, capture_argv=False):
             env["FAKE_GH_LOG"] = os.path.join(tmp, "argv.log")
         if with_gh:
             shim = os.path.join(tmp, "gh")
-            with open(shim, "w") as fh:
+            with open(shim, "w", encoding="utf-8") as fh:
                 fh.write(GH_SHIM)
             os.chmod(shim, os.stat(shim).st_mode | stat.S_IEXEC)
             if sys.platform == "win32":
                 shim_cmd = os.path.join(tmp, "gh.cmd")
-                with open(shim_cmd, "w") as fh:
+                with open(shim_cmd, "w", encoding="utf-8") as fh:
                     fh.write(f'@"{sys.executable}" "{shim}" %*\n')
             env["PATH"] = tmp + os.pathsep + env.get("PATH", "")
             env["FAKE_GH_MODE"] = mode
@@ -98,7 +98,7 @@ def run(command, mode="child", with_gh=True, capture_argv=False):
         if capture_argv:
             log = env.get("FAKE_GH_LOG")
             if log and os.path.exists(log):
-                calls = [json.loads(line) for line in open(log) if line.strip()]
+                calls = [json.loads(line) for line in open(log, encoding="utf-8") if line.strip()]
     return (proc, calls) if capture_argv else proc
 
 

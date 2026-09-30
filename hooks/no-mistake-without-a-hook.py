@@ -114,7 +114,7 @@ REDUNDANT_PROSE = re.compile(
 def scan(path):
     """Return (admission_text, admitted_at, addressed_at)."""
     admit_txt, admit_at, done_at = None, -1, -1
-    with open(path, errors="ignore") as fh:
+    with open(path, encoding="utf-8", errors="ignore") as fh:
         for i, line in enumerate(fh):
             try:
                 m = json.loads(line)

@@ -811,6 +811,10 @@ the author had already read the same file twice without finding it.)
   [`challenge-unnecessary-complexity`](challenge-unnecessary-complexity.md) are
   review-side, applying to a diff or prose under review.
   This applies before any artifact exists.
+- [`proactively-suggest-alternatives`](../principles/proactively-suggest-alternatives.md)
+  governs proposing better technical mechanisms for a valid goal,
+  whereas this fragment interrogates whether the assignment's premises
+  and instructions are sound.
 - [`ardi`](ardi.md)'s "an instruction's own suggested code is not exempt" is
   the narrow case: a code snippet inside an issue, checked against project
   conventions before pushing.

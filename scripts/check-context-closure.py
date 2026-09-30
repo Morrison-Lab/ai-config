@@ -286,6 +286,13 @@ DEFAULT_ROOT_CHAR_WARN_FRACTION = 0.90
 # purpose.
 DEFAULT_FRAGMENT_CAP_BYTES = 100_000
 
+# OpenAI Codex auto-loads AGENTS.md at launch with a default 32 KiB
+# (32,768 bytes) project doc limit (`project_doc_max_bytes`), silently
+# truncating anything beyond that (ai-config#4066). Like the root-char cap
+# and CLI total limits, this gate fails regardless of --strict unless
+# --no-agents-md-gate is passed.
+DEFAULT_AGENTS_MD_CAP_BYTES = 32_768
+
 # English prose runs roughly 3.5-4.5 bytes per token, so a token figure from
 # any single divisor is an estimate with about +/-15% in it. Byte counts are
 # exact, which is why the budget itself is denominated in bytes and tokens
@@ -844,8 +851,8 @@ def render_root_chars(chars: int | None, root: str, cap: int, warn_fraction: flo
             f"against the harness's {cap:,} ({pct:.1f}%),\n"
             f"  so it is over by {chars - cap:,}. The harness will not load it "
             f"whole, and nothing else reports that.\n"
-            f"  Move content into an @-imported fragment or a linked companion "
-            f"file (see ai-config#1259 for the pattern)."
+            f"  Move content into a linked companion file (plain link, not an "
+            f"@-import; ai-config#1259, #4061) or an on-demand memory file."
         )
     text = (
         f"\n  {root}: {chars:,} characters against the harness's {cap:,}-char "
@@ -906,8 +913,8 @@ def render_root_growth(before, after, root, cap, fraction):
         f"cap), and this branch adds {delta:+,} more.\n"
         f"{headroom} Near the cap the file may shrink or hold, "
         f"not grow.\n"
-        f"  Move this section into an @-imported fragment or a linked "
-        f"companion file (ai-config#1259), or trim an equivalent amount of "
+        f"  Move this section into a linked companion file (plain link, not an "
+        f"@-import; ai-config#1259, #4061), or trim an equivalent amount of "
         f"prose elsewhere in {root}."
     )
 
@@ -943,6 +950,28 @@ def render_total_chars(file_chars, limit, margin):
         )
         return True, "\n".join(lines)
     lines.append(f"  Under the gate by {gate - total:,} chars.")
+    return False, "\n".join(lines)
+
+
+def render_agents_md_cap(size: int, cap: int) -> tuple[bool, str]:
+    """(over, text) for the Codex 32 KiB byte gate on AGENTS.md.
+
+    OpenAI Codex defaults project_doc_max_bytes to 32 KiB (32,768 B) and
+    silently truncates any AGENTS.md exceeding that limit (ai-config#4066).
+    Fails regardless of --strict unless --no-agents-md-gate is passed.
+    """
+    pct = (size / cap) * 100
+    lines = [
+        "",
+        f"  AGENTS.md: {size:,} bytes against Codex's {cap:,}-byte cap ({pct:.1f}%), {cap - size:,} to spare.",
+    ]
+    if size > cap:
+        lines.append(
+            f"  OVER THE CODEX AGENTS.MD CAP by {size - cap:,} bytes. Move "
+            "extended rationale and case records into linked companions under "
+            "shared/ or AGENTS.cases.md (ai-config#4066)."
+        )
+        return True, "\n".join(lines)
     return False, "\n".join(lines)
 
 
@@ -1123,6 +1152,20 @@ def main(argv=None) -> int:
         ),
     )
     parser.add_argument(
+        "--agents-md-cap",
+        type=positive_int,
+        default=DEFAULT_AGENTS_MD_CAP_BYTES,
+        help=(
+            "byte cap on AGENTS.md, matching Codex's 32 KiB project_doc_max_bytes "
+            f"default (default: {DEFAULT_AGENTS_MD_CAP_BYTES:,})"
+        ),
+    )
+    parser.add_argument(
+        "--no-agents-md-gate",
+        action="store_true",
+        help="report AGENTS.md byte count but never fail on it",
+    )
+    parser.add_argument(
         "--strict",
         action="store_true",
         help="exit 1 if over budget (default: advisory, exits 0). In --compare "
@@ -1197,6 +1240,18 @@ def main(argv=None) -> int:
         args.repo_margin,
     )
     print(total_text)
+
+    agents_over = False
+    agents_path = base / "AGENTS.md"
+    if agents_path.is_file():
+        agents_size = agents_path.stat().st_size
+        reported_over, agents_text = render_agents_md_cap(
+            agents_size, args.agents_md_cap
+        )
+        print(agents_text)
+        if reported_over and args.no_agents_md_gate:
+            print("  (reported only: --no-agents-md-gate is set)")
+        agents_over = reported_over and not args.no_agents_md_gate
 
     total = sum(size for _, size, _ in files)
     after_total = None
@@ -1371,6 +1426,11 @@ def main(argv=None) -> int:
     if total_over:
         # The CLI's own total limit, so the same stance as root_over: not
         # gated on --strict. See DEFAULT_TOTAL_CHAR_LIMIT.
+        return 1
+    if agents_over:
+        # OpenAI Codex's default project_doc_max_bytes limit, so the same
+        # stance as root_over: not gated on --strict. See
+        # DEFAULT_AGENTS_MD_CAP_BYTES.
         return 1
     if root_growth_over:
         # NOT gated on --strict, and not on --max-growth either. This one

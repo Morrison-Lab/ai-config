@@ -509,7 +509,9 @@ An infra PR is one where every changed path is tooling or agent configuration
 
 A top-level `scripts/` is deliberately absent, because in a content repository it can hold analysis code.
 
-The grant is decided by what the PR changes, so the guard reads the PR's file list from GitHub (`gh api .../pulls/N/files`).
+The grant is decided by what the PR changes,
+so the guard reads the PR's file list from GitHub (`gh api .../pulls/N/files`,
+or direct REST via `urllib` when `gh` is not on `PATH`).
 It checks every changed path, and a renamed file's previous path as well, so moving a content file under `.github/` does not qualify.
 Every doubt denies:
 
@@ -517,22 +519,25 @@ Every doubt denies:
 - a failed or timed-out fetch;
 - an empty file list, or one that disagrees with the PR's `changed_files`;
 - a list at the API's 3000-file cap;
-- any one path outside the list.
+- any one path outside the list;
+- no pinned head commit SHA matching the PR's head commit, or an ambiguous SHA.
 
 The target and merge-type ambiguity tests are the per-repository grant's, unchanged.
 
-The PR number is read only from quote-masked text, so a number inside a `--body` or `-t` cannot stand in for the real one.
+The PR number and pinned head commit SHA are read only from quote-masked text, so a value inside a `--body` or `-t` cannot stand in for the real one.
 Without that, `gh pr merge -R o/r --body "see 12"` would check PR 12's files while merging the current branch's PR.
+The merge must pin the exact head commit SHA (`--match-head-commit <sha>`, `sha=<sha>` in REST, or `expectedHeadSha` on the MCP merge tool) matching the PR's head commit SHA fetched alongside the file list.
+This guarantees that if a push lands on the PR between the guard's inspection and the merge, GitHub refuses the merge.
 `gh pr merge --auto` and the MCP auto-merge tools are not covered, because auto-merge merges whatever the PR holds once its checks pass, not what the guard just read.
 
 The Scope Limit binds this grant exactly as it binds the other one: the guard checks what the PR changes, not whether it is fully clean.
 Run `check-pr-fully-clean.py` first.
 
-- **Do:** merge a fully clean infra PR with the PR number and `-R` in the command (`gh pr merge 15 -R Morrison-Lab/pds --squash`), or through the MCP merge tool with `owner`, `repo` and `pullNumber`.
-- **Do:** push nothing between the clean check and the merge.
-  The file list is read at merge time, but a push landing between that read and the merge is not seen.
-  `--match-head-commit <sha>` closes that window.
-- **Don't:** read a refusal as the PR not being infra until the command names one PR number and one target.
+- **Do:** merge a fully clean infra PR with the PR number, `-R`, and `--match-head-commit <sha>` in the command (`gh pr merge 15 -R Morrison-Lab/pds --squash --match-head-commit <sha>`), or through the MCP merge tool with `owner`, `repo`, `pullNumber`, and `expectedHeadSha`.
+- **Do:** pin the exact head commit SHA to guarantee no push landed between the clean check, the guard's inspection, and the merge.
+- **Don't:** run an unpinned merge under the infra grant;
+  unpinned merges deny because the guard cannot verify that the merged commit matches what it inspected.
+- **Don't:** read a refusal as the PR not being infra until the command names one PR number, one target, and pins the matching head commit SHA.
 - **Don't:** expect this grant to clear Claude Code's own auto-mode permission checker, which is separate from this hook and may still need a permission rule.
 
 `NO_UNAUTHORIZED_MERGE_DISABLE_INFRA_GRANT=1` turns the grant off; nothing turns it on.

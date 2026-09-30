@@ -26,7 +26,7 @@ def run(payload: dict, commands: list[str] | None = None) -> str:
     tpath = ""
     tmp = None
     if commands is not None:
-        tmp = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False)
+        tmp = tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".jsonl", delete=False)
         for c in commands:
             tmp.write(json.dumps({
                 "message": {"content": [

@@ -246,3 +246,17 @@ active development eventually go public, and "open-source" read as a plausible
 default rather than as an assertion about the repository's state that day.
 Fixed by rewording to state the repository is private during development and
 dropping "open-source".)
+
+## Read a config list's own comment before stating why an entry belongs on it
+
+(Morrison-Lab/ai-config#4091, 2026-09-28 on Morrison-Lab/pds: `check-dois`
+failed on pds#15 because the publisher returned 503 for `dobson4e`'s DOI.
+An AI agent proposed fixing it by "adding it to `BIB_EXCLUDE_KEYS` like the
+other publisher-blocked books", stating this in chat and in a public PR comment.
+That was wrong: the comment next to that list in pds's
+`.github/workflows/check-bibliography-dois.yml` states it holds books with **no
+DOI**, to be removed once a DOI is verified.
+`dobson4e` had a valid DOI (confirmed against the book's copyright page), so
+the proposal violated the list's own stated rule.
+The agent found this only after later reading the file, and corrected it in
+chat and on the PR.)

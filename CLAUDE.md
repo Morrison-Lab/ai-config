@@ -63,14 +63,15 @@ larger in-scope outcome clear.
 
 ## Status requests do not make issues report-only
 
-A request for status means inspect live state and finish every safe, in-scope fix it reveals before reporting, and file every noticed issue, however small, in its owning tracker.
+A request for status means examine the transcript to check if the agent got stuck, frozen, or dropped the ball, inspect live state, finish every safe, in-scope fix it reveals before reporting, resume stalled work immediately, and file every noticed issue, however small, in its owning tracker.
 Detail, rationale, and cases: [`shared/workflow/status-requests-act.md`](shared/workflow/status-requests-act.md).
 
 ## Flag good moments to `/clear` in long-running sessions
 
 [`shared/workflow/flag-session-boundaries.md`](shared/workflow/flag-session-boundaries.md) (linked, not imported: read it before declaring a stopping point)
 
-Every message that ends a turn or a stretch of work states `**Stopping Point**: Clean stopping point reached` or `**Stopping Point**: Not a clean stopping point / work remains queued: ...`.
+Every message that ends a turn or a stretch of work states `**Stopping Point**: Clean stopping point reached --- session done; UMS executed; no follow-up items pending` or `**Stopping Point**: Not a clean stopping point / work remains queued: session not done; ...`.
+State explicitly whether the session is done or not, confirm UMS pass, and confirm noticed follow-up items are filed.
 Before every non-clean pause, arm a timer or other wake that resumes the next step, and report when it fires.
 Exception: when a harness posts the final message somewhere and no person reads the session turn by turn (a CI or `@claude` workflow run), put the declaration inside the substantive reply or omit it, never after it, since the harness keeps only the last message ([rme#1081](https://github.com/d-morrison/rme/issues/1081)).
 Proactively flag a good stopping point with the `⚠️ **FLAG** ---` tag.
@@ -243,7 +244,9 @@ Detail, rationale, and cases: [`shared/workflow/post-feedback-to-pr.md`](shared/
 
 ## Subscribe to PR updates automatically
 
-When opening or taking over a PR in any repo, subscribe/watch that PR's activity immediately using the available GitHub notification/subscription mechanism. If the current session's tools cannot subscribe, say so explicitly and fall back to active polling for reviews, comments, and checks during the session.
+When opening or taking over a PR in any repo, subscribe/watch that PR's activity immediately using the available GitHub notification/subscription mechanism.
+Subscribe only after the PR creation call returns, using the returned number or URL --- never batch subscription with creation or predict the number.
+If the current session's tools cannot subscribe, say so explicitly and fall back to active polling for reviews, comments, and checks during the session.
 
 ## Monitor every pushed PR head to completion
 
@@ -1367,9 +1370,9 @@ Write it with the Write tool (Edit for an existing file) to a uniquely named scr
 The Write tool passes bytes unchanged, and it cannot be silently skipped the way a heredoc inside a hook-denied Bash call is.
 
 - **Do:** use Write or Edit for any content with a backslash, a backtick, code, or more than a few lines.
-- **Don't:** embed a patch script, regex, commit message or PR body in a heredoc.
 - **Do:** where a heredoc is genuinely unavoidable, build the character with `chr(92)` or a placeholder token before it enters the body, and print `repr()` of the constructed string.
 - **Do:** parse-check or read back any file a heredoc just wrote with escapes in it.
+- **Don't:** embed a patch script, regex, commit message or PR body in a heredoc.
 - **Don't:** type a doubled backslash directly inside a heredoc body, quoted delimiter or not.
 - **Don't:** treat having read this rule as the check --- it was loaded, and the collapse happened anyway.
 

@@ -312,7 +312,7 @@ def scan(path):
     last_text = ""
     events = []  # (timestamp_key, file_position, kind)
     position = 0
-    with open(path, errors="ignore") as fh:
+    with open(path, encoding="utf-8", errors="ignore") as fh:
         for line in fh:
             position += 1
             try:
@@ -494,7 +494,7 @@ def main():
     if os.path.exists(sentinel):
         return 0
     try:
-        open(sentinel, "w").close()
+        open(sentinel, "w", encoding="utf-8").close()
     except Exception:
         pass
 
@@ -519,7 +519,7 @@ def main():
                     "claude agent means a live pid holds it\n\n"
                     "If it is still running, declare "
                     "`**Stopping Point**: Not a clean stopping point / work remains "
-                    "queued: <agent> still running`. Never `--force` a worktree "
+                    "queued: session not done; <agent> still running`. Never `--force` a worktree "
                     "removal to make the signal go away -- see "
                     "skills/clean-worktrees/SKILL.md; read the lock itself per "
                       "memories/subagent-worktrees.md."

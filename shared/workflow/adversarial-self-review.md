@@ -411,6 +411,10 @@ The test is mechanical rather than tonal: an `Agent` call was made, or it was no
 **Foreground, not background.**
 A background dispatch returns an agent id rather than a report, so the verdict is not the call's result and the work you are gating cannot wait on it.
 This is the Agent tool's own criterion for `run_in_background: false` --- the very next action depends on the answer.
+When the harness forces background execution (e.g. Remote Control active or background agent isolation), the tool result is an async launch stub (`agentId: ...` or `status: running`), and task `output_file` remains at 0 bytes while running.
+Polling `output_file` for `Reviewed-Commit:` never matches while the subagent is in flight.
+The verdict arrives only via a subagent hand-back message after the turn ends.
+`hooks/no-unshipped-commit.py` stays quiet while a pre-push review of HEAD is in flight (ai-config#4109), allowing the turn to conclude cleanly so the background subagent can finish and deliver its report.
 
 **Read-only.**
 The reviewer reports; the author disposes.
@@ -530,6 +534,13 @@ Each review's full report arrived only via a later task-notification, and each p
 This is the field-present variant, not the field-absent one #3684 recorded above: the field existed, was set to the value that should have forced a synchronous call, and the harness ignored it three times in a row.
 Confirming that both variants keep recurring independently, rather than one having been a one-off, is the point of recording this instance: `ALLOW_UNREVIEWED_PUSH=1` was used twice in that session with the review's own verdict and `Reviewed-Commit` stated in the same reply, per the remedy given above.)
 
+**Remote Control and background agent isolation deliver the report as a hand-back message.**
+
+(Diagnosed 2026-09-28/29, driving `Morrison-Lab/ai-config#4109`: on Windows under Claude Code with Remote Control active, every `adversarial-reviewer` launch through `Agent` returned an async-launch stub rather than the synchronous report, even with `run_in_background: false` explicitly passed and `isolation: "worktree"`.
+The task's `output_file` stayed at 0 bytes while running, so polling it for `Reviewed-Commit:` never matches.
+The report arrives only as a subagent hand-back message after the turn ends.
+`hooks/no-unshipped-commit.py` was updated to recognize in-flight pre-push reviews of HEAD, staying quiet to allow the turn to conclude and let the subagent complete reactively rather than deadlocking against `no-push-without-self-review.py`.)
+
 **Cursor Cloud has a subagent dispatch.**
 On Cursor Cloud, when the session's `Task` tool lists
 `adversarial-reviewer`, that is the dispatch
@@ -603,6 +614,14 @@ Resolve it from a remote-tracking ref after fetching that remote, and state the 
 - **Don't:** name a bare local branch as `<base>` --- one behind its remote widens the diff so the reviewer works on already-merged code, and one that is ahead of or diverged from its remote in commits the head branch also carries narrows it so part of the change is never reviewed.
 - **Don't:** read a clean verdict as covering the whole change when the base was local;
   the narrowing direction produces exactly that.
+
+### Brief reviewers to enumerate all findings in a single pass
+
+Convergence slows down dramatically when a reviewer reports only a single finding per round (e.g. reporting one naming defect, then waiting for a fix to report casing in the next round, and style in another).
+Brief reviewers to conduct an exhaustive pass across all categories (defects, factual claims, slop, repo conventions, semantic line breaks) and enumerate every single defect in a single pass to enable rapid convergence.
+
+- **Do:** instruct the reviewer to enumerate all findings exhaustively across all categories in its first pass.
+- **Don't:** allow a reviewer to trickle findings one at a time across multiple successive rounds.
 
 ### The PR's own review history is rationale you cannot withhold
 
@@ -931,9 +950,9 @@ Measured 2026-09-04: a dispatched reviewer returned a full report ending "No fin
 The fix is the same one this section already gives: state the required line explicitly in the brief, as a literal `### Verdict: Ready for merge` outside any code fence or HTML comment, and require the `review-data` payload to agree with it --- the two representations disagreeing (a `### Verdict: Ready for merge` line paired with a `review-data` payload naming findings) is itself a defect in the report, per this file's "Structured review data" section below.
 
 - **Do:** treat a report with no verdict line at all as the identical failure to a heading-separated one --- both leave the guard holding a stale prior verdict.
-- **Don't:** assume a report that "sounds clean" (ends in "No findings.", carries a clean JSON payload) discharges the guard without the literal verdict line the parser requires.
 - **Do:** leave the verdict's wording to the persona, or quote its phrases (`Ready for merge`, `Needs more work`) exactly when a brief has to mention them.
 - **Do:** dispatch one reviewer per repository, and push each repository before dispatching the next review.
+- **Don't:** assume a report that "sounds clean" (ends in "No findings.", carries a clean JSON payload) discharges the guard without the literal verdict line the parser requires.
 - **Don't:** ask the reviewer for a verdict in your own vocabulary ("end with clean / not clean") --- the brief overrides the persona's format, the reviewer answers `### Verdict: clean`, and that parses as no verdict.
 - **Don't:** review two repositories in one dispatch --- `parse_report` returns one `(verdict, Reviewed-Commit)` pair per report, so one report cannot clear both pushes.
 

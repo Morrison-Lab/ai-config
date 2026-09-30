@@ -298,7 +298,7 @@ PR_NUMBER_JSON = re.compile(
 # the whole corpus, not two.
 _FALLBACK_CLEAN = [
     r"\bReady\s+for\s+merge\b",
-    r"Verdict:\s*(?:Clean|Approved|Ready)\b",
+    r"(?:[*_]{1,3})?Verdict(?:[*_]{1,3})?:(?:[*_]{1,3})?\s*(?:Clean|Approved|Ready|No\s+blocking\s+issues?(?:\s+(?:found|identified))?)\b",
     r"\bApproved\s+for\s+merge\b",
 ]
 CLEAN_PATTERNS = list(getattr(_cpfc, "VERDICT_CLEAN_PATTERNS", None) or _FALLBACK_CLEAN)
@@ -469,7 +469,7 @@ def records(path):
     if _rums is not None:
         yield from _rums.records(path)
         return
-    with open(path, errors="ignore") as fh:
+    with open(path, encoding="utf-8", errors="ignore") as fh:
         for line in fh:
             try:
                 yield json.loads(line)
@@ -909,7 +909,7 @@ def main() -> int:
     if os.path.exists(sentinel):
         return 0
     try:
-        open(sentinel, "w").close()
+        open(sentinel, "w", encoding="utf-8").close()
     except Exception:
         pass
 

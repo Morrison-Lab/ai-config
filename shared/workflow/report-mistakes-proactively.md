@@ -566,6 +566,8 @@ Knowing the rule in the moment did not stop it once a parallel batch put the cre
 - **Do:** put the create call in its own batch, and the citation, subscription or link-back in a later one that reads the returned number.
 - **Don't:** batch a create with anything that names what the create will return --- a subscription, a comment, another issue's body.
 
+See also [`watch-and-ardi`](watch-and-ardi.md) for PR subscriptions specifically.
+
 ## A dupe-check chained into the same call as the create gates nothing
 
 The section above rules out announcing step 2's outcome before step 2 has

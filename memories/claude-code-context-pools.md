@@ -114,3 +114,18 @@ a second round caught "Detect and" dropped from `prune-dead-code`.
 - **Do:** trim the longest descriptions the error names, not only the new one.
 - **Don't:** read the over-budget line as advisory.
 - **Don't:** shorten a description past what the skill body says it does.
+
+## Distinguish the root size ratchet from the closure total-limit gate
+
+In `scripts/check-context-closure.py`, multiple distinct gates govern context size:
+- **Root size ratchet** (`DEFAULT_ROOT_GROWTH_GATE_FRACTION`): restricts net growth of root `CLAUDE.md` when it reaches 90% or more of its cap.
+  Its remediation message explicitly recommends moving content into an `@`-imported fragment or a linked companion file.
+- **Closure total-limit gate** (`render_total_chars`) and **per-fragment cap** (`DEFAULT_FRAGMENT_CAP_BYTES`): limits the total size of `CLAUDE.md` plus all recursively `@`-imported files.
+  An `@` import auto-loads the fragment into every session's context, counting toward this total.
+
+When advising authors to use plain markdown links rather than `@` imports (as in `shared/principles/README.md`),
+cite the closure total-limit gate and per-fragment cap, not the root size ratchet.
+
+- **Do:** cite the closure total-limit gate when explaining why fragments are linked rather than `@`-imported.
+- **Don't:** confuse the root `CLAUDE.md` size ratchet with the closure total-limit gate.
+

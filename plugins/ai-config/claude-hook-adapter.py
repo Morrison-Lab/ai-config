@@ -92,19 +92,15 @@ def normalize_isolation(raw_workspace):
     """Map Antigravity's Workspace concept onto Claude Code's `isolation`
     enum, or return None when the value isn't a recognized isolation mode.
 
-    Antigravity's Workspace values (e.g. "share"/"branch") are not the same
-    enum as Claude Code's `isolation` mode ("worktree"/"remote").
-    hooks/flag-unassigned-worktree.py gates its warning on the truthiness of
-    `isolation`, so passing an unrecognized Workspace value through
-    unconditionally would silently suppress that warning for every
-    subagent launch whose Workspace happens to be non-empty. Only a
-    recognized value maps through; anything else -- including an unset,
-    non-string, or unrecognized Workspace -- yields None, which that
-    hook's `.get()` treats the same as an absent field.
+    Antigravity's Workspace values ("inherit", "branch", "share") differ
+    from Claude Code's `isolation` mode ("worktree", "remote"). "branch"
+    creates an isolated branched workspace, which satisfies worktree isolation.
     """
     if not isinstance(raw_workspace, str):
         return None
     normalized = raw_workspace.strip().lower()
+    if normalized == "branch":
+        return "worktree"
     return normalized if normalized in RECOGNIZED_ISOLATION_MODES else None
 
 def parse_timeout(val):
@@ -412,6 +408,7 @@ def main():
                     "tool_input": {
                         "subagent_type": sub.get("TypeName") or sub.get("typeName"),
                         "isolation": normalize_isolation(raw_workspace),
+                        "model": sub.get("Model") or sub.get("model"),
                         # The raw Antigravity Workspace value, preserved for
                         # any downstream consumer that wants it -- it is not
                         # the same concept as `isolation` above, so it is

@@ -257,7 +257,7 @@ def test_run_reports_each_rc_and_fails_overall():
         text = out.getvalue()
         check("overall exit is 1 when a step fails", rc == 1)
         check("the failing step's own exit code appears in the table", "Failing step" in text and " 3 " in text.replace("\n", " "))
-        check("the multi-line step ran under bash and executed its second line", out_file.read_text() == "two\n")
+        check("the multi-line step ran under bash and executed its second line", out_file.read_text(encoding="utf-8") == "two\n")
         check("working-directory is honoured", "Sub-directory step" in text)
         check("the summary carries the denominator", "of 6 step(s) derived" in text and "2 not runnable" in text)
 
@@ -279,7 +279,7 @@ def test_require_clean_on_dirty_tree():
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         wf = _write_fixture(tmp)
         subprocess.run(["git", "init", "-q", "-b", "main"], cwd=tmp, check=True)
-        (Path(tmp) / "dirty.txt").write_text("x")
+        (Path(tmp) / "dirty.txt").write_text("x", encoding="utf-8")
         err = io.StringIO()
         with redirect_stdout(io.StringIO()), redirect_stderr(err):
             rc = rlv.main(["--workflow", str(wf), "--root", tmp, "--only", "Passing", "--require-clean"])
@@ -374,7 +374,7 @@ def test_list_shows_availability_note():
     """Under --list a step with a requires probe says availability is unchecked."""
     with tempfile.TemporaryDirectory() as tmp:
         wf = Path(tmp) / "validate.yml"
-        wf.write_text(FIXTURE)
+        wf.write_text(FIXTURE, encoding="utf-8")
         rlv._REQUIRES_CACHE.clear()
         out = io.StringIO()
         with redirect_stdout(out), redirect_stderr(io.StringIO()):
@@ -438,7 +438,7 @@ def test_changed_end_to_end():
         subprocess.run(["git", "init", "-q", "-b", "main"], cwd=tmp, check=True,
                        env=env)
         # Create a file and commit it
-        (Path(tmp) / "test.md").write_text("x")
+        (Path(tmp) / "test.md").write_text("x", encoding="utf-8")
         subprocess.run(["git", "add", "test.md"], cwd=tmp, check=True,
                        env=env)
         subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=tmp, check=True,
@@ -447,7 +447,7 @@ def test_changed_end_to_end():
         subprocess.run(["git", "checkout", "-q", "-b", "feature"], cwd=tmp, check=True,
                        env=env)
         # Modify the file and commit
-        (Path(tmp) / "test.md").write_text("y")
+        (Path(tmp) / "test.md").write_text("y", encoding="utf-8")
         subprocess.run(["git", "commit", "-q", "-am", "mod"], cwd=tmp, check=True,
                        env=env)
 

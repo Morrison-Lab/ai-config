@@ -37,6 +37,15 @@ Commands below are annotated with their abstract operation token (e.g.
 [`tool-mappings.md`](../../tool-mappings.md) instead of the `gh` command shown
 if this session doesn't have `gh`.
 
+## Check the transcript for stalled turns or dropped balls
+
+Before querying the forge, inspect recent session turns in the conversation transcript:
+- Did a push, review request, or CI check error out without being retried?
+- Did a PR monitoring loop, subagent, or scheduled timer fail or stop unexpectedly?
+- Did an earlier turn leave findings unaddressed or a merge unperformed after a clean verdict?
+
+If the session got stuck, frozen, or dropped the ball on the PR lifecycle, diagnose the stall and resume the next concrete step immediately in the same turn.
+
 ## Verify the PR is still open first
 
 Before checking CI or review, confirm the PR hasn't merged or closed since you last looked, and fetch its branch name and draft state:

@@ -147,7 +147,7 @@ class CommandExtraction(unittest.TestCase):
         self.assertIn("closes #923", run_hook(bash(command)))
 
     def test_body_file_is_read(self):
-        with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as handle:
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".md", delete=False) as handle:
             handle.write("A separate PR will close #77 afterwards.\n")
             path = handle.name
         try:
@@ -159,7 +159,7 @@ class CommandExtraction(unittest.TestCase):
     def test_gh_api_issue_body_patch(self):
         # A PATCH to the issue itself edits its DESCRIPTION, which GitHub does
         # scan.
-        with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as handle:
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".md", delete=False) as handle:
             handle.write("The follow-up will close #88.\n")
             path = handle.name
         try:
@@ -189,7 +189,7 @@ class CommentsAreOutOfScope(unittest.TestCase):
         )
 
     def test_gh_api_comments_endpoint_is_silent(self):
-        with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as handle:
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".md", delete=False) as handle:
             handle.write(self.BODY + "\n")
             path = handle.name
         try:

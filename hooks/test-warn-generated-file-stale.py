@@ -33,10 +33,10 @@ def build_repo(source_edited, regenerated, only_output_edited=False, no_generato
     run("git", "config", "user.name", "t")
     os.makedirs(os.path.join(d, "scripts"), exist_ok=True)
     if not no_generator:
-        with open(os.path.join(d, "scripts", "gen.py"), "w") as fh:
+        with open(os.path.join(d, "scripts", "gen.py"), "w", encoding="utf-8") as fh:
             fh.write(GENERATOR)
     for name in ("src.json", "out.json"):
-        with open(os.path.join(d, name), "w") as fh:
+        with open(os.path.join(d, name), "w", encoding="utf-8") as fh:
             fh.write('{"a": 1}')
     run("git", "add", "-A")
     run("git", "commit", "-qm", "base")
@@ -45,16 +45,16 @@ def build_repo(source_edited, regenerated, only_output_edited=False, no_generato
     if only_output_edited:
         # The generated file drifts without its source being touched, so
         # --check fails while this push changes nothing that caused it.
-        with open(os.path.join(d, "out.json"), "w") as fh:
+        with open(os.path.join(d, "out.json"), "w", encoding="utf-8") as fh:
             fh.write('{"a": 99}')
         run("git", "add", "-A")
         run("git", "commit", "-qm", "drift")
         return d
     if source_edited:
-        with open(os.path.join(d, "src.json"), "w") as fh:
+        with open(os.path.join(d, "src.json"), "w", encoding="utf-8") as fh:
             fh.write('{"a": 2}')
         if regenerated:
-            with open(os.path.join(d, "out.json"), "w") as fh:
+            with open(os.path.join(d, "out.json"), "w", encoding="utf-8") as fh:
                 fh.write('{"a": 2}')
         run("git", "add", "-A")
         run("git", "commit", "-qm", "edit")
@@ -63,13 +63,13 @@ def build_repo(source_edited, regenerated, only_output_edited=False, no_generato
 
 def warned(d, command):
     env = dict(os.environ)
-    patched = open(HOOK).read().replace(
+    patched = open(HOOK, encoding="utf-8").read().replace(
         '("hooks/hooks.json", [sys.executable, "scripts/gen-hooks-plugin.py", "--check"]),',
         '("src.json", [sys.executable, "scripts/gen.py", "--check"]),',
     ).replace('"origin/HEAD", "origin/main"', '"main", "main"'
     ).replace('"@{upstream}", ', '')
     hook_copy = os.path.join(d, "hook.py")
-    with open(hook_copy, "w") as fh:
+    with open(hook_copy, "w", encoding="utf-8") as fh:
         fh.write(patched)
     out = subprocess.run(
         [sys.executable, hook_copy],

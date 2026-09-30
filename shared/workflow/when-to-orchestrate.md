@@ -50,6 +50,9 @@ the artifact handoff and the staleness re-check a prepared patch needs.
 The line is **mutation of shared state**, not read-only-ness in the literal
 sense: a worker writing a patch file to its own worktree is on the safe side of
 it.
+When workers write intermediate artifacts (such as PR bodies or staged patches),
+require each worker to use a unique temp path or `mktemp` per [`use-subagents`](use-subagents.md)'s unique-temp-path rule
+so parallel subagents never overwrite each other's files in a shared scratchpad.
 
 ## Stay inline when
 

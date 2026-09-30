@@ -115,3 +115,30 @@ the Don't side is inferred.
 Filed as [Morrison-Lab/mlr#10](https://github.com/Morrison-Lab/mlr/issues/10), [#11](https://github.com/Morrison-Lab/mlr/issues/11), and [#12](https://github.com/Morrison-Lab/mlr/issues/12), 2026-09-28, for Robert & Casella's *Monte Carlo Statistical Methods*, Gelman & Rubin (1992), and Brooks & Gelman (1998) respectively.
 Issue #10 was later found to rest on a truncated search --- the book is present under a search that was not cut short --- and was corrected rather than left standing;
 see the timeout section linked above.)
+
+## Format outtakes with per-file escaped includes directly at removal sites
+
+When course content is retired or migrated to another repository (such as `mds` or `pds`), preserve the removed material under `chapters/outtakes/` rather than deleting it.
+Follow the repository's documented escaped-include convention:
+place commented-out, escaped includes (`<!-- {{</* include outtakes/_name.qmd */>}} -->`) directly at the original removal locations in the parent chapter.
+This ensures restoring original slidebreaks, exercises, or derivations requires only unescaping and uncommenting, rather than reconstructing layout and file order from git diffs.
+
+- **Do:** place commented-out, escaped includes (`<!-- {{</* include outtakes/_name.qmd */>}} -->`) at the exact positions where the content was removed.
+- **Don't:** use a generic folder or prose comment (such as `see chapters/outtakes/...`) in place of per-file escaped includes when moving subfiles to outtakes.
+
+(The Do side is the user's, 2026-09-23, documented in `CLAUDE.md`: "When good content is removed, move it to an outtakes file rather than deleting it... with its include left disabled where the content used to be, escaped as well as commented out: `<!-- {{</* include outtakes/_name.qmd */>}} -->`";
+the Don't side is inferred from the automated review on lds#273, 2026-09-29.)
+
+## Sequence cross-repository content migrations recipient-first
+
+When migrating content across repositories (e.g. migrating math refreshers from `lds` to `mds`/`pds`):
+the downstream referencing PR in the originating repository (`lds`) adds links to anchors hosted on the recipient repositories' published websites (`morrison-lab.github.io/<repo>/...`).
+Automated code review checks resolve external links against the live published site, not against open PR branch previews.
+
+- **Do:** drive recipient PRs (`mds`, `pds`) to full clean status first, merge them to `main`, and verify GitHub Pages deployment before expecting external link checks on the referencing PR (`lds`) to pass clean.
+- **Don't:** attempt to merge the referencing PR before the recipient PRs have merged and deployed, or treat the resulting external link failures as anchor mismatches in the downstream PR.
+
+(The Do and Don't sides are inferred from the cross-repo review failures on lds#273, 2026-09-29, where external anchors were rejected because recipient PRs mds#48 and pds#43 had not yet merged and deployed to Pages.)
+
+
+

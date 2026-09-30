@@ -1355,7 +1355,7 @@ _infra_case("MCP merge with a non-numeric PR number", "BLOCK", INFRA_FILES,
 # The fetch budget must end before the hook's own timeout: a hook killed by
 # its timeout does not deny, so a longer budget fails OPEN on a slow network.
 # Read the registered timeout rather than restating it, so the two cannot drift.
-_hooks_json = json.loads((Path(HOOK).parent / "hooks.json").read_text())
+_hooks_json = json.loads((Path(HOOK).parent / "hooks.json").read_text(encoding="utf-8"))
 _timeouts = [h.get("timeout") for entries in _hooks_json.get("hooks", {}).values()
              for e in entries for h in e.get("hooks", [])
              if h.get("script") == "no-unauthorized-merge.py"]

@@ -59,7 +59,7 @@ def settings_with(command, matcher="Bash", event="PreToolUse"):
 
 def write_settings(home, settings):
     home.mkdir(parents=True, exist_ok=True)
-    (home / "settings.json").write_text(json.dumps(settings, indent=2))
+    (home / "settings.json").write_text(json.dumps(settings, indent=2), encoding="utf-8")
 
 
 # --- the library, known positive first ---------------------------------------
@@ -117,7 +117,7 @@ with tempfile.TemporaryDirectory() as tmp:
 with tempfile.TemporaryDirectory() as tmp:
     home = Path(tmp) / "claude"
     present = Path(tmp) / "guard.py"
-    present.write_text("import sys" + NL + "sys.exit(0)" + NL)
+    present.write_text("import sys" + NL + "sys.exit(0)" + NL, encoding="utf-8")
     write_settings(home, settings_with(f'python3 "{present}"'))
     result = run_check(home)
     check("--check exits 0 when every registered path resolves",
@@ -139,7 +139,7 @@ with tempfile.TemporaryDirectory() as tmp:
     home = Path(tmp) / "claude"
     present = home / "guard.py"
     home.mkdir(parents=True)
-    present.write_text("import sys" + NL + "sys.exit(0)" + NL)
+    present.write_text("import sys" + NL + "sys.exit(0)" + NL, encoding="utf-8")
 
     # The resolution of a Windows-shaped path is OS-native (Path.is_file),
     # so these three run only on Windows; the token-level Windows cases
@@ -194,7 +194,7 @@ check("interpreter_token returns None for an empty command",
 
 with tempfile.TemporaryDirectory() as tmp:
     present = Path(tmp) / "hook.py"
-    present.write_text("")
+    present.write_text("", encoding="utf-8")
     absent = Path(tmp) / "no-such-hook.py"
 
     check("probe_interpreter reports ok when the interpreter can read the file",
@@ -251,10 +251,10 @@ with tempfile.TemporaryDirectory() as tmp:
         """
         if os.name == "nt":
             path = stub_dir / (name + ".bat")
-            path.write_text("@exit /b " + str(exit_code) + NL)
+            path.write_text("@exit /b " + str(exit_code) + NL, encoding="utf-8")
         else:
             path = stub_dir / name
-            path.write_text("#!/bin/sh" + NL + "exit " + str(exit_code) + NL)
+            path.write_text("#!/bin/sh" + NL + "exit " + str(exit_code) + NL, encoding="utf-8")
             path.chmod(0o755)
         return path
 
@@ -333,10 +333,10 @@ with tempfile.TemporaryDirectory() as tmp:
     # baseline shortfall. This case registers several rows on ONE interpreter,
     # which is exactly what made the old line wrong.
     write_settings(home, settings_with(f'python3 "{present}"'))
-    with open(home / "settings.json") as fh:
+    with open(home / "settings.json", encoding="utf-8") as fh:
         blob = json.load(fh)
     blob["hooks"]["PreToolUse"][0]["hooks"] *= 4
-    (home / "settings.json").write_text(json.dumps(blob))
+    (home / "settings.json").write_text(json.dumps(blob), encoding="utf-8")
     result = run_check(home)
     check("the distribution line counts rows, not interpreters",
           "4 registered command(s): 4 probeable" in result.stdout)
@@ -348,11 +348,11 @@ with tempfile.TemporaryDirectory() as tmp:
     # it over the second.
     write_settings(home, settings_with(
         'python3 "${CLAUDE_PLUGIN_ROOT}/hooks/a.py"'))
-    with open(home / "settings.json") as fh:
+    with open(home / "settings.json", encoding="utf-8") as fh:
         blob = json.load(fh)
     blob["hooks"]["PreToolUse"][0]["hooks"].append(
         {"type": "command", "command": "python3 -c 'import sys'"})
-    (home / "settings.json").write_text(json.dumps(blob))
+    (home / "settings.json").write_text(json.dumps(blob), encoding="utf-8")
     result = run_check(home)
     check("two unprobeable rows on one interpreter each keep their own reason",
           "expands only in the plugin loader" in result.stdout
@@ -362,7 +362,7 @@ with tempfile.TemporaryDirectory() as tmp:
 
 with tempfile.TemporaryDirectory() as tmp:
     present = Path(tmp) / "hook.py"
-    present.write_text("")
+    present.write_text("", encoding="utf-8")
     # A leading assignment is part of the command, not the name of it.
     check("interpreter_token skips a leading environment assignment",
           hp.interpreter_token('PYTHONPATH=/x python3 "/y/a.py"') == "python3")

@@ -250,14 +250,14 @@ def _sentinel_gate(sentinel_path, admit_at, window=LOOP_WINDOW):
     last_at = None
     if os.path.exists(sentinel_path):
         try:
-            with open(sentinel_path) as fh:
+            with open(sentinel_path, encoding="utf-8") as fh:
                 last_at = int(fh.read().strip())
         except Exception:
             last_at = None  # unreadable sentinel -- treat as no prior firing
     if last_at is not None and admit_at - last_at <= window:
         return False
     try:
-        with open(sentinel_path, "w") as fh:
+        with open(sentinel_path, "w", encoding="utf-8") as fh:
             fh.write(str(admit_at))
     except Exception:
         pass
@@ -327,7 +327,7 @@ def visible_prose(text):
 
 
 def records(path):
-    with open(path, errors="ignore") as fh:
+    with open(path, encoding="utf-8", errors="ignore") as fh:
         for line in fh:
             try:
                 yield json.loads(line)

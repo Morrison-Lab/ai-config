@@ -241,7 +241,7 @@ def _last_create_index(path):
     last = -1
     i = 0
     try:
-        with open(path, errors="ignore") as fh:
+        with open(path, encoding="utf-8", errors="ignore") as fh:
             for line in fh:
                 i += 1
                 try:
@@ -301,7 +301,7 @@ def main() -> int:
     if os.path.exists(sentinel):
         return 0
     try:
-        open(sentinel, "w").close()
+        open(sentinel, "w", encoding="utf-8").close()
     except Exception:
         pass
 

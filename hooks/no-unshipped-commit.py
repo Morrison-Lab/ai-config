@@ -1926,7 +1926,7 @@ def main():
     sentinel = os.path.join(tempfile.gettempdir(), f".claude-unshipped-commit-{key}")
     if os.path.exists(sentinel):
         return
-    open(sentinel, "w").close()
+    open(sentinel, "w", encoding="utf-8").close()
     print(json.dumps({"decision": "block", "reason": reason}))
 
 

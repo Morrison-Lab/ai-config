@@ -277,7 +277,7 @@ def run(records):
     tmp = tempfile.mkdtemp()
     try:
         path = os.path.join(tmp, "transcript.jsonl")
-        with open(path, "w") as fh:
+        with open(path, "w", encoding="utf-8") as fh:
             for r in records:
                 fh.write(json.dumps(r) + "\n")
         proc = subprocess.run(
@@ -314,7 +314,7 @@ for records, desc in SILENT:
 shared = tempfile.mkdtemp()
 try:
     same = os.path.join(shared, "t.jsonl")
-    with open(same, "w") as fh:
+    with open(same, "w", encoding="utf-8") as fh:
         for r in (NAME_ONLY, INCIDENT):
             fh.write(json.dumps(r) + "\n")
     env = dict(os.environ, TMPDIR=shared, TEMP=shared, TMP=shared)
@@ -356,7 +356,7 @@ boundary = tempfile.mkdtemp()
 sibling_tmp = tempfile.mkdtemp()
 try:
     tp = os.path.join(boundary, "t.jsonl")
-    with open(tp, "w") as fh:
+    with open(tp, "w", encoding="utf-8") as fh:
         for r in (ESCALATE_ONE_FILE, SCOPED_CHECK):
             fh.write(json.dumps(r) + "\n")
     payload = json.dumps({"transcript_path": tp})
@@ -382,7 +382,7 @@ finally:
 bad = tempfile.mkdtemp()
 try:
     p = os.path.join(bad, "t.jsonl")
-    with open(p, "w") as fh:
+    with open(p, "w", encoding="utf-8") as fh:
         fh.write("{not json at all\n")
     proc = subprocess.run(
         [sys.executable, HOOK], input=json.dumps({"transcript_path": p}),

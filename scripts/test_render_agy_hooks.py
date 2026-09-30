@@ -185,7 +185,7 @@ class TestRendererCli(unittest.TestCase):
             rc = self.run_main(["--platform", "posix", "--output", str(out)])
             self.assertEqual(rc, 0)
             self.assertTrue(out.exists())
-            self.assertTrue(list(agy_hooks.iter_commands(json.loads(out.read_text()))))
+            self.assertTrue(list(agy_hooks.iter_commands(json.loads(out.read_text(encoding="utf-8")))))
 
     def test_missing_source_reports_one_line_and_exits_one(self):
         with tempfile.TemporaryDirectory() as tmp:

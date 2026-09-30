@@ -50,7 +50,7 @@ def payload(**overrides):
 
 class CheckMrFullyCleanTests(unittest.TestCase):
     def run_checker(self, value):
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as handle:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", suffix=".json", delete=False) as handle:
             json.dump(value, handle)
             path = handle.name
         result = subprocess.run(

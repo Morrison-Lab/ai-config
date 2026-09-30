@@ -403,14 +403,14 @@ def _repo_with_staged_move():
     run("git", "init", "-q", "--initial-branch", "main")
     run("git", "config", "user.email", "t@t")
     run("git", "config", "user.name", "t")
-    with open(os.path.join(d, "src.md"), "w") as fh:
+    with open(os.path.join(d, "src.md"), "w", encoding="utf-8") as fh:
         fh.write("\n".join(BIG) + "\n")
     run("git", "add", "-A")
     run("git", "commit", "-qm", "base")
     os.unlink(os.path.join(d, "src.md"))
-    with open(os.path.join(d, "src.md"), "w") as fh:
+    with open(os.path.join(d, "src.md"), "w", encoding="utf-8") as fh:
         fh.write("moved out\n")
-    with open(os.path.join(d, "dst.md"), "w") as fh:
+    with open(os.path.join(d, "dst.md"), "w", encoding="utf-8") as fh:
         fh.write("\n".join(BIG) + "\n")
     run("git", "add", "-A")
     return d

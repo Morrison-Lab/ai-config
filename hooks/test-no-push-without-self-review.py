@@ -68,7 +68,7 @@ def make_repo(names=("one", "two"), extra_env=None) -> str:
     d = tempfile.mkdtemp(prefix="npwsr-")
     _git(d, "init", "-q", "-b", "main", env=extra_env)
     for n in names:
-        with open(os.path.join(d, f"{n}.txt"), "w") as f:
+        with open(os.path.join(d, f"{n}.txt"), "w", encoding="utf-8") as f:
             f.write(n)
         _git(d, "add", "-A", env=extra_env)
         _git(d, "commit", "-qm", n, env=extra_env)
@@ -83,7 +83,7 @@ PREV = _git(REPO, "rev-parse", "HEAD~1")
 # so the "which commits does this push ship" and "which repo is it" checks are
 # distinguishable from a bare HEAD lookup in the hook's own cwd.
 _git(REPO, "checkout", "-q", "-b", "feature")
-with open(os.path.join(REPO, "unreviewed.txt"), "w") as f:
+with open(os.path.join(REPO, "unreviewed.txt"), "w", encoding="utf-8") as f:
     f.write("unreviewed")
 _git(REPO, "add", "-A")
 _git(REPO, "commit", "-qm", "unreviewed")
@@ -107,7 +107,7 @@ def run_hook(cmd: str, transcript_events: list | None = None,
              payload_extra: dict | None = None) -> tuple[int, dict]:
     tpath = None
     if transcript_events is not None:
-        tf = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False)
+        tf = tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".jsonl", delete=False)
         for ev in transcript_events:
             tf.write(json.dumps(ev) + "\n")
         tf.close()
@@ -1136,10 +1136,10 @@ def valueless_bool_cases() -> tuple[int, int]:
     failures = 0
     ran = 0
     path = os.path.join(REPO, ".git", "config")
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         original = f.read()
     try:
-        with open(path, "a") as f:
+        with open(path, "a", encoding="utf-8") as f:
             f.write('[remote "origin"]\n\tmirror\n')
         ran += 1
         rc, out = run_hook(f"git -C {REPO} push origin", reviewed())
@@ -1157,7 +1157,7 @@ def valueless_bool_cases() -> tuple[int, int]:
         else:
             print(f"PASS: {label}")
     finally:
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             f.write(original)
     return failures, ran
 
@@ -1182,14 +1182,14 @@ def budget_cases() -> tuple[int, int]:
     try:
         shim = os.path.join(d, "git")
         real = shutil.which("git")
-        with open(shim, "w") as f:
+        with open(shim, "w", encoding="utf-8") as f:
             f.write(f'#!/bin/sh\nsleep 1\nexec {real} "$@"\n')
         os.chmod(shim, 0o755)
         extra_env = {"PATH": d + os.pathsep + os.environ.get("PATH", ""),
                      "NPWSR_BUDGET_SECONDS": "2"}
         if sys.platform == "win32":
             mod_path = os.path.join(d, "_slowgit.py")
-            with open(mod_path, "w") as f:
+            with open(mod_path, "w", encoding="utf-8") as f:
                 f.write(f'''import sys, time, subprocess
 def main():
     time.sleep(1)
@@ -1416,7 +1416,7 @@ def fixture_branch_cases() -> tuple[int, int]:
         try:
             _git(d, "init", "-q", env=env)  # unpinned ok
             _git(d, "checkout", "-q", "-b", "main", env=env)
-            with open(os.path.join(d, "one.txt"), "w") as f:
+            with open(os.path.join(d, "one.txt"), "w", encoding="utf-8") as f:
                 f.write("one")
             _git(d, "add", "-A", env=env)
             _git(d, "commit", "-qm", "one", env=env)
@@ -2143,7 +2143,7 @@ def fallback_cases() -> tuple[int, int]:
 
     # 5. Negative: On-disk report file without transcript is rejected (no unauthenticated forge)
     report_file = os.path.join(REPO, ".git", "adversarial-review-report.txt")
-    with open(report_file, "w") as f:
+    with open(report_file, "w", encoding="utf-8") as f:
         f.write(body("Ready for merge", HEAD))
     try:
         # Run with no transcript events
@@ -2476,7 +2476,7 @@ def omo_cases() -> tuple[int, int]:
         sid = "ses_testfallback"
         tdir = os.path.join(d, "transcripts")
         os.makedirs(tdir)
-        with open(os.path.join(tdir, f"{sid}.jsonl"), "w") as f:
+        with open(os.path.join(tdir, f"{sid}.jsonl"), "w", encoding="utf-8") as f:
             for ev in omo_reviewed(HEAD):
                 f.write(json.dumps(ev) + "\n")
         rc, out = run_hook(
@@ -2795,7 +2795,7 @@ def codex_cases() -> tuple[int, int]:
     try:
         tdir = os.path.join(d, "transcripts")
         os.makedirs(tdir)
-        with open(os.path.join(tdir, "sess-codex.jsonl"), "w") as f:
+        with open(os.path.join(tdir, "sess-codex.jsonl"), "w", encoding="utf-8") as f:
             for ev in reviewed(tool="spawn_agent"):
                 f.write(json.dumps(ev) + "\n")
         rc, out = run_hook(
@@ -2821,11 +2821,11 @@ def codex_cases() -> tuple[int, int]:
     try:
         tdir = os.path.join(d, "transcripts")
         os.makedirs(tdir)
-        with open(os.path.join(tdir, "sess-other.jsonl"), "w") as f:
+        with open(os.path.join(tdir, "sess-other.jsonl"), "w", encoding="utf-8") as f:
             for ev in reviewed(tool="spawn_agent"):
                 f.write(json.dumps(ev) + "\n")
         reported = os.path.join(d, "reported.jsonl")
-        with open(reported, "w") as f:
+        with open(reported, "w", encoding="utf-8") as f:
             f.write(json.dumps(poison_assistant_prose()) + "\n")
         rc, out = run_hook(
             PUSH, None,
@@ -3562,7 +3562,7 @@ def exempt_repo_cases() -> tuple[int, int]:
     def run_e2e(remotes, configs, args, extra_env=None, shape="{git}",
                checkout=None, detach=False):
         d = make_repo(("x",)).replace("\\", "/")
-        tf = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False)
+        tf = tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".jsonl", delete=False)
         tf.close()
         try:
             if checkout:

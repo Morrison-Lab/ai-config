@@ -999,7 +999,7 @@ def transcript_derivations(path):
     agent_ids = set()
     pending = {}
     try:
-        fh = open(path, errors="ignore")
+        fh = open(path, encoding="utf-8", errors="ignore")
     except Exception:
         return any_p, count_p, (agg_vals, False)
 
@@ -1304,7 +1304,7 @@ def main() -> int:
         if os.path.exists(sentinel):
             return 0
         try:
-            open(sentinel, "w").close()
+            open(sentinel, "w", encoding="utf-8").close()
         except Exception:
             pass
 

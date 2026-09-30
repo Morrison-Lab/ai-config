@@ -2824,7 +2824,7 @@ def deny(reason: str) -> None:
     # push. Emit an emergency failure log to stderr and fail closed (exit 2).
     if not written:
         try:
-            sys.stdout = open(os.devnull, "w")
+            sys.stdout = open(os.devnull, "w", encoding="utf-8")
         except Exception:
             pass
         try:
@@ -2989,7 +2989,7 @@ def main() -> int:
     except Exception as exc:
         if _DENIAL_ISSUED[0]:
             try:
-                sys.stdout = open(os.devnull, "w")
+                sys.stdout = open(os.devnull, "w", encoding="utf-8")
             except Exception:
                 pass
             try:

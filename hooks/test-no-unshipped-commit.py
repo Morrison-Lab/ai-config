@@ -1711,7 +1711,7 @@ finally:
 
 print("PASS: _collect_worktrees_and_branches deduplicates list_worktrees across same-repo paths (ai-config#4120)")
 
-# Case 7: Handback fallback runs when reviewer tool_result has empty text content
+# Case 10: Handback fallback runs when reviewer tool_result has empty text content
 h_empty_ts = tempfile.mkdtemp()
 ts_empty_path = os.path.join(h_empty_ts, "transcript.jsonl")
 guard_obj = subject._load_review_guard()

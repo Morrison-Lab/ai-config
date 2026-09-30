@@ -115,3 +115,17 @@ the Don't side is inferred.
 Filed as [Morrison-Lab/mlr#10](https://github.com/Morrison-Lab/mlr/issues/10), [#11](https://github.com/Morrison-Lab/mlr/issues/11), and [#12](https://github.com/Morrison-Lab/mlr/issues/12), 2026-09-28, for Robert & Casella's *Monte Carlo Statistical Methods*, Gelman & Rubin (1992), and Brooks & Gelman (1998) respectively.
 Issue #10 was later found to rest on a truncated search --- the book is present under a search that was not cut short --- and was corrected rather than left standing;
 see the timeout section linked above.)
+
+## Outtake formatting and cross-repo content migration sequence
+
+When course content is retired or migrated to another repository (such as `mds` or `pds`), preserve the removed material under `chapters/outtakes/` rather than deleting it.
+Follow the repository's documented escaped-include convention:
+place commented-out, escaped includes (`<!-- {{</* include outtakes/_name.qmd */>}} -->`) directly at the original removal locations in the parent chapter.
+This ensures restoring original slidebreaks, exercises, or derivations requires only unescaping and uncommenting, rather than reconstructing layout and file order from git diffs.
+
+When migrating content across repositories (e.g. migrating math refreshers from `lds` to `mds`/`pds`):
+- **Phased migration sequence**: Merging downstream signposts and links in the originating repository (`lds`) depends on the recipient repositories (`mds`, `pds`) having already merged to `main` and deployed to GitHub Pages.
+- **External anchor resolution**: Automated review checks verify external links against the live published site (`morrison-lab.github.io/<repo>/...`), not against unmerged branch previews.
+- **Do:** drive recipient PRs (`mds`, `pds`) to full clean status first, merge them, verify GitHub Pages deployment, and only then obtain a clean review verdict on the referencing PR (`lds`).
+- **Don't:** use generic folder references (such as `see chapters/outtakes/...`) in place of per-file escaped includes when moving subfiles to outtakes.
+

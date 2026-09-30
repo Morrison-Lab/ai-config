@@ -218,7 +218,7 @@ short assignment-shaped fragment.
   that did nothing; removing the flag immediately reproduced the
   `unused_function` failure it was supposed to prevent.)
 
-## lintr — `lint_dir()` natively merges `.lintr.R` exclusions; avoid manual extraction scripts
+## lintr --- `lint_dir()` natively merges `.lintr.R` exclusions; avoid manual extraction scripts
 
 - In Quarto repositories using `lintr`, `lintr::lint_dir()` (with its default `parse_settings = TRUE`) automatically merges `settings$exclusions` defined in `.lintr.R` (`exclusions <- c(exclusions, settings$exclusions)`).
 - **Avoid manual extraction via `sys.source`**: parsing `.lintr.R` in CI scripts and passing `names(cfg_env$exclusions)` into `exclusions_list` flattens structured per-linter exclusions (such as `list("data-raw" = list(pipe_consistency_linter = Inf))`) into blanket whole-file exclusions, silently disabling all linters for those paths.

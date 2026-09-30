@@ -1243,10 +1243,14 @@ Pattern 34's `\u0061` example and this one's `\u0077` are the same trick.
 
 ## Pattern 61: Scanning Unbounded argv Tokens for Global Flags Across Subcommands
 
-- **Mistake**: scanning a tool's entire `argv` for global command-line options (such as `git -C <dir>`) without bounding the scan to tokens preceding the subcommand. When a subcommand accepts an option with the same flag name (such as `git commit -C <commit>` to reuse a commit message), the subcommand argument is misparsed as the global option, redirecting or corrupting execution context (e.g. setting `target_cwd` to a nonexistent path and silently suppressing validation).
-- **Direction of failure**: fail-open for pre-commit guards and linters. By redirecting the target working directory to an invalid path derived from a subcommand option, git commands in the hook fail or exit early, suppressing warnings on genuine defects.
-- **Example**: 2026-09-30, PR [#4148](https://github.com/Morrison-Lab/ai-config/pull/4148) (`hooks/warn-unparseable-staged-config.py`). `find_commit_invocations` looped through all `argv` tokens looking for `-C`, causing `git commit -C HEAD` to treat `HEAD` as the repository working directory instead of a commit reference.
-- **Fix**: bound option parsing by subcommand position. Parse global options sequentially from index 1 until the first non-option token (the subcommand), and treat all subsequent options as arguments to that subcommand.
+- **Mistake**: scanning a tool's entire `argv` for global command-line options (such as `git -C <dir>`) without bounding the scan to tokens preceding the subcommand.
+  When a subcommand accepts an option with the same flag name (such as `git commit -C <commit>` to reuse a commit message), the subcommand argument is misparsed as the global option, redirecting or corrupting execution context (e.g. setting `target_cwd` to a nonexistent path and silently suppressing validation).
+- **Direction of failure**: fail-open for pre-commit guards and linters.
+  By redirecting the target working directory to an invalid path derived from a subcommand option, git commands in the hook fail or exit early, suppressing warnings on genuine defects.
+- **Example**: 2026-09-30, PR [#4148](https://github.com/Morrison-Lab/ai-config/pull/4148) (`hooks/warn-unparseable-staged-config.py`).
+  `find_commit_invocations` looped through all `argv` tokens looking for `-C`, causing `git commit -C HEAD` to treat `HEAD` as the repository working directory instead of a commit reference.
+- **Fix**: bound option parsing by subcommand position.
+  Parse global options sequentially from index 1 until the first non-option token (the subcommand), and treat all subsequent options as arguments to that subcommand.
 - **Do:** stop global option parsing at the subcommand boundary when analyzing command lines.
 - **Do:** test subcommand options that share names with global options (e.g. `git commit -C HEAD`).
 - **Don't:** scan the entire `argv` list for global flags with a simple loop over `enumerate(argv)`.

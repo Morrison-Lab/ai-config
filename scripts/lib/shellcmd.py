@@ -582,11 +582,9 @@ def resolve_cd_target(rest: list[str], cur_dir: str | None) -> str | None:
         return cur_dir
 
     if target is None:
-        # Bare `cd` or `cd -P` with no directory defaults to $HOME (~).
-        # For pushd with no args, it swaps top 2 stack entries (indeterminate -> None).
         if cmd_name == "pushd":
             return None
-        target = "~"
+        return os.path.expanduser("~")
 
     # Expand ~ and ~/path
     if target == "~" or target.startswith("~/"):
@@ -603,11 +601,13 @@ def resolve_cd_target(rest: list[str], cur_dir: str | None) -> str | None:
         # Unexpanded shell variables/substitutions cannot be resolved statically.
         return None
 
-    if os.path.isabs(target):
-        return os.path.normpath(target)
-    if cur_dir is not None:
-        return os.path.normpath(os.path.join(cur_dir, target))
-    return os.path.normpath(target)
+    target = native_path(target)
+    was_forward = target.startswith("/") or bool(re.match(r"^[A-Za-z]:/", target)) or bool(cur_dir and cur_dir.startswith("/"))
+    is_abs = os.path.isabs(target) or bool(re.match(r"^[A-Za-z]:[/\\]", target))
+    resolved = os.path.normpath(target if is_abs or cur_dir is None else os.path.join(cur_dir, target))
+    if was_forward:
+        resolved = resolved.replace("\\", "/")
+    return resolved
 
 
 # A SHELL specifically, which is a narrower question than "an interpreter".

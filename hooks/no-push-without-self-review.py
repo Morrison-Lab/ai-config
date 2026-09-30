@@ -1065,10 +1065,10 @@ def _resolve_cd_target(rest: list[str], cur_dir: str | None) -> str | None:
     # False, so a Git Bash drive path was joined onto `cur_dir` and then
     # normalized into a drive-less path nothing downstream could repair.
     target = _native_path(target)
-    was_windows_drive_forward = bool(re.match(r"^[A-Za-z]:/", target))
+    was_forward = target.startswith("/") or bool(re.match(r"^[A-Za-z]:/", target)) or bool(cur_dir and cur_dir.startswith("/"))
     is_abs = os.path.isabs(target) or bool(re.match(r"^[A-Za-z]:[/\\]", target))
     resolved = os.path.normpath(target if is_abs or cur_dir is None else os.path.join(cur_dir, target))
-    if was_windows_drive_forward:
+    if was_forward:
         resolved = resolved.replace("\\", "/")
     return resolved
 
@@ -2513,7 +2513,7 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, list[str], boo
                         # not. A comment cannot hold an invariant that a shared
                         # constant can (ai-config#3737 round 6).
                         if any(t in reviewer_task_ids
-                                for t in _task_ids(inp)):
+                               for t in _task_ids(inp)):
                             if isinstance(call_id, str) and call_id:
                                 reviewer_call_ids.add(call_id)
                     elif tool_name in AGENT_TOOLS:

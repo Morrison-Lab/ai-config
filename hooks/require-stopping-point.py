@@ -45,6 +45,7 @@ RX_SESSION_STATUS = re.compile(
     r"\bsession\s+(?:is\s+)?(?:not\s+done|done|not\s+finished|finished|not\s+complete|complete|ongoing|in\s+progress)\b",
     re.IGNORECASE,
 )
+RX_SECTION_BREAK = re.compile(r"^(?:#{1,6}\s+|[-*+]\s+|\d+\.\s+)")
 RX_INDENTED_CODE = re.compile(r"^(?: {4,}|\t)(?![-*]\s+|\d+\.\s+)")
 INLINE_CODE_RX = re.compile(r"`[^`\n]+`")
 
@@ -77,9 +78,15 @@ def has_stopping_point_declaration(text: str) -> bool:
             continue
         line_no_inline = INLINE_CODE_RX.sub("", line)
         if RX_LINE.search(line_no_inline):
-            combined = line_no_inline
-            if i + 1 < len(lines):
-                combined += " " + INLINE_CODE_RX.sub("", lines[i + 1])
+            combined_parts = [line_no_inline]
+            for j in range(i + 1, min(len(lines), i + 6)):
+                nxt = INLINE_CODE_RX.sub("", lines[j]).strip()
+                if not nxt:
+                    continue
+                if RX_SECTION_BREAK.match(nxt) and not RX_LINE.search(nxt):
+                    break
+                combined_parts.append(nxt)
+            combined = " ".join(combined_parts)
             if RX_SESSION_STATUS.search(combined):
                 return True
     return False

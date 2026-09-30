@@ -1024,4 +1024,8 @@ When suppressing the unpushed-commit Stop hook (`no-unshipped-commit.py`) becaus
   which immediately rejects the push as non-plain.
   Use `env VAR=val git push` instead,
   which matches `COMMAND_WRAPPERS` in `_strip_env` and is evaluated as a single simple command.
+- **Cross-platform absolute path resolution for Windows drive paths:** On POSIX/Linux systems, Python's `os.path.isabs("C:/path")` returns `False`.
+  Helpers resolving `cd` targets (`resolve_cd_target`) must check Windows drive paths (`^[A-Za-z]:[/\\]`) as absolute across platforms before calling `os.path.join(cur_dir, target)`, preventing mangled joined paths (e.g. `/cur/dir/C:/path`).
+- **Agent ID regex prefix consumption:** When extracting agent IDs from tool result text to construct `.meta.json` paths, patterns matching `agent_id:` must consume optional leading `agent-` prefixes (`(?:agent-)?([\w-]+)`), avoiding doubled prefixes like `agent-agent-<id>.meta.json`.
+
 

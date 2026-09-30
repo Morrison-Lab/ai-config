@@ -87,6 +87,8 @@ rather than through `.cmd` or `.bat` batch wrappers.
   - `invoke_subagent` passes an array `{"Subagents": [{"TypeName": "...", "Workspace": "...", "Prompt": "..."}]}`.
     A bridge adapter evaluates all subagents in the list against `Agent` PreToolUse hooks.
     If any subagent triggers `deny`, the whole tool execution is denied.
+    Subagent isolation requires passing `Workspace: "branch"` in `invoke_subagent`, which `claude-hook-adapter` maps to Claude Code's `isolation: "worktree"` enum (`hooks/flag-unassigned-worktree.py`).
+    On Windows, ensure `~/.gemini/config/plugins/ai-config/claude-hook-adapter.py` is kept synced with `plugins/ai-config/claude-hook-adapter.py`.
   - `send_message` maps to `SendMessage`.
   - `define_subagent` maps to `Task`.
   - Claude PreToolUse hooks may also return a top-level `systemMessage` (shown to the user, independent of the `hookSpecificOutput.permissionDecision` deny/allow verdict).

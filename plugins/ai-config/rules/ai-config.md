@@ -20,7 +20,7 @@ These instructions define standardized operating rules for Antigravity operating
 8. **Research existing solutions before implementing (DRW):** Check existing libraries and upstream packages before hand-rolling custom code.
 9. **"Or" means "and/or":** "Or" always means "and/or", not xor, unless xor or mutual exclusivity is explicitly specified.
 10. **Always give recommendations with questions:** Whenever asking a question or presenting choices, provide a concrete recommended option.
-11. **Status and diagnostic requests are not report-only:** Diagnose and repair issues immediately in the same turn rather than waiting for follow-up prompts.
+11. **Status and diagnostic requests are not report-only:** Diagnose and repair issues immediately in the same turn rather than waiting for follow-up prompts. When asked for status, examine the transcript to check if the agent got stuck, frozen, or dropped the ball, diagnose what stalled, and resume work immediately.
 12. **Run UMS proactively:** Run UMS when scrutinized and before pausing when learnings have accumulated.
 13. **Timestamp recaps in local time:** Use Pacific Time (`TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`).
 14. **Don't take anyone's word for it (no sycophancy):** Give users the whole truth and nothing but the truth,

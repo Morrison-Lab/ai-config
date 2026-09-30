@@ -116,16 +116,23 @@ Filed as [Morrison-Lab/mlr#10](https://github.com/Morrison-Lab/mlr/issues/10), [
 Issue #10 was later found to rest on a truncated search --- the book is present under a search that was not cut short --- and was corrected rather than left standing;
 see the timeout section linked above.)
 
-## Outtake formatting and cross-repo content migration sequence
+## Format outtakes with per-file escaped includes directly at removal sites
 
 When course content is retired or migrated to another repository (such as `mds` or `pds`), preserve the removed material under `chapters/outtakes/` rather than deleting it.
 Follow the repository's documented escaped-include convention:
 place commented-out, escaped includes (`<!-- {{</* include outtakes/_name.qmd */>}} -->`) directly at the original removal locations in the parent chapter.
 This ensures restoring original slidebreaks, exercises, or derivations requires only unescaping and uncommenting, rather than reconstructing layout and file order from git diffs.
 
+- **Do:** place commented-out, escaped includes (`<!-- {{</* include outtakes/_name.qmd */>}} -->`) at the exact positions where the content was removed.
+- **Don't:** use a generic folder or prose comment (such as `see chapters/outtakes/...`) in place of per-file escaped includes when moving subfiles to outtakes.
+
+## Sequence cross-repository content migrations recipient-first
+
 When migrating content across repositories (e.g. migrating math refreshers from `lds` to `mds`/`pds`):
-- **Phased migration sequence**: Merging downstream signposts and links in the originating repository (`lds`) depends on the recipient repositories (`mds`, `pds`) having already merged to `main` and deployed to GitHub Pages.
-- **External anchor resolution**: Automated review checks verify external links against the live published site (`morrison-lab.github.io/<repo>/...`), not against unmerged branch previews.
-- **Do:** drive recipient PRs (`mds`, `pds`) to full clean status first, merge them, verify GitHub Pages deployment, and only then obtain a clean review verdict on the referencing PR (`lds`).
-- **Don't:** use generic folder references (such as `see chapters/outtakes/...`) in place of per-file escaped includes when moving subfiles to outtakes.
+the downstream referencing PR in the originating repository (`lds`) adds links to anchors hosted on the recipient repositories' published websites (`morrison-lab.github.io/<repo>/...`).
+Automated code review checks resolve external links against the live published site, not against open PR branch previews.
+
+- **Do:** drive recipient PRs (`mds`, `pds`) to full clean status first, merge them to `main`, and verify GitHub Pages deployment before expecting external link checks on the referencing PR (`lds`) to pass clean.
+- **Don't:** attempt to merge the referencing PR before the recipient PRs have merged and deployed, or treat the resulting external link failures as anchor mismatches in the downstream PR.
+
 

@@ -941,8 +941,8 @@ check("the examined count covers every depth below the root",
 # --strict still returns 1.
 with tempfile.TemporaryDirectory() as d:
     base = Path(d)
-    (base / "CLAUDE.md").write_text("@big.md\n")
-    (base / "big.md").write_text("x" * 500)
+    (base / "CLAUDE.md").write_text("@big.md\n", encoding="utf-8")
+    (base / "big.md").write_text("x" * 500, encoding="utf-8")
     check(
         "a fragment over the cap fails without --strict",
         ccc.main(

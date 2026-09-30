@@ -613,7 +613,7 @@ def main() -> int:
     if os.path.exists(sentinel):
         return 0
     try:
-        with open(sentinel, "w") as fh:
+        with open(sentinel, "w", encoding="utf-8") as fh:
             fh.write(str(tb_at))
     except Exception:
         pass

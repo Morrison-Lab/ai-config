@@ -454,7 +454,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             if not args.quiet:
                 scope_label = "added line(s)" if args.diff else "line(s)"
                 print(
-                    f"✓ Checked {result.files_count} file(s), {result.lines_count} {scope_label}: no non-ASCII punctuation found."
+                    f"ok: checked {result.files_count} file(s), {result.lines_count} {scope_label}: no non-ASCII punctuation found."
                 )
 
     if result.status == "violations":

@@ -312,7 +312,7 @@ def scan(path):
     last_text = ""
     events = []  # (timestamp_key, file_position, kind)
     position = 0
-    with open(path, errors="ignore") as fh:
+    with open(path, encoding="utf-8", errors="ignore") as fh:
         for line in fh:
             position += 1
             try:
@@ -494,7 +494,7 @@ def main():
     if os.path.exists(sentinel):
         return 0
     try:
-        open(sentinel, "w").close()
+        open(sentinel, "w", encoding="utf-8").close()
     except Exception:
         pass
 

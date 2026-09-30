@@ -1205,7 +1205,7 @@ def scan(path):
     push_attempts = []
     push_tool_use_ids = set()
     blocked_push_ids = set()
-    with open(path, errors="ignore") as fh:
+    with open(path, encoding="utf-8", errors="ignore") as fh:
         for line in fh:
             i += 1
             try:
@@ -1384,7 +1384,7 @@ def main() -> int:
     if os.path.exists(sentinel):
         return 0
     try:
-        with open(sentinel, "w"):
+        with open(sentinel, "w", encoding="utf-8"):
             pass
     except Exception:
         pass

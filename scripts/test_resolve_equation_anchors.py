@@ -110,8 +110,7 @@ class ResolveAnchors(unittest.TestCase):
         )
 
     def test_page_with_no_display_equations_fails(self):
-        with tempfile.NamedTemporaryFile(
-            "w", suffix=".html", delete=False
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".html", delete=False
         ) as handle:
             handle.write(page("<p>no math here</p>"))
             path = handle.name
@@ -125,8 +124,7 @@ class ResolveAnchors(unittest.TestCase):
             os.unlink(path)
 
     def test_selecting_a_missing_anchor_reports_failure(self):
-        with tempfile.NamedTemporaryFile(
-            "w", suffix=".html", delete=False
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".html", delete=False
         ) as handle:
             handle.write(page(f"<p>{display('a')}</p>"))
             path = handle.name
@@ -141,8 +139,7 @@ class ResolveAnchors(unittest.TestCase):
             os.unlink(path)
 
     def test_selecting_a_present_anchor_prints_only_that_equation(self):
-        with tempfile.NamedTemporaryFile(
-            "w", suffix=".html", delete=False
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".html", delete=False
         ) as handle:
             handle.write(
                 page(f"<p>{display('a')}</p><p>{display('wanted')}</p>")

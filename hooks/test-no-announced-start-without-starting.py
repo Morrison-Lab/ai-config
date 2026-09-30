@@ -41,7 +41,7 @@ def say(text):
 
 
 def run(messages):
-    with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as fh:
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".jsonl", delete=False) as fh:
         for m in messages:
             fh.write(json.dumps(m) + "\n")
         path = fh.name

@@ -74,7 +74,7 @@ else:
 
 sys.exit(response.get("exit_code", 0))
 """
-        mock_curl_script.write_text(mock_curl_content)
+        mock_curl_script.write_text(mock_curl_content, encoding="utf-8")
         mock_curl_script.chmod(mock_curl_script.stat().st_mode | stat.S_IEXEC)
 
     def tearDown(self):
@@ -82,7 +82,7 @@ sys.exit(response.get("exit_code", 0))
 
     def run_upload(self, env_overrides=None, mock_config=None):
         if mock_config is not None:
-            self.mock_responses.write_text(json.dumps(mock_config))
+            self.mock_responses.write_text(json.dumps(mock_config), encoding="utf-8")
         env = os.environ.copy()
         env["PATH"] = f"{self.bin_dir}:{env['PATH']}"
         env["ANTHROPIC_API_KEY"] = "sk-ant-test-workspace-key"
@@ -105,7 +105,7 @@ sys.exit(response.get("exit_code", 0))
         if not self.curl_log.exists():
             return []
         calls = []
-        with open(self.curl_log, "r") as f:
+        with open(self.curl_log, "r", encoding="utf-8") as f:
             for line in f:
                 if line.strip():
                     calls.append(json.loads(line))
@@ -113,9 +113,9 @@ sys.exit(response.get("exit_code", 0))
 
     def test_new_skills_creation(self):
         (self.stage / "skill-alpha").mkdir()
-        (self.stage / "skill-alpha" / "SKILL.md").write_text("# Alpha Skill\nContent")
+        (self.stage / "skill-alpha" / "SKILL.md").write_text("# Alpha Skill\nContent", encoding="utf-8")
         (self.stage / "skill-beta").mkdir()
-        (self.stage / "skill-beta" / "SKILL.md").write_text("# Beta Skill\nContent")
+        (self.stage / "skill-beta" / "SKILL.md").write_text("# Beta Skill\nContent", encoding="utf-8")
 
         mock_config = {
             "GET https://api.anthropic.com/v1/skills": {
@@ -133,19 +133,19 @@ sys.exit(response.get("exit_code", 0))
         self.assertIn("created: skill-alpha -> skill_alpha_123", res.stdout)
         self.assertIn("created=2 versioned=0 unchanged=0 deleted=0 failed=0", res.stdout)
 
-        map_content = self.map_file.read_text()
+        map_content = self.map_file.read_text(encoding="utf-8")
         self.assertIn("skill-alpha\tskill_alpha_123\tCREATED", map_content)
         self.assertIn("skill-beta\tskill_alpha_123\tCREATED", map_content)
 
         self.assertTrue(self.state_file.exists())
-        state = json.loads(self.state_file.read_text())
+        state = json.loads(self.state_file.read_text(encoding="utf-8"))
         self.assertIn("skill-alpha", state["skills"])
         self.assertIn("skill-beta", state["skills"])
         self.assertEqual(state["skills"]["skill-alpha"]["id"], "skill_alpha_123")
 
     def test_unchanged_skill_skipped(self):
         (self.stage / "skill-alpha").mkdir()
-        (self.stage / "skill-alpha" / "SKILL.md").write_text("# Alpha Skill\nContent")
+        (self.stage / "skill-alpha" / "SKILL.md").write_text("# Alpha Skill\nContent", encoding="utf-8")
 
         mock_config = {
             "GET https://api.anthropic.com/v1/skills": {
@@ -181,7 +181,7 @@ sys.exit(response.get("exit_code", 0))
     def test_modified_skill_versioned(self):
         (self.stage / "skill-alpha").mkdir()
         skill_file = self.stage / "skill-alpha" / "SKILL.md"
-        skill_file.write_text("# Alpha Skill\nInitial")
+        skill_file.write_text("# Alpha Skill\nInitial", encoding="utf-8")
 
         mock_config = {
             "GET https://api.anthropic.com/v1/skills": {
@@ -195,7 +195,7 @@ sys.exit(response.get("exit_code", 0))
         }
         self.run_upload(mock_config=mock_config)
 
-        skill_file.write_text("# Alpha Skill\nModified content")
+        skill_file.write_text("# Alpha Skill\nModified content", encoding="utf-8")
 
         mock_config["GET https://api.anthropic.com/v1/skills"] = {
             "code": 200,
@@ -211,12 +211,12 @@ sys.exit(response.get("exit_code", 0))
         self.assertIn("versioned: skill-alpha -> skill_alpha_123 (version ver_2)", res.stdout)
         self.assertIn("created=0 versioned=1 unchanged=0 deleted=0 failed=0", res.stdout)
 
-        state = json.loads(self.state_file.read_text())
+        state = json.loads(self.state_file.read_text(encoding="utf-8"))
         self.assertEqual(state["skills"]["skill-alpha"]["version_id"], "ver_2")
 
     def test_force_upload(self):
         (self.stage / "skill-alpha").mkdir()
-        (self.stage / "skill-alpha" / "SKILL.md").write_text("# Alpha Skill\nContent")
+        (self.stage / "skill-alpha" / "SKILL.md").write_text("# Alpha Skill\nContent", encoding="utf-8")
 
         mock_config = {
             "GET https://api.anthropic.com/v1/skills": {
@@ -237,7 +237,7 @@ sys.exit(response.get("exit_code", 0))
                     "version_id": "ver_1",
                 }
             }
-        }))
+        }), encoding="utf-8")
 
         res = self.run_upload(env_overrides={"FORCE": "1"}, mock_config=mock_config)
         self.assertEqual(res.returncode, 0)
@@ -258,10 +258,10 @@ sys.exit(response.get("exit_code", 0))
                     "version_id": "ver_1",
                 }
             }
-        }))
+        }), encoding="utf-8")
 
         (self.stage / "skill-managed-1").mkdir()
-        (self.stage / "skill-managed-1" / "SKILL.md").write_text("# Skill 1")
+        (self.stage / "skill-managed-1" / "SKILL.md").write_text("# Skill 1", encoding="utf-8")
 
         mock_config = {
             "GET https://api.anthropic.com/v1/skills": {
@@ -289,10 +289,10 @@ sys.exit(response.get("exit_code", 0))
         self.assertIn("deleted: skill-managed-2 -> sk_m2", res.stdout)
         self.assertIn("deleted=1", res.stdout)
 
-        map_content = self.map_file.read_text()
+        map_content = self.map_file.read_text(encoding="utf-8")
         self.assertIn("skill-managed-2\tsk_m2\tDELETED", map_content)
 
-        state = json.loads(self.state_file.read_text())
+        state = json.loads(self.state_file.read_text(encoding="utf-8"))
         self.assertIn("skill-managed-1", state["skills"])
         self.assertNotIn("skill-managed-2", state["skills"])
 
@@ -310,7 +310,7 @@ sys.exit(response.get("exit_code", 0))
                     "hash": "hash_2",
                 }
             }
-        }))
+        }), encoding="utf-8")
         mock_config = {
             "GET https://api.anthropic.com/v1/skills": {
                 "code": 200,
@@ -327,9 +327,9 @@ sys.exit(response.get("exit_code", 0))
 
     def test_multi_file_skill_upload(self):
         (self.stage / "quarto-authoring").mkdir()
-        (self.stage / "quarto-authoring" / "SKILL.md").write_text("# Quarto")
+        (self.stage / "quarto-authoring" / "SKILL.md").write_text("# Quarto", encoding="utf-8")
         (self.stage / "quarto-authoring" / "references").mkdir()
-        (self.stage / "quarto-authoring" / "references" / "figures.md").write_text("# Figures")
+        (self.stage / "quarto-authoring" / "references" / "figures.md").write_text("# Figures", encoding="utf-8")
 
         mock_config = {
             "GET https://api.anthropic.com/v1/skills": {
@@ -352,7 +352,7 @@ sys.exit(response.get("exit_code", 0))
 
     def test_auth_error_bails_out(self):
         (self.stage / "skill-alpha").mkdir()
-        (self.stage / "skill-alpha" / "SKILL.md").write_text("# Alpha")
+        (self.stage / "skill-alpha" / "SKILL.md").write_text("# Alpha", encoding="utf-8")
 
         mock_config = {
             "GET https://api.anthropic.com/v1/skills": {

@@ -74,7 +74,7 @@ def base_payload():
 
 def run_script(payload):
     """Run the real CLI against *payload*; return (exit_code, output)."""
-    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as fh:
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False) as fh:
         json.dump(payload, fh)
         path = fh.name
     try:
@@ -122,7 +122,7 @@ def main():
     check("a non-object payload exits 2", code == 2)
 
     # a file that is not JSON at all
-    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as fh:
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False) as fh:
         fh.write("{not json")
         bad = fh.name
     res = subprocess.run(
@@ -285,7 +285,7 @@ def main():
     p = base_payload()
     p["check_runs"][0]["html_url"] = (
         "https://github.com/example-org/example-repo/actions/runs/900/job/1")
-    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as fh:
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False) as fh:
         json.dump(p, fh)
         path = fh.name
     res = subprocess.run(

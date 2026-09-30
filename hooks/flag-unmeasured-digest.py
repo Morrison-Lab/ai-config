@@ -853,7 +853,7 @@ def main() -> int:
                     _emit_pin(pin_hit)
                 return 0
             try:
-                open(sentinel, "w").close()
+                open(sentinel, "w", encoding="utf-8").close()
             except Exception:
                 pass
 

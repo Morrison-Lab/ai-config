@@ -262,10 +262,10 @@ def main():
     # A nested clone must not inherit its parent's answer.
     nest = tempfile.mkdtemp()
     os.makedirs(os.path.join(nest, "scripts"))
-    open(os.path.join(nest, "scripts", "run-local-validation.py"), "w").close()
+    open(os.path.join(nest, "scripts", "run-local-validation.py"), "w", encoding="utf-8").close()
     inner = os.path.join(nest, "vendor", "other")
     os.makedirs(inner)
-    open(os.path.join(inner, ".git"), "w").close()
+    open(os.path.join(inner, ".git"), "w", encoding="utf-8").close()
     check("fires in the outer repo that has the script",
           run(PUSH, [CHECKER], cwd=nest)[0])
     check("...and NOT in a nested repo that does not",
@@ -276,7 +276,7 @@ def main():
     bare = os.path.join(nest, "mirror.git")
     os.makedirs(os.path.join(bare, "objects"))
     os.makedirs(os.path.join(bare, "refs"))
-    open(os.path.join(bare, "HEAD"), "w").close()
+    open(os.path.join(bare, "HEAD"), "w", encoding="utf-8").close()
     check("...nor in a nested BARE repo",
           not run(PUSH, [CHECKER], cwd=os.path.join(bare, "refs"))[0])
 
@@ -325,8 +325,8 @@ def main():
     # DIFFERENT repository from the sweep, so the test has to supply one.
     other = tempfile.mkdtemp()
     os.makedirs(os.path.join(other, "scripts"))
-    open(os.path.join(other, "scripts", "run-local-validation.py"), "w").close()
-    open(os.path.join(other, ".git"), "w").close()
+    open(os.path.join(other, "scripts", "run-local-validation.py"), "w", encoding="utf-8").close()
+    open(os.path.join(other, ".git"), "w", encoding="utf-8").close()
     check("a sweep recorded anywhere silences a push from ANOTHER repo (#3698)",
           not run(PUSH, [CHECKER, DERIVED], cwd=other)[0])
     check("...and that repo would otherwise be warned",

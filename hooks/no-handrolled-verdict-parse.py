@@ -399,7 +399,7 @@ def checked_prs(path):
     valid_prs = set()
     successful_calls = set()
 
-    with open(path, errors="ignore") as fh:
+    with open(path, encoding="utf-8", errors="ignore") as fh:
         for idx, line in enumerate(fh):
             try:
                 msg = json.loads(line)

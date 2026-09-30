@@ -318,7 +318,7 @@ def records(path):
     records have none and dropping them would cost real coverage.
     """
     seen = set()
-    with open(path, errors="ignore") as fh:
+    with open(path, encoding="utf-8", errors="ignore") as fh:
         for line in fh:
             try:
                 rec = json.loads(line)
@@ -544,7 +544,7 @@ def main() -> int:
         if os.path.exists(sentinel):
             continue
         try:
-            open(sentinel, "w").close()
+            open(sentinel, "w", encoding="utf-8").close()
         except Exception:
             pass
         print(message(label, stretch, total, shapes))

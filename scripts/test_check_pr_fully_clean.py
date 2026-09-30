@@ -4351,7 +4351,7 @@ def main() -> int:
             break
     if _base_src is not None:
         _tmp = Path(_tf.mkdtemp()) / "base_checker.py"
-        _tmp.write_text(_base_src)
+        _tmp.write_text(_base_src, encoding="utf-8")
         _bspec = importlib.util.spec_from_file_location("base_checker", _tmp)
         _base = importlib.util.module_from_spec(_bspec)
         _bspec.loader.exec_module(_base)

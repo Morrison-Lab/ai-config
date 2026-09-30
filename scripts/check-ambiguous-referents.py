@@ -90,7 +90,7 @@ def find_candidates(text: str, threshold: int = 2) -> list[tuple[str, int]]:
 
 
 def scan_file(path: Path, threshold: int) -> list[tuple[str, int]]:
-    return find_candidates(path.read_text(errors="ignore"), threshold)
+    return find_candidates(path.read_text(encoding="utf-8", errors="ignore"), threshold)
 
 
 def main(argv: list[str]) -> int:

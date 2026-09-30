@@ -164,7 +164,7 @@ def main() -> int:
               "mock_empty_arm" in str(exc))
 
     # 6. build_corpus raises when --corpus points to an empty record list
-    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as tmp_f:
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False) as tmp_f:
         json.dump([], tmp_f)
         tmp_path = tmp_f.name
     try:
@@ -179,7 +179,7 @@ def main() -> int:
         Path(tmp_path).unlink(missing_ok=True)
 
     # 7. CLI execution with empty corpus file exits non-zero with reach error
-    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as tmp_f:
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False) as tmp_f:
         json.dump([], tmp_f)
         tmp_path = tmp_f.name
     try:

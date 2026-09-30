@@ -389,7 +389,7 @@ def combine_transcripts(paths):
     handle, outpath = tempfile.mkstemp()
     with os.fdopen(handle, "w") as out:
         for p in paths:
-            with open(p) as inc:
+            with open(p, encoding="utf-8") as inc:
                 out.write(inc.read())
     return outpath
 
@@ -1211,7 +1211,7 @@ def write_transcript_with_reply(path, reply_text):
     point: the transcript_path, the derived reason, and the repo state all
     stay identical across two calls, and only the reply's wording changes.
     """
-    with open(path, "w") as stream:
+    with open(path, "w", encoding="utf-8") as stream:
         stream.write(json.dumps({"type": "assistant", "message": {"content": [
             {"type": "tool_use", "name": "Bash",
              "input": {"command": "git commit -m hook"}}]}}) + "\n")
@@ -1384,7 +1384,7 @@ assert subject.decide(rev_root, path_async) == ""
 # Case 3: Reviewer verdict arrives as a task-notification / handback
 # -> is_pre_push_review_in_flight is False, decide() blocks because commit is unpushed
 h_verdict, path_verdict = tempfile.mkstemp()
-with open(path_async, "r") as src, os.fdopen(h_verdict, "w") as dst:
+with open(path_async, "r", encoding="utf-8") as src, os.fdopen(h_verdict, "w") as dst:
     dst.write(src.read())
     # Subagent handback notification arrives
     dst.write(json.dumps({
@@ -1419,7 +1419,7 @@ assert "1 commit(s) on HEAD are not on its upstream" in subject.decide(rev_root,
 
 # Case 5: New commit after an earlier review round -> not in flight until re-dispatched
 h_recommit, path_recommit = tempfile.mkstemp()
-with open(path_verdict, "r") as src, os.fdopen(h_recommit, "w") as dst:
+with open(path_verdict, "r", encoding="utf-8") as src, os.fdopen(h_recommit, "w") as dst:
     dst.write(src.read())
     dst.write(json.dumps({
         "type": "assistant",
@@ -1487,7 +1487,7 @@ assert reason_iso and "commit(s)" in reason_iso, reason_iso
 
 # Subsequent commit on worktree A does NOT cancel worktree B's in-flight review
 h_iso2, path_iso2 = tempfile.mkstemp()
-with open(path_iso, "r") as src, os.fdopen(h_iso2, "w") as dst:
+with open(path_iso, "r", encoding="utf-8") as src, os.fdopen(h_iso2, "w") as dst:
     dst.write(src.read())
     dst.write(json.dumps({
         "type": "assistant",
@@ -1518,7 +1518,7 @@ assert subject.is_pre_push_review_in_flight(rev_root, path_omo) is True
 
 # 3. Unrelated tool output with verdict text
 h_omo_unrelated, path_omo_unrelated = tempfile.mkstemp()
-with open(path_omo, "r") as src, os.fdopen(h_omo_unrelated, "w") as dst:
+with open(path_omo, "r", encoding="utf-8") as src, os.fdopen(h_omo_unrelated, "w") as dst:
     dst.write(src.read())
     dst.write(json.dumps({
         "type": "tool_use", "tool_name": "bash",
@@ -1534,7 +1534,7 @@ assert subject.is_pre_push_review_in_flight(rev_root, path_omo_unrelated) is Tru
 
 # 4. Ambiguity poisoning: a second pending task dispatch poisons the tool name
 h_omo_poison, path_omo_poison = tempfile.mkstemp()
-with open(path_omo_unrelated, "r") as src, os.fdopen(h_omo_poison, "w") as dst:
+with open(path_omo_unrelated, "r", encoding="utf-8") as src, os.fdopen(h_omo_poison, "w") as dst:
     dst.write(src.read())
     # Second task tool_use before first has returned
     dst.write(json.dumps({
@@ -1552,7 +1552,7 @@ assert subject.is_pre_push_review_in_flight(rev_root, path_omo_poison) is True
 
 # 5. Clean, unambiguous OMO reviewer result DOES clear in-flight status
 h_omo_clean, path_omo_clean = tempfile.mkstemp()
-with open(path_omo, "r") as src, os.fdopen(h_omo_clean, "w") as dst:
+with open(path_omo, "r", encoding="utf-8") as src, os.fdopen(h_omo_clean, "w") as dst:
     dst.write(src.read())
     dst.write(json.dumps({
         "type": "tool_result", "tool_name": "task",

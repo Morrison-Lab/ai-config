@@ -409,6 +409,18 @@
   When the user or a task specifies a particular implementation approach or mechanism to achieve a goal, do not treat the mechanism as an immutable requirement when a simpler, cleaner, more idiomatic, or upstream alternative reaches the same objective.
   Distinguish the underlying goal from candidate mechanisms, evaluate alternatives against DRW (upstream tools), KISS (simplicity), YAGNI (minimal code), and systemic maintainability, and proactively present and recommend the better approach.
   See [`shared/principles/proactively-suggest-alternatives.md`](../shared/principles/proactively-suggest-alternatives.md).
+- **Use real-world examples for general practice**:
+  "when we do or see something that would be a good example for general practice, use it"
+  (User directive, Issue #4093).
+  When working across repositories (e.g. `pds`, `psw`, `ai-config`),
+  identify high-quality solutions, structural tightenings,
+  and clear before-and-after edits that illustrate core standards and general practice.
+  Capture these concrete real-world instances directly into shared documentation,
+  writing style guidelines, or skills as worked examples
+  rather than relying on abstract statements or synthetic scenarios.
+  Grounding instructions in real lab PRs and edits makes guidance concrete,
+  relatable, and directly actionable.
+  See [`shared/principles/use-real-world-examples.md`](../shared/principles/use-real-world-examples.md).
 - Always run /ums (Update Memories and Skills) after finishing a task --- don't wait to be asked.
 - After a PR/MR merges, run the `post-merge` skill: verify the merge actually landed, tidy the local branch (checkout main, pull, `git branch -d`), confirm any deferred items are tracked, then run UMS to capture what the PR's review lifecycle taught --- mistakes corrected and guidance given along the way.
   A merge is the natural checkpoint to bank lessons before context is lost.

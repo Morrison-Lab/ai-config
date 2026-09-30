@@ -258,6 +258,29 @@ See [`shared/principles/proactively-suggest-alternatives.md`](shared/principles/
 - **Don't:** offer vague objections without presenting a concrete,
   actionable alternative.
 
+## Use real-world examples for general practice
+
+When we do or see something that would be a good example for general practice,
+use it.
+When authoring, reviewing, or observing work that exemplifies good general
+engineering, writing, or architectural practice,
+actively capture and incorporate it as a concrete before-and-after example
+in shared guides, rules, and documentation.
+The user's standing directive:
+"when we do or see something that would be a good example for general practice, use it"
+(user directive, Issue #4093).
+Before-and-after examples ground abstract rules in reality,
+showing both the suboptimal pattern and the concrete mechanism of improvement.
+See [`shared/principles/use-real-world-examples.md`](shared/principles/use-real-world-examples.md).
+
+- **Do:** capture exemplary refactors and tightened constructs from real PRs
+  and add them as before-and-after examples in shared documentation.
+- **Do:** pair every before-and-after case with an explicit critique explaining
+  why the refactoring improved clarity, structure, or precision.
+- **Do:** cite authentic repository sources (PRs, issues, commits) for provenance.
+- **Don't:** leave great examples of general practice isolated in closed PR diffs.
+- **Don't:** invent artificial or toy examples when authentic project refactors exist.
+
 ## Always give recommendations with questions
 
 Whenever asking the user a question or presenting options for a genuine decision,

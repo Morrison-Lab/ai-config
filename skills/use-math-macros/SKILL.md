@@ -243,15 +243,18 @@ Tracked in Morrison-Lab/pds#33.
   Bare `\mA` or `\vw` are undefined and break LuaLaTeX during PDF compilation.
   Use `\matr{A}` for matrices and `\vec{w}` or `\vecf{w}` for vectors.
 - **Latin vector collision with `\vb`**: `macros.qmd` defines `\def\b{\beta}` and `\def\vb{\vec \b}`, which expands to Greek `\vec{\beta}` rather than Latin vector `b`.
-  When denoting a Latin vector (such as an intercept or bias vector $b$), do not use `\vb`; use `\vec{b}` or `\vecf{b}`.
+  When denoting a Latin vector (such as an intercept or bias vector $b$), do not use `\vb`;
+  use `\vec{b}` or `\vecf{b}`.
   ([`Morrison-Lab/mds#48`](https://github.com/Morrison-Lab/mds/pull/48), 2026-09-29.)
 
 ## Anti-patterns
 
 - ❌ Inventing a macro name not defined in `macros.qmd` — it silently breaks the
   render. Verify every command resolves (step 4).
-- ❌ Using bare `\mA` or `\vw` expecting them to expand to matrices or vectors --- they are undefined in `macros.qmd` and break LuaLaTeX during PDF compilation. Use `\matr{A}` and `\vec{w}` / `\vecf{w}` instead.
-- ❌ Using `\vb` for Latin vector $b$ (e.g. bias or intercept) --- `macros.qmd` defines `\vb` as `\vec{\beta}` (Greek beta), colliding with Latin vector $b$. Use `\vec{b}` or `\vecf{b}` instead.
+- ❌ Using bare `\mA` or `\vw` expecting them to expand to matrices or vectors --- they are undefined in `macros.qmd` and break LuaLaTeX during PDF compilation.
+  Use `\matr{A}` and `\vec{w}` / `\vecf{w}` instead.
+- ❌ Using `\vb` for Latin vector $b$ (e.g. bias or intercept) --- `macros.qmd` defines `\vb` as `\vec{\beta}` (Greek beta), colliding with Latin vector $b$.
+  Use `\vec{b}` or `\vecf{b}` instead.
 - ❌ Running `git submodule update --remote` in a checkout that is running
   provenance-stamped SLURM jobs — it dirties the tree and poisons the run. Use a
   worktree.

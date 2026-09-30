@@ -23,12 +23,12 @@ try:
         "scripts", "lib")
     if _LIB not in sys.path:
         sys.path.insert(0, _LIB)
-    from shellcmd import (resolve_cd_target, simple_commands_with_scope,
+    from shellcmd import (native_path, resolve_cd_target, simple_commands_with_scope,
                           strip_env)
 except Exception as _exc:  # broken install; fail open and say so
     print(f"no-unshipped-commit: cannot load scripts/lib/shellcmd.py "
           f"({_exc}); not tracking the shell's directory", file=sys.stderr)
-    resolve_cd_target = simple_commands_with_scope = strip_env = None
+    native_path = resolve_cd_target = simple_commands_with_scope = strip_env = None
 
 # `(?![\w-])`, not `\b`. A word boundary sits happily between `commit` and
 # `-`, because `-` is a non-word character -- so `git\s+commit\b` matched
@@ -287,6 +287,9 @@ def _scope_dir(dirs, scope, cur_dir):
     return dirs[scope]
 
 
+_RX_WIN_DRIVE_PATH = re.compile(r"([A-Za-z]:\\[^;&|\n\r]+)")
+
+
 def shell_dir_after(text, cur_dir, parent_only=False):
     """The directory the shell stands in WHERE `text` ENDS, given `cur_dir`,
     or, with `parent_only`, the caller's own shell wherever `text` stopped.
@@ -315,7 +318,10 @@ def shell_dir_after(text, cur_dir, parent_only=False):
     # and swallowing the rest of the call. When it is swallowed anyway,
     # `end_scope` stays the caller's own shell and the parent's directory is
     # the answer, which is what this function returned before scopes existed.
-    argvs = simple_commands_with_scope(text + chr(10) + END_MARKER)
+    parse_text = text
+    if "\\" in text:
+        parse_text = _RX_WIN_DRIVE_PATH.sub(lambda m: m.group(1).replace("\\", "/"), text)
+    argvs = simple_commands_with_scope(parse_text + chr(10) + END_MARKER)
     if argvs is None:
         return None
     dirs, end_scope = {}, (0,)
@@ -326,7 +332,10 @@ def shell_dir_after(text, cur_dir, parent_only=False):
             break
         _, rest = strip_env(argv)
         if rest and rest[0] in ("cd", "pushd", "popd"):
-            dirs[scope] = resolve_cd_target(rest, here)
+            target = resolve_cd_target(rest, here)
+            if target and native_path is not None:
+                target = native_path(target)
+            dirs[scope] = target
     return _scope_dir(dirs, (0,) if parent_only else end_scope, cur_dir)
 
 
@@ -1035,6 +1044,24 @@ def _extract_dispatch_text(inp):
     return " ".join(texts)
 
 
+def _git_common_dir(cwd):
+    """Return the normalized common git dir for a repository/worktree, or ''."""
+    if not cwd or not os.path.exists(cwd):
+        return ""
+    try:
+        res = subprocess.run(
+            ["git", "-C", cwd, "rev-parse", "--git-common-dir"],
+            capture_output=True, text=True, timeout=5)
+        if res.returncode == 0:
+            out = res.stdout.strip()
+            if not os.path.isabs(out):
+                out = os.path.normpath(os.path.join(cwd, out))
+            return os.path.normcase(os.path.realpath(out))
+    except Exception:
+        pass
+    return ""
+
+
 def _is_commit_relevant(harness_dirs, commit_dir, named_paths, commit_branches, target_cwd_real, target_branch, effective_cwd=None):
     """True if a commit event is attributed to the target worktree or branch."""
     if target_cwd_real is None and target_branch is None:
@@ -1070,7 +1097,7 @@ def _is_commit_relevant(harness_dirs, commit_dir, named_paths, commit_branches, 
 
 def _is_dispatch_relevant(inp, tool_name, harness_dirs, cur_dir, target_cwd_real, target_branch,
                           head_sha, other_branches, effective_cwd=None, dispatch_branches=None,
-                          current_repo_branch=None):
+                          current_repo_branch=None, last_commit_dir=None, dispatch_dir=None):
     """True if a reviewer dispatch targets this worktree, branch, or HEAD SHA."""
     if target_cwd_real is None and target_branch is None:
         return True
@@ -1084,12 +1111,27 @@ def _is_dispatch_relevant(inp, tool_name, harness_dirs, cur_dir, target_cwd_real
     if target_branch and target_branch in text:
         return True
 
+    if target_cwd_real and isinstance(inp, dict):
+        prompt_text = str(
+            inp.get("prompt") or inp.get("Prompt") or
+            inp.get("command") or inp.get("cmd") or inp.get("CommandLine") or ""
+        )
+        prompt_text_lower = prompt_text.lower()
+        norm_target = _normalize_dir_key(target_cwd_real)
+        if norm_target and (norm_target.lower() in prompt_text_lower or norm_target.replace("\\", "/").lower() in prompt_text_lower):
+            return True
+        base_target = os.path.basename(norm_target)
+        if base_target and len(base_target) > 3 and base_target.lower() in prompt_text_lower:
+            return True
+
     if other_branches and any(ob in text for ob in other_branches):
         return False
 
     all_paths = set(harness_dirs)
     if cur_dir:
         all_paths.add(cur_dir)
+    elif last_commit_dir:
+        all_paths.add(last_commit_dir)
     elif effective_cwd:
         all_paths.add(effective_cwd)
 
@@ -1099,26 +1141,43 @@ def _is_dispatch_relevant(inp, tool_name, harness_dirs, cur_dir, target_cwd_real
             if isinstance(v, str) and v and v != "inherit":
                 all_paths.add(v)
 
+    target_common = _git_common_dir(target_cwd_real) if target_cwd_real else ""
+    cwd_matches = False
     if target_cwd_real:
-        if not any(_paths_overlap(p, target_cwd_real) for p in all_paths):
+        for p in all_paths:
+            if _paths_overlap(p, target_cwd_real):
+                cwd_matches = True
+                break
+            if target_common and _git_common_dir(p) == target_common:
+                cwd_matches = True
+                break
+        if not cwd_matches:
             return False
 
     if target_branch:
+        different_worktree = bool(
+            dispatch_dir and target_cwd_real and
+            _normalize_dir_key(dispatch_dir) != _normalize_dir_key(target_cwd_real)
+        )
         if dispatch_branches:
             if target_branch not in dispatch_branches:
-                return False
+                if not (different_worktree and dispatch_branches <= {"main", "master"} and
+                        last_commit_dir and _paths_overlap(last_commit_dir, target_cwd_real)):
+                    return False
         elif current_repo_branch and target_branch != current_repo_branch:
-            return False
+            if not (different_worktree and current_repo_branch in ("main", "master") and
+                    last_commit_dir and _paths_overlap(last_commit_dir, target_cwd_real)):
+                return False
 
     return True
 
 
 def _process_bash_tool_use(inp, cur_dir, branches_by_dir, target_cwd_real, target_branch,
                            head_sha, other_branches, effective_cwd, current_repo_branch,
-                           guard, worktree_paths=None):
+                           guard, worktree_paths=None, last_commit_dir=None):
     """Process a bash/command invocation for commits, directory moves, and reviewer dispatches.
 
-    Returns (new_cur_dir, commit_seen, dispatch_seen).
+    Returns (new_cur_dir, commit_seen, dispatch_seen, commit_seen_dir).
     """
     harness_dirs, harness_cwd = set(), None
     if isinstance(inp, dict):
@@ -1135,6 +1194,7 @@ def _process_bash_tool_use(inp, cur_dir, branches_by_dir, target_cwd_real, targe
     start_dir = harness_cwd or cur_dir or effective_cwd
 
     commit_seen = False
+    commit_seen_dir = None
     for commit in COMMIT.finditer(scanned):
         before = scanned[:commit.start()]
         invocation = scanned[commit.start():commit.end()]
@@ -1146,6 +1206,7 @@ def _process_bash_tool_use(inp, cur_dir, branches_by_dir, target_cwd_real, targe
         if _is_commit_relevant(harness_dirs, commit_dir, commit_paths, commit_branches,
                                target_cwd_real, target_branch, effective_cwd=effective_cwd):
             commit_seen = True
+            commit_seen_dir = dir_before
 
     end_dir = absolute_dir(shell_dir_after(scanned, start_dir, parent_only=True))
     target_update_dir = end_dir or start_dir
@@ -1163,15 +1224,17 @@ def _process_bash_tool_use(inp, cur_dir, branches_by_dir, target_cwd_real, targe
                                 target_branch, head_sha, other_branches,
                                 effective_cwd=effective_cwd,
                                 dispatch_branches=dispatch_branches,
-                                current_repo_branch=current_repo_branch):
+                                current_repo_branch=current_repo_branch,
+                                last_commit_dir=last_commit_dir,
+                                dispatch_dir=dispatch_dir):
             dispatch_seen = True
 
-    return new_cur_dir, commit_seen, dispatch_seen
+    return new_cur_dir, commit_seen, dispatch_seen, commit_seen_dir
 
 
 def _process_agent_tool_use(inp, tool_name, cur_dir, branches_by_dir, target_cwd_real,
                             target_branch, head_sha, other_branches, effective_cwd,
-                            current_repo_branch, guard, worktree_paths=None):
+                            current_repo_branch, guard, worktree_paths=None, last_commit_dir=None):
     """Process an agent/subagent tool use for reviewer dispatch.
 
     Returns True if this invocation is a relevant reviewer dispatch.
@@ -1190,32 +1253,16 @@ def _process_agent_tool_use(inp, tool_name, cur_dir, branches_by_dir, target_cwd
             if agent_cwd is None:
                 agent_cwd = val
 
-    dispatch_dir = agent_cwd or cur_dir or effective_cwd
+    dispatch_dir = agent_cwd or cur_dir or last_commit_dir or effective_cwd
     dispatch_branches = _lookup_dir_branches(branches_by_dir, dispatch_dir, worktree_paths)
 
     return _is_dispatch_relevant(inp, tool_name, agent_dirs, cur_dir, target_cwd_real,
                                 target_branch, head_sha, other_branches,
                                 effective_cwd=effective_cwd,
                                 dispatch_branches=dispatch_branches,
-                                current_repo_branch=current_repo_branch)
-
-
-def _git_common_dir(cwd):
-    """Return the normalized common git dir for a repository/worktree, or ''."""
-    if not cwd or not os.path.exists(cwd):
-        return ""
-    try:
-        res = subprocess.run(
-            ["git", "-C", cwd, "rev-parse", "--git-common-dir"],
-            capture_output=True, text=True, timeout=5)
-        if res.returncode == 0:
-            out = res.stdout.strip()
-            if not os.path.isabs(out):
-                out = os.path.normpath(os.path.join(cwd, out))
-            return os.path.normcase(os.path.realpath(out))
-    except Exception:
-        pass
-    return ""
+                                current_repo_branch=current_repo_branch,
+                                last_commit_dir=last_commit_dir,
+                                dispatch_dir=dispatch_dir)
 
 
 def _collect_worktrees_and_branches(cwd, session_cwd, target_branch):
@@ -1316,6 +1363,7 @@ class _TranscriptScanner:
         self.seq = 0
         self.omo_seq = 0
         self.last_commit_seq = None
+        self.last_commit_dir = None
         self.last_dispatch_seq = None
         self.last_verdict_seq = None
         self.reviewer_call_ids = set()
@@ -1339,13 +1387,14 @@ class _TranscriptScanner:
             self.pending_omo_uses.setdefault(name, []).append(call_id)
             inp = record.get("tool_input")
             if name in {"bash", "run_command", "terminal", "execute_command", "shell"}:
-                self.cur_dir, commit_seen, dispatch_seen = _process_bash_tool_use(
+                self.cur_dir, commit_seen, dispatch_seen, commit_dir = _process_bash_tool_use(
                     inp, self.cur_dir, self.branches_by_dir, self.target_cwd_real,
                     self.target_branch, self.head_sha, self.other_branches,
                     self.effective_cwd, self.current_repo_branch, self.guard,
-                    worktree_paths=self.worktree_paths)
+                    worktree_paths=self.worktree_paths, last_commit_dir=self.last_commit_dir)
                 if commit_seen:
                     self.last_commit_seq = self.seq
+                    self.last_commit_dir = commit_dir or self.cur_dir
                 if dispatch_seen:
                     self.last_dispatch_seq = self.seq
                     self.reviewer_call_ids.add(call_id)
@@ -1353,7 +1402,8 @@ class _TranscriptScanner:
                                          self.target_cwd_real, self.target_branch,
                                          self.head_sha, self.other_branches,
                                          self.effective_cwd, self.current_repo_branch,
-                                         self.guard, worktree_paths=self.worktree_paths):
+                                         self.guard, worktree_paths=self.worktree_paths,
+                                         last_commit_dir=self.last_commit_dir):
                 self.last_dispatch_seq = self.seq
                 self.reviewer_call_ids.add(call_id)
         else:
@@ -1367,6 +1417,10 @@ class _TranscriptScanner:
                 self.seq += 1
                 if not record.get("is_error"):
                     out_text = self.guard._result_text({"content": record.get("tool_output")})
+                    tid_match = re.search(r"\b(?:task[-_ ]?id|conversationId|agent[-_ ]?id)[:=]\s*[`\"']?([\w-]+)", out_text, re.I) or re.search(r"message from [`\"']?agent-?([\w-]+)[`\"']?", out_text, re.I)
+                    if tid_match:
+                        self.active_reviewer_task_ids.add(tid_match.group(1))
+                        self.active_reviewer_task_ids.add(f"agent-{tid_match.group(1)}")
                     if self._matches_head_verdict(out_text):
                         self.last_verdict_seq = self.seq
 
@@ -1393,22 +1447,43 @@ class _TranscriptScanner:
                 if self._matches_head_verdict(content_text):
                     self.last_verdict_seq = self.seq
 
+    def handle_subagent_handback(self, record, text):
+        """Process subagent handback message containing review verdict."""
+        if not self.reviewer_call_ids and not self.active_reviewer_task_ids:
+            return
+        sender_id = str(record.get("sender") or "")
+        is_tracked_sender = (
+            sender_id in self.active_reviewer_task_ids
+            or f"agent-{sender_id}" in self.active_reviewer_task_ids
+            or (sender_id.startswith("agent-") and sender_id[6:] in self.active_reviewer_task_ids)
+        )
+        is_handback_marker = bool(re.search(
+            r"(?:^|\n)\s*(?:(?:This agent's report was delivered to you as a message|\[Subagent hand-back|SubagentHandback)\b)",
+            text, re.I
+        ))
+        if is_tracked_sender or is_handback_marker:
+            if self._matches_head_verdict(text):
+                self.seq += 1
+                self.last_verdict_seq = self.seq
+
     def handle_block(self, b, record):
         """Process an individual tool_use or tool_result block."""
         b_type = b.get("type")
         if b_type == "tool_use":
+            self.seq += 1
             tool_name = (b.get("name") or "").lower()
             call_id = b.get("id")
             inp = b.get("input") or {}
 
             if tool_name in {"bash", "run_command", "terminal", "execute_command", "shell"}:
-                self.cur_dir, commit_seen, dispatch_seen = _process_bash_tool_use(
+                self.cur_dir, commit_seen, dispatch_seen, commit_dir = _process_bash_tool_use(
                     inp, self.cur_dir, self.branches_by_dir, self.target_cwd_real,
                     self.target_branch, self.head_sha, self.other_branches,
                     self.effective_cwd, self.current_repo_branch, self.guard,
-                    worktree_paths=self.worktree_paths)
+                    worktree_paths=self.worktree_paths, last_commit_dir=self.last_commit_dir)
                 if commit_seen:
                     self.last_commit_seq = self.seq
+                    self.last_commit_dir = commit_dir or self.cur_dir
                 if dispatch_seen:
                     self.last_dispatch_seq = self.seq
                     if call_id:
@@ -1417,7 +1492,8 @@ class _TranscriptScanner:
                                          self.target_cwd_real, self.target_branch,
                                          self.head_sha, self.other_branches,
                                          self.effective_cwd, self.current_repo_branch,
-                                         self.guard, worktree_paths=self.worktree_paths):
+                                         self.guard, worktree_paths=self.worktree_paths,
+                                         last_commit_dir=self.last_commit_dir):
                 self.last_dispatch_seq = self.seq
                 if call_id:
                     self.reviewer_call_ids.add(call_id)
@@ -1443,9 +1519,10 @@ class _TranscriptScanner:
                                 self.active_reviewer_task_ids.add(tid)
                     except Exception:
                         pass
-                    tid_match = re.search(r"\b(?:task[-_ ]?id|conversationId|agentId)[:=]\s*[`\"']?([\w-]+)", res_text, re.I)
+                    tid_match = re.search(r"\b(?:task[-_ ]?id|conversationId|agent[-_ ]?id)[:=]\s*[`\"']?([\w-]+)", res_text, re.I) or re.search(r"message from [`\"']?agent-?([\w-]+)[`\"']?", res_text, re.I)
                     if tid_match:
                         self.active_reviewer_task_ids.add(tid_match.group(1))
+                        self.active_reviewer_task_ids.add(f"agent-{tid_match.group(1)}")
 
                     if self._matches_head_verdict(res_text, call_id=call_id):
                         self.last_verdict_seq = self.seq
@@ -1460,6 +1537,20 @@ class _TranscriptScanner:
 
         self.handle_reviewer_record(record)
         self.handle_task_notification(record)
+
+        msg = record.get("message")
+        if isinstance(msg, dict):
+            content = msg.get("content")
+            if isinstance(content, str):
+                self.handle_subagent_handback(record, content)
+            elif isinstance(content, list):
+                for blk in content:
+                    if isinstance(blk, dict) and blk.get("type") in ("text", None):
+                        t = blk.get("text") or blk.get("content")
+                        if isinstance(t, str) and t:
+                            self.handle_subagent_handback(record, t)
+        elif isinstance(record.get("content"), str):
+            self.handle_subagent_handback(record, record["content"])
 
         for b in self.guard._iter_blocks(record):
             self.handle_block(b, record)

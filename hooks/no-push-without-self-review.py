@@ -2168,7 +2168,8 @@ def _is_reviewer_record(record: dict) -> bool:
 # dispatch's own `toolUseId`. `[\w-]+` matches the same id shape
 # `TASK_ID_KEYS`' own text-mined fallback already accepts elsewhere in this
 # file.
-AGENT_ID_IN_TEXT = re.compile(r"\bagentId[:=]\s*[`\"']?([\w-]+)", re.I)
+AGENT_ID_IN_TEXT = re.compile(r"\bagent[-_ ]?id[:=]\s*[`\"']?([\w-]+)", re.I)
+AGENT_ID_FROM_PROSE = re.compile(r"message from [`\"']?agent-?([\w-]+)[`\"']?", re.I)
 
 
 def _subagents_dir(transcript_path: str) -> str:
@@ -2285,7 +2286,7 @@ def _handback_report_text(transcript_path: str, call_id, res_text: str) -> str |
             break
 
     if meta_path is None:
-        agent_id_match = AGENT_ID_IN_TEXT.search(res_text)
+        agent_id_match = AGENT_ID_IN_TEXT.search(res_text) or AGENT_ID_FROM_PROSE.search(res_text)
         if not agent_id_match:
             return None
         candidate = os.path.join(subagents_dir, f"agent-{agent_id_match.group(1)}.meta.json")
@@ -2459,6 +2460,26 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, list[str], boo
                     if found:
                         verdict, reviewed_commits = found, shas
 
+            # Handback delivery as direct transcript messages from subagent
+            if saw_reviewer_call and not is_assistant:
+                sender_id = str(record.get("sender") or "")
+                is_tracked_sender = (
+                    sender_id in reviewer_task_ids
+                    or f"agent-{sender_id}" in reviewer_task_ids
+                    or (sender_id.startswith("agent-") and sender_id[6:] in reviewer_task_ids)
+                )
+                text = _result_text(
+                    record.get("message") if isinstance(record.get("message"), dict) else record
+                )
+                is_handback_marker = bool(re.search(
+                    r"(?:^|\n)\s*(?:(?:This agent's report was delivered to you as a message|\[Subagent hand-back|SubagentHandback)\b)",
+                    text, re.I
+                ))
+                if (is_tracked_sender or is_handback_marker) and text:
+                    found, shas = parse_report_all(text)
+                    if found:
+                        verdict, reviewed_commits = found, shas
+
             for b in _iter_blocks(record):
                 b_type = b.get("type")
 
@@ -2488,7 +2509,7 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, list[str], boo
                         # not. A comment cannot hold an invariant that a shared
                         # constant can (ai-config#3737 round 6).
                         if any(t in reviewer_task_ids
-                               for t in _task_ids(inp)):
+                                for t in _task_ids(inp)):
                             if isinstance(call_id, str) and call_id:
                                 reviewer_call_ids.add(call_id)
                     elif tool_name in AGENT_TOOLS:
@@ -2519,9 +2540,11 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, list[str], boo
                                 for tid in _registrable_task_ids(res_data):
                                     reviewer_task_ids.add(tid)
                         except Exception:
-                            tid_match = re.search(r"\b(?:task[-_ ]?id|conversationId|agentId)[:=]\s*[`\"']?([\w-]+)", res_text, re.I)
-                            if tid_match:
-                                reviewer_task_ids.add(tid_match.group(1))
+                            pass
+                        tid_match = re.search(r"\b(?:task[-_ ]?id|conversationId|agent[-_ ]?id)[:=]\s*[`\"']?([\w-]+)", res_text, re.I) or AGENT_ID_FROM_PROSE.search(res_text)
+                        if tid_match:
+                            reviewer_task_ids.add(tid_match.group(1))
+                            reviewer_task_ids.add(f"agent-{tid_match.group(1)}")
 
                         if not b.get("is_error"):
                             found, shas = parse_report_all(res_text)

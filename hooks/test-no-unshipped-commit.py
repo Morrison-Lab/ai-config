@@ -1750,3 +1750,57 @@ with open(ts_empty_path, encoding="utf-8") as f:
 
 assert scanner_empty.is_in_flight() is False, "Empty tool_result with handback report must register verdict"
 print("PASS: empty-content tool_result resolves handback verdict cleanly (ai-config#4120)")
+
+# ai-config#4130: shell_dir_after normalizes Windows drive paths with backslashes
+win_path = r"C:\path\to\repo"
+resolved_win = subject.shell_dir_after(f"cd {win_path}", r"C:\other")
+assert resolved_win == win_path or (resolved_win and resolved_win.replace("/", "\\") == win_path), f"Unexpected resolved dir: {resolved_win}"
+print("PASS: shell_dir_after handles Windows backslashes in cd target (ai-config#4130)")
+
+# ai-config#4130: pre-push review in flight detected when prompt names worktree or runs from root checkout
+h_wt_ts = tempfile.mkdtemp()
+ts_wt_path = os.path.join(h_wt_ts, "transcript.jsonl")
+wt_dir = os.path.join(rev_root, "worktrees", "feature-worktree")
+with open(ts_wt_path, "w", encoding="utf-8") as f:
+    f.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "c_wt_1", "name": "Bash", "input": {
+            "command": f'git -C "{wt_dir}" commit -m "fix something"'
+        }}]}
+    }) + "\n")
+    f.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "c_wt_2", "name": "Agent", "input": {
+            "subagent_type": "adversarial-reviewer",
+            "prompt": f"Review changes in {wt_dir}"
+        }}]}
+    }) + "\n")
+
+scanner_wt = subject._TranscriptScanner(
+    guard_obj, ts_wt_path, rev_head, wt_dir, "feat-wt", set(), rev_root, "main", {wt_dir}
+)
+with open(ts_wt_path, encoding="utf-8") as f:
+    for line in f:
+        scanner_wt.scan_record(json.loads(line))
+
+assert scanner_wt.is_in_flight() is True, "Review dispatch naming worktree path must be in-flight"
+print("PASS: review dispatch naming worktree in prompt recognized in-flight (ai-config#4130)")
+
+# And when SubagentHandback message arrives with verdict:
+with open(ts_wt_path, "a", encoding="utf-8") as f:
+    f.write(json.dumps({
+        "type": "user",
+        "message": {"role": "user", "content": [
+            {"type": "text", "text": f"[Subagent hand-back]\n### Verdict: Ready for merge\n\nReviewed-Commit: {rev_head}\n"}
+        ]}
+    }) + "\n")
+
+scanner_wt2 = subject._TranscriptScanner(
+    guard_obj, ts_wt_path, rev_head, wt_dir, "feat-wt", set(), rev_root, "main", {wt_dir}
+)
+with open(ts_wt_path, encoding="utf-8") as f:
+    for line in f:
+        scanner_wt2.scan_record(json.loads(line))
+
+assert scanner_wt2.is_in_flight() is False, "SubagentHandback verdict must discharge in-flight review"
+print("PASS: SubagentHandback verdict discharges in-flight review (ai-config#4130)")

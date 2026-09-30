@@ -251,7 +251,10 @@ To prevent temporary file collisions across parallel workers:
 - **Don't:** use generic, static filenames like `pr.md`, `body.txt`, or `diff.patch` in instructions or briefs dispatched to concurrent subagents.
 - **Don't:** assume that separate subagent contexts isolate file writes when tools operate against a shared filesystem scratchpad.
 
-(Measured 2026-09-29 in a four-agent parallel rollout across course repos: multiple agents wrote to `pr.md` in the shared scratchpad, resulting in `qwt#148` temporarily receiving `mds` PR content with `Closes #41`; caught and remediated in ai-config#4105.)
+(Measured 2026-09-29 in a four-agent parallel rollout across course repos:
+multiple agents wrote to `pr.md` in the shared scratchpad,
+resulting in `qwt#148` temporarily receiving `mds` PR content with `Closes #41`;
+caught and remediated in ai-config#4105.)
 
 
 

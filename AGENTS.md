@@ -281,6 +281,39 @@ See [`shared/principles/use-real-world-examples.md`](shared/principles/use-real-
 - **Don't:** leave great examples of general practice isolated in closed PR diffs.
 - **Don't:** invent artificial or toy examples when authentic project refactors exist.
 
+## Search the tracker and AGENTS.md before building or denying a policy
+
+Before answering that a permission or policy does not exist,
+and before implementing a new policy or capability,
+search the full policy corpus and the issue tracker.
+
+`AGENTS.md` is the authoritative, unconditional cross-agent contract.
+Cross-repo policies, standing merge grants, worktree rules,
+and delivery conventions are codified here
+rather than duplicated in individual skill files or local memories.
+Searching only `skills/` or `memories/` leaves `AGENTS.md` unread
+and leads agents to falsely deny standing policies that already exist.
+
+Similarly, implementing a fresh capability or grant request
+without searching open issues and PRs risks duplicating existing work
+(such as #4085 duplicating already-open #4039).
+An open issue or PR often contains requirements, allowlists,
+or prior user directives that define the necessary scope.
+See [`shared/workflow/search-before-building-or-denying.md`](shared/workflow/search-before-building-or-denying.md).
+
+- **Do:** search `AGENTS.md`, `CLAUDE.md`, `memories/`, `shared/`,
+  and open issues before answering "no" to whether a policy or permission exists.
+- **Do:** run an all-state tracker search before implementing a capability request,
+  even when the user's prompt is explicit and fresh.
+- **Do:** check whether an open issue or PR already establishes architecture,
+  allowlists, or user requirements.
+- **Don't:** assert that a standing grant or rule does not exist
+  based only on searching `skills/` or `memories/`.
+- **Don't:** implement a new policy without checking
+  whether an active issue already specifies the intended scope.
+- **Don't:** ask the user to choose a design when an existing directive
+  already covers it; show them the directive and ask whether it still stands.
+
 ## Always give recommendations with questions
 
 Whenever asking the user a question or presenting options for a genuine decision,

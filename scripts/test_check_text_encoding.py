@@ -153,6 +153,11 @@ def main() -> int:
         code, out, err = run_script(str(d / "bad_tempfile_none.py"))
         check("tempfile.NamedTemporaryFile('w', encoding=None) is flagged", code == 1)
 
+        write_file(d, "bad_path_open_x.py", 'with p.open("x") as f:\n    pass\n')
+        code, out, err = run_script(str(d / "bad_path_open_x.py"))
+        check("path.open('x') without encoding is flagged", code == 1)
+        check("error mentions mode='x'", "mode='x'" in err)
+
         # 2. Negative tests: operations with explicit encoding or binary mode pass
         clean_code = (
             'import io, tempfile, zipfile\n'
@@ -160,9 +165,11 @@ def main() -> int:
             'with open("file.txt", "w", encoding="utf-8") as f: pass\n'
             'with open("file.bin", "rb") as f: pass\n'
             'with open("file.bin", mode="wb") as f: pass\n'
+            'with open("file.bin", "xb") as f: pass\n'
             'with p.open("rb") as f: pass\n'
             'with p.open(encoding="utf-8") as f: pass\n'
             'with p.open("w", encoding="utf-8") as f: pass\n'
+            'with p.open("x", encoding="utf-8") as f: pass\n'
             't = p.read_text(encoding="utf-8")\n'
             't2 = p.read_text("utf-8")\n'
             'p.write_text("data", encoding="utf-8")\n'

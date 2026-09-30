@@ -93,7 +93,7 @@ def has_exemption(line: str) -> bool:
     return "# noqa: text-encoding" in line or "# pragma: no-encoding" in line
 
 
-VALID_MODE_CHARS = set("rwa+btU")
+VALID_MODE_CHARS = set("rwax+btU")
 
 NON_PATH_RECEIVERS = {
     "os", "tarfile", "zipfile", "gzip", "bz2", "lzma", "shutil",

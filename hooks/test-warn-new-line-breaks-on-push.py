@@ -198,6 +198,15 @@ def test_main():
 # ------------------------------------------------------------ mutation harness
 
 MUTATIONS = {
+    # Negative control: an unmutated copy must flip nothing. Each real
+    # mutation below disables detection outright, so its expected set is
+    # every warn case -- the same set a copy that cannot load its sibling
+    # produces. Only this control tells the two apart (#3648).
+    "M0_control_unmutated": (
+        "an unmutated copy run from the mutant location behaves like the hook",
+        [],
+        set(),
+    ),
     "M1_checker_candidates": (
         "checker candidates list must not be empty",
         [('CHECKER_CANDIDATES = (\n    os.path.join("scripts", "vendor", "gha-check-new-line-breaks.py"),\n    os.path.join("scripts", "check-new-line-breaks.py"),\n)',
@@ -233,7 +242,10 @@ def test_mutations():
                 sys.exit(f"FATAL: anchor not present once in {HOOK} (found {count}):\n{find}")
             mutated = mutated.replace(find, replace)
 
-        fd, path = tempfile.mkstemp(suffix=".py")
+        # Beside the hook, not in the OS temp dir: the subject loads its
+        # sibling off its own __file__, so a mutant elsewhere loses the
+        # sibling and every clause "fails" identically (#3648).
+        fd, path = tempfile.mkstemp(suffix=".py", dir=os.path.dirname(HOOK))
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
             handle.write(mutated)
 

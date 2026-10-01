@@ -1120,3 +1120,11 @@ Hit on [wai#128](https://github.com/Morrison-Lab/wai/issues/128) (byok ITPM/budg
   `--bs-table-color`, `--bs-table-bg`, `--bs-table-border-color`,
   `--bs-table-striped-color`, and `--bs-table-striped-bg`.
   Treat this as unverified until a real rendered table in a `.widget-panel` confirms it.
+- **RevealJS section and title slide overflow**:
+  In Quarto RevealJS presentations,
+  level-1 (`#`) section headings generate title slides with `.title-slide .center`
+  which center content vertically and do not scroll.
+  Any large body text placed directly under a level-1 heading overflows off screen.
+  Placing a horizontal rule (`---`) or a format-conditional `{{< slidebreak >}}` shortcode
+  immediately after the level-1 heading
+  separates the section title slide from the body content on subsequent slides.

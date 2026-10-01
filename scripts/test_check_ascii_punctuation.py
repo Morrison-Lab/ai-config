@@ -197,21 +197,34 @@ def main() -> int:
     # exactly the input it exists to flag. CI's UTF-8 locale cannot reproduce
     # that, so check the calls statically.
     import ast
+    subprocess_funcs = {"run", "check_output", "check_call", "call", "Popen"}
     tree = ast.parse(SCRIPT.read_text(encoding="utf-8"))
-    text_calls = []
+    calls = []
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
         func = node.func
-        if not (isinstance(func, ast.Attribute) and func.attr == "run"):
+        name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", None)
+        if name not in subprocess_funcs:
             continue
         kwargs = {kw.arg: kw.value for kw in node.keywords}
-        text = kwargs.get("text")
-        if isinstance(text, ast.Constant) and text.value is True:
-            text_calls.append((node.lineno, "encoding" in kwargs))
-    check("script has text-mode subprocess calls to inspect", len(text_calls) > 0)
-    for lineno, has_encoding in text_calls:
-        check(f"subprocess.run at line {lineno} sets encoding=", has_encoding)
+        if None in kwargs:
+            # **kwargs hides whether the call decodes text; refuse to guess.
+            calls.append((node.lineno, name, False))
+            continue
+        decodes = any(
+            not (isinstance(kwargs.get(k), ast.Constant) and kwargs[k].value is False)
+            for k in ("text", "universal_newlines")
+            if k in kwargs
+        )
+        if not decodes and "encoding" not in kwargs:
+            continue  # bytes mode: nothing to decode
+        enc = kwargs.get("encoding")
+        utf8 = isinstance(enc, ast.Constant) and str(enc.value).lower().replace("_", "-") in ("utf-8", "utf8")
+        calls.append((node.lineno, name, utf8))
+    check("script has text-mode subprocess calls to inspect", len(calls) > 0)
+    for lineno, name, utf8 in calls:
+        check(f"subprocess.{name} at line {lineno} decodes as encoding='utf-8'", utf8)
 
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0

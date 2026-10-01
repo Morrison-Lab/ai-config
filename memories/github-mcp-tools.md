@@ -1246,3 +1246,10 @@ the user had to report the merge.
 - **Do:** tell a subagent that it must report a refused subscription, not carry on as if subscribed.
 - **Don't:** assume a PR is watched because you asked for it to be,
   since a refusal is silent unless the result is read.
+
+## A whole-file write that shrinks the file is flagged by a hook
+
+`hooks/warn-write-shrink.py` compares the new `content` of `create_or_update_file` and `push_files` against the live size on the branch and warns on a large shrink (ai-config#4169).
+
+- **Do:** treat its warning as a request to rebuild from the live content or confirm the cut.
+- **Don't:** read silence as proof of a complete rewrite, since a failed lookup fails open with only a note.

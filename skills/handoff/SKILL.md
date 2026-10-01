@@ -120,6 +120,8 @@ local commits and why held, open decisions, numbered pick-up steps>
 
 Please hold off on pushing to this branch in the meantime.
 
+Session worktree: <output of git rev-parse --show-toplevel>
+
 _Posted by Claude Code (AI agent) --- not written by a human._"   # COMMENT_PR
 ```
 

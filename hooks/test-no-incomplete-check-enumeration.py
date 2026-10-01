@@ -39,6 +39,18 @@ PARTIAL_ROLLUP = {"type": "assistant", "message": {"content": [
 CHECKER = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {
         "command": "python3 scripts/check-pr-fully-clean.py 651 -R ucdavis/bcs"}}]}}
+# The GitLab counterpart, run for an MR (ai-config#4161, observed on
+# health-analytics-core/abridge!110).
+CHECKER_MR = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "python3 scripts/check-mr-fully-clean.py 651 "
+                   "-p health-analytics-core/abridge --quorum 1"}}]}}
+# Pins the outcome (a test file is not the checker), not which regex part
+# produces it: `\b` already fails after `test_`, so the `(?<!test_)`
+# lookbehind is redundant (tracked in ai-config#4184).
+TEST_FILE_MR = {"type": "assistant", "message": {"content": [
+    {"type": "tool_use", "input": {
+        "command": "python3 scripts/test_check-mr-fully-clean.py"}}]}}
 CHECKER_2277 = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {
         "command": "python3 scripts/check-pr-fully-clean.py 2277 "
@@ -261,6 +273,11 @@ CASES = [
      "checker ran after nothing was pushed -- claim is covered"),
     ([PARTIAL, CHECKER, say("#651 is fully clean.")], "allow",
      "checker ran last, so the claim rests on the complete read"),
+    ([PARTIAL, CHECKER_MR, say("#651 is fully clean.")], "allow",
+     "ai-config#4161: check-mr-fully-clean.py is the complete instrument for "
+     "an MR, so a clean claim resting on it is covered"),
+    ([PARTIAL, TEST_FILE_MR, say("#651 is fully clean.")], "block",
+     "running the MR checker's TEST file is not running the MR checker"),
     ([PARTIAL, ENDPOINT, say("#655 is fully clean and ready to merge.")], "block",
      "paginated check-runs is check-half only, not a fully-clean read"),
     ([PARTIAL, MCP_ENDPOINT, say("#651 is fully clean.")], "block",

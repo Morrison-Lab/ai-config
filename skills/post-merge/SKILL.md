@@ -390,6 +390,8 @@ conflicting PR can sit in `UNKNOWN` and get missed if you filter for
    ```bash
    gh pr comment <N> --body "Working on this — please hold off on pushing to this branch until I'm done.
 
+   Session worktree: <output of git rev-parse --show-toplevel>
+
    _Posted by Claude Code (AI agent) --- not written by a human._"   # COMMENT_PR
    ```
 5. **Create an isolated worktree**, fetch the latest `main` (the squash-merge commit that caused the conflict), and merge:

@@ -414,7 +414,7 @@ _RETARGET_LEAD = re.compile(
     r"(?:on|in|for|at|from|across|over)(?![ \t]+(?:this|our|the current))"
     r"|last[ \t]+(?:week|month|night|time|round)|yesterday|earlier"
     r"|previously|before"
-    r")(?:[ \t,]+(?!(?:%s)(?![-\w]))\w+){0,3}[ \t,]+\Z" % _CONJUNCTION_ALT,
+    r")(?:[ \t,]+(?!(?:%s)(?![-\w]))#?\w+){0,3}[ \t,]+\Z" % _CONJUNCTION_ALT,
     re.I,
 )
 

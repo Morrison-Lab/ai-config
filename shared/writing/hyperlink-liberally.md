@@ -13,7 +13,7 @@ A hyperlink provides 1-click access directly to the authoritative documentation,
 - **Internal rules, skills, fragments, and memories.**
   When citing a policy, operating rule, skill, memory file, or repository script, provide a clickable relative markdown link to the file (e.g. [`strict-merge-policy`](../workflow/strict-merge-policy.md), [`use-preferred-style`](../../skills/use-preferred-style/SKILL.md), [`check-context-closure.py`](../../scripts/check-context-closure.py)).
 - **Forge artifacts.**
-  Always format issues, pull requests, commits, discussions, workflow runs, and review comments as clickable hyperlinks to their forge URLs (e.g. [PR #4066](https://github.com/Morrison-Lab/ai-config/issues/4066)), never as bare numbers, review ids, or SHAs.
+  Always format issues, pull requests, commits, discussions, workflow runs, and review comments as clickable hyperlinks to their forge URLs (e.g. [issue #4066](https://github.com/Morrison-Lab/ai-config/issues/4066), [PR #4152](https://github.com/Morrison-Lab/ai-config/pull/4152)), never as bare numbers, review ids, or SHAs.
   See [`link-forge-artifacts`](link-forge-artifacts.md).
 - **Technical terms and formal concepts.**
   Hyperlink technical terms and named concepts on first mention to their defining section, glossary anchor, or canonical specification.

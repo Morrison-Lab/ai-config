@@ -42,7 +42,7 @@ sys.exit(1)
 def run(tool, tool_input, sizes, gh_on_path=True):
     with tempfile.TemporaryDirectory() as d:
         gh = pathlib.Path(d) / "gh"
-        gh.write_text(STUB.replace("PYTHON", sys.executable, 1))
+        gh.write_text(STUB.replace("PYTHON", sys.executable, 1), encoding="utf-8")
         gh.chmod(gh.stat().st_mode | stat.S_IEXEC)
         env = dict(os.environ)
         env.pop("ANTIGRAVITY_AGENT", None)

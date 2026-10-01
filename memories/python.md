@@ -441,13 +441,13 @@ Mechanical enforcement is provided by `scripts/check-text-encoding.py` and gated
 - **Do:** check relative path segments against `IGNORED_DIRS` rather than absolute paths.
 - **Don't:** call bare `open()`, `p.read_text()`, or `p.write_text(content)` without an explicit `encoding` argument or with `encoding=None` on cross-platform code.
 
+(Measured 2026-09-29 when running `scripts/install-hooks.py` on Windows, where reading UTF-8 characters in `hooks/hooks.json` raised `UnicodeDecodeError` in `cp1252`;
+repo-wide audit and mechanical lint guard shipped in #4121.)
+
 The same default applies to `subprocess` in text mode: `run`, `check_output` or `Popen` with `text=True`, `universal_newlines=True` or a bare `errors=`, and no `encoding=`, decode the child's output with cp1252.
 A `git diff` holding a U+201D then raises `UnicodeDecodeError` in the reader thread, `stdout` comes back `None`, and the caller crashes on the next line (ai-config#4154).
 `scripts/check-text-encoding.py` does not cover subprocess calls as of 2026-09-30, and ai-config#4159 tracks extending it.
 
 - **Do:** pass `encoding="utf-8", errors="replace"` to every text-mode subprocess call that can see git output, file paths, or commit messages.
-- **Don't:** test an encoding fix only with an em-dash fixture, or read a green CI run as covering it, since CI's UTF-8 locale never exercises the cp1252 path.
-
-(Measured 2026-09-29 when running `scripts/install-hooks.py` on Windows, where reading UTF-8 characters in `hooks/hooks.json` raised `UnicodeDecodeError` in `cp1252`;
-repo-wide audit and mechanical lint guard shipped in #4121.)
+- **Don't:** read a green CI run as covering an encoding fix, since CI's UTF-8 locale never exercises the cp1252 path (and see the em-dash fixture note above).
 

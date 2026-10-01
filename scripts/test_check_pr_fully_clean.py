@@ -8533,12 +8533,35 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         "classify_verdict: a not-clean verdict inside an HTML comment still blocks (#3685, fail closed)",
         checker.classify_verdict(pre_3685 + "<!-- Verdict: Needs more work -->", "", "github-actions") == "not-clean",
     )
-    no_findings_key = json.dumps({"verdict": "approved"})
     check(
-        "classify_verdict: a payload lacking findings does not clear through the prose scan (#3685)",
+        "classify_verdict: a stray mid-line <!-- does not hide a later visible verdict (#3685)",
         checker.classify_verdict(
-            pre_3685 + "<!-- review-data: " + no_findings_key + " -->", "", "github-actions"
-        ) != "clean",
+            "### Summary\nI saw a stray <!-- in the file.\n\n### Verdict: Ready for merge\n", "", "github-actions"
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: an indented closed comment hides only its own interior (#3685)",
+        checker.classify_verdict(
+            "### Verdict\n  <!-- note -->\nVerdict: Ready for merge\n", "", "github-actions"
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: a known agent's comment-only verdict reads as unreadable (#3685)",
+        checker.classify_verdict(
+            "**Claude finished** review\n\n<!-- Verdict: Ready for merge -->", "", "github-actions"
+        ) == "unreadable",
+    )
+    # The issue's own repro: a schema_version-less payload with an explicit,
+    # empty findings list. It clears through the deliberate late
+    # payload_is_clean path (#2736), after the prose scans have had their
+    # veto -- not through the prose scan, which #3685 was about. Pinned so a
+    # change to that policy is a visible decision.
+    issue_repro = json.dumps({"verdict": "approved", "findings": []})
+    check(
+        "classify_verdict: #3685 repro clears only via the late payload path (pinned)",
+        checker.classify_verdict(
+            pre_3685 + "<!-- review-data: " + issue_repro + " -->", "", "github-actions"
+        ) == "clean",
     )
 
 

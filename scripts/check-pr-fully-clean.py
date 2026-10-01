@@ -2641,7 +2641,44 @@ def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str
     return "clean"
 
 
-_HTML_COMMENT_INTERIOR = re.compile(r"(<!--)(.*?)(-->|\Z)", re.DOTALL)
+# A line-opening `<!--` (up to three spaces of indent) starts a CommonMark
+# type-2 HTML block, so when unterminated it hides the rest of the body.
+_LINE_OPENING_COMMENT = re.compile(r"^[ ]{0,3}<!--", re.MULTILINE)
+
+
+def _blank_html_comments(text: str) -> str:
+    """Blank HTML comment interiors in *text*, preserving every offset.
+
+    A terminated comment is blanked wherever it sits. An unterminated one is
+    blanked to the end only when it opens a line; a stray mid-line `<!--`
+    with no `-->` renders as literal text and hides nothing. A linear scan
+    rather than one regex: a lazy `<!--.*?-->` rescans to the end of the body
+    for every stray `<!--`, which measured 18 s on 20,000 of them.
+    """
+    out = []
+    pos = 0
+    while True:
+        start = text.find("<!--", pos)
+        if start < 0:
+            break
+        end = text.find("-->", start + 4)
+        if end < 0:
+            # No `-->` remains, so no later comment closes either; only a
+            # line-opening one can still hide anything.
+            line_start = text.rfind("\n", 0, start) + 1
+            opener = _LINE_OPENING_COMMENT.search(text, line_start)
+            if opener is None:
+                break
+            open_end = opener.end()
+            out.append(text[pos:open_end])
+            out.append(" " * (len(text) - open_end))
+            return "".join(out)
+        out.append(text[pos:start + 4])
+        out.append(" " * (end - start - 4))
+        out.append("-->")
+        pos = end + 3
+    out.append(text[pos:])
+    return "".join(out)
 
 
 def classify_verdict(body: str, state: str = "", author: str = "") -> str:
@@ -2754,12 +2791,10 @@ def classify_verdict(body: str, state: str = "", author: str = "") -> str:
     # is not a stated verdict: a commented-out `<!-- Verdict: Ready for
     # merge -->` must not clear a PR (ai-config#3685). Blanked for the CLEAN
     # scan only, preserving offsets, so a not-clean phrase hidden in a
-    # comment still blocks above -- the fail-closed direction. An
+    # comment still blocks above -- the fail-closed direction. A line-opening
     # unterminated `<!--` hides the rest of the body when rendered, so it
-    # runs to the end here too.
-    clean_scan = _HTML_COMMENT_INTERIOR.sub(
-        lambda m: m.group(1) + " " * len(m.group(2)) + m.group(3), scan
-    )
+    # runs to the end here too; a mid-line one hides nothing.
+    clean_scan = _blank_html_comments(scan)
 
     for pat in VERDICT_CLEAN_PATTERNS:
         for match in re.finditer(pat, clean_scan, re.IGNORECASE | re.MULTILINE):
@@ -2813,9 +2848,14 @@ def classify_verdict(body: str, state: str = "", author: str = "") -> str:
     # pattern matched (even if later retracted by a negation/qualifier guard),
     # the body is readable and should return "" rather than "unreadable".
     if _detect_review_agent(body):
+        # The clean half reads `clean_scan`, as the clean loop does, so a
+        # verdict stated only inside an HTML comment reports "unreadable"
+        # rather than "" (#3685 review finding).
         has_any_pattern_match = bool(
-            re.search("|".join(VERDICT_NOT_CLEAN_PATTERNS + VERDICT_CLEAN_PATTERNS),
-                       scan, re.IGNORECASE | re.MULTILINE)
+            re.search("|".join(VERDICT_NOT_CLEAN_PATTERNS),
+                      scan, re.IGNORECASE | re.MULTILINE)
+            or re.search("|".join(VERDICT_CLEAN_PATTERNS),
+                         clean_scan, re.IGNORECASE | re.MULTILINE)
         )
         if not has_any_pattern_match:
             return "unreadable"

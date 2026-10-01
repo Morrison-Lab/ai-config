@@ -518,6 +518,12 @@ CASES = [
       say("14 pass. On #1234, 3 checks failed.")], True,
      "...and so is the `#1234` spelling"),
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. Waiting on #1234, 3 checks failed.")], False,
+     "...but a waiting verb still governs the preposition before a `#N`"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. See #12, 3 checks failed.")], False,
+     "...and a lead word that is not a preposition is no re-target"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
       say("14 pass. On this PR, 3 checks failed.")], False,
      "...but a self-referential object is a disclosure, not a re-target"),
     # The first sentence must disclose NOTHING, or it returns True on its

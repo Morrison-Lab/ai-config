@@ -1040,19 +1040,22 @@ Measured 2026-10-01 on host shiva (48 cores, load about 1.6): `python3 scripts/t
 A Bash call with `run_in_background` and `timeout: 600000` was killed before the run finished.
 Its output had gone only to the task output file, so it was lost with the task.
 
-- **Do:** launch it with `run_in_background: true` and `timeout: 1800000`, with the full log redirected inside the command to a scratchpad file (`python3 scripts/test_hooks.py > <scratchpad>/hooks.log 2>&1`, no trailing `&`, per the double-backgrounding entry in [`claude-code.md`](claude-code.md)).
+- **Do:** launch it with `run_in_background: true` and `timeout: 1800000`, redirecting the full log inside the command to a scratchpad file: `python3 -u scripts/test_hooks.py > <scratchpad>/hooks.log 2>&1`, with no trailing `&` (see the double-backgrounding entry in [`claude-code.md`](claude-code.md)).
+  Use `-u` because the runner flushes only its `RUN:` lines, so without it the log lags the run.
   Then `grep -E '^FAIL: hooks/|^FAIL: [^ ]+ (now has|is in)|suites passed' <scratchpad>/hooks.log` lists the failing suites and coverage failures by path, without the case-level lines.
 - **Don't:** run it in the foreground or under a 10-minute timeout.
 - **Don't:** pipe it straight into `grep` with no saved log: the per-suite detail needed to find which case failed is gone once the pipe closes.
 
-**Name a failing suite from its own summary line, `FAIL: hooks/test-<name>.py (exit N)`, which states the path.**
+**Name a failing suite from its own summary line, `FAIL: hooks/test-<name>.py (exit N)` or `... (timed out after Ns)`, which states the path.**
 After that line the runner dumps the suite's output, which can carry case-level `FAIL` lines (for example `PATHISH stays linear`).
 Those case lines sit directly above the next suite's `RUN:` line, so they are easy to attribute to it.
 They belong to the summary `FAIL` line above them.
-The coverage check prints its own `FAIL` lines (`has no subject`, `has two subjects`, `has no test`, and two `KNOWN_UNTESTED` lines), and those belong to no suite: some print before any `RUN:`, others after the last suite.
+Two other kinds of `FAIL` line belong to no suite that ran.
+The suite loop prints `has no subject` and `has two subjects` for a test it skips, with no `RUN:` line, so such a line sits between the neighbouring suites' output.
+The coverage check (`has no test` and two `KNOWN_UNTESTED` lines) runs after every suite, so its lines sit after the last suite and before the `N/M hook test suites passed` summary.
 
 - **Do:** find the `FAIL: hooks/...` summary line first, then read the case lines beneath it for the detail.
 - **Don't:** read the `RUN:` line beneath a `FAIL` as the suite that failed.
-- **Don't:** attribute a coverage-check `FAIL` to whichever suite ran nearest it.
+- **Don't:** attribute a subject-mismatch or coverage `FAIL` to whichever suite ran nearest it.
 
 

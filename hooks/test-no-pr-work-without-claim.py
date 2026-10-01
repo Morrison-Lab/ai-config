@@ -25,9 +25,13 @@ SUBJECT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
 MARKER = "_Posted by Claude Code (AI agent) --- not written by a human._"
 SID = "session_test_AAAA"
 FAKE_GH = """\
-import json, os, sys
-data = json.load(open(os.environ["FAKE_GH_DATA"]))
+import json, os, sys, time
+data = json.load(open(os.environ["FAKE_GH_DATA"], encoding="utf-8"))
 path = sys.argv[-1]
+with open(os.environ["FAKE_GH_LOG"], "a", encoding="utf-8") as log:
+    log.write(path + "\\n")
+if os.environ.get("FAKE_GH_SLEEP"):
+    time.sleep(float(os.environ["FAKE_GH_SLEEP"]))
 for needle, resp in data.items():
     if needle in path:
         if resp == "FAIL":
@@ -75,7 +79,8 @@ def claim(body_extra="", marker=True, phrase="hold off", at="2026-09-30T20:00:00
 
 def run(name, command, expect, *, comments=None, prs="open", repo_kwargs=None,
         activity=None, env=None, stdin_raw=None, tool="Bash", branch="feat/x",
-        gh_fail=False, check_in_ctx=None, extra_payload=None, cwd_other=False):
+        gh_fail=False, check_in_ctx=None, extra_payload=None, cwd_other=False,
+        expect_paths=None):
     """expect: None (silent) | 'deny' | 'ctx' (additionalContext, no decision).
 
     `command` may be a callable (repo_path, other_path) -> str. `other` is a
@@ -103,6 +108,8 @@ def run(name, command, expect, *, comments=None, prs="open", repo_kwargs=None,
         e = dict(os.environ)
         e.pop("ALLOW_UNCLAIMED_PR_WORK", None)
         e["FAKE_GH_DATA"] = data_path
+        log_path = os.path.join(tmp, "requests.log")
+        e["FAKE_GH_LOG"] = log_path
         e["PR_CLAIM_GH_CMD"] = (f'"{sys.executable.replace(chr(92), "/")}" '
                                 f'"{fake_path.replace(chr(92), "/")}"')
         e.update(env or {})
@@ -117,6 +124,16 @@ def run(name, command, expect, *, comments=None, prs="open", repo_kwargs=None,
         got = ("deny" if spec.get("permissionDecision") == "deny"
                else "ctx" if spec.get("additionalContext") else None)
         ok = got == expect and r.returncode == 0
+        if ok and expect_paths:
+            requested = ""
+            if os.path.exists(log_path):
+                with open(log_path, encoding="utf-8") as f:
+                    requested = f.read()
+            ok = all(p in requested for p in expect_paths)
+            if not ok:
+                FAILURES.append(f"{name}: requested paths lacked "
+                                f"{expect_paths}: {requested!r}")
+                return
         if ok and check_in_ctx:
             blob = (spec.get("additionalContext", "") + r.stderr
                     + spec.get("permissionDecisionReason", ""))
@@ -240,7 +257,8 @@ with tempfile.TemporaryDirectory() as tmp:
         json.dump(data, f)
     with open(fp, "w", encoding="utf-8") as f:
         f.write(FAKE_GH)
-    e = dict(os.environ, FAKE_GH_DATA=dp, PR_CLAIM_GH_CMD=(
+    e = dict(os.environ, FAKE_GH_DATA=dp,
+             FAKE_GH_LOG=os.path.join(tmp, "requests.log"), PR_CLAIM_GH_CMD=(
         f'"{sys.executable.replace(chr(92), "/")}" "{fp.replace(chr(92), "/")}"'))
     e.pop("ALLOW_UNCLAIMED_PR_WORK", None)
     r = subprocess.run([sys.executable, SUBJECT], capture_output=True,
@@ -303,6 +321,50 @@ run("R1-18 peer claim: stand down, do not post over it", COMMIT, "deny",
     check_in_ctx="Do not post a competing")
 run("R1-19 no claim at all: how to post one", COMMIT, "deny",
     check_in_ctx="gh pr comment 7")
+
+# --- review round 2 --------------------------------------------------------
+# Claim wordings emitted elsewhere in skills/ must still count.
+ardi_claim = lambda top: [{
+    "body": f"Driving this PR to clean --- please hold off until done.\n\n"
+            f"Session id: `{SID}`\n\n{MARKER}",
+    "created_at": "2026-09-30T20:00:00Z", "html_url": "u"}]
+review_claim = lambda top: [{
+    "body": f"claude is reviewing this PR --- please hold off on pushing to "
+            f"this branch until the review comment lands.\n\nSession id: "
+            f"`{SID}`\n\n{MARKER}",
+    "created_at": "2026-09-30T20:00:00Z", "html_url": "u"}]
+run("R2-1 ardi wording claim counts", COMMIT, None, comments=ardi_claim)
+run("R2-2 review-only wording claim counts", COMMIT, None,
+    comments=review_claim)
+# Path boundaries: sentence-final period is fine, a left-extension is not.
+run("R2-3 worktree path ending a sentence (no backticks)", COMMIT, None,
+    comments=lambda top: [claim(f"Session worktree: {top}.")])
+run("R2-4 worktree path inside a longer path is not mine", COMMIT, "deny",
+    comments=lambda top: [claim(f"Session worktree: `x{top}`")])
+# Push refspec: the destination branch is the one checked.
+run("R2-5 HEAD:refs/heads/foo checks foo", "git push origin HEAD:refs/heads/foo",
+    "deny", expect_paths=["head=Morrison-Lab:foo"])
+run("R2-6 plain refspec checks that branch", "git push origin other-branch",
+    "deny", expect_paths=["head=Morrison-Lab:other-branch"])
+run("R2-7 a tag push is not a branch", "git push origin refs/tags/v1", None)
+run("R2-8 git push -u origin HEAD checks the current branch",
+    "git push -u origin HEAD", "deny", expect_paths=["head=Morrison-Lab:feat/x"])
+# URL encoding and remote shapes.
+run("R2-9 branch with # is encoded in the pulls query", COMMIT, "deny",
+    branch="feat/a#b", expect_paths=["head=Morrison-Lab:feat/a%23b"])
+run("R2-10 branch with # is encoded in the activity query", "git push origin HEAD",
+    None, branch="feat/a#b", comments=mine,
+    expect_paths=["ref=refs/heads/feat/a%23b"])
+run("R2-11 remote URL with a trailing slash", COMMIT, "deny",
+    repo_kwargs={"remote": "https://github.com/Morrison-Lab/test-repo/"})
+# Activity cap and total budget.
+many = [{"activity_type": "push", "timestamp": "2026-09-30T22:00:00Z",
+         "after": "d" * 40, "actor": {"login": "peer"}}] * 14
+run("R2-12 many foreign pushes are capped", PUSH, "ctx", comments=mine,
+    activity=many, check_in_ctx="more pushes not examined")
+run("R2-13 a spent time budget is a visible fail-open", COMMIT, "ctx",
+    env={"PR_CLAIM_TOTAL_BUDGET": "1", "FAKE_GH_SLEEP": "4"},
+    check_in_ctx="could not verify")
 
 print(f"{COUNT[0]} cases, {len(FAILURES)} failures")
 for f in FAILURES:

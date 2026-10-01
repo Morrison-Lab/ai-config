@@ -52,11 +52,16 @@ Past 2 hours the claim has expired; re-post it before resuming.
 ```bash
 gh pr comment <N> --body "Claude Code CLI (local session) is working on this — please hold off on pushing to this branch until I'm done.
 
+Session worktree: <absolute path of this checkout>
+
 _Posted by Claude Code (AI agent) --- not written by a human._"      # COMMENT_PR
 gh issue comment <N> --body "Claude Code CLI (local session) is working on this — please hold off until I'm done.
 
 _Posted by Claude Code (AI agent) --- not written by a human._"   # COMMENT_ISSUE
 ```
+
+The `Session worktree:` line (or a `Session id:` line) is what lets `hooks/no-pr-work-without-claim.py` tell this session's claim from another session's under the same login;
+without it the hook denies the first `git commit` on the PR branch.
 
 A review-only session uses the same `hold off` invariant so existing
 detectors still match, and names the review so authors know when they

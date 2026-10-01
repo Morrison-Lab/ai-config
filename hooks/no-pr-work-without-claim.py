@@ -60,6 +60,19 @@ and the command's own `git -C` (`scripts/lib/shellcmd.py`'s
 visible fail-open, not a guess. Subshell scoping of a `cd` is not modelled
 (`simple_commands` flattens it).
 
+A push is judged by its first refspec's destination branch (`git push origin
+HEAD:foo` checks `foo`; a tag push is skipped); with no refspec it is the
+checkout's current branch. A push of several branches is judged by the first.
+
+The activity warning compares each push's `after` SHA to local `HEAD`, so a
+session that amended, rebased or force-pushed its own earlier pushes sees them
+as foreign, and so does a main-sync merge pushed by the @claude bot. It is a
+warning, never a deny, for that reason. At most MAX_ACTIVITY_CHECKS pushes are
+examined.
+
+Every subprocess shares one TOTAL_BUDGET-second deadline (under the hooks.json
+timeout); running out is a visible fail-open.
+
 Cost: one to three forge reads per matched commit or push, uncached. Accepted
 because a stale cached "claimed" answer is exactly the failure being guarded.
 
@@ -77,7 +90,9 @@ never ran (`shared/principles/fail-fast.md`).
 call's leading `export`, or in the process environment. It is for a case this
 guard did not foresee; reaching for it means saying why.
 
-`PR_CLAIM_GH_CMD` replaces the `gh` executable (shlex-split); tests use it.
+`PR_CLAIM_GH_CMD` replaces the `gh` executable (shlex-split) and
+`PR_CLAIM_TOTAL_BUDGET` sets the shared subprocess budget in seconds
+(default 20); tests use both.
 """
 from __future__ import annotations
 
@@ -87,13 +102,23 @@ import re
 import shlex
 import subprocess
 import sys
+import time
+from urllib.parse import quote
 
 OVERRIDE = "ALLOW_UNCLAIMED_PR_WORK"
 OWNERS = {"morrison-lab"}
 AGENT_MARKER = "posted by claude code (ai agent)"
-CLAIM_PHRASES = ("hold off", "paws off")
 NET_TIMEOUT = 8
+# One budget for every subprocess the hook runs, kept under the hooks.json
+# timeout (30s) so a slow forge is a visible fail-open rather than a harness
+# kill. Set at the start of main().
+TOTAL_BUDGET = float(os.environ.get("PR_CLAIM_TOTAL_BUDGET", "20"))
+_DEADLINE = [None]
+MAX_ACTIVITY_CHECKS = 10
 SKIP_BRANCHES = {"HEAD", "main", "master"}
+# `git push` options that consume the NEXT token as a value.
+PUSH_VALUE_OPTS = {"-o", "--push-option", "--repo", "--receive-pack", "--exec",
+                   "--recurse-submodules", "--signed"}
 
 try:
     _LIB = os.path.join(
@@ -189,8 +214,13 @@ def warn_open(message):
 
 
 def run(argv, cwd=None):
+    timeout = NET_TIMEOUT
+    if _DEADLINE[0] is not None:
+        timeout = min(timeout, _DEADLINE[0] - time.monotonic())
+        if timeout <= 0:
+            raise TimeoutError(f"the hook's {TOTAL_BUDGET}s budget is spent")
     return subprocess.run(argv, cwd=cwd, capture_output=True, text=True,
-                          timeout=NET_TIMEOUT)
+                          timeout=timeout)
 
 
 def git(cwd, *args):
@@ -230,12 +260,15 @@ def norm(text):
 def is_claim(body):
     """A claim comment: agent marker, `working on this`, and hold-off wording.
 
-    A release or status comment can contain "hold off" in other senses ("no
-    need to hold off"), so the opening claim phrase is required as well.
+    Every emitter in skills/ carries one of the two wordings (claim-pr, ardi,
+    handoff, and the review-only form all say `hold off`; the older emitters
+    say `paws off`), so that is the invariant. A release comment ("unclaiming")
+    and a negated mention ("no need to hold off") are not claims.
     """
     low = (body or "").lower()
-    return (AGENT_MARKER in low and "working on this" in low
-            and any(p in low for p in CLAIM_PHRASES)
+    return (AGENT_MARKER in low
+            and re.search(r"(?<!need to )(?<!not )(?<!n't )hold off|paws off",
+                          low) is not None
             and "unclaim" not in low)
 
 
@@ -252,7 +285,11 @@ def names_session(body, session_id, worktree):
             return True
     if worktree:
         wt = re.escape(norm(worktree).rstrip("/"))
-        return re.search(wt + r"(?![\w./-])", low) is not None
+        # Left boundary: `/work/repo` must not match inside `/home/u/work/repo`.
+        # Right boundary: a sentence-final `.` after the path is fine, but
+        # `.x` or `/x` or `-x` continues the path.
+        return re.search(r"(?<![\w./-])" + wt + r"(?![\w/-]|\.\w)",
+                         low) is not None
     return False
 
 
@@ -342,8 +379,41 @@ def matched_command(command, start_dir):
             workdir = d if os.path.isabs(d) else os.path.join(workdir, d)
         if workdir is None:
             raise Indeterminate("a `cd` target that cannot be resolved statically")
-        return sub, workdir
+        return sub, workdir, (push_target(args) if sub == "push" else None)
     return None
+
+
+def push_target(args):
+    """The branch a `git push` writes, from its first refspec.
+
+    `None` when the push names no refspec (the current branch is meant),
+    `"HEAD"` for `HEAD` (also the current branch), `"!skip"` for a ref that is
+    not a branch (a tag), else the destination branch name. Only the first
+    refspec is read; a push of several branches is judged by the first. Known
+    limit.
+    """
+    pos, i = [], 0
+    while i < len(args):
+        tok = args[i]
+        if tok == "--":
+            pos.extend(args[i + 1:])
+            break
+        if tok.startswith("-"):
+            i += 2 if tok in PUSH_VALUE_OPTS else 1
+            continue
+        pos.append(tok)
+        i += 1
+    if len(pos) < 2:
+        return None
+    spec = pos[1].lstrip("+")
+    dst = spec.split(":", 1)[1] if ":" in spec else spec
+    if dst in ("", "HEAD"):
+        return "HEAD"
+    if dst.startswith("refs/heads/"):
+        return dst[len("refs/heads/"):]
+    if dst.startswith("refs/"):
+        return "!skip"
+    return dst
 
 
 def activity_warning(owner, repo, branch, since, cwd):
@@ -354,8 +424,9 @@ def activity_warning(owner, repo, branch, since, cwd):
     would spend the network timeout for nothing.
     """
     items = gh_json(f"repos/{owner}/{repo}/activity"
-                    f"?ref=refs/heads/{branch}&per_page=50", paginate=False)
-    foreign = []
+                    f"?ref=refs/heads/{quote(branch, safe='/')}&per_page=50",
+                    paginate=False)
+    foreign, checked, capped = [], 0, False
     for it in items:
         if it.get("activity_type") not in ("push", "force_push"):
             continue
@@ -364,6 +435,10 @@ def activity_warning(owner, repo, branch, since, cwd):
         after = it.get("after") or ""
         if not after:
             continue
+        checked += 1
+        if checked > MAX_ACTIVITY_CHECKS:
+            capped = True
+            break
         if run(["git", "merge-base", "--is-ancestor", after, "HEAD"],
                cwd=cwd).returncode == 0:
             continue
@@ -374,6 +449,7 @@ def activity_warning(owner, repo, branch, since, cwd):
     return ("Pushes to this branch since your claim that are NOT in your local "
             "history (another session or person, or a force-push of yours): "
             + "; ".join(foreign[:5])
+            + (" (more pushes not examined)" if capped else "")
             + ". Fetch and read them before pushing "
               "(shared/workflow/claim-pr.md; ai-config#4155).")
 
@@ -394,11 +470,14 @@ def evaluate(payload):
                               f"runs in ({exc})"}
     if hit is None:
         return None
-    verb, cwd = hit
-    branch = git(cwd, "rev-parse", "--abbrev-ref", "HEAD")
+    verb, cwd, target = hit
+    if target == "!skip":
+        return None
+    branch = (target if target not in (None, "HEAD")
+              else git(cwd, "rev-parse", "--abbrev-ref", "HEAD"))
     if not branch or branch in SKIP_BRANCHES:
         return None
-    m = re.search(r"github\.com[:/]([^/\s]+)/([^/\s]+?)(?:\.git)?$",
+    m = re.search(r"github\.com[:/]([^/\s]+)/([^/\s]+?)(?:\.git)?/?$",
                   git(cwd, "remote", "get-url", "origin") or "")
     if not m or m.group(1).lower() not in OWNERS:
         return None
@@ -408,7 +487,7 @@ def evaluate(payload):
 
     try:
         prs = gh_json(f"repos/{owner}/{repo}/pulls?state=open"
-                      f"&head={owner}:{branch}")
+                      f"&head={quote(owner + ':' + branch, safe=':/')}")
         if not prs:
             return None
         pr = prs[0]
@@ -460,6 +539,7 @@ def evaluate(payload):
 
 
 def main():
+    _DEADLINE[0] = time.monotonic() + TOTAL_BUDGET
     try:
         payload = json.load(sys.stdin)
     except Exception as exc:

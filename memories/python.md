@@ -424,7 +424,11 @@ In Python versions prior to 3.15, `pathlib.Path.read_text()`, `Path.write_text()
 On Windows without `PYTHONUTF8=1`,
 this is typically `cp1252` (Windows-1252).
 
-Reading or writing a file that contains UTF-8 characters (e.g. smart quotes, em dashes, non-ASCII Unicode characters) using bare `Path.read_text()`, `Path.write_text()`, or `open()` fails with `UnicodeDecodeError: 'charmap' codec can't decode byte 0x... in position ...` or `UnicodeEncodeError`.
+Reading or writing a file that contains UTF-8 characters using bare `Path.read_text()`, `Path.write_text()`, or `open()` either fails with `UnicodeDecodeError: 'charmap' codec can't decode byte 0x... in position ...` (or `UnicodeEncodeError`) or silently produces mojibake.
+Which one depends on the bytes: decoding fails only on a byte cp1252 leaves undefined (`0x81`, `0x8d`, `0x8f`, `0x90`, `0x9d`).
+So a right double quote (U+201D, `e2 80 9d`) raises, while an em dash (U+2014, `e2 80 94`) decodes to mojibake without error.
+A regression test for a cp1252 crash therefore needs a character like U+201D;
+an em-dash fixture passes whether the bug is present or not (ai-config#4158).
 Likewise, printing non-ASCII glyphs (e.g. `✓` checkmarks) to stdout fails on Windows with cp1252;
 scripts should use pure ASCII markers (e.g. `ok:`) per [`shared/coding/ascii-punctuation-in-source.md`](../shared/coding/ascii-punctuation-in-source.md).
 
@@ -436,6 +440,13 @@ Mechanical enforcement is provided by `scripts/check-text-encoding.py` and gated
 - **Do:** print ASCII markers (`ok:`) rather than Unicode checkmarks in CLI script output.
 - **Do:** check relative path segments against `IGNORED_DIRS` rather than absolute paths.
 - **Don't:** call bare `open()`, `p.read_text()`, or `p.write_text(content)` without an explicit `encoding` argument or with `encoding=None` on cross-platform code.
+
+The same default applies to `subprocess` in text mode: `run`, `check_output` or `Popen` with `text=True`, `universal_newlines=True` or a bare `errors=`, and no `encoding=`, decode the child's output with cp1252.
+A `git diff` holding a U+201D then raises `UnicodeDecodeError` in the reader thread, `stdout` comes back `None`, and the caller crashes on the next line (ai-config#4154).
+`scripts/check-text-encoding.py` does not cover subprocess calls as of 2026-09-30, and ai-config#4159 tracks extending it.
+
+- **Do:** pass `encoding="utf-8", errors="replace"` to every text-mode subprocess call that can see git output, file paths, or commit messages.
+- **Don't:** test an encoding fix only with an em-dash fixture, or read a green CI run as covering it, since CI's UTF-8 locale never exercises the cp1252 path.
 
 (Measured 2026-09-29 when running `scripts/install-hooks.py` on Windows, where reading UTF-8 characters in `hooks/hooks.json` raised `UnicodeDecodeError` in `cp1252`;
 repo-wide audit and mechanical lint guard shipped in #4121.)

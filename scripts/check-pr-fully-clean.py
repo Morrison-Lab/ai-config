@@ -2641,6 +2641,9 @@ def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str
     return "clean"
 
 
+_HTML_COMMENT_INTERIOR = re.compile(r"(<!--)(.*?)(-->|\Z)", re.DOTALL)
+
+
 def classify_verdict(body: str, state: str = "", author: str = "") -> str:
     """Classify one automated review item as 'not-clean', 'clean', or '' (none).
 
@@ -2747,8 +2750,19 @@ def classify_verdict(body: str, state: str = "", author: str = "") -> str:
     if copilot == "clean":
         return "clean"
 
+    # Text inside an HTML comment is hidden from the rendered review, so it
+    # is not a stated verdict: a commented-out `<!-- Verdict: Ready for
+    # merge -->` must not clear a PR (ai-config#3685). Blanked for the CLEAN
+    # scan only, preserving offsets, so a not-clean phrase hidden in a
+    # comment still blocks above -- the fail-closed direction. An
+    # unterminated `<!--` hides the rest of the body when rendered, so it
+    # runs to the end here too.
+    clean_scan = _HTML_COMMENT_INTERIOR.sub(
+        lambda m: m.group(1) + " " * len(m.group(2)) + m.group(3), scan
+    )
+
     for pat in VERDICT_CLEAN_PATTERNS:
-        for match in re.finditer(pat, scan, re.IGNORECASE | re.MULTILINE):
+        for match in re.finditer(pat, clean_scan, re.IGNORECASE | re.MULTILINE):
             # `match_content_start`, not `match.start()`: the "No issues
             # found." pattern above is `^[ \t]*...` under MULTILINE, so a
             # match with real leading indentation checks citedness from

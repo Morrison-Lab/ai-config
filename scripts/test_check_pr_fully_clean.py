@@ -8509,6 +8509,38 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     check("check_review_comments: pending review request blocks clean status", not ok)
     check("check_review_comments: pending review request names in-flight reviewer", any("copilot-pull-request-reviewer" in i for i in issues))
 
+    # ai-config#3685: text inside an HTML comment is not a stated verdict.
+    pre_3685 = "### Verdict\n**Content review: inconclusive, needs a human look**\n\n"
+    check(
+        "classify_verdict: a clean verdict inside an HTML comment does not clear (#3685)",
+        checker.classify_verdict(pre_3685 + "<!-- Verdict: Ready for merge -->", "", "github-actions") == "",
+    )
+    check(
+        "classify_verdict: an unterminated HTML comment hides a clean verdict too (#3685)",
+        checker.classify_verdict(pre_3685 + "<!-- Verdict: Ready for merge", "", "github-actions") == "",
+    )
+    check(
+        "classify_verdict: the same clean verdict in visible prose still clears (#3685 control)",
+        checker.classify_verdict(pre_3685 + "Verdict: Ready for merge", "", "github-actions") == "clean",
+    )
+    check(
+        "classify_verdict: visible clean prose beside an HTML comment still clears (#3685)",
+        checker.classify_verdict(
+            "### Verdict\nVerdict: Ready for merge\n\n<!-- reviewer note -->", "", "github-actions"
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: a not-clean verdict inside an HTML comment still blocks (#3685, fail closed)",
+        checker.classify_verdict(pre_3685 + "<!-- Verdict: Needs more work -->", "", "github-actions") == "not-clean",
+    )
+    no_findings_key = json.dumps({"verdict": "approved"})
+    check(
+        "classify_verdict: a payload lacking findings does not clear through the prose scan (#3685)",
+        checker.classify_verdict(
+            pre_3685 + "<!-- review-data: " + no_findings_key + " -->", "", "github-actions"
+        ) != "clean",
+    )
+
 
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0

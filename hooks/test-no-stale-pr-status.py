@@ -803,9 +803,16 @@ CASES = [
      "negated 'ready to merge' must not block"),
     ([QUERY, PUSH, say("Neither #1629 nor #1634 is ready to merge yet.")], False,
      "ai-config#4007: 'neither/nor' denies readiness the same way 'not' does, "
-     "and RX_NEGATION must catch it rather than reading the denial as a claim"),
+     "and the guard must catch it rather than reading the denial as a claim"),
     ([QUERY, PUSH, say("#1629 is ready to merge.")], True,
      "control for the neither/nor case above: an unnegated claim still blocks"),
+    ([QUERY, PUSH, say("Neither reviewer raised concerns, so #1689 is fully "
+                       "clean and ready to merge.")], True,
+     "'neither' as a determiner on a DIFFERENT noun ('reviewer') than the one "
+     "the claim is about must not suppress the guard -- same shape as the "
+     "deliberately-excluded bare 'no' case above, and this is a genuine "
+     "stale-clean claim the attachment check (RX_LEADING_SEPARATOR on the "
+     "comma+'so') must still catch"),
     ([QUERY, PUSH, say("493 isn't fully clean yet.")], False,
      "contraction negation must not block -- the ASSERT phrase has to actually "
      "appear in the sentence (isn't green never matches RX_ASSERT at all, so "

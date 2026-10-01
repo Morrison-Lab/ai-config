@@ -150,8 +150,13 @@ MAX_ACTIVITY_CHECKS = 10
 # for ("unclaiming", the retired "paws off released", the "PR is free" and
 # "now mergeable" forms), plus "releasing my claim". A bare "will release the
 # claim when done" is a claim, not a release.
-RELEASE_TERMS = (r"unclaim|released|pr is free|now mergeable"
-                 r"|releasing (?:my |the |this )?claim")
+#
+# "released" alone is NOT a term: a claim can say "so it can be released" in its
+# own prose, and treating that as a release denies a session that claimed
+# correctly. The retired form is "paws off released".
+RELEASE_TERMS = (r"unclaim|paws off released|claims? released"
+                 r"|released (?:my |the |this )?claim|pr is free"
+                 r"|now mergeable|releasing (?:my |the |this )?claim")
 # claim-pr.md: a claim is live for 2 hours from the PR's last push or comment.
 STALE_HOURS = 2
 SKIP_BRANCHES = {"HEAD", "main", "master"}

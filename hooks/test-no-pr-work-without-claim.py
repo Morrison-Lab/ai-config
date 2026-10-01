@@ -487,6 +487,16 @@ run("R6-4 'back off' wording is a claim", COMMIT, None,
 run("R6-5 /usr/bin/git commit", "/usr/bin/git commit -m x", "deny")
 run("R6-6 timeout 60 git push", "timeout 60 git push origin feat/x", "deny")
 run("R6-7 command git commit", "command git commit -m x", "deny")
+# --- review round 7 -------------------------------------------------------
+run("R7-1 a claim whose own prose says 'can be released' is still a claim",
+    COMMIT, None,
+    comments=lambda top: [claim(f"Session worktree: `{top}`\n\nDriving this "
+                                f"PR so the fix can be released.")])
+run("R7-2 'claim released' is a release", COMMIT, "deny",
+    comments=[{"body": f"Claim released; hold off no more. Session id: "
+                       f"`{SID}`\n\n{MARKER}",
+               "created_at": "2026-09-30T20:00:00Z", "html_url": "u"}])
+
 # A directory that does not exist is a quiet pass, not a warning.
 run("R6-8 cd into a missing directory", "cd /no/such/dir/at/all && " + COMMIT,
     None)

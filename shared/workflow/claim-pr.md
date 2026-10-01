@@ -128,7 +128,7 @@ It also denies when a claim that names a different session is newer than yours, 
 The hook's docstring lists its known limits: an own claim's age and most release wordings are not evaluated (a peer claim on a PR idle over 2 hours only warns), a PR from a fork is not seen, and two sessions sharing one checkout cannot be told apart.
 A claim that names no session only warns, until every claim emitter carries the session line ([#4160](https://github.com/Morrison-Lab/ai-config/issues/4160)).
 The check reads `repos/<owner>/<repo>/activity?ref=refs/heads/<branch>`.
-Hooks are inert in remote and web sessions, so a cloud session relies on its own instructions to run the same two reads.
+Hooks are inert in remote and web sessions, so a cloud session relies on its own instructions to read the PR's claim comments and that activity endpoint before it commits or pushes.
 
 - **Do:** post the claim, with a `Session worktree:` or `Session id:` line, before the first commit on a PR branch you did not just create.
 - **Do:** read the activity endpoint (or `git ls-remote` plus `git log`) for pushes you did not make before every push, and treat one as a peer.

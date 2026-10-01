@@ -800,7 +800,7 @@ RX_FAIL_QUERY = re.compile(
 # negation signal silently disables the guard on exactly the phrasing this
 # repo's own recap convention uses most.
 RX_NEGATION = re.compile(
-    r"\b(not|never|cannot|unable)\b|n['\u2019]t\b", re.I,
+    r"\b(not|never|cannot|unable|neither|nor)\b|n['\u2019]t\b", re.I,
 )
 # Sentence boundaries: a terminator (optionally followed by markdown/quote
 # closing punctuation, e.g. "yet.**" or "clean.\"") then whitespace or

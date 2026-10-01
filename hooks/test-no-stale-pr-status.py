@@ -801,6 +801,11 @@ CASES = [
      "negation in an earlier clause of the same sentence, ASSERT phrase used referentially"),
     ([QUERY, PUSH, say("Not ready to merge yet; still waiting on CI.")], False,
      "negated 'ready to merge' must not block"),
+    ([QUERY, PUSH, say("Neither #1629 nor #1634 is ready to merge yet.")], False,
+     "ai-config#4007: 'neither/nor' denies readiness the same way 'not' does, "
+     "and RX_NEGATION must catch it rather than reading the denial as a claim"),
+    ([QUERY, PUSH, say("#1629 is ready to merge.")], True,
+     "control for the neither/nor case above: an unnegated claim still blocks"),
     ([QUERY, PUSH, say("493 isn't fully clean yet.")], False,
      "contraction negation must not block -- the ASSERT phrase has to actually "
      "appear in the sentence (isn't green never matches RX_ASSERT at all, so "

@@ -61,6 +61,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: echo "$GITHUB_TOKEN"
+      - name: Base-ref step
+        run: |
+          BASE="${{ github.base_ref || github.event.repository.default_branch }}"
+          echo "$BASE"
   new-line-breaks:
     runs-on: ubuntu-latest
     steps:
@@ -198,6 +202,11 @@ def test_derive_steps():
           by["lint-markdown"].partial == rlv.MARKDOWNLINT_UNCOVERED)
     check("a uses: job with no local equivalent is listed as not runnable",
           not by["unknown-uses"].runnable and "unknown.yml" in by["unknown-uses"].note)
+    check("ai-config#4015: a github.base_ref||default_branch expression is substituted "
+          "with the local --base (stripped of its remote prefix) and the step runs",
+          by["Base-ref step"].runnable
+          and 'BASE="main"' in by["Base-ref step"].command
+          and "${{" not in by["Base-ref step"].command)
 
 
 def test_expression_regex_edge_cases():
@@ -259,7 +268,7 @@ def test_run_reports_each_rc_and_fails_overall():
         check("the failing step's own exit code appears in the table", "Failing step" in text and " 3 " in text.replace("\n", " "))
         check("the multi-line step ran under bash and executed its second line", out_file.read_text() == "two\n")
         check("working-directory is honoured", "Sub-directory step" in text)
-        check("the summary carries the denominator", "of 6 step(s) derived" in text and "2 not runnable" in text)
+        check("the summary carries the denominator", "of 7 step(s) derived" in text and "2 not runnable" in text)
 
 
 def test_only_and_skip_filters():

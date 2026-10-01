@@ -85,6 +85,14 @@ DEFAULT_SKIP = r"^Install dependencies$"
 # literal) still matches; `[^}]*` would silently pass such a step as runnable.
 GITHUB_EXPRESSION = re.compile(r"\$\{\{.*?\}\}")
 
+# ai-config#4015: this one expression resolves locally to the script's own
+# --base, so substitute it before the unresolvable-expression check runs,
+# rather than marking the whole step NOT RUN. `github.base_ref` is a bare
+# branch name (no remote prefix), so strip one if `--base` carries it.
+_BASE_REF_EXPRESSION = re.compile(
+    r"\$\{\{\s*github\.base_ref\s*\|\|\s*github\.event\.repository\.default_branch\s*\}\}"
+)
+
 # Local equivalents for jobs that only `uses:` a reusable workflow or a
 # composite action. Keyed by a substring of the `uses:` reference; the value
 # is a function of (job dict, args) returning (command, env) or None.
@@ -295,9 +303,12 @@ def derive_steps(workflow: Dict[str, Any], job_name: str, base: str) -> List[Ste
         if run is None:
             continue
         env = {k: str(v) for k, v in (s.get("env") or {}).items()}
+        local_base_ref = base.split("/", 1)[-1] if "/" in base else base
+        command = _BASE_REF_EXPRESSION.sub(local_base_ref, str(run).rstrip("\n"))
+        env = {k: _BASE_REF_EXPRESSION.sub(local_base_ref, v) for k, v in env.items()}
         step = Step(
             name=str(s.get("name") or run.strip().splitlines()[0]),
-            command=str(run).rstrip("\n"),
+            command=command,
             env=env,
             cwd=s.get("working-directory"),
             source=job_name,

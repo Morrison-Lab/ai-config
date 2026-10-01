@@ -815,6 +815,11 @@ RX_NEGATION = re.compile(
 # only the nearest `neither`/`nor` before the ASSERT phrase counts, and only
 # when nothing in RX_LEADING_SEPARATOR's clause-break set (a comma, `so`,
 # `and`, `:`, ...) sits between it and the phrase.
+#
+# Known limitation, shared with plain `not` and tracked in ai-config#4176: a
+# denying VERB flips the sentence ("Neither of us doubts #1689 is ready to
+# merge.", "I do not doubt #1689 is ready to merge."), and neither this scan
+# nor RX_NEGATION reads verb semantics, so both read those as denials.
 RX_NEITHER_NOR = re.compile(r"\b(?:neither|nor)\b", re.I)
 # Sentence boundaries: a terminator (optionally followed by markdown/quote
 # closing punctuation, e.g. "yet.**" or "clean.\"") then whitespace or

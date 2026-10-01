@@ -231,6 +231,35 @@ def main():
         print("FAIL: sentinel did not suppress the repeat")
         failed.append("sentinel")
 
+    # norm_rev's window (ai-config#3989): short revs behave as before, and a rev
+    # longer than the window is returned unchanged unless the window proves
+    # where the suffix chain starts.
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("hook_under_test", HOOK)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    for name, rev, want in [
+        ("norm_rev: short rev strips its suffix", "d1dd05e3^", "d1dd05e3"),
+        ("norm_rev: all-suffix short rev is kept", "^^", "^^"),
+        ("norm_rev: over-window all-suffix rev is unchanged",
+         "a" + "^" * 257, "a" + "^" * 257),
+        ("norm_rev: over-window @{...} is unchanged",
+         "HEAD@{" + "u" * 294 + "}", "HEAD@{" + "u" * 294 + "}"),
+        ("norm_rev: over-window ~1 chain is unchanged",
+         "main" + "~1" * 150, "main" + "~1" * 150),
+        ("norm_rev: over-window rev with a provable short suffix is stripped",
+         "a" * 300 + "^2", "a" * 300),
+        ("norm_rev: over-window rev with no suffix is unchanged",
+         "a" * 300, "a" * 300),
+    ]:
+        got = mod.norm_rev(rev)
+        if got == want:
+            print(f"PASS: {name}")
+            passes += 1
+        else:
+            print(f"FAIL: {name} -- got {got[:20]!r}...({len(got)}), want ({len(want)})")
+            failed.append(name)
+
     print(f"\n{passes} passed, {len(failed)} failed")
     if failed:
         print("failed cases: " + " | ".join(failed))

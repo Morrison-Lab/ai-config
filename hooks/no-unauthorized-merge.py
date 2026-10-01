@@ -1617,24 +1617,34 @@ def is_infra_path(path: str) -> bool:
 
 
 _PR_WORD = re.compile(r"\bpr\s+")
-# regex-safe: one anchored attempt; worst case 100k-char segment of `pr ` words 0.006s vs hook timeout 10s (ai-config#3989)
-_MERGE_TAIL = re.compile(r"(?:\S+\s+)*?merge\b(.*)$")
+_MERGE_TOKEN = re.compile(r"(?<!\S)merge\b")
 
 
 def pr_merge_tail(inert_seg: str) -> str | None:
     """Text after the `merge` token of the first `pr ... merge`, or None.
 
-    Anchors at the FIRST `pr` word only. A later `pr` word can match only if
-    the first one does (its candidate `merge` tokens are a subset of the
-    first one's), so retrying every `pr` word, as one `re.search` over the
-    whole `pr ... merge` shape did, found nothing more and cost O(n^2) on a
-    segment full of `pr` words (measured 18.6s at 100k chars, ai-config#3989).
+    Equivalent to one lazy `pr`, tokens, `merge`, rest-of-line `re.search`
+    over the whole segment, which was O(n^2) twice over: it retried every `pr` word (18.6s at 100k chars of
+    `pr `), and tried `(.*)$` at every `merge` token (4.3s at 100k, 13.7s at
+    200k chars of `merge ` before a newline; ai-config#3989). Both are
+    avoided by deciding the answer from positions instead of backtracking:
+
+    - Only the FIRST `pr` word is tried. A later one can match only if the
+      first does, because its candidate `merge` tokens are a subset.
+    - `(.*)$` (no DOTALL) succeeds at a `merge` only when no newline follows
+      it except possibly as the string's final character. So the answer is
+      the first `merge` token after the last such newline.
     """
     head = _PR_WORD.search(inert_seg)
     if head is None:
         return None
-    m = _MERGE_TAIL.match(inert_seg, head.end())
-    return m.group(1) if m else None
+    body_end = len(inert_seg) - 1 if inert_seg.endswith("\n") else len(inert_seg)
+    start = max(head.end(), inert_seg.rfind("\n", 0, body_end) + 1)
+    m = _MERGE_TOKEN.search(inert_seg, start)
+    if m is None:
+        return None
+    newline = inert_seg.find("\n", m.end())
+    return inert_seg[m.end():newline if newline != -1 else len(inert_seg)]
 
 
 def merge_pr_number(inert_seg: str) -> int | None:

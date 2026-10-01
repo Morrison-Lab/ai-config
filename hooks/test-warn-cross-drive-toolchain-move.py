@@ -22,6 +22,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 HOOK = os.path.join(HERE, "warn-cross-drive-toolchain-move.py")
@@ -37,6 +38,23 @@ failures = []
 def check(label, got, want):
     if got != want:
         failures.append(f"{label}: got {got!r}, want {want!r}")
+
+
+# ai-config#3989: RELOCATOR's whitespace no longer crosses a newline. A newline
+# ends the command, so `timeout` followed by a newline is not a prefix of the
+# `mv` on the next line. The old pattern matched this; no longer matching is
+# intended. A relocation verb after a newline still matches via the newline
+# itself as the command-position anchor.
+check("RELOCATOR: prefix word, newline, then verb no longer chains",
+      hook.RELOCATOR.search("timeout\nFOO=1 mv |\n"), None)
+check("RELOCATOR: a verb on its own line still matches",
+      bool(hook.RELOCATOR.search("echo hi\ncp a b")), True)
+check("RELOCATOR: a prefixed verb on one line still matches",
+      bool(hook.RELOCATOR.search("; sudo mv a b")), True)
+_t0 = time.perf_counter()
+list(hook.RELOCATOR.finditer("\nsudo " * 16000))
+check("RELOCATOR: a 96k-char run of newline+sudo is not quadratic (was >20s)",
+      time.perf_counter() - _t0 < 2.0, True)
 
 
 # ---------------------------------------------------------------------------

@@ -317,7 +317,7 @@ test_cp1252_encoding()
 # --- 7. Recorded-safe markers (ai-config#3989) ---
 
 BAD_CALL = 'import re\nRX = re.compile(r"(a+)+")\n'
-MARKER = "# regex-safe: 1k-char run of a: 0.001s, hook timeout 10s"
+MARKER = "# regex-safe: worst case 1k-char run of a 0.001s, hook timeout 10s"
 
 
 def scan_text(text: str, *extra: str) -> tuple[int, dict]:
@@ -385,6 +385,51 @@ def test_safe_markers() -> None:
         "marker whose reason has no measured time is an error",
         rc == 1 and "marker_without_measurement" in kinds,
         f"rc={rc} kinds={kinds!r}",
+    )
+
+    # Each part of the measurement is required: a time alone is not enough.
+    weak_reasons = {
+        "time only": "tested 1s",
+        "no timeout": "worst case 1k-char run of a 0.001s",
+        "timeout without a figure": "worst case 1k-char run of a 0.001s, timeout ok",
+        "no worst case": "1k-char run of a 0.001s, hook timeout 10s",
+        "no measured time (only the timeout's)": "worst case 1k-char run, hook timeout 10s",
+    }
+    for label, reason in weak_reasons.items():
+        rc, data = scan_text(f"import re\n# regex-safe: {reason}\nRX = re.compile(r\"(a+)+\")\n")
+        kinds = {f["kind"] for r in data["reports"] for f in r["findings"]}
+        check(
+            f"marker reason with {label} is a marker_without_measurement finding",
+            rc == 1 and "marker_without_measurement" in kinds and "nested_quantifier" in kinds,
+            f"rc={rc} kinds={kinds!r}",
+        )
+
+    # `timeout none` and the hyphenated phrase are accepted.
+    rc, data = scan_text(
+        "import re\n# regex-safe: worst-case 1k-char run of a 0.001s; timeout none (CLI)\n"
+        "RX = re.compile(r\"(a+)+\")\n"
+    )
+    check(
+        "worst-case spelling and `timeout none` are accepted",
+        rc == 0 and data["status"] == "clean",
+        f"rc={rc} data={data!r}",
+    )
+
+    # A valid marker above a pattern with no finding is an unused_marker finding.
+    rc, data = scan_text(f"import re\n{MARKER}\nRX = re.compile(\"a\")\n")
+    kinds = {f["kind"] for r in data["reports"] for f in r["findings"]}
+    check(
+        "valid marker above a clean pattern is an unused_marker finding",
+        rc == 1 and kinds == {"unused_marker"},
+        f"rc={rc} kinds={kinds!r}",
+    )
+
+    # A used marker is not reported as unused.
+    rc, data = scan_text(f"import re\n{MARKER}\nRX = re.compile(r\"(a+)+\")\n")
+    check(
+        "a marker that silences a finding is not reported as unused",
+        data["vulnerabilities_count"] == 0,
+        f"data={data!r}",
     )
 
     # A bare marker on a safe pattern is still reported (stray marker).

@@ -14,12 +14,16 @@ Recorded-safe patterns:
   A pattern the linter flags but that has been measured safe is silenced with a
   `regex-safe:` comment (the marker is the literal text `regex-safe:` after a
   hash) on the line the report names (the first line of the call) or in the
-  unbroken block of comment lines directly above it. The reason must contain the
-  measurement: a worst-case input, its time, and the timeout it runs under,
-  e.g. `10k-char line of spaces: 0.01s, hook timeout 10s`. A marker whose reason
-  carries no timing figure (a number followed by `ms` or `s`) is itself a
-  finding, so a bare marker cannot silence anything. `--no-markers` ignores
-  markers and reports every finding (the negative control).
+  unbroken block of comment lines directly above it. The reason must contain all
+  three parts of the measurement: the phrase `worst case` (or `worst-case`) with
+  the input, a measured time, and `timeout` followed by the timeout it runs
+  under (a time, or `none`), e.g. `worst case 10k-char line of spaces 0.01s,
+  hook timeout 10s`. A marker missing any part (a bare `tested 1s` included) is
+  itself a `marker_without_measurement` finding and silences nothing. A valid
+  marker that no finding uses is an `unused_marker` finding, so a marker cannot
+  outlive the pattern it described. The marker binds to a line, not to the
+  pattern's text. `--no-markers` ignores markers and reports every finding (the
+  negative control).
 
 Usage:
   python3 scripts/check_regex_patterns.py
@@ -53,8 +57,12 @@ ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_SCAN_DIRS = ["hooks", "scripts", "plugins"]
 DEFAULT_TIMEOUT = 0.25  # seconds per dynamic probe
 SAFE_MARKER = "regex-safe:"
-# A reason must carry a measured time, so a marker cannot be a bare assertion.
-RE_MEASUREMENT = re.compile(r"\d(?:\.\d+)?\s*(?:ms|s)\b")
+# A reason must carry all of: `worst case`, a measured time, and `timeout` plus a
+# time or `none`, so a marker cannot be a bare assertion.
+_TIME = r"\d+(?:\.\d+)?\s*(?:ms|s)\b"
+RE_WORST_CASE = re.compile(r"worst[ -]case", re.IGNORECASE)
+RE_TIMEOUT = re.compile(rf"timeout\s+(?:none\b|{_TIME})", re.IGNORECASE)
+RE_TIME = re.compile(_TIME)
 
 
 @dataclass
@@ -660,7 +668,11 @@ def marker_lines_for(line_number: int, lines: list[str], markers: dict[int, str]
 
 
 def is_valid_reason(reason: str) -> bool:
-    return bool(RE_MEASUREMENT.search(reason))
+    """True when the reason has `worst case`, a measured time, and a timeout."""
+    if not (RE_WORST_CASE.search(reason) and RE_TIMEOUT.search(reason)):
+        return False
+    # The measured time must be one other than the timeout's own figure.
+    return bool(RE_TIME.search(RE_TIMEOUT.sub("", reason)))
 
 
 # --- File and Directory Scanning ---
@@ -697,23 +709,31 @@ def scan_file(
                     findings=[
                         Finding(
                             kind="marker_without_measurement",
-                            message=f"`{SAFE_MARKER}` marker has no measured time in its reason",
+                            message=f"`{SAFE_MARKER}` marker lacks part of the measurement",
                             severity="vulnerability",
-                            details=f"Reason given: {reason!r}; expected a figure such as '0.01s' or '12ms'.",
+                            details=(
+                                f"Reason given: {reason!r}; needs 'worst case <input>', a measured "
+                                "time such as '0.01s', and 'timeout <time or none>'."
+                            ),
                         )
                     ],
                 )
             )
 
+    used_markers: set[int] = set()
     for inst in instances:
         findings = check_static_ast(inst.pattern_str, inst.flags)
         if enable_dynamic:
             dynamic_findings = check_dynamic_probes(inst.pattern_str, inst.flags, timeout=timeout)
             findings.extend(dynamic_findings)
 
-        if findings and any(
-            is_valid_reason(markers[n]) for n in marker_lines_for(inst.line_number, lines, markers)
-        ):
+        applicable = [
+            n
+            for n in marker_lines_for(inst.line_number, lines, markers)
+            if is_valid_reason(markers[n])
+        ]
+        if findings and applicable:
+            used_markers.update(applicable)
             continue
 
         if findings:
@@ -726,6 +746,27 @@ def scan_file(
                     flags=inst.flags,
                     source_call=inst.source_call,
                     findings=findings,
+                )
+            )
+
+    for line_number, reason in sorted(markers.items()):
+        if is_valid_reason(reason) and line_number not in used_markers:
+            reports.append(
+                RegexReport(
+                    file_path=str(file_path),
+                    line_number=line_number,
+                    col_offset=0,
+                    pattern_str="",
+                    flags=0,
+                    source_call="marker",
+                    findings=[
+                        Finding(
+                            kind="unused_marker",
+                            message=f"`{SAFE_MARKER}` marker silences no finding",
+                            severity="vulnerability",
+                            details="No flagged pattern is reported on this line or directly below its comment block; remove the marker.",
+                        )
+                    ],
                 )
             )
 

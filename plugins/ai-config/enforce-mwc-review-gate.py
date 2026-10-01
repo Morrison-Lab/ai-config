@@ -85,7 +85,7 @@ CLEAN_VERDICT_RE = re.compile(
     r"|no findings|approved?)\b",
     re.IGNORECASE,
 )
-# regex-safe: worst case 100k-char review body of `not be` repeats 0.013s; hook has no timeout set (host default) (ai-config#3989)
+# regex-safe: worst case 100k-char review body of `not be` repeats 0.013s; timeout none (host default) (ai-config#3989)
 NOT_CLEAN_VERDICT_RE = re.compile(
     r"\b(needs? (?:more )?work|changes requested"
     r"|request[_ ]changes|do not merge|needs? revision"

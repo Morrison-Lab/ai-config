@@ -1787,7 +1787,7 @@ _FINDINGS_HEADING_NOT_EXEMPT = re.compile(
     r")\b"
     r"|(?<!non-)(?<!non\s)\bblocking\b"
 )
-# regex-safe: worst case 100k-char line of spaces 0.009s; CLI script, no hook timeout; was >20s at 100k (ai-config#3989)
+# regex-safe: worst case 100k-char line of spaces 0.009s; CLI script, timeout none; was >20s at 100k (ai-config#3989)
 _LINE_RESOLUTION_WORDS = re.compile(
     r"(?i)\b(?:"
     r"(?:is|are|was|were|have|has)\s+(?:now\s+|also\s+|already\s+|since\s+|been\s+)*"

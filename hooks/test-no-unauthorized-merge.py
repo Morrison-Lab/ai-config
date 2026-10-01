@@ -1761,6 +1761,54 @@ _rest_infra_case("REST fallback e2e: MCP merge with expectedHeadSha allows",
                  "allow", INFRA_FILES,
                  mcp=(_MCP, {"owner": "Morrison-Lab", "repo": "pds", "pullNumber": 15, "expectedHeadSha": TEST_HEAD_SHA}))
 
+# ai-config#3989: `pr_merge_tail` replaced one lazy regex that was O(n^2) twice
+# over. Differential-test it against that regex on random strings, newlines
+# included, then time the shapes that were slow.
+import random  # noqa: E402
+import re  # noqa: E402
+
+_OLD_TAIL = re.compile(r"\bpr\s+(?:\S+\s+)*?merge\b(.*)$")
+
+
+def _old_tail(seg):
+    m = _OLD_TAIL.search(seg)
+    return m.group(1) if m else None
+
+
+def _check(label, ok):
+    global checks, wrong
+    checks += 1
+    wrong += not ok
+    print(f"  {'ok' if ok else 'WRONG':<6} {label}")
+
+
+_rng = random.Random(3989)
+_atoms = ["pr", "pr ", "merge", "merge ", "merge-x", "mergex", " ", "  ", "\n", "\n\n",
+          "\t", "a", "--x ", "12 ", "gh ", "-pr ", "pr\n", " merge\n", "\r"]
+_mismatch = []
+for _ in range(20000):
+    _s = "".join(_rng.choice(_atoms) for _ in range(_rng.randint(0, 12)))
+    if _old_tail(_s) != _guard.pr_merge_tail(_s):
+        _mismatch.append(_s)
+_check(f"pr_merge_tail matches the old regex on 20000 random strings "
+       f"(first mismatch: {_mismatch[:1]!r})", not _mismatch)
+for _label, _s, _want in [
+    ("merge before a trailing newline", "gh pr merge 12\n", " 12"),
+    ("only the last line's merge counts", "pr merge a\nmerge b", " b"),
+    ("a merge followed by an interior newline fails", "pr merge a\nb", None),
+    ("no pr word", "gh merge 12", None),
+]:
+    _check(f"pr_merge_tail: {_label}", _guard.pr_merge_tail(_s) == _old_tail(_s) == _want)
+for _label, _s in [
+    ("`merge ` repeated before a newline (was 4.3s at 100k, 13.7s at 200k)",
+     "pr " + "merge " * 33000 + "\nx"),
+    ("`pr ` repeated (was 18.6s at 100k)", "pr " * 66000),
+]:
+    _t0 = time.perf_counter()
+    _guard.pr_merge_tail(_s)
+    _check(f"pr_merge_tail on {_label} stays under 1s",
+           time.perf_counter() - _t0 < 1.0)
+
 total = checks
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
 sys.exit(1 if wrong else 0)

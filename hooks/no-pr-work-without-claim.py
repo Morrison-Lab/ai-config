@@ -21,7 +21,7 @@ When the checkout's branch has an OPEN PR in a Morrison-Lab repo it reads the
 PR's issue comments and DENIES unless one is a claim from THIS session:
 
   * a claim is a comment carrying the agent marker (`Posted by Claude Code (AI
-    agent)`) and the `hold off` (or legacy `paws off`) wording, per
+    agent)`) and the `hold off` (or legacy `paws off` / `back off`) wording, per
     `skills/claim-pr/SKILL.md`;
   * it is THIS session's when its body contains the payload's `session_id` or
     this worktree's path (`/c/x` and `C:/x` spellings are equal). The forge
@@ -270,7 +270,13 @@ def run(argv, cwd=None):
 
 
 def git(cwd, *args):
-    r = run(["git", *args], cwd=cwd)
+    """stdout of a git call in `cwd`, or None (also when `cwd` does not exist:
+    git could not run the user's command there either, so there is nothing to
+    guard and no reason to warn)."""
+    try:
+        r = run(["git", *args], cwd=cwd)
+    except OSError:
+        return None
     return r.stdout.strip() if r.returncode == 0 else None
 
 
@@ -313,16 +319,20 @@ def norm(text):
 def is_claim(body):
     """A claim comment: the agent marker plus hold-off wording.
 
-    Every emitter in skills/ carries one of the two wordings (claim-pr, ardi,
-    handoff, and the review-only form all say `hold off`; the older emitters
-    say `paws off`), so that is the invariant. A release comment ("unclaiming",
+    Every emitter in skills/ carries one of the three wordings claim-pr.md
+    tells claim readers to match (claim-pr, ardi, handoff and the review-only
+    form say `hold off`; the older emitters say `paws off` or `back off`), so
+    that is the invariant. A release comment ("unclaiming",
     "releasing my claim") and a negated mention ("no need to hold off") are
     not claims.
     """
-    low = (body or "").lower()
+    # The session lines are data, not prose: a worktree named after an issue
+    # slug ("fix-unclaim-wording") must not read as a release term.
+    low = re.sub(r"(?m)^[ \t]*session (?:worktree|id):.*$", "",
+                 (body or "").lower())
     return (AGENT_MARKER in low
-            and re.search(r"(?<!need to )(?<!not )(?<!n't )hold off|paws off",
-                          low) is not None
+            and re.search(r"(?<!need to )(?<!not )(?<!n't )(?:hold|back) off"
+                          r"|paws off", low) is not None
             and re.search(RELEASE_TERMS, low) is None)
 
 

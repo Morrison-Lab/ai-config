@@ -81,7 +81,7 @@ def claim(body_extra="", marker=True, phrase="hold off", at="2026-09-30T20:00:00
 def run(name, command, expect, *, comments=None, prs="open", repo_kwargs=None,
         activity=None, env=None, stdin_raw=None, tool="Bash", branch="feat/x",
         gh_fail=False, check_in_ctx=None, extra_payload=None, cwd_other=False,
-        expect_paths=None, pr_updated_at=None):
+        expect_paths=None, pr_updated_at=None, repo_name="wt-one"):
     """expect: None (silent) | 'deny' | 'ctx' (additionalContext, no decision).
 
     `command` may be a callable (repo_path, other_path) -> str. `other` is a
@@ -89,7 +89,8 @@ def run(name, command, expect, *, comments=None, prs="open", repo_kwargs=None,
     """
     COUNT[0] += 1
     with tempfile.TemporaryDirectory() as tmp:
-        repo, top = make_repo(tmp, branch=branch, **(repo_kwargs or {}))
+        repo, top = make_repo(tmp, branch=branch, name=repo_name,
+                              **(repo_kwargs or {}))
         other, other_top = make_repo(tmp, branch="main", name="wt-other")
         if callable(command):
             command = command(top, other_top)
@@ -466,6 +467,29 @@ run("R5-6 a different worktree's claim (e.g. a parent's) reads as a peer's",
     COMMIT, "deny",
     comments=lambda top: [claim("Session worktree: `/somewhere/else/entirely`")],
     check_in_ctx="working this branch now")
+
+# --- review round 6 -------------------------------------------------------
+# Worktrees are named after issue slugs, and the repo's vocabulary includes the
+# release terms: a path or id carrying one must not make a good claim fail.
+run("R6-1 worktree named after a release term still matches", COMMIT, None,
+    repo_name="fix-unclaim-wording",
+    comments=lambda top: [claim(f"Session worktree: `{top}`")])
+run("R6-2 worktree named 'pr-released' still matches", COMMIT, None,
+    repo_name="pr-released",
+    comments=lambda top: [claim(f"Session worktree: `{top}`")])
+run("R6-3 session id containing a release term still matches", COMMIT, None,
+    comments=[claim("Session id: `session_now-mergeable_1`")],
+    extra_payload={"session_id": "session_now-mergeable_1"})
+run("R6-4 'back off' wording is a claim", COMMIT, None,
+    comments=lambda top: [claim(f"Session worktree: `{top}`",
+                                phrase="back off")])
+# Wrapped invocations resolve through strip_env (checked here, not assumed).
+run("R6-5 /usr/bin/git commit", "/usr/bin/git commit -m x", "deny")
+run("R6-6 timeout 60 git push", "timeout 60 git push origin feat/x", "deny")
+run("R6-7 command git commit", "command git commit -m x", "deny")
+# A directory that does not exist is a quiet pass, not a warning.
+run("R6-8 cd into a missing directory", "cd /no/such/dir/at/all && " + COMMIT,
+    None)
 
 # A broken install (no scripts/lib beside the hook) must be visible, not inert.
 COUNT[0] += 1

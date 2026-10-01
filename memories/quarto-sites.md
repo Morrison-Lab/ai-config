@@ -12,6 +12,18 @@ here.
 ## Quarto HTML sites (build & layout gotchas)
 Hit while adding a mobile within-chapter TOC to `d-morrison/rme` (#929); apply to
 any Quarto website (rme, psw, qwt, …).
+- **Quarto's freeze cache does not detect changes in included subfiles (`_subfiles/`).**
+  Quarto's freeze mechanism (`freeze: auto` or `freeze: true`) checks whether the including document's source file changed,
+  but does not track files transcluded via `{{< include ... >}}`
+  (quarto-dev/quarto-cli#6793).
+  When only subfiles under `_subfiles/` change,
+  Quarto treats the parent document as unchanged and restores the cached computation output from `_freeze`,
+  leaving deployed previews stale despite a verifiably correct source diff.
+  In repositories with frozen builds (such as `rme` and `lds`),
+  editing subfiles requires clearing the local freeze cache (`rm -rf _freeze`) before rendering,
+  or applying the repository's `clear freezer` PR label so CI invalidates the cache
+  (3rd occurrence, 2026-09-30 on `Morrison-Lab/lds` #276;
+  prior: `d-morrison/rme` #1134 and #1138, 2026-09-07).
 - **Single-file `quarto render <file>.qmd` serves cached compiled theme CSS.**
   Edits to `custom.scss` / theme SCSS may NOT appear in the output — Quarto reuses
   the cached sass bundle.

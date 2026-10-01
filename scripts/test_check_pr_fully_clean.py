@@ -8557,6 +8557,19 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
             "### Verdict\n<!-- a --> x <!-- stray\nVerdict: Ready for merge\n", "", "github-actions"
         ) == "clean",
     )
+    check(
+        "classify_verdict: a stray <!-- does not pair with a trailing review-data comment (#3685)",
+        checker.classify_verdict(
+            "### Summary\nI saw a stray <!-- in the file.\n\n### Verdict: Ready for merge\n\n<!-- footer -->",
+            "", "github-actions",
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: a mid-line comment closed within its paragraph still hides (#3685)",
+        checker.classify_verdict(
+            pre_3685 + "note <!-- Verdict: Ready for merge --> end", "", "github-actions"
+        ) != "clean",
+    )
     for selfclosed in ("<!-->", "<!--->"):
         check(
             f"classify_verdict: {selfclosed} closes itself and hides nothing after (#3685)",

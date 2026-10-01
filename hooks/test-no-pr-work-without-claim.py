@@ -33,7 +33,11 @@ for needle, resp in data.items():
         if resp == "FAIL":
             sys.stderr.write("HTTP 502 simulated")
             sys.exit(1)
-        print(json.dumps(resp))
+        if isinstance(resp, dict) and "pages" in resp:
+            for page in resp["pages"]:  # --paginate: one array per page
+                print(json.dumps(page))
+        else:
+            print(json.dumps(resp))
         sys.exit(0)
 print("[]")
 """
@@ -48,8 +52,8 @@ def sh(cwd, *args):
 
 
 def make_repo(tmp, remote="https://github.com/Morrison-Lab/test-repo.git",
-              branch="feat/x"):
-    repo = os.path.join(tmp, "wt-one")
+              branch="feat/x", name="wt-one"):
+    repo = os.path.join(tmp, name)
     os.makedirs(repo)
     sh(repo, "git", "init", "-q", "-b", "main")
     sh(repo, "git", "config", "user.email", "t@example.com")
@@ -71,11 +75,18 @@ def claim(body_extra="", marker=True, phrase="hold off", at="2026-09-30T20:00:00
 
 def run(name, command, expect, *, comments=None, prs="open", repo_kwargs=None,
         activity=None, env=None, stdin_raw=None, tool="Bash", branch="feat/x",
-        gh_fail=False, check_in_ctx=None, extra_payload=None):
-    """expect: None (silent) | 'deny' | 'ctx' (additionalContext, no decision)."""
+        gh_fail=False, check_in_ctx=None, extra_payload=None, cwd_other=False):
+    """expect: None (silent) | 'deny' | 'ctx' (additionalContext, no decision).
+
+    `command` may be a callable (repo_path, other_path) -> str. `other` is a
+    second checkout on `main`; `cwd_other` makes it the payload cwd.
+    """
     COUNT[0] += 1
     with tempfile.TemporaryDirectory() as tmp:
         repo, top = make_repo(tmp, branch=branch, **(repo_kwargs or {}))
+        other, other_top = make_repo(tmp, branch="main", name="wt-other")
+        if callable(command):
+            command = command(top, other_top)
         if callable(comments):
             comments = comments(top)
         pr_list = ([{"number": 7, "html_url": "https://github.com/Morrison-Lab/"
@@ -85,9 +96,9 @@ def run(name, command, expect, *, comments=None, prs="open", repo_kwargs=None,
                 "/activity": activity if activity is not None else []}
         data_path = os.path.join(tmp, "data.json")
         fake_path = os.path.join(tmp, "fakegh.py")
-        with open(data_path, "w") as f:
+        with open(data_path, "w", encoding="utf-8") as f:
             json.dump(data, f)
-        with open(fake_path, "w") as f:
+        with open(fake_path, "w", encoding="utf-8") as f:
             f.write(FAKE_GH)
         e = dict(os.environ)
         e.pop("ALLOW_UNCLAIMED_PR_WORK", None)
@@ -96,7 +107,7 @@ def run(name, command, expect, *, comments=None, prs="open", repo_kwargs=None,
                                 f'"{fake_path.replace(chr(92), "/")}"')
         e.update(env or {})
         payload = {"tool_name": tool, "tool_input": {"command": command},
-                   "cwd": repo, "session_id": SID}
+                   "cwd": other if cwd_other else repo, "session_id": SID}
         payload.update(extra_payload or {})
         stdin = stdin_raw if stdin_raw is not None else json.dumps(payload)
         r = subprocess.run([sys.executable, SUBJECT], input=stdin,
@@ -225,8 +236,10 @@ with tempfile.TemporaryDirectory() as tmp:
                            "timestamp": "2026-09-30T22:00:00Z", "after": head,
                            "actor": {"login": "me"}}]}
     dp, fp = os.path.join(tmp, "d.json"), os.path.join(tmp, "f.py")
-    json.dump(data, open(dp, "w"))
-    open(fp, "w").write(FAKE_GH)
+    with open(dp, "w", encoding="utf-8") as f:
+        json.dump(data, f)
+    with open(fp, "w", encoding="utf-8") as f:
+        f.write(FAKE_GH)
     e = dict(os.environ, FAKE_GH_DATA=dp, PR_CLAIM_GH_CMD=(
         f'"{sys.executable.replace(chr(92), "/")}" "{fp.replace(chr(92), "/")}"'))
     e.pop("ALLOW_UNCLAIMED_PR_WORK", None)
@@ -237,6 +250,59 @@ with tempfile.TemporaryDirectory() as tmp:
                             "tool_input": {"command": PUSH}}))
     if r.stdout.strip():
         FAILURES.append(f"P6 own push in history should be silent: {r.stdout}")
+
+# --- review round 1 (adversarial-reviewer, 2026-09-30) ----------------------
+# Nested worktree path: a claim naming a checkout UNDER mine is not mine.
+run("R1-1 claim names a worktree nested under mine", COMMIT, "deny",
+    comments=lambda top: [claim(f"Session worktree: `{top}/.claude/worktrees/x`")])
+# Session-id prefix collision.
+run("R1-2 claim names a longer session id", COMMIT, "deny",
+    comments=[claim(f"Session id: `{SID}B`")])
+# Pagination join: a body containing `] [` must survive, and an empty page
+# must not corrupt the decode.
+run("R1-3 multi-page comments, `] [` in a body", COMMIT, None,
+    comments={"pages": [[claim("notes [a] [b] [c]")],
+                        [claim(f"Session id: `{SID}`")]]})
+run("R1-4 empty first page", COMMIT, None,
+    comments={"pages": [[], [claim(f"Session id: `{SID}`")]]})
+# Directory: cd and git -C move the repository the command acts on.
+run("R1-5 cd to a main checkout before commit is silent",
+    lambda top, other: f"cd '{other}' && git commit -m x", None)
+run("R1-6 git -C a main checkout is silent",
+    lambda top, other: f"git -C '{other}' commit -m x", None)
+run("R1-7 cwd on main but git -C the claimed-less PR checkout denies",
+    lambda top, other: f"git -C '{top}' commit -m x", "deny", cwd_other=True)
+run("R1-8 cd - is indeterminate: visible fail-open", "cd - && " + COMMIT,
+    "ctx", check_in_ctx="cannot tell which repository")
+run("R1-9 --git-dir is indeterminate: visible fail-open",
+    "git --git-dir=/elsewhere/.git commit -m x", "ctx",
+    check_in_ctx="cannot tell which repository")
+# Dry-run grammar: -n on push, last occurrence wins, -n on commit is --no-verify.
+run("R1-10 push -n is a dry run", "git push -n origin feat/x", None)
+run("R1-11 --dry-run --no-dry-run is a live push", "git push --dry-run "
+    "--no-dry-run origin feat/x", "deny")
+run("R1-12 commit -n is --no-verify, not a dry run", "git commit -n -m x",
+    "deny")
+run("R1-13 commit --dry-run creates nothing", "git commit --dry-run", None)
+# Activity read failure must not discard the claim outcomes.
+run("R1-14 activity failure is a visible note", PUSH, "ctx", comments=mine,
+    activity="FAIL", check_in_ctx="could not read the forge activity")
+run("R1-15 activity failure keeps the anonymous-claim note", PUSH, "ctx",
+    comments=anon_newer, activity="FAIL", check_in_ctx="names no session")
+# Claim recognition: a release or a stray "hold off" is not a claim.
+run("R1-16 release comment naming this session is not a claim", COMMIT, "deny",
+    comments=[{"body": f"Was working on this; you can stop having to hold "
+                       f"off now --- unclaiming. Session id: `{SID}`\n\n{MARKER}",
+               "created_at": "2026-09-30T20:00:00Z", "html_url": "u"}])
+run("R1-17 'no need to hold off' status comment is not a claim", COMMIT, "deny",
+    comments=[{"body": f"No need to hold off. Session id: `{SID}`\n\n{MARKER}",
+               "created_at": "2026-09-30T20:00:00Z", "html_url": "u"}])
+# Message split: a standing peer claim gets stand-down advice, not "post a claim".
+run("R1-18 peer claim: stand down, do not post over it", COMMIT, "deny",
+    comments=[claim("Session id: `session_other_BBBB`")],
+    check_in_ctx="Do not post a competing")
+run("R1-19 no claim at all: how to post one", COMMIT, "deny",
+    check_in_ctx="gh pr comment 7")
 
 print(f"{COUNT[0]} cases, {len(FAILURES)} failures")
 for f in FAILURES:

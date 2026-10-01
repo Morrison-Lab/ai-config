@@ -47,6 +47,22 @@ A claim's 2-hour expiry (claim-pr.md) is not evaluated. An own claim is
 accepted whatever its age; staleness over-approximation via `updatedAt` would
 mark every session's own pushes as fresh activity. Known limit.
 
+A release ("unclaiming") comment is not modelled either: it only keeps a
+comment containing `unclaim` from counting as a claim. A claim whose session
+later released it still satisfies this check. Known limit.
+
+A PR from a fork (head repo under another owner) is not found by the
+`head=<owner>:<branch>` query, so the hook stays silent for it. Known limit.
+
+The directory a command runs in is the payload `cwd` moved by earlier `cd`s
+and the command's own `git -C` (`scripts/lib/shellcmd.py`'s
+`resolve_cd_target`); an unresolvable move (`cd -`, `$VAR`, `--git-dir`) is a
+visible fail-open, not a guess. Subshell scoping of a `cd` is not modelled
+(`simple_commands` flattens it).
+
+Cost: one to three forge reads per matched commit or push, uncached. Accepted
+because a stale cached "claimed" answer is exactly the failure being guarded.
+
 ## Failure policy
 
 Fails OPEN on any parse trouble, outside a git repo, off a Morrison-Lab remote,
@@ -85,11 +101,17 @@ try:
         "scripts", "lib")
     if _LIB not in sys.path:
         sys.path.insert(0, _LIB)
-    from shellcmd import env_value, git_subcommand, simple_commands
+    from shellcmd import (GIT_VALUE_OPTS, env_value, resolve_cd_target,
+                          simple_commands, strip_env)
 except Exception as _exc:  # broken install: fail open, and say so
     print(f"no-pr-work-without-claim: cannot load scripts/lib/shellcmd.py "
           f"({_exc}); not evaluating", file=sys.stderr)
-    env_value = git_subcommand = simple_commands = None
+    env_value = simple_commands = strip_env = resolve_cd_target = None
+    GIT_VALUE_OPTS = frozenset()
+
+# Raised when the directory a command runs in cannot be named statically.
+class Indeterminate(Exception):
+    pass
 
 LEADING_OVERRIDE = re.compile(
     r"\A[ \t]*(?:export[ \t]+)?" + OVERRIDE + r"=1[ \t]*(?:;|&&|\|\||\r?\n|\Z)")
@@ -115,6 +137,22 @@ that session is working this branch, and the second one stands down.
 {override}=1 clears this refusal (env prefix on the command, a leading
 `export`, or the process environment) -- for a case this guard did not foresee,
 and say why.
+"""
+
+DENY_PEER_CLAIM = """\
+`git {verb}` on branch `{branch}` ({pr_url}): the PR has a claim that does not
+name this session, and this session has none of its own.
+
+    that claim:   {peer_url}  ({peer_at})
+
+It is either another session's, or your own posted without a `Session
+worktree:` / `Session id:` line (re-post it with one). If it is another
+session's, that session is working this branch now. Do not post a competing
+claim over it and do not commit: stand down, or take over only after theirs has lapsed
+or been released (shared/workflow/claim-pr.md, 2-hour rule), by posting a fresh
+claim that names this session.
+
+{override}=1 clears this refusal; say why.
 """
 
 DENY_SUPERSEDED = """\
@@ -160,17 +198,29 @@ def git(cwd, *args):
     return r.stdout.strip() if r.returncode == 0 else None
 
 
-def gh_json(path):
-    """GET `path` through `gh api`; raises on any failure (caller fails open)."""
+def gh_json(path, paginate=True):
+    """GET `path` through `gh api`; raises on any failure (caller fails open).
+
+    `--paginate` prints one JSON array per page, back to back. They are decoded
+    one at a time with `raw_decode` rather than joined by rewriting `][`, which
+    would also rewrite a comment body containing `] [`.
+    """
     cmd = shlex.split(os.environ.get("PR_CLAIM_GH_CMD", "gh"))
-    r = run([*cmd, "api", "--paginate", path])
+    r = run([*cmd, "api", *(["--paginate"] if paginate else []), path])
     if r.returncode != 0:
         raise RuntimeError(f"gh api {path} failed: {r.stderr.strip()[:200]}")
-    text = r.stdout.strip()
-    if not text:
-        return []
-    # --paginate concatenates one JSON array per page: ][ -> ,
-    return json.loads(re.sub(r"\]\s*\[", ",", text))
+    text, items, pos = r.stdout, [], 0
+    decoder = json.JSONDecoder()
+    while True:
+        while pos < len(text) and text[pos].isspace():
+            pos += 1
+        if pos >= len(text):
+            return items
+        page, pos = decoder.raw_decode(text, pos)
+        if isinstance(page, list):
+            items.extend(page)
+        else:
+            items.append(page)
 
 
 def norm(text):
@@ -178,17 +228,31 @@ def norm(text):
 
 
 def is_claim(body):
+    """A claim comment: agent marker, `working on this`, and hold-off wording.
+
+    A release or status comment can contain "hold off" in other senses ("no
+    need to hold off"), so the opening claim phrase is required as well.
+    """
     low = (body or "").lower()
-    return AGENT_MARKER in low and any(p in low for p in CLAIM_PHRASES)
+    return (AGENT_MARKER in low and "working on this" in low
+            and any(p in low for p in CLAIM_PHRASES)
+            and "unclaim" not in low)
 
 
 def names_session(body, session_id, worktree):
+    """True when `body` names this session's id or this exact worktree path.
+
+    Both tests are token-bounded: an id or path that is merely a PREFIX of a
+    longer one (`...-ab`, `.../.claude/worktrees/x`) does not match.
+    """
     low = norm(body or "")
-    if session_id and session_id.lower() in low:
-        return True
+    if session_id:
+        sid = re.escape(session_id.lower())
+        if re.search(r"(?<![\w-])" + sid + r"(?![\w-])", low):
+            return True
     if worktree:
         wt = re.escape(norm(worktree).rstrip("/"))
-        return re.search(wt + r"(?![\w.-])", low) is not None
+        return re.search(wt + r"(?![\w./-])", low) is not None
     return False
 
 
@@ -207,31 +271,90 @@ def classify_claims(comments, session_id, worktree):
     return mine, theirs, anonymous
 
 
-def matched_command(command):
-    """(verb, env) for the first commit/push worth guarding, else None."""
+def is_dry_run(sub, rest):
+    """Last-occurrence-wins over `--dry-run` / `--no-dry-run` (and push `-n`).
+
+    `git commit -n` is `--no-verify`, so the short form counts for push only.
+    """
+    dry = False
+    for tok in rest:
+        if tok == "--":
+            break
+        if tok == "--dry-run" or (sub == "push" and re.fullmatch(
+                r"-[A-Za-z]*n[A-Za-z]*", tok)):
+            dry = True
+        elif tok == "--no-dry-run":
+            dry = False
+    return dry
+
+
+def git_options(rest_after_git):
+    """(index of the subcommand, list of `-C` dirs); raises Indeterminate on
+    `--git-dir` / `--work-tree`, which move the repository itself."""
+    i, c_dirs = 0, []
+    while i < len(rest_after_git) and rest_after_git[i].startswith("-"):
+        tok = rest_after_git[i]
+        if tok in ("--git-dir", "--work-tree") or tok.startswith(
+                ("--git-dir=", "--work-tree=")):
+            raise Indeterminate("--git-dir/--work-tree")
+        if tok == "-C" and i + 1 < len(rest_after_git):
+            c_dirs.append(rest_after_git[i + 1])
+        i += 2 if tok in GIT_VALUE_OPTS else 1
+    return i, c_dirs
+
+
+def matched_command(command, start_dir):
+    """`(verb, workdir)` for the first commit/push worth guarding, else None.
+
+    `workdir` is where that command runs: the payload cwd moved by any earlier
+    `cd` in the same compound command, then by the command's own `git -C`.
+    Raises Indeterminate when that cannot be named (`cd -`, `$VAR`, ...), which
+    the caller turns into a visible fail-open.
+    """
     cmds = simple_commands(command)
     if not cmds:
         return None
+    cur = start_dir
     for argv in cmds:
-        parsed = git_subcommand(argv)
-        if parsed is None:
+        env, rest = strip_env(argv)
+        if not rest:
             continue
-        sub, rest, env = parsed
+        if rest[0] in ("cd", "pushd", "popd"):
+            cur = resolve_cd_target(rest, cur)
+            continue
+        if rest[0] != "git":
+            continue
+        idx, c_dirs = git_options(rest[1:])
+        if idx + 1 >= len(rest):
+            continue
+        sub, args = rest[1 + idx], rest[2 + idx:]
         if sub not in ("commit", "push"):
             continue
-        if "--dry-run" in rest or (sub == "push" and (
-                "--delete" in rest or "-d" in rest)):
+        if is_dry_run(sub, args) or (sub == "push" and (
+                "--delete" in args or "-d" in args)):
             continue
         if env_value(env, OVERRIDE) == "1":
             continue
-        return sub, env
+        workdir = cur
+        for d in c_dirs:
+            if workdir is None:
+                break
+            workdir = d if os.path.isabs(d) else os.path.join(workdir, d)
+        if workdir is None:
+            raise Indeterminate("a `cd` target that cannot be resolved statically")
+        return sub, workdir
     return None
 
 
 def activity_warning(owner, repo, branch, since, cwd):
-    """Foreign pushes since `since`, as a warning string or None."""
+    """Foreign pushes since `since`, as a warning string or None.
+
+    One page only: the endpoint lists newest first and only entries newer than
+    the claim matter, so walking the branch's whole history (`--paginate`)
+    would spend the network timeout for nothing.
+    """
     items = gh_json(f"repos/{owner}/{repo}/activity"
-                    f"?ref=refs/heads/{branch}&per_page=50")
+                    f"?ref=refs/heads/{branch}&per_page=50", paginate=False)
     foreign = []
     for it in items:
         if it.get("activity_type") not in ("push", "force_push"):
@@ -264,12 +387,14 @@ def evaluate(payload):
         return None
     if os.environ.get(OVERRIDE) == "1" or LEADING_OVERRIDE.match(command):
         return None
-    hit = matched_command(command)
+    try:
+        hit = matched_command(command, payload.get("cwd") or os.getcwd())
+    except Indeterminate as exc:
+        return {"open_error": f"cannot tell which repository the command "
+                              f"runs in ({exc})"}
     if hit is None:
         return None
-    verb = hit[0]
-
-    cwd = payload.get("cwd") or os.getcwd()
+    verb, cwd = hit
     branch = git(cwd, "rev-parse", "--abbrev-ref", "HEAD")
     if not branch or branch in SKIP_BRANCHES:
         return None
@@ -292,6 +417,12 @@ def evaluate(payload):
         mine, theirs, anonymous = classify_claims(comments, session_id,
                                                   worktree)
         pr_url = pr.get("html_url") or f"#{pr['number']}"
+        if not mine and (theirs or anonymous):
+            peer = max(theirs + anonymous, key=lambda c: c["created_at"])
+            return {"decision": "deny", "reason": DENY_PEER_CLAIM.format(
+                verb=verb, branch=branch, pr_url=pr_url,
+                peer_url=peer.get("html_url", "?"), peer_at=peer["created_at"],
+                override=OVERRIDE)}
         if not mine:
             return {"decision": "deny", "reason": DENY_NO_CLAIM.format(
                 verb=verb, branch=branch, pr_url=pr_url, pr_number=pr["number"],
@@ -311,7 +442,16 @@ def evaluate(payload):
                          "yours; it may be another session's. Read the PR "
                          "comments before continuing.")
         if verb == "push":
-            warning = activity_warning(owner, repo, branch, latest_mine, cwd)
+            # Its own try: a 403/404 from the activity endpoint (it needs push
+            # access) must not discard the claim outcomes already computed.
+            try:
+                warning = activity_warning(owner, repo, branch, latest_mine,
+                                           cwd)
+            except Exception as exc:
+                warning = (f"could not read the forge activity for this "
+                           f"branch ({type(exc).__name__}: {exc}); check for "
+                           f"other writers by hand before pushing.")
+                print(f"no-pr-work-without-claim: {warning}", file=sys.stderr)
             if warning:
                 notes.append(warning)
         return {"context": " ".join(notes)} if notes else None

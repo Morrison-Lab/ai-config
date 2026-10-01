@@ -203,6 +203,22 @@ CASES = [
      "an MCP issue_read for comments discharges it -- the tool NAME carries "
      "the match, so searching only `input` made this path dead code"),
 
+    # ai-config#3992: the number named can be a pull request. Its comments are
+    # read through `pull_request_read`, which nothing discharged, so the
+    # reminder repeated word for word every turn after a real read.
+    ([PROMPT,
+      tool("mcp__github__pull_request_read",
+           {"method": "get_comments", "owner": "o", "repo": "r",
+            "pullNumber": 1566}),
+      say(CLAIM)], False,
+     "an MCP pull_request_read for comments discharges a PR number"),
+    ([PROMPT,
+      tool("mcp__github__pull_request_read",
+           {"method": "get_comments", "owner": "o", "repo": "r",
+            "pullNumber": 9999}),
+      say(CLAIM)], True,
+     "a pull_request_read of a DIFFERENT PR does not discharge this number"),
+
     # A bulleted recap is this corpus's default reporting shape. A `\n- item`
     # has no whitespace after the newline, so a `\s+`-anchored split treated
     # the whole recap as ONE sentence and attached an unrelated cue to an

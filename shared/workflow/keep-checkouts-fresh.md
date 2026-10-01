@@ -65,8 +65,10 @@ In every session --- at session start, and again periodically during long sessio
    **In a local session working in a worktree under `<primary>/.claude/worktrees/`, the running hooks can be the primary checkout's copies, and nothing fast-forwards that checkout.**
    `.claude/hooks/session-start.sh` exits unless `CLAUDE_CODE_REMOTE=true`, so a local session never pulls it.
    Measured 2026-09-30 ([ai-config#1815, comment](https://github.com/Morrison-Lab/ai-config/issues/1815#issuecomment-5925627614)): the primary sat on `main` 312 commits behind `origin/main`.
-   `hooks/no-push-without-self-review.py` then refused a push with "could not load its push detector from no-unreviewed-pr.py ([Errno 2] ... '<primary>/.claude/hooks/no-unreviewed-pr.py')", the symptom of the already-fixed [#2981](https://github.com/Morrison-Lab/ai-config/issues/2981).
-   The path in the message is the evidence that the hook ran from the primary; the loading mechanism was not traced.
+   `hooks/no-push-without-self-review.py` then refused a push with "could not load its push detector from no-unreviewed-pr.py ([Errno 2] No such file or directory: '<primary>/.claude/hooks/no-unreviewed-pr.py')",
+   the symptom of the already-fixed [#2981](https://github.com/Morrison-Lab/ai-config/issues/2981).
+   The path in the message is the evidence that the hook ran from the primary.
+   The loading mechanism was not traced.
    `git -C <primary> pull --ff-only` cleared it.
 
    - **Do:** at session start in a worktree session, fast-forward the primary checkout too, under the same on-`main`, clean-tree conditions as step 1 above.

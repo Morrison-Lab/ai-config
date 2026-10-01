@@ -183,6 +183,8 @@ def resolve_base_ref(repo_root: Path, requested_base: Optional[str]) -> str:
             cwd=repo_root,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
         )
         if proc.returncode == 0:
             return ref
@@ -227,6 +229,8 @@ def get_untracked_files(repo_root: Path, extensions: Set[str]) -> List[Path]:
         cwd=repo_root,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
     )
     if proc.returncode != 0:
         return []
@@ -251,6 +255,8 @@ def resolve_merge_base(repo_root: Path, base_ref: str) -> str:
         cwd=repo_root,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
     )
     if proc.returncode == 0:
         mb = proc.stdout.strip()
@@ -271,6 +277,8 @@ def scan_diff(
         cwd=repo_root,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
     )
     if diff_proc.returncode != 0:
         return ScanResult(
@@ -454,7 +462,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             if not args.quiet:
                 scope_label = "added line(s)" if args.diff else "line(s)"
                 print(
-                    f"✓ Checked {result.files_count} file(s), {result.lines_count} {scope_label}: no non-ASCII punctuation found."
+                    f"ok: Checked {result.files_count} file(s), {result.lines_count} {scope_label}: no non-ASCII punctuation found."
                 )
 
     if result.status == "violations":

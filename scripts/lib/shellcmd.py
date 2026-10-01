@@ -603,11 +603,18 @@ def resolve_cd_target(rest: list[str], cur_dir: str | None) -> str | None:
         # Unexpanded shell variables/substitutions cannot be resolved statically.
         return None
 
-    if os.path.isabs(target):
-        return os.path.normpath(target)
-    if cur_dir is not None:
-        return os.path.normpath(os.path.join(cur_dir, target))
-    return os.path.normpath(target)
+    # Before `isabs`: on Windows under Python 3.13, `isabs("/c/Users/x")` is
+    # False, so a Git Bash drive path was joined onto `cur_dir` and then
+    # normalized into a drive-less path nothing downstream could repair.
+    target = native_path(target)
+    is_abs = os.path.isabs(target) or bool(re.match(r"^[A-Za-z]:[/\\]", target))
+    was_windows_drive_forward = bool(re.match(r"^[A-Za-z]:/", target or "")) or (
+        bool(re.match(r"^[A-Za-z]:/", cur_dir or "")) and not is_abs
+    )
+    resolved = os.path.normpath(target if is_abs or cur_dir is None else os.path.join(cur_dir, target))
+    if was_windows_drive_forward:
+        resolved = resolved.replace("\\", "/")
+    return resolved
 
 
 # A SHELL specifically, which is a narrower question than "an interpreter".

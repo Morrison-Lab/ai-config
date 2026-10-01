@@ -53,8 +53,16 @@ passes, so the URL-inflation exception above still needs no special casing in
 the check.
 And a line that packs two short sentences fails even at 50 characters, which
 is the violation to actually look for before pushing.
+Rhetorical questions followed immediately by their answer (e.g. `...feet? Zero.`)
+are a common failure mode: both are short sentences, and packing them onto one
+line trips the sentence check regardless of column width.
 Fix a flagged line by breaking at the sentence boundary, not by rewrapping
 the paragraph to a narrower column.
+
+- **Do:** break between a rhetorical question and its immediate answer;
+  the gate flags lines packing both (e.g. `...feet? Zero.`).
+- **Don't:** pack a rhetorical question and its immediate answer onto a single source line.
+
 (ai-config#712: assuming an 80-character limit sent me measuring line lengths
 against the wrong criterion; reading the retired script's own source settled
 it, and the real check then found 7 multi-sentence lines a length check had

@@ -21,6 +21,7 @@ These instructions define standardized operating rules for Antigravity operating
 9. **"Or" means "and/or":** "Or" always means "and/or", not xor, unless xor or mutual exclusivity is explicitly specified.
 10. **Always give recommendations with questions:** Whenever asking a question or presenting choices, provide a concrete recommended option.
 11. **Status and diagnostic requests are not report-only:** Diagnose and repair issues immediately in the same turn rather than waiting for follow-up prompts.
+    When asked for status, examine the transcript to check if the agent got stuck, frozen, or dropped the ball, diagnose what stalled, and resume work immediately.
 12. **Run UMS proactively:** Run UMS when scrutinized and before pausing when learnings have accumulated.
 13. **Timestamp recaps in local time:** Use Pacific Time (`TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`).
 14. **Don't take anyone's word for it (no sycophancy):** Give users the whole truth and nothing but the truth,
@@ -34,6 +35,10 @@ These instructions define standardized operating rules for Antigravity operating
     sweep active tasks before declaring completion.
 16. **Deliver completed implementation work:** When asked to implement, edit, or write up a change on a feature branch, do not stop at an uncommitted or unpushed worktree.
     Complete the delivery cycle: commit scoped changes, run adversarial self-review to a clean verdict, push the branch, and open or update its Pull Request automatically without waiting for the user to ask.
+17. **Say whether the session is done when reporting stopping point status:** When ending a turn and reporting stopping point status, explicitly state whether the session is done or not, including running UMS (or confirming no new learnings accumulated) and filing noticed follow-up items.
+18. **Proactively suggest better alternatives:** If there's another way to accomplish the same goal more simply, cleanly, or reliably, proactively suggest and recommend that alternative rather than blindly implementing a proposed mechanism.
+19. **Use real-world examples for general practice:** When we do or see something that would be a good example for general practice, actively capture and incorporate it as a concrete before-and-after example in shared documentation.
+20. **Search tracker and AGENTS.md before building or denying a policy:** Search `AGENTS.md`, `CLAUDE.md`, `memories/`, `shared/`, and open issues before answering "no" to whether a policy exists or implementing a capability request.
 
 ## Antigravity Workflow Conventions
 

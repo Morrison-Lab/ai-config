@@ -78,7 +78,7 @@ def stubs(tz_answer, plain_answer, powershell_body, utc_answer="2026-07-01T19:00
     if the hook skipped straight to the second."""
     d = tempfile.mkdtemp()
     date_stub = os.path.join(d, "date")
-    with open(date_stub, "w") as fh:
+    with open(date_stub, "w", encoding="utf-8") as fh:
         # The stub answers only for the two format strings the hook actually
         # passes, so dropping or mangling "$FMT" fails here rather than
         # returning the preformatted fixture regardless.
@@ -91,7 +91,7 @@ def stubs(tz_answer, plain_answer, powershell_body, utc_answer="2026-07-01T19:00
                  "if [ \"${TZ:-}\" = America/Los_Angeles ]; then printf '%s\\n'; else printf '%s\\n'; fi\n"
                  % (utc_answer, tz_answer, plain_answer))
     ps_stub = os.path.join(d, "powershell")
-    with open(ps_stub, "w") as fh:
+    with open(ps_stub, "w", encoding="utf-8") as fh:
         # Answer only for the hook's invocation shape, and record the program
         # so the third-rung case can compare it whole against the expected
         # text (see EXPECTED_PS_PROGRAM); a fragment match let a rewired
@@ -148,7 +148,7 @@ rc, out = run(with_stubs(d))
 check("exit 0", rc == 0)
 check("prints the Pacific reading PowerShell supplied", bool(LOCAL.search(out)))
 check("never labels the GMT reading as local", "GMT" not in out)
-with open(os.path.join(d, "ps-program")) as fh:
+with open(os.path.join(d, "ps-program"), encoding="utf-8") as fh:
     program = " ".join(fh.read().split())
 check("hands PowerShell the complete conversion program, compared whole",
       program == EXPECTED_PS_PROGRAM)

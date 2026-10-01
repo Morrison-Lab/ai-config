@@ -527,6 +527,47 @@ Operationalized by:
 [`challenge-unnecessary-complexity`](../workflow/challenge-unnecessary-complexity.md),
 and [`fail-fast`](fail-fast.md).
 
+## Proactively suggest better alternatives to proposed approaches
+
+When asked to accomplish a goal using a specific approach,
+suggest a better alternative if one exists.
+Do not treat the proposed mechanism as an immutable requirement
+when another path reaches the same objective more simply, cleanly,
+or reliably.
+The user's standing principle:
+"if there's another way to accomplish the same goal, I'm always open to suggestions"
+(user directive, Issue #4095).
+Distinguish the underlying goal from candidate mechanisms,
+and weigh alternatives against DRW (upstream tools),
+KISS (simplicity), YAGNI (minimal code), and systemic maintainability.
+
+Full statement: [`proactively-suggest-alternatives`](proactively-suggest-alternatives.md).
+Operationalized by:
+[`dont-reinvent-wheel`](dont-reinvent-wheel.md),
+[`challenge-unnecessary-complexity`](../workflow/challenge-unnecessary-complexity.md),
+[`prefer-upstream`](../../skills/prefer-upstream/SKILL.md),
+and the recommendation requirements in `AGENTS.md`.
+
+## Use real-world examples for general practice
+
+When we do or see something that would be a good example for general practice,
+use it.
+When authoring, reviewing, or observing work that exemplifies good general
+engineering, writing, or architectural practice,
+actively capture and incorporate it as a concrete before-and-after example
+in shared guides, rules, and documentation.
+The user's standing directive:
+"when we do or see something that would be a good example for general practice, use it"
+(user directive, Issue #4093).
+Real-world before-and-after cases ground abstract principles in reality,
+illustrating why a pattern was suboptimal and how the refactored construct improves upon it.
+
+Full statement: [`use-real-world-examples`](use-real-world-examples.md).
+Operationalized by:
+[`informal-definitions`](../writing/informal-definitions.md),
+[`examples-are-scanned`](../writing/examples-are-scanned.md),
+and the documentation conventions in `AGENTS.md`.
+
 ## Get under the hood --- inspect source code and raw output
 
 When trying to understand what a process is doing,
@@ -670,6 +711,18 @@ for the entire catalog: it mandates empirical verification over deference to aut
 extending challenge-the-assignment (which focuses on task briefs) to all factual claims,
 recommendations, and assumptions, while leaning on deterministic-tools and
 algorithmatize-checks as the instruments of independent verification.
+
+Proactively-suggest-alternatives extends don't-take-my-word-for-it and challenge-the-assignment
+from factual truth to technical implementation:
+where don't-take-my-word-for-it questions whether an empirical claim is true,
+proactively-suggest-alternatives questions whether a requested mechanism
+is the best way to achieve the underlying goal,
+offering simpler, idiomatic, or upstream alternatives.
+
+Use-real-world-examples grounds all principles across the catalog in authentic practice:
+it takes exemplary refactors, tightened definitions, and systemic solutions observed in real PRs
+and promotes them to concrete before-and-after cases in shared documentation,
+ensuring breakthroughs in one repository improve standards across all of them.
 
 Get-under-the-hood provides the diagnostic counterpart to deterministic-tools
 and fail-fast: where fail-fast ensures failure is loud and deterministic-tools

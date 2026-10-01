@@ -19,7 +19,7 @@ In every session --- at session start, and again periodically during long sessio
    The path in the message is the evidence that the hook ran from the primary.
    The loading mechanism was not traced.
    `git -C <primary> pull --ff-only` cleared it.
-   Step 2's guard-refusal paragraph covers the same symptom when the stale copy is an installed plugin rather than the primary checkout.
+   Step 2's guard-refusal paragraph covers the same class of symptom, a guard refusing because its copy is stale, when that copy is an installed plugin.
 
    - **Do:** at session start in a worktree session, fast-forward the primary checkout too, under the same on-`main`, clean-tree conditions as above.
    - **Do:** read a hook error naming a nonexistent path under `.claude/hooks/` as a stale-hook symptom first.

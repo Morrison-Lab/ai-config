@@ -263,7 +263,7 @@ and the defect was in a loop.)
 ## A lazy span regex is quadratic when openers are many and closers are absent
 
 A non-nested lazy span such as `<!--.*?-->` under DOTALL has no nested quantifier, so it reads as linear.
-It is not: every opener scans to the end of the body looking for a closer, fails, and the engine restarts at the next opener.
+The regex is not linear: every opener scans to the end of the body looking for a closer, fails, and the engine restarts at the next opener.
 With N stray openers and no closer the total is O(N^2), the same start-position axis as "Quadratic cost can come from restart positions, not from backtracking".
 
 Measured 2026-09-30 on [ai-config#4172](https://github.com/Morrison-Lab/ai-config/pull/4172), the PR that adds `_blank_html_comments` to `scripts/check-pr-fully-clean.py`:

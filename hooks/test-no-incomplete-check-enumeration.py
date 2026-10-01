@@ -45,6 +45,9 @@ CHECKER_MR = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {
         "command": "python3 scripts/check-mr-fully-clean.py 651 "
                    "-p health-analytics-core/abridge --quorum 1"}}]}}
+# Pins the outcome (a test file is not the checker), not which regex part
+# produces it: `\b` already fails after `test_`, so the `(?<!test_)`
+# lookbehind is redundant (tracked in ai-config#4184).
 TEST_FILE_MR = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {
         "command": "python3 scripts/test_check-mr-fully-clean.py"}}]}}

@@ -498,10 +498,12 @@ See ai-config#694 for the precedent.
   [`gha-reusable-workflows.md`](gha-reusable-workflows.md)'s "403 caveat"
   and "fully READ-ONLY" entries --- so test with a throwaway push before relying on
   it.
-  For what goes wrong reconstructing a large file (~180KB+) across several
-  `create_or_update_file` chunks with no local checkout --- the compaction/output-size
-  failure modes, the pre-write size-shrink guard, and reporting self-inflicted breakage
-  immediately --- see [`large-file-content-api-pushes.md`](large-file-content-api-pushes.md).
+  **When no local checkout exists for a large content-API write, verify against the file's CURRENT live size, not just what you intended to send.**
+  A multi-chunk reconstruction can silently ship truncated content if a compaction summary or output-size limit cuts `content` mid-generation.
+  Compare the new content's size against the file's live size before writing, refuse a large shrink, then re-fetch after the push to confirm.
+  This is mechanizable --- file a hook/tooling issue for it (Morrison-Lab/ai-config#4169) rather than hand-checking every time, and prefer a session with a real local checkout when one exists, since `git diff` verifies byte-for-byte.
+  Report self-inflicted breakage in one line the moment it is noticed, even mid-repair, rather than trusting a compaction summary's account of it.
+  (Morrison-Lab/ai-config#4134, 2026-09-30/10-01: a session truncated `memories/preferences.md` during a self-damaged "restore" across several compaction cycles, until a separate session with git tooling fixed it.)
 - **Issue *writes* 404 while *reads* succeed → the issue was transferred to
   another repo, not a permissions gap.** If `mcp__github__add_issue_comment` /
   `issue_write` to `owner/repo#<N>` fail (`404 Not Found`, or `Could not resolve

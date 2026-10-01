@@ -28,6 +28,8 @@ The body carries a real blank line before the disclosure marker --- `\n` inside 
 ```bash
 gh pr comment <N> --body "Driving this PR to clean --- please hold off until done.
 
+Session worktree: <output of git rev-parse --show-toplevel>
+
 _Posted by Claude Code (AI agent) --- not written by a human._"   # COMMENT_PR
 ```
 Skip if your most recent comment already says so and is still live --- claims expire 2 hours after the most recent push or comment, and an expired one needs reasserting, per [`claim-pr`](../../shared/workflow/claim-pr.md).

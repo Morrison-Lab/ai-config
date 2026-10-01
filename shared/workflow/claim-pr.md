@@ -8,6 +8,8 @@ Use:
 ```
 gh pr comment <N> --body "Working on this --- please hold off on pushing to this branch until I'm done.
 
+Session worktree: <output of git rev-parse --show-toplevel>
+
 _Posted by Claude Code (AI agent) --- not written by a human._"
 gh issue comment <N> --body "Working on this --- please hold off until I'm done.
 

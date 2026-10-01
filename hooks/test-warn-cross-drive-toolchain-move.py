@@ -412,8 +412,8 @@ MUTATIONS = {
     "M1_command_position_anchor": (
         "the relocation verb must sit at a COMMAND position, or this "
         "corpus's own prose about the rule trips the guard",
-        [('    r"""(?:^|[;&|\\n({])\\s*\n        (?:sudo',
-          '    r"""(?:)\\s*\n        (?:sudo')],
+        [('    r"""(?:^|[;&|\\n({])[^\\S\\n]*\n        (?:sudo',
+          '    r"""(?:)[^\\S\\n]*\n        (?:sudo')],
         # S11's quoted `robocopy` becomes a command. S12 does NOT flip here,
         # because `strip_noise` blanks the heredoc body before the anchor is
         # ever consulted -- that clause is M5's, and keeping the two apart is

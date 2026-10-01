@@ -187,7 +187,9 @@ IS_ANCESTOR = re.compile(r"--is-ancestor\s+(\S+)\s+(\S+)")
 
 # Revision suffixes that select a RELATIVE commit. Stripped when asking "same
 # commit?" (D-A) and preserved when asking "two distinct sides?" (D-B).
+# regex-safe: norm_rev scans only the last 256 chars; 100k-char token of ^ 0.001s vs hook timeout 10s (ai-config#3989)
 REV_SUFFIX = re.compile(r"(?:\^\{[^}]*\}|\^[0-9]*|~[0-9]*|@\{[^}]*\})+$")
+REV_SUFFIX_SCAN = 256
 
 HEX = re.compile(r"[0-9a-f]{7,40}\Z", re.I)
 
@@ -233,8 +235,13 @@ def norm_rev(rev):
     two legitimately different sides of a comparison, and collapsing them would
     let a single extraction discharge itself.
     """
-    out = REV_SUFFIX.sub("", clean(rev))
-    return out or clean(rev)
+    rev = clean(rev)
+    # REV_SUFFIX is O(n^2) on a long run of `^`/`~` (it retries from every
+    # position), so only the last REV_SUFFIX_SCAN characters are scanned; a
+    # real suffix chain is a few characters (ai-config#3989).
+    head, tail = rev[:-REV_SUFFIX_SCAN], rev[-REV_SUFFIX_SCAN:]
+    out = head + REV_SUFFIX.sub("", tail)
+    return out or rev
 
 
 def same_commit(a, b):

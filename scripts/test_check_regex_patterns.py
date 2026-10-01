@@ -11,6 +11,8 @@ Verifies that:
   7. AST regex extraction correctly extracts calls (`re.compile`, `re.search`, `re.sub`, etc.) and flags.
   8. CLI arguments (`--json`, `--timeout`, `--no-dynamic`, `--strict`) behave as expected.
   9. Success output encodes on a cp1252 stdout stream (ai-config#2038).
+ 10. `regex-safe:` markers silence a pattern only with a measured reason, and the
+     repo's own baseline is zero (ai-config#3989).
 """
 from __future__ import annotations
 
@@ -310,6 +312,130 @@ def test_cp1252_encoding() -> None:
 
 
 test_cp1252_encoding()
+
+
+# --- 7. Recorded-safe markers (ai-config#3989) ---
+
+BAD_CALL = 'import re\nRX = re.compile(r"(a+)+")\n'
+MARKER = "# regex-safe: 1k-char run of a: 0.001s, hook timeout 10s"
+
+
+def scan_text(text: str, *extra: str) -> tuple[int, dict]:
+    with tempfile.TemporaryDirectory() as td:
+        f = Path(td) / "marked.py"
+        f.write_text(text, encoding="utf-8")
+        rc, out, err = run_script(["--paths", str(f), "--json", *extra])
+        return rc, json.loads(out)
+
+
+def test_safe_markers() -> None:
+    # Negative control: the unmarked known-bad pattern is still reported.
+    rc, data = scan_text(BAD_CALL)
+    check(
+        "negative control: unmarked `(a+)+` is still reported",
+        rc == 1 and data["vulnerabilities_count"] > 0,
+        f"rc={rc} data={data!r}",
+    )
+
+    # Marker on the line above, with a measurement, silences it.
+    rc, data = scan_text(f"import re\n{MARKER}\nRX = re.compile(r\"(a+)+\")\n")
+    check(
+        "measured marker on the line above silences the finding",
+        rc == 0 and data["status"] == "clean",
+        f"rc={rc} data={data!r}",
+    )
+
+    # Marker as a trailing comment on the reported line also silences it.
+    rc, data = scan_text(f"import re\nRX = re.compile(r\"(a+)+\")  {MARKER}\n")
+    check(
+        "measured marker on the reported line silences the finding",
+        rc == 0 and data["status"] == "clean",
+        f"rc={rc} data={data!r}",
+    )
+
+    # Marker inside the unbroken comment block above also counts.
+    rc, data = scan_text(f"import re\n{MARKER}\n# more prose about it\nRX = re.compile(r\"(a+)+\")\n")
+    check(
+        "measured marker earlier in the comment block above silences the finding",
+        rc == 0 and data["status"] == "clean",
+        f"rc={rc} data={data!r}",
+    )
+
+    # A marker separated by code does not reach the pattern.
+    rc, data = scan_text(f"import re\n{MARKER}\nX = 1\nRX = re.compile(r\"(a+)+\")\n")
+    check(
+        "marker separated from the pattern by code does not silence it",
+        rc == 1 and data["vulnerabilities_count"] > 0,
+        f"rc={rc} data={data!r}",
+    )
+
+    # A marker with no reason is itself an error and silences nothing.
+    rc, data = scan_text("import re\n# regex-safe:\nRX = re.compile(r\"(a+)+\")\n")
+    kinds = {f["kind"] for r in data["reports"] for f in r["findings"]}
+    check(
+        "marker with no reason is an error and does not silence the pattern",
+        rc == 1 and "marker_without_measurement" in kinds and "nested_quantifier" in kinds,
+        f"rc={rc} kinds={kinds!r}",
+    )
+
+    # A reason with prose but no timing figure is rejected the same way.
+    rc, data = scan_text("import re\n# regex-safe: it is fine\nRX = re.compile(r\"(a+)+\")\n")
+    kinds = {f["kind"] for r in data["reports"] for f in r["findings"]}
+    check(
+        "marker whose reason has no measured time is an error",
+        rc == 1 and "marker_without_measurement" in kinds,
+        f"rc={rc} kinds={kinds!r}",
+    )
+
+    # A bare marker on a safe pattern is still reported (stray marker).
+    rc, data = scan_text("import re\n# regex-safe:\nRX = re.compile(r\"^abc$\")\n")
+    check(
+        "bare marker is reported even when the pattern is clean",
+        rc == 1 and data["vulnerabilities_count"] == 1,
+        f"rc={rc} data={data!r}",
+    )
+
+    # Marker text inside a string or docstring is not a marker.
+    rc, data = scan_text('import re\n"""# regex-safe:"""\nRX = re.compile(r"^abc$")\n')
+    check(
+        "marker text inside a docstring is not treated as a marker",
+        rc == 0 and data["status"] == "clean",
+        f"rc={rc} data={data!r}",
+    )
+
+    # --no-markers ignores a valid marker (the control for the repo-wide run).
+    rc, data = scan_text(f"import re\n{MARKER}\nRX = re.compile(r\"(a+)+\")\n", "--no-markers")
+    check(
+        "--no-markers reports a pattern a valid marker would silence",
+        rc == 1 and data["vulnerabilities_count"] > 0,
+        f"rc={rc} data={data!r}",
+    )
+
+
+test_safe_markers()
+
+
+# --- 8. The repo's own baseline is zero (ai-config#3989) ---
+
+def test_repo_baseline_is_zero() -> None:
+    rc, out, err = run_script(["--json"])
+    data = json.loads(out)
+    check(
+        "repo scan reports zero findings",
+        rc == 0 and data["vulnerabilities_count"] == 0,
+        f"count={data['vulnerabilities_count']} "
+        f"first={[(r['file_path'], r['line_number']) for r in data['reports'][:5]]}",
+    )
+    rc, out, err = run_script(["--json", "--no-markers"])
+    data = json.loads(out)
+    check(
+        "negative control: --no-markers still finds the annotated patterns",
+        data["vulnerabilities_count"] > 0,
+        f"count={data['vulnerabilities_count']}",
+    )
+
+
+test_repo_baseline_is_zero()
 
 
 # --- Final summary ---

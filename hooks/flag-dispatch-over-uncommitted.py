@@ -58,6 +58,7 @@ import sys
 
 # An absolute POSIX or Windows path in the prompt. Trailing punctuation is trimmed so a
 # path at the end of a sentence still resolves.
+# regex-safe: worst case 100k-char prompt of path segments 0.004s vs hook timeout 10s (ai-config#3989)
 RX_ABS_PATH = re.compile(
     r"((?:/(?:[\w.@+-]+/)+[\w.@+-]*"
     r"|[A-Za-z]:[/\\](?:[\w.@+-]+[/\\])*[\w.@+-]*))"

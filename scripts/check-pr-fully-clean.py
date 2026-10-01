@@ -1787,6 +1787,7 @@ _FINDINGS_HEADING_NOT_EXEMPT = re.compile(
     r")\b"
     r"|(?<!non-)(?<!non\s)\bblocking\b"
 )
+# regex-safe: worst case 100k-char line of spaces 0.009s; CLI script, no hook timeout; was >20s at 100k (ai-config#3989)
 _LINE_RESOLUTION_WORDS = re.compile(
     r"(?i)\b(?:"
     r"(?:is|are|was|were|have|has)\s+(?:now\s+|also\s+|already\s+|since\s+|been\s+)*"
@@ -1797,7 +1798,7 @@ _LINE_RESOLUTION_WORDS = re.compile(
     r"|(?:item|items|feedback|issues?|findings?|bugs?|everything|both|all)\s+(?:now\s+|also\s+|already\s+|since\s+)?(?:fixed|resolved|addressed|closed|cleared)"
     r"|(?:fixed|resolved|addressed|cleared|closed)\s+(?:(?:this|it|that|the\s+(?:bug|issue|finding|defect|crash|problem|leak))\s+)?(?:in|by|via)\s+(?:commit\s+[a-f0-9]+|[a-f0-9]{7,40}|PR\s+#?\d+|#\d+|this\s+round(?:['\u2019]s)?\s+(?:diff|push|commit|changes?|fixes?))"
     r")\b"
-    r"|^[ \t]*(?:[-*+]|\d+[.)])?[ \t]*(?:\*\*)?\[?(?:resolved|fixed|addressed|closed|cleared)\b\]?"
+    r"|^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]*)?(?:\*\*)?\[?(?:resolved|fixed|addressed|closed|cleared)\b\]?"
 )
 _LINE_UNRESOLVED_WORDS = re.compile(
     r"(?i)\b(?:"

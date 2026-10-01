@@ -10,11 +10,23 @@ for vulnerability to catastrophic backtracking and self-ambiguous partitioning:
   5. Dynamic timeout probes: executes crafted non-matching probe inputs against regexes
      with a hard timeout to empirically catch exponential backtracking.
 
+Recorded-safe patterns:
+  A pattern the linter flags but that has been measured safe is silenced with a
+  `regex-safe:` comment (the marker is the literal text `regex-safe:` after a
+  hash) on the line the report names (the first line of the call) or in the
+  unbroken block of comment lines directly above it. The reason must contain the
+  measurement: a worst-case input, its time, and the timeout it runs under,
+  e.g. `10k-char line of spaces: 0.01s, hook timeout 10s`. A marker whose reason
+  carries no timing figure (a number followed by `ms` or `s`) is itself a
+  finding, so a bare marker cannot silence anything. `--no-markers` ignores
+  markers and reports every finding (the negative control).
+
 Usage:
   python3 scripts/check_regex_patterns.py
   python3 scripts/check_regex_patterns.py --paths hooks/ scripts/ plugins/
   python3 scripts/check_regex_patterns.py --json
   python3 scripts/check_regex_patterns.py --timeout 0.25 --strict
+  python3 scripts/check_regex_patterns.py --no-markers
 """
 from __future__ import annotations
 
@@ -27,6 +39,7 @@ import signal
 import sys
 import threading
 import time
+import tokenize
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -39,6 +52,9 @@ except ImportError:
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_SCAN_DIRS = ["hooks", "scripts", "plugins"]
 DEFAULT_TIMEOUT = 0.25  # seconds per dynamic probe
+SAFE_MARKER = "regex-safe:"
+# A reason must carry a measured time, so a marker cannot be a bare assertion.
+RE_MEASUREMENT = re.compile(r"\d(?:\.\d+)?\s*(?:ms|s)\b")
 
 
 @dataclass
@@ -606,6 +622,47 @@ def check_dynamic_probes(
     return findings
 
 
+# --- Recorded-safe markers ---
+
+
+def collect_safe_markers(content: str) -> dict[int, str]:
+    """Map line number -> reason text for every real comment carrying the marker.
+
+    Reads COMMENT tokens, so marker text inside a string or docstring (this
+    module's own usage notes) is never mistaken for a marker.
+    """
+    markers: dict[int, str] = {}
+    try:
+        for tok in tokenize.generate_tokens(iter(content.splitlines(keepends=True)).__next__):
+            if tok.type != tokenize.COMMENT:
+                continue
+            body = tok.string.lstrip("#").strip()
+            if body.startswith(SAFE_MARKER):
+                markers[tok.start[0]] = body[len(SAFE_MARKER):].strip()
+    except (tokenize.TokenError, IndentationError, StopIteration):
+        pass
+    return markers
+
+
+def marker_lines_for(line_number: int, lines: list[str], markers: dict[int, str]) -> list[int]:
+    """Marker lines that apply to a pattern reported at `line_number`.
+
+    The reported line itself, then each line of the unbroken run of comment
+    lines directly above it.
+    """
+    found = [line_number] if line_number in markers else []
+    n = line_number - 1
+    while n >= 1 and lines[n - 1].lstrip().startswith("#"):
+        if n in markers:
+            found.append(n)
+        n -= 1
+    return found
+
+
+def is_valid_reason(reason: str) -> bool:
+    return bool(RE_MEASUREMENT.search(reason))
+
+
 # --- File and Directory Scanning ---
 
 
@@ -613,6 +670,7 @@ def scan_file(
     file_path: Path,
     timeout: float = DEFAULT_TIMEOUT,
     enable_dynamic: bool = True,
+    use_markers: bool = True,
 ) -> list[RegexReport]:
     """Scan a single Python file for regex patterns and analyze them."""
     try:
@@ -623,12 +681,40 @@ def scan_file(
 
     instances = extract_regex_instances_from_ast(tree, str(file_path))
     reports: list[RegexReport] = []
+    markers = collect_safe_markers(content) if use_markers else {}
+    lines = content.splitlines()
+
+    for line_number, reason in sorted(markers.items()):
+        if not is_valid_reason(reason):
+            reports.append(
+                RegexReport(
+                    file_path=str(file_path),
+                    line_number=line_number,
+                    col_offset=0,
+                    pattern_str="",
+                    flags=0,
+                    source_call="marker",
+                    findings=[
+                        Finding(
+                            kind="marker_without_measurement",
+                            message=f"`{SAFE_MARKER}` marker has no measured time in its reason",
+                            severity="vulnerability",
+                            details=f"Reason given: {reason!r}; expected a figure such as '0.01s' or '12ms'.",
+                        )
+                    ],
+                )
+            )
 
     for inst in instances:
         findings = check_static_ast(inst.pattern_str, inst.flags)
         if enable_dynamic:
             dynamic_findings = check_dynamic_probes(inst.pattern_str, inst.flags, timeout=timeout)
             findings.extend(dynamic_findings)
+
+        if findings and any(
+            is_valid_reason(markers[n]) for n in marker_lines_for(inst.line_number, lines, markers)
+        ):
+            continue
 
         if findings:
             reports.append(
@@ -708,6 +794,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Skip dynamic probe timeout execution checks",
     )
     parser_cli.add_argument(
+        "--no-markers",
+        action="store_true",
+        help=f"Ignore `{SAFE_MARKER}` markers and report every finding (negative control)",
+    )
+    parser_cli.add_argument(
         "--json",
         action="store_true",
         help="Emit JSON output instead of text",
@@ -733,7 +824,12 @@ def main(argv: list[str] | None = None) -> int:
     all_reports: list[RegexReport] = []
 
     for f in files_to_scan:
-        reports = scan_file(f, timeout=args.timeout, enable_dynamic=not args.no_dynamic)
+        reports = scan_file(
+            f,
+            timeout=args.timeout,
+            enable_dynamic=not args.no_dynamic,
+            use_markers=not args.no_markers,
+        )
         all_reports.extend(reports)
 
     vuln_count = sum(len(r.findings) for r in all_reports)

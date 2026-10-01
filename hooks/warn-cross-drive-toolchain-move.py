@@ -118,9 +118,10 @@ import sys
 # and a sentence containing "move" must all miss. PowerShell's aliases are
 # included under their own names because a session on this machine writes
 # `Copy-Item` and `cp` interchangeably for the same cmdlet.
+# regex-safe: worst case 100k-char command of newline+sudo repeats 0.004s vs hook timeout 15s; was >20s (ai-config#3989)
 RELOCATOR = re.compile(
-    r"""(?:^|[;&|\n({])\s*
-        (?:sudo\s+|env\s+\S+=\S+\s+|timeout\s+\S+\s+)*
+    r"""(?:^|[;&|\n({])[^\S\n]*
+        (?:sudo[^\S\n]+|env[^\S\n]+\S+=\S+[^\S\n]+|timeout[^\S\n]+\S+[^\S\n]+)*
         (?P<verb>
             robocopy | xcopy | rsync
           | copy-item | move-item | \bcpi\b | \bmi\b

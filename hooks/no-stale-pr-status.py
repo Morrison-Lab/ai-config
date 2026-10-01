@@ -1031,10 +1031,11 @@ RX_LEADING_SEPARATOR = re.compile(_CLAUSE_SEPARATORS, re.I)
 # decides it: in a SUBJECT relative the pronoun IS the claim and the verb
 # follows it directly, while an OBJECT relative puts its own subject in
 # between. So the carve-out must reach the retraction.
+# regex-safe: worst case 100k-char run of spaces 0.06s vs hook timeout 10s; was >20s at 10k (ai-config#3989)
 RX_METALINGUISTIC_HEAD = re.compile(
     r"\b(?:is|was|were|are)\s+"
-    r"(?:the|a|an|this|that|my|our|its)?\s*"
-    r"(?:earlier|prior|previous|one|only|original)?\s*"
+    r"(?:(?:the|a|an|this|that|my|our|its)\s+)?"
+    r"(?:(?:earlier|prior|previous|one|only|original)\s+)?"
     r"(?:claim|statement|line|note|status|report|reading|call|verdict"
     r"|assertion|assessment|sentence|wording)\s+"
     r"(?:that|which)\s+"

@@ -1616,6 +1616,27 @@ def is_infra_path(path: str) -> bool:
     return any(p.fullmatch(path) for p in INFRA_PATH_PATTERNS)
 
 
+_PR_WORD = re.compile(r"\bpr\s+")
+# regex-safe: one anchored attempt; worst case 100k-char segment of `pr ` words 0.006s vs hook timeout 10s (ai-config#3989)
+_MERGE_TAIL = re.compile(r"(?:\S+\s+)*?merge\b(.*)$")
+
+
+def pr_merge_tail(inert_seg: str) -> str | None:
+    """Text after the `merge` token of the first `pr ... merge`, or None.
+
+    Anchors at the FIRST `pr` word only. A later `pr` word can match only if
+    the first one does (its candidate `merge` tokens are a subset of the
+    first one's), so retrying every `pr` word, as one `re.search` over the
+    whole `pr ... merge` shape did, found nothing more and cost O(n^2) on a
+    segment full of `pr` words (measured 18.6s at 100k chars, ai-config#3989).
+    """
+    head = _PR_WORD.search(inert_seg)
+    if head is None:
+        return None
+    m = _MERGE_TAIL.match(inert_seg, head.end())
+    return m.group(1) if m else None
+
+
 def merge_pr_number(inert_seg: str) -> int | None:
     """The one PR number this segment's merge names, or None.
 
@@ -1630,9 +1651,9 @@ def merge_pr_number(inert_seg: str) -> int | None:
     argument at all (the current branch's PR), is not a number and denies.
     """
     numbers = set(m.group(1) for m in _PULLS_MERGE_NUMBER.finditer(inert_seg))
-    m = re.search(r"\bpr\s+(?:\S+\s+)*?merge\b(.*)$", inert_seg)
-    if m:
-        tokens = m.group(1).split()
+    tail = pr_merge_tail(inert_seg)
+    if tail is not None:
+        tokens = tail.split()
         for i, tok in enumerate(tokens):
             if tok.isdigit() and not (i and tokens[i - 1] in _GH_PR_MERGE_VALUE_FLAGS):
                 numbers.add(tok)
@@ -1654,9 +1675,9 @@ def merge_pinned_sha(inert_seg: str) -> str | None:
     Multiple different pinned SHAs or an unparseable/missing value denies.
     """
     shas = set()
-    m = re.search(r"\bpr\s+(?:\S+\s+)*?merge\b(.*)$", inert_seg)
-    if m:
-        tokens = m.group(1).split()
+    tail = pr_merge_tail(inert_seg)
+    if tail is not None:
+        tokens = tail.split()
         for i, tok in enumerate(tokens):
             if tok == "--match-head-commit":
                 if i > 0 and tokens[i - 1] in _GH_PR_MERGE_VALUE_FLAGS:

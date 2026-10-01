@@ -1034,4 +1034,21 @@ When suppressing the unpushed-commit Stop hook (`no-unshipped-commit.py`) becaus
   which splits at the flag's own `=` delimiter and yields `key=val` rather than `val`.
   Use `tok.partition("key=")[2]` or `tok.rsplit("=", 1)[1]` to cleanly extract the target value across both attached (`--field=key=val`) and detached (`-f key=val`) spellings.
 
+## `scripts/test_hooks.py` takes 15-20 minutes: save the log, and attribute a FAIL to the `RUN:` line above it
+
+Measured 2026-10-01 on host shiva (48 cores, load about 1.6): `python3 scripts/test_hooks.py` runs 108 hook suites serially and took 15-20 minutes.
+A Bash call with `run_in_background` and `timeout: 600000` was killed before the run finished.
+Its output had gone only to the task output file, so it was lost with the task.
+
+- **Do:** launch it with `run_in_background: true` and `timeout: 1800000`, with the full log redirected inside the command to a scratchpad file (`python3 scripts/test_hooks.py > <scratchpad>/hooks.log 2>&1`, no trailing `&`, per the double-backgrounding entry in [`claude-code.md`](claude-code.md)).
+  Then `grep -E '^FAIL|suites passed' <scratchpad>/hooks.log`.
+- **Don't:** run it in the foreground or under a 10-minute timeout.
+- **Don't:** pipe it straight into `grep` with no saved log: the per-suite detail needed to find which case failed is gone once the pipe closes.
+
+**A `FAIL` line belongs to the last `RUN:` line ABOVE it, not to the next one below.**
+Case-level `FAIL` lines (for example `PATHISH stays linear`) print after the suite's own summary `FAIL` line, so they sit directly above the next suite's `RUN:` line and are easy to misattribute to it.
+
+- **Do:** walk upward from a `FAIL` line to the nearest `RUN:` line to name the suite.
+- **Don't:** read the `RUN:` line beneath a `FAIL` as the suite that failed.
+
 

@@ -309,6 +309,46 @@ check("mcp issue_read fallback without structural target field still discharges 
 check("unrelated mcp tool does not discharge",
       hook.mcp_reads_comments("mcp__github__get_me", {}, "1544"), False)
 
+# ai-config#3992: the number a claim names can be a pull request, and the MCP
+# route to a PR's conversation is `pull_request_read`, not `issue_read`.
+for _method in ("get_comments", "get_review_comments", "get_reviews"):
+    check(f"mcp pull_request_read method={_method} for pullNumber N discharges N (ai-config#3992)",
+          hook.mcp_reads_comments(
+              "mcp__github__pull_request_read",
+              {"method": _method, "owner": "o", "repo": "r", "pullNumber": 106},
+              "106"),
+          True)
+check("mcp pull_request_read method=get (plain view) does NOT discharge",
+      hook.mcp_reads_comments(
+          "mcp__github__pull_request_read",
+          {"method": "get", "owner": "o", "repo": "r", "pullNumber": 106},
+          "106"),
+      False)
+check("mcp pull_request_read method=get_diff does NOT discharge",
+      hook.mcp_reads_comments(
+          "mcp__github__pull_request_read",
+          {"method": "get_diff", "owner": "o", "repo": "r", "pullNumber": 106},
+          "106"),
+      False)
+check("mcp pull_request_read for a different pullNumber does not discharge",
+      hook.mcp_reads_comments(
+          "mcp__github__pull_request_read",
+          {"method": "get_comments", "owner": "o", "repo": "r", "pullNumber": 107},
+          "106"),
+      False)
+check("mcp pull_request_read with no recoverable number does not discharge",
+      hook.mcp_reads_comments(
+          "mcp__github__pull_request_read",
+          {"method": "get_comments", "owner": "o", "repo": "r"},
+          "106"),
+      False)
+check("cursor-mapped name ending in pull_request_read discharges",
+      hook.mcp_reads_comments(
+          "some_prefix_pull_request_read",
+          {"method": "get_comments", "pullNumber": 106},
+          "106"),
+      True)
+
 # --------------------------------------------------------- transcript_has_comments_read
 
 no_read = write_transcript(["git status", "gh issue view 1544"])

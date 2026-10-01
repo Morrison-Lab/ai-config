@@ -518,12 +518,45 @@ def _extract_target_issue_number(tool_input):
 
 # Imported by `no-unread-issue-claim.py` as well as used here, so a
 # signature change here breaks that hook's suite rather than this one's.
+# The `method` values of `pull_request_read` that return a pull request's
+# conversation: issue-style comments, inline review comments, and reviews.
+# `get`, `get_diff`, `get_files` and the rest do not.
+_PR_CONVERSATION_METHODS = {"get_comments", "get_review_comments", "get_reviews"}
+
+
+def _pull_request_read_discharges(tool_input, number):
+    """True for a `pull_request_read` conversation read of PR `number`.
+
+    The number a claim names can be a pull request, whose conversation lives
+    behind `pull_request_read` rather than `issue_read` (ai-config#3992).
+    The target is read structurally from `pullNumber`/`pull_number`/`number`
+    and never searched for in the payload, for the same reason
+    `_extract_target_issue_number` is (ai-config#3845). With no recoverable
+    target this does not discharge.
+    """
+    if not isinstance(tool_input, dict):
+        return False
+    method = tool_input.get("method")
+    if not (isinstance(method, str)
+            and method.lower() in _PR_CONVERSATION_METHODS):
+        return False
+    for key in ("pullNumber", "pull_number", "number"):
+        val = tool_input.get(key)
+        if val is not None and not isinstance(val, (dict, list)):
+            s = str(val).strip()
+            if s.isdigit():
+                return s == str(number).strip()
+    return False
+
+
 def mcp_reads_comments(name, tool_input, number):
     """True when this MCP tool_use is a READ_ISSUE_COMMENTS call for
     `number` -- tool-mappings.yml's `mcp__github__issue_read` with
     `method: get_comments`, or a Cursor-mapped name ending in `issue_read`."""
     if not isinstance(name, str) or not name:
         return False
+    if name.endswith("pull_request_read"):
+        return _pull_request_read_discharges(tool_input, number)
     if name != "mcp__github__issue_read" and not name.endswith("issue_read"):
         return False
     if not isinstance(tool_input, dict):

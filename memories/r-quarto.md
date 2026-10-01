@@ -1095,6 +1095,31 @@ Hit on [wai#128](https://github.com/Morrison-Lab/wai/issues/128) (byok ITPM/budg
   upstream or suggested R package, unit tests must verify full `formals()`
   equality (both argument names and default values) and output equivalence
   across every supported target format, rather than testing only `names(formals())`.
+- **`QUARTO_R` on Windows**:
+  When Quarto fails to discover an installed R binary on Windows for knitr execution,
+  set `$env:QUARTO_R = "C:\Program Files\R\R-4.5.1\bin\x64\R.exe"` (or the appropriate R executable path)
+  in the execution session.
+- **Reticulate `py` binding in Quarto documents**:
+  In Quarto documents mixing R and Python via `reticulate`,
+  do not assign `py <- reticulate::py` in an early knitr setup chunk before Python runs.
+  Early binding caches an uninitialized environment that shadows subsequent Python evaluations.
+  Assign `py <- reticulate::py` inside or immediately following the chunk where Python code runs
+  so inline expressions (`` `r py$var` ``) access live variables.
+- **Observable JS (OJS) table header background in dark-themed Quarto documents (unverified)**:
+  In `Morrison-Lab/mds` PR #52, a `.widget-panel` OJS panel with hardcoded dark text (`color: #222`)
+  showed a suspected dark-theme contrast issue on table headers,
+  attributed to an assumed Quarto dark-theme rule
+  (`div.observablehq table thead tr th { background-color: var(--bs-body-bg); }`)
+  resolving `--bs-body-bg` to `#222` and producing black-on-black headers.
+  That CSS-variable-resolution claim was never confirmed against Quarto's own source,
+  and no `.widget-panel` in `mds` actually renders a table yet, so the fix is unexercised.
+  The `custom.scss` change merged in mds#52 is broader than a single selector:
+  it sets `.widget-panel table`, `.widget-panel table thead tr th`,
+  and `.widget-panel table th, .widget-panel table td` together,
+  overriding `color`/`background-color` alongside the Bootstrap table custom properties
+  `--bs-table-color`, `--bs-table-bg`, `--bs-table-border-color`,
+  `--bs-table-striped-color`, and `--bs-table-striped-bg`.
+  Treat this as unverified until a real rendered table in a `.widget-panel` confirms it.
 - **RevealJS section and title slide overflow**:
   In Quarto RevealJS presentations,
   level-1 (`#`) section headings generate title slides with `.title-slide .center`

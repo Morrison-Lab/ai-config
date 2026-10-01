@@ -998,6 +998,8 @@ The `use-math-macros` (alias `macroize`) skill is the executable procedure.
 
 Two gotchas: `git submodule update --remote` bumps the tracked gitlink, which dirties `git diff HEAD` --- do it in a worktree, never a checkout running provenance-stamped SLURM jobs.
 And custom macro command-names leak into `spelling::spell_check_package()` for `.qmd` files under `vignettes/` (the spelling filter strips common LaTeX like `\text`/`\frac` but not custom macros), so add every macro name used, plus genuine terms, to `inst/WORDLIST`; files under `inst/analyses/` are not spell-checked.
+Also watch macro and notation gotchas: canonical probability notation in lab materials is `\Pr(...)` (or `\P(...)`), not bare `P(...)`.
+In `macros.qmd`, matrix and vector shorthands like `\mA` and `\vw` are undefined and break LuaLaTeX during PDF compilation (use `\matr{A}` and `\vec{w}` / `\vecf{w}`), and `\vb` expands to Greek `\vec{\beta}` rather than Latin vector $b$ (use `\vec{b}`).
 
 This is the author-side half; the review-side counterpart is
 `Morrison-Lab/gha`'s `claude-code-review.yml` `check-latex-macros` opt-in input

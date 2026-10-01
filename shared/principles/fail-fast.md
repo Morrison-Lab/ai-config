@@ -933,10 +933,11 @@ page tree.
   proof of completeness, without checking whether the tree has more than one
   `/Pages` node.
 
-### A parser that drops what it cannot parse needs an independent count of its population
+### A ninth cause: a parser drops what it cannot parse, so its population needs an independent count
 
-The causes above are checks that break, or that point at the wrong subject.
-A third shape is a parser that is sound for the lines it understands and silently drops the rest, so no check broke and the count is simply short.
+The eighth cause is an input that arrives wrong.
+Here the input is right and the parse succeeds:
+the parser is sound for the lines it understands and silently drops the rest, so no check broke and the count is simply short.
 It reads its input fully and still loses items, because its failure mode is skipping a line that does not match the expected shape.
 (Measured 2026-10-01, syncing Morrison-Lab/win's lecture notes with Hernan and Robins's *Causal Inference: What If*, 21 Nov 2025 revision.)
 A table-of-contents parser silently dropped wrapped entries (a title continued onto a second line), so the sync it fed worked from an incomplete list while every parsed row was correct.

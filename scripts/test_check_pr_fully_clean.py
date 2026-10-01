@@ -8509,6 +8509,110 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     check("check_review_comments: pending review request blocks clean status", not ok)
     check("check_review_comments: pending review request names in-flight reviewer", any("copilot-pull-request-reviewer" in i for i in issues))
 
+    # ai-config#3685: text inside an HTML comment is not a stated verdict.
+    pre_3685 = "### Verdict\n**Content review: inconclusive, needs a human look**\n\n"
+    check(
+        "classify_verdict: a clean verdict inside an HTML comment does not clear (#3685)",
+        checker.classify_verdict(pre_3685 + "<!-- Verdict: Ready for merge -->", "", "github-actions") == "",
+    )
+    check(
+        "classify_verdict: an unterminated HTML comment hides a clean verdict too (#3685)",
+        checker.classify_verdict(pre_3685 + "<!-- Verdict: Ready for merge", "", "github-actions") == "",
+    )
+    check(
+        "classify_verdict: the same clean verdict in visible prose still clears (#3685 control)",
+        checker.classify_verdict(pre_3685 + "Verdict: Ready for merge", "", "github-actions") == "clean",
+    )
+    check(
+        "classify_verdict: visible clean prose beside an HTML comment still clears (#3685)",
+        checker.classify_verdict(
+            "### Verdict\nVerdict: Ready for merge\n\n<!-- reviewer note -->", "", "github-actions"
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: a not-clean verdict inside an HTML comment still blocks (#3685, fail closed)",
+        checker.classify_verdict(pre_3685 + "<!-- Verdict: Needs more work -->", "", "github-actions") == "not-clean",
+    )
+    check(
+        "classify_verdict: a stray mid-line <!-- does not hide a later visible verdict (#3685)",
+        checker.classify_verdict(
+            "### Summary\nI saw a stray <!-- in the file.\n\n### Verdict: Ready for merge\n", "", "github-actions"
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: an indented closed comment hides only its own interior (#3685)",
+        checker.classify_verdict(
+            "### Verdict\n  <!-- note -->\nVerdict: Ready for merge\n", "", "github-actions"
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: a known agent's comment-only verdict reads as unreadable (#3685)",
+        checker.classify_verdict(
+            "**Claude finished** review\n\n<!-- Verdict: Ready for merge -->", "", "github-actions"
+        ) == "unreadable",
+    )
+    check(
+        "classify_verdict: a closed comment then a stray <!-- on one line hides nothing after (#3685)",
+        checker.classify_verdict(
+            "### Verdict\n<!-- a --> x <!-- stray\nVerdict: Ready for merge\n", "", "github-actions"
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: a stray <!-- does not pair with a trailing review-data comment (#3685)",
+        checker.classify_verdict(
+            "### Summary\nI saw a stray <!-- in the file.\n\n### Verdict: Ready for merge\n\n<!-- footer -->",
+            "", "github-actions",
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: a CRLF blank line ends a stray <!--'s paragraph (#3685)",
+        checker.classify_verdict(
+            "### Summary\r\nstray <!-- x\r\n\r\n### Verdict: Ready for merge\r\n\r\n<!-- footer -->",
+            "", "github-actions",
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: a line-opening footer ends a stray <!--'s paragraph (#3685)",
+        checker.classify_verdict(
+            "### Summary\nI saw a stray <!-- here\n### Verdict: Ready for merge\n<!-- review-data: x -->",
+            "", "github-actions",
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: a mid-line comment closed within its paragraph still hides (#3685)",
+        checker.classify_verdict(
+            pre_3685 + "note <!-- Verdict: Ready for merge --> end", "", "github-actions"
+        ) != "clean",
+    )
+    for selfclosed in ("<!-->", "<!--->"):
+        check(
+            f"classify_verdict: {selfclosed} closes itself and hides nothing after (#3685)",
+            checker.classify_verdict(
+                "### Verdict\n" + selfclosed + "\nVerdict: Ready for merge\n", "", "github-actions"
+            ) == "clean",
+        )
+    blank_probes = [
+        "<!-- a --> x <!-- unterm\nVerdict: Ready for merge",
+        "a <!-- b --> c", "x <!-- y", "x\n  <!-- y\nz", "<!-->", "<!--->", "",
+        "x\r\n<!-- y\r\nz",
+    ]
+    check(
+        "_blank_html_comments: output length always equals input length (#3685)",
+        all(len(checker._blank_html_comments(t)) == len(t) for t in blank_probes),
+    )
+    # The issue's own repro: a schema_version-less payload with an explicit,
+    # empty findings list. It clears through the deliberate late
+    # payload_is_clean path (#2736), after the prose scans have had their
+    # veto -- not through the prose scan, which #3685 was about. Pinned so a
+    # change to that policy is a visible decision.
+    issue_repro = json.dumps({"verdict": "approved", "findings": []})
+    check(
+        "classify_verdict: #3685 repro clears only via the late payload path (pinned)",
+        checker.classify_verdict(
+            pre_3685 + "<!-- review-data: " + issue_repro + " -->", "", "github-actions"
+        ) == "clean",
+    )
+
 
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0

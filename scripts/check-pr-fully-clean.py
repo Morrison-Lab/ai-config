@@ -2641,6 +2641,85 @@ def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str
     return "clean"
 
 
+# A line-opening `<!--` (up to three spaces of indent) starts a CommonMark
+# type-2 HTML block, so when unterminated it hides the rest of the body.
+_LINE_OPENING_COMMENT = re.compile(r"^[ ]{0,3}<!--", re.MULTILINE)
+# Where an inline comment's paragraph ends: a blank line (CRLF included), or
+# a line-opening `<!--`, since an HTML block interrupts a paragraph.
+_PARAGRAPH_END = re.compile(r"\n[ \t\r]*\n|\n[ ]{0,3}<!--")
+
+
+def _opens_line(text: str, start: int) -> bool:
+    """True when the `<!--` at *start* has only 0-3 spaces before it on its line."""
+    j = start
+    while j > 0 and start - j < 3 and text[j - 1] == " ":
+        j -= 1
+    return j == 0 or text[j - 1] == "\n"
+
+
+def _blank_html_comments(text: str) -> str:
+    """Blank HTML comment interiors in *text*, preserving every offset.
+
+    A line-opening comment (an HTML block) is blanked to its `-->`, or to the
+    end of the body when it has none. A mid-line comment is inline HTML,
+    which cannot cross a blank line or the start of an HTML block (see
+    _PARAGRAPH_END), so a mid-line `<!--` whose nearest `-->`
+    lies past the end of its paragraph renders as literal text and hides
+    nothing -- otherwise a stray `<!--` in prose would pair with the trailing
+    `<!-- review-data ... -->` most review bodies carry and blank the visible
+    verdict between them. `<!-->` and `<!--->` close themselves.
+
+    Callers pass the citation-masked scan, so a `-->` inside a cited code
+    span is invisible here and the comment reads as unterminated; that only
+    ever blanks more, which errs toward not-clean. Likewise a line-opening
+    `<!--` inside a fenced block, or a second `<!--` after a closed
+    line-opening comment on the same line, is treated as a comment.
+
+    A linear scan rather than one regex: a lazy `<!--.*?-->` rescans to the
+    end of the body for every stray `<!--`, which measured 18 s on 20,000 of
+    them. The next `-->` and the next blank line only move forward, so each
+    is cached and re-searched only once passed.
+    """
+    out = []
+    pos = 0
+    search = 0
+    close = -2  # next `-->` at or after the current opener; -1 = none left
+    para_end = -1  # end of the current opener's paragraph
+    while True:
+        start = text.find("<!--", search)
+        if start < 0:
+            break
+        if close != -1 and close < start + 2:
+            close = text.find("-->", start + 2)
+        opens_line = _opens_line(text, start)
+        if close < 0:
+            if not opens_line:
+                # Only a later line-opening comment can still hide anything.
+                opener = _LINE_OPENING_COMMENT.search(text, start)
+                if opener is None:
+                    break
+                start = opener.end() - 4
+            out.append(text[pos:start + 4])
+            out.append(" " * (len(text) - start - 4))
+            return "".join(out)
+        if not opens_line:
+            if para_end < start:
+                gap = _PARAGRAPH_END.search(text, start)
+                para_end = gap.start() if gap else len(text)
+            if close > para_end:
+                search = start + 4
+                continue
+        if close < start + 4:
+            out.append(text[pos:close + 3])
+        else:
+            out.append(text[pos:start + 4])
+            out.append(" " * (close - start - 4))
+            out.append("-->")
+        pos = search = close + 3
+    out.append(text[pos:])
+    return "".join(out)
+
+
 def classify_verdict(body: str, state: str = "", author: str = "") -> str:
     """Classify one automated review item as 'not-clean', 'clean', or '' (none).
 
@@ -2747,8 +2826,17 @@ def classify_verdict(body: str, state: str = "", author: str = "") -> str:
     if copilot == "clean":
         return "clean"
 
+    # Text inside an HTML comment is hidden from the rendered review, so it
+    # is not a stated verdict: a commented-out `<!-- Verdict: Ready for
+    # merge -->` must not clear a PR (ai-config#3685). Blanked for the CLEAN
+    # scan only, preserving offsets, so a not-clean phrase hidden in a
+    # comment still blocks above -- the fail-closed direction. A line-opening
+    # unterminated `<!--` hides the rest of the body when rendered, so it
+    # runs to the end here too; a mid-line one hides nothing.
+    clean_scan = _blank_html_comments(scan)
+
     for pat in VERDICT_CLEAN_PATTERNS:
-        for match in re.finditer(pat, scan, re.IGNORECASE | re.MULTILINE):
+        for match in re.finditer(pat, clean_scan, re.IGNORECASE | re.MULTILINE):
             # `match_content_start`, not `match.start()`: the "No issues
             # found." pattern above is `^[ \t]*...` under MULTILINE, so a
             # match with real leading indentation checks citedness from
@@ -2799,9 +2887,14 @@ def classify_verdict(body: str, state: str = "", author: str = "") -> str:
     # pattern matched (even if later retracted by a negation/qualifier guard),
     # the body is readable and should return "" rather than "unreadable".
     if _detect_review_agent(body):
+        # The clean half reads `clean_scan`, as the clean loop does, so a
+        # verdict stated only inside an HTML comment reports "unreadable"
+        # rather than "" (#3685 review finding).
         has_any_pattern_match = bool(
-            re.search("|".join(VERDICT_NOT_CLEAN_PATTERNS + VERDICT_CLEAN_PATTERNS),
-                       scan, re.IGNORECASE | re.MULTILINE)
+            re.search("|".join(VERDICT_NOT_CLEAN_PATTERNS),
+                      scan, re.IGNORECASE | re.MULTILINE)
+            or re.search("|".join(VERDICT_CLEAN_PATTERNS),
+                         clean_scan, re.IGNORECASE | re.MULTILINE)
         )
         if not has_any_pattern_match:
             return "unreadable"

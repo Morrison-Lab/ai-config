@@ -2644,7 +2644,9 @@ def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str
 # A line-opening `<!--` (up to three spaces of indent) starts a CommonMark
 # type-2 HTML block, so when unterminated it hides the rest of the body.
 _LINE_OPENING_COMMENT = re.compile(r"^[ ]{0,3}<!--", re.MULTILINE)
-_BLANK_LINE = re.compile(r"\n[ \t]*\n")
+# Where an inline comment's paragraph ends: a blank line (CRLF included), or
+# a line-opening `<!--`, since an HTML block interrupts a paragraph.
+_PARAGRAPH_END = re.compile(r"\n[ \t\r]*\n|\n[ ]{0,3}<!--")
 
 
 def _opens_line(text: str, start: int) -> bool:
@@ -2660,7 +2662,8 @@ def _blank_html_comments(text: str) -> str:
 
     A line-opening comment (an HTML block) is blanked to its `-->`, or to the
     end of the body when it has none. A mid-line comment is inline HTML,
-    which cannot cross a blank line, so a mid-line `<!--` whose nearest `-->`
+    which cannot cross a blank line or the start of an HTML block (see
+    _PARAGRAPH_END), so a mid-line `<!--` whose nearest `-->`
     lies past the end of its paragraph renders as literal text and hides
     nothing -- otherwise a stray `<!--` in prose would pair with the trailing
     `<!-- review-data ... -->` most review bodies carry and blank the visible
@@ -2669,7 +2672,8 @@ def _blank_html_comments(text: str) -> str:
     Callers pass the citation-masked scan, so a `-->` inside a cited code
     span is invisible here and the comment reads as unterminated; that only
     ever blanks more, which errs toward not-clean. Likewise a line-opening
-    `<!--` inside a fenced block is treated as a comment.
+    `<!--` inside a fenced block, or a second `<!--` after a closed
+    line-opening comment on the same line, is treated as a comment.
 
     A linear scan rather than one regex: a lazy `<!--.*?-->` rescans to the
     end of the body for every stray `<!--`, which measured 18 s on 20,000 of
@@ -2700,7 +2704,7 @@ def _blank_html_comments(text: str) -> str:
             return "".join(out)
         if not opens_line:
             if para_end < start:
-                gap = _BLANK_LINE.search(text, start)
+                gap = _PARAGRAPH_END.search(text, start)
                 para_end = gap.start() if gap else len(text)
             if close > para_end:
                 search = start + 4

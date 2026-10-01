@@ -8565,6 +8565,20 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ) == "clean",
     )
     check(
+        "classify_verdict: a CRLF blank line ends a stray <!--'s paragraph (#3685)",
+        checker.classify_verdict(
+            "### Summary\r\nstray <!-- x\r\n\r\n### Verdict: Ready for merge\r\n\r\n<!-- footer -->",
+            "", "github-actions",
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: a line-opening footer ends a stray <!--'s paragraph (#3685)",
+        checker.classify_verdict(
+            "### Summary\nI saw a stray <!-- here\n### Verdict: Ready for merge\n<!-- review-data: x -->",
+            "", "github-actions",
+        ) == "clean",
+    )
+    check(
         "classify_verdict: a mid-line comment closed within its paragraph still hides (#3685)",
         checker.classify_verdict(
             pre_3685 + "note <!-- Verdict: Ready for merge --> end", "", "github-actions"

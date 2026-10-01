@@ -252,6 +252,13 @@ The [`google-antigravity/antigravity-sdk-python`](https://github.com/google-anti
   Review bodies commonly format their verdict section as `## Verdict` (H2) or `### Verdict` (H3).
   `VERDICT_MARKER_RE` must match `#{2,4}\s*Verdict\b` rather than strictly requiring `### Verdict`;
   otherwise, reviews with `## Verdict` are ignored by the gate and fall back to older comments, resulting in false `stale` merge denials.
+- **Unchained `ALLOW_UNREVIEWED_PUSH=1` prefix in Windows PowerShell**:
+  `hooks/no-push-without-self-review.py` verifies the `ALLOW_UNREVIEWED_PUSH=1` override token appears as an unchained environment prefix before the `git push` invocation (e.g. `ALLOW_UNREVIEWED_PUSH=1 git push ...`).
+  Windows PowerShell 5.1 does not natively support POSIX-style inline environment variable assignments and errors if typed directly.
+  Chaining `$env:ALLOW_UNREVIEWED_PUSH="1"; git push ...` is rejected by the hook as chained commands.
+  Creating a PowerShell function:
+  `New-Item -Path function: -Name "ALLOW_UNREVIEWED_PUSH=1" -Value { param($cmd, [Parameter(ValueFromRemainingArguments=$true)]$rest) & $cmd @rest }`
+  allows unchained `ALLOW_UNREVIEWED_PUSH=1 git push ...` commands to execute directly in Windows PowerShell while satisfying the hook's prefix parser.
 
 ## Antigravity native task and subagent management APIs
 

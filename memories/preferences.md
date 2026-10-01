@@ -498,3 +498,153 @@
 - Before adding a bullet that redefines or narrows an existing term (fully clean, claim-pr, ARDI, etc.), grep the repo for that term's OTHER canonical definitions --- not just the twin preferences.md/CLAUDE.md copy above, but any `shared/*.md` fragment, skill doc, or other memory file that states the same rule.
   If the new rule is a genuine refinement, update the canonical doc itself in the same PR, not just a satellite copy; note in the PR description that the canonical file is touched and why. (Learned on sparta 2026-07-01, PR #318: a new `dont-merge-failing-workflows` bullet expanded "fully clean" CI to mean every workflow green, including non-gating checks --- but silently contradicted the canonical `shared/workflow/fully-clean.md` [`@`-included into `CLAUDE.md`], which still said "every required check."
   The `@claude` bot review caught the drift in round 1.)
+- After adding or updating skills OR memory files in the ai-config repo, always commit and push everything to origin (on the current branch if a PR is already open, or create a new branch + PR if the change is out of scope).
+  Never leave ANY changes in ai-config as local-only uncommitted edits --- including memory files.
+- **AI memories, skills, and commands never stay local-only.**
+  That covers session memory and auto-memory as well as local-only files:
+  a scratchpad is not a home, so anything worth keeping must be committed and
+  pushed.
+  When I capture a durable learning, commit it to the right repo via PR --- GENERAL/cross-project learnings go to `Morrison-Lab/ai-config` (as bullets in the right `memories/*.md` topic file);
+  PROJECT-SPECIFIC learnings go to that project's own repo (its `CLAUDE.md` / agent docs / `.claude/memories/`).
+  A memory kept only under `~/.claude/projects/<path>/memory/` or `~/.codex/memories/` is invisible to other sessions, machines, and humans, and rots silently --- so migrate it.
+  Capturing a learning isn't done until it's committed where the right audience will see it.
+- **A migrate-then-delete cleanup (copy content into a repo, THEN delete the local source) must verify the copy is both COMPLETE and CURRENT before deleting --- not just that it exists.**
+  A migration commits a point-in-time snapshot, but the local source keeps evolving, so a copy made days earlier can be missing later edits --- or carry a policy the source has since reversed.
+  Diff each file against the merged target before deleting it.
+  And fact-check the migrated CONTENT against current repo state, because copying preserves stale claims verbatim: a memory paragraph can describe a bug as still-open (naming a since-removed function) when a later PR already fixed it and closed the issue.
+  (ucdavis/bcs#427, 2026-07-24: of 7 migrated memory files, 4 had newer local content the repo lacked --- one carried a superseded `--exclude=c1` policy --- and a "still-open #371" paragraph was wholly obsolete, since #377 had fixed it and closed #371. Diffed every file and checked the issue/code state before deleting the 15 local copies.)
+- In Codex sessions, treat `Morrison-Lab/ai-config` as the canonical home for cross-project memories even if a local `~/.codex/memories/` store is present.
+  The local store is not the durable source of truth; if ai-config access is missing from the environment, restore access first rather than writing the memory only locally.
+- When committing, stage the SPECIFIC files you touched --- NEVER `git add -A`.
+  The working tree often holds unrelated in-flight edits (the user's own UMS/skill commits, another draft); `git add -A` silently sweeps those into your commit and onto your PR, bloating the review and extending the cycle.
+  List paths explicitly, and `git status` before committing to confirm only intended files are staged. (Learned the hard way: a `git add -A` swept the user's `scout-peers` skill into an unrelated `/prune` PR, adding several extra review rounds.)
+- **Always use a worktree; never the primary checkout.**
+  Every local session --- including gi/gii/ardia, simple single-file edits, and reads that will become writes --- starts by creating a dedicated worktree.
+  **Do:** `git worktree add -b <branch> ../ai-config-worktrees/<branch> origin/main` (or per the `session-lock` skill's `ai-session.sh worktree <branch>`) before any read or write, and clean it up after merge with `git worktree remove`. (Learned when a concurrent session deleted a freshly-written, still-untracked skill file from the wd.)
+  **Don't:** work directly in the shared/primary checkout, even for "just a quick read" or "just one file" --- reads often become writes, and the primary checkout is shared with concurrent sessions.
+  This default holds for EVERY local session, not just substantial multi-file work or when the user flags the wd as "in use" / "do this in a separate repo", so parallel local AI agent sessions never step on or clobber each other's working directory or branch state.
+  The ai-config working copy is often in use by CONCURRENT local AI agent sessions.
+  Untracked or uncommitted files there can be silently wiped by another session (branch switch / `git clean`).
+  Create it off `origin/main` (`git worktree add -b <branch> ../ai-config-worktrees/<branch> origin/main`), not the shared wd.
+  Clean it up after merge with `git worktree remove`. (Learned when a concurrent session deleted a freshly-written, still-untracked skill file from the wd.)
+  The `session-lock` skill tooling automates this: `ai-session.sh worktree <branch> [--base origin/main]` creates the isolated worktree, `register`/`check` surface collisions, and the registry under `.git/ai-sessions/` lets parallel sessions see each other before they clobber the shared checkout.
+  This applies to EVERY repo, not just ai-config --- bcs and the other work repos are checked out as worktrees too, and a concurrent agent may rely on a given checkout staying on its current branch.
+  Use ONE worktree per branch/PR: don't `git checkout` a *different* branch inside an existing worktree (or the shared checkout) to move between several in-flight PRs --- that silently changes the branch out from under any other session or task pointed at that path.
+  Spin up a separate worktree per PR instead (`git worktree add`), even when you're already inside a worktree. (Learned on bcs, 2026-07-08: hopped a single worktree's branch across three open PRs and switched the ai-config checkout's branch mid-task --- both risk clobbering a concurrent agent.) (Reinforced as a correction, 2026-08-19: the user issued `\cai always use a worktree; never the primary checkout` after observing the primary checkout being used instead of a worktree.)
+- **An uncommitted change in your tree is not evidence that it is new.**
+  **Diff it against the base before treating it as precious.**
+  The bullet above says a concurrent session's uncommitted work can be silently wiped, so protect it.
+  This is its counterweight: *protect it* and *it is worth protecting* are different claims, and only the first follows from finding a dirty file.
+  Caution about someone else's work reads as the responsible posture, so the belief never gets tested, and the assumed-precious framing keeps the file from being opened at all.
+  - **Do:** run `git diff origin/main -- <path>` on a dirty file before deciding what it is worth.
+  - **Do:** open a dirty file that a check is failing on, rather than attributing the failure to whoever left it there.
+  - **Don't:** infer value from provenance --- another session having written it says nothing about whether that session already landed it.
+  - **Don't:** leave a file unstaged for hours on an untested belief about who owns it.
+  (Measured 2026-08-21 on ai-config#1884: two `memories/` files were treated for hours as a peer session's in-flight work.
+  Both additions were already on `main` in fuller form, and the diff had also rewritten three *correct* relative links into broken ones --- the `check-links.py` failure being blamed on that session all along.)
+
+- **Don't touch anyone else's branch.**
+  **Do:** only push to or modify branches I created in my own worktree, or a PR branch that passes `memories/reviewing-prs.md`'s scope test (opened by me, assigned to me, explicitly requested, or the Actions app's) and carries no live claim from another session.
+  **Don't:** push commits, force-push, checkout, or edit branches belonging to another session or user that fail that test --- even if the content looks worth keeping or the branch looks abandoned.
+  If a branch needs work that isn't mine, flag it and let the owner handle it.
+  A live claim on an in-scope branch still means waiting for it to expire, per `claim-pr`.
+  (User directive, 2026-08-19.
+  The scope-test carve-out follows the 2026-09-01 directives in `reviewing-prs.md`.)
+- **Subagent worktrees: the parent is a colliding party too, and `isolation: "worktree"` has an unstated precondition.**
+  Both rules moved to [`subagent-worktrees.md`](subagent-worktrees.md) at the 1250-line gate, with their measurements: a lone agent sharing the parent's checkout is fully exposed to the parent's own `git checkout`, and `isolation: "worktree"` errors in a session whose cwd merely holds repos as subdirectories.
+- Bash's cwd PERSISTS across separate calls within a session (it does not silently reset between calls) --- so a `cd` in one call carries forward into the next unless a later call `cd`s elsewhere.
+  This one mechanism causes two mirror-image mistakes depending on the session's layout:
+  - **Session runs INSIDE a worktree:** do NOT prefix git commands with `cd <main-checkout>`.
+    Because cwd persists, that `cd` doesn't just affect the current call --- any *later* call that omits its own `cd` stays in the main checkout too, silently working against a different branch (often another session's) instead of your worktree.
+    Run git in the worktree with no `cd` at all; if you must touch another checkout, use `git -C <path>` instead of `cd`-ing into it.
+    `gh` commands keyed by PR or issue number are cwd-agnostic, so only `git` breaks.
+    Run `git branch --show-current` before committing or pushing to confirm.
+    Learned on PR #62: a `cd`-prefixed push hit `main` and made my own worktree commits look missing.
+  - **Session juggles several full (non-worktree) repo checkouts side by side:** a call with no `cd` silently runs against whichever repo an earlier call last `cd`'d into, not the repo you mean this time.
+    Never omit an explicit `cd <repo>` in any Bash call when more than one repo checkout is in play, and re-verify with `pwd` or `git remote -v` after any call whose target repo matters.
+    This bites hardest in back-to-back "same shape, different repo" calls (e.g. an identical empty claim-commit pushed to two sibling PRs one after another) --- the second call looks correct in isolation but silently repeats the first call's repo.
+    Caught it by checking `mergeable_state` output afterward; recovery was a `git reset --hard` to the last-good local commit plus `git push --force-with-lease` to undo the wrong-repo push before redoing it with an explicit `cd`. (Learned on ai-config#454/gha#215: an empty commit meant for `gha` landed on `ai-config`'s branch instead.)
+- Before pushing skill/memory changes to ai-config, run the local checks that `validate.yml` runs in CI --- at minimum `python3 scripts/validate-skills.py` and `python3 scripts/check-links.py`, for frontmatter and broken-relative-link errors --- before they cost an ARDI round.
+  Derive the full list from `.github/workflows/validate.yml` rather than from this bullet, which named only those two while the job had grown well past them.
+  `python3 scripts/run-local-validation.py` is that derivation (ai-config#1940): `--list` shows the plan and `--only REGEX` runs a slice.
+  The `scripts/test_*.py` steps are the half most easily skipped and the half that actually gates: several of them assert against the **live** corpus, so an edit elsewhere in the repo can turn one red without touching its subject.
+  Running a production script is not running its test, and an "advisory" script can have a hard-gating twin in the same job --- see `memories/tools.md` on `check-context-closure.py` for the instance where editing `CLAUDE.md`'s `@`-import list is what trips it.
+- When creating a new acronym/short-name skill (e.g., `gi`, `sup`, `ums`), always also create a spelled-out alias skill (e.g., `grab-issue`, `send-upstream`, `update-memories-and-skills`) that points to the canonical file.
+- Some skills are platform/global --- present in the Claude Code skill registry but with NO local `skills/<name>/` directory (e.g. `deep-research`).
+  Cross-references to them are valid.
+  Automated reviewers (Copilot, the `@claude` bot) may wrongly flag such a reference as a "non-existent skill"; check the available-skills list presented to the agent (the Claude Code skill registry) before treating a skill cross-ref as a broken link, then rebut the false positive. (ai-config#120 flagged it 4x.)
+- **Do not request Copilot code review on any PR, in any repo, while the moratorium stands.**
+  The live expiry is `MORATORIUM_END` in `hooks/no-unreviewed-pr.py`;
+  it was extended to December 2026 on 2026-09-02.
+  Standing maintainer directive, restated and widened to all repos on 2026-08-19.
+  It outranks `hooks/no-unreviewed-pr.py` and `shared/workflow/pr-on-claim.md`'s request-the-reviewer step.
+  State the directive as the reason when a PR ships without one, and re-verify at the expiry.
+  Full statement, measurements, and Do/Don't pair: [`gh-cli.md`](gh-cli.md), "Restated and widened 2026-08-19".
+- Per [`copilot-review-before-human.md`](../shared/vendored/copilot-review-before-human.md), request AI review (`@claude review`) after completing code pushes, and do NOT request human review until after the AI review produces a clean/approved verdict (or an impasse/deadlock occurs).
+- During ARDI loops: if a round has only Rebut/Defer dispositions (no code pushed), still explicitly re-request review --- the push won't auto-trigger the reviewer bot.
+  BUT the converse: when a round DID push code, the push already triggers the review workflow --- do NOT also post "@claude review again".
+  On workflows with `concurrency: cancel-in-progress` (Morrison-Lab/gha) the two runs cancel each other, leaving the latest commit with a canceled, never-posted verdict.
+  If a review ends up canceled with no comment, check first whether a newer run for the **same PR** is already in flight --- a retry cancels it, and it may be a review a human just requested --- and dispatch only when nothing is running: `gh workflow run claude-review.yml --ref <PR-branch> -f pr_number=<N>`.
+  Attribute in-flight runs to a PR from each run's own `gather-context` log.
+  `gh run list` reports `main` as the branch for every dispatched review.
+  Always pass `--ref`: a dispatch without it runs against the default branch, so the run's check runs land on `main`'s tip rather than the PR head --- which leaves the PR's own review check stale and makes a check-runs query at that head a vacuous all-clear about whether a review is in flight.
+  See [`review-verdict-pitfalls`](../shared/workflow/review-verdict-pitfalls.md)'s "A `cancelled` review is the one case where retrying is the cause rather than the remedy".
+- During ARDI loops: when waiting for long-running review workflows (`claude-review.yml`, `@claude` review, or CI checks), set a background timer (`schedule` tool with `DurationSeconds=180` or `300`) before ending the turn so you automatically wake up to check for review completion rather than sitting idle until the next user message.
+- During ARDI loops: always ANTICIPATE what the reviewer will flag next and fix those issues preemptively in the same commit.
+  Don't wait for each round to surface issues one at a time --- read the code holistically, think about what patterns the reviewer has flagged in prior rounds (documentation gaps, coupling without cross-references, missing edge-case guards, inconsistent accounting), and fix analogous issues elsewhere in the same file before pushing.
+  The goal is to minimize back-and-forth rounds.
+- When a PR's own body states a blocking dependency ("draft, blocked on sibling-repo PR #N landing first"), that sentence is a claim about the PR's *actual* state, not just a note to the reader --- verify the PR really is in that state (draft, not marked ready) before moving on, don't just describe the constraint in prose and leave the PR ready/open regardless.
+  Caught by the `@claude` reviewer (twice, once inline and once in the full verdict) after a companion PR was opened ready-for-review while its own body said "blocked, should stay draft" --- the citation it made to a sibling-repo file genuinely 404'd on that repo's `main` because the dependency hadn't merged yet.
+  Fix pattern once caught: convert back to draft, reword any forward-looking citation to something that stays accurate regardless of merge timing (e.g. "proposed in #N --- once merged, lives at `path`" rather than asserting the path already resolves), then flip back to ready and re-verify the citation resolves once the dependency actually merges. (Learned on ai-config#454/gha#215.)
+- During ARDI loops: only stop iterating (without consensus) if you're at a literal impasse --- going in circles, redoing and undoing the same changes.
+  New nits each round is NOT an impasse; keep addressing them.
+  **There is no round limit, and "asymptotic noise" is an anti-pattern rather than a signal.**
+  Always request another review. Stop only on a totally clean review, on every remaining item being escalated to a human (nothing actionable left), or on me saying stop --- never on a round count, and never by asking whether to accept the current state.
+  A deadlock on ONE item does not stop the loop: escalate that item and keep driving the rest.
+  That question fires on how many rounds have passed rather than on what the findings are worth, and it reads as diligence, which is why it goes unexamined.
+  (Purged from the corpus in ai-config#1030 after ai-config#1029 ran six rounds producing 23 real findings, with rounds 2-6 each finding bugs in earlier rounds' own fixes; the loop stopped to ask twice under the old guard, both times the answer was to keep going, and the next round found four more real bugs. Rationale and case record in `skills/ardi/SKILL.md`, "Stopping conditions".)
+- **A `Needs work` verdict begins the repair step; it does not end the task.**
+  - **Do:** address each actionable finding, rerun the finding's verification,
+    push the repair, and obtain a fresh review before reporting the PR state.
+  - **Don't:** stop after summarizing a blocking review, or present its findings
+    as a blocker when the current session can repair them.
+  (User correction, 2026-08-27: HAC SAP PR #2 received an actionable local
+  adversarial review, and the session reported the verdict rather than repairing
+  it until the user asked whether work had stopped.)
+- **Every mistake owes a HOOK, not just a recorded learning.** When I get something wrong, ask whether a condition decidable from the transcript would have caught it, and write the hook if so.
+  A prose rule is consulted at read time and broken at composition time, so re-reading it never reaches the moment it breaks --- every mistake in the 2026-08-02 session already had a rule covering it, and the rule is what failed.
+  Model a message that is wrong to send on `hooks/no-offer-to-file.py` (a `Stop` block); model an obligation that follows a message which is right to send on `hooks/remind-ums-after-error.py` (a `UserPromptSubmit` injection).
+  Never block an error admission --- admitting stays free and immediate, and only the follow-up is owed.
+  Not every mistake is mechanizable: a one-off factual slip or a judgment call has no decidable condition, and a hook invented for one misfires and gets switched off, taking the real cases with it.
+  Saying plainly that a mistake is not mechanizable, and why, discharges this.
+  This is separate from the UMS pass an error already owes: that records the learning, the hook prevents the recurrence, and both can be owed at once. (`cai`, 2026-08-02; implemented as `hooks/no-mistake-without-a-hook.py`, which is the rule applied to itself.)
+- **A new enforcement hook always ships with its test in the same change before pushing.**
+  When authoring or modifying a hook in `hooks/`, create its companion regression suite `hooks/test-<name>.py` in the same commit and run `python3 scripts/test_hooks.py` before pushing.
+  Shipping a hook without its test fails the runner's subject-to-test coverage check in CI and pre-commit; keeping the subject and test tightly coupled ensures new guards and their behavioral assertions land together. (ai-config#1616: `no-unshipped-commit.py` reached a PR before its test suite was written.)
+- Keep the bot's `@`-mention trigger phrase OUT of PR/issue comment prose unless you actually intend to dispatch.
+  The `issue_comment` trigger fires on the bare mention ANYWHERE in a comment --- even in a sentence saying you're NOT triggering a review (e.g. an ARD summary noting "not posting [the mention]").
+  A stray mention spawns a run that cancels the push-triggered review on `cancel-in-progress` setups.
+  On the Morrison-Lab/gha mention bot it also starts a session whose residual-commit sweep can churn the branch.
+  Refer to it obliquely ("re-request review", "the review-trigger mention") or split the tokens (e.g. `@ claude`, with a space). (Learned the hard way on ai-config#41; ardi/iterate/ard carry the warning.)
+- Don't ping EXTERNAL people or repos from our OWN repo's PR/issue/commit/comment text.
+  An `@username` for a non-team person (e.g. an upstream maintainer) sends them a GitHub notification, and the `owner/repo#number` shorthand for an external issue posts a cross-reference backlink onto THEIR issue.
+  Both reach into a repo we shouldn't be touching.
+  Refer to external people by plain name ("a Quarto collaborator") and external issues by a full URL link --- never `@name` or `owner/repo#num` --- reserving those forms for our own team and repos. (ai-config#246: the PR body `@`-mentioned `mcanouil` and the commit used `quarto-dev/quarto-cli#NNNNN`, both pinging the very upstream repo the PR was meant not to disturb.)
+- When writing prose (a PR/issue comment, commit message, chat reply) that references an issue or PR in a DIFFERENT repo than the one you're posting in, always disambiguate with the full `owner/repo#N` form --- never a bare `#N`.
+  GitHub silently resolves a bare `#N` to the CURRENT repo, so `#156` typed in an ai-config PR comment links to ai-config#156 even when you meant a different repo's #156.
+  This is a correctness bug (a dead or misleading link), distinct from the notification-etiquette rule above (which governs whether `owner/repo#N` is appropriate to use AT ALL for a given repo, e.g. avoid it for external repos you shouldn't ping).
+  Once you've established that a cross-repo reference is otherwise fine to make, still spell out `owner/repo#N` in full --- don't drop to the bare form just because it reads shorter. (ai-config#304: `fxtas#156`/`fxtas#157` written as bare `#156`/`#157` in an ai-config PR comment auto-linked to ai-config#156 instead of ucdavis/fxtas#156.)
+- While I'm iterating a PR, the `@claude` bot (triggered by an `@claude` comment --- including one I or the user posts mid-loop) runs its OWN ARD and pushes fix commits to the SAME PR branch.
+  Before every edit/push during a PR loop, `git fetch` and reconcile `origin/<branch>`: sync to the bot's commit and don't redo fixes it already landed.
+  Two Claude sessions on one branch is the parallel-session collision `claim-pr`/`session-lock` warn about. (ai-config#120: the bot fixed 3 of 4 findings while I worked the same branch.)
+- A *suggested fix* (a `suggestion` block or proposed code) from any reviewer --- human or bot --- can itself be wrong --- verify it before applying; don't paste it in blind.
+  Check it handles the general case, not just the one flagged spot.
+  If the correct fix differs, apply that and say so in the ARD reply so the reviewer sees why you diverged. (ai-config#94 round 2: a suggested regex `[>|][-+]?` would have blanked every inline `description:` --- the very round-1 bug under review; the right fix kept the block indicator optional, `[>|]?[-+]?`.)
+- In R/Quarto/Rmd prose, prefer inline R expressions (`` `r ...`
+  ``) over hard-coded numbers that came from the analysis (means, counts, p-values, sample sizes) so the text never goes stale on re-render.
+  Hard-coded literals are fine for genuine constants (a chosen threshold, a year).
+  Example: [ucdavis/bcs#191 review comment r3437005734](https://github.com/ucdavis/bcs/pull/191/changes#r3437005734).
+- When adding or changing math (LaTeX/Quarto equations --- `$...$`, `$$...$$`, `\begin{equation}`, `\(...\)`), always verify it actually RENDERS --- open the rendered HTML page and confirm the equation displays, not just that the build succeeded.
+  A typo in a macro can silently break MathJax while the build still passes.
+  For rme, open your PR's preview page --- e.g. `https://morrison-lab.github.io/rme/pr-preview/pr-<N>/chapters/proportional-hazards-models.html`
+  (the `pr-<N>` previews are per-PR and get deleted when the PR closes, so `<N>` is a placeholder for your PR number).

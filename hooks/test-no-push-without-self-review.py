@@ -3515,6 +3515,18 @@ def exempt_repo_cases() -> tuple[int, int]:
                   f"None, not the literal string (got {got!r})", got is None)
     finally:
         shutil.rmtree(not_a_repo, ignore_errors=True)
+    # A case variant of HEAD is unclear, not the literal: on a
+    # case-insensitive filesystem git resolves `head` through `.git/HEAD` and
+    # pushes the current branch, so reading it as a branch named "head" would
+    # grant the exemption to a push that updates `main` (review finding on
+    # ai-config#4017). `+head` goes through the same path after the strip.
+    mod._DEADLINE[0] = time.monotonic() + 10
+    for spec in ("head", "Head", "hEAD", "+head"):
+        got = mod._refspec_dest_branch(spec, REPO, [])
+        check(f"`_refspec_dest_branch({spec!r}, REPO, [])` is None (unclear), "
+              f"not the literal string (got {got!r})", got is None)
+    check("`+HEAD` still resolves to the current branch after the force strip",
+          mod._refspec_dest_branch("+HEAD", REPO, []) == "main")
     # `HEAD:somebranch` and `main:HEAD` are NOT the colon-less idiom -- only a
     # bare `HEAD`/`@` with no colon at all gets the special case.
     check("`HEAD:feature` is NOT the bare-HEAD idiom -- dest is the literal 'feature'",

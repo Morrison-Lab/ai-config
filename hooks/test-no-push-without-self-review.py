@@ -3483,6 +3483,43 @@ def exempt_repo_cases() -> tuple[int, int]:
         check(f"`_refspec_dest_branch({spec!r})` is {want!r} (got {got!r})",
               got == want)
 
+    # ai-config#4017: a colon-less `HEAD`/`@` resolves to the CURRENT branch
+    # name, not the literal string "HEAD"/"@" -- `REPO` is pinned to `main`
+    # (see `make_repo`), so these must come back "main" rather than falling
+    # through to the untouched literal-string path above.
+    #
+    # Calling `_rev_parse_ref` -> `_run_git` directly (rather than through the
+    # hook's own entry point, which resets this at every invocation) runs
+    # against whatever is left of the shared time budget from earlier tests
+    # in this process, so it must be refreshed here or this block times out
+    # on nothing but accumulated budget from unrelated prior tests.
+    mod._DEADLINE[0] = time.monotonic() + 10
+    for spec in ("HEAD", "@"):
+        got = mod._refspec_dest_branch(spec, REPO, [])
+        check(f"`_refspec_dest_branch({spec!r}, REPO, [])` resolves to the "
+              f"current branch 'main', not the literal string (got {got!r})",
+              got == "main")
+    # A colon-less HEAD/@ in a directory git cannot resolve (no repository)
+    # must stay None (unclear) rather than silently falling back to the
+    # literal string -- the same fail-closed direction `_refspec_dest_branch`
+    # takes everywhere else. `directory=None` is deliberately NOT used for
+    # this: it means "run git in this process's own cwd", which during a
+    # test run is this very repository, so it resolves to whatever branch
+    # the checkout happens to be on rather than exercising "unresolvable".
+    not_a_repo = tempfile.mkdtemp(prefix="npwsr-norepo-")
+    try:
+        mod._DEADLINE[0] = time.monotonic() + 10
+        for spec in ("HEAD", "@"):
+            got = mod._refspec_dest_branch(spec, not_a_repo, [])
+            check(f"`_refspec_dest_branch({spec!r}, <non-repo dir>, [])` is "
+                  f"None, not the literal string (got {got!r})", got is None)
+    finally:
+        shutil.rmtree(not_a_repo, ignore_errors=True)
+    # `HEAD:somebranch` and `main:HEAD` are NOT the colon-less idiom -- only a
+    # bare `HEAD`/`@` with no colon at all gets the special case.
+    check("`HEAD:feature` is NOT the bare-HEAD idiom -- dest is the literal 'feature'",
+          mod._refspec_dest_branch("HEAD:feature", REPO, []) == "feature")
+
     for argv, want in (
         (["git", "push", "origin", "main"], True),
         (["git", "push", "origin", "feature"], False),
@@ -3500,6 +3537,17 @@ def exempt_repo_cases() -> tuple[int, int]:
             got = f"raised {type(exc).__name__}"
         check(f"`_push_targets_default_branch(None, {argv!r}, [])` is "
               f"{want!r} (got {got!r})", got is want)
+
+    # ai-config#4017: `git push origin HEAD`/`@` from a checkout on `main`
+    # (REPO) must report True -- the documented "same name on the remote"
+    # idiom actually ships `main`, and must not be exempted because the
+    # literal string "HEAD" never matches DEFAULT_BRANCH_NAMES.
+    mod._DEADLINE[0] = time.monotonic() + 10
+    for argv in (["git", "push", "origin", "HEAD"],
+                 ["git", "push", "origin", "@"]):
+        got = mod._push_targets_default_branch(REPO, argv, [])
+        check(f"`_push_targets_default_branch(REPO, {argv!r}, [])` on a "
+              f"main checkout is True (got {got!r})", got is True)
 
     for command, want in (
         ("git push origin main", True),
@@ -3612,6 +3660,13 @@ def exempt_repo_cases() -> tuple[int, int]:
          origin_mln, [], "push origin main", None, "{git}", True),
         ("an exempt push to `master` is still denied",
          origin_mln, [], "push origin master", None, "{git}", True),
+        ("ai-config#4017: `git push origin HEAD` from a checkout on `main` "
+         "on an exempt remote is still denied -- HEAD is a documented "
+         "same-name-on-remote idiom, not a literal branch called 'HEAD'",
+         origin_mln, [], "push origin HEAD", None, "{git}", True),
+        ("ai-config#4017: `git push origin @` (git's alias for HEAD) on an "
+         "exempt remote is still denied, same as the HEAD spelling above",
+         origin_mln, [], "push origin @", None, "{git}", True),
         ("a force-push refspec targeting `main` on an exempt remote is denied",
          origin_mln, [], "push origin +feature:main", None, "{git}", True),
         ("a `:branch` deletion of `main` on an exempt remote is denied",

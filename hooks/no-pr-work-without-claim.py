@@ -47,13 +47,21 @@ It cannot see the cloud half: hooks are inert in remote and web sessions
 (ai-config#2004), so a cloud session is only covered by its own instructions or
 a server-side check. This is the local half of #4155 only.
 
-A claim's 2-hour expiry (claim-pr.md) is not evaluated. An own claim is
-accepted whatever its age; staleness over-approximation via `updatedAt` would
-mark every session's own pushes as fresh activity. Known limit.
+claim-pr.md's 2-hour expiry is applied to a PEER's claim only, through the
+PR's `updated_at` (which over-approximates freshness, so a stale verdict is
+definitive): when the only claim names another session and the PR has shown no
+activity for 2 hours, the hook warns instead of denying. An OWN claim is
+accepted whatever its age, because every session's own pushes would otherwise
+count as fresh activity. Known limit.
 
-A release ("unclaiming") comment is not modelled either: it only keeps a
-comment containing `unclaim` from counting as a claim. A claim whose session
-later released it still satisfies this check. Known limit.
+A release comment is not modelled beyond keeping an "unclaiming" / "releasing
+my claim" comment from counting as a claim. A claim whose session later
+released it with other wording still satisfies this check. Known limit.
+
+Push destinations built by the shell (`$BRANCH`, `$(git branch --show-current)`)
+cannot be read statically and fall back to the checkout's current branch. A
+remote URL whose host is an SSH alias beginning `github.com` is accepted; any
+other alias is not matched and the hook stays silent.
 
 Session identity is the worktree path (the model rarely knows its own
 `session_id`), so two sessions sharing ONE checkout cannot be told apart, and
@@ -118,6 +126,7 @@ import shlex
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from urllib.parse import quote
 
 OVERRIDE = "ALLOW_UNCLAIMED_PR_WORK"
@@ -130,6 +139,8 @@ NET_TIMEOUT = 8
 TOTAL_BUDGET = float(os.environ.get("PR_CLAIM_TOTAL_BUDGET", "20"))
 _DEADLINE = [None]
 MAX_ACTIVITY_CHECKS = 10
+# claim-pr.md: a claim is live for 2 hours from the PR's last push or comment.
+STALE_HOURS = 2
 SKIP_BRANCHES = {"HEAD", "main", "master"}
 # Options that consume the NEXT token as a value when written without `=`.
 # (`git push --signed` and `--recurse-submodules` take their value attached
@@ -287,18 +298,37 @@ def norm(text):
 
 
 def is_claim(body):
-    """A claim comment: agent marker, `working on this`, and hold-off wording.
+    """A claim comment: the agent marker plus hold-off wording.
 
     Every emitter in skills/ carries one of the two wordings (claim-pr, ardi,
     handoff, and the review-only form all say `hold off`; the older emitters
-    say `paws off`), so that is the invariant. A release comment ("unclaiming")
-    and a negated mention ("no need to hold off") are not claims.
+    say `paws off`), so that is the invariant. A release comment ("unclaiming",
+    "releasing my claim") and a negated mention ("no need to hold off") are
+    not claims.
     """
     low = (body or "").lower()
     return (AGENT_MARKER in low
             and re.search(r"(?<!need to )(?<!not )(?<!n't )hold off|paws off",
                           low) is not None
-            and "unclaim" not in low)
+            and re.search(r"unclaim|releas(?:e|ed|ing) (?:this |my |the )?"
+                          r"(?:claim|pr|branch|hold)", low) is None)
+
+
+def pr_is_stale(pr):
+    """True when the PR shows no activity for STALE_HOURS (claim-pr's rule).
+
+    `updated_at` moves on more events than pushes and comments, so it only
+    over-approximates freshness: a stale verdict is definitive, a borderline
+    one respects the claim. A PR with no readable `updated_at` is not stale.
+    """
+    stamp = pr.get("updated_at")
+    if not stamp:
+        return False
+    try:
+        then = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return (datetime.now(timezone.utc) - then).total_seconds() > STALE_HOURS * 3600
 
 
 def names_session(body, session_id, worktree):
@@ -464,7 +494,9 @@ def push_target(args):
     if spec.startswith(":"):
         return "!skip"  # `:old` deletes a remote branch
     dst = spec.split(":", 1)[1] if ":" in spec else spec
-    if dst in ("", "HEAD"):
+    if dst in ("", "HEAD") or any(c in dst for c in "$`("):
+        # `HEAD`, or a name built by the shell (`$BRANCH`, `$(git branch
+        # --show-current)`) that cannot be read statically: the current branch.
         return "HEAD"
     if dst.startswith("refs/heads/"):
         return dst[len("refs/heads/"):]
@@ -517,6 +549,11 @@ def evaluate(payload):
     if not isinstance(command, str) or not command.strip():
         return None
     if simple_commands is None:
+        # A broken install must not be a silent bypass; only commands that
+        # mention git are worth a warning.
+        if re.search(r"\bgit\b", command):
+            return {"open_error": "scripts/lib/shellcmd.py could not be "
+                                  "loaded, so this command was not examined"}
         return None
     if os.environ.get(OVERRIDE) == "1" or LEADING_OVERRIDE.match(command):
         return None
@@ -534,7 +571,7 @@ def evaluate(payload):
               else git(cwd, "rev-parse", "--abbrev-ref", "HEAD"))
     if not branch or branch in SKIP_BRANCHES:
         return None
-    m = re.search(r"github\.com[:/]([^/\s]+)/([^/\s]+?)(?:\.git)?/?$",
+    m = re.search(r"github\.com[\w.-]*[:/]([^/\s]+)/([^/\s]+?)(?:\.git)?/?$",
                   git(cwd, "remote", "get-url", "origin") or "")
     if not m or m.group(1).lower() not in OWNERS:
         return None
@@ -553,47 +590,58 @@ def evaluate(payload):
         mine, theirs, anonymous = classify_claims(comments, session_id,
                                                   worktree)
         pr_url = pr.get("html_url") or f"#{pr['number']}"
-        if not mine and theirs:
+        notes = []
+        if not mine and theirs and pr_is_stale(pr):
+            # claim-pr.md's 2-hour rule: a claim on a PR idle that long has
+            # lapsed. `updated_at` over-approximates freshness, so "stale" is
+            # definitive; a PR touched since then keeps the deny below.
+            notes.append(
+                f"The only claim on {pr_url} names another session, but the "
+                f"PR has shown no activity for over {STALE_HOURS} hours, so "
+                f"it is treated as lapsed. Post your own claim naming this "
+                f"session (`Session worktree: {worktree}`) before continuing.")
+            since = max(c["created_at"] for c in theirs)
+        elif not mine and theirs:
             peer = max(theirs, key=lambda c: c["created_at"])
             return {"decision": "deny", "reason": DENY_PEER_CLAIM.format(
                 verb=verb, branch=branch, pr_url=pr_url,
                 peer_url=peer.get("html_url", "?"), peer_at=peer["created_at"],
                 override=OVERRIDE)}
-        if not mine and anonymous:
+        elif not mine and anonymous:
             # A claim that names no session may be this session's own, posted
             # with a template that predates the session line (ai-config#4160).
             # Unattributable, so it warns rather than denies: a hard deny here
             # would block every existing claim flow on first commit.
-            return {"context": (
+            notes.append(
                 f"The PR {pr_url} has a claim that names no session "
                 f"({anonymous[-1].get('html_url', '?')}). It may be yours or "
                 f"another session's, and this hook cannot tell. Re-post it "
                 f"with a `Session worktree: {worktree}` line so it can be "
-                f"attributed; if it is another session's, stand down.")}
-        if not mine:
+                f"attributed; if it is another session's, stand down.")
+            since = max(c["created_at"] for c in anonymous)
+        elif not mine:
             return {"decision": "deny", "reason": DENY_NO_CLAIM.format(
                 verb=verb, branch=branch, pr_url=pr_url, pr_number=pr["number"],
                 worktree=worktree, session_id=session_id or "<session id>",
                 override=OVERRIDE)}
-        latest_mine = max(c["created_at"] for c in mine)
-        newer = [c for c in theirs if c["created_at"] > latest_mine]
-        if newer:
-            t = max(newer, key=lambda c: c["created_at"])
-            return {"decision": "deny", "reason": DENY_SUPERSEDED.format(
-                verb=verb, branch=branch, pr_url=pr_url, mine_at=latest_mine,
-                theirs_url=t.get("html_url", "?"), theirs_at=t["created_at"],
-                override=OVERRIDE)}
-        notes = []
-        if any(c["created_at"] > latest_mine for c in anonymous):
-            notes.append("A claim that names no session was posted after "
-                         "yours; it may be another session's. Read the PR "
-                         "comments before continuing.")
+        else:
+            since = max(c["created_at"] for c in mine)
+            newer = [c for c in theirs if c["created_at"] > since]
+            if newer:
+                t = max(newer, key=lambda c: c["created_at"])
+                return {"decision": "deny", "reason": DENY_SUPERSEDED.format(
+                    verb=verb, branch=branch, pr_url=pr_url, mine_at=since,
+                    theirs_url=t.get("html_url", "?"),
+                    theirs_at=t["created_at"], override=OVERRIDE)}
+            if any(c["created_at"] > since for c in anonymous):
+                notes.append("A claim that names no session was posted after "
+                             "yours; it may be another session's. Read the PR "
+                             "comments before continuing.")
         if verb == "push":
             # Its own try: a 403/404 from the activity endpoint (it needs push
             # access) must not discard the claim outcomes already computed.
             try:
-                warning = activity_warning(owner, repo, branch, latest_mine,
-                                           cwd)
+                warning = activity_warning(owner, repo, branch, since, cwd)
             except Exception as exc:
                 warning = (f"could not read the forge activity for this "
                            f"branch ({type(exc).__name__}: {exc}); check for "

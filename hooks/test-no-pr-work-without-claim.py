@@ -81,7 +81,7 @@ def claim(body_extra="", marker=True, phrase="hold off", at="2026-09-30T20:00:00
 def run(name, command, expect, *, comments=None, prs="open", repo_kwargs=None,
         activity=None, env=None, stdin_raw=None, tool="Bash", branch="feat/x",
         gh_fail=False, check_in_ctx=None, extra_payload=None, cwd_other=False,
-        expect_paths=None):
+        expect_paths=None, pr_updated_at=None):
     """expect: None (silent) | 'deny' | 'ctx' (additionalContext, no decision).
 
     `command` may be a callable (repo_path, other_path) -> str. `other` is a
@@ -96,7 +96,9 @@ def run(name, command, expect, *, comments=None, prs="open", repo_kwargs=None,
         if callable(comments):
             comments = comments(top)
         pr_list = ([{"number": 7, "html_url": "https://github.com/Morrison-Lab/"
-                     "test-repo/pull/7"}] if prs == "open" else [])
+                     "test-repo/pull/7",
+                     **({"updated_at": pr_updated_at} if pr_updated_at
+                        else {})}] if prs == "open" else [])
         data = {"pulls?state=open": "FAIL" if gh_fail else pr_list,
                 "/comments": comments or [],
                 "/activity": activity if activity is not None else []}
@@ -417,6 +419,53 @@ run("R3-9 a non-origin remote is skipped", "git push fork feat/x", None)
 run("R3-10 bare --signed does not swallow the remote",
     "git push --signed origin feat/x", "deny",
     expect_paths=["head=Morrison-Lab:feat/x"])
+
+# --- review round 4 --------------------------------------------------------
+from datetime import datetime, timezone  # noqa: E402
+
+NOW = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+peer = lambda top: [claim("Session id: `session_other_BBBB`")]
+run("R4-1 push to a $VAR destination falls back to the current branch",
+    'git push origin "$BRANCH"', "deny",
+    expect_paths=["head=Morrison-Lab:feat/x"])
+run("R4-2 HEAD:$B destination falls back too", "git push origin HEAD:$B",
+    "deny", expect_paths=["head=Morrison-Lab:feat/x"])
+run("R4-3 anonymous-only claim still gets the push activity warning", PUSH,
+    "ctx", comments=[claim()], activity=foreign,
+    check_in_ctx="NOT in your local history")
+run("R4-4 peer claim on a PR idle for years is treated as lapsed", COMMIT,
+    "ctx", comments=peer, pr_updated_at="2020-01-01T00:00:00Z",
+    check_in_ctx="treated as lapsed")
+run("R4-5 peer claim on a PR touched just now still denies", COMMIT, "deny",
+    comments=peer, pr_updated_at=NOW)
+run("R4-6 releasing-my-claim comment is not a claim", COMMIT, "deny",
+    comments=[{"body": f"Releasing my claim, hold off no more. Session id: "
+                       f"`{SID}`\n\n{MARKER}",
+               "created_at": "2026-09-30T20:00:00Z", "html_url": "u"}])
+run("R4-7 ssh host-alias remote", COMMIT, "deny",
+    repo_kwargs={"remote": "git@github.com-work:Morrison-Lab/test-repo.git"})
+
+# A broken install (no scripts/lib beside the hook) must be visible, not inert.
+COUNT[0] += 1
+with tempfile.TemporaryDirectory() as tmp:
+    os.makedirs(os.path.join(tmp, "hooks"))
+    lone = os.path.join(tmp, "hooks", "no-pr-work-without-claim.py")
+    with open(SUBJECT, encoding="utf-8") as src, open(
+            lone, "w", encoding="utf-8") as dst:
+        dst.write(src.read())
+    r = subprocess.run([sys.executable, lone], capture_output=True, text=True,
+                       input=json.dumps({"tool_name": "Bash", "cwd": tmp,
+                                         "tool_input": {"command": COMMIT}}))
+    quiet = subprocess.run([sys.executable, lone], capture_output=True,
+                           text=True, input=json.dumps(
+                               {"tool_name": "Bash", "cwd": tmp,
+                                "tool_input": {"command": "ls"}}))
+    if "could not be loaded" not in r.stdout:
+        FAILURES.append(f"R4-8 broken install must warn on a git command: "
+                        f"{r.stdout!r} {r.stderr!r}")
+    if quiet.stdout.strip():
+        FAILURES.append(f"R4-9 broken install must stay quiet on `ls`: "
+                        f"{quiet.stdout!r}")
 
 print(f"{COUNT[0]} cases, {len(FAILURES)} failures")
 for f in FAILURES:

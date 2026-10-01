@@ -14,12 +14,14 @@ Recorded-safe patterns:
   A pattern the linter flags but that has been measured safe is silenced with a
   `regex-safe:` comment (the marker is the literal text `regex-safe:` after a
   hash) on the line the report names (the first line of the call) or in the
-  unbroken block of comment lines directly above it. The reason must contain all
-  three parts of the measurement: the phrase `worst case` (or `worst-case`) with
-  the input, a measured time, and `timeout` followed by the timeout it runs
-  under (a time, or `none`), e.g. `worst case 10k-char line of spaces 0.01s,
-  hook timeout 10s`. A marker missing any part (a bare `tested 1s` included) is
-  itself a `marker_without_measurement` finding and silences nothing. A valid
+  unbroken block of comment lines directly above it. The linter checks only that
+  three tokens are PRESENT in the reason: the phrase `worst case` (or
+  `worst-case`), a time such as `0.01s`, and `timeout` followed by a time or
+  `none`, e.g. `worst case 10k-char line of spaces 0.01s, hook timeout 10s`. It
+  does NOT verify that the described input is the worst case or that the time
+  was measured; that stays the author's and the reviewer's job. A marker missing
+  any token (a bare `tested 1s` included) is itself a
+  `marker_without_measurement` finding and silences nothing. A valid
   marker that no finding uses is an `unused_marker` finding, so a marker cannot
   outlive the pattern it described. The marker binds to a line, not to the
   pattern's text. `--no-markers` ignores markers and reports every finding (the
@@ -668,7 +670,7 @@ def marker_lines_for(line_number: int, lines: list[str], markers: dict[int, str]
 
 
 def is_valid_reason(reason: str) -> bool:
-    """True when the reason has `worst case`, a measured time, and a timeout."""
+    """True when the reason contains the three tokens; the claims are not verified."""
     if not (RE_WORST_CASE.search(reason) and RE_TIMEOUT.search(reason)):
         return False
     # The measured time must be one other than the timeout's own figure.

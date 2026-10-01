@@ -237,14 +237,20 @@ def norm_rev(rev):
     two legitimately different sides of a comparison, and collapsing them would
     let a single extraction discharge itself.
 
-    REV_SUFFIX retries from every position, so it is O(n^2) on a long run of
-    `^`/`~` (>20s at 100k chars, ai-config#3989). A revision longer than
-    REV_SUFFIX_SCAN is therefore scanned only in its last REV_SUFFIX_SCAN
-    characters, and the answer is used only when that window PROVES where the
-    suffix chain starts: a chain found inside the window that does not touch its
-    left edge, with a character before it that no suffix unit can end in. When
-    it cannot prove that (an all-suffix revision, an over-long `@{...}`, a
-    digit run, or no chain at all) the revision is returned unchanged.
+    REV_SUFFIX retries from every position,
+    so it is O(n^2) on a long run of `^`/`~` (>20s at 100k chars, ai-config#3989).
+    A revision longer than REV_SUFFIX_SCAN is therefore scanned only
+    in its last REV_SUFFIX_SCAN characters.
+    The result is conservative, not exact:
+    an over-window revision may be left with a suffix unstripped,
+    and is never stripped more than the unwindowed pattern would strip it.
+    The window's chain is used only when it does not touch the window's left edge
+    and the character before it is not the end of any suffix unit.
+    Otherwise (an all-suffix revision, an over-long `@{...}`, a digit run,
+    or no chain at all) the revision is returned unchanged.
+    A nested unit inside the window after an over-window `^{` prefix
+    is stripped on its own, so `base^{aaa...^{x}` loses only `^{x}`
+    where the unwindowed pattern would reduce it to `base`.
     """
     rev = clean(rev)
     if len(rev) <= REV_SUFFIX_SCAN:

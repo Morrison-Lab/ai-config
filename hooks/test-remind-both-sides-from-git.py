@@ -249,6 +249,8 @@ def main():
          "main" + "~1" * 150, "main" + "~1" * 150),
         ("norm_rev: over-window rev with a provable short suffix is stripped",
          "a" * 300 + "^2", "a" * 300),
+        ("norm_rev: nested ^{x} after an over-window ^{ is stripped alone (conservative; unwindowed gives 'base')",
+         "base^{" + "a" * 300 + "^{x}", "base^{" + "a" * 300),
         ("norm_rev: over-window rev with no suffix is unchanged",
          "a" * 300, "a" * 300),
     ]:

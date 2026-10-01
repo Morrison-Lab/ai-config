@@ -1624,10 +1624,13 @@ def pr_merge_tail(inert_seg: str) -> str | None:
     """Text after the `merge` token of the first `pr ... merge`, or None.
 
     Equivalent to one lazy `pr`, tokens, `merge`, rest-of-line `re.search`
-    over the whole segment, which was O(n^2) twice over: it retried every `pr` word (18.6s at 100k chars of
-    `pr `), and tried `(.*)$` at every `merge` token (4.3s at 100k, 13.7s at
-    200k chars of `merge ` before a newline; ai-config#3989). Both are
-    avoided by deciding the answer from positions instead of backtracking:
+    over the whole segment, which was O(n^2) twice over.
+    It retried every `pr` word (18.6s at 100k chars of `pr `),
+    and tried `(.*)$` at every `merge` token
+    (4.3s at 100k, 13.7s at 200k chars of `merge ` before a newline;
+    ai-config#3989).
+    Both are avoided by deciding the answer from positions
+    instead of backtracking:
 
     - Only the FIRST `pr` word is tried. A later one can match only if the
       first does, because its candidate `merge` tokens are a subset.

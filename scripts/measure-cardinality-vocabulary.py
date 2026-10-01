@@ -200,6 +200,7 @@ def is_shallow_clone():
         out = subprocess.run(
             ["git", "rev-parse", "--is-shallow-repository"],
             capture_output=True, text=True, check=True,
+            encoding="utf-8", errors="replace",
         ).stdout.strip()
     except (FileNotFoundError, subprocess.CalledProcessError) as exc:
         print(

@@ -73,6 +73,8 @@ def tracked_python_files(root: Path) -> list[Path]:
             ["git", "-C", str(root), "ls-files", "-z", "--", "*.py"],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             check=True,
         )
     except (OSError, subprocess.CalledProcessError) as exc:

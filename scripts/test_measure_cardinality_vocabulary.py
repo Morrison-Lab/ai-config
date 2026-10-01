@@ -377,5 +377,25 @@ check(
     "not a git repository" in msg,
 )
 
+# Windows decodes text-mode subprocess output with the locale codepage, so a
+# non-ASCII commit message would garble or raise. Pin the decoding kwargs the
+# `git log` call must carry (ai-config#4159).
+_seen = {}
+
+
+def _fake_run(cmd, **kwargs):
+    _seen.update(kwargs)
+    return mcv.subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+
+_real_run = mcv.subprocess.run
+mcv.subprocess.run = _fake_run
+try:
+    mcv.commit_bodies("HEAD")
+finally:
+    mcv.subprocess.run = _real_run
+check("git log output is decoded as UTF-8", _seen.get("encoding") == "utf-8")
+check("a bad byte is replaced rather than raised", _seen.get("errors") == "replace")
+
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(1 if failures else 0)

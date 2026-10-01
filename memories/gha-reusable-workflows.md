@@ -405,12 +405,30 @@ A consumer workflow calling `Morrison-Lab/gha/.github/workflows/claude-code-revi
   its `id-token: write` is correct, since the agent writes.
   A consumer caller is a *copy* of the blessed stub, with that repo's drift, so copying it inherits every grant, every missing gate, and every claim in its comments without their sources.
   [`upgrade-to-gha`](../shared/workflow/upgrade-to-gha.md) already says to copy `permissions:` from `examples/<name>.yml`;
-  the `if:` gate and the header comments belong to the same diff.
+  the `if:` gate, `secrets:` block, and the header comments belong to the same diff.
   A condensed comment is a fresh claim, per [`fact-check-prose`](../shared/writing/fact-check-prose.md)'s condensation section.
-  - **Do:** start from gha's `examples/<name>.yml` at the tag you pin, and diff the finished caller against it clause by clause: `permissions:`, job `if:`, `on:` types, and each header claim.
+  - **Do:** start from gha's `examples/<name>.yml` at the tag you pin, and diff the finished caller against it clause by clause: `permissions:`, `secrets:`, job `if:`, `on:` types, and each header claim.
   - **Do:** re-check every qualifier a condensed comment dropped against the callee at the pinned tag.
   - **Don't:** copy a sibling consumer's caller, ai-config's own included, as the reference.
   - **Don't:** treat a copied comment's rationale as true because the file it came from is blessed.
+- **Sync caller permissions and named secrets with upstream stubs; omit `secrets: inherit`:**
+  Keep both `permissions:` and `secrets:` blocks in caller stubs in exact sync with upstream example stubs in `Morrison-Lab/gha` (`examples/claude.yml`, `examples/claude-code-review.yml`) at the pinned tag.
+  Pass secrets explicitly rather than via `secrets: inherit`:
+  `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`, `SUBMODULES_TOKEN`, `WORKFLOW_TOKEN` for `claude.yml`;
+  `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`, `SUBMODULES_TOKEN` for `claude-code-review.yml`.
+  Two distinct mechanisms make `secrets: inherit` an anti-pattern here:
+  1. **zizmor default rule compliance:**
+     zizmor flags `secrets: inherit` as a medium-severity finding (`secrets-inherit`).
+     Explicitly naming caller secrets satisfies zizmor's default rule,
+     allowing repositories to remove the `secrets-inherit` ignore block from `.github/zizmor.yml` (Morrison-Lab/lds#50).
+  2. **Cross-org / cross-user boundary failure:**
+     GitHub Actions only inherits secrets when caller and callee share an organization or user account.
+     A cross-owner caller (e.g. an organization repo calling a personal repo's reusable workflow)
+     silently inherits empty secrets,
+     failing environment validation or token authentication.
+  - **Do:** name caller secrets explicitly in `Morrison-Lab/gha` caller workflows.
+  - **Do:** drop any `secrets-inherit` ignore rule from `.github/zizmor.yml` once callers pass named secrets.
+  - **Don't:** use `secrets: inherit` in new or migrated caller stubs.
 
 ## Bundled repository suites (`check-*.yml`) and callee input verification
 

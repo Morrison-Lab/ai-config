@@ -1374,7 +1374,8 @@ def _parse_push(argv: list[str]) -> tuple[list[str], str | None] | None:
     return positionals, repo
 
 
-def _refspec_dest_branch(spec: str) -> str | None:
+def _refspec_dest_branch(spec: str, directory: str | None = None,
+                          env: list[str] | None = None) -> str | None:
     """The bare branch name a refspec would write on the remote, or None if unclear.
 
     Only a spec naming an ordinary branch is resolved: a leading `+` (force)
@@ -1393,8 +1394,33 @@ def _refspec_dest_branch(spec: str) -> str | None:
     unclear -- exactly the gap this function exists to close, reopened via a
     push shape that ships every local branch, `main` included, with no
     colon-delimited destination naming it literally.
+
+    ai-config#4017: a colon-less `HEAD` or `@` (git's alias for it) is a
+    documented git idiom ("push the current branch to the same name on the
+    remote" -- `man git-push`), not a literal destination named "HEAD".
+    Treating it as the literal string let `git push origin HEAD` from a
+    checkout on `main` read as targeting a branch called "HEAD", which never
+    matches `DEFAULT_BRANCH_NAMES`, granting the self-review exemption to a
+    bare push that actually updates `main`. Resolved the same way the
+    no-refspec path above already resolves HEAD's name; unresolvable still
+    returns None rather than guessing, the same fail-closed direction as
+    everywhere else in this function.
+
+    A case variant (`head`, `Head`) is NOT resolved this way, and is not
+    left as the literal either: on a case-insensitive filesystem (macOS
+    default) git finds `.git/HEAD` through it and pushes the current branch,
+    but through the common git dir, so from a linked worktree it names the
+    MAIN checkout's branch rather than the worktree's own, and
+    `rev-parse --abbrev-ref HEAD` would answer the wrong question. Whether it
+    resolves at all depends on the filesystem, so it is unclear, which this
+    function reports as None.
     """
     spec = spec.lstrip("+")
+    if ":" not in spec:
+        if spec in ("HEAD", "@"):
+            return _rev_parse_ref(directory, env or [], "--abbrev-ref", "HEAD")
+        if spec.upper() == "HEAD":
+            return None
     dest = spec.split(":", 1)[1] if ":" in spec else spec
     if not dest:
         return None
@@ -1452,7 +1478,7 @@ def _push_targets_default_branch(directory: str | None, argv: list[str],
                 return None
         branch = _rev_parse_ref(directory, env, "--abbrev-ref", "HEAD")
         return branch in DEFAULT_BRANCH_NAMES if branch else None
-    dests = [_refspec_dest_branch(spec) for spec in refspecs]
+    dests = [_refspec_dest_branch(spec, directory, env) for spec in refspecs]
     if any(d is None for d in dests):
         return None
     return any(d in DEFAULT_BRANCH_NAMES for d in dests)

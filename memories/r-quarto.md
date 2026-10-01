@@ -1096,9 +1096,9 @@ Hit on [wai#128](https://github.com/Morrison-Lab/wai/issues/128) (byok ITPM/budg
   equality (both argument names and default values) and output equivalence
   across every supported target format, rather than testing only `names(formals())`.
 - **`QUARTO_R` on Windows**:
-  When Quarto fails to discover an installed R binary on Windows for knitr execution,
-  set `$env:QUARTO_R = "C:\Program Files\R\R-4.5.1\bin\x64\R.exe"` (or the appropriate R executable path)
-  in the execution session.
+  When Quarto cannot find the right R installation, see [`quarto-sites.md`](quarto-sites.md)'s section
+  "`Rscript pipe is being closed (os error 232)` from Quarto means read the full log for the missing-package message".
+  A machine-specific `QUARTO_R` path belongs in that machine's own project memory, not here.
 - **Reticulate `py` binding in Quarto documents**:
   In Quarto documents mixing R and Python via `reticulate`,
   do not assign `py <- reticulate::py` in an early knitr setup chunk before Python runs.

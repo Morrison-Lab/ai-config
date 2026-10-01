@@ -1065,8 +1065,11 @@ def _resolve_cd_target(rest: list[str], cur_dir: str | None) -> str | None:
     # False, so a Git Bash drive path was joined onto `cur_dir` and then
     # normalized into a drive-less path nothing downstream could repair.
     target = _native_path(target)
-    was_windows_drive_forward = bool(re.match(r"^[A-Za-z]:/", target))
-    resolved = os.path.normpath(os.path.join(cur_dir, target) if cur_dir is not None else target)
+    is_abs = os.path.isabs(target) or bool(re.match(r"^[A-Za-z]:[/\\]", target))
+    was_windows_drive_forward = bool(re.match(r"^[A-Za-z]:/", target or "")) or (
+        bool(re.match(r"^[A-Za-z]:/", cur_dir or "")) and not is_abs
+    )
+    resolved = os.path.normpath(target if is_abs or cur_dir is None else os.path.join(cur_dir, target))
     if was_windows_drive_forward:
         resolved = resolved.replace("\\", "/")
     return resolved
@@ -1741,8 +1744,24 @@ def _is_plain_push(directory: str | None, argv: list[str],
         # prefixes that can only mean these two (`--rec`, `--ex`).
         if tok.startswith(("--rec", "--ex")):
             return False
-    return not _run_git(directory, env, "config", "--get-regexp",
-                        TRANSPORT_CONFIG)
+    cfg_out = _run_git(directory, env, "config", "--get-regexp",
+                       TRANSPORT_CONFIG)
+    if not cfg_out:
+        return True
+    for line in cfg_out.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        key, _, val = line.partition(" ")
+        key = key.lower()
+        val = val.strip().lower()
+        if re.match(r"^http\.(.*\.)?sslverify$", key):
+            # Only disabling TLS verification (false/0/no/off) is disqualifying
+            if val in ("false", "0", "no", "off"):
+                return False
+        else:
+            return False
+    return True
 
 
 def push_is_exempt(directory: str | None, argv: list[str],
@@ -2168,7 +2187,8 @@ def _is_reviewer_record(record: dict) -> bool:
 # dispatch's own `toolUseId`. `[\w-]+` matches the same id shape
 # `TASK_ID_KEYS`' own text-mined fallback already accepts elsewhere in this
 # file.
-AGENT_ID_IN_TEXT = re.compile(r"\bagentId[:=]\s*[`\"']?([\w-]+)", re.I)
+AGENT_ID_IN_TEXT = re.compile(r"\bagent[-_ ]?id[:=]\s*[`\"']?(?:agent-)?([\w-]+)", re.I)
+AGENT_ID_FROM_PROSE = re.compile(r"message from [`\"']?agent-?([\w-]+)[`\"']?", re.I)
 
 
 def _subagents_dir(transcript_path: str) -> str:
@@ -2285,10 +2305,13 @@ def _handback_report_text(transcript_path: str, call_id, res_text: str) -> str |
             break
 
     if meta_path is None:
-        agent_id_match = AGENT_ID_IN_TEXT.search(res_text)
+        agent_id_match = AGENT_ID_IN_TEXT.search(res_text) or AGENT_ID_FROM_PROSE.search(res_text)
         if not agent_id_match:
             return None
-        candidate = os.path.join(subagents_dir, f"agent-{agent_id_match.group(1)}.meta.json")
+        raw_id = agent_id_match.group(1)
+        if raw_id.lower().startswith("agent-"):
+            raw_id = raw_id[len("agent-"):]
+        candidate = os.path.join(subagents_dir, f"agent-{raw_id}.meta.json")
         if os.path.isfile(candidate):
             meta_path = candidate
 
@@ -2459,6 +2482,26 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, list[str], boo
                     if found:
                         verdict, reviewed_commits = found, shas
 
+            # Handback delivery as direct transcript messages from subagent
+            if saw_reviewer_call and not is_assistant:
+                sender_id = str(record.get("sender") or "")
+                is_tracked_sender = (
+                    sender_id in reviewer_task_ids
+                    or f"agent-{sender_id}" in reviewer_task_ids
+                    or (sender_id.startswith("agent-") and sender_id[6:] in reviewer_task_ids)
+                )
+                text = _result_text(
+                    record.get("message") if isinstance(record.get("message"), dict) else record
+                )
+                is_handback_marker = bool(re.search(
+                    r"(?:^|\n)\s*(?:(?:This agent's report was delivered to you as a message|\[Subagent hand-back|SubagentHandback)\b)",
+                    text, re.I
+                ))
+                if (is_tracked_sender or is_handback_marker) and text:
+                    found, shas = parse_report_all(text)
+                    if found:
+                        verdict, reviewed_commits = found, shas
+
             for b in _iter_blocks(record):
                 b_type = b.get("type")
 
@@ -2519,9 +2562,11 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, list[str], boo
                                 for tid in _registrable_task_ids(res_data):
                                     reviewer_task_ids.add(tid)
                         except Exception:
-                            tid_match = re.search(r"\b(?:task[-_ ]?id|conversationId|agentId)[:=]\s*[`\"']?([\w-]+)", res_text, re.I)
-                            if tid_match:
-                                reviewer_task_ids.add(tid_match.group(1))
+                            pass
+                        tid_match = re.search(r"\b(?:task[-_ ]?id|conversationId|agent[-_ ]?id)[:=]\s*[`\"']?([\w-]+)", res_text, re.I) or AGENT_ID_FROM_PROSE.search(res_text)
+                        if tid_match:
+                            reviewer_task_ids.add(tid_match.group(1))
+                            reviewer_task_ids.add(f"agent-{tid_match.group(1)}")
 
                         if not b.get("is_error"):
                             found, shas = parse_report_all(res_text)
@@ -2793,7 +2838,7 @@ def deny(reason: str) -> None:
     # push. Emit an emergency failure log to stderr and fail closed (exit 2).
     if not written:
         try:
-            sys.stdout = open(os.devnull, "w")
+            sys.stdout = open(os.devnull, "w", encoding="utf-8")
         except Exception:
             pass
         try:
@@ -2958,7 +3003,7 @@ def main() -> int:
     except Exception as exc:
         if _DENIAL_ISSUED[0]:
             try:
-                sys.stdout = open(os.devnull, "w")
+                sys.stdout = open(os.devnull, "w", encoding="utf-8")
             except Exception:
                 pass
             try:

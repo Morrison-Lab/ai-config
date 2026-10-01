@@ -232,6 +232,31 @@ or start with a **clean context** (receiving only a scoped brief).
 - **Don't:** serialize an entire session's history into a manual brief when conversation-inheriting dispatch is available.
 - **Don't:** clone a large session history for a trivial, already-isolated 1-line memory note when inline capture or a clean brief suffices.
 
+## Parallel subagents must use unique temporary file paths in shared scratchpads
+
+Background subagents launched concurrently inherit the orchestrator's session environment, working directory, and shared scratchpad space (e.g. `/tmp`, the orchestrator's scratchpad directory, or a common checkout path).
+When a prompt or brief directs a subagent to write intermediate artifacts to disk --- such as drafting a PR body, preparing a patch, staging a commit message, or saving temporary search results --- without mandating a unique path name, parallel workers default to predictable generic filenames (like `pr.md`, `body.txt`, `patch.diff`, or `temp.json`).
+
+Because the workers execute concurrently in the same scratchpad, their file writes race:
+one subagent silently overwrites another subagent's file immediately before the second agent reads or uploads it.
+For example, when multiple subagents draft PR descriptions to `pr.md` and execute `gh pr edit --body-file pr.md` or `gh pr create --body-file pr.md`, one repository's PR can receive another repository's issue references and description (`Closes #41`), cross-contaminating PR metadata and triggering erroneous issue closures or confusing reviews.
+
+To prevent temporary file collisions across parallel workers:
+
+1. **Require distinct per-agent temp paths or `mktemp` in every parallel brief**: Include a unique identifier (such as the target repository name, issue/PR number, subagent role, or `mktemp` with a distinct template) in every temporary file path specified in the subagent's instructions.
+2. **Verify cross-agent artifacts post-batch**: After a parallel wave completes, the orchestrator must verify that generated artifacts and PR bodies correspond to their intended targets (e.g. checking `gh pr view <PR> --json body` to confirm issue numbers and touched pages match the owning repo).
+
+- **Do:** instruct parallel subagents to generate unique temporary file names (e.g. `mktemp /tmp/pr-XXXXXX.md` or `pr-<repo>-<issue>.md`) instead of generic paths like `pr.md`.
+- **Do:** verify that all PR bodies and artifact files created across a parallel batch belong to their intended target repositories and issues before declaring completion.
+- **Don't:** use generic, static filenames like `pr.md`, `body.txt`, or `diff.patch` in instructions or briefs dispatched to concurrent subagents.
+- **Don't:** assume that separate subagent contexts isolate file writes when tools operate against a shared filesystem scratchpad.
+
+(Measured 2026-09-29 in a four-agent parallel rollout across course repos:
+multiple agents wrote to `pr.md` in the shared scratchpad,
+resulting in `qwt#148` temporarily receiving `mds` PR content with `Closes #41`;
+caught and remediated in ai-config#4105.)
+
+
 
 
 

@@ -41,7 +41,7 @@ def say(text):
 
 
 def run(messages):
-    with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as fh:
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".jsonl", delete=False) as fh:
         for m in messages:
             fh.write(json.dumps(m) + "\n")
         path = fh.name
@@ -72,7 +72,7 @@ CASES_BLOCK = [
     # the window and the measured instance goes unmatched.
     "I'm starting it now: issue, branch, PR.\n\n"
     "**Stopping Point**: Not a clean stopping point / work remains queued: "
-    "#1045 awaiting CI. Seven arrays run until 06:30. Then #1016, #1036, "
+    "session not done; #1045 awaiting CI. Seven arrays run until 06:30. Then #1016, #1036, "
     "#1015, #1007 and #1000.",
     "I'll begin the refactor.",
     "I am now starting the month_pool propagation fix.",
@@ -112,7 +112,7 @@ CASES_PASS = [
     "Filed the issue and cut the branch.",
     # No commitment at all.
     "The sweep is 76 of 175 chunks in, with no failures.",
-    "**Stopping Point**: Clean stopping point reached.",
+    "**Stopping Point**: Clean stopping point reached --- session done; UMS executed; no follow-up items pending.",
     # Quoting the rule must not trip it.
     "The banned shape is `I'll start on it` with nothing following.",
 ]

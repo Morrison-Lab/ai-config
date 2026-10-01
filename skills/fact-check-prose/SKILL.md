@@ -56,6 +56,9 @@ Read the changed prose and pull out three kinds of units to check:
 - **Computed/rendered values** — a number, table entry, or figure the prose
   describes as the output of code, a model fit, or a render.
 - **Citations to external works** --- identify all sources cited that will need to be checked.
+- **Config list and allowlist criteria** --- when prose describes why an entry
+  belongs on an allowlist or exclusion list, or what its entries have in common,
+  verify the claim against the defining comment or documentation in code.
 
 ### 2. Pre-flight Readiness Gate (Hard Stop)
 

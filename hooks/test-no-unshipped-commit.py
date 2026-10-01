@@ -389,7 +389,7 @@ def combine_transcripts(paths):
     handle, outpath = tempfile.mkstemp()
     with os.fdopen(handle, "w") as out:
         for p in paths:
-            with open(p) as inc:
+            with open(p, encoding="utf-8") as inc:
                 out.write(inc.read())
     return outpath
 
@@ -1211,7 +1211,7 @@ def write_transcript_with_reply(path, reply_text):
     point: the transcript_path, the derived reason, and the repo state all
     stay identical across two calls, and only the reply's wording changes.
     """
-    with open(path, "w") as stream:
+    with open(path, "w", encoding="utf-8") as stream:
         stream.write(json.dumps({"type": "assistant", "message": {"content": [
             {"type": "tool_use", "name": "Bash",
              "input": {"command": "git commit -m hook"}}]}}) + "\n")
@@ -1384,7 +1384,7 @@ assert subject.decide(rev_root, path_async) == ""
 # Case 3: Reviewer verdict arrives as a task-notification / handback
 # -> is_pre_push_review_in_flight is False, decide() blocks because commit is unpushed
 h_verdict, path_verdict = tempfile.mkstemp()
-with open(path_async, "r") as src, os.fdopen(h_verdict, "w") as dst:
+with open(path_async, "r", encoding="utf-8") as src, os.fdopen(h_verdict, "w") as dst:
     dst.write(src.read())
     # Subagent handback notification arrives
     dst.write(json.dumps({
@@ -1419,7 +1419,7 @@ assert "1 commit(s) on HEAD are not on its upstream" in subject.decide(rev_root,
 
 # Case 5: New commit after an earlier review round -> not in flight until re-dispatched
 h_recommit, path_recommit = tempfile.mkstemp()
-with open(path_verdict, "r") as src, os.fdopen(h_recommit, "w") as dst:
+with open(path_verdict, "r", encoding="utf-8") as src, os.fdopen(h_recommit, "w") as dst:
     dst.write(src.read())
     dst.write(json.dumps({
         "type": "assistant",
@@ -1487,7 +1487,7 @@ assert reason_iso and "commit(s)" in reason_iso, reason_iso
 
 # Subsequent commit on worktree A does NOT cancel worktree B's in-flight review
 h_iso2, path_iso2 = tempfile.mkstemp()
-with open(path_iso, "r") as src, os.fdopen(h_iso2, "w") as dst:
+with open(path_iso, "r", encoding="utf-8") as src, os.fdopen(h_iso2, "w") as dst:
     dst.write(src.read())
     dst.write(json.dumps({
         "type": "assistant",
@@ -1518,7 +1518,7 @@ assert subject.is_pre_push_review_in_flight(rev_root, path_omo) is True
 
 # 3. Unrelated tool output with verdict text
 h_omo_unrelated, path_omo_unrelated = tempfile.mkstemp()
-with open(path_omo, "r") as src, os.fdopen(h_omo_unrelated, "w") as dst:
+with open(path_omo, "r", encoding="utf-8") as src, os.fdopen(h_omo_unrelated, "w") as dst:
     dst.write(src.read())
     dst.write(json.dumps({
         "type": "tool_use", "tool_name": "bash",
@@ -1534,7 +1534,7 @@ assert subject.is_pre_push_review_in_flight(rev_root, path_omo_unrelated) is Tru
 
 # 4. Ambiguity poisoning: a second pending task dispatch poisons the tool name
 h_omo_poison, path_omo_poison = tempfile.mkstemp()
-with open(path_omo_unrelated, "r") as src, os.fdopen(h_omo_poison, "w") as dst:
+with open(path_omo_unrelated, "r", encoding="utf-8") as src, os.fdopen(h_omo_poison, "w") as dst:
     dst.write(src.read())
     # Second task tool_use before first has returned
     dst.write(json.dumps({
@@ -1552,7 +1552,7 @@ assert subject.is_pre_push_review_in_flight(rev_root, path_omo_poison) is True
 
 # 5. Clean, unambiguous OMO reviewer result DOES clear in-flight status
 h_omo_clean, path_omo_clean = tempfile.mkstemp()
-with open(path_omo, "r") as src, os.fdopen(h_omo_clean, "w") as dst:
+with open(path_omo, "r", encoding="utf-8") as src, os.fdopen(h_omo_clean, "w") as dst:
     dst.write(src.read())
     dst.write(json.dumps({
         "type": "tool_result", "tool_name": "task",
@@ -1665,3 +1665,142 @@ reason_interleave = subject.decide(wt_interleave_root, path_interleave)
 assert reason_interleave and "feat-a" in reason_interleave, reason_interleave
 
 print("PASS: pre-push review in flight suppresses unpushed commit block until verdict arrives (ai-config#4109)")
+
+# ai-config#4120: _collect_worktrees_and_branches deduplicates list_worktrees
+calls = []
+orig_list_worktrees = subject.list_worktrees
+
+
+def tracking_list_worktrees(d):
+    calls.append(d)
+    return orig_list_worktrees(d)
+
+
+subject.list_worktrees = tracking_list_worktrees
+try:
+    # 1. When cwd and session_cwd belong to the same repo worktrees, list_worktrees is called only once
+    del calls[:]
+    other_b, wt_p = subject._collect_worktrees_and_branches(wt_interleave_root, wt_interleave_b, "main")
+    assert len(calls) == 1, f"Expected 1 list_worktrees call, got {len(calls)}: {calls}"
+    assert "feat-a" in other_b
+
+    # 2. When cwd and session_cwd are identical, list_worktrees is called only once
+    del calls[:]
+    other_b, wt_p = subject._collect_worktrees_and_branches(wt_interleave_root, wt_interleave_root, "main")
+    assert len(calls) == 1, f"Expected 1 list_worktrees call, got {len(calls)}: {calls}"
+
+    # 3. When session_cwd is None, list_worktrees is called only once
+    del calls[:]
+    other_b, wt_p = subject._collect_worktrees_and_branches(wt_interleave_root, None, "main")
+    assert len(calls) == 1, f"Expected 1 list_worktrees call, got {len(calls)}: {calls}"
+
+    # 4. When session_cwd is in a subdirectory of a known worktree, list_worktrees is called only once
+    del calls[:]
+    sub_dir = os.path.join(wt_interleave_root, "some_sub_dir")
+    os.makedirs(sub_dir, exist_ok=True)
+    other_b, wt_p = subject._collect_worktrees_and_branches(wt_interleave_root, sub_dir, "main")
+    assert len(calls) == 1, f"Expected 1 list_worktrees call for worktree subdirectory, got {len(calls)}: {calls}"
+
+    # 5. When session_cwd belongs to a different repo, its branches do not leak into other_branches
+    del calls[:]
+    other_b, wt_p = subject._collect_worktrees_and_branches(rev_root, wt_interleave_root, "main")
+    assert len(calls) == 2, f"Expected 2 list_worktrees calls across different repos, got {len(calls)}: {calls}"
+    assert "feat-a" not in other_b, f"session_cwd branch 'feat-a' must not leak into other_branches: {other_b}"
+finally:
+    subject.list_worktrees = orig_list_worktrees
+
+print("PASS: _collect_worktrees_and_branches deduplicates list_worktrees across same-repo paths (ai-config#4120)")
+
+# Case 10: Handback fallback runs when reviewer tool_result has empty text content
+h_empty_ts = tempfile.mkdtemp()
+ts_empty_path = os.path.join(h_empty_ts, "transcript.jsonl")
+guard_obj = subject._load_review_guard()
+sub_empty_dir = guard_obj._subagents_dir(ts_empty_path)
+os.makedirs(sub_empty_dir, exist_ok=True)
+
+with open(os.path.join(sub_empty_dir, "agent-xyz.meta.json"), "w", encoding="utf-8") as f:
+    json.dump({"toolUseId": "call_empty_1", "agentType": "adversarial-reviewer"}, f)
+
+with open(os.path.join(sub_empty_dir, "agent-xyz.jsonl"), "w", encoding="utf-8") as f:
+    f.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "name": "SubagentHandback", "input": {
+            "message": f"### Verdict: Ready for merge\n\nReviewed-Commit: {rev_head}\n"
+        }}]}
+    }) + "\n")
+
+with open(ts_empty_path, "w", encoding="utf-8") as f:
+    f.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "call_empty_1", "name": "Agent", "input": {
+            "subagent_type": "adversarial-reviewer", "prompt": "review HEAD"
+        }}]}
+    }) + "\n")
+    f.write(json.dumps({
+        "type": "user",
+        "message": {"content": [{"type": "tool_result", "tool_use_id": "call_empty_1", "content": ""}]}
+    }) + "\n")
+
+scanner_empty = subject._TranscriptScanner(
+    guard_obj, ts_empty_path, rev_head, rev_root, "main", set(), rev_root, "main", set()
+)
+with open(ts_empty_path, encoding="utf-8") as f:
+    for line in f:
+        scanner_empty.scan_record(json.loads(line))
+
+assert scanner_empty.is_in_flight() is False, "Empty tool_result with handback report must register verdict"
+print("PASS: empty-content tool_result resolves handback verdict cleanly (ai-config#4120)")
+
+# ai-config#4130: shell_dir_after normalizes Windows drive paths with backslashes
+win_path = r"C:\path\to\repo"
+resolved_win = subject.shell_dir_after(f"cd {win_path}", r"C:\other")
+assert resolved_win == win_path or (resolved_win and resolved_win.replace("/", "\\") == win_path), f"Unexpected resolved dir: {resolved_win}"
+print("PASS: shell_dir_after handles Windows backslashes in cd target (ai-config#4130)")
+
+# ai-config#4130: pre-push review in flight detected when prompt names worktree or runs from root checkout
+h_wt_ts = tempfile.mkdtemp()
+ts_wt_path = os.path.join(h_wt_ts, "transcript.jsonl")
+wt_dir = os.path.join(rev_root, "worktrees", "feature-worktree")
+with open(ts_wt_path, "w", encoding="utf-8") as f:
+    f.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "c_wt_1", "name": "Bash", "input": {
+            "command": f'git -C "{wt_dir}" commit -m "fix something"'
+        }}]}
+    }) + "\n")
+    f.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "c_wt_2", "name": "Agent", "input": {
+            "subagent_type": "adversarial-reviewer",
+            "prompt": f"Review changes in {wt_dir}"
+        }}]}
+    }) + "\n")
+
+scanner_wt = subject._TranscriptScanner(
+    guard_obj, ts_wt_path, rev_head, wt_dir, "feat-wt", set(), rev_root, "main", {wt_dir}
+)
+with open(ts_wt_path, encoding="utf-8") as f:
+    for line in f:
+        scanner_wt.scan_record(json.loads(line))
+
+assert scanner_wt.is_in_flight() is True, f"Review dispatch naming worktree path must be in-flight (commit_seq={scanner_wt.last_commit_seq}, dispatch_seq={scanner_wt.last_dispatch_seq}, verdict_seq={scanner_wt.last_verdict_seq})"
+print("PASS: review dispatch naming worktree in prompt recognized in-flight (ai-config#4130)")
+
+# And when SubagentHandback message arrives with verdict:
+with open(ts_wt_path, "a", encoding="utf-8") as f:
+    f.write(json.dumps({
+        "type": "user",
+        "message": {"role": "user", "content": [
+            {"type": "text", "text": f"[Subagent hand-back]\n### Verdict: Ready for merge\n\nReviewed-Commit: {rev_head}\n"}
+        ]}
+    }) + "\n")
+
+scanner_wt2 = subject._TranscriptScanner(
+    guard_obj, ts_wt_path, rev_head, wt_dir, "feat-wt", set(), rev_root, "main", {wt_dir}
+)
+with open(ts_wt_path, encoding="utf-8") as f:
+    for line in f:
+        scanner_wt2.scan_record(json.loads(line))
+
+assert scanner_wt2.is_in_flight() is False, "SubagentHandback verdict must discharge in-flight review"
+print("PASS: SubagentHandback verdict discharges in-flight review (ai-config#4130)")

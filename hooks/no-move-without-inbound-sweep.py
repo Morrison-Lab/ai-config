@@ -374,7 +374,7 @@ def swept(transcript: str, basename: str) -> bool:
         return True
 
     try:
-        fh = open(transcript, errors="ignore")
+        fh = open(transcript, encoding="utf-8", errors="ignore")
     except OSError:
         return True
     with fh:

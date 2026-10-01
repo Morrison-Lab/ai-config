@@ -1256,7 +1256,7 @@ def main():
     if os.path.exists(sentinel):
         return
     try:
-        open(sentinel, "w").close()
+        open(sentinel, "w", encoding="utf-8").close()
     except OSError:
         pass
     print(json.dumps({

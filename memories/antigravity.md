@@ -87,6 +87,8 @@ rather than through `.cmd` or `.bat` batch wrappers.
   - `invoke_subagent` passes an array `{"Subagents": [{"TypeName": "...", "Workspace": "...", "Prompt": "..."}]}`.
     A bridge adapter evaluates all subagents in the list against `Agent` PreToolUse hooks.
     If any subagent triggers `deny`, the whole tool execution is denied.
+    Subagent isolation requires passing `Workspace: "branch"` in `invoke_subagent`, which `claude-hook-adapter` maps to Claude Code's `isolation: "worktree"` enum (`hooks/flag-unassigned-worktree.py`).
+    On Windows, ensure `~/.gemini/config/plugins/ai-config/claude-hook-adapter.py` is kept synced with `plugins/ai-config/claude-hook-adapter.py`.
   - `send_message` maps to `SendMessage`.
   - `define_subagent` maps to `Task`.
   - Claude PreToolUse hooks may also return a top-level `systemMessage` (shown to the user, independent of the `hookSpecificOutput.permissionDecision` deny/allow verdict).
@@ -203,6 +205,17 @@ The [`google-antigravity/antigravity-sdk-python`](https://github.com/google-anti
   So where `agy` is available, dispatching the review that way discharges the guard directly and needs no override at all.
   The override above is for the case where it is not.
   No other delegation CLI is recognized, so `codex`, `opencode` and `adv` still need the override.
+- In Windows PowerShell sessions, running
+  `$env:ALLOW_UNREVIEWED_PUSH="1"; git push ...` is split on the semicolon
+  and rejected as a chained command by `hooks/no-push-without-self-review.py`.
+  Run `env ALLOW_UNREVIEWED_PUSH=1 git push ...`
+  (using Git's bundled `usr/bin/env.exe`) instead
+  so the assignment precedes `git` in a single simple command without chaining.
+  (Measured 2026-09-30 in an Antigravity Windows PowerShell session.)
+- In PowerShell, passing multiline markdown with quotes to `gh pr create --body`
+  can cause quote delimiter errors (`unknown arguments [...]`);
+  writing the body to a unique scratch file and passing `--body-file`
+  avoids argument corruption.
 
 ## Antigravity hook runner 30s timeout and adapter parallelism
 

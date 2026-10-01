@@ -393,7 +393,7 @@ def run(command, events, hook=None, tool_name="Bash", env=None):
 
 def mutate():
     """Run every clause-isolation mutant. Returns the failure count."""
-    original = open(HOOK).read()
+    original = open(HOOK, encoding="utf-8").read()
     failures = 0
     print("\nmutation checks (each must flip its own isolating case):")
     for label, old, new, command, events, before_want, after_want in MUTANTS:

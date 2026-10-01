@@ -393,7 +393,7 @@ def scan(path):
     push_events = []
     text = ""
     i = 0
-    with open(path, errors="ignore") as fh:
+    with open(path, encoding="utf-8", errors="ignore") as fh:
         for line in fh:
             i += 1
             try:
@@ -469,7 +469,7 @@ def already_fired(text):
     if os.path.exists(marker):
         return True
     try:
-        open(marker, "w").close()
+        open(marker, "w", encoding="utf-8").close()
     except Exception:
         pass
     return False

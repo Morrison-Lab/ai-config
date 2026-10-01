@@ -2009,7 +2009,7 @@ def scan(path):
     # push never re-arms review for a PR that can no longer take one.
     live = {}
     text = ""
-    with open(path, errors="ignore") as fh:
+    with open(path, encoding="utf-8", errors="ignore") as fh:
         for line in fh:
             try:
                 m = json.loads(line)
@@ -2625,7 +2625,7 @@ def main() -> int:
     if os.path.exists(sentinel):
         return 0
     try:
-        open(sentinel, "w").close()
+        open(sentinel, "w", encoding="utf-8").close()
     except Exception:
         pass
 

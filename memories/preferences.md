@@ -220,11 +220,13 @@
   - **Don't:** end a delivery recap with a review-ready PR still in draft because the tool default was draft or because you opened early for CI and forgot the final un-draft step. (User correction, 2026-08-20: [#1707](https://github.com/Morrison-Lab/ai-config/pull/1707) stayed draft after checks passed.)
   - **Don't:** un-draft a **deliberately draft-gated** dependent PR.
     That PR is review-ready by construction and sits in draft only to block the wrong merge order until its prerequisite merges, so `AGENTS.md`'s draft-status carve-out and this file's own blocking-dependency entry both reserve it --- this rule does not reach it.
-- **Always State Clean Stopping Point When Stopping Work**: The last message posted before stopping any session or turn MUST explicitly state whether or not this is a clean stopping point for the session (e.g. `**Stopping Point**: Clean stopping point reached` or `**Stopping Point**: Not a clean stopping point / work remains queued: ...`).
-  Whenever ending a session, completing a turn, or wrapping up work (whether finishing a single task, a multi-issue backlog loop like `gii`/`gia`, a PR stack sweep, or an automated session wrap-up like `mwc`/`wrap-up`), ALWAYS include an explicit `**Stopping Point**` declaration.
-  Never finish or stop without stating whether or not a clean stopping point has been reached.
+- **Always State Clean Stopping Point When Stopping Work**: The last message posted before stopping any session or turn MUST explicitly state whether or not this is a clean stopping point for the session (e.g. `**Stopping Point**: Clean stopping point reached --- session done; UMS executed; no follow-up items pending` or `**Stopping Point**: Not a clean stopping point / work remains queued: session not done; ...`).
+  Whenever ending a session, completing a turn, or wrapping up work (whether finishing a single task, a multi-issue backlog loop like `gii`/`gia`, a PR stack sweep, or an automated session wrap-up like `mwc`/`wrap-up`), ALWAYS include an explicit `**Stopping Point**` declaration that says whether the session is done or not.
+  Explicitly say whether the session is done or not when reporting stopping point status (e.g. `**Stopping Point**: Clean stopping point reached --- session done; UMS executed; no follow-up items pending` or `**Stopping Point**: Not a clean stopping point / work remains queued: session not done; ...`).
+  Include confirming UMS pass (or no new learnings accumulated) and that any follow-up items noticed during the turn or task have been filed.
+  Never finish or stop without stating whether or not a clean stopping point has been reached and whether the session is done.
   If you opened PRs and haven't driven them to clean (and merged them if `mwc` is active), it is NOT a clean stopping point --- explicitly state that the PR remains in flight and unmerged.
-  (User corrections / directives, 2026-08-17, 2026-08-18, 2026-08-30.)
+  (User corrections / directives, 2026-08-17, 2026-08-18, 2026-08-30, 2026-09-29 / Issue #4128.)
 
 - **AI Capability & Memory Changes (`cai` / `ca`)**: Whenever a session creates or updates AI capabilities, memories, or skill definitions (`cai`, `ca`, `ums`), immediately branch off `main` in `Morrison-Lab/ai-config` (or the working repo), commit, push to origin, open a PR, request review, and drive to clean (or merge under `mwc`). Never leave `cai` or memory edits sitting uncommitted in a local working directory or wait for the user to prompt for a push. (User correction, 2026-08-17.)
 - Keep PRs focused on a single concern:
@@ -252,6 +254,9 @@
 - After creating, pushing to, or being handed a PR, immediately arm a persistent monitoring loop using whatever wake this session has, without asking first.
   A PR-activity subscription is not a loop.
   Treat a "are you monitoring?" question as a status check that starts the loop if it is not running.
+- **Examine Transcript for Stalls and Dropped Balls on Status Inquiries**: When asked for a "status update", "status?", or "how is it going", inspect the conversation transcript and turn history to check if the agent got stuck, frozen, or dropped the ball (unhandled tool errors, forgotten subagents or background tasks, unarmed pauses, or unfulfilled next steps).
+  Diagnose what stalled and immediately resume the dropped work in that very same turn rather than reporting passive, report-only status.
+  (User directive, 2026-09-29, ai-config#4126; see [`shared/workflow/status-requests-act.md`](../shared/workflow/status-requests-act.md).)
 - **Always Keep a Scheduled Monitor Timer Running for In-Flight Work**: Whenever ending a turn after code pushes or while background CI, `@claude review`, or async jobs are executing on active PRs under `mwc` / `ARDI`, ALWAYS launch a `schedule` timer (e.g. 120s) before ending the turn.
   If no review has arrived when the timer expires, verify that review workflow runs are still active in CI (via `gh run list` / `gh pr view --json statusCheckRollup`).
   If the reviewer failed, was canceled, skipped with no replacement, or produced a stub review with no stated verdict, invoke `self-review-fallback` per [`shared/workflow/self-review-fallback.md`](../shared/workflow/self-review-fallback.md).
@@ -399,6 +404,46 @@
   Include a "Notes for Automated Reviewers" section for any recurring false positives.
 - When noticing potential improvements to the codebase while working, proactively suggest them (don't wait to be asked).
   The user wants to hear about improvements as they come up.
+- **Proactively suggest better alternatives to proposed approaches**:
+  "if there's another way to accomplish the same goal, I'm always open to suggestions" (User directive, Issue #4095).
+  When the user or a task specifies a particular implementation approach or mechanism to achieve a goal, do not treat the mechanism as an immutable requirement when a simpler, cleaner, more idiomatic, or upstream alternative reaches the same objective.
+  Distinguish the underlying goal from candidate mechanisms, evaluate alternatives against DRW (upstream tools), KISS (simplicity), YAGNI (minimal code), and systemic maintainability, and proactively present and recommend the better approach.
+  See [`shared/principles/proactively-suggest-alternatives.md`](../shared/principles/proactively-suggest-alternatives.md).
+- **Use real-world examples for general practice**:
+  "when we do or see something that would be a good example for general practice, use it"
+  (User directive, Issue #4093).
+  When working across repositories (e.g. `pds`, `psw`, `ai-config`),
+  identify high-quality solutions, structural tightenings,
+  and clear before-and-after edits that illustrate core standards and general practice.
+  Capture these concrete real-world instances directly into shared documentation,
+  writing style guidelines, or skills as worked examples
+  rather than relying on abstract statements or synthetic scenarios.
+  Grounding instructions in real lab PRs and edits makes guidance concrete,
+  relatable, and directly actionable.
+  See [`shared/principles/use-real-world-examples.md`](../shared/principles/use-real-world-examples.md).
+- **Search the tracker and AGENTS.md before building or denying a policy**:
+  When asked whether a permission, policy, or standing grant exists,
+  search the full policy corpus (`AGENTS.md`, `CLAUDE.md`, `memories/`, `shared/`,
+  and open issues) before answering "no" --- `AGENTS.md` is the universal contract
+  and defines cross-repo standing grants (such as the infra-PR `mwc` grant)
+  that are not duplicated in `skills/` or `memories/`.
+  Before implementing a capability request, run an all-state tracker search
+  to avoid duplicating existing open work (as occurred when #4085 duplicated #4039).
+  If an existing directive covers a design or scope question,
+  show the user the directive and ask whether it still stands,
+  rather than asking them to choose from scratch.
+  (Learned on `Morrison-Lab/pds`, Issue #4092, 2026-09-28).
+  See [`shared/workflow/grep-is-not-coverage.md`](../shared/workflow/grep-is-not-coverage.md).
+- Read a config list's defining comment or documentation before proposing an entry
+  or explaining what its entries have in common;
+  do not infer the list's purpose from its identifier name
+  or from the immediate error you want to silence
+  (Issue #4091, 2026-09-28 on Morrison-Lab/pds).
+  See [`shared/writing/fact-check-prose.md`](../shared/writing/fact-check-prose.md).
+- Subscribe to a newly opened PR only after `create_pull_request` returns, using the returned number or URL;
+  never batch the subscription call with creation or predict the number
+  (Issue #4090, 2026-09-28 on Morrison-Lab/pds).
+  See [`shared/workflow/watch-and-ardi.md`](../shared/workflow/watch-and-ardi.md).
 - Always run /ums (Update Memories and Skills) after finishing a task --- don't wait to be asked.
 - After a PR/MR merges, run the `post-merge` skill: verify the merge actually landed, tidy the local branch (checkout main, pull, `git branch -d`), confirm any deferred items are tracked, then run UMS to capture what the PR's review lifecycle taught --- mistakes corrected and guidance given along the way.
   A merge is the natural checkpoint to bank lessons before context is lost.

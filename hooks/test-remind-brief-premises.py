@@ -567,7 +567,7 @@ def gh_stub(body):
     """
     d = tempfile.mkdtemp()
     exe = os.path.join(d, "gh")
-    with open(exe, "w") as fh:
+    with open(exe, "w", encoding="utf-8") as fh:
         fh.write("#!/bin/sh\n" + body + "\n")
     os.chmod(exe, 0o755)
     return d

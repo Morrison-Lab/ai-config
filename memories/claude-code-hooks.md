@@ -1041,7 +1041,7 @@ So a session that reads the remedy, follows it, and gets an agent id back cannot
 A session that does not name the deadlock re-tests the same two commands every turn under `Stop`-hook pressure, and is pushed toward a genuinely bad workaround.
 
 - **Do:** re-test both commands once per session for a fresh reading, then stop if both still deny.
-- **Do:** emit the `**Stopping Point**: Not a clean stopping point` declaration and name the deadlock plainly;
+- **Do:** emit the `**Stopping Point**: Not a clean stopping point / work remains queued: session not done; <deadlock description>` declaration and name the deadlock plainly;
   the classifier explicitly instructs this.
 - **Don't:** route around it with MCP GitHub write tools (`push_files`, `create_or_update_file`) --- that is the documented guard gap ai-config#1929, not a remedy.
 - **Don't:** soft-reset to zero the unshipped count, and never edit the blocking hook to silence it.

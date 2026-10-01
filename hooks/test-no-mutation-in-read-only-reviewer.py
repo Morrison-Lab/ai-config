@@ -210,7 +210,7 @@ for cmd in OVERRIDE_CASES:
     check(f"must respect inline override: {cmd}", hit, None)
 
 # 8. Transcript-based detection (Claude Code subagent transcript)
-with tempfile.NamedTemporaryFile("w", delete=False, suffix=".jsonl", prefix="agent-") as tf:
+with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False, suffix=".jsonl", prefix="agent-") as tf:
     # Emulate Claude Code subagent transcript
     tf.write(json.dumps({"type": "user", "message": {"content": "Review the diff at HEAD"}}) + "\n")
     tf.write(json.dumps({

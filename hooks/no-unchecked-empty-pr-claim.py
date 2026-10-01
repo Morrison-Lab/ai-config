@@ -449,7 +449,7 @@ def main() -> int:
     if os.path.exists(sentinel):
         return 0
     try:
-        with open(sentinel, "w"):
+        with open(sentinel, "w", encoding="utf-8"):
             pass
     except Exception:
         pass

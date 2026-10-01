@@ -382,7 +382,7 @@ def run_cli(argv):
             sys.stdin.reconfigure(errors="replace")
             diff_text = sys.stdin.read()
         else:
-            diff_text = open(target, errors="replace").read()
+            diff_text = open(target, encoding="utf-8", errors="replace").read()
     except OSError as exc:
         print(f"flag-stale-adjacent-comment: cannot read {target} ({exc})",
               file=sys.stderr)

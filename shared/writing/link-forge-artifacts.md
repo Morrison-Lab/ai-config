@@ -14,4 +14,6 @@ A comment has no number to recognize the way a PR does, so its link is the *only
 - **Do:** link every comment, review, issue, PR, or run I mention having acted on, wherever the mention occurs --- table or prose.
 - **Don't:** report "I replied to that" or "filed the issue" as a bare fact with no URL attached.
 
+See [`hyperlink-liberally`](hyperlink-liberally.md) for the general principle covering tools, internal rules, and technical terms.
+
 (Directive from the user, 2026-09-09: telling them a reply had been posted without linking it made them go find it themselves.)

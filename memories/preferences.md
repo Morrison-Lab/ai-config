@@ -528,6 +528,7 @@
   (see [AGENTS.md](../AGENTS.md)'s "File formatting & links" rule for the exceptions).
   (User directive / CAI, 2026-08-30.)
   Don't leave a bare SHA, review id, or GitHub review-event name (`COMMENT`) as the only pointer --- wrap it in a markdown link.
+  See [`hyperlink-liberally`](../shared/writing/hyperlink-liberally.md) for the broader principle covering tools, internal rules, and technical terms.
   Example formats:
   - Pipelines: `[#3330](https://host/project/-/pipelines/3330)`
   - Jobs: `[job 11056](https://host/project/-/jobs/11056)`

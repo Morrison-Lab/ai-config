@@ -1208,6 +1208,11 @@ math, apply this in addition to the fact-check above.
 
 A model is never "Bayesian"; only how it is fitted is.
 
+## Hyperlink liberally: make it easy for readers to find more information
+
+Connect referenced concepts, external packages, internal rules, and forge artifacts to clickable URLs rather than leaving them as plain text.
+Detail, rationale, and cases: [`shared/writing/hyperlink-liberally.md`](shared/writing/hyperlink-liberally.md).
+
 ## Hyperlink technical terms and results; no forward references
 
 [shared/writing/definition-crossrefs.md](shared/writing/definition-crossrefs.md)

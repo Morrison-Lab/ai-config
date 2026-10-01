@@ -43,11 +43,17 @@ import json
 import os
 import subprocess
 import sys
+import time
 import urllib.parse
 
 TOOLS = ("mcp__github__create_or_update_file", "mcp__github__push_files")
 MAX_LOOKUPS = 12
 LOOKUP_TIMEOUT = 8
+# One shared deadline for ALL lookups in a call, so the hook finishes and emits
+# its fail-open note before the 60 s timeout hooks.json gives it. Without it
+# MAX_LOOKUPS x LOOKUP_TIMEOUT could reach 96 s and the harness would kill the
+# hook silently. Env-overridable (WRITE_SHRINK_BUDGET, WRITE_SHRINK_MAX_LOOKUPS).
+TOTAL_BUDGET = 40.0
 
 
 def _num(name, default, cast):
@@ -82,7 +88,7 @@ def writes(tool, inp):
                 yield f["path"], f["content"]
 
 
-def live_size(owner, repo, path, branch):
+def live_size(owner, repo, path, branch, timeout=LOOKUP_TIMEOUT):
     """Return (size, note). size None with note None means a new file."""
     api = f"repos/{owner}/{repo}/contents/{urllib.parse.quote(path)}"
     if branch:
@@ -90,7 +96,7 @@ def live_size(owner, repo, path, branch):
     cmd = ["gh", "api", api, "--jq", ".size"]
     try:
         proc = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=LOOKUP_TIMEOUT
+            cmd, capture_output=True, text=True, timeout=timeout
         )
     except (OSError, subprocess.SubprocessError) as exc:
         return None, f"{path}: lookup failed ({type(exc).__name__})"
@@ -101,7 +107,7 @@ def live_size(owner, repo, path, branch):
     try:
         return int(proc.stdout.strip()), None
     except ValueError:
-        return None, f"{path}: lookup returned no size (path may be a directory)"
+        return None, f"{path}: lookup returned no size"
 
 
 def shrunk(live, new, t):
@@ -131,11 +137,22 @@ def main():
     t = thresholds()
     flagged, notes = [], []
     try:
-        for i, (path, content) in enumerate(writes(tool, inp)):
-            if i >= MAX_LOOKUPS:
-                notes.append(f"only the first {MAX_LOOKUPS} files were checked")
+        deadline = time.monotonic() + _num("WRITE_SHRINK_BUDGET", TOTAL_BUDGET, float)
+        cap = _num("WRITE_SHRINK_MAX_LOOKUPS", MAX_LOOKUPS, int)
+        items = list(writes(tool, inp))
+        for i, (path, content) in enumerate(items):
+            if i >= cap:
+                notes.append(f"only the first {cap} files were checked")
                 break
-            live, note = live_size(owner, repo, path, branch)
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                notes.append(
+                    f"time budget exhausted; {len(items) - i} file(s) not checked"
+                )
+                break
+            live, note = live_size(
+                owner, repo, path, branch, min(LOOKUP_TIMEOUT, remaining)
+            )
             if note:
                 notes.append(note)
             if live is None:

@@ -190,6 +190,29 @@ def main() -> int:
         check("merge-base prevents main branch changes from polluting diff", code == 0)
         check("...and only scans feature branch added lines", "Checked 1 file(s), 1 added line(s)" in out)
 
+    # 6. Every text-mode subprocess call names its encoding (ai-config#4154).
+    # Without it Python decodes with the locale codepage, which on Windows is
+    # cp1252: a UTF-8 em-dash in `git diff` output raises UnicodeDecodeError
+    # in the reader thread, stdout comes back None, and the script crashes on
+    # exactly the input it exists to flag. CI's UTF-8 locale cannot reproduce
+    # that, so check the calls statically.
+    import ast
+    tree = ast.parse(SCRIPT.read_text(encoding="utf-8"))
+    text_calls = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if not (isinstance(func, ast.Attribute) and func.attr == "run"):
+            continue
+        kwargs = {kw.arg: kw.value for kw in node.keywords}
+        text = kwargs.get("text")
+        if isinstance(text, ast.Constant) and text.value is True:
+            text_calls.append((node.lineno, "encoding" in kwargs))
+    check("script has text-mode subprocess calls to inspect", len(text_calls) > 0)
+    for lineno, has_encoding in text_calls:
+        check(f"subprocess.run at line {lineno} sets encoding=", has_encoding)
+
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

@@ -509,6 +509,14 @@ CASES = [
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
       say("14 pass. Last week 3 checks failed.")], True,
      "...and for a temporal re-target, which names no place at all"),
+    # ai-config#3988: the `#` spelling of a pull-request target is how this
+    # corpus writes one nearly everywhere, and `#` is not a `\w` character.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. On PR 1234, 3 checks failed.")], True,
+     "a re-target spelled with the word PR is recognised"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("14 pass. On #1234, 3 checks failed.")], True,
+     "...and so is the `#1234` spelling"),
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
       say("14 pass. On this PR, 3 checks failed.")], False,
      "...but a self-referential object is a disclosure, not a re-target"),

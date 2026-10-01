@@ -621,3 +621,42 @@ Use the directory form, since it is the documented one.
 working in `Morrison-Lab/mln`; the local, machine-specific `QUARTO_R` path
 and R-version details live in that machine's own Claude Code project memory,
 not here, since they are not reusable across machines.)
+
+## Unnumbered sections bind Quarto PDF theorem counters to 0 (`\thesection` is 0)
+
+When `number-sections: false` is used in Quarto PDF output, Quarto's default LaTeX template defines theorem and exercise environments using `[section]` (e.g. `\newtheorem{exercise}{Exercise}[section]`).
+Because unnumbered sections do not advance the LaTeX `section` counter (`\c@section`), `\thesection` remains 0.
+This causes environments to render as "Exercise 0.1", "Exercise 0.2", etc., and reset to 0.1 at each subsequent section heading rather than numbering consecutively across the document.
+
+The systemic remedy is unbinding the theorem counters from `section` via `format.pdf.include-in-header`:
+
+```latex
+\makeatletter
+\AtBeginDocument{%
+  \@for\thm:=theorem,lemma,corollary,proposition,conjecture,definition,example,exercise,algorithm,refremark,refsolution\do{%
+    \@ifundefined{c@\thm}{}{\counterwithout{\thm}{section}}%
+  }%
+}
+\makeatother
+```
+
+- **Do:** unbind theorem counters (`\counterwithout{\thm}{section}`) when compiling PDF documents with unnumbered sections.
+- **Don't:** settle for manual numbering or live with "Exercise 0.x" artifacts in unnumbered PDF handouts or worksheets.
+
+## Multi-format Quarto websites and CI PDF rendering (avoiding 404 links and solution leaks)
+
+In a Quarto website project configuring both `html` and `pdf` in `_quarto.yml`, Quarto generates sidebar links and download buttons from the HTML pages directly to the corresponding `.pdf` artifacts.
+If CI renders only with `quarto render --to html`, the referenced PDF files are never built, leaving dead download links (404 errors) on the deployed site.
+
+Furthermore, rendering PDF formats in multi-format publishing pipelines introduces leak vectors when student worksheets and instructor solutions share common source files or includes.
+
+Systemic practices for multi-format Quarto CI:
+
+1. **Enable TinyTeX in CI:** Configure `tinytex: true` in `quarto-dev/quarto-actions/setup` so the runner environment has a complete LaTeX engine available for PDF generation.
+2. **Run bare `quarto render`:** Run a single project-wide `quarto render` without `--to html` so all configured formats (`html`, `pdf`) are built and supporting assets are preserved.
+3. **Verify artifact existence and verify absence of solution leaks:** In CI validation steps, verify that expected PDF files exist in the publish directory and audit their text content using `pdftotext` (from `poppler-utils`) to confirm that private solution blocks or instructor materials have not leaked into public student outputs.
+
+- **Do:** run bare `quarto render` with TinyTeX enabled in CI when `_quarto.yml` specifies multi-format outputs.
+- **Do:** verify both PDF existence and absence of leaked solutions via `pdftotext` in CI checks.
+- **Don't:** use `quarto render --to html` on a multi-format website where HTML pages link to downloadable PDFs.
+

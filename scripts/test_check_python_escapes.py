@@ -219,6 +219,28 @@ def main() -> int:
         check("the uncompilable file is named", "does not compile" in out)
         check("the uncompilable file is not counted as an escape", "0 carried" in out)
 
+    # Windows decodes text-mode subprocess output with the locale codepage, so
+    # a non-ASCII tracked path would garble or raise. CI's UTF-8 locale cannot
+    # show that at runtime, so pin the decoding kwargs the call must carry
+    # (ai-config#4159).
+    spec = importlib.util.spec_from_file_location("check_python_escapes_enc", SCRIPT)
+    enc_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(enc_module)
+    seen = {}
+
+    def fake_run(cmd, **kwargs):
+        seen.update(kwargs)
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    real_run = enc_module.subprocess.run
+    enc_module.subprocess.run = fake_run
+    try:
+        enc_module.tracked_python_files(REPO)
+    finally:
+        enc_module.subprocess.run = real_run
+    check("git ls-files output is decoded as UTF-8", seen.get("encoding") == "utf-8")
+    check("a bad byte is replaced rather than raised", seen.get("errors") == "replace")
+
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

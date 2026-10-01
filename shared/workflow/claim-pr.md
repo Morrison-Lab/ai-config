@@ -114,6 +114,24 @@ while under-respecting a live one costs a collision.
 issue claims last 2 hours from the most recent push or comment; if it's been
 longer than that, reassert your claim.")
 
+**Claim before the first commit on a PR branch, and look for other writers before you push.**
+Two agent sessions, neither claiming, worked the same three PR branches on 2026-09-30 ([#4155](https://github.com/Morrison-Lab/ai-config/issues/4155)).
+A cloud session's "restore" commit on [PR #4134](https://github.com/Morrison-Lab/ai-config/pull/4134) left `memories/preferences.md` at 706 lines instead of 1177.
+The local session found the collision only through its pre-push `git ls-remote`, after its own commits existed.
+`ListAgents` cannot see a cloud session, so a claim comment and the forge's own record are the only evidence a peer is there.
+
+Every session that comments under one account shares one forge login, so a claim must also say which session it is.
+Add a `Session worktree:` line (the checkout path) or a `Session id:` line to the claim body.
+[`hooks/no-pr-work-without-claim.py`](../../hooks/no-pr-work-without-claim.py) denies a `git commit` or `git push` on a branch with an open Morrison-Lab PR unless one claim comment carries the agent marker and names this session.
+It also denies when a claim naming a different session is newer than yours, and before a push it warns about pushes since your claim that your local history lacks.
+The check reads `repos/<owner>/<repo>/activity?ref=refs/heads/<branch>`.
+Hooks are inert in remote and web sessions, so a cloud session relies on its own instructions to run the same two reads.
+
+- **Do:** post the claim, with a `Session worktree:` or `Session id:` line, before the first commit on a PR branch you did not just create.
+- **Do:** read the activity endpoint (or `git ls-remote` plus `git log`) for pushes you did not make before every push, and treat one as a peer.
+- **Don't:** commit locally on a PR branch first and claim "when you push" --- the commit is the work a collision strands.
+- **Don't:** treat a quiet `ListAgents` as proof nobody else is on the branch.
+
 **Every detector of a claim matches the OLD wording as well as the new one, and dropping the old alternation is the one edit that fails silently.**
 There were **two** retired invariants, not one, and enumerating them from the file in front of you is how the second was missed for a whole review round.
 Most emitters carried the `paws off` invariant --- `claim-pr`, `gi`, `st`, `gip`, `pr-on-claim`, `post-merge`, `handoff` (as "still claimed, paws off.") and the orchestrator (as "paws off until done").

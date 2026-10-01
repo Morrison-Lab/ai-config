@@ -2661,21 +2661,26 @@ def _blank_html_comments(text: str) -> str:
         start = text.find("<!--", pos)
         if start < 0:
             break
-        end = text.find("-->", start + 4)
+        # From start + 2, not + 4: `<!-->` and `<!--->` close themselves.
+        end = text.find("-->", start + 2)
         if end < 0:
             # No `-->` remains, so no later comment closes either; only a
-            # line-opening one can still hide anything.
+            # line-opening one can still hide anything. Never search before
+            # `pos`: an opener there was already consumed as a closed comment.
             line_start = text.rfind("\n", 0, start) + 1
-            opener = _LINE_OPENING_COMMENT.search(text, line_start)
+            opener = _LINE_OPENING_COMMENT.search(text, max(line_start, pos))
             if opener is None:
                 break
             open_end = opener.end()
             out.append(text[pos:open_end])
             out.append(" " * (len(text) - open_end))
             return "".join(out)
-        out.append(text[pos:start + 4])
-        out.append(" " * (end - start - 4))
-        out.append("-->")
+        if end < start + 4:
+            out.append(text[pos:end + 3])
+        else:
+            out.append(text[pos:start + 4])
+            out.append(" " * (end - start - 4))
+            out.append("-->")
         pos = end + 3
     out.append(text[pos:])
     return "".join(out)

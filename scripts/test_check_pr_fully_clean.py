@@ -8551,6 +8551,28 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
             "**Claude finished** review\n\n<!-- Verdict: Ready for merge -->", "", "github-actions"
         ) == "unreadable",
     )
+    check(
+        "classify_verdict: a closed comment then a stray <!-- on one line hides nothing after (#3685)",
+        checker.classify_verdict(
+            "### Verdict\n<!-- a --> x <!-- stray\nVerdict: Ready for merge\n", "", "github-actions"
+        ) == "clean",
+    )
+    for selfclosed in ("<!-->", "<!--->"):
+        check(
+            f"classify_verdict: {selfclosed} closes itself and hides nothing after (#3685)",
+            checker.classify_verdict(
+                "### Verdict\n" + selfclosed + "\nVerdict: Ready for merge\n", "", "github-actions"
+            ) == "clean",
+        )
+    blank_probes = [
+        "<!-- a --> x <!-- unterm\nVerdict: Ready for merge",
+        "a <!-- b --> c", "x <!-- y", "x\n  <!-- y\nz", "<!-->", "<!--->", "",
+        "x\r\n<!-- y\r\nz",
+    ]
+    check(
+        "_blank_html_comments: output length always equals input length (#3685)",
+        all(len(checker._blank_html_comments(t)) == len(t) for t in blank_probes),
+    )
     # The issue's own repro: a schema_version-less payload with an explicit,
     # empty findings list. It clears through the deliberate late
     # payload_is_clean path (#2736), after the prose scans have had their

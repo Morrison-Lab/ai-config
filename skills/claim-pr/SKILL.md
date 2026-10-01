@@ -52,7 +52,7 @@ Past 2 hours the claim has expired; re-post it before resuming.
 ```bash
 gh pr comment <N> --body "Claude Code CLI (local session) is working on this — please hold off on pushing to this branch until I'm done.
 
-Session worktree: <absolute path of this checkout>
+Session worktree: <output of git rev-parse --show-toplevel>
 
 _Posted by Claude Code (AI agent) --- not written by a human._"      # COMMENT_PR
 gh issue comment <N> --body "Claude Code CLI (local session) is working on this — please hold off until I'm done.

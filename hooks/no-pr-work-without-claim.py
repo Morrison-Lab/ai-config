@@ -24,9 +24,13 @@ PR's issue comments and DENIES unless one is a claim from THIS session:
     agent)`) and the `hold off` (or legacy `paws off`) wording, per
     `skills/claim-pr/SKILL.md`;
   * it is THIS session's when its body contains the payload's `session_id` or
-    this worktree's path. claim-pr's stock wording carries neither -- the
-    forge login is shared by every session under one account, so the comment
-    must say which session it is. The deny text gives the one-line addition.
+    this worktree's path (`/c/x` and `C:/x` spellings are equal). The forge
+    login is shared by every session under one account, so the comment must
+    say which session it is; the skills/claim-pr template now does.
+  * no claim at all, or only claims naming a DIFFERENT session: DENY.
+  * only claims that name NO session (every other emitter's template, until
+    ai-config#4160 lands): WARN, because such a claim may be this session's
+    own and a hard deny would block every existing claim flow.
   * a claim from a DIFFERENT session posted AFTER this session's latest claim
     is a takeover: DENY. (A newer claim that names no session at all is not
     attributable, so it only warns.)
@@ -51,6 +55,15 @@ A release ("unclaiming") comment is not modelled either: it only keeps a
 comment containing `unclaim` from counting as a claim. A claim whose session
 later released it still satisfies this check. Known limit.
 
+Session identity is the worktree path (the model rarely knows its own
+`session_id`), so two sessions sharing ONE checkout cannot be told apart, and
+neither can an isolated subagent worktree from its parent. Known limit; it is
+the same-checkout shape of the 2026-09-30 incident that this hook cannot see.
+
+A commit or push nested in a shell's `-c` starts in a directory this scan
+cannot know, so it is a visible fail-open (not evaluated) unless the piece
+`cd`s to an absolute path first.
+
 A PR from a fork (head repo under another owner) is not found by the
 `head=<owner>:<branch>` query, so the hook stays silent for it. Known limit.
 
@@ -66,7 +79,9 @@ checkout's current branch. A push of several branches is judged by the first.
 
 The activity warning compares each push's `after` SHA to local `HEAD`, so a
 session that amended, rebased or force-pushed its own earlier pushes sees them
-as foreign, and so does a main-sync merge pushed by the @claude bot. It is a
+as foreign, and so does a main-sync merge pushed by the @claude bot, and so
+does any push whose commit this clone has not fetched (a stale or shallow
+clone). It is a
 warning, never a deny, for that reason. At most MAX_ACTIVITY_CHECKS pushes are
 examined.
 
@@ -116,9 +131,16 @@ TOTAL_BUDGET = float(os.environ.get("PR_CLAIM_TOTAL_BUDGET", "20"))
 _DEADLINE = [None]
 MAX_ACTIVITY_CHECKS = 10
 SKIP_BRANCHES = {"HEAD", "main", "master"}
-# `git push` options that consume the NEXT token as a value.
-PUSH_VALUE_OPTS = {"-o", "--push-option", "--repo", "--receive-pack", "--exec",
-                   "--recurse-submodules", "--signed"}
+# Options that consume the NEXT token as a value when written without `=`.
+# (`git push --signed` and `--recurse-submodules` take their value attached
+# with `=` only, so they are deliberately absent.)
+PUSH_VALUE_OPTS = {"-o", "--push-option", "--repo", "--receive-pack", "--exec"}
+COMMIT_VALUE_OPTS = {"-m", "--message", "-F", "--file", "-C", "--reuse-message",
+                     "-c", "--reedit-message", "--author", "--date",
+                     "--cleanup", "-t", "--template", "--fixup", "--squash"}
+# A short-option cluster ending in one of these takes the next token as value
+# (`git commit -am "msg"`).
+SHORT_VALUE_LETTERS = {"commit": "mFCct", "push": "o"}
 
 try:
     _LIB = os.path.join(
@@ -127,11 +149,12 @@ try:
     if _LIB not in sys.path:
         sys.path.insert(0, _LIB)
     from shellcmd import (GIT_VALUE_OPTS, env_value, resolve_cd_target,
-                          simple_commands, strip_env)
+                          shell_c_expansions, simple_commands, strip_env)
 except Exception as _exc:  # broken install: fail open, and say so
     print(f"no-pr-work-without-claim: cannot load scripts/lib/shellcmd.py "
           f"({_exc}); not evaluating", file=sys.stderr)
     env_value = simple_commands = strip_env = resolve_cd_target = None
+    shell_c_expansions = None
     GIT_VALUE_OPTS = frozenset()
 
 # Raised when the directory a command runs in cannot be named statically.
@@ -165,17 +188,15 @@ and say why.
 """
 
 DENY_PEER_CLAIM = """\
-`git {verb}` on branch `{branch}` ({pr_url}): the PR has a claim that does not
-name this session, and this session has none of its own.
+`git {verb}` on branch `{branch}` ({pr_url}): the PR has a claim naming a
+different session, and this session has none of its own.
 
     that claim:   {peer_url}  ({peer_at})
 
-It is either another session's, or your own posted without a `Session
-worktree:` / `Session id:` line (re-post it with one). If it is another
-session's, that session is working this branch now. Do not post a competing
-claim over it and do not commit: stand down, or take over only after theirs has lapsed
-or been released (shared/workflow/claim-pr.md, 2-hour rule), by posting a fresh
-claim that names this session.
+That session is working this branch now. Do not post a competing claim over
+it and do not commit: stand down. To take over, first confirm theirs has
+lapsed or been released (shared/workflow/claim-pr.md, 2-hour rule; this hook
+does not check either), then post a fresh claim that names this session.
 
 {override}=1 clears this refusal; say why.
 """
@@ -189,7 +210,8 @@ after you did.
 
 That session is the live owner now. Stop and read their claim before touching
 the branch; take over only by posting a fresh claim of your own once theirs has
-lapsed or been released (shared/workflow/claim-pr.md, 2-hour rule).
+lapsed or been released (shared/workflow/claim-pr.md, 2-hour rule; this hook
+checks neither).
 
 {override}=1 clears this refusal; say why.
 """
@@ -254,7 +276,14 @@ def gh_json(path, paginate=True):
 
 
 def norm(text):
-    return text.replace("\\", "/").lower()
+    """Lowercase, forward slashes, and Git Bash `/c/x` read as `c:/x`.
+
+    Applied to the claim body and the worktree path alike, so a session that
+    wrote its path from `pwd` in Git Bash still matches `git rev-parse
+    --show-toplevel`'s `C:/x` form.
+    """
+    text = text.replace("\\", "/").lower()
+    return re.sub(r"(?<![\w/])/([a-z])/(?=[\w.-])", r"\1:/", text)
 
 
 def is_claim(body):
@@ -313,10 +342,18 @@ def is_dry_run(sub, rest):
 
     `git commit -n` is `--no-verify`, so the short form counts for push only.
     """
-    dry = False
+    dry, skip = False, False
+    value_opts = COMMIT_VALUE_OPTS if sub == "commit" else PUSH_VALUE_OPTS
     for tok in rest:
+        if skip:  # the value of the previous option, e.g. a `-m` message
+            skip = False
+            continue
         if tok == "--":
             break
+        if tok in value_opts or (re.fullmatch(r"-[A-Za-z]+", tok)
+                                 and tok[-1] in SHORT_VALUE_LETTERS[sub]):
+            skip = True
+            continue
         if tok == "--dry-run" or (sub == "push" and re.fullmatch(
                 r"-[A-Za-z]*n[A-Za-z]*", tok)):
             dry = True
@@ -348,6 +385,20 @@ def matched_command(command, start_dir):
     Raises Indeterminate when that cannot be named (`cd -`, `$VAR`, ...), which
     the caller turns into a visible fail-open.
     """
+    # The command itself, then every command line nested in a shell's `-c`.
+    # A nested piece starts in a directory this scan cannot know, so a
+    # commit/push found there is Indeterminate (a visible fail-open) rather
+    # than silently skipped, unless the piece `cd`s to an absolute path first.
+    texts = ([(command, start_dir)]
+             + [(t, None) for t in shell_c_expansions(command)[1:]])
+    for text, text_dir in texts:
+        hit = _scan(text, text_dir)
+        if hit is not None:
+            return hit
+    return None
+
+
+def _scan(command, start_dir):
     cmds = simple_commands(command)
     if not cmds:
         return None
@@ -403,9 +454,15 @@ def push_target(args):
             continue
         pos.append(tok)
         i += 1
+    if any(t in ("--tags", "--all", "--mirror") for t in args):
+        return "!skip"  # pushes a ref SET, not one branch
+    if pos and pos[0] != "origin":
+        return "!skip"  # the PR lookup is against origin's repository
     if len(pos) < 2:
         return None
     spec = pos[1].lstrip("+")
+    if spec.startswith(":"):
+        return "!skip"  # `:old` deletes a remote branch
     dst = spec.split(":", 1)[1] if ":" in spec else spec
     if dst in ("", "HEAD"):
         return "HEAD"
@@ -496,12 +553,23 @@ def evaluate(payload):
         mine, theirs, anonymous = classify_claims(comments, session_id,
                                                   worktree)
         pr_url = pr.get("html_url") or f"#{pr['number']}"
-        if not mine and (theirs or anonymous):
-            peer = max(theirs + anonymous, key=lambda c: c["created_at"])
+        if not mine and theirs:
+            peer = max(theirs, key=lambda c: c["created_at"])
             return {"decision": "deny", "reason": DENY_PEER_CLAIM.format(
                 verb=verb, branch=branch, pr_url=pr_url,
                 peer_url=peer.get("html_url", "?"), peer_at=peer["created_at"],
                 override=OVERRIDE)}
+        if not mine and anonymous:
+            # A claim that names no session may be this session's own, posted
+            # with a template that predates the session line (ai-config#4160).
+            # Unattributable, so it warns rather than denies: a hard deny here
+            # would block every existing claim flow on first commit.
+            return {"context": (
+                f"The PR {pr_url} has a claim that names no session "
+                f"({anonymous[-1].get('html_url', '?')}). It may be yours or "
+                f"another session's, and this hook cannot tell. Re-post it "
+                f"with a `Session worktree: {worktree}` line so it can be "
+                f"attributed; if it is another session's, stand down.")}
         if not mine:
             return {"decision": "deny", "reason": DENY_NO_CLAIM.format(
                 verb=verb, branch=branch, pr_url=pr_url, pr_number=pr["number"],

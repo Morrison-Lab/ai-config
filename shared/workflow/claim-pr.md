@@ -124,7 +124,8 @@ Every session that comments under one account shares one forge login, so a claim
 Add a `Session worktree:` line (the checkout path) or a `Session id:` line to the claim body.
 [`hooks/no-pr-work-without-claim.py`](../../hooks/no-pr-work-without-claim.py) denies a `git commit` or `git push` on a branch with an open Morrison-Lab PR unless one claim comment carries the agent marker and names this session.
 It also denies when a claim naming a different session is newer than yours, and before a push it warns about pushes since your claim that your local history lacks.
-The hook's docstring lists its known limits: claim age and release comments are not evaluated, and a PR from a fork is not seen.
+The hook's docstring lists its known limits: claim age and release comments are not evaluated, a PR from a fork is not seen, and two sessions sharing one checkout cannot be told apart.
+A claim that names no session only warns, until every claim emitter carries the session line ([#4160](https://github.com/Morrison-Lab/ai-config/issues/4160)).
 The check reads `repos/<owner>/<repo>/activity?ref=refs/heads/<branch>`.
 Hooks are inert in remote and web sessions, so a cloud session relies on its own instructions to run the same two reads.
 

@@ -14,6 +14,7 @@ Run: python3 hooks/test-no-pr-work-without-claim.py [hooks/no-pr-work-without-cl
 """
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -170,8 +171,8 @@ run("N11 heredoc body naming commit",
 # --- the claim requirement -------------------------------------------------
 run("D1 commit, PR has no claim", COMMIT, "deny")
 run("D2 push, PR has no claim", PUSH, "deny")
-run("D3 claim without session identity", COMMIT, "deny",
-    comments=[claim()])
+run("D3 claim without session identity only warns", COMMIT, "ctx",
+    comments=[claim()], check_in_ctx="names no session")
 run("D4 claim naming session lacks the agent marker", COMMIT, "deny",
     comments=[claim(f"Session id: {SID}", marker=False)])
 run("D5 claim lacks the hold-off wording", COMMIT, "deny",
@@ -241,33 +242,58 @@ run("P3 foreign push but verb is commit: no activity check", COMMIT, None,
 run("P4 non-push activity ignored", PUSH, None, comments=mine,
     activity=branch_del)
 
-# P6: own push already in local history is silent. HEAD sha is only known once
-# the repo exists, so this case builds its own activity from inside the repo.
-COUNT[0] += 1
-with tempfile.TemporaryDirectory() as tmp:
-    repo, top = make_repo(tmp)
-    head = sh(repo, "git", "rev-parse", "HEAD")
-    data = {"pulls?state=open": [{"number": 7, "html_url": "u"}],
-            "/comments": mine(top),
-            "/activity": [{"activity_type": "push",
-                           "timestamp": "2026-09-30T22:00:00Z", "after": head,
-                           "actor": {"login": "me"}}]}
-    dp, fp = os.path.join(tmp, "d.json"), os.path.join(tmp, "f.py")
-    with open(dp, "w", encoding="utf-8") as f:
-        json.dump(data, f)
-    with open(fp, "w", encoding="utf-8") as f:
-        f.write(FAKE_GH)
-    e = dict(os.environ, FAKE_GH_DATA=dp,
-             FAKE_GH_LOG=os.path.join(tmp, "requests.log"), PR_CLAIM_GH_CMD=(
-        f'"{sys.executable.replace(chr(92), "/")}" "{fp.replace(chr(92), "/")}"'))
-    e.pop("ALLOW_UNCLAIMED_PR_WORK", None)
-    r = subprocess.run([sys.executable, SUBJECT], capture_output=True,
-                       text=True, env=e, input=json.dumps(
-                           {"tool_name": "Bash", "cwd": repo,
-                            "session_id": SID,
-                            "tool_input": {"command": PUSH}}))
-    if r.stdout.strip():
-        FAILURES.append(f"P6 own push in history should be silent: {r.stdout}")
+def real_commit_case(name, pick_sha, expect_warning):
+    """A push whose `after` is a REAL commit of the test repo.
+
+    `pick_sha(repo)` returns it: HEAD (own push, an ancestor) or the tip of a
+    side branch (a real commit that is NOT an ancestor of HEAD). A made-up SHA
+    would pass through `merge-base`'s exit 128 (unknown object) instead, which
+    is a different branch of the hook.
+    """
+    COUNT[0] += 1
+    with tempfile.TemporaryDirectory() as tmp:
+        repo, top = make_repo(tmp)
+        sha = pick_sha(repo)
+        data = {"pulls?state=open": [{"number": 7, "html_url": "u"}],
+                "/comments": mine(top),
+                "/activity": [{"activity_type": "push",
+                               "timestamp": "2026-09-30T22:00:00Z",
+                               "after": sha, "actor": {"login": "me"}}]}
+        dp, fp = os.path.join(tmp, "d.json"), os.path.join(tmp, "f.py")
+        with open(dp, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+        with open(fp, "w", encoding="utf-8") as f:
+            f.write(FAKE_GH)
+        e = dict(os.environ, FAKE_GH_DATA=dp,
+                 FAKE_GH_LOG=os.path.join(tmp, "requests.log"),
+                 PR_CLAIM_GH_CMD=(f'"{sys.executable.replace(chr(92), "/")}" '
+                                  f'"{fp.replace(chr(92), "/")}"'))
+        e.pop("ALLOW_UNCLAIMED_PR_WORK", None)
+        r = subprocess.run([sys.executable, SUBJECT], capture_output=True,
+                           text=True, env=e, input=json.dumps(
+                               {"tool_name": "Bash", "cwd": repo,
+                                "session_id": SID,
+                                "tool_input": {"command": PUSH}}))
+        warned = "NOT in your local history" in r.stdout
+        if warned != expect_warning:
+            FAILURES.append(f"{name}: warned={warned}, expected "
+                            f"{expect_warning}: {r.stdout!r} {r.stderr!r}")
+
+
+def head_sha(repo):
+    return sh(repo, "git", "rev-parse", "HEAD")
+
+
+def side_branch_sha(repo):
+    sh(repo, "git", "checkout", "-q", "-b", "side")
+    sh(repo, "git", "commit", "-q", "--allow-empty", "-m", "side")
+    sha = sh(repo, "git", "rev-parse", "HEAD")
+    sh(repo, "git", "checkout", "-q", "feat/x")
+    return sha
+
+
+real_commit_case("P6 own push (real HEAD commit) is silent", head_sha, False)
+real_commit_case("P7 real non-ancestor commit warns", side_branch_sha, True)
 
 # --- review round 1 (adversarial-reviewer, 2026-09-30) ----------------------
 # Nested worktree path: a claim naming a checkout UNDER mine is not mine.
@@ -365,6 +391,32 @@ run("R2-12 many foreign pushes are capped", PUSH, "ctx", comments=mine,
 run("R2-13 a spent time budget is a visible fail-open", COMMIT, "ctx",
     env={"PR_CLAIM_TOTAL_BUDGET": "1", "FAKE_GH_SLEEP": "4"},
     check_in_ctx="could not verify")
+
+# --- review round 3 --------------------------------------------------------
+gitbash = lambda top: ("/" + top[0].lower() + top[2:]
+                       if re.match(r"[A-Za-z]:/", top) else top)
+run("R3-1 Git Bash /c/... spelling of the worktree matches", COMMIT, None,
+    comments=lambda top: [claim(f"Session worktree: `{gitbash(top)}`")])
+run("R3-2 older anonymous claim plus my own claim is silent", COMMIT, None,
+    comments=lambda top: [claim(at="2026-09-30T19:00:00Z"),
+                          claim(f"Session worktree: `{top}`",
+                                at="2026-09-30T20:00:00Z")])
+# A commit inside `bash -c` starts in an unknowable directory: visible, not silent.
+run("R3-3 commit inside bash -c is a visible fail-open",
+    "bash -c 'git commit -m x'", "ctx", check_in_ctx="cannot tell which")
+run("R3-4 bash -c that cd's to an absolute main checkout is silent",
+    lambda top, other: f"bash -c \"cd '{other}' && git commit -m x\"", None)
+# Option values are not options.
+run("R3-5 a commit message equal to --dry-run is still a commit",
+    "git commit -m --dry-run", "deny")
+run("R3-6 -am message value is skipped too", 'git commit -am "--dry-run"', "deny")
+# Push shapes.
+run("R3-7 delete by colon refspec is skipped", "git push origin :old", None)
+run("R3-8 --tags pushes a ref set: skipped", "git push --tags origin", None)
+run("R3-9 a non-origin remote is skipped", "git push fork feat/x", None)
+run("R3-10 bare --signed does not swallow the remote",
+    "git push --signed origin feat/x", "deny",
+    expect_paths=["head=Morrison-Lab:feat/x"])
 
 print(f"{COUNT[0]} cases, {len(FAILURES)} failures")
 for f in FAILURES:

@@ -66,7 +66,10 @@ jobs:
       actions: read
       checks: read
     uses: Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2
-    secrets: inherit
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      SUBMODULES_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}
     with:
       pr-number: ${{ github.event.pull_request.number || inputs.pr_number }}
 ```
@@ -99,7 +102,10 @@ the consumer repo automatically inherits:
    see [`gha-reusable-workflows.md`](../../memories/gha-reusable-workflows.md)'s "Template propagation hazard".
    If this is the repository's **first** workflow, the PR adding it cannot get a bot review:
    see [`claude-review-dispatch.md`](../../memories/claude-review-dispatch.md)'s first-workflow section.
-3. Ensure required permissions (`contents: read`, `pull-requests: write`, `issues: write`, `actions: read`, `checks: read`) are declared on the caller job.
+3. Ensure required permissions (`contents: read`, `pull-requests: write`, `issues: write`, `actions: read`, `checks: read`) and named secrets (`CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`, `SUBMODULES_TOKEN`) are declared on the caller job.
+   Pass secrets explicitly rather than via `secrets: inherit`:
+   GitHub only inherits secrets into a reusable workflow owned by the same organization or user,
+   and naming secrets satisfies zizmor's default `secrets-inherit` rule so no ignore rule is needed in `.github/zizmor.yml`.
 4. Pass any project-specific guidance via `prompt-addendum`.
    Fact-check it like a PR body, not less:
    it is the standing instruction every future review runs under

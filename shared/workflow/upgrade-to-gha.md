@@ -157,7 +157,10 @@ Every new repo gets these gha-backed callers, whatever the repo's purpose, becau
 - `check-secrets.yml` --- the gitleaks history scan.
 - `check-junk-files.yml` --- tracked OS/editor detritus.
 - `check-typos.yml` --- misspellings on the lines a PR adds.
-- `lint-workflows.yml` --- actionlint plus zizmor over `.github/`, together with a `.github/zizmor.yml` accepting tag pins and a `.github/dependabot.yml` keeping those tags current (`Morrison-Lab/mln`'s copies of both are the pattern to start from).
+- `lint-workflows.yml` --- actionlint plus zizmor over `.github/`,
+  together with a `.github/zizmor.yml` accepting tag pins and a `.github/dependabot.yml` keeping those tags current
+  (`Morrison-Lab/lds`'s copies of both are the pattern to start from;
+  callers naming secrets explicitly satisfy zizmor's default `secrets-inherit` rule and require no ignore block).
 
 ### Add whatever fits the repo type on top of that
 

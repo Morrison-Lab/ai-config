@@ -933,6 +933,24 @@ page tree.
   proof of completeness, without checking whether the tree has more than one
   `/Pages` node.
 
+### A ninth cause: a parser drops what it cannot parse, so its population needs an independent count
+
+The eighth cause is an input that arrives wrong.
+Here the input is right and the parse succeeds:
+the parser is sound for the lines it understands and silently drops the rest, so no check broke and the count is simply short.
+It reads its input fully and still loses items, because its failure mode is skipping a line that does not match the expected shape.
+(Measured 2026-10-01, syncing Morrison-Lab/win's lecture notes with Hernan and Robins's *Causal Inference: What If*, 21 Nov 2025 revision.)
+A table-of-contents parser silently dropped wrapped entries (a title continued onto a second line), so the sync it fed worked from an incomplete list while every parsed row was correct.
+
+- **Do:** count the candidate lines with a second, simpler method (for example, every line ending in a page number) independently of the parser, and exit non-zero (2) on any mismatch with the parsed count.
+- **Do:** print both counts, so a pass states what it matched.
+- **Don't:** let a parser's skip branch be silent;
+  a dropped item and an absent item must not look alike.
+- **Don't:** validate the parser against the rows it did parse;
+  they are correct by construction.
+
+(See [`algorithmatize-checks`](../workflow/algorithmatize-checks.md) for building the cross-check as an instrument rather than eyeballing the list.)
+
 ## In a guard you ship: partial is worse than absent
 
 Everything above concerns a check whose failure is invisible **at runtime**,

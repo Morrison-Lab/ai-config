@@ -205,6 +205,10 @@ def main() -> int:
             continue
         func = node.func
         name = func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", None)
+        if name in ("getoutput", "getstatusoutput"):
+            # Always decode with the locale codepage; no encoding= exists.
+            calls.append((node.lineno, name, False))
+            continue
         if name not in subprocess_funcs:
             continue
         kwargs = {kw.arg: kw.value for kw in node.keywords}
@@ -217,8 +221,8 @@ def main() -> int:
             for k in ("text", "universal_newlines")
             if k in kwargs
         )
-        if not decodes and "encoding" not in kwargs:
-            continue  # bytes mode: nothing to decode
+        if not decodes and "encoding" not in kwargs and "errors" not in kwargs:
+            continue  # bytes mode: nothing to decode (errors= alone means text mode)
         enc = kwargs.get("encoding")
         utf8 = isinstance(enc, ast.Constant) and str(enc.value).lower().replace("_", "-") in ("utf-8", "utf8")
         calls.append((node.lineno, name, utf8))

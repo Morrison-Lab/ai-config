@@ -64,9 +64,13 @@ remote URL whose host is an SSH alias beginning `github.com` is accepted; any
 other alias is not matched and the hook stays silent.
 
 Session identity is the worktree path (the model rarely knows its own
-`session_id`), so two sessions sharing ONE checkout cannot be told apart, and
-neither can an isolated subagent worktree from its parent. Known limit; it is
-the same-checkout shape of the 2026-09-30 incident that this hook cannot see.
+`session_id`), so two sessions sharing ONE checkout cannot be told apart.
+Known limit; it is the same-checkout shape of the 2026-09-30 incident that this
+hook cannot see. The converse also holds: an isolated subagent worktree has a
+different path from its parent, so a PR branch the parent claimed reads as a
+PEER's claim to the subagent, which is denied until it posts a claim of its
+own (or sets the override). That is the intended reading for a second writer
+on a claimed branch, and subagents normally work branches of their own.
 
 A commit or push nested in a shell's `-c` starts in a directory this scan
 cannot know, so it is a visible fail-open (not evaluated) unless the piece
@@ -84,14 +88,17 @@ visible fail-open, not a guess. Subshell scoping of a `cd` is not modelled
 A push is judged by its first refspec's destination branch (`git push origin
 HEAD:foo` checks `foo`; a tag push is skipped); with no refspec it is the
 checkout's current branch. A push of several branches is judged by the first.
+An argument-less `git push` goes to the branch's upstream remote, which is
+assumed to be `origin`.
 
 The activity warning compares each push's `after` SHA to local `HEAD`, so a
 session that amended, rebased or force-pushed its own earlier pushes sees them
 as foreign, and so does a main-sync merge pushed by the @claude bot, and so
 does any push whose commit this clone has not fetched (a stale or shallow
 clone). It is a
-warning, never a deny, for that reason. At most MAX_ACTIVITY_CHECKS pushes are
-examined.
+warning, never a deny, for that reason. Only the newest page (50 entries) of
+the activity feed is read, and at most MAX_ACTIVITY_CHECKS pushes of it are
+examined, so on a busy branch older foreign pushes are not seen.
 
 Every subprocess shares one TOTAL_BUDGET-second deadline (under the hooks.json
 timeout); running out is a visible fail-open.
@@ -139,6 +146,12 @@ NET_TIMEOUT = 8
 TOTAL_BUDGET = float(os.environ.get("PR_CLAIM_TOTAL_BUDGET", "20"))
 _DEADLINE = [None]
 MAX_ACTIVITY_CHECKS = 10
+# The release terms claim-pr.md already tells every claim detector to check
+# for ("unclaiming", the retired "paws off released", the "PR is free" and
+# "now mergeable" forms), plus "releasing my claim". A bare "will release the
+# claim when done" is a claim, not a release.
+RELEASE_TERMS = (r"unclaim|released|pr is free|now mergeable"
+                 r"|releasing (?:my |the |this )?claim")
 # claim-pr.md: a claim is live for 2 hours from the PR's last push or comment.
 STALE_HOURS = 2
 SKIP_BRANCHES = {"HEAD", "main", "master"}
@@ -310,8 +323,7 @@ def is_claim(body):
     return (AGENT_MARKER in low
             and re.search(r"(?<!need to )(?<!not )(?<!n't )hold off|paws off",
                           low) is not None
-            and re.search(r"unclaim|releas(?:e|ed|ing) (?:this |my |the )?"
-                          r"(?:claim|pr|branch|hold)", low) is None)
+            and re.search(RELEASE_TERMS, low) is None)
 
 
 def pr_is_stale(pr):
@@ -347,7 +359,7 @@ def names_session(body, session_id, worktree):
         # Left boundary: `/work/repo` must not match inside `/home/u/work/repo`.
         # Right boundary: a sentence-final `.` after the path is fine, but
         # `.x` or `/x` or `-x` continues the path.
-        return re.search(r"(?<![\w./-])" + wt + r"(?![\w/-]|\.\w)",
+        return re.search(r"(?<![\w./-])" + wt + r"(?![\w-]|/[\w.-]|\.\w)",
                          low) is not None
     return False
 

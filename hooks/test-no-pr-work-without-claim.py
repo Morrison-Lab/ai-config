@@ -445,6 +445,28 @@ run("R4-6 releasing-my-claim comment is not a claim", COMMIT, "deny",
 run("R4-7 ssh host-alias remote", COMMIT, "deny",
     repo_kwargs={"remote": "git@github.com-work:Morrison-Lab/test-repo.git"})
 
+# --- review round 5 -------------------------------------------------------
+run("R5-1 a claim that says it WILL release the claim is still a claim",
+    COMMIT, None,
+    comments=lambda top: [claim(f"Session worktree: `{top}`. I will release "
+                                f"the claim when done.")])
+run("R5-2 the retired 'paws off released' wording is a release", COMMIT,
+    "deny", comments=[{"body": f"Done --- paws off released. Session id: "
+                               f"`{SID}`\n\n{MARKER}",
+                       "created_at": "2026-09-30T20:00:00Z", "html_url": "u"}])
+run("R5-3 'PR is free' is a release", COMMIT, "deny",
+    comments=[{"body": f"PR is free; hold off no more. Session id: `{SID}`"
+                       f"\n\n{MARKER}",
+               "created_at": "2026-09-30T20:00:00Z", "html_url": "u"}])
+run("R5-4 worktree path with a trailing slash matches", COMMIT, None,
+    comments=lambda top: [claim(f"Session worktree: {top}/ (this one)")])
+run("R5-5 a path extended by a child directory does not match", COMMIT,
+    "deny", comments=lambda top: [claim(f"Session worktree: {top}/sub/dir")])
+run("R5-6 a different worktree's claim (e.g. a parent's) reads as a peer's",
+    COMMIT, "deny",
+    comments=lambda top: [claim("Session worktree: `/somewhere/else/entirely`")],
+    check_in_ctx="working this branch now")
+
 # A broken install (no scripts/lib beside the hook) must be visible, not inert.
 COUNT[0] += 1
 with tempfile.TemporaryDirectory() as tmp:

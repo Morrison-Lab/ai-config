@@ -16,7 +16,10 @@ This is [`verify-the-right-artifact`](verify-the-right-artifact.md) applied to r
 - **The source being fixed while the deployed page is not**, because a stale freeze cache served the previous render.
 
 That last one is the one to internalize, because every other check in this corpus passes on it.
-On `d-morrison/rme` #1134 and #1138 (2026-09-07) the source was verifiably correct and the deployed preview still carried the pre-fix content: `_subfiles/` were edited without that repo's `clear freezer` label, so the build restored a freeze cache keyed to the commit before the fix.
+On `d-morrison/rme` #1134 and #1138 (2026-09-07), and 3rd occurrence on `Morrison-Lab/lds` #276 (2026-09-30):
+the source was verifiably correct and the deployed preview still carried the pre-fix content:
+`_subfiles/` were edited without that repo's `clear freezer` label,
+so the build restored a freeze cache keyed to the commit before the fix.
 Reading the diff passes.
 Reading the render does not.
 

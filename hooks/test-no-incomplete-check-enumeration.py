@@ -47,7 +47,7 @@ CHECKER_MR = {"type": "assistant", "message": {"content": [
                    "-p health-analytics-core/abridge --quorum 1"}}]}}
 TEST_FILE_MR = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {
-        "command": "python3 scripts/test_check_mr_fully_clean.py"}}]}}
+        "command": "python3 scripts/test_check-mr-fully-clean.py"}}]}}
 CHECKER_2277 = {"type": "assistant", "message": {"content": [
     {"type": "tool_use", "input": {
         "command": "python3 scripts/check-pr-fully-clean.py 2277 "

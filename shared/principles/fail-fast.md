@@ -224,8 +224,10 @@ A table-of-contents parser silently dropped wrapped entries (a title continued o
 
 - **Do:** count the candidate lines with a second, simpler method (for example, every line ending in a page number) independently of the parser, and exit non-zero (2) on any mismatch with the parsed count.
 - **Do:** print both counts, so a pass states what it matched.
-- **Don't:** let a parser's skip branch be silent; a dropped item and an absent item must not look alike.
-- **Don't:** validate the parser against the rows it did parse; they are correct by construction.
+- **Don't:** let a parser's skip branch be silent;
+  a dropped item and an absent item must not look alike.
+- **Don't:** validate the parser against the rows it did parse;
+  they are correct by construction.
 
 (See [`algorithmatize-checks`](../workflow/algorithmatize-checks.md) for building the cross-check as an instrument rather than eyeballing the list.)
 

@@ -40,7 +40,8 @@ Both readings are defensible, nothing in either report flagged the choice, and t
 - **Do:** before fan-out, list the terms in the brief that a careful reader could resolve two ways, and state each rule with one worked example drawn from real data (a section whose text ends mid-page, with the page you want recorded).
 - **Do:** run the rule on one item yourself first and paste that result into the brief.
 - **Don't:** assume a term the parent session uses consistently is unambiguous to an agent that has only the brief.
-- **Don't:** discover the split by comparing outputs after the wave; that costs a re-work round per agent.
+- **Don't:** discover the split by comparing outputs after the wave;
+  that costs a re-work round per agent.
 
 ## What to change, in order of payoff
 

@@ -237,8 +237,10 @@ RX_PARTIAL = re.compile(
 
 # Only the fully-clean script authorizes a terminal clean / ready-to-merge
 # claim. A paginated check-runs read is the check half only (ai-config#2277).
+# `check-mr-fully-clean.py` is the GitLab counterpart, run for an MR where
+# `check-pr-fully-clean.py` is run for a PR (ai-config#4161).
 RX_COMPLETE = re.compile(
-    r"(?<!test_)\bcheck-pr-fully-clean\.py",
+    r"(?<!test_)\bcheck-(?:pr|mr)-fully-clean\.py",
     re.I,
 )
 
@@ -267,7 +269,7 @@ RX_PUSH = re.compile(r"git\s+push|create_or_update_file|push_files", re.I)
 # `test_check-pr-fully-clean.py` invocation and a path digit are both excluded
 # here exactly as they are there.
 RX_COMPLETE_ARG = re.compile(
-    r"(?<!test_)\bcheck-pr-fully-clean\.py[\s\"']+#?(\d{1,6})(?![\w./-])",
+    r"(?<!test_)\bcheck-(?:pr|mr)-fully-clean\.py[\s\"']+#?(\d{1,6})(?![\w./-])",
     re.I,
 )
 

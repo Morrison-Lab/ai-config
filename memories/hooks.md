@@ -1041,8 +1041,8 @@ A Bash call with `run_in_background` and `timeout: 600000` was killed before the
 Its output had gone only to the task output file, so it was lost with the task.
 
 - **Do:** launch it with `run_in_background: true` and `timeout: 1800000`, redirecting the full log inside the command to a scratchpad file: `python3 -u scripts/test_hooks.py > <scratchpad>/hooks.log 2>&1`, with no trailing `&` (see the double-backgrounding entry in [`claude-code.md`](claude-code.md)).
-  Use `-u` because the runner flushes only its `RUN:` lines, so without it the log lags the run.
-  Then `grep -E '^FAIL: hooks/|^FAIL: [^ ]+ (now has|is in)|suites passed' <scratchpad>/hooks.log` lists the failing suites and coverage failures by path, without the case-level lines.
+  Use `-u` to keep the log in order: the runner writes a failing suite's stderr dump unbuffered, so without `-u` that dump can land above the still-buffered `FAIL:` summary line it belongs under.
+  Then `grep -E '^FAIL: hooks/|^FAIL: [^ ]+ (now has|is in)|suites passed' <scratchpad>/hooks.log` lists every non-case `FAIL` line by path: failing suites, subject mismatches, and coverage failures.
 - **Don't:** run it in the foreground or under a 10-minute timeout.
 - **Don't:** pipe it straight into `grep` with no saved log: the per-suite detail needed to find which case failed is gone once the pipe closes.
 

@@ -30,6 +30,21 @@ it read as a normal, finished piece of work.
 The third --- correcting a filed issue's body --- was never done and never mentioned as skipped or deferred.
 `updated_at == created_at` on the issue via a single API read confirmed it had not been touched since filing.)
 
+## A rule the agents will each apply differently needs a worked example in the brief
+
+A brief can be fully specified and still fan out into different behaviour, because a term in it has two reasonable readings and each agent picks one without noticing there was a choice.
+This is [`challenge-ambiguous-terminology`](challenge-ambiguous-terminology.md) applied to a brief's author, and [`fact-check-prose`](../writing/fact-check-prose.md#a-prompt-is-a-standing-instruction-so-it-gets-more-checking-than-documentation) says why it bites: a brief is read by a reader that cannot ask which reading was meant.
+Measured 2026-10-01, syncing Morrison-Lab/win's lecture notes with *Causal Inference: What If*:
+per-chapter agents were told to record the "end page of a section".
+Some took the page before the next section starts, others the page where the section's text ends.
+Both readings are defensible, nothing in either report flagged the choice, and the mismatch surfaced only when the outputs were compared, which forced re-work rounds.
+
+- **Do:** before fan-out, list the terms in the brief that a careful reader could resolve two ways, and state each rule with one worked example drawn from real data (a section whose text ends mid-page, with the page you want recorded).
+- **Do:** run the rule on one item yourself first and paste that result into the brief.
+- **Don't:** assume a term the parent session uses consistently is unambiguous to an agent that has only the brief.
+- **Don't:** discover the split by comparing outputs after the wave;
+  that costs a re-work round per agent.
+
 ## What to change, in order of payoff
 
 **Keep a per-agent mistake ledger and prepend it to every brief.**

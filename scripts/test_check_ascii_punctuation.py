@@ -155,6 +155,19 @@ def main() -> int:
         code, out, err = run_script("--diff", "--base", "HEAD~1", cwd=repo)
         check("committed change on branch with em-dash fails exit 1", code == 1)
 
+        # 5e2. Committed right double quote in diff mode (ai-config#4154).
+        # Its UTF-8 bytes end in 0x9d, which cp1252 leaves undefined, so on a
+        # Windows host without encoding= the git-diff reader raised
+        # UnicodeDecodeError and the script crashed. An em-dash (0x94) decodes
+        # under cp1252 as mojibake and never reproduced the crash.
+        (repo / "quote.py").write_text(f"q = {RIGHT_DOUBLE_QUOTE}x{RIGHT_DOUBLE_QUOTE}\n", encoding="utf-8")
+        subprocess.run(["git", "add", "quote.py"], cwd=repo, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "commit with right double quote"], cwd=repo, check=True)
+        code, out, err = run_script("--diff", "--base", "HEAD~1", cwd=repo)
+        # A crash also exits 1, so require that no traceback was printed.
+        check("diff containing U+201D (0x9d byte) fails exit 1 rather than crashing", code == 1 and "Traceback" not in err)
+        check("...and stderr names RIGHT DOUBLE QUOTATION MARK in quote.py", "quote.py:1:" in err and "RIGHT DOUBLE QUOTATION MARK" in err)
+
         # 5f. Untracked file with em-dash is detected in diff mode
         (repo / "untracked.py").write_text(f"new_code = '{EM_DASH}'\n", encoding="utf-8")
         code, out, err = run_script("--diff", "--base", "HEAD", cwd=repo)
@@ -192,10 +205,11 @@ def main() -> int:
 
     # 6. Every text-mode subprocess call names its encoding (ai-config#4154).
     # Without it Python decodes with the locale codepage, which on Windows is
-    # cp1252: a UTF-8 em-dash in `git diff` output raises UnicodeDecodeError
-    # in the reader thread, stdout comes back None, and the script crashes on
-    # exactly the input it exists to flag. CI's UTF-8 locale cannot reproduce
-    # that, so check the calls statically.
+    # cp1252: a UTF-8 right double quote (bytes e2 80 9d; 0x9d is undefined
+    # in cp1252) in `git diff` output raises UnicodeDecodeError in the reader
+    # thread, stdout comes back None, and the script crashes on exactly the
+    # input it exists to flag (5e2 exercises it). CI's UTF-8 locale cannot
+    # reproduce that, so also check the calls statically.
     import ast
     subprocess_funcs = {"run", "check_output", "check_call", "call", "Popen"}
     tree = ast.parse(SCRIPT.read_text(encoding="utf-8"))

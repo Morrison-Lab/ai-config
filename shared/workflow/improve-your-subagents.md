@@ -33,6 +33,8 @@ The third --- correcting a filed issue's body --- was never done and never menti
 ## A rule the agents will each apply differently needs a worked example in the brief
 
 A brief can be fully specified and still fan out into different behaviour, because a term in it has two reasonable readings and each agent picks one without noticing there was a choice.
+This is [`challenge-ambiguous-terminology`](challenge-ambiguous-terminology.md) applied to a brief's author, and [`fact-check-prose`](../writing/fact-check-prose.md#a-prompt-is-a-standing-instruction-so-it-gets-more-checking-than-documentation) says why it bites: a brief is read by a reader that cannot ask which reading was meant.
+(Measured 2026-10-01, syncing Morrison-Lab/win's lecture notes with *Causal Inference: What If*.)
 Per-chapter agents were told to record the "end page of a section".
 Some took the page before the next section starts, others the page where the section's text ends.
 Both readings are defensible, nothing in either report flagged the choice, and the mismatch surfaced only when the outputs were compared, which forced re-work rounds.

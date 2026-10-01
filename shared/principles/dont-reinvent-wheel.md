@@ -199,16 +199,6 @@ bug the local patch would have shipped, since normalizing `\r` only for
 the terminator comparison leaves stray carriage returns in the posted
 body. `v2` had since been slid, so consumers already had it.)
 
-**A local copy of a document you are syncing to is a snapshot too.**
-The same trap applies when the "upstream" is a book, a spec, or a course text rather than a repo, and the copy you hold is the nearest one rather than the canonical one.
-A lecture-notes repo was synced chapter by chapter, across a whole fan-out wave, to a locally present copy of a textbook revision dated 21 Nov 2025.
-The book's own landing page already linked a 19 Aug 2026 revision, and a sibling thread found that only after many chapters were done.
-Nothing in the local copy said it was old, and it parsed and cited cleanly, so every chapter's work was internally correct and aimed at the wrong revision.
-
-- **Do:** before pinning a source revision, fetch the canonical landing page (`WebFetch` works when `curl` to that host is proxy-blocked) and confirm which revision is latest.
-- **Do:** name the revision and its date in the brief, so each agent syncs to the one you checked.
-- **Don't:** treat a locally present copy as current because it is the one on disk.
-
 **The mirror direction, where the remedy above becomes the cause.**
 Everything above assumes you are fixing a bug going forward, so reading
 `main` is right.
@@ -256,6 +246,17 @@ The conclusion held anyway, since both versions fail an errored run without
 asking whether a verdict was posted, which is precisely why the wrong ref
 went unnoticed.
 The attribution was retracted on gha#391.)
+
+**A local copy of a document you are syncing to is a snapshot too.**
+The same trap applies (see [`verify-the-right-artifact`](../workflow/verify-the-right-artifact.md), whose "cached copy for the origin" shape this is) when the "upstream" is a book, a spec, or a course text rather than a repo, and the copy you hold is the nearest one rather than the canonical one.
+Measured 2026-10-01, syncing Morrison-Lab/win's lecture notes with Hernan and Robins's *Causal Inference: What If*:
+the repo was synced chapter by chapter, across a whole fan-out wave, to a locally present copy of a textbook revision dated 21 Nov 2025.
+The book's own landing page already linked a 19 Aug 2026 revision, and a sibling thread found that only after many chapters were done.
+Nothing in the local copy said it was old, and it parsed and cited cleanly, so every chapter's work was internally correct and aimed at the wrong revision.
+
+- **Do:** before pinning a source revision, fetch the canonical landing page (on 2026-10-01, in a Claude Code remote container, `WebFetch` worked when `curl` to that host was proxy-blocked) and confirm which revision is latest.
+- **Do:** name the revision and its date in the brief, so each agent syncs to the one you checked.
+- **Don't:** treat a locally present copy as current because it is the one on disk.
 
 ## When rolling our own is right
 

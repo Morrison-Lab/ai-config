@@ -453,6 +453,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-pr-work-without-claim.py\"",
+            "timeout": 30,
+            "script": "no-pr-work-without-claim.py",
+            "why": "ai-config#4155, measured 2026-09-30: two agent sessions worked the same three PR branches at once and neither posted a claim, so a cloud session's restore commit on PR #4134 left memories/preferences.md at 706 lines instead of 1177. shared/workflow/claim-pr.md says to claim first and nothing enforced it; ListAgents cannot see a cloud session. DENIES a `git commit` or `git push` on a branch with an open Morrison-Lab PR unless a claim comment (agent marker plus hold-off wording) names THIS session by session id or worktree path, and denies when a claim naming another session is newer than yours. Before a push it WARNS (never denies) about pushes since your claim that are not in local history, read from the forge activity endpoint. Fails OPEN and says so on any network or gh failure. Local half only: hooks are inert in remote/web sessions (#2004). Clear with ALLOW_UNCLAIMED_PR_WORK=1. Every subprocess shares one 20s budget (PR_CLAIM_TOTAL_BUDGET), under this 30s timeout, so a slow forge is a visible fail-open rather than a harness kill. The skills/claim-pr template now carries the Session worktree line the hook matches on; the other claim emitters (ardi, handoff, gi, st, gip, pr-on-claim, tracked in #4160) do not yet, so a claim that names no session only WARNS (it may be the session's own) instead of denying. A commit nested in `bash -c` is a visible fail-open, and two sessions sharing one checkout cannot be told apart (known limits in the hook docstring)."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-chained-push.py\"",
             "timeout": 10,
             "script": "flag-chained-push.py",

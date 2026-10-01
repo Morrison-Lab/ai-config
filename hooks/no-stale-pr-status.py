@@ -802,6 +802,25 @@ RX_FAIL_QUERY = re.compile(
 RX_NEGATION = re.compile(
     r"\b(not|never|cannot|unable)\b|n['\u2019]t\b", re.I,
 )
+
+# ai-config#4007: `neither`/`nor` deny readiness ("Neither #1629 nor #1634 is
+# ready to merge yet.") exactly as `not` does, but unlike `not` they commonly
+# serve as a determiner on a DIFFERENT noun than the one the ASSERT phrase's
+# copula governs -- the same shape the "no" exclusion above (RX_NEGATION's own
+# comment) was written to avoid: "Neither reviewer raised concerns, so #1689
+# is fully clean and ready to merge." is a genuine, unnegated stale-clean
+# claim, not a denial of one. So `neither`/`nor` are NOT added to the
+# sentence-wide RX_NEGATION scan; instead they reuse the same attachment
+# discipline `_is_retracted` already applies to retraction vocabulary below --
+# only the nearest `neither`/`nor` before the ASSERT phrase counts, and only
+# when nothing in RX_LEADING_SEPARATOR's clause-break set (a comma, `so`,
+# `and`, `:`, ...) sits between it and the phrase.
+#
+# Known limitation, shared with plain `not` and tracked in ai-config#4176: a
+# denying VERB flips the sentence ("Neither of us doubts #1689 is ready to
+# merge.", "I do not doubt #1689 is ready to merge."), and neither this scan
+# nor RX_NEGATION reads verb semantics, so both read those as denials.
+RX_NEITHER_NOR = re.compile(r"\b(?:neither|nor)\b", re.I)
 # Sentence boundaries: a terminator (optionally followed by markdown/quote
 # closing punctuation, e.g. "yet.**" or "clean.\"") then whitespace or
 # end-of-string -- OR any single newline. A bare newline has to count on its
@@ -1126,7 +1145,28 @@ def _is_negated(text, hit, starts=None):
     """
     if RX_NEGATION.search(text[_sentence_start(text, hit, starts):hit.start()]):
         return True
+    if _is_neither_nor_negated(text, hit, starts):
+        return True
     return _is_retracted(text, hit, starts)
+
+
+def _is_neither_nor_negated(text, hit, starts=None):
+    """True if the nearest `neither`/`nor` before `hit` attaches to it.
+
+    Same shape as `_is_retracted`'s leading scan: take the LAST
+    `neither`/`nor` before the ASSERT phrase in this sentence, and only
+    count it when nothing in RX_LEADING_SEPARATOR's clause-break set sits
+    between it and the phrase -- otherwise it is a determiner on some
+    other noun ("Neither reviewer raised concerns, so #1689 is ready to
+    merge."), not a denial of this claim.
+    """
+    start = _sentence_start(text, hit, starts)
+    before = None
+    for before in RX_NEITHER_NOR.finditer(text, start, hit.start()):
+        pass
+    return before is not None and _attaches(
+        RX_MARKDOWN_SPAN.sub("", text[before.end():hit.start()]),
+        RX_LEADING_SEPARATOR)
 
 
 def all_unnegated_asserts(text):

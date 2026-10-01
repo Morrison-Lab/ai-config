@@ -687,3 +687,5 @@ Bare italic `p(x)` creates notation inconsistency across chapters and subfiles a
 - **Don't:** write un-macroed italic `p(x)` or `p(x, y)` when defining or evaluating PMFs or PDFs.
 
 ([`Morrison-Lab/pds#43`](https://github.com/Morrison-Lab/pds/pull/43), 2026-09-29.)
+
+Two macro-collision gotchas to watch for in `macros.qmd` itself: matrix and vector shorthands like `\mA` and `\vw` are undefined and break LuaLaTeX during PDF compilation (use `\matr{A}` and `\vec{w}` / `\vecf{w}` instead), and `\vb` expands to Greek `\vec{\beta}` rather than Latin vector $b$ (use `\vec{b}`).

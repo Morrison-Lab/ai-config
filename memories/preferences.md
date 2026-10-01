@@ -348,3 +348,153 @@
   Go all the way: file an issue, commit on a branch, and open a PR --- without waiting to be asked.
   Stopping at a local edit leaves the change uncommitted and invisible to reviewers.
 - `dem-extra1/ai-config` is a FORK of the canonical ai-config repo, which now lives at `Morrison-Lab/ai-config` (see the transfer note below; it was `d-morrison/ai-config` before the move, and that path still redirects).
+  When working in that fork, open PRs against the canonical repo (base `main`) as a cross-fork PR with head `dem-extra1:<branch>`, NOT against the fork's own `main`. (If a remote/web session is scoped only to `dem-extra1/ai-config` with no `add_repo` tool, the cross-fork PR can't be created from that session; push the branch and surface that the upstream PR must be opened from a session where the canonical repo is in scope.)
+  **The repo has MOVED: it was transferred from `d-morrison/ai-config` to `Morrison-Lab/ai-config`, which is now its canonical home.** This is a transfer, not a fork; there is no upstream/downstream pair, just one repo whose old path still resolves.
+  GitHub keeps the pre-transfer path working, so `d-morrison/ai-config` remotes, clones, and API calls all silently redirect to `Morrison-Lab`.
+  A push to a `d-morrison` remote lands on `Morrison-Lab`, and `create_pull_request` with `owner: "d-morrison"` opens a PR that comes back with a `Morrison-Lab` URL and number.
+  **In a scoped remote session, pass the PRE-MOVE owner to every GitHub MCP call.**
+  A session whose scope lists `d-morrison/ai-config` gets "Access denied" for `owner: "Morrison-Lab"`, since scope is matched against the literal owner string and the redirect does not extend it.
+  The same call with `owner: "d-morrison"` redirects server-side and **works**, for reads as well as writes: `create_pull_request`, `update_pull_request`, and `issue_write` all land on `Morrison-Lab`, and so do `pull_request_read`, `get_job_logs`, and `actions_run_trigger`.
+  So the repo is fully reachable for most calls; only the spelling of the owner matters for them.
+  Two exceptions, for unrelated reasons. `add_repo` refuses `Morrison-Lab` as a **cross-tier add** ("session already has repos from owner(s) [...]") once the session already holds `the repository owner`/`ucd-serg`/`ucdavis` repos; that is a session-composition limit, not a scope or redirect one, and it does not block anything above.
+  `mcp__github__resolve_review_thread` is unreachable under **either** owner spelling for this repo (see `memories/github-mcp-tools.md`), which is a genuine gap rather than a spelling issue.
+  **Do not conclude a repo is unreachable from one denied call.** Trying `owner: "Morrison-Lab"`, getting "Access denied", and stopping there produced a published claim that a PR's state "cannot be polled on demand", repeated in a memory entry and a PR body, and used to justify polling the branch over git instead.
+  It was false the whole time; the writes going through the pre-move owner were sitting right there as the counter-example.
+  When one owner spelling is denied, try the other before recording a limitation. (2026-07-31.)
+  Because it is one repo rather than two, do **not** reason about a "fork lagging behind upstream": `git show origin/main:<path>` through a `the repository owner` remote is reading `Morrison-Lab`'s own `main`, so content that landed upstream is visible immediately. (2026-07-31: an earlier draft of this entry called it a fork and was corrected by the owner, who performed the move.)
+- Always include `Closes #N` in MR/PR descriptions to auto-close the linked issue on merge.
+- On GitLab, assign MRs to `demorrison`.
+- Before committing code changes, run the repo checks that CI enforces
+  (at minimum lint + tests, plus build/render where applicable),
+  not only the narrowest package-level test command.
+  If a repo has both package tests and a root-level lint step,
+  run both before the commit.
+  (Learned on UCD-SERG/lab-manual#433:
+  committing after package tests passed still left a root-level lint failure.)
+- Always use `glab` (the GitLab CLI) for GitLab operations --- MR comments, file uploads, API calls, pipeline checks --- instead of raw `curl` against the GitLab REST API.
+  `glab` handles auth via its own config (no `GITLAB_TOKEN` env var needed), so it works even when a token isn't exported in the current shell.
+  Use `glab api` for endpoints without a dedicated subcommand (e.g. `POST /projects/:id/uploads` for file attachments).
+- Treat the browser GUI as a last resort for every task.
+  Prefer a CLI, MCP tool, or direct API whenever the task does not inherently require a visual/browser-only capability.
+- Run local validation before pushing R-pkg work: lintr::lint_package(), devtools::document(), devtools::test(), devtools::check(), pkgdown::build_site() (per repo copilot-instructions).
+- Before opening a PR, read the repo's own agent/contributor instructions (CLAUDE.md → the canonical reference it points to, e.g. `.github/copilot-instructions.md` / CONTRIBUTING) and front-load the required pre-PR housekeeping in the FIRST commit instead of discovering it via red CI.
+  For R packages this means a NEWS.md entry AND a `usethis::use_version()` DESCRIPTION dev-version bump, even for a docs-only / vignette-only change --- see `r-quarto.md`'s "R-package PR CI gates" section for the full changelog-check / version-check / spellcheck / opt-out-label details.
+  The concise, auto-loaded version of this rule now lives in
+  [`shared/workflow/read-canonical-doc-before-starting.md`](../shared/workflow/read-canonical-doc-before-starting.md),
+  wired into `CLAUDE.md` --- this bullet stays for its extra R-package specifics.
+- Never commit directly to a shared/multi-project CI-infra repo's `main` --- even when confident and already validated the fix live.
+  Push to a branch and open an MR for review first.
+  This applies going forward; it does not retroactively require undoing an already-validated fix already on main unless the user asks.
+- After an iterate loop completes, ALWAYS create follow-up issues for every deferred/acknowledged item before reporting done.
+  Never leave deferred items untracked.
+- When an MR/PR addresses multiple independent concerns, proactively offer to split it into separate MRs/PRs (one per concern).
+  Simpler diffs = easier review, independent merge timelines, and less risk of one concern blocking another.
+- When resolving a git merge/rebase/cherry-pick conflict, consolidate the best of BOTH branches --- read why each side changed the hunk and preserve both intents; never blind-pick `--ours`/`--theirs`, which silently discards the other side's work.
+  Remove every marker (verify with `git diff --check`), run the repo's pre-commit checks (a merge clean on each side separately can break combined), then stage and finish the operation --- don't `--abort`/`--skip` a conflict you were asked to resolve.
+  Note: "ours"/"theirs" are reversed in a rebase vs a merge.
+  The `resolve-conflicts` skill (alias `rc`) operationalizes this.
+  `sync-pr-branch`/`clean-branches`/`gii` delegate to it. (Distinct from `session-lock`, which deconflicts AI *sessions*, not git content.)
+- When deferring items to follow-up issues during a PR/MR review loop, always update the PR/MR description with a "Known Deferred Items" section listing each deferred issue (with link), description, and rationale.
+  This gives automated reviewers context so they stop re-flagging the same items.
+  Include a "Notes for Automated Reviewers" section for any recurring false positives.
+- When noticing potential improvements to the codebase while working, proactively suggest them (don't wait to be asked).
+  The user wants to hear about improvements as they come up.
+- Always run /ums (Update Memories and Skills) after finishing a task --- don't wait to be asked.
+- After a PR/MR merges, run the `post-merge` skill: verify the merge actually landed, tidy the local branch (checkout main, pull, `git branch -d`), confirm any deferred items are tracked, then run UMS to capture what the PR's review lifecycle taught --- mistakes corrected and guidance given along the way.
+  A merge is the natural checkpoint to bank lessons before context is lost.
+  Do all of this automatically --- including opening the follow-up branch and PR that records the lessons --- without asking permission first; opening that follow-up PR is a standing yes.
+- **This applies per-merge, not once per session.** During a backlog-clearing run (many PRs merged back-to-back), it's easy to treat "run UMS after merging" as a one-off end-of-session step and batch it --- wrong: run it after EACH merge, before starting the next PR.
+  Caught on sparta (2026-06-30): merged ~8 PRs in one session without running UMS once, until the user explicitly said "do ums after each merge; then keep going."
+  The existing instruction already covered this; the gap was execution discipline in a fast multi-merge loop, not missing guidance --- re-read this bullet at the top of every "pick the next backlog item" cycle.
+  In a multi-AGENT pipeline, UMS runs at BOTH levels: each subagent runs UMS once ITS PR merges (it stops after reporting CLEAN, so the coordinator resumes it post-merge with a "your PR merged, run UMS" nudge --- or the agent-launch spec bakes in a final UMS step), and the coordinator runs its own UMS for the cross-PR orchestration learnings no single subagent can see (merge-order sequencing, conflict-cascade handling, pipeline mechanics).
+  Each agent writes its OWN memory file plus one MEMORY.md index line to keep the conflict surface small; avoid rewriting shared memory bodies concurrently. (Learned on sparta 2026-07-01.)
+- After ANY PR merges to main (under mwc, post-merge, or manual merge), IMMEDIATELY and autonomously sweep all open PRs in the repository for merge conflicts (`gh pr list --state open --json number,title,headRefName,author,assignees,mergeable,mergeStateStatus`).
+  Filter that list by `memories/reviewing-prs.md`'s scope test first (opened by or assigned to the invoking user, explicitly requested by name, or authored by the GitHub Actions app);
+  an out-of-scope conflicting PR is reported to the user and left untouched.
+  For any in-scope PR reporting `CONFLICTING` or `UNKNOWN`, fetch main, test the merge, resolve the conflict in an isolated worktree, and push the sync commit proactively without waiting for the user to point it out or ask for it. (Learned on ai-config, 2026-08-24: "cai: you should have checked PR conflicts on your own".)
+- Keep it simple.
+  Don't over-explain or ask permission for straightforward fixes --- just do them.
+- Don't re-ask a decision that's already settled and built.
+  Once an answer is given and the work is implemented to match it (and CI-green), don't reopen it with a fresh AskUserQuestion --- that invites a contradictory answer you then have to reconcile, and discounts work already done.
+  If you think the scope should change, say so explicitly with a recommendation instead of silently re-asking. (Learned on gha#110: re-asked content structure + deploy after the PR was built and green; the user had to reconcile the conflict with "keep what's built.")
+- The reverse mistake: committing to a build on an ambiguous `config-ai`-style capability request instead of asking first, when the ambiguity is genuinely between two mechanisms that would build materially different artifacts (a passive standing rule vs. an active, invokable skill), not just two homes for the same content.
+  `config-ai`'s "least mechanism" tiebreaker is for picking between forms that do the same thing more or less expensively --- it's not license to default to the cheaper reading of a verb-first request ("go through X one at a time", "sweep Y for Z"), which usually names a repeatable action (a Skill), not a preference to record.
+  One clarifying question is far cheaper than a full build-and-PR cycle spent on the wrong mechanism. (ai-config#583 vs. #585, 2026-07-16: built a `CLAUDE.md` presentation rule first, then had to build the actually-requested issue-sweeping skill separately once the user said "no i meant...".)
+- When finishing work on an MR/PR (clean review, ready to merge, etc.), always provide a clickable link to the MR/PR in the chat message.
+- When discovering bugs in upstream/shared infrastructure (e.g., HACtions templates), always file an issue immediately --- don't ask first.
+- More generally: always post a follow-up issue without asking first, in any repo we own or are a member of (a filed issue is cheap to close later if it turns out not to be helpful, so there's no real downside to erring toward filing).
+  The opposite default applies to a repo we're NOT a member of --- never post there autonomously; draft it and ask the user for permission first, per the fuller upstream-contribution escalation path (`shared/workflow/upstream-issues.md`).
+- Generalizing the bullets above: when a small, obvious, low-risk follow-up falls
+  out of work already in progress (a two-line comment fix, a stale link, an
+  accompanying NEWS bullet), just do it and report it, rather than describing it
+  and asking "want me to?".
+  The asking costs a round-trip per trivial change and makes me repeat the same
+  answer.
+  Keep asking when the choice is genuinely load-bearing: a tradeoff with no
+  obviously right answer, a hard-to-reverse action, or something touching
+  shared/outward-facing state.
+  The test is "small and obvious", not "quick".
+  (Given 2026-07-28 as "always yes", after a run of offers that were each
+  accepted.)
+- When I detect a concrete follow-up while working --- even outside a formal review/defer loop --- file the follow-up issue before reporting back, rather than just mentioning it in chat.
+  Same owned/member-vs-external split as the bullet above: file directly in a repo we own or are a member of; in an external repo, draft it and ask the user first (`shared/workflow/upstream-issues.md`).
+- Before acting on a request, review the relevant ai-config memories first so existing standing rules and prior lessons shape the response.
+- When the user points out a mistake I made, fix that mistake immediately and then record the learning for future runs, without waiting for extra prompting.
+- When a CI/review gate on your OWN PR keeps failing because of the repo owner's tooling (a flaky review workflow, a misfiring guard) and NOT your content, don't rabbit-hole opening fix-PR after fix-PR against their CI infra --- FIRST check whether the owner is already reworking that same infra in parallel (scan recent `main` commits and open PRs), since a fix landed under them collides with their work and is likely superseded; then verify the deliverable independently (render/lint/tests) and hand off/escalate to the owner sooner.
+  Corollary --- bootstrap deadlock: you can't cleanly fix a review workflow via PRs that are themselves reviewed by that broken workflow, so such a fix lands by admin-merge, not self-certification. (Learned on rme#954: content was done+verified early, but I iterated several `gha` review-workflow PRs chasing a no-verdict gate that the repository owner was concurrently fixing via his own #201/#204.)
+- Always check r-lib, tidyverse, and similar R ecosystem organizations for off-the-shelf solutions before building custom implementations.
+  Prefer well-maintained upstream packages over hand-rolled code when they meet the requirements.
+- When borrowing code or ideas from another repo, verify its license from the source FIRST (fetch its LICENSE file / `gh api repos/<o>/<r>/license`).
+  MIT/BSD/Apache/ISC → may adapt WITH attribution recorded in a root `CREDITS.md` (keep copyright notices); no-license / "all rights reserved" → reimplement the *idea* clean-room, never copy text/code verbatim; copyleft (GPL/AGPL/MPL) → flag the compatibility consequence before copying.
+  The `/scout-peers` skill encodes the full survey → license-gate → borrow-with-attribution loop.
+  - **Second occurrence, 2026-08-25**: Failed to check the license of `posit-dev/skills` before vendoring the R and Quarto workflows into our `skills/` directory.
+- Before starting work on an issue/MR, always review the MR history (merged and closed) to ensure the proposed changes don't undo past progress or re-introduce previously fixed problems.
+- Before building setup/infra/toolchain config in a repo, fetch origin/main and scan the repo's own reference material (e.g. `references/`, `docs/`) and recent main commits for an existing or just-merged solution --- build on / align with it rather than a parallel, possibly contradictory approach. (Learned after drafting a juliaup-based Julia install that conflicted with the repo's reviewed curl+tarball cloud-setup reference.)
+- Always simplify code where feasible (without feature loss) --- prune dead code paths, remove unreachable branches, simplify variable assignments that can never take their fallback values given the current invocation context.
+- When fixing a bug or a fragile/duplicated pattern, grep the WHOLE repo for sibling instances and fix them all in one pass --- don't patch only the occurrence you happened to notice.
+  Otherwise a reviewer flags the missed copies as a separate finding, costing an extra round. (Learned on d-morrison/ai-config#45: the `git -C ~/.claude/skills` path fix was applied to `ums/SKILL.md` but the identical line in `skill-builder/SKILL.md` was missed until review caught it.)
+- When renaming a variable or concept, grep for the old term in **both code and comments** (including section headers, file-level comments, and inline `# ---` banners).
+  A variable rename that also appears in a section header (`# --- 2. Baseline covariates + Nelson-Aalen ---`) costs an extra ARDI round every time the header is missed.
+  After changing the identifier, run `grep -r "old_name" .` before committing. (Learned on ucdavis/bcs#246: `nelson_aalen` → `cumhaz_baseline` fixed the variable and the file header but missed the section header --- caught two ARDI rounds later.)
+- When removing decorative comment banners (e.g. `# ---...---` / `# Name #` blocks), scan for **every** occurrence in the file --- both file-scope banners and inner function-body banners.
+  Removing only the outer ones leaves the inner ones, and a reviewer catches the inconsistency as a separate finding.
+  Run `grep -n "^[[:space:]]*#[[:space:]]*[-=*_#]" file` to surface padded/decorated banner lines before committing. (Learned on d-morrison/ai-config#274: outer banners stripped in round 1, inner ones missed until round 2.)
+- Do not commit scratch test files that are not wired into CI.
+  A file like `test_fix.py` with a dead `sys.path.insert` at the top and no pytest/CI integration adds noise without value and costs an extra ARDI round.
+  Delete it before the initial push, or as soon as a reviewer flags it. (Learned on d-morrison/ai-config#274.)
+- In test code, express date intervals with lubridate rather than hardcoded day counts.
+  Use `lubridate::years(N)` + date arithmetic for calendar-year intervals from a known start date, or `lubridate::dyears(N)` when an exact numeric duration (`N x 365.25 x 86400` seconds) is what the function under test expects --- `years()` returns a Period, `dyears()` returns a Duration; pick the one that matches the semantics.
+  Only fall back to a raw day count when the function requires one; verify it via `365.25 x N`, not by counting leap years manually (e.g., "3 leap years in 2000-2003" is wrong --- only 2000 qualifies), and confirm with `lubridate::time_length(lubridate::ddays(days_exact), "years") == N` (`time_length()` requires a timespan object, not a bare numeric). (Learned on ucdavis/bcs#249: using lubridate directly avoids the error class entirely.)
+- When writing documentation in a stacked PR (or any branch), only document features whose code is actually present on the CURRENT branch's ancestry --- `grep` for the symbol/constant first.
+  A feature that lives in a sibling branch also targeting `main` is NOT in scope, even if conceptually related; documenting it reads as a hallucinated feature and a reviewer will flag it.
+  Move those docs to the branch where the code lives. (A specific case of "NEVER assume; ALWAYS verify" above.)
+- Reference material derived from a repo's own code constants --- tables of values, spawn layouts, file-format/API semantics --- belongs in THAT repo's docs next to the code, not in central `ai-config` memory.
+  A memory copy rots silently when the constants change (nobody editing the game/library code thinks to update a memory in another repo) and isn't discoverable by human contributors.
+  Keep the durable *lesson/gotcha* in memory and point at the in-repo docs for the tables. (Learned splitting a sparta scenario cheat-sheet: the lesson "team 0 is stationary by default" now lives in sparta's `CLAUDE.md`; the speed/UID/order-target tables live in sparta's `demos/README.md` + `REPLAY.md` --- ai-config#1 / lacaedemon/sparta#207.)
+- Avoid nested function calls and nested function definitions where feasible --- prefer named intermediate variables (or a pipe, e.g. `|>` / `%>%` in R) over `f(g(h(x)))`, and prefer top-level function definitions over functions defined inside other functions.
+  Keep the nesting only when flattening it would be more convoluted. (CLAUDE.md "Coding style" section has the full rationale.)
+- Follow the SERG lab manual (https://ucd-serg.github.io/lab-manual/) for coding and collaboration conventions.
+- Always hyperlink named artifacts in prose wherever a URL exists (PRs, MRs, reviews, review comments, issue comments, issues, commits, checks, jobs, pipelines, workflow runs).
+  Whenever mentioning pull requests or issues in chat responses, recaps,
+  comments, reviews, or documentation,
+  always format them as clickable markdown hyperlinks to their forge URLs
+  (e.g. `[PR #123](https://github.com/<owner>/<repo>/pull/123)`),
+  never as bare unlinked `#123` text
+  (see [AGENTS.md](../AGENTS.md)'s "File formatting & links" rule for the exceptions).
+  (User directive / CAI, 2026-08-30.)
+  Don't leave a bare SHA, review id, or GitHub review-event name (`COMMENT`) as the only pointer --- wrap it in a markdown link.
+  Example formats:
+  - Pipelines: `[#3330](https://host/project/-/pipelines/3330)`
+  - Jobs: `[job 11056](https://host/project/-/jobs/11056)`
+  - Commits: `[320d7ad](https://host/project/-/commit/320d7ad)`
+  - PRs/reviews: `[PR 668](https://github.com/owner/repo/pull/668)`, `[review 5025211582](https://github.com/owner/repo/pull/668#pullrequestreview-5025211582)`
+- When linking to MRs/PRs, link to the bottom of the page so the user doesn't have to scroll:
+  - GitLab: use a specific note anchor (e.g., `#note_11437`); there is no symbolic "latest" anchor
+  - GitHub: use a specific comment anchor (e.g., `#issuecomment-4739921085`); there is no symbolic "latest" anchor
+- When stopping work on an MR/PR (end of conversation, pausing, handing off), always post the MR/PR link so the user can click through immediately.
+- When the user provides general guidance or a new preference, always update BOTH the relevant skills AND `/memories/preferences.md`.
+  Skills encode the behavior; preferences ensure it persists and is visible across all contexts.
+  When the same rule lives in two copies (an expanded one in `CLAUDE.md`, a terse one in `preferences.md`), keep load-bearing qualifiers/caveats consistent across both --- the short copy is the one that most easily drops a qualifier and becomes misleading. (Learned on PR #43: the terse pipe-examples bullet dropped the "in R" qualifier that `CLAUDE.md` had, which a reviewer flagged as implying `|>` / `%>%` exist in Python/JS.)
+- Before adding a bullet that redefines or narrows an existing term (fully clean, claim-pr, ARDI, etc.), grep the repo for that term's OTHER canonical definitions --- not just the twin preferences.md/CLAUDE.md copy above, but any `shared/*.md` fragment, skill doc, or other memory file that states the same rule.
+  If the new rule is a genuine refinement, update the canonical doc itself in the same PR, not just a satellite copy; note in the PR description that the canonical file is touched and why. (Learned on sparta 2026-07-01, PR #318: a new `dont-merge-failing-workflows` bullet expanded "fully clean" CI to mean every workflow green, including non-gating checks --- but silently contradicted the canonical `shared/workflow/fully-clean.md` [`@`-included into `CLAUDE.md`], which still said "every required check."
+  The `@claude` bot review caught the drift in round 1.)

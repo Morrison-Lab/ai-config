@@ -342,6 +342,18 @@ check("mcp pull_request_read with no recoverable number does not discharge",
           {"method": "get_comments", "owner": "o", "repo": "r"},
           "106"),
       False)
+check("the first target key present decides: a non-integer pullNumber does not fall through to `number`",
+      hook.mcp_reads_comments(
+          "mcp__github__pull_request_read",
+          {"method": "get_comments", "pullNumber": True, "number": 106},
+          "106"),
+      False)
+check("a different pullNumber is not rescued by a later `number` key naming the claim",
+      hook.mcp_reads_comments(
+          "mcp__github__pull_request_read",
+          {"method": "get_comments", "pullNumber": 107, "number": 106},
+          "106"),
+      False)
 check("cursor-mapped name ending in pull_request_read discharges",
       hook.mcp_reads_comments(
           "some_prefix_pull_request_read",

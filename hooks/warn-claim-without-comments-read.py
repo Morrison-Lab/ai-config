@@ -516,8 +516,6 @@ def _extract_target_issue_number(tool_input):
     return None
 
 
-# Imported by `no-unread-issue-claim.py` as well as used here, so a
-# signature change here breaks that hook's suite rather than this one's.
 # The `method` values of `pull_request_read` that return a pull request's
 # conversation: issue-style comments, inline review comments, and reviews.
 # `get`, `get_diff`, `get_files` and the rest do not.
@@ -540,15 +538,20 @@ def _pull_request_read_discharges(tool_input, number):
     if not (isinstance(method, str)
             and method.lower() in _PR_CONVERSATION_METHODS):
         return False
+    # The FIRST key present decides, whatever its value: a `pullNumber` that
+    # is not a plain integer must not fall through to a later `number` and
+    # discharge on weaker evidence than the call itself named.
     for key in ("pullNumber", "pull_number", "number"):
-        val = tool_input.get(key)
-        if val is not None and not isinstance(val, (dict, list)):
-            s = str(val).strip()
-            if s.isdigit():
-                return s == str(number).strip()
+        if key not in tool_input:
+            continue
+        val = tool_input[key]
+        s = str(val).strip() if not isinstance(val, (dict, list, bool)) else ""
+        return s.isdigit() and s == str(number).strip()
     return False
 
 
+# Imported by `no-unread-issue-claim.py` as well as used here, so a
+# signature change here breaks that hook's suite rather than this one's.
 def mcp_reads_comments(name, tool_input, number):
     """True when this MCP tool_use is a READ_ISSUE_COMMENTS call for
     `number` -- tool-mappings.yml's `mcp__github__issue_read` with

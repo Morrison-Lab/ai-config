@@ -266,11 +266,11 @@ A non-nested lazy span such as `<!--.*?-->` under DOTALL has no nested quantifie
 It is not: every opener scans to the end of the body looking for a closer, fails, and the engine restarts at the next opener.
 With N stray openers and no closer the total is O(N^2), the same start-position axis as "Quadratic cost can come from restart positions, not from backtracking".
 
-Measured 2026-09-30 on [ai-config#4172](https://github.com/Morrison-Lab/ai-config/issues/4172) (`scripts/check-pr-fully-clean.py`'s HTML-comment blanker):
-20,000 stray `<!--` took 18 s on the author's machine, and doubling the openers quadruples the time.
+Measured 2026-09-30 on [ai-config#4172](https://github.com/Morrison-Lab/ai-config/pull/4172), the PR that adds `_blank_html_comments` to `scripts/check-pr-fully-clean.py`:
+20,000 stray `<!--` took 18 s on the PR author's machine, and doubling the openers quadruples the time.
 (A re-run on another machine took 3.6 s, so trust the scaling rather than the absolute figure.)
 A linear scan over the same input took about 1 ms.
-It calls `str.find("-->", pos)` and caches the result, re-searching only once the scan position passes the cached closer, because closer positions only move forward.
+That scan calls `str.find("-->", pos)` and caches the result, re-searching only once the scan position passes the cached closer, because closer positions only move forward.
 
 - **Do:** measure worst-case time on a many-openers, no-closer input before shipping a span regex.
 - **Do:** use a `find`-based scan with a forward-only cached closer when openers can be numerous.

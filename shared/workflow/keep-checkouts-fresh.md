@@ -10,6 +10,21 @@ In every session --- at session start, and again periodically during long sessio
    See [`fail-fast`](../principles/fail-fast.md), "A proxy that answers a narrower question passes the same way".
    Still flag it rather than force if the tree is dirty, or if a path on local `main` is genuinely missing from `origin/main`.
    **If `main` isn't the currently checked-out branch** (the session is already working on a feature branch), skip the checkout dance entirely --- `git branch -f main origin/main` realigns the ref in place without touching the working tree or switching away from the branch you're actively on.
+
+   **In a local session working in a worktree under `<primary>/.claude/worktrees/`, the running hooks can be the primary checkout's copies, and nothing fast-forwards that checkout.**
+   `.claude/hooks/session-start.sh` exits unless `CLAUDE_CODE_REMOTE=true`, so a local session never pulls it.
+   Measured 2026-09-30 ([ai-config#1815, comment](https://github.com/Morrison-Lab/ai-config/issues/1815#issuecomment-5925627614)): the primary sat on `main` 312 commits behind `origin/main`.
+   `hooks/no-push-without-self-review.py` then refused a push with "could not load its push detector from no-unreviewed-pr.py ([Errno 2] No such file or directory: '<primary>/.claude/hooks/no-unreviewed-pr.py')",
+   the symptom of the already-fixed [#2981](https://github.com/Morrison-Lab/ai-config/issues/2981).
+   The path in the message is the evidence that the hook ran from the primary.
+   The loading mechanism was not traced.
+   `git -C <primary> pull --ff-only` cleared it.
+   Step 2's guard-refusal paragraph covers the same symptom when the stale copy is an installed plugin rather than the primary checkout.
+
+   - **Do:** at session start in a worktree session, fast-forward the primary checkout too, under the same on-`main`, clean-tree conditions as above.
+   - **Do:** read a hook error naming a nonexistent path under `.claude/hooks/` as a stale-hook symptom first.
+   - **Don't:** debug the hook's logic, or override the guard, before checking the primary checkout's freshness.
+
 2. **The `~/.claude` consumer install.**
    Claude Code and Cursor no longer read this repo's `skills/` and `commands/` as a symlinked copy under `~/.claude` at all.
    They install this repo as a native plugin, which auto-updates at session start (see README's *Verify the install*),
@@ -61,19 +76,6 @@ In every session --- at session start, and again periodically during long sessio
    - **Don't:** read `installed_plugins.json`'s `lastUpdated` field as a freshness measure.
      It says when the pin was last written, and nothing about how many commits `origin/main` has gained since the pinned SHA.
    - **Don't:** re-run an expensive dispatch against a guard, or reach for its override, without first checking whether the installed plugin is current for the specific behaviour the guard is enforcing.
-
-   **In a local session working in a worktree under `<primary>/.claude/worktrees/`, the running hooks can be the primary checkout's copies, and nothing fast-forwards that checkout.**
-   `.claude/hooks/session-start.sh` exits unless `CLAUDE_CODE_REMOTE=true`, so a local session never pulls it.
-   Measured 2026-09-30 ([ai-config#1815, comment](https://github.com/Morrison-Lab/ai-config/issues/1815#issuecomment-5925627614)): the primary sat on `main` 312 commits behind `origin/main`.
-   `hooks/no-push-without-self-review.py` then refused a push with "could not load its push detector from no-unreviewed-pr.py ([Errno 2] No such file or directory: '<primary>/.claude/hooks/no-unreviewed-pr.py')",
-   the symptom of the already-fixed [#2981](https://github.com/Morrison-Lab/ai-config/issues/2981).
-   The path in the message is the evidence that the hook ran from the primary.
-   The loading mechanism was not traced.
-   `git -C <primary> pull --ff-only` cleared it.
-
-   - **Do:** at session start in a worktree session, fast-forward the primary checkout too, under the same on-`main`, clean-tree conditions as step 1 above.
-   - **Do:** read a hook error naming a nonexistent path under `.claude/hooks/` as a stale-hook symptom first.
-   - **Don't:** debug the hook's logic, or override the guard, before checking the primary checkout's freshness.
 
    `shared/`, `hooks/`, and `memories/` have no plugin-equivalent replacement yet ([#2352](https://github.com/Morrison-Lab/ai-config/issues/2352)), so anyone relying on `~/.claude/shared`, `~/.claude/hooks`, or `~/.claude/memories` today is on a symlink or copy placed by an install predating that change, or by a manual step --- `bootstrap.sh` no longer places any of them.
    **`skills/` belongs in that sweep too, and the plugin serving them is not a reason to skip it.**

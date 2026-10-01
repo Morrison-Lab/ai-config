@@ -62,6 +62,17 @@ In every session --- at session start, and again periodically during long sessio
      It says when the pin was last written, and nothing about how many commits `origin/main` has gained since the pinned SHA.
    - **Don't:** re-run an expensive dispatch against a guard, or reach for its override, without first checking whether the installed plugin is current for the specific behaviour the guard is enforcing.
 
+   **In a local session working in a worktree under `<primary>/.claude/worktrees/`, the running hooks can be the primary checkout's copies, and nothing fast-forwards that checkout.**
+   `.claude/hooks/session-start.sh` exits unless `CLAUDE_CODE_REMOTE=true`, so a local session never pulls it.
+   Measured 2026-09-30 ([ai-config#1815, comment](https://github.com/Morrison-Lab/ai-config/issues/1815#issuecomment-5925627614)): the primary sat on `main` 312 commits behind `origin/main`.
+   `hooks/no-push-without-self-review.py` then refused a push with "could not load its push detector from no-unreviewed-pr.py ([Errno 2] ... '<primary>/.claude/hooks/no-unreviewed-pr.py')", the symptom of the already-fixed [#2981](https://github.com/Morrison-Lab/ai-config/issues/2981).
+   The path in the message is the evidence that the hook ran from the primary; the loading mechanism was not traced.
+   `git -C <primary> pull --ff-only` cleared it.
+
+   - **Do:** at session start in a worktree session, fast-forward the primary checkout too, under the same on-`main`, clean-tree conditions as step 1 above.
+   - **Do:** read a hook error naming a nonexistent path under `.claude/hooks/` as a stale-hook symptom first.
+   - **Don't:** debug the hook's logic, or override the guard, before checking the primary checkout's freshness.
+
    `shared/`, `hooks/`, and `memories/` have no plugin-equivalent replacement yet ([#2352](https://github.com/Morrison-Lab/ai-config/issues/2352)), so anyone relying on `~/.claude/shared`, `~/.claude/hooks`, or `~/.claude/memories` today is on a symlink or copy placed by an install predating that change, or by a manual step --- `bootstrap.sh` no longer places any of them.
    **`skills/` belongs in that sweep too, and the plugin serving them is not a reason to skip it.**
    A leftover `~/.claude/skills` from a pre-plugin install loads alongside the plugin, listing every skill twice --- bare `ums` beside `ai-config:ums` --- which crowds the skill listing and can cost entries their descriptions, the text routing selects on.

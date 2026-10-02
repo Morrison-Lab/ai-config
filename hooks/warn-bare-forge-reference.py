@@ -20,18 +20,28 @@ Deliberate limits, so the warning stays rare enough to be read:
     removed first.
   - A `#` followed by a digit run is a reference only at a word boundary and
     only when the digits are not part of a hex colour or an anchor.
+  - Ordinals such as "#1 priority" or "Step #2" cannot be told from issue
+    numbers by text alone, so they are listed and the note says to ignore
+    them. Parenthesised and bold references ("(#4224)", "**#4224**") warn.
+  - A `#N` directly after `.`, `-`, `/` or `&` ("fixed.#12", "PR-#12") is not
+    flagged: this trades a missed warning for fewer false ones on paths,
+    entities and fragments.
 """
 import json
 import re
 import sys
 
 REPLY_TOOL = re.compile(r"(^|__)(reply|post_message|update_message)$")
-FENCE = re.compile(r"^ {0,3}(```|~~~).*?^ {0,3}\1[^\n]*$", re.M | re.S)
-INLINE_CODE = re.compile(r"`[^`\n]*`")
+# A fence runs to its closing fence, or to the end of the text when unclosed.
+FENCE = re.compile(
+    r"^ {0,3}(```+|~~~+).*?(?:^ {0,3}\1[`~]*[ \t]*$|\Z)", re.M | re.S)
+# A code span closes on a backtick run of the same length, across lines.
+INLINE_CODE = re.compile(r"(?<!`)(`+)(?!`).*?(?<!`)\1(?!`)", re.S)
 MD_LINK = re.compile(r"!?\[[^\]\n]*\]\([^)\n]*\)")
+# `[text][label]` links and `[label]: url` definitions.
+REF_LINK = re.compile(r"\[[^\]\n]*\]\[[^\]\n]*\]")
+REF_DEF = re.compile(r"^ {0,3}\[[^\]\n]+\]:[ \t].*$", re.M)
 BARE_URL = re.compile(r"https?://\S+")
-# `[#12]` style reference definitions and `(#cmsg_...)` thread anchors are
-# links too; the Markdown-link pattern above already removes them.
 REF = re.compile(
     r"(?<![\w/&#.-])"
     r"(?:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?[#!]\d{1,5}\b"
@@ -48,7 +58,7 @@ list position), ignore this note."""
 
 
 def strip_links_and_code(text: str) -> str:
-    for pattern in (FENCE, INLINE_CODE, MD_LINK, BARE_URL):
+    for pattern in (FENCE, INLINE_CODE, MD_LINK, REF_LINK, REF_DEF, BARE_URL):
         text = pattern.sub(" ", text)
     return text
 

@@ -33,6 +33,16 @@ CASES = [
     ("heading hash", REPLY, "## 2 items\n#hashtag", None),
     ("other tool", "Bash", "echo #12", None),
     ("no refs", REPLY, "Nothing to report.", None),
+    ("ordinal is listed", REPLY, "#1 priority, Step #2.", ["#1", "#2"]),
+    ("parenthesised", REPLY, "Done (#4224).", ["#4224"]),
+    ("bold", REPLY, "**#4224** merged.", ["#4224"]),
+    ("ref-style link", REPLY, "See [#12][1].\n\n[1]: https://x.test/12", None),
+    ("ref definition label", REPLY, "[#12]: https://x.test/12", None),
+    ("double-backtick span", REPLY, "Use ``fix #12`` here.", None),
+    ("multi-line span", REPLY, "Use `fix\n#12` here.", None),
+    ("unclosed fence", REPLY, "```\nfix #12\nmore", None),
+    ("owner/repo shape", REPLY, "Edit a/b#12 now.", ["a/b#12"]),
+    ("after period is not flagged", REPLY, "fixed.#12", None),
 ]
 
 

@@ -12,17 +12,26 @@ The same command succeeds from a Terminal tab, which the user has already grante
 - **Don't:** conclude the share is unmounted or the file is missing from that error alone.
 
 When the work must run unattended (the user asleep, approval prompts piling up), a Terminal tab per run does not scale.
-The one-time setup is a worker the user starts in Terminal, which already has the access, and which the Claude app feeds:
+The one-time setup is a worker the user starts in Terminal, which already has the access, and which the Claude app feeds.
+Starting it is the user's decision to delegate that access, not a way around the macOS gate, so propose it and let the user choose.
+It has:
 
-- a queue folder the session writes job files into, with results written back beside them, limited to status, logs, and outputs already cleared to leave the share (such as a rendered manuscript of aggregate results), never row-level data;
-- an allowlist of job types, such as "render this .qmd", with no arbitrary shell commands;
+- a queue folder the session writes job requests into;
+- an allowlist of job types, such as "render this project's manuscript", with no arbitrary shell commands;
 - an expiry time, after which the worker exits on its own.
+
+A job-type allowlist does not limit what code runs.
+A render executes the document's own R code with Terminal's access, so the worker is only as safe as the code it renders.
+Restrict it to files in the project repository at a commit the user has reviewed, never a file the session writes into the queue.
+It is also not a data-egress control.
+Write back only a status and exit code, and the project's normal rendered outputs (for example the manuscript of aggregate results), never logs or intermediate files that can echo restricted data.
 
 The abridge render worker under `~/Library/Application Support/abridge-render-queue/` on the user's Mac follows this pattern (set up 2026-10-02, relayed from the coordinator session, not verified from this repo).
 The user's prompt that led to it: "sure claude can't read the s-drive ,but can't it run code that can?"
 
-- **Do:** propose the queue worker as soon as repeated prompts or a blocked resource would stall unattended work.
-- **Don't:** copy restricted data, such as PHI from the S-drive, into a local cache the Claude app can read, to get around the block.
+- **Do:** propose the queue worker when a per-app gate blocks the Claude app from a resource the user already reaches from Terminal, and unattended work would otherwise stall.
+- **Don't:** copy restricted data (row-level records, or anything the project treats as protected health information;
+  the coordinator session described the S-drive as holding PHI on 2026-10-02) into a local cache the Claude app can read, to get around the block.
 
 ## Claude Projects: confirm a thread's own session state before saying it is running
 

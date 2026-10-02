@@ -111,12 +111,13 @@ ask:
   steps by changing the workflow's shape rather than merely trimming
   individual steps
   (see [`restructure-for-efficiency`](../workflow/restructure-for-efficiency.md)).
-- **Replace a repeated prompt with a one-time setup.**
-  This applies only where the user already holds the access and a prompt keeps asking them to confirm it, which stalls work while they are away.
-  Propose a setup the user can approve once, as their own decision, rather than asking them to answer the same prompt again;
-  it confirms an access they already have and bypasses no gate.
-  When one process lacks access that another process the user already trusts does have, the setup is a narrowly scoped worker the user starts in the trusted process, which the session submits jobs to.
-  It stays inside the boundary below: it is limited to named job types, and it never moves restricted data somewhere the boundary was meant to keep it out of.
+- **Offer a one-time setup in place of repeated prompts.**
+  This applies when the user already holds an access, and a per-app or per-process gate keeps blocking the agent from it or keeps asking the user to confirm it, which stalls work while they are away.
+  Such a gate is still a permission gate, so the agent never routes around it on its own.
+  The agent proposes a setup, and the user's explicit approval of that setup is what permits it.
+  When another process the user trusts already has the access, the setup is a narrowly scoped worker that the user starts in that process;
+  the session then submits jobs to the worker.
+  [The boundary](#the-boundary-what-is-not-an-artificial-constraint) still binds: the worker runs only what the user approved, and it never moves restricted data somewhere the gate was meant to keep it out of.
   The macOS case is in [`claude-app-projects`](../../memories/claude-app-projects.md).
 
 ## The boundary: what is not an artificial constraint

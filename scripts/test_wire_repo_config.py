@@ -120,6 +120,34 @@ class WireRepoConfig(unittest.TestCase):
             self.run_main()
         self.assertEqual(self.read("AGENTS.md"), broken)
 
+    def test_r_package_gets_anchored_rbuildignore_entries(self):
+        (self.repo / "DESCRIPTION").write_text("Package: x\n", encoding="utf-8")
+        (self.repo / "CLAUDE.md").write_text("# Claude\n", encoding="utf-8")
+        (self.repo / ".Rbuildignore").write_text("^.*\\.Rproj$", encoding="utf-8")
+        self.assertEqual(self.run_main("--check")[0], 1)
+        self.run_main()
+        self.assertEqual(self.read(".Rbuildignore"),
+                         "^.*\\.Rproj$\n^AGENTS\\.md$\n^CLAUDE\\.md$\n^\\.claude$\n")
+        code, out = self.run_main("--check")
+        self.assertEqual(code, 0, out)
+
+    def test_rbuildignore_keeps_existing_matches_and_skips_absent_claude_md(self):
+        (self.repo / "DESCRIPTION").write_text("Package: x\n", encoding="utf-8")
+        (self.repo / ".Rbuildignore").write_text("^\\.claude\n[\n", encoding="utf-8")
+        self.run_main()
+        # `^\.claude` already covers .claude, `[` does not compile and is
+        # skipped, and no CLAUDE.md exists, so only AGENTS.md is added.
+        self.assertEqual(self.read(".Rbuildignore"), "^\\.claude\n[\n^AGENTS\\.md$\n")
+
+    def test_rbuildignore_created_for_package_without_one(self):
+        (self.repo / "DESCRIPTION").write_text("Package: x\n", encoding="utf-8")
+        self.run_main()
+        self.assertEqual(self.read(".Rbuildignore"), "^AGENTS\\.md$\n^\\.claude$\n")
+
+    def test_non_package_gets_no_rbuildignore(self):
+        self.run_main()
+        self.assertFalse((self.repo / ".Rbuildignore").exists())
+
     def test_ai_config_and_its_subdirectories_are_skipped(self):
         (self.repo / ".claude-plugin").mkdir()
         (self.repo / ".claude-plugin/marketplace.json").write_text(

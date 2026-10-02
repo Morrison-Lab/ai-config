@@ -17,6 +17,11 @@ writes what those surfaces read from the repository itself (ai-config#4206):
                          CLAUDE.md when one exists.
   .claude/settings.json  registers the Morrison-Lab marketplace, so Claude
                          Code offers the plugin to anyone who trusts the repo.
+  .Rbuildignore          in an R package (a DESCRIPTION at the root), anchored
+                         entries for the top-level paths above, so
+                         `R CMD check` raises no "non-standard files" NOTE.
+                         Existing patterns that already match a path are kept
+                         and nothing is added for it.
 
 The plugin itself is enabled in the repo only with `--enable-plugin`. Where
 the account sync or a user-level enable already loads it, a second,
@@ -123,6 +128,45 @@ def block_change(repo: Path, name: str) -> tuple[str, str | None]:
     return f"write {name}: {verb} the ai-config block", updated
 
 
+# Top-level paths this script writes or appends to; an R package must keep them
+# out of its build, or R CMD check reports them as non-standard files.
+WIRED_PATHS = ("AGENTS.md", "CLAUDE.md", ".claude")
+
+
+def rbuildignore_matches(patterns: list[str], path: str) -> bool:
+    """True when an .Rbuildignore pattern excludes `path`.
+
+    R reads each line as a Perl regex matched case-insensitively against the
+    path relative to the package root; Python's `re` agrees on every pattern
+    an .Rbuildignore realistically carries. A pattern `re` cannot compile is
+    skipped rather than treated as a match, so the worst case is a redundant
+    entry, never a missing one.
+    """
+    for pattern in patterns:
+        try:
+            if re.search(pattern, path, re.IGNORECASE):
+                return True
+        except re.error:
+            continue
+    return False
+
+
+def rbuildignore_change(repo: Path, will_exist: set[str]) -> tuple[str, str | None]:
+    """Anchored entries for the wired paths an R package does not yet ignore."""
+    if not (repo / "DESCRIPTION").is_file():
+        return "ok    .Rbuildignore not needed (no DESCRIPTION)", None
+    path = repo / ".Rbuildignore"
+    current = path.read_text(encoding="utf-8") if path.exists() else ""
+    patterns = [line.strip() for line in current.splitlines() if line.strip()]
+    missing = [name for name in WIRED_PATHS
+               if name in will_exist and not rbuildignore_matches(patterns, name)]
+    if not missing:
+        return "ok    .Rbuildignore already excludes the wired files", None
+    sep = "" if not current or current.endswith("\n") else "\n"
+    added = "".join(f"^{re.escape(name)}$\n" for name in missing)
+    return f"write .Rbuildignore: exclude {', '.join(missing)}", current + sep + added
+
+
 def wire(repo: Path, check: bool, enable_plugin: bool) -> bool:
     """Wire one repo. Returns True when it was already fully wired."""
     if is_ai_config(repo.resolve()):
@@ -130,11 +174,17 @@ def wire(repo: Path, check: bool, enable_plugin: bool) -> bool:
         return True
     settings_msg, settings = settings_change(repo, enable_plugin)
     docs = [block_change(repo, name) for name in ("AGENTS.md", "CLAUDE.md")]
-    for msg in (settings_msg, *(m for m, _ in docs)):
+    will_exist = {name for name, (_, text) in zip(("AGENTS.md", "CLAUDE.md"), docs)
+                  if text is not None or (repo / name).exists()}
+    if settings is not None or (repo / ".claude").exists():
+        will_exist.add(".claude")
+    ignore_msg, ignore = rbuildignore_change(repo, will_exist)
+    for msg in (settings_msg, *(m for m, _ in docs), ignore_msg):
         if check and msg.startswith("write"):
             msg = "todo" + msg[len("write"):]
         print(f"{repo}: {msg}")
-    already_wired = settings is None and all(text is None for _, text in docs)
+    already_wired = (settings is None and ignore is None
+                     and all(text is None for _, text in docs))
     if check:
         return already_wired
     if settings is not None:
@@ -145,6 +195,8 @@ def wire(repo: Path, check: bool, enable_plugin: bool) -> bool:
     for name, (_, text) in zip(("AGENTS.md", "CLAUDE.md"), docs):
         if text is not None:
             (repo / name).write_text(text, encoding="utf-8")
+    if ignore is not None:
+        (repo / ".Rbuildignore").write_text(ignore, encoding="utf-8")
     return already_wired
 
 

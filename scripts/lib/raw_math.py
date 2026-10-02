@@ -176,14 +176,14 @@ def _mask_definitions(text: str) -> str:
 # Any indent is accepted, so a fence inside a list item opens and closes
 # by the same rule; a backtick fence's info string cannot contain a
 # backtick.
-_FENCE = re.compile(r"^((?: {0,3}>)*) *(?:(?:[-*+]|[0-9]{1,9}[.)]) +)?(`{3,}|~{3,})(.*)$")
+_FENCE = re.compile(r"^((?: {0,3}>)*) *((?:[-*+]|[0-9]{1,9}[.)]) +)?(`{3,}|~{3,})(.*)$")
 _QUOTE = re.compile(r"(?: {0,3}>)*")
 
 
 def _fence(line: str):
     """Return the fence marker a line opens or closes, or None."""
     m = _FENCE.match(line)
-    if not m or (m.group(2)[0] == "`" and "`" in m.group(3)):
+    if not m or (m.group(3)[0] == "`" and "`" in m.group(4)):
         return None
     return m
 
@@ -196,22 +196,25 @@ def _quote_depth(line: str) -> int:
 def _mask_spans(line: str) -> str:
     """Blank inline code spans, in time linear in the line's length.
 
-    A span opens at a backtick run that is not backslash-escaped and closes
-    at the next run of the same length. A run with no matching closer is
-    left as text, so the math after it is still scanned.
+    A span opens at a backtick run and closes at the next run of the same
+    length. A backslash escapes the first backtick of an opening run, but
+    not a closing one, since escapes do not work inside a span. A run with
+    no matching closer is left as text, so the math after it is still
+    scanned.
     """
-    runs = []
+    runs = []  # (start, end, escaped)
     i, n = 0, len(line)
+    slashes = 0  # backslashes immediately before line[i]
     while i < n:
-        if line[i] == "\\":
-            i += 2
-        elif line[i] == "`":
+        if line[i] == "`":
             j = i
             while j < n and line[j] == "`":
                 j += 1
-            runs.append((i, j))
+            runs.append((i, j, slashes % 2 == 1))
+            slashes = 0
             i = j
         else:
+            slashes = slashes + 1 if line[i] == "\\" else 0
             i += 1
     later: dict[int, list[int]] = {}  # run length -> later run indexes, reversed
     for k in range(len(runs) - 1, -1, -1):
@@ -219,11 +222,12 @@ def _mask_spans(line: str) -> str:
     out = list(line)
     k = 0
     while k < len(runs):
-        start, end = runs[k]
-        stack = later[end - start]
+        start, end, escaped = runs[k]
+        start += escaped  # an escaped first backtick is literal text
+        stack = later.get(end - start, [])
         while stack and stack[-1] <= k:
             stack.pop()
-        if not stack:
+        if start == end or not stack:
             k += 1
             continue
         close = stack.pop()
@@ -241,13 +245,13 @@ def _mask_code(lines):
         if opener is not None and _quote_depth(line) < depth:
             opener = None  # the blockquote ended, and the fence with it
         if opener is None and m:
-            opener = m.group(2)
+            opener = m.group(3)
             depth = m.group(1).count(">")
             yield ""
         elif opener is not None:
-            if (m and m.group(1).count(">") == depth
-                    and m.group(2)[0] == opener[0] and len(m.group(2)) >= len(opener)
-                    and not m.group(3).strip()):
+            if (m and m.group(1).count(">") == depth and not m.group(2)
+                    and m.group(3)[0] == opener[0] and len(m.group(3)) >= len(opener)
+                    and not m.group(4).strip()):
                 opener = None
             yield ""
         else:

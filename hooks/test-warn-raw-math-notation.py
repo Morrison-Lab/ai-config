@@ -56,6 +56,8 @@ WARN = [
     ("Write", {"file_path": "a.md", "content": "1. ```r\n   x <- 1\n   ```\n\nREAL $\\mathbb{E}[Y]$"}, "\\Ep"),
     ("Write", {"file_path": "a.md", "content": "```md\n> ```\n```\nREAL $\\mathbb{E}[Y]$"}, "\\Ep"),
     ("Write", {"file_path": "a.md", "content": "\\`$\\mathbb{E}[Y]$\\`"}, "\\Ep"),
+    ("Write", {"file_path": "a.md", "content": "`\\` real $\\mathbb{E}[Y]$ `x`"}, "\\Ep"),
+    ("Write", {"file_path": "a.md", "content": "```\n- ```\nx\n```\n\nREAL $\\mathbb{E}[Y]$"}, "\\Ep"),
 ]
 for tool, ti, macro in WARN:
     out = hook(tool, ti)
@@ -84,6 +86,7 @@ QUIET = [
     ("Write", {"file_path": "x.md", "content": "    ```\n$\\mathbb{E}[Y]$"}, "an indented fence line (treated as a fence)"),
     ("Write", {"file_path": "x.md", "content": "- ```\n  $\\mathbb{E}[Y]$\n  ```"}, "a fence inside a list item"),
     ("Write", {"file_path": "x.md", "content": "use ``$\\mathbb{E}$`` here"}, "a double-backtick code span"),
+    ("Write", {"file_path": "x.md", "content": "use \\``$\\mathbb{E}$` here"}, "a span after an escaped backtick"),
     ("Write", {"file_path": "x.tex", "content": "\\newcommand*{\\Ex}{\\mathbb{E}}"}, "a starred newcommand"),
     ("Write", {"file_path": "x.tex", "content": "\\DeclareMathOperator*{\\Vx}{\\mathrm{Var}}"}, "a starred DeclareMathOperator"),
     ("Write", {"file_path": "x.tex", "content": "\\newcommand{\\Ex}[1]{\\mathbb{E}\\{#1\\}}"}, "a definition with escaped braces"),

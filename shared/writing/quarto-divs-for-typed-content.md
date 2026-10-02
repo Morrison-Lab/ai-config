@@ -27,15 +27,12 @@ and check every category rather than stopping at definitions.
 - **Proofs**: `::: proof`, immediately after the result it proves.
 - **Examples**: `#exm-`, after the definition or result they illustrate.
 - **Exercises and their solutions**: `#exr-` and the repository's solution div
-  (`::: solution`, or `.sol` where a profile filter hides it).
-- **Commentary on the math** (synonyms, history, scope limits, motivation):
-  a remark, per [`quarto-remarks-vs-callouts.md`](quarto-remarks-vs-callouts.md).
-- **Guidance to the reader**: a callout, per the same file:
-  `.callout-warning` or `.callout-caution` for a common mistake or trap,
-  `.callout-tip` for hints and study or software advice,
-  `.callout-note` or `.callout-important` for notes about the course or the document.
-- **Optional material** a reader may skip:
-  a collapsible callout (`collapse="true"`).
+  (`::: solution`, or the `.sol` class that
+  [`Morrison-Lab/gha`'s `student-qmd`](https://github.com/Morrison-Lab/gha/tree/main/student-qmd)
+  removes from student copies).
+- **Commentary on the math, warnings, hints and tips, notes, and optional material**:
+  a remark or the matching callout type,
+  chosen per [`quarto-remarks-vs-callouts.md`](quarto-remarks-vs-callouts.md).
 - **Figures and tables**: `::: {#fig-...}` and `::: {#tbl-...}`,
   per [`quarto-figure-captions.md`](quarto-figure-captions.md).
 
@@ -47,26 +44,40 @@ Examples are a "notation" box, a "key takeaway" summary,
 a "connection to the book" pointer in notes that parallel a textbook,
 or a "data" box describing a dataset's variables.
 
-- Define it once in the project config,
-  the way the lab's sites define their theorem-type colors:
-  a `custom-callout` entry (from the `coatless-quarto/custom-callout` extension)
-  with its own color, so it is distinguishable from the existing types.
+- Define it once in the project config, with its own color,
+  so it is distinguishable from the existing types.
+  What the config needs depends on the kind of type:
+  - A **callout type** used as `::: {.callout-<type>}` needs a `custom-callout` entry
+    (from the `coatless-quarto/custom-callout` extension).
+  - A **theorem-like div** (framed like a definition)
+    also needs a `callouty-theorem` entry,
+    the way `Morrison-Lab/psw`'s `_quarto-website.yml` configures `remark`, `proof`, and `solution`.
+  - A **plain div class** (`::: notation`) gets no frame from either extension,
+    so it needs its own CSS rule.
 - Style it in revealjs as well as HTML,
   per [`quarto-revealjs-div-styling.md`](quarto-revealjs-div-styling.md).
 - Use it consistently: once the type exists,
   every block of that kind gets it.
 - When the same new type would serve several repositories,
-  add it to the shared template (`qwt`, `qbt`, `qmt`) rather than to one site.
+  add it to the shared templates
+  ([`qwt`](https://github.com/Morrison-Lab/qwt),
+  [`qbt`](https://github.com/Morrison-Lab/qbt),
+  [`qmt`](https://github.com/Morrison-Lab/qmt))
+  rather than to one site.
 
 ## Limits
 
 - **Don't nest theorem-type divs.**
   A definition does not go inside a theorem, and no theorem-type div goes inside a remark;
-  see `skills/quarto-authoring/references/divs-and-spans.md`.
+  see [`divs-and-spans.md`](../../skills/quarto-authoring/references/divs-and-spans.md).
+  Layout wrappers and callouts may still contain them.
   Two typed blocks sit side by side.
 - **Don't box the narrative.**
   Prose that connects one typed block to the next,
-  or that motivates a section, is not a typed block.
+  or that introduces a section, is not a typed block.
+  The tie-breaker: a sentence about one specific block
+  (its motivation, a synonym, a caveat) is a remark or callout attached to that block;
+  a sentence that joins blocks or opens a section is narrative.
   A div around every paragraph makes the frames meaningless.
 - **One type per box.**
   A block that mixes a definition with a warning about it

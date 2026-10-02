@@ -1069,7 +1069,7 @@ and a read-through inspects sentences, not the sequence.
 
 Every block with a type --- definition, result, proof, example, exercise, solution, remark, warning, tip, note --- goes in the div or callout of that type, in every repository with Quarto content.
 A recurring kind of block with no matching category gets a new custom div or callout type rather than staying in plain prose.
-Connective narrative stays unboxed, and theorem-type divs are never nested.
+Connective narrative stays unboxed, and one theorem-type div does not go inside another.
 
 ## Writing style: a grouping level must earn its place
 

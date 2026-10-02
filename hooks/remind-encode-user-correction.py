@@ -27,8 +27,10 @@ is decidable. Host memory is allowed in addition, never instead.
 It does not try to catch every plain correction ("no, use UTC"): those carry
 no lexical marker that separates them from an ordinary instruction, and a
 reminder that fires on every "no" or "again" teaches the reader to skip it.
-Each pattern therefore needs words that only make sense addressed to an
-agent that missed something, and windows stay inside one sentence.
+Each pattern therefore needs wording that is rare outside a complaint to an
+agent that missed something, and windows stay inside one sentence. Rare is
+not never ("I repeat: great job" fires), so the reminder ends with an
+explicit instruction to ignore it when the words were not a correction.
 
 Inject-only, like its siblings: the user's message is never blocked. Text the
 user did not type as a correction is removed before matching: fenced and
@@ -46,10 +48,13 @@ PATTERNS = [
     r"\bmake me repeat\b",
     r"^\s*I repeat:",
     r"\b(?:have|had|keep|kept|need) (?:to )?(?:tell|telling|remind|reminding) you"
-    r" (?:to|not|that you|again)\b",
+    r" (?:to|not|that you|again|this|that|every|each|over)\b",
+    r"\b(?:keep|kept) having to (?:tell|remind|repeat|say|ask)\b",
+    r"\bI(?:'ve| have) had to (?:tell|remind|repeat|say|ask)\b",
+    r"\brepeated (?:this|that|it|myself) (?:many|multiple|several|\d|again|before)",
     r"\b(?:have to|need to) keep (?:saying|telling|asking|reminding)\b",
     r"\bI(?:'ve| have)? (?:already|just) (?:told|explained (?:this|that|it) to) you\b",
-    r"\bI(?:'ve| have)? told you (?:before|already|this|so many|to|not|again"
+    r"\bI(?:'ve| have)? told you (?:before|already|this|that|so many|to|not|again"
     r"|yesterday|last|many|multiple|several|\d)",
     r"\bI(?:'ve| have) (?:said|asked you|explained) (?:this |that |it )?"
     r"(?:before|already|again|many|multiple|several|\d)",
@@ -62,7 +67,9 @@ PATTERNS = [
     r"\b(?:have to|need to) (?:tell|remind) you\b",
     r"\bshould(?:n't| not) have to (?:tell|ask|say|remind|repeat)\b",
     # The agent repeating a miss.
-    r"(?<!are )\byou(?:'re| are)? still (?:not|interpreting|ignoring|forgetting)\b",
+    r"(?<!are )\byou(?:'re| are)? still (?:not|haven't|interpreting|ignoring|forgetting)\b",
+    r"\byou(?:'re| are) doing (?:it|that|this) again\b",
+    r"\byou (?:misread|misunderstood|misinterpreted) (?:me|my|what I)\b",
     r"\byou keep (?:forgetting|ignoring|missing|doing)\b",
     r"\byou never remember\b",
     r"\byou(?:'ve| have)? (?:forgot(?:ten)?|ignored|did (?:it|that|this))\b"
@@ -72,7 +79,7 @@ PATTERNS = [
     r"\b(?:interpret\w*|read(?:ing)?|tak(?:e|ing) (?:it|this|that|me|my \w+))\b"
     r"[^.?!\n]{0,40}\btoo (?:narrowly|literally)\b",
     r"\b(?:things?|stuff) that (?:feel|feels|seem|seems|should be) obvious\b",
-    r"\b(?:that's|this is|that is|it's) not what I (?:asked|meant|said|wanted)\b",
+    r"\b(?:that'?s|this is|that is) not what I (?:asked|meant|said)\b",
     r"\byou ignored my\b",
 ]
 MATCHER = re.compile("|".join(PATTERNS), re.IGNORECASE | re.MULTILINE)

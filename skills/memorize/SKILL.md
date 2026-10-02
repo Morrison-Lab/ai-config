@@ -68,7 +68,8 @@ those forms — this skill is what it hands off to once memory is the answer.
      project memory as short-lived, not-yet-durable staging, and update
      `MEMORY.md` there as an index entry too.
    - **General standing rule** — an always-apply working preference across ALL repos ("always link PRs in tables", "use Pacific time") → ai-config's own `AGENTS.md` (cross-agent) or `CLAUDE.md` / a `shared/` fragment (Claude-specific detail), committed to `Morrison-Lab/ai-config` by PR.
-     The plugin's `hooks/inject-core-rules.py` loads `AGENTS.md` into every session, so that is what makes the rule reach other projects.
+     The plugin's `hooks/inject-core-rules.py` puts `AGENTS.md` (its opening, plus an order to read the rest) into every session, so that is what makes the rule reach other projects.
+     Keep the `AGENTS.md` entry to the rule in a line or two with a pointer, and put detail in a `shared/` fragment: `AGENTS.md` has a hard 32,768-byte cap.
      Do not write it to `~/.claude/CLAUDE.md` unless that file is a symlink into an ai-config checkout: the symlink install was removed, and a plain file there is invisible to every other machine, container and project.
    - **Host memory is a copy, never the home.**
      A claude.ai project's memory, a Cowork or desktop memory store, or any other memory the harness offers is read only inside that project.
@@ -115,8 +116,7 @@ those forms — this skill is what it hands off to once memory is the answer.
      directory as an index entry. Tell the user this is temporary staging
      and what's still needed (agent-doc infra added via a PR, or upstream
      approval).
-   - **`/memories/session/`** — skip; conversation-only notes shouldn't enter
-     the shared repo.
+   - **`/memories/session/`** — skip; conversation-only notes shouldn't enter the shared repo.
    - **No `~/.claude/memories` symlink** (a cloud or project session, or any machine set up after the symlink install was removed) — attach or clone `Morrison-Lab/ai-config`, commit the change there on a branch, and open a PR (`push-memory` does this).
      A write under `~/.claude` that is not a symlink into ai-config is lost with the container or stays on one machine, which is how the user ends up repeating themselves.
    - **Everything else gets committed** to ai-config.

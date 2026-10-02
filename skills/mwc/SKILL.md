@@ -22,9 +22,7 @@ without asking confirmation before every merge.
   without explicit user instruction for that specific PR.
   Pushing, building, or driving a PR to 100% clean CI
   DOES NOT grant permission to merge.
-  One repository is exempted standing --- see "The standing per-repository
-  grant" below --- and so are infra-only PRs in any Morrison-Lab repository
-  --- see "The standing infra-PR grant".
+  Two repositories are exempted standing --- see "The standing per-repository grant" below --- and so are infra-only PRs in any Morrison-Lab repository --- see "The standing infra-PR grant".
   The Scope Limit binds both.
 - **MWC Override Scope**: When the user explicitly issues `/mwc`, the bare word `mwc`, "merge when confident", "merge at will", or "maw", that baseline prohibition is suspended for the current session only.
   The bare word is listed here, not only in `CLAUDE.md`'s general "Bare keyword directives" convention, so this file is self-contained: a slash command is routed to this skill by the harness itself, while a bare word in prose is a convention the model must recognize on its own, and it recognizes it most reliably when the file governing the mechanics (`enable-mwc`, `check-mwc`, the Scope Limit) names the exact form it will see rather than only implying it maps here.
@@ -409,7 +407,7 @@ The two grants differ on every axis except the Scope Limit, which binds both:
 
 | | session grant (`/mwc`) | standing grant |
 | :--- | :--- | :--- |
-| scope | this session, every repo | `Morrison-Lab/ai-config`, forever |
+| scope | this session, every repo | `Morrison-Lab/ai-config` and the macros repo, forever |
 | keyed on | a `.mwc` marker in the **current** repo's git dir | the **target** repo named in the command |
 | enabling step | `enable-mwc`, then `check-mwc` | none |
 | covers | any merge command run from that checkout | `gh pr merge` / `gh api .../pulls/N/merge` only |

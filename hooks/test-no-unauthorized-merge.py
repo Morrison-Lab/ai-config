@@ -23,6 +23,10 @@ if not os.path.isfile(HOOK):
 os.environ["NO_UNAUTHORIZED_MERGE_DISABLE_INFRA_GRANT"] = "1"
 
 BLOCK = [
+    # The macros entries in STANDING_MERGE_GRANT_REPOS are exact names.
+    ("gh pr merge 12 -R d-morrison/macros-fork", "a repo whose name merely starts with macros"),
+    ("gh pr merge 12 -R Other-Owner/macros", "the macros name under an ungranted owner"),
+    ("gh pr merge 12 -R d-morrison/macros -R Morrison-Lab/gha", "a granted macros target beside an ungranted one"),
     ("gh pr merge 411 --squash", "bare gh pr merge"),
     ('bash -c "gh pr merge 411 --squash"', "subshell bash -c gh pr merge inside double quotes"),
     ("sh -c 'gh pr merge 411 --squash'", "subshell sh -c gh pr merge inside single quotes"),

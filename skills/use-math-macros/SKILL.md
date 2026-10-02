@@ -23,7 +23,7 @@ place.
 - "macroize", "macroize the math", "use macros", "use the macros submodule",
   "convert math to macros", "polish the math with macros".
 - **Every time you write, edit, or review math in a lab `.qmd` or `.tex` document**, a manuscript or a single equation alike --- this is mandatory, not a polish pass.
-  Use the semantic macro for each concept the library names (`\E`/`\Ep` for an expectation, `\Var`, `\Cov`, `\P`, …) rather than writing its raw LaTeX, and when no macro names the concept, add one (step 6) rather than writing raw LaTeX (standing rule;
+  Use the semantic macro for each concept the library names (`\Ep` for a bare expectation operator, `\E{x}` for one subscripted by `x`, `\Var`, `\Cov`, `\P`, …) rather than writing its raw LaTeX, and when no macro names the concept, add one (step 6) rather than writing raw LaTeX (standing rule;
   see `memories/preferences.md`).
 
 ## Procedure

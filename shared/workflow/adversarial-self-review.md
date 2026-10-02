@@ -1497,15 +1497,15 @@ That is the same-reviewer clean the rule asks for, and it is a real re-review ra
 
 ## Post every independent review on the PR or MR it reviewed
 
-Every independent review you run on a PR or MR goes on that PR or MR, not only a fallback review that gates a push.
-That covers a dispatched subagent review, an adversarial review, a referee-style read of a rendered document, and a review from another model or harness.
+Every independent review you run on a PR or MR goes on that PR or MR, not only the pre-push pass or the fallback review.
+That covers a dispatched subagent review, an adversarial review, a referee read (an independent read of a rendered document, such as a manuscript, the way a journal referee would read it), and a review from another model or harness.
 On GitLab, post it as an MR note;
 for a branch with no PR yet, post it once the PR exists.
 A review that returns a structured report with a verdict is posted in the form set by [The posted fallback comment is the reviewer's report](#the-posted-fallback-comment-is-the-reviewers-report-not-an-author-composite).
 A referee read of a rendered document has no verdict line, so post its findings with page numbers, as [`review-rendered-documents`](review-rendered-documents.md) step 6 records them.
 Post the dispositions as [`ard`](../../skills/ard/SKILL.md) posts them, naming the fixing commit once it is pushed.
 Each comment ends with the [`disclose-agent-authorship`](disclose-agent-authorship.md) marker.
-A not-clean report you post is a standing verdict under [the relayed not-clean round section](#a-relayed-not-clean-round-is-a-standing-verdict-under-your-login-so-close-it-with-a-clean-one-on-the-new-head), so after fixing its findings, re-run the same reviewer on the new head and post that result.
+A not-clean report you post is a standing verdict, so close it as [the relayed not-clean round section](#a-relayed-not-clean-round-is-a-standing-verdict-under-your-login-so-close-it-with-a-clean-one-on-the-new-head) directs.
 In your reply to the user, link the posted comment itself, per [`link-forge-artifacts`](../writing/link-forge-artifacts.md).
 
 A review that lives only in the session is invisible to the repository owner and lost when the session ends.

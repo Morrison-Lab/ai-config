@@ -1,6 +1,6 @@
 ---
 name: "use-math-macros"
-description: "Use shared math macros submodule."
+description: "Use shared semantic math macros in all lab math."
 ---
 
 # use-math-macros (Codex wrapper)

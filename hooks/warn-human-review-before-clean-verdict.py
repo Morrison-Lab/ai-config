@@ -6,16 +6,19 @@ person to review. The rule was skipped, and the fix for the skip was again
 prose (ai-config#4241), so this hook checks the action itself.
 
 It fires on a request for a human reviewer:
-  - `gh pr edit --add-reviewer NAME`
+  - `gh pr edit --add-reviewer NAME`, `gh pr create --reviewer/-r NAME`
   - `gh api .../requested_reviewers` with `reviewers[]=NAME`
-  - `mcp__github__update_pull_request` with a `reviewers` list
+  - `mcp__github__update_pull_request` or `create_pull_request` with a
+    `reviewers` list
 A reviewer is a person unless the login contains `bot`, `copilot` or `claude`.
 
 It looks in the transcript (JSONL), after the last pushed command, for a clean
 review result: a `Verdict: Ready for merge` line or a `"verdict": "CLEAN"`
-payload together with a 40-hex commit. Quoted instructions name the verdict
-but carry no commit, so they do not count. If it finds none, it adds a note. It never blocks: an explicit instruction from the user to
-request review now is a valid reason, and a hook cannot see that reliably.
+payload together with a 40-hex commit.
+Quoted instructions name the verdict but carry no commit, so they do not count.
+If it finds none, it adds a note.
+It never blocks: an explicit instruction from the user to request review now
+is a valid reason, and a hook cannot see that reliably.
 
 Deliberate limits:
   - It reads only the transcript. It does not call GitHub, so a verdict that was
@@ -23,6 +26,11 @@ Deliberate limits:
   - A missing or unreadable transcript is silent (fail open).
   - A reviewer request that removes a reviewer (`-X DELETE`) is ignored. A
     request whose reviewers sit in a `--input` JSON file is not seen.
+  - A verdict is not compared with the pushed head. One printed before the
+    last push (the usual pre-push review) does not count, and one for an
+    older commit printed after it does.
+  - A push counts when a Bash command runs `git push` (also `git -C DIR
+    push`) or an MCP file-write tool runs. Other ways of pushing are not seen.
 """
 import json
 import os
@@ -37,7 +45,8 @@ VERDICT = re.compile(
     r"^[ \t#>*]*Verdict:[ \t*]*Ready for merge|\"verdict\":\s*\"CLEAN\"",
     re.I | re.M)
 COMMIT = re.compile(r"(Reviewed-Commit:|\"commit_sha\":)\s*\"?[0-9a-f]{40}", re.I)
-PUSH = re.compile(r"(^|[;&|]\s*)git\s+push\b")
+PUSH = re.compile(r"(^|[;&|]\s*)git(\s+-\S+(\s+\S+)?)*\s+push\b")
+MCP_PUSH = re.compile(r"mcp__github__(push_files|create_or_update_file)")
 DELETE = re.compile(r"(-X|--method)[ =]+DELETE", re.I)
 
 NOTE = """\
@@ -54,24 +63,33 @@ def humans(names):
     return [n for n in names if n and not BOT.search(n)]
 
 
-def reviewers_from_bash(command):
+def reviewers_from_segment(command):
     try:
         words = shlex.split(command)
     except ValueError:
         return []
     names = []
     for i, word in enumerate(words):
-        if word == "--add-reviewer" and i + 1 < len(words):
+        if word in ("--add-reviewer", "--reviewer", "-r") and i + 1 < len(words):
             names += words[i + 1].split(",")
-        elif word.startswith("--add-reviewer="):
+        elif word.startswith(("--add-reviewer=", "--reviewer=")):
             names += word.split("=", 1)[1].split(",")
         elif word.startswith("reviewers[]="):
             names.append(word.split("=", 1)[1])
     if DELETE.search(command):
         return []
-    if "requested_reviewers" in command or "--add-reviewer" in command:
+    if "requested_reviewers" in command or re.search(
+            r"--add-reviewer|gh\s+pr\s+create", command):
         return names
     return []
+
+
+def reviewers_from_bash(command):
+    """Reviewer logins requested by any simple command in a compound line."""
+    names = []
+    for segment in re.split(r"&&|\|\||[;|\n]", command):
+        names += reviewers_from_segment(segment)
+    return names
 
 
 def requested_humans(payload):
@@ -81,7 +99,7 @@ def requested_humans(payload):
         return []
     if tool == "Bash" and isinstance(tool_input.get("command"), str):
         return humans(reviewers_from_bash(tool_input["command"]))
-    if tool.endswith("update_pull_request"):
+    if tool.endswith(("update_pull_request", "create_pull_request")):
         names = tool_input.get("reviewers")
         if isinstance(names, list):
             return humans([n for n in names if isinstance(n, str)])
@@ -132,7 +150,8 @@ def clean_since_last_push(path):
     last_push = 0
     for number, record in enumerate(records):
         cmds = commands(record) if not isinstance(record, str) else [record]
-        if any(PUSH.search(c) for c in cmds):
+        if any(PUSH.search(c) for c in cmds) or (
+                MCP_PUSH.search(json.dumps(record))):
             last_push = number
     for record in records[last_push:]:
         for text in strings(record):

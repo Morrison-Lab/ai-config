@@ -15,29 +15,37 @@ The same command succeeds from a Terminal tab, which the user has already grante
 ## Unattended work: a user-approved Terminal-side queue worker
 
 When the work must run unattended (the user asleep, approval prompts piling up), a Terminal tab per run does not scale.
-The alternative is a setup the user approves and starts themselves, which expires: a worker running in Terminal, which already has the access, and which the Claude app feeds.
-Starting the worker is the user's decision to delegate that access, not a way around the macOS gate, so propose it and let the user choose.
+The alternative is a worker that the user approves and starts in Terminal.
+Terminal already has the access, the Claude app feeds the worker jobs, and the worker expires on its own.
+Starting the worker is the user's decision to delegate Terminal's access to the Claude app's session.
+It is a delegation the macOS privacy controls did not grant, so it needs the organization's policy to allow it, and it is the user's call, not the agent's.
 The worker has:
 
 - a queue folder the session writes job requests into;
-- an allowlist of job types, such as "render this project's manuscript", with no arbitrary shell commands;
+- an allowlist of job types, such as "render this project's manuscript";
 - a pinned commit SHA that the user sets, so the worker runs only that commit and never the working tree;
-- an expiry time, after which the worker exits on its own.
+- an expiry time, after which the worker exits.
 
+The job request carries no shell commands, but the code at the pinned commit can still run anything, for example through R's `system()`.
 The worker rejects any job that names a path or a git ref, because the session can write the repository and a reviewed commit is only enforceable when the worker, not the job, picks the code.
 A job-type allowlist limits job types, not code.
 A render executes the document's own R code with Terminal's full access, so the user must review the code at the pinned commit before approving.
+That SHA pins only the repository: R packages, input data, `.Rprofile`, and `renv` fetches sit outside it.
+The worker's code, its configuration, and the pinned SHA must live where the Claude app cannot write, or the session could change what runs.
 The worker is also not a data-egress control.
-It should write back only a status and exit code, and the project's normal rendered outputs (for example the manuscript of aggregate results), never logs or intermediate files that can echo restricted data.
+Limits on what the worker writes back (a status and exit code, and the project's normal rendered outputs, never logs or intermediate files that can echo restricted data) rest on the user's review of the code at the pinned commit, not on enforcement.
+Even aggregate outputs, such as a manuscript of aggregate results, can contain small cells that identify individuals.
 
-The abridge render worker under `~/Library/Application Support/abridge-render-queue/` on the user's Mac follows this pattern.
+The abridge render worker under `~/Library/Application Support/abridge-render-queue/` on the user's Mac reportedly follows this pattern.
 The coordinator session reported it on 2026-10-02, and this repo has not verified it: its existence, the queue folder, and the properties above are reported, not observed.
+The coordinator session also described the S-drive as holding PHI on 2026-10-02.
 
+- **Do:** before proposing the worker, confirm (or ask the user to confirm) that the organization's data and IT policy permits it;
+  the user's approval does not waive that policy.
 - **Do:** propose the queue worker when a per-app gate blocks the Claude app from a resource the user already reaches from Terminal, and unattended work would otherwise stall.
 - **Do:** let the user review the code at the pinned commit before the worker starts.
-- **Don't:** copy restricted data (row-level records, or anything the project treats as protected health information;
-  the coordinator session described the S-drive as holding PHI on 2026-10-02) into a local cache the Claude app can read, to get around the block.
-- **Don't:** suggest granting the Claude app Network Volumes or Full Disk Access as the alternative to the worker.
+- **Don't:** copy row-level records, or anything the project treats as protected health information, into a local cache the Claude app can read.
+- **Don't:** offer Network Volumes or Full Disk Access as the alternative (see the first section's Don't).
 
 ## Claude Projects: confirm a thread's own session state before saying it is running
 

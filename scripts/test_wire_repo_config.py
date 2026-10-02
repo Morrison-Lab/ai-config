@@ -87,9 +87,15 @@ class WireRepoConfig(unittest.TestCase):
         self.assertEqual(self.read("CLAUDE.md"), "# Claude\n\n" + wire.BLOCK)
 
     def test_claude_md_importing_agents_is_left_alone(self):
-        (self.repo / "CLAUDE.md").write_text("@AGENTS.md\n", encoding="utf-8")
+        for text in ("@AGENTS.md\n", "# x\n\n@./AGENTS.md\n"):
+            (self.repo / "CLAUDE.md").write_text(text, encoding="utf-8")
+            self.run_main()
+            self.assertEqual(self.read("CLAUDE.md"), text)
+
+    def test_claude_md_mentioning_agents_in_code_gets_block(self):
+        (self.repo / "CLAUDE.md").write_text("Use `@AGENTS.md` imports.\n", encoding="utf-8")
         self.run_main()
-        self.assertEqual(self.read("CLAUDE.md"), "@AGENTS.md\n")
+        self.assertIn(wire.BEGIN, self.read("CLAUDE.md"))
 
     def test_stale_block_is_replaced_in_place(self):
         stale = f"intro\n\n{wire.BEGIN}\nold text\n{wire.END}\n\noutro\n"

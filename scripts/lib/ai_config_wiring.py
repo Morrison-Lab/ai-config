@@ -2,9 +2,9 @@
 
 Both scripts register the same marketplace, refuse to wire an ai-config
 checkout into itself, and splice a marked block into a Markdown file the user
-also edits (ai-config#4206). hooks/inject-core-rules.py keeps its own copy of
-`is_ai_config`, because a hook runs from the plugin cache with no guarantee
-that scripts/lib is importable beside it.
+also edits (ai-config#4206). hooks/inject-core-rules.py keeps its own
+version of the checkout test (`ai_config_root`), because a hook runs from
+the plugin cache with no guarantee that scripts/lib is importable beside it.
 """
 from __future__ import annotations
 

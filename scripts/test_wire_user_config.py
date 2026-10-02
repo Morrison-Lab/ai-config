@@ -132,6 +132,7 @@ class WireUserConfig(unittest.TestCase):
         self.write_settings({"enabledPlugins": ["x"], "hooks": ["y"]})
         code, out = self.run_main()
         self.assertEqual(code, 0, out)
+        self.assertIn("is not a JSON object", line(out, "Claude Code"))
         self.assertIn("Gemini CLI", out)
 
     def test_unterminated_gemini_block_is_reported_not_doubled(self):
@@ -156,6 +157,12 @@ class WireUserConfig(unittest.TestCase):
         _, out = self.run_main()
         self.assertIn("fire every hook twice", line(out, "Claude Code"))
         self.assertNotIn("enabledPlugins", self.settings())
+
+    def test_non_default_claude_home_hook_install_is_detected(self):
+        self.write_settings({"hooks": {"Stop": [{"hooks": [
+            {"type": "command", "command": "python3 /x/claude/hooks/no-placeholder-reply.py"}]}]}})
+        _, out = self.run_main()
+        self.assertIn("fire every hook twice", line(out, "Claude Code"))
 
     def test_foreign_codex_file_is_left_alone(self):
         codex = self.home / ".codex/AGENTS.md"
@@ -198,12 +205,19 @@ class WireUserConfig(unittest.TestCase):
         self.assertFalse((self.home / ".config/opencode").exists())
         config_dir = self.home / ".config/opencode"
         config_dir.mkdir(parents=True)
-        stale = str(self.home / "old-checkout/AGENTS.md")
+        old = self.home / "old-checkout"
+        (old / ".claude-plugin").mkdir(parents=True)
+        (old / ".claude-plugin/marketplace.json").write_text(
+            json.dumps({"name": "Morrison-Lab"}), encoding="utf-8")
+        (old / "AGENTS.md").write_text("old\n", encoding="utf-8")
+        gone = str(self.home / "unmounted-project/AGENTS.md")
         (config_dir / "opencode.json").write_text(
-            json.dumps({"instructions": ["mine.md", stale]}), encoding="utf-8")
+            json.dumps({"instructions": ["mine.md", str(old / "AGENTS.md"), gone]}),
+            encoding="utf-8")
         self.run_main()
         config = json.loads((config_dir / "opencode.json").read_text(encoding="utf-8"))
-        self.assertEqual(config["instructions"], ["mine.md", str(wire.ROOT / "AGENTS.md")])
+        self.assertEqual(config["instructions"],
+                         ["mine.md", gone, str(wire.ROOT / "AGENTS.md")])
 
     def test_opencode_jsonc_is_not_shadowed(self):
         config_dir = self.home / ".config/opencode"

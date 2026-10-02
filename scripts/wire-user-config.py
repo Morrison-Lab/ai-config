@@ -29,9 +29,9 @@ Every step is idempotent and conservative:
     synced copy or a user-scope install is on disk, or on a machine that
     registered the catalog through `scripts/install-hooks.py --fix`. Each of
     those plus a marketplace copy fires every hook twice. A remote (claude.ai)
-    container with no synced copy is reported as `skip`: its account sync
-    has failed (ai-config#3948), and enabling a second copy there would
-    double every hook once the sync recovers.
+    container with no synced copy is reported as `skip`: the account sync is
+    missing or failed (ai-config#3948), and enabling a second copy there
+    would double every hook once the sync delivers one.
   - A Codex file or link that is not ours is left alone; a dangling link, or
     one into another ai-config checkout, is repointed here.
   - Each step reports `ok`, `write`/`link`, `todo` (with --check) or `skip`
@@ -45,6 +45,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -115,7 +116,10 @@ def non_plugin_hooks_registered(settings: dict) -> bool:
                     continue
                 if "CLAUDE_PLUGIN_ROOT" in command:
                     continue
-                if any(f".claude/hooks/{name}" in command for name in scripts):
+                # install-hooks.py writes `$HOME/.claude/hooks/<name>`, or a
+                # literal CLAUDE_HOME path, with either separator.
+                if any(re.search(r"[\\/]hooks[\\/]" + re.escape(name) + r"\b", command)
+                       for name in scripts):
                     return True
     return False
 
@@ -139,11 +143,14 @@ def plugin_on_disk(claude_home: Path) -> str | None:
 
 
 def wire_claude(check: bool) -> tuple[str, bool]:
-    claude_home = home() / ".claude"
+    claude_home = Path(os.environ.get("CLAUDE_HOME", home() / ".claude"))
     path = claude_home / "settings.json"
     settings = load_json(path)
     if settings is None:
         return f"skip  {path} is not a JSON object; fix it by hand", False
+    for key in ("enabledPlugins", "extraKnownMarketplaces", "hooks"):
+        if key in settings and not isinstance(settings[key], dict):
+            return f"skip  {path}: `{key}` is not a JSON object; fix it by hand", False
     explicit = ai_config_entries(settings)
     if explicit:
         state = ", ".join(f"{k}={v}" for k, v in sorted(explicit.items()))
@@ -156,8 +163,8 @@ def wire_claude(check: bool) -> tuple[str, bool]:
         return f"ok    plugin already loads from {elsewhere}", True
     if os.environ.get("CLAUDE_CODE_REMOTE") == "true":
         return ("skip  remote container with no synced plugin copy: the account "
-                "plugin sync failed (ai-config#3948); a marketplace copy here "
-                "would load twice once the sync works"), False
+                "plugin sync is missing or failed (ai-config#3948); a marketplace "
+                "copy here would load twice once the sync delivers one"), False
     if non_plugin_hooks_registered(settings):
         return (f"skip  {path} registers the hook catalog from ~/.claude/hooks "
                 "(install-hooks.py path); enabling the plugin too would fire "
@@ -227,12 +234,15 @@ def wire_gemini(check: bool) -> tuple[str, bool]:
 
 
 def stale_instruction(entry: object, agents: str) -> bool:
-    """An earlier ai-config AGENTS.md entry from a moved or other checkout."""
+    """An earlier AGENTS.md entry that is provably another ai-config checkout's.
+
+    An entry whose file is gone cannot be attributed, so it is kept: it may be
+    the user's own entry for a project that is moved or unmounted.
+    """
     if not isinstance(entry, str) or entry == agents or not entry.endswith("/AGENTS.md"):
         return False
     candidate = Path(entry)
-    return candidate.is_absolute() and (
-        not candidate.exists() or is_ai_config(candidate.parent))
+    return candidate.is_absolute() and is_ai_config(candidate.parent)
 
 
 def wire_opencode(check: bool) -> tuple[str, bool]:
@@ -276,7 +286,7 @@ def main(argv: list[str] | None = None) -> int:
     for label, step in STEPS:
         try:
             message, ok = step(args.check)
-        except (OSError, UnicodeError, ValueError, TypeError, AttributeError) as err:
+        except (OSError, UnicodeError, ValueError) as err:
             message, ok = f"skip  {type(err).__name__}: {err}", False
         print(f"{label:<12} {message}")
         all_ok = all_ok and ok

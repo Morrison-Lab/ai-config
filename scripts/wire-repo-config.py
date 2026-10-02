@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -51,13 +52,18 @@ BLOCK = f"""{BEGIN}
 This repository follows the maintainer's cross-project agent rules in
 [Morrison-Lab/ai-config](https://github.com/Morrison-Lab/ai-config).
 If your harness has not already loaded them (Claude Code loads them through
-the `ai-config@Morrison-Lab` plugin), read
+the ai-config plugin), read
 [AGENTS.md](https://github.com/Morrison-Lab/ai-config/blob/main/AGENTS.md)
 before starting work, and follow it alongside this file.
 This file's own instructions add to those rules, and win only where they are
 more specific.
 {END}
 """
+
+
+# A Claude Code import: `@AGENTS.md` or `@./AGENTS.md` at the start of a line
+# (an import inside a code span or fence is not read as one).
+IMPORTS_AGENTS = re.compile(r"^@(?:\./)?AGENTS\.md\s*$", re.MULTILINE)
 
 
 def load_settings(path: Path) -> dict:
@@ -103,7 +109,7 @@ def block_change(repo: Path, name: str) -> tuple[str, str | None]:
     current = path.read_text(encoding="utf-8") if path.exists() else ""
     if BLOCK in current:
         return f"ok    {name} already points at ai-config", None
-    if name == "CLAUDE.md" and (not current or "@AGENTS.md" in current):
+    if name == "CLAUDE.md" and (not current or IMPORTS_AGENTS.search(current)):
         return f"ok    {name} absent or imports AGENTS.md; nothing to add", None
     try:
         updated = splice_block(current, BLOCK, BEGIN, END)
@@ -124,9 +130,9 @@ def wire(repo: Path, check: bool, enable_plugin: bool) -> bool:
         if check and msg.startswith("write"):
             msg = "todo" + msg[len("write"):]
         print(f"{repo}: {msg}")
-    pending = settings is None and all(text is None for _, text in docs)
+    already_wired = settings is None and all(text is None for _, text in docs)
     if check:
-        return pending
+        return already_wired
     if settings is not None:
         path = repo / ".claude" / "settings.json"
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -135,7 +141,7 @@ def wire(repo: Path, check: bool, enable_plugin: bool) -> bool:
     for name, (_, text) in zip(("AGENTS.md", "CLAUDE.md"), docs):
         if text is not None:
             (repo / name).write_text(text, encoding="utf-8")
-    return pending
+    return already_wired
 
 
 def main(argv: list[str] | None = None) -> int:

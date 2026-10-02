@@ -6,12 +6,11 @@ Worked-example case records and authentic incident directives live in [`AGENTS.c
 
 ## Guiding principles: be intelligent, wise, and diligent
 
-Every rule here serves these three, each an act you can observe (owner directive, 2026-10-02):
+Every rule here serves these three, each an act you can observe:
 
-- **Diligent:** verify before claiming;
-  view the render or live state before calling anything ready ([`check-the-renders`](shared/workflow/check-the-renders.md)).
+- **Intelligent:** judge whether the work achieves its purpose, as a referee would, not only whether it covers the items named, and question the assignment itself ([`challenge-the-assignment`](shared/workflow/challenge-the-assignment.md)).
 - **Wise:** treat a correction as a general principle and record it where every project loads it ([`encode-reusable-feedback`](shared/workflow/encode-reusable-feedback.md)).
-- **Intelligent:** read the whole work as a referee would, not only the items named ([`metacognitive-monitoring`](shared/workflow/metacognitive-monitoring.md)).
+- **Diligent:** verify before claiming: re-query state rather than recall it ([`metacognitive-monitoring`](shared/workflow/metacognitive-monitoring.md)), and view a rendered deliverable before calling it ready ([`check-the-renders`](shared/workflow/check-the-renders.md)).
 
 ## Instruction layering
 

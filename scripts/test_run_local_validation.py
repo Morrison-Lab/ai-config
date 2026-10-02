@@ -269,6 +269,9 @@ def test_run_reports_each_rc_and_fails_overall():
         check("the multi-line step ran under bash and executed its second line", out_file.read_text(encoding="utf-8") == "two\n")
         check("working-directory is honoured", "Sub-directory step" in text)
         check("the summary carries the denominator", "of 7 step(s) derived" in text and "2 not runnable" in text)
+        summary = text[text.index(" passed, "):]
+        check("the summary names each failed step and its exit code",
+              "  FAILED: Failing step (rc 3)" in summary)
 
 
 def test_only_and_skip_filters():

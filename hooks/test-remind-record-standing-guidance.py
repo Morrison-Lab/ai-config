@@ -44,7 +44,7 @@ RULE = "Always link every PR in tables when you report status to me."
 
 
 def run(recs, prompt="Thanks, now please run the tests again.", sentinel_dir=None,
-        raw=None, twice=False):
+        raw=None, twice=False, count=False):
     fd, tpath = tempfile.mkstemp(suffix=".jsonl")
     with os.fdopen(fd, "w") as fh:
         for r in recs:
@@ -64,7 +64,10 @@ def run(recs, prompt="Thanks, now please run the tests again.", sentinel_dir=Non
                 sys.exit(f"FATAL: hook exited {p.returncode}\n{p.stderr.strip()}")
             if '"decision"' in p.stdout or "block" in p.stdout.lower():
                 sys.exit(f"FATAL: block-shaped output\n{p.stdout}")
-            outs.append("REMIND" if p.stdout.strip() else "silent")
+            if count:
+                outs.append(p.stdout.count("Standing-guidance reminder"))
+            else:
+                outs.append("REMIND" if p.stdout.strip() else "silent")
     finally:
         os.unlink(tpath)
         if own:
@@ -101,6 +104,8 @@ SILENT = [
     ([], "Please fix the failing test in foo.py and rerun the suite.", "plain task request"),
     ([], "Should we always link PRs in tables, or only in summaries?", "question about a rule"),
     ([], "Why does the build never finish on this branch?", "question using never"),
+    ([], "Can you always link every PR in tables when you report status to me?",
+     "question that would match the always alternative"),
     ([], "ok thanks", "short ack"),
     ([], "Never mind.", "short, under the length floor"),
     ([], "Here is the text:\n```\nFrom now on always link every PR in tables.\n```\nsummarize it", "fenced text"),
@@ -155,6 +160,14 @@ ok = got == ["REMIND", "silent"]
 wrong += not ok
 print(f"  {'ok' if ok else 'WRONG':<7} prompt echoed in transcript fires once ({got})")
 
+# With the new prompt echoed as the last record, the REAL earlier rule before
+# it is still checked: two reminders, one per distinct rule.
+n = run([user("Never skip the pre-push review on any branch."), say("ok"), user(RULE)],
+        RULE, count=True)
+ok = n == 2
+wrong += not ok
+print(f"  {'ok' if ok else 'WRONG':<7} echoed prompt does not hide the real earlier rule ({n} reminders)")
+
 # Two distinct rules each get their own firing in one sentinel dir.
 sd = tempfile.mkdtemp()
 a = run([], "From now on, record every rule in ai-config.", sentinel_dir=sd)
@@ -180,6 +193,6 @@ ok = v == "REMIND"
 wrong += not ok
 print(f"  {'ok' if ok else 'WRONG':<7} missing transcript still reminds for the new prompt")
 
-total = len(REMIND) + len(SILENT) - 1 + 4 + 5 + 1
+total = len(REMIND) + len(SILENT) - 1 + 5 + 5 + 1
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
 sys.exit(1 if wrong else 0)

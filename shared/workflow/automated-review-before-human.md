@@ -1,6 +1,7 @@
 Never ask a person to review work until its automated review is clean or deadlocked.
-That holds in every repository, project and forge: a GitHub PR, a GitLab MR, a rendered document sent for a read, or any other work product awaiting a person's review.
-A question or a status report to the user is not a review request.
+That holds in every repository, project and forge (GitHub, GitLab, or any other): a GitHub PR, a GitLab MR, a rendered document sent for a read, or any other work product awaiting a person's review.
+A question to the user is not a review request.
+A status report or a PR/MR check is covered, though: list an item as waiting on human review only when its latest commit has a clean automated review, and when that review has not run, start it, even under a read-only brief ([`status-requests-act`](status-requests-act.md)).
 The agent triggers the automated reviews itself;
 "ready for your review" is a claim that this already happened.
 
@@ -47,15 +48,17 @@ Then ask, and link the clean verdict (or the deadlocked item) in the request.
 
 The rule was already in the corpus as step 3 of a PR loop ("request human review only after AI approval or deadlock"), near the end of `AGENTS.md`, worded for GitHub pull requests.
 The rule was skipped anyway: on 2026-10-02 an agent asked the user to review a GitLab MR on which no automated review had been triggered.
+The same day, a scheduled read-only status check listed six GitLab MRs as waiting on the user's review although their manual AI review job had never run;
+the rule's PR-loop wording did not read as covering a status pass.
 A loop step fires while the agent is driving a PR;
 the moment that matters is different --- the agent has finished and is about to hand off --- and nothing at that moment pointed back to the loop.
 Stating the rule as a precondition of the request puts it where the handoff happens, and naming every forge stops "PR" being read as "GitHub only".
 
 - **Do:** trigger the automated reviews yourself, drive them to clean or deadlock, and link that verdict when you ask a person to review.
-- **Don't:** tell a person a PR, MR or document is ready for their review on a draft or on a head with no clean automated verdict, or treat a quota-skipped review as a pass.
+- **Don't:** tell a person a PR, MR or document is ready for their review, or list it as waiting on their review, on a draft or on a head with no clean automated verdict, or treat a quota-skipped review as a pass.
 
 (User, 2026-10-02, on abridge MR !124: "you need to trigger the automated reviews on [the MR] and possibly others;
 always do this when you're ready for a review.
 don't ask me to review until you get a clean automated review or deadlock.
 haven't I told you this before?" and "that should be a global rule for all our work (all projects, all repos)".
-Tracked in [ai-config#4241](https://github.com/Morrison-Lab/ai-config/issues/4241).)
+Tracked in [ai-config#4240](https://github.com/Morrison-Lab/ai-config/issues/4240) and [ai-config#4241](https://github.com/Morrison-Lab/ai-config/issues/4241).)

@@ -12,6 +12,16 @@ Every rule here serves these three, each an act you can observe:
 - **Wise:** treat a correction as a general principle and record it where every project loads it ([`encode-reusable-feedback`](shared/workflow/encode-reusable-feedback.md)).
 - **Diligent:** verify before claiming: re-query state rather than recall it ([`metacognitive-monitoring`](shared/workflow/metacognitive-monitoring.md)), and view a rendered deliverable before calling it ready ([`check-the-renders`](shared/workflow/check-the-renders.md)).
 
+## Get a clean automated review before asking a person to review
+
+Never ask a person to review a PR, a GitLab MR, a document, or anything else, in any repo or project, until its automated review is clean or deadlocked.
+Trigger the automated reviews yourself once the round's pushes are done, then iterate (`ardi`) until clean; in a repo that reviews on push, confirm that run finished on the current head rather than adding a duplicate.
+A quota-skipped, stubbed, or never-started review is no review: re-trigger it, and post an independent adversarial review meanwhile.
+See [`automated-review-before-human`](shared/workflow/automated-review-before-human.md).
+
+- **Do:** trigger and drive the automated review to clean or deadlock, then link that verdict when asking for human review.
+- **Don't:** say "ready for your review" on a head with no clean automated verdict.
+
 ## Instruction layering
 
 `AGENTS.md` is the compact, unconditional cross-agent contract.
@@ -429,17 +439,6 @@ See [`monitor-scoped-open-prs`](shared/workflow/monitor-scoped-open-prs.md).
 - **Do:** derive the scoped open PR/MR set in each active repository at every monitoring pass, and arm a persistent loop.
 - **Do:** act on terminal CI failures, merge conflicts, and review findings without waiting for a prompt.
 - **Don't:** sweep every accessible repository or stop monitoring because an item was opened by someone else.
-## Request review and drive every started PR to clean
-
-Whenever starting or working on a Pull Request:
-1. **Trigger AI review when done pushing**: Request AI review after completing code pushes for the round;
-   in repos with automatic review on PR events, do not trigger redundant reviews.
-2. **Drive to clean**: Run `ardi` / review-and-iterate loop until CI passes and review findings are clean.
-3. **Request human review only after AI approval or deadlock**: Per [`copilot-review-before-human`](shared/vendored/copilot-review-before-human.md), request human review only after AI review produces a clean verdict, or upon an impasse.
-
-- **Do:** trigger AI review after code pushes, and request human review only after AI review is clean or deadlocked.
-- **Don't:** trigger redundant reviews when automation is running, or request human review on draft work.
-
 ## Cursor Cloud specific instructions
 
 See [`cursor-cloud-instructions`](shared/workflow/cursor-cloud-instructions.md) for environment caveats, preview/render commands, and pre-commit setup when working in Cursor Cloud.

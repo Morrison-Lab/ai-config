@@ -461,6 +461,9 @@ If you and the reviewer reach an impasse on a single item (your rebuttal didn't 
 
 ## Request review and drive every started PR to clean
 
+`AGENTS.md`'s "Get a clean automated review before asking a person to review" governs: no request for human review, on any forge, before a clean or deadlocked automated review that you triggered yourself ([`automated-review-before-human`](shared/workflow/automated-review-before-human.md)).
+This section is the GitHub mechanics.
+
 Whenever starting or working on a Pull Request:
 1. **Trigger AI review when done pushing**: In repositories where reviews do not auto-trigger, request an AI review (`@claude review` comment, or dispatch `claude-review.yml`) **after completing all code pushes** for the round, not when the PR is first opened and empty.
    In repos that automatically trigger review on PR events (`pull_request` synchronize, opened, ready_for_review), do NOT manually trigger a redundant review if an automated review is already running or queued.

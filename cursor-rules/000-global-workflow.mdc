@@ -33,7 +33,7 @@ alwaysApply: true
 - **NEVER merge any Pull Request or Merge Request without explicit user permission.**
 - Creating, opening, updating, or driving a PR to clean CI/review does NOT grant permission to merge it.
 
-## Request review and drive every started PR to clean
-- Request AI review (`@claude review`) after completing code pushes.
-- Run `ardi` / review loop to drive CI to clean.
-- Request human review ONLY after AI approval or deadlock.
+## Get a clean automated review before asking a person to review
+- Never ask a person to review a PR, MR, or document, in any repo, until its automated review is clean or deadlocked.
+- Trigger the automated reviews yourself after completing code pushes, and run `ardi` to drive them and CI to clean.
+- A quota-skipped or never-started review is no review: re-trigger it. See `shared/workflow/automated-review-before-human.md`.

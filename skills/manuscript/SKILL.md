@@ -174,6 +174,7 @@ Check the EQUATOR page for the current version before citing one.
   For a ggplot, preview it at those exact dimensions before rendering with [ggview](https://github.com/idmn/ggview): add `canvas(6.5, 4)` (the final width and height, in inches by default) to the plot.
   In a Quarto chunk, copy those dimensions into `fig-width`/`fig-height`;
   for a figure saved to a file, save it with `ggview::save_ggplot()`, which uses the canvas size.
+  Remove `canvas()` before rendering: printing a plot that carries it opens the preview in the IDE viewer (through `rstudioapi::viewer()`) instead of drawing it into the document, so the rendered page loses the figure.
   Wide diagrams such as Sankey plots often fail this way: the plot ends up tiny in a field of white space.
   Judge it on the rendered page.
   The printed size of the plot's text is its font size in the plot code times the displayed width divided by `fig-width`;

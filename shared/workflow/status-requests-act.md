@@ -13,7 +13,7 @@ the owning GitHub, GitLab, or equivalent tracker.** File it before reporting
 it; use the correct private tracker and redact sensitive details when needed.
 
 A status report never lists a PR or MR as waiting on human review without a clean automated review on its latest commit;
-when that review has not run, start it ([`automated-review-before-human`](automated-review-before-human.md)).
+when that review has not run, start it under the conditions in [`automated-review-before-human`](automated-review-before-human.md).
 
 ## Examine the transcript for stalls, freezes, and dropped balls
 

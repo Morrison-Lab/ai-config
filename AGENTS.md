@@ -4,6 +4,15 @@ This file defines standardized, vendor-neutral instructions for AI coding agents
 
 Worked-example case records and authentic incident directives live in [`AGENTS.cases.md`](AGENTS.cases.md), moved out of this auto-loaded context.
 
+## Guiding principles: be intelligent, wise, and diligent
+
+Every rule here serves these three, each an act you can observe (owner directive, 2026-10-02):
+
+- **Diligent:** verify before claiming;
+  view the render or live state before calling anything ready ([`check-the-renders`](shared/workflow/check-the-renders.md)).
+- **Wise:** treat a correction as a general principle and record it where every project loads it ([`encode-reusable-feedback`](shared/workflow/encode-reusable-feedback.md)).
+- **Intelligent:** read the whole work as a referee would, not only the items named ([`metacognitive-monitoring`](shared/workflow/metacognitive-monitoring.md)).
+
 ## Instruction layering
 
 `AGENTS.md` is the compact, unconditional cross-agent contract.

@@ -178,6 +178,20 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
     - **Do:** read a GraphQL-backed call's 403 body in a CCR session before assuming there is no substitute --- it names the specific REST route to use.
     - **Don't:** treat a GraphQL failure in one of these sessions as a dead end merely because GraphQL or a GraphQL-backed `gh` subcommand is the path documented elsewhere in this corpus.
 
+## The proxy refuses git-data writes over REST, but not the PR path or `git push`
+
+Measured 2026-10-02 in a claude.ai cloud/project session, through the agent proxy.
+`gh api repos/{o}/{r}/git/trees --input -` (POST) and `gh api repos/{o}/{r}/git/refs -f ref=... -f sha=...` (POST) both failed with `Write access to this GitHub API path is not permitted through this proxy. (HTTP 403)`.
+That is the same proxy refusal the branch-deletion bullet above records for `git/refs`, now measured on creation and on tree writes too.
+These are the low-level routes a no-checkout multi-repo edit would build commits from.
+The proxy did not refuse `POST repos/{o}/{r}/pulls`, `POST .../issues/{n}/labels`, or `git push` from a shallow clone: a fresh `git clone --depth 1` of Morrison-Lab/psw, a commit, and a push opened [psw#81](https://github.com/Morrison-Lab/psw/pull/81), and the same route served this repo's own PRs.
+The proxy does not refuse `PUT .../pulls/{n}/merge` either, but the client may, as the next section records.
+GraphQL is blocked too, per the GraphQL bullet above and [ai-config#3653](https://github.com/Morrison-Lab/ai-config/issues/3653);
+[ai-config#4220](https://github.com/Morrison-Lab/ai-config/issues/4220) tracks that block's effect on `check-pr-fully-clean.py`.
+
+- **Do:** for a multi-repo edit with no local checkout, run `git clone --depth 1`, branch, commit, `git ls-remote --heads origin <branch>`, then `git push` in its own command, and open the PR with `gh api repos/{o}/{r}/pulls --input file.json`.
+- **Don't:** assemble the commit through `git/trees` and `git/refs` POSTs, or conclude REST writes are blocked wholesale because those two return 403 --- the proxy leaves the PR, label, and push paths open.
+
 ## The merge call is not blocked by the proxy, and is still refused --- by the client
 
 The bullet above ends "Merging is not similarly blocked", which is true of the

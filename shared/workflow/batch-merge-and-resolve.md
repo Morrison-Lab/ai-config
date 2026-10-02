@@ -556,36 +556,30 @@ survives no reordering: both orders reach the same total, so this is not a
 merge-order constraint that sequencing fixes.
 One branch has to relocate its content, or the file has to be split first.
 
-The byte-capped form has a one-command instrument, because `git merge-tree --write-tree` prints the merged tree's id on its first line:
+Two things make it worth checking rather than trusting CI.
+The breach lands on `main`, so it goes red for **everyone** afterwards rather than for whoever caused it.
+And the step that enforces a cap is not reliably the one named for it: a step labelled advisory may genuinely exit 0 while a self-test inside that same check's **test suite** asserts the real corpus complies and gates the job.
+Grepping a workflow for what enforces a threshold can therefore find the advisory step and conclude wrongly.
+[`review-verdict-pitfalls`](review-verdict-pitfalls.md) already owns the near half of this, in its case covering a check "designed to NEVER fail regardless of their own posted content, so their green color carries zero signal at all".
+What the capped-file case adds is that the signal is not merely absent but **misdirecting**: a second step enforces the same threshold, so the advisory label is accurate about its own step and false about the job.
+
+For a byte cap, `git merge-tree --write-tree` gives the projection directly, because it prints the merged tree's id on its first line.
+It needs git 2.38 or later and a freshly fetched base:
 
 ```bash
-git cat-file -p "$(git merge-tree --write-tree origin/main <head> | head -1):AGENTS.md" | wc -c
+git fetch origin main
+tree="$(git merge-tree --write-tree origin/main "$head")" || { echo "conflict or merge-tree failure"; exit 1; }
+git cat-file -p "${tree%%$'\n'*}:AGENTS.md" | wc -c
 ```
 
-Measured 2026-10-02: PR #4213 had `AGENTS.md` at 32,725 of Codex's 32,768-byte cap on its own branch, with green CI and a clean review.
-Meanwhile #4215 and other PRs merged and grew `main`'s copy to 32,627 bytes.
-The `merge-tree` of #4213 over that `main` produced 33,029 bytes, over the cap, with no conflict.
-Each PR's `check-context-closure` had run against its own base, so nothing red showed it before merge.
+A conflict, an error, or a count of 0 is not a pass;
+expect a figure near the file's current size.
+Measured 2026-10-02, as of the last CI run on each head: [#4213](https://github.com/Morrison-Lab/ai-config/pull/4213) carried `AGENTS.md` at 32,725 of Codex's 32,768-byte cap on its own branch, with green CI and a clean review, while [#4215](https://github.com/Morrison-Lab/ai-config/pull/4215) and others merged and grew `main`'s copy to 32,627 bytes (fe72a1f1).
+The merge result came to 33,029 bytes, over the cap, with no conflict.
 The remedy was merging `main` into the PR and trimming.
 
-- **Do:** before merging a PR that grows a size-capped file (`AGENTS.md`, anything `check-context-closure` gates), measure the cap on the merge result with the command above, after any earlier PR in the same batch has merged.
-- **Don't:** trust the headroom figure from the PR's own CI or review when `main` has moved since.
-
-Two things make it worth checking rather than trusting CI.
-The breach lands on `main`, so it goes red for **everyone** afterwards rather
-than for whoever caused it.
-And the step that enforces a cap is not reliably the one named for it: a step
-labelled advisory may genuinely exit 0 while a self-test inside that same
-check's **test suite** asserts the real corpus complies and gates the job.
-Grepping a workflow for what enforces a threshold can therefore find the
-advisory step and conclude wrongly.
-[`review-verdict-pitfalls`](review-verdict-pitfalls.md) already owns the near
-half of this, in its case covering a check "designed to NEVER fail regardless
-of their own posted content, so their green color carries zero signal at
-all".
-What the capped-file case adds is that the signal is not merely absent but
-**misdirecting**: a second step enforces the same threshold, so the advisory
-label is accurate about its own step and false about the job.
+- **Do:** re-run the byte count on the merge result immediately before merging any PR that grows a capped file, after every earlier merge in the batch.
+- **Don't:** read the headroom figure in the PR's own CI output as current once `main` has moved.
 
 **Clean auto-merge of independently grown logic (fail-open union).**
 A merge uniting two independently developed versions of a file can be resolved

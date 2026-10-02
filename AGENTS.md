@@ -15,7 +15,7 @@ Every rule here serves these three, each an act you can observe:
 ## Get a clean automated review before asking a person to review
 
 Never ask a person to review a PR, GitLab MR, document, or other work product, in any repo or project, until its automated review is clean or deadlocked.
-Trigger the automated reviews yourself after the round's last push, and iterate (`ardi`) until clean.
+Trigger the automated reviews yourself after the round's last push (unless they run on push), and iterate (`ardi`) until clean.
 A quota-skipped, stubbed, or never-started review is no review: re-trigger it, and if it still cannot give a verdict, a clean posted adversarial review stands in.
 See [`automated-review-before-human`](shared/workflow/automated-review-before-human.md) for steps and exceptions.
 
@@ -361,6 +361,7 @@ See [`put-prs-in-ready-mode`](shared/workflow/put-prs-in-ready-mode.md).
 
 - **Do:** open completed work ready for review, or mark draft ready once checks pass.
 - **Don't:** leave a PR ready for review in draft, except a deliberately draft-gated dependent PR.
+
 ## Antigravity Workspace Rules & Activation Scopes
 
 See [`GEMINI.md`](GEMINI.md) and [`memories/antigravity.md`](memories/antigravity.md) for Antigravity-specific workspace rules, activation scopes, manifests, and hook integration.

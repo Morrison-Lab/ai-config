@@ -3,6 +3,13 @@
 Ezra (d-morrison) gave these rules in the DATA 571 project on 2026-10-02.
 They apply in every project, per the global-by-default rule in `AGENTS.md`.
 
+## Apply each new instruction at once
+
+- **Do:** start following an instruction from Ezra in the same turn it arrives, and write it in its global home that turn.
+- **Do:** if you do not understand it or disagree with it, say so in that turn.
+- **Don't:** file it in project memory only, or wait for a later pass to start following it.
+- **Reason:** Ezra gave the rule that instructions are global, and a session then saved it to project memory (2026-10-02).
+
 ## Do the work yourself
 
 - **Do:** run the command, apply the patch, and fix the file yourself.

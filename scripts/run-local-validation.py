@@ -52,8 +52,9 @@ against a tree an edit is about to change expires with the edit (#1262).
 
 Exit codes:
   0  every step that ran passed
-  1  at least one step failed (its exit code is in the table, and the
-     closing summary names it on a "FAILED:" line)
+  1  at least one step failed (its exit code, or "timeout", is in the table;
+     the closing summary names it on a "FAILED:" line, or on a "broken:"
+     line for an unparseable workflow file)
   2  the workflow could not be read or parsed, no job matched, --require-clean
      failed, or PyYAML is missing
 

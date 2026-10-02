@@ -42,6 +42,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 from ai_config_wiring import (  # noqa: E402
     MARKETPLACE, MARKETPLACE_SOURCE, PLUGIN, is_ai_config, splice_block)
+from fences import strip_fences  # noqa: E402
 from plugin_overlap import ai_config_entries  # noqa: E402
 
 BEGIN = "<!-- ai-config:begin (managed by Morrison-Lab/ai-config scripts/wire-repo-config.py) -->"
@@ -62,7 +63,8 @@ more specific.
 
 
 # A Claude Code import: `@AGENTS.md` or `@./AGENTS.md` at the start of a line
-# (an import inside a code span or fence is not read as one).
+# (an import inside a code span or fence is not read as one, so fenced
+# blocks are stripped before matching).
 IMPORTS_AGENTS = re.compile(r"^@(?:\./)?AGENTS\.md\s*$", re.MULTILINE)
 
 
@@ -109,7 +111,7 @@ def block_change(repo: Path, name: str) -> tuple[str, str | None]:
     current = path.read_text(encoding="utf-8") if path.exists() else ""
     if BLOCK in current:
         return f"ok    {name} already points at ai-config", None
-    if name == "CLAUDE.md" and (not current or IMPORTS_AGENTS.search(current)):
+    if name == "CLAUDE.md" and (not current or IMPORTS_AGENTS.search(strip_fences(current))):
         return f"ok    {name} absent or imports AGENTS.md; nothing to add", None
     try:
         updated = splice_block(current, BLOCK, BEGIN, END)

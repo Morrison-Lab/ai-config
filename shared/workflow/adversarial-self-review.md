@@ -1505,7 +1505,7 @@ A review that returns a structured report with a verdict is posted in the form s
 A referee read of a rendered document has no verdict line, so post its findings with page numbers, as [`review-rendered-documents`](review-rendered-documents.md) step 6 records them.
 Post the dispositions as [`ard`](../../skills/ard/SKILL.md) posts them, naming the fixing commit once it is pushed.
 Each comment ends with the [`disclose-agent-authorship`](disclose-agent-authorship.md) marker.
-A not-clean report you post is a standing verdict under [the section just above](#a-relayed-not-clean-round-is-a-standing-verdict-under-your-login-so-close-it-with-a-clean-one-on-the-new-head), so after fixing its findings, re-run the same reviewer on the new head and post that result.
+A not-clean report you post is a standing verdict under [the relayed not-clean round section](#a-relayed-not-clean-round-is-a-standing-verdict-under-your-login-so-close-it-with-a-clean-one-on-the-new-head), so after fixing its findings, re-run the same reviewer on the new head and post that result.
 In your reply to the user, link the posted comment itself, per [`link-forge-artifacts`](../writing/link-forge-artifacts.md).
 
 A review that lives only in the session is invisible to the repository owner and lost when the session ends.

@@ -11,12 +11,16 @@ so those files sat in the synced plugin directory unread. A project thread
 on 2026-10-02 saw the AGENTS.md rules only after cloning ai-config by hand
 (ai-config#4206).
 
-A SessionStart hook is the one plugin component that can put text into the
-model's context, so this hook is how the rules travel with the plugin. It
+Plugin docs route instructions through skills, but a skill body loads only
+when invoked; a SessionStart hook is the plugin component that puts text into
+context unprompted, so this hook is how the always-on rules travel with it. It
 prints a short header naming both files by absolute path, then AGENTS.md
-verbatim. The header comes first on purpose: Claude Code caps injected hook
-output and spills the excess to a file behind a preview, so whatever the cap,
-the preview still carries the instruction to read both files in full.
+verbatim. The header comes first on purpose: Claude Code caps each injected
+hook string at 10,000 characters, and over the cap it saves the output to a
+file and injects only the path plus a preview of the first 2,000 characters,
+without asking the model to read the file (code.claude.com/docs/en/hooks).
+AGENTS.md is far over that cap, so the header must fit inside the preview and
+must itself tell the model to read both files; the test pins it under 2,000.
 
 CLAUDE.md is named rather than inlined. It is several times the size of
 AGENTS.md, and AGENTS.md already says to consult it on demand.

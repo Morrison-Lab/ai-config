@@ -58,6 +58,10 @@ with tempfile.TemporaryDirectory() as tmp:
     rules_at = ctx.index("Rule one: never assume")
     assert agents_at < rules_at and claude_at < rules_at, ctx
     assert "read both files in full" in ctx, ctx
+    # Over the 10,000-character cap Claude Code injects only a 2,000-character
+    # preview, so the read instruction and both paths must sit inside it.
+    assert ctx.index("---") < 2000, ctx.index("---")
+    assert claude_at < 2000 and agents_at < 2000, (agents_at, claude_at)
 
     # 2. The project is ai-config itself.
     selfrepo = tmp / "ai-config"

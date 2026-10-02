@@ -34,6 +34,20 @@ scripts/inventory.sh                         # live counts of skills/wrappers/co
 
 In a Claude Code or Cursor session with the plugin installed (see each harness's section below), type `/` and confirm the skills appear (e.g. `/scout-peers`, `/ardi`).
 
+### Load the rules everywhere, not only the skills
+
+A plugin has no slot for instruction files, so the Claude Code plugin alone delivers skills, commands and hooks but never `AGENTS.md` or `CLAUDE.md` ([#4206](https://github.com/Morrison-Lab/ai-config/issues/4206)).
+Three mechanisms close that gap, one per place an agent can be configured:
+
+| where | mechanism | reaches |
+|---|---|---|
+| the plugin | [`hooks/inject-core-rules.py`](hooks/inject-core-rules.py), a `SessionStart` hook that names `AGENTS.md` and `CLAUDE.md` by path, orders `AGENTS.md` read in full, and lists its section headings, all inside Claude Code's 10,000-character hook-output cap | every Claude Code session with the plugin enabled: CLI, desktop, claude.ai cloud and project sessions, Remote Control, and gha's `@claude` bots (which install the plugin by default) |
+| each machine | [`scripts/wire-user-config.py`](scripts/wire-user-config.py), run by `bootstrap.sh` | Claude Code user settings (marketplace plus `enabledPlugins`), `~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md`, and opencode's `instructions` |
+| each repository | [`scripts/wire-repo-config.py`](scripts/wire-repo-config.py) `<repo-dir>...` | an `AGENTS.md` block (and the same block in a `CLAUDE.md` that does not import `AGENTS.md`) pointing Codex cloud, Copilot, Jules, Cursor background agents and Claude Code at ai-config, plus the marketplace in `.claude/settings.json`; `--enable-plugin` also enables the plugin there, only for repos whose sessions get it no other way, since a second copy fires every hook twice |
+
+Both scripts merge rather than replace, leave an explicit `ai-config@*` choice alone, and take `--check` to report without writing.
+`wire-user-config.py` also refuses to enable the plugin on a machine that registered the hook catalog through `install-hooks.py --fix`, since the two paths together fire every hook twice.
+
 ### Antigravity & Gemini CLI
 
 `ai-config` natively integrates with **Google Antigravity** (`agy` CLI, Antigravity IDE, and Antigravity 2.0) and **Gemini CLI**:
@@ -434,6 +448,7 @@ The payload gaps that remain and the per-guard status are in
 
 | hook | event | enforces |
 |---|---|---|
+| `inject-core-rules.py` | `SessionStart` (startup\|clear\|compact) | on startup, `/clear` and compaction, names `AGENTS.md` and `CLAUDE.md` by path, orders `AGENTS.md` read in full and lists its section headings, wherever the plugin is enabled, since a plugin has no instruction-file slot of its own; inside an ai-config checkout it names that checkout's own files, since Claude Code's default loads only its `CLAUDE.md` there (ai-config#4206) |
 | `inject-local-time.sh` | `UserPromptSubmit` | supplies the real local time, so a recap timestamp is never recalled |
 | `warn-python3-cannot-read-hooks.sh` | `UserPromptSubmit` | names the interpreter when the `python3` on `PATH` cannot read the directory the hooks live in -- a condition that denies `Bash`, `Edit`, `Write` and `Agent` at once (every tool a `PreToolUse` matcher names; `Read` and `Grep` are unaffected), while each denial names a hook rather than the interpreter. Shell, not Python: in the failure this hook reports, no Python hook can run. Silent when the interpreter is fine; see the hook's own header for the mechanism (ai-config#3624) |
 | `require-gh-repo-flag.py` | `PreToolUse` (Bash) | blocks a mutating repo-scoped `gh` command that omits `-R` |

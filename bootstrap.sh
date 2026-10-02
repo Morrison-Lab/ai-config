@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 # Bootstrap ai-config: register skills.json and plugins.json for Antigravity,
-# and run machine-specific dotfile installers.
+# wire every agent's user-level config, and run machine-specific dotfile
+# installers.
 #
 # Note: Global symlink installations for Claude Code, Codex, and Cursor have
 # been removed. Claude Code and Cursor install this repo as a native plugin;
-# Codex has no replacement install path yet (see ai-config#2352).
+# Codex has no replacement install path for skills yet (see ai-config#2352);
+# scripts/wire-user-config.py (run below) links ~/.codex/AGENTS.md so Codex
+# at least loads the rules, and wires Claude Code's user settings, Gemini
+# CLI's GEMINI.md and opencode's instructions the same way (ai-config#4206).
 
 set -euo pipefail
 
@@ -149,6 +153,13 @@ except Exception:
 " 2>/dev/null && printf 'updated plugins.json (registered %s)\n' "$PLUGIN_STAGING_DIR" || printf 'skip  plugins.json (%s exists)\n' "$PLUGINS_JSON"
   fi
 fi
+
+# Wire ai-config into each agent's user-level config (Claude Code plugin,
+# Codex and Gemini global instruction files, opencode instructions), so a
+# session in ANY repo on this machine loads the rules (ai-config#4206).
+printf '\n--- user-level agent config ---\n'
+python3 "$SCRIPT_DIR/scripts/wire-user-config.py" ||
+  printf 'warn  %s exited %d\n' "scripts/wire-user-config.py" "$?"
 
 # --- Machine-specific dotfiles ---
 shopt -s nullglob

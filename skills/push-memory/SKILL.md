@@ -39,8 +39,8 @@ memory on its own branch + PR, never touching the repo you're working in.
   is general (not tied to the repo you're in), and `ai-config` is **not** your
   working repo.
 
-If `ai-config` **is** your working repo (you're on its `main`, symlinked, with
-push access), use `memorize` — it's the shorter path. This skill is for the
+If `ai-config` **is** your working repo (a checkout you can branch and open a
+PR from), use `memorize` — it's the shorter path. This skill is for the
 cross-repo case.
 
 ## First: is it actually a general-purpose memory for ai-config?
@@ -185,8 +185,8 @@ These are exactly
 ## Relationship to other skills
 
 - **`memorize`** (`remember` / `always`) — the same routing and voice rules for
-  the normal case: `ai-config` is your working repo, symlinked, and you push to
-  its current branch directly. Reach for `memorize` there; reach for
+  the case where `ai-config` is your working repo and you open the PR from
+  that checkout. Reach for `memorize` there; reach for
   `push-memory` when `ai-config` is not the repo you're in.
 - **`ums`** — reviews the whole session and may also update skill definitions.
   `push-memory` stores exactly one memory the user names; it never scans or

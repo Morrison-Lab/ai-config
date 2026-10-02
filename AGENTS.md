@@ -195,7 +195,7 @@ See [`improve-your-subagents`](shared/workflow/improve-your-subagents.md).
 
 ## Treat user profanity and frustration as urgent defect signals
 
-Treat profanity, frustration, any correction, or the user repeating themselves as an urgent defect: acknowledge briefly, fix it now, and that turn commit the general rule to its owning repo (ai-config beyond one repo), never only to project memory (`hooks/remind-encode-user-correction.py`).
+Treat profanity, frustration, a correction, or a repeat request as an urgent defect: diagnose, fix it now, and in that turn commit the general rule to the repo that owns it (ai-config if it spans repos), never only to project memory (`hooks/remind-encode-user-correction.py`).
 See [`user-profanity-signal`](shared/workflow/user-profanity-signal.md).
 
 ## Status and diagnostic requests do not make issues report-only

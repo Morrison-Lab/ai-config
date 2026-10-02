@@ -814,7 +814,8 @@ and that the pre-push guard accepts two verdict phrasings, when it accepts three
 
 ## Require detailed and holistic review passes
 
-Reviewers must independently assess both detailed, evidence-backed implementation defects and the whole change: requirements, intent, cross-file consistency, integration, regression risk, and validation.
+Reviewers must independently assess both detailed, evidence-backed implementation defects and the whole change:
+requirements, intent, cross-file consistency, integration, regression risk, and validation.
 A perfunctory scan of isolated diff hunks misses both subtle line-level bugs and systemic architectural drift.
 
 The two passes evaluate complementary failure modes:
@@ -836,22 +837,6 @@ An explicit evaluation of the holistic assessment alongside an itemized findings
 - **Do:** require reviewers to conduct and explicitly document both a detailed implementation defect audit and a holistic change assessment.
 - **Do:** report the holistic assessment explicitly in review outputs, even when no architectural, integration, or regression issues are found.
 - **Don't:** accept a review that stops at superficial surface checks without evaluating the systemic impact on requirements, architecture, cross-file consistency, and validation rigor.
-
-## Post every independent review on the PR or MR it reviewed
-
-Every independent review you run on a PR or MR goes on that PR or MR, not only a fallback review that gates a push.
-That covers a dispatched subagent review, an adversarial review, a referee-style read of a rendered document, and a review from another model or harness.
-On GitLab, post it as an MR note;
-for a branch with no PR yet, post it once the PR exists.
-Post the report in the form [the posted fallback comment](#the-posted-fallback-comment-is-the-reviewers-report-not-an-author-composite) section sets, and the dispositions as [`ard`](../../skills/ard/SKILL.md) posts them, naming the fixing commit once it is pushed.
-Each comment ends with the [`disclose-agent-authorship`](disclose-agent-authorship.md) marker.
-A posted not-clean report stands as your login's verdict until a fresh clean one follows on the new head, per [the relayed not-clean round](#a-relayed-not-clean-round-is-a-standing-verdict-under-your-login-so-close-it-with-a-clean-one-on-the-new-head) section.
-
-A review that lives only in the session is invisible to the owner and lost when the session ends.
-Asked about a referee pass on a manuscript MR, the owner wanted it posted "for our records and so I can see what you're working on" (2026-10-02).
-
-- **Do:** post each independent review's report, and then its dispositions, on the PR or MR it reviewed.
-- **Don't:** keep a review's findings in the chat, the session, or a scratch file and report only the fixes.
 
 ## The posted fallback comment is the reviewer's report, not an author composite
 
@@ -1509,6 +1494,25 @@ That is the same-reviewer clean the rule asks for, and it is a real re-review ra
 - **Don't:** rely on "all findings addressed in <sha>" inside the not-clean comment, or on later bot verdicts, to clear a not-clean you relayed.
 
 (Measured 2026-09-01 on UCD-SERG/serocalculator#668: the relayed round on `065adf0` read as `d-morrison=not-clean` two CLEAN bot verdicts later, and a fresh Sonnet adversarial review of `2aa82df`, posted with its verdict, was what flipped the instrument to exit 0.)
+
+## Post every independent review on the PR or MR it reviewed
+
+Every independent review you run on a PR or MR goes on that PR or MR, not only a fallback review that gates a push.
+That covers a dispatched subagent review, an adversarial review, a referee-style read of a rendered document, and a review from another model or harness.
+On GitLab, post it as an MR note;
+for a branch with no PR yet, post it once the PR exists.
+A review that returns a structured report with a verdict is posted in the form set by [The posted fallback comment is the reviewer's report](#the-posted-fallback-comment-is-the-reviewers-report-not-an-author-composite).
+A referee read of a rendered document has no verdict line, so post its findings with page numbers, as [`review-rendered-documents`](review-rendered-documents.md) step 6 records them.
+Post the dispositions as [`ard`](../../skills/ard/SKILL.md) posts them, naming the fixing commit once it is pushed.
+Each comment ends with the [`disclose-agent-authorship`](disclose-agent-authorship.md) marker.
+A not-clean report you post is a standing verdict under [the section just above](#a-relayed-not-clean-round-is-a-standing-verdict-under-your-login-so-close-it-with-a-clean-one-on-the-new-head), so after fixing its findings, re-run the same reviewer on the new head and post that result.
+In your reply to the user, link the posted comment itself, per [`link-forge-artifacts`](../writing/link-forge-artifacts.md).
+
+A review that lives only in the session is invisible to the repository owner and lost when the session ends.
+(Directive from the user, 2026-10-02, about a referee read of a manuscript MR: post the referee's report "for our records and so I can see what you're working on", and always give the link to it.)
+
+- **Do:** post each independent review's report, and then its dispositions, on the PR or MR it reviewed, and link that comment in your reply.
+- **Don't:** keep a review's findings in the chat, the session, or a scratch file and report only the fixes.
 
 ## A reviewer handed nothing returns clean, so the brief must make an empty input an error
 

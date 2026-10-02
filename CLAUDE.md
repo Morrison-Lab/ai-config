@@ -170,7 +170,7 @@ See [`finish-wave`](skills/finish-wave/SKILL.md).
 
 ## Link PRs in tables
 
-Link every PR, issue, comment, review, or run you mention having acted on, in tables and chat prose alike, e.g. `[#237](https://github.com/<owner>/<repo>/pull/237)`.
+Link every PR, MR, issue, comment, review, run, published page, or file you mention having posted, created, or acted on, in tables and chat prose alike, e.g. `[#237](https://github.com/<owner>/<repo>/pull/237)`.
 Detail, rationale, and cases: [`shared/writing/link-forge-artifacts.md`](shared/writing/link-forge-artifacts.md).
 
 ## Tag chat output by category so long recaps stay scannable

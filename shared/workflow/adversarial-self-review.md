@@ -1481,7 +1481,7 @@ halt the review process and escalate to the user for a tie-breaking decision.
 
 ## A relayed not-clean round is a standing verdict under your login, so close it with a clean one on the new head
 
-The findings a subagent review returns are worth posting to the PR, and the natural form is one comment: "the review returned Needs more work with N findings;
+The findings a subagent review returns are posted to the PR, and the natural form is one comment: "the review returned Needs more work with N findings;
 all N are addressed in <sha>".
 That comment is posted under the account's own login, and `scripts/check-pr-fully-clean.py` reads it as that login's latest verdict.
 "All addressed" does not clear it, because the instrument keys on the verdict phrase and on the reviewer, and a later all-clear from a *different* reviewer never supersedes a standing not-clean (ai-config#2274).
@@ -1503,7 +1503,7 @@ On GitLab, post it as an MR note;
 for a branch with no PR yet, post it once the PR exists.
 A review that returns a structured report with a verdict is posted in the form set by [The posted fallback comment is the reviewer's report](#the-posted-fallback-comment-is-the-reviewers-report-not-an-author-composite).
 A referee read of a rendered document has no verdict line, so post its findings with page numbers, as [`review-rendered-documents`](review-rendered-documents.md) step 6 records them.
-Post the dispositions as [`ard`](../../skills/ard/SKILL.md) posts them, naming the fixing commit once it is pushed.
+Post the dispositions as [`ard`](../../skills/ard/SKILL.md) posts them, in a separate comment from the report, naming the fixing commit once it is pushed.
 Each comment ends with the [`disclose-agent-authorship`](disclose-agent-authorship.md) marker.
 A not-clean report you post is a standing verdict, so close it as [the relayed not-clean round section](#a-relayed-not-clean-round-is-a-standing-verdict-under-your-login-so-close-it-with-a-clean-one-on-the-new-head) directs.
 In your reply to the user, link the posted comment itself, per [`link-forge-artifacts`](../writing/link-forge-artifacts.md).

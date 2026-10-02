@@ -24,6 +24,9 @@ When none is named, use the defaults below, which follow the
 [ICMJE Recommendations](https://www.icmje.org/recommendations/) and
 [AMA Manual of Style](https://www.amamanualofstyle.com/) conventions common
 in clinical and health-services journals.
+The reader-facing version of this guide is PSW's chapter
+[Preparing a manuscript for submission](https://morrison-lab.github.io/psw/chapters/manuscript-submission.html);
+when the two disagree, defer to PSW and fix this skill to match.
 For prose style, defer to [PSW](https://morrison-lab.github.io/psw/) and the
 [`use-preferred-style`](../use-preferred-style/SKILL.md) skill.
 

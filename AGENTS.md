@@ -99,7 +99,7 @@ See [`prefer-systemic-solutions-over-one-off-fixes`](shared/principles/prefer-sy
 - **Don't:** settle for a one-off patch that leaves the defect class open to recur elsewhere.
 ## Research existing solutions before implementing (DRW)
 
-Before writing custom code or hand-rolling helpers, always perform a research step to verify DRW (don't reinvent the wheel) and check for existing libraries, functions, or package solutions across our repos, standard libraries, and trustworthy upstream ecosystems (base R, tidyverse / r-lib, PyPI, npm).
+Before writing custom code or helpers, check for an existing solution (DRW, don't reinvent the wheel) in our repos, standard libraries, and trusted upstream ecosystems (base R, tidyverse / r-lib, PyPI, npm).
 Record what was searched and what was found.
 See [`dont-reinvent-wheel`](shared/principles/dont-reinvent-wheel.md) and [`prefer-upstream`](skills/prefer-upstream/SKILL.md).
 

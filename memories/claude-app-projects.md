@@ -10,28 +10,34 @@ The same command succeeds from a Terminal tab, which the user has already grante
 
 - **Do:** run the command in a Terminal tab, or ask the user to, when a Claude-app session gets a permission error on `/Volumes/...`.
 - **Don't:** conclude the share is unmounted or the file is missing from that error alone.
+- **Don't:** suggest granting the Claude app Network Volumes or Full Disk Access to get around this block.
+
+## Unattended work: a user-approved Terminal-side queue worker
 
 When the work must run unattended (the user asleep, approval prompts piling up), a Terminal tab per run does not scale.
-The one-time setup is a worker the user starts in Terminal, which already has the access, and which the Claude app feeds.
-Starting it is the user's decision to delegate that access, not a way around the macOS gate, so propose it and let the user choose.
-It has:
+The alternative is a setup the user approves and starts themselves, which expires: a worker running in Terminal, which already has the access, and which the Claude app feeds.
+Starting the worker is the user's decision to delegate that access, not a way around the macOS gate, so propose it and let the user choose.
+The worker has:
 
 - a queue folder the session writes job requests into;
 - an allowlist of job types, such as "render this project's manuscript", with no arbitrary shell commands;
+- a pinned commit SHA that the user sets, so the worker runs only that commit and never the working tree;
 - an expiry time, after which the worker exits on its own.
 
-A job-type allowlist does not limit what code runs.
-A render executes the document's own R code with Terminal's access, so the worker is only as safe as the code it renders.
-Restrict it to files in the project repository at a commit the user has reviewed, never a file the session writes into the queue.
-It is also not a data-egress control.
-Write back only a status and exit code, and the project's normal rendered outputs (for example the manuscript of aggregate results), never logs or intermediate files that can echo restricted data.
+The worker rejects any job that names a path or a git ref, because the session can write the repository and a reviewed commit is only enforceable when the worker, not the job, picks the code.
+A job-type allowlist limits job types, not code.
+A render executes the document's own R code with Terminal's full access, so the user must review the code at the pinned commit before approving.
+The worker is also not a data-egress control.
+It should write back only a status and exit code, and the project's normal rendered outputs (for example the manuscript of aggregate results), never logs or intermediate files that can echo restricted data.
 
-The abridge render worker under `~/Library/Application Support/abridge-render-queue/` on the user's Mac follows this pattern (set up 2026-10-02, relayed from the coordinator session, not verified from this repo).
-The user's prompt that led to it: "sure claude can't read the s-drive ,but can't it run code that can?"
+The abridge render worker under `~/Library/Application Support/abridge-render-queue/` on the user's Mac follows this pattern.
+The coordinator session reported it on 2026-10-02, and this repo has not verified it: its existence, the queue folder, and the properties above are reported, not observed.
 
 - **Do:** propose the queue worker when a per-app gate blocks the Claude app from a resource the user already reaches from Terminal, and unattended work would otherwise stall.
+- **Do:** let the user review the code at the pinned commit before the worker starts.
 - **Don't:** copy restricted data (row-level records, or anything the project treats as protected health information;
   the coordinator session described the S-drive as holding PHI on 2026-10-02) into a local cache the Claude app can read, to get around the block.
+- **Don't:** suggest granting the Claude app Network Volumes or Full Disk Access as the alternative to the worker.
 
 ## Claude Projects: confirm a thread's own session state before saying it is running
 

@@ -128,14 +128,14 @@ external reviewer becomes available again. Formal reviews (e.g. Copilot)
 don't show up in the comments query above at all -- they're a separate
 review object.
 
-**This is a status query -- inspect an existing Copilot or human review,
-don't request one.**
+**This is a status query -- inspect an existing Copilot or human review rather than requesting one, apart from the gate below.**
 Requesting a review is a mutation: it triggers a review job, consumes reviewer quota, and can collide with an active `ardi` loop driving the same PR.
 Use the read-only half of [`ardi`'s step 2](../ardi/SKILL.md) -- fetch the matched review's body + inline comments at the current `commit_id` and require a zero-findings verdict -- but skip the `POST /requested_reviewers` call.
 The one exception is the automated review gate in **Reviewers Requested** below: an in-scope PR with no automated review on its head and none in flight gets that review started.
+The automated reviewers are the repo's review workflow and Copilot, started by the triggers in step 1 of [`automated-review-before-human`](../../shared/workflow/automated-review-before-human.md#the-gate).
 If no genuine Copilot verdict exists at the current head, check for a human's formal review at the head (next subsection) before reporting `no verdict at head`;
 only when neither exists, report that;
-an external reviewer is still not requested here, since only the automated review is covered by that exception.
+a human reviewer is never requested here, since only the automated reviews are covered by that exception.
 Green CI plus a clean self-review is not sufficient on its own if an
 external reviewer is reachable.
 
@@ -390,7 +390,8 @@ Render a **Review Summary Table** for the PR:
   - If AI review is running: `In-flight AI review`.
   - If CI is pending: `Wait for CI (<pending-check>)`.
   - If neither AI review nor External review has a verified clean verdict at head: `Confirm review (no verified verdict at head)`.
-  - If fully clean (no human blocks, at least one verified clean review at head with 0 open findings across all reviews, CI green, 0 open threads, up to date with main):
+  - If no automated reviewer (the `@claude` bot or Copilot) has a verified clean verdict at head, even with a human's clean review: `Start automated review` for an in-scope PR, else `No automated review at head`.
+  - If fully clean (no human blocks, at least one verified clean **automated** review at head with 0 open findings across all reviews, CI green, 0 open threads, up to date with main):
     - If `Author` is `the repository owner` (self-authored): `Ready for self-merge`.
     - If `Author` is external and human review is requested (`the repository owner`): `Ready for human review`.
     - If `Author` is external and human review is not yet requested: `Request human review`.

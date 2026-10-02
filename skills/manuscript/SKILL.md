@@ -171,6 +171,7 @@ Check the EQUATOR page for the current version before citing one.
   The plotted content fills the available width (the text width, or the journal's stated figure width), with no large blank margins or empty space inside the image.
   Every piece of text in it (axis labels, tick labels, node and legend labels) is at least the journal's stated minimum, and in any case about 8 pt or larger at the printed size, close to the caption text.
   Set the figure's width and height (`fig-width`/`fig-height`, or the export size) to that width and an aspect ratio that fits the content, rather than exporting at a default size and letting the document scale it down.
+  For a ggplot, preview it at those exact dimensions before rendering with [ggview](https://github.com/idmn/ggview): add `canvas(6.5, 4, units = "in")` (the final width and height) to the plot, and save it with `ggview::save_ggplot()` at the same size.
   Wide diagrams such as Sankey plots are the usual failure: drawn on a large default canvas, then shrunk to fit, so the plot is tiny in a field of white space.
   Judge it on the rendered page: the figure's smallest text should look no smaller than the caption beneath it, and its printed size is the font size in the plot code times the displayed width divided by `fig-width`.
 - Colorblind-safe palettes, and do not use color as the only way to tell groups apart;

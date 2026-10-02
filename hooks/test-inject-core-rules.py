@@ -8,14 +8,19 @@ stdin/stdout contract:
   1. A consumer project: SessionStart additionalContext whose header names
      both files by absolute path, inside the 2,000-character preview Claude
      Code keeps when output exceeds its 10,000-character cap.
-  2. The project is an ai-config checkout: silent, even when that checkout's
-     AGENTS.md differs from the plugin's cached copy (a branch editing it).
-  3. A subdirectory of an ai-config checkout: silent.
+  2. The project is an ai-config checkout whose AGENTS.md differs from the
+     plugin's cached copy (a branch editing it): the checkout's copy is
+     injected and named, not the cache's.
+  3. A subdirectory of an ai-config checkout: the same.
   4. Negative control: a project with its own unrelated AGENTS.md and a
-     marketplace.json under another name -- not silent.
+     marketplace.json under another name -- the plugin's copy.
   5. No AGENTS.md in the plugin root: exit 0, stdout empty, stderr names it.
   6. Garbage stdin, project from CLAUDE_PROJECT_DIR; no env and no payload
      cwd, project from the process cwd (the Cursor adapter's case).
+  8. A plugin root under a long cache path still keeps the header inside the
+     2,000-character preview.
+  9. Under Cursor (CURSOR_PROJECT_DIR set) in an ai-config workspace: silent,
+     since Cursor reads that AGENTS.md itself; elsewhere it still injects.
   7. A CLAUDE_PLUGIN_ROOT pointing at a directory with no AGENTS.md is
      ignored, as under the generated hooks-only plugin.
 """
@@ -78,24 +83,28 @@ with tempfile.TemporaryDirectory() as tmp:
     claude_at = ctx.index(str(root.resolve() / "CLAUDE.md"))
     rules_at = ctx.index("Rule one: never assume")
     assert agents_at < rules_at and claude_at < rules_at, ctx
-    assert "read both files in full" in ctx, ctx
+    assert "read AGENTS.md in full" in ctx, ctx
+    assert "do not load it whole" in ctx, ctx
     assert ctx.index("---") < 2000, ctx.index("---")
 
     # 2. An ai-config checkout whose AGENTS.md differs from the plugin copy.
     selfrepo = make_ai_config(tmp / "ai-config", agents=RULES + "new rule\n")
     proc = run(root, selfrepo)
-    assert proc.returncode == 0 and proc.stdout == "", (proc.stdout, proc.stderr)
+    assert proc.returncode == 0, proc.stderr
+    ctx = json.loads(proc.stdout)["hookSpecificOutput"]["additionalContext"]
+    assert "new rule" in ctx and str(selfrepo.resolve() / "AGENTS.md") in ctx, ctx
+    assert str(root.resolve()) not in ctx, ctx
 
     # 3. A subdirectory of it.
     sub = selfrepo / "skills" / "x"
     sub.mkdir(parents=True)
     proc = run(root, sub)
-    assert proc.returncode == 0 and proc.stdout == "", proc.stdout
+    assert proc.returncode == 0 and "new rule" in proc.stdout, proc.stdout
 
     # 4. Negative control: other repo, other marketplace name, same AGENTS.md.
     other = make_ai_config(tmp / "other", agents=RULES, name="someone-else")
     proc = run(root, other)
-    assert proc.returncode == 0 and "Rule one" in proc.stdout, proc.stdout
+    assert proc.returncode == 0 and str(root.resolve()) in proc.stdout, proc.stdout
 
     # 5. Broken install.
     empty = make_root(tmp / "empty-plugin", with_agents=False)
@@ -105,16 +114,31 @@ with tempfile.TemporaryDirectory() as tmp:
 
     # 6. Garbage stdin; then project from the process cwd.
     proc = run(root, selfrepo, stdin="not json")
-    assert proc.returncode == 0 and proc.stdout == "", proc.stdout
+    assert proc.returncode == 0 and "new rule" in proc.stdout, proc.stdout
     proc = run(root, consumer, stdin="not json")
     assert proc.returncode == 0 and "Rule one" in proc.stdout, proc.stderr
+    assert "new rule" not in proc.stdout, proc.stdout
     proc = run(root, None, stdin="{}", cwd=selfrepo)
-    assert proc.returncode == 0 and proc.stdout == "", proc.stdout
+    assert proc.returncode == 0 and "new rule" in proc.stdout, proc.stdout
     proc = run(root, None, stdin=json.dumps({"cwd": str(selfrepo)}), cwd=consumer)
-    assert proc.returncode == 0 and proc.stdout == "", proc.stdout
+    assert proc.returncode == 0 and "new rule" in proc.stdout, proc.stdout
 
     # 7. CLAUDE_PLUGIN_ROOT elsewhere is ignored.
     proc = run(root, consumer, env_extra={"CLAUDE_PLUGIN_ROOT": str(empty)})
     assert proc.returncode == 0 and "Rule one" in proc.stdout, proc.stderr
 
-print("ok: inject-core-rules.py, 7 cases")
+    # 9. Cursor in an ai-config workspace reads AGENTS.md itself: silent.
+    proc = run(root, selfrepo, env_extra={"CURSOR_PROJECT_DIR": str(selfrepo)})
+    assert proc.returncode == 0 and proc.stdout == "", proc.stdout
+    proc = run(root, consumer, env_extra={"CURSOR_PROJECT_DIR": str(consumer)})
+    assert proc.returncode == 0 and "Rule one" in proc.stdout, proc.stdout
+
+    # 8. A long plugin-cache path.
+    deep = make_root(tmp / ".claude" / "plugins" / "synced"
+                     / "b5b13525-7253-4506-8dbd-37004bb96493_488ecef7-2d6b-47fc-b492-24a0c8e4c81a"
+                     / "ai-config" / "cache" / "0123456789abcdef0123456789abcdef01234567")
+    proc = run(deep, consumer)
+    ctx = json.loads(proc.stdout)["hookSpecificOutput"]["additionalContext"]
+    assert ctx.index("---") < 2000, ctx.index("---")
+
+print("ok: inject-core-rules.py, 9 cases")

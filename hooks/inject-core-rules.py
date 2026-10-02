@@ -20,22 +20,28 @@ hook string at 10,000 characters, and over the cap it saves the output to a
 file and injects only the path plus a preview of the first 2,000 characters,
 without asking the model to read the file (code.claude.com/docs/en/hooks).
 AGENTS.md is far over that cap, so the header must fit inside the preview and
-must itself tell the model to read both files; the test pins it under 2,000.
+must itself tell the model to read AGENTS.md; the test pins it under 2,000.
 
-CLAUDE.md is named rather than inlined. It is several times the size of
-AGENTS.md, and AGENTS.md already says to consult it on demand.
+CLAUDE.md is named, never inlined or ordered read in full. It is several
+times the size of AGENTS.md, and AGENTS.md says not to load it wholesale at
+session start but to consult the sections that apply.
 
-Silent in two cases, both measured from the filesystem rather than assumed:
+Which copy is injected is measured from the filesystem rather than assumed:
 
-  - The session's project IS an ai-config checkout: the project directory,
-    or a parent of it, carries `.claude-plugin/marketplace.json` named
-    Morrison-Lab. Claude Code already auto-loads that checkout's CLAUDE.md,
-    and its AGENTS.md may be newer than the plugin's cached copy, so
-    injecting the cached one would contradict it. Identity, not content: a
-    branch that edits AGENTS.md is still ai-config.
-  - The plugin root has no AGENTS.md. That is a broken install, not a reason
-    to block the session; the hook says so on stderr and exits 0.
+  - When the session's project is an ai-config checkout (the project
+    directory, or a parent of it, carries `.claude-plugin/marketplace.json`
+    named Morrison-Lab), the checkout's own files are named and injected.
+    Claude Code auto-loads only that checkout's CLAUDE.md, which does not
+    import AGENTS.md, and the checkout may be newer than the plugin's cached
+    copy (a branch editing AGENTS.md). Identity, not content. Under Cursor
+    (CURSOR_PROJECT_DIR set) the hook is silent there instead, because
+    Cursor already reads the workspace's root AGENTS.md.
+  - Otherwise the plugin's own copy is used.
+  - When the chosen root has no AGENTS.md, that is a broken install, not a
+    reason to block the session; the hook says so on stderr and exits 0.
 """
+from __future__ import annotations
+
 import json
 import os
 import sys
@@ -50,11 +56,12 @@ project unless the user narrows them, and they rank like a user-level
 CLAUDE.md: a repository's own instructions add to them, and win only where
 they are more specific.
 
-Before acting on the first request, read both files in full (use the Read
-tool; this injected copy may be truncated):
+Before acting on the first request, read AGENTS.md in full with the Read
+tool, since the copy below may be cut short. Consult CLAUDE.md only for the
+sections that apply; do not load it whole.
 
-- {agents}  (the authoritative cross-agent contract, inlined below)
-- {claude}  (Claude-specific workflows; consult the sections that apply)
+- {agents}  (the authoritative cross-agent contract; its text follows)
+- {claude}  (Claude-specific workflows)
 
 Relative links inside them (`shared/...`, `memories/...`, `skills/...`)
 resolve against {root}.
@@ -68,17 +75,17 @@ def plugin_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
-def is_ai_config(directory: Path) -> bool:
+def ai_config_root(directory: Path) -> Path | None:
+    """The ai-config checkout containing directory, if any."""
     for candidate in (directory, *directory.parents):
         manifest = candidate / ".claude-plugin" / "marketplace.json"
         try:
-            name = json.loads(manifest.read_text(encoding="utf-8")).get("name")
-        except (OSError, ValueError, AttributeError):
+            data = json.loads(manifest.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
             continue
-        if name == "Morrison-Lab":
-            return True
-    return False
-
+        if isinstance(data, dict) and data.get("name") == "Morrison-Lab":
+            return candidate
+    return None
 
 
 def project_dir(payload: dict) -> Path:
@@ -94,15 +101,16 @@ def main() -> int:
     if not isinstance(payload, dict):
         payload = {}
 
-    root = plugin_root()
+    checkout = ai_config_root(project_dir(payload).resolve())
+    if checkout and os.environ.get("CURSOR_PROJECT_DIR"):
+        # Cursor reads a workspace's root AGENTS.md natively.
+        return 0
+    root = checkout or plugin_root()
     agents = root / "AGENTS.md"
     claude = root / "CLAUDE.md"
     if not agents.is_file():
         print(f"inject-core-rules: no AGENTS.md under {root}; "
               "the ai-config plugin install looks incomplete", file=sys.stderr)
-        return 0
-
-    if is_ai_config(project_dir(payload).resolve()):
         return 0
 
     text = HEADER.format(agents=agents, claude=claude, root=root)

@@ -113,8 +113,35 @@ class WireUserConfig(unittest.TestCase):
     def test_remote_container_is_left_to_the_account_sync(self):
         with mock.patch.dict(os.environ, {"CLAUDE_CODE_REMOTE": "true"}):
             _, out = self.run_main()
-        self.assertIn("remote container", line(out, "Claude Code"))
-        self.assertFalse((self.home / ".claude/settings.json").exists())
+            self.assertIn("skip  remote container", line(out, "Claude Code"))
+            self.assertFalse((self.home / ".claude/settings.json").exists())
+            (self.home / ".claude/plugins/synced/org_x/ai-config").mkdir(parents=True)
+            _, out = self.run_main()
+        self.assertIn("ok    plugin already loads", line(out, "Claude Code"))
+
+    def test_project_scoped_install_does_not_count(self):
+        plugins = self.home / ".claude/plugins"
+        plugins.mkdir(parents=True)
+        (plugins / "installed_plugins.json").write_text(json.dumps({"version": 2, "plugins": {
+            "ai-config@Morrison-Lab": [{"scope": "project", "projectPath": "/x"}]}}),
+            encoding="utf-8")
+        self.run_main()
+        self.assertTrue(self.settings()["enabledPlugins"]["ai-config@Morrison-Lab"])
+
+    def test_malformed_settings_values_do_not_abort(self):
+        self.write_settings({"enabledPlugins": ["x"], "hooks": ["y"]})
+        code, out = self.run_main()
+        self.assertEqual(code, 0, out)
+        self.assertIn("Gemini CLI", out)
+
+    def test_unterminated_gemini_block_is_reported_not_doubled(self):
+        gemini = self.home / ".gemini/GEMINI.md"
+        gemini.parent.mkdir(parents=True)
+        broken = f"# mine\n{wire.GEMINI_BEGIN}\n"
+        gemini.write_text(broken, encoding="utf-8")
+        _, out = self.run_main()
+        self.assertIn("skip  ValueError", line(out, "Gemini CLI"))
+        self.assertEqual(gemini.read_text(encoding="utf-8"), broken)
 
     def test_synced_plugin_on_disk_is_not_doubled(self):
         (self.home / ".claude/plugins/synced/org_x/ai-config").mkdir(parents=True)

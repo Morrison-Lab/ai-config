@@ -25,11 +25,13 @@ Every step is idempotent and conservative:
   - An explicit user choice wins. Any `ai-config@*` entry already present in
     `enabledPlugins` is left exactly as it is: a true one means the plugin
     loads, an all-false set is a deliberate opt-out.
-  - The plugin is not enabled where it already arrives another way: in a
-    remote (claude.ai) container, whose account plugin sync delivers it; when
-    a synced or installed copy is on disk; or on a machine that registered
-    the catalog through `scripts/install-hooks.py --fix`. Each of those plus
-    a marketplace copy fires every hook twice.
+  - The plugin is not enabled where it already arrives another way: when a
+    synced copy or a user-scope install is on disk, or on a machine that
+    registered the catalog through `scripts/install-hooks.py --fix`. Each of
+    those plus a marketplace copy fires every hook twice. A remote (claude.ai)
+    container with no synced copy is reported as `skip`: its account sync
+    has failed (ai-config#3948), and enabling a second copy there would
+    double every hook once the sync recovers.
   - A Codex file or link that is not ours is left alone; a dangling link, or
     one into another ai-config checkout, is repointed here.
   - Each step reports `ok`, `write`/`link`, `todo` (with --check) or `skip`
@@ -49,9 +51,11 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-MARKETPLACE = "Morrison-Lab"
-PLUGIN = f"ai-config@{MARKETPLACE}"
-MARKETPLACE_SOURCE = {"source": "github", "repo": "Morrison-Lab/ai-config"}
+sys.path.insert(0, str(ROOT / "scripts" / "lib"))
+from ai_config_wiring import (  # noqa: E402
+    MARKETPLACE, MARKETPLACE_SOURCE, PLUGIN, is_ai_config, splice_block)
+from plugin_overlap import ai_config_entries  # noqa: E402
+
 GEMINI_LINK = "ai-config-AGENTS.md"
 GEMINI_BEGIN = "<!-- ai-config:begin (managed by ai-config/scripts/wire-user-config.py) -->"
 GEMINI_END = "<!-- ai-config:end -->"
@@ -59,14 +63,6 @@ GEMINI_END = "<!-- ai-config:end -->"
 
 def home() -> Path:
     return Path(os.environ.get("HOME", str(Path.home())))
-
-
-def is_ai_config(directory: Path) -> bool:
-    manifest = directory / ".claude-plugin" / "marketplace.json"
-    try:
-        return json.loads(manifest.read_text(encoding="utf-8")).get("name") == MARKETPLACE
-    except (OSError, ValueError, AttributeError):
-        return False
 
 
 def load_json(path: Path) -> dict | None:
@@ -107,10 +103,16 @@ def catalog_scripts() -> set[str]:
 def non_plugin_hooks_registered(settings: dict) -> bool:
     """True when settings.json runs catalog hooks from ~/.claude/hooks."""
     scripts = catalog_scripts()
-    for groups in (settings.get("hooks") or {}).values():
-        for group in groups or []:
-            for hook in group.get("hooks", []):
-                command = hook.get("command", "")
+    hooks = settings.get("hooks")
+    if not isinstance(hooks, dict):
+        return False
+    for groups in hooks.values():
+        for group in groups if isinstance(groups, list) else []:
+            entries = group.get("hooks") if isinstance(group, dict) else None
+            for hook in entries if isinstance(entries, list) else []:
+                command = hook.get("command", "") if isinstance(hook, dict) else ""
+                if not isinstance(command, str):
+                    continue
                 if "CLAUDE_PLUGIN_ROOT" in command:
                     continue
                 if any(f".claude/hooks/{name}" in command for name in scripts):
@@ -124,9 +126,15 @@ def plugin_on_disk(claude_home: Path) -> str | None:
     if synced:
         return f"account plugin sync ({synced[0]})"
     installed = load_json(claude_home / "plugins" / "installed_plugins.json") or {}
-    names = [n for n in (installed.get("plugins") or {}) if n.startswith("ai-config@")]
-    if names:
-        return f"installed plugin {names[0]}"
+    plugins = installed.get("plugins")
+    for name, records in (plugins.items() if isinstance(plugins, dict) else ()):
+        if not name.startswith("ai-config@"):
+            continue
+        # A project-scoped install loads only in that project, so it does not
+        # stand in for a user-wide enable.
+        records = records if isinstance(records, list) else [records]
+        if any(isinstance(r, dict) and r.get("scope", "user") == "user" for r in records):
+            return f"installed plugin {name} (user scope)"
     return None
 
 
@@ -136,20 +144,20 @@ def wire_claude(check: bool) -> tuple[str, bool]:
     settings = load_json(path)
     if settings is None:
         return f"skip  {path} is not a JSON object; fix it by hand", False
-    enabled = settings.get("enabledPlugins") or {}
-    explicit = {k: v for k, v in enabled.items() if k.startswith("ai-config@")}
+    explicit = ai_config_entries(settings)
     if explicit:
         state = ", ".join(f"{k}={v}" for k, v in sorted(explicit.items()))
         if any(explicit.values()):
             return f"ok    {path} enables the plugin ({state})", True
         return (f"skip  {path} disables the plugin ({state}); "
                 "left as an explicit choice"), False
-    if os.environ.get("CLAUDE_CODE_REMOTE") == "true":
-        return ("ok    remote container: the account plugin sync delivers the "
-                "plugin; a marketplace copy would load it twice"), True
     elsewhere = plugin_on_disk(claude_home)
     if elsewhere:
         return f"ok    plugin already loads from {elsewhere}", True
+    if os.environ.get("CLAUDE_CODE_REMOTE") == "true":
+        return ("skip  remote container with no synced plugin copy: the account "
+                "plugin sync failed (ai-config#3948); a marketplace copy here "
+                "would load twice once the sync works"), False
     if non_plugin_hooks_registered(settings):
         return (f"skip  {path} registers the hook catalog from ~/.claude/hooks "
                 "(install-hooks.py path); enabling the plugin too would fire "
@@ -212,14 +220,7 @@ def wire_gemini(check: bool) -> tuple[str, bool]:
         return f"ok    {path} imports ./{GEMINI_LINK}", True
     if check:
         return f"todo  {path}: add the ai-config import block", False
-    if GEMINI_BEGIN in current and GEMINI_END in current:
-        head, rest = current.split(GEMINI_BEGIN, 1)
-        tail = rest.split(GEMINI_END, 1)[1].lstrip("\n")
-        updated = head + block + tail
-    elif not current or current.endswith("\n\n"):
-        updated = current + block
-    else:
-        updated = current + ("\n" if current.endswith("\n") else "\n\n") + block
+    updated = splice_block(current, block, GEMINI_BEGIN, GEMINI_END)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(updated, encoding="utf-8")
     return f"write {path}: ai-config import block", True
@@ -275,7 +276,7 @@ def main(argv: list[str] | None = None) -> int:
     for label, step in STEPS:
         try:
             message, ok = step(args.check)
-        except (OSError, UnicodeError, ValueError) as err:
+        except (OSError, UnicodeError, ValueError, TypeError, AttributeError) as err:
             message, ok = f"skip  {type(err).__name__}: {err}", False
         print(f"{label:<12} {message}")
         all_ok = all_ok and ok

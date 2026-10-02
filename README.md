@@ -43,7 +43,7 @@ Three mechanisms close that gap, one per place an agent can be configured:
 |---|---|---|
 | the plugin | [`hooks/inject-core-rules.py`](hooks/inject-core-rules.py), a `SessionStart` hook that injects `AGENTS.md` and names `CLAUDE.md` to read | every Claude Code session with the plugin enabled: CLI, desktop, claude.ai cloud and project sessions, Remote Control, and gha's `@claude` bots (which install the plugin by default) |
 | each machine | [`scripts/wire-user-config.py`](scripts/wire-user-config.py), run by `bootstrap.sh` | Claude Code user settings (marketplace plus `enabledPlugins`), `~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md`, and opencode's `instructions` |
-| each repository | [`scripts/wire-repo-config.py`](scripts/wire-repo-config.py) `<repo-dir>...` | the repo's `.claude/settings.json` (so a container with no user config still installs the plugin) and an `AGENTS.md` block that points Codex cloud, Copilot, Jules and Cursor background agents at ai-config |
+| each repository | [`scripts/wire-repo-config.py`](scripts/wire-repo-config.py) `<repo-dir>...` | an `AGENTS.md` block (and the same block in a `CLAUDE.md` that does not import `AGENTS.md`) pointing Codex cloud, Copilot, Jules, Cursor background agents and Claude Code at ai-config, plus the marketplace in `.claude/settings.json`; `--enable-plugin` also enables the plugin there, only for repos whose sessions get it no other way, since a second copy fires every hook twice |
 
 Both scripts merge rather than replace, leave an explicit `ai-config@*` choice alone, and take `--check` to report without writing.
 `wire-user-config.py` also refuses to enable the plugin on a machine that registered the hook catalog through `install-hooks.py --fix`, since the two paths together fire every hook twice.
@@ -448,7 +448,7 @@ The payload gaps that remain and the per-guard status are in
 
 | hook | event | enforces |
 |---|---|---|
-| `inject-core-rules.py` | `SessionStart` | loads `AGENTS.md` into context (and names `CLAUDE.md` to read) wherever the plugin is enabled, since a plugin has no instruction-file slot of its own; silent inside ai-config itself, where Claude Code already loads both (ai-config#4206) |
+| `inject-core-rules.py` | `SessionStart` | loads `AGENTS.md` into context (and names `CLAUDE.md` to read) wherever the plugin is enabled, since a plugin has no instruction-file slot of its own; inside an ai-config checkout it injects that checkout's own `AGENTS.md`, since Claude Code auto-loads only its `CLAUDE.md` there (ai-config#4206) |
 | `inject-local-time.sh` | `UserPromptSubmit` | supplies the real local time, so a recap timestamp is never recalled |
 | `warn-python3-cannot-read-hooks.sh` | `UserPromptSubmit` | names the interpreter when the `python3` on `PATH` cannot read the directory the hooks live in -- a condition that denies `Bash`, `Edit`, `Write` and `Agent` at once (every tool a `PreToolUse` matcher names; `Read` and `Grep` are unaffected), while each denial names a hook rather than the interpreter. Shell, not Python: in the failure this hook reports, no Python hook can run. Silent when the interpreter is fine; see the hook's own header for the mechanism (ai-config#3624) |
 | `require-gh-repo-flag.py` | `PreToolUse` (Bash) | blocks a mutating repo-scoped `gh` command that omits `-R` |

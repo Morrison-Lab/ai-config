@@ -836,7 +836,7 @@ def handle_stop(cursor: dict[str, Any], entries: list[dict[str, Any]]) -> dict[s
     return {}
 
 
-def handle_user_prompt_submit(
+def run_context_scripts(
     cursor: dict[str, Any],
     entries: list[dict[str, Any]],
     once_per_generation: bool,
@@ -875,11 +875,11 @@ def handle_session_start(cursor: dict[str, Any], entries: list[dict[str, Any]]) 
     # sessionStart timeout.
     deadline = event_deadline("sessionStart")
     parts = [
-        handle_user_prompt_submit(
+        run_context_scripts(
             cursor, entries, once_per_generation=False, event="sessionStart",
             claude_event="SessionStart", deadline=deadline,
         ),
-        handle_user_prompt_submit(
+        run_context_scripts(
             cursor, entries, once_per_generation=True, event="sessionStart",
             deadline=deadline,
         ),
@@ -895,7 +895,7 @@ def handle_post_tool(cursor: dict[str, Any], entries: list[dict[str, Any]]) -> d
     stashed = take_stashed_context(str(cursor.get("tool_use_id") or ""))
     if stashed:
         parts.append(stashed)
-    extra = handle_user_prompt_submit(
+    extra = run_context_scripts(
         cursor, entries, once_per_generation=True, event="postToolUse",
     )
     if extra:

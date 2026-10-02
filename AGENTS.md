@@ -195,7 +195,7 @@ See [`improve-your-subagents`](shared/workflow/improve-your-subagents.md).
 
 ## Treat user profanity and frustration as urgent defect signals
 
-When the user expresses frustration or profanity, treat it as an urgent defect signal: acknowledge briefly, diagnose the issue, fix it immediately, and record learnings in `memories/` or rules.
+Treat profanity, frustration, a correction, or a repeat request as an urgent defect: diagnose, fix it now, and in that turn commit the general rule to the repo that owns it (ai-config if it spans repos), never only to project memory (`hooks/remind-encode-user-correction.py`).
 See [`user-profanity-signal`](shared/workflow/user-profanity-signal.md).
 
 ## Status and diagnostic requests do not make issues report-only

@@ -16,9 +16,9 @@ whose working repo is something else** (a product repo, `gha`, a data-analysis
 repo). This is the cross-repo companion to `memorize`: same routing and voice
 rules, different delivery.
 
-`memorize`'s commit/push step assumes `ai-config` is your primary checkout,
-symlinked into `~/.claude/` by `bootstrap.sh`, with direct push to `main`. That
-breaks when you're elsewhere:
+`memorize`'s legacy commit/push path assumes `ai-config` is your primary checkout, symlinked into `~/.claude/`, with direct push to `main`.
+That breaks when you're elsewhere, which is the normal case in a cloud or claude.ai project session.
+A project's own memory is never the place for a cross-repo rule, since no other project reads it:
 
 - A session scoped to another repo may not have `ai-config` checked out at all —
   the `~/.claude/memories` symlink can be absent or dangling.
@@ -39,9 +39,8 @@ memory on its own branch + PR, never touching the repo you're working in.
   is general (not tied to the repo you're in), and `ai-config` is **not** your
   working repo.
 
-If `ai-config` **is** your working repo (you're on its `main`, symlinked, with
-push access), use `memorize` — it's the shorter path. This skill is for the
-cross-repo case.
+If `ai-config` **is** your working repo (a checkout you can branch and open a PR from), use `memorize` — it's the shorter path.
+This skill is for the cross-repo case.
 
 ## First: is it actually a general-purpose memory for ai-config?
 
@@ -184,10 +183,8 @@ These are exactly
 
 ## Relationship to other skills
 
-- **`memorize`** (`remember` / `always`) — the same routing and voice rules for
-  the normal case: `ai-config` is your working repo, symlinked, and you push to
-  its current branch directly. Reach for `memorize` there; reach for
-  `push-memory` when `ai-config` is not the repo you're in.
+- **`memorize`** (`remember` / `always`) — the same routing and voice rules for the case where `ai-config` is your working repo and you open the PR from that checkout.
+  Reach for `memorize` there; reach for `push-memory` when `ai-config` is not the repo you're in.
 - **`ums`** — reviews the whole session and may also update skill definitions.
   `push-memory` stores exactly one memory the user names; it never scans or
   edits skills.

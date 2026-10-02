@@ -209,6 +209,13 @@
             "timeout": 10,
             "script": "remind-ci-crosscheck-sim-verdict.py",
             "why": "Lacaedemon/sparta incident of 2026-08-22 -- a local simulation run reading FAIL was used to publish a decision, while CI transcript on the same clip/seed read PASS. Injects a reminder on the prompt following a local sim/transcript check when used to assert a verdict, prompting a CI-side reading."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-encode-user-correction.py\"",
+            "timeout": 10,
+            "script": "remind-encode-user-correction.py",
+            "why": "ai-config#4208 -- the user had to repeat a correction across sessions and projects. The UMS reminders key on the agent's own admission or an accepted review finding, so a correction from the user triggered none of them, and the natural landing place outside ai-config was host memory no other project reads. Injects, never blocks, the procedure that commits the general rule in the same turn to the repo that owns it, ai-config for anything beyond one repo."
           }
         ]
       }

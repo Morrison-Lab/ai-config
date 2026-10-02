@@ -16,12 +16,9 @@ and agents. **`remember` / `/remember` and `always` / `/always` are synonyms
 for this skill** — same behavior; the wording the user happens to use doesn't
 change anything.
 
-Unlike `ums` (which reviews the whole session and may also update skill
-definitions), this stores exactly what the user says — no scanning, no skill
-updates. Memory files — and `~/.claude/CLAUDE.md` — are symlinked into the
-ai-config repo, so memorize **commits and pushes** the one change; otherwise
-the note is lost when the session ends (ephemeral cloud containers are
-reclaimed) and never syncs elsewhere.
+Unlike `ums` (which reviews the whole session and may also update skill definitions), this stores exactly what the user says — no scanning, no skill updates.
+A memory counts only once it is committed to the repo that owns it (ai-config for a cross-repo rule or fact), so memorize **commits and pushes** the one change;
+otherwise the note is lost when the session ends (ephemeral cloud containers are reclaimed) and no other project or machine sees it.
 
 ## When this fires
 
@@ -70,9 +67,14 @@ those forms — this skill is what it hands off to once memory is the answer.
      anything. Until approved, stage the fact in that repo's local Claude
      project memory as short-lived, not-yet-durable staging, and update
      `MEMORY.md` there as an index entry too.
-   - **General standing rule** — an always-apply working preference across ALL
-     repos ("always link PRs in tables", "use Pacific time") →
-     `~/.claude/CLAUDE.md` (it's loaded every session)
+   - **General standing rule** — an always-apply working preference across ALL repos ("always link PRs in tables", "use Pacific time") → ai-config's own `AGENTS.md` (cross-agent) or `CLAUDE.md` / a `shared/` fragment (Claude-specific detail), committed to `Morrison-Lab/ai-config` by PR.
+     The plugin's `hooks/inject-core-rules.py` starts every session with `AGENTS.md`'s section index and an order to read it in full, so that is what makes the rule reach other projects.
+     Keep the `AGENTS.md` entry to the rule in a line or two with a pointer, and put detail in a `shared/` fragment: `AGENTS.md` has a hard 32,768-byte cap.
+     Do not write it to `~/.claude/CLAUDE.md` unless that file is a symlink into an ai-config checkout: the symlink install was removed, and a plain file there is invisible to every other machine, container and project.
+   - **Host memory is a copy, never the home.**
+     A claude.ai project's memory, a Cowork or desktop memory store, or any other memory the harness offers is read only inside that project.
+     A cross-project rule goes to ai-config as above;
+     the host memory may hold a pointer to it (ai-config#4208).
    - **General reference fact** — a cross-project fact that only matters when
      relevant ("gh opens a pager — pipe to cat") → a topical file in
      `/memories/`, or `tools.md` for what fits none of them.
@@ -114,20 +116,17 @@ those forms — this skill is what it hands off to once memory is the answer.
      directory as an index entry. Tell the user this is temporary staging
      and what's still needed (agent-doc infra added via a PR, or upstream
      approval).
-   - **`/memories/session/`** — skip; conversation-only notes shouldn't enter
-     the shared repo.
-   - **Everything else — including `~/.claude/CLAUDE.md` writes — gets
-     committed** to ai-config. This assumes `bootstrap.sh` has symlinked `memories/` and
-   `CLAUDE.md` into the ai-config repo (the expected setup) and that ai-config is
-   your working repo. When you're **working primarily in another repo** and want
-   to push a general memory to ai-config from there, use `push-memory` instead —
-   it delivers on a branch + PR and never touches the repo you're in. Resolve the repo
-   from the `memories/` symlink and stage the file by its path *within* the
-   repo (`git rev-parse --show-toplevel` follows the symlink to the repo root,
-   robust across one or many hops — unlike single-hop `readlink`):
+   - **`/memories/session/`** — skip; conversation-only notes shouldn't enter the shared repo.
+   - **No `~/.claude/memories` symlink** (a cloud or project session, or any machine set up after the symlink install was removed) — attach or clone `Morrison-Lab/ai-config`, commit the change there on a branch, and open a PR (`push-memory` does this).
+     A write under `~/.claude` that is not a symlink into ai-config is lost with the container or stays on one machine, which is how the user ends up repeating themselves.
+   - **Everything else gets committed** to ai-config.
+     The commands below apply only to a machine that still has the legacy `~/.claude/memories` symlink into an ai-config checkout and works in that checkout;
+     without the symlink, use the bullet above.
+     When you're **working primarily in another repo** and want to push a general memory to ai-config from there, use `push-memory` instead --- it delivers on a branch + PR and never touches the repo you're in.
+     Resolve the repo from the `memories/` symlink and stage the file by its path *within* the repo (`git rev-parse --show-toplevel` follows the symlink to the repo root, robust across one or many hops, unlike single-hop `readlink`):
 
    ```bash
-   [ -L ~/.claude/memories ] || { echo "~/.claude/memories isn't a symlink — run bootstrap.sh first"; exit 1; }
+   [ -L ~/.claude/memories ] || { echo "no ~/.claude/memories symlink: use the no-symlink path (push-memory)"; exit 1; }
    repo="$(git -C ~/.claude/memories rev-parse --show-toplevel)"   # ai-config repo root
    rel="CLAUDE.md"   # or memories/<file>.md  (NOT memories/repo/ — that's gone)
    git -C "$repo" add "$rel" \
@@ -146,16 +145,11 @@ those forms — this skill is what it hands off to once memory is the answer.
    belongs. In an ephemeral cloud session the push is mandatory: an unpushed
    commit dies with the container.
 
-   **Worktree session / occupied main checkout.** `~/.claude/memories` and
-   `~/.claude/CLAUDE.md` are symlinked to the **main** checkout, so
-   `git -C ~/.claude/memories rev-parse --show-toplevel` resolves to the main
-   checkout — *not* your worktree. If that checkout is on a non-`main` branch
-   (e.g. another session is working there, possibly with uncommitted edits),
-   committing through the symlink lands your memory on the wrong branch and can
-   tangle with that session's work. In that case don't commit through the
-   symlink: edit the memory file at its path inside **your** worktree, commit on
-   your worktree branch, and land it via branch + PR + merge. It only reaches the
-   live symlinked memory once it merges to `main` and the main checkout updates.
+   **Worktree session / occupied main checkout (legacy symlink machines).**
+   Where `~/.claude/memories` and `~/.claude/CLAUDE.md` are still symlinked to the **main** checkout, `git -C ~/.claude/memories rev-parse --show-toplevel` resolves to the main checkout — *not* your worktree.
+   If that checkout is on a non-`main` branch (e.g. another session is working there, possibly with uncommitted edits), committing through the symlink lands your memory on the wrong branch and can tangle with that session's work.
+   In that case don't commit through the symlink: edit the memory file at its path inside **your** worktree, commit on your worktree branch, and land it via branch + PR + merge.
+   It only reaches the live symlinked memory once it merges to `main` and the main checkout updates.
    (See the worktree-isolation and no-`cd`-in-worktree bullets in
    `memories/preferences.md`, and the `session-lock` skill.)
 6. **Confirm**: one sentence — what was stored, where, and that it was pushed.

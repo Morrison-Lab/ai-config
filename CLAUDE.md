@@ -187,6 +187,7 @@ Do the work yourself instead of asking Ezra to run commands.
 Report an unreachable source instead of citing it from memory.
 Treat CI error annotations as failures, and keep removed content in an outtakes file.
 State the model you chose for each task.
+Apply each new instruction in the turn it arrives, and look for recurring patterns in corrections yourself.
 
 ## Never close a reply by offering to do work you are already allowed to do
 

@@ -27,8 +27,10 @@ Do not treat the currently speaking agent as an implicit scope restriction.
 The same holds for projects and repositories.
 Read an instruction as global across every project and repository unless the user explicitly limits it to one.
 Record a global instruction in its global home (`psw` for prose rules, this repository for agent rules, `gha` for checks), not only in a project's memory or instructions.
+Writing it in project memory as well is fine, but it is not enough alone.
 
 - **Do:** put a new instruction in the global home, and have project files link to it.
+- **Do:** start following the instruction in the same turn it arrives.
 - **Don't:** read "we are working on project X" as a scope limit, or record the instruction only in project memory.
 
 ## Gate external repository communication on membership

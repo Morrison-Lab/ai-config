@@ -574,9 +574,11 @@ git cat-file -p "${tree%%$'\n'*}:AGENTS.md" | wc -c
 
 A conflict, an error, or a count of 0 is not a pass;
 expect a figure near the file's current size.
-Measured 2026-10-02, as of the last CI run on each head: [#4213](https://github.com/Morrison-Lab/ai-config/pull/4213) carried `AGENTS.md` at 32,725 of Codex's 32,768-byte cap on its own branch, with green CI and a clean review, while [#4215](https://github.com/Morrison-Lab/ai-config/pull/4215) and others merged and grew `main`'s copy to 32,627 bytes (fe72a1f1).
-The merge result came to 33,029 bytes, over the cap, with no conflict.
-The remedy was merging `main` into the PR and trimming.
+Measured 2026-10-02: [#4213](https://github.com/Morrison-Lab/ai-config/pull/4213)'s branch at 1c1e6592 held `AGENTS.md` at 31,941 of Codex's 32,768-byte cap, well inside it.
+Meanwhile [#4215](https://github.com/Morrison-Lab/ai-config/pull/4215) merged and grew `main`'s copy to 32,627 bytes (45d60d0f).
+`git merge-tree --write-tree 45d60d0f 1c1e6592` gives 33,029 bytes, over the cap, with no conflict;
+the branch's own merge of `main` (d957ee2f) has the same tree.
+The remedy was trimming the section on the merged branch, to 32,725 bytes (0ba906df).
 
 - **Do:** re-run the byte count on the merge result immediately before merging any PR that grows a capped file, after every earlier merge in the batch.
 - **Don't:** read the headroom figure in the PR's own CI output as current once `main` has moved.

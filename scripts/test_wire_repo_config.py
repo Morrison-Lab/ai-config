@@ -120,6 +120,81 @@ class WireRepoConfig(unittest.TestCase):
             self.run_main()
         self.assertEqual(self.read("AGENTS.md"), broken)
 
+    def test_r_package_gets_anchored_rbuildignore_entries(self):
+        (self.repo / "DESCRIPTION").write_text("Package: x\n", encoding="utf-8")
+        (self.repo / "CLAUDE.md").write_text("# Claude\n", encoding="utf-8")
+        (self.repo / ".Rbuildignore").write_text("^.*\\.Rproj$", encoding="utf-8")
+        self.assertEqual(self.run_main("--check")[0], 1)
+        self.assertEqual(self.read(".Rbuildignore"), "^.*\\.Rproj$", "--check wrote")
+        self.run_main()
+        self.assertEqual(self.read(".Rbuildignore"),
+                         "^.*\\.Rproj$\n^AGENTS\\.md$\n^CLAUDE\\.md$\n^\\.claude$\n")
+        code, out = self.run_main("--check")
+        self.assertEqual(code, 0, out)
+
+    def test_rbuildignore_keeps_existing_matches_and_skips_absent_claude_md(self):
+        (self.repo / "DESCRIPTION").write_text("Package: x\n", encoding="utf-8")
+        (self.repo / ".Rbuildignore").write_text("^\\.claude\n[\n", encoding="utf-8")
+        self.run_main()
+        # `^\.claude` already covers .claude, `[` does not compile and is
+        # skipped, and no CLAUDE.md exists, so only AGENTS.md is added.
+        self.assertEqual(self.read(".Rbuildignore"), "^\\.claude\n[\n^AGENTS\\.md$\n")
+
+    def test_rbuildignore_padded_pattern_is_not_a_match(self):
+        # R does not trim lines, so "^AGENTS\.md$ " matches nothing there.
+        (self.repo / "DESCRIPTION").write_text("Package: x\n", encoding="utf-8")
+        (self.repo / ".Rbuildignore").write_bytes(b"^AGENTS\\.md$ \r\n^\\.claude$\r\n")
+        self.run_main()
+        self.assertEqual((self.repo / ".Rbuildignore").read_bytes(),
+                         b"^AGENTS\\.md$ \r\n^\\.claude$\r\n^AGENTS\\.md$\r\n")
+
+    def test_rbuildignore_blank_line_is_not_a_match_all(self):
+        # An empty regex matches every path, so R drops blank lines first.
+        (self.repo / "DESCRIPTION").write_text("Package: x\n", encoding="utf-8")
+        (self.repo / ".Rbuildignore").write_text("^.*\\.Rproj$\n\n", encoding="utf-8")
+        self.run_main()
+        self.assertEqual(self.read(".Rbuildignore"),
+                         "^.*\\.Rproj$\n\n^AGENTS\\.md$\n^\\.claude$\n")
+
+    def test_rbuildignore_matches_case_insensitively(self):
+        (self.repo / "DESCRIPTION").write_text("Package: x\n", encoding="utf-8")
+        (self.repo / ".Rbuildignore").write_text("^agents\\.md$\n^\\.CLAUDE$\n",
+                                                 encoding="utf-8")
+        _, out = self.run_main()
+        self.assertEqual(self.read(".Rbuildignore"), "^agents\\.md$\n^\\.CLAUDE$\n", out)
+
+    def test_rbuildignore_cr_only_file_keeps_cr(self):
+        (self.repo / "DESCRIPTION").write_text("Package: x\n", encoding="utf-8")
+        (self.repo / ".Rbuildignore").write_bytes(b"^\\.claude$\r^x\x0c$\r")
+        self.run_main()
+        self.assertEqual((self.repo / ".Rbuildignore").read_bytes(),
+                         b"^\\.claude$\r^x\x0c$\r^AGENTS\\.md$\r")
+
+    def test_rbuildignore_pathological_pattern_is_skipped(self):
+        (self.repo / "DESCRIPTION").write_text("Package: x\n", encoding="utf-8")
+        nested = "(" * 1000 + ")" * 1000
+        (self.repo / ".Rbuildignore").write_text(f"a{{4294967296}}\n{nested}\n",
+                                                 encoding="utf-8")
+        self.run_main()
+        self.assertEqual(self.read(".Rbuildignore"),
+                         f"a{{4294967296}}\n{nested}\n^AGENTS\\.md$\n^\\.claude$\n")
+
+    def test_non_utf8_rbuildignore_is_an_error(self):
+        (self.repo / "DESCRIPTION").write_text("Package: x\n", encoding="utf-8")
+        (self.repo / ".Rbuildignore").write_bytes(b"\xff\n")
+        with self.assertRaises(SystemExit) as ctx:
+            self.run_main()
+        self.assertIn("not UTF-8", str(ctx.exception.code))
+
+    def test_rbuildignore_created_for_package_without_one(self):
+        (self.repo / "DESCRIPTION").write_text("Package: x\n", encoding="utf-8")
+        self.run_main()
+        self.assertEqual(self.read(".Rbuildignore"), "^AGENTS\\.md$\n^\\.claude$\n")
+
+    def test_non_package_gets_no_rbuildignore(self):
+        self.run_main()
+        self.assertFalse((self.repo / ".Rbuildignore").exists())
+
     def test_ai_config_and_its_subdirectories_are_skipped(self):
         (self.repo / ".claude-plugin").mkdir()
         (self.repo / ".claude-plugin/marketplace.json").write_text(

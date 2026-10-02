@@ -17,45 +17,73 @@ reusable feedback into ai-config" -- and neither had a trigger:
     auto-memory). Each is invisible to every OTHER project, which is exactly
     how the user ends up repeating themselves.
 
-So this matches the user's prompt for correction and repetition language and
-injects the procedure: fix the instance, widen the correction to its general
-rule, commit that rule in this turn to the repo that owns it (ai-config for a
-cross-repo rule), and add a hook when the miss is decidable. Host memory is
-allowed in addition, never instead.
+So this matches the user's prompt for three families of phrase -- having to
+say something again, the agent repeating a miss, and the agent reading an
+instruction wrongly -- and injects the procedure: fix the instance, widen the
+correction to its general rule, commit that rule in this turn to the repo
+that owns it (ai-config for a cross-repo rule), and add a hook when the miss
+is decidable. Host memory is allowed in addition, never instead.
+
+It does not try to catch every plain correction ("no, use UTC"): those carry
+no lexical marker that separates them from an ordinary instruction, and a
+reminder that fires on every "no" or "again" teaches the reader to skip it.
+Each pattern therefore needs words that only make sense addressed to an
+agent that missed something, and windows stay inside one sentence.
 
 Inject-only, like its siblings: the user's message is never blocked. Text the
-user did not type as a correction is removed before matching: fenced code,
-`>` quotes, and <system-reminder> / <pasted_content> blocks. The vocabulary
-is deliberately narrow -- each phrase states a correction or a repeat
-addressed to the agent -- because a reminder that fires on every "again" or
-"still" teaches the reader to skip it. It fires on every matching prompt
-rather than once per session: each correction is its own rule.
+user did not type as a correction is removed before matching: fenced and
+indented code, `>` quotes, inline code and double-quoted spans, and
+<system-reminder> / <pasted_content> blocks. It fires on every matching
+prompt rather than once per session: each correction is its own rule.
 """
 import json
 import re
 import sys
 
 PATTERNS = [
+    # Having to say something again.
     r"\brepeat(?:ing|ed)? myself\b",
-    r"\b(?:have|had|keep|kept) (?:to )?(?:tell|telling|remind|reminding) you\b",
-    r"\bI(?:'ve| have)? (?:already|just) (?:told|explained (?:this )?to) you\b",
-    r"\b(?:I(?:'ve| have)|already) told you\b",
-    r"\b(?:as|like) I (?:said|told you|asked)(?: before| earlier| already)?\b",
-    r"\bhow many times (?:do|have|must|will|should) I\b",
-    r"\b(?:feels?|should be|seems?) (?:so )?obvious\b",
-    r"\btoo (?:narrowly|literally)\b",
-    r"\byou(?:'re| are)? still (?:not|interpreting|doing|missing|ignoring|forgetting|getting)\b",
-    r"\byou keep (?:forgetting|ignoring|missing|getting|doing)\b",
-    r"\bevery (?:single )?(?:time|session|project)\b.{0,40}\b(?:tell|remind)(?:ing)? you\b",
+    r"\bmake me repeat\b",
+    r"^\s*I repeat:",
+    r"\b(?:have|had|keep|kept|need) (?:to )?(?:tell|telling|remind|reminding) you"
+    r" (?:to|not|that you|again)\b",
+    r"\b(?:have to|need to) keep (?:saying|telling|asking|reminding)\b",
+    r"\bI(?:'ve| have)? (?:already|just) (?:told|explained (?:this|that|it) to) you\b",
+    r"\bI(?:'ve| have)? told you (?:before|already|this|so many|to|not|again"
+    r"|yesterday|last|many|multiple|several|\d)",
+    r"\bI(?:'ve| have) (?:said|asked you|explained) (?:this |that |it )?"
+    r"(?:before|already|again|many|multiple|several|\d)",
+    r"\bdidn't I (?:tell|say|ask)\b",
+    r"\b(?:as|like) I (?:said|told you|asked)(?: you)? (?:before|earlier|already|last)\b",
+    r"\bhow many times (?:do I have to|must I|have I (?:told|said|asked))\b",
+    r"\bfor the (?:second|third|fourth|fifth|nth|\d+(?:st|nd|rd|th)) time\b",
+    r"\bwe(?:'ve| have)? (?:went|gone|been) over this\b",
+    r"\bevery (?:single )?(?:time|session|project)\b[^.?!\n]{0,40}"
+    r"\b(?:have to|need to) (?:tell|remind) you\b",
     r"\bshould(?:n't| not) have to (?:tell|ask|say|remind|repeat)\b",
-    r"\byou(?:'ve| have)? (?:forgot(?:ten)?|ignored|missed|broke(?:n)?)\b.{0,60}\bagain\b",
+    # The agent repeating a miss.
+    r"(?<!are )\byou(?:'re| are)? still (?:not|interpreting|ignoring|forgetting)\b",
+    r"\byou keep (?:forgetting|ignoring|missing|doing)\b",
+    r"\byou never remember\b",
+    r"\byou(?:'ve| have)? (?:forgot(?:ten)?|ignored|did (?:it|that|this))\b"
+    r"[^.?!\n]{0,60}\bagain\b",
+    r"\bsame mistake (?:again|as (?:last|before))\b",
+    # The agent reading an instruction wrongly.
+    r"\b(?:interpret\w*|read(?:ing)?|tak(?:e|ing) (?:it|this|that|me|my \w+))\b"
+    r"[^.?!\n]{0,40}\btoo (?:narrowly|literally)\b",
+    r"\b(?:things?|stuff) that (?:feel|feels|seem|seems|should be) obvious\b",
+    r"\b(?:that's|this is|that is|it's) not what I (?:asked|meant|said|wanted)\b",
+    r"\byou ignored my\b",
 ]
-MATCHER = re.compile("|".join(PATTERNS), re.IGNORECASE | re.DOTALL)
+MATCHER = re.compile("|".join(PATTERNS), re.IGNORECASE | re.MULTILINE)
 
+LEFT_DQ, RIGHT_DQ = chr(0x201C), chr(0x201D)
 NOT_TYPED = [
     re.compile(r"^ {0,3}(```|~~~).*?^ {0,3}\1[^\n]*$", re.MULTILINE | re.DOTALL),
     re.compile(r"<(system-reminder|pasted_content)\b[^>]*>.*?</\1>", re.DOTALL),
-    re.compile(r"^ {0,3}>.*$", re.MULTILINE),
+    re.compile(r"^\s*>.*$", re.MULTILINE),
+    re.compile(r"^(?: {4}|\t).*$", re.MULTILINE),
+    re.compile(r'`[^`\n]*`|"[^"\n]*"|' + LEFT_DQ + "[^" + RIGHT_DQ + r"\n]*" + RIGHT_DQ),
 ]
 
 REMINDER = """\
@@ -82,7 +110,7 @@ profanity and frustration as urgent defect signals" and CLAUDE.md \
 
 
 def typed_text(prompt: str) -> str:
-    text = prompt.replace("’", "'").replace("‘", "'")
+    text = prompt.replace(chr(0x2019), "'").replace(chr(0x2018), "'")
     for pattern in NOT_TYPED:
         text = pattern.sub(" ", text)
     return text

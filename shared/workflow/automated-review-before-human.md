@@ -2,11 +2,12 @@ Never ask a person to review work until its automated review is clean or deadloc
 That holds in every repository, project and forge (GitHub, GitLab, or any other): a GitHub PR, a GitLab MR, a rendered document sent for a read, or any other work product awaiting a person's review.
 A question to the user is not a review request.
 A status report or a PR/MR check is covered too: list an item as waiting on human review only when its latest commit has a clean automated review.
-Start the review job, even under a read-only brief ([`status-requests-act`](status-requests-act.md)), when all three hold:
+Start the review job, even under a read-only brief ([`status-requests-act`](status-requests-act.md)), when all four hold:
 
 - the review has not run on the latest commit;
 - the item is in scope per [`reviewing-prs`](../../memories/reviewing-prs.md);
-- no review run is in flight on its head.
+- no review run is in flight on its head;
+- the item is not a draft.
 
 Starting it is the only review-related write this rule adds to a status pass.
 In a status pass, report a draft as a draft, and an out-of-scope item as having no clean automated review, rather than un-drafting it or triggering a review on it.
@@ -54,7 +55,7 @@ Then ask, and link the clean verdict (or the deadlocked item) in the request.
 
 ## Why it is a gate on the request, not a step in the loop
 
-The rule was already in the corpus as step 3 of a PR loop ("request human review only after AI approval or deadlock"), in a section near the end of `AGENTS.md` that this change replaced, worded for GitHub pull requests.
+The rule was already in the corpus as step 3 of a PR loop ("request human review only after AI approval or deadlock"), in the `AGENTS.md` section "Request review and drive every started PR to clean" (replaced by this fragment in #4248), worded for GitHub pull requests.
 The rule was skipped anyway: on 2026-10-02 an agent asked the user to review a GitLab MR on which no automated review had been triggered.
 The same day, a scheduled read-only status check listed six GitLab MRs as waiting on the user's review although their manual AI review job had never run;
 the rule's PR-loop wording did not read as covering a status pass.

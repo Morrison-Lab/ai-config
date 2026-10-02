@@ -128,13 +128,18 @@ external reviewer becomes available again. Formal reviews (e.g. Copilot)
 don't show up in the comments query above at all -- they're a separate
 review object.
 
-**This is a status query -- inspect an existing Copilot or human review, don't request one.**
-Requesting a review is a mutation: it triggers a review job, consumes reviewer quota, and can collide with an active `ardi` loop driving the same PR.
-Use the read-only half of [`ardi`'s step 2](../ardi/SKILL.md) -- fetch the matched review's body + inline comments at the current `commit_id` and require a zero-findings verdict -- but skip the `POST /requested_reviewers` call.
-If no genuine Copilot verdict exists at the current head, check for a human's formal review at the head (next subsection) before reporting `no verdict at head`;
-only when neither exists, report that;
-don't request it from inside this skill.
-Starting a missing automated review is the session's job under [`automated-review-before-human`](../../shared/workflow/automated-review-before-human.md), not this skill's yet ([#4253](https://github.com/Morrison-Lab/ai-config/issues/4253)).
+**This is a status query -- inspect an existing Copilot or human review,
+don't request one.**
+Requesting a review is a mutation: it triggers a review job,
+consumes reviewer quota, and can collide with an active `ardi` loop driving
+the same PR. Use the read-only half of
+[`ardi`'s step 2](../ardi/SKILL.md) -- fetch the matched review's body +
+inline comments at the current `commit_id` and require a zero-findings
+verdict -- but skip the `POST /requested_reviewers` call. If no genuine
+Copilot verdict exists at the current head, check for a human's formal
+review at the head (next subsection) before reporting `no verdict at head`;
+only when neither exists, report that and
+offer to run `ardi` (which can request one); don't request it yourself here.
 Green CI plus a clean self-review is not sufficient on its own if an
 external reviewer is reachable.
 
@@ -376,7 +381,6 @@ Render a **Review Summary Table** for the PR:
   When AI review is clean and CI is green, list requested reviewers (e.g. `the repository owner`) or flag `⚠️ None (Request human review)`.
   When AI review is clean but CI is failing or pending, display `- (CI in progress / failing)`.
   When AI review is in-flight or unclean, display `- (AI review in progress)`.
-  When no automated review has run on the head at all (none found, or only a stale one) and none is running, display `- (needs automated review)`, never `⚠️ None (Request human review)`.
 - **Next Step** --- computed deterministically using the full state matrix:
   - If `isDraft`: `Draft (Work in progress)`.
   - If human `CHANGES_REQUESTED` is pending: `Blocked on human changes (<login>)` (overrides everything below).
@@ -386,10 +390,8 @@ Render a **Review Summary Table** for the PR:
   - If AI review or External review has open findings: `Drive to clean (ARDI)`.
   - If AI review is running: `In-flight AI review`.
   - If CI is pending: `Wait for CI (<pending-check>)`.
-  - If no automated reviewer (the `@claude` bot, Copilot, or the posted stand-in review that [the gate's item 3](../../shared/workflow/automated-review-before-human.md#the-gate) allows) has a verified clean verdict at head, whatever a human's review says: `Needs automated review (no clean automated verdict at head)`.
-    Never label such a row ready for, or waiting on, human review;
-    [`automated-review-before-human`](../../shared/workflow/automated-review-before-human.md) says when the session starts that review ([#4253](https://github.com/Morrison-Lab/ai-config/issues/4253) tracks doing it inside this skill).
-  - If fully clean (no human blocks, at least one verified clean **automated** review at head with 0 open findings across all reviews, CI green, 0 open threads, up to date with main):
+  - If neither AI review nor External review has a verified clean verdict at head: `Confirm review (no verified verdict at head)`.
+  - If fully clean (no human blocks, at least one verified clean review at head with 0 open findings across all reviews, CI green, 0 open threads, up to date with main):
     - If `Author` is `the repository owner` (self-authored): `Ready for self-merge`.
     - If `Author` is external and human review is requested (`the repository owner`): `Ready for human review`.
     - If `Author` is external and human review is not yet requested: `Request human review`.

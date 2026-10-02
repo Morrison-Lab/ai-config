@@ -9,9 +9,13 @@ allowed-tools:
 
 # pr-status-all
 
-Produce a **one-row-per-PR status table** for all open PRs.
-This is the whole-queue version of [`pr-status`](../pr-status/SKILL.md): apply the same "read the **latest** review and parse it for findings" discipline to every open PR, then lay the results out as a table.
-It is **read-only** --- it reports status, it does not push, merge, or run review loops (use [`ardia`](../ardia/SKILL.md) for that, or [`sync-pr-branch`](../sync-pr-branch/SKILL.md) to update a branch).
+Produce a **one-row-per-PR status table** for all open PRs. This is the
+whole-queue version of [`pr-status`](../pr-status/SKILL.md): apply the same
+"read the **latest** review and parse it for findings" discipline to every
+open PR, then lay the results out as a table. It is **read-only** --- it reports
+status, it does not push, merge, or run review loops (use
+[`ardia`](../ardia/SKILL.md) for that, or
+[`sync-pr-branch`](../sync-pr-branch/SKILL.md) to update a branch).
 
 Because the per-PR signals are independent and read-only, gather them
 **concurrently** --- one subagent per PR --- then assemble the table. See
@@ -95,9 +99,7 @@ Fill in `<N>`, `<headRefName>`, `<isDraft>`, `<owner>`, `<repo>` for each PR (re
 >    a formal review (Copilot's or a human's) is a separate object it won't show.
 >    This step **only inspects existing reviews (Copilot's or a human's)** -- it never POSTs a review request.
 >    Requesting a review is a mutation (triggers a review job, consumes quota, can collide with a concurrent `ardi` loop), which breaks this skill's whole justification for fanning out subagents concurrently (*read-only, side-effect-free*).
->    Starting a missing automated review is the orchestrating session's job under [`automated-review-before-human`](../../shared/workflow/automated-review-before-human.md), never a subagent's ([#4253](https://github.com/Morrison-Lab/ai-config/issues/4253)).
->    If no genuine verdict already exists at the current head, report that fact -- don't try to produce one;
->    that's `ardi`'s job.
+>    If no genuine verdict already exists at the current head, report that fact -- don't try to produce one; that's `ardi`'s job.
 >    ```bash
 >    set -o pipefail
 >    head="$(gh pr view "<N>" --json headRefOid -q .headRefOid)"
@@ -155,7 +157,6 @@ Fill in `<N>`, `<headRefName>`, `<isDraft>`, `<owner>`, `<repo>` for each PR (re
 >      - If `reviewRequests` is empty, report `⚠️ None (Request human review)`.
 >    - If AI review is clean/approved but CI is failing or pending, report `- (CI in progress / failing)`.
 >    - If AI review is still in-flight or unclean, report `- (AI review in progress)`.
->    - If no automated review (`@claude`, Copilot, or a posted stand-in review) has run on the head and none is running, report `- (needs automated review)`.
 > 5. **Unresolved threads** -- count open inline review threads (`READ_PR_REVIEW_COMMENTS`).
 >    ```bash
 >    gh api graphql -f query='query {
@@ -184,7 +185,7 @@ Fill in `<N>`, `<headRefName>`, `<isDraft>`, `<owner>`, `<repo>` for each PR (re
 >    Keep `DISMISSED` in the filter so an explicit dismissal clears an older `CHANGES_REQUESTED`.
 >    Any non-empty result **blocks** regardless of what any bot says -- report `changes requested by <login>`.
 >
-> Return: PR number, Author, isDraft, AI Review (`[✅ Clean (Round N)](url)` / `[⏳ In-Flight](url)` / `[⚠️ Unverified](url)` / `[❌ Needs Work](url)` / `none found`), External Review (`clean` / `N open` / `no verdict at head`), Human Blocked (`none` / `changes requested by <login>`), CI State (`🟢 All Green` / `❌ Failing (<name>)` / `⏳ Pending (<name>)`), Reviewers Requested (`the repository owner` / `*Self-authored*` / `⚠️ None` / `❌ Changes requested by <login>` / `- (CI in progress / failing)` / `- (AI review in progress)` / `- (needs automated review)`), Threads (`resolved` / `N open`), Behind-main (`up to date` / `N commits`), Next Step (computed per the deterministic transition rules).
+> Return: PR number, Author, isDraft, AI Review (`[✅ Clean (Round N)](url)` / `[⏳ In-Flight](url)` / `[⚠️ Unverified](url)` / `[❌ Needs Work](url)` / `none found`), External Review (`clean` / `N open` / `no verdict at head`), Human Blocked (`none` / `changes requested by <login>`), CI State (`🟢 All Green` / `❌ Failing (<name>)` / `⏳ Pending (<name>)`), Reviewers Requested (`the repository owner` / `*Self-authored*` / `⚠️ None` / `❌ Changes requested by <login>` / `- (CI in progress / failing)` / `- (AI review in progress)`), Threads (`resolved` / `N open`), Behind-main (`up to date` / `N commits`), Next Step (computed per the deterministic transition rules).
 
 ### 3. Assemble (orchestrator)
 
@@ -223,7 +224,6 @@ A Markdown table, one row per open PR, with these columns:
   When AI review is clean and CI is green, list requested reviewers (e.g. `the repository owner`) or flag `⚠️ None (Request human review)`.
   When AI review is clean but CI is failing or pending, display `- (CI in progress / failing)`.
   When AI review is in-flight or unclean, display `- (AI review in progress)`.
-  When no automated review has run on the head at all (none found, or only a stale one) and none is running, display `- (needs automated review)`, never `⚠️ None (Request human review)`.
 - **Next Step** --- computed deterministically using the full state matrix:
   - If `isDraft`: `Draft (Work in progress)`.
   - If human `CHANGES_REQUESTED` is pending: `Blocked on human changes (<login>)` (overrides everything below).
@@ -233,10 +233,8 @@ A Markdown table, one row per open PR, with these columns:
   - If AI review or External review has open findings: `Drive to clean (ARDI)`.
   - If AI review is running: `In-flight AI review`.
   - If CI is pending: `Wait for CI (<pending-check>)`.
-  - If no automated reviewer (the `@claude` bot, Copilot, or the posted stand-in review that [the gate's item 3](../../shared/workflow/automated-review-before-human.md#the-gate) allows) has a verified clean verdict at head, whatever a human's review says: `Needs automated review (no clean automated verdict at head)`.
-    Never label such a row ready for, or waiting on, human review;
-    [`automated-review-before-human`](../../shared/workflow/automated-review-before-human.md) says when the session starts that review ([#4253](https://github.com/Morrison-Lab/ai-config/issues/4253) tracks doing it inside this skill).
-  - If fully clean (no human blocks, at least one verified clean **automated** review at head with 0 open findings across all reviews, CI green, 0 open threads, up to date with main):
+  - If neither AI review nor External review has a verified clean verdict at head: `Confirm review (no verified verdict at head)`.
+  - If fully clean (no human blocks, at least one verified clean review at head with 0 open findings across all reviews, CI green, 0 open threads, up to date with main):
     - If `Author` is `the repository owner` (self-authored): `Ready for self-merge`.
     - If `Author` is external and human review is requested (`the repository owner`): `Ready for human review`.
     - If `Author` is external and human review is not yet requested: `Request human review`.
@@ -249,21 +247,26 @@ When detailed git/thread metrics are needed, include the extended columns:
 |:---|:---|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---|
 
 Below the table, list each PR's open findings briefly (or "none"), and call out anything needing action: branches behind main, failing CI, drafts, reviews that returned `null`, or a pending human review.
-Do **not** label a PR "ready to merge" or "merge-ready" unless it is **fully clean** --- **Human is `none`** (a blocking human review overrides everything below) *and* an automated verdict (Review, a Copilot External review, or the gate's stand-in review) is `clean` at the current head *and* no review has open findings *and* all CI workflows are green *and* it's not behind main *and* every inline review thread is resolved.
+Do **not** label a PR "ready to merge" or "merge-ready" unless it is **fully clean** --- **Human is `none`** (a blocking human review overrides everything below) *and* at least one of Review or External is `clean` at the current head *and* neither one has open findings *and* all CI workflows are green *and* it's not behind main *and* every inline review thread is resolved.
 Never hedge with "ready except for one nit."
 
 ## Why fan-out is safe here (and the write-loops stay series)
 
-This loop parallelizes because its units are **independent and side-effect-free** --- each PR's signals are read-only and don't depend on any other PR.
-The whole-queue *write* loops are different, and deliberately stay (mostly) series:
+This loop parallelizes because its units are **independent and side-effect-free**
+--- each PR's signals are read-only and don't depend on any other PR. The
+whole-queue *write* loops are different, and deliberately stay (mostly) series:
 
 - **`ardia` / `iterate-all`** --- share one working directory, compete for CI
   runner capacity, and have human checkpoints. Parallelize only opt-in, with
   worktree isolation + bounded concurrency --- not by default.
-- **`gii` / `gia`** --- intentionally sequential: a later issue's base branch depends on whether the prior MR merged, and same-file issues conflict.
-  **`gip`** is the opt-in exception --- it fans out only the *provably independent* subset (no stacking dependency, no file overlap), each subagent in its own worktree, and sends everything else back through `gii`.
+- **`gii` / `gia`** --- intentionally sequential: a later issue's base branch
+  depends on whether the prior MR merged, and same-file issues conflict.
+  **`gip`** is the opt-in exception --- it fans out only the *provably
+  independent* subset (no stacking dependency, no file overlap), each subagent
+  in its own worktree, and sends everything else back through `gii`.
 
-Rule of thumb: fan out a whole-queue loop only when its units are provably independent and don't mutate shared state --- like this one.
+Rule of thumb: fan out a whole-queue loop only when its units are provably
+independent and don't mutate shared state --- like this one.
 
 ## Notes
 
@@ -276,9 +279,9 @@ Rule of thumb: fan out a whole-queue loop only when its units are provably indep
 
 ## Relationship to other skills
 
-- **`pr-status`** --- the single-PR version;
-  this applies its latest-review-only / `null`-not-clean discipline across the whole open-PR queue.
-  (pr-status : pr-status-all :: `ardi` : `ardia`.)
+- **`pr-status`** --- the single-PR version; this applies its latest-review-only /
+  `null`-not-clean discipline across the whole open-PR queue. (pr-status :
+  pr-status-all :: `ardi` : `ardia`.)
 - **`ardia` / `iterate-all`** --- the *write* counterpart: actually drive every
   open PR to clean. This skill only reports; see *Why fan-out is safe here* for
   why those loops stay series.

@@ -1,18 +1,18 @@
 ---
-name: "release-post"
-description: "Write R package release blog posts."
+name: "manuscript"
+description: "Prepare a paper for a journal."
 ---
 
-# release-post (Codex wrapper)
+# manuscript (Codex wrapper)
 
 This is a generated Codex wrapper around the canonical ai-config Claude skill.
 
-Source: [skills/release-post/SKILL.md](../../skills/release-post/SKILL.md)
+Source: [skills/manuscript/SKILL.md](../../skills/manuscript/SKILL.md)
 
 Before acting, read the source skill completely and follow its workflow, adapting it to Codex.
 
-The source lives at `skills/release-post/SKILL.md` in the same ai-config checkout as this wrapper.
-If this wrapper was loaded through `${CODEX_HOME:-$HOME/.codex}/skills/release-post`, resolve the symlink target for this wrapper directory first, then read `../../skills/release-post/SKILL.md` relative to that real directory.
+The source lives at `skills/manuscript/SKILL.md` in the same ai-config checkout as this wrapper.
+If this wrapper was loaded through `${CODEX_HOME:-$HOME/.codex}/skills/manuscript`, resolve the symlink target for this wrapper directory first, then read `../../skills/manuscript/SKILL.md` relative to that real directory.
 Do not resolve that relative path from inside `${CODEX_HOME:-$HOME/.codex}/skills`, because it points back at the wrapper tree.
 
 - Treat `user-invocable` and `allowed-tools` as Claude metadata, not Codex permissions.

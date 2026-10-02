@@ -13,6 +13,9 @@ This is [`verify-the-right-artifact`](verify-the-right-artifact.md) applied to r
 - A crossref that resolved to nothing (`?@fig-...`).
 - A list that lost the blank line above it and rendered as a paragraph beginning with a literal `-`.
 - A KaTeX error swallowed into a `katex-error` span.
+- A layout defect in a paged render (PDF or DOCX): a table with no caption, a caption stranded on the page after its float, a caption rendered as a section heading.
+  Text-and-numbers comparison of the render misses all three;
+  see [`manuscript-float-layout`](../writing/manuscript-float-layout.md).
 - **The source being fixed while the deployed page is not**, because a stale freeze cache served the previous render.
 
 That last one is the one to internalize, because every other check in this corpus passes on it.

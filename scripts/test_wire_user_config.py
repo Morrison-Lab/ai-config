@@ -41,7 +41,7 @@ class WireUserConfig(unittest.TestCase):
         return code, out.getvalue()
 
     def settings(self):
-        return json.loads((self.home / ".claude/settings.json").read_text())
+        return json.loads((self.home / ".claude/settings.json").read_text(encoding="utf-8"))
 
     def test_fresh_machine_wires_everything_and_is_idempotent(self):
         code, out = self.run_main("--check")
@@ -55,18 +55,18 @@ class WireUserConfig(unittest.TestCase):
         codex = self.home / ".codex/AGENTS.md"
         self.assertTrue(codex.is_symlink())
         self.assertEqual(codex.resolve(), (wire.ROOT / "AGENTS.md").resolve())
-        gemini = (self.home / ".gemini/GEMINI.md").read_text()
+        gemini = (self.home / ".gemini/GEMINI.md").read_text(encoding="utf-8")
         self.assertIn(f"@{wire.ROOT / 'AGENTS.md'}", gemini)
         code, out = self.run_main("--check")
         self.assertEqual(code, 0, out)
-        before = (self.home / ".gemini/GEMINI.md").read_text()
+        before = (self.home / ".gemini/GEMINI.md").read_text(encoding="utf-8")
         self.run_main()
-        self.assertEqual((self.home / ".gemini/GEMINI.md").read_text(), before)
+        self.assertEqual((self.home / ".gemini/GEMINI.md").read_text(encoding="utf-8"), before)
 
     def test_existing_settings_are_preserved(self):
         path = self.home / ".claude/settings.json"
         path.parent.mkdir(parents=True)
-        path.write_text(json.dumps({"model": "opus", "enabledPlugins": {"x@y": True}}))
+        path.write_text(json.dumps({"model": "opus", "enabledPlugins": {"x@y": True}}), encoding="utf-8")
         self.run_main()
         s = self.settings()
         self.assertEqual(s["model"], "opus")
@@ -76,7 +76,7 @@ class WireUserConfig(unittest.TestCase):
     def test_explicit_disable_is_respected(self):
         path = self.home / ".claude/settings.json"
         path.parent.mkdir(parents=True)
-        path.write_text(json.dumps({"enabledPlugins": {"ai-config@Morrison-Lab": False}}))
+        path.write_text(json.dumps({"enabledPlugins": {"ai-config@Morrison-Lab": False}}), encoding="utf-8")
         code, out = self.run_main()
         self.assertIn("disables the plugin", out)
         self.assertFalse(self.settings()["enabledPlugins"]["ai-config@Morrison-Lab"])
@@ -84,7 +84,7 @@ class WireUserConfig(unittest.TestCase):
     def test_other_marketplace_copy_counts_as_enabled(self):
         path = self.home / ".claude/settings.json"
         path.parent.mkdir(parents=True)
-        path.write_text(json.dumps({"enabledPlugins": {"ai-config@ai-config": True}}))
+        path.write_text(json.dumps({"enabledPlugins": {"ai-config@ai-config": True}}), encoding="utf-8")
         _, out = self.run_main()
         self.assertNotIn("ai-config@Morrison-Lab", self.settings()["enabledPlugins"])
         self.assertIn("ok", out)
@@ -94,7 +94,7 @@ class WireUserConfig(unittest.TestCase):
         path.parent.mkdir(parents=True)
         path.write_text(json.dumps({"hooks": {"UserPromptSubmit": [{"hooks": [
             {"type": "command",
-             "command": "\"$HOME/.claude/hooks/inject-local-time.sh\""}]}]}}))
+             "command": "\"$HOME/.claude/hooks/inject-local-time.sh\""}]}]}}), encoding="utf-8")
         _, out = self.run_main()
         self.assertIn("fire every hook twice", out)
         self.assertNotIn("enabledPlugins", self.settings())
@@ -102,17 +102,17 @@ class WireUserConfig(unittest.TestCase):
     def test_foreign_codex_file_is_left_alone(self):
         codex = self.home / ".codex/AGENTS.md"
         codex.parent.mkdir(parents=True)
-        codex.write_text("my own rules\n")
+        codex.write_text("my own rules\n", encoding="utf-8")
         _, out = self.run_main()
         self.assertIn("skip", out)
-        self.assertEqual(codex.read_text(), "my own rules\n")
+        self.assertEqual(codex.read_text(encoding="utf-8"), "my own rules\n")
 
     def test_gemini_block_appends_after_user_content(self):
         gemini = self.home / ".gemini/GEMINI.md"
         gemini.parent.mkdir(parents=True)
-        gemini.write_text("# mine\nkeep this\n")
+        gemini.write_text("# mine\nkeep this\n", encoding="utf-8")
         self.run_main()
-        text = gemini.read_text()
+        text = gemini.read_text(encoding="utf-8")
         self.assertTrue(text.startswith("# mine\nkeep this\n"), text)
         self.assertEqual(text.count(wire.GEMINI_BEGIN), 1)
 
@@ -122,7 +122,7 @@ class WireUserConfig(unittest.TestCase):
         self.assertFalse((self.home / ".config/opencode").exists())
         (self.home / ".config/opencode").mkdir(parents=True)
         self.run_main()
-        config = json.loads((self.home / ".config/opencode/opencode.json").read_text())
+        config = json.loads((self.home / ".config/opencode/opencode.json").read_text(encoding="utf-8"))
         self.assertIn(str(wire.ROOT / "AGENTS.md"), config["instructions"])
 
 

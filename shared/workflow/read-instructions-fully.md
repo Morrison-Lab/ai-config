@@ -21,7 +21,7 @@ A request for a resource means giving its direct link, per [`link-forge-artifact
 A correction applies every time the situation recurs, not only on the occasion it named.
 
 When the user adds a clarification in parentheses, or as a second message right after the first, it names an inference you were expected to make unprompted.
-Treat that clarification as a missed inference rather than as new information.
+If the clarification was not already obvious to you, take it as a correction: a missed inference, not new information.
 Act on it, and record the general lesson as [the correction section above](#treat-a-correction-as-a-general-principle) describes.
 
 - **Do:** act on a request's plain implications unprompted, such as linking the resource it asks for.
@@ -30,4 +30,4 @@ Act on it, and record the general lesson as [the correction section above](#trea
 - **Don't:** wait for the user to spell out what a request plainly implies.
 
 (Directives from the user, 2026-10-02: "assume that nothing I write is filler";
-after having to add "(that is, give me the link)" and "(always)" to a request for a referee report: "something I write to you parenthetically should be obvious to you".)
+after having to add "(that is, give me the link)" and "(always)" to a request for a referee report: "something I write to you parenthetically should be obvious to you", and "take it as a correction if it's not obvious".)

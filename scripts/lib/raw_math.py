@@ -95,56 +95,105 @@ def compile_rules(rules: dict[str, str]) -> re.Pattern[str]:
     return re.compile("|".join(parts))
 
 
-def _blank(span: str) -> str:
-    """Replace every character but newlines with a space."""
-    return "".join(c if c == "\n" else " " for c in span)
+def _definition_end(text: str, start: int) -> int | None:
+    r"""Return the end of the definition whose command ends at `start`.
+
+    The definition is the macro's name (`\Ep`, or `{\Ep}`), an optional
+    argument spec (`[1]`, `#1`), and one brace body. The walk skips escaped
+    characters such as `\{` and `%` comments, and stops at a blank line.
+    It returns None for anything that does not parse as a definition (a
+    prose mention, a truncated body), so that text is scanned, not hidden.
+    """
+    limit = len(text)
+    i = start
+    depth = 0
+    named = False  # the macro's name has been read
+    in_spec = False  # inside [..] at depth 0
+    while i < limit:
+        c = text[i]
+        if c == "\n" and text.startswith("\n", i + 1):
+            return None  # a blank line ends the search
+        if c == "\\":
+            j = i + 1
+            while j < limit and text[j].isalpha():
+                j += 1
+            if depth == 0 and not in_spec:
+                if named:  # a second control sequence before any body
+                    return None
+                named = True
+            i = max(j, i + 2)
+            continue
+        if c == "%":
+            nl = text.find("\n", i, limit)
+            i = limit if nl < 0 else nl + 1
+            continue
+        if in_spec:
+            in_spec = c != "]"
+        elif c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth < 0:
+                return None
+            if depth == 0:
+                if named:
+                    return i + 1
+                named = True  # that group was the name: {\Ep}
+        elif depth == 0:
+            if c == "[" and named:
+                in_spec = True
+            elif not (c.isspace() or c.isdigit() or c == "#"):
+                return None  # ordinary text: not a definition
+        i += 1
+    return None
 
 
 def _mask_definitions(text: str) -> str:
     """Blank each macro definition's span, keeping line breaks.
 
-    Works on the whole text, so a body that starts on the next line
-    (`\\newcommand{\\E}{%` then the body) is masked too.
+    Works on the whole text in one pass, so a body that starts on the next
+    line (`\\newcommand{\\Ex}{%` then the body) is masked too.
     """
-    line = text
-    out = text
-    for m in reversed(list(_DEFINITION.finditer(text))):
-        i = m.end()
-        depth = 0
-        bodies = 0
-        # Walk the name, any [n] argument count, and the brace body.
-        while i < len(line):
-            c = line[i]
-            if c == "{":
-                depth += 1
-            elif c == "}":
-                depth -= 1
-                if depth == 0:
-                    bodies += 1
-                    nxt = line[i + 1:].lstrip()
-                    if not nxt.startswith(("{", "[")) or bodies >= 2:
-                        i += 1
-                        break
-            i += 1
-        out = out[:m.start()] + _blank(out[m.start():i]) + out[i:]
-    return out
+    pieces = []
+    pos = 0
+    for m in _DEFINITION.finditer(text):
+        if m.start() < pos:
+            continue  # inside a definition already masked
+        end = _definition_end(text, m.end())
+        if end is None:
+            continue
+        pieces.append(text[pos:m.start()])
+        pieces.append(re.sub(r"[^\n]", " ", text[m.start():end]))
+        pos = end
+    pieces.append(text[pos:])
+    return "".join(pieces)
 
 
-_FENCE = re.compile(r"^\s*(`{3,}|~{3,})")
+# CommonMark: up to 3 spaces of indent, optionally inside a blockquote; a
+# backtick fence's info string cannot contain a backtick.
+_FENCE = re.compile(r"^(?:\s{0,3}>)*\s{0,3}(`{3,}|~{3,})(.*)$")
 _CODE_SPAN = re.compile(r"(`+)(?!`).*?(?<!`)\1(?!`)")
+
+
+def _fence(line: str):
+    """Return the fence marker a line opens or closes, or None."""
+    m = _FENCE.match(line)
+    if not m or (m.group(1)[0] == "`" and "`" in m.group(2)):
+        return None
+    return m
 
 
 def _mask_code(lines):
     """Blank fenced blocks and inline code spans in Markdown-like text."""
     opener = None  # the open fence's marker, e.g. "````"
     for line in lines:
-        m = _FENCE.match(line)
+        m = _fence(line)
         if opener is None and m:
             opener = m.group(1)
             yield ""
         elif opener is not None:
             if (m and m.group(1)[0] == opener[0] and len(m.group(1)) >= len(opener)
-                    and not line.strip()[len(m.group(1)):].strip()):
+                    and not m.group(2).strip()):
                 opener = None
             yield ""
         else:

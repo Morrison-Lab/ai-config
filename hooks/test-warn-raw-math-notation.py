@@ -45,6 +45,13 @@ WARN = [
     ("Write", {"file_path": "a.qmd", "content": "$\\mathit{Var}(X)$"}, "\\Var"),
     ("Write", {"file_path": "a.md", "content": "````\n```\n````\n$\\mathbb{E}[Y]$"}, "\\Ep"),
     ("Write", {"file_path": "a.tex", "content": "\\def\\Foo{%\n1}\n$\\mathbb{E}[X]$"}, "\\Ep"),
+    ("Write", {"file_path": "a.tex", "content": "\\def\\lb{\\{}\n$\\mathbb{E}[X]$"}, "\\Ep"),
+    ("Write", {"file_path": "a.tex", "content": "\\newcommand{\\foo}{x\n$\\mathbb{E}[X]$"}, "\\Ep"),
+    ("Write", {"file_path": "a.tex", "content": "\\def\\Ex\n\n$\\mathbb{E}[X]$"}, "\\Ep"),
+    ("Write", {"file_path": "a.tex", "content": "Use \\newcommand to make macros: $\\mathbb{E}[X]$"}, "\\Ep"),
+    ("Write", {"file_path": "a.tex", "content": "\\def\\a{1}\n[see] $\\mathrm{Var}(X)$"}, "\\Var"),
+    ("Write", {"file_path": "a.md", "content": "    ```\n$\\mathbb{E}[Y]$"}, "\\Ep"),
+    ("Write", {"file_path": "a.md", "content": "```x``` text\n$\\mathbb{E}[Y]$"}, "\\Ep"),
 ]
 for tool, ti, macro in WARN:
     out = hook(tool, ti)
@@ -69,6 +76,9 @@ QUIET = [
     ("Write", {"file_path": "x.tex", "content": "\\newcommand{\\Ex}{%\n\\mathbb{E}}"}, "a definition body on the next line"),
     ("Write", {"file_path": "x.md", "content": "````\n```\n$\\mathbb{E}[Y]$\n```\n````"}, "a nested fence"),
     ("Write", {"file_path": "x.md", "content": "~~~\n```\n$\\mathbb{E}[Y]$\n~~~"}, "a tilde fence holding a backtick line"),
+    ("Write", {"file_path": "x.md", "content": "> ```\n> $\\mathbb{E}[Y]$\n> ```"}, "a fence inside a blockquote"),
+    ("Write", {"file_path": "x.tex", "content": "\\newcommand{\\Ex}[1]{\\mathbb{E}\\{#1\\}}"}, "a definition with escaped braces"),
+    ("Write", {"file_path": "x.tex", "content": "\\newcommand{\\Vx}[1][X]{\\operatorname{Var}(#1)}"}, "a definition with an optional default"),
     ("Write", {"file_path": "x.qmd", "content": "$\\mathit{E} + \\mathit{P}$"}, "a single italic letter"),
 ]
 for tool, ti, why in QUIET:
@@ -136,6 +146,18 @@ with tempfile.TemporaryDirectory() as d:
     r = subprocess.run([sys.executable, LINT, os.path.join(d, "missing.qmd")],
                        capture_output=True, text=True)
     check(r.returncode == 2, "lint exits 2 on a missing path")
+
+# --- definition masking is linear, not quadratic ---------------------------
+sys.path.insert(0, os.path.join(os.path.dirname(HERE), "scripts", "lib"))
+import time  # noqa: E402
+
+from raw_math import find_raw  # noqa: E402
+
+big = "\\def\\a{1}\n" * 100_000 + "$\\mathbb{E}[X]$\n"
+t0 = time.monotonic()
+hits = list(find_raw(big))
+check(len(hits) == 1 and time.monotonic() - t0 < 5,
+      "100,000 definitions scan in under 5 s and the trailing hit is found")
 
 print(f"\n{len(FAILURES)} failure(s)")
 sys.exit(1 if FAILURES else 0)

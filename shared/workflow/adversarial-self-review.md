@@ -1520,9 +1520,12 @@ Run a fresh independent review on every revision of a deliverable before you han
 A revision is any new head you report, show, or ask the user to look at: a pushed fix round, a new render, a redrafted document.
 For a rendered document such as a manuscript, the review is a referee read of the new render, done by a reviewer other than the session that made the revision.
 An earlier review covers the head it read and nothing after it, so a clean verdict on the previous revision does not carry over.
-Post each review per [the section above](#post-every-independent-review-on-the-pr-or-mr-it-reviewed), and link it in the reply that hands the revision back.
+Post each review per [Post every independent review on the PR or MR it reviewed](#post-every-independent-review-on-the-pr-or-mr-it-reviewed), and link it in the reply that hands the revision back.
 
-This does not reopen [the one-round rule](#the-review-gates-the-push-not-the-work-----and-it-is-one-round-not-a-loop): the review gates the hand-back of each revision, and it is one round per revision, not a loop that holds the push until a reviewer is satisfied.
+This does not reopen [the one-round rule](#the-review-gates-the-push-not-the-work-----and-it-is-one-round-not-a-loop): the push itself is not gated by this review, only the report to the user is, so review the pushed head before you report it.
+It is one round per revision, not a loop.
+When that review returns findings, fix them and push, and either review the fix before reporting it or report it with the open findings disclosed;
+the fix is the next revision and owes its own review before the following hand-back.
 (Directive from the user, 2026-10-02, after a manuscript revision went back without a new review: "did you get another adversarial peer review?
 do that every time".)
 

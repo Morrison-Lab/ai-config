@@ -45,11 +45,9 @@ The user's reaction was that treating those MRs as ready was insane, and the gat
    - any breach of the float and caption layout rules in the `manuscript-float-layout` fragment ([ai-config#4203](https://github.com/Morrison-Lab/ai-config/pull/4203));
    - anything else the document's own conventions require (for a manuscript, the [`manuscript`](../../skills/manuscript/SKILL.md) skill's checklist).
 6. **Record the evidence** in a PR/MR comment: the commit the render came from, the converter used, the page count, that every page was viewed, and each finding with its page number.
-   When a reviewer other than the session that wrote the diff did the page review (a subagent, a referee pass), post the reviewer's report too, per [`adversarial-self-review`](adversarial-self-review.md#post-every-independent-review-on-the-pr-or-mr-it-reviewed).
+   Post the independent reviewer's report from step 7 too, per [`adversarial-self-review`](adversarial-self-review.md#post-every-independent-review-on-the-pr-or-mr-it-reviewed).
    Fix the findings and repeat from step 1 on the new head.
 7. **Get an independent referee read of this render** before handing it back to the user: a reviewer other than the session that made the revision reads every page, per [`adversarial-self-review`](adversarial-self-review.md#review-every-revision-before-it-goes-back-to-the-user).
-   Every revision gets its own read;
-   the read of an earlier render does not carry over.
 8. **Only then** report the PR ready or treat it as mergeable.
    A push after the review invalidates it, exactly as it invalidates a review verdict.
 

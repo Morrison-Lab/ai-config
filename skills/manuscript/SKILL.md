@@ -282,8 +282,8 @@ A green build is not "done".
 Item 1 is a hard gate: no manuscript PR or MR is reported ready or merged, under any grant, until it passes ([`review-rendered-documents`](../../shared/workflow/review-rendered-documents.md)).
 Before calling a manuscript ready:
 
-1. [ ] Export the render to PDF and **look at every page**, main text and supplement.
-   An independent referee read of this render, not an earlier one, is posted on the PR or MR and linked in the reply that hands it back.
+1. [ ] Export the render to PDF and **look at every page**, main text and supplement;
+   evidence: a referee read of this render by an independent reviewer, posted on the PR or MR and linked in the reply that hands it back.
 2. [ ] Every table and figure has a number and a caption, and is cited in the text in order.
 3. [ ] The rendered layout passes every rule in the `manuscript-float-layout` fragment ([ai-config#4203](https://github.com/Morrison-Lab/ai-config/pull/4203)).
 4. [ ] No table runs off the page; no figure is cropped or blurry.

@@ -280,6 +280,7 @@ Most journals require each of these, in the text or in submission forms:
 ## 15. Pre-submission checklist
 
 A green build is not "done".
+Item 1 is a hard gate: no manuscript PR or MR is reported ready or merged, under any grant, until it passes ([`review-rendered-documents`](../../shared/workflow/review-rendered-documents.md)).
 Before calling a manuscript ready:
 
 1. [ ] Export the render to PDF and **look at every page**, main text and supplement.
@@ -303,3 +304,4 @@ Before calling a manuscript ready:
 16. [ ] Cover letter drafted: the question, the main finding, why this journal, confirmation that the work is not under consideration elsewhere, and any suggested or excluded reviewers.
 
 Report the manuscript as ready only after this checklist passes, and say which items were checked on the rendered PDF.
+Post the page-by-page evidence on the PR or MR as that fragment describes.

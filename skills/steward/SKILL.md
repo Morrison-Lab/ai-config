@@ -80,6 +80,10 @@ read the linked file before acting on that point.
   `mwc` grants autonomous merging of fully clean PRs for the session;
   otherwise, merge only the PRs the user named.
   See [`mwc`](../mwc/SKILL.md).
+- **View the rendered document before calling a document PR ready.**
+  When the PR changes a Word, PDF, slide, or manuscript render, open the render at the current head, look at every page, and post the evidence before reporting it ready or merging it.
+  Green CI is not enough.
+  See [`review-rendered-documents`](../../shared/workflow/review-rendered-documents.md).
 - **Surface merge order** when one PR depends on another,
   such as links to a page that a sibling PR adds.
   Merge the dependency first, wait for its deploy,

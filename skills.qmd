@@ -111,6 +111,7 @@ field (e.g. "grab an issue", "drive to clean", "update memories and skills").
 | [`r-package-development`](skills/r-package-development/SKILL.md) | | Day-to-day R package dev loop: load, test, document, format |
 | [`testing-r-packages`](skills/testing-r-packages/SKILL.md) | | Full testthat reference: fixtures, mocking, snapshots, BDD-style tests |
 | [`quarto-authoring`](skills/quarto-authoring/SKILL.md) | | Author and convert Quarto documents |
+| [`manuscript`](skills/manuscript/SKILL.md) | | Prepare a scientific manuscript for journal submission: structure, reporting guidelines, tables, figures, statistics, supplement, and a rendered-PDF checklist |
 | [`lifecycle`](skills/lifecycle/SKILL.md) | | Apply lifecycle badges and deprecation stages to R package functions |
 | [`brand-yml`](skills/brand-yml/SKILL.md) | | Configure a shared `_brand.yml` for Quarto, Shiny, and R Markdown |
 | [`alt-text`](skills/alt-text/SKILL.md) | | Write accessible alt text (`fig-alt`) for figures in Quarto documents and pkgdown sites |

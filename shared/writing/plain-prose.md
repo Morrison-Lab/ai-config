@@ -36,6 +36,15 @@ When PSW and this guidance disagree, PSW wins.
   - **Do:** apply those PSW sections when writing or reviewing prose.
   - **Don't:** copy their text here; link the section instead
     (see [`dont-reinvent-wheel`](../principles/dont-reinvent-wheel.md)).
+- **Follow an abstract or general statement with a concrete example.**
+  A general claim is fine when an instance follows it;
+  a vague one with no instance is not.
+  PSW's rule and its before/after are proposed in `Morrison-Lab/psw#76` ---
+  once merged, they live at
+  [Follow an abstract statement with an example](https://morrison-lab.github.io/psw/chapters/word-choice.html#follow-an-abstract-statement-with-an-example).
+  - **Do:** give the instance right after the general claim,
+    using the document's running example where it has one.
+  - **Don't:** leave a general claim for the reader to instantiate.
 - **Put an inline list of three or more phrases in a bullet list**,
   introduced by a sentence ending in a colon, and number sequential steps.
   A short series of single words may stay inline.

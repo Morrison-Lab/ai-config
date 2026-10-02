@@ -18,7 +18,7 @@ Use this skill whenever drafting, revising, rendering, or reviewing a paper or i
 The target journal's *Instructions for Authors* override everything here (word limits, abstract headings, reference style, where figures go, file formats).
 Read them first when a journal is named.
 When none is named, use the defaults below, which follow the [ICMJE Recommendations](https://www.icmje.org/recommendations/) and [AMA Manual of Style](https://www.amamanualofstyle.com/) conventions common in clinical and health-services journals.
-The reader-facing version of this guide is PSW's chapter [Preparing a manuscript for submission](https://morrison-lab.github.io/psw/chapters/manuscript-submission.html);
+The reader-facing version of this guide is PSW's chapter "Preparing a manuscript for submission" (added by [psw#74](https://github.com/Morrison-Lab/psw/pull/74));
 when the two disagree, defer to PSW and fix this skill to match.
 For prose style, defer to [PSW](https://morrison-lab.github.io/psw/) and the [`use-preferred-style`](../use-preferred-style/SKILL.md) skill.
 
@@ -284,11 +284,8 @@ Before calling a manuscript ready:
 
 1. [ ] Export the render to PDF and **look at every page**, main text and supplement.
 2. [ ] Every table and figure has a number and a caption, and is cited in the text in order.
-3. [ ] No caption is on a different page from its table or figure, or split across a page break;
-   no table runs off the page;
-   no figure is cropped or blurry.
-4. [ ] Tables and figures sit after the references;
-   a page break precedes the supplement.
+3. [ ] The rendered layout passes every rule in the `manuscript-float-layout` fragment ([ai-config#4203](https://github.com/Morrison-Lab/ai-config/pull/4203)).
+4. [ ] No table runs off the page; no figure is cropped or blurry.
 5. [ ] No broken cross-references (`??`, `@fig-`, `Table ?`), raw Markdown, code output, warnings, or `NA` in rendered tables.
 6. [ ] Abstract numbers match the Results, tables, and figures.
 7. [ ] Every abbreviation is defined at first use (abstract, text, each table and figure).

@@ -182,12 +182,15 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
 
 Measured 2026-10-02 in a claude.ai cloud/project session, through the agent proxy.
 `gh api repos/{o}/{r}/git/trees --input -` (POST) and `gh api repos/{o}/{r}/git/refs -f ref=... -f sha=...` (POST) both failed with `Write access to this GitHub API path is not permitted through this proxy. (HTTP 403)`.
+That is the same proxy refusal the branch-deletion bullet above records for `git/refs`, now measured on creation and on tree writes too.
 These are the low-level routes a no-checkout multi-repo edit would build commits from.
-`POST repos/{o}/{r}/pulls`, `POST .../issues/{n}/labels`, `PUT .../pulls/{n}/merge`, and `git push` from a shallow clone all worked.
-GraphQL is blocked as well, which is tracked separately in [ai-config#4220](https://github.com/Morrison-Lab/ai-config/issues/4220) and not restated here.
+The proxy did not refuse `POST repos/{o}/{r}/pulls`, `POST .../issues/{n}/labels`, or `git push` from a shallow clone: a fresh `git clone --depth 1` of Morrison-Lab/psw, a commit, and a push opened [psw#81](https://github.com/Morrison-Lab/psw/pull/81), and the same route served this repo's own PRs.
+The proxy does not refuse `PUT .../pulls/{n}/merge` either, but the client may, as the next section records.
+GraphQL is blocked too, per the GraphQL bullet above and [ai-config#3653](https://github.com/Morrison-Lab/ai-config/issues/3653);
+[ai-config#4220](https://github.com/Morrison-Lab/ai-config/issues/4220) tracks that block's effect on `check-pr-fully-clean.py`.
 
 - **Do:** for a multi-repo edit with no local checkout, run `git clone --depth 1`, branch, commit, `git ls-remote --heads origin <branch>`, then `git push` in its own command, and open the PR with `gh api repos/{o}/{r}/pulls --input file.json`.
-- **Don't:** assemble the commit through `git/trees` and `git/refs` POSTs, or conclude REST writes are blocked wholesale because those two 403 --- the PR, label, merge, and push paths are open.
+- **Don't:** assemble the commit through `git/trees` and `git/refs` POSTs, or conclude REST writes are blocked wholesale because those two 403 --- the proxy leaves the PR, label, and push paths open.
 
 ## The merge call is not blocked by the proxy, and is still refused --- by the client
 

@@ -16,12 +16,9 @@ and agents. **`remember` / `/remember` and `always` / `/always` are synonyms
 for this skill** — same behavior; the wording the user happens to use doesn't
 change anything.
 
-Unlike `ums` (which reviews the whole session and may also update skill
-definitions), this stores exactly what the user says — no scanning, no skill
-updates. Memory files — and `~/.claude/CLAUDE.md` — are symlinked into the
-ai-config repo, so memorize **commits and pushes** the one change; otherwise
-the note is lost when the session ends (ephemeral cloud containers are
-reclaimed) and never syncs elsewhere.
+Unlike `ums` (which reviews the whole session and may also update skill definitions), this stores exactly what the user says — no scanning, no skill updates.
+A memory counts only once it is committed to the repo that owns it (ai-config for a cross-repo rule or fact), so memorize **commits and pushes** the one change;
+otherwise the note is lost when the session ends (ephemeral cloud containers are reclaimed) and no other project or machine sees it.
 
 ## When this fires
 
@@ -70,20 +67,13 @@ those forms — this skill is what it hands off to once memory is the answer.
      anything. Until approved, stage the fact in that repo's local Claude
      project memory as short-lived, not-yet-durable staging, and update
      `MEMORY.md` there as an index entry too.
-   - **General standing rule** — an always-apply working preference across ALL
-     repos ("always link PRs in tables", "use Pacific time") → ai-config's
-     own `AGENTS.md` (cross-agent) or `CLAUDE.md` / a `shared/` fragment
-     (Claude-specific detail), committed to `Morrison-Lab/ai-config` by PR.
-     The plugin's `hooks/inject-core-rules.py` loads `AGENTS.md` into every
-     session, so that is what makes the rule reach other projects. Do not
-     write it to `~/.claude/CLAUDE.md` unless that file is a symlink into an
-     ai-config checkout: the symlink install was removed, and a plain file
-     there is invisible to every other machine, container and project.
-   - **Host memory is a copy, never the home.** A claude.ai project's
-     memory, a Cowork or desktop memory store, or any other memory the
-     harness offers is read only inside that project. A cross-project rule
-     goes to ai-config as above; the host memory may hold a pointer to it
-     (ai-config#4208).
+   - **General standing rule** — an always-apply working preference across ALL repos ("always link PRs in tables", "use Pacific time") → ai-config's own `AGENTS.md` (cross-agent) or `CLAUDE.md` / a `shared/` fragment (Claude-specific detail), committed to `Morrison-Lab/ai-config` by PR.
+     The plugin's `hooks/inject-core-rules.py` loads `AGENTS.md` into every session, so that is what makes the rule reach other projects.
+     Do not write it to `~/.claude/CLAUDE.md` unless that file is a symlink into an ai-config checkout: the symlink install was removed, and a plain file there is invisible to every other machine, container and project.
+   - **Host memory is a copy, never the home.**
+     A claude.ai project's memory, a Cowork or desktop memory store, or any other memory the harness offers is read only inside that project.
+     A cross-project rule goes to ai-config as above;
+     the host memory may hold a pointer to it (ai-config#4208).
    - **General reference fact** — a cross-project fact that only matters when
      relevant ("gh opens a pager — pipe to cat") → a topical file in
      `/memories/`, or `tools.md` for what fits none of them.
@@ -127,21 +117,13 @@ those forms — this skill is what it hands off to once memory is the answer.
      approval).
    - **`/memories/session/`** — skip; conversation-only notes shouldn't enter
      the shared repo.
-   - **No `~/.claude/memories` symlink** (a cloud or project session, or any
-     machine set up after the symlink install was removed) — attach or clone
-     `Morrison-Lab/ai-config`, commit the change there on a branch, and open
-     a PR (`push-memory` does this). A write under `~/.claude` that is not
-     a symlink into ai-config is lost with the container or stays on one
-     machine, which is how the user ends up repeating themselves.
-   - **Everything else — including `~/.claude/CLAUDE.md` writes — gets
-     committed** to ai-config. This assumes `bootstrap.sh` has symlinked `memories/` and
-   `CLAUDE.md` into the ai-config repo (the expected setup) and that ai-config is
-   your working repo. When you're **working primarily in another repo** and want
-   to push a general memory to ai-config from there, use `push-memory` instead —
-   it delivers on a branch + PR and never touches the repo you're in. Resolve the repo
-   from the `memories/` symlink and stage the file by its path *within* the
-   repo (`git rev-parse --show-toplevel` follows the symlink to the repo root,
-   robust across one or many hops — unlike single-hop `readlink`):
+   - **No `~/.claude/memories` symlink** (a cloud or project session, or any machine set up after the symlink install was removed) — attach or clone `Morrison-Lab/ai-config`, commit the change there on a branch, and open a PR (`push-memory` does this).
+     A write under `~/.claude` that is not a symlink into ai-config is lost with the container or stays on one machine, which is how the user ends up repeating themselves.
+   - **Everything else gets committed** to ai-config.
+     The commands below apply only to a machine that still has the legacy `~/.claude/memories` symlink into an ai-config checkout and works in that checkout;
+   without the symlink, use the bullet above.
+   When you're **working primarily in another repo** and want to push a general memory to ai-config from there, use `push-memory` instead — it delivers on a branch + PR and never touches the repo you're in.
+   Resolve the repo from the `memories/` symlink and stage the file by its path *within* the repo (`git rev-parse --show-toplevel` follows the symlink to the repo root, robust across one or many hops — unlike single-hop `readlink`):
 
    ```bash
    [ -L ~/.claude/memories ] || { echo "~/.claude/memories isn't a symlink — run bootstrap.sh first"; exit 1; }

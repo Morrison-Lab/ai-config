@@ -16,9 +16,9 @@ whose working repo is something else** (a product repo, `gha`, a data-analysis
 repo). This is the cross-repo companion to `memorize`: same routing and voice
 rules, different delivery.
 
-`memorize`'s commit/push step assumes `ai-config` is your primary checkout,
-symlinked into `~/.claude/` by `bootstrap.sh`, with direct push to `main`. That
-breaks when you're elsewhere:
+`memorize`'s legacy commit/push path assumes `ai-config` is your primary checkout, symlinked into `~/.claude/`, with direct push to `main`.
+That breaks when you're elsewhere, which is the normal case in a cloud or claude.ai project session.
+A project's own memory is never the place for a cross-repo rule, since no other project reads it:
 
 - A session scoped to another repo may not have `ai-config` checked out at all —
   the `~/.claude/memories` symlink can be absent or dangling.

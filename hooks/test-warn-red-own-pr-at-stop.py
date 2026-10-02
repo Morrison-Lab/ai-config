@@ -4,8 +4,18 @@
 Run: python3 hooks/test-warn-red-own-pr-at-stop.py [hook path]
 
 The warning is a Stop hook's `systemMessage`, so every positive case reads that
-key and checks it names the PR and the failing check.
+key and checks it names the PR and the failing check. Every case that is not
+meant to crash also asserts an empty stderr, so a hook that crashes (and fails
+open, exit 0, printing nothing) cannot pass as a clean negative.
+
+The wake-event fixture (`wake`) is INVENTED, not copied from a real transcript:
+no real sample of a `check_run` webhook wake event was available when this was
+written, so its `<github-webhook-activity>` wrapper and JSON body are a guess at
+the shape. The hook finds check runs by structure (a dict with `name` and
+`conclusion`, PRs under `pull_requests`), not by the wrapper, so the guess only
+has to be close. Replace the fixture with a real sample once one is captured.
 """
+import importlib.util
 import json
 import os
 import subprocess
@@ -22,14 +32,16 @@ def rec(**kw):
     return json.dumps(kw) + "\n"
 
 
-def call(name, tool_input, result=""):
+def call(name, tool_input, result="", is_error=False):
     """An assistant tool_use followed by its user tool_result."""
     ident = f"toolu_{next(_ids)}"
+    block = {"type": "tool_result", "tool_use_id": ident, "content": result}
+    if is_error:
+        block["is_error"] = True
     return (
         rec(type="assistant", message={"content": [
             {"type": "tool_use", "id": ident, "name": name, "input": tool_input}]})
-        + rec(type="user", message={"content": [
-            {"type": "tool_result", "tool_use_id": ident, "content": result}]}))
+        + rec(type="user", message={"content": [block]}))
 
 
 def created(number):
@@ -80,8 +92,17 @@ def run_of(name, conclusion):
             "conclusion": conclusion}
 
 
-def push(command="git push origin b"):
-    return call("Bash", {"command": command}, "ok")
+def push(command="git push origin b", result="ok", is_error=False):
+    return call("Bash", {"command": command}, result, is_error)
+
+
+def head_run(name, conclusion, sha):
+    return dict(run_of(name, conclusion), head_sha=sha)
+
+
+def red7(*more):
+    """PR 7 owned, with a failing `tests` check, followed by more transcript."""
+    return created(7) + wake("tests", "failure", 7) + "".join(more)
 
 
 def branch_update(number):
@@ -232,6 +253,110 @@ CASES = [
                 "pull_requests": [{"number": 7}]}})}]}), [], None),
     ("a quota-looking failure on a non-review check still warns",
      created(7) + wake("tests", "failure", 7, QUOTA), [7], "tests"),
+    # --- Adversarial-review round 2 ---
+    # A blocked or failed merge/close/update does not drop the PR.
+    ("errored gh pr merge keeps the PR", red7(
+        call("Bash", {"command": "gh pr merge 7 --squash"}, "merge blocked", True)),
+     [7], "tests"),
+    ("gh pr merge with Exit code 1 keeps the PR", red7(
+        call("Bash", {"command": "gh pr merge 7"}, "Exit code 1\nnot mergeable")),
+     [7], "tests"),
+    ("errored gh pr close keeps the PR", red7(
+        call("Bash", {"command": "gh pr close 7"}, "boom", True)), [7], "tests"),
+    ("errored merge_pull_request keeps the PR", red7(
+        call("mcp__github__merge_pull_request", {"pullNumber": 7}, "not mergeable", True)),
+     [7], "tests"),
+    ("merge_pull_request error text keeps the PR", red7(
+        call("mcp__github__merge_pull_request", {"pullNumber": 7},
+             "Error: Pull Request is not mergeable")), [7], "tests"),
+    ("errored update_pull_request close keeps the PR", red7(
+        call("mcp__github__update_pull_request", {"pullNumber": 7, "state": "closed"},
+             "422", True)), [7], "tests"),
+    # gh pr create forms; a failed create is not adopted.
+    ("git push && gh pr create counts as own",
+     call("Bash", {"command": "git push -u origin b && gh pr create --fill"},
+          "https://github.com/o/r/pull/8\n") + wake("tests", "failure", 8),
+     [8], "tests"),
+    ("cd x && gh pr create counts as own",
+     call("Bash", {"command": "cd x && gh pr create --fill"},
+          "https://github.com/o/r/pull/8\n") + wake("tests", "failure", 8),
+     [8], "tests"),
+    ("GH_TOKEN=x gh pr create counts as own",
+     call("Bash", {"command": "GH_TOKEN=x gh pr create --fill"},
+          "https://github.com/o/r/pull/8\n") + wake("tests", "failure", 8),
+     [8], "tests"),
+    ("failed gh pr create printing an existing PR URL is not adopted",
+     call("Bash", {"command": "gh pr create --fill"},
+          "a pull request for branch b already exists:\nhttps://github.com/o/r/pull/8\n",
+          True) + wake("tests", "failure", 8), [], None),
+    ("Exit code 1 gh pr create is not adopted",
+     call("Bash", {"command": "gh pr create --fill"},
+          "Exit code 1\nhttps://github.com/o/r/pull/8\n") + wake("tests", "failure", 8),
+     [], None),
+    ("errored create_pull_request is not adopted",
+     call("mcp__github__create_pull_request", {"title": "t"},
+          json.dumps({"number": 8, "url": "https://github.com/o/r/pull/8"}), True)
+     + wake("tests", "failure", 8), [], None),
+    # An action counts only when it had an effect.
+    ("errored comment is not acting", red7(
+        call("mcp__github__add_issue_comment",
+             {"owner": "o", "repo": "r", "issue_number": 7, "body": "b"}, "403", True)),
+     [7], "tests"),
+    ("errored gh pr comment is not acting", red7(
+        call("Bash", {"command": "gh pr comment 7 --body x"}, "failed to post", True)),
+     [7], "tests"),
+    ("errored branch update is not acting", red7(
+        call("mcp__github__update_pull_request_branch",
+             {"owner": "o", "repo": "r", "pullNumber": 7}, "conflict", True)),
+     [7], "tests"),
+    ("Everything up-to-date is not acting", red7(
+        push(result="Everything up-to-date\n")), [7], "tests"),
+    ("branch-delete push is not acting", red7(
+        push("git push origin --delete b"), push("git push origin :b")),
+     [7], "tests"),
+    ("push to a URL remote is not acting", red7(
+        push("git push https://github.com/other/repo.git b")), [7], "tests"),
+    ("errored push is not acting", red7(
+        push("git push origin b", "hook declined", True)), [7], "tests"),
+    ("push whose output has a mid-line error: still acts", red7(
+        push(result="remote: note: error: none, this is the hook banner\n"
+                    "To github.com:o/r.git\n   a1..b2  b -> b\n")), [], None),
+    ("fatal: push output is not acting", red7(
+        push(result="fatal: unable to access 'https://x'\n")), [7], "tests"),
+    # One odd record does not disable the scan.
+    ("non-scalar conclusion is skipped, the rest still scanned",
+     created(7) + wake("lint", ["failure"], 7) + wake("tests", "failure", 7),
+     [7], "tests"),
+    ("non-ASCII digits in an issue_number are not a number", red7(
+        call("mcp__github__add_issue_comment",
+             {"owner": "o", "repo": "r", "issue_number": "²", "body": "b"}, "ok")),
+     [7], "tests"),
+    ("Arabic-Indic digits in gh pr close are not a number", red7(
+        call("Bash", {"command": "gh pr close ٧"}, "ok")), [7], "tests"),
+    ("many unparseable braces still finish and find the event",
+     created(7) + wake("tests", "failure", 7, {"note": "{" * 20000}), [7], "tests"),
+    # Evidence keyed by check name plus head SHA.
+    ("late success on an old head does not clear a failure on a newer head",
+     created(7) + listing(7, [head_run("lint", "success", "aaa")])
+     + listing(7, [head_run("tests", "failure", "bbb")])
+     + wake("tests", "success", 7, {"head_sha": "aaa"}), [7], "tests"),
+    ("success on a newer head clears an older head's failure",
+     created(7) + wake("tests", "failure", 7, {"head_sha": "aaa"})
+     + wake("tests", "success", 7, {"head_sha": "bbb"}), [], None),
+    ("success on the same head clears that head's failure",
+     created(7) + wake("tests", "failure", 7, {"head_sha": "aaa"})
+     + wake("tests", "success", 7, {"head_sha": "aaa"}), [], None),
+    ("failure on a newer head survives success on the older one",
+     created(7) + wake("tests", "success", 7, {"head_sha": "aaa"})
+     + wake("tests", "failure", 7, {"head_sha": "bbb"}), [7], "tests"),
+    # A tool-result echo flagged isMeta is not a wake event.
+    ("meta tool-result echo is not a wake event",
+     created(7) + rec(type="user", isMeta=True, sourceToolUseID="toolu_1",
+                      message={"content": [{"type": "text", "text":
+                          json.dumps({"check_run": {"name": "tests",
+                                                    "conclusion": "failure",
+                                                    "pull_requests": [{"number": 7}]}})}]}),
+     [], None),
 ]
 
 
@@ -251,27 +376,27 @@ def run(transcript, stdin=None):
     finally:
         if handle:
             os.unlink(handle.name)
-    return proc.returncode, proc.stdout
+    return proc.returncode, proc.stdout, proc.stderr
 
 
 def main():
     failures = 0
     for name, transcript, prs, check in CASES:
-        code, out = run(transcript)
-        ok = code == 0
+        code, out, err = run(transcript)
+        ok = code == 0 and err == ""
         if prs:
             message = ""
             if out:
                 message = json.loads(out).get("systemMessage", "")
             ok = ok and all(f"#{n}" in message for n in prs) and check in message \
-                and "do not end the turn" in message
+                and "does not block the stop" in message
         else:
             ok = ok and out == ""
         if not ok:
             failures += 1
-            print(f"FAIL {name}: code={code} out={out!r}")
+            print(f"FAIL {name}: code={code} out={out!r} err={err!r}")
     # Two PRs, one red: only the red one is named.
-    _, out = run(created(7) + created(8) + wake("tests", "failure", 8))
+    _, out, _ = run(created(7) + created(8) + wake("tests", "failure", 8))
     if "#7" in json.loads(out)["systemMessage"].split("still")[0]:
         failures += 1
         print("FAIL green PR named in the warning")
@@ -285,10 +410,36 @@ def main():
             ("non-JSON stdin", "", "not json"),
             ("stdin is a list", "", "[]"),
             ("transcript_path is a number", "", '{"transcript_path": 5}')):
-        code, out = run(transcript, stdin)
-        if code != 0 or out:
+        code, out, err = run(transcript, stdin)
+        if code != 0 or out or err:
             failures += 1
-            print(f"FAIL fail-open {name}: code={code} out={out!r}")
+            print(f"FAIL fail-open {name}: code={code} out={out!r} err={err!r}")
+    # One unparseable-by-recursion record is skipped, reported once, and the rest of
+    # the scan still finds the failure.
+    code, out, err = run(created(7) + "[" * 100000 + "\n" + wake("tests", "failure", 7))
+    if code != 0 or "#7" not in out or "skipped 1 unreadable record" not in err:
+        failures += 1
+        print(f"FAIL per-record fail-open: code={code} out={out!r} err={err!r}")
+    # decoded() is not quadratic: it stops after MAX_BRACE_TRIES braces that do not parse.
+    spec = importlib.util.spec_from_file_location("hook_under_test", HOOK)
+    hook = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(hook)
+    calls = []
+
+    class Counting(hook.json.JSONDecoder):
+        def raw_decode(self, text, idx=0):
+            calls.append(idx)
+            return super().raw_decode(text, idx)
+
+    real = hook.json.JSONDecoder
+    hook.json.JSONDecoder = Counting
+    try:
+        list(hook.decoded("{" * 20000))
+    finally:
+        hook.json.JSONDecoder = real
+    if len(calls) > hook.MAX_BRACE_TRIES:
+        failures += 1
+        print(f"FAIL decoded() tried {len(calls)} braces, limit {hook.MAX_BRACE_TRIES}")
     # An unreadable transcript is not silent: one stderr line, still exit 0.
     directory = tempfile.mkdtemp()
     try:

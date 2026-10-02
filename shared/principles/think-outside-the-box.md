@@ -112,13 +112,14 @@ ask:
   individual steps
   (see [`restructure-for-efficiency`](../workflow/restructure-for-efficiency.md)).
 - **Offer a user-approved setup in place of repeated prompts.**
-  This applies when the user already holds an access, and a per-app or per-process gate keeps blocking the agent from that access or keeps asking the user to confirm it, which stalls work while they are away.
+  This applies when the user already holds an access, and a per-app or per-process gate keeps blocking the agent from that access or keeps asking the user to confirm that access, and the prompts stall work while the user is away.
   Such a gate is still a permission gate, so the agent never routes around it on its own.
-  The agent proposes a setup, and the user's explicit approval of that setup is what permits it.
+  The agent proposes a setup.
+  The setup needs the user's explicit approval, and the organization's data and IT policy must also permit it.
   When another process the user trusts already holds the access, the setup is a worker the user starts in that process, and the session submits jobs to the worker.
-  The worker is scoped in job types only: job code runs with that process's full access, so the user must review the code at the pinned commit before approving the setup.
+  The worker is scoped in job types only: job code runs with that process's full access, so the user must review the code at a commit the user pins the worker to before approving the setup.
   A user's approval cannot waive an organization's data or IT policy.
-  The agent never routes around a permission gate on its own, and restricted data never moves where the gate keeps it out.
+  Restricted data is never copied anywhere the Claude app can read.
   The macOS case is in [`claude-app-projects`](../../memories/claude-app-projects.md).
 
 ## The boundary: what is not an artificial constraint

@@ -1,6 +1,6 @@
 # Claude app and Claude Projects: device access and thread state
 
-What a session on the user's own computer through the Claude app can reach, and how to tell what a Claude Project thread is actually doing.
+What a session on the user's own computer through the Claude app can reach, how to run unattended work through a user-approved Terminal-side queue worker, and how to tell what a Claude Project thread is actually doing.
 Split out of `tools.md` when a 2026-10-02 append crossed its 1250-line gate.
 
 ## macOS privacy blocks the Claude app from network volumes; a Terminal tab can read them
@@ -16,9 +16,9 @@ The same command succeeds from a Terminal tab, which the user has already grante
 
 When the work must run unattended (the user asleep, approval prompts piling up), a Terminal tab per run does not scale.
 The alternative is a worker that the user approves and starts in Terminal.
-Terminal already has the access, the Claude app feeds the worker jobs, and the worker expires on its own.
+Terminal already has the access, the Claude app feeds the worker jobs, and the worker stops at a set expiry time.
 Starting the worker is the user's decision to delegate Terminal's access to the Claude app's session.
-It is a delegation the macOS privacy controls did not grant, so it needs the organization's policy to allow it, and it is the user's call, not the agent's.
+The delegation is one the macOS privacy controls did not grant, so the organization's policy must allow the delegation, and the delegation is the user's call, not the agent's.
 The worker has:
 
 - a queue folder the session writes job requests into;
@@ -37,14 +37,16 @@ Limits on what the worker writes back (a status and exit code, and the project's
 Even aggregate outputs, such as a manuscript of aggregate results, can contain small cells that identify individuals.
 
 The abridge render worker under `~/Library/Application Support/abridge-render-queue/` on the user's Mac reportedly follows this pattern.
-The coordinator session reported it on 2026-10-02, and this repo has not verified it: its existence, the queue folder, and the properties above are reported, not observed.
-The coordinator session also described the S-drive as holding PHI on 2026-10-02.
+The Claude Project's coordinator session (the session that routes work to threads) reported it on 2026-10-02, and this repo has not verified it: its existence, the queue folder, and the properties above are reported, not observed.
+In particular, the separation of the worker's code and configuration from the queue folder is not verified.
+That coordinator session also described the S-drive as holding PHI on 2026-10-02.
 
 - **Do:** before proposing the worker, confirm (or ask the user to confirm) that the organization's data and IT policy permits it;
   the user's approval does not waive that policy.
 - **Do:** propose the queue worker when a per-app gate blocks the Claude app from a resource the user already reaches from Terminal, and unattended work would otherwise stall.
 - **Do:** let the user review the code at the pinned commit before the worker starts.
 - **Don't:** copy row-level records, or anything the project treats as protected health information, into a local cache the Claude app can read.
+- **Don't:** write rendered outputs with unsuppressed small cells to a location the Claude app can read.
 - **Don't:** offer Network Volumes or Full Disk Access as the alternative (see the first section's Don't).
 
 ## Claude Projects: confirm a thread's own session state before saying it is running

@@ -28,6 +28,9 @@ Deliberate limits:
     request whose reviewers sit in a `--input` JSON file is not seen.
   - Only tool results count as a review result, so a verdict the agent
     wrote itself does not.
+  - When a command cannot be tokenised (an apostrophe in a heredoc body),
+    reviewer flags are found by a plain text scan, without splitting on
+    shell operators.
   - Commands joined by a newline share one segment, so a DELETE on one
     line can hide a request on the next.
   - A verdict is not compared with the pushed head. One printed before the
@@ -49,8 +52,13 @@ VERDICT = re.compile(
     r"^[ \t#>*]*Verdict:[ \t*]*Ready for merge|\"verdict\":\s*\"CLEAN\"",
     re.I | re.M)
 COMMIT = re.compile(r"(Reviewed-Commit:|\"commit_sha\":)\s*\"?[0-9a-f]{40}", re.I)
-# `git` then `push` within a few words; the bound keeps the match linear.
-PUSH = re.compile(r"(^|[\s;&|(])git\s+(?:\S+\s+){0,4}?push\b")
+# `git`, then options (`-C DIR`, `-c k=v`, `--flag`), then `push` as the
+# subcommand; the bound keeps the match linear.
+PUSH = re.compile(
+    r"(^|[\s;&|(])git(?:\s+-[cC]\s+\S+|\s+-\S+){0,6}\s+push\b")
+# Fallback when a command cannot be tokenised (an apostrophe in a heredoc).
+REVIEWER_FLAG = re.compile(
+    r"(?:--add-reviewer|--reviewer|-r)[ =]+([^\s\"']+)|reviewers\[\]=([^\s\"']+)")
 MCP_PUSH = re.compile(r"mcp__github__(push_files|create_or_update_file)")
 DELETE = re.compile(r"(-X|--method)[ =]+DELETE", re.I)
 
@@ -89,8 +97,8 @@ def reviewers_from_words(words):
     return []
 
 
-def reviewers_from_bash(command):
-    """Reviewer logins requested by any simple command in a compound line.
+def segments(command):
+    """Word lists of the simple commands in a compound line, or None.
 
     The whole command is tokenised first, so quotes (a multi-line `--body`)
     stay intact, and then split on the shell operator tokens.
@@ -100,14 +108,46 @@ def reviewers_from_bash(command):
     try:
         words = list(lexer)
     except ValueError:
-        return []
-    names, segment = [], []
+        return None
+    found, segment = [], []
     for word in words + [";"]:
         if word in OPERATORS:
-            names += reviewers_from_words(segment)
+            found.append(segment)
             segment = []
         else:
             segment.append(word)
+    return found
+
+
+def is_push(command):
+    """True when the line runs `git [options] push` outside any quotes."""
+    parts = segments(command)
+    if parts is None:
+        return bool(PUSH.search(command))
+    for words in parts:
+        for i, word in enumerate(words):
+            if word != "git":
+                continue
+            rest = words[i + 1:]
+            while rest and rest[0].startswith("-"):
+                rest = rest[2:] if rest[0] in ("-C", "-c") else rest[1:]
+            if rest and rest[0] == "push":
+                return True
+    return False
+
+
+def reviewers_from_bash(command):
+    """Reviewer logins requested by any simple command in a compound line."""
+    parts = segments(command)
+    if parts is None:
+        if DELETE.search(command) or not re.search(
+                r"gh pr (create|edit)|requested_reviewers", command):
+            return []
+        found = [a or b for a, b in REVIEWER_FLAG.findall(command)]
+        return [n for name in found for n in name.split(",")]
+    names = []
+    for words in parts:
+        names += reviewers_from_words(words)
     return names
 
 
@@ -194,7 +234,7 @@ def clean_since_last_push(path):
     last_push = 0
     for number, record in enumerate(records):
         cmds = commands(record) if not isinstance(record, str) else [record]
-        if any(PUSH.search(c) for c in cmds) or any(
+        if any(is_push(c) for c in cmds) or any(
                 MCP_PUSH.search(n) for n in tool_names(record)):
             last_push = number
     for record in records[last_push:]:

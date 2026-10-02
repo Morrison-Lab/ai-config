@@ -1139,7 +1139,7 @@ self-review confirms the claim, which was never the defect.
 
 [shared/workflow/check-the-renders.md](shared/workflow/check-the-renders.md)
 
-For a document whose deliverable is a file (Word, PDF, slides, a manuscript), viewing the render is a hard merge gate: no "ready" and no merge, under any grant, until every page of the render at the current head has been viewed and the evidence posted on the PR.
+For a document whose deliverable is a file (Word, PDF, slides, a manuscript), viewing the render is a hard merge gate: no "ready" and no merge, under any grant, until every page of the render at the current head has been viewed, the evidence posted on the PR, and an independent referee read of that render posted too.
 Procedure: [`review-rendered-documents`](shared/workflow/review-rendered-documents.md).
 
 A repo that publishes a website or book has the rendered page as its

@@ -845,6 +845,7 @@ the dispatched reviewer's structured report, then the required
 disclosure marker from
 [`disclose-agent-authorship`](disclose-agent-authorship.md).
 The marker is forge attribution, not author recap.
+This form applies to every posted independent review, not only the fallback case: [Post every independent review on the PR or MR it reviewed](#post-every-independent-review-on-the-pr-or-mr-it-reviewed) points here for it.
 Dispatching the reviewer and then writing a different review body is the
 same failure as reviewing inline, one step later: the authoring session
 still composed the text that readers treat as the review.
@@ -1481,8 +1482,7 @@ halt the review process and escalate to the user for a tie-breaking decision.
 
 ## A relayed not-clean round is a standing verdict under your login, so close it with a clean one on the new head
 
-The findings a subagent review returns are posted to the PR, and the natural form is one comment: "the review returned Needs more work with N findings;
-all N are addressed in <sha>".
+The findings a subagent review returns are posted to the PR, and the report goes in one comment and the dispositions in a separate one ([Post every independent review on the PR or MR it reviewed](#post-every-independent-review-on-the-pr-or-mr-it-reviewed)), for example "the review returned Needs more work with N findings", then "all N are addressed in <sha>".
 That comment is posted under the account's own login, and `scripts/check-pr-fully-clean.py` reads it as that login's latest verdict.
 "All addressed" does not clear it, because the instrument keys on the verdict phrase and on the reviewer, and a later all-clear from a *different* reviewer never supersedes a standing not-clean (ai-config#2274).
 So the PR reads not-clean under `mwc` however many CLEAN bot rounds follow, until the same login posts a clean verdict on the current head.
@@ -1524,8 +1524,9 @@ Post each review per [Post every independent review on the PR or MR it reviewed]
 
 This does not reopen [the one-round rule](#the-review-gates-the-push-not-the-work-----and-it-is-one-round-not-a-loop): the push itself is not gated by this review, only the report to the user is, so review the pushed head before you report it.
 It is one round per revision, not a loop.
-When that review returns findings, fix them and push, and either review the fix before reporting it or report it with the open findings disclosed;
-the fix is the next revision and owes its own review before the following hand-back.
+When that review returns findings, fix them and push;
+the fix is the next revision, so review its head before reporting it as ready.
+The only alternative is to report the unreviewed head SHA explicitly as unreviewed, with the remaining findings listed, and not as ready.
 (Directive from the user, 2026-10-02, after a manuscript revision went back without a new review: "did you get another adversarial peer review?
 do that every time".)
 

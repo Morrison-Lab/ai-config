@@ -45,11 +45,12 @@ The user's reaction was that treating those MRs as ready was insane, and the gat
    - any breach of the float and caption layout rules in the `manuscript-float-layout` fragment ([ai-config#4203](https://github.com/Morrison-Lab/ai-config/pull/4203));
    - anything else the document's own conventions require (for a manuscript, the [`manuscript`](../../skills/manuscript/SKILL.md) skill's checklist).
 6. **Record the evidence** in a PR/MR comment: the commit the render came from, the converter used, the page count, that every page was viewed, and each finding with its page number.
-   Post the independent reviewer's report from step 7 too, per [`adversarial-self-review`](adversarial-self-review.md#post-every-independent-review-on-the-pr-or-mr-it-reviewed).
    Fix the findings and repeat from step 1 on the new head.
 7. **Get an independent referee read of this render** before handing it back to the user: a reviewer other than the session that made the revision reads every page, per [`adversarial-self-review`](adversarial-self-review.md#review-every-revision-before-it-goes-back-to-the-user).
+   Post the referee's report on the PR or MR with its page numbers, per [`adversarial-self-review`](adversarial-self-review.md#post-every-independent-review-on-the-pr-or-mr-it-reviewed).
+   Fix its findings and repeat from step 1 on the new head.
 8. **Only then** report the PR ready or treat it as mergeable.
-   A push after the review invalidates it, exactly as it invalidates a review verdict.
+   A push after the step 7 referee read invalidates that read, exactly as it invalidates a review verdict.
 
 ## When you cannot view the pages
 
@@ -57,7 +58,7 @@ If the session cannot render, convert, or view images (a missing converter, a fi
 Say so plainly, name what blocked it, and ask the user to view the document or to unblock the step.
 Never substitute a text extraction, a CI artifact's existence, or a source read for viewing the pages, and never describe the PR as ready while the gate is open.
 
-- **Do:** open the rendered document at the current head, look at every page, and post the page-by-page evidence before calling the PR ready.
+- **Do:** open the rendered document at the current head, look at every page, post the page-by-page evidence, and get and post the independent referee read of that render before calling the PR ready.
 - **Do:** treat an unviewable render as a blocker you report, not a step you skip.
-- **Don't:** call a document-producing PR ready, or merge it under `mwc` or any other grant, on green CI and a clean review alone.
+- **Don't:** call a document-producing PR ready, or merge it under `mwc` or any other grant, on green CI and a clean review alone, or without a referee read of the current render.
 - **Don't:** check only the pages the diff touched, or a render from an earlier commit.

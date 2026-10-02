@@ -24,6 +24,8 @@ Those manuals must defer to this file for universal policy.
 Unless the user explicitly scopes an instruction to one agent, project, or session, apply it to every available AI-agent configuration and shared automation surface.
 Do not treat the currently speaking agent as an implicit scope restriction.
 
+The same holds for projects: see [`global-by-default`](shared/workflow/global-by-default.md).
+
 ## Gate external repository communication on membership
 
 Before sending outward communication to a repository (PRs/MRs, issues, comments, reviews, discussions, notifications), positively verify that the user is a member of that specific repository.
@@ -172,7 +174,6 @@ See [`AGENTS.cases.md`](AGENTS.cases.md).
 - **Do:** state your specific recommendation alongside every question or choice presented to the user.
 - **Do:** write every pending-decision line as "decide X --- I recommend Y, because Z".
 - **Don't:** ask questions or present choices without declaring your recommended path.
-- **Don't:** use "Let me know if..." to offer already-authorized work instead of performing it.
 ## Run UMS when work is scrutinized
 
 When you read a review of your work, receive critical feedback on it, or a questioned claim ("are you sure about that?") turns out to be wrong, run `ums` in that turn.

@@ -35,8 +35,15 @@ SKIP_DIRS = {".git", "_site", "_freeze", ".quarto", "node_modules", "renv"}
 
 
 def _walk(root: Path):
-    """Yield files under root, never descending into SKIP_DIRS."""
-    for dirpath, dirnames, filenames in os.walk(root):
+    """Yield regular files under root, never descending into SKIP_DIRS.
+
+    Symlinked directories are not followed. A directory that cannot be
+    listed raises OSError (exit 2) rather than being skipped silently.
+    """
+    def fail(exc: OSError):
+        raise exc
+
+    for dirpath, dirnames, filenames in os.walk(root, onerror=fail):
         dirnames[:] = sorted(d for d in dirnames if d not in SKIP_DIRS)
         for name in sorted(filenames):
             f = Path(dirpath) / name

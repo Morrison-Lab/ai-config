@@ -43,6 +43,8 @@ WARN = [
     ("Write", {"file_path": "a.tex", "content": "\\def\\Foo{1} $\\mathbb{E}[X]$"}, "\\Ep"),
     ("NotebookEdit", {"notebook_path": "n.ipynb", "new_source": "$\\operatorname{logit}(p)$"}, "\\logit"),
     ("Write", {"file_path": "a.qmd", "content": "$\\mathit{Var}(X)$"}, "\\Var"),
+    ("Write", {"file_path": "a.md", "content": "````\n```\n````\n$\\mathbb{E}[Y]$"}, "\\Ep"),
+    ("Write", {"file_path": "a.tex", "content": "\\def\\Foo{%\n1}\n$\\mathbb{E}[X]$"}, "\\Ep"),
 ]
 for tool, ti, macro in WARN:
     out = hook(tool, ti)
@@ -64,6 +66,9 @@ QUIET = [
     ("Write", {"file_path": "x.md", "content": "```\n$\\mathbb{E}[Y]$\n```"}, "a fenced code block"),
     ("Write", {"file_path": "x.tex", "content": "\\newcommand{\\Ex}[1]{\\mathbb{E}\\left[#1\\right]}"}, "a newcommand body"),
     ("Write", {"file_path": "x.tex", "content": "the \\textit{logit} link"}, "italic prose with textit"),
+    ("Write", {"file_path": "x.tex", "content": "\\newcommand{\\Ex}{%\n\\mathbb{E}}"}, "a definition body on the next line"),
+    ("Write", {"file_path": "x.md", "content": "````\n```\n$\\mathbb{E}[Y]$\n```\n````"}, "a nested fence"),
+    ("Write", {"file_path": "x.md", "content": "~~~\n```\n$\\mathbb{E}[Y]$\n~~~"}, "a tilde fence holding a backtick line"),
     ("Write", {"file_path": "x.qmd", "content": "$\\mathit{E} + \\mathit{P}$"}, "a single italic letter"),
 ]
 for tool, ti, why in QUIET:
@@ -120,6 +125,14 @@ with tempfile.TemporaryDirectory() as d:
                        capture_output=True, text=True)
     check(r.returncode == 1 and "dangling" not in r.stderr,
           "lint skips a dangling symlink")
+    if os.geteuid() != 0:  # root can list any directory
+        locked = os.path.join(d, "locked")
+        os.makedirs(locked)
+        os.chmod(locked, 0)
+        r = subprocess.run([sys.executable, LINT, "--macros", macros, d],
+                           capture_output=True, text=True)
+        os.chmod(locked, 0o700)
+        check(r.returncode == 2, "lint exits 2 on an unlistable directory")
     r = subprocess.run([sys.executable, LINT, os.path.join(d, "missing.qmd")],
                        capture_output=True, text=True)
     check(r.returncode == 2, "lint exits 2 on a missing path")

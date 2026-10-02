@@ -95,10 +95,20 @@ def compile_rules(rules: dict[str, str]) -> re.Pattern[str]:
     return re.compile("|".join(parts))
 
 
-def _mask_definitions(line: str) -> str:
-    """Blank each macro definition's span, keeping the rest of the line."""
-    out = line
-    for m in reversed(list(_DEFINITION.finditer(line))):
+def _blank(span: str) -> str:
+    """Replace every character but newlines with a space."""
+    return "".join(c if c == "\n" else " " for c in span)
+
+
+def _mask_definitions(text: str) -> str:
+    """Blank each macro definition's span, keeping line breaks.
+
+    Works on the whole text, so a body that starts on the next line
+    (`\\newcommand{\\E}{%` then the body) is masked too.
+    """
+    line = text
+    out = text
+    for m in reversed(list(_DEFINITION.finditer(text))):
         i = m.end()
         depth = 0
         bodies = 0
@@ -116,23 +126,29 @@ def _mask_definitions(line: str) -> str:
                         i += 1
                         break
             i += 1
-        out = out[:m.start()] + " " * (i - m.start()) + out[i:]
+        out = out[:m.start()] + _blank(out[m.start():i]) + out[i:]
     return out
 
 
-_FENCE = re.compile(r"^\s*(```|~~~)")
+_FENCE = re.compile(r"^\s*(`{3,}|~{3,})")
 _CODE_SPAN = re.compile(r"(`+)(?!`).*?(?<!`)\1(?!`)")
 
 
 def _mask_code(lines):
     """Blank fenced blocks and inline code spans in Markdown-like text."""
-    in_fence = False
+    opener = None  # the open fence's marker, e.g. "````"
     for line in lines:
-        if _FENCE.match(line):
-            in_fence = not in_fence
+        m = _FENCE.match(line)
+        if opener is None and m:
+            opener = m.group(1)
             yield ""
-            continue
-        yield "" if in_fence else _CODE_SPAN.sub(lambda m: " " * len(m.group(0)), line)
+        elif opener is not None:
+            if (m and m.group(1)[0] == opener[0] and len(m.group(1)) >= len(opener)
+                    and not line.strip()[len(m.group(1)):].strip()):
+                opener = None
+            yield ""
+        else:
+            yield _CODE_SPAN.sub(lambda c: " " * len(c.group(0)), line)
 
 
 def find_raw(text: str, rules: dict[str, str] | None = None, markdown: bool = False):
@@ -146,7 +162,8 @@ def find_raw(text: str, rules: dict[str, str] | None = None, markdown: bool = Fa
     lines = text.splitlines()
     if markdown:
         lines = list(_mask_code(lines))
+    lines = _mask_definitions("\n".join(lines)).split("\n")
     for lineno, line in enumerate(lines, 1):
-        for m in rx.finditer(_mask_definitions(line)):
+        for m in rx.finditer(line):
             name = next(g for g in m.groups() if g)
             yield lineno, m.group(0), rules[name]

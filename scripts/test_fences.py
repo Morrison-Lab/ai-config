@@ -2,6 +2,7 @@
 """Tests for scripts/lib/fences.py (CommonMark fence/code stripper, ai-config#1567)."""
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -156,6 +157,23 @@ stripped_comb = strip_math(doc_combined_math)
 check("combined math strips display math", "\\mathbf{A}" not in stripped_comb)
 check("combined math strips inline math", "$f(x) = y$" not in stripped_comb)
 check("combined math preserves prose", "Here" in stripped_comb)
+
+# 13. Line-level construct detector: closed and unclosed fence (PR #4215)
+IMPORT_LINE = re.compile(r"^@AGENTS\.md$", re.MULTILINE)
+doc_closed_import = "intro\n```\n@AGENTS.md\n```\nend"
+doc_unclosed_import = "intro\n```\n@AGENTS.md\nmore"
+doc_real_import = "intro\n@AGENTS.md\n"
+for label, doc, expect in (
+    ("closed fence", doc_closed_import, False),
+    ("unclosed fence", doc_unclosed_import, False),
+    ("real import", doc_real_import, True),
+):
+    got = bool(IMPORT_LINE.search(strip_fences(doc, swallow_unclosed=True)))
+    check(f"line-level detector with swallow_unclosed=True: {label}", got == expect)
+check(
+    "default swallow_unclosed=False leaves an unclosed fence's import line matchable",
+    bool(IMPORT_LINE.search(strip_fences(doc_unclosed_import))),
+)
 
 print(f"\n{passed} passed, {failed} failed")
 if failed:

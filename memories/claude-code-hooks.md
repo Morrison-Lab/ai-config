@@ -1138,9 +1138,30 @@ Do not fall back to assistant text narration if `saw_reply_tool` is True, becaus
 ## Strip code fences and spans using shared `scripts/lib/fences.py` with `swallow_unclosed=False`
 
 Hand-rolled fence matchers (`FENCE_OPEN_RX` / `FENCE_CLOSE_RX`) miss multi-backtick spans and can get permanently stuck in fence mode if an unclosed code block occurs, causing subsequent prose or declarations to be swallowed and falsely flagged (ai-config#3748).
-Always import `strip_code` or `strip_fences` from `scripts/lib/fences.py` and pass `swallow_unclosed=False` explicitly.
+Always import `strip_code` or `strip_fences` from `scripts/lib/fences.py` and pass `swallow_unclosed` explicitly, choosing it as the paragraph below the list says.
 
 - **Do:** reuse `scripts/lib/fences.py` (`strip_code` / `strip_fences`) instead of hand-rolling regex fence trackers.
 - **Do:** specify `swallow_unclosed=False` when stripping fences to preserve declarations written below unterminated code blocks.
 - **Don't:** hand-roll fence opening and closing regexes that let an unclosed fence swallow the rest of the message.
+
+**The choice of `swallow_unclosed` follows what the regex detects, so the default is wrong for a line-level Markdown construct in a file.**
+CommonMark runs an unclosed fence to end of file, so a detector for a construct that lives on its own line (a `@AGENTS.md` import line, a heading, a link-reference definition) must pass `swallow_unclosed=True`.
+The default `False` blanks only the opener of an unclosed fence and leaves its contents matchable, so an import line quoted inside the unclosed block is read as real (found by review on PR #4215, `scripts/wire-repo-config.py`).
+The `False` choice above is for a chat message, where the author's later prose is real;
+a file is not that.
+
+- **Do:** pass `strip_fences(text, swallow_unclosed=True)` before matching a line-level construct in a Markdown file.
+- **Do:** test the detector with both a closed and an unclosed fence holding the construct (`scripts/test_fences.py` section 13 shows the pair).
+- **Don't:** copy `swallow_unclosed=False` from a message-reading hook into a file-reading detector, or rely on the default.
+
+## A SessionStart hook's `additionalContext` is capped at 10,000 characters
+
+Claude Code caps each hook's injected `additionalContext` at 10,000 characters.
+Past the cap it saves the whole output to a file and injects only that file's path plus a preview of about 2,000 characters, so a hook that injects a long document delivers a fragment of it and the session never sees the rest.
+Nothing errors, so the truncation is invisible unless the output length is measured.
+
+- **Do:** keep must-see content under the cap, for example an index of a few hundred characters plus an explicit order to Read the full file.
+- **Do:** pin the hook's real output length under the cap in its test (run the hook, assert `len(additionalContext) < 10000`), so growth fails the suite instead of silently truncating.
+- **Don't:** inject a whole file or a growing catalog and assume the model saw all of it.
+- **Don't:** test only that `additionalContext` is present, which passes at any length.
 

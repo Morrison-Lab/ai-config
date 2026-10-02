@@ -52,6 +52,8 @@ WARN = [
     ("Write", {"file_path": "a.tex", "content": "\\def\\a{1}\n[see] $\\mathrm{Var}(X)$"}, "\\Var"),
     ("Write", {"file_path": "a.md", "content": "    ```\n$\\mathbb{E}[Y]$"}, "\\Ep"),
     ("Write", {"file_path": "a.md", "content": "```x``` text\n$\\mathbb{E}[Y]$"}, "\\Ep"),
+    ("Write", {"file_path": "a.md", "content": "> ```\n> x\n$\\mathbb{E}[Y]$"}, "\\Ep"),
+    ("Write", {"file_path": "a.md", "content": "\t```\n$\\mathbb{E}[Y]$"}, "\\Ep"),
 ]
 for tool, ti, macro in WARN:
     out = hook(tool, ti)
@@ -77,6 +79,8 @@ QUIET = [
     ("Write", {"file_path": "x.md", "content": "````\n```\n$\\mathbb{E}[Y]$\n```\n````"}, "a nested fence"),
     ("Write", {"file_path": "x.md", "content": "~~~\n```\n$\\mathbb{E}[Y]$\n~~~"}, "a tilde fence holding a backtick line"),
     ("Write", {"file_path": "x.md", "content": "> ```\n> $\\mathbb{E}[Y]$\n> ```"}, "a fence inside a blockquote"),
+    ("Write", {"file_path": "x.tex", "content": "\\newcommand*{\\Ex}{\\mathbb{E}}"}, "a starred newcommand"),
+    ("Write", {"file_path": "x.tex", "content": "\\DeclareMathOperator*{\\Vx}{\\mathrm{Var}}"}, "a starred DeclareMathOperator"),
     ("Write", {"file_path": "x.tex", "content": "\\newcommand{\\Ex}[1]{\\mathbb{E}\\{#1\\}}"}, "a definition with escaped braces"),
     ("Write", {"file_path": "x.tex", "content": "\\newcommand{\\Vx}[1][X]{\\operatorname{Var}(#1)}"}, "a definition with an optional default"),
     ("Write", {"file_path": "x.qmd", "content": "$\\mathit{E} + \\mathit{P}$"}, "a single italic letter"),
@@ -145,7 +149,8 @@ with tempfile.TemporaryDirectory() as d:
         check(r.returncode == 2, "lint exits 2 on an unlistable directory")
     r = subprocess.run([sys.executable, LINT, os.path.join(d, "missing.qmd")],
                        capture_output=True, text=True)
-    check(r.returncode == 2, "lint exits 2 on a missing path")
+    check(r.returncode == 2 and "no such file" in r.stderr,
+          "lint exits 2 on a missing path and says why")
 
 # --- definition masking is linear, not quadratic ---------------------------
 sys.path.insert(0, os.path.join(os.path.dirname(HERE), "scripts", "lib"))
@@ -158,6 +163,12 @@ t0 = time.monotonic()
 hits = list(find_raw(big))
 check(len(hits) == 1 and time.monotonic() - t0 < 5,
       "100,000 definitions scan in under 5 s and the trailing hit is found")
+
+big = "\\newcommand{\\a}{ x\n" * 20_000 + "$\\mathbb{E}[X]$\n"
+t0 = time.monotonic()
+hits = list(find_raw(big))
+check(len(hits) == 1 and time.monotonic() - t0 < 5,
+      "20,000 unclosed definitions scan in under 5 s and the trailing hit is found")
 
 print(f"\n{len(FAILURES)} failure(s)")
 sys.exit(1 if FAILURES else 0)

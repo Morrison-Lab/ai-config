@@ -44,7 +44,7 @@ _LETTER_WRAPPERS = r"(?:operatorname\*?|mathrm|mathbb)"
 _NAME_WRAPPERS = r"(?:operatorname\*?|mathrm|mathit|text|textrm|textup)"
 
 _DEFINITION = re.compile(
-    r"\\(?:def|newcommand|renewcommand|providecommand|DeclareMathOperator)\*?\b")
+    r"\\(?:def|newcommand|renewcommand|providecommand|DeclareMathOperator)\*?(?![A-Za-z])")
 
 _DERIVABLE = re.compile(
     r"\\def\\([A-Za-z]+)\{\\operatorname\{([A-Za-z]+)\}\}")
@@ -95,7 +95,7 @@ def compile_rules(rules: dict[str, str]) -> re.Pattern[str]:
     return re.compile("|".join(parts))
 
 
-def _definition_end(text: str, start: int) -> int | None:
+def _definition_end(text: str, start: int, limit: int) -> int | None:
     r"""Return the end of the definition whose command ends at `start`.
 
     The definition is the macro's name (`\Ep`, or `{\Ep}`), an optional
@@ -103,8 +103,9 @@ def _definition_end(text: str, start: int) -> int | None:
     characters such as `\{` and `%` comments, and stops at a blank line.
     It returns None for anything that does not parse as a definition (a
     prose mention, a truncated body), so that text is scanned, not hidden.
+    The walk never passes `limit`, the start of the next definition command,
+    so each character is walked at most once across all definitions.
     """
-    limit = len(text)
     i = start
     depth = 0
     named = False  # the macro's name has been read
@@ -156,10 +157,12 @@ def _mask_definitions(text: str) -> str:
     """
     pieces = []
     pos = 0
-    for m in _DEFINITION.finditer(text):
+    matches = list(_DEFINITION.finditer(text))
+    for k, m in enumerate(matches):
         if m.start() < pos:
             continue  # inside a definition already masked
-        end = _definition_end(text, m.end())
+        limit = matches[k + 1].start() if k + 1 < len(matches) else len(text)
+        end = _definition_end(text, m.end(), limit)
         if end is None:
             continue
         pieces.append(text[pos:m.start()])
@@ -171,29 +174,39 @@ def _mask_definitions(text: str) -> str:
 
 # CommonMark: up to 3 spaces of indent, optionally inside a blockquote; a
 # backtick fence's info string cannot contain a backtick.
-_FENCE = re.compile(r"^(?:\s{0,3}>)*\s{0,3}(`{3,}|~{3,})(.*)$")
+_FENCE = re.compile(r"^((?: {0,3}>)*) {0,3}(`{3,}|~{3,})(.*)$")
+_QUOTE = re.compile(r"(?: {0,3}>)*")
 _CODE_SPAN = re.compile(r"(`+)(?!`).*?(?<!`)\1(?!`)")
 
 
 def _fence(line: str):
     """Return the fence marker a line opens or closes, or None."""
     m = _FENCE.match(line)
-    if not m or (m.group(1)[0] == "`" and "`" in m.group(2)):
+    if not m or (m.group(2)[0] == "`" and "`" in m.group(3)):
         return None
     return m
+
+
+def _quote_depth(line: str) -> int:
+    """Count the blockquote markers (`>`) that prefix a line."""
+    return _QUOTE.match(line).group(0).count(">")
 
 
 def _mask_code(lines):
     """Blank fenced blocks and inline code spans in Markdown-like text."""
     opener = None  # the open fence's marker, e.g. "````"
+    depth = 0  # blockquote depth the fence opened at
     for line in lines:
         m = _fence(line)
+        if opener is not None and _quote_depth(line) < depth:
+            opener = None  # the blockquote ended, and the fence with it
         if opener is None and m:
-            opener = m.group(1)
+            opener = m.group(2)
+            depth = m.group(1).count(">")
             yield ""
         elif opener is not None:
-            if (m and m.group(1)[0] == opener[0] and len(m.group(1)) >= len(opener)
-                    and not m.group(2).strip()):
+            if (m and m.group(2)[0] == opener[0] and len(m.group(2)) >= len(opener)
+                    and not m.group(3).strip()):
                 opener = None
             yield ""
         else:

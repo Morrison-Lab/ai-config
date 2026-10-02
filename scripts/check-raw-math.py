@@ -60,7 +60,7 @@ def iter_files(paths):
         elif p.is_file():
             yield p
         else:
-            raise FileNotFoundError(p)
+            raise FileNotFoundError(f"{p}: no such file or directory")
 
 
 class AmbiguousMacros(Exception):

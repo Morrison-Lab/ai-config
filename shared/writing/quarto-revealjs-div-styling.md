@@ -19,3 +19,16 @@ Check the rendered deck, not only the HTML page.
 (Directive from the user, 2026-09-25: "can we add the div boxes and colors in
 revealjs format? ... it's not clear where the formal definition ends and the
 commentary begins", stated as a general principle for every project.)
+
+## A section header gets its own slide
+
+Put a slide break between every section (level 1) header and the content after it,
+so the header is a title slide and the content starts on the next slide.
+Do this once for the whole project, in a Lua filter listed under `revealjs: filters:`
+(lds uses `filters/section-slide-break.lua`),
+not by typing a break after each header in every chapter.
+
+- **Do:** check in the rendered deck that each section header stands alone on its slide.
+- **Don't:** leave a section header sharing a slide with its first paragraph or box.
+
+(Directive from the user, 2026-10-02: "put a slide break between every section slide header and the following content", stated as a general principle for every project.)

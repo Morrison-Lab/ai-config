@@ -1418,7 +1418,7 @@ The Write tool passes bytes unchanged, and it cannot be silently skipped the way
   Another lab member's PR that fails the test gets neither the comment nor the merge.
   [`mwc`](skills/mwc/SKILL.md)'s "Another session's PR" section carries the derivation and the pattern/anti-pattern pair (ai-config#2460).
 
-**One standing exception: PRs targeting `Morrison-Lab/ai-config` carry a standing `mwc` grant**, with no per-session re-issue and no `enable-mwc` step --- `hooks/no-unauthorized-merge.py` reads the merge's target repo off the command.
+**One standing exception: PRs targeting `Morrison-Lab/ai-config` or the shared math-macros repo (`d-morrison/macros`) carry a standing `mwc` grant**, with no per-session re-issue and no `enable-mwc` step --- `hooks/no-unauthorized-merge.py` reads the merge's target repo off the command.
 [`mwc`](skills/mwc/SKILL.md)'s Scope Limit binds in full, so it covers a **fully clean** PR (see [`fully-clean`](shared/workflow/fully-clean.md)) and nothing else.
 It is scoped to the **target**, so a merge from an ai-config checkout into another repo is unaffected.
 

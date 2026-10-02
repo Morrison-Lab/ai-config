@@ -166,9 +166,22 @@ Check the EQUATOR page for the current version before citing one.
 
 - **Numbered** in citation order and **captioned**.
   The legend goes **below** the figure: a title phrase, then sentences explaining panels, symbols, error bars ("Error bars indicate 95% CIs"), and abbreviations.
-- Axis labels with units;
-  readable font sizes at final print size;
-  consistent fonts across figures.
+- Axis labels with units; consistent fonts across figures.
+- **Size each figure for the page.**
+  The plotted content fills the available width (the text width, or the journal's stated figure width), with no large blank margins or empty space inside the image.
+  Every piece of text in it (axis labels, tick labels, node and legend labels) is at least the journal's stated minimum, and in any case about 8 pt or larger at the printed size.
+  Set the figure's width and height (`fig-width`/`fig-height`, or the export size) to that width and an aspect ratio that fits the content, rather than exporting at a default size and letting the document scale it down.
+  Wide diagrams such as Sankey plots often fail this rule: the plot ends up tiny in a field of white space.
+  For a ggplot, preview it at those exact dimensions before rendering with [ggview](https://github.com/idmn/ggview): add `canvas(6.5, 4)` (the final width and height, in inches by default) to the plot.
+  The preview opens in the RStudio IDE's viewer (through `rstudioapi::viewer()`);
+  in any other editor, save the plot with `ggview::save_ggplot()` and open the saved file instead.
+  In a Quarto chunk, copy those dimensions into `fig-width`/`fig-height`;
+  for a figure saved to a file, save it with `ggview::save_ggplot()`, which uses the canvas size.
+  Remove `canvas()` from any plot that a chunk prints into the document: printing a plot that carries it calls `rstudioapi::viewer()` instead of drawing it, so the figure never reaches the document, and a render outside the RStudio IDE (from a terminal or CI) stops with "RStudio not running".
+  A plot saved with `save_ggplot()` can keep its `canvas()`, since that is where the saved size comes from.
+  Judge it on the rendered page.
+  The printed size of the plot's text is its font size in the plot code times the displayed width divided by `fig-width`;
+  as a quick visual check, figure text far smaller than the caption beneath it is almost certainly below 8 pt.
 - Colorblind-safe palettes, and do not use color as the only way to tell groups apart;
   pair it with shape or line type.
 - Show the data where possible (points with intervals beat bar charts of means).
@@ -285,7 +298,9 @@ Before calling a manuscript ready:
 1. [ ] Export the render to PDF and **look at every page**, main text and supplement.
 2. [ ] Every table and figure has a number and a caption, and is cited in the text in order.
 3. [ ] The rendered layout passes every rule in the `manuscript-float-layout` fragment ([ai-config#4203](https://github.com/Morrison-Lab/ai-config/pull/4203)).
-4. [ ] No table runs off the page; no figure is cropped or blurry.
+4. [ ] No table runs off the page;
+   no figure is cropped or blurry;
+   every figure fills the available width without large blank margins, and its smallest text is about 8 pt or larger (section 7).
 5. [ ] No broken cross-references (`??`, `@fig-`, `Table ?`), raw Markdown, code output, warnings, or `NA` in rendered tables.
 6. [ ] Abstract numbers match the Results, tables, and figures.
 7. [ ] Every abbreviation is defined at first use (abstract, text, each table and figure).

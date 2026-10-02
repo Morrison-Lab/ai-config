@@ -11,10 +11,15 @@ A deliberately draft-gated dependent PR takes the gate once its prerequisites me
 Before any message that asks a person to review, check these on the current head:
 
 1. **The automated reviews ran on this head.**
-   Trigger every configured reviewer yourself once the round's pushes are done.
-   That means the repo's review workflow, by whichever trigger its caller documents: ai-config's `.github/workflows/claude-review.yml` takes a `/review` comment or a `workflow_dispatch`, and [`ardi`](../../skills/ardi/SKILL.md) covers the `@claude review` and dispatch-only cases.
-   It also means Copilot ([`copilot-review-before-human`](../vendored/copilot-review-before-human.md)), and on GitLab the MR pipeline's review job (find it in `.gitlab-ci.yml`'s `include:` list, per [`self-review-fallback`](self-review-fallback.md), and run it or start a new MR pipeline).
-   In a repo that reviews automatically on push, let that run rather than adding a duplicate, but confirm it actually started and finished on this head.
+   Trigger every configured reviewer yourself once the round's pushes are done:
+
+   - the repo's review workflow, by whichever trigger its caller documents.
+     ai-config's `.github/workflows/claude-review.yml` runs on `pull_request` events (not for a bot sender), on a `/review` comment, and on `workflow_dispatch`;
+     [`ardi`](../../skills/ardi/SKILL.md) covers the `@claude review` and dispatch-only cases.
+   - Copilot, per [`copilot-review-before-human`](../vendored/copilot-review-before-human.md).
+   - On GitLab, the MR pipeline's review job: find it in `.gitlab-ci.yml`'s `include:` list, per [`self-review-fallback`](self-review-fallback.md), and run it or start a new MR pipeline.
+
+   Where the review runs on push by itself, let that run rather than adding a duplicate, but confirm it actually started and finished on this head.
 2. **The verdict is clean, or the loop is deadlocked.**
    Address every finding (fix, rebut, or defer to a filed issue), push, and re-trigger, per [`ardi`](ardi.md) and [`address-every-comment`](address-every-comment.md).
    A deadlock is an item where your rebuttal and the reviewer's re-raise have each failed to persuade the other;
@@ -29,6 +34,11 @@ Before any message that asks a person to review, check these on the current head
    Run `scripts/check-pr-fully-clean.py` or `scripts/check-mr-fully-clean.py` where they apply, and otherwise re-query the head's review state rather than recall it ([`recheck-review-findings`](recheck-review-findings.md)).
 
 The gate governs when a request may go out, not whether one must, so a repo whose standing instruction is never to request human review (such as `Lacaedemon/sparta` in [`preferences`](../../memories/preferences.md)) is unaffected.
+Two cases go to a person without it, and each request says so:
+
+- a redaction PR, whose automated review [`pr-on-claim`](pr-on-claim.md) deliberately withholds, since a reviewer reading the removed lines is the harm;
+- an explicit instruction from the user to request a human review now, which is more specific than this rule;
+  report the automated review's state in the same reply.
 
 Then ask, and link the clean verdict (or the deadlocked item) in the request.
 

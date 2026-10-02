@@ -83,11 +83,11 @@ with tempfile.TemporaryDirectory() as d:
     dirty = os.path.join(d, "dirty.qmd")
     clean = os.path.join(d, "clean.qmd")
     macros = os.path.join(d, "macros.qmd")
-    with open(dirty, "w") as f:
+    with open(dirty, "w", encoding="utf-8") as f:
         f.write("ok line\n$\\mathbb{E}[Y]$ and $\\operatorname{sinc}(x)$\n")
-    with open(clean, "w") as f:
+    with open(clean, "w", encoding="utf-8") as f:
         f.write("$\\Ep[Y]$\n")
-    with open(macros, "w") as f:
+    with open(macros, "w", encoding="utf-8") as f:
         f.write("\\def\\sinc{\\operatorname{sinc}}\n")
 
     r = subprocess.run([sys.executable, LINT, clean], capture_output=True, text=True)
@@ -101,14 +101,14 @@ with tempfile.TemporaryDirectory() as d:
           "--macros derives a rule and skips the library file itself")
     for sub in ("a/macros", "b/macros"):
         os.makedirs(os.path.join(d, sub), exist_ok=True)
-        with open(os.path.join(d, sub, "macros.qmd"), "w") as f:
+        with open(os.path.join(d, sub, "macros.qmd"), "w", encoding="utf-8") as f:
             f.write("\\def\\sinc{\\operatorname{sinc}}\n")
     r = subprocess.run([sys.executable, LINT, clean], capture_output=True, text=True, cwd=d)
     check(r.returncode == 2 and "--macros" in r.stderr,
           "lint stops when several macros libraries are found")
     nm = os.path.join(d, "node_modules", "pkg")
     os.makedirs(nm)
-    with open(os.path.join(nm, "vendored.qmd"), "w") as f:
+    with open(os.path.join(nm, "vendored.qmd"), "w", encoding="utf-8") as f:
         f.write("$\\mathbb{E}[Y]$\n")
     r = subprocess.run([sys.executable, LINT, "--macros", macros, d],
                        capture_output=True, text=True)

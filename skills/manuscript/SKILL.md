@@ -185,7 +185,7 @@ Check the EQUATOR page for the current version before citing one.
 - **Estimates with uncertainty**: give the point estimate with its 95% CI.
   Format consistently, for example "0.82 (95% CI, 0.71 to 0.95)" or "0.82 (95% CI, 0.71--0.95)".
   Use "to" when a bound is negative.
-- **Describe an estimate as an estimate**, in the abstract too: "Under the stated difference-in-differences assumptions, we estimated that the intervention reduced time in notes by 1.26 minutes (95% CI, 0.68 to 1.84)", not "the intervention reduced time in notes by 1.26 minutes".
+- **Describe an estimate as an estimate**, in the abstract too: "Under the stated difference-in-differences assumptions, we estimated that the intervention reduced time in notes by 1.26 minutes (95% CI, 0.68 to 1.84)", not "Under the stated difference-in-differences assumptions, the intervention reduced time in notes by 1.26 minutes".
   A point estimate stated as a bare fact reads as a known value rather than as an estimate from the data.
 - **P values**: exact values to 2 or 3 decimals ("P = .03", "P = .21");
   "P < .001" below that.

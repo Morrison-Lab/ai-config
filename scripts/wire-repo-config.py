@@ -111,7 +111,9 @@ def block_change(repo: Path, name: str) -> tuple[str, str | None]:
     current = path.read_text(encoding="utf-8") if path.exists() else ""
     if BLOCK in current:
         return f"ok    {name} already points at ai-config", None
-    if name == "CLAUDE.md" and (not current or IMPORTS_AGENTS.search(strip_fences(current))):
+    # An unclosed fence runs to end of file (CommonMark), so swallow it too.
+    outside_code = strip_fences(current, swallow_unclosed=True)
+    if name == "CLAUDE.md" and (not current or IMPORTS_AGENTS.search(outside_code)):
         return f"ok    {name} absent or imports AGENTS.md; nothing to add", None
     try:
         updated = splice_block(current, BLOCK, BEGIN, END)

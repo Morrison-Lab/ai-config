@@ -99,9 +99,10 @@ class WireRepoConfig(unittest.TestCase):
         self.assertIn(wire.BEGIN, self.read("CLAUDE.md"))
 
     def test_claude_md_import_inside_fence_gets_block(self):
-        (self.repo / "CLAUDE.md").write_text("```\n@AGENTS.md\n```\n", encoding="utf-8")
-        self.run_main()
-        self.assertIn(wire.BEGIN, self.read("CLAUDE.md"))
+        for text in ("```\n@AGENTS.md\n```\n", "```\n@AGENTS.md\n"):
+            (self.repo / "CLAUDE.md").write_text(text, encoding="utf-8")
+            self.run_main()
+            self.assertIn(wire.BEGIN, self.read("CLAUDE.md"), repr(text))
 
     def test_stale_block_is_replaced_in_place(self):
         stale = f"intro\n\n{wire.BEGIN}\nold text\n{wire.END}\n\noutro\n"

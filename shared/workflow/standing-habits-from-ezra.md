@@ -10,6 +10,16 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`.
 - **Don't:** file it in project memory only, or wait for a later pass to start following it.
 - **Reason:** Ezra gave the rule that instructions are global, and a session then saved it to project memory (2026-10-02).
 
+## Find recurring patterns yourself
+
+- **Do:** look for repeats in your own mistakes and in Ezra's corrections, and name the pattern without being asked.
+- **Do:** fix the pattern with a mechanism (a rule, a hook or a check), not one instance at a time.
+- **Do:** record both halves: the belief you held and what replaced it.
+- **Don't:** wait for Ezra to point out that the same correction has come up again.
+- **Example (2026-10-02):** four instructions in a row each needed Ezra to say "global".
+  The belief was "wait to be told an instruction is global".
+  It was replaced by "every instruction is global by default, so route it to ai-config or psw in the same turn".
+
 ## Do the work yourself
 
 - **Do:** run the command, apply the patch, and fix the file yourself.

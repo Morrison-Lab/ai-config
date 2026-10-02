@@ -19,4 +19,6 @@ Open the PR.
 - **Do:** pick the home by scope --- an `ai-config` shared fragment, `CLAUDE.md`, or `memories/` for a cross-repo rule;
   the specific repo's own docs for a repo-specific one.
 - **Don't:** leave a reusable learning in session-local auto-memory as a substitute for committing it.
+- **Don't:** file a general lesson in one project's memory (a Claude Project's memory, a repo's notes) because that is where it came up;
+  project memory keeps only facts that are true of that project alone, and every lesson defaults to the most general home that fits (owner directive, 2026-10-02).
 - **Don't:** offer to upstream it, or ask which repo --- decide and do it, surfacing the choice only when it is genuinely ambiguous or architecturally significant.

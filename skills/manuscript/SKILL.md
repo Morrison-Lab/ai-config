@@ -69,6 +69,7 @@ Describe contributions with the [CRediT taxonomy](https://credit.niso.org/) when
 - Typically 250 to 350 words.
   Check the limit.
 - Results give the sample size and the main effect estimates with 95% CIs, not only P values.
+  Phrase each effect estimate as an estimate ("we estimated that ..."), per section 8.
   Report the primary outcome first.
 - Conclusions follow from the results and match the design: no causal language from an observational design unless the identification strategy supports it, and say what that strategy is.
 - No citations, no undefined abbreviations, no figure or table references.
@@ -197,6 +198,8 @@ Check the EQUATOR page for the current version before citing one.
 - **Estimates with uncertainty**: give the point estimate with its 95% CI.
   Format consistently, for example "0.82 (95% CI, 0.71 to 0.95)" or "0.82 (95% CI, 0.71--0.95)".
   Use "to" when a bound is negative.
+- **Describe an estimate as an estimate**, in the abstract too: "Under the stated difference-in-differences assumptions, we estimated that the intervention reduced time in notes by 1.26 minutes (95% CI, 0.68 to 1.84)", not "Under the stated difference-in-differences assumptions, the intervention reduced time in notes by 1.26 minutes".
+  A point estimate stated as a bare fact reads as a known value rather than as an estimate from the data.
 - **P values**: exact values to 2 or 3 decimals ("P = .03", "P = .21");
   "P < .001" below that.
   AMA style uses no leading zero and a capital italic *P*.
@@ -212,7 +215,7 @@ Check the EQUATOR page for the current version before citing one.
 - **Decimals**: no more precision than the data support.
   Percentages to one decimal (or whole numbers when n < 100);
   ratios to two decimals;
-  keep the same precision for the same quantity everywhere.
+  keep the same precision for the same quantity everywhere, and give a point estimate and both of its CI bounds the same number of decimal places: "1.26 (95% CI, 0.68 to 1.84)", not "1.26 (95% CI, 0.675 to 1.84)".
 - Spell out numbers that begin a sentence, or rewrite the sentence.
   Use digits for measurements and statistics.
 - Units: SI or the journal's convention, with a space between number and unit ("5 mg");
@@ -304,7 +307,8 @@ Before calling a manuscript ready:
 5. [ ] No broken cross-references (`??`, `@fig-`, `Table ?`), raw Markdown, code output, warnings, or `NA` in rendered tables.
 6. [ ] Abstract numbers match the Results, tables, and figures.
 7. [ ] Every abbreviation is defined at first use (abstract, text, each table and figure).
-8. [ ] Estimates carry 95% CIs; P values and decimals follow section 8.
+8. [ ] Estimates carry 95% CIs, are phrased as estimates, and share decimal places with their CIs;
+   P values and decimals follow section 8.
 9. [ ] No pipeline or audit notes, file names, or TODOs in the main text.
 10. [ ] Reporting-guideline checklist completed, with page numbers.
 11. [ ] References resolve, are in order, and support their sentences.

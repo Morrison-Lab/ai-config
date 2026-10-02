@@ -470,9 +470,9 @@ Whenever starting or working on a Pull Request:
 2. **Drive to clean**: Run `ardi` / the review-and-iterate loop to ensure CI passes and all review findings are addressed until the PR reaches a clean verdict.
 3. **Request human review once the gate above passes**: request the configured repo reviewers per `skills/request-pr-review/SKILL.md`.
 
-- **Do:** Trigger AI review (or let the automated PR review run) after completing code pushes, and request human review only after the AI review is clean/approved (or upon an impasse).
+- **Do:** Trigger AI review yourself (or let the automated PR review run) after completing code pushes, and request human review only once the gate above passes.
 - **Don't:** Manually trigger a redundant `@claude review` comment when an automated review is already running or triggered by the push/ready event.
-- **Don't:** Request human review when the PR is first opened empty, before code pushes are complete, or before the AI review has passed / produced a clean verdict.
+- **Don't:** Request human review when the PR is first opened empty or before code pushes are complete.
 
 
 ## Check the remote immediately before every push

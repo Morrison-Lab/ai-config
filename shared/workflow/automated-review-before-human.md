@@ -17,10 +17,13 @@ Before any message that asks a person to review, check these on the current head
 3. **A review that never produced a verdict is not one.**
    A quota skip, a stub with no verdict, a run that never started, or a repo with no reviewer at all leaves the head unreviewed.
    Re-trigger once the quota resets, and meanwhile post an independent adversarial review per [`self-review-fallback`](self-review-fallback.md) and [`adversarial-self-review`](adversarial-self-review.md).
+   When no automated reviewer is configured, or the configured one stays unavailable, that posted review, driven to a clean verdict on the current head, stands in as the automated verdict.
+   Say so in the request: name the reviewer that did not run and why, and link the stand-in review.
 4. **The check is an instrument, not a recollection.**
    Run `scripts/check-pr-fully-clean.py` or `scripts/check-mr-fully-clean.py` where they apply, and otherwise re-query the head's review state rather than recall it ([`recheck-review-findings`](recheck-review-findings.md)).
 
-A draft PR or MR is not ready for a person either: mark it ready ([`put-prs-in-ready-mode`](put-prs-in-ready-mode.md)) before the gate, not after.
+A draft PR or MR is not ready for a person either: mark it ready before asking, except a deliberately draft-gated dependent PR, per [`put-prs-in-ready-mode`](put-prs-in-ready-mode.md).
+The gate governs when a request may go out, not whether one must, so a repo whose standing instruction is never to request human review (such as `Lacaedemon/sparta` in [`preferences`](../../memories/preferences.md)) is unaffected.
 
 Then ask, and link the clean verdict (or the deadlocked item) in the request.
 
@@ -38,7 +41,5 @@ Stating the rule as a precondition of the request puts it where the handoff happ
 (User, 2026-10-02, on abridge MR !124: "you need to trigger the automated reviews on [the MR] and possibly others;
 always do this when you're ready for a review.
 don't ask me to review until you get a clean automated review or deadlock.
-haven't I told you this before?"
-and
-"that should be a global rule for all our work (all projects, all repos)".
+haven't I told you this before?" and "that should be a global rule for all our work (all projects, all repos)".
 Tracked in [ai-config#4241](https://github.com/Morrison-Lab/ai-config/issues/4241).)

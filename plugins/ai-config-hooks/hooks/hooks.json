@@ -1357,6 +1357,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-red-own-pr-at-stop.py\"'",
+            "timeout": 10,
+            "script": "warn-red-own-pr-at-stop.py",
+            "why": "The rule to fix red CI on your own PRs unprompted existed and nothing fired at turn end, so the person had to ask 'fix failing CI?' twice in one day. Warns, never blocks, when a turn ends while a PR this session opened still has a failing check (a check_run wake event or a get_check_runs result) and no push, update_pull_request_branch, comment on that PR or later passing reading followed. Bot-review checks whose text says quota, session limit or did not finish are exempt, since nothing in the PR fixes them. Reads only the transcript."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-incomplete-check-enumeration.py\"'",
             "timeout": 10,
             "script": "no-incomplete-check-enumeration.py",

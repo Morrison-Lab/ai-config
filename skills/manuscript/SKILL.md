@@ -175,7 +175,8 @@ Check the EQUATOR page for the current version before citing one.
   For a ggplot, preview it at those exact dimensions before rendering with [ggview](https://github.com/idmn/ggview): add `canvas(6.5, 4)` (the final width and height, in inches by default) to the plot.
   In a Quarto chunk, copy those dimensions into `fig-width`/`fig-height`;
   for a figure saved to a file, save it with `ggview::save_ggplot()`, which uses the canvas size.
-  Remove `canvas()` before rendering: printing a plot that carries it calls `rstudioapi::viewer()` instead of drawing it into the document, so a render outside the RStudio IDE (from a terminal or CI) stops with "RStudio not running", and anywhere else the figure is not drawn.
+  Remove `canvas()` from any plot that a chunk prints into the document: printing a plot that carries it calls `rstudioapi::viewer()` instead of drawing it, so the figure never reaches the document, and a render outside the RStudio IDE (from a terminal or CI) stops with "RStudio not running".
+  A plot saved with `save_ggplot()` can keep its `canvas()`, since that is where the saved size comes from.
   Judge it on the rendered page.
   The printed size of the plot's text is its font size in the plot code times the displayed width divided by `fig-width`;
   as a quick visual check, figure text far smaller than the caption beneath it is almost certainly below 8 pt.

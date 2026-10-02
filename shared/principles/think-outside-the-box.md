@@ -112,10 +112,12 @@ ask:
   individual steps
   (see [`restructure-for-efficiency`](../workflow/restructure-for-efficiency.md)).
 - **Replace a repeated prompt with a one-time setup.**
-  Before asking the user to sit through the same approval or permission prompt again and again, look for a setup they can approve once that removes it, so work can continue while they are away.
-  When one process lacks access that another process the user already trusts does have, have the user start a narrowly scoped worker in the trusted process and submit jobs to it.
-  The setup must stay inside the boundary below: the user approves it knowingly, it is limited to named job types, and it never copies restricted data somewhere the boundary was meant to keep it out of.
-  The macOS case is in `memories/claude-app-projects.md`.
+  This applies only where the user already holds the access and a prompt keeps asking them to confirm it, which stalls work while they are away.
+  Propose a setup the user can approve once, as their own decision, rather than asking them to answer the same prompt again;
+  it confirms an access they already have and bypasses no gate.
+  When one process lacks access that another process the user already trusts does have, the setup is a narrowly scoped worker the user starts in the trusted process, which the session submits jobs to.
+  It stays inside the boundary below: it is limited to named job types, and it never moves restricted data somewhere the boundary was meant to keep it out of.
+  The macOS case is in [`claude-app-projects`](../../memories/claude-app-projects.md).
 
 ## The boundary: what is not an artificial constraint
 

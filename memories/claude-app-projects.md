@@ -14,7 +14,7 @@ The same command succeeds from a Terminal tab, which the user has already grante
 When the work must run unattended (the user asleep, approval prompts piling up), a Terminal tab per run does not scale.
 The one-time setup is a worker the user starts in Terminal, which already has the access, and which the Claude app feeds:
 
-- a queue folder the session writes job files into, with results written back beside them;
+- a queue folder the session writes job files into, with results written back beside them, limited to status, logs, and outputs already cleared to leave the share (such as a rendered manuscript of aggregate results), never row-level data;
 - an allowlist of job types, such as "render this .qmd", with no arbitrary shell commands;
 - an expiry time, after which the worker exits on its own.
 
@@ -23,7 +23,6 @@ The user's prompt that led to it: "sure claude can't read the s-drive ,but can't
 
 - **Do:** propose the queue worker as soon as repeated prompts or a blocked resource would stall unattended work.
 - **Don't:** copy restricted data, such as PHI from the S-drive, into a local cache the Claude app can read, to get around the block.
-- **Don't:** ask the user to approve the same prompt again and again when a one-time setup would remove it.
 
 ## Claude Projects: confirm a thread's own session state before saying it is running
 

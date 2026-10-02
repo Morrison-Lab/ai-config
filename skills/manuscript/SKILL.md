@@ -173,6 +173,8 @@ Check the EQUATOR page for the current version before citing one.
   Set the figure's width and height (`fig-width`/`fig-height`, or the export size) to that width and an aspect ratio that fits the content, rather than exporting at a default size and letting the document scale it down.
   Wide diagrams such as Sankey plots often fail this rule: the plot ends up tiny in a field of white space.
   For a ggplot, preview it at those exact dimensions before rendering with [ggview](https://github.com/idmn/ggview): add `canvas(6.5, 4)` (the final width and height, in inches by default) to the plot.
+  The preview opens in the RStudio IDE's viewer (through `rstudioapi::viewer()`);
+  in any other editor, save the plot with `ggview::save_ggplot()` and open the saved file instead.
   In a Quarto chunk, copy those dimensions into `fig-width`/`fig-height`;
   for a figure saved to a file, save it with `ggview::save_ggplot()`, which uses the canvas size.
   Remove `canvas()` from any plot that a chunk prints into the document: printing a plot that carries it calls `rstudioapi::viewer()` instead of drawing it, so the figure never reaches the document, and a render outside the RStudio IDE (from a terminal or CI) stops with "RStudio not running".

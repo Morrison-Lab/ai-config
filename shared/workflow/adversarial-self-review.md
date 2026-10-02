@@ -1529,7 +1529,7 @@ This rule adds no push gate beyond the existing pre-push review.
 The loop is bounded by the head you report:
 
 - When the review of that head is clean, report it.
-  A later fix needs a fresh review only if it changes what you report, such as the render.
+  A later fix needs a fresh review only if it changes what you report: the render for a rendered document, or the diff content for a PR.
 - When the review returns findings, fix them and review the fix head before reporting it as ready.
 - Alternatively, report the unreviewed head SHA explicitly as unreviewed, with the remaining findings listed, and not as ready.
 

@@ -51,7 +51,7 @@ The user's reaction was that treating those MRs as ready was insane, and the gat
    Fix its findings, then review the fix head before reporting it as ready, or report it explicitly as unreviewed with the findings listed;
    a fix that does not change the render needs no new read.
 8. **Only then** report the PR ready or treat it as mergeable.
-   A push after the step 7 referee read invalidates that read, exactly as it invalidates a review verdict.
+   A push that changes the render after the step 7 referee read invalidates that read.
 
 ## When you cannot view the pages
 

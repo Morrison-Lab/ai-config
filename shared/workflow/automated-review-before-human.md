@@ -1,14 +1,14 @@
 Never ask a person to review work until its automated review is clean or deadlocked.
 That holds in every repository, project and forge (GitHub, GitLab, or any other): a GitHub PR, a GitLab MR, a rendered document sent for a read, or any other work product awaiting a person's review.
 A question to the user is not a review request.
-A status report or a PR/MR check is covered, though: list an item as waiting on human review only when its latest commit has a clean automated review, and when that review has not run, start it, even under a read-only brief ([`status-requests-act`](status-requests-act.md)).
+A status report or a PR/MR check is covered, though: list an item as waiting on human review only when its latest commit has a clean automated review, and when that review has not run, start the review job, even under a read-only brief (starting it is the only write this licenses: no push, merge or edit) ([`status-requests-act`](status-requests-act.md)).
 The agent triggers the automated reviews itself;
 "ready for your review" is a claim that this already happened.
 
 ## The gate
 
 Mark a draft PR or MR ready first, since a draft is not ready for a person and can suppress the forge's review automation ([`put-prs-in-ready-mode`](put-prs-in-ready-mode.md)).
-A deliberately draft-gated dependent PR takes the gate once its prerequisites merge and it is un-drafted.
+A deliberately draft-gated dependent PR is the exception: it stays in draft, so trigger its automated review explicitly (a comment or dispatch), and let the merge-order alert carry the ordering.
 
 Before any message that asks a person to review, check these on the current head:
 

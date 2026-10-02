@@ -20,7 +20,7 @@ A quota-skipped, stubbed, or never-started review is no review: re-trigger it, a
 See [`automated-review-before-human`](shared/workflow/automated-review-before-human.md) for steps and exceptions.
 
 - **Do:** drive the automated review to clean or deadlock, and link that verdict.
-- **Don't:** say "ready for your review" on a head with no clean automated verdict.
+- **Don't:** say "ready for your review" on a draft or a head with no clean automated verdict.
 
 ## Instruction layering
 

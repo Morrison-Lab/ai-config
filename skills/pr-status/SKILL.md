@@ -378,6 +378,8 @@ Render a **Review Summary Table** for the PR:
 - **Reviewers Requested** --- evaluates human review status per [`copilot-review-before-human.md`](../../shared/vendored/copilot-review-before-human.md).
   If human review has requested changes, flag `❌ Changes requested by <login>`.
   For self-authored PRs, note `*Self-authored*`.
+  Never label a row ready for, or waiting on, human review without a clean automated verdict on its latest commit;
+  when none has run, trigger it ([`automated-review-before-human`](../../shared/workflow/automated-review-before-human.md)).
   When AI review is clean and CI is green, list requested reviewers (e.g. `the repository owner`) or flag `⚠️ None (Request human review)`.
   When AI review is clean but CI is failing or pending, display `- (CI in progress / failing)`.
   When AI review is in-flight or unclean, display `- (AI review in progress)`.

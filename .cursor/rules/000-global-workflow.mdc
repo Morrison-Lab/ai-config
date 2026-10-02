@@ -35,5 +35,5 @@ alwaysApply: true
 
 ## Get a clean automated review before asking a person to review
 - Never ask a person to review a PR, MR, or document, on any forge or repo, until its automated review is clean or deadlocked.
-- Trigger the automated reviews yourself after completing code pushes, and run `ardi` to drive them and CI to clean.
+- Trigger the automated reviews yourself after completing code pushes (unless review already runs on push), and run `ardi` to drive them and CI to clean.
 - A quota-skipped or never-started review is no review: re-trigger it. See `shared/workflow/automated-review-before-human.md`.

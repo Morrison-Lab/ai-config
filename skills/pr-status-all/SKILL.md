@@ -95,6 +95,7 @@ Fill in `<N>`, `<headRefName>`, `<isDraft>`, `<owner>`, `<repo>` for each PR (re
 >    a formal review (Copilot's or a human's) is a separate object it won't show.
 >    This step **only inspects existing reviews (Copilot's or a human's)** -- it never POSTs a review request.
 >    Requesting a review is a mutation (triggers a review job, consumes quota, can collide with a concurrent `ardi` loop), which breaks this skill's whole justification for fanning out subagents concurrently (*read-only, side-effect-free*).
+>    Starting a missing automated review is the orchestrating session's job under [`automated-review-before-human`](../../shared/workflow/automated-review-before-human.md), never a subagent's ([#4253](https://github.com/Morrison-Lab/ai-config/issues/4253)).
 >    If no genuine verdict already exists at the current head, report that fact -- don't try to produce one;
 >    that's `ardi`'s job.
 >    ```bash
@@ -221,6 +222,7 @@ A Markdown table, one row per open PR, with these columns:
   When AI review is clean and CI is green, list requested reviewers (e.g. `the repository owner`) or flag `⚠️ None (Request human review)`.
   When AI review is clean but CI is failing or pending, display `- (CI in progress / failing)`.
   When AI review is in-flight or unclean, display `- (AI review in progress)`.
+  When no automated reviewer has a clean verdict at head and none is running, display `- (needs automated review)`, never `⚠️ None (Request human review)`.
 - **Next Step** --- computed deterministically using the full state matrix:
   - If `isDraft`: `Draft (Work in progress)`.
   - If human `CHANGES_REQUESTED` is pending: `Blocked on human changes (<login>)` (overrides everything below).
@@ -230,7 +232,7 @@ A Markdown table, one row per open PR, with these columns:
   - If AI review or External review has open findings: `Drive to clean (ARDI)`.
   - If AI review is running: `In-flight AI review`.
   - If CI is pending: `Wait for CI (<pending-check>)`.
-  - If no automated reviewer (the `@claude` bot or Copilot) has a verified clean verdict at head, whatever a human's review says: `Needs automated review (no clean automated verdict at head)`.
+  - If no automated reviewer (the `@claude` bot, Copilot, or the posted stand-in review that [the gate's item 3](../../shared/workflow/automated-review-before-human.md#the-gate) allows) has a verified clean verdict at head, whatever a human's review says: `Needs automated review (no clean automated verdict at head)`.
     Never label such a row ready for, or waiting on, human review;
     [`automated-review-before-human`](../../shared/workflow/automated-review-before-human.md) says when the session starts that review ([#4253](https://github.com/Morrison-Lab/ai-config/issues/4253) tracks doing it inside this skill).
   - If fully clean (no human blocks, at least one verified clean **automated** review at head with 0 open findings across all reviews, CI green, 0 open threads, up to date with main):
@@ -246,7 +248,7 @@ When detailed git/thread metrics are needed, include the extended columns:
 |:---|:---|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---|
 
 Below the table, list each PR's open findings briefly (or "none"), and call out anything needing action: branches behind main, failing CI, drafts, reviews that returned `null`, or a pending human review.
-Do **not** label a PR "ready to merge" or "merge-ready" unless it is **fully clean** --- **Human is `none`** (a blocking human review overrides everything below) *and* at least one of Review or External is `clean` at the current head *and* neither one has open findings *and* all CI workflows are green *and* it's not behind main *and* every inline review thread is resolved.
+Do **not** label a PR "ready to merge" or "merge-ready" unless it is **fully clean** --- **Human is `none`** (a blocking human review overrides everything below) *and* an automated verdict (Review, a Copilot External review, or the gate's stand-in review) is `clean` at the current head *and* no review has open findings *and* all CI workflows are green *and* it's not behind main *and* every inline review thread is resolved.
 Never hedge with "ready except for one nit."
 
 ## Why fan-out is safe here (and the write-loops stay series)
@@ -259,9 +261,7 @@ The whole-queue *write* loops are different, and deliberately stay (mostly) seri
   worktree isolation + bounded concurrency --- not by default.
 - **`gii` / `gia`** --- intentionally sequential: a later issue's base branch
   depends on whether the prior MR merged, and same-file issues conflict.
-  **`gip`** is the opt-in exception --- it fans out only the *provably
-  independent* subset (no stacking dependency, no file overlap), each subagent
-  in its own worktree, and sends everything else back through `gii`.
+  **`gip`** is the opt-in exception --- it fans out only the *provably independent* subset (no stacking dependency, no file overlap), each subagent in its own worktree, and sends everything else back through `gii`.
 
 Rule of thumb: fan out a whole-queue loop only when its units are provably independent and don't mutate shared state --- like this one.
 

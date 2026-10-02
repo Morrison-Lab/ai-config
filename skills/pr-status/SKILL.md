@@ -133,7 +133,8 @@ Requesting a review is a mutation: it triggers a review job, consumes reviewer q
 Use the read-only half of [`ardi`'s step 2](../ardi/SKILL.md) -- fetch the matched review's body + inline comments at the current `commit_id` and require a zero-findings verdict -- but skip the `POST /requested_reviewers` call.
 If no genuine Copilot verdict exists at the current head, check for a human's formal review at the head (next subsection) before reporting `no verdict at head`;
 only when neither exists, report that and offer to run `ardi` (which can request one);
-don't request it yourself here, beyond what the automated-review gate in **Next Step** below allows.
+don't request it yourself here.
+Starting a missing automated review is the session's job under [`automated-review-before-human`](../../shared/workflow/automated-review-before-human.md), not this skill's yet ([#4253](https://github.com/Morrison-Lab/ai-config/issues/4253)).
 Green CI plus a clean self-review is not sufficient on its own if an
 external reviewer is reachable.
 
@@ -375,6 +376,7 @@ Render a **Review Summary Table** for the PR:
   When AI review is clean and CI is green, list requested reviewers (e.g. `the repository owner`) or flag `⚠️ None (Request human review)`.
   When AI review is clean but CI is failing or pending, display `- (CI in progress / failing)`.
   When AI review is in-flight or unclean, display `- (AI review in progress)`.
+  When no automated reviewer has a clean verdict at head and none is running, display `- (needs automated review)`, never `⚠️ None (Request human review)`.
 - **Next Step** --- computed deterministically using the full state matrix:
   - If `isDraft`: `Draft (Work in progress)`.
   - If human `CHANGES_REQUESTED` is pending: `Blocked on human changes (<login>)` (overrides everything below).
@@ -384,7 +386,7 @@ Render a **Review Summary Table** for the PR:
   - If AI review or External review has open findings: `Drive to clean (ARDI)`.
   - If AI review is running: `In-flight AI review`.
   - If CI is pending: `Wait for CI (<pending-check>)`.
-  - If no automated reviewer (the `@claude` bot or Copilot) has a verified clean verdict at head, whatever a human's review says: `Needs automated review (no clean automated verdict at head)`.
+  - If no automated reviewer (the `@claude` bot, Copilot, or the posted stand-in review that [the gate's item 3](../../shared/workflow/automated-review-before-human.md#the-gate) allows) has a verified clean verdict at head, whatever a human's review says: `Needs automated review (no clean automated verdict at head)`.
     Never label such a row ready for, or waiting on, human review;
     [`automated-review-before-human`](../../shared/workflow/automated-review-before-human.md) says when the session starts that review ([#4253](https://github.com/Morrison-Lab/ai-config/issues/4253) tracks doing it inside this skill).
   - If fully clean (no human blocks, at least one verified clean **automated** review at head with 0 open findings across all reviews, CI green, 0 open threads, up to date with main):

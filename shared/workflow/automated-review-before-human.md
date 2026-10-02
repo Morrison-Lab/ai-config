@@ -9,7 +9,7 @@ Start the review job, even under a read-only brief ([`status-requests-act`](stat
 - no review run is in flight on its head.
 
 Starting it is the only review-related write this rule adds to a status pass.
-Report a draft as a draft, and report an out-of-scope item as having no clean automated review, rather than un-drafting or triggering anything.
+In a status pass, report a draft as a draft, and an out-of-scope item as having no clean automated review, rather than un-drafting or triggering anything.
 The agent triggers the automated reviews itself.
 "Ready for your review" is a claim that this already happened.
 

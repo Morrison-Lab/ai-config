@@ -39,7 +39,9 @@ def _walk(root: Path):
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = sorted(d for d in dirnames if d not in SKIP_DIRS)
         for name in sorted(filenames):
-            yield Path(dirpath) / name
+            f = Path(dirpath) / name
+            if f.is_file():  # skips dangling symlinks and other non-regular entries
+                yield f
 
 
 def iter_files(paths):
@@ -77,6 +79,9 @@ def main(argv=None) -> int:
     if args.macros is not None and not args.macros.is_file():
         print(f"check-raw-math: --macros {args.macros} is not a file", file=sys.stderr)
         return 2
+    # The library is decoded strictly: a rule derived from a mis-decoded
+    # definition would be wrong, so a bad library is a read error (exit 2).
+    # Scanned files use errors="replace", since a stray byte cannot fake a hit.
     try:
         macros = args.macros or default_macros(Path.cwd())
         rules = load_rules(macros)

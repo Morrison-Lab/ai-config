@@ -63,6 +63,8 @@ QUIET = [
     ("Write", {"file_path": "x.qmd", "content": "Never write `\\mathbb{E}`; use the macro."}, "an inline code span"),
     ("Write", {"file_path": "x.md", "content": "```\n$\\mathbb{E}[Y]$\n```"}, "a fenced code block"),
     ("Write", {"file_path": "x.tex", "content": "\\newcommand{\\Ex}[1]{\\mathbb{E}\\left[#1\\right]}"}, "a newcommand body"),
+    ("Write", {"file_path": "x.tex", "content": "the \\textit{logit} link"}, "italic prose with textit"),
+    ("Write", {"file_path": "x.qmd", "content": "$\\mathit{E} + \\mathit{P}$"}, "a single italic letter"),
 ]
 for tool, ti, why in QUIET:
     check(hook(tool, ti) == "", f"quiet: {why}")
@@ -113,6 +115,11 @@ with tempfile.TemporaryDirectory() as d:
                        capture_output=True, text=True)
     check(r.returncode == 2 and "Traceback" not in r.stderr,
           "lint exits 2 on an undecodable --macros file")
+    os.symlink(os.path.join(d, "nowhere"), os.path.join(d, "dangling.qmd"))
+    r = subprocess.run([sys.executable, LINT, "--macros", macros, d],
+                       capture_output=True, text=True)
+    check(r.returncode == 1 and "dangling" not in r.stderr,
+          "lint skips a dangling symlink")
     r = subprocess.run([sys.executable, LINT, os.path.join(d, "missing.qmd")],
                        capture_output=True, text=True)
     check(r.returncode == 2, "lint exits 2 on a missing path")

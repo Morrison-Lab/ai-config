@@ -12,9 +12,31 @@ import tempfile
 HOOK = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
     os.path.dirname(__file__), "warn-human-review-before-clean-verdict.py")
 
-PUSHED = '{"command": "git push -u origin b"}\n'
-CLEAN = "### Verdict: Ready for merge\n"
-OTHER = "### Verdict: Needs more work\n"
+SHA = "a" * 40
+
+
+def rec(**kw):
+    return json.dumps(kw) + "\n"
+
+
+def push(command="git push -u origin b"):
+    return rec(type="assistant", message={"content": [
+        {"type": "tool_use", "input": {"command": command}}]})
+
+
+def text(body):
+    return rec(type="user", message={"content": [
+        {"type": "tool_result", "content": body}]})
+
+
+PUSHED = push()
+CLEAN = text("### Verdict: Ready for merge\n\nReviewed-Commit: " + SHA + "\n")
+PAYLOAD = text('<!-- review-data: {"commit_sha": "' + SHA
+               + '", "verdict": "CLEAN", "findings": []} -->')
+OTHER = text("### Verdict: Needs more work\n\nReviewed-Commit: " + SHA + "\n")
+QUOTED = text("Write `### Verdict: Ready for merge` only if nothing is left.")
+NEGATED = text("The PR is not fully clean yet.")
+MENTION = text("remember to git push after the review")
 ADD = "gh pr edit 7 --add-reviewer d-morrison"
 API = ("gh api repos/o/r/pulls/7/requested_reviewers -X POST "
        "-f 'reviewers[]=d-morrison'")
@@ -29,6 +51,17 @@ CASES = [
     ("clean verdict after push", "Bash", {"command": ADD}, PUSHED + CLEAN, False, None),
     ("clean verdict before the last push", "Bash", {"command": ADD},
      CLEAN + PUSHED, True, "d-morrison"),
+    ("escaped review-data payload counts", "Bash", {"command": ADD},
+     PUSHED + PAYLOAD, False, None),
+    ("quoted instruction is not a verdict", "Bash", {"command": ADD},
+     PUSHED + QUOTED, True, "d-morrison"),
+    ("not fully clean is not a verdict", "Bash", {"command": ADD},
+     PUSHED + NEGATED, True, "d-morrison"),
+    ("a mere mention of git push keeps the boundary", "Bash", {"command": ADD},
+     PUSHED + CLEAN + MENTION, False, None),
+    ("DELETE removes a reviewer", "Bash",
+     {"command": "gh api -X DELETE repos/o/r/pulls/7/requested_reviewers "
+                 "-f 'reviewers[]=d-morrison'"}, PUSHED, False, None),
     ("no push at all, clean verdict", "Bash", {"command": ADD}, CLEAN, False, None),
     ("bot reviewer", "Bash",
      {"command": "gh pr edit 7 --add-reviewer copilot-pull-request-reviewer[bot]"},

@@ -1514,6 +1514,21 @@ A review that lives only in the session is invisible to the repository owner and
 - **Do:** post each independent review's report, and then its dispositions, on the PR or MR it reviewed, and link that comment in your reply.
 - **Don't:** keep a review's findings in the chat, the session, or a scratch file and report only the fixes.
 
+## Review every revision before it goes back to the user
+
+Run a fresh independent review on every revision of a deliverable before you hand that revision back to the user, not once per task.
+A revision is any new head you report, show, or ask the user to look at: a pushed fix round, a new render, a redrafted document.
+For a rendered document such as a manuscript, the review is a referee read of the new render, done by a reviewer other than the session that made the revision.
+An earlier review covers the head it read and nothing after it, so a clean verdict on the previous revision does not carry over.
+Post each review per [the section above](#post-every-independent-review-on-the-pr-or-mr-it-reviewed), and link it in the reply that hands the revision back.
+
+This does not reopen [the one-round rule](#the-review-gates-the-push-not-the-work-----and-it-is-one-round-not-a-loop): the review gates the hand-back of each revision, and it is one round per revision, not a loop that holds the push until a reviewer is satisfied.
+(Directive from the user, 2026-10-02, after a manuscript revision went back without a new review: "did you get another adversarial peer review?
+do that every time".)
+
+- **Do:** dispatch a fresh reviewer on each new head before reporting it to the user, and link the posted report in that reply.
+- **Don't:** reuse the first revision's review for later revisions, or report a revision as ready on the strength of your own reading.
+
 ## A reviewer handed nothing returns clean, so the brief must make an empty input an error
 
 `git diff origin/<default-branch>...HEAD` reads the **commit graph**.

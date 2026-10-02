@@ -23,7 +23,8 @@ The same reader at the end of the page has to guess which link goes with which s
 ## Where each repository states it
 
 - `Morrison-Lab/psw`: the prose rule, in `chapters/paper-organization.qmd`, "Links to videos and other media".
-  The prose copy is canonical for wording; this fragment is the agent-facing copy.
+  The prose copy is canonical for wording.
+  This fragment is the agent-facing copy.
 - `Morrison-Lab/lds`: [`AUTHORING.md`](https://github.com/Morrison-Lab/lds/blob/main/AUTHORING.md), "Put each video and other external media link beside the content it supports" (Ezra, 2026-10-02).
   Other note repositories link to this fragment rather than restating it.
 

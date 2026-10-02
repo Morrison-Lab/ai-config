@@ -22,7 +22,7 @@ place.
 
 - "macroize", "macroize the math", "use macros", "use the macros submodule",
   "convert math to macros", "polish the math with macros".
-- **Every time you write, edit, or review math in a lab `.qmd` or `.tex` document**, a manuscript or a single equation alike --- this is mandatory, not a polish pass.
+- **Every time you write, edit, or review LaTeX math anywhere**: any project or repo, and any format (Quarto, R Markdown, LaTeX, roxygen and `.Rd`, slides, Markdown docs, notebooks), a manuscript or a single equation alike --- this is mandatory, not a polish pass.
   Use the semantic macro for each concept the library names (`\Ep` for a bare expectation operator, `\E{x}` for one subscripted by `x`, `\Var`, `\Cov`, `\P`, …) rather than writing its raw LaTeX, and when no macro names the concept, add one (step 6) rather than writing raw LaTeX (standing rule;
   see `memories/preferences.md`).
 
@@ -199,6 +199,15 @@ The macros repo carries a standing `mwc` grant, so merge the macro PR yourself o
 Bump the submodule pointer in the manuscript repo once that macro PR merges.
 
 ### 7. Verify the render and spellcheck, then ship
+
+Run the raw-notation lint over what you changed, pointing it at the library so its operator macros extend the rules:
+
+```bash
+python3 <ai-config>/scripts/check-raw-math.py --macros inst/analyses/macros/macros.qmd <changed files or dirs>
+```
+
+It exits 1 and prints `file:line: raw -> use macro` for each hit.
+`hooks/warn-raw-math-notation.py` runs the same patterns at write time and warns, never blocks.
 
 ```bash
 quarto render <manuscript>.qmd            # must render with the macros include

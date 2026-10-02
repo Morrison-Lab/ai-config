@@ -1037,6 +1037,13 @@
             "timeout": 10,
             "script": "flag-unsourced-term-attribution.py",
             "why": "A term and year pinned to a document (\"Autumn 2008\" beside a .pdf) is a claim that lives inside the document, and it is broken at composition time, so a rule cannot reach it. Measured on Morrison-Lab/mlg#20, where the year came from the files' mtimes and the PDF's own header said 2007. Warns, never blocks."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-raw-math-notation.py\"",
+            "timeout": 10,
+            "script": "warn-raw-math-notation.py",
+            "why": "User directive 2026-10-02: any LaTeX math, in any repo or format, uses the shared semantic macros (d-morrison/macros) wherever a macro names the concept. Broken in a manuscript whose first equation spelled an expectation in raw LaTeX; the rule is broken at composition time inside a Write or Edit, which prose cannot reach. Warns, never blocks: a raw spelling can be deliberate. Patterns live in scripts/lib/raw_math.py, shared with the scripts/check-raw-math.py lint. Tracked as #4221."
           }
         ]
       },
@@ -1085,6 +1092,13 @@
             "timeout": 10,
             "script": "flag-unsourced-term-attribution.py",
             "why": "A term and year pinned to a document (\"Autumn 2008\" beside a .pdf) is a claim that lives inside the document, and it is broken at composition time, so a rule cannot reach it. Measured on Morrison-Lab/mlg#20, where the year came from the files' mtimes and the PDF's own header said 2007. Warns, never blocks."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-raw-math-notation.py\"",
+            "timeout": 10,
+            "script": "warn-raw-math-notation.py",
+            "why": "User directive 2026-10-02: any LaTeX math, in any repo or format, uses the shared semantic macros (d-morrison/macros) wherever a macro names the concept. Broken in a manuscript whose first equation spelled an expectation in raw LaTeX; the rule is broken at composition time inside a Write or Edit, which prose cannot reach. Warns, never blocks: a raw spelling can be deliberate. Patterns live in scripts/lib/raw_math.py, shared with the scripts/check-raw-math.py lint. Tracked as #4221."
           }
         ]
       },
@@ -1126,6 +1140,13 @@
             "timeout": 10,
             "script": "flag-unsourced-term-attribution.py",
             "why": "A term and year pinned to a document (\"Autumn 2008\" beside a .pdf) is a claim that lives inside the document, and it is broken at composition time, so a rule cannot reach it. Measured on Morrison-Lab/mlg#20, where the year came from the files' mtimes and the PDF's own header said 2007. Warns, never blocks."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-raw-math-notation.py\"",
+            "timeout": 10,
+            "script": "warn-raw-math-notation.py",
+            "why": "User directive 2026-10-02: any LaTeX math, in any repo or format, uses the shared semantic macros (d-morrison/macros) wherever a macro names the concept. Broken in a manuscript whose first equation spelled an expectation in raw LaTeX; the rule is broken at composition time inside a Write or Edit, which prose cannot reach. Warns, never blocks: a raw spelling can be deliberate. Patterns live in scripts/lib/raw_math.py, shared with the scripts/check-raw-math.py lint. Tracked as #4221."
           }
         ]
       },

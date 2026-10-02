@@ -991,12 +991,14 @@ applied to a human decision rather than to a verification step.
 That is strictly stronger, which is exactly why it's reserved:
 it suppresses a mistake at the cost of suppressing the PR's own review and auto-merge machinery.
 
-## Use the shared math-macros submodule for manuscript math
+## Use the shared math-macros library for all LaTeX math
 
 Write math in lab Quarto/LaTeX manuscripts with the shared [`d-morrison/macros`](https://github.com/d-morrison/macros) submodule (vendored at `inst/analyses/macros`, included via `{{< include .../macros/macros.qmd >}}`), not ad-hoc raw LaTeX --- it gives every document the same polished, condensed notation from one versioned source.
-This is mandatory for every equation, not a polish pass: use the semantic macro wherever one names the concept (an expectation is `\E`, not a raw `\mathbb{E}`).
+This applies to LaTeX math in any project, repo, or format (Quarto, R Markdown, LaTeX, roxygen, slides, docs), not only manuscripts, and is mandatory for every equation, not a polish pass: use the semantic macro wherever one names the concept (an expectation is `\E`, not a raw `\mathbb{E}`).
 Keep the submodule up to date, and add new semantic macros to it (via a PR to `d-morrison/macros`, which carries a standing `mwc` grant) whenever a needed concept has no macro, rather than defining one-off commands inline.
-(Directive from the user, 2026-10-02, on a manuscript equation that wrote out an expectation in raw LaTeX: "you're supposed to always use semantic macros wherever applicable, and add new semantic macros as needed".)
+(Directive from the user, 2026-10-02, on a manuscript equation that wrote out an expectation in raw LaTeX: "you're supposed to always use semantic macros wherever applicable, and add new semantic macros as needed";
+then "anytime we're writing latex math in any project/repo/etc, use the macros repo".)
+`scripts/check-raw-math.py` lints for raw operators, and `hooks/warn-raw-math-notation.py` warns at write time.
 The `use-math-macros` (alias `macroize`) skill is the executable procedure.
 
 Two gotchas: `git submodule update --remote` bumps the tracked gitlink, which dirties `git diff HEAD` --- do it in a worktree, never a checkout running provenance-stamped SLURM jobs.

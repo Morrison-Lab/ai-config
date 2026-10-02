@@ -1063,6 +1063,14 @@ and a read-through inspects sentences, not the sequence.
 
 [`shared/writing/quarto-remarks-vs-callouts.md`](shared/writing/quarto-remarks-vs-callouts.md)
 
+## Quarto: put typed content in a div or callout wherever one fits
+
+[`shared/writing/quarto-divs-for-typed-content.md`](shared/writing/quarto-divs-for-typed-content.md)
+
+Every block with a type --- definition, result, proof, example, exercise, solution, remark, warning, tip, note --- goes in the div or callout of that type, in every repository with Quarto content.
+A recurring kind of block with no matching category gets a new custom div or callout type rather than staying in plain prose.
+Connective narrative stays unboxed, and theorem-type divs are never nested.
+
 ## Writing style: a grouping level must earn its place
 
 [`shared/writing/grouping-levels.md`](shared/writing/grouping-levels.md)

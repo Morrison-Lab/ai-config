@@ -6,6 +6,9 @@ whether a block is part of the mathematical development
 or a sign by the road.
 A remark and a callout look similar and are easy to swap,
 so choose by what the content is about.
+That every typed block belongs in a div in the first place
+is [`quarto-divs-for-typed-content.md`](quarto-divs-for-typed-content.md)'s rule;
+this file decides between two of the boxes.
 
 ## Which one
 

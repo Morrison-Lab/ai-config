@@ -169,11 +169,15 @@ Check the EQUATOR page for the current version before citing one.
 - Axis labels with units; consistent fonts across figures.
 - **Size each figure for the page.**
   The plotted content fills the available width (the text width, or the journal's stated figure width), with no large blank margins or empty space inside the image.
-  Every piece of text in it (axis labels, tick labels, node and legend labels) is at least the journal's stated minimum, and in any case about 8 pt or larger at the printed size, close to the caption text.
+  Every piece of text in it (axis labels, tick labels, node and legend labels) is at least the journal's stated minimum, and in any case about 8 pt or larger at the printed size.
   Set the figure's width and height (`fig-width`/`fig-height`, or the export size) to that width and an aspect ratio that fits the content, rather than exporting at a default size and letting the document scale it down.
-  For a ggplot, preview it at those exact dimensions before rendering with [ggview](https://github.com/idmn/ggview): add `canvas(6.5, 4, units = "in")` (the final width and height) to the plot, and save it with `ggview::save_ggplot()` at the same size.
-  Wide diagrams such as Sankey plots are the usual failure: drawn on a large default canvas, then shrunk to fit, so the plot is tiny in a field of white space.
-  Judge it on the rendered page: the figure's smallest text should look no smaller than the caption beneath it, and its printed size is the font size in the plot code times the displayed width divided by `fig-width`.
+  For a ggplot, preview it at those exact dimensions before rendering with [ggview](https://github.com/idmn/ggview): add `canvas(6.5, 4)` (the final width and height, in inches by default) to the plot.
+  In a Quarto chunk, copy those dimensions into `fig-width`/`fig-height`;
+  for a figure saved to a file, save it with `ggview::save_ggplot()`, which uses the canvas size.
+  Wide diagrams such as Sankey plots often fail this way: the plot ends up tiny in a field of white space.
+  Judge it on the rendered page.
+  The printed size of the plot's text is its font size in the plot code times the displayed width divided by `fig-width`;
+  as a quick visual check, figure text far smaller than the caption beneath it is almost certainly below 8 pt.
 - Colorblind-safe palettes, and do not use color as the only way to tell groups apart;
   pair it with shape or line type.
 - Show the data where possible (points with intervals beat bar charts of means).

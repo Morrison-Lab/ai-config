@@ -40,6 +40,7 @@ The user's reaction was that treating those MRs as ready was insane, and the gat
 5. **Check each page** for:
    - a table running off the page or split badly;
    - a figure that is missing, cropped, blurry, or out of order;
+   - a figure whose plotted content is small inside large blank margins, or whose text is smaller than about 8 pt at the printed size;
    - a missing number or caption on any table or figure;
    - broken cross-references (`??`, `?@fig-`, `Table ?`), raw Markdown, code output, warnings, or `NA` cells;
    - any breach of the float and caption layout rules in the `manuscript-float-layout` fragment ([ai-config#4203](https://github.com/Morrison-Lab/ai-config/pull/4203));

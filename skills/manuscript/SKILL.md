@@ -166,9 +166,12 @@ Check the EQUATOR page for the current version before citing one.
 
 - **Numbered** in citation order and **captioned**.
   The legend goes **below** the figure: a title phrase, then sentences explaining panels, symbols, error bars ("Error bars indicate 95% CIs"), and abbreviations.
-- Axis labels with units;
-  readable font sizes at final print size;
-  consistent fonts across figures.
+- Axis labels with units; consistent fonts across figures.
+- **Size each figure for the page.**
+  The plotted content fills the available text width, with no large blank margins or empty space inside the image, and every piece of text in it (axis labels, tick labels, node and legend labels) is 8 to 10 pt at the printed size.
+  Set the figure's width and height (`fig-width`/`fig-height`, or the export size) to the text width and an aspect ratio that fits the content, rather than exporting at a default size and letting the document scale it down.
+  Wide diagrams such as Sankey plots are the usual failure: drawn on a large default canvas, then shrunk to fit, so the plot is tiny in a field of white space.
+  Judge this on the rendered page, not in the source.
 - Colorblind-safe palettes, and do not use color as the only way to tell groups apart;
   pair it with shape or line type.
 - Show the data where possible (points with intervals beat bar charts of means).
@@ -285,7 +288,9 @@ Before calling a manuscript ready:
 1. [ ] Export the render to PDF and **look at every page**, main text and supplement.
 2. [ ] Every table and figure has a number and a caption, and is cited in the text in order.
 3. [ ] The rendered layout passes every rule in the `manuscript-float-layout` fragment ([ai-config#4203](https://github.com/Morrison-Lab/ai-config/pull/4203)).
-4. [ ] No table runs off the page; no figure is cropped or blurry.
+4. [ ] No table runs off the page;
+   no figure is cropped or blurry;
+   every figure fills the text width without large blank margins, and its text reads at 8 to 10 pt (section 7).
 5. [ ] No broken cross-references (`??`, `@fig-`, `Table ?`), raw Markdown, code output, warnings, or `NA` in rendered tables.
 6. [ ] Abstract numbers match the Results, tables, and figures.
 7. [ ] Every abbreviation is defined at first use (abstract, text, each table and figure).

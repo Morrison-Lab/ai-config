@@ -842,12 +842,14 @@ def handle_user_prompt_submit(
     once_per_generation: bool,
     event: str = "postToolUse",
     claude_event: str = "UserPromptSubmit",
+    deadline: float | None = None,
 ) -> str:
     if once_per_generation and not claim_ups_slot(cursor, event):
         return ""
     payload = claude_payload_for_transcript(cursor, claude_event)
     chunks: list[str] = []
-    deadline = event_deadline(event)
+    if deadline is None:
+        deadline = event_deadline(event)
     for entry in entries:
         if entry["event"] != claude_event:
             continue
@@ -869,13 +871,17 @@ def handle_user_prompt_submit(
 def handle_session_start(cursor: dict[str, Any], entries: list[dict[str, Any]]) -> dict[str, Any]:
     # Claude SessionStart scripts (inject-core-rules.py, ai-config#4206) run
     # once at session open, ungated by the UserPromptSubmit slot, and go first.
+    # Both passes share one deadline so together they stay inside Cursor's
+    # sessionStart timeout.
+    deadline = event_deadline("sessionStart")
     parts = [
         handle_user_prompt_submit(
             cursor, entries, once_per_generation=False, event="sessionStart",
-            claude_event="SessionStart",
+            claude_event="SessionStart", deadline=deadline,
         ),
         handle_user_prompt_submit(
             cursor, entries, once_per_generation=True, event="sessionStart",
+            deadline=deadline,
         ),
     ]
     extra = "\n".join(part for part in parts if part)

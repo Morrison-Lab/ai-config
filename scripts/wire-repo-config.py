@@ -117,7 +117,8 @@ def wire(repo: Path, check: bool) -> bool:
     if settings is not None:
         path = repo / ".claude" / "settings.json"
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
+        path.write_text(json.dumps(settings, indent=2, ensure_ascii=False) + "\n",
+                        encoding="utf-8")
     if agents is not None:
         (repo / "AGENTS.md").write_text(agents, encoding="utf-8")
     return settings is None and agents is None

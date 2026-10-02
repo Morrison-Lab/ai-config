@@ -27,13 +27,15 @@ AGENTS.md, and AGENTS.md already says to consult it on demand.
 
 Silent in two cases, both measured from the filesystem rather than assumed:
 
-  - The session's project IS ai-config (its own AGENTS.md is byte-identical
-    to the plugin's). Claude Code already auto-loads that repo's CLAUDE.md,
-    so injecting again would double the context.
+  - The session's project IS an ai-config checkout: the project directory,
+    or a parent of it, carries `.claude-plugin/marketplace.json` named
+    Morrison-Lab. Claude Code already auto-loads that checkout's CLAUDE.md,
+    and its AGENTS.md may be newer than the plugin's cached copy, so
+    injecting the cached one would contradict it. Identity, not content: a
+    branch that edits AGENTS.md is still ai-config.
   - The plugin root has no AGENTS.md. That is a broken install, not a reason
     to block the session; the hook says so on stderr and exits 0.
 """
-import hashlib
 import json
 import os
 import sys
@@ -60,22 +62,28 @@ resolve against {root}.
 
 
 def plugin_root() -> Path:
-    raw = os.environ.get("CLAUDE_PLUGIN_ROOT")
-    if raw:
-        return Path(raw)
+    # This file always lives at <root>/hooks/. CLAUDE_PLUGIN_ROOT is not used:
+    # the generated hooks-only plugin exports its own directory there, which
+    # holds no AGENTS.md.
     return Path(__file__).resolve().parent.parent
 
 
-def digest(path: Path) -> str | None:
-    try:
-        return hashlib.sha256(path.read_bytes()).hexdigest()
-    except OSError:
-        return None
+def is_ai_config(directory: Path) -> bool:
+    for candidate in (directory, *directory.parents):
+        manifest = candidate / ".claude-plugin" / "marketplace.json"
+        try:
+            name = json.loads(manifest.read_text(encoding="utf-8")).get("name")
+        except (OSError, ValueError, AttributeError):
+            continue
+        if name == "Morrison-Lab":
+            return True
+    return False
 
 
-def project_dir(payload: dict) -> Path | None:
+
+def project_dir(payload: dict) -> Path:
     raw = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd")
-    return Path(raw) if raw else None
+    return Path(raw) if raw else Path.cwd()
 
 
 def main() -> int:
@@ -89,14 +97,12 @@ def main() -> int:
     root = plugin_root()
     agents = root / "AGENTS.md"
     claude = root / "CLAUDE.md"
-    agents_digest = digest(agents)
-    if agents_digest is None:
+    if not agents.is_file():
         print(f"inject-core-rules: no AGENTS.md under {root}; "
               "the ai-config plugin install looks incomplete", file=sys.stderr)
         return 0
 
-    project = project_dir(payload)
-    if project is not None and digest(project / "AGENTS.md") == agents_digest:
+    if is_ai_config(project_dir(payload).resolve()):
         return 0
 
     text = HEADER.format(agents=agents, claude=claude, root=root)

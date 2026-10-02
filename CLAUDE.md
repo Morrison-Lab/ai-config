@@ -1221,7 +1221,8 @@ Detail, rationale, and cases: [`shared/writing/hyperlink-liberally.md`](shared/w
 [`shared/writing/media-links-beside-content.md`](shared/writing/media-links-beside-content.md)
 
 In lecture notes, put each video or other external media link in a one-line note right after the exercise, figure or definition it supports, never in an end-of-page list.
-External sites are fine to link; never link internal homework or exam repositories.
+External sites are fine to link.
+Never link internal homework or exam repositories.
 
 ## Hyperlink technical terms and results; no forward references
 

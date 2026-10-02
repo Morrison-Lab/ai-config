@@ -179,6 +179,15 @@ Box (a `===` line above and below) only what the user is waiting on: ❓ **QUEST
 Prefix without a box the informational ones: 📊 **UPDATE**, ⚠️ **FLAG**, ✔️ **DONE**, 🟢 **ALL CLEAR**.
 Detail, rationale, and cases: [`shared/writing/tag-chat-output.md`](shared/writing/tag-chat-output.md).
 
+## Standing habits from Ezra
+
+[`shared/workflow/standing-habits-from-ezra.md`](shared/workflow/standing-habits-from-ezra.md)
+
+Do the work yourself instead of asking Ezra to run commands.
+Report an unreachable source instead of citing it from memory.
+Treat CI error annotations as failures, and keep removed content in an outtakes file.
+State the model you chose for each task.
+
 ## Never close a reply by offering to do work you are already allowed to do
 
 [shared/workflow/no-cop-out-offers.md](shared/workflow/no-cop-out-offers.md)

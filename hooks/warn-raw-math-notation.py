@@ -12,11 +12,13 @@ so a rule in prose alone does not reach it.
 Scans the text being written to a `.qmd`, `.Rmd`, `.tex`, `.md`, `.R`,
 `.Rd`, `.Rnw` or `.ipynb` file with the patterns in
 `scripts/lib/raw_math.py` (shared with the `scripts/check-raw-math.py`
-lint), and names each raw operator and the macro to use.
+lint, which can also extend them from the macros library; this hook uses
+the built-in rules only), and names each raw operator and the macro to use.
 
 WARNS, never blocks: a raw spelling can be deliberate (a macro definition,
 prose quoting the raw form, a document that cannot load the library), and
 this hook cannot tell those apart. Fails open on any parse trouble.
+Tracked as ai-config#4221.
 """
 import json
 import os
@@ -28,7 +30,7 @@ try:
         "scripts", "lib")
     if _LIB not in sys.path:
         sys.path.insert(0, _LIB)
-    from raw_math import MATH_SUFFIXES, find_raw
+    from raw_math import MATH_SUFFIXES, find_raw, is_library, is_markdown
 except Exception as _exc:  # broken install; fail open and say so
     print(f"warn-raw-math-notation: cannot load scripts/lib/raw_math.py "
           f"({_exc}); not evaluating", file=sys.stderr)
@@ -39,9 +41,6 @@ MAX_LISTED = 5
 
 def _content(tool_input):
     text = tool_input.get("content") or tool_input.get("new_string") or ""
-    if not text and isinstance(tool_input.get("edits"), list):
-        text = "\n".join(e.get("new_string") or "" for e in tool_input["edits"]
-                         if isinstance(e, dict))
     if not text:
         text = tool_input.get("new_source") or ""
     return text
@@ -54,18 +53,18 @@ def main() -> int:
         payload = json.load(sys.stdin)
     except Exception:
         return 0
-    if payload.get("tool_name") not in ("Write", "Edit", "MultiEdit", "NotebookEdit"):
+    if payload.get("tool_name") not in ("Write", "Edit", "NotebookEdit"):
         return 0
     ti = payload.get("tool_input") or {}
     target = str(ti.get("file_path") or ti.get("notebook_path") or "")
     if not target.lower().endswith(MATH_SUFFIXES):
         return 0
-    if os.path.basename(target) == "macros.qmd":
+    if is_library(target):
         return 0  # the library itself defines the raw forms
-    hits = list(find_raw(_content(ti)))
+    hits = list(find_raw(_content(ti), markdown=is_markdown(target)))
     if not hits:
         return 0
-    listed = "\n".join(f"    line {n}: {raw} -> use {macro}"
+    listed = "\n".join(f"    line {n} of the new text: {raw} -> use {macro}"
                        for n, raw, macro in hits[:MAX_LISTED])
     more = f"\n    ...and {len(hits) - MAX_LISTED} more" if len(hits) > MAX_LISTED else ""
     msg = (

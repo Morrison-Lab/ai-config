@@ -37,6 +37,11 @@ WARN = [
     ("Write", {"file_path": "R/f.R", "content": "#' @return \\eqn{\\text{logit}(p)}"}, "\\logit"),
     ("Write", {"file_path": "notes.Rmd", "content": "$\\mathbb E[X]$"}, "\\Ep"),
     ("Edit", {"file_path": "s.qmd", "new_string": "$\\mathrm{Cov}(X, Y)$"}, "\\Cov"),
+    ("Write", {"file_path": "a.tex", "content": "${\\rm E}[X]$"}, "\\Ep"),
+    ("Write", {"file_path": "a.tex", "content": "\\mathop{\\rm Var}(X)"}, "\\Var"),
+    ("Write", {"file_path": "a.qmd", "content": "$\\mathbb{E}\\left[Y\\right]$"}, "\\Ep"),
+    ("Write", {"file_path": "a.tex", "content": "\\def\\Foo{1} $\\mathbb{E}[X]$"}, "\\Ep"),
+    ("NotebookEdit", {"notebook_path": "n.ipynb", "new_source": "$\\operatorname{logit}(p)$"}, "\\logit"),
 ]
 for tool, ti, macro in WARN:
     out = hook(tool, ti)
@@ -51,6 +56,12 @@ QUIET = [
     ("Write", {"file_path": "x.qmd", "content": "$\\mathbb{R}^n$"}, "an operator with no macro rule"),
     ("Write", {"file_path": "x.qmd", "content": "$\\operatorname{Exp}(x)$"}, "a longer name sharing a prefix"),
     ("Bash", {"command": "echo '\\mathbb{E}' > a.qmd"}, "not a file-write tool"),
+    ("Write", {"file_path": "x.qmd", "content": "$\\mathbf{E}\\mathbf{x}$"}, "a bold matrix named E"),
+    ("Write", {"file_path": "x.tex", "content": "$\\mathbf{P}$ and $\\mathsf{P}$"}, "a bold or sans-serif P"),
+    ("Write", {"file_path": "x.qmd", "content": "the $\\text{E}$-value"}, "an E-value in text"),
+    ("Write", {"file_path": "x.qmd", "content": "Never write `\\mathbb{E}`; use the macro."}, "an inline code span"),
+    ("Write", {"file_path": "x.md", "content": "```\n$\\mathbb{E}[Y]$\n```"}, "a fenced code block"),
+    ("Write", {"file_path": "x.tex", "content": "\\newcommand{\\Ex}[1]{\\mathbb{E}\\left[#1\\right]}"}, "a newcommand body"),
 ]
 for tool, ti, why in QUIET:
     check(hook(tool, ti) == "", f"quiet: {why}")
@@ -80,6 +91,13 @@ with tempfile.TemporaryDirectory() as d:
                        capture_output=True, text=True)
     check(r.returncode == 1 and "\\sinc" in r.stdout and "macros.qmd:" not in r.stdout,
           "--macros derives a rule and skips the library file itself")
+    for sub in ("a/macros", "b/macros"):
+        os.makedirs(os.path.join(d, sub), exist_ok=True)
+        with open(os.path.join(d, sub, "macros.qmd"), "w") as f:
+            f.write("\\def\\sinc{\\operatorname{sinc}}\n")
+    r = subprocess.run([sys.executable, LINT, clean], capture_output=True, text=True, cwd=d)
+    check(r.returncode == 2 and "--macros" in r.stderr,
+          "lint stops when several macros libraries are found")
     r = subprocess.run([sys.executable, LINT, os.path.join(d, "missing.qmd")],
                        capture_output=True, text=True)
     check(r.returncode == 2, "lint exits 2 on a missing path")

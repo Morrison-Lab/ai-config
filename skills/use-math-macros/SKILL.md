@@ -207,7 +207,7 @@ python3 <ai-config>/scripts/check-raw-math.py --macros inst/analyses/macros/macr
 ```
 
 It exits 1 and prints `file:line: raw -> use macro` for each hit.
-`hooks/warn-raw-math-notation.py` runs the same patterns at write time and warns, never blocks.
+`hooks/warn-raw-math-notation.py` runs the lint's built-in patterns at write time and warns, never blocks.
 
 ```bash
 quarto render <manuscript>.qmd            # must render with the macros include

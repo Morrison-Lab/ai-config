@@ -1,6 +1,6 @@
 # Review every page of a rendered document before calling it ready
 
-A PR or MR that changes a rendered document is not ready, and is not mergeable under any grant, until someone has opened the rendered output at the current head and looked at every page.
+A PR or MR that changes a rendered document is not ready, and is not mergeable under any grant, until someone has opened the rendered output at the current head and looked at every page, and a reviewer other than the session that made the revision has read that render (the referee read, step 7 of the procedure below).
 This is a hard gate, not a guideline.
 Green CI, a clean review verdict, and a correct source diff do not satisfy it, alone or together.
 
@@ -48,7 +48,8 @@ The user's reaction was that treating those MRs as ready was insane, and the gat
    Fix the findings and repeat from step 1 on the new head.
 7. **Get an independent referee read of this render** before handing it back to the user: a reviewer other than the session that made the revision reads every page, per [`adversarial-self-review`](adversarial-self-review.md#review-every-revision-before-it-goes-back-to-the-user).
    Post the referee's report on the PR or MR with its page numbers, per [`adversarial-self-review`](adversarial-self-review.md#post-every-independent-review-on-the-pr-or-mr-it-reviewed).
-   Fix its findings and repeat from step 1 on the new head.
+   Fix its findings, then review the fix head before reporting it as ready, or report it explicitly as unreviewed with the findings listed;
+   a fix that does not change the render needs no new read.
 8. **Only then** report the PR ready or treat it as mergeable.
    A push after the step 7 referee read invalidates that read, exactly as it invalidates a review verdict.
 

@@ -284,7 +284,7 @@ Before calling a manuscript ready:
 
 1. [ ] Export the render to PDF and **look at every page**, main text and supplement;
    evidence: the page-by-page comment on the PR or MR.
-2. [ ] An independent referee read of this render, by a reviewer other than the session that made the revision;
+2. [ ] An independent [referee read](../../shared/workflow/adversarial-self-review.md#post-every-independent-review-on-the-pr-or-mr-it-reviewed) of this render, by a reviewer other than the session that made the revision;
    evidence: its report, posted on the PR or MR and linked in the reply that hands the manuscript back.
 3. [ ] Every table and figure has a number and a caption, and is cited in the text in order.
 4. [ ] The rendered layout passes every rule in the `manuscript-float-layout` fragment ([ai-config#4203](https://github.com/Morrison-Lab/ai-config/pull/4203)).

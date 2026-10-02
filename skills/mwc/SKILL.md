@@ -31,7 +31,7 @@ without asking confirmation before every merge.
 - **Scope Limit**: An MWC grant applies ONLY to PRs that are 100% clean
   (all CI checks passing, automated review verdicts from all available providers in the quorum clean, no unresolved comments, no open block labels).
   It NEVER authorizes merging a PR with failing CI, unresolved findings, pending reviews, or a missing/skipped quorum review.
-  Nor does it authorize merging a PR that changes a rendered document (Word, PDF, slides, a manuscript) before that document has been viewed page by page at the current head, with the evidence posted on the PR ([`review-rendered-documents`](../../shared/workflow/review-rendered-documents.md)).
+  Nor does it authorize merging a PR that changes a rendered document (Word, PDF, slides, a manuscript) before that document has been viewed page by page at the current head, with the evidence and an independent referee read of that render posted on the PR ([`review-rendered-documents`](../../shared/workflow/review-rendered-documents.md)).
   A clean automated review from every available provider evaluating the current HEAD commit is strictly required for autonomous merge under MWC;
   a reviewer skip notice (e.g. for quota exhaustion or workflow edits) or a fallback self-review does NOT waive this requirement, grant merge authority under MWC, or clear missing external review.
   **A PR/MR does not count as clean for MWC if there are reviews still running.**

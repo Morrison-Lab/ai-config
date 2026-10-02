@@ -1482,8 +1482,8 @@ halt the review process and escalate to the user for a tie-breaking decision.
 
 ## A relayed not-clean round is a standing verdict under your login, so close it with a clean one on the new head
 
-The findings a subagent review returns are posted to the PR, and the report goes in one comment and the dispositions in a separate one ([Post every independent review on the PR or MR it reviewed](#post-every-independent-review-on-the-pr-or-mr-it-reviewed)), for example "the review returned Needs more work with N findings", then "all N are addressed in <sha>".
-That comment is posted under the account's own login, and `scripts/check-pr-fully-clean.py` reads it as that login's latest verdict.
+The findings a subagent review returns are posted to the PR as the report comment, per [Post every independent review on the PR or MR it reviewed](#post-every-independent-review-on-the-pr-or-mr-it-reviewed).
+The report comment is posted under the account's own login, and `scripts/check-pr-fully-clean.py` reads it as that login's latest verdict.
 "All addressed" does not clear it, because the instrument keys on the verdict phrase and on the reviewer, and a later all-clear from a *different* reviewer never supersedes a standing not-clean (ai-config#2274).
 So the PR reads not-clean under `mwc` however many CLEAN bot rounds follow, until the same login posts a clean verdict on the current head.
 
@@ -1502,7 +1502,7 @@ That covers a dispatched subagent review, an adversarial review, a referee read 
 On GitLab, post it as an MR note;
 for a branch with no PR yet, post it once the PR exists.
 A review that returns a structured report with a verdict is posted in the form set by [The posted fallback comment is the reviewer's report](#the-posted-fallback-comment-is-the-reviewers-report-not-an-author-composite).
-A referee read of a rendered document has no verdict line, so post its findings with page numbers, as [`review-rendered-documents`](review-rendered-documents.md) step 6 records them.
+A referee read of a rendered document has no verdict line, so post its findings with page numbers.
 Post the dispositions as [`ard`](../../skills/ard/SKILL.md) posts them, in a separate comment from the report, naming the fixing commit once it is pushed.
 Each comment ends with the [`disclose-agent-authorship`](disclose-agent-authorship.md) marker.
 A not-clean report you post is a standing verdict, so close it as [the relayed not-clean round section](#a-relayed-not-clean-round-is-a-standing-verdict-under-your-login-so-close-it-with-a-clean-one-on-the-new-head) directs.
@@ -1516,22 +1516,29 @@ A review that lives only in the session is invisible to the repository owner and
 
 ## Review every revision before it goes back to the user
 
-Run a fresh independent review on every revision of a deliverable before you hand that revision back to the user, not once per task.
-A revision is any new head you report, show, or ask the user to look at: a pushed fix round, a new render, a redrafted document.
+Every revision you hand back to the user as a result gets one fresh independent review of the exact head you report.
+That covers a rendered document, a draft, and a PR reported ready.
 For a rendered document such as a manuscript, the review is a referee read of the new render, done by a reviewer other than the session that made the revision.
 An earlier review covers the head it read and nothing after it, so a clean verdict on the previous revision does not carry over.
 Post each review per [Post every independent review on the PR or MR it reviewed](#post-every-independent-review-on-the-pr-or-mr-it-reviewed), and link it in the reply that hands the revision back.
 
-This does not reopen [the one-round rule](#the-review-gates-the-push-not-the-work-----and-it-is-one-round-not-a-loop): the push itself is not gated by this review, only the report to the user is, so review the pushed head before you report it.
-It is one round per revision, not a loop.
-When that review returns findings, fix them and push;
-the fix is the next revision, so review its head before reporting it as ready.
-The only alternative is to report the unreviewed head SHA explicitly as unreviewed, with the remaining findings listed, and not as ready.
+The pre-push review of that head counts.
+A pre-push review of the exact head you report satisfies this rule, so an ordinary ARDI round needs nothing extra, and the same head never gets a second review.
+This rule adds no push gate beyond the existing pre-push review.
+
+The loop is bounded by the head you report:
+
+- When the review of that head is clean, report it.
+  A later fix needs a fresh review only if it changes what you report, such as the render.
+- When the review returns findings, fix them and review the fix head before reporting it as ready.
+- Alternatively, report the unreviewed head SHA explicitly as unreviewed, with the remaining findings listed, and not as ready.
+
 (Directive from the user, 2026-10-02, after a manuscript revision went back without a new review: "did you get another adversarial peer review?
 do that every time".)
 
-- **Do:** dispatch a fresh reviewer on each new head before reporting it to the user, and link the posted report in that reply.
-- **Don't:** reuse the first revision's review for later revisions, or report a revision as ready on the strength of your own reading.
+- **Do:** review each head you report to the user once, by a reviewer other than its author, and link the posted report in that reply;
+  where a head cannot be reviewed, report it explicitly as unreviewed, not as ready.
+- **Don't:** reuse an earlier revision's review for a later head, report a revision as ready on the strength of your own reading, or re-review a head the pre-push review already covered.
 
 ## A reviewer handed nothing returns clean, so the brief must make an empty input an error
 

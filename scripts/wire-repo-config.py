@@ -19,7 +19,8 @@ writes what those surfaces read from the repository itself (ai-config#4206):
                          Code offers the plugin to anyone who trusts the repo.
   .Rbuildignore          in an R package (a DESCRIPTION at the root), anchored
                          entries for the top-level paths above, so
-                         `R CMD check` raises no "non-standard files" NOTE.
+                         `R CMD check` raises no NOTE about them
+                         (non-standard top-level files, hidden directories).
                          Existing patterns that already match a path are kept
                          and nothing is added for it.
 
@@ -136,17 +137,20 @@ WIRED_PATHS = ("AGENTS.md", "CLAUDE.md", ".claude")
 def rbuildignore_matches(patterns: list[str], path: str) -> bool:
     """True when an .Rbuildignore pattern excludes `path`.
 
-    R reads each line as a Perl regex matched case-insensitively against the
-    path relative to the package root; Python's `re` agrees on every pattern
-    an .Rbuildignore realistically carries. A pattern `re` cannot compile is
-    skipped rather than treated as a match, so the worst case is a redundant
-    entry, never a missing one.
+    R reads each non-empty line, untrimmed, as a Perl regex matched
+    case-insensitively against the path relative to the package root
+    (`tools:::inRbuildignore`). Python's `re` stands in for PCRE; anchors,
+    escapes and character classes, which is what .Rbuildignore files use,
+    behave the same in both. A pattern `re` cannot compile (a syntax error,
+    an oversized repeat, runaway nesting) is skipped rather
+    than treated as a match, so it can cost a redundant entry, never a
+    missing one.
     """
     for pattern in patterns:
         try:
             if re.search(pattern, path, re.IGNORECASE):
                 return True
-        except re.error:
+        except (re.error, OverflowError, RecursionError):
             continue
     return False
 
@@ -156,14 +160,25 @@ def rbuildignore_change(repo: Path, will_exist: set[str]) -> tuple[str, str | No
     if not (repo / "DESCRIPTION").is_file():
         return "ok    .Rbuildignore not needed (no DESCRIPTION)", None
     path = repo / ".Rbuildignore"
-    current = path.read_text(encoding="utf-8") if path.exists() else ""
-    patterns = [line.strip() for line in current.splitlines() if line.strip()]
+    try:
+        # newline="" keeps CRLF files as they are, so only new lines change.
+        current = ""
+        if path.exists():
+            with path.open(encoding="utf-8", newline="") as f:
+                current = f.read()
+    except UnicodeDecodeError as err:
+        raise SystemExit(f"error: {path} is not UTF-8: {err}")
+    # Like R: drop empty lines only; a space is part of the pattern.
+    # readLines splits on LF, CRLF and CR only, unlike str.splitlines().
+    patterns = [line for line in re.split(r"\r\n|\r|\n", current) if line]
     missing = [name for name in WIRED_PATHS
                if name in will_exist and not rbuildignore_matches(patterns, name)]
     if not missing:
         return "ok    .Rbuildignore already excludes the wired files", None
-    sep = "" if not current or current.endswith("\n") else "\n"
-    added = "".join(f"^{re.escape(name)}$\n" for name in missing)
+    eol = re.search(r"\r\n|\r|\n", current)
+    eol = eol.group() if eol else "\n"
+    sep = "" if not current or current.endswith(("\n", "\r")) else eol
+    added = "".join(f"^{re.escape(name)}${eol}" for name in missing)
     return f"write .Rbuildignore: exclude {', '.join(missing)}", current + sep + added
 
 
@@ -196,7 +211,8 @@ def wire(repo: Path, check: bool, enable_plugin: bool) -> bool:
         if text is not None:
             (repo / name).write_text(text, encoding="utf-8")
     if ignore is not None:
-        (repo / ".Rbuildignore").write_text(ignore, encoding="utf-8")
+        with (repo / ".Rbuildignore").open("w", encoding="utf-8", newline="") as f:
+            f.write(ignore)
     return already_wired
 
 

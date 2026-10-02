@@ -15,7 +15,7 @@ The agent triggers the automated reviews itself.
 
 ## The gate
 
-Mark a draft PR or MR ready first, since a draft is not ready for a person and can suppress the forge's review automation ([`put-prs-in-ready-mode`](put-prs-in-ready-mode.md)).
+When about to ask for a review, mark a draft PR or MR ready first, since a draft is not ready for a person and can suppress the forge's review automation ([`put-prs-in-ready-mode`](put-prs-in-ready-mode.md)).
 A deliberately draft-gated dependent PR is the exception: it stays in draft, so trigger its automated review explicitly (a comment or dispatch), and let the merge-order alert carry the ordering.
 
 Before any message that asks a person to review, check these on the current head:

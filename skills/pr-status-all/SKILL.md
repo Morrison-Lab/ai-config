@@ -11,10 +11,7 @@ allowed-tools:
 
 Produce a **one-row-per-PR status table** for all open PRs.
 This is the whole-queue version of [`pr-status`](../pr-status/SKILL.md): apply the same "read the **latest** review and parse it for findings" discipline to every open PR, then lay the results out as a table.
-It is **read-only** apart from starting a missing automated review --- it reports status, it does not push, merge, or run review loops (use [`ardia`](../ardia/SKILL.md) for that, or [`sync-pr-branch`](../sync-pr-branch/SKILL.md) to update a branch).
-The fan-out stays read-only;
-after the table is assembled, the orchestrator applies [`automated-review-before-human`](../../shared/workflow/automated-review-before-human.md) one PR at a time.
-No row reads `Ready for human review` without a clean automated verdict on its head, and an in-scope PR with no automated review and none in flight gets that review started, the one write this skill makes.
+It is **read-only** --- it reports status, it does not push, merge, or run review loops (use [`ardia`](../ardia/SKILL.md) for that, or [`sync-pr-branch`](../sync-pr-branch/SKILL.md) to update a branch).
 
 Because the per-PR signals are independent and read-only, gather them
 **concurrently** --- one subagent per PR --- then assemble the table. See
@@ -42,9 +39,8 @@ Do not describe it as merge-ready.
 ### 1. Enumerate the open PRs (orchestrator, one cheap call)
 
 ```bash
-gh pr list --state open --json number,title,headRefName,isDraft,author,assignees \
-  --jq '.[] | "\(.number)\t\(.headRefName)\t\(.isDraft)\t\(.author.login)\t\([.assignees[].login] | join(","))\t\(.title)"'   # LIST_PRS
-gh api user -q .login   # the current user, for the scope test in step 4
+gh pr list --state open --json number,title,headRefName,isDraft,author \
+  --jq '.[] | "\(.number)\t\(.headRefName)\t\(.isDraft)\t\(.author.login)\t\(.title)"'   # LIST_PRS
 ```
 
 This is fast and sequential --- a single call to get the work units.
@@ -59,7 +55,6 @@ and there is nothing to collide on.
 **Safety Cap:** If Step 1 returns more than 10 open PRs, do not fan out per-PR subagents.
 Unbounded concurrent subagents would exhaust the session's token quota.
 Instead, build a **condensed** table straight from Step 1's own fields (title, `headRefName`, `isDraft`, author) plus one cheap orchestrator-level `gh pr checks` pass per PR for CI state --- skip the seven-signal subagent depth (review currency, external-reviewer check, thread counts, behind-main) entirely.
-Then run step 4's gate over every row, reading each head's `@claude` verdict with one comments query per PR.
 Label the table's heading "Condensed --- queue too large for full per-PR review (N open PRs)" so it reads as lower-fidelity rather than as the standard dashboard, and note that a full audit is available on a smaller subset or via `ardia`.
 
 Give each subagent its PR number, `headRefName`, and `isDraft`, and have it gather the **seven independent signals** below and return one structured row.
@@ -99,9 +94,9 @@ Fill in `<N>`, `<headRefName>`, `<isDraft>`, `<owner>`, `<repo>` for each PR (re
 >    The comment above is the `@claude` bot only;
 >    a formal review (Copilot's or a human's) is a separate object it won't show.
 >    This step **only inspects existing reviews (Copilot's or a human's)** -- it never POSTs a review request.
->    Requesting a review is a mutation (triggers a review job, consumes quota, can collide with a concurrent `ardi` loop), which breaks the justification for fanning out subagents concurrently (*read-only, side-effect-free*);
->    the orchestrator starts a missing automated review afterwards, in step 4.
->    If no genuine verdict already exists at the current head, report that fact -- don't try to produce one; that's `ardi`'s job.
+>    Requesting a review is a mutation (triggers a review job, consumes quota, can collide with a concurrent `ardi` loop), which breaks this skill's whole justification for fanning out subagents concurrently (*read-only, side-effect-free*).
+>    If no genuine verdict already exists at the current head, report that fact -- don't try to produce one;
+>    that's `ardi`'s job.
 >    ```bash
 >    set -o pipefail
 >    head="$(gh pr view "<N>" --json headRefOid -q .headRefOid)"
@@ -193,19 +188,6 @@ Fill in `<N>`, `<headRefName>`, `<isDraft>`, `<owner>`, `<repo>` for each PR (re
 
 Collect the rows the subagents return and **pair each with the `title`, `headRefName`, and `isDraft`** the orchestrator already has from step 1 (the subagent doesn't re-fetch these), then render the table + per-PR findings list (see *Output*) --- marking draft PRs clearly (e.g. `[#<N>](url) (Draft)`).
 
-### 4. Apply the automated review gate (orchestrator, one PR at a time)
-
-This is the skill's one write, and it runs after the read-only fan-out.
-For each row whose AI Review is not `✅ Clean` at head and whose External Review has no clean Copilot verdict at head:
-
-1. A draft stays `Draft`; trigger nothing.
-2. A PR out of scope (the current user is neither its author nor an assignee, and the request did not name it, per [`reviewing-prs`](../../memories/reviewing-prs.md)) gets Next Step `No automated review at head`.
-3. Otherwise check for a review run in flight on the head, e.g. `gh run list --workflow claude-review.yml --commit <headRefOid> --json status -q '.[] | select(.status != "completed")'`.
-   A non-empty result means `In-flight AI review`.
-4. With none in flight, start the review by the trigger in step 1 of [`automated-review-before-human`](../../shared/workflow/automated-review-before-human.md#the-gate), and set Next Step to `Automated review started (<link>)`.
-
-The condensed table (more than 10 PRs) and the series fallback run this step too, and the condensed table gains an `Automated review` column for it.
-
 ### Graceful degradation to series
 
 If subagent fan-out is unavailable (no `Agent` tool in the session), fall back to gathering the seven signals **in series** -- loop the exact same per-PR gather (items 1-7 above, including the currency check, thread resolution, behind-main check, and the human `CHANGES_REQUESTED` check) over each PR from step 1.
@@ -248,8 +230,9 @@ A Markdown table, one row per open PR, with these columns:
   - If AI review or External review has open findings: `Drive to clean (ARDI)`.
   - If AI review is running: `In-flight AI review`.
   - If CI is pending: `Wait for CI (<pending-check>)`.
-  - If neither AI review nor External review has a verified clean verdict at head: `Confirm review (no verified verdict at head)`.
-  - If no automated reviewer (the `@claude` bot or Copilot) has a verified clean verdict at head, even with a human's clean review: `Start automated review` for an in-scope PR, else `No automated review at head`.
+  - If no automated reviewer (the `@claude` bot or Copilot) has a verified clean verdict at head, whatever a human's review says: `Needs automated review (no clean automated verdict at head)`.
+    Never label such a row ready for, or waiting on, human review;
+    [`automated-review-before-human`](../../shared/workflow/automated-review-before-human.md) says when the session starts that review ([#4253](https://github.com/Morrison-Lab/ai-config/issues/4253) tracks doing it inside this skill).
   - If fully clean (no human blocks, at least one verified clean **automated** review at head with 0 open findings across all reviews, CI green, 0 open threads, up to date with main):
     - If `Author` is `the repository owner` (self-authored): `Ready for self-merge`.
     - If `Author` is external and human review is requested (`the repository owner`): `Ready for human review`.
@@ -268,7 +251,7 @@ Never hedge with "ready except for one nit."
 
 ## Why fan-out is safe here (and the write-loops stay series)
 
-The fan-out parallelizes because its units are **independent and side-effect-free** --- each PR's signals are read-only and don't depend on any other PR.
+This loop parallelizes because its units are **independent and side-effect-free** --- each PR's signals are read-only and don't depend on any other PR.
 The whole-queue *write* loops are different, and deliberately stay (mostly) series:
 
 - **`ardia` / `iterate-all`** --- share one working directory, compete for CI
@@ -280,7 +263,7 @@ The whole-queue *write* loops are different, and deliberately stay (mostly) seri
   independent* subset (no stacking dependency, no file overlap), each subagent
   in its own worktree, and sends everything else back through `gii`.
 
-Rule of thumb: fan out a whole-queue loop only when its units are provably independent and don't mutate shared state --- like this skill's fan-out, whose one write (step 4) runs afterwards in series.
+Rule of thumb: fan out a whole-queue loop only when its units are provably independent and don't mutate shared state --- like this one.
 
 ## Notes
 
@@ -293,9 +276,9 @@ Rule of thumb: fan out a whole-queue loop only when its units are provably indep
 
 ## Relationship to other skills
 
-- **`pr-status`** --- the single-PR version; this applies its latest-review-only /
-  `null`-not-clean discipline across the whole open-PR queue. (pr-status :
-  pr-status-all :: `ardi` : `ardia`.)
+- **`pr-status`** --- the single-PR version;
+  this applies its latest-review-only / `null`-not-clean discipline across the whole open-PR queue.
+  (pr-status : pr-status-all :: `ardi` : `ardia`.)
 - **`ardia` / `iterate-all`** --- the *write* counterpart: actually drive every
   open PR to clean. This skill only reports; see *Why fan-out is safe here* for
   why those loops stay series.

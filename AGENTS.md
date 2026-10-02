@@ -24,6 +24,8 @@ Those manuals must defer to this file for universal policy.
 Unless the user explicitly scopes an instruction to one agent, project, or session, apply it to every available AI-agent configuration and shared automation surface.
 Do not treat the currently speaking agent as an implicit scope restriction.
 
+The same holds for projects: see [`global-by-default`](shared/workflow/global-by-default.md).
+
 ## Gate external repository communication on membership
 
 Before sending outward communication to a repository (PRs/MRs, issues, comments, reviews, discussions, notifications), positively verify that the user is a member of that specific repository.
@@ -97,7 +99,7 @@ See [`prefer-systemic-solutions-over-one-off-fixes`](shared/principles/prefer-sy
 - **Don't:** settle for a one-off patch that leaves the defect class open to recur elsewhere.
 ## Research existing solutions before implementing (DRW)
 
-Before writing custom code or hand-rolling helpers, always perform a research step to verify DRW (don't reinvent the wheel) and check for existing libraries, functions, or package solutions across our repos, standard libraries, and trustworthy upstream ecosystems (base R, tidyverse / r-lib, PyPI, npm).
+Before writing custom code or helpers, check for an existing solution (DRW, don't reinvent the wheel) in our repos, standard libraries, and trusted upstream ecosystems (base R, tidyverse / r-lib, PyPI, npm).
 Record what was searched and what was found.
 See [`dont-reinvent-wheel`](shared/principles/dont-reinvent-wheel.md) and [`prefer-upstream`](skills/prefer-upstream/SKILL.md).
 
@@ -172,7 +174,6 @@ See [`AGENTS.cases.md`](AGENTS.cases.md).
 - **Do:** state your specific recommendation alongside every question or choice presented to the user.
 - **Do:** write every pending-decision line as "decide X --- I recommend Y, because Z".
 - **Don't:** ask questions or present choices without declaring your recommended path.
-- **Don't:** use "Let me know if..." to offer already-authorized work instead of performing it.
 ## Run UMS when work is scrutinized
 
 When you read a review of your work, receive critical feedback on it, or a questioned claim ("are you sure about that?") turns out to be wrong, run `ums` in that turn.

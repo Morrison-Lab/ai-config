@@ -109,8 +109,12 @@ Do not reduce an instruction to the smallest literal action when its context mak
 Apply grants and rules at the breadth stated without adding unstated conditions, exceptions, or restrictions.
 See [`AGENTS.cases.md`](AGENTS.cases.md) and [`challenge-the-assignment.cases.md`](shared/workflow/challenge-the-assignment.cases.md).
 
+Read every word, infer what a request plainly implies, and treat a correction as a general principle whenever plausible: [`read-instructions-fully`](shared/workflow/read-instructions-fully.md).
+
 - **Do:** apply a grant or rule at the breadth stated, naming limits only when stated or forced by a harder rule.
 - **Don't:** add unstated conditions to permissions, or narrow scope unnecessarily.
+- **Don't:** confine a correction to its case, drop a qualifier, or wait to be told what a request implies.
+
 ## "Or" always means "and/or", not xor, unless xor is explicitly specified
 
 In instructions, prompts, specifications, issue descriptions, and checklists, treat "or" as inclusive ("and/or") unless exclusive choice is explicitly stated (e.g., "either A or B, but not both", "mutually exclusive", or "xor").

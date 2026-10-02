@@ -125,6 +125,14 @@ jobs:
         # denies every tool call its matcher names, since python3 exits 2 and
         # exit 2 is the PreToolUse deny signal.
         run: python3 scripts/test_install_hooks.py
+      - name: Run wire-user-config tests
+        # ai-config#4206: bootstrap.sh wires Claude Code, Codex, Gemini CLI and
+        # opencode user config; these pin that it never overrides a user choice.
+        run: python3 scripts/test_wire_user_config.py
+      - name: Run wire-repo-config tests
+        # ai-config#4206: the per-repo rollout must merge into existing
+        # settings and AGENTS.md rather than replace them.
+        run: python3 scripts/test_wire_repo_config.py
       - name: Run orchestrator tests
         # ai-config#2627: this suite existed and ran nowhere, so the
         # orchestrator's own behaviour was unpinned -- which is how a literal

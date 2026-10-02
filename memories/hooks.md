@@ -1058,4 +1058,15 @@ The coverage check (`has no test` and two `KNOWN_UNTESTED` lines) runs after eve
 - **Don't:** read the `RUN:` line beneath a `FAIL` as the suite that failed.
 - **Don't:** attribute a subject-mismatch or coverage `FAIL` to whichever suite ran nearest it.
 
+## Testing a hook that fires on regex phrase families
+
+A hook that triggers on several regex phrase families can pass a suite while one family is dead, because another family already matches every fixture.
+
+- **Do:** give every pattern at least one FIRES case that no other pattern matches, which proves each pattern is load-bearing.
+- **Do:** add benign near-miss NO-FIRE cases for each family (the same words in a different sense).
+- **Do:** strip code spans and fences, quotes, and system or pasted blocks before matching, and test one FIRES phrase inside each stripped region as a NO-FIRE.
+- **Don't:** count a suite green because every FIRES fixture matched;
+  a pattern shadowed by another is not tested.
+- **Don't:** match against the raw message, where a quoted or pasted phrase fires the hook.
+
 

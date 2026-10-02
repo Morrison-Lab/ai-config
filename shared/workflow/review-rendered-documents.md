@@ -40,9 +40,11 @@ The user's reaction was that treating those MRs as ready was insane, and the gat
 5. **Check each page** for:
    - a table running off the page or split badly;
    - a figure that is missing, cropped, blurry, or out of order;
+   - a figure whose plotted content is small inside large blank margins, or whose smallest text is below about 8 pt at the printed size (text far smaller than the caption is the visible sign);
    - a missing number or caption on any table or figure;
    - broken cross-references (`??`, `?@fig-`, `Table ?`), raw Markdown, code output, warnings, or `NA` cells;
    - any breach of the float and caption layout rules in the `manuscript-float-layout` fragment ([ai-config#4203](https://github.com/Morrison-Lab/ai-config/pull/4203));
+   - for each equation on the page, raw LaTeX in its source where a semantic macro from the shared macros library applies, per [`use-math-macros`](../../skills/use-math-macros/SKILL.md);
    - anything else the document's own conventions require (for a manuscript, the [`manuscript`](../../skills/manuscript/SKILL.md) skill's checklist).
 6. **Record the evidence** in a PR/MR comment: the commit the render came from, the converter used, the page count, that every page was viewed, and each finding with its page number.
    Fix the findings and repeat from step 1 on the new head.

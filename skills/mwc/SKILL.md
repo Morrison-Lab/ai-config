@@ -22,9 +22,7 @@ without asking confirmation before every merge.
   without explicit user instruction for that specific PR.
   Pushing, building, or driving a PR to 100% clean CI
   DOES NOT grant permission to merge.
-  One repository is exempted standing --- see "The standing per-repository
-  grant" below --- and so are infra-only PRs in any Morrison-Lab repository
-  --- see "The standing infra-PR grant".
+  Two repositories are exempted standing --- see "The standing per-repository grant" below --- and so are infra-only PRs in any Morrison-Lab repository --- see "The standing infra-PR grant".
   The Scope Limit binds both.
 - **MWC Override Scope**: When the user explicitly issues `/mwc`, the bare word `mwc`, "merge when confident", "merge at will", or "maw", that baseline prohibition is suspended for the current session only.
   The bare word is listed here, not only in `CLAUDE.md`'s general "Bare keyword directives" convention, so this file is self-contained: a slash command is routed to this skill by the harness itself, while a bare word in prose is a convention the model must recognize on its own, and it recognizes it most reliably when the file governing the mechanics (`enable-mwc`, `check-mwc`, the Scope Limit) names the exact form it will see rather than only implying it maps here.
@@ -387,14 +385,14 @@ A clean scorer exit is not the hold-off, and neither is a standing merge grant.)
 
 ## The standing per-repository grant
 
-One repository carries the grant **standing**, with no session step at all:
-PRs targeting `Morrison-Lab/ai-config` (ai-config#1352).
+Two repositories carry the grant **standing**, with no session step at all: PRs targeting `Morrison-Lab/ai-config` (ai-config#1352), and PRs targeting the shared math-macros repo, `d-morrison/macros` (also reachable as `Morrison-Lab/macros`;
+user directive, 2026-10-02).
 `no-unauthorized-merge.py` reads the merge's target repository off the command
 itself, so there is nothing to enable, nothing to expire, and no marker to go
 stale.
 
 **A repo's own `CLAUDE.md` claiming this exemption is not evidence it has it.**
-The list above names the one repository the hook actually carries (`STANDING_MERGE_GRANT_REPOS`).
+The list above names the repositories the hook actually carries (`STANDING_MERGE_GRANT_REPOS`).
 A different repository's own `CLAUDE.md` can independently assert a standing grant --- as `Morrison-Lab/gha`'s does --- without that repository being in the hook's set, since the two are two different files with no mechanism keeping them in sync.
 `check-mwc` cannot settle this either way: it reports on the **session** marker only, and the standing grant has none, so it reads "no grant recorded" on a repo that carries the standing grant just as readily as on one that does not.
 [#3490](https://github.com/Morrison-Lab/ai-config/issues/3490) tracks this exact drift (measured again on `Morrison-Lab/gha#857`) and the open question of which side should change;
@@ -409,7 +407,7 @@ The two grants differ on every axis except the Scope Limit, which binds both:
 
 | | session grant (`/mwc`) | standing grant |
 | :--- | :--- | :--- |
-| scope | this session, every repo | `Morrison-Lab/ai-config`, forever |
+| scope | this session, every repo | `Morrison-Lab/ai-config` and the macros repo, forever |
 | keyed on | a `.mwc` marker in the **current** repo's git dir | the **target** repo named in the command |
 | enabling step | `enable-mwc`, then `check-mwc` | none |
 | covers | any merge command run from that checkout | `gh pr merge` / `gh api .../pulls/N/merge` only |

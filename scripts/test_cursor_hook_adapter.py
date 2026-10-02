@@ -425,6 +425,7 @@ with tempfile.TemporaryDirectory() as raw:
     write_hook(hooks, "block-stop-env.py", stop_env_py)
     write_hook(hooks, "warn-stop.py", stop_warn_py)
     write_hook(hooks, "inject-time.sh", ups_sh)
+    write_hook(hooks, "session-rules.sh", "#!/bin/sh\necho 'core rules: read AGENTS.md'\n")
     write_hook(hooks, "count-task.py", count_py)
     write_hook(hooks, "tx-guard.py", tx_guard_py)
     manifest = {
@@ -462,6 +463,9 @@ with tempfile.TemporaryDirectory() as raw:
             ],
             "UserPromptSubmit": [
                 {"hooks": [{"script": "inject-time.sh", "timeout": 5}]},
+            ],
+            "SessionStart": [
+                {"hooks": [{"script": "session-rules.sh", "timeout": 5}]},
             ],
         }
     }
@@ -695,6 +699,12 @@ with tempfile.TemporaryDirectory() as raw:
     check(
         "sessionStart injects UPS additional_context",
         "10:00 PDT" in str(session.get("additional_context")),
+    )
+    session_ctx = str(session.get("additional_context") or "")
+    check(
+        "sessionStart runs Claude SessionStart scripts ahead of UPS (#4206)",
+        "core rules: read AGENTS.md" in session_ctx
+        and session_ctx.index("core rules") < session_ctx.index("10:00 PDT"),
     )
     after_typed_session = run_adapter(
         "postToolUse",

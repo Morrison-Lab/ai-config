@@ -102,6 +102,7 @@ def stash_dir() -> Path:
 # Values must be keys of HANDLERS; main() dispatches through HANDLERS.
 EVENT_MAPPING: dict[str, list[str]] = {
     "PreToolUse": ["preToolUse"],
+    "SessionStart": ["sessionStart"],
     "Stop": ["stop"],
     "UserPromptSubmit": ["sessionStart", "postToolUse"],
 }
@@ -835,19 +836,22 @@ def handle_stop(cursor: dict[str, Any], entries: list[dict[str, Any]]) -> dict[s
     return {}
 
 
-def handle_user_prompt_submit(
+def run_context_scripts(
     cursor: dict[str, Any],
     entries: list[dict[str, Any]],
     once_per_generation: bool,
     event: str = "postToolUse",
+    claude_event: str = "UserPromptSubmit",
+    deadline: float | None = None,
 ) -> str:
     if once_per_generation and not claim_ups_slot(cursor, event):
         return ""
-    payload = claude_payload_for_transcript(cursor, "UserPromptSubmit")
+    payload = claude_payload_for_transcript(cursor, claude_event)
     chunks: list[str] = []
-    deadline = event_deadline(event)
+    if deadline is None:
+        deadline = event_deadline(event)
     for entry in entries:
-        if entry["event"] != "UserPromptSubmit":
+        if entry["event"] != claude_event:
             continue
         timeout = remaining_timeout(deadline, float(entry.get("timeout") or 10))
         if timeout is None:
@@ -865,9 +869,22 @@ def handle_user_prompt_submit(
 
 
 def handle_session_start(cursor: dict[str, Any], entries: list[dict[str, Any]]) -> dict[str, Any]:
-    extra = handle_user_prompt_submit(
-        cursor, entries, once_per_generation=True, event="sessionStart",
-    )
+    # Claude SessionStart scripts (inject-core-rules.py, ai-config#4206) run
+    # once at session open, ungated by the UserPromptSubmit slot, and go first.
+    # Both passes share one deadline so together they stay inside Cursor's
+    # sessionStart timeout.
+    deadline = event_deadline("sessionStart")
+    parts = [
+        run_context_scripts(
+            cursor, entries, once_per_generation=False, event="sessionStart",
+            claude_event="SessionStart", deadline=deadline,
+        ),
+        run_context_scripts(
+            cursor, entries, once_per_generation=True, event="sessionStart",
+            deadline=deadline,
+        ),
+    ]
+    extra = "\n".join(part for part in parts if part)
     if extra:
         return {"additional_context": extra}
     return {}
@@ -878,7 +895,7 @@ def handle_post_tool(cursor: dict[str, Any], entries: list[dict[str, Any]]) -> d
     stashed = take_stashed_context(str(cursor.get("tool_use_id") or ""))
     if stashed:
         parts.append(stashed)
-    extra = handle_user_prompt_submit(
+    extra = run_context_scripts(
         cursor, entries, once_per_generation=True, event="postToolUse",
     )
     if extra:

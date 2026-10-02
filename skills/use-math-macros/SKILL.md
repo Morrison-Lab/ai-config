@@ -1,6 +1,6 @@
 ---
 name: use-math-macros
-description: "Use shared math macros submodule."
+description: "Use shared semantic math macros in all lab math."
 user-invocable: true
 allowed-tools:
   - Bash
@@ -22,9 +22,9 @@ place.
 
 - "macroize", "macroize the math", "use macros", "use the macros submodule",
   "convert math to macros", "polish the math with macros".
-- Any time you write or review substantial math in a lab `.qmd` — apply the
-  macros rather than one-off LaTeX (standing rule; see
-  `memories/preferences.md`).
+- **Every time you write, edit, or review LaTeX math anywhere**: any project or repo, and any format (Quarto, R Markdown, LaTeX, roxygen and `.Rd`, slides, Markdown docs, notebooks), a manuscript or a single equation alike --- this is mandatory, not a polish pass.
+  Use the semantic macro for each concept the library names (`\Ep` for a bare expectation operator, `\E{x}` for one subscripted by `x`, `\Var`, `\Cov`, `\P`, …) rather than writing its raw LaTeX, and when no macro names the concept, add one (step 6) rather than writing raw LaTeX (standing rule;
+  see `memories/preferences.md`).
 
 ## Procedure
 
@@ -194,9 +194,20 @@ git checkout -b add-<concept>-macro
 # edit macros.qmd, then push + open a PR to d-morrison/macros
 ```
 
+Name the new macro for the concept it denotes, not for its typography, so it stays semantic.
+The macros repo carries a standing `mwc` grant, so merge the macro PR yourself once it is fully clean (see `STANDING_MERGE_GRANT_REPOS` in `hooks/no-unauthorized-merge.py`).
 Bump the submodule pointer in the manuscript repo once that macro PR merges.
 
 ### 7. Verify the render and spellcheck, then ship
+
+Run the raw-notation lint over what you changed, pointing it at the library so its operator macros extend the rules:
+
+```bash
+python3 <ai-config>/scripts/check-raw-math.py --macros inst/analyses/macros/macros.qmd <changed files or dirs>
+```
+
+It exits 1 and prints `file:line: raw -> use macro` for each hit.
+`hooks/warn-raw-math-notation.py` runs the lint's built-in patterns at write time and warns, never blocks.
 
 ```bash
 quarto render <manuscript>.qmd            # must render with the macros include

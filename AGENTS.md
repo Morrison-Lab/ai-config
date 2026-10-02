@@ -50,6 +50,7 @@ When authoring analysis figures, prefer `ggplot2` over base graphics wherever th
 For each plot, consider whether an axis should be extended to show important reference values such as zero.
 When writing display equations, avoid placing multiple equations on one display line unless a special reason makes that layout clearer.
 Label every display equation so it receives an equation number and a stable URL.
+Write all LaTeX math, in any repo or format, with the shared semantic macros: [`use-math-macros`](skills/use-math-macros/SKILL.md).
 
 ## Check external repository guidelines and PR template before filing
 

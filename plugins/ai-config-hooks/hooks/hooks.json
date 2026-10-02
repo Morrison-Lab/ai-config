@@ -779,6 +779,13 @@
             "timeout": 10,
             "script": "flag-partial-put-to-resource-root.py",
             "why": "A partial PUT to a REST resource ROOT can null fields the body never named, returning 200 either way. Measured 2026-09-24: a Canvas course PUT setting one boolean also cleared start_at and end_at, and four restore attempts returned 200 and changed nothing. Warns, never blocks."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-human-review-before-clean-verdict.py\"'",
+            "timeout": 10,
+            "script": "warn-human-review-before-clean-verdict.py",
+            "why": "ai-config#4247: AGENTS.md says to get a clean automated review before asking a person to review, and the rule was skipped (ai-config#4241). Warns, never blocks, when a request for a human reviewer (`gh pr edit --add-reviewer`, a `requested_reviewers` POST, or mcp__github__update_pull_request with `reviewers`) is made and the transcript since the last `git push` holds no clean verdict. Logins containing bot, copilot or claude are not people. Reads only the transcript; an explicit instruction from the user to request review now is a valid reason to ignore the note."
           }
         ]
       },
@@ -970,6 +977,13 @@
             "timeout": 10,
             "script": "flag-self-authored-verdict-echo.py",
             "why": "The MCP half of the Bash entry above, following flag-unmeasured-timestamp.py's precedent. hooks.json matches by tool name, so the Bash entry never sees a comment posted through mcp__github__add_issue_comment / add_reply_to_pull_request_comment / update_issue_comment -- which is how the mln#49 comments went out, from a remote session with no `gh` on PATH. Same script, same warn-only behaviour, reading tool_input.body directly. The edit tool is covered deliberately: the incident's first attempted fix was an edit to the offending comment, and it did not clear the reading. Those three are exactly what is bound. The script inherits MCP_POST_TOOLS from require-agent-disclosure.py, adds update_issue_comment, and subtracts THREE review surfaces by name: pull_request_review_write, discussion_comment_write and add_comment_to_pending_review. An adversarial review reproduced a formal REQUEST_CHANGES review, carrying ARD labels and its own not-clean verdict, warning through the first of those -- the self-review population fire condition 5 exists to leave alone. The third is subtracted on the same criterion rather than bound: it is step 2 of the three-call sequence that files a formal review (create the pending review, add each comment, submit), so a comment posted through it is part of a review being composed. Counting it as bound is the claim a round-9 review falsified against the module."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-human-review-before-clean-verdict.py\"'",
+            "timeout": 10,
+            "script": "warn-human-review-before-clean-verdict.py",
+            "why": "The MCP half of the Bash entry: a remote session has no `gh`, so mcp__github__update_pull_request with `reviewers` is how it requests a person. Same script, same warn-only behaviour."
           }
         ]
       },

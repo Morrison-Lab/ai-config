@@ -33,13 +33,12 @@ In Quarto, `{{< pagebreak >}}` emits a page break in PDF and DOCX output (and in
 ## A caption stays on the same page as its float
 
 Never leave a caption on a different page from its figure or table,
-and do not let a caption split across a page break unless it cannot be avoided
-(a caption longer than the space left on a page with its float).
-Fix this with page breaks **between** floats,
-so each float starts where it and its caption fit,
+and do not let a caption split across a page break.
+Fix both with page breaks **between** floats,
+so each float starts on a page where it and its caption fit,
 rather than by shrinking the float or cutting the caption.
-A float too tall to share a page with its caption is the one case where a split is unavoidable;
-there, keep the float whole and let the caption continue.
+The one unavoidable case is a float plus caption taller than a full page;
+there, keep the float whole and let the caption continue onto the next page.
 
 ## Every float gets a numbered caption, rendered as a caption
 
@@ -54,9 +53,9 @@ is not attached to the float, and is not numbered by the cross-reference system 
 so it drifts out of sync with the real numbering as floats are added or moved.
 In Quarto, the caption is the last paragraph of a `#fig-`/`#tbl-` div
 (see [`quarto-figure-captions`](quarto-figure-captions.md));
-a supplement that needs its own label or numbering configures it through the tool's cross-reference settings
-(in Quarto, the `crossref` options such as `fig-prefix` and `tbl-prefix`)
-rather than typing the number into a heading.
+the `crossref` options `fig-prefix` and `tbl-prefix` change only the label word (for example, to "Supplementary Figure"),
+and `S`-prefixed numbering needs a custom cross-reference type or a filter.
+Either way, the number comes from the tool, never typed into a heading.
 
 ## Check these on the render, not the source
 

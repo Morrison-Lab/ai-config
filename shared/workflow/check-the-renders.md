@@ -13,12 +13,14 @@ This is [`verify-the-right-artifact`](verify-the-right-artifact.md) applied to r
 - A crossref that resolved to nothing (`?@fig-...`).
 - A list that lost the blank line above it and rendered as a paragraph beginning with a literal `-`.
 - A KaTeX error swallowed into a `katex-error` span.
-- A layout defect in a paged render (PDF or DOCX): a table with no caption, a caption stranded on the page after its float, a caption rendered as a section heading.
-  Text-and-numbers comparison of the render misses all three;
-  see [`manuscript-float-layout`](../writing/manuscript-float-layout.md).
 - **The source being fixed while the deployed page is not**, because a stale freeze cache served the previous render.
 
-That last one is the one to internalize, because every other check in this corpus passes on it.
+A paged render (PDF or DOCX) adds a class of its own, which neither `check-rendered-page.py` nor `check-rendered-references.py` checks:
+layout defects such as a table with no caption, a caption stranded on the page after its float, or a caption rendered as a section heading.
+A text-and-numbers comparison of the render misses all three;
+see [`manuscript-float-layout`](../writing/manuscript-float-layout.md).
+
+The last item in the list above is the one to internalize, because every other check in this corpus passes on it.
 On `d-morrison/rme` #1134 and #1138 (2026-09-07), and 3rd occurrence on `Morrison-Lab/lds` #276 (2026-09-30):
 the source was verifiably correct and the deployed preview still carried the pre-fix content:
 `_subfiles/` were edited without that repo's `clear freezer` label,

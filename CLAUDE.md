@@ -1057,7 +1057,7 @@ and a read-through inspects sentences, not the sequence.
 
 ## Manuscript layout: floats at the end, captions with their floats
 
-In a journal-submission manuscript, put main-text figures and tables after the main text and references and before the supplement, insert a page break before the supplementary-material header, keep each caption on its float's page (page breaks between floats, not split captions), and give every float a numbered caption rendered as a caption, never as a heading.
+In a journal-submission manuscript, unless the journal's instructions say otherwise, put main-text figures and tables after the main text and references and before the supplement, insert a page break before the supplementary-material header, keep each caption on its float's page (page breaks between floats, not split captions), and give every float a numbered caption rendered as a caption, never as a heading.
 Check these on the rendered layout, not only its text and numbers.
 
 [`shared/writing/manuscript-float-layout.md`](shared/writing/manuscript-float-layout.md)

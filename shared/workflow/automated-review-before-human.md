@@ -1,7 +1,10 @@
 Never ask a person to review work until its automated review is clean or deadlocked.
 That holds in every repository, project and forge (GitHub, GitLab, or any other): a GitHub PR, a GitLab MR, a rendered document sent for a read, or any other work product awaiting a person's review.
 A question to the user is not a review request.
-A status report or a PR/MR check is covered, though: list an item as waiting on human review only when its latest commit has a clean automated review, and when that review has not run, start the review job, even under a read-only brief (starting it is the only write this licenses: no push, merge or edit) ([`status-requests-act`](status-requests-act.md)).
+A status report or a PR/MR check is covered too: list an item as waiting on human review only when its latest commit has a clean automated review.
+When that review has not run, the item is in scope per [`reviewing-prs`](../../memories/reviewing-prs.md), and no review run is in flight on its head, start the review job, even under a read-only brief ([`status-requests-act`](status-requests-act.md)).
+Starting it is the only write a status pass licenses.
+Report a draft as a draft, and report an out-of-scope item as having no clean automated review, rather than un-drafting or triggering anything.
 The agent triggers the automated reviews itself;
 "ready for your review" is a claim that this already happened.
 

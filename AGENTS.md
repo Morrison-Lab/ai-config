@@ -172,7 +172,6 @@ See [`AGENTS.cases.md`](AGENTS.cases.md).
 - **Do:** state your specific recommendation alongside every question or choice presented to the user.
 - **Do:** write every pending-decision line as "decide X --- I recommend Y, because Z".
 - **Don't:** ask questions or present choices without declaring your recommended path.
-- **Don't:** use "Let me know if..." to offer already-authorized work instead of performing it.
 ## Run UMS when work is scrutinized
 
 When you read a review of your work, receive critical feedback on it, or a questioned claim ("are you sure about that?") turns out to be wrong, run `ums` in that turn.

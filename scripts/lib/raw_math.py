@@ -41,7 +41,7 @@ BUILTIN_RULES: dict[str, str] = {
 # matrix, a complexity class, or prose ("E-value"), so single-letter names
 # are matched only in the wrappers that spell an operator.
 _LETTER_WRAPPERS = r"(?:operatorname\*?|mathrm|mathbb)"
-_NAME_WRAPPERS = r"(?:operatorname\*?|mathrm|text|textrm|textup)"
+_NAME_WRAPPERS = r"(?:operatorname\*?|mathrm|mathit|text|textrm|textup|textit)"
 
 _DEFINITION = re.compile(
     r"\\(?:def|newcommand|renewcommand|providecommand|DeclareMathOperator)\*?\b")

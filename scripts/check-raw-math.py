@@ -23,6 +23,7 @@ usage or read error. The rule is in `skills/use-math-macros/SKILL.md`
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -33,16 +34,19 @@ from raw_math import (  # noqa: E402
 SKIP_DIRS = {".git", "_site", "_freeze", ".quarto", "node_modules", "renv"}
 
 
-def _skipped(path: Path, root: Path) -> bool:
-    return bool(SKIP_DIRS.intersection(path.relative_to(root).parts))
+def _walk(root: Path):
+    """Yield files under root, never descending into SKIP_DIRS."""
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = sorted(d for d in dirnames if d not in SKIP_DIRS)
+        for name in sorted(filenames):
+            yield Path(dirpath) / name
 
 
 def iter_files(paths):
     for p in paths:
         if p.is_dir():
-            for f in sorted(p.rglob("*")):
-                if (f.is_file() and f.suffix.lower() in MATH_SUFFIXES
-                        and not _skipped(f, p)):
+            for f in _walk(p):
+                if f.suffix.lower() in MATH_SUFFIXES:
                     yield f
         elif p.is_file():
             yield p
@@ -55,7 +59,8 @@ class AmbiguousMacros(Exception):
 
 
 def default_macros(root: Path) -> Path | None:
-    found = [f for f in root.rglob("macros/macros.qmd") if not _skipped(f, root)]
+    found = [f for f in _walk(root)
+             if f.name == "macros.qmd" and f.parent.name == "macros"]
     distinct = sorted({f.resolve() for f in found})
     if len(distinct) > 1:
         raise AmbiguousMacros(", ".join(str(f) for f in distinct))
@@ -80,7 +85,7 @@ def main(argv=None) -> int:
         print(f"check-raw-math: several macros libraries found ({exc}); "
               "pass --macros", file=sys.stderr)
         return 2
-    except OSError as exc:
+    except (OSError, UnicodeDecodeError) as exc:
         print(f"check-raw-math: {exc}", file=sys.stderr)
         return 2
 

@@ -42,6 +42,7 @@ WARN = [
     ("Write", {"file_path": "a.qmd", "content": "$\\mathbb{E}\\left[Y\\right]$"}, "\\Ep"),
     ("Write", {"file_path": "a.tex", "content": "\\def\\Foo{1} $\\mathbb{E}[X]$"}, "\\Ep"),
     ("NotebookEdit", {"notebook_path": "n.ipynb", "new_source": "$\\operatorname{logit}(p)$"}, "\\logit"),
+    ("Write", {"file_path": "a.qmd", "content": "$\\mathit{Var}(X)$"}, "\\Var"),
 ]
 for tool, ti, macro in WARN:
     out = hook(tool, ti)
@@ -98,6 +99,20 @@ with tempfile.TemporaryDirectory() as d:
     r = subprocess.run([sys.executable, LINT, clean], capture_output=True, text=True, cwd=d)
     check(r.returncode == 2 and "--macros" in r.stderr,
           "lint stops when several macros libraries are found")
+    nm = os.path.join(d, "node_modules", "pkg")
+    os.makedirs(nm)
+    with open(os.path.join(nm, "vendored.qmd"), "w") as f:
+        f.write("$\\mathbb{E}[Y]$\n")
+    r = subprocess.run([sys.executable, LINT, "--macros", macros, d],
+                       capture_output=True, text=True)
+    check("vendored.qmd" not in r.stdout, "lint skips node_modules")
+    bad = os.path.join(d, "bad-macros.qmd")
+    with open(bad, "wb") as f:
+        f.write(b"\xff\xfe\\def\n")
+    r = subprocess.run([sys.executable, LINT, "--macros", bad, clean],
+                       capture_output=True, text=True)
+    check(r.returncode == 2 and "Traceback" not in r.stderr,
+          "lint exits 2 on an undecodable --macros file")
     r = subprocess.run([sys.executable, LINT, os.path.join(d, "missing.qmd")],
                        capture_output=True, text=True)
     check(r.returncode == 2, "lint exits 2 on a missing path")

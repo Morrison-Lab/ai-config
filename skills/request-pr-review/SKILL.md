@@ -62,7 +62,7 @@ project-level memory.
 Never request a human reviewer on a PR in sparta.
 
 The exception is repo-scoped, not rule-wide.
-Requesting a human reviewer on other repos applies after AI review passes or on deadlock.
+On other repos, request a human reviewer only once the [`automated-review-before-human`](../../shared/workflow/automated-review-before-human.md) gate passes.
 Within sparta the exception covers every path that would reach a request: the
 post-AI-review request above, and the deadlock escalation below.
 

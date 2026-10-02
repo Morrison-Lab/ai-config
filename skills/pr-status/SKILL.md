@@ -133,7 +133,7 @@ Requesting a review is a mutation: it triggers a review job, consumes reviewer q
 Use the read-only half of [`ardi`'s step 2](../ardi/SKILL.md) -- fetch the matched review's body + inline comments at the current `commit_id` and require a zero-findings verdict -- but skip the `POST /requested_reviewers` call.
 If no genuine Copilot verdict exists at the current head, check for a human's formal review at the head (next subsection) before reporting `no verdict at head`;
 only when neither exists, report that and offer to run `ardi` (which can request one);
-don't request it yourself here.
+don't request it yourself here, beyond what the automated-review gate in **Next Step** below allows.
 Green CI plus a clean self-review is not sufficient on its own if an
 external reviewer is reachable.
 

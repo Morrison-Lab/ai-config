@@ -17,7 +17,8 @@ This is [`verify-the-right-artifact`](verify-the-right-artifact.md) applied to r
 
 A paged render (PDF or DOCX) adds a class of its own, which neither `check-rendered-page.py` nor `check-rendered-references.py` checks:
 layout defects such as a table with no caption, a caption stranded on the page after its float, or a caption rendered as a section heading.
-A text-and-numbers comparison of the render misses all three;
+A comparison of the render's text and numbers misses the first two,
+and misses the third unless it also checks heading structure;
 see [`manuscript-float-layout`](../writing/manuscript-float-layout.md).
 
 The last item in the list above is the one to internalize, because every other check in this corpus passes on it.

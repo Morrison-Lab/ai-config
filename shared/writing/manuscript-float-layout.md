@@ -63,7 +63,8 @@ Every rule above is a property of the rendered page layout,
 so none of them shows in a source diff or in a comparison of the rendered text and numbers.
 Measured 2026-10-01 on a private manuscript render:
 an uncaptioned two-column `kable` table passed a review that compared the rendered text and numbers against the expected values,
-because a missing caption and a misplaced float change no number.
+because the comparison covered the table's values,
+and a missing caption or a misplaced float changes none of them.
 When reviewing a manuscript render, page through it (or its PDF) and check layout explicitly:
 float placement, page breaks, caption pagination, and that every float has a numbered caption.
 This is the layout half of [`check-the-renders`](../workflow/check-the-renders.md).

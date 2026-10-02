@@ -25,6 +25,7 @@ The div id (`#fig-`/`#tbl-`) carries the cross-reference; the chunk `label` stay
 a plain code label.
 This keeps figures consistent with tables, which already use div syntax.
 
-For where floats go in a journal-submission manuscript, page breaks around them,
-and keeping each caption on its float's page, see
-[`manuscript-float-layout`](manuscript-float-layout.md).
+For where floats go in a journal-submission manuscript,
+the page breaks around them,
+and keeping each caption on its float's page,
+see [`manuscript-float-layout`](manuscript-float-layout.md).

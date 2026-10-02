@@ -351,6 +351,10 @@ ask only for destructive, high-impact, or blocking decisions.
 This grants no merge authority.
 See [`AGENTS.cases.md`](AGENTS.cases.md).
 
+The grant covers installing and updating software: R, R packages (including through `renv`), Quarto, and any other tool, on any machine where the owner has install access, directly or through conda, mamba, pyenv, Homebrew, or a similar manager.
+Do it whenever it helps, without asking (owner directive, 2026-10-02).
+A resulting lockfile change (`renv.lock`, `environment.yml`) is a repo change and goes through the normal PR flow.
+
 ## Strict Merge Control Policy
 
 - **NEVER merge any PR or MR without explicit user permission.**

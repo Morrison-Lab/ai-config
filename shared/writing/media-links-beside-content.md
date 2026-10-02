@@ -14,13 +14,16 @@ The same reader at the end of the page has to guess which link goes with which s
 - Cite the source in a bracketed citation.
 - A video that covers several sections goes after the first section it supports.
 - Never put a link between an exercise and its solution.
-- External sites are fine to link.
+- Link public sites freely, including course sites that host their own solutions.
+  Students and their AI tools already know everything public, so leaving a public link out gains nothing (Ezra, 2026-10-02).
   Never link internal repositories that hold graded work, such as homework or exam repositories.
 - Move an existing end-of-page list instead of deleting it.
   A link with no sensible home goes to an outtakes file, not the bin.
 
 ## Where each repository states it
 
+- `Morrison-Lab/psw`: the prose rule, in `chapters/paper-organization.qmd`, "Links to videos and other media".
+  The prose copy is canonical for wording; this fragment is the agent-facing copy.
 - `Morrison-Lab/lds`: [`AUTHORING.md`](https://github.com/Morrison-Lab/lds/blob/main/AUTHORING.md), "Put each video and other external media link beside the content it supports" (Ezra, 2026-10-02).
   Other note repositories link to this fragment rather than restating it.
 

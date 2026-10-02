@@ -186,6 +186,8 @@ This is a warning with a custom title.
 
 Details: [references/callouts.md](references/callouts.md)
 
+In the lab's repositories, every block with a type (definition, result, proof, example, exercise, warning, tip, note) goes in the matching div or callout, and a recurring kind with no matching type gets a custom one: [`shared/writing/quarto-divs-for-typed-content.md`](../../shared/writing/quarto-divs-for-typed-content.md).
+
 ### Figures
 
 ```markdown

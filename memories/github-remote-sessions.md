@@ -190,7 +190,7 @@ GraphQL is blocked too, per the GraphQL bullet above and [ai-config#3653](https:
 [ai-config#4220](https://github.com/Morrison-Lab/ai-config/issues/4220) tracks that block's effect on `check-pr-fully-clean.py`.
 
 - **Do:** for a multi-repo edit with no local checkout, run `git clone --depth 1`, branch, commit, `git ls-remote --heads origin <branch>`, then `git push` in its own command, and open the PR with `gh api repos/{o}/{r}/pulls --input file.json`.
-- **Don't:** assemble the commit through `git/trees` and `git/refs` POSTs, or conclude REST writes are blocked wholesale because those two 403 --- the proxy leaves the PR, label, and push paths open.
+- **Don't:** assemble the commit through `git/trees` and `git/refs` POSTs, or conclude REST writes are blocked wholesale because those two return 403 --- the proxy leaves the PR, label, and push paths open.
 
 ## The merge call is not blocked by the proxy, and is still refused --- by the client
 

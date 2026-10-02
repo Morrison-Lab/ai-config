@@ -14,6 +14,19 @@
     "group level; `timeout` and an optional `if` sit on the hook entry."
   ],
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/inject-core-rules.py\"",
+            "timeout": 10,
+            "script": "inject-core-rules.py",
+            "why": "ai-config#4206 -- a plugin has no instruction-file slot, so AGENTS.md and CLAUDE.md shipped inside the plugin and were never read; a project thread saw the rules only after cloning ai-config by hand. Injects AGENTS.md (and names CLAUDE.md) at session start wherever the plugin is enabled, except in ai-config itself, where Claude Code already loads them."
+          }
+        ]
+      }
+    ],
     "UserPromptSubmit": [
       {
         "hooks": [

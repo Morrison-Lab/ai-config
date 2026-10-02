@@ -127,7 +127,7 @@ Any non-zero row is a red CI job waiting to happen: fix it before pushing,
 per [`fully-clean`](../../shared/workflow/fully-clean.md).
 (ai-config#1940, #1262.)
 
-- **Do:** read the run's closing summary count, and account for every failed step by name before pushing (the table's rc column, or the summary's `FAILED:` lines once [#4228](https://github.com/Morrison-Lab/ai-config/pull/4228) merges).
+- **Do:** read the run's closing summary count, and account for every failed step by name before pushing (each step's rc is in the run's table).
 - **Don't:** grep the output for one marker such as `FAIL:` and treat its absence as a pass.
   Failures print in several shapes (`FAIL:`, `error:`, a nonzero rc), and a 6,000-line run hid a second failed step this way ([#4227](https://github.com/Morrison-Lab/ai-config/issues/4227)).
 

@@ -172,11 +172,12 @@ def _mask_definitions(text: str) -> str:
     return "".join(pieces)
 
 
-# CommonMark: up to 3 spaces of indent, optionally inside a blockquote; a
-# backtick fence's info string cannot contain a backtick.
-_FENCE = re.compile(r"^((?: {0,3}>)*) {0,3}(`{3,}|~{3,})(.*)$")
+# A fence line, optionally inside a blockquote or after a list marker.
+# Any indent is accepted, so a fence inside a list item opens and closes
+# by the same rule; a backtick fence's info string cannot contain a
+# backtick.
+_FENCE = re.compile(r"^((?: {0,3}>)*) *(?:(?:[-*+]|[0-9]{1,9}[.)]) +)?(`{3,}|~{3,})(.*)$")
 _QUOTE = re.compile(r"(?: {0,3}>)*")
-_CODE_SPAN = re.compile(r"(`+)(?!`).*?(?<!`)\1(?!`)")
 
 
 def _fence(line: str):
@@ -192,6 +193,45 @@ def _quote_depth(line: str) -> int:
     return _QUOTE.match(line).group(0).count(">")
 
 
+def _mask_spans(line: str) -> str:
+    """Blank inline code spans, in time linear in the line's length.
+
+    A span opens at a backtick run that is not backslash-escaped and closes
+    at the next run of the same length. A run with no matching closer is
+    left as text, so the math after it is still scanned.
+    """
+    runs = []
+    i, n = 0, len(line)
+    while i < n:
+        if line[i] == "\\":
+            i += 2
+        elif line[i] == "`":
+            j = i
+            while j < n and line[j] == "`":
+                j += 1
+            runs.append((i, j))
+            i = j
+        else:
+            i += 1
+    later: dict[int, list[int]] = {}  # run length -> later run indexes, reversed
+    for k in range(len(runs) - 1, -1, -1):
+        later.setdefault(runs[k][1] - runs[k][0], []).append(k)
+    out = list(line)
+    k = 0
+    while k < len(runs):
+        start, end = runs[k]
+        stack = later[end - start]
+        while stack and stack[-1] <= k:
+            stack.pop()
+        if not stack:
+            k += 1
+            continue
+        close = stack.pop()
+        out[start:runs[close][1]] = " " * (runs[close][1] - start)
+        k = close + 1
+    return "".join(out)
+
+
 def _mask_code(lines):
     """Blank fenced blocks and inline code spans in Markdown-like text."""
     opener = None  # the open fence's marker, e.g. "````"
@@ -205,12 +245,13 @@ def _mask_code(lines):
             depth = m.group(1).count(">")
             yield ""
         elif opener is not None:
-            if (m and m.group(2)[0] == opener[0] and len(m.group(2)) >= len(opener)
+            if (m and m.group(1).count(">") == depth
+                    and m.group(2)[0] == opener[0] and len(m.group(2)) >= len(opener)
                     and not m.group(3).strip()):
                 opener = None
             yield ""
         else:
-            yield _CODE_SPAN.sub(lambda c: " " * len(c.group(0)), line)
+            yield _mask_spans(line)
 
 
 def find_raw(text: str, rules: dict[str, str] | None = None, markdown: bool = False):

@@ -50,10 +50,12 @@ WARN = [
     ("Write", {"file_path": "a.tex", "content": "\\def\\Ex\n\n$\\mathbb{E}[X]$"}, "\\Ep"),
     ("Write", {"file_path": "a.tex", "content": "Use \\newcommand to make macros: $\\mathbb{E}[X]$"}, "\\Ep"),
     ("Write", {"file_path": "a.tex", "content": "\\def\\a{1}\n[see] $\\mathrm{Var}(X)$"}, "\\Var"),
-    ("Write", {"file_path": "a.md", "content": "    ```\n$\\mathbb{E}[Y]$"}, "\\Ep"),
     ("Write", {"file_path": "a.md", "content": "```x``` text\n$\\mathbb{E}[Y]$"}, "\\Ep"),
     ("Write", {"file_path": "a.md", "content": "> ```\n> x\n$\\mathbb{E}[Y]$"}, "\\Ep"),
-    ("Write", {"file_path": "a.md", "content": "\t```\n$\\mathbb{E}[Y]$"}, "\\Ep"),
+    ("Write", {"file_path": "a.md", "content": "- ```\n  code\n  ```\nREAL $\\mathbb{E}[Y]$"}, "\\Ep"),
+    ("Write", {"file_path": "a.md", "content": "1. ```r\n   x <- 1\n   ```\n\nREAL $\\mathbb{E}[Y]$"}, "\\Ep"),
+    ("Write", {"file_path": "a.md", "content": "```md\n> ```\n```\nREAL $\\mathbb{E}[Y]$"}, "\\Ep"),
+    ("Write", {"file_path": "a.md", "content": "\\`$\\mathbb{E}[Y]$\\`"}, "\\Ep"),
 ]
 for tool, ti, macro in WARN:
     out = hook(tool, ti)
@@ -79,6 +81,9 @@ QUIET = [
     ("Write", {"file_path": "x.md", "content": "````\n```\n$\\mathbb{E}[Y]$\n```\n````"}, "a nested fence"),
     ("Write", {"file_path": "x.md", "content": "~~~\n```\n$\\mathbb{E}[Y]$\n~~~"}, "a tilde fence holding a backtick line"),
     ("Write", {"file_path": "x.md", "content": "> ```\n> $\\mathbb{E}[Y]$\n> ```"}, "a fence inside a blockquote"),
+    ("Write", {"file_path": "x.md", "content": "    ```\n$\\mathbb{E}[Y]$"}, "an indented fence line (treated as a fence)"),
+    ("Write", {"file_path": "x.md", "content": "- ```\n  $\\mathbb{E}[Y]$\n  ```"}, "a fence inside a list item"),
+    ("Write", {"file_path": "x.md", "content": "use ``$\\mathbb{E}$`` here"}, "a double-backtick code span"),
     ("Write", {"file_path": "x.tex", "content": "\\newcommand*{\\Ex}{\\mathbb{E}}"}, "a starred newcommand"),
     ("Write", {"file_path": "x.tex", "content": "\\DeclareMathOperator*{\\Vx}{\\mathrm{Var}}"}, "a starred DeclareMathOperator"),
     ("Write", {"file_path": "x.tex", "content": "\\newcommand{\\Ex}[1]{\\mathbb{E}\\{#1\\}}"}, "a definition with escaped braces"),
@@ -169,6 +174,12 @@ t0 = time.monotonic()
 hits = list(find_raw(big))
 check(len(hits) == 1 and time.monotonic() - t0 < 5,
       "20,000 unclosed definitions scan in under 5 s and the trailing hit is found")
+
+big = "a " + "`" * 40_000 + " $\\mathbb{E}[X]$"
+t0 = time.monotonic()
+hits = list(find_raw(big, markdown=True))
+check(len(hits) == 1 and time.monotonic() - t0 < 5,
+      "a line with 40,000 unmatched backticks scans in under 5 s")
 
 print(f"\n{len(FAILURES)} failure(s)")
 sys.exit(1 if FAILURES else 0)

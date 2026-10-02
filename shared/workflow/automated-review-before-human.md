@@ -3,7 +3,7 @@ That holds in every repository, project and forge (GitHub, GitLab, or any other)
 A question to the user is not a review request.
 A status report or a PR/MR check is covered too: list an item as waiting on human review only when its latest commit has a clean automated review.
 When that review has not run, the item is in scope per [`reviewing-prs`](../../memories/reviewing-prs.md), and no review run is in flight on its head, start the review job, even under a read-only brief ([`status-requests-act`](status-requests-act.md)).
-Starting it is the only write a status pass licenses.
+Starting it is the only review-related write this rule adds to a status pass.
 Report a draft as a draft, and report an out-of-scope item as having no clean automated review, rather than un-drafting or triggering anything.
 The agent triggers the automated reviews itself;
 "ready for your review" is a claim that this already happened.

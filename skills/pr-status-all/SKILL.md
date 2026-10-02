@@ -9,13 +9,12 @@ allowed-tools:
 
 # pr-status-all
 
-Produce a **one-row-per-PR status table** for all open PRs. This is the
-whole-queue version of [`pr-status`](../pr-status/SKILL.md): apply the same
-"read the **latest** review and parse it for findings" discipline to every
-open PR, then lay the results out as a table. It is **read-only** --- it reports
-status, it does not push, merge, or run review loops (use
-[`ardia`](../ardia/SKILL.md) for that, or
-[`sync-pr-branch`](../sync-pr-branch/SKILL.md) to update a branch).
+Produce a **one-row-per-PR status table** for all open PRs.
+This is the whole-queue version of [`pr-status`](../pr-status/SKILL.md): apply the same "read the **latest** review and parse it for findings" discipline to every open PR, then lay the results out as a table.
+It is **read-only** apart from starting a missing automated review --- it reports status, it does not push, merge, or run review loops (use [`ardia`](../ardia/SKILL.md) for that, or [`sync-pr-branch`](../sync-pr-branch/SKILL.md) to update a branch).
+The fan-out stays read-only;
+after the table is assembled, the orchestrator applies [`automated-review-before-human`](../../shared/workflow/automated-review-before-human.md) one PR at a time.
+No row reads `Ready for human review` without a clean automated verdict on its head, and an in-scope PR with no automated review and none in flight gets that review started, the one write this skill makes.
 
 Because the per-PR signals are independent and read-only, gather them
 **concurrently** --- one subagent per PR --- then assemble the table. See

@@ -132,10 +132,10 @@ review object.
 don't request one.**
 Requesting a review is a mutation: it triggers a review job, consumes reviewer quota, and can collide with an active `ardi` loop driving the same PR.
 Use the read-only half of [`ardi`'s step 2](../ardi/SKILL.md) -- fetch the matched review's body + inline comments at the current `commit_id` and require a zero-findings verdict -- but skip the `POST /requested_reviewers` call.
-The one exception is the automated review gate below: an in-scope PR with no automated review on its head and none in flight gets that review started.
+The one exception is the automated review gate in **Reviewers Requested** below: an in-scope PR with no automated review on its head and none in flight gets that review started.
 If no genuine Copilot verdict exists at the current head, check for a human's formal review at the head (next subsection) before reporting `no verdict at head`;
-only when neither exists, report that and offer to run `ardi` (which can request one);
-don't request it yourself here.
+only when neither exists, report that;
+an external reviewer is still not requested here, since only the automated review is covered by that exception.
 Green CI plus a clean self-review is not sufficient on its own if an
 external reviewer is reachable.
 
@@ -375,7 +375,7 @@ Render a **Review Summary Table** for the PR:
   If human review has requested changes, flag `❌ Changes requested by <login>`.
   For self-authored PRs, note `*Self-authored*`.
   Never label a row ready for, or waiting on, human review without a clean automated verdict on its latest commit ([`automated-review-before-human`](../../shared/workflow/automated-review-before-human.md)).
-  When none has run, start it only for an in-scope PR with no run in flight on its head;
+  When none has run, start it only for an in-scope PR (its author, assignee or named in the request, per [`reviewing-prs`](../../memories/reviewing-prs.md)) with no run in flight on its head;
   otherwise report `no automated review at head`.
   When AI review is clean and CI is green, list requested reviewers (e.g. `the repository owner`) or flag `⚠️ None (Request human review)`.
   When AI review is clean but CI is failing or pending, display `- (CI in progress / failing)`.

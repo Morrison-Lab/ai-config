@@ -26,6 +26,10 @@ Deliberate limits:
   - A missing or unreadable transcript is silent (fail open).
   - A reviewer request that removes a reviewer (`-X DELETE`) is ignored. A
     request whose reviewers sit in a `--input` JSON file is not seen.
+  - Only tool results count as a review result, so a verdict the agent
+    wrote itself does not.
+  - Commands joined by a newline share one segment, so a DELETE on one
+    line can hide a request on the next.
   - A verdict is not compared with the pushed head. One printed before the
     last push (the usual pre-push review) does not count, and one for an
     older commit printed after it does.
@@ -45,7 +49,8 @@ VERDICT = re.compile(
     r"^[ \t#>*]*Verdict:[ \t*]*Ready for merge|\"verdict\":\s*\"CLEAN\"",
     re.I | re.M)
 COMMIT = re.compile(r"(Reviewed-Commit:|\"commit_sha\":)\s*\"?[0-9a-f]{40}", re.I)
-PUSH = re.compile(r"(^|[;&|]\s*)git(\s+-\S+(\s+\S+)?)*\s+push\b")
+# `git` then `push` within a few words; the bound keeps the match linear.
+PUSH = re.compile(r"(^|[\s;&|(])git\s+(?:\S+\s+){0,4}?push\b")
 MCP_PUSH = re.compile(r"mcp__github__(push_files|create_or_update_file)")
 DELETE = re.compile(r"(-X|--method)[ =]+DELETE", re.I)
 
@@ -63,11 +68,10 @@ def humans(names):
     return [n for n in names if n and not BOT.search(n)]
 
 
-def reviewers_from_segment(command):
-    try:
-        words = shlex.split(command)
-    except ValueError:
-        return []
+OPERATORS = {";", "&&", "||", "|", "&", "(", ")", ";;"}
+
+
+def reviewers_from_words(words):
     names = []
     for i, word in enumerate(words):
         if word in ("--add-reviewer", "--reviewer", "-r") and i + 1 < len(words):
@@ -76,19 +80,34 @@ def reviewers_from_segment(command):
             names += word.split("=", 1)[1].split(",")
         elif word.startswith("reviewers[]="):
             names.append(word.split("=", 1)[1])
-    if DELETE.search(command):
+    text = " ".join(words)
+    if DELETE.search(text):
         return []
-    if "requested_reviewers" in command or re.search(
-            r"--add-reviewer|gh\s+pr\s+create", command):
+    if "requested_reviewers" in text or re.search(
+            r"--add-reviewer|gh pr create", text):
         return names
     return []
 
 
 def reviewers_from_bash(command):
-    """Reviewer logins requested by any simple command in a compound line."""
-    names = []
-    for segment in re.split(r"&&|\|\||[;|\n]", command):
-        names += reviewers_from_segment(segment)
+    """Reviewer logins requested by any simple command in a compound line.
+
+    The whole command is tokenised first, so quotes (a multi-line `--body`)
+    stay intact, and then split on the shell operator tokens.
+    """
+    lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
+    lexer.whitespace_split = True
+    try:
+        words = list(lexer)
+    except ValueError:
+        return []
+    names, segment = [], []
+    for word in words + [";"]:
+        if word in OPERATORS:
+            names += reviewers_from_words(segment)
+            segment = []
+        else:
+            segment.append(word)
     return names
 
 
@@ -116,6 +135,31 @@ def strings(node):
     elif isinstance(node, list):
         for value in node:
             yield from strings(value)
+
+
+def results(node):
+    """Strings inside tool_result blocks: output the agent did not write."""
+    if isinstance(node, dict):
+        if node.get("type") == "tool_result":
+            yield from strings(node)
+        else:
+            for value in node.values():
+                yield from results(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from results(value)
+
+
+def tool_names(node):
+    """Names of tools the agent called (tool_use blocks only)."""
+    if isinstance(node, dict):
+        if node.get("type") == "tool_use" and isinstance(node.get("name"), str):
+            yield node["name"]
+        for value in node.values():
+            yield from tool_names(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from tool_names(value)
 
 
 def commands(node):
@@ -150,11 +194,11 @@ def clean_since_last_push(path):
     last_push = 0
     for number, record in enumerate(records):
         cmds = commands(record) if not isinstance(record, str) else [record]
-        if any(PUSH.search(c) for c in cmds) or (
-                MCP_PUSH.search(json.dumps(record))):
+        if any(PUSH.search(c) for c in cmds) or any(
+                MCP_PUSH.search(n) for n in tool_names(record)):
             last_push = number
     for record in records[last_push:]:
-        for text in strings(record):
+        for text in results(record):
             if VERDICT.search(text) and COMMIT.search(text):
                 return True
     return False

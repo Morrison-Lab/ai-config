@@ -556,6 +556,21 @@ survives no reordering: both orders reach the same total, so this is not a
 merge-order constraint that sequencing fixes.
 One branch has to relocate its content, or the file has to be split first.
 
+The byte-capped form has a one-command instrument, because `git merge-tree --write-tree` prints the merged tree's id on its first line:
+
+```bash
+git cat-file -p "$(git merge-tree --write-tree origin/main <head> | head -1):AGENTS.md" | wc -c
+```
+
+Measured 2026-10-02: PR #4213 had `AGENTS.md` at 32,725 of Codex's 32,768-byte cap on its own branch, with green CI and a clean review.
+Meanwhile #4215 and other PRs merged and grew `main`'s copy to 32,627 bytes.
+The `merge-tree` of #4213 over that `main` produced 33,029 bytes, over the cap, with no conflict.
+Each PR's `check-context-closure` had run against its own base, so nothing red showed it before merge.
+The remedy was merging `main` into the PR and trimming.
+
+- **Do:** before merging a PR that grows a size-capped file (`AGENTS.md`, anything `check-context-closure` gates), measure the cap on the merge result with the command above, after any earlier PR in the same batch has merged.
+- **Don't:** trust the headroom figure from the PR's own CI or review when `main` has moved since.
+
 Two things make it worth checking rather than trusting CI.
 The breach lands on `main`, so it goes red for **everyone** afterwards rather
 than for whoever caused it.

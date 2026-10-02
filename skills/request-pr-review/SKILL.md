@@ -13,7 +13,7 @@ After AI review produces a clean verdict or upon a review deadlock, request a hu
 
 ## When to run
 
-- After completing code pushes for the round AND after the AI review produces a clean/approved verdict (or upon a review deadlock), per [`copilot-review-before-human.md`](../../shared/vendored/copilot-review-before-human.md).
+- After completing code pushes for the round AND after the AI review produces a clean/approved verdict (or upon a review deadlock), per [`automated-review-before-human`](../../shared/workflow/automated-review-before-human.md), the gate on every request for human review, and [`copilot-review-before-human.md`](../../shared/vendored/copilot-review-before-human.md).
 - When the user asks you to "request review" on an existing PR.
 
 ## Command

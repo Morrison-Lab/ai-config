@@ -15,7 +15,8 @@ Every rule here serves these three, each an act you can observe:
 ## Get a clean automated review before asking a person to review
 
 Never ask a person to review a PR, a GitLab MR, a document, or anything else, in any repo or project, until its automated review is clean or deadlocked.
-Trigger the automated reviews yourself once the round's pushes are done, then iterate (`ardi`) until clean; in a repo that reviews on push, confirm that run finished on the current head rather than adding a duplicate.
+Trigger the automated reviews yourself once the round's pushes are done, and iterate (`ardi`) until clean.
+Where review runs on push, confirm it finished on the current head instead of adding a duplicate.
 A quota-skipped, stubbed, or never-started review is no review: re-trigger it, and post an independent adversarial review meanwhile.
 See [`automated-review-before-human`](shared/workflow/automated-review-before-human.md).
 
@@ -439,6 +440,7 @@ See [`monitor-scoped-open-prs`](shared/workflow/monitor-scoped-open-prs.md).
 - **Do:** derive the scoped open PR/MR set in each active repository at every monitoring pass, and arm a persistent loop.
 - **Do:** act on terminal CI failures, merge conflicts, and review findings without waiting for a prompt.
 - **Don't:** sweep every accessible repository or stop monitoring because an item was opened by someone else.
+
 ## Cursor Cloud specific instructions
 
 See [`cursor-cloud-instructions`](shared/workflow/cursor-cloud-instructions.md) for environment caveats, preview/render commands, and pre-commit setup when working in Cursor Cloud.

@@ -142,7 +142,7 @@
     park on a client approval-card failure,
     or close with an offer to push ---
     standing grant already covers push and PR (not merge).
-- When opening a GitHub PR, trigger AI review (`@claude review`) when done pushing, and request human review (`<reviewer>`) only after AI review passes cleanly or on deadlock (see request-pr-review skill).
+- When opening a PR or MR on any forge, trigger AI review yourself when done pushing, and request human review (`<reviewer>`) only after AI review passes cleanly or on deadlock (gate: [`automated-review-before-human`](../shared/workflow/automated-review-before-human.md), and the request-pr-review skill).
   The one exception is `Lacaedemon/sparta`, which never requests human review, on AI review approval or on deadlock escalation alike.
 - **In repos whose review workflow does not auto-trigger on PR activity, ALWAYS trigger AI review (`@claude review` / dispatch `claude-review.yml`) when done pushing code for the round.**
   `ai-config` now auto-reviews ordinary in-repo PR opens and pushes via `pull_request`, so explicit dispatch is the exception rather than the default there.
@@ -626,7 +626,7 @@
   It outranks `hooks/no-unreviewed-pr.py` and `shared/workflow/pr-on-claim.md`'s request-the-reviewer step.
   State the directive as the reason when a PR ships without one, and re-verify at the expiry.
   Full statement, measurements, and Do/Don't pair: [`gh-cli.md`](gh-cli.md), "Restated and widened 2026-08-19".
-- Per [`copilot-review-before-human.md`](../shared/vendored/copilot-review-before-human.md), request AI review (`@claude review`) after completing code pushes, and do NOT request human review until after the AI review produces a clean/approved verdict (or an impasse/deadlock occurs).
+- Per [`copilot-review-before-human.md`](../shared/vendored/copilot-review-before-human.md) and [`automated-review-before-human`](../shared/workflow/automated-review-before-human.md), request AI review after completing code pushes, and do NOT request human review until after the AI review produces a clean/approved verdict (or an impasse/deadlock occurs).
 - During ARDI loops: if a round has only Rebut/Defer dispositions (no code pushed), still explicitly re-request review --- the push won't auto-trigger the reviewer bot.
   BUT the converse: when a round DID push code, the push already triggers the review workflow --- do NOT also post "@claude review again".
   On workflows with `concurrency: cancel-in-progress` (Morrison-Lab/gha) the two runs cancel each other, leaving the latest commit with a canceled, never-posted verdict.

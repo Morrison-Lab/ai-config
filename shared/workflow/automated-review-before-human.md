@@ -9,14 +9,14 @@ Start the review job, even under a read-only brief ([`status-requests-act`](stat
 - no review run is in flight on its head.
 
 Starting it is the only review-related write this rule adds to a status pass.
-In a status pass, report a draft as a draft, and an out-of-scope item as having no clean automated review, rather than un-drafting or triggering anything.
+In a status pass, report a draft as a draft, and an out-of-scope item as having no clean automated review, rather than un-drafting it or triggering a review on it.
 The agent triggers the automated reviews itself.
 "Ready for your review" is a claim that this already happened.
 
 ## The gate
 
 When about to ask for a review, mark a draft PR or MR ready first, since a draft is not ready for a person and can suppress the forge's review automation ([`put-prs-in-ready-mode`](put-prs-in-ready-mode.md)).
-A deliberately draft-gated dependent PR is the exception: it stays in draft, so trigger its automated review explicitly (a comment or dispatch), and let the merge-order alert carry the ordering.
+A deliberately draft-gated dependent PR is the exception: it stays in draft, so trigger its automated review explicitly (a `/review`-style comment, or a dispatch where the caller allows it), and let the merge-order alert carry the ordering.
 
 Before any message that asks a person to review, check these on the current head:
 
@@ -24,7 +24,7 @@ Before any message that asks a person to review, check these on the current head
    Trigger every configured reviewer yourself once the round's pushes are done:
 
    - the repo's review workflow, by whichever trigger its caller documents.
-     ai-config's `.github/workflows/claude-review.yml` runs on `pull_request` events (not for a bot sender), on a `/review` comment, and on `workflow_dispatch`;
+     ai-config's `.github/workflows/claude-review.yml` runs on `pull_request` events (not for a bot sender), on a `/review` comment, and on `workflow_dispatch`, but a dispatch issued by `claude[bot]` fails, so an agent session uses `/review`;
      [`ardi`](../../skills/ardi/SKILL.md) covers the `@claude review` and dispatch-only cases.
    - Copilot, per [`copilot-review-before-human`](../vendored/copilot-review-before-human.md).
    - On GitLab, the MR pipeline's review job: find it in `.gitlab-ci.yml`'s `include:` list, per [`self-review-fallback`](self-review-fallback.md), and run it or start a new MR pipeline.
@@ -54,7 +54,7 @@ Then ask, and link the clean verdict (or the deadlocked item) in the request.
 
 ## Why it is a gate on the request, not a step in the loop
 
-The rule was already in the corpus as step 3 of a PR loop ("request human review only after AI approval or deadlock"), near the end of `AGENTS.md`, worded for GitHub pull requests.
+The rule was already in the corpus as step 3 of a PR loop ("request human review only after AI approval or deadlock"), in a section near the end of `AGENTS.md` that this change replaced, worded for GitHub pull requests.
 The rule was skipped anyway: on 2026-10-02 an agent asked the user to review a GitLab MR on which no automated review had been triggered.
 The same day, a scheduled read-only status check listed six GitLab MRs as waiting on the user's review although their manual AI review job had never run;
 the rule's PR-loop wording did not read as covering a status pass.

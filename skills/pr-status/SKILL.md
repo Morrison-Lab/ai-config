@@ -132,8 +132,8 @@ review object.
 Requesting a review is a mutation: it triggers a review job, consumes reviewer quota, and can collide with an active `ardi` loop driving the same PR.
 Use the read-only half of [`ardi`'s step 2](../ardi/SKILL.md) -- fetch the matched review's body + inline comments at the current `commit_id` and require a zero-findings verdict -- but skip the `POST /requested_reviewers` call.
 If no genuine Copilot verdict exists at the current head, check for a human's formal review at the head (next subsection) before reporting `no verdict at head`;
-only when neither exists, report that and offer to run `ardi` (which can request one);
-don't request it yourself here.
+only when neither exists, report that;
+don't request it from inside this skill.
 Starting a missing automated review is the session's job under [`automated-review-before-human`](../../shared/workflow/automated-review-before-human.md), not this skill's yet ([#4253](https://github.com/Morrison-Lab/ai-config/issues/4253)).
 Green CI plus a clean self-review is not sufficient on its own if an
 external reviewer is reachable.
@@ -376,7 +376,7 @@ Render a **Review Summary Table** for the PR:
   When AI review is clean and CI is green, list requested reviewers (e.g. `the repository owner`) or flag `⚠️ None (Request human review)`.
   When AI review is clean but CI is failing or pending, display `- (CI in progress / failing)`.
   When AI review is in-flight or unclean, display `- (AI review in progress)`.
-  When no automated reviewer has a clean verdict at head and none is running, display `- (needs automated review)`, never `⚠️ None (Request human review)`.
+  When no automated review has run on the head at all (none found, or only a stale one) and none is running, display `- (needs automated review)`, never `⚠️ None (Request human review)`.
 - **Next Step** --- computed deterministically using the full state matrix:
   - If `isDraft`: `Draft (Work in progress)`.
   - If human `CHANGES_REQUESTED` is pending: `Blocked on human changes (<login>)` (overrides everything below).

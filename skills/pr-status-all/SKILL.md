@@ -155,6 +155,7 @@ Fill in `<N>`, `<headRefName>`, `<isDraft>`, `<owner>`, `<repo>` for each PR (re
 >      - If `reviewRequests` is empty, report `⚠️ None (Request human review)`.
 >    - If AI review is clean/approved but CI is failing or pending, report `- (CI in progress / failing)`.
 >    - If AI review is still in-flight or unclean, report `- (AI review in progress)`.
+>    - If no automated review (`@claude`, Copilot, or a posted stand-in review) has run on the head and none is running, report `- (needs automated review)`.
 > 5. **Unresolved threads** -- count open inline review threads (`READ_PR_REVIEW_COMMENTS`).
 >    ```bash
 >    gh api graphql -f query='query {
@@ -183,7 +184,7 @@ Fill in `<N>`, `<headRefName>`, `<isDraft>`, `<owner>`, `<repo>` for each PR (re
 >    Keep `DISMISSED` in the filter so an explicit dismissal clears an older `CHANGES_REQUESTED`.
 >    Any non-empty result **blocks** regardless of what any bot says -- report `changes requested by <login>`.
 >
-> Return: PR number, Author, isDraft, AI Review (`[✅ Clean (Round N)](url)` / `[⏳ In-Flight](url)` / `[⚠️ Unverified](url)` / `[❌ Needs Work](url)` / `none found`), External Review (`clean` / `N open` / `no verdict at head`), Human Blocked (`none` / `changes requested by <login>`), CI State (`🟢 All Green` / `❌ Failing (<name>)` / `⏳ Pending (<name>)`), Reviewers Requested (`the repository owner` / `*Self-authored*` / `⚠️ None` / `❌ Changes requested by <login>` / `- (CI in progress / failing)` / `- (AI review in progress)`), Threads (`resolved` / `N open`), Behind-main (`up to date` / `N commits`), Next Step (computed per the deterministic transition rules).
+> Return: PR number, Author, isDraft, AI Review (`[✅ Clean (Round N)](url)` / `[⏳ In-Flight](url)` / `[⚠️ Unverified](url)` / `[❌ Needs Work](url)` / `none found`), External Review (`clean` / `N open` / `no verdict at head`), Human Blocked (`none` / `changes requested by <login>`), CI State (`🟢 All Green` / `❌ Failing (<name>)` / `⏳ Pending (<name>)`), Reviewers Requested (`the repository owner` / `*Self-authored*` / `⚠️ None` / `❌ Changes requested by <login>` / `- (CI in progress / failing)` / `- (AI review in progress)` / `- (needs automated review)`), Threads (`resolved` / `N open`), Behind-main (`up to date` / `N commits`), Next Step (computed per the deterministic transition rules).
 
 ### 3. Assemble (orchestrator)
 
@@ -222,7 +223,7 @@ A Markdown table, one row per open PR, with these columns:
   When AI review is clean and CI is green, list requested reviewers (e.g. `the repository owner`) or flag `⚠️ None (Request human review)`.
   When AI review is clean but CI is failing or pending, display `- (CI in progress / failing)`.
   When AI review is in-flight or unclean, display `- (AI review in progress)`.
-  When no automated reviewer has a clean verdict at head and none is running, display `- (needs automated review)`, never `⚠️ None (Request human review)`.
+  When no automated review has run on the head at all (none found, or only a stale one) and none is running, display `- (needs automated review)`, never `⚠️ None (Request human review)`.
 - **Next Step** --- computed deterministically using the full state matrix:
   - If `isDraft`: `Draft (Work in progress)`.
   - If human `CHANGES_REQUESTED` is pending: `Blocked on human changes (<login>)` (overrides everything below).
@@ -259,8 +260,7 @@ The whole-queue *write* loops are different, and deliberately stay (mostly) seri
 - **`ardia` / `iterate-all`** --- share one working directory, compete for CI
   runner capacity, and have human checkpoints. Parallelize only opt-in, with
   worktree isolation + bounded concurrency --- not by default.
-- **`gii` / `gia`** --- intentionally sequential: a later issue's base branch
-  depends on whether the prior MR merged, and same-file issues conflict.
+- **`gii` / `gia`** --- intentionally sequential: a later issue's base branch depends on whether the prior MR merged, and same-file issues conflict.
   **`gip`** is the opt-in exception --- it fans out only the *provably independent* subset (no stacking dependency, no file overlap), each subagent in its own worktree, and sends everything else back through `gii`.
 
 Rule of thumb: fan out a whole-queue loop only when its units are provably independent and don't mutate shared state --- like this one.

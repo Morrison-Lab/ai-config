@@ -1,6 +1,5 @@
 Never ask a person to review work until its automated review is clean or deadlocked.
 That holds in every repository, project and forge (GitHub, GitLab, or any other): a GitHub PR, a GitLab MR, a rendered document sent for a read, or any other work product awaiting a person's review.
-A question to the user is not a review request.
 A status report or a PR/MR check is covered too: list an item as waiting on human review only when its latest commit has a clean automated review.
 Start the review job, even under a read-only brief ([`status-requests-act`](status-requests-act.md)), when all four hold:
 
@@ -18,7 +17,10 @@ The agent triggers the automated reviews itself.
 
 When about to ask for a review, mark a draft PR or MR ready first, since a draft is not ready for a person and can suppress the forge's review automation ([`put-prs-in-ready-mode`](put-prs-in-ready-mode.md)).
 A deliberately draft-gated dependent PR is the exception: it stays in draft, so trigger its automated review explicitly (a `/review`-style comment, or a dispatch where the caller allows it), and let the merge-order alert carry the ordering.
+It is not presented to a person as awaiting review until it is un-drafted, and a status pass reports it as draft-gated.
 
+The gate covers items in scope per [`reviewing-prs`](../../memories/reviewing-prs.md);
+for anything else, report the review state and trigger nothing.
 Before any message that asks a person to review, check these on the current head:
 
 1. **The automated reviews ran on this head.**
@@ -55,7 +57,7 @@ Then ask, and link the clean verdict (or the deadlocked item) in the request.
 
 ## Why it is a gate on the request, not a step in the loop
 
-The rule was already in the corpus as step 3 of a PR loop ("request human review only after AI approval or deadlock"), in the `AGENTS.md` section "Request review and drive every started PR to clean" (replaced by this fragment in #4248), worded for GitHub pull requests.
+The rule was already in the corpus as step 3 of a PR loop ("request human review only after AI approval or deadlock"), in the `AGENTS.md` section "Request review and drive every started PR to clean" (replaced by this fragment in [#4248](https://github.com/Morrison-Lab/ai-config/pull/4248)), worded for GitHub pull requests.
 The rule was skipped anyway: on 2026-10-02 an agent asked the user to review a GitLab MR on which no automated review had been triggered.
 The same day, a scheduled read-only status check listed six GitLab MRs as waiting on the user's review although their manual AI review job had never run;
 the rule's PR-loop wording did not read as covering a status pass.

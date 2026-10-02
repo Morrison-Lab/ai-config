@@ -33,6 +33,20 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`.
 - **Do:** move good content you remove into an outtakes file.
 - **Don't:** delete it.
 
+## Leave no thread idle
+
+- **Do:** while work is queued, schedule a check-in about every 30 minutes, and nudge any thread silent for more than 30 minutes.
+- **Don't:** end a turn with queued work and nothing set to resume it.
+
+## Send bulk work to other models
+
+Claude quota is scarce, so Claude plans and verifies, and other models do bulk work.
+
+- **Do:** try the Antigravity CLI (`agy`) first, then OpenCode, OpenRouter, the Cursor CLI, and Databricks.
+- **Do:** name every model you use when you brief it.
+- **Don't:** use Codex.
+- **Don't:** send student data to any model, because it is a FERPA education record.
+
 ## Choose a model for each task
 
 - **Do:** use a small model for mechanical work, a mid-size model for routine coding and PR driving, and the strongest model for authoring and design.

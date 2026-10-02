@@ -1420,7 +1420,14 @@ def mask_payloads(text: str) -> str:
 # cannot see, and `ALLOW_MERGE=1` already covers the one-off case from inside
 # the command text. Adding a repository here is a one-line diff, and code
 # review is the right gate for an allowlist.
-STANDING_MERGE_GRANT_REPOS = frozenset({"morrison-lab/ai-config"})
+#
+# The shared math-macros repo carries the same standing grant (user directive,
+# 2026-10-02: "the macros repo should have a standing mwc grant"). It answers
+# to both owner spellings, since d-morrison/macros and Morrison-Lab/macros
+# resolve to the same repository.
+STANDING_MERGE_GRANT_REPOS = frozenset(
+    {"morrison-lab/ai-config", "d-morrison/macros", "morrison-lab/macros"}
+)
 
 # Only the GitHub PR-merge forms carry the grant, which is what the user
 # granted: "PRs targeting the ai-config repo".

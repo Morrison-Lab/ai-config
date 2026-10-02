@@ -325,6 +325,9 @@ format:
 This skill covers general Quarto authoring and documents the upstream chunk-option syntax (`#| label: fig-...`, `#| fig-cap: "..."`) that Quarto itself supports for figure and table captions.
 This repo overrides that convention for its own `.qmd` files: [`shared/writing/quarto-figure-captions.md`](../../shared/writing/quarto-figure-captions.md) requires div syntax (`::: {#fig-...}` / `::: {#tbl-...}`) instead, and that lab-specific rule takes precedence over the chunk-option examples in this skill's [`references/figures.md`](references/figures.md) and [`references/tables.md`](references/tables.md) whenever the document under edit belongs to this repo.
 
+Math in a lab document uses the shared semantic macros, not raw LaTeX, wherever a macro names the concept;
+[`use-math-macros`](../use-math-macros/SKILL.md) is the procedure, including adding a macro when none fits.
+
 ## Resources
 
 - [Quarto Documentation](https://quarto.org/docs/)

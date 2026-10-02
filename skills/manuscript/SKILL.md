@@ -269,6 +269,8 @@ Most journals require each of these, in the text or in submission forms:
 ## 14. Rendering and layout (Quarto)
 
 - Render from source every time; do not edit the output file.
+- Write every equation with the shared semantic math macros, per [`use-math-macros`](../use-math-macros/SKILL.md): `\E` for an expectation, `\Var` for a variance, and so on, wherever the library has a macro for the concept.
+  When it has none, add one to the macros repo rather than writing raw LaTeX.
 - Float placement, page breaks, and caption rules (floats after the references, a break before the supplement, captions on their float's page and rendered as captions rather than headings) live in the `manuscript-float-layout` fragment ([ai-config#4203](https://github.com/Morrison-Lab/ai-config/pull/4203));
   follow it rather than restating it here.
 - Table captions on top (`tbl-cap-location: top`), figure captions below (`fig-cap-location: bottom`).
@@ -298,6 +300,7 @@ Before calling a manuscript ready:
 14. [ ] Word, table, figure, and reference counts within the journal's limits.
 15. [ ] AI-tell and fact-check passes done.
 16. [ ] Cover letter drafted: the question, the main finding, why this journal, confirmation that the work is not under consideration elsewhere, and any suggested or excluded reviewers.
+17. [ ] Every equation uses the shared semantic macros wherever one applies, and any concept without one got a new macro ([`use-math-macros`](../use-math-macros/SKILL.md)).
 
 Report the manuscript as ready only after this checklist passes, and say which items were checked on the rendered PDF.
 Post the page-by-page evidence on the PR or MR as that fragment describes.

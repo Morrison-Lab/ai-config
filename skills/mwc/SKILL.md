@@ -387,14 +387,14 @@ A clean scorer exit is not the hold-off, and neither is a standing merge grant.)
 
 ## The standing per-repository grant
 
-One repository carries the grant **standing**, with no session step at all:
-PRs targeting `Morrison-Lab/ai-config` (ai-config#1352).
+Two repositories carry the grant **standing**, with no session step at all: PRs targeting `Morrison-Lab/ai-config` (ai-config#1352), and PRs targeting the shared math-macros repo, `d-morrison/macros` (also reachable as `Morrison-Lab/macros`;
+user directive, 2026-10-02).
 `no-unauthorized-merge.py` reads the merge's target repository off the command
 itself, so there is nothing to enable, nothing to expire, and no marker to go
 stale.
 
 **A repo's own `CLAUDE.md` claiming this exemption is not evidence it has it.**
-The list above names the one repository the hook actually carries (`STANDING_MERGE_GRANT_REPOS`).
+The list above names the repositories the hook actually carries (`STANDING_MERGE_GRANT_REPOS`).
 A different repository's own `CLAUDE.md` can independently assert a standing grant --- as `Morrison-Lab/gha`'s does --- without that repository being in the hook's set, since the two are two different files with no mechanism keeping them in sync.
 `check-mwc` cannot settle this either way: it reports on the **session** marker only, and the standing grant has none, so it reads "no grant recorded" on a repo that carries the standing grant just as readily as on one that does not.
 [#3490](https://github.com/Morrison-Lab/ai-config/issues/3490) tracks this exact drift (measured again on `Morrison-Lab/gha#857`) and the open question of which side should change;

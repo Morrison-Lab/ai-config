@@ -994,7 +994,9 @@ it suppresses a mistake at the cost of suppressing the PR's own review and auto-
 ## Use the shared math-macros submodule for manuscript math
 
 Write math in lab Quarto/LaTeX manuscripts with the shared [`d-morrison/macros`](https://github.com/d-morrison/macros) submodule (vendored at `inst/analyses/macros`, included via `{{< include .../macros/macros.qmd >}}`), not ad-hoc raw LaTeX --- it gives every document the same polished, condensed notation from one versioned source.
-Keep the submodule up to date, and add new macros to it (via a PR to `d-morrison/macros`) whenever a needed concept has no macro, rather than defining one-off commands inline.
+This is mandatory for every equation, not a polish pass: use the semantic macro wherever one names the concept (an expectation is `\E`, not a raw `\mathbb{E}`).
+Keep the submodule up to date, and add new semantic macros to it (via a PR to `d-morrison/macros`, which carries a standing `mwc` grant) whenever a needed concept has no macro, rather than defining one-off commands inline.
+(Directive from the user, 2026-10-02, on a manuscript equation that wrote out an expectation in raw LaTeX: "you're supposed to always use semantic macros wherever applicable, and add new semantic macros as needed".)
 The `use-math-macros` (alias `macroize`) skill is the executable procedure.
 
 Two gotchas: `git submodule update --remote` bumps the tracked gitlink, which dirties `git diff HEAD` --- do it in a worktree, never a checkout running provenance-stamped SLURM jobs.

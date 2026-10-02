@@ -6,32 +6,40 @@ and nothing fired at turn end, so a turn could end over a red PR and the person
 had to ask "fix failing CI?" (twice in one day). This hook checks the one thing
 that is decidable from the transcript.
 
-Own PRs: numbers returned by a `create_pull_request` result or a `gh pr create`
-result, plus PRs passed to `subscribe_pr_activity`.
+Own PRs: numbers returned by a `create_pull_request` result, or by a Bash
+command that starts with `gh pr create` (only the `/pull/N` URL of that result).
+Subscribing to a PR does not make it ours.
 
 Latest status evidence per PR, in transcript order:
   - a `check_run` wake event (a user-side record, JSON carrying `conclusion`),
-  - a `get_check_runs` result (`pull_request_read`), read as a complete listing.
+  - a `get_check_runs` result (`pull_request_read`).
 A failing conclusion is `failure`, `timed_out` or `startup_failure`. `success`,
 `skipped`, `neutral`, `cancelled` and an unfinished run (no conclusion) are not.
+A `get_check_runs` result replaces the PR's earlier evidence only when it holds
+a parsed `check_runs` array that is non-empty and whose length equals
+`total_count`; an error, an empty list or a paginated page merges instead.
+Wake events seen before the PR is registered are kept and attributed once it is.
 
 A failure is acted on when, after the evidence, the transcript shows a
-`git push` (or an MCP file write), `update_pull_request_branch` or an
-`add_issue_comment` on that PR, `gh pr comment` on it, or a later reading in
-which the check no longer fails.
+`git push` (or an MCP file write) that was not rejected or a dry run,
+`update_pull_request_branch` or an `add_issue_comment` on that PR,
+`gh pr comment` on it, or a later reading in which the check no longer fails.
+The warning repeats every turn until then; that is intended.
+
+A PR is dropped when the session ran `gh pr merge` / `gh pr close` on it,
+`merge_pull_request`, or `update_pull_request` with `state` closed.
 
 Not fired for a bot-review check (`review / claude-review`, `require-review`,
-`require-clean-verdict`) whose text says quota, session limit or did not finish:
-nothing in the PR can fix that.
+`require-clean-verdict`) whose name or output title/summary says quota, session
+limit or did not finish: nothing in the PR can fix that.
 
 Deliberate limits:
   - Transcript only, no network. A failure the session never saw is not seen.
   - PRs are keyed by number alone, so the same number in two repositories
     shares one state.
   - Any push counts as acting on every PR, because the push does not name one.
-  - A merged or closed PR is dropped only when this session called
-    `merge_pull_request` on it.
-  - Warns, never blocks; a missing or unreadable transcript is silent.
+  - Warns, never blocks. A missing transcript is silent; any other error prints
+    one line to stderr and exits 0.
 """
 import json
 import os
@@ -44,12 +52,16 @@ BOT_REVIEW = re.compile(r"claude-review|require-review|require-clean-verdict", r
 UNFIXABLE = re.compile(r"quota|session limit|did not finish", re.I)
 PR_URL = re.compile(r"/pull/(\d+)")
 PR_REF = re.compile(r"/pull/(\d+)|#(\d+)|\bPR (\d+)", re.I)
+GH_CREATE = re.compile(r"\s*gh\s+pr\s+create\b")
 PR_KEYS = ("pullNumber", "pull_number", "prNumber", "pr_number", "number")
 MCP_PUSH = re.compile(r"(push_files|create_or_update_file)$")
-# Fallback for a wake event that is not JSON: one name and one conclusion.
+REJECTED = re.compile(r"\[rejected\]|error:")
+# Fallback for a wake event that is not JSON: one name and one conclusion, on
+# one line, so it cannot span two events.
 TEXT_RUN = re.compile(
-    r"check_run.*?name\W+([^\n,\"']+).*?conclusion\W+(failure|timed_out|startup_failure)",
-    re.I | re.S)
+    r"check_run.*?name\W+([^\n,\"']+).*?conclusion\W+"
+    r"(failure|timed_out|startup_failure|success|skipped|neutral|cancelled)",
+    re.I)
 
 NOTE = (
     "[hook: warn-red-own-pr-at-stop] PR {prs} opened in this session still "
@@ -154,7 +166,20 @@ def bash_words(command):
         return command.split()
 
 
+def gh_pr_number(words, verb):
+    """PR number of `gh pr <verb> N-or-URL`, or None when the line has no such call."""
+    for i in range(len(words) - 2):
+        if words[i:i + 3] == ["gh", "pr", verb]:
+            for word in words[i + 3:]:
+                if PR_URL.search(word):
+                    return int(PR_URL.search(word).group(1))
+                if word.isdigit():
+                    return int(word)
+    return None
+
+
 def is_push(command):
+    """A `git [options] push` that is not a dry run."""
     words = bash_words(command)
     for i, word in enumerate(words):
         if word == "git":
@@ -162,12 +187,19 @@ def is_push(command):
             while rest and rest[0].startswith("-"):
                 rest = rest[2:] if rest[0] in ("-C", "-c") else rest[1:]
             if rest and rest[0] == "push":
-                return True
+                return not any(w in ("--dry-run", "-n") for w in rest[1:])
     return False
 
 
 def unfixable(run):
-    return bool(BOT_REVIEW.search(str(run.get("name"))) and UNFIXABLE.search(json.dumps(run)))
+    """A bot-review check whose own name and title/summary say nothing can fix it."""
+    if not BOT_REVIEW.search(str(run.get("name"))):
+        return False
+    parts = [run.get("title"), run.get("summary")]
+    output = run.get("output")
+    if isinstance(output, dict):
+        parts += [output.get("title"), output.get("summary")]
+    return bool(UNFIXABLE.search(" ".join(p for p in parts if isinstance(p, str))))
 
 
 class State:
@@ -201,17 +233,10 @@ class State:
         return found
 
 
-def own_from_result(text, state):
-    for match in PR_URL.finditer(text):
-        state.own.add(int(match.group(1)))
-    for value in decoded(text):
-        if isinstance(value, dict) and isinstance(value.get("number"), int):
-            state.own.add(value["number"])
-
-
 def scan(path):
     state = State()
-    uses = {}  # tool_use id -> (name, input)
+    uses = {}      # tool_use id -> (name, input)
+    pending = {}   # tool_use id -> record index of a push awaiting its result
     with open(path, encoding="utf-8", errors="replace") as handle:
         lines = handle.read().splitlines()
     for index, line in enumerate(lines):
@@ -227,10 +252,16 @@ def scan(path):
                 name = str(block.get("name") or "")
                 tool_input = block.get("input")
                 uses[block.get("id")] = (name, tool_input)
-                note_action(state, name, tool_input, index)
+                if note_action(state, name, tool_input, index):
+                    pending[block.get("id")] = index
             elif kind == "tool_result":
-                name, tool_input = uses.get(block.get("tool_use_id"), ("", None))
-                note_result(state, name, tool_input, text_of(block.get("content")), index)
+                ident = block.get("tool_use_id")
+                name, tool_input = uses.get(ident, ("", None))
+                text = text_of(block.get("content"))
+                if ident in pending and not (
+                        block.get("is_error") or REJECTED.search(text)):
+                    state.pushes.append(pending[ident])
+                note_result(state, name, tool_input, text, index)
             elif kind == "text" and record.get("type") == "user":
                 if not (record.get("isMeta") and record.get("sourceToolUseID")):
                     note_wake(state, block.get("text") or "", index)
@@ -238,27 +269,23 @@ def scan(path):
 
 
 def note_action(state, name, tool_input, index):
+    """Record an action; return True for a push whose result decides if it counts."""
     if name == "Bash" and isinstance(tool_input, dict):
         command = tool_input.get("command")
-        if isinstance(command, str):
-            if is_push(command):
-                state.pushes.append(index)
-            words = bash_words(command)
-            if "gh" in words and "comment" in words and "pr" in words:
-                pr = next((int(w) for w in words if w.isdigit()), None)
-                for w in words:
-                    if PR_URL.search(w):
-                        pr = int(PR_URL.search(w).group(1))
-                if pr:
-                    state.actions.setdefault(pr, []).append(index)
-        return
-    if MCP_PUSH.search(name):
-        state.pushes.append(index)
-    elif name.endswith("subscribe_pr_activity") and not name.endswith("unsubscribe_pr_activity"):
-        pr = number_from_input(tool_input)
+        if not isinstance(command, str):
+            return False
+        words = bash_words(command)
+        for verb in ("merge", "close"):
+            pr = gh_pr_number(words, verb)
+            if pr:
+                state.dropped.add(pr)
+        pr = gh_pr_number(words, "comment")
         if pr:
-            state.own.add(pr)
-    elif name.endswith(("update_pull_request_branch", "add_issue_comment")):
+            state.actions.setdefault(pr, []).append(index)
+        return is_push(command)
+    if MCP_PUSH.search(name):
+        return True
+    if name.endswith(("update_pull_request_branch", "add_issue_comment")):
         pr = issue_number(tool_input)
         if pr:
             state.actions.setdefault(pr, []).append(index)
@@ -266,38 +293,71 @@ def note_action(state, name, tool_input, index):
         pr = number_from_input(tool_input)
         if pr:
             state.dropped.add(pr)
+    elif name.endswith("update_pull_request") and isinstance(tool_input, dict) \
+            and str(tool_input.get("state")).lower() == "closed":
+        pr = number_from_input(tool_input)
+        if pr:
+            state.dropped.add(pr)
+    return False
+
+
+def created_number(name, tool_input, text):
+    """The PR a create call returned, or None. Only that call's own result counts."""
+    if name.endswith("create_pull_request"):
+        for value in decoded(text):
+            if isinstance(value, dict) and isinstance(value.get("number"), int):
+                return value["number"]
+        match = PR_URL.search(text)
+        return int(match.group(1)) if match else None
+    if name == "Bash" and isinstance(tool_input, dict) \
+            and GH_CREATE.match(str(tool_input.get("command"))):
+        urls = PR_URL.findall(text)
+        return int(urls[-1]) if urls else None
+    return None
+
+
+def is_full_listing(values):
+    """A parsed check_runs array, non-empty, whose length is total_count."""
+    for value in values:
+        runs = value.get("check_runs") if isinstance(value, dict) else None
+        if isinstance(runs, list) and runs and value.get("total_count") == len(runs):
+            return True
+    return False
 
 
 def note_result(state, name, tool_input, text, index):
-    is_create = name.endswith("create_pull_request") or (
-        name == "Bash" and isinstance(tool_input, dict)
-        and re.search(r"\bgh pr create\b", str(tool_input.get("command"))))
-    if is_create:
-        own_from_result(text, state)
+    number = created_number(name, tool_input, text)
+    if number:
+        state.own.add(number)
         return
     if name.endswith("pull_request_read") and isinstance(tool_input, dict) \
             and tool_input.get("method") == "get_check_runs":
         pr = number_from_input(tool_input)
         if pr:
-            runs = [r for v in decoded(text) for r in check_runs(v)]
-            state.evidence(pr, runs, index, complete=True)
+            values = list(decoded(text))
+            runs = [r for v in values for r in check_runs(v)]
+            state.evidence(pr, runs, index, complete=is_full_listing(values))
 
 
 def note_wake(state, text, index):
+    """Fold check_run wake events into per-PR evidence, owned or not yet."""
     if "check_run" not in text:
         return
-    if state.own:
-        runs, prs = [], set()
-        for value in decoded(text):
-            runs += list(check_runs(value))
-            prs |= set(pr_numbers(value))
-        if not runs:
-            runs = [{"name": m.group(1).strip(), "conclusion": m.group(2).lower()}
-                    for m in TEXT_RUN.finditer(text)]
-        if not prs:
-            prs = {int(a or b or c) for a, b, c in PR_REF.findall(text)}
-        for pr in prs & state.own:
+    found = False
+    for value in decoded(text):
+        runs, prs = list(check_runs(value)), set(pr_numbers(value))
+        found = found or bool(runs)
+        for pr in prs if runs else ():
             state.evidence(pr, runs, index, complete=False)
+    if found:
+        return
+    for line in text.splitlines():
+        match = TEXT_RUN.search(line)
+        if not match:
+            continue
+        run = {"name": match.group(1).strip(), "conclusion": match.group(2).lower()}
+        for a, b, c in PR_REF.findall(line):
+            state.evidence(int(a or b or c), [run], index, complete=False)
 
 
 def main():
@@ -306,9 +366,10 @@ def main():
         path = payload.get("transcript_path") if isinstance(payload, dict) else None
         if not isinstance(path, str) or not os.path.exists(path):
             return 0
-        state = scan(path)
-        found = state.unacted()
-    except Exception:  # fail open: a guard that crashes must not wedge a session
+        found = scan(path).unacted()
+    except Exception as exc:  # fail open, but say so: a silent guard looks like a clean run
+        sys.stderr.write(
+            f"warn-red-own-pr-at-stop: skipped ({type(exc).__name__}: {exc})\n")
         return 0
     if not found:
         return 0

@@ -58,6 +58,16 @@ def wake(check, conclusion, number, extra=None):
                                  + "</github-webhook-activity>"}]})
 
 
+def usertext(body):
+    return rec(type="user", message={"content": [{"type": "text", "text": body}]})
+
+
+def partial_listing(number, runs, total):
+    return call("mcp__github__pull_request_read",
+                {"method": "get_check_runs", "pullNumber": number},
+                json.dumps({"total_count": total, "check_runs": runs}))
+
+
 def listing(number, runs):
     return call("mcp__github__pull_request_read",
                 {"method": "get_check_runs", "owner": "o", "repo": "r",
@@ -94,8 +104,55 @@ CASES = [
                                                           run_of("tests", "success")]),
      [7], "lint"),
     ("gh pr create counts as own", gh_created(8) + wake("tests", "failure", 8), [8], "tests"),
-    ("subscribe_pr_activity counts as own", subscribed(9) + wake("tests", "failure", 9),
-     [9], "tests"),
+    ("wake seen before the PR is registered is attributed later",
+     wake("tests", "failure", 7) + created(7), [7], "tests"),
+    ("gh pr create with other URLs in the result owns the last one",
+     call("Bash", {"command": "gh pr create --title t"},
+          "see https://github.com/o/r/pull/3 for context\n"
+          "https://github.com/o/r/pull/8\n") + wake("tests", "failure", 8),
+     [8], "tests"),
+    ("paginated listing merges instead of replacing",
+     created(7) + wake("tests", "failure", 7)
+     + partial_listing(7, [run_of("lint", "success")], 5), [7], "tests"),
+    ("empty listing merges instead of replacing",
+     created(7) + wake("tests", "failure", 7) + partial_listing(7, [], 0), [7], "tests"),
+    ("error result merges instead of replacing",
+     created(7) + wake("tests", "failure", 7)
+     + call("mcp__github__pull_request_read",
+            {"method": "get_check_runs", "pullNumber": 7}, "Error: 502 Bad Gateway"),
+     [7], "tests"),
+    ("rejected push is not acting", created(7) + wake("tests", "failure", 7)
+     + call("Bash", {"command": "git push origin b"},
+            " ! [rejected]        b -> b (non-fast-forward)\n"), [7], "tests"),
+    ("push with error: output is not acting", created(7) + wake("tests", "failure", 7)
+     + call("Bash", {"command": "git push origin b"}, "error: failed to push"),
+     [7], "tests"),
+    ("dry-run push is not acting", created(7) + wake("tests", "failure", 7)
+     + push("git push --dry-run origin b"), [7], "tests"),
+    ("errored MCP file write is not acting", created(7) + wake("tests", "failure", 7)
+     + call("mcp__github__push_files", {}, "error: 409 conflict"), [7], "tests"),
+    ("text events: failure on one line, PR named on another",
+     created(7) + usertext("check_run name=tests conclusion=failure\nsee #7 for context"),
+     [], None),
+    ("text events: failure with its PR on the same line",
+     created(7) + usertext("check_run name=tests conclusion=failure for #7"), [7], "tests"),
+    ("text events: a later success text clears a failure text",
+     created(7) + usertext("check_run name=tests conclusion=failure for #7")
+     + usertext("check_run name=tests conclusion=success for #7"), [], None),
+    ("text events do not span two events",
+     created(7) + usertext("check_run name=lint conclusion=success for #7\n"
+                           "other name=tests then conclusion=failure for #7"), [], None),
+    ("quota words outside the title and summary do not exempt",
+     created(7) + wake("review / claude-review", "failure", 7,
+                       {"app": {"description": "usage quota app"},
+                        "output": {"summary": "Verdict: Needs more work"}}),
+     [7], "review / claude-review"),
+    ("echo gh pr create is not a create",
+     call("Bash", {"command": "echo gh pr create"},
+          "https://github.com/o/r/pull/7\n") + wake("tests", "failure", 7), [], None),
+    ("closing a PR by another number leaves this one",
+     created(7) + wake("tests", "failure", 7)
+     + call("Bash", {"command": "gh pr close 8"}, "ok"), [7], "tests"),
     ("two own PRs, one red", created(7) + created(8) + wake("tests", "failure", 8),
      [8], "tests"),
     ("timed_out is a failure", created(7) + wake("tests", "timed_out", 7), [7], "tests"),
@@ -123,6 +180,21 @@ CASES = [
      created(7) + wake("tests", "failure", 7) + push("git commit -m push"), [7], "tests"),
     # Negatives.
     ("PR this session did not open", wake("tests", "failure", 7), [], None),
+    ("subscribing does not make a PR own", subscribed(9) + wake("tests", "failure", 9),
+     [], None),
+    ("gh pr merge drops the PR", created(7) + wake("tests", "failure", 7)
+     + call("Bash", {"command": "gh pr merge 7 --squash"}, "ok"), [], None),
+    ("gh pr close drops the PR", created(7) + wake("tests", "failure", 7)
+     + call("Bash", {"command": "gh pr close https://github.com/o/r/pull/7"}, "ok"),
+     [], None),
+    ("update_pull_request state closed drops the PR",
+     created(7) + wake("tests", "failure", 7)
+     + call("mcp__github__update_pull_request", {"pullNumber": 7, "state": "closed"}, "ok"),
+     [], None),
+    ("update_pull_request without closing keeps the PR",
+     created(7) + wake("tests", "failure", 7)
+     + call("mcp__github__update_pull_request", {"pullNumber": 7, "title": "t"}, "ok"),
+     [7], "tests"),
     ("success", created(7) + wake("tests", "success", 7), [], None),
     ("skipped", created(7) + wake("tests", "skipped", 7), [], None),
     ("neutral", created(7) + wake("tests", "neutral", 7), [], None),
@@ -217,6 +289,17 @@ def main():
         if code != 0 or out:
             failures += 1
             print(f"FAIL fail-open {name}: code={code} out={out!r}")
+    # An unreadable transcript is not silent: one stderr line, still exit 0.
+    directory = tempfile.mkdtemp()
+    try:
+        proc = subprocess.run([sys.executable, HOOK],
+                              input=json.dumps({"transcript_path": directory}),
+                              capture_output=True, text=True)
+    finally:
+        os.rmdir(directory)
+    if proc.returncode != 0 or proc.stdout or len(proc.stderr.strip().splitlines()) != 1:
+        failures += 1
+        print(f"FAIL unreadable transcript: {proc.returncode} {proc.stdout!r} {proc.stderr!r}")
     print("ok" if not failures else f"{failures} failure(s)")
     return 1 if failures else 0
 

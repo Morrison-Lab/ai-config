@@ -142,7 +142,7 @@ def run(tool, tool_input, transcript):
     path = "/nonexistent/transcript.jsonl"
     handle = None
     if transcript is not None:
-        handle = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False)
+        handle = tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".jsonl", delete=False)
         handle.write(transcript)
         handle.close()
         path = handle.name

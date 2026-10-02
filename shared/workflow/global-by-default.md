@@ -5,9 +5,9 @@ An instruction from the user applies to every project and repository unless the 
 
 ## Where to record it
 
-- Prose rules go in `psw`.
-- Agent rules go in `ai-config`.
-- Checks go in `gha`.
+- Prose rules go in [`psw`](https://github.com/Morrison-Lab/psw/).
+- Agent rules go in [`ai-config`](https://github.com/Morrison-Lab/ai-config).
+- Checks go in [`gha`](https://github.com/Morrison-Lab/gha).
 - Project memory may also hold the rule, but it is not enough alone.
 
 ## What to do

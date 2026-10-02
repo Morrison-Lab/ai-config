@@ -178,6 +178,17 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
     - **Do:** read a GraphQL-backed call's 403 body in a CCR session before assuming there is no substitute --- it names the specific REST route to use.
     - **Don't:** treat a GraphQL failure in one of these sessions as a dead end merely because GraphQL or a GraphQL-backed `gh` subcommand is the path documented elsewhere in this corpus.
 
+## The proxy refuses git-data writes over REST, but not the PR path or `git push`
+
+Measured 2026-10-02 in a claude.ai cloud/project session, through the agent proxy.
+`gh api repos/{o}/{r}/git/trees --input -` (POST) and `gh api repos/{o}/{r}/git/refs -f ref=... -f sha=...` (POST) both failed with `Write access to this GitHub API path is not permitted through this proxy. (HTTP 403)`.
+These are the low-level routes a no-checkout multi-repo edit would build commits from.
+`POST repos/{o}/{r}/pulls`, `POST .../issues/{n}/labels`, `PUT .../pulls/{n}/merge`, and `git push` from a shallow clone all worked.
+GraphQL is blocked as well, which is tracked separately in [ai-config#4220](https://github.com/Morrison-Lab/ai-config/issues/4220) and not restated here.
+
+- **Do:** for a multi-repo edit with no local checkout, run `git clone --depth 1`, branch, commit, `git ls-remote --heads origin <branch>`, then `git push` in its own command, and open the PR with `gh api repos/{o}/{r}/pulls --input file.json`.
+- **Don't:** assemble the commit through `git/trees` and `git/refs` POSTs, or conclude REST writes are blocked wholesale because those two 403 --- the PR, label, merge, and push paths are open.
+
 ## The merge call is not blocked by the proxy, and is still refused --- by the client
 
 The bullet above ends "Merging is not similarly blocked", which is true of the

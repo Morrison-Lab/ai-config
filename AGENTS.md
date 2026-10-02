@@ -14,9 +14,9 @@ Every rule here serves these three, each an act you can observe:
 
 ## Get a clean automated review before asking a person to review
 
-Never ask a person to review a PR, a GitLab MR, a document, or anything else, in any repo or project, until its automated review is clean or deadlocked.
+Never ask a person to review a PR, a GitLab MR, a document, or other work product, in any repo or project, until its automated review is clean or deadlocked.
 Trigger the automated reviews yourself once the round's pushes are done, and iterate (`ardi`) until clean.
-A quota-skipped, stubbed, or never-started review is no review: re-trigger it, and until one runs, a clean posted independent adversarial review stands in.
+A quota-skipped, stubbed, or never-started review is no review: re-trigger it, and if it still cannot give a verdict, a clean posted independent adversarial review stands in.
 See [`automated-review-before-human`](shared/workflow/automated-review-before-human.md) for the steps and the two exceptions.
 
 - **Do:** trigger and drive the automated review to clean or deadlock, then link that verdict when asking for human review.

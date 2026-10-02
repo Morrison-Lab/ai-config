@@ -1,5 +1,6 @@
 Never ask a person to review work until its automated review is clean or deadlocked.
-That holds in every repository, project and forge: a GitHub PR, a GitLab MR, a rendered document sent for a read, or anything else a person is asked to look at.
+That holds in every repository, project and forge: a GitHub PR, a GitLab MR, a rendered document sent for a read, or any other work product awaiting a person's review.
+A question or a status report to the user is not a review request.
 The agent triggers the automated reviews itself;
 "ready for your review" is a claim that this already happened.
 

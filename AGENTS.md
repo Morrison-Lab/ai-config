@@ -24,16 +24,7 @@ Those manuals must defer to this file for universal policy.
 Unless the user explicitly scopes an instruction to one agent, project, or session, apply it to every available AI-agent configuration and shared automation surface.
 Do not treat the currently speaking agent as an implicit scope restriction.
 
-The same holds for projects and repositories.
-Read an instruction as global across every project and repository unless the user explicitly limits it to one.
-Record a global instruction in its global home (`psw` for prose rules, this repository for agent rules, `gha` for checks), not only in a project's memory or instructions.
-Writing it in project memory as well is fine, but it is not enough alone.
-Once the rule is in its global home, you decide whether to shorten the project copy.
-The default is to shorten it to a one-line pointer to the global copy after the global copy merges.
-
-- **Do:** put a new instruction in the global home, and have project files link to it.
-- **Do:** start following the instruction in the same turn it arrives.
-- **Don't:** read "we are working on project X" as a scope limit, or record the instruction only in project memory.
+The same holds for projects: see [`global-by-default`](shared/workflow/global-by-default.md).
 
 ## Gate external repository communication on membership
 
@@ -182,7 +173,6 @@ See [`AGENTS.cases.md`](AGENTS.cases.md).
 - **Do:** state your specific recommendation alongside every question or choice presented to the user.
 - **Do:** write every pending-decision line as "decide X --- I recommend Y, because Z".
 - **Don't:** ask questions or present choices without declaring your recommended path.
-- **Don't:** use "Let me know if..." to offer already-authorized work instead of performing it.
 ## Run UMS when work is scrutinized
 
 When you read a review of your work, receive critical feedback on it, or a questioned claim ("are you sure about that?") turns out to be wrong, run `ums` in that turn.

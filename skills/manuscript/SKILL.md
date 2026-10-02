@@ -160,8 +160,7 @@ Check the EQUATOR page for the current version before citing one.
 - A table must fit the page width.
   Split a wide table or move it to the supplement;
   never let it run off the margin.
-- Keep the caption, table, and footnotes together on one page.
-  A caption is never on a separate page from its table, and never split across a page break unless the caption alone is longer than a page.
+- Caption placement and page breaks around tables follow the `manuscript-float-layout` fragment ([ai-config#4203](https://github.com/Morrison-Lab/ai-config/pull/4203)).
 
 ## 7. Figures
 
@@ -178,7 +177,7 @@ Check the EQUATOR page for the current version before citing one.
   raster at 300 dpi or more (600 to 1200 for line art) in TIFF or PNG.
 - Multi-panel figures label panels A, B, C and refer to them in the legend.
 - Add alt text when the journal or venue supports it (see [`alt-text`](../alt-text/SKILL.md)).
-- Keep the caption on the same page as the figure, and never split it across a page break unless the caption alone is longer than a page.
+- Caption placement and page breaks around figures follow the `manuscript-float-layout` fragment ([ai-config#4203](https://github.com/Morrison-Lab/ai-config/pull/4203)).
 
 ## 8. Statistics and numbers
 
@@ -214,7 +213,6 @@ Check the EQUATOR page for the current version before citing one.
 - A separate document (or a clearly separated part after a page break) with its own title, the paper's title and authors, and a table of contents.
 - Number items with the journal's scheme: "eTable 1", "eFigure 1", "eMethods" (JAMA style) or "Table S1", "Figure S1".
   Same numbering and caption rules as the main text.
-  Supplement captions use the caption style, not a heading style, so they stay out of the heading outline and keep the caption formatting.
 - Cite each supplement item from the main text, in order.
 - The supplement is where these belong: extended methods, full model output, sensitivity analyses, additional tables, code and software versions, data-processing details, and any pipeline or audit notes (data-quality checks, exclusions traced step by step, reconciliation with earlier reports).
 - Keep it as polished as the main text: same caption, table, and abbreviation rules.
@@ -271,12 +269,10 @@ Most journals require each of these, in the text or in submission forms:
 ## 14. Rendering and layout (Quarto)
 
 - Render from source every time; do not edit the output file.
-- Put tables and figures after the references with `{{< pagebreak >}}` before each, and a page break before the supplement.
+- Float placement, page breaks, and caption rules (floats after the references, a break before the supplement, captions on their float's page and rendered as captions rather than headings) live in the `manuscript-float-layout` fragment ([ai-config#4203](https://github.com/Morrison-Lab/ai-config/pull/4203));
+  follow it rather than restating it here.
 - Table captions on top (`tbl-cap-location: top`), figure captions below (`fig-cap-location: bottom`).
   Use div syntax for labels and captions ([`quarto-figure-captions.md`](../../shared/writing/quarto-figure-captions.md)).
-- Keep captions with their objects: in PDF, stop floats from drifting (`fig-pos: "H"` or one float per page);
-  in Word, the reference document's caption style should have "Keep with next" set, and each float sits on its own page.
-- When two floats would share a page and one would split or lose its caption, insert a page break between them rather than letting either split.
 - Double spacing, line numbers, and page numbers if the journal asks (common for review copies).
 - Cross-references must resolve; run [`check-rendered-refs`](../check-rendered-refs/SKILL.md).
 

@@ -4,6 +4,14 @@ This file defines standardized, vendor-neutral instructions for AI coding agents
 
 Worked-example case records and authentic incident directives live in [`AGENTS.cases.md`](AGENTS.cases.md), moved out of this auto-loaded context.
 
+## Guiding principles: be intelligent, wise, and diligent
+
+Every rule here serves these three, each an act you can observe:
+
+- **Intelligent:** judge whether the work achieves its purpose, as a referee would, not only whether it covers the items named, and [question the assignment itself](shared/workflow/challenge-the-assignment.md).
+- **Wise:** treat a correction as a general principle and record it where every project loads it ([`encode-reusable-feedback`](shared/workflow/encode-reusable-feedback.md)).
+- **Diligent:** verify before claiming: re-query state rather than recall it ([`metacognitive-monitoring`](shared/workflow/metacognitive-monitoring.md)), and view a rendered deliverable before calling it ready ([`check-the-renders`](shared/workflow/check-the-renders.md)).
+
 ## Instruction layering
 
 `AGENTS.md` is the compact, unconditional cross-agent contract.
@@ -351,6 +359,10 @@ ask only for destructive, high-impact, or blocking decisions.
 This grants no merge authority.
 See [`AGENTS.cases.md`](AGENTS.cases.md).
 
+The grant covers installing and updating software: R, R packages (including through `renv`), Quarto, and any other tool, on any machine where the owner has install access, directly or through conda, mamba, pyenv, Homebrew, or a similar manager.
+Do it whenever it helps, without asking (owner directive, 2026-10-02).
+A resulting lockfile change (`renv.lock`, `environment.yml`) is a repo change and goes through the normal PR flow.
+
 ## Strict Merge Control Policy
 
 - **NEVER merge any PR or MR without explicit user permission.**
@@ -359,6 +371,9 @@ See [`AGENTS.cases.md`](AGENTS.cases.md).
   Under `mwc`, a PR must be fully clean across CI and review (see [`fully-clean.md`](shared/workflow/fully-clean.md));
   any reviewer's standing not-clean vetoes merge.
   ARD every item across PR history before merge, then request fresh reviews.
+- **Never call a document-producing PR ready, or merge it, before viewing every page of its render.**
+  For a Word, PDF, slide, or manuscript render, view every page at the current head and post the evidence first, per [`review-rendered-documents`](shared/workflow/review-rendered-documents.md);
+  green CI is not enough.
 - **Never describe a PR as merge-ready without a clean review verdict on the latest commit.**
   `mergeStateStatus: CLEAN` is conflict-free plus passing checks, not a review verdict;
   report missing review as blocked on review.

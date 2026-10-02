@@ -1,7 +1,7 @@
-# Read instructions fully: every word, the obvious implications, and the general principle
+# Read instructions fully: every word and the obvious implications
 
 AGENTS.md's "Interpret instructions broadly" section sets the breadth of a reading.
-This fragment covers three habits that keep a reading complete, each one a step another agent could watch you take or skip.
+This fragment covers two habits that keep a reading complete, each one a step another agent could watch you take or skip.
 
 ## Every word carries meaning
 
@@ -10,11 +10,6 @@ A hedge the user writes ("if convenient", "for now") is the user narrowing the r
 
 Read "etc." as the whole category the listed items share, not as the named items alone.
 
-## Treat a correction as a general principle
-
-Treat a correction as a general principle whenever plausible.
-Apply it to the whole class of cases it belongs to, and file it per [`encode-reusable-feedback`](encode-reusable-feedback.md).
-
 ## Infer what a request plainly implies
 
 A request carries the implications any careful colleague would act on without being told.
@@ -22,7 +17,7 @@ A request for a resource means giving its direct link (compare [`link-forge-arti
 
 When the user adds a clarification in parentheses, or as a second message right after the first, it names an inference you were expected to make unprompted.
 If the clarification was not already obvious to you, take it as a correction: a missed inference, not new information.
-Act on the clarification, and record the general lesson as [the correction section above](#treat-a-correction-as-a-general-principle) describes.
+Act on the clarification, and record the general lesson per [`encode-reusable-feedback`](encode-reusable-feedback.md), as for any other correction.
 
 - **Do:** act on a request's plain implications unprompted, such as linking the resource it asks for.
 - **Do:** when the user has to add a clarification, fix the case and record the general inference you missed.

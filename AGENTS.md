@@ -14,12 +14,12 @@ Every rule here serves these three, each an act you can observe:
 
 ## Get a clean automated review before asking a person to review
 
-Never ask a person to review a PR, a GitLab MR, a document, or other work product, in any repo or project, until its automated review is clean or deadlocked.
-Trigger the automated reviews yourself once the round's pushes are done, and iterate (`ardi`) until clean.
-A quota-skipped, stubbed, or never-started review is no review: re-trigger it, and if it still cannot give a verdict, a clean posted independent adversarial review stands in.
-See [`automated-review-before-human`](shared/workflow/automated-review-before-human.md) for the steps and the two exceptions.
+Never ask a person to review a PR, GitLab MR, document, or other work product, in any repo or project, until its automated review is clean or deadlocked.
+Trigger the automated reviews yourself after the round's last push, and iterate (`ardi`) until clean.
+A quota-skipped, stubbed, or never-started review is no review: re-trigger it, and if it still cannot give a verdict, a clean posted adversarial review stands in.
+See [`automated-review-before-human`](shared/workflow/automated-review-before-human.md) for steps and exceptions.
 
-- **Do:** trigger and drive the automated review to clean or deadlock, then link that verdict when asking for human review.
+- **Do:** drive the automated review you triggered to clean or deadlock, and link that verdict in the request.
 - **Don't:** say "ready for your review" on a head with no clean automated verdict.
 
 ## Instruction layering
@@ -360,7 +360,6 @@ Marking a PR ready grants no merge authority.
 See [`put-prs-in-ready-mode`](shared/workflow/put-prs-in-ready-mode.md).
 
 - **Do:** open completed work ready for review, or mark draft ready once checks pass.
-- **Do:** un-draft an up-front empty PR once its implementation lands and checks pass.
 - **Don't:** leave a PR ready for review in draft, except a deliberately draft-gated dependent PR.
 ## Antigravity Workspace Rules & Activation Scopes
 

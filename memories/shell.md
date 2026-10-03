@@ -17,6 +17,11 @@ Recurrence, 2026-09-28 (a cloud session on `Morrison-Lab/pds`, no ai-config load
 Minutes later, `for p in $(pgrep -f 'scripts/test_hooks.py'); do [ "$p" != "$$" ] && kill $p; done` killed its own background task the same way: `$$` excludes the shell, not the command-substitution child whose argv carries the pattern.
 Evidence recorded on ai-config#2915.
 
+Recurrence, 2026-10-03 (an ardia sweep): `pkill -f run_validate.py; ...` matched the wrapping `bash -c` process, so the tool call died with exit 144 and the rest of the command never ran.
+
+- **Do:** run `pkill` in its own call, or use a pattern the calling command line does not contain, such as `pkill -f '[r]un_validate'`.
+- **Don't:** chain `pkill` with other work in one call using a literal pattern taken from that same line.
+
 ### Robust remedies
 
 - **Poll a done-marker file**:

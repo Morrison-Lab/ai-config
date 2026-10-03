@@ -297,29 +297,32 @@ Most journals require each of these, in the text or in submission forms:
 ## 15. Pre-submission checklist
 
 A green build is not "done".
-Item 1 is a hard gate: no manuscript PR or MR is reported ready or merged, under any grant, until it passes ([`review-rendered-documents`](../../shared/workflow/review-rendered-documents.md)).
+Items 1 and 2 are a hard gate: no manuscript PR or MR is reported ready or merged, under any grant, until it passes ([`review-rendered-documents`](../../shared/workflow/review-rendered-documents.md)).
 Before calling a manuscript ready:
 
-1. [ ] Export the render to PDF and **look at every page**, main text and supplement.
-2. [ ] Every table and figure has a number and a caption, and is cited in the text in order.
-3. [ ] The rendered layout passes every rule in the `manuscript-float-layout` fragment ([ai-config#4203](https://github.com/Morrison-Lab/ai-config/pull/4203)).
-4. [ ] No table runs off the page;
+1. [ ] Export the render to PDF and **look at every page**, main text and supplement;
+   evidence: the page-by-page comment on the PR or MR.
+2. [ ] An independent [referee read](../../shared/workflow/adversarial-self-review.md#post-every-independent-review-on-the-pr-or-mr-it-reviewed) of this render, by a reviewer other than the session that made the revision;
+   evidence: its report, posted on the PR or MR and linked in the reply that hands the manuscript back.
+3. [ ] Every table and figure has a number and a caption, and is cited in the text in order.
+4. [ ] The rendered layout passes every rule in the `manuscript-float-layout` fragment ([ai-config#4203](https://github.com/Morrison-Lab/ai-config/pull/4203)).
+5. [ ] No table runs off the page;
    no figure is cropped or blurry;
    every figure fills the available width without large blank margins, and its smallest text is about 8 pt or larger (section 7).
-5. [ ] No broken cross-references (`??`, `@fig-`, `Table ?`), raw Markdown, code output, warnings, or `NA` in rendered tables.
-6. [ ] Abstract numbers match the Results, tables, and figures.
-7. [ ] Every abbreviation is defined at first use (abstract, text, each table and figure).
-8. [ ] Estimates carry 95% CIs, are phrased as estimates, and share decimal places with their CIs;
+6. [ ] No broken cross-references (`??`, `@fig-`, `Table ?`), raw Markdown, code output, warnings, or `NA` in rendered tables.
+7. [ ] Abstract numbers match the Results, tables, and figures.
+8. [ ] Every abbreviation is defined at first use (abstract, text, each table and figure).
+9. [ ] Estimates carry 95% CIs, are phrased as estimates, and share decimal places with their CIs;
    P values and decimals follow section 8.
-9. [ ] No pipeline or audit notes, file names, or TODOs in the main text.
-10. [ ] Reporting-guideline checklist completed, with page numbers.
-11. [ ] References resolve, are in order, and support their sentences.
-12. [ ] Title page complete: authors, affiliations, corresponding author, word counts.
-13. [ ] Required statements present (section 13).
-14. [ ] Word, table, figure, and reference counts within the journal's limits.
-15. [ ] AI-tell and fact-check passes done.
-16. [ ] Cover letter drafted: the question, the main finding, why this journal, confirmation that the work is not under consideration elsewhere, and any suggested or excluded reviewers.
-17. [ ] Every equation uses the shared semantic macros wherever one applies, and any concept without one got a new macro ([`use-math-macros`](../use-math-macros/SKILL.md)).
+10. [ ] No pipeline or audit notes, file names, or TODOs in the main text.
+11. [ ] Reporting-guideline checklist completed, with page numbers.
+12. [ ] References resolve, are in order, and support their sentences.
+13. [ ] Title page complete: authors, affiliations, corresponding author, word counts.
+14. [ ] Required statements present (section 13).
+15. [ ] Word, table, figure, and reference counts within the journal's limits.
+16. [ ] AI-tell and fact-check passes done.
+17. [ ] Cover letter drafted: the question, the main finding, why this journal, confirmation that the work is not under consideration elsewhere, and any suggested or excluded reviewers.
+18. [ ] Every equation uses the shared semantic macros wherever one applies, and any concept without one got a new macro ([`use-math-macros`](../use-math-macros/SKILL.md)).
 
 Report the manuscript as ready only after this checklist passes, and say which items were checked on the rendered PDF.
 Post the page-by-page evidence on the PR or MR as that fragment describes.

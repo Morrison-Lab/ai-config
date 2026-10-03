@@ -122,7 +122,10 @@ def _simple_commands(cmd):
 # missed `perl -0777pi -e 's/a/b/'` entirely -- slurp mode plus a
 # non-global substitution being the worst-case form of the bug this hook
 # exists to catch.
-_PERL_INPLACE_CLUSTER = re.compile(r"^-(?:[np]|0[0-7]*)*i(?:[npi]|0[0-7]*)*(\.\S*)?$")
+# regex-safe: worst case 100k-char flag token of 0s 0.001s vs hook timeout 20s; was exponential, >20s at 1k (ai-config#3989)
+_PERL_INPLACE_CLUSTER = re.compile(
+    r"^-(?:[np]|0[0-7]*(?![0-7]))*i(?:[npi]|0[0-7]*(?![0-7]))*(\.\S*)?$"
+)
 
 # sed's -i, optionally bundled with -n (quiet). BSD sed's mandatory backup-
 # extension argument, when given as a separate empty-string token

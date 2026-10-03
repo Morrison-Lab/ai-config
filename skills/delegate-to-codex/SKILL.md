@@ -19,6 +19,12 @@ can't finish. Exhaust the *current 5-hour codex window*, then fall back to Claud
 until the window resets. This skill is the mechanism; the preference lives in
 `memories/delegation.md`.
 
+**Scope: UCDH projects only.**
+The `codex` plan here is UCDH's, so use this skill only for a UCDH project ---
+the `bcs` or `hac` groups, on any forge.
+Outside UCDH, route to `agy`, OpenCode, OpenRouter or the Cursor CLI instead
+(user directive, 2026-10-03; see `memories/delegation.md`).
+
 ## When this fires
 
 - "delegate to codex", "use codex", "run this on codex", "do this with codex",

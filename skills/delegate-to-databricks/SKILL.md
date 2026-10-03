@@ -18,6 +18,11 @@ The delegation-ladder preference this plugs into lives in [`memories/delegation.
 [`memories/databricks-hosted-llms.md`](../../memories/databricks-hosted-llms.md) carries the underlying Codex/Databricks configuration facts this skill builds on --- read it alongside this file rather than only this one;
 the two sections below repeat only what changes the setup steps.
 
+**Scope: `hac`-group projects on the UCDH GitLab only.**
+The UCDH Databricks workspace is for projects in the `hac` group (`health-analytics-core`) on `hc2-gitlab.ucdmc.ucdavis.edu`.
+Do not dispatch work from any other project to it, including `bcs` and other UCDH projects
+(user directive, 2026-10-03; see `memories/delegation.md`).
+
 ## Why this is a shell-out, not a subagent
 
 Claude Code's `Agent` tool takes no generic `base_url` override for an arbitrary custom endpoint --- its `model` parameter selects among Claude model tiers (e.g. `sonnet`, `opus`, `haiku`), not among backends, and which deployment route Claude Code itself talks to (the Anthropic API, or an enterprise-cloud option such as Amazon Bedrock, Google Vertex, or Microsoft Foundry) is a separate, session-level configuration that a per-call `model` value cannot redirect.

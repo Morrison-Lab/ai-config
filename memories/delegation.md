@@ -7,6 +7,18 @@ this section is self-contained.
 ## Delegate heavy work to another CLI first --- codex, agy, opencode, and openrouter
 
 > [!IMPORTANT]
+> **Codex and Databricks are scoped to UCDH projects** (user directive, 2026-10-03:
+> "ucdh databricks is only for projects in the hac group on the ucdh gitlab, and ucdh codex is only for ucdh projects on any forge (bcs + hac)").
+> The `codex` lane below, and [`delegate-to-codex`](../skills/delegate-to-codex/SKILL.md), apply only in a UCDH project:
+> the `bcs` or `hac` groups, on any forge (for example `ucdavis/bcs`, `ucdavis/hac.*`, or `health-analytics-core` on `hc2-gitlab.ucdmc.ucdavis.edu`).
+> The Databricks lane, and [`delegate-to-databricks`](../skills/delegate-to-databricks/SKILL.md), apply only in a `hac`-group project on the UCDH GitLab.
+> Everywhere else, the ladder starts at `agy`, then OpenCode, OpenRouter and the Cursor CLI, per
+> [`standing-habits-from-ezra`](../shared/workflow/standing-habits-from-ezra.md).
+>
+> - **Do:** check which project the work belongs to before routing to `codex` or Databricks.
+> - **Don't:** read the "codex first" order below as covering non-UCDH projects.
+
+> [!IMPORTANT]
 > **`agy` (Google Antigravity) is confirmed usable as a dispatchable subagent, effective 2026-09-02** (user directives that day: "start using agy as a subagent where feasible", "use agy cli for it").
 > The 2026-08-20 API-dispatch outage (`429: prepayment credits depleted`, user directive that day, scope corrected 2026-08-23) stays on record as history --- it explains why an earlier version of this banner said "out of service" --- but it never described the CLI, which the 2026-08-25 clarification already carved out as a separate, unaffected path.
 > **A fresh Windows install on 2026-09-02, from the official `google-antigravity/antigravity-cli` GitHub release, confirms the CLI works end to end**: `agy --version` reports 1.1.24, `agy models` lists a real roster, and a headless smoke test returned the expected output in about 5 seconds.

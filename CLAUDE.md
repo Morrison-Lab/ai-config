@@ -1063,6 +1063,14 @@ and a read-through inspects sentences, not the sequence.
 
 [`shared/writing/quarto-remarks-vs-callouts.md`](shared/writing/quarto-remarks-vs-callouts.md)
 
+## Quarto: put typed content in a div or callout wherever one fits
+
+[`shared/writing/quarto-divs-for-typed-content.md`](shared/writing/quarto-divs-for-typed-content.md)
+
+Every block with a type --- definition, result, proof, example, exercise, solution, remark, warning, tip, note --- goes in the div or callout of that type, in every repository with Quarto content.
+A recurring kind of block with no matching category gets a new custom div or callout type rather than staying in plain prose.
+Connective narrative stays unboxed, and one theorem-type div does not go inside another.
+
 ## Writing style: a grouping level must earn its place
 
 [`shared/writing/grouping-levels.md`](shared/writing/grouping-levels.md)
@@ -1416,7 +1424,7 @@ The Write tool passes bytes unchanged, and it cannot be silently skipped the way
   Another lab member's PR that fails the test gets neither the comment nor the merge.
   [`mwc`](skills/mwc/SKILL.md)'s "Another session's PR" section carries the derivation and the pattern/anti-pattern pair (ai-config#2460).
 
-**One standing exception: PRs targeting `Morrison-Lab/ai-config` carry a standing `mwc` grant**, with no per-session re-issue and no `enable-mwc` step --- `hooks/no-unauthorized-merge.py` reads the merge's target repo off the command.
+**One standing exception: PRs targeting `Morrison-Lab/ai-config` or the shared math-macros repo (`d-morrison/macros`) carry a standing `mwc` grant**, with no per-session re-issue and no `enable-mwc` step --- `hooks/no-unauthorized-merge.py` reads the merge's target repo off the command.
 [`mwc`](skills/mwc/SKILL.md)'s Scope Limit binds in full, so it covers a **fully clean** PR (see [`fully-clean`](shared/workflow/fully-clean.md)) and nothing else.
 It is scoped to the **target**, so a merge from an ai-config checkout into another repo is unaffected.
 

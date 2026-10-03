@@ -23,6 +23,10 @@ if not os.path.isfile(HOOK):
 os.environ["NO_UNAUTHORIZED_MERGE_DISABLE_INFRA_GRANT"] = "1"
 
 BLOCK = [
+    # The macros entries in STANDING_MERGE_GRANT_REPOS are exact names.
+    ("gh pr merge 12 -R d-morrison/macros-fork", "a repo whose name merely starts with macros"),
+    ("gh pr merge 12 -R Other-Owner/macros", "the macros name under an ungranted owner"),
+    ("gh pr merge 12 -R d-morrison/macros -R Morrison-Lab/gha", "a granted macros target beside an ungranted one"),
     ("gh pr merge 411 --squash", "bare gh pr merge"),
     ('bash -c "gh pr merge 411 --squash"', "subshell bash -c gh pr merge inside double quotes"),
     ("sh -c 'gh pr merge 411 --squash'", "subshell sh -c gh pr merge inside single quotes"),
@@ -615,6 +619,12 @@ ALLOW = [
      "-Rvalue with no separator, which gh's flag parser accepts"),
     ('gh pr merge 1352 -R "Morrison-Lab/ai-config" --squash',
      "a quoted repo argument, unquoted by unquote_words before the lookup"),
+    ("gh pr merge 12 -R d-morrison/macros --squash",
+     "the macros repo carries the standing grant too"),
+    ("gh pr merge 12 --repo Morrison-Lab/macros",
+     "the macros repo under its other owner spelling"),
+    ("gh api -X PUT repos/d-morrison/macros/pulls/12/merge",
+     "the REST PR-merge form against the macros repo"),
     ("gh api -X PUT repos/Morrison-Lab/ai-config/pulls/1352/merge",
      "the REST PR-merge form against the granted repo"),
     ("gh api --method PUT /repos/Morrison-Lab/ai-config/pulls/1352/merge",

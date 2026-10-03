@@ -11,7 +11,7 @@ The same reader at the end of the page has to guess which link goes with which s
 - Write one line per link, such as `*Video:* Weinberger derives the descent direction ([from 3:09](https://example.org/video?t=189s)).` Use `*Media:*` for other external material, such as a podcast, an article or an interactive demo.
 - Name the speaker and say what the video shows, in simple, literal wording.
 - Link the exact start time when the video covers more than the topic.
-- Cite the source in a bracketed citation.
+- Cite the source with a bracketed citation key after the link, such as `[@weinberger-lecture]`, so the source also appears in the references.
 - A video that covers several sections goes after the first section it supports.
 - Never put a link between an exercise and its solution.
 - Link public sites freely, including course sites that host their own solutions.
@@ -22,10 +22,10 @@ The same reader at the end of the page has to guess which link goes with which s
 
 ## Where each repository states it
 
-- `Morrison-Lab/psw`: the prose rule, in `chapters/paper-organization.qmd`, "Links to videos and other media".
-  The prose copy is canonical for wording.
+- `Morrison-Lab/psw`: the prose rule, proposed for `chapters/paper-organization.qmd` as "Links to videos and other media" in [psw#83](https://github.com/Morrison-Lab/psw/pull/83) (still open as of 2026-10-03).
+  Once it merges, the prose copy is canonical for wording.
   This fragment is the agent-facing copy.
-- `Morrison-Lab/lds`: [`AUTHORING.md`](https://github.com/Morrison-Lab/lds/blob/main/AUTHORING.md), "Put each video and other external media link beside the content it supports" (Ezra, 2026-10-02).
+- `Morrison-Lab/lds` (a private repository): [`AUTHORING.md`](https://github.com/Morrison-Lab/lds/blob/main/AUTHORING.md), "Put each video and other external media link beside the content it supports" (Ezra, 2026-10-02).
   Other note repositories link to this fragment rather than restating it.
 
 ## Related

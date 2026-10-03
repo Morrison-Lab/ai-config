@@ -54,6 +54,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/remind-record-standing-guidance.py\"'",
+            "timeout": 10,
+            "script": "remind-record-standing-guidance.py",
+            "why": "AGENTS.md 'Generalize instructions to every AI agent by default': a standing rule is recorded in its global home (ai-config for agent rules, psw for prose rules, gha for checks) in the same turn it is given, and followed from then on. Injects, never blocks, when the new prompt or the previous user message reads as standing guidance and no ai-config or psw write or dispatch followed it. Project memory is allowed but not enough alone."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/remind-ums-after-error.py\"'",
             "timeout": 10,
             "script": "remind-ums-after-error.py",
@@ -779,6 +786,13 @@
             "timeout": 10,
             "script": "flag-partial-put-to-resource-root.py",
             "why": "A partial PUT to a REST resource ROOT can null fields the body never named, returning 200 either way. Measured 2026-09-24: a Canvas course PUT setting one boolean also cleared start_at and end_at, and four restore attempts returned 200 and changed nothing. Warns, never blocks."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-human-review-before-clean-verdict.py\"'",
+            "timeout": 10,
+            "script": "warn-human-review-before-clean-verdict.py",
+            "why": "ai-config#4247: AGENTS.md says to get a clean automated review before asking a person to review, and the rule was skipped (ai-config#4241). Warns, never blocks, when a request for a human reviewer (`gh pr edit --add-reviewer`, `gh pr create --reviewer`/`-r`, a `requested_reviewers` POST, or mcp__github__update_pull_request/create_pull_request with `reviewers`) is made and the transcript since the last `git push` holds no clean verdict. Logins containing bot, copilot or claude are not people. Reads only the transcript; an explicit instruction from the user to request review now is a valid reason to ignore the note."
           }
         ]
       },
@@ -910,6 +924,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-write-shrink.py\"'",
+            "timeout": 60,
+            "script": "warn-write-shrink.py",
+            "why": "ai-config#4169 (from #4134): create_or_update_file and push_files replace a file's WHOLE content, so a stale or partial reconstruction is internally consistent yet far smaller than what is live; the size checks in memories/github-mcp-tools.md compare against the intended source and miss it. Looks up the live size via gh api and warns loudly (never blocks) when the new content shrinks the file by more than 50%, or by more than 20% above 10KB. Fails open with a visible note when the lookup fails; a new file is silent. The script ignores every other mcp__github__ tool."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-pr-create-without-dupe-check.py\"'",
             "timeout": 10,
             "script": "warn-pr-create-without-dupe-check.py",
@@ -970,6 +991,13 @@
             "timeout": 10,
             "script": "flag-self-authored-verdict-echo.py",
             "why": "The MCP half of the Bash entry above, following flag-unmeasured-timestamp.py's precedent. hooks.json matches by tool name, so the Bash entry never sees a comment posted through mcp__github__add_issue_comment / add_reply_to_pull_request_comment / update_issue_comment -- which is how the mln#49 comments went out, from a remote session with no `gh` on PATH. Same script, same warn-only behaviour, reading tool_input.body directly. The edit tool is covered deliberately: the incident's first attempted fix was an edit to the offending comment, and it did not clear the reading. Those three are exactly what is bound. The script inherits MCP_POST_TOOLS from require-agent-disclosure.py, adds update_issue_comment, and subtracts THREE review surfaces by name: pull_request_review_write, discussion_comment_write and add_comment_to_pending_review. An adversarial review reproduced a formal REQUEST_CHANGES review, carrying ARD labels and its own not-clean verdict, warning through the first of those -- the self-review population fire condition 5 exists to leave alone. The third is subtracted on the same criterion rather than bound: it is step 2 of the three-call sequence that files a formal review (create the pending review, add each comment, submit), so a comment posted through it is part of a review being composed. Counting it as bound is the claim a round-9 review falsified against the module."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-human-review-before-clean-verdict.py\"'",
+            "timeout": 10,
+            "script": "warn-human-review-before-clean-verdict.py",
+            "why": "The MCP half of the Bash entry: a remote session has no `gh`, so mcp__github__update_pull_request or create_pull_request with `reviewers` is how it requests a person. Same script, same warn-only behaviour."
           }
         ]
       },
@@ -1322,6 +1350,18 @@
             "why": "A partial PUT to a REST resource ROOT can null fields the body never named, returning 200 either way. Measured 2026-09-24: a Canvas course PUT setting one boolean also cleared start_at and end_at, and four restore attempts returned 200 and changed nothing. Warns, never blocks."
           }
         ]
+      },
+      {
+        "matcher": "mcp__hearthbot__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-bare-forge-reference.py\"'",
+            "timeout": 10,
+            "script": "warn-bare-forge-reference.py",
+            "why": "ai-config#4224. The user asked for a link on every artifact a reply names ('always give me hyperlinks!', then 'how many times do I have to tell you that?', 2026-10-02) after the rule was already in memory and repo instructions; the miss happens at composition time, so the rule alone did not fire. Warns, never blocks, when a user-visible reply tool call carries a bare forge reference (#N, !N, owner/repo#N) outside Markdown links, URLs and code. Descriptions without a number ('the referee note') have no lexical marker and are out of scope. Fails open."
+          }
+        ]
       }
     ],
     "Stop": [
@@ -1354,6 +1394,13 @@
             "timeout": 10,
             "script": "no-stale-pr-status.py",
             "why": "Blocks a reply asserting a PR's check state when the last status query predates the last push, so a stale reading is never reported as current."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-red-own-pr-at-stop.py\"'",
+            "timeout": 10,
+            "script": "warn-red-own-pr-at-stop.py",
+            "why": "The rule to fix red CI on your own PRs unprompted existed and nothing fired at turn end, so the person had to ask 'fix failing CI?' twice in one day. Warns, never blocks, when a turn ends while a PR this session opened still has a failing check (a check_run wake event or a get_check_runs result) and nothing that had an effect followed: a push, update_pull_request_branch or a comment on that PR, or a later passing reading. A rejected or failed push, a dry-run, branch-delete or other-repo push, 'Everything up-to-date' and any errored tool call do not count as acting, and a failed merge, close or create neither drops nor adopts a PR. Bot-review checks whose name and title or summary say quota, session limit or did not finish are exempt, since nothing in the PR fixes them. Reads only the transcript and fails open per record."
           },
           {
             "type": "command",

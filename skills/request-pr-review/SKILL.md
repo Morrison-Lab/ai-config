@@ -13,8 +13,8 @@ After AI review produces a clean verdict or upon a review deadlock, request a hu
 
 ## When to run
 
-- After completing code pushes for the round AND after the AI review produces a clean/approved verdict (or upon a review deadlock), per [`copilot-review-before-human.md`](../../shared/vendored/copilot-review-before-human.md).
-- When the user asks you to "request review" on an existing PR.
+- After completing code pushes for the round AND after the AI review produces a clean/approved verdict (or upon a review deadlock), per [`automated-review-before-human`](../../shared/workflow/automated-review-before-human.md), the gate on every request for human review, and [`copilot-review-before-human.md`](../../shared/vendored/copilot-review-before-human.md).
+- When the user asks you to "request review" on an existing PR: an explicit instruction overrides the gate, but report the automated review's state on the current head in the same reply.
 
 ## Command
 
@@ -62,7 +62,7 @@ project-level memory.
 Never request a human reviewer on a PR in sparta.
 
 The exception is repo-scoped, not rule-wide.
-Requesting a human reviewer on other repos applies after AI review passes or on deadlock.
+On other repos, request a human reviewer only once the [`automated-review-before-human`](../../shared/workflow/automated-review-before-human.md) gate passes.
 Within sparta the exception covers every path that would reach a request: the
 post-AI-review request above, and the deadlock escalation below.
 

@@ -46,7 +46,7 @@ standing yes (see `preferences.md`).
   statuses), not every raw Actions workflow run — see `fully-clean.md`'s
   `action_required`-with-zero-jobs gotcha if something looks off despite an
   all-clear checks view.
-- If the PR changes a rendered document (Word, PDF, slides, a manuscript), confirm the page-by-page review of the render at the current head has been done and its evidence posted on the PR ([`review-rendered-documents`](../../shared/workflow/review-rendered-documents.md)).
+- If the PR changes a rendered document (Word, PDF, slides, a manuscript), confirm the page-by-page review of the render at the current head has been done and its evidence posted on the PR, along with an independent referee read of that render ([`review-rendered-documents`](../../shared/workflow/review-rendered-documents.md)).
   If it has not, do it now or stop; never merge on green CI alone.
 - Check `mergeStateStatus` in addition to `mergeable`. A PR can be
   `"MERGEABLE"` but `"BLOCKED"` when branch protection requires at least one

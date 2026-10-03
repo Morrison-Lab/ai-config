@@ -19,6 +19,11 @@ can't finish. Exhaust the *current 5-hour codex window*, then fall back to Claud
 until the window resets. This skill is the mechanism; the preference lives in
 `memories/delegation.md`.
 
+**Scope: UCDH projects only.**
+The `codex` plan here is UCDH's, so use this skill only for a UCDH project --- the `bcs` or `hac` groups, on any forge.
+Outside UCDH, route to `agy`, OpenCode, OpenRouter or the Cursor CLI instead (user directive, 2026-10-03;
+see `memories/delegation.md`).
+
 ## When this fires
 
 - "delegate to codex", "use codex", "run this on codex", "do this with codex",
@@ -208,10 +213,9 @@ this synthesis step — codex produced the parts, Claude assembles the whole.
   that taxonomy's "paranoid reviewer, cross-model-family" case: point codex at
   Claude's own prior output ("does this design/diff hold up?") instead of only
   ever handing codex fresh investigation. Same procedure, different prompt.
-- **Workflow orchestration** (the `Workflow` tool) — runs fan-out on **Claude**
-  subagents. Prefer this skill's codex path first for the read/verify stages to
-  conserve Claude budget; reserve `Workflow` for stages codex can't do or once
-  its window is exhausted.
+- **Workflow orchestration** (the `Workflow` tool) — runs fan-out on **Claude** subagents.
+  In a UCDH project, prefer this skill's codex path first for the read/verify stages to conserve Claude budget;
+  reserve `Workflow` for stages codex can't do or once its window is exhausted.
 - **`ums` / `record-learnings`** — capture any new codex mechanics learned into
   the backing memory so this skill stays current.
 

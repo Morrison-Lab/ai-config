@@ -350,7 +350,7 @@ push, post summary, re-request review) on the main thread.
 
 For a judgment-heavy sidecar task (a subtle root-cause hunt, adjudicating a deadlocked rebuttal before escalating to a human), give the subagent a stronger model via the `Agent` tool's `model` parameter (e.g. `model: 'opus'`).
 Symmetrically, drop to a cheaper/faster tier (`model: 'fable'` or `'haiku'`) for a mechanical sidecar task --- see [`select-model`](../../skills/select-model/SKILL.md)'s decision tree for both directions.
-For a heavy fan-out investigation/verification pass, prefer a separately-billed provider (e.g. the `codex` CLI) first when available --- see [`delegate-to-codex`](../delegate-to-codex/SKILL.md).
+For a heavy fan-out investigation/verification pass, prefer a separately-billed provider (e.g. the `codex` CLI, in UCDH projects only) first when available --- see [`delegate-to-codex`](../delegate-to-codex/SKILL.md).
 
 ## The bar: "fully clean"
 
@@ -391,7 +391,7 @@ Do-Confirm; per
 - [ ] Every reviewer's latest verdict has zero findings and no disputed rebuttals.
 - [ ] You have obtained genuine posted clean verdicts at the current head from ALL reachable providers in your pinned quorum -- re-checked right before declaring clean.
 - [ ] Every self-review posted along the way was produced by a separate `adversarial-reviewer` subagent rather than inline, and its findings were dispositioned ([`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md)).
-- [ ] **Killer item, for a PR that changes a rendered document (Word, PDF, slides, a manuscript):** the render at the current head has been viewed page by page and the evidence posted on the PR, per [`review-rendered-documents`](../../shared/workflow/review-rendered-documents.md).
+- [ ] **Killer item, for a PR that changes a rendered document (Word, PDF, slides, a manuscript):** the render at the current head has been viewed page by page, the evidence posted on the PR, and an independent referee read of that render posted too, per [`review-rendered-documents`](../../shared/workflow/review-rendered-documents.md).
   Marked because green CI and a clean verdict say nothing about caption placement, table layout, or page breaks, and skipping this step is how broken manuscripts were reported ready.
 - [ ] Every inline review thread is resolved.
 - [ ] The only open conversation is the final all-clear exchange (the reviewer's all-clear comment and your reply --- normally a top-level PR comment, not an inline thread).

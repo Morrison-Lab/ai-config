@@ -12,6 +12,9 @@ however small or outside the current task's scope, must at minimum be filed in
 the owning GitHub, GitLab, or equivalent tracker.** File it before reporting
 it; use the correct private tracker and redact sensitive details when needed.
 
+A status report never lists a PR or MR as waiting on human review without a clean automated review on its latest commit;
+when that review has not run, start it under the conditions in [`automated-review-before-human`](automated-review-before-human.md).
+
 ## Examine the transcript for stalls, freezes, and dropped balls
 
 When a user asks for a "status update", "status?", or "how is it going", the inquiry is often prompted because the agent stopped responding, lost momentum, or paused unexpectedly.

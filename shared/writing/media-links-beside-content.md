@@ -1,7 +1,8 @@
 # Put media links beside the content they support
 
 In lecture notes and other teaching pages, put each video or other external media link in a short note right after the exercise, figure or definition it supports.
-Do not collect the links in a "Videos" list at the end of the page.
+Do not collect the links only in a "Videos" list at the end of the page.
+A consolidated list may also appear, in addition to the notes, never instead of them.
 
 A reader who has just worked a problem is ready to watch a video about it.
 The same reader at the end of the page has to guess which link goes with which section, and often never reaches the list.
@@ -16,8 +17,9 @@ The same reader at the end of the page has to guess which link goes with which s
 - Never put a link between an exercise and its solution.
 - Link public sites freely, including course sites that host their own solutions.
   Students and their AI tools already know everything public, so leaving a public link out gains nothing (Ezra, 2026-10-02).
-  Never link internal repositories that hold graded work, such as homework or exam repositories.
-- Move an existing end-of-page list instead of deleting it.
+  Never link private repositories, such as ones that hold graded homework or exams.
+- When a page has only an end-of-page list, move each link to the section it supports.
+  The list may stay as a supplement.
   A link with no sensible home goes to an outtakes file, not the bin.
 
 ## Where each repository states it
@@ -26,7 +28,8 @@ The same reader at the end of the page has to guess which link goes with which s
   Once it merges, the prose copy is canonical for wording.
   This fragment is the agent-facing copy.
 - `Morrison-Lab/lds` (a private repository): [`AUTHORING.md`](https://github.com/Morrison-Lab/lds/blob/main/AUTHORING.md), "Put each video and other external media link beside the content it supports" (Ezra, 2026-10-02).
-  Other note repositories link to this fragment rather than restating it.
+  It restates the rule in its own format: each video note goes in a `::: {.videos}` callout titled "Watch", and other material gets a `*Media:*` note.
+  Follow that format in `lds`.
 
 ## Related
 

@@ -300,7 +300,8 @@ call was actually denied.
 
 **Direct fix: upgrade gh** (`winget upgrade GitHub.cli` on Windows).
 Measured 2026-10-03: gh 2.52.0 (June 2024) failed `gh pr edit`;
-2.102.0 fixed it, verified with a no-op `gh pr edit --add-label`.
+2.102.0 fixed it, verified with no-op runs of `gh pr edit --add-label`,
+`--body-file` and `--remove-reviewer`, each exiting 0 and applying.
 The REST fallbacks below are a stopgap while the upgrade is unavailable, not the answer.
 
 `gh pr edit <N> --body-file <f>` can fail outright with
@@ -318,16 +319,19 @@ interpolation), same as `--body-file` on the porcelain command.
 
 - **Do:** run `gh --version`, upgrade gh, and re-run the same `gh pr edit`;
   use the REST API only if the upgrade is genuinely unavailable, and say so.
-  For labels on a PR, use `gh api -X POST repos/{owner}/{repo}/issues/{number}/labels -f "labels[]=<label>"`,
-  which bypasses the porcelain GraphQL `projectCards` query entirely.
-  Likewise, `gh pr edit --remove-reviewer <user>` fails on the same deprecated GraphQL `projectCards` query;
-  the reliable REST workaround is `gh api -X DELETE repos/<owner>/<repo>/pulls/<pr>/requested_reviewers -f "reviewers[]=<user>"`.
+- **Stopgap, only while gh cannot be upgraded:** labels go through
+  `gh api -X POST repos/{owner}/{repo}/issues/{number}/labels -f "labels[]=<label>"`,
+  and a reviewer is removed with
+  `gh api -X DELETE repos/<owner>/<repo>/pulls/<pr>/requested_reviewers -f "reviewers[]=<user>"`,
+  since an old gh's `--add-label` and `--remove-reviewer` hit the same `projectCards` query.
 - **Don't:** read the error as a permissions or repo problem --- the failing
   field is one the edit never needed.
 - **Don't:** switch to `gh api -X PATCH` without diagnosing, or write that workaround into a brief for another session.
 
 (Measured 2026-08-23 on [ai-config#1976](https://github.com/Morrison-Lab/ai-config/issues/1976), 2026-09-23 on [gha#913](https://github.com/Morrison-Lab/gha/issues/913), and 2026-09-24 on [wai#245](https://github.com/Morrison-Lab/wai/pull/245), gh in local Windows sessions;
-the REST endpoints succeeded immediately.)
+the REST endpoints succeeded immediately.
+Those sessions did not record their gh version or try an upgrade,
+so they show the stopgap works, not that upgrading was unnecessary.)
 
 ## `gh pr merge` "not up to date with the base branch" does not fire consistently on an equally-stale PR
 

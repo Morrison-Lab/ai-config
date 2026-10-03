@@ -19,10 +19,9 @@ The delegation-ladder preference this plugs into lives in [`memories/delegation.
 the two sections below repeat only what changes the setup steps.
 
 **Scope: `hac`-group projects on the UCDH GitLab only.**
-The UCDH Databricks workspace is for projects in the `hac` group on the UCDH GitLab ---
-`health-analytics-core` (Health Analytics Core) on `hc2-gitlab.ucdmc.ucdavis.edu`.
-Do not dispatch work from any other project to it, including `bcs` and other UCDH projects
-(user directive, 2026-10-03; see `memories/delegation.md`).
+The UCDH Databricks workspace is for projects in the `hac` group on the UCDH GitLab --- `health-analytics-core` (Health Analytics Core) on `hc2-gitlab.ucdmc.ucdavis.edu`.
+Do not dispatch work from any other project to it, including `bcs` and other UCDH projects (user directive, 2026-10-03;
+see `memories/delegation.md`).
 
 ## Why this is a shell-out, not a subagent
 

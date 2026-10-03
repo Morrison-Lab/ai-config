@@ -122,19 +122,10 @@ ARDI) on the main thread so the loop keeps moving; this is a single sidecar
 call within one iteration, not a way to run whole issues concurrently --- for
 that, see [`gip`](../gip/SKILL.md).
 
-When the sidecar task is judgment-heavy (a tricky bug hunt, an
-architecturally significant call, an adversarial review pass before the
-implementation goes out for real review), give the subagent a stronger model
-via the `Agent` tool's `model` parameter (e.g. `model: 'opus'`) instead of
-leaving it at the session default. Symmetrically, override to a cheaper/faster
-tier (`model: 'fable'` or `'haiku'`) for mechanical, bounded sidecar work --- a
-lookup, a formatting check, a repeated verification --- rather than defaulting
-to the session's own tier; see
-[`select-model`](../../skills/select-model/SKILL.md)'s decision tree for both
-directions. When the sidecar task is a heavy fan-out read/draft/verify pass
-and a separately-billed provider is available (e.g. the `codex` CLI), prefer
-spending that budget first and keep Claude/Agent-tool quota in reserve --- see
-[`delegate-to-codex`](../delegate-to-codex/SKILL.md).
+When the sidecar task is judgment-heavy (a tricky bug hunt, an architecturally significant call, an adversarial review pass before the implementation goes out for real review), give the subagent a stronger model via the `Agent` tool's `model` parameter (e.g. `model: 'opus'`) instead of leaving it at the session default.
+Symmetrically, override to a cheaper/faster tier (`model: 'fable'` or `'haiku'`) for mechanical, bounded sidecar work --- a lookup, a formatting check, a repeated verification --- rather than defaulting to the session's own tier;
+see [`select-model`](../../skills/select-model/SKILL.md)'s decision tree for both directions.
+When the sidecar task is a heavy fan-out read/draft/verify pass and a separately-billed provider is available (e.g. the `codex` CLI, in UCDH projects only), prefer spending that budget first and keep Claude/Agent-tool quota in reserve --- see [`delegate-to-codex`](../delegate-to-codex/SKILL.md).
 
 ## Stacking rules
 
@@ -199,8 +190,7 @@ When the loop ends, print a summary:
 - **`sync-pr-branch`** — used when stacking to keep branches current
 - **`select-model`** — decision tree for picking a subagent's model tier when
   delegating sidecar work (see "Delegate sidecar work when helpful")
-- **`delegate-to-codex`** — when a sidecar task is a heavy fan-out
-  read/draft/verify pass and codex is available, prefer it first
+- **`delegate-to-codex`** — when a sidecar task is a heavy fan-out read/draft/verify pass and codex is available (UCDH projects only), prefer it first
 
 ## Auto-proceed mode
 

@@ -47,13 +47,8 @@ The user's 2026-08-25 machine inventory names **cursor**, **agy** (CLI),
 From the authoring session's perspective the ladder filters itself:
 any entry sharing your model or your harness does not qualify for this gate,
 whatever the list says.
-Dispatch in independence-and-availability order ---
-`agy` CLI or `opencode` first, then `codex` (UCDH projects only), then `claude` ---
-where each entry qualifies only if both its model and harness
-differ from the authoring session.
-This review order serves independence and measured availability,
-overriding [`delegation.md`](../../memories/delegation.md)'s cost-first
-delegation order for general work.
+Dispatch in independence-and-availability order --- `agy` CLI or `opencode` first, then `codex` (UCDH projects only), then `claude` --- where each entry qualifies only if both its model and harness differ from the authoring session.
+This review order serves independence and measured availability, overriding [`delegation.md`](../../memories/delegation.md)'s cost-first delegation order for general work.
 A multi-backend harness qualifies only when both its harness
 and its configured model differ from the authoring session.
 `cursor` stays out of the active ladder until its headless dispatch

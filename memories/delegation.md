@@ -7,14 +7,10 @@ this section is self-contained.
 ## Delegate heavy work to another CLI first --- codex, agy, opencode, and openrouter
 
 > [!IMPORTANT]
-> **Codex and Databricks are scoped to UCDH projects** (user directive, 2026-10-03:
-> "ucdh databricks is only for projects in the hac group on the ucdh gitlab, and ucdh codex is only for ucdh projects on any forge (bcs + hac)").
-> The `codex` lane below, and [`delegate-to-codex`](../skills/delegate-to-codex/SKILL.md), apply only in a UCDH project:
-> the `bcs` or `hac` groups, on any forge: for example the `ucdavis/bcs` and `ucdavis/hac.*` repositories on GitHub,
-> or a project in the `health-analytics-core` group (Health Analytics Core, HAC) on the UCDH GitLab, `hc2-gitlab.ucdmc.ucdavis.edu`.
+> **Codex and Databricks are scoped to UCDH (UC Davis Health) projects** (user directive, 2026-10-03: "ucdh databricks is only for projects in the hac group on the ucdh gitlab, and ucdh codex is only for ucdh projects on any forge (bcs + hac)").
+> The `codex` lane below, and [`delegate-to-codex`](../skills/delegate-to-codex/SKILL.md), apply only in a UCDH project, meaning the `bcs` or `hac` groups on any forge; for example, the `ucdavis/bcs` and `ucdavis/hac.*` repositories on GitHub, or a project in the `health-analytics-core` group (Health Analytics Core, HAC) on the UCDH GitLab, `hc2-gitlab.ucdmc.ucdavis.edu`.
 > The Databricks lane, and [`delegate-to-databricks`](../skills/delegate-to-databricks/SKILL.md), apply only in a `hac`-group project on the UCDH GitLab.
-> Everywhere else, the ladder starts at `agy`, then OpenCode, OpenRouter and the Cursor CLI, per
-> [`standing-habits-from-ezra`](../shared/workflow/standing-habits-from-ezra.md).
+> Everywhere else, the ladder starts at `agy`, then OpenCode, OpenRouter and the Cursor CLI, per [`standing-habits-from-ezra`](../shared/workflow/standing-habits-from-ezra.md).
 >
 > - **Do:** check which project the work belongs to before routing to `codex` or Databricks.
 > - **Don't:** read the "codex first" order below as covering non-UCDH projects.
@@ -96,19 +92,12 @@ against content the fix had already changed.
 but has no measured headless dispatch mechanics here yet ---
 probe before relying on it.
 
-Exhaust the *current usage window* of each metered destination in turn ---
-`codex` first in a UCDH project (roughly 5 hours),
-then `agy` CLI as its own availability allows,
-then OpenCode's `opencode-go/*` window ---
-then fall back to Claude until a window resets.
+Exhaust the *current usage window* of each metered destination in turn --- `codex` first in a UCDH project (roughly 5 hours), then `agy` CLI as its own availability allows, then OpenCode's `opencode-go/*` window --- then fall back to Claude until a window resets.
 "Delegate first" means the current window,
 not abandoning Claude permanently.
 
-**`opencode`'s hosted-free tier has no window to exhaust,
-which changes where they sit rather than just adding a row.**
-That tier costs nothing,
-so for work a small model can actually do it goes *ahead* of codex and agy
-rather than behind them: there is no budget to conserve by skipping it.
+**`opencode`'s hosted-free tier has no window to exhaust, which changes where they sit rather than just adding a row.**
+That tier costs nothing, so for work a small model can actually do it goes *ahead* of codex and agy rather than behind them: there is no budget to conserve by skipping it.
 Capability is the binding constraint in its place,
 and it is unmeasured here ---
 the hosted ids are preview names
@@ -260,27 +249,13 @@ Scoped 2026-10-03: the `codex` half applies only in UCDH projects (see the banne
 
 Scope: `hac`-group projects on the UCDH GitLab only (user directive, 2026-10-03).
 
-[`memories/databricks-hosted-llms.md`](databricks-hosted-llms.md) already
-carried the underlying facts (the `auth.command` mechanism, the hard
-`wire_api = "responses"` requirement, which models qualify) from a
-2026-08-29 investigation.
-What's new on 2026-09-15 is operationalizing that into a delegation-ladder
-skill --- [`delegate-to-databricks`](../skills/delegate-to-databricks/SKILL.md),
-linked from this file's ladder table above --- and a live end-to-end
-verification: a found-in-the-wild `model_providers.databricks` config plus
-per-model profile-layer files on the user's own machine, dispatched with
-`codex exec --profile databricks --sandbox read-only --skip-git-repo-check
-"Reply with exactly: OK" < /dev/null`, round-tripped correctly against a
-Databricks-hosted GPT-5.6-family model at a measured ~49,000-token Codex-side
-agent-mode overhead for that single turn.
+[`memories/databricks-hosted-llms.md`](databricks-hosted-llms.md) already carried the underlying facts (the `auth.command` mechanism, the hard `wire_api = "responses"` requirement, which models qualify) from a 2026-08-29 investigation.
+What's new on 2026-09-15 is operationalizing that into a delegation-ladder skill --- [`delegate-to-databricks`](../skills/delegate-to-databricks/SKILL.md), linked from this file's ladder table above --- and a live end-to-end verification: a found-in-the-wild `model_providers.databricks` config plus per-model profile-layer files on the user's own machine, dispatched with `codex exec --profile databricks --sandbox read-only --skip-git-repo-check "Reply with exactly: OK" < /dev/null`, round-tripped correctly against a Databricks-hosted GPT-5.6-family model at a measured ~49,000-token Codex-side agent-mode overhead for that single turn.
 Tracked as [ai-config#3726](https://github.com/Morrison-Lab/ai-config/issues/3726).
 
-- **Do:** read `databricks-hosted-llms.md` before `delegate-to-databricks` ---
-  it carries the facts (which models qualify, the hard `wire_api` requirement,
-  the auth-storage mechanics) the skill's dispatch steps assume.
-- **Don't:** duplicate those facts here; this entry exists to record that the
-  route is now verified end-to-end and has a skill, not to restate the
-  underlying facts a second time.
+- **Do:** read `databricks-hosted-llms.md` before `delegate-to-databricks` --- it carries the facts (which models qualify, the hard `wire_api` requirement, the auth-storage mechanics) the skill's dispatch steps assume.
+- **Don't:** duplicate those facts here;
+  this entry exists to record that the route is now verified end-to-end and has a skill, not to restate the underlying facts a second time.
 
 ## agy on Windows
 

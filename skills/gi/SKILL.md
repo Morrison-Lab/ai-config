@@ -334,17 +334,9 @@ a claim from the issue description, drafting a test fixture, or investigating
 a tangential failure surfaced along the way. Keep claiming, branching, opening
 the draft PR, and the ARDI loop itself on the main thread.
 
-For a judgment-heavy sidecar task (a subtle bug hunt, an architecturally
-significant design call), override the subagent's model to a stronger tier
-via the `Agent` tool's `model` parameter (e.g. `model: 'opus'`) rather than
-the session default. Symmetrically, drop to a cheaper/faster tier (`model:
-'fable'` or `'haiku'`) for a mechanical, bounded sidecar task instead of
-leaving it at the session default --- see
-[`select-model`](../../skills/select-model/SKILL.md)'s decision tree for both
-directions. For a heavy fan-out read/draft/verify pass, prefer a
-separately-billed provider (e.g. the `codex` CLI, in UCDH projects only) first when available, to
-conserve Claude/Agent-tool budget --- see
-[`delegate-to-codex`](../delegate-to-codex/SKILL.md).
+For a judgment-heavy sidecar task (a subtle bug hunt, an architecturally significant design call), override the subagent's model to a stronger tier via the `Agent` tool's `model` parameter (e.g. `model: 'opus'`) rather than the session default.
+Symmetrically, drop to a cheaper/faster tier (`model: 'fable'` or `'haiku'`) for a mechanical, bounded sidecar task instead of leaving it at the session default --- see [`select-model`](../../skills/select-model/SKILL.md)'s decision tree for both directions.
+For a heavy fan-out read/draft/verify pass, prefer a separately-billed provider (e.g. the `codex` CLI, in UCDH projects only) first when available, to conserve Claude/Agent-tool budget --- see [`delegate-to-codex`](../delegate-to-codex/SKILL.md).
 
 ## Handling blocked issues
 

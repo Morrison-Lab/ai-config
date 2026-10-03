@@ -139,6 +139,28 @@ See [`flag-session-boundaries.cases.md`](flag-session-boundaries.cases.md), "Lef
 Whenever there's a meaningful chance I'd want to come back to this conversation later, recommend leaving the session alone and starting a fresh one for the next task, instead of `/clear`ing it -- the old session stays fully retrievable (nothing to lose), at the cost of a small navigation step to reopen it.
 Reserve a bare `/clear` recommendation for when nothing in the session is worth revisiting; when in doubt, default to the archive-and-start-new option since it's strictly safer.
 
+**When you recommend a new session, offer to start it yourself.**
+A recommendation to start fresh leaves the user to open the session and type out what it should do, and the second half is the part that needs this session's context.
+So write the next session's opening prompt yourself and make it self-contained: the repo, the issue or PR numbers, what to skip and why, and any uncommitted or unpushed work, since a session spawned in a fresh worktree cannot see it.
+Then offer to start the session with that prompt already in it, by whatever this harness provides:
+
+- **Claude desktop app:** post a `spawn_task` chip (`mcp__ccd_session__spawn_task`) carrying the prompt.
+  The session starts only when the user clicks the chip, in a fresh worktree, so the chip is the offer and the click is the yes.
+  The tool is described for out-of-scope follow-up work, and a session handoff is a second use of the same mechanism.
+- **Terminal, or any harness with no one-click mechanism:** give the prompt in a fenced block and ask plainly whether to open a terminal tab running `claude` on it.
+  Open it only on a yes.
+- **Nothing can start a session:** give the prompt in a fenced block ready to paste, and say that this harness cannot start the session for them.
+
+The user has not authorized starting a session, so asking is correct here, and [`no-cop-out-offers`](no-cop-out-offers.md) agrees, since it governs only actions already authorized.
+Where a one-click mechanism exists, attach it as the ask rather than writing "want me to start it?" in prose.
+Archiving the current session stays with the user.
+
+- **Do:** attach the way to start the session (the chip, the terminal offer, or the paste-ready prompt) in the same reply that recommends it.
+- **Don't:** recommend a fresh session and leave the user to open it and reconstruct the next prompt.
+
+(User directive, 2026-10-03, Morrison-Lab/mds: "when you recommend a new session, you should offer to start it yourself";
+[#4270](https://github.com/Morrison-Lab/ai-config/issues/4270).)
+
 **`/compact` is a third alternative, for weak continuity rather than a clean break.**
 When the next move is to keep working on *loosely related* things in the same window -- no concrete open item, so not the live state that triggers the `compress-session` flag, but enough of a thread that a clean slate would lose something worth keeping -- recommend `/compact` instead of archive-and-start-new.
 It carries a lossy summary forward in place, keeping the gist and skipping the reopen step, at the cost of a session that keeps growing and detail that is lost.

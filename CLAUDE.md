@@ -80,6 +80,7 @@ Place the tag at the natural end of that turn's recap (or immediately before a `
 A clean stopping point requires that something actually finished, and the fragment's disqualifier list cannot tell you whether anything did --- so name the thing that finished, and read a turn that only explored as having completed nothing however few blockers it trips.
 Hold the flag while any PR this session opened or pushed to is still unmerged, per the bright line the fragment states in full; run `wrap-up`'s state sweep first rather than trusting memory, since a bot-opened PR or a leftover branch never entered the conversation.
 Default to archive-and-start-new over a bare `/clear` whenever the session might be worth revisiting, and to `/compact` when the next work continues the same loose thread; the fragment covers each option's tradeoff and the same menu applied at the moment of opening a *new* PR, not only at a stopping point.
+When you recommend a new session, offer to start it yourself: write its opening prompt and attach the harness's way to start a session with that prompt already in it (a `spawn_task` chip in the desktop app, otherwise a paste-ready prompt and a plain question), rather than leaving the user to open it and type the prompt.
 
 ## Flag good moments to run `compress-session`, too
 

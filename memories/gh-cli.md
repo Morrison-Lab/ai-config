@@ -300,11 +300,11 @@
 - **`gh pr edit` exiting 1 with the `projectCards` / "Projects (classic) is being deprecated" GraphQL error means gh is too old: upgrade it (`winget upgrade GitHub.cli`), do not work around it.**
   Measured 2026-10-03: gh 2.52.0 failed, 2.102.0 fixed it (verified with a no-op `gh pr edit --add-label`);
   see `memories/github.md`.
-  The REST PATCH below is a stopgap only when no upgrade is possible.
-  `gh pr edit <N> --body "..."` / `--body-file <f>` returns exit code 1 with a GraphQL deprecation warning (`Projects (classic) is being deprecated…`).
+  On an old gh, `gh pr edit <N> --body "..."` / `--body-file <f>` returns exit code 1 with a GraphQL deprecation warning (`Projects (classic) is being deprecated…`).
   Sometimes the edit lands anyway;
   **sometimes it does not apply at all** (seen on sparta 2026-06-30: three `gh pr edit --body-file` attempts left the body unchanged with the `SHA_PLACEHOLDER` still in place).
-  Either way, don't trust it — verify with `gh api repos/<o>/<r>/pulls/<N> --jq .body`, and just use the REST PATCH directly, which always exits 0 and applies: `gh api -X PATCH repos/<o>/<r>/pulls/<N> -f body="..."`.
+  Either way, don't trust that run: verify with `gh api repos/<o>/<r>/pulls/<N> --jq .body`.
+  Only where gh genuinely cannot be upgraded, use the REST PATCH as a stopgap, which exits 0 and applies: `gh api -X PATCH repos/<o>/<r>/pulls/<N> -f body="..."`.
   For a multi-line body, read it from a file with `-F body=@<path>` (capital `-F` to pull the field value from the file) rather than cramming it into `-f body="..."`.
 - **PR description image embeds: use `raw.githubusercontent.com`, not `github.com/.../raw/...`.**
   Embedding a committed file in a PR body with `![](https://github.com/<owner>/<repo>/raw/<sha>/<path>)` may not render — the reviewer will flag it.

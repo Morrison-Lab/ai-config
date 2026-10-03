@@ -1234,6 +1234,14 @@ A model is never "Bayesian"; only how it is fitted is.
 Connect referenced concepts, external packages, internal rules, and forge artifacts to clickable URLs rather than leaving them as plain text.
 Detail, rationale, and cases: [`shared/writing/hyperlink-liberally.md`](shared/writing/hyperlink-liberally.md).
 
+## Put media links beside the content they support
+
+[`shared/writing/media-links-beside-content.md`](shared/writing/media-links-beside-content.md)
+
+In lecture notes, put each video or other external media link in a one-line note right after the exercise, figure or definition it supports, never only in an end-of-page list.
+External sites are fine to link.
+Never link private repositories, such as ones that hold graded homework or exams.
+
 ## Hyperlink technical terms and results; no forward references
 
 [shared/writing/definition-crossrefs.md](shared/writing/definition-crossrefs.md)

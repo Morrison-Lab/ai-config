@@ -94,7 +94,7 @@ When a new entry lands after `main` has appended one of its own, take the next n
   is what stops a shape match becoming a second wrong attribution.
   Never transcribe a fallback review's prose
   or call a PR ready for merge without `check-pr-fully-clean.py` exiting 0.
-- **Canonical Rule**: `AGENTS.md` ("Request review and drive every started PR to clean"),
+- **Canonical Rule**: `AGENTS.md` ("Get a clean automated review before asking a person to review"),
   `fully-clean.md`, and `hooks/no-incomplete-check-enumeration.py`.
 - **Do:** Run `python3 scripts/check-pr-fully-clean.py <N> -R <owner>/<repo>`
   before a terminal clean / ready-to-merge claim.

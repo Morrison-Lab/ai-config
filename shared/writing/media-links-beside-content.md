@@ -9,7 +9,7 @@ The same reader at the end of the page has to guess which link goes with which s
 
 ## How to apply
 
-- Write one line per link, such as `*Video:* Weinberger derives the descent direction ([from 3:09](https://example.org/video?t=189s)).` Use `*Media:*` for other external material, such as a podcast, an article or an interactive demo.
+- Write one line per link, such as `*Video:* Weinberger derives the descent direction ([from 3:09](https://example.org/video?t=189s)) [@weinberger-lecture].` Use `*Media:*` for other external material, such as a podcast, an article or an interactive demo.
 - Name the speaker and say what the video shows, in simple, literal wording.
 - Link the exact start time when the video covers more than the topic.
 - Cite the source with a bracketed citation key after the link, such as `[@weinberger-lecture]`, so the source also appears in the references.

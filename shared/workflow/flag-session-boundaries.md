@@ -141,20 +141,21 @@ Reserve a bare `/clear` recommendation for when nothing in the session is worth 
 
 **When you recommend a new session, offer to start it yourself.**
 A recommendation to start fresh leaves the user to open the session and type out what it should do, and the second half is the part that needs this session's context.
-So write the next session's opening prompt yourself, self-contained (repo, issue numbers, what to skip and why), and attach a way to start the session with that prompt already in it.
-Use whatever starts a session in this harness:
+So write the next session's opening prompt yourself and make it self-contained: the repo, the issue or PR numbers, what to skip and why, and any uncommitted or unpushed work, since the new session starts from a fresh checkout and cannot see it.
+Then offer to start the session with that prompt already in it, by whatever this harness provides:
 
-- **Claude desktop app:** a `spawn_task` chip (`mcp__ccd_session__spawn_task`).
-  It is a one-click offer that starts a fresh session on the prompt you wrote, so posting it needs no separate yes from the user.
-- **Terminal:** offer to open a terminal tab running `claude` with the prompt, and do it once the user says yes.
-- **No mechanism available:** give the prompt in a fenced block ready to paste, and say that this harness offers no way to start the session for them.
+- **Claude desktop app:** post a `spawn_task` chip (`mcp__ccd_session__spawn_task`) carrying the prompt.
+  The session starts only when the user clicks the chip, in a fresh worktree, so the chip is the offer and the click is the yes.
+  The tool is described for out-of-scope follow-up work, and a session handoff is a second use of the same mechanism.
+- **Terminal, or any harness with no one-click mechanism:** give the prompt in a fenced block and ask plainly whether to open a terminal tab running `claude` on it.
+  Open it only on a yes.
+- **Nothing can start a session:** give the prompt in a fenced block ready to paste, and say that this harness cannot start the session for them.
 
-Starting a session is new work rather than something the user already authorized, so this is an offer, and [`no-cop-out-offers`](no-cop-out-offers.md) does not turn it into an action to take unasked.
-What that rule does forbid is an offer that is only a sentence ("want me to start it?") when a working mechanism is at hand.
-The chip *is* the offer, so attach it rather than describing it.
+The user has not authorized starting a session, so asking is correct here, and [`no-cop-out-offers`](no-cop-out-offers.md) agrees, since it governs only actions already authorized.
+Where a one-click mechanism exists, attach it as the ask rather than writing "want me to start it?" in prose.
 Archiving the current session stays with the user.
 
-- **Do:** attach the started-session mechanism (or the paste-ready prompt where none exists) in the same reply that recommends the new session.
+- **Do:** attach the way to start the session (the chip, the terminal offer, or the paste-ready prompt) in the same reply that recommends it.
 - **Don't:** recommend a fresh session and leave the user to open it and reconstruct the next prompt.
 
 (User directive, 2026-10-03, Morrison-Lab/mds: "when you recommend a new session, you should offer to start it yourself";

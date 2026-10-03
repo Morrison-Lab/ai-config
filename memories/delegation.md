@@ -8,7 +8,8 @@ this section is self-contained.
 
 > [!IMPORTANT]
 > **Codex and Databricks are scoped to UCDH (UC Davis Health) projects** (user directive, 2026-10-03: "ucdh databricks is only for projects in the hac group on the ucdh gitlab, and ucdh codex is only for ucdh projects on any forge (bcs + hac)").
-> The `codex` lane below, and [`delegate-to-codex`](../skills/delegate-to-codex/SKILL.md), apply only in a UCDH project, meaning the `bcs` or `hac` groups on any forge; for example, the `ucdavis/bcs` and `ucdavis/hac.*` repositories on GitHub, or a project in the `health-analytics-core` group (Health Analytics Core, HAC) on the UCDH GitLab, `hc2-gitlab.ucdmc.ucdavis.edu`.
+> The `codex` lane below, and [`delegate-to-codex`](../skills/delegate-to-codex/SKILL.md), apply only in a UCDH project, meaning the `bcs` or `hac` groups on any forge;
+> for example, the `ucdavis/bcs` and `ucdavis/hac.*` repositories on GitHub, or a project in the `health-analytics-core` group (Health Analytics Core, HAC) on the UCDH GitLab, `hc2-gitlab.ucdmc.ucdavis.edu`.
 > The Databricks lane, and [`delegate-to-databricks`](../skills/delegate-to-databricks/SKILL.md), apply only in a `hac`-group project on the UCDH GitLab.
 > Everywhere else, the ladder starts at `agy`, then OpenCode, OpenRouter and the Cursor CLI, per [`standing-habits-from-ezra`](../shared/workflow/standing-habits-from-ezra.md).
 >

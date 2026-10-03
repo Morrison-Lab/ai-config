@@ -61,6 +61,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-record-standing-guidance.py\"",
+            "timeout": 10,
+            "script": "remind-record-standing-guidance.py",
+            "why": "AGENTS.md 'Generalize instructions to every AI agent by default': a standing rule is recorded in its global home (ai-config for agent rules, psw for prose rules, gha for checks) in the same turn it is given, and followed from then on. Injects, never blocks, when the new prompt or the previous user message reads as standing guidance and no ai-config or psw write or dispatch followed it. Project memory is allowed but not enough alone."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-ums-after-error.py\"",
             "timeout": 10,
             "script": "remind-ums-after-error.py",

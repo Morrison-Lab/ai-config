@@ -91,7 +91,8 @@ The same holds for a skipped check: a render skipped because an interpreter is m
 - **Do:** check the version, upgrade or install, then re-run the original command.
 - **Don't:** substitute a different command (`gh api -X PATCH` for `gh pr edit`) or skip the check without diagnosing why the first one failed.
 
-(2026-10-03: `gh pr edit` failed on `projectCards`; the agent switched to `gh api -X PATCH`, copied that into a brief, and had earlier skipped local renders for lack of Julia.
+(2026-10-03: `gh pr edit` failed on `projectCards`;
+the agent switched to `gh api -X PATCH`, copied that into a brief, and had earlier skipped local renders for lack of Julia.
 Cause: gh 2.52.0; `winget upgrade GitHub.cli` fixed it.
 User: "I don't like workarounds when direct solutions are available".)
 

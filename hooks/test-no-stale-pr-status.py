@@ -1087,6 +1087,13 @@ CASES = [
      "an adverb may sit beside the auxiliary too"),
     ([QUERY, PUSH, say("All checks green is a claim that has now been retracted.")], False,
      "and between two auxiliaries"),
+    # ai-config#3989 rewrote the head phrase so each optional word carries its
+    # own `\s+` (the old chained `\s*` groups were cubic on a whitespace run).
+    # The one intended behaviour change: a determiner or modifier joined to the
+    # noun with no space no longer reads as the head phrase.
+    ([QUERY, PUSH, say("All checks green is theclaim that was wrong.")], True,
+     "a space-less join of determiner and noun is not the head phrase, so the "
+     "carve-out no longer applies (it did before ai-config#3989)"),
     ([QUERY, PUSH, say("All checks green is a claim that reviewers overstated.")], True,
      "an unmarked plural subject fills no slot in the head phrase, so that "
      "object relative still breaks attachment"),

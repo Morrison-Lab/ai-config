@@ -304,7 +304,7 @@ MUTATIONS = {
     "M9_perl_octal_zero_flag": (
         "perl's -0 takes an optional octal argument, so -0777 must still "
         "read as carrying the in-place flag",
-        [(r'r"^-(?:[np]|0[0-7]*)*i(?:[npi]|0[0-7]*)*(\.\S*)?$"',
+        [(r'r"^-(?:[np]|0[0-7]*(?![0-7]))*i(?:[npi]|0[0-7]*(?![0-7]))*(\.\S*)?$"',
           r'r"^-[0np]*i[0npi]*(\.\S*)?$"')],
         {"W12"},
     ),

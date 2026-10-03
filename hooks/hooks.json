@@ -917,6 +917,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-write-shrink.py\"",
+            "timeout": 60,
+            "script": "warn-write-shrink.py",
+            "why": "ai-config#4169 (from #4134): create_or_update_file and push_files replace a file's WHOLE content, so a stale or partial reconstruction is internally consistent yet far smaller than what is live; the size checks in memories/github-mcp-tools.md compare against the intended source and miss it. Looks up the live size via gh api and warns loudly (never blocks) when the new content shrinks the file by more than 50%, or by more than 20% above 10KB. Fails open with a visible note when the lookup fails; a new file is silent. The script ignores every other mcp__github__ tool."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-pr-create-without-dupe-check.py\"",
             "timeout": 10,
             "script": "warn-pr-create-without-dupe-check.py",
@@ -1327,6 +1334,18 @@
             "timeout": 10,
             "script": "flag-partial-put-to-resource-root.py",
             "why": "A partial PUT to a REST resource ROOT can null fields the body never named, returning 200 either way. Measured 2026-09-24: a Canvas course PUT setting one boolean also cleared start_at and end_at, and four restore attempts returned 200 and changed nothing. Warns, never blocks."
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__hearthbot__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-bare-forge-reference.py\"",
+            "timeout": 10,
+            "script": "warn-bare-forge-reference.py",
+            "why": "ai-config#4224. The user asked for a link on every artifact a reply names ('always give me hyperlinks!', then 'how many times do I have to tell you that?', 2026-10-02) after the rule was already in memory and repo instructions; the miss happens at composition time, so the rule alone did not fire. Warns, never blocks, when a user-visible reply tool call carries a bare forge reference (#N, !N, owner/repo#N) outside Markdown links, URLs and code. Descriptions without a number ('the referee note') have no lexical marker and are out of scope. Fails open."
           }
         ]
       }

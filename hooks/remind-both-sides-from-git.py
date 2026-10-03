@@ -187,7 +187,11 @@ IS_ANCESTOR = re.compile(r"--is-ancestor\s+(\S+)\s+(\S+)")
 
 # Revision suffixes that select a RELATIVE commit. Stripped when asking "same
 # commit?" (D-A) and preserved when asking "two distinct sides?" (D-B).
+# regex-safe: worst case 256-char window (norm_rev scans no more) of ^ 0.001s, 100k-char rev 0.000s; hook timeout 10s (ai-config#3989)
 REV_SUFFIX = re.compile(r"(?:\^\{[^}]*\}|\^[0-9]*|~[0-9]*|@\{[^}]*\})+$")
+REV_SUFFIX_SCAN = 256
+# The last character of every REV_SUFFIX unit: `}`, a digit, `^` or `~`.
+REV_UNIT_END = frozenset("0123456789^~}")
 
 HEX = re.compile(r"[0-9a-f]{7,40}\Z", re.I)
 
@@ -232,9 +236,30 @@ def norm_rev(rev):
     commit as the extraction. D-B must not use this: `<base>` and `<base>^` are
     two legitimately different sides of a comparison, and collapsing them would
     let a single extraction discharge itself.
+
+    REV_SUFFIX retries from every position,
+    so it is O(n^2) on a long run of `^`/`~` (>20s at 100k chars, ai-config#3989).
+    A revision longer than REV_SUFFIX_SCAN is therefore scanned only
+    in its last REV_SUFFIX_SCAN characters.
+    The result is conservative, not exact:
+    an over-window revision may be left with a suffix unstripped,
+    and is never stripped more than the unwindowed pattern would strip it.
+    The window's chain is used only when it does not touch the window's left edge
+    and the character before it is not the end of any suffix unit.
+    Otherwise (an all-suffix revision, an over-long `@{...}`, a digit run,
+    or no chain at all) the revision is returned unchanged.
+    A nested unit inside the window after an over-window `^{` prefix
+    is stripped on its own, so `base^{aaa...^{x}` loses only `^{x}`
+    where the unwindowed pattern would reduce it to `base`.
     """
-    out = REV_SUFFIX.sub("", clean(rev))
-    return out or clean(rev)
+    rev = clean(rev)
+    if len(rev) <= REV_SUFFIX_SCAN:
+        return REV_SUFFIX.sub("", rev) or rev
+    tail = rev[-REV_SUFFIX_SCAN:]
+    m = REV_SUFFIX.search(tail)
+    if m is None or m.start() == 0 or tail[m.start() - 1] in REV_UNIT_END:
+        return rev
+    return rev[:len(rev) - len(tail) + m.start()] or rev
 
 
 def same_commit(a, b):

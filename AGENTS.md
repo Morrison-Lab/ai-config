@@ -12,6 +12,16 @@ Every rule here serves these three, each an act you can observe:
 - **Wise:** treat a correction as a general principle and record it where every project loads it ([`encode-reusable-feedback`](shared/workflow/encode-reusable-feedback.md)).
 - **Diligent:** verify before claiming: re-query state rather than recall it ([`metacognitive-monitoring`](shared/workflow/metacognitive-monitoring.md)), and view a rendered deliverable before calling it ready ([`check-the-renders`](shared/workflow/check-the-renders.md)).
 
+## Get a clean automated review before asking a person to review
+
+Never ask a person to review a PR, GitLab MR, document, or other work product, on any forge, repo or project, or report one as awaiting human review, until its automated review is clean or deadlocked.
+Trigger the automated reviews yourself after the round's last push (or confirm a run on that head), and iterate (`ardi`) until clean.
+A quota-skipped, stubbed, or never-started review is no review: re-trigger it, and if it still cannot give a verdict, a clean posted adversarial review stands in.
+See [`automated-review-before-human`](shared/workflow/automated-review-before-human.md) for steps and exceptions.
+
+- **Do:** drive the automated review to clean or deadlock, and link that verdict.
+- **Don't:** say "ready for your review" on a draft or a head with no clean automated verdict.
+
 ## Instruction layering
 
 `AGENTS.md` is the compact, unconditional cross-agent contract.
@@ -351,8 +361,8 @@ Marking a PR ready grants no merge authority.
 See [`put-prs-in-ready-mode`](shared/workflow/put-prs-in-ready-mode.md).
 
 - **Do:** open completed work ready for review, or mark draft ready once checks pass.
-- **Do:** un-draft an up-front empty PR once its implementation lands and checks pass.
 - **Don't:** leave a PR ready for review in draft, except a deliberately draft-gated dependent PR.
+
 ## Antigravity Workspace Rules & Activation Scopes
 
 See [`GEMINI.md`](GEMINI.md) and [`memories/antigravity.md`](memories/antigravity.md) for Antigravity-specific workspace rules, activation scopes, manifests, and hook integration.
@@ -431,16 +441,6 @@ See [`monitor-scoped-open-prs`](shared/workflow/monitor-scoped-open-prs.md).
 - **Do:** derive the scoped open PR/MR set in each active repository at every monitoring pass, and arm a persistent loop.
 - **Do:** act on terminal CI failures, merge conflicts, and review findings without waiting for a prompt.
 - **Don't:** sweep every accessible repository or stop monitoring because an item was opened by someone else.
-## Request review and drive every started PR to clean
-
-Whenever starting or working on a Pull Request:
-1. **Trigger AI review when done pushing**: Request AI review after completing code pushes for the round;
-   in repos with automatic review on PR events, do not trigger redundant reviews.
-2. **Drive to clean**: Run `ardi` / review-and-iterate loop until CI passes and review findings are clean.
-3. **Request human review only after AI approval or deadlock**: Per [`copilot-review-before-human`](shared/vendored/copilot-review-before-human.md), request human review only after AI review produces a clean verdict, or upon an impasse.
-
-- **Do:** trigger AI review after code pushes, and request human review only after AI review is clean or deadlocked.
-- **Don't:** trigger redundant reviews when automation is running, or request human review on draft work.
 
 ## Cursor Cloud specific instructions
 

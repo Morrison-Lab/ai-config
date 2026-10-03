@@ -170,7 +170,7 @@ See [`finish-wave`](skills/finish-wave/SKILL.md).
 
 ## Link PRs in tables
 
-Link every PR, issue, comment, review, or run you mention having acted on, in tables and chat prose alike, e.g. `[#237](https://github.com/<owner>/<repo>/pull/237)`.
+Link every PR, MR, issue, comment, review, run, published page, or file you mention having posted, created, or acted on, in tables and chat prose alike, e.g. `[#237](https://github.com/<owner>/<repo>/pull/237)`.
 Detail, rationale, and cases: [`shared/writing/link-forge-artifacts.md`](shared/writing/link-forge-artifacts.md).
 
 ## Tag chat output by category so long recaps stay scannable
@@ -461,15 +461,18 @@ If you and the reviewer reach an impasse on a single item (your rebuttal didn't 
 
 ## Request review and drive every started PR to clean
 
+`AGENTS.md`'s "Get a clean automated review before asking a person to review" governs: no request for human review, on any forge, before a clean or deadlocked automated review that you triggered yourself ([`automated-review-before-human`](shared/workflow/automated-review-before-human.md)).
+This section is the GitHub mechanics.
+
 Whenever starting or working on a Pull Request:
 1. **Trigger AI review when done pushing**: In repositories where reviews do not auto-trigger, request an AI review (`@claude review` comment, or dispatch `claude-review.yml`) **after completing all code pushes** for the round, not when the PR is first opened and empty.
    In repos that automatically trigger review on PR events (`pull_request` synchronize, opened, ready_for_review), do NOT manually trigger a redundant review if an automated review is already running or queued.
 2. **Drive to clean**: Run `ardi` / the review-and-iterate loop to ensure CI passes and all review findings are addressed until the PR reaches a clean verdict.
-3. **Request human review only after AI approval or deadlock**: Per [`copilot-review-before-human.md`](shared/vendored/copilot-review-before-human.md), request human review (configured repo reviewers per `skills/request-pr-review/SKILL.md`) **only after** the AI review produces a clean/approved verdict, or if an impasse/deadlock occurs.
+3. **Request human review once the `AGENTS.md` gate passes**: request the configured repo reviewers per `skills/request-pr-review/SKILL.md`.
 
-- **Do:** Trigger AI review (or let the automated PR review run) after completing code pushes, and request human review only after the AI review is clean/approved (or upon an impasse).
+- **Do:** Trigger AI review yourself (or let the automated PR review run) after completing code pushes, and request human review only once the `AGENTS.md` gate passes.
 - **Don't:** Manually trigger a redundant `@claude review` comment when an automated review is already running or triggered by the push/ready event.
-- **Don't:** Request human review when the PR is first opened empty, before code pushes are complete, or before the AI review has passed / produced a clean verdict.
+- **Don't:** Request human review when the PR is first opened empty or before code pushes are complete.
 
 
 ## Check the remote immediately before every push
@@ -1055,9 +1058,18 @@ and a read-through inspects sentences, not the sequence.
 
 [`shared/writing/quarto-figure-captions.md`](shared/writing/quarto-figure-captions.md)
 
-## Quarto: style div boxes in revealjs as well as HTML
+## Manuscript layout: floats at the end, captions with their floats
+
+In a journal-submission manuscript, unless the journal's instructions say otherwise, put main-text figures and tables after the main text and references and before the supplement, insert a page break before the supplementary-material header, keep each caption on its float's page (page breaks between floats, not split captions), and give every float a numbered caption rendered as a caption, never as a heading.
+Check these on the rendered layout, not only its text and numbers.
+
+[`shared/writing/manuscript-float-layout.md`](shared/writing/manuscript-float-layout.md)
+
+## Quarto: style and lay out revealjs slides
 
 [`shared/writing/quarto-revealjs-div-styling.md`](shared/writing/quarto-revealjs-div-styling.md)
+
+Style div boxes in `revealjs` as in HTML, keep the default font size rather than `smaller: true`, and give each section header its own slide.
 
 ## Quarto: remarks for commentary on the math, callouts for guidance to the reader
 
@@ -1147,7 +1159,7 @@ self-review confirms the claim, which was never the defect.
 
 [shared/workflow/check-the-renders.md](shared/workflow/check-the-renders.md)
 
-For a document whose deliverable is a file (Word, PDF, slides, a manuscript), viewing the render is a hard merge gate: no "ready" and no merge, under any grant, until every page of the render at the current head has been viewed and the evidence posted on the PR.
+For a document whose deliverable is a file (Word, PDF, slides, a manuscript), viewing the render is a hard merge gate: no "ready" and no merge, under any grant, until every page of the render at the current head has been viewed, the evidence posted on the PR, and an independent referee read of that render posted too.
 Procedure: [`review-rendered-documents`](shared/workflow/review-rendered-documents.md).
 
 A repo that publishes a website or book has the rendered page as its

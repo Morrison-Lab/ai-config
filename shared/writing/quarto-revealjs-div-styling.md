@@ -1,4 +1,6 @@
-# Quarto: give revealjs slides the same div boxes and colors as HTML
+# Quarto: style and lay out revealjs slides
+
+## Give slides the same div boxes and colors as HTML
 
 Theorem-like and callout divs (`#def-`, `#thm-`, `#exr-`, `#sol-`, custom
 callouts) render as boxed, colored blocks in HTML, but the `revealjs` format
@@ -19,6 +21,21 @@ Check the rendered deck, not only the HTML page.
 (Directive from the user, 2026-09-25: "can we add the div boxes and colors in
 revealjs format? ... it's not clear where the formal definition ends and the
 commentary begins", stated as a general principle for every project.)
+
+## Slide text fills the slide
+
+Do not shrink the base font of a `revealjs` deck (for example with
+`smaller: true`).
+A shrunken base leaves most of a short slide empty, as on the lds big-ideas deck.
+Keep the default size, and let `scrollable: true` handle the few dense slides.
+Check the rendered deck in the light and dark palettes: sweep every slide with
+`Reveal.next()`, count the slides that scroll, and look at the densest ones
+(long solutions, figures, code).
+
+- **Do:** render the deck and check slide density before and after any change to its font size.
+- **Don't:** set `smaller: true` to avoid scrolling on a few dense slides.
+
+(Directive from the user, 2026-10-02: "can we make the default font size bigger in revealjs format? ... most of the slide is empty", stated as a general principle for every project.)
 
 ## A section header gets its own slide
 

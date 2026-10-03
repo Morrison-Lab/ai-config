@@ -11,8 +11,12 @@ Four of the sixteen cited repositories --- `ucdavis/bcs`, `ucdavis/epi204`, `ucd
 Resolving would not prove a repository public in any case, since GitHub redirects a renamed or moved path and `git ls-remote` follows it (measured 2026-09-04, `facebook/jest` and `zeit/next.js` each returned their successor's `HEAD` SHA).
 
 - **Do:** read a 404 as a wrong number, and re-derive the number, whenever you have access to the repository.
+- **Do:** check a cited repository's existence with an authenticated listing (`mcp__claude-code-remote__list_repos` or `gh repo view`) before conceding or rebutting a reviewer's "does not exist" finding, and label a private repository as private in the prose.
 - **Don't:** conclude that a 404 from one of those four repositories is a wrong number when you lack access --- an access boundary is likelier, and `gh api repos/<owner>/<repo>` cannot tell you which, because it answers 404 for private, deleted, and never-existing alike to a caller without access.
   Ask someone who has access rather than repointing the citation yourself.
+- **Don't:** treat a review bot's or an unauthenticated `curl`'s 404 as proof that a citation is fabricated.
+  Case, 2026-10-03 ([ai-config#4238](https://github.com/Morrison-Lab/ai-config/pull/4238)): the Claude review bot twice flagged `Morrison-Lab/lds` as nonexistent, because its token could not see the repository and `curl` got a 404.
+  `list_repos` and `add_repo` showed the repository exists and is private, and a clone confirmed the cited `AUTHORING.md` heading at line 216.
 - **Don't:** infer that a repository is private from a `git ls-remote` failure --- a deleted or never-existing repository fails identically, while a renamed or moved one resolves.
 
 ## Conda activation before Quarto validation

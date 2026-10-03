@@ -1046,6 +1046,12 @@ Its output had gone only to the task output file, so it was lost with the task.
 - **Don't:** run it in the foreground or under a 10-minute timeout.
 - **Don't:** pipe it straight into `grep` with no saved log: the per-suite detail needed to find which case failed is gone once the pipe closes.
 
+Case, 2026-10-03: checking an old-based PR's merge with `main` in a cloud container, `scripts/test_hooks.py` alone ran more than 15 minutes.
+The checks that answered the actual merge-result risk ran in seconds: `check-context-closure.py` (the AGENTS.md byte cap), `check-links.py`, `validate-skills.py`, `check-hook-catalog.py`, `gen-hooks-plugin.py --check`, `check_regex_patterns.py`, `check-memory-file-size.py --strict`, and the touched hooks' own test files.
+
+- **Do:** check an old-based PR's merge with `main` using the checks for the surfaces it touches, and leave the full suite to CI.
+- **Don't:** block on the full `validate.yml` step list locally when CI runs it anyway.
+
 **Name a failing suite from its own summary line, `FAIL: hooks/test-<name>.py (exit N)` or `... (timed out after Ns)`, which states the path.**
 After that line the runner dumps the suite's output, which can carry case-level `FAIL` lines (for example `PATHISH stays linear`).
 Those case lines sit directly above the next suite's `RUN:` line, so they are easy to attribute to it.

@@ -81,6 +81,21 @@ skips producing an artifact.
 - **Don't:** let "broken tool" become the reason a verification gets skipped
   and its unverified claim ships regardless.
 
+## A broken or missing tool is fixed, not routed around
+
+The bias above applies at its most concrete to a tool that errors or is absent.
+Once the first-failure diagnosis finds the tool itself at fault (outdated, not installed), upgrade or install it, and say so.
+A workaround is the stopgap after that fix proves unavailable, never the first move, and it does not go into a brief for another session as if it were the method.
+The same holds for a skipped check: a render skipped because an interpreter is missing is a prompt to install the interpreter, or to ask for permission to.
+
+- **Do:** check the version, upgrade or install, then re-run the original command.
+- **Don't:** substitute a different command (`gh api -X PATCH` for `gh pr edit`) or skip the check without diagnosing why the first one failed.
+
+(2026-10-03: `gh pr edit` failed on `projectCards`;
+the agent switched to `gh api -X PATCH`, copied that into a brief, and had earlier skipped local renders for lack of Julia.
+Cause: gh 2.52.0; `winget upgrade GitHub.cli` fixed it.
+User: "I don't like workarounds when direct solutions are available".)
+
 ## A timeout bounds how long you wait, not what the command already did
 
 The section above tells you to attempt the thing before reporting it broken,

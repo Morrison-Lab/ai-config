@@ -499,7 +499,8 @@ No issue tracks the incident itself;
 the hook proposal is [ai-config#4267](https://github.com/Morrison-Lab/ai-config/issues/4267).
 
 - **Do:** stop a process you started by its own handle: `TaskStop` on the background task id.
-- **Do:** otherwise use a PID captured at launch, as that bullet says, and pass each tool the PID kind it takes (in Git Bash, `kill` takes the MSYS PID and `taskkill` the Windows PID; unverified here).
+- **Do:** otherwise use a PID captured at launch, as that bullet says, and pass each tool the PID kind it takes.
+  In Git Bash, `kill` takes the MSYS PID and `taskkill` the Windows PID (unverified here).
 - **Do:** keep a kill command's output visible, so a no-match, an access error, and a success read differently.
 - **Don't:** kill by image name (`taskkill /IM`, `killall`, `Stop-Process -Name`), or by a name-only `pkill` pattern, when a process you did not start could match it.
 - **Don't:** discard the output of a kill command (`>/dev/null 2>&1; true`).

@@ -27,6 +27,8 @@ so the header is a title slide and the content starts on the next slide.
 Do this once for the whole project, in a Lua filter listed under `revealjs: filters:`
 (lds uses `filters/section-slide-break.lua`),
 not by typing a break after each header in every chapter.
+The [`slidebreak`](https://github.com/Morrison-Lab/slidebreak) shortcode inserts one break where it is typed,
+so it suits a one-off break but not this every-header rule.
 
 - **Do:** check in the rendered deck that each section header stands alone on its slide.
 - **Don't:** leave a section header sharing a slide with its first paragraph or box.

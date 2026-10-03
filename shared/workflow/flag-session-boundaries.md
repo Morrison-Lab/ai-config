@@ -139,6 +139,27 @@ See [`flag-session-boundaries.cases.md`](flag-session-boundaries.cases.md), "Lef
 Whenever there's a meaningful chance I'd want to come back to this conversation later, recommend leaving the session alone and starting a fresh one for the next task, instead of `/clear`ing it -- the old session stays fully retrievable (nothing to lose), at the cost of a small navigation step to reopen it.
 Reserve a bare `/clear` recommendation for when nothing in the session is worth revisiting; when in doubt, default to the archive-and-start-new option since it's strictly safer.
 
+**When you recommend a new session, offer to start it yourself.**
+A recommendation to start fresh leaves the user to open the session and type out what it should do, and the second half is the part that needs this session's context.
+So write the next session's opening prompt yourself, self-contained (repo, issue numbers, what to skip and why), and attach a way to start the session with that prompt already in it.
+Use whatever starts a session in this harness:
+
+- **Claude desktop app:** a `spawn_task` chip (`mcp__ccd_session__spawn_task`).
+  It is a one-click offer that starts a fresh session on the prompt you wrote, so posting it needs no separate yes from the user.
+- **Terminal:** offer to open a terminal tab running `claude` with the prompt, and do it once the user says yes.
+- **No mechanism available:** give the prompt in a fenced block ready to paste, and say that this harness offers no way to start the session for them.
+
+Starting a session is new work rather than something the user already authorized, so this is an offer, and [`no-cop-out-offers`](no-cop-out-offers.md) does not turn it into an action to take unasked.
+What that rule does forbid is an offer that is only a sentence ("want me to start it?") when a working mechanism is at hand.
+The chip *is* the offer, so attach it rather than describing it.
+Archiving the current session stays with the user.
+
+- **Do:** attach the started-session mechanism (or the paste-ready prompt where none exists) in the same reply that recommends the new session.
+- **Don't:** recommend a fresh session and leave the user to open it and reconstruct the next prompt.
+
+(User directive, 2026-10-03, Morrison-Lab/mds: "when you recommend a new session, you should offer to start it yourself";
+[#4270](https://github.com/Morrison-Lab/ai-config/issues/4270).)
+
 **`/compact` is a third alternative, for weak continuity rather than a clean break.**
 When the next move is to keep working on *loosely related* things in the same window -- no concrete open item, so not the live state that triggers the `compress-session` flag, but enough of a thread that a clean slate would lose something worth keeping -- recommend `/compact` instead of archive-and-start-new.
 It carries a lossy summary forward in place, keeping the gist and skipping the reopen step, at the cost of a session that keeps growing and detail that is lost.

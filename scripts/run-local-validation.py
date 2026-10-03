@@ -52,7 +52,9 @@ against a tree an edit is about to change expires with the edit (#1262).
 
 Exit codes:
   0  every step that ran passed
-  1  at least one step failed (its exit code is in the table)
+  1  at least one step failed (its exit code, or "timeout", is in the table;
+     the closing summary names it on a "FAILED:" line, or on a "broken:"
+     line for an unparseable workflow file)
   2  the workflow could not be read or parsed, no job matched, --require-clean
      failed, or PyYAML is missing
 
@@ -575,6 +577,9 @@ def main(argv: Optional[List[str]] = None) -> int:
           f"{len(not_run)} not runnable locally, of "
           + _denominator(len(results), sum(1 for s, _, _, _ in results if s.kind == "workflow-file"), args.workflow,
                          broken=sum(1 for s, _, _, _ in results if s.broken)))
+    for s, rc, _, _ in failed:
+        if rc != "broken":  # broken steps get their own line below
+            print(f"  FAILED: {s.name} (rc {rc})")
     for s, rc, _, reason in results:
         if rc == "skip" and reason:
             print(f"  skipped: {s.name} ({reason})")

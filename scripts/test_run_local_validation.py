@@ -172,6 +172,8 @@ def test_other_workflow_files():
               and "1 step(s) derived from" in text)
         check("run mode exits 1 while an other workflow file is unparseable, and names it",
               rc == 1 and "broken: broken.yaml" in text)
+        check("a broken file is not also reported on a FAILED: line",
+              "FAILED: broken.yaml" not in text)
         check("run-mode not-run report names the other files",
               "not run: review.yml (other workflow file, not derived (on: pull_request, workflow_dispatch))" in text)
 
@@ -269,6 +271,23 @@ def test_run_reports_each_rc_and_fails_overall():
         check("the multi-line step ran under bash and executed its second line", out_file.read_text(encoding="utf-8") == "two\n")
         check("working-directory is honoured", "Sub-directory step" in text)
         check("the summary carries the denominator", "of 7 step(s) derived" in text and "2 not runnable" in text)
+        summary = text[text.index(" passed, "):]
+        check("the summary names each failed step and its exit code",
+              "  FAILED: Failing step (rc 3)" in summary)
+
+        def timed_out(*_args, **_kwargs):
+            raise subprocess.TimeoutExpired("step", 1)
+
+        real_run_step = rlv.run_step
+        rlv.run_step = timed_out
+        try:
+            out = io.StringIO()
+            with redirect_stdout(out), redirect_stderr(io.StringIO()):
+                rc = rlv.main(["--workflow", str(wf), "--root", tmp, "--only", "Failing step"])
+        finally:
+            rlv.run_step = real_run_step
+        check("a timed-out step is named on a FAILED: line",
+              rc == 1 and "  FAILED: Failing step (rc timeout)" in out.getvalue())
 
 
 def test_only_and_skip_filters():

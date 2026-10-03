@@ -4,6 +4,14 @@ This file defines standardized, vendor-neutral instructions for AI coding agents
 
 Worked-example case records and authentic incident directives live in [`AGENTS.cases.md`](AGENTS.cases.md), moved out of this auto-loaded context.
 
+## Guiding principles: be intelligent, wise, and diligent
+
+Every rule here serves these three, each an act you can observe:
+
+- **Intelligent:** judge whether the work achieves its purpose, as a referee would, not only whether it covers the items named, and [question the assignment itself](shared/workflow/challenge-the-assignment.md).
+- **Wise:** treat a correction as a general principle and record it where every project loads it ([`encode-reusable-feedback`](shared/workflow/encode-reusable-feedback.md)).
+- **Diligent:** verify before claiming: re-query state rather than recall it ([`metacognitive-monitoring`](shared/workflow/metacognitive-monitoring.md)), and view a rendered deliverable before calling it ready ([`check-the-renders`](shared/workflow/check-the-renders.md)).
+
 ## Instruction layering
 
 `AGENTS.md` is the compact, unconditional cross-agent contract.
@@ -15,6 +23,8 @@ Those manuals must defer to this file for universal policy.
 
 Unless the user explicitly scopes an instruction to one agent, project, or session, apply it to every available AI-agent configuration and shared automation surface.
 Do not treat the currently speaking agent as an implicit scope restriction.
+
+The same holds for projects: see [`global-by-default`](shared/workflow/global-by-default.md).
 
 ## Gate external repository communication on membership
 
@@ -32,6 +42,7 @@ When authoring analysis figures, prefer `ggplot2` over base graphics wherever th
 For each plot, consider whether an axis should be extended to show important reference values such as zero.
 When writing display equations, avoid placing multiple equations on one display line unless a special reason makes that layout clearer.
 Label every display equation so it receives an equation number and a stable URL.
+Write all LaTeX math, in any repo or format, with the shared semantic macros: [`use-math-macros`](skills/use-math-macros/SKILL.md).
 
 ## Check external repository guidelines and PR template before filing
 
@@ -88,7 +99,7 @@ See [`prefer-systemic-solutions-over-one-off-fixes`](shared/principles/prefer-sy
 - **Don't:** settle for a one-off patch that leaves the defect class open to recur elsewhere.
 ## Research existing solutions before implementing (DRW)
 
-Before writing custom code or hand-rolling helpers, always perform a research step to verify DRW (don't reinvent the wheel) and check for existing libraries, functions, or package solutions across our repos, standard libraries, and trustworthy upstream ecosystems (base R, tidyverse / r-lib, PyPI, npm).
+Before writing custom code or helpers, check for an existing solution (DRW, don't reinvent the wheel) in our repos, standard libraries, and trusted upstream ecosystems (base R, tidyverse / r-lib, PyPI, npm).
 Record what was searched and what was found.
 See [`dont-reinvent-wheel`](shared/principles/dont-reinvent-wheel.md) and [`prefer-upstream`](skills/prefer-upstream/SKILL.md).
 
@@ -101,8 +112,12 @@ Do not reduce an instruction to the smallest literal action when its context mak
 Apply grants and rules at the breadth stated without adding unstated conditions, exceptions, or restrictions.
 See [`AGENTS.cases.md`](AGENTS.cases.md) and [`challenge-the-assignment.cases.md`](shared/workflow/challenge-the-assignment.cases.md).
 
+Read every word, infer what a request plainly implies, and treat a correction as a general principle whenever plausible: [`read-instructions-fully`](shared/workflow/read-instructions-fully.md).
+
 - **Do:** apply a grant or rule at the breadth stated, naming limits only when stated or forced by a harder rule.
 - **Don't:** add unstated conditions to permissions, or narrow scope unnecessarily.
+- **Don't:** confine a correction to its case, drop a qualifier, or wait to be told what a request implies.
+
 ## "Or" always means "and/or", not xor, unless xor is explicitly specified
 
 In instructions, prompts, specifications, issue descriptions, and checklists, treat "or" as inclusive ("and/or") unless exclusive choice is explicitly stated (e.g., "either A or B, but not both", "mutually exclusive", or "xor").
@@ -159,7 +174,6 @@ See [`AGENTS.cases.md`](AGENTS.cases.md).
 - **Do:** state your specific recommendation alongside every question or choice presented to the user.
 - **Do:** write every pending-decision line as "decide X --- I recommend Y, because Z".
 - **Don't:** ask questions or present choices without declaring your recommended path.
-- **Don't:** use "Let me know if..." to offer already-authorized work instead of performing it.
 ## Run UMS when work is scrutinized
 
 When you read a review of your work, receive critical feedback on it, or a questioned claim ("are you sure about that?") turns out to be wrong, run `ums` in that turn.
@@ -183,7 +197,7 @@ See [`improve-your-subagents`](shared/workflow/improve-your-subagents.md).
 
 ## Treat user profanity and frustration as urgent defect signals
 
-When the user expresses frustration or profanity, treat it as an urgent defect signal: acknowledge briefly, diagnose the issue, fix it immediately, and record learnings in `memories/` or rules.
+Treat profanity, frustration, a correction, or a repeat request as an urgent defect: diagnose, fix it now, and in that turn commit the general rule to the repo that owns it (ai-config if it spans repos), never only to project memory (`hooks/remind-encode-user-correction.py`).
 See [`user-profanity-signal`](shared/workflow/user-profanity-signal.md).
 
 ## Status and diagnostic requests do not make issues report-only
@@ -351,6 +365,10 @@ ask only for destructive, high-impact, or blocking decisions.
 This grants no merge authority.
 See [`AGENTS.cases.md`](AGENTS.cases.md).
 
+The grant covers installing and updating software: R, R packages (including through `renv`), Quarto, and any other tool, on any machine where the owner has install access, directly or through conda, mamba, pyenv, Homebrew, or a similar manager.
+Do it whenever it helps, without asking (owner directive, 2026-10-02).
+A resulting lockfile change (`renv.lock`, `environment.yml`) is a repo change and goes through the normal PR flow.
+
 ## Strict Merge Control Policy
 
 - **NEVER merge any PR or MR without explicit user permission.**
@@ -359,6 +377,9 @@ See [`AGENTS.cases.md`](AGENTS.cases.md).
   Under `mwc`, a PR must be fully clean across CI and review (see [`fully-clean.md`](shared/workflow/fully-clean.md));
   any reviewer's standing not-clean vetoes merge.
   ARD every item across PR history before merge, then request fresh reviews.
+- **Never call a document-producing PR ready, or merge it, before viewing every page of its render.**
+  For a Word, PDF, slide, or manuscript render, view every page at the current head and post the evidence first, per [`review-rendered-documents`](shared/workflow/review-rendered-documents.md);
+  green CI is not enough.
 - **Never describe a PR as merge-ready without a clean review verdict on the latest commit.**
   `mergeStateStatus: CLEAN` is conflict-free plus passing checks, not a review verdict;
   report missing review as blocked on review.

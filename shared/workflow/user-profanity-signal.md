@@ -12,6 +12,11 @@ Treat profanity and intense frustration as a top-severity operational defect ale
 The user's frustration is the symptom;
 the agent's mistake is the root cause.
 
+Any correction from the user,
+and the user saying they had to repeat themselves,
+get the same treatment:
+each means a rule was missed or never recorded where this session could read it.
+
 ## Anti-patterns to strictly avoid
 
 - **Do not tone-police or lecture**:
@@ -54,9 +59,17 @@ When a user uses profanity or displays intense frustration:
 4. **Trigger an urgent UMS pass**:
    User frustration is an immediate trigger for Update Memories and Skills (UMS)
    per [`run-ums-proactively.md`](run-ums-proactively.md).
+   Commit the general rule in that turn
+   to the repo that owns it,
+   which is ai-config whenever the rule applies beyond one repo,
+   from whatever repo or project the session is in.
    Record the failure mode,
    anti-pattern,
-   and resolution in [`memories/preferences.md`](../../memories/preferences.md).
+   and resolution there,
+   in [`memories/preferences.md`](../../memories/preferences.md) or the governing fragment.
+   Project or host memory may hold a copy but never the only one,
+   since no other project reads it.
+   `hooks/remind-encode-user-correction.py` fires on a correction or repeat request as a reminder.
 5. **Prevent recurrence mechanically**:
    Ship an automated check,
    hook,
@@ -68,10 +81,12 @@ When a user uses profanity or displays intense frustration:
 
 ## Summary
 
-- **Do:** treat user profanity and frustration as a critical defect alert.
+- **Do:** treat user profanity, frustration, a correction, or a repeat request as a critical defect alert.
+- **Do:** commit the general rule to its owning repo (ai-config across repos) in the same turn.
 - **Do:** inspect live state and trace the recent action to diagnose the root cause immediately.
 - **Do:** fix the defect completely in that same turn and report the fix in the past tense.
 - **Do:** run UMS urgently to persist the lesson and build mechanical enforcement.
 - **Don't:** tone-police, lecture, or argue with the user about their choice of words.
 - **Don't:** emit canned HR apologies or empty verbal assurances.
+- **Don't:** leave the lesson only in project or host memory, where no other project reads it.
 - **Don't:** continue with unrelated background work while an active defect is causing user frustration.

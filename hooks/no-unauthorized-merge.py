@@ -1405,7 +1405,7 @@ def mask_payloads(text: str) -> str:
 # --- Standing per-repository merge grant ---------------------------------
 #
 # ai-config#1352: the user granted a STANDING merge permission for PRs
-# targeting this repository -- "PRs targeting the ai-config repo should have a
+# targeting the ai-config repository (and later the macros repo, below) -- "PRs targeting the ai-config repo should have a
 # standing mwc". That is not the session-scoped kind `/mwc` records, so the
 # guard has to honour it with no marker file and no per-session enabling step.
 #
@@ -1420,7 +1420,14 @@ def mask_payloads(text: str) -> str:
 # cannot see, and `ALLOW_MERGE=1` already covers the one-off case from inside
 # the command text. Adding a repository here is a one-line diff, and code
 # review is the right gate for an allowlist.
-STANDING_MERGE_GRANT_REPOS = frozenset({"morrison-lab/ai-config"})
+#
+# The shared math-macros repo carries the same standing grant (user directive,
+# 2026-10-02: "the macros repo should have a standing mwc grant"). It answers
+# to both owner spellings: d-morrison/macros and Morrison-Lab/macros both
+# resolved, with the same HEAD (fb15659c), to `git ls-remote` on 2026-10-02.
+STANDING_MERGE_GRANT_REPOS = frozenset(
+    {"morrison-lab/ai-config", "d-morrison/macros", "morrison-lab/macros"}
+)
 
 # Only the GitHub PR-merge forms carry the grant, which is what the user
 # granted: "PRs targeting the ai-config repo".

@@ -1056,7 +1056,7 @@ gh pr view <N> --json state,mergedAt,mergeCommit
 
 ## `gh pr merge` needs `-R` for the standing-grant repo check to fire
 
-`CLAUDE.md` gives PRs targeting `Morrison-Lab/ai-config` a standing `mwc` grant, and `hooks/no-unauthorized-merge.py` implements it by reading the merge's **target repo off the command**.
+`CLAUDE.md` gives PRs targeting `Morrison-Lab/ai-config` (and the shared macros repo) a standing `mwc` grant, and `hooks/no-unauthorized-merge.py` implements it by reading the merge's **target repo off the command**.
 
 So the grant is not resolved from the checkout.
 Run this from an ai-config worktree, on an ai-config PR, and it is refused:

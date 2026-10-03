@@ -186,6 +186,8 @@ This is a warning with a custom title.
 
 Details: [references/callouts.md](references/callouts.md)
 
+In the lab's repositories, every block with a type (definition, result, proof, example, exercise, warning, tip, note) goes in the matching div or callout, and a recurring kind with no matching type gets a custom one: [`shared/writing/quarto-divs-for-typed-content.md`](../../shared/writing/quarto-divs-for-typed-content.md).
+
 ### Figures
 
 ```markdown
@@ -326,6 +328,9 @@ This skill covers general Quarto authoring and documents the upstream chunk-opti
 This repo overrides that convention for its own `.qmd` files: [`shared/writing/quarto-figure-captions.md`](../../shared/writing/quarto-figure-captions.md) requires div syntax (`::: {#fig-...}` / `::: {#tbl-...}`) instead, and that lab-specific rule takes precedence over the chunk-option examples in this skill's [`references/figures.md`](references/figures.md) and [`references/tables.md`](references/tables.md) whenever the document under edit belongs to this repo.
 
 For a journal-submission manuscript, [`shared/writing/manuscript-float-layout.md`](../../shared/writing/manuscript-float-layout.md) sets where figures and tables go (after the main text and references, before the supplement), the page break before the supplement, and how captions must paginate and render.
+
+LaTeX math in any document uses the shared semantic macros, not raw LaTeX, wherever a macro names the concept;
+[`use-math-macros`](../use-math-macros/SKILL.md) is the procedure, including adding a macro when none fits.
 
 ## Resources
 

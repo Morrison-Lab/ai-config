@@ -36,12 +36,33 @@ When PSW and this guidance disagree, PSW wins.
   - **Do:** apply those PSW sections when writing or reviewing prose.
   - **Don't:** copy their text here; link the section instead
     (see [`dont-reinvent-wheel`](../principles/dont-reinvent-wheel.md)).
+- **Follow an abstract or general statement with a concrete example.**
+  A general claim is fine when an instance follows it;
+  a vague one with no instance is not.
+  PSW's rule and its before/after are proposed in
+  [`Morrison-Lab/psw#76`](https://github.com/Morrison-Lab/psw/pull/76)
+  (open as of 2026-10-02) ---
+  once merged, they live at
+  [Follow an abstract statement with an example](https://morrison-lab.github.io/psw/chapters/word-choice.html#follow-an-abstract-statement-with-an-example).
+  - **Do:** give the instance right after the general claim.
+  - **Don't:** leave a general claim for the reader to instantiate.
 - **Put an inline list of three or more phrases in a bullet list**,
   introduced by a sentence ending in a colon, and number sequential steps.
   A short series of single words may stay inline.
   PSW's rule and examples are proposed in `Morrison-Lab/psw#60` ---
   once merged, they live at `chapters/conciseness.qmd`,
   "Put lists in bullet points".
+- **Write for every reader, including readers learning English
+  and neurodiverse readers.**
+  Use literal words, not idioms or slang,
+  and spell out abbreviations and hidden steps.
+  PSW's rules, each with a before/after example, are proposed in
+  [`Morrison-Lab/psw#79`](https://github.com/Morrison-Lab/psw/pull/79)
+  (open as of 2026-10-02) ---
+  once merged, they live at
+  [Writing for every reader](https://morrison-lab.github.io/psw/chapters/inclusive-writing.html).
+  - **Do:** write "the estimates become very large".
+  - **Don't:** write "the estimates blow up".
 
 This is a default, not an absolute rule. Keep a clause or a technical term when
 removing it would lose meaning or precision. Never trade an honest hedge for

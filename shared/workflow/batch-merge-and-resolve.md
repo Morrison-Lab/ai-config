@@ -557,20 +557,31 @@ merge-order constraint that sequencing fixes.
 One branch has to relocate its content, or the file has to be split first.
 
 Two things make it worth checking rather than trusting CI.
-The breach lands on `main`, so it goes red for **everyone** afterwards rather
-than for whoever caused it.
-And the step that enforces a cap is not reliably the one named for it: a step
-labelled advisory may genuinely exit 0 while a self-test inside that same
-check's **test suite** asserts the real corpus complies and gates the job.
-Grepping a workflow for what enforces a threshold can therefore find the
-advisory step and conclude wrongly.
-[`review-verdict-pitfalls`](review-verdict-pitfalls.md) already owns the near
-half of this, in its case covering a check "designed to NEVER fail regardless
-of their own posted content, so their green color carries zero signal at
-all".
-What the capped-file case adds is that the signal is not merely absent but
-**misdirecting**: a second step enforces the same threshold, so the advisory
-label is accurate about its own step and false about the job.
+The breach lands on `main`, so it goes red for **everyone** afterwards rather than for whoever caused it.
+And the step that enforces a cap is not reliably the one named for it: a step labelled advisory may genuinely exit 0 while a self-test inside that same check's **test suite** asserts the real corpus complies and gates the job.
+Grepping a workflow for what enforces a threshold can therefore find the advisory step and conclude wrongly.
+[`review-verdict-pitfalls`](review-verdict-pitfalls.md) already owns the near half of this, in its case covering a check "designed to NEVER fail regardless of their own posted content, so their green color carries zero signal at all".
+What the capped-file case adds is that the signal is not merely absent but **misdirecting**: a second step enforces the same threshold, so the advisory label is accurate about its own step and false about the job.
+
+For a byte cap, `git merge-tree --write-tree` gives the projection directly, because it prints the merged tree's id on its first line.
+It needs git 2.38 or later and a freshly fetched base:
+
+```bash
+git fetch origin main
+tree="$(git merge-tree --write-tree origin/main "$head")" || { echo "conflict or merge-tree failure"; exit 1; }
+git cat-file -p "${tree%%$'\n'*}:AGENTS.md" | wc -c
+```
+
+A conflict, an error, or a count of 0 is not a pass;
+expect a figure near the file's current size.
+Measured 2026-10-02: [#4213](https://github.com/Morrison-Lab/ai-config/pull/4213)'s branch at 1c1e6592 held `AGENTS.md` at 31,941 of Codex's 32,768-byte cap, well inside it.
+Meanwhile [#4215](https://github.com/Morrison-Lab/ai-config/pull/4215) merged and grew `main`'s copy to 32,627 bytes (45d60d0f).
+`git merge-tree --write-tree 45d60d0f 1c1e6592` gives 33,029 bytes, over the cap, with no conflict;
+the branch's own merge of `main` (d957ee2f) has the same tree.
+The remedy was trimming the section on the merged branch, to 32,725 bytes (0ba906df).
+
+- **Do:** re-run the byte count on the merge result immediately before merging any PR that grows a capped file, after every earlier merge in the batch.
+- **Don't:** read the headroom figure in the PR's own CI output as current once `main` has moved.
 
 **Clean auto-merge of independently grown logic (fail-open union).**
 A merge uniting two independently developed versions of a file can be resolved

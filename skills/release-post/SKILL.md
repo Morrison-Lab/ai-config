@@ -1,6 +1,6 @@
 ---
 name: release-post
-description: Create professional package release blog posts for Tidyverse/Shiny.
+description: Write R package release blog posts.
 user-invocable: true
 allowed-tools:
   - Read

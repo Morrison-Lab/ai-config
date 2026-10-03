@@ -361,8 +361,7 @@ dependency, needs design decision, upstream bug):
 - **`defer-issue`** — if sub-tasks emerge during implementation, defer them
 - **`select-model`** — decision tree for picking a subagent's model tier when
   delegating sidecar work (see Delegating sidecar work)
-- **`delegate-to-codex`** — when a sidecar task is a heavy fan-out
-  read/draft/verify pass and codex is available, prefer it first
+- **`delegate-to-codex`** — when a sidecar task is a heavy fan-out read/draft/verify pass and codex is available (UCDH projects only), prefer it first
 
 ## Anti-patterns
 

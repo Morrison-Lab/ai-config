@@ -785,7 +785,7 @@
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-human-review-before-clean-verdict.py\"'",
             "timeout": 10,
             "script": "warn-human-review-before-clean-verdict.py",
-            "why": "ai-config#4247: AGENTS.md says to get a clean automated review before asking a person to review, and the rule was skipped (ai-config#4241). Warns, never blocks, when a request for a human reviewer (`gh pr edit --add-reviewer`, a `requested_reviewers` POST, or mcp__github__update_pull_request with `reviewers`) is made and the transcript since the last `git push` holds no clean verdict. Logins containing bot, copilot or claude are not people. Reads only the transcript; an explicit instruction from the user to request review now is a valid reason to ignore the note."
+            "why": "ai-config#4247: AGENTS.md says to get a clean automated review before asking a person to review, and the rule was skipped (ai-config#4241). Warns, never blocks, when a request for a human reviewer (`gh pr edit --add-reviewer`, `gh pr create --reviewer`/`-r`, a `requested_reviewers` POST, or mcp__github__update_pull_request/create_pull_request with `reviewers`) is made and the transcript since the last `git push` holds no clean verdict. Logins containing bot, copilot or claude are not people. Reads only the transcript; an explicit instruction from the user to request review now is a valid reason to ignore the note."
           }
         ]
       },
@@ -983,7 +983,7 @@
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-human-review-before-clean-verdict.py\"'",
             "timeout": 10,
             "script": "warn-human-review-before-clean-verdict.py",
-            "why": "The MCP half of the Bash entry: a remote session has no `gh`, so mcp__github__update_pull_request with `reviewers` is how it requests a person. Same script, same warn-only behaviour."
+            "why": "The MCP half of the Bash entry: a remote session has no `gh`, so mcp__github__update_pull_request or create_pull_request with `reviewers` is how it requests a person. Same script, same warn-only behaviour."
           }
         ]
       },

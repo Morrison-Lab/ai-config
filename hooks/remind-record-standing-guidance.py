@@ -86,9 +86,11 @@ GLOBAL_PATH = re.compile(
 WRITE_CMD = re.compile(r"\bgit\b|\btee\b|\bsed\s+-i|>>?\s*\S|\bcp\b|\bmv\b")
 AGENT_TARGET = re.compile(r"\bai-config\b|\bpsw\b", re.I)
 
+# Compared case-insensitively: harnesses spell the same tool differently.
 WRITE_TOOLS = {
-    "Write", "Edit", "NotebookEdit", "MultiEdit", "write", "edit",
-    "write_to_file", "replace_file_content", "apply_diff", "StrReplace", "EditNotebook",
+    "write", "edit", "notebookedit", "multiedit", "write_to_file", "replace_file_content",
+    "apply_diff", "strreplace", "editnotebook", "edit_file", "create_file", "apply_patch",
+    "str_replace_editor",
 }
 BASH_TOOLS = {"Bash", "bash"}
 AGENT_TOOLS = {"Task", "Agent"}
@@ -170,10 +172,11 @@ def scan(path):
                 name, inp = b.get("name") or "", b.get("input") or {}
                 if not isinstance(inp, dict):
                     continue
-                if name in WRITE_TOOLS:
+                if name.lower() in WRITE_TOOLS:
                     target = str(
                         inp.get("file_path") or inp.get("notebook_path") or inp.get("path")
-                        or inp.get("TargetFile") or inp.get("target_file") or ""
+                        or inp.get("TargetFile") or inp.get("target_file") or inp.get("filePath")
+                        or inp.get("target_notebook") or ""
                     )
                     if GLOBAL_PATH.search(target):
                         recorded.append(i)

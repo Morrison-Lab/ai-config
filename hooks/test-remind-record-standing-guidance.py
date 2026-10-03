@@ -99,6 +99,8 @@ REMIND = [
     ([tool("Edit", {"file_path": "/home/u/ai-config/AGENTS.md"}), user(RULE), say("ok")],
      NEUTRAL, "an Edit BEFORE the message does not discharge it"),
     ([user(RULE), result(), say("ok")], NEUTRAL, "tool_result records are not human messages"),
+    ([user(RULE), tool("Write", {"file_path": "/home/u/proj/notes.md", "content": "x"})],
+     NEUTRAL, "a Write outside a global home does not discharge"),
 ]
 SILENT = [
     ([], "Please fix the failing test in foo.py and rerun the suite.", "plain task request"),
@@ -122,6 +124,8 @@ SILENT = [
      NEUTRAL, "discharged by later NotebookEdit (notebook_path) under ai-config"),
     ([user(RULE), tool("write_to_file", {"TargetFile": "/home/u/ai-config/AGENTS.md", "CodeContent": "x"})],
      NEUTRAL, "discharged by later cross-agent write_to_file (TargetFile) under ai-config"),
+    ([user(RULE), tool("multiedit", {"filePath": "/home/u/ai-config/AGENTS.md"})],
+     NEUTRAL, "discharged by lowercase multiedit (filePath) under ai-config"),
     ([user(RULE), tool("Bash", {"command": "cd ai-config && git add AGENTS.md && git commit -m x"})],
      NEUTRAL, "discharged by later git Bash on ai-config"),
     ([user(RULE), tool("Agent", {"prompt": "Record this rule in psw and ai-config."})],

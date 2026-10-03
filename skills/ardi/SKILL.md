@@ -391,7 +391,7 @@ Do-Confirm; per
 - [ ] Every reviewer's latest verdict has zero findings and no disputed rebuttals.
 - [ ] You have obtained genuine posted clean verdicts at the current head from ALL reachable providers in your pinned quorum -- re-checked right before declaring clean.
 - [ ] Every self-review posted along the way was produced by a separate `adversarial-reviewer` subagent rather than inline, and its findings were dispositioned ([`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md)).
-- [ ] **Killer item, for a PR that changes a rendered document (Word, PDF, slides, a manuscript):** the render at the current head has been viewed page by page and the evidence posted on the PR, per [`review-rendered-documents`](../../shared/workflow/review-rendered-documents.md).
+- [ ] **Killer item, for a PR that changes a rendered document (Word, PDF, slides, a manuscript):** the render at the current head has been viewed page by page, the evidence posted on the PR, and an independent referee read of that render posted too, per [`review-rendered-documents`](../../shared/workflow/review-rendered-documents.md).
   Marked because green CI and a clean verdict say nothing about caption placement, table layout, or page breaks, and skipping this step is how broken manuscripts were reported ready.
 - [ ] Every inline review thread is resolved.
 - [ ] The only open conversation is the final all-clear exchange (the reviewer's all-clear comment and your reply --- normally a top-level PR comment, not an inline thread).

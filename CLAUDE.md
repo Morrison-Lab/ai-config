@@ -170,7 +170,7 @@ See [`finish-wave`](skills/finish-wave/SKILL.md).
 
 ## Link PRs in tables
 
-Link every PR, issue, comment, review, or run you mention having acted on, in tables and chat prose alike, e.g. `[#237](https://github.com/<owner>/<repo>/pull/237)`.
+Link every PR, MR, issue, comment, review, run, published page, or file you mention having posted, created, or acted on, in tables and chat prose alike, e.g. `[#237](https://github.com/<owner>/<repo>/pull/237)`.
 Detail, rationale, and cases: [`shared/writing/link-forge-artifacts.md`](shared/writing/link-forge-artifacts.md).
 
 ## Tag chat output by category so long recaps stay scannable
@@ -1147,7 +1147,7 @@ self-review confirms the claim, which was never the defect.
 
 [shared/workflow/check-the-renders.md](shared/workflow/check-the-renders.md)
 
-For a document whose deliverable is a file (Word, PDF, slides, a manuscript), viewing the render is a hard merge gate: no "ready" and no merge, under any grant, until every page of the render at the current head has been viewed and the evidence posted on the PR.
+For a document whose deliverable is a file (Word, PDF, slides, a manuscript), viewing the render is a hard merge gate: no "ready" and no merge, under any grant, until every page of the render at the current head has been viewed, the evidence posted on the PR, and an independent referee read of that render posted too.
 Procedure: [`review-rendered-documents`](shared/workflow/review-rendered-documents.md).
 
 A repo that publishes a website or book has the rendered page as its

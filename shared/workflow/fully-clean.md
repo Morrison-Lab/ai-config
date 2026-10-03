@@ -666,7 +666,7 @@ Specification and mechanics live in that fragment.
 See [`fully-clean.cases.md`](fully-clean.cases.md),
 "Two agents, one head, opposite verdicts".
 
-**A document-producing PR has a further gate (user directive, 2026-10-02): no "ready" report and no merge under any grant, `mwc` included, until the rendered document at the current head has been viewed page by page and the evidence posted on the PR.**
+**A document-producing PR has a further gate (user directive, 2026-10-02): no "ready" report and no merge under any grant, `mwc` included, until the rendered document at the current head has been viewed page by page, the evidence posted on the PR, and an independent referee read of that render posted too.**
 It stacks on both criteria and on the adversarial gate above;
 none of them satisfies it.
 Specification and procedure live in [`review-rendered-documents`](review-rendered-documents.md).

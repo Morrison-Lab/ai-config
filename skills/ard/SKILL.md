@@ -374,7 +374,7 @@ Symmetrically, drop to a cheaper/faster tier (`model: 'fable'` or `'haiku'`)
 for a mechanical check (a lookup, confirming a file/symbol still exists); see
 [`select-model`](../../skills/select-model/SKILL.md)'s decision tree for both
 directions. For a heavy fan-out verification pass, prefer a separately-billed
-provider (e.g. the `codex` CLI) first when available --- see
+provider (e.g. the `codex` CLI, in UCDH projects only) first when available --- see
 [`delegate-to-codex`](../delegate-to-codex/SKILL.md).
 
 ## Proactive hook compliance

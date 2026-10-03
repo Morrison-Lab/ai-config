@@ -10,7 +10,8 @@ this section is self-contained.
 > **Codex and Databricks are scoped to UCDH projects** (user directive, 2026-10-03:
 > "ucdh databricks is only for projects in the hac group on the ucdh gitlab, and ucdh codex is only for ucdh projects on any forge (bcs + hac)").
 > The `codex` lane below, and [`delegate-to-codex`](../skills/delegate-to-codex/SKILL.md), apply only in a UCDH project:
-> the `bcs` or `hac` groups, on any forge (for example `ucdavis/bcs`, `ucdavis/hac.*`, or `health-analytics-core` on `hc2-gitlab.ucdmc.ucdavis.edu`).
+> the `bcs` or `hac` groups, on any forge: for example the `ucdavis/bcs` and `ucdavis/hac.*` repositories on GitHub,
+> or a project in the `health-analytics-core` group (Health Analytics Core, HAC) on the UCDH GitLab, `hc2-gitlab.ucdmc.ucdavis.edu`.
 > The Databricks lane, and [`delegate-to-databricks`](../skills/delegate-to-databricks/SKILL.md), apply only in a `hac`-group project on the UCDH GitLab.
 > Everywhere else, the ladder starts at `agy`, then OpenCode, OpenRouter and the Cursor CLI, per
 > [`standing-habits-from-ezra`](../shared/workflow/standing-habits-from-ezra.md).
@@ -56,7 +57,7 @@ Claude's: `codex`, `agy`, and OpenCode's `opencode-go/*` tier.
 | CLI / Provider | plan | skill |
 |---|---|---|
 | `codex` | ChatGPT | [`delegate-to-codex`](../skills/delegate-to-codex/SKILL.md) (alias `dtc`) |
-| `codex --profile <databricks-profile>` | institution-hosted Databricks Model Serving, when configured | [`delegate-to-databricks`](../skills/delegate-to-databricks/SKILL.md) |
+| `codex --profile <databricks-profile>` | institution-hosted Databricks Model Serving, when configured; `hac`-group projects on the UCDH GitLab only | [`delegate-to-databricks`](../skills/delegate-to-databricks/SKILL.md) |
 | `agy` (Google Antigravity) | API retired, **CLI available** (2026-08-25) | none --- invoke `agy --print` directly |
 | `opencode` | OpenCode Go (`opencode-go/*`, $10/mo windowed) + free hosted (`opencode/*`, opencode Zen) | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) (alias `dto`) |
 | `openrouter` | prepaid credit balance, reached through OpenCode's `openrouter` provider | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md)'s "A third destination" section |
@@ -96,7 +97,7 @@ but has no measured headless dispatch mechanics here yet ---
 probe before relying on it.
 
 Exhaust the *current usage window* of each metered destination in turn ---
-`codex` first (roughly 5 hours),
+`codex` first in a UCDH project (roughly 5 hours),
 then `agy` CLI as its own availability allows,
 then OpenCode's `opencode-go/*` window ---
 then fall back to Claude until a window resets.
@@ -253,8 +254,11 @@ reaffirmed 2026-07-06 ("always use codex first
 (until we hit the 5-hour limits) before using up claude quota"),
 and widened 2026-08-15 ("in addition to codex, we have agy quota to use;
 try using both of those as subagents before exhausting claude quota").
+Scoped 2026-10-03: the `codex` half applies only in UCDH projects (see the banner at the top of this section).
 
 ## Databricks-hosted models are now an operationalized delegation destination, via Codex CLI
+
+Scope: `hac`-group projects on the UCDH GitLab only (user directive, 2026-10-03).
 
 [`memories/databricks-hosted-llms.md`](databricks-hosted-llms.md) already
 carried the underlying facts (the `auth.command` mechanism, the hard
@@ -581,7 +585,7 @@ both needed the underlying claim traced back to its source.
 **Sonnet adversarial reviewers were the highest-value spend in the sweep.**
 Across roughly 20 review rounds they surfaced a pre-existing verdict-spoofing parser vulnerability already live on `main`, several straddle/swallow enumeration bypasses, and repeatedly refused to accept an enumeration-based patch until a structural fix replaced it --- holding the line across multiple rounds rather than accepting the first plausible-looking patch.
 
-- **Do:** route a well-specified, mechanical brief to `codex` first.
+- **Do:** in a UCDH project, route a well-specified, mechanical brief to `codex` first.
 - **Do:** give a cheap CLI's output --- `codex`, `opencode`, or `agy` --- the same adversarial review any diff gets;
   a clean run is not a clean review.
 - **Do:** fact-check every scope or boundary claim a cheap model writes against the source it cites, not against how the sentence reads.

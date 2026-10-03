@@ -1,7 +1,8 @@
 # Standing habits from Ezra
 
 Ezra (d-morrison) gave these rules in the DATA 571 project on 2026-10-02.
-They apply in every project, per the global-by-default rule in `AGENTS.md`.
+They apply in every project, per the global-by-default rule in `AGENTS.md`,
+except where a rule names a narrower scope (the Codex and Databricks lanes below).
 
 ## Apply each new instruction at once
 

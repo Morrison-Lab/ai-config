@@ -215,7 +215,7 @@ this synthesis step — codex produced the parts, Claude assembles the whole.
   Claude's own prior output ("does this design/diff hold up?") instead of only
   ever handing codex fresh investigation. Same procedure, different prompt.
 - **Workflow orchestration** (the `Workflow` tool) — runs fan-out on **Claude**
-  subagents. Prefer this skill's codex path first for the read/verify stages to
+  subagents. In a UCDH project, prefer this skill's codex path first for the read/verify stages to
   conserve Claude budget; reserve `Workflow` for stages codex can't do or once
   its window is exhausted.
 - **`ums` / `record-learnings`** — capture any new codex mechanics learned into

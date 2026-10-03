@@ -412,7 +412,7 @@ sidecar work, and symmetrically a cheaper/faster tier (`model: 'fable'` or
 `'haiku'`) for a mechanical one --- see
 [`select-model`](../../skills/select-model/SKILL.md)'s decision tree for both
 directions. For a heavy fan-out survey/verify pass, prefer a
-separately-billed provider (e.g. the `codex` CLI) first when available ---
+separately-billed provider (e.g. the `codex` CLI, in UCDH projects only) first when available ---
 see [`delegate-to-codex`](../delegate-to-codex/SKILL.md).
 
 ## Recurring / unattended runs

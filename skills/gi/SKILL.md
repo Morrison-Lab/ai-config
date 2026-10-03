@@ -342,7 +342,7 @@ the session default. Symmetrically, drop to a cheaper/faster tier (`model:
 leaving it at the session default --- see
 [`select-model`](../../skills/select-model/SKILL.md)'s decision tree for both
 directions. For a heavy fan-out read/draft/verify pass, prefer a
-separately-billed provider (e.g. the `codex` CLI) first when available, to
+separately-billed provider (e.g. the `codex` CLI, in UCDH projects only) first when available, to
 conserve Claude/Agent-tool budget --- see
 [`delegate-to-codex`](../delegate-to-codex/SKILL.md).
 

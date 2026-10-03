@@ -350,7 +350,7 @@ push, post summary, re-request review) on the main thread.
 
 For a judgment-heavy sidecar task (a subtle root-cause hunt, adjudicating a deadlocked rebuttal before escalating to a human), give the subagent a stronger model via the `Agent` tool's `model` parameter (e.g. `model: 'opus'`).
 Symmetrically, drop to a cheaper/faster tier (`model: 'fable'` or `'haiku'`) for a mechanical sidecar task --- see [`select-model`](../../skills/select-model/SKILL.md)'s decision tree for both directions.
-For a heavy fan-out investigation/verification pass, prefer a separately-billed provider (e.g. the `codex` CLI) first when available --- see [`delegate-to-codex`](../delegate-to-codex/SKILL.md).
+For a heavy fan-out investigation/verification pass, prefer a separately-billed provider (e.g. the `codex` CLI, in UCDH projects only) first when available --- see [`delegate-to-codex`](../delegate-to-codex/SKILL.md).
 
 ## The bar: "fully clean"
 

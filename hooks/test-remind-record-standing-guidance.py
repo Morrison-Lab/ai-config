@@ -126,6 +126,8 @@ SILENT = [
      NEUTRAL, "discharged by later cross-agent write_to_file (TargetFile) under ai-config"),
     ([user(RULE), tool("multiedit", {"filePath": "/home/u/ai-config/AGENTS.md"})],
      NEUTRAL, "discharged by lowercase multiedit (filePath) under ai-config"),
+    ([user(RULE), tool("run_command", {"command": "cd ai-config && git add AGENTS.md && git commit -m x"})],
+     NEUTRAL, "discharged by cross-agent run_command on ai-config"),
     ([user(RULE), tool("Bash", {"command": "cd ai-config && git add AGENTS.md && git commit -m x"})],
      NEUTRAL, "discharged by later git Bash on ai-config"),
     ([user(RULE), tool("Agent", {"prompt": "Record this rule in psw and ai-config."})],

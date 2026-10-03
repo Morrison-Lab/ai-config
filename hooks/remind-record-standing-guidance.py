@@ -92,8 +92,8 @@ WRITE_TOOLS = {
     "apply_diff", "strreplace", "editnotebook", "edit_file", "create_file", "apply_patch",
     "str_replace_editor",
 }
-BASH_TOOLS = {"Bash", "bash"}
-AGENT_TOOLS = {"Task", "Agent"}
+BASH_TOOLS = {"bash", "run_command", "execute_command", "terminal", "shell"}
+AGENT_TOOLS = {"task", "agent"}
 
 
 def visible_prose(text):
@@ -180,11 +180,11 @@ def scan(path):
                     )
                     if GLOBAL_PATH.search(target):
                         recorded.append(i)
-                elif name in BASH_TOOLS:
+                elif name.lower() in BASH_TOOLS:
                     cmd = str(inp.get("command") or "")
                     if GLOBAL_PATH.search(cmd) and WRITE_CMD.search(cmd):
                         recorded.append(i)
-                elif name in AGENT_TOOLS:
+                elif name.lower() in AGENT_TOOLS:
                     blob = str(inp.get("prompt") or "") + str(inp.get("description") or "")
                     if AGENT_TARGET.search(blob):
                         recorded.append(i)

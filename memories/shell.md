@@ -482,7 +482,7 @@ A terminal renders a real newline as a line break and a backslash-n as `\n`, and
 ## Stop a process by its own handle, not by image name
 
 The `pkill -f` sections above cover a pattern that matches the caller,
-and "Kill by PID, not pattern" above already says to use a recorded PID.
+and the "Kill by PID, not pattern" bullet in the first section already says to use a recorded PID.
 This section adds the case where a name matches other sessions' processes,
 and the harness handle (`TaskStop`) that fits a background task.
 
@@ -499,7 +499,7 @@ No issue tracks the incident itself;
 the hook proposal is [ai-config#4267](https://github.com/Morrison-Lab/ai-config/issues/4267).
 
 - **Do:** stop a process you started by its own handle: `TaskStop` on the background task id.
-- **Do:** otherwise use a PID captured at launch, as the section above says.
+- **Do:** otherwise use a PID captured at launch, as that bullet says, and pass each tool the PID kind it takes (in Git Bash, `kill` takes the MSYS PID and `taskkill` the Windows PID; unverified here).
 - **Do:** keep a kill command's output visible, so a no-match, an access error, and a success read differently.
 - **Don't:** kill by image name (`taskkill /IM`, `killall`, `Stop-Process -Name`), or by a name-only `pkill` pattern, when a process you did not start could match it.
 - **Don't:** discard the output of a kill command (`>/dev/null 2>&1; true`).

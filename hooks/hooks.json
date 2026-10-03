@@ -1336,6 +1336,18 @@
             "why": "A partial PUT to a REST resource ROOT can null fields the body never named, returning 200 either way. Measured 2026-09-24: a Canvas course PUT setting one boolean also cleared start_at and end_at, and four restore attempts returned 200 and changed nothing. Warns, never blocks."
           }
         ]
+      },
+      {
+        "matcher": "mcp__hearthbot__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-bare-forge-reference.py\"",
+            "timeout": 10,
+            "script": "warn-bare-forge-reference.py",
+            "why": "ai-config#4224. The user asked for a link on every artifact a reply names ('always give me hyperlinks!', then 'how many times do I have to tell you that?', 2026-10-02) after the rule was already in memory and repo instructions; the miss happens at composition time, so the rule alone did not fire. Warns, never blocks, when a user-visible reply tool call carries a bare forge reference (#N, !N, owner/repo#N) outside Markdown links, URLs and code. Descriptions without a number ('the referee note') have no lexical marker and are out of scope. Fails open."
+          }
+        ]
       }
     ],
     "Stop": [

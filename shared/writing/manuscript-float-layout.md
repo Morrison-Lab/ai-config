@@ -9,7 +9,7 @@ for Quarto's div syntax, see [`quarto-figure-captions`](quarto-figure-captions.m
 
 A reading copy, a website, or a preprint can still place floats near the text that cites them.
 The rules below apply when the target is a journal submission,
-where many journals' instructions to authors ask for floats after the main text;
+where the journal's instructions to authors may ask for floats after the main text;
 when a specific journal's instructions say otherwise, follow the journal.
 
 ## Main-text floats go at the end of the main manuscript
@@ -71,12 +71,12 @@ float placement, page breaks, caption pagination, and that every float has a num
 This is the layout half of [`check-the-renders`](../workflow/check-the-renders.md).
 
 - **Do:** put main-text figures and tables after the main text and references, and before the supplement, in a journal-submission manuscript.
-- **Don't:** leave floats inline in a submission manuscript because the source was drafted that way.
 - **Do:** insert a page break before the supplementary-material header.
-- **Don't:** let the supplement header follow the last main-text float on the same page.
 - **Do:** insert page breaks between floats so each caption shares a page with its float.
-- **Don't:** accept a caption stranded on the next page, or split across a page break when a break between floats would avoid it.
 - **Do:** give every figure and table, supplementary ones included, a numbered caption produced by the tool's caption mechanism.
-- **Don't:** write a caption as a section heading (`## Supplementary Figure S43: ...`) or leave a table uncaptioned.
 - **Do:** check layout on the rendered document before calling a render reviewed.
+- **Don't:** leave floats inline in a submission manuscript because the source was drafted that way.
+- **Don't:** let the supplement header follow the last main-text float on the same page.
+- **Don't:** accept a caption stranded on the next page, or split across a page break when a break between floats would avoid it.
+- **Don't:** write a caption as a section heading (`## Supplementary Figure S43: ...`) or leave a table uncaptioned.
 - **Don't:** treat a text-and-numbers comparison of the render as a layout review.

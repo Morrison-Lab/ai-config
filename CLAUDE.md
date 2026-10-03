@@ -1065,9 +1065,11 @@ Check these on the rendered layout, not only its text and numbers.
 
 [`shared/writing/manuscript-float-layout.md`](shared/writing/manuscript-float-layout.md)
 
-## Quarto: style div boxes in revealjs as well as HTML
+## Quarto: style and lay out revealjs slides
 
 [`shared/writing/quarto-revealjs-div-styling.md`](shared/writing/quarto-revealjs-div-styling.md)
+
+Style div boxes in `revealjs` as in HTML, keep the default font size rather than `smaller: true`, and give each section header its own slide.
 
 ## Quarto: remarks for commentary on the math, callouts for guidance to the reader
 

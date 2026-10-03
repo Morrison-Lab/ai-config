@@ -478,3 +478,20 @@ A terminal renders a real newline as a line break and a backslash-n as `\n`, and
 - **Do:** read back the written line with `repr()` before trusting it.
 - **Don't:** type a doubled backslash in a heredoc that writes a Python string literal --- two interpreters get a turn at it, not one.
 - **Don't:** answer a collapse by adding more backslashes.
+
+## Stop a process by its own handle, never by image or process name
+
+The sections above are about `pkill -f` matching the caller or a peer worktree's run.
+The broader rule is that a name-based kill (`taskkill /IM`, `pkill`, `killall`, `Stop-Process -Name`) selects by a property every session on the machine shares, so it can hit another concurrent Claude session's processes.
+A `-f` flag or a `/FI` filter narrows it only as far as the filter discriminates, and `WINDOWTITLE eq *` matches every title.
+
+Case, 2026-10-03 (Windows, Claude Code desktop app, Git Bash, a `lds` session):
+to stop a `python3 -m http.server` it had started as a harness background task, the agent ran `taskkill //F //IM python3.exe //FI "WINDOWTITLE eq *"` with stderr discarded (`>/dev/null 2>&1; true`).
+That selects every `python3.exe` on the machine, concurrent sessions' included.
+It happened to match nothing, and the discarded output meant the agent could not tell what the command had done.
+It then stopped the server correctly with the harness's `TaskStop` on the background task's own id.
+
+- **Do:** stop a process you started by its own handle: `TaskStop` on the background task id, or a PID captured at launch (`$!`, or the PID the server prints).
+- **Do:** keep a kill command's output visible, so a no-match, an access error, and a success read differently.
+- **Don't:** kill by image or process name (`taskkill /IM`, `pkill`, `killall`, `Stop-Process -Name`) on a machine shared with other sessions.
+- **Don't:** discard the output of a kill command (`>/dev/null 2>&1; true`).

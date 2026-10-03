@@ -141,7 +141,7 @@ Reserve a bare `/clear` recommendation for when nothing in the session is worth 
 
 **When you recommend a new session, offer to start it yourself.**
 A recommendation to start fresh leaves the user to open the session and type out what it should do, and the second half is the part that needs this session's context.
-So write the next session's opening prompt yourself and make it self-contained: the repo, the issue or PR numbers, what to skip and why, and any uncommitted or unpushed work, since the new session starts from a fresh checkout and cannot see it.
+So write the next session's opening prompt yourself and make it self-contained: the repo, the issue or PR numbers, what to skip and why, and any uncommitted or unpushed work, since a session spawned in a fresh worktree cannot see it.
 Then offer to start the session with that prompt already in it, by whatever this harness provides:
 
 - **Claude desktop app:** post a `spawn_task` chip (`mcp__ccd_session__spawn_task`) carrying the prompt.

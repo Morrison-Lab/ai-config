@@ -53,7 +53,8 @@ is not attached to the float, and is not numbered by the cross-reference system 
 so it drifts out of sync with the real numbering as floats are added or moved.
 In Quarto, the caption is the last paragraph of a `#fig-`/`#tbl-` div
 (see [`quarto-figure-captions`](quarto-figure-captions.md));
-the `crossref` options `fig-prefix` and `tbl-prefix` change only the label word (for example, to "Supplementary Figure"),
+the `crossref` options `fig-title` and `tbl-title` change only the caption's label word (for example, to "Supplementary Figure"),
+`fig-prefix` and `tbl-prefix` change the same word in inline references,
 and `S`-prefixed numbering needs a custom cross-reference type or a filter.
 Either way, the number comes from the tool, never typed into a heading.
 

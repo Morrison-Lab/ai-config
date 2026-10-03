@@ -479,26 +479,30 @@ A terminal renders a real newline as a line break and a backslash-n as `\n`, and
 - **Don't:** type a doubled backslash in a heredoc that writes a Python string literal --- two interpreters get a turn at it, not one.
 - **Don't:** answer a collapse by adding more backslashes.
 
-## Stop a process by its own handle, not by image or process name
+## Stop a process by its own handle, not by image name
 
-The `pkill -f` self-match sections above fix the case where a pattern matches the caller.
-Anchoring a pattern there makes the caller safe.
-It does not make a name-based kill safe on a machine that other sessions share,
-because the name selects every process of that image, theirs included.
-This section adds the Windows forms (`taskkill /IM`, `Stop-Process -Name`) and the discarded-output half.
+The `pkill -f` sections above cover a pattern that matches the caller,
+and "Kill by PID, not pattern" above already says to use a recorded PID.
+This section adds the case where a name matches other sessions' processes,
+and the harness handle (`TaskStop`) that fits a background task.
 
-Case, 2026-10-03 (Windows, Claude Code desktop app, Git Bash, a `lds` session; no tracking issue, the hook proposal is [ai-config#4267](https://github.com/Morrison-Lab/ai-config/issues/4267)):
+Case, 2026-10-03 (Windows, Claude Code desktop app, Git Bash, a `lds` session):
 to stop a `python3 -m http.server` it had started as a harness background task,
 the agent ran `taskkill //F //IM python3.exe //FI "WINDOWTITLE eq *"` with stderr discarded (`>/dev/null 2>&1; true`).
 Filtering on image name can select every `python3.exe` on the machine,
-concurrent sessions' included,
-and the title filter is no guarantee otherwise.
-The command matched nothing here;
+concurrent sessions' included.
+The command matched nothing here,
 why it matched nothing was not established,
 and the discarded output left the agent unable to tell what it had done.
 It then stopped the server correctly with the harness's `TaskStop` on the background task's own id.
+No issue tracks the incident itself;
+the hook proposal is [ai-config#4267](https://github.com/Morrison-Lab/ai-config/issues/4267).
 
-- **Do:** stop a process you started by its own handle: `TaskStop` on the background task id, or a PID captured at launch (`$!`, or the PID the server prints), confirming with `kill -0` that it is still your process before killing.
+- **Do:** stop a process you started by its own handle: `TaskStop` on the background task id.
+- **Do:** otherwise use a PID captured at launch, as the section above says.
 - **Do:** keep a kill command's output visible, so a no-match, an access error, and a success read differently.
-- **Don't:** kill by image or process name (`taskkill /IM`, `pkill`, `killall`, `Stop-Process -Name`) on a machine shared with other sessions, even with an anchored pattern.
+- **Don't:** kill by image name (`taskkill /IM`, `killall`, `Stop-Process -Name`), or by a name-only `pkill` pattern, when a process you did not start could match it.
 - **Don't:** discard the output of a kill command (`>/dev/null 2>&1; true`).
+
+An anchored `pkill -f` pattern (above) stops the self-kill only.
+It remains the fallback when no handle exists and the pattern is specific to your own command line.

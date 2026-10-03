@@ -297,7 +297,9 @@
   (Morrison-Lab/ai-config#969, 2026-08-01: `gh pr list --state merged --limit 15 --json number,mergedAt` plus a `mergedAt > 2026-08-01T08:00:00Z` filter returned only #1019, merged at `09:03:13Z`, and missed #969, merged at `09:14:38Z`.
   Raw `--limit 6` output showed #1013 at `05:36Z` before #1012 at `05:45Z`, proving the page was not sorted by merge time.
   Raising the limit to 30 returned both #1019 and #969.)
-- **`gh pr edit` exits 1 on repos with Projects Classic — use `gh api` to update PR body.**
+- **`gh pr edit` exiting 1 with the `projectCards` / "Projects (classic) is being deprecated" GraphQL error means gh is too old: upgrade it (`winget upgrade GitHub.cli`), do not work around it.**
+  Measured 2026-10-03: gh 2.52.0 failed, 2.102.0 fixed it (verified with a no-op `gh pr edit --add-label`); see `memories/github.md`.
+  The REST PATCH below is a stopgap only when no upgrade is possible.
   `gh pr edit <N> --body "..."` / `--body-file <f>` returns exit code 1 with a GraphQL deprecation warning (`Projects (classic) is being deprecated…`).
   Sometimes the edit lands anyway;
   **sometimes it does not apply at all** (seen on sparta 2026-06-30: three `gh pr edit --body-file` attempts left the body unchanged with the `SHA_PLACEHOLDER` still in place).

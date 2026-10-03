@@ -296,7 +296,11 @@ Download and parse the run's `claude-review-execution-*` artifact
 reading the job log's own summary line, which never shows which tool
 call was actually denied.
 
-## `gh pr edit` can fail on Projects-classic deprecation; PATCH the pulls REST endpoint instead
+## `gh pr edit` failing on `projectCards` means gh is too old; upgrade it
+
+**Direct fix: upgrade gh** (`winget upgrade GitHub.cli` on Windows).
+Measured 2026-10-03: gh 2.52.0 (June 2024) failed `gh pr edit`; 2.102.0 fixed it, verified with a no-op `gh pr edit --add-label`.
+The REST fallbacks below are a stopgap while the upgrade is unavailable, not the answer.
 
 `gh pr edit <N> --body-file <f>` can fail outright with
 `GraphQL: Projects (classic) is being deprecated ... (repository.pullRequest.projectCards)`
@@ -311,14 +315,16 @@ gh api repos/<owner>/<repo>/pulls/<N> -X PATCH -F body=@<file>
 `-F body=@<file>` keeps the body-file discipline (backtick-safe, no shell
 interpolation), same as `--body-file` on the porcelain command.
 
-- **Do:** fall back to the REST API when `gh pr edit` errors on
-  `projectCards`, rather than retrying or hand-editing on the web.
+- **Do:** run `gh --version`, upgrade gh, and re-run the same `gh pr edit`;
+  use the REST API only if the upgrade is genuinely unavailable, and say so.
   For labels on a PR, use `gh api -X POST repos/{owner}/{repo}/issues/{number}/labels -f "labels[]=<label>"`,
   which bypasses the porcelain GraphQL `projectCards` query entirely.
   Likewise, `gh pr edit --remove-reviewer <user>` fails on the same deprecated GraphQL `projectCards` query;
   the reliable REST workaround is `gh api -X DELETE repos/<owner>/<repo>/pulls/<pr>/requested_reviewers -f "reviewers[]=<user>"`.
 - **Don't:** read the error as a permissions or repo problem --- the failing
   field is one the edit never needed.
+- **Don't:** switch to `gh api -X PATCH` without diagnosing, or write that
+  workaround into a brief for another session.
 
 (Measured 2026-08-23 on [ai-config#1976](https://github.com/Morrison-Lab/ai-config/issues/1976), 2026-09-23 on [gha#913](https://github.com/Morrison-Lab/gha/issues/913), and 2026-09-24 on [wai#245](https://github.com/Morrison-Lab/wai/pull/245), gh in local Windows sessions;
 the REST endpoints succeeded immediately.)

@@ -1091,6 +1091,14 @@ Every block with a type --- definition, result, proof, example, exercise, soluti
 A recurring kind of block with no matching category gets a new custom div or callout type rather than staying in plain prose.
 Connective narrative stays unboxed, and one theorem-type div does not go inside another.
 
+## Quarto: every visible code chunk shows a result
+
+[`shared/writing/quarto-visible-chunk-results.md`](shared/writing/quarto-visible-chunk-results.md)
+
+A code chunk readers can see should produce a figure, a table, or console output;
+end an assignment-only chunk with an expression that shows what it made,
+or merge it into the chunk that displays the result.
+
 ## Writing style: a grouping level must earn its place
 
 [`shared/writing/grouping-levels.md`](shared/writing/grouping-levels.md)

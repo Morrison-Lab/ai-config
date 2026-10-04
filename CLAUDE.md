@@ -1239,6 +1239,15 @@ math, apply this in addition to the fact-check above.
 
 A model is never "Bayesian"; only how it is fitted is.
 
+## Course sites: prerequisite sequence and content placement
+
+[`shared/writing/course-sequence.md`](shared/writing/course-sequence.md)
+
+The lab's course sites run mds -> pds -> sds,
+which branches into lds (prediction) and rme (model inference);
+win and cie (causal inference) feed rme.
+Define content in the earliest site that needs it, and link to later or sibling sites only as further reading on advanced topics.
+
 ## Hyperlink liberally: make it easy for readers to find more information
 
 Connect referenced concepts, external packages, internal rules, and forge artifacts to clickable URLs rather than leaving them as plain text.

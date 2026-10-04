@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.10.18">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="Prepare a paper for a journal.">
+
+<title>skill – ai-config</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<script src="../../site_libs/cookie-consent/cookie-consent.js"></script>
+<link href="../../site_libs/cookie-consent/cookie-consent.css" rel="stylesheet">
+<script src="../../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dark-b85bc7c33db8c58e0ec93c3465666fed.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap-55617497126496852ff9f5a59253c640.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-90b0ccabdf50233fb893b00cd6e33405.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-55617497126496852ff9f5a59253c640.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-VLDZY2T3JF"></script>
+
+<script type="text/plain" cookie-consent="tracking">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-VLDZY2T3JF', { 'anonymize_ip': true});
+</script>
+
+<script type="text/javascript" charset="UTF-8">
+document.addEventListener('DOMContentLoaded', function () {
+cookieconsent.run({
+  "notice_banner_type":"simple",
+  "consent_type":"implied",
+  "palette":"light",
+  "language":"en",
+  "page_load_consent_levels":["strictly-necessary","functionality","tracking","targeting"],
+  "notice_banner_reject_button_hide":false,
+  "preferences_center_close_button_hide":false,
+  "website_name":""
+  ,
+"language":"en"
+  });
+});
+</script> 
+  
+
+
+<link rel="stylesheet" href="../../styles.css">
+</head>
+
+<body class="nav-fixed quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+    const toggleBodyColorMode = (bsSheetEl) => {
+      const mode = bsSheetEl.getAttribute("data-mode");
+      const bodyEl = window.document.querySelector("body");
+      if (mode === "dark") {
+        bodyEl.classList.add("quarto-dark");
+        bodyEl.classList.remove("quarto-light");
+      } else {
+        bodyEl.classList.add("quarto-light");
+        bodyEl.classList.remove("quarto-dark");
+      }
+    }
+    const toggleBodyColorPrimary = () => {
+      const bsSheetEl = window.document.querySelector("link#quarto-bootstrap:not([rel=disabled-stylesheet])");
+      if (bsSheetEl) {
+        toggleBodyColorMode(bsSheetEl);
+      }
+    }
+    const setColorSchemeToggle = (alternate) => {
+      const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+      for (let i=0; i < toggles.length; i++) {
+        const toggle = toggles[i];
+        if (toggle) {
+          if (alternate) {
+            toggle.classList.add("alternate");
+          } else {
+            toggle.classList.remove("alternate");
+          }
+        }
+      }
+    };
+    const toggleColorMode = (alternate) => {
+      // Switch the stylesheets
+      const primaryStylesheets = window.document.querySelectorAll('link.quarto-color-scheme:not(.quarto-color-alternate)');
+      const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+      manageTransitions('#quarto-margin-sidebar .nav-link', false);
+      if (alternate) {
+        // note: dark is layered on light, we don't disable primary!
+        enableStylesheet(alternateStylesheets);
+        for (const sheetNode of alternateStylesheets) {
+          if (sheetNode.id === "quarto-bootstrap") {
+            toggleBodyColorMode(sheetNode);
+          }
+        }
+      } else {
+        disableStylesheet(alternateStylesheets);
+        enableStylesheet(primaryStylesheets)
+        toggleBodyColorPrimary();
+      }
+      manageTransitions('#quarto-margin-sidebar .nav-link', true);
+      // Switch the toggles
+      setColorSchemeToggle(alternate)
+      // Hack to workaround the fact that safari doesn't
+      // properly recolor the scrollbar when toggling (#1455)
+      if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+        manageTransitions("body", false);
+        window.scrollTo(0, 1);
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          manageTransitions("body", true);
+        }, 40);
+      }
+    }
+    const disableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        stylesheet.rel = 'disabled-stylesheet';
+      }
+    }
+    const enableStylesheet = (stylesheets) => {
+      for (let i=0; i < stylesheets.length; i++) {
+        const stylesheet = stylesheets[i];
+        if(stylesheet.rel !== 'stylesheet') { // for Chrome, which will still FOUC without this check
+          stylesheet.rel = 'stylesheet';
+        }
+      }
+    }
+    const manageTransitions = (selector, allowTransitions) => {
+      const els = window.document.querySelectorAll(selector);
+      for (let i=0; i < els.length; i++) {
+        const el = els[i];
+        if (allowTransitions) {
+          el.classList.remove('notransition');
+        } else {
+          el.classList.add('notransition');
+        }
+      }
+    }
+    const isFileUrl = () => {
+      return window.location.protocol === 'file:';
+    }
+    const hasAlternateSentinel = () => {
+      let styleSentinel = getColorSchemeSentinel();
+      if (styleSentinel !== null) {
+        return styleSentinel === "alternate";
+      } else {
+        return false;
+      }
+    }
+    const setStyleSentinel = (alternate) => {
+      const value = alternate ? "alternate" : "default";
+      if (!isFileUrl()) {
+        window.localStorage.setItem("quarto-color-scheme", value);
+      } else {
+        localAlternateSentinel = value;
+      }
+    }
+    const getColorSchemeSentinel = () => {
+      if (!isFileUrl()) {
+        const storageValue = window.localStorage.getItem("quarto-color-scheme");
+        return storageValue != null ? storageValue : localAlternateSentinel;
+      } else {
+        return localAlternateSentinel;
+      }
+    }
+    const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+      const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+      const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+      let newTheme = '';
+      if(authorPrefersDark) {
+        newTheme = isAlternate ? baseTheme : alternateTheme;
+      } else {
+        newTheme = isAlternate ? alternateTheme : baseTheme;
+      }
+      const changeGiscusTheme = () => {
+        // From: https://github.com/giscus/giscus/issues/336
+        const sendMessage = (message) => {
+          const iframe = document.querySelector('iframe.giscus-frame');
+          if (!iframe) return;
+          iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+        }
+        sendMessage({
+          setConfig: {
+            theme: newTheme
+          }
+        });
+      }
+      const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+      if (isGiscussLoaded) {
+        changeGiscusTheme();
+      }
+    };
+    const authorPrefersDark = false;
+    const darkModeDefault = authorPrefersDark;
+      document.querySelector('link#quarto-text-highlighting-styles.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+      document.querySelector('link#quarto-bootstrap.quarto-color-scheme-extra').rel = 'disabled-stylesheet';
+    let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+    // Dark / light mode switch
+    window.quartoToggleColorScheme = () => {
+      // Read the current dark / light value
+      let toAlternate = !hasAlternateSentinel();
+      toggleColorMode(toAlternate);
+      setStyleSentinel(toAlternate);
+      toggleGiscusIfUsed(toAlternate, darkModeDefault);
+      window.dispatchEvent(new Event('resize'));
+    };
+    // Switch to dark mode if need be
+    if (hasAlternateSentinel()) {
+      toggleColorMode(true);
+    } else {
+      toggleColorMode(false);
+    }
+  </script>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../index.html">
+    <span class="navbar-title">ai-config</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../setup.html"> 
+<span class="menu-text">Setup</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../skills.html"> 
+<span class="menu-text">Skills</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../agents.html"> 
+<span class="menu-text">Agents</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../workflow.html"> 
+<span class="menu-text">Workflow</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/Morrison-Lab/ai-config"> <i class="bi bi-github" role="img" aria-label="GitHub">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+  <a href="" class="quarto-reader-toggle quarto-navigation-tool px-1" onclick="window.quartoToggleReader(); return false;" title="Toggle reader mode">
+  <div class="quarto-reader-toggle-btn">
+  <i class="bi"></i>
+  </div>
+</a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#manuscript-get-a-scientific-paper-ready-to-submit" id="toc-manuscript-get-a-scientific-paper-ready-to-submit" class="nav-link active" data-scroll-target="#manuscript-get-a-scientific-paper-ready-to-submit">manuscript — get a scientific paper ready to submit</a>
+  <ul class="collapse">
+  <li><a href="#document-order" id="toc-document-order" class="nav-link" data-scroll-target="#document-order">1. Document order</a></li>
+  <li><a href="#title-page" id="toc-title-page" class="nav-link" data-scroll-target="#title-page">2. Title page</a></li>
+  <li><a href="#abstract" id="toc-abstract" class="nav-link" data-scroll-target="#abstract">3. Abstract</a></li>
+  <li><a href="#main-text-by-section" id="toc-main-text-by-section" class="nav-link" data-scroll-target="#main-text-by-section">4. Main text by section</a>
+  <ul class="collapse">
+  <li><a href="#introduction" id="toc-introduction" class="nav-link" data-scroll-target="#introduction">Introduction</a></li>
+  <li><a href="#methods" id="toc-methods" class="nav-link" data-scroll-target="#methods">Methods</a></li>
+  <li><a href="#results" id="toc-results" class="nav-link" data-scroll-target="#results">Results</a></li>
+  <li><a href="#discussion" id="toc-discussion" class="nav-link" data-scroll-target="#discussion">Discussion</a></li>
+  <li><a href="#conclusions" id="toc-conclusions" class="nav-link" data-scroll-target="#conclusions">Conclusions</a></li>
+  </ul></li>
+  <li><a href="#reporting-guidelines" id="toc-reporting-guidelines" class="nav-link" data-scroll-target="#reporting-guidelines">5. Reporting guidelines</a></li>
+  <li><a href="#tables" id="toc-tables" class="nav-link" data-scroll-target="#tables">6. Tables</a></li>
+  <li><a href="#figures" id="toc-figures" class="nav-link" data-scroll-target="#figures">7. Figures</a></li>
+  <li><a href="#statistics-and-numbers" id="toc-statistics-and-numbers" class="nav-link" data-scroll-target="#statistics-and-numbers">8. Statistics and numbers</a></li>
+  <li><a href="#supplement" id="toc-supplement" class="nav-link" data-scroll-target="#supplement">9. Supplement</a></li>
+  <li><a href="#abbreviations" id="toc-abbreviations" class="nav-link" data-scroll-target="#abbreviations">10. Abbreviations</a></li>
+  <li><a href="#references" id="toc-references" class="nav-link" data-scroll-target="#references">11. References</a></li>
+  <li><a href="#prose" id="toc-prose" class="nav-link" data-scroll-target="#prose">12. Prose</a></li>
+  <li><a href="#required-statements" id="toc-required-statements" class="nav-link" data-scroll-target="#required-statements">13. Required statements</a></li>
+  <li><a href="#rendering-and-layout-quarto" id="toc-rendering-and-layout-quarto" class="nav-link" data-scroll-target="#rendering-and-layout-quarto">14. Rendering and layout (Quarto)</a></li>
+  <li><a href="#pre-submission-checklist" id="toc-pre-submission-checklist" class="nav-link" data-scroll-target="#pre-submission-checklist">15. Pre-submission checklist</a></li>
+  </ul></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/manuscript/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/manuscript/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block"></header>
+
+
+
+
+
+<section id="manuscript-get-a-scientific-paper-ready-to-submit" class="level1">
+<h1>manuscript — get a scientific paper ready to submit</h1>
+<p>Apply standard journal conventions to a research manuscript without being asked, then verify the rendered output page by page. Use this skill whenever drafting, revising, rendering, or reviewing a paper or its supplement meant for a peer-reviewed journal.</p>
+<p><strong>Precedence.</strong> The target journal’s <em>Instructions for Authors</em> override everything here (word limits, abstract headings, reference style, where figures go, file formats). Read them first when a journal is named. When none is named, use the defaults below, which follow the <a href="https://www.icmje.org/recommendations/">ICMJE Recommendations</a> and <a href="https://www.amamanualofstyle.com/">AMA Manual of Style</a> conventions common in clinical and health-services journals. The reader-facing version of this guide is PSW’s chapter “Preparing a manuscript for submission” (added by <a href="https://github.com/Morrison-Lab/psw/pull/74">psw#74</a>); when the two disagree, defer to PSW and fix this skill to match. For prose style, defer to <a href="https://morrison-lab.github.io/psw/">PSW</a> and the <a href="../../skills/use-preferred-style/SKILL.html"><code>use-preferred-style</code></a> skill.</p>
+<section id="document-order" class="level2">
+<h2 class="anchored" data-anchor-id="document-order">1. Document order</h2>
+<p>Assemble the main document in this order:</p>
+<ol type="1">
+<li><strong>Title page</strong> (section 2).</li>
+<li><strong>Structured abstract</strong> (section 3), then keywords and, if the journal uses them, Key Points.</li>
+<li><strong>Main text</strong> in IMRaD order: Introduction, Methods, Results, Discussion (with a Limitations subsection or paragraph), Conclusions.</li>
+<li><strong>Back matter</strong>: Acknowledgments, author contributions, funding, conflict of interest disclosures, data and code availability, ethics statement (when the journal wants these in the text rather than in a form).</li>
+<li><strong>References.</strong></li>
+<li><strong>Tables</strong>, each starting on its own page, numbered in citation order.</li>
+<li><strong>Figures</strong>, each on its own page with its caption on the same page.</li>
+<li><strong>Page break</strong>, then the <strong>Supplement</strong> (section 9), as a separate file if the journal requires one.</li>
+</ol>
+<p>Tables and figures go at the end of the main text, not inline. Many journals also want figures uploaded as separate files with legends listed after the references; when that is the instruction, follow it and keep the end-of-document copies only for review drafts.</p>
+</section>
+<section id="title-page" class="level2">
+<h2 class="anchored" data-anchor-id="title-page">2. Title page</h2>
+<ul>
+<li><strong>Title</strong>: specific and informative, naming the population, exposure or intervention, outcome, and design where they fit (for example, “… : A Difference-in-Differences Analysis”). No abbreviations, no question titles, no puns. Check the character limit.</li>
+<li><strong>Running head</strong> (short title) if required.</li>
+<li><strong>Authors</strong>: full names, highest degrees if the journal wants them, affiliations, ORCID iDs. Byline order is agreed among the authors, not inferred.</li>
+<li><strong>Corresponding author</strong>: name, postal address, email.</li>
+<li><strong>Word counts</strong>: abstract and main text (Introduction through Discussion; excludes abstract, references, tables, figure legends).</li>
+<li>Counts of tables, figures, and references.</li>
+<li>Trial or protocol registration number, when applicable.</li>
+</ul>
+<p><strong>Authorship</strong> follows the four <a href="https://www.icmje.org/recommendations/browse/roles-and-responsibilities/defining-the-role-of-authors-and-contributors.html">ICMJE criteria</a>: substantial contribution to conception, design, data acquisition, or analysis; drafting or critical revision; final approval; and accountability. Everyone else goes in Acknowledgments, with permission. Describe contributions with the <a href="https://credit.niso.org/">CRediT taxonomy</a> when the journal asks.</p>
+</section>
+<section id="abstract" class="level2">
+<h2 class="anchored" data-anchor-id="abstract">3. Abstract</h2>
+<ul>
+<li><strong>Structured</strong>, using the journal’s headings. A generic default: Background (or Importance), Objective, Methods (Design, Setting, and Participants; Exposure; Main Outcomes and Measures), Results, Conclusions (and Relevance).</li>
+<li>Typically 250 to 350 words. Check the limit.</li>
+<li>Results give the sample size and the main effect estimates with 95% CIs, not only P values. Phrase each effect estimate as an estimate (“we estimated that …”), per section 8. Report the primary outcome first.</li>
+<li>Conclusions follow from the results and match the design: no causal language from an observational design unless the identification strategy supports it, and say what that strategy is.</li>
+<li>No citations, no undefined abbreviations, no figure or table references.</li>
+<li>Keywords: 3 to 6, preferably <a href="https://meshb.nlm.nih.gov/">MeSH</a> terms.</li>
+</ul>
+</section>
+<section id="main-text-by-section" class="level2">
+<h2 class="anchored" data-anchor-id="main-text-by-section">4. Main text by section</h2>
+<section id="introduction" class="level3">
+<h3 class="anchored" data-anchor-id="introduction">Introduction</h3>
+<p>Three short paragraphs is usually enough: what is known, the gap, and the objective or hypothesis. End with a sentence stating the aim. Do not preview results.</p>
+</section>
+<section id="methods" class="level3">
+<h3 class="anchored" data-anchor-id="methods">Methods</h3>
+<p>Enough detail that another analyst could reproduce the analysis.</p>
+<ul>
+<li>Study design and setting (place, dates of each period).</li>
+<li>Data sources and how records were linked.</li>
+<li>Participants: eligibility, exclusions with counts, and a flow diagram when exclusions are non-trivial.</li>
+<li>Exposure or intervention definition, including timing.</li>
+<li>Outcomes: primary and secondary, with units and how each was measured.</li>
+<li>Covariates and why they were included.</li>
+<li>Statistical analysis: the estimand, the model, assumptions and how they were checked, handling of missing data, clustering or correlation, multiple comparisons, sensitivity analyses, software with versions. Cite the methods papers.</li>
+<li>Ethics: IRB approval or exemption with protocol number, consent or waiver.</li>
+<li>The reporting guideline followed (section 5).</li>
+</ul>
+</section>
+<section id="results" class="level3">
+<h3 class="anchored" data-anchor-id="results">Results</h3>
+<ul>
+<li>Open with the analytic sample and its characteristics (Table 1).</li>
+<li>Report the primary outcome, then secondary outcomes, then sensitivity analyses, in the order the Methods introduced them.</li>
+<li>Report numbers; do not interpret them here. Do not restate every table cell in the text; give the key estimates and point to the table.</li>
+<li>Cite every table and figure in the text, in numerical order, at first relevant mention.</li>
+</ul>
+</section>
+<section id="discussion" class="level3">
+<h3 class="anchored" data-anchor-id="discussion">Discussion</h3>
+<ol type="1">
+<li>Principal findings in one paragraph, without repeating the numbers.</li>
+<li>Comparison with prior work, with citations.</li>
+<li>Interpretation and possible mechanisms, labelled as such.</li>
+<li><strong>Limitations</strong>: honest and specific (confounding, selection, measurement, generalizability, power), each with its likely direction and what was done about it.</li>
+<li>Implications for practice, policy, or research.</li>
+</ol>
+</section>
+<section id="conclusions" class="level3">
+<h3 class="anchored" data-anchor-id="conclusions">Conclusions</h3>
+<p>Two to four sentences that the data support. No new results.</p>
+</section>
+</section>
+<section id="reporting-guidelines" class="level2">
+<h2 class="anchored" data-anchor-id="reporting-guidelines">5. Reporting guidelines</h2>
+<p>Pick the guideline for the design from the <a href="https://www.equator-network.org/">EQUATOR Network</a>, follow it while writing, and submit the completed checklist if the journal asks. Common ones:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 50%">
+<col style="width: 50%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Design</th>
+<th>Guideline</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Observational (cohort, case-control, cross-sectional)</td>
+<td>STROBE</td>
+</tr>
+<tr class="even">
+<td>Observational using routinely collected or EHR data</td>
+<td>RECORD (extends STROBE)</td>
+</tr>
+<tr class="odd">
+<td>Randomized trial</td>
+<td>CONSORT</td>
+</tr>
+<tr class="even">
+<td>Trial protocol</td>
+<td>SPIRIT</td>
+</tr>
+<tr class="odd">
+<td>Systematic review or meta-analysis</td>
+<td>PRISMA</td>
+</tr>
+<tr class="even">
+<td>Diagnostic accuracy</td>
+<td>STARD</td>
+</tr>
+<tr class="odd">
+<td>Prediction model (including machine learning)</td>
+<td>TRIPOD (TRIPOD+AI)</td>
+</tr>
+<tr class="even">
+<td>Quality improvement</td>
+<td>SQUIRE</td>
+</tr>
+<tr class="odd">
+<td>Economic evaluation</td>
+<td>CHEERS</td>
+</tr>
+<tr class="even">
+<td>Qualitative research</td>
+<td>SRQR or COREQ</td>
+</tr>
+<tr class="odd">
+<td>Animal research</td>
+<td>ARRIVE</td>
+</tr>
+<tr class="even">
+<td>Statistical reporting in general</td>
+<td>SAMPL</td>
+</tr>
+</tbody>
+</table>
+<p>Check the EQUATOR page for the current version before citing one.</p>
+</section>
+<section id="tables" class="level2">
+<h2 class="anchored" data-anchor-id="tables">6. Tables</h2>
+<ul>
+<li><strong>Numbered</strong> in citation order (Table 1, Table 2, …) and <strong>captioned</strong>. Every table has both.</li>
+<li>The caption (title) goes <strong>above</strong> the table and says what, who, where, and when, in a phrase: “Table 2. Change in Work RVUs per Clinic Session After AI Scribe Adoption, 2023–2025”.</li>
+<li>Self-contained: a reader should understand it without the text.</li>
+<li>Column headers carry units; use the same units and decimals down a column.</li>
+<li>Horizontal rules only (top, below header, bottom). No vertical rules, no shading, no color unless the journal allows it.</li>
+<li>Footnotes below the table: define every abbreviation used in the table, even if defined in the text; explain symbols and notes with superscript letters (a, b, c) in order of appearance; state the statistical test or model behind each P value or estimate.</li>
+<li>Give denominators: “45 (12.3%)”, or put N in the column header.</li>
+<li>Table 1 describes the sample by group, without P values for baseline comparisons in a trial; standardized mean differences are better for observational comparisons.</li>
+<li>A table must fit the page width. Split a wide table or move it to the supplement; never let it run off the margin.</li>
+<li>Caption placement and page breaks around tables follow the <code>manuscript-float-layout</code> fragment (<a href="https://github.com/Morrison-Lab/ai-config/pull/4203">ai-config#4203</a>).</li>
+</ul>
+</section>
+<section id="figures" class="level2">
+<h2 class="anchored" data-anchor-id="figures">7. Figures</h2>
+<ul>
+<li><strong>Numbered</strong> in citation order and <strong>captioned</strong>. The legend goes <strong>below</strong> the figure: a title phrase, then sentences explaining panels, symbols, error bars (“Error bars indicate 95% CIs”), and abbreviations.</li>
+<li>Axis labels with units; consistent fonts across figures.</li>
+<li><strong>Size each figure for the page.</strong> The plotted content fills the available width (the text width, or the journal’s stated figure width), with no large blank margins or empty space inside the image. Every piece of text in it (axis labels, tick labels, node and legend labels) is at least the journal’s stated minimum, and in any case about 8 pt or larger at the printed size. Set the figure’s width and height (<code>fig-width</code>/<code>fig-height</code>, or the export size) to that width and an aspect ratio that fits the content, rather than exporting at a default size and letting the document scale it down. Wide diagrams such as Sankey plots often fail this rule: the plot ends up tiny in a field of white space. For a ggplot, preview it at those exact dimensions before rendering with <a href="https://github.com/idmn/ggview">ggview</a>: add <code>canvas(6.5, 4)</code> (the final width and height, in inches by default) to the plot. The preview opens in the RStudio IDE’s viewer (through <code>rstudioapi::viewer()</code>); in any other editor, save the plot with <code>ggview::save_ggplot()</code> and open the saved file instead. In a Quarto chunk, copy those dimensions into <code>fig-width</code>/<code>fig-height</code>; for a figure saved to a file, save it with <code>ggview::save_ggplot()</code>, which uses the canvas size. Remove <code>canvas()</code> from any plot that a chunk prints into the document: printing a plot that carries it calls <code>rstudioapi::viewer()</code> instead of drawing it, so the figure never reaches the document, and a render outside the RStudio IDE (from a terminal or CI) stops with “RStudio not running”. A plot saved with <code>save_ggplot()</code> can keep its <code>canvas()</code>, since that is where the saved size comes from. Judge it on the rendered page. The printed size of the plot’s text is its font size in the plot code times the displayed width divided by <code>fig-width</code>; as a quick visual check, figure text far smaller than the caption beneath it is almost certainly below 8 pt.</li>
+<li>Colorblind-safe palettes, and do not use color as the only way to tell groups apart; pair it with shape or line type.</li>
+<li>Show the data where possible (points with intervals beat bar charts of means). Start a bar axis at zero.</li>
+<li>Vector formats (PDF, EPS, SVG) for plots; raster at 300 dpi or more (600 to 1200 for line art) in TIFF or PNG.</li>
+<li>Multi-panel figures label panels A, B, C and refer to them in the legend.</li>
+<li>Add alt text when the journal or venue supports it (see <a href="../../skills/alt-text/SKILL.html"><code>alt-text</code></a>).</li>
+<li>Caption placement and page breaks around figures follow the <code>manuscript-float-layout</code> fragment (<a href="https://github.com/Morrison-Lab/ai-config/pull/4203">ai-config#4203</a>).</li>
+</ul>
+</section>
+<section id="statistics-and-numbers" class="level2">
+<h2 class="anchored" data-anchor-id="statistics-and-numbers">8. Statistics and numbers</h2>
+<ul>
+<li><strong>Estimates with uncertainty</strong>: give the point estimate with its 95% CI. Format consistently, for example “0.82 (95% CI, 0.71 to 0.95)” or “0.82 (95% CI, 0.71–0.95)”. Use “to” when a bound is negative.</li>
+<li><strong>Describe an estimate as an estimate</strong>, in the abstract too: “Under the stated difference-in-differences assumptions, we estimated that the intervention reduced time in notes by 1.26 minutes (95% CI, 0.68 to 1.84)”, not “Under the stated difference-in-differences assumptions, the intervention reduced time in notes by 1.26 minutes”. A point estimate stated as a bare fact reads as a known value rather than as an estimate from the data.</li>
+<li><strong>P values</strong>: exact values to 2 or 3 decimals (“P = .03”, “P = .21”); “P &lt; .001” below that. AMA style uses no leading zero and a capital italic <em>P</em>. Never “P = 0.000” or “NS”.</li>
+<li>Prefer estimates and intervals over significance language. Do not write “trend toward significance” or “marginally significant”. Reserve “significant” for its statistical meaning, and avoid it for importance.</li>
+<li>A wide interval means the estimate <strong>had more uncertainty</strong>; write that, not “less precise” or “imprecise”. Absence of evidence is not evidence of absence: an interval that crosses the null is compatible with both benefit and harm, so say so.</li>
+<li><strong>Descriptive statistics</strong>: mean (SD) for roughly symmetric data, median (IQR) for skewed data; counts with percentages.</li>
+<li><strong>Decimals</strong>: no more precision than the data support. Percentages to one decimal (or whole numbers when n &lt; 100); ratios to two decimals; keep the same precision for the same quantity everywhere, and give a point estimate and both of its CI bounds the same number of decimal places: “1.26 (95% CI, 0.68 to 1.84)”, not “1.26 (95% CI, 0.675 to 1.84)”.</li>
+<li>Spell out numbers that begin a sentence, or rewrite the sentence. Use digits for measurements and statistics.</li>
+<li>Units: SI or the journal’s convention, with a space between number and unit (“5 mg”); thousands separators per the journal (“12,345”).</li>
+<li>Name the estimand and model for every effect: “average treatment effect on the treated, estimated with the Callaway and Sant’Anna difference-in-differences estimator”.</li>
+<li>Numbers in the text, tables, figures, and abstract must agree. Generate them from code (inline R in Quarto), never by retyping.</li>
+</ul>
+</section>
+<section id="supplement" class="level2">
+<h2 class="anchored" data-anchor-id="supplement">9. Supplement</h2>
+<ul>
+<li>A separate document (or a clearly separated part after a page break) with its own title, the paper’s title and authors, and a table of contents.</li>
+<li>Number items with the journal’s scheme: “eTable 1”, “eFigure 1”, “eMethods” (JAMA style) or “Table S1”, “Figure S1”. Same numbering and caption rules as the main text.</li>
+<li>Cite each supplement item from the main text, in order.</li>
+<li>The supplement is where these belong: extended methods, full model output, sensitivity analyses, additional tables, code and software versions, data-processing details, and any pipeline or audit notes (data-quality checks, exclusions traced step by step, reconciliation with earlier reports).</li>
+<li>Keep it as polished as the main text: same caption, table, and abbreviation rules.</li>
+</ul>
+</section>
+<section id="abbreviations" class="level2">
+<h2 class="anchored" data-anchor-id="abbreviations">10. Abbreviations</h2>
+<ul>
+<li>Define each abbreviation at first use in the abstract and again at first use in the main text, then use it consistently.</li>
+<li>Define abbreviations again in each table and figure footnote or legend.</li>
+<li>Abbreviate only terms used several times. Do not abbreviate in the title.</li>
+<li>Standard units and very common terms (CI, SD, IQR, US) need no definition in most journals; check the journal’s list.</li>
+</ul>
+</section>
+<section id="references" class="level2">
+<h2 class="anchored" data-anchor-id="references">11. References</h2>
+<ul>
+<li>Use the journal’s style (AMA/Vancouver numbered by default). Generate the list from a <code>.bib</code> file with a CSL style; never format by hand.</li>
+<li>Number in order of first citation; a citation in a table or figure counts at the point where that table or figure is first cited.</li>
+<li>Cite the primary source, and check every reference exists and supports the sentence it is attached to (see <a href="../../skills/purge-hallucinations/SKILL.html"><code>purge-hallucinations</code></a> and <a href="../../shared/writing/citations.md"><code>shared/writing/citations.md</code></a>).</li>
+<li>Include DOIs when the style allows. Check for retractions.</li>
+<li>Cite software and R packages you relied on.</li>
+</ul>
+</section>
+<section id="prose" class="level2">
+<h2 class="anchored" data-anchor-id="prose">12. Prose</h2>
+<ul>
+<li>Follow <a href="../../skills/use-preferred-style/SKILL.html"><code>use-preferred-style</code></a>: plain, direct, short sentences, active voice.</li>
+<li>Past tense for what was done and found (Methods, Results); present tense for established knowledge and for what the findings mean.</li>
+<li>Match causal language to the design. “Was associated with” for associations; causal verbs only when the design and assumptions earn them, and state the assumptions.</li>
+<li>No clichés or AI tells: no “novel”, “groundbreaking”, “delve”, “crucial”, “landscape”, “underscore”, “it is worth noting”, and no “not just X but Y” antitheses. Run <a href="../../skills/find-ai-tells/SKILL.html"><code>find-ai-tells</code></a>.</li>
+<li><strong>No pipeline, audit, or process notes in the main text.</strong> No mentions of scripts, file names, variable names, merge requests, code versions, reviewer conversations, “as noted in the earlier draft”, TODOs, or changelog-style asides. Those go in the supplement or nowhere.</li>
+<li>One term per concept throughout; do not vary terms for elegance.</li>
+<li>Define every group, period, and outcome before using it.</li>
+<li>Run <a href="../../skills/fact-check-prose/SKILL.html"><code>fact-check-prose</code></a> on claims and numbers against the rendered output.</li>
+</ul>
+</section>
+<section id="required-statements" class="level2">
+<h2 class="anchored" data-anchor-id="required-statements">13. Required statements</h2>
+<p>Most journals require each of these, in the text or in submission forms:</p>
+<ul>
+<li>Funding sources and the funder’s role.</li>
+<li>Conflict of interest disclosures (<a href="https://www.icmje.org/disclosure-of-interest/">ICMJE disclosure form</a>).</li>
+<li>Ethics approval and consent.</li>
+<li>Data availability and code availability.</li>
+<li>Trial or protocol registration.</li>
+<li>Use of AI tools in writing or analysis, if the journal’s policy asks.</li>
+<li>Prior presentation or preprint.</li>
+</ul>
+</section>
+<section id="rendering-and-layout-quarto" class="level2">
+<h2 class="anchored" data-anchor-id="rendering-and-layout-quarto">14. Rendering and layout (Quarto)</h2>
+<ul>
+<li>Render from source every time; do not edit the output file.</li>
+<li>Write every equation with the shared semantic math macros, per <a href="../../skills/use-math-macros/SKILL.html"><code>use-math-macros</code></a>: <code>\E</code> for an expectation, <code>\Var</code> for a variance, and so on, wherever the library has a macro for the concept. When it has none, add one to the macros repo rather than writing raw LaTeX.</li>
+<li>Float placement, page breaks, and caption rules (floats after the references, a break before the supplement, captions on their float’s page and rendered as captions rather than headings) live in the <code>manuscript-float-layout</code> fragment (<a href="https://github.com/Morrison-Lab/ai-config/pull/4203">ai-config#4203</a>); follow it rather than restating it here.</li>
+<li>Table captions on top (<code>tbl-cap-location: top</code>), figure captions below (<code>fig-cap-location: bottom</code>). Use div syntax for labels and captions (<a href="../../shared/writing/quarto-figure-captions.md"><code>quarto-figure-captions.md</code></a>).</li>
+<li>Double spacing, line numbers, and page numbers if the journal asks (common for review copies).</li>
+<li>Cross-references must resolve; run <a href="../../skills/check-rendered-refs/SKILL.html"><code>check-rendered-refs</code></a>.</li>
+</ul>
+</section>
+<section id="pre-submission-checklist" class="level2">
+<h2 class="anchored" data-anchor-id="pre-submission-checklist">15. Pre-submission checklist</h2>
+<p>A green build is not “done”. Items 1 and 2 are a hard gate: no manuscript PR or MR is reported ready or merged, under any grant, until it passes (<a href="../../shared/workflow/review-rendered-documents.md"><code>review-rendered-documents</code></a>). Before calling a manuscript ready:</p>
+<ol type="1">
+<li><label><input type="checkbox">Export the render to PDF and <strong>look at every page</strong>, main text and supplement; evidence: the page-by-page comment on the PR or MR.</label></li>
+<li><label><input type="checkbox">An independent <a href="../../shared/workflow/adversarial-self-review.md#post-every-independent-review-on-the-pr-or-mr-it-reviewed">referee read</a> of this render, by a reviewer other than the session that made the revision; evidence: its report, posted on the PR or MR and linked in the reply that hands the manuscript back.</label></li>
+<li><label><input type="checkbox">Every table and figure has a number and a caption, and is cited in the text in order.</label></li>
+<li><label><input type="checkbox">The rendered layout passes every rule in the <code>manuscript-float-layout</code> fragment (<a href="https://github.com/Morrison-Lab/ai-config/pull/4203">ai-config#4203</a>).</label></li>
+<li><label><input type="checkbox">No table runs off the page; no figure is cropped or blurry; every figure fills the available width without large blank margins, and its smallest text is about 8 pt or larger (section 7).</label></li>
+<li><label><input type="checkbox">No broken cross-references (<code>??</code>, <code>@fig-</code>, <code>Table ?</code>), raw Markdown, code output, warnings, or <code>NA</code> in rendered tables.</label></li>
+<li><label><input type="checkbox">Abstract numbers match the Results, tables, and figures.</label></li>
+<li><label><input type="checkbox">Every abbreviation is defined at first use (abstract, text, each table and figure).</label></li>
+<li><label><input type="checkbox">Estimates carry 95% CIs, are phrased as estimates, and share decimal places with their CIs; P values and decimals follow section 8.</label></li>
+<li><label><input type="checkbox">No pipeline or audit notes, file names, or TODOs in the main text.</label></li>
+<li><label><input type="checkbox">Reporting-guideline checklist completed, with page numbers.</label></li>
+<li><label><input type="checkbox">References resolve, are in order, and support their sentences.</label></li>
+<li><label><input type="checkbox">Title page complete: authors, affiliations, corresponding author, word counts.</label></li>
+<li><label><input type="checkbox">Required statements present (section 13).</label></li>
+<li><label><input type="checkbox">Word, table, figure, and reference counts within the journal’s limits.</label></li>
+<li><label><input type="checkbox">AI-tell and fact-check passes done.</label></li>
+<li><label><input type="checkbox">Cover letter drafted: the question, the main finding, why this journal, confirmation that the work is not under consideration elsewhere, and any suggested or excluded reviewers.</label></li>
+<li><label><input type="checkbox">Every equation uses the shared semantic macros wherever one applies, and any concept without one got a new macro (<a href="../../skills/use-math-macros/SKILL.html"><code>use-math-macros</code></a>).</label></li>
+</ol>
+<p>Report the manuscript as ready only after this checklist passes, and say which items were checked on the rendered PDF. Post the page-by-page evidence on the PR or MR as that fragment describes.</p>
+
+
+</section>
+</section>
+
+<a onclick="window.scrollTo(0, 0); return false;" role="button" id="quarto-back-to-top"><i class="bi bi-arrow-up"></i> Back to top</a></main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    // Ensure there is a toggle, if there isn't float one in the top right
+    if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+      const a = window.document.createElement('a');
+      a.classList.add('top-right');
+      a.classList.add('quarto-color-scheme-toggle');
+      a.href = "";
+      a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+      const i = window.document.createElement("i");
+      i.classList.add('bi');
+      a.appendChild(i);
+      window.document.body.appendChild(a);
+    }
+    setColorSchemeToggle(hasAlternateSentinel())
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/Morrison-Lab\.github\.io\/ai-config\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+            // default icon
+            link.classList.add("external");
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p>Built with <a href="https://quarto.org/">Quarto</a></p>
+<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/Morrison-Lab/ai-config/edit/main/skills/manuscript/SKILL.md" class="toc-action"><i class="bi bi-github"></i>Edit this page</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/issues/new" class="toc-action"><i class="bi empty"></i>Report an issue</a></li><li><a href="https://github.com/Morrison-Lab/ai-config/blob/main/skills/manuscript/SKILL.md" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div><div class="cookie-consent-footer"><a href="#" id="open_preferences_center">Cookie Preferences</a></div></div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
+
+
+
+
+</body></html>

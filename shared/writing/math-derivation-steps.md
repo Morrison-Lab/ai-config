@@ -25,6 +25,29 @@ points in one sentence is fine --- a derivation's whole value is that each
 line is independently checkable, so skipping a step defeats the purpose even
 when the reader could reconstruct it themselves.
 
+The combined steps that survive self-review are the ones that read as a
+single idea:
+
+- "the chain rule applied to each term of the sum" is two rules (derivative
+  of a sum, then the chain rule);
+- a line that distributes a sum operator *and* substitutes
+  $\sum_i y_i = n \bar{y}$ is at least three operations (split the sum,
+  sum a constant, factor out a constant) before the substitution;
+- plugging in an inner derivative *and* pulling the resulting constant out
+  of the sum;
+- prose such as "setting this to zero and dividing by $-2n$ gives",
+  which hides two operations in a sentence rather than a line.
+
+Check each line against those tells:
+
+- **Do:** give each displayed line one operation and its own
+  justification, and prove a fact the step relies on (deviations from a
+  mean sum to zero) in its own block or exercise before citing it.
+- **Don't:** label a line with one justification that names a rule while
+  the line also applies a second rule or a substitution, as sds#54's first
+  OLS solutions did ("(inner derivative is $-1$)" over a line that also
+  factored and summed).
+
 ## Reviewing: name the gap, don't just flag it
 
 [`fact-check-prose.md`](fact-check-prose.md)'s document-internal-reasoning

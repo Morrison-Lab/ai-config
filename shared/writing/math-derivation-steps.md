@@ -38,6 +38,8 @@ single idea:
 - prose such as "setting this to zero and dividing by $-2n$ gives",
   which hides two operations in a sentence rather than a line.
 
+Check each line against those tells:
+
 - **Do:** give each displayed line one operation and its own
   justification, and prove a fact the step relies on (deviations from a
   mean sum to zero) in its own block or exercise before citing it.

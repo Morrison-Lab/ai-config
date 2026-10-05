@@ -11,6 +11,7 @@ That second axis applies to any displayed equation, a standalone definition
 included, not only to a line inside a running derivation, and its remedy
 reaches document scope even though the defect shows up in one line.
 The third is **whether** a line is displayed at all: display versus inline, a decision that is usually never made on purpose rather than made wrongly.
+A last section covers prose that describes a formula: keeping a function apart from its value.
 
 ## Writing: don't skip steps
 
@@ -498,3 +499,21 @@ A checker written afterward --- per file, counting display equations examined an
 On the supplement's working build it then found 7 missing-break findings across 5 defective equations, and 0 after repair, with the repair keeping all five equations display and adding the missing breaks.
 The finding count and the equation count differ because a single equation can be missing a break on either side or both: three of the five were missing only one side, two were missing both, which is 1 + 1 + 1 + 2 + 2 = 7.
 Two of the five defective equations sat in a different section from the three the author knew about, and neither the author nor the user had noticed those two: the defect carries no text of its own, so a build check that only compares accepted versus rejected text was blind to the defect by construction.)
+
+## Prose about a formula: a function versus its value
+
+A function and its value at a point are different objects:
+in $\mu_i = \mu(x_i)$, $\mu$ is a function and $\mu(x_i)$ is a number.
+Writing the function with its placeholder argument, $\mu(x)$, already
+denotes a value, so "the value of $\mu(x)$ at $x_i$" reads as a value of a
+value.
+Either drop the placeholder ("the value of $\mu$ at $x_i$") or keep it and
+name the substitution ("$\mu(x)$ evaluated at $x_i$").
+
+- **Do:** write "each outcome is centered on a mean function $\mu(x)$
+  evaluated at that outcome's covariate values", "the value of $f$ at 0" or
+  "$f(0)$", and "$L$ evaluated at $\hat\theta$".
+- **Don't:** combine "the value of" with a placeholder argument, as in "the
+  value of a mean function $\mu(x)$ at its own covariate values" (the first
+  wording of `def-cond-gaussian` in Morrison-Lab/sds#54) or "the value of the
+  density $f(x)$ at 0".

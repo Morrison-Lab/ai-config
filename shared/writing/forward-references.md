@@ -164,7 +164,7 @@ so you may leave out the pointer.
 
 - **Do:** keep the crossref and add a signpost, e.g.
   `one-versus-one, defined later in this section (@def-one-versus-one)`.
-- **Do:** note that you may leave out the pointer when the passage
+- **Do:** feel free to leave out the pointer when the passage
   motivates the definition that follows.
 - **Don't:** fix a forward crossref by deleting the `@`-link and
   leaving only the term's or target's name.

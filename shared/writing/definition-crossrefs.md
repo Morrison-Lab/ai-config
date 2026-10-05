@@ -29,6 +29,9 @@ every mention:
   must appear **before** its first mention in reading order --- earlier in
   the same document, not later. A crossref pointing at a div the reader
   hasn't reached yet is a forward reference.
+  Fix it by moving the div earlier,
+  or, when it has to stay where it is, keep the crossref and signpost it,
+  per [keep the crossref](forward-references.md#keep-the-crossref).
 
 Scope note: "same document" means the single rendered file this checklist
 runs against. In a multi-file Quarto book, a term defined in a later

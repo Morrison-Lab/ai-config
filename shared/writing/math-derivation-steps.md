@@ -11,7 +11,7 @@ That second axis applies to any displayed equation, a standalone definition
 included, not only to a line inside a running derivation, and its remedy
 reaches document scope even though the defect shows up in one line.
 The third is **whether** a line is displayed at all: display versus inline, a decision that is usually never made on purpose rather than made wrongly.
-A last section covers prose that describes a formula: keeping a function apart from its value.
+Two last sections cover how a derivation is laid out in teaching material, and prose that describes a formula: keeping a function apart from its value.
 
 ## Writing: don't skip steps
 
@@ -507,20 +507,39 @@ On the supplement's working build it then found 7 missing-break findings across 
 The finding count and the equation count differ because a single equation can be missing a break on either side or both: three of the five were missing only one side, two were missing both, which is 1 + 1 + 1 + 2 + 2 = 7.
 Two of the five defective equations sat in a different section from the three the author knew about, and neither the author nor the user had noticed those two: the defect carries no text of its own, so a build check that only compares accepted versus rejected text was blind to the defect by construction.)
 
+## Teaching material: exercise, solution, theorem, proof
+
+In course notes and other teaching material,
+present a derivation as one or more exercises,
+each followed by its solution,
+then the theorem that records the result,
+with a short proof that cites the exercises.
+The reader meets each question before its answer,
+and the result itself is easy to find without searching through the working.
+
+- **Do:** give each step its own exercise
+  (each partial derivative, solving the resulting equations, the second-derivative check),
+  put each solution right after its exercise with a matching id
+  (`#exr-foo`, `#sol-foo` in Quarto),
+  define notation the exercises use before them,
+  and make the proof a few sentences citing the exercises.
+- **Don't:** state a theorem and then derive it inside one long proof block,
+  or copy the exercises' working into the proof.
+
 ## Prose about a formula: a function versus its value
 
 A function and its value at a point are different objects:
 in $\mu_i = \mu(x_i)$, $\mu$ is a function and $\mu(x_i)$ is a number.
-Writing the function with its placeholder argument, $\mu(x)$, already
-denotes a value, so "the value of $\mu(x)$ at $x_i$" reads as a value of a
-value.
-Either drop the placeholder ("the value of $\mu$ at $x_i$") or keep it and
-name the substitution ("$\mu(x)$ evaluated at $x_i$").
+Written with its placeholder argument, $\mu(x)$ already denotes a value,
+so "the value of $\mu(x)$ at $x_i$" reads as a value of a value.
+Either drop the placeholder ("the value of $\mu$ at $x_i$"),
+or keep it and name the substitution ("$\mu(x)$ evaluated at $x_i$").
 
 - **Do:** write "each outcome is centered on a mean function $\mu(x)$
-  evaluated at that outcome's covariate values", "the value of $f$ at 0" or
-  "$f(0)$", and "$L$ evaluated at $\hat\theta$".
-- **Don't:** combine "the value of" with a placeholder argument, as in "the
-  value of a mean function $\mu(x)$ at its own covariate values" (the first
-  wording of `def-cond-gaussian` in Morrison-Lab/sds#54) or "the value of the
-  density $f(x)$ at 0".
+  evaluated at that outcome's covariate values",
+  "the value of $f$ at 0" or "$f(0)$",
+  and "$L$ evaluated at $\hat\theta$".
+- **Don't:** combine "the value of" with a placeholder argument,
+  as in "the value of a mean function $\mu(x)$ at its own covariate values"
+  (the first wording of `def-cond-gaussian` in Morrison-Lab/sds#54)
+  or "the value of the density $f(x)$ at 0".

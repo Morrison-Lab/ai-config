@@ -74,3 +74,15 @@ branch still present, contradiction rule firing spuriously) rather than
 promising it later.
 The cross-vendor review that caught the overclaiming in the first draft of this
 entry is on [#1874](https://github.com/Morrison-Lab/ai-config/pull/1874).)
+
+## "Keep the crossref"
+
+([Morrison-Lab/lds#392](https://github.com/Morrison-Lab/lds/pull/392),
+2026-10-05: a forward-reference fix in an SVM lecture solution on multiclass
+classification removed the `@def-one-versus-one` link and left the bare term
+name.
+The maintainer said that was worse than the forward reference, and gave the
+rule: "if it's motivation for a coming definition, it's ok not to point",
+"but otherwise we want to preserve crossrefs".
+The fix kept the link and signposted it:
+"one-versus-one, defined later in this section (@def-one-versus-one)".)

@@ -65,6 +65,14 @@ read it before running this skill; the steps below are the short version.
    - **Reword** --- only when reordering would break the document's
      narrative logic. Replace the vague pointer with a precise, working
      link/crossref instead of leaving a bare "below".
+     For any `@`-crossref (`@def-`, `@sec-`, `@fig-`, `@tbl-`, `@thm-`,
+     `@eq-`, ...), keep the link and signpost it
+     ("one-versus-one, defined later in this section
+     (@def-one-versus-one)");
+     never delete the link and leave only the bare name.
+     The exception: you may leave out the pointer when the passage
+     motivates the definition that follows
+     (see the fragment's "Keep the crossref").
    - **Leave it** when the mention is a deliberate roadmap/overview preview
      (see the fragment's "roadmap exception") --- not every forward-pointing
      sentence is a defect.
@@ -112,3 +120,5 @@ read it before running this skill; the steps below are the short version.
 - ❌ Rewording as the default fix --- reordering is the stronger fix
   (removes the pointer entirely); reserve rewording for when reordering
   would break the narrative.
+- ❌ Deleting a forward `@`-crossref and leaving the bare name ---
+  that is worse than the forward reference; keep the link and signpost it.

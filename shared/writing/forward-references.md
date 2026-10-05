@@ -64,6 +64,8 @@ list at the end of the document, say --- is a back-reference and fine.
 Prefer deleting the pointer over rewording it: in a sequential procedure
 the reader reaches the target anyway, so a step that states its own
 mechanism in brief needs no cross-reference at all.
+That preference covers a step-number pointer only;
+an `@`-crossref is kept, per [Keep the crossref](#keep-the-crossref).
 
 **A pointer aimed the *wrong* way is a different defect, and fixing one can
 leave you applying the wrong test to the rest.**
@@ -120,6 +122,10 @@ For each candidate, check two things:
    precedes the mention, the wording is simply wrong (should say "above")
    but there's no forward-reference problem to fix structurally.
 
+A crossref already fixed under [Keep the crossref](#keep-the-crossref)
+--- a working `@`-crossref with a signpost such as "defined later in this
+section" --- is not a finding, even though the signpost matches the grep.
+
 Only a hit that is (a) a genuine reference and (b) genuinely pointing
 ahead is a forward reference to fix.
 
@@ -139,6 +145,32 @@ Two options, in order of preference:
    reference, but at least lets the reader jump to it rather than search.
    Use this only when reordering is genuinely worse, not as a default
    shortcut.
+
+### Keep the crossref
+
+Removing the link is not a third option.
+When a forward pointer is an `@`-crossref of any kind ---
+`@def-x`, `@sec-x`, `@fig-x`, `@tbl-x`, `@thm-x`, `@eq-x`, and so on ---
+and reordering is not the fix,
+keep the crossref and signpost it,
+so the reader knows the target is coming and can jump to it.
+Deleting the link and leaving only the bare name
+is worse than the forward reference it replaces:
+the reader loses both the warning and the jump.
+
+The one exception is a passage that motivates the definition that follows.
+There the motivation leads into the definition,
+so you may leave out the pointer.
+
+- **Do:** keep the crossref and add a signpost, e.g.
+  `one-versus-one, defined later in this section (@def-one-versus-one)`.
+- **Do:** feel free to leave out the pointer when the passage
+  motivates the definition that follows.
+- **Don't:** fix a forward crossref by deleting the `@`-link and
+  leaving only the term's or target's name.
+
+See [`forward-references.cases.md`](forward-references.cases.md),
+"Keep the crossref".
 
 ## Moving prose makes self-references stale
 

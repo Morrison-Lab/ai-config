@@ -11,6 +11,9 @@ every mention:
   `@thm-cauchy-schwarz`) or an explicit markdown link to the div's anchor.
   A bare mention of a term the reader hasn't been given a definition for
   forces them to search instead of click.
+  One exception: you may leave out the pointer when the passage motivates
+  the definition that follows, per
+  [`forward-references.md`](forward-references.md#keep-the-crossref).
 - **No hand-written type word in front of the crossref.**
   Quarto emits the type name as part of a theorem-family crossref, so
   `@def-hessian` already renders as "Definition 5".
@@ -39,6 +42,9 @@ diff.
 - For each technical term or named result mentioned in the prose, find its
   defining div (if one exists) and confirm the first mention is a working
   crossref/link to it, not bare text.
+  A bare mention in a passage that motivates the definition that follows
+  is not a missing crossref
+  ([keep the crossref](forward-references.md#keep-the-crossref)).
 - For each definition/theorem/etc. div, confirm it precedes --- in document
   reading order --- every place that references it, whether a prose mention
   or a crossref used elsewhere in the same document.
@@ -69,6 +75,10 @@ one of:
 - **Forward reference** --- the div is at `<location>`, after the mention
   at `<location>`; move the div earlier, or restructure so the definition
   precedes its use.
+  When the div has to stay where it is, keep the crossref and signpost it
+  ("defined later in this section (@def-x)"), per
+  [keep the crossref](forward-references.md#keep-the-crossref);
+  never delete the link.
 - **Undefined term** --- the term is mentioned but no div defines it
   anywhere in the document; add the missing definition.
 - **Doubled type word** --- the mention writes the type name in front of a

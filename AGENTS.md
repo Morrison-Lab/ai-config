@@ -34,6 +34,8 @@ Those manuals must defer to this file for universal policy.
 Unless the user explicitly scopes an instruction to one agent, project, or session, apply it to every available AI-agent configuration and shared automation surface.
 Do not treat the currently speaking agent as an implicit scope restriction.
 
+On an auto-mode denial, ask the user to switch modes: [details](shared/workflow/ask-for-manual-approval.md).
+
 The same holds for projects: see [`global-by-default`](shared/workflow/global-by-default.md).
 
 ## Gate external repository communication on membership
@@ -236,18 +238,6 @@ When working in a consumer repo, check if the `.ai-config` submodule is outdated
 
 When a repository migrates to native AI agent plugins (Antigravity or Claude Code plugins), remove redundant git submodules that duplicated those configurations.
 See [`remove-redundant-plugin-submodules`](shared/workflow/remove-redundant-plugin-submodules.md).
-
-## Ask the user to leave auto mode when an action needs their approval
-
-[`shared/workflow/ask-for-manual-approval.md`](shared/workflow/ask-for-manual-approval.md)
-
-When a permission classifier or approval mode (Claude Code auto mode, and by analogy the approval modes of Codex, Gemini, and Antigravity) denies an action the task needs, ask the user to switch out of that mode so they can approve it directly.
-When the approved actions are done, tell the user they can switch back.
-Hard-prohibited categories (credentials, financial actions, permanent deletion) are excluded.
-
-- **Do:** name the refused command and ask the user to switch out of auto mode;
-  then say "you can switch back to auto mode now".
-- **Don't:** stall, work around the denial, or hand the user a script to run in place of the approval.
 
 ## Verify changes before pushing
 

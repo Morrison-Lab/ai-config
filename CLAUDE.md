@@ -608,15 +608,7 @@ Detail, rationale, and cases: [`shared/workflow/assign-subagent-worktrees.md`](s
 
 ## Ask the user to leave auto mode when an action needs their approval
 
-[`shared/workflow/ask-for-manual-approval.md`](shared/workflow/ask-for-manual-approval.md)
-
-When a permission classifier or approval mode (Claude Code auto mode, and by analogy the approval modes of Codex, Gemini, and Antigravity) denies an action the task needs, ask the user to switch out of that mode so they can approve it directly.
-When the approved actions are done, tell the user they can switch back.
-Hard-prohibited categories (credentials, financial actions, permanent deletion) are excluded.
-
-- **Do:** name the refused command and ask the user to switch out of auto mode;
-  then say "you can switch back to auto mode now".
-- **Don't:** stall, work around the denial, or hand the user a script to run in place of the approval.
+When the classifier denies a needed action, ask the user to switch modes, then say when to switch back: [`ask-for-manual-approval`](shared/workflow/ask-for-manual-approval.md).
 
 ## Non-destructive actions
 

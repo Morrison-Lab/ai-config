@@ -83,7 +83,10 @@ _DOUBLED_BACKSLASH = re.compile(r"\\\\")
 
 
 def _heredoc_bodies(command):
-    """Yield (delimiter, body_text) for every heredoc in COMMAND.
+    """Yield (delimiter, body_text, opener_line) for every heredoc in COMMAND.
+
+    OPENER_LINE is the full text of the line the heredoc is opened on, so a
+    caller can ask what the body is FED TO (`hooks/no-interpreter-heredoc.py`).
 
     Two-phase, mirroring `scripts/lib/shellcmd.py`'s own `_heredoc_free`:
     find every opener on the next opener line with the shared
@@ -135,9 +138,12 @@ def _heredoc_bodies(command):
         # every delimiter on the opener line first, then consume the bodies
         # in that order.
         delims = []
+        first_opener_start = m.start()
         while m is not None and m.start() < line_end:
             delims.append(m.group(3))
             m = RX_HEREDOC_OPEN.search(command, m.end())
+        opener_line = command[
+            command.rfind("\n", 0, first_opener_start) + 1:line_end]
         pos = line_end + 1
         for delim in delims:
             term = re.compile(
@@ -146,12 +152,12 @@ def _heredoc_bodies(command):
             if hit is None:
                 # Unterminated heredoc runs to the end of the input, as the
                 # shell reads it.
-                yield delim, command[pos:]
+                yield delim, command[pos:], opener_line
                 return
             body_end = hit.start()
             if body_end > pos and command[body_end - 1] == "\n":
                 body_end -= 1
-            yield delim, command[pos:body_end]
+            yield delim, command[pos:body_end], opener_line
             # The closer's lookahead leaves `hit.end()` ON the terminator's
             # newline; the next body (or the next opener line) starts after
             # it.
@@ -162,7 +168,7 @@ def find_offenses(command):
     """[(delimiter, line_text, line_no), ...] for every heredoc body line in
     COMMAND that carries two consecutive backslashes."""
     out = []
-    for delim, body in _heredoc_bodies(command):
+    for delim, body, _opener_line in _heredoc_bodies(command):
         for i, line in enumerate(body.split("\n"), start=1):
             if _DOUBLED_BACKSLASH.search(line):
                 out.append((delim, line, i))

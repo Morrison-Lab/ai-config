@@ -460,6 +460,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-interpreter-heredoc.py\"",
+            "timeout": 20,
+            "script": "no-interpreter-heredoc.py",
+            "why": "CLAUDE.md 'Tool transport collapses doubled backslashes'; shared/coding/heredoc-backslash-collapse.md. The rule says do not carry content in a heredoc, and its only enforcement was the warn-only warn-heredoc-doubled-backslash.py, which did not change behaviour: measured 2026-10-05 in a Morrison-Lab/psw session, about 15 `python - <<'EOF'` heredocs despite the rule and the warnings, one of which silently turned `\\\\frac` in a LaTeX formula into a form feed plus `rac`, caught only by reading the file back. DENIES a heredoc whose body is the script an interpreter (python, py, node, Rscript, perl, ruby, bash/sh) reads from stdin AND contains a backslash or a backtick: the remedy (Write tool to a scratchpad file, run it by path) is always available and costs one call, so the refusal is always satisfiable. A heredoc fed to anything else (cat, git commit -F -) keeps the warn-only behaviour. Escape hatch: a real leading `ALLOW_INTERPRETER_HEREDOC=1` env assignment (or the hook's own environment); a mere mention of the string does not disarm it. Reuses the heredoc body parser of warn-heredoc-doubled-backslash.py and scripts/lib/shellcmd.py's RX_HEREDOC_OPEN. Fails open. Tracked as #4298."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-heredoc-doubled-backslash.py\"",
             "timeout": 20,
             "script": "warn-heredoc-doubled-backslash.py",

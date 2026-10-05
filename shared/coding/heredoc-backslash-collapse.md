@@ -33,6 +33,29 @@ A heredoc stays fine for a short, plain-ASCII body with no backslashes and no ba
 Both sides of the pair are inferred from that session's two failures.
 Tracked as [ai-config#4083](https://github.com/Morrison-Lab/ai-config/issues/4083).)
 
+## The interpreter case is blocked, not warned about
+
+A warning did not change behaviour.
+Measured 2026-10-05 in a Morrison-Lab/psw session: about 15 `python - <<'EOF'` heredocs despite this rule and the warning below, one of which silently turned `\\frac` in a LaTeX formula into a form feed plus `rac`.
+It was caught only by reading the written file back.
+
+[`hooks/no-interpreter-heredoc.py`](../../hooks/no-interpreter-heredoc.py) therefore **denies** a command in which a heredoc body is the script an interpreter (`python`, `python3`, `py`, `node`, `Rscript`, `perl`, `ruby`, `bash`/`sh`) reads from stdin and the body contains a backslash or a backtick.
+The denial names the remedy: write the script with the Write tool to a scratchpad file and run it by path.
+A heredoc fed to anything else (`cat <<EOF > file`, `git commit -F -`) is not blocked and keeps the warn-only behaviour of `warn-heredoc-doubled-backslash.py`.
+
+The refusal is always satisfiable, because the Write-then-run route is always available and costs one call.
+That is why this case can deny where the general case cannot: the general hook cannot tell a mistaken doubled backslash from one a regex needs, but an interpreter script has a strictly better route.
+
+Escape hatch, for a case the guard did not foresee, with the reason stated: prefix the command with `ALLOW_INTERPRETER_HEREDOC=1` (a real leading env assignment, so a command that merely mentions the string does not disarm it), or set it in the hook's environment.
+
+Known gaps, accepted: a heredoc written to a `.py` file and run later in the same command is not seen (only the doubled-backslash warning covers it), and an interpreter option that takes a value (`python -W ignore <<EOF`) makes the value read as a script path.
+
+- **Do:** write an interpreter script with the Write tool and run it by path.
+- **Don't:** reach for the override to get a heredoc past the denial.
+  It is for a case the guard did not foresee.
+
+(Tracked as [ai-config#4298](https://github.com/Morrison-Lab/ai-config/issues/4298).)
+
 ## The collapse, measured
 
 Inside a Bash-tool heredoc with a **quoted** delimiter (`<<'PY'`), which should be entirely literal, a doubled backslash `\\` arrives as a single `\`.

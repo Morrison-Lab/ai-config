@@ -1429,6 +1429,7 @@ Knowing the rule also does not stop you tripping it, since nothing about typing 
 **So the default is not to carry content in a heredoc at all.**
 Write it with the Write tool (Edit for an existing file) to a uniquely named scratchpad file, and hand the command the path (`git commit -F`, `--body-file`, `python3 script.py`).
 The Write tool passes bytes unchanged, and it cannot be silently skipped the way a heredoc inside a hook-denied Bash call is.
+`hooks/no-interpreter-heredoc.py` denies a backslash- or backtick-bearing heredoc fed to an interpreter (override `ALLOW_INTERPRETER_HEREDOC=1`).
 
 - **Do:** use Write or Edit for any content with a backslash, a backtick, code, or more than a few lines.
 - **Do:** where a heredoc is genuinely unavoidable, build the character with `chr(92)` or a placeholder token before it enters the body, and print `repr()` of the constructed string.

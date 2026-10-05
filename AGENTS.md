@@ -85,8 +85,7 @@ When ending a turn and reporting stopping point status, explicitly state whether
 See [`flag-session-boundaries`](shared/workflow/flag-session-boundaries.md).
 
 - **Do:** explicitly state "session is done" or "session is not done" with concrete remaining queued steps at every stopping point report.
-- **Don't:** declare the session done while the same reply, or an earlier one still unanswered, leaves the user an open question --- an offer ("...if you want"), a choice, or a request for input, boxed or not.
-  An open question means the session is not done; list it as the remaining step instead.
+- **Don't:** declare the session done while a question or offer to the user is still open, boxed or not; list it as a remaining step instead.
 
 ## Terminate superseded and abandoned background tasks
 

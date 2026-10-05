@@ -29,6 +29,7 @@ A real rejection --- a `403` from the proxy (see this file's push-scope "Excepti
 The wording of the harness prompt never limits them.
 
 **When the auto-mode classifier refuses an action the user has authorized, suggest switching out of auto mode --- at once, unprompted.**
+The general rule, for every agent and every denied action, is [`ask-for-manual-approval`](ask-for-manual-approval.md); this section carries the 2026-09-28 measured case.
 A standing grant made earlier in the conversation does not clear the auto-mode classifier.
 Per <https://code.claude.com/docs/en/auto-mode-config>, only a user message that "directly and specifically describes the exact action" clears a `soft_deny` block,
 and nothing in the conversation clears a `hard_deny` block.

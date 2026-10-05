@@ -237,6 +237,14 @@ When working in a consumer repo, check if the `.ai-config` submodule is outdated
 When a repository migrates to native AI agent plugins (Antigravity or Claude Code plugins), remove redundant git submodules that duplicated those configurations.
 See [`remove-redundant-plugin-submodules`](shared/workflow/remove-redundant-plugin-submodules.md).
 
+## Ask the user to leave auto mode when an action needs their approval
+
+When a permission classifier or approval mode (Claude Code auto mode, Codex approval modes, Gemini and Antigravity equivalents) denies an action the task needs, ask the user to switch out of that mode so they can approve it directly.
+Do not stall, work around the denial, or hand the user a script to run.
+When the approved actions are done, tell the user they can switch back.
+Hard-prohibited categories (credentials, financial actions) are excluded.
+See [`ask-for-manual-approval`](shared/workflow/ask-for-manual-approval.md).
+
 ## Verify changes before pushing
 
 Always run relevant local linters, tests, and formatting checks before pushing commits to a remote branch.

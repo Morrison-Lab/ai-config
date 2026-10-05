@@ -993,7 +993,7 @@ it suppresses a mistake at the cost of suppressing the PR's own review and auto-
 
 ## Use the shared math-macros library for all LaTeX math
 
-Write math in lab Quarto/LaTeX manuscripts with the shared [`Morrison-Lab/macros`](https://github.com/Morrison-Lab/macros) submodule (formerly `d-morrison/macros`; vendored at `inst/analyses/macros`, included via `{{< include .../macros/macros.qmd >}}`), not ad-hoc raw LaTeX --- it gives every document the same polished, condensed notation from one versioned source.
+Write math in lab Quarto/LaTeX manuscripts with the shared [`Morrison-Lab/macros`](https://github.com/Morrison-Lab/macros) submodule (formerly `d-morrison/macros`, vendored at `inst/analyses/macros`, included via `{{< include .../macros/macros.qmd >}}`), not ad-hoc raw LaTeX --- it gives every document the same polished, condensed notation from one versioned source.
 This applies to LaTeX math in any project, repo, or format (Quarto, R Markdown, LaTeX, roxygen, slides, docs), not only manuscripts, and is mandatory for every equation, not a polish pass: use the semantic macro wherever one names the concept (an expectation is `\E`, not a raw `\mathbb{E}`).
 Keep the submodule up to date, and add new semantic macros to it (via a PR to `Morrison-Lab/macros`, which carries a standing `mwc` grant) whenever a needed concept has no macro, rather than defining one-off commands inline.
 (Directive from the user, 2026-10-02, on a manuscript equation that wrote out an expectation in raw LaTeX: "you're supposed to always use semantic macros wherever applicable, and add new semantic macros as needed";

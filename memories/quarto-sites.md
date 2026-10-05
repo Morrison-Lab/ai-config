@@ -689,3 +689,14 @@ Bare italic `p(x)` creates notation inconsistency across chapters and subfiles a
 ([`Morrison-Lab/pds#43`](https://github.com/Morrison-Lab/pds/pull/43), 2026-09-29.)
 
 Two macro-collision gotchas to watch for in `macros.qmd` itself: matrix and vector shorthands like `\mA` and `\vw` are undefined and break LuaLaTeX during PDF compilation (use `\matr{A}` and `\vec{w}` / `\vecf{w}` instead), and `\vb` expands to Greek `\vec{\beta}` rather than Latin vector $b$ (use `\vec{b}`).
+
+## A `@` crossref inside math (`\text{by @def-x}`) does not resolve
+
+Quarto resolves crossrefs in Markdown text, and math is passed through to MathJax/KaTeX untouched.
+So a justification written inside a display equation, such as `&= a + b && \text{by @def-cdev}`, renders the literal `@def-cdev` rather than a link, and the build raises no warning.
+Put the justification in the prose around the equation, or in a plain-text `\text{}` naming the step, and keep the `@` crossref outside the `$$ ... $$`.
+
+- **Do:** cite a definition or exercise in the sentence that introduces or follows the derivation.
+- **Don't:** put `@def-...`, `@thm-...` or `@exr-...` inside `\text{}` in math and trust it to link.
+
+(Morrison-Lab/sds#54, 2026-10-05: caught on the rendered preview, not by the build.)

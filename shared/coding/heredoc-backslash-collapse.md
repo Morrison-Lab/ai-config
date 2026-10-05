@@ -39,7 +39,8 @@ A warning did not change behaviour.
 Measured 2026-10-05 in a Morrison-Lab/psw session: about 15 `python - <<'EOF'` heredocs despite this rule and the warning below, one of which silently turned `\\frac` in a LaTeX formula into a form feed plus `rac`.
 It was caught only by reading the written file back.
 
-[`hooks/no-interpreter-heredoc.py`](../../hooks/no-interpreter-heredoc.py) therefore **denies** a command in which a heredoc body is the script an interpreter (`python`, `python3`, `py`, `node`, `Rscript`, `perl`, `ruby`, `bash`/`sh`) reads from stdin and the body contains a backslash or a backtick.
+[`hooks/no-interpreter-heredoc.py`](../../hooks/no-interpreter-heredoc.py) therefore **denies** a command in which a heredoc body is the script an interpreter (for example `python`, `python3`, `py`, `node`, `Rscript`, `perl`, `ruby`, `bash`/`sh`;
+also `R`, `php`, `pwsh`, `zsh`, `dash`, `ksh`, `pypy`) reads from stdin and the body contains a backslash or a backtick.
 The denial names the remedy: write the script with the Write tool to a scratchpad file and run it by path.
 A heredoc fed to anything else (`cat <<EOF > file`, `git commit -F -`) is not blocked and keeps the warn-only behaviour of `warn-heredoc-doubled-backslash.py`.
 
@@ -48,7 +49,9 @@ That is why this case can deny where the general case cannot: the general hook c
 
 Escape hatch, for a case the guard did not foresee, with the reason stated: prefix the command with `ALLOW_INTERPRETER_HEREDOC=1` (a real leading env assignment, so a command that merely mentions the string does not disarm it), or set it in the hook's environment.
 
-Known gaps, accepted: a heredoc written to a `.py` file and run later in the same command is not seen (only the doubled-backslash warning covers it), and an interpreter option that takes a value (`python -W ignore <<EOF`) makes the value read as a script path.
+Known gaps, accepted: a heredoc written to a `.py` file and run later in the same command is not seen (only the doubled-backslash warning covers it), and an interpreter option with a value other than `-W`, `-X`, `-Q` and `--check-hash-based-pycs` reads as a script path.
+The opener regex is quote-blind, so a `<<` inside a quoted string on an interpreter line can cause a false deny, which costs one retry with the override.
+See the hook docstring for the full list.
 
 - **Do:** write an interpreter script with the Write tool and run it by path.
 - **Don't:** reach for the override to get a heredoc past the denial.

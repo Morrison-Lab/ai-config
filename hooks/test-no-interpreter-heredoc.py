@@ -92,6 +92,10 @@ SHOULD_DENY = [
      "timeout with a duration", {}),
     ("D20", "python3 /dev/stdin " + heredoc("EOF", LATEX),
      "/dev/stdin is the stdin script spelled as a path", {}),
+    ("D22", "python3 -W ignore - " + heredoc("EOF", LATEX),
+     "a value-taking interpreter option must not read as a script path", {}),
+    ("D23", "python3 -X dev " + heredoc("EOF", LATEX),
+     "-X opt with the script on stdin", {}),
     ("D21", "R --no-save " + heredoc("EOF", LATEX),
      "R reading its script from stdin", {}),
 ]
@@ -227,6 +231,12 @@ MUTATIONS = {
         [('    return positionals[0] == "-" or positionals[0] == "/dev/stdin"',
           '    return True')],
         {"A5", "A6", "A11"},
+    ),
+    "M14_interpreter_value_options": (
+        "`-W ignore` consumes its value",
+        [('_INTERPRETER_VALUE_OPTS = {"-W", "-X", "-Q", '
+          '"--check-hash-based-pycs"}', "_INTERPRETER_VALUE_OPTS = set()")],
+        {"D22", "D23"},
     ),
     "M9_info_flags": (
         "--version and friends run no script",

@@ -46,9 +46,10 @@ Known gaps, accepted rather than hidden:
   * `cat > x.py <<EOF ... EOF` followed by `python x.py` in the same command
     writes a script through a heredoc without feeding an interpreter on the
     opener line. Only the doubled-backslash warning covers it.
-  * An interpreter option that takes a value (`python -W ignore <<EOF`) makes
-    the value read as a positional script argument, so the heredoc is judged
-    data and passes.
+  * An interpreter option that takes a value is skipped only for `-W`, `-X`,
+    `-Q` and `--check-hash-based-pycs`; any other (`python -c`-style or
+    tool-specific) value reads as a positional script argument, so the
+    heredoc is judged data and passes.
   * The opener is found with `scripts/lib/shellcmd.py`'s quote-blind
     `RX_HEREDOC_OPEN`, so a `<<` inside a quoted string on a line that also
     runs an interpreter is read as a heredoc opener (a false deny costs one
@@ -119,6 +120,8 @@ _WRAPPERS = {"sudo", "env", "command", "exec", "time", "nohup", "nice",
              "timeout", "uv", "poetry", "pipx", "run", "{", "!"}
 # options of a wrapper that take a VALUE as the next token (`sudo -u bob`)
 _WRAPPER_VALUE_OPTS = {"-u", "-g", "-C", "-U", "-h", "-p", "-r", "-t"}
+# interpreter options that take a VALUE as the next token (`python -W ignore`)
+_INTERPRETER_VALUE_OPTS = {"-W", "-X", "-Q", "--check-hash-based-pycs"}
 _DURATION = re.compile(r"^[0-9.]+[smhd]?$")
 _INFO_FLAGS = {"--version", "-V", "-h", "--help", "-version"}
 _ENV_ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
@@ -189,6 +192,8 @@ def _positionals(args):
             i += 3  # `2 > f`: the fd, the operator, and its target
         elif _REDIRECT_WITH_TARGET.match(arg):
             i += 1
+        elif arg in _INTERPRETER_VALUE_OPTS:
+            i += 2
         else:
             if arg == "-" or not arg.startswith("-"):
                 out.append(arg)

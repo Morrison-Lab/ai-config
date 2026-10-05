@@ -20,7 +20,12 @@ so the chain reaches the reader rather than stopping one hop short.
 Put it next to the content it credits,
 not only in a page-level list,
 so it travels with the content when a fragment is included elsewhere.
-In Quarto, end the item's own div with a small, muted note:
+An attribution is a typed block,
+so in Quarto it gets its own div type
+([`quarto-divs-for-typed-content`](quarto-divs-for-typed-content.md)):
+end the item's own div with an `attribution` div,
+styled once in the site's CSS (small and muted),
+not a paragraph dressed in presentational classes such as `.small .text-muted`:
 
 ```markdown
 ::: {#def-overfitting}
@@ -28,7 +33,7 @@ In Quarto, end the item's own div with a small, muted note:
 
 ...
 
-::: {.small .text-muted}
+::: {.attribution}
 Source: adapted from the rme notes'
 [definition of overfitting](https://morrison-lab.github.io/rme/chapters/predictor-selection.html#def-overfitting);
 see also @james2021islr2e [sec. 5.1].
@@ -49,7 +54,7 @@ what was checked in a PDF,
 a page number not yet verified,
 or a wording edit made while porting.
 
-- **Do:** end each adapted or sourced item with a visible "Source:" note.
+- **Do:** end each adapted or sourced item with a visible "Source:" note in an `attribution` div.
 - **Don't:** leave an attribution only in an HTML comment.
 
 (Morrison-Lab/sds, 2026-10-05:

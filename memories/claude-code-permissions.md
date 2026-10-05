@@ -283,3 +283,20 @@ src = src.replace(anchor, replacement)
 - **Don't:** read a reason that seems not to describe the edit as licence to
   proceed --- you cannot tell a misfire from a correct refusal from inside
   the refused turn.
+
+## A "rejected" tool call may already have run
+
+When the user rejects a tool call while it is in flight
+(the result reads "The user doesn't want to proceed with this tool use ...
+the new_string was NOT written"),
+a Bash command can still have executed, in part or in full, before the rejection registered.
+In Morrison-Lab/sds#54 (2026-10-05) a rejected command had already committed and pushed
+`3480e6d`; the session then told the user it "never ran", relying on a clean working tree,
+which a completed commit-and-push also leaves behind.
+
+- **Do:** after any rejected Bash call that writes, commits or pushes,
+  check the real state before saying anything about it:
+  `git log -3 --oneline`, `git ls-remote --heads origin <branch>`, and the target files.
+- **Don't:** report that a rejected command "did not run" from the rejection text
+  or from `git status` alone.
+

@@ -459,6 +459,13 @@ A named quantity that is never cited again does not automatically earn this: the
 setting $f(t)$ on its own display line breaks that sentence in two for no reason the reader can find, and running prose directly into a display line on either side is the specific defect that neighbour-copying habit produces.
 If removing the equation and reading the sentence aloud with a plain noun phrase in its place still parses, the equation belongs inline.
 
+**A definition or a result states its formula as a display equation.**
+Every technical definition and every theorem, corollary or lemma gets
+a prose sentence saying what it means *and* its formula displayed inside the same block,
+built from terms already defined;
+a formula left inline in the sentence is easy to miss and cannot be labeled.
+A purely descriptive definition with no formula (a kind of plot, a kind of variable) stays prose.
+
 **Two equations meant to be compared must be given the same form as each other.**
 A reader can weigh two expressions side by side only when both are shown at the same scale and in the same position relative to the surrounding text --- both inline, or both display, never one of each.
 Mismatched form silently withdraws the comparison the passage is asking the reader to make, even when each individual equation renders correctly on its own.

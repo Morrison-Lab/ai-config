@@ -339,8 +339,11 @@ whose conclusion is neither `success` nor `skipped`.
 
 A check that is not required leaves the PR `unstable` rather than `blocked` when it is cancelled.
 On 2026-10-05 one CodeQL default-setup run refused `rerun-failed-jobs` with 403 "This workflow run cannot be retried".
-Restarting default setup and a new commit were not tried, so either may be the way out.
-Do not push an empty commit to retrigger the cancelled CodeQL job, per [`github-actions.md`](github-actions.md)'s skipped-required-check section.
+The next push carrying a real change to the PR started a fresh CodeQL run on the new head,
+and its `Analyze (actions)` passed.
+Restarting default setup was not tried.
+An empty commit made only to retrigger CodeQL is not a real change:
+[`github-actions.md`](github-actions.md)'s skipped-required-check section rules out an empty commit to kick CI.
 
 - **Do:** list every check run on the head, and rerun each run holding a cancelled or failed check under a required name.
 - **Do:** treat a green same-named check run in another run as no evidence about the blocked one.
@@ -350,7 +353,8 @@ Do not push an empty commit to retrigger the cancelled CodeQL job, per [`github-
 Every `validate` job on the head, and CodeQL's `Analyze (actions)`, sat without a runner and was cancelled at about 20:40 UTC.
 The `push` run's rerun went green, but the PR stayed `blocked`
 until the `pull_request` run, whose same-named check runs were still `cancelled`, was rerun too.
-The PR then read `unstable`, because `Analyze (actions)` was still cancelled and its rerun returned the 403.)
+The PR then read `unstable`, because `Analyze (actions)` was still cancelled and its rerun returned the 403.
+The push of `83262e22`, which added this subsection, ran CodeQL again, and `Analyze (actions)` passed.)
 
 ## An API outage is not an Actions outage, and it presents as the opposite shape
 

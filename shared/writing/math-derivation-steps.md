@@ -529,6 +529,29 @@ and the result itself is easy to find without searching through the working.
 - **Don't:** state a theorem and then derive it inside one long proof block,
   or copy the exercises' working into the proof.
 
+Give each theorem, corollary or lemma block one result.
+Two results joined by a semicolon,
+or set side by side with `\qquad` in one display,
+usually belong in two blocks,
+each with its own exercise and proof,
+so that a later step can cite only the result it uses.
+
+- **Do:** split a theorem, corollary or lemma block whose statement joins two results
+  with a semicolon or a `\qquad`.
+- **Don't:** state two results in one block because they share a setting.
+
+When a derivation would add and subtract a term to turn one side into the other,
+start from the other side and simplify it instead.
+To show $Y_i = \mu_i + \varepsilon_i$ with $\varepsilon_i := Y_i - \mu_i$,
+expand $\mu_i + \varepsilon_i$ to $\mu_i + (Y_i - \mu_i)$ and cancel,
+rather than writing $Y_i = Y_i - \mu_i + \mu_i$:
+every line then follows from a definition or a simplification,
+and none asks the reader to accept a term whose purpose shows only later.
+
+- **Do:** derive an equality from the side that a definition expands.
+- **Don't:** add and subtract a term to reach an expression
+  that starting from the other side would reach by simplifying.
+
 ## Prose about a formula: a function versus its value
 
 A function and its value at a point are different objects:

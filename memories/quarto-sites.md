@@ -219,7 +219,8 @@ but set `PLAYWRIGHT_DISABLE_FORCED_CHROMIUM_PROXIED_LOOPBACK=1` in the environme
 Playwright appends `<-loopback>` to Chromium's proxy bypass list,
 so without the variable even `http://127.0.0.1` requests go to the proxy, which answers 405.
 The `bypass` option alone does not override that.
-(Measured 2026-10-05: 405 without the variable; with it, 200, and MathJax and Quarto's scripts ran.)
+(Measured 2026-10-05: 405 without the variable.
+With it, 200, and MathJax and Quarto's scripts ran.)
 Then wait on `MathJax.startup.promise` before reading `document.documentElement.scrollWidth`.
 
 - **Do:** walk up from an overflowing leaf to the first ancestor wider than its parent.

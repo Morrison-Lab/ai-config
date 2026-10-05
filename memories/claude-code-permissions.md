@@ -288,7 +288,8 @@ src = src.replace(anchor, replacement)
 
 When the user rejects a tool call while it is in flight
 (the result reads "The user doesn't want to proceed with this tool use.
-The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file).
+The tool use was rejected (eg.
+if it was a file edit, the new_string was NOT written to the file).
 STOP what you are doing and wait for the user to tell you how to proceed."),
 a Bash command can still have executed, in part or in full, before the rejection registered.
 In Morrison-Lab/sds#54 (2026-10-05) a rejected command had already committed and pushed

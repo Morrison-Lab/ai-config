@@ -11,6 +11,7 @@ That second axis applies to any displayed equation, a standalone definition
 included, not only to a line inside a running derivation, and its remedy
 reaches document scope even though the defect shows up in one line.
 The third is **whether** a line is displayed at all: display versus inline, a decision that is usually never made on purpose rather than made wrongly.
+Two last sections cover how a derivation is laid out in teaching material, and prose that describes a formula: keeping a function apart from its value.
 
 ## Writing: don't skip steps
 
@@ -458,6 +459,13 @@ A named quantity that is never cited again does not automatically earn this: the
 setting $f(t)$ on its own display line breaks that sentence in two for no reason the reader can find, and running prose directly into a display line on either side is the specific defect that neighbour-copying habit produces.
 If removing the equation and reading the sentence aloud with a plain noun phrase in its place still parses, the equation belongs inline.
 
+**A definition or a result states its formula as a display equation.**
+Every technical definition and every theorem, corollary or lemma gets
+a prose sentence saying what it means *and* its formula displayed inside the same block,
+built from terms already defined;
+a formula left inline in the sentence is easy to miss and cannot be labeled.
+A purely descriptive definition with no formula (a kind of plot, a kind of variable) stays prose.
+
 **Two equations meant to be compared must be given the same form as each other.**
 A reader can weigh two expressions side by side only when both are shown at the same scale and in the same position relative to the surrounding text --- both inline, or both display, never one of each.
 Mismatched form silently withdraws the comparison the passage is asking the reader to make, even when each individual equation renders correctly on its own.
@@ -477,9 +485,11 @@ The decision is the same question on every authoring surface this corpus touches
 - **Do:** make an equation display, and label it, when the prose returns to it or when it carries the step the argument is making.
 - **Do:** make an equation inline when it is a grammatical constituent of the sentence around it --- test this by reading the sentence aloud with the equation replaced by a plain noun phrase.
 - **Do:** give two equations meant to be compared the same form and scale as each other.
+- **Do:** display the formula of every definition and result (theorem, corollary, lemma) inside its own block, next to its prose statement.
 - **Don't:** let a fresh equation's form default to whatever markup the equation before it happened to use.
 - **Don't:** treat "it renders correctly" as evidence the display/inline choice was made deliberately --- a correct render is fully compatible with the form having never been decided at all.
 - **Don't:** compare two equations set at different scales and expect the reader to do the normalizing.
+- **Don't:** leave a definition's or result's formula inline in its sentence, where it is easy to miss and cannot be labeled.
 
 ### In review: display versus inline
 
@@ -489,6 +499,7 @@ Either the display/inline choice was wrong and the equation should be inline, or
 Converting a correctly-display equation to inline because it looks glued to its introducing sentence removes the display form the argument actually needed, and does not fix the missing break that caused the symptom.
 
 Flag the inverse too --- an equation the prose cites again later, written inline with no way to reference it.
+Flag a definition or result whose formula appears only inline, or only in its proof.
 And flag a pair of compared equations set at different scales, since that finding is invisible on the diff of either equation alone;
 it shows only once both are read together.
 
@@ -498,3 +509,63 @@ A checker written afterward --- per file, counting display equations examined an
 On the supplement's working build it then found 7 missing-break findings across 5 defective equations, and 0 after repair, with the repair keeping all five equations display and adding the missing breaks.
 The finding count and the equation count differ because a single equation can be missing a break on either side or both: three of the five were missing only one side, two were missing both, which is 1 + 1 + 1 + 2 + 2 = 7.
 Two of the five defective equations sat in a different section from the three the author knew about, and neither the author nor the user had noticed those two: the defect carries no text of its own, so a build check that only compares accepted versus rejected text was blind to the defect by construction.)
+
+## Teaching material: exercise, solution, theorem, proof
+
+In course notes and other teaching material,
+present a derivation as one or more exercises,
+each followed by its solution,
+then the theorem that records the result,
+with a short proof that cites the exercises.
+The reader meets each question before its answer,
+and the result itself is easy to find without searching through the working.
+
+- **Do:** give each step its own exercise
+  (each partial derivative, solving the resulting equations, the second-derivative check),
+  put each solution right after its exercise with a matching id
+  (`#exr-foo`, `#sol-foo` in Quarto),
+  define notation the exercises use before them,
+  and make the proof a few sentences citing the exercises.
+- **Don't:** state a theorem and then derive it inside one long proof block,
+  or copy the exercises' working into the proof.
+
+Give each theorem, corollary or lemma block one result.
+Two results joined by a semicolon,
+or set side by side with `\qquad` in one display,
+usually belong in two blocks,
+each with its own exercise and proof,
+so that a later step can cite only the result it uses.
+
+- **Do:** split a theorem, corollary or lemma block whose statement joins two results
+  with a semicolon or a `\qquad`.
+- **Don't:** state two results in one block because they share a setting.
+
+When a derivation would add and subtract a term to turn one side into the other,
+start from the other side and simplify it instead.
+To show $Y_i = \mu_i + \varepsilon_i$ with $\varepsilon_i := Y_i - \mu_i$,
+expand $\mu_i + \varepsilon_i$ to $\mu_i + (Y_i - \mu_i)$ and cancel,
+rather than writing $Y_i = Y_i - \mu_i + \mu_i$:
+every line then follows from a definition or a simplification,
+and none asks the reader to accept a term whose purpose shows only later.
+
+- **Do:** derive an equality from the side that a definition expands.
+- **Don't:** add and subtract a term to reach an expression
+  that starting from the other side would reach by simplifying.
+
+## Prose about a formula: a function versus its value
+
+A function and its value at a point are different objects:
+in $\mu_i = \mu(x_i)$, $\mu$ is a function and $\mu(x_i)$ is a number.
+Written with its placeholder argument, $\mu(x)$ already denotes a value,
+so "the value of $\mu(x)$ at $x_i$" reads as a value of a value.
+Either drop the placeholder ("the value of $\mu$ at $x_i$"),
+or keep it and name the substitution ("$\mu(x)$ evaluated at $x_i$").
+
+- **Do:** write "each outcome is centered on a mean function $\mu(x)$
+  evaluated at that outcome's covariate values",
+  "the value of $f$ at 0" or "$f(0)$",
+  and "$L$ evaluated at $\hat\theta$".
+- **Don't:** combine "the value of" with a placeholder argument,
+  as in "the value of a mean function $\mu(x)$ at its own covariate values"
+  (the first wording of `def-cond-gaussian` in Morrison-Lab/sds#54)
+  or "the value of the density $f(x)$ at 0".

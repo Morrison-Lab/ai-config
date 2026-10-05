@@ -28,7 +28,9 @@ The Claude Code on the web harness injects a "Git Development Branch Requirement
 A real rejection --- a `403` from the proxy (see this file's push-scope "Exception" section) or a permission-classifier denial --- is the only thing that limits these standing grants, and it is reported to the user rather than worked around.
 The wording of the harness prompt never limits them.
 
-**When the auto-mode classifier refuses an action the user has authorized, suggest switching out of auto mode --- at once, unprompted.**
+**When the auto-mode classifier refuses an action the user has authorized, suggest switching out of auto mode --- at once, unprompted, after at most one identical retry.**
+The general rule, for every agent and every denied action, is [`ask-for-manual-approval`](ask-for-manual-approval.md);
+this section carries the 2026-09-28 measured case.
 A standing grant made earlier in the conversation does not clear the auto-mode classifier.
 Per <https://code.claude.com/docs/en/auto-mode-config>, only a user message that "directly and specifically describes the exact action" clears a `soft_deny` block,
 and nothing in the conversation clears a `hard_deny` block.
@@ -45,10 +47,7 @@ so committing it to a repository does nothing.
 A cloud session reads no `~/.claude/settings.json` either, so for cloud sessions managed settings are the only durable route.
 For a single denial, `/permissions` has a **Recently denied** tab that can mark the call for retry.
 
-- **Do:** on the first classifier denial of an authorized action, tell the user which action was refused and suggest switching to manual mode to approve it, plus `autoMode` in `~/.claude/settings.json` or managed settings as the lasting fix.
-- **Do:** batch the blocked actions so a single stretch of manual mode clears them, and say when auto mode can be turned back on.
-- **Don't:** retry the refused action, rephrase it, or route it through another tool while still in auto mode.
-- **Don't:** leave the user to discover the mode switch, or offer only the `autoMode` configuration, which takes a settings change the user has to make.
+The Do/Don't pair for this rule lives in [`ask-for-manual-approval`](ask-for-manual-approval.md).
 
 (Directives from the user, 2026-09-28, in order:
 

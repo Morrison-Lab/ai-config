@@ -36,6 +36,8 @@ Do not treat the currently speaking agent as an implicit scope restriction.
 
 The same holds for projects: see [`global-by-default`](shared/workflow/global-by-default.md).
 
+On an auto-mode denial: [`ask-for-manual-approval`](shared/workflow/ask-for-manual-approval.md).
+
 ## Gate external repository communication on membership
 
 Before sending outward communication to a repository (PRs/MRs, issues, comments, reviews, discussions, notifications), positively verify that the user is a member of that specific repository.

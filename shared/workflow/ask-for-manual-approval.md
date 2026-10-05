@@ -6,10 +6,10 @@ Codex approval modes, Gemini, and Antigravity are covered by analogy, since none
 read "auto mode" as the equivalent unattended-approval mode there.
 
 When the classifier denies an action the task needs, the user can approve it directly as soon as they leave auto mode.
-Asking the user to switch is always available, so ask before improvising anything else.
+Asking the user to switch is available whenever the conditions under "When to ask" hold, so ask before improvising anything else.
 
 The denial is not a verdict on the action.
-The classifier cannot see what the user said hours ago, and a standing grant does not clear it (see [`use-existing-pr-branch`](use-existing-pr-branch.md) for the measured denial labels and the lasting `autoMode` fix).
+A standing grant does not clear a classifier denial: only a message that directly and specifically describes the exact action does (see [`use-existing-pr-branch`](use-existing-pr-branch.md) for the measured denial labels and the lasting `autoMode` fix).
 A manual-mode permission prompt costs the user one click.
 Every substitute costs more: a stalled turn, a workaround that defeats the guard (see [`claude-code-permissions`](../../memories/claude-code-permissions.md)), or a script handed to the user to run, which can fail for reasons the agent could have seen and takes longer than the approval would have.
 
@@ -37,7 +37,9 @@ For those, state the rule and ask the user to do the action themselves.
 ## What to say
 
 Name the refused command and the stated denial reason, batch every action that will need approval, and ask the user to switch out of auto mode for that stretch.
-Then continue with the approved actions, and do not retry the refused one in auto mode.
+Do not retry the refused action in auto mode.
+Until the user switches, continue with any work the denial does not block, and arm a wake to resume the denied step.
+Also name `autoMode` in `~/.claude/settings.json` or managed settings as the lasting fix.
 
 ## Say when it is over
 
@@ -46,5 +48,6 @@ Nothing else tells them the stretch has ended, and every later action keeps rais
 
 - **Do:** on a classifier denial of a needed, authorized action, name the refused command and its stated reason, and ask the user to switch out of auto mode so they can approve it.
 - **Do:** batch the actions that need approval into one manual-mode stretch, then say plainly, "you can switch back to auto mode now".
+- **Don't:** leave the user to discover the mode switch.
 - **Don't:** stall, retry, rephrase, or route around the denial, or hand the user a script to run in place of the approval.
 - **Don't:** ask to leave auto mode for a hard-prohibited category (credentials, financial actions, permanent deletion).

@@ -34,9 +34,9 @@ Those manuals must defer to this file for universal policy.
 Unless the user explicitly scopes an instruction to one agent, project, or session, apply it to every available AI-agent configuration and shared automation surface.
 Do not treat the currently speaking agent as an implicit scope restriction.
 
-On an auto-mode denial, ask the user to switch modes: [details](shared/workflow/ask-for-manual-approval.md).
-
 The same holds for projects: see [`global-by-default`](shared/workflow/global-by-default.md).
+
+On an auto-mode denial: [`ask-for-manual-approval`](shared/workflow/ask-for-manual-approval.md).
 
 ## Gate external repository communication on membership
 

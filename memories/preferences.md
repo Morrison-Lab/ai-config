@@ -993,11 +993,14 @@ it suppresses a mistake at the cost of suppressing the PR's own review and auto-
 
 ## Use the shared math-macros library for all LaTeX math
 
-Write math in lab Quarto/LaTeX manuscripts with the shared [`d-morrison/macros`](https://github.com/d-morrison/macros) submodule (vendored at `inst/analyses/macros`, included via `{{< include .../macros/macros.qmd >}}`), not ad-hoc raw LaTeX --- it gives every document the same polished, condensed notation from one versioned source.
+Write math in lab Quarto/LaTeX manuscripts with the shared [`Morrison-Lab/macros`](https://github.com/Morrison-Lab/macros) submodule (formerly `d-morrison/macros`; vendored at `inst/analyses/macros`, included via `{{< include .../macros/macros.qmd >}}`), not ad-hoc raw LaTeX --- it gives every document the same polished, condensed notation from one versioned source.
 This applies to LaTeX math in any project, repo, or format (Quarto, R Markdown, LaTeX, roxygen, slides, docs), not only manuscripts, and is mandatory for every equation, not a polish pass: use the semantic macro wherever one names the concept (an expectation is `\E`, not a raw `\mathbb{E}`).
-Keep the submodule up to date, and add new semantic macros to it (via a PR to `d-morrison/macros`, which carries a standing `mwc` grant) whenever a needed concept has no macro, rather than defining one-off commands inline.
+Keep the submodule up to date, and add new semantic macros to it (via a PR to `Morrison-Lab/macros`, which carries a standing `mwc` grant) whenever a needed concept has no macro, rather than defining one-off commands inline.
 (Directive from the user, 2026-10-02, on a manuscript equation that wrote out an expectation in raw LaTeX: "you're supposed to always use semantic macros wherever applicable, and add new semantic macros as needed";
 then "anytime we're writing latex math in any project/repo/etc, use the macros repo".)
+When the macros PR can't happen in the session, a repo-local macro file is the stopgap, and every macro added to one gets an issue in `Morrison-Lab/macros` in the same turn, listing its definition and meaning, so it reaches the shared library.
+(Directive from the user, 2026-10-05, after [Morrison-Lab/sds#54](https://github.com/Morrison-Lab/sds/pull/54) added 13 repo-local macros without one: "any time you create new macros like that, you should file an issue in macros".
+Filed afterwards as [Morrison-Lab/macros#103](https://github.com/Morrison-Lab/macros/issues/103).)
 `scripts/check-raw-math.py` lints for raw operators, and `hooks/warn-raw-math-notation.py` warns at write time.
 The `use-math-macros` (alias `macroize`) skill is the executable procedure.
 

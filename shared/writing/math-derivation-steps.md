@@ -485,9 +485,11 @@ The decision is the same question on every authoring surface this corpus touches
 - **Do:** make an equation display, and label it, when the prose returns to it or when it carries the step the argument is making.
 - **Do:** make an equation inline when it is a grammatical constituent of the sentence around it --- test this by reading the sentence aloud with the equation replaced by a plain noun phrase.
 - **Do:** give two equations meant to be compared the same form and scale as each other.
+- **Do:** display the formula of every definition and result (theorem, corollary, lemma) inside its own block, next to its prose statement.
 - **Don't:** let a fresh equation's form default to whatever markup the equation before it happened to use.
 - **Don't:** treat "it renders correctly" as evidence the display/inline choice was made deliberately --- a correct render is fully compatible with the form having never been decided at all.
 - **Don't:** compare two equations set at different scales and expect the reader to do the normalizing.
+- **Don't:** leave a definition's or result's formula inline in its sentence, where it is easy to miss and cannot be labeled.
 
 ### In review: display versus inline
 
@@ -497,6 +499,7 @@ Either the display/inline choice was wrong and the equation should be inline, or
 Converting a correctly-display equation to inline because it looks glued to its introducing sentence removes the display form the argument actually needed, and does not fix the missing break that caused the symptom.
 
 Flag the inverse too --- an equation the prose cites again later, written inline with no way to reference it.
+Flag a definition or result whose formula appears only inline, or only in its proof.
 And flag a pair of compared equations set at different scales, since that finding is invisible on the diff of either equation alone;
 it shows only once both are read together.
 

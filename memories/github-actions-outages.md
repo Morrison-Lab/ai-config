@@ -322,6 +322,36 @@ what makes the recovery re-measurable after the fact.
 The check-run-mirrors-job claim was confirmed directly on head `73a4b3b7`,
 where both jobs and both check runs report `success` under the same names.)
 
+### Rerun every run holding a cancelled check under a required name
+
+One head can carry two runs of the same workflow, one per event,
+with check runs of the same names in each.
+Rerunning one of them does not clear the other's cancelled check runs.
+Observed once: the `push` run's `validate` went green on rerun,
+yet the PR stayed `blocked` while the `pull_request` run's same-named check runs were still `cancelled`.
+The converse (a cancelled `push` check beside a green `pull_request` one) was not seen,
+so this does not settle whether any cancelled same-named check blocks or only the `pull_request` run's does.
+The rule below is safe under either reading.
+So after an outage, read the required contexts from `repos/<o>/<r>/rules/branches/<base>`
+(see [`gh-cli.md`](gh-cli.md)),
+then rerun **every** run that has a check run under one of those names
+whose conclusion is neither `success` nor `skipped`.
+
+A check that is not required leaves the PR `unstable` rather than `blocked` when it is cancelled.
+On 2026-10-05 one CodeQL default-setup run refused `rerun-failed-jobs` with 403 "This workflow run cannot be retried".
+Restarting default setup and a new commit were not tried, so either may be the way out.
+Do not push an empty commit to retrigger the cancelled CodeQL job, per [`github-actions.md`](github-actions.md)'s skipped-required-check section.
+
+- **Do:** list every check run on the head, and rerun each run holding a cancelled or failed check under a required name.
+- **Do:** treat a green same-named check run in another run as no evidence about the blocked one.
+- **Don't:** stop after rerunning one run because its `validate` went green.
+
+(2026-10-05, Morrison-Lab/ai-config#4302 at `5eea58d2`.
+Every `validate` job on the head, and CodeQL's `Analyze (actions)`, sat without a runner and was cancelled at about 20:40 UTC.
+The `push` run's rerun went green, but the PR stayed `blocked`
+until the `pull_request` run, whose same-named check runs were still `cancelled`, was rerun too.
+The PR then read `unstable`, because `Analyze (actions)` was still cancelled and its rerun returned the 403.)
+
 ## An API outage is not an Actions outage, and it presents as the opposite shape
 
 Everything above describes an **Actions** incident, whose signature the first

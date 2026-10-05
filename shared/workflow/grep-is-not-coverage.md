@@ -237,6 +237,22 @@ The same session then built and merged a narrower grant (ai-config#4085) without
 - **Don't:** ask the user to choose a design an existing directive already fixes.
   Show them the directive instead.
 
+### PSW is part of the corpus for prose and presentation rules
+
+(2026-10-05, Morrison-Lab/sds#72 and ai-config#4300.)
+[`visible-attributions.md`](../writing/visible-attributions.md) records the incident:
+a custom `.attribution` class for source credits, caught for contradicting PSW's Source callout.
+The lesson here is the search that never ran.
+Neither sds#72's `.attribution` class nor the `.small .text-muted` markup in the first commit of ai-config#4300 came from a search for an existing convention.
+PSW's ["Adapting another course's material"](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#adapting-another-courses-material) already covered the case.
+`shared/writing/citations.md` had linked that PSW section since ai-config#3995,
+but summarized it as a `::: notes` div, so a reader who stopped at the summary got the wrong format.
+
+- **Do:** search PSW (the published site or Morrison-Lab/psw) and `shared/writing/`, by topic and filename, before adding any prose or Quarto-presentation convention,
+  and follow a link to PSW rather than trusting the summary beside it.
+- **Don't:** coin a class or format for something PSW already prescribes;
+  follow PSW, or extend it and say which section the new rule extends.
+
 ### The same failure has a same-repo sibling: the wrong directory
 
 The section above routes between repos;

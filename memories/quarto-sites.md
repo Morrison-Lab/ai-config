@@ -204,9 +204,27 @@ and `display: block; overflow-x: auto` on `main table` below Bootstrap's `sm` br
 
 **Measure with MathJax rendered, or the widths are wrong.**
 Unrendered TeX is long plain text, so a page can read as overflowing when it is not, or the reverse.
-In a claude.ai cloud session `cdn.jsdelivr.net` is blocked by the network policy, so MathJax never loads.
-Install `mathjax@4` and `@mathjax/mathjax-newcm-font` from npm into the scratchpad, and have Playwright `route()` every `https://cdn.jsdelivr.net/npm/<pkg>@<ver>/<path>` request to the matching `node_modules/<pkg>/<path>`.
-Launch Chromium with `--ignore-certificate-errors` so the proxy's certificate does not block the web fonts, which also change widths.
+Whether `cdn.jsdelivr.net` is reachable depends on the environment's network policy:
+it was blocked in an earlier cloud session, and reachable through the agent proxy on 2026-10-05 (curl 200, and MathJax loaded in Chromium once the proxy CA was trusted).
+Check first with `curl -sS -o /dev/null -w '%{http_code}' https://cdn.jsdelivr.net/npm/mathjax@4/tex-chtml.js`.
+Anything but 200 means blocked:
+a policy block prints `000` with `CONNECT tunnel failed, response 403`, not a 403 status.
+Only when it is blocked, install `mathjax@4` and `@mathjax/mathjax-newcm-font` from npm into the scratchpad, and have Playwright `route()` every `https://cdn.jsdelivr.net/npm/<pkg>@<ver>/<path>` request to the matching `node_modules/<pkg>/<path>`.
+In a cloud (CCR) container, Chromium does not trust the agent proxy's CA by default:
+`/root/.ccr/README.md` says the browser NSS store is set up, but on 2026-10-05 `~/.pki/nssdb` held no certificates and remote assets failed with `net::ERR_CERT_AUTHORITY_INVALID`.
+Trusting the CA clears that error and lets the web fonts load (they also change widths).
+Do not disable certificate verification instead.
+To trust it:
+`apt-get install -y libnss3-tools`, then `certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n ccr-agent-proxy -i /root/.ccr/agent-proxy-ca.crt`
+(if the directory has no database files yet, run `certutil -d sql:$HOME/.pki/nssdb -N --empty-password` first).
+Separately, launch Playwright Chromium with `proxy: {server: process.env.HTTPS_PROXY, bypass: '127.0.0.1,localhost'}` so its traffic reaches the agent proxy at all.
+Keep serving the render over HTTP, as [`debugging.md`](debugging.md) says (`file://` blocks Quarto's `type=module` scripts),
+but set `PLAYWRIGHT_DISABLE_FORCED_CHROMIUM_PROXIED_LOOPBACK=1` in the environment:
+Playwright appends `<-loopback>` to Chromium's proxy bypass list,
+so without the variable even `http://127.0.0.1` requests go to the proxy, which answers 405.
+The `bypass` option alone does not override that.
+(Measured 2026-10-05: 405 without the variable.
+With it, 200, and MathJax and Quarto's scripts ran.)
 Then wait on `MathJax.startup.promise` before reading `document.documentElement.scrollWidth`.
 
 - **Do:** walk up from an overflowing leaf to the first ancestor wider than its parent.

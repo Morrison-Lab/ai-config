@@ -36,6 +36,19 @@ single idea:
   sum a constant, factor out a constant) before the substitution;
 - plugging in an inner derivative *and* pulling the resulting constant out
   of the sum;
+- "cancel" as one justification.
+  Cancelling $a$ in $a + (b - a)$
+  removes the parentheses,
+  reorders the terms,
+  groups the two that cancel,
+  replaces $a - a$ with $0$,
+  and drops the $+ 0$.
+  Cancelling $n$ in $n \cdot \frac{b}{n}$
+  rewrites $\frac{b}{n}$ as $b \cdot \frac{1}{n}$,
+  reorders the factors,
+  groups the two that cancel,
+  replaces $n \cdot \frac{1}{n}$ with $1$,
+  and drops the $1 \cdot$;
 - prose such as "setting this to zero and dividing by $-2n$ gives",
   which hides two operations in a sentence rather than a line.
 

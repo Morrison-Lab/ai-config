@@ -46,10 +46,7 @@ so committing it to a repository does nothing.
 A cloud session reads no `~/.claude/settings.json` either, so for cloud sessions managed settings are the only durable route.
 For a single denial, `/permissions` has a **Recently denied** tab that can mark the call for retry.
 
-- **Do:** on the first classifier denial of an authorized action, tell the user which action was refused and suggest switching to manual mode to approve it, plus `autoMode` in `~/.claude/settings.json` or managed settings as the lasting fix.
-- **Do:** batch the blocked actions so a single stretch of manual mode clears them, and say when auto mode can be turned back on.
-- **Don't:** retry the refused action, rephrase it, or route it through another tool while still in auto mode.
-- **Don't:** leave the user to discover the mode switch, or offer only the `autoMode` configuration, which takes a settings change the user has to make.
+The Do/Don't pair for this rule lives in [`ask-for-manual-approval`](ask-for-manual-approval.md).
 
 (Directives from the user, 2026-09-28, in order:
 

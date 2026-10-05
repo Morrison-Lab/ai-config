@@ -12,7 +12,8 @@ allowed-tools:
 # use-math-macros — condense manuscript math onto the shared macros submodule
 
 Rewrite the math expressions in a lab Quarto/LaTeX document so they use the
-shared [`d-morrison/macros`](https://github.com/d-morrison/macros) submodule
+shared [`Morrison-Lab/macros`](https://github.com/Morrison-Lab/macros) submodule
+(migrated from `d-morrison/macros`, whose URLs redirect to it)
 (`\Ep`, `\Prf`, `\paren`/`\sb`/`\cb`, `\expit`, `\logit`, `\Var`, `\hp`, `\S`,
 `\h`, …) instead of ad-hoc raw LaTeX. This gives every lab document the same
 polished, condensed notation, and centralizes the definitions in one versioned
@@ -33,11 +34,11 @@ place.
 It is typically vendored at `inst/analyses/macros` (URL in `.gitmodules`):
 
 ```bash
-grep -A2 'submodule.*macros' .gitmodules      # confirm path + d-morrison/macros URL
+grep -A2 'submodule.*macros' .gitmodules      # confirm path + macros URL (either owner name)
 git submodule update --init inst/analyses/macros   # checkout at recorded commit
 ```
 
-To bring it up to date with `d-morrison/macros`:
+To bring it up to date with `Morrison-Lab/macros`:
 
 ```bash
 git submodule update --remote inst/analyses/macros
@@ -185,18 +186,34 @@ math in `vignettes/`.
 
 ### 6. Add missing macros to the submodule when helpful
 
-If a needed concept has no macro, add it to `d-morrison/macros` via a PR to that
+If a needed concept has no macro, add it to `Morrison-Lab/macros` via a PR to that
 repo — do **not** define a one-off command inline in the manuscript:
 
 ```bash
 cd inst/analyses/macros
 git checkout -b add-<concept>-macro
-# edit macros.qmd, then push + open a PR to d-morrison/macros
+# edit macros.qmd, then push + open a PR to Morrison-Lab/macros
 ```
 
 Name the new macro for the concept it denotes, not for its typography, so it stays semantic.
 The macros repo carries a standing `mwc` grant, so merge the macro PR yourself once it is fully clean (see `STANDING_MERGE_GRANT_REPOS` in `hooks/no-unauthorized-merge.py`).
 Bump the submodule pointer in the manuscript repo once that macro PR merges.
+
+When the macros PR can't happen in this session,
+a repo-local macro file is an acceptable stopgap
+(such as `_subfiles/_macros-sds.qmd` in sds);
+an inline one-off command in a document still is not.
+Every macro added to a repo-local macro file
+gets an issue in [`Morrison-Lab/macros`](https://github.com/Morrison-Lab/macros) in the same turn,
+listing each new definition, what it means, and any existing macro it overlaps.
+In a remote session that has the repo attached under its old name,
+the issue tool accepted owner `d-morrison` and GitHub redirected the issue to the migrated repo
+(measured once, 2026-10-05: [Morrison-Lab/macros#103](https://github.com/Morrison-Lab/macros/issues/103)).
+
+- **Do:** file the `Morrison-Lab/macros` issue in the same turn
+  that you add a macro to any repo-local macro file.
+- **Don't:** leave a repo-local macro for a later upstreaming pass;
+  [Morrison-Lab/sds#54](https://github.com/Morrison-Lab/sds/pull/54) accumulated 13 of them before anyone filed the issue.
 
 ### 7. Verify the render and spellcheck, then ship
 

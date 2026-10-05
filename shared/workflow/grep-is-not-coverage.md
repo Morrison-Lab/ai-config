@@ -237,6 +237,20 @@ The same session then built and merged a narrower grant (ai-config#4085) without
 - **Don't:** ask the user to choose a design an existing directive already fixes.
   Show them the directive instead.
 
+### PSW is part of the corpus for prose and presentation rules
+
+(2026-10-05, Morrison-Lab/sds#72 and ai-config#4300.)
+Asked to make source attributions reader-visible, a session invented a custom `.attribution` div,
+then wrote it up as a lab-wide rule in `shared/writing/`.
+[PSW](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#adapting-another-courses-material) already prescribed a collapsed `.callout-note` titled "Source" for exactly that case,
+and the automated review of ai-config#4300 caught the contradiction.
+PSW lives in its own repository, so no search of ai-config's `shared/` could have found it;
+`shared/writing/citations.md` links it, but only for readers who open that file.
+
+- **Do:** search PSW (the published site or Morrison-Lab/psw) and `shared/writing/citations.md` before adding any prose or Quarto-presentation convention.
+- **Don't:** coin a class or format for something PSW already prescribes;
+  follow PSW, or extend it and say which section the new rule extends.
+
 ### The same failure has a same-repo sibling: the wrong directory
 
 The section above routes between repos;

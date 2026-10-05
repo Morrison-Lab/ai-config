@@ -1242,14 +1242,3 @@ Pattern 34's `\u0061` example and this one's `\u0077` are the same trick.
 - **Don't:** scan the entire `argv` list for global flags with a simple loop over `enumerate(argv)`.
 - **Don't:** hand-roll an option scanner when `shellcmd.git_subcommand` is already available in the repo.
 
-## Pattern 62: Inventing a Writing or Presentation Convention Without Searching PSW
-
-- **Mistake**: adding a prose or Quarto-presentation convention (a div class, a callout form, a citation layout) without first searching the lab's existing prose rules, so the new rule competes with one already written.
-- **Direction of failure**: a second, contradictory convention that readers and reviewers then have to reconcile.
-- **Example**: 2026-10-05, [Morrison-Lab/sds#72](https://github.com/Morrison-Lab/sds/pull/72) and [#4300](https://github.com/Morrison-Lab/ai-config/pull/4300).
-  The agent invented a custom `.attribution` div for source credits.
-  [PSW](https://morrison-lab.github.io/psw/chapters/citations-evidence.html) ("Adapting another course's material") already prescribed a collapsed `.callout-note` titled "Source", and the automated review of #4300 caught the contradiction.
-- **Canonical Rule**: [`shared/writing/citations.md`](../shared/writing/citations.md) (which points at PSW's citation rules) and [`grep-is-not-coverage.md`](../shared/workflow/grep-is-not-coverage.md).
-- **Fix**: before adding any such convention, search the published PSW site (or the Morrison-Lab/psw repo) and `shared/writing/` for an existing rule, then follow or extend it.
-- **Do:** search PSW and `shared/writing/citations.md` first, and cite the PSW section the new rule extends.
-- **Don't:** coin a new class or format for something PSW already prescribes, or treat an empty phrase grep as proof that no rule exists.

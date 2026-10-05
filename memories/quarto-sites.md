@@ -208,8 +208,12 @@ Whether `cdn.jsdelivr.net` is reachable depends on the environment's network pol
 it was blocked in an earlier cloud session, and reachable through the agent proxy on 2026-10-05 (curl 200, and MathJax loaded in Chromium once the proxy CA was trusted).
 Check first with `curl -sS -o /dev/null -w '%{http_code}' https://cdn.jsdelivr.net/npm/mathjax@4/tex-chtml.js`.
 Only when it is blocked, install `mathjax@4` and `@mathjax/mathjax-newcm-font` from npm into the scratchpad, and have Playwright `route()` every `https://cdn.jsdelivr.net/npm/<pkg>@<ver>/<path>` request to the matching `node_modules/<pkg>/<path>`.
-Trust the proxy's CA in the NSS store and launch Chromium with the proxy, so its certificate does not block the web fonts, which also change widths;
-load the local render by `file://` URL (see [`debugging.md`](debugging.md)'s "Cloud (CCR) containers" bullet for the `certutil` steps).
+In a cloud (CCR) container, Chromium does not trust the agent proxy's CA by default:
+`/root/.ccr/README.md` says the browser NSS store is set up, but on 2026-10-05 `~/.pki/nssdb` was empty and remote assets failed with `net::ERR_CERT_AUTHORITY_INVALID`.
+Trust the CA rather than disabling verification ---
+`apt-get install -y libnss3-tools`, then `certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n ccr-agent-proxy -i /root/.ccr/agent-proxy-ca.crt` ---
+and launch Playwright Chromium with `proxy: {server: process.env.HTTPS_PROXY}`, so the certificate does not block the web fonts, which also change widths.
+With that proxy setting Chromium sends even `http://127.0.0.1` requests to the proxy, which answers 405, so load the local render by `file://` URL.
 Then wait on `MathJax.startup.promise` before reading `document.documentElement.scrollWidth`.
 
 - **Do:** walk up from an overflowing leaf to the first ancestor wider than its parent.

@@ -64,6 +64,8 @@ list at the end of the document, say --- is a back-reference and fine.
 Prefer deleting the pointer over rewording it: in a sequential procedure
 the reader reaches the target anyway, so a step that states its own
 mechanism in brief needs no cross-reference at all.
+That preference covers a bare step number only; a crossref to a definition
+is kept, per [Keep the crossref](#keep-the-crossref).
 
 **A pointer aimed the *wrong* way is a different defect, and fixing one can
 leave you applying the wrong test to the rest.**
@@ -139,6 +141,29 @@ Two options, in order of preference:
    reference, but at least lets the reader jump to it rather than search.
    Use this only when reordering is genuinely worse, not as a default
    shortcut.
+
+### Keep the crossref
+
+Removing the link is not a third option.
+When the forward pointer is a crossref to a definition (`@def-x`) and the
+definition has to stay where it is, keep the crossref and signpost it,
+so the reader knows the term is coming and can jump to it.
+Deleting the link and leaving the bare term name is worse than the forward
+reference it replaces: the reader loses both the warning and the jump.
+
+The one exception is a passage that only motivates a definition that
+follows soon.
+There the motivation leads into the definition, so no pointer is needed.
+
+- **Do:** keep the crossref and add a signpost, e.g.
+  `one-versus-one, defined later in this section (@def-one-versus-one)`.
+- **Do:** leave out the pointer when the passage is motivation for the
+  definition that comes right after it.
+- **Don't:** fix a forward crossref by deleting the `@def-...` link and
+  leaving only the term's name.
+
+See [`forward-references.cases.md`](forward-references.cases.md),
+"Keep the crossref".
 
 ## Moving prose makes self-references stale
 

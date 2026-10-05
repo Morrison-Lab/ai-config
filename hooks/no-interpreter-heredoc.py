@@ -54,12 +54,17 @@ Known gaps, accepted rather than hidden:
     runs an interpreter is read as a heredoc opener (a false deny costs one
     retry with the override, per README's "a hook that misfires is worse than
     a missing one" -- the interpreter-on-the-line requirement is what keeps
-    this rare).
+    this rare). The denial can then name the wrong delimiter
+    (`python3 -c "print(1<<2)" - <<EOF` names `2`).
+  * Launchers and interpreters outside the lists in this file (`deno run -`,
+    `docker run -i img python -`, a `{ ... }` group's own options) pass, as
+    does a here-string (`python3 - <<< "..."`), which is not a heredoc body.
 
 ## Override
 
 `ALLOW_INTERPRETER_HEREDOC=1`, as a real leading env assignment on a command
-of the opener line (`ALLOW_INTERPRETER_HEREDOC=1 python3 - <<'EOF'`), or in
+of the opener line that runs the interpreter
+(`ALLOW_INTERPRETER_HEREDOC=1 python3 - <<'EOF'`), or in
 the hook's own environment. A mention of the string elsewhere in the command
 does not count, so a command that merely documents the override cannot
 disarm the guard. It exists for a case this guard did not foresee, and using
@@ -106,11 +111,16 @@ except Exception as _exc:  # broken install; fail open and say so
     _PARSER = None
 
 _INTERPRETER = re.compile(
-    r"^(python[0-9.]*|pypy[0-9.]*|py|node|nodejs|rscript|perl|ruby"
-    r"|bash|sh|zsh|dash|ksh)$")
+    r"^(python[0-9.]*|pypy[0-9.]*|py|node|nodejs|r|rscript|perl|ruby|php"
+    r"|pwsh|bash|sh|zsh|dash|ksh)$")
 _REDIRECT_ONLY = re.compile(r"^[0-9]*[<>]+&?$")
 _REDIRECT_WITH_TARGET = re.compile(r"^[0-9]*[<>]+&?[^<>]+$")
-_WRAPPERS = {"sudo", "env", "command", "exec", "time", "nohup", "nice"}
+_WRAPPERS = {"sudo", "env", "command", "exec", "time", "nohup", "nice",
+             "timeout", "uv", "poetry", "pipx", "run", "{", "!"}
+# options of a wrapper that take a VALUE as the next token (`sudo -u bob`)
+_WRAPPER_VALUE_OPTS = {"-u", "-g", "-C", "-U", "-h", "-p", "-r", "-t"}
+_DURATION = re.compile(r"^[0-9.]+[smhd]?$")
+_INFO_FLAGS = {"--version", "-V", "-h", "--help", "-version"}
 _ENV_ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 _SHELL_OPS = set("();|&")
 
@@ -121,13 +131,21 @@ def _segments(opener_line):
     lexer = shlex.shlex(text, posix=True, punctuation_chars=True)
     lexer.whitespace_split = True
     segments, current = [], []
-    for token in lexer:
-        if token and all(ch in _SHELL_OPS for ch in token):
-            if current:
-                segments.append(current)
-            current = []
-        else:
-            current.append(token)
+    try:
+        for token in lexer:
+            if token and all(ch in _SHELL_OPS for ch in token):
+                if current:
+                    segments.append(current)
+                current = []
+            else:
+                current.append(token)
+    except ValueError:
+        # Unbalanced quote (the opener regex is quote-blind, so a stray
+        # apostrophe earlier on the line lands here). Failing open would let
+        # the command through, so fall back to a quote-stripped split.
+        plain = text.replace("'", " ").replace('"', " ")
+        return [seg.split() for seg in re.split(r"[;&|()]+", plain)
+                if seg.split()]
     if current:
         segments.append(current)
     return segments
@@ -136,12 +154,19 @@ def _segments(opener_line):
 def _program(argv):
     """(program, args, override_present) with env assignments and wrappers
     skipped."""
-    i, override = 0, False
+    i, override, in_wrapper = 0, False, False
     while i < len(argv):
         token = argv[i]
         if _ENV_ASSIGN.match(token):
             override = override or token == f"{OVERRIDE}=1"
-        elif os.path.basename(token) not in _WRAPPERS:
+        elif os.path.basename(token) in _WRAPPERS:
+            in_wrapper = True
+        elif in_wrapper and token.startswith("-"):
+            if token in _WRAPPER_VALUE_OPTS:
+                i += 1
+        elif in_wrapper and _DURATION.match(token):
+            pass
+        else:
             break
         i += 1
     if i >= len(argv):
@@ -165,28 +190,34 @@ def _positionals(args):
         elif _REDIRECT_WITH_TARGET.match(arg):
             i += 1
         else:
-            if not arg.startswith("-"):
+            if arg == "-" or not arg.startswith("-"):
                 out.append(arg)
             i += 1
     return out
 
 
 def _reads_script_from_stdin(args):
-    return "-" in args or not _positionals(args)
+    if any(a in _INFO_FLAGS for a in args):
+        return False  # `python3 --version <<EOF` runs no script at all
+    positionals = _positionals(args)
+    if not positionals:
+        return True
+    # the stdin marker only counts as the SCRIPT when it comes first;
+    # `python3 a.py -` passes `-` to a.py as data
+    return positionals[0] == "-" or positionals[0] == "/dev/stdin"
 
 
 def interpreter_feed(opener_line):
     """(interpreter_name, override_present) when a command on OPENER_LINE
     reads its script from stdin, else None."""
-    any_override = False
-    hit = None
     for argv in _segments(opener_line):
         name, args, override = _program(argv)
-        any_override = any_override or override
-        if (hit is None and name and _INTERPRETER.match(name)
+        if (name and _INTERPRETER.match(name)
                 and _reads_script_from_stdin(args)):
-            hit = name
-    return None if hit is None else (hit, any_override)
+            # the override counts only on the interpreter's OWN command, not
+            # on an unrelated one earlier on the line
+            return name, override
+    return None
 
 
 def find_offense(command):

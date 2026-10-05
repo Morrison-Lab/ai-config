@@ -77,6 +77,23 @@ SHOULD_DENY = [
     ("D14", "python3 " + heredoc("EOF", LATEX).replace(
         "<<'EOF'", "<<'EOF' 2>&1", 1),
      "`2>&1` is not a script path either", {}),
+    ("D15", "ALLOW_INTERPRETER_HEREDOC=1 true; python3 - "
+     + heredoc("EOF", LATEX),
+     "the override on an UNRELATED command of the line does not cover the "
+     "interpreter's", {}),
+    ("D16", "echo it's; python3 - " + heredoc("EOF", LATEX),
+     "an unbalanced quote earlier on the opener line must not make the "
+     "guard fail open", {}),
+    ("D17", "uv run python - " + heredoc("EOF", LATEX),
+     "a launcher in front of the interpreter", {}),
+    ("D18", "sudo -u bob python3 - " + heredoc("EOF", LATEX),
+     "a wrapper option that takes a value", {}),
+    ("D19", "timeout 5 python3 - " + heredoc("EOF", LATEX),
+     "timeout with a duration", {}),
+    ("D20", "python3 /dev/stdin " + heredoc("EOF", LATEX),
+     "/dev/stdin is the stdin script spelled as a path", {}),
+    ("D21", "R --no-save " + heredoc("EOF", LATEX),
+     "R reading its script from stdin", {}),
 ]
 
 SHOULD_ALLOW = [
@@ -102,6 +119,10 @@ SHOULD_ALLOW = [
      {"ALLOW_INTERPRETER_HEREDOC": "1"}),
     ("A9", "cat <<< " + chr(34) + "a" + B * 2 + "b" + chr(34),
      "a here-string, no heredoc", {}),
+    ("A11", "python3 a.py - " + heredoc("EOF", "a" + B * 2 + "b"),
+     "`-` after a script path is data passed to the script", {}),
+    ("A12", "python3 --version " + heredoc("EOF", "a" + B * 2 + "b"),
+     "an informational flag runs no script", {}),
     ("A10", "git commit -F - " + heredoc("EOF", "msg " + B * 2 + " " + T + "x" + T),
      "a heredoc fed to git", {}),
 ]
@@ -202,10 +223,38 @@ MUTATIONS = {
         {"D13", "D14"},
     ),
     "M3_positional_script_file": (
-        "a positional script file means the heredoc is data",
-        [('    return "-" in args or not _positionals(args)',
+        "a script path (or `-` after one) means the heredoc is data",
+        [('    return positionals[0] == "-" or positionals[0] == "/dev/stdin"',
           '    return True')],
-        {"A5", "A6"},
+        {"A5", "A6", "A11"},
+    ),
+    "M9_info_flags": (
+        "--version and friends run no script",
+        [("    if any(a in _INFO_FLAGS for a in args):",
+          "    if False:")],
+        {"A12"},
+    ),
+    "M10_dev_stdin": (
+        "/dev/stdin is the script on stdin",
+        [(' or positionals[0] == "/dev/stdin"', "")],
+        {"D20"},
+    ),
+    "M11_launchers": (
+        "timeout/uv/poetry/pipx/run are wrappers",
+        [('"timeout", "uv", "poetry", "pipx", "run", "{", "!"}',
+          '"{", "!"}')],
+        {"D17", "D19"},
+    ),
+    "M12_wrapper_value_options": (
+        "`sudo -u bob` consumes its value",
+        [('_WRAPPER_VALUE_OPTS = {"-u", "-g", "-C", "-U", "-h", "-p", "-r", '
+          '"-t"}', "_WRAPPER_VALUE_OPTS = set()")],
+        {"D18"},
+    ),
+    "M13_unbalanced_quote_fallback": (
+        "a ValueError from shlex falls back instead of failing open",
+        [("    except ValueError:", "    except ZeroDivisionError:")],
+        {"D16"},
     ),
     "M4_leading_assignment_override": (
         "a leading ALLOW_INTERPRETER_HEREDOC=1 assignment disarms the guard",
@@ -221,7 +270,7 @@ MUTATIONS = {
     "M6_interpreter_filter": (
         "only an interpreter's heredoc is refused",
         [("_INTERPRETER.match(name)", "True")],
-        {"A3", "A10"},
+        {"A3", "D15"},
     ),
     "M7_pipe_is_a_command_boundary": (
         "`|` separates commands on the opener line, so `cat <<EOF | python3 -` "

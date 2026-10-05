@@ -606,10 +606,6 @@ More generally, when an incident makes you stop doing something you decided to d
 never just change the behaviour.
 Detail, rationale, and cases: [`shared/workflow/assign-subagent-worktrees.md`](shared/workflow/assign-subagent-worktrees.md).
 
-## Ask the user to leave auto mode when an action needs their approval
-
-When the classifier denies a needed action, ask the user to switch modes, then say when to switch back: [`ask-for-manual-approval`](shared/workflow/ask-for-manual-approval.md).
-
 ## Non-destructive actions
 
 Standing grant, recorded universally in `AGENTS.md` ("Default to action without asking"): proceed with non-destructive steps without asking, and ask only for destructive, ambiguous, high-impact, or genuinely blocking choices.

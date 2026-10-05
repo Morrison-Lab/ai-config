@@ -36,20 +36,21 @@ single idea:
   sum a constant, factor out a constant) before the substitution;
 - plugging in an inner derivative *and* pulling the resulting constant out
   of the sum;
-- "cancel" as one justification.
-  Cancelling $a$ in $a + (b - a)$
-  removes the parentheses,
-  reorders the terms,
-  groups the two that cancel,
-  replaces $a - a$ with $0$,
-  and drops the $+ 0$.
-  Cancelling $n$ in $n \cdot \frac{b}{n}$
-  rewrites $\frac{b}{n}$ as $b \cdot \frac{1}{n}$,
-  removes the parentheses,
-  reorders the factors,
-  groups the two that cancel,
-  replaces $n \cdot \frac{1}{n}$ with $1$,
-  and drops the $1 \cdot$;
+- "cancel" as one justification:
+  cancelling $a$ in $a + (b - a)$
+  removes the parentheses ($a + b - a$),
+  reorders the terms ($b + a - a$),
+  groups the two that cancel ($b + (a - a)$),
+  replaces $a - a$ with $0$ ($b + 0$),
+  and drops the $+ 0$;
+- "cancel" for factors:
+  cancelling $n$ in $n \cdot \frac{b}{n}$
+  rewrites the division as multiplication by a reciprocal ($n \cdot (b \cdot \frac{1}{n})$),
+  removes the parentheses ($n \cdot b \cdot \frac{1}{n}$),
+  reorders the factors ($b \cdot n \cdot \frac{1}{n}$),
+  groups the two that cancel ($b \cdot (n \cdot \frac{1}{n})$),
+  replaces $n \cdot \frac{1}{n}$ with $1$ ($b \cdot 1$),
+  and drops the $\cdot 1$;
 - prose such as "setting this to zero and dividing by $-2n$ gives",
   which hides two operations in a sentence rather than a line.
 

@@ -207,10 +207,14 @@ Unrendered TeX is long plain text, so a page can read as overflowing when it is 
 Whether `cdn.jsdelivr.net` is reachable depends on the environment's network policy:
 it was blocked in an earlier cloud session, and reachable through the agent proxy on 2026-10-05 (curl 200, and MathJax loaded in Chromium once the proxy CA was trusted).
 Check first with `curl -sS -o /dev/null -w '%{http_code}' https://cdn.jsdelivr.net/npm/mathjax@4/tex-chtml.js`.
+Anything but 200 means blocked:
+a policy block prints `000` with `CONNECT tunnel failed, response 403`, not a 403 status.
 Only when it is blocked, install `mathjax@4` and `@mathjax/mathjax-newcm-font` from npm into the scratchpad, and have Playwright `route()` every `https://cdn.jsdelivr.net/npm/<pkg>@<ver>/<path>` request to the matching `node_modules/<pkg>/<path>`.
 In a cloud (CCR) container, Chromium does not trust the agent proxy's CA by default:
 `/root/.ccr/README.md` says the browser NSS store is set up, but on 2026-10-05 `~/.pki/nssdb` held no certificates and remote assets failed with `net::ERR_CERT_AUTHORITY_INVALID`.
-Trust the CA rather than disabling verification, which is what clears that error and lets the web fonts load (they also change widths):
+Trusting the CA clears that error and lets the web fonts load (they also change widths).
+Do not disable certificate verification instead.
+To trust it:
 `apt-get install -y libnss3-tools`, then `certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n ccr-agent-proxy -i /root/.ccr/agent-proxy-ca.crt`
 (if the directory has no database files yet, run `certutil -d sql:$HOME/.pki/nssdb -N --empty-password` first).
 Separately, launch Playwright Chromium with `proxy: {server: process.env.HTTPS_PROXY, bypass: '127.0.0.1,localhost'}` so its traffic reaches the agent proxy at all.

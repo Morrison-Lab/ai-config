@@ -45,6 +45,7 @@ single idea:
   and drops the $+ 0$.
   Cancelling $n$ in $n \cdot \frac{b}{n}$
   rewrites $\frac{b}{n}$ as $b \cdot \frac{1}{n}$,
+  removes the parentheses,
   reorders the factors,
   groups the two that cancel,
   replaces $n \cdot \frac{1}{n}$ with $1$,

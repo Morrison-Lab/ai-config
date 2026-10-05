@@ -81,6 +81,16 @@ A `QUESTION`, `OFFER`, or `BLOCKER` box is by definition something the user has 
 The contradiction is invisible from the inside when both land in one message, because posing the question and declaring the stop feel like separate acts performed at different moments.
 They are not separate to the reader, who gets a request for input and a claim that nothing is pending in the same breath.
 
+**The box is not what makes it a question.**
+An unboxed offer or question in prose --- "I can file an issue on that if you want", "should I also update X?" --- is just as open, and it is easier to miss because no marker draws the eye to it.
+Measured 2026-10-05 in a Morrison-Lab/lbt session: a reply ended "I can file an issue ... if you want" and then "The session is done", and the user answered that when there are open questions for them, the session is not done.
+It should have been boxed in the first place: [`tag-chat-output`](../writing/tag-chat-output.md) puts every question and offer to the user in a `===` box, or at least sets an inline one apart in bold, and a boxed offer next to "The session is done" is hard to miss.
+So box questions and offers when writing them, and before declaring a clean stop, scan the reply, and any earlier reply still unanswered, for a question, offer, or choice put to the user that slipped through unboxed.
+
+- **Do:** treat any open question to the user as making the session not done, and list it as the remaining step.
+- **Do:** box every question and offer to the user when writing it, per `tag-chat-output`.
+- **Don't:** count only boxed `QUESTION`/`OFFER` markers as open questions.
+
 **`git log origin/<default-branch>..HEAD` plus `git status --short` decides whether the session produced anything durable.**
 An empty range and a clean tree mean this branch carries nothing.
 That is not the same as the session having produced nothing: one that merged its own PR and then ran [`post-merge`](../../skills/post-merge/SKILL.md)'s cleanup leaves an identical reading while having finished the most a session can finish.

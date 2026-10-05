@@ -699,4 +699,4 @@ Put the justification in the prose around the equation, or in a plain-text `\tex
 - **Do:** cite a definition or exercise in the sentence that introduces or follows the derivation.
 - **Don't:** put `@def-...`, `@thm-...` or `@exr-...` inside `\text{}` in math and trust it to link.
 
-(Morrison-Lab/sds#54, 2026-10-05: caught on the rendered preview, not by the build.)
+([`Morrison-Lab/sds#54`](https://github.com/Morrison-Lab/sds/pull/54), 2026-10-05: caught on the rendered preview, not by the build.)

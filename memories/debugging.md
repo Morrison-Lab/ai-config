@@ -47,6 +47,14 @@ lines had accumulated — unrelated to fence state, but found in the same cycle.
   scripts (e.g. Quarto's `quarto-nav.js` / `quarto.js`) via CORS, so headroom/nav
   behavior won't run. Test viewport-specific behavior with `newPage({ viewport })`,
   and assert computed styles / `offsetHeight` (not just DOM presence).
+- **Cloud (CCR) containers: Chromium does not trust the agent proxy's CA by default, and a proxy setting changes how local pages load.**
+  `/root/.ccr/README.md` says the browser NSS store is set up, but on 2026-10-05 `~/.pki/nssdb` was empty and pages failed with `net::ERR_CERT_AUTHORITY_INVALID` (MathJax from `cdn.jsdelivr.net` never loaded in screenshots).
+  Trust the CA rather than disabling verification:
+  `apt-get install -y libnss3-tools`, then `certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n ccr-agent-proxy -i /root/.ccr/agent-proxy-ca.crt`,
+  and launch Playwright Chromium with `proxy: {server: process.env.HTTPS_PROXY}`.
+  With that proxy setting, Chromium sends even `http://127.0.0.1` requests to the proxy, which answers 405, so load local renders by `file://` URL (this overrides the HTTP-server advice below, at the cost of the `type=module` CORS limit).
+  - **Do:** import the proxy CA into the NSS store and verify with a screenshot that remote assets (MathJax, fonts) loaded.
+  - **Don't:** reach for `--ignore-certificate-errors`, or trust `/root/.ccr/README.md`'s claim that the store is already set up without checking `certutil -d sql:$HOME/.pki/nssdb -L`.
 - **Quarto dark mode** (the `theme: {light: cosmo, dark: darkly}` pair in
   `_quarto.yml` that adds a navbar toggle): to force/screenshot the dark theme,
   set `localStorage["quarto-color-scheme"] = "alternate"` via `addInitScript`

@@ -206,7 +206,8 @@ and `display: block; overflow-x: auto` on `main table` below Bootstrap's `sm` br
 Unrendered TeX is long plain text, so a page can read as overflowing when it is not, or the reverse.
 In a claude.ai cloud session `cdn.jsdelivr.net` is blocked by the network policy, so MathJax never loads.
 Install `mathjax@4` and `@mathjax/mathjax-newcm-font` from npm into the scratchpad, and have Playwright `route()` every `https://cdn.jsdelivr.net/npm/<pkg>@<ver>/<path>` request to the matching `node_modules/<pkg>/<path>`.
-Launch Chromium with `--ignore-certificate-errors` so the proxy's certificate does not block the web fonts, which also change widths.
+Trust the proxy's CA in the NSS store and launch Chromium with the proxy, so its certificate does not block the web fonts, which also change widths;
+load the local render by `file://` URL (see [`debugging.md`](debugging.md)'s "Cloud (CCR) containers" bullet for the `certutil` steps).
 Then wait on `MathJax.startup.promise` before reading `document.documentElement.scrollWidth`.
 
 - **Do:** walk up from an overflowing leaf to the first ancestor wider than its parent.

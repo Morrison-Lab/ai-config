@@ -614,7 +614,8 @@ When a permission classifier or approval mode (Claude Code auto mode, and by ana
 When the approved actions are done, tell the user they can switch back.
 Hard-prohibited categories (credentials, financial actions, permanent deletion) are excluded.
 
-- **Do:** name the refused command and ask the user to switch out of auto mode; then say "you can switch back to auto mode now".
+- **Do:** name the refused command and ask the user to switch out of auto mode;
+  then say "you can switch back to auto mode now".
 - **Don't:** stall, work around the denial, or hand the user a script to run in place of the approval.
 
 ## Non-destructive actions

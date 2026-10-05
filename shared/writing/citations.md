@@ -810,6 +810,8 @@ Three citation rules live canonically in PSW's Citations and evidence chapter:
 - [Put the content first](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#put-the-content-first):
   headings name the topic, and a quotation is followed by a bare citation;
 - [Adapting another course's material](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#adapting-another-courses-material):
-  write our own version and credit it in a `::: notes` div.
+  write our own version and credit it in a collapsed `.callout-note` titled "Source"
+  (a `::: notes` div only on a site whose stylesheet sets `.notes` apart);
+  [`visible-attributions`](visible-attributions.md) covers where the credit goes in included fragments.
 
 Link those sections rather than restating them here.

@@ -1175,7 +1175,7 @@ self-review confirms the claim, which was never the defect.
 
 [`shared/writing/visible-attributions.md`](shared/writing/visible-attributions.md)
 
-Credit every source where readers of the rendered document can see it, in a typed `attribution` div next to the content it credits, never only in an HTML comment.
+Credit every source where readers of the rendered document can see it, in PSW's collapsed "Source" callout at the end of the item it credits, never only in an HTML comment.
 
 ## Check the renders, not just the source
 

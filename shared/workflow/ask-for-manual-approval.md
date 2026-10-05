@@ -40,7 +40,7 @@ If the user has not authorized the action, do not ask to switch modes.
 Ask the user whether to do it at all, and proceed only on a yes.
 
 Approval never makes a hard-prohibited category acceptable.
-The list is not exhaustive: credentials, financial actions, and permanent deletion are examples, and the agent's own safety rules hold the full list.
+The list is not exhaustive: credentials, financial transfers, permanent deletion, and CAPTCHAs are examples, and each agent's own safety rules hold the full list.
 For those, state the rule and ask the user to do the action themselves.
 
 ## What to say
@@ -48,6 +48,7 @@ For those, state the rule and ask the user to do the action themselves.
 Name the refused command and the stated denial reason, batch every action that will need approval, and ask the user to switch out of auto mode for that stretch.
 Name `autoMode` in `~/.claude/settings.json` or managed settings as the lasting fix.
 Until the user switches, continue with any work the denial does not block, and arm a wake to resume the denied step.
+If the user is away (an `away` session, or a CI or `@claude` run), nobody can switch modes: record the denied action as a pending decision, do not poll for the switch, and continue other work.
 
 ## Say when it is over
 
@@ -59,5 +60,6 @@ Nothing else tells them the stretch has ended, and every later action keeps rais
 - **Do:** on a classifier denial of a needed, authorized action, name the refused command and its stated reason, and ask the user to switch out of auto mode so they can approve it.
 - **Do:** batch the actions that need approval into one manual-mode stretch, then say plainly, "you can switch back to auto mode now".
 - **Don't:** end the turn after a denial without naming the mode switch, or offer only the `autoMode` configuration, which takes a settings change the user has to make.
-- **Don't:** stall, retry more than once, rephrase, or route around the denial, or hand the user a script to run in place of the approval.
+- **Don't:** retry a denied command more than once, or rephrase it.
+- **Don't:** route around a denial, or hand the user a script to run in place of the approval.
 - **Don't:** ask to leave auto mode for a hard-prohibited category, or for an action the user has not authorized.

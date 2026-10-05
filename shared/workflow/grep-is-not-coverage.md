@@ -240,14 +240,16 @@ The same session then built and merged a narrower grant (ai-config#4085) without
 ### PSW is part of the corpus for prose and presentation rules
 
 (2026-10-05, Morrison-Lab/sds#72 and ai-config#4300.)
-Asked to make source attributions reader-visible, a session invented a custom `.attribution` div,
-then wrote it up as a lab-wide rule in `shared/writing/`.
+Asked to make source attributions reader-visible, a session coined a custom `.attribution` div class in sds#72,
+and the first commit of ai-config#4300 wrote a lab-wide rule prescribing a different markup, `.small .text-muted`, in `shared/writing/`.
+Neither step searched for an existing convention.
 [PSW](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#adapting-another-courses-material) already prescribed a collapsed `.callout-note` titled "Source" for exactly that case,
 and the automated review of ai-config#4300 caught the contradiction.
-PSW lives in its own repository, so no search of ai-config's `shared/` could have found it;
-`shared/writing/citations.md` links it, but only for readers who open that file.
+`shared/writing/citations.md` had linked that PSW section since ai-config#3995,
+but summarized it as a `::: notes` div, so a reader who stopped at the summary got the wrong format.
 
-- **Do:** search PSW (the published site or Morrison-Lab/psw) and `shared/writing/citations.md` before adding any prose or Quarto-presentation convention.
+- **Do:** search PSW (the published site or Morrison-Lab/psw), `shared/writing/citations.md` and `shared/writing/visible-attributions.md` before adding any prose or Quarto-presentation convention,
+  and follow a link to PSW rather than trusting the summary beside it.
 - **Don't:** coin a class or format for something PSW already prescribes;
   follow PSW, or extend it and say which section the new rule extends.
 

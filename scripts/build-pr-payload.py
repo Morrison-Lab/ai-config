@@ -373,6 +373,7 @@ def fetch_payload(owner_repo: str, pr_number: int, token: str) -> Dict[str, Any]
         f"{base}/commits/{pr_raw['head']['sha']}/check-runs", token, envelope="check_runs"
     )
     actions_runs = fetch_actions_runs(owner_repo, run_ids_from_check_runs(check_runs_raw), token)
+    review_threads = fetch_review_threads(owner_repo, pr_number, token)
     try:
         review_comments_raw = rest_get(f"{base}/pulls/{pr_number}/comments", token)
     except Exception as exc:  # noqa: BLE001

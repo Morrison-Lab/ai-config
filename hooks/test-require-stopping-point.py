@@ -575,6 +575,70 @@ if not streamed_chunks_transcript(missing_chunks):
 else:
     print("PASS: streamed chunks missing declaration warns (#2500)")
 
+# Test 5: Delta fragments where second chunk starts with first chunk text (Copilot review finding)
+asterisk_delta_chunks = [
+    "*",
+    "*Stopping Point**: Clean stopping point reached --- session done.",
+]
+if streamed_chunks_transcript(asterisk_delta_chunks):
+    print("FAIL: assistant delta fragments starting with first chunk text lost asterisk")
+    failed += 1
+else:
+    print("PASS: assistant delta fragments starting with first chunk text preserve all text")
+
+asterisk_model_chunks = [
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "id": "model_star",
+        "content": "*",
+    }),
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "id": "model_star",
+        "content": "*Stopping Point**: Clean stopping point reached --- session done.",
+    }),
+]
+if run("", raw_lines=asterisk_model_chunks):
+    print("FAIL: MODEL delta fragments starting with first chunk text lost asterisk")
+    failed += 1
+else:
+    print("PASS: MODEL delta fragments starting with first chunk text preserve all text")
+
+# Test 6: User-shaped isMeta harness event between same-ID fragments does not reset accumulated reply (Copilot review finding)
+harness_interleaved_chunks = [
+    json.dumps({
+        "type": "user",
+        "message": {"content": "do task"},
+    }),
+    json.dumps({
+        "type": "assistant",
+        "message": {
+            "id": "msg_interleaved_1",
+            "content": [{"type": "text", "text": "**Stopping Point**: Clean stopping point reached --- "}],
+        },
+    }),
+    json.dumps({
+        "type": "user",
+        "isMeta": True,
+        "content": "[SYSTEM NOTIFICATION: Hook execution completed]",
+    }),
+    json.dumps({
+        "type": "assistant",
+        "message": {
+            "id": "msg_interleaved_1",
+            "content": [{"type": "text", "text": "session done; UMS executed; no follow-up items pending."}],
+        },
+    }),
+]
+if run("", raw_lines=harness_interleaved_chunks):
+    print("FAIL: harness isMeta event interleaved between same-ID fragments reset reply and caused false warning")
+    failed += 1
+else:
+    print("PASS: harness isMeta event interleaved between same-ID fragments preserves reply")
+
+
 # Conversational question-answering final replies (ai-config#4308)
 qa_reply_without_decl = (
     "The branch was already auto-deleted on merge.\n"

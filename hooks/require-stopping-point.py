@@ -127,15 +127,13 @@ def last_text(path: str) -> str:
                     continue
                 etype = event.get("type") or event.get("role") or ""
                 source = event.get("source") or ""
-                if is_skill_load_meta(event):
-                    # A loaded skill body arrives as a `type: "user"` entry
-                    # with `isMeta: true` and a `sourceToolUseID`. It was
-                    # never a real prompt, so it must not reset the
-                    # accumulated reply the way a genuine new user turn does
-                    # (ai-config#3860). `isMeta` alone is not this test: a
-                    # scheduled check-in continuation also carries `isMeta:
-                    # true` but no `sourceToolUseID`, and it IS a genuine
-                    # new turn -- see scripts/lib/transcript_meta.py.
+                if is_skill_load_meta(event) or is_harness_meta(event):
+                    # A loaded skill body or harness metadata (system notification,
+                    # hook feedback) carries `isMeta: true`. It was never a real
+                    # user prompt, so it must not reset the accumulated reply the way
+                    # a genuine new user turn does (ai-config#3860, ai-config#4308).
+                    # A scheduled check-in continuation (promptSource: "sdk") is a
+                    # genuine new turn and is not matched by is_harness_meta.
                     continue
                 if (
                     etype == "user"
@@ -209,18 +207,17 @@ def last_text(path: str) -> str:
                         consecutive_assistant = False
                         curr_msg_id = None
                     elif text:
-                        is_same_message = (
-                            (msg_id and curr_msg_id and msg_id == curr_msg_id)
-                            or (
-                                consecutive_assistant
-                                and not msg_id
-                                and not curr_msg_id
-                                and last_text_val
-                                and text.startswith(last_text_val)
-                            )
+                        is_same_message = bool(
+                            msg_id and curr_msg_id and msg_id == curr_msg_id
                         )
                         if is_same_message:
-                            if last_text_val and text.startswith(last_text_val):
+                            is_cumulative = bool(
+                                event.get("cumulative")
+                                or (event.get("message") or {}).get("cumulative")
+                                or event.get("update_mode") == "cumulative"
+                                or event.get("mode") in {"replace", "cumulative"}
+                            )
+                            if is_cumulative:
                                 last_text_val = text
                             else:
                                 last_text_val += text
@@ -255,18 +252,17 @@ def last_text(path: str) -> str:
                         consecutive_assistant = False
                         curr_msg_id = None
                     elif text:
-                        is_same_message = (
-                            (msg_id and curr_msg_id and msg_id == curr_msg_id)
-                            or (
-                                consecutive_assistant
-                                and not msg_id
-                                and not curr_msg_id
-                                and last_text_val
-                                and text.startswith(last_text_val)
-                            )
+                        is_same_message = bool(
+                            msg_id and curr_msg_id and msg_id == curr_msg_id
                         )
                         if is_same_message:
-                            if last_text_val and text.startswith(last_text_val):
+                            is_cumulative = bool(
+                                event.get("cumulative")
+                                or (event.get("message") or {}).get("cumulative")
+                                or event.get("update_mode") == "cumulative"
+                                or event.get("mode") in {"replace", "cumulative"}
+                            )
+                            if is_cumulative:
                                 last_text_val = text
                             else:
                                 last_text_val += text

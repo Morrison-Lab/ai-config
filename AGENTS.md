@@ -429,7 +429,8 @@ See [`persistent-pr-loop`](shared/workflow/persistent-pr-loop.md).
 
 - **Do:** arm a persistent loop in the turn you open, push to, or take over a PR.
 - **Do:** actively query current-head CI and review state with `gh`/`glab` after every push until terminal.
-- **Do:** in the Claude desktop app, turn on the PR's Auto-fix switch; it replaces the polling loop there.
+- **Do:** in the Claude desktop app, turn on the PR's Auto-fix switch;
+  it replaces the polling loop there.
 - **Don't:** treat a webhook subscription or one-shot status poll as watching.
 
 ## Monitor scoped open PRs and MRs

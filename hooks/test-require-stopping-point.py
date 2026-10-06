@@ -17,7 +17,17 @@ _spec.loader.exec_module(subject)
 
 
 def make_test_env(tmpdir, extra_env=None):
-    env = dict(os.environ, TMPDIR=tmpdir, TEMP=tmpdir, TMP=tmpdir, GITHUB_ACTIONS="", CI="")
+    env = dict(
+        os.environ,
+        TMPDIR=tmpdir,
+        TEMP=tmpdir,
+        TMP=tmpdir,
+        GITHUB_ACTIONS="",
+        CI="",
+        NON_INTERACTIVE="",
+        CLAUDE_NON_INTERACTIVE="",
+        HARNESS_MODE="",
+    )
     if extra_env:
         env.update(extra_env)
     return env
@@ -892,9 +902,16 @@ adapter_payload_t1 = {
     "session_id": "sess_adapter_1",
     "transcript_path": adapter_tscript_t1,
 }
+
+adapter_tscript_t1_retry = os.path.join(adapter_sess_dir, "t1_retry.jsonl")
+with open(adapter_tscript_t1_retry, "w", encoding="utf-8") as f:
+    f.write(json.dumps({"type": "user", "message": {"content": "turn 1"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"id": "msg_a1", "content": "identical undeclared reply"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"id": "msg_a1_retry", "content": "identical undeclared reply"}}) + "\n")
+
 adapter_payload_t1_retry = {
     "session_id": "sess_adapter_1",
-    "transcript_path": adapter_tscript_t1,
+    "transcript_path": adapter_tscript_t1_retry,
 }
 
 adapter_tscript_t2 = os.path.join(adapter_sess_dir, "t2.jsonl")
@@ -916,10 +933,10 @@ else:
     print("PASS: adapter-shaped turn 1 warns")
 
 if run_direct_payload(adapter_payload_t1_retry, tmpdir=adapter_sess_dir):
-    print("FAIL: adapter-shaped turn 1 retry was not deduplicated")
+    print("FAIL: adapter-shaped turn 1 retry with appended assistant message was not deduplicated")
     failed += 1
 else:
-    print("PASS: adapter-shaped turn 1 retry is deduplicated")
+    print("PASS: adapter-shaped turn 1 retry with appended assistant message is deduplicated")
 
 if not run_direct_payload(adapter_payload_t2, tmpdir=adapter_sess_dir):
     print("FAIL: adapter-shaped turn 2 was silently suppressed by turn 1 sentinel")
@@ -938,9 +955,16 @@ idless_payload_t1 = {
     "session_id": "sess_idless_1",
     "transcript_path": idless_tscript_t1,
 }
+
+idless_tscript_t1_retry = os.path.join(idless_sess_dir, "t1_retry.jsonl")
+with open(idless_tscript_t1_retry, "w", encoding="utf-8") as f:
+    f.write(json.dumps({"type": "user", "message": {"content": "turn 1"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"content": "identical undeclared reply"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"content": "identical undeclared reply"}}) + "\n")
+
 idless_payload_t1_retry = {
     "session_id": "sess_idless_1",
-    "transcript_path": idless_tscript_t1,
+    "transcript_path": idless_tscript_t1_retry,
 }
 
 idless_tscript_t2 = os.path.join(idless_sess_dir, "t2.jsonl")

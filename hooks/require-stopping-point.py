@@ -354,25 +354,24 @@ def extract_turn_id(payload: dict) -> str:
         try:
             with open(tpath, "r", encoding="utf-8") as f:
                 content = f.read()
-            last_id = ""
+            current_turn_id = ""
+            prompt_lines_so_far = []
             for line in content.splitlines():
-                line = line.strip()
-                if not line:
+                line_str = line.strip()
+                if not line_str:
                     continue
                 try:
-                    event = json.loads(line)
+                    event = json.loads(line_str)
                 except Exception:
                     continue
                 if not isinstance(event, dict):
                     continue
 
-                # Reset identifier at genuine prompt boundaries (excluding tool results,
-                # skill-load metadata, and sidechains) so an ID-less subsequent turn reaches
-                # the content hash fallback rather than inheriting the prior turn's ID.
                 if event.get("isMeta") and event.get("sourceToolUseID"):
                     continue
                 if event.get("isSidechain"):
                     continue
+
                 etype = event.get("type") or event.get("role") or ""
                 source = event.get("source") or ""
                 if etype in {"user", "USER_INPUT"} or source == "USER_EXPLICIT":
@@ -392,8 +391,48 @@ def extract_turn_id(payload: dict) -> str:
                         )
                     )
                     if not is_tool_result:
-                        last_id = ""
+                        prompt_lines_so_far.append(line_str)
+                        ev_id = None
+                        for k in (
+                            "prompt_id",
+                            "promptId",
+                            "turn_id",
+                            "turnId",
+                            "step_index",
+                            "stepIndex",
+                        ):
+                            val = event.get(k)
+                            if val is not None and str(val).strip():
+                                ev_id = str(val).strip()
+                                break
+                        if ev_id is None:
+                            val = (event.get("message") or {}).get("id") or event.get("id")
+                            if val is not None and str(val).strip():
+                                ev_id = str(val).strip()
+                        if ev_id is not None:
+                            current_turn_id = ev_id
+                        else:
+                            # Prompt lacks an ID: hash the transcript up to and including
+                            # this prompt boundary so subsequent assistant retries within
+                            # this turn share the exact same stable identity.
+                            prefix = "\n".join(prompt_lines_so_far)
+                            current_turn_id = hashlib.sha256(prefix.encode("utf-8")).hexdigest()[:16]
 
+            if current_turn_id:
+                return current_turn_id
+
+            # Fallback for transcripts with no genuine prompt boundary
+            last_id = ""
+            for line in content.splitlines():
+                line_str = line.strip()
+                if not line_str:
+                    continue
+                try:
+                    event = json.loads(line_str)
+                except Exception:
+                    continue
+                if not isinstance(event, dict):
+                    continue
                 ev_id = None
                 for k in (
                     "prompt_id",
@@ -413,6 +452,7 @@ def extract_turn_id(payload: dict) -> str:
                         ev_id = str(val).strip()
                 if ev_id is not None:
                     last_id = ev_id
+
             if last_id:
                 return last_id
             if content.strip():

@@ -25,6 +25,10 @@
   that PR. There's no CLI shortcut for **Auto-merge when ready**; that one
   always needs a manual toggle. A true default would require a feature
   request via `/feedback`.
+- **Update 2026-10-05: the desktop app now exposes `mcp__ccd_pr__set_monitor`**,
+  which sets Auto-fix for the session's bound PR (`auto_fix` and `address_comments` together).
+  Under auto mode, its permission check refused the call on lds#411,
+  so the user may still have to tick the box. The bullet below predates the tool.
 - **No tool on the agent's side can toggle this itself.**
   Checked the full available toolset (Bash, every loaded MCP tool, and
   `update-config`, a skill rather than an MCP tool) for a client-side

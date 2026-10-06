@@ -44,7 +44,7 @@ def run(text, tmpdir=None, raw_lines=None, key_name="transcript_path"):
                 )
                 + "\n"
             )
-    env = dict(os.environ, TMPDIR=tmpdir, TEMP=tmpdir, TMP=tmpdir)
+    env = dict(os.environ, TMPDIR=tmpdir, TEMP=tmpdir, TMP=tmpdir, GITHUB_ACTIONS="", CI="")
     res = subprocess.run(
         [sys.executable, HOOK],
         input=json.dumps({key_name: path}),
@@ -60,7 +60,7 @@ def run(text, tmpdir=None, raw_lines=None, key_name="transcript_path"):
 def run_direct_payload(payload, env=None, tmpdir=None):
     if tmpdir is None:
         tmpdir = tempfile.mkdtemp()
-    base_env = dict(os.environ, TMPDIR=tmpdir, TEMP=tmpdir, TMP=tmpdir)
+    base_env = dict(os.environ, TMPDIR=tmpdir, TEMP=tmpdir, TMP=tmpdir, GITHUB_ACTIONS="", CI="")
     if env:
         base_env.update(env)
     res = subprocess.run(
@@ -973,30 +973,18 @@ if not run_direct_payload(idless_payload_t2, tmpdir=idless_sess_dir):
 else:
     print("PASS: id-less turn 2 warns")
 
-# Test: Harness-mode exceptions
-if run_direct_payload({"reply": "No stopping point declaration here.", "harness_mode": True}):
-    print("FAIL: harness_mode payload warned")
+# Test: Harness-mode exceptions (GITHUB_ACTIONS and CI)
+if run_direct_payload({"reply": "No stopping point declaration here."}, env={"GITHUB_ACTIONS": "true"}):
+    print("FAIL: GITHUB_ACTIONS=true warned")
     failed += 1
 else:
-    print("PASS: harness_mode payload passes without warning")
+    print("PASS: GITHUB_ACTIONS=true passes without warning")
 
-if run_direct_payload({"reply": "No stopping point declaration here.", "non_interactive": True}):
-    print("FAIL: non_interactive payload warned")
+if run_direct_payload({"reply": "No stopping point declaration here."}, env={"CI": "true"}):
+    print("FAIL: CI=true warned")
     failed += 1
 else:
-    print("PASS: non_interactive payload passes without warning")
-
-if run_direct_payload({"reply": "No stopping point declaration here."}, env={"HARNESS_MODE": "1"}):
-    print("FAIL: HARNESS_MODE env warned")
-    failed += 1
-else:
-    print("PASS: HARNESS_MODE env passes without warning")
-
-if run_direct_payload({"reply": "No stopping point declaration here."}, env={"CLAUDE_NON_INTERACTIVE": "1"}):
-    print("FAIL: CLAUDE_NON_INTERACTIVE env warned")
-    failed += 1
-else:
-    print("PASS: CLAUDE_NON_INTERACTIVE env passes without warning")
+    print("PASS: CI=true passes without warning")
 
 # Test: Whitespace preservation during chunk reconstruction (assistant branch)
 whitespace_assistant_transcript = [

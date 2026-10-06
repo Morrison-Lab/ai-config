@@ -139,15 +139,19 @@ class PullRequest:
                 "--paginate", "--jq",
                 "[.[] | {author: {login: (.user.login // \"\")}, commit_id: (.commit_id // \"\"), original_commit_id: (.original_commit_id // \"\")}]"
             ]
-            try:
-                stdout = self._fetcher(cmd)
-                data = []
-                for chunk in stdout.strip().split("\n"):
-                    if chunk.strip():
-                        data.extend(json.loads(chunk))
-                self._review_comments_data = data
-            except Exception:
-                self._review_comments_data = []
+            stdout = self._fetcher(cmd)
+            data = []
+            for chunk in stdout.strip().split("\n"):
+                if chunk.strip():
+                    parsed = json.loads(chunk)
+                    if isinstance(parsed, list):
+                        data.extend(parsed)
+                    elif isinstance(parsed, dict):
+                        if "comments" in parsed and isinstance(parsed["comments"], list):
+                            data.extend(parsed["comments"])
+                        else:
+                            data.append(parsed)
+            self._review_comments_data = data
         return self._review_comments_data
 
     def get_check_runs(self) -> List[CheckRun]:

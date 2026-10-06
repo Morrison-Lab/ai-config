@@ -3352,14 +3352,18 @@ def check_latest_verdict(
         elif identity == "Copilot" and is_copilot_empty_balanced_closer_look(body):
             # An empty Balanced 'Needs a closer look' review on HEAD with no live
             # inline comments clears standing not-clean state (ai-config#4318).
+            # The carve-out requires verified absence of live inline comments:
+            # if review_comments is None (unsupplied or fetch error), it must
+            # fail closed and preserve standing not-clean state.
             if (
                 head_oid
                 and _oid
                 and len(_oid) >= 7
                 and head_oid.startswith(_oid)
+                and review_comments is not None
             ):
-                rcs = review_comments() if callable(review_comments) else (review_comments or [])
-                if not _has_live_inline_bot_item(rcs, identity, head_oid):
+                rcs = review_comments() if callable(review_comments) else review_comments
+                if rcs is not None and not _has_live_inline_bot_item(rcs, identity, head_oid):
                     per_reviewer.pop(identity, None)
                     if latest_identity == identity:
                         if per_reviewer:
@@ -3705,7 +3709,7 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
         rc = getattr(pr, "review_comments", None)
         if rc is None and hasattr(pr, "get_review_comments"):
             rc = pr.get_review_comments()
-        return rc or []
+        return rc
 
     # Criterion 4, evaluated over the WHOLE review history rather than only the
     # items matching HEAD: a not-clean verdict at an earlier commit stands until

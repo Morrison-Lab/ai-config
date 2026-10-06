@@ -85,7 +85,7 @@ def check(name: str, condition: bool):
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from scripts.lib.pull_request import PullRequest
+from scripts.lib.pull_request import PullRequest, Review
 
 original_check_ci_runs = checker.check_ci_runs
 def wrapped_check_ci_runs(sha, repo, *args, **kwargs):
@@ -6752,11 +6752,23 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     eb_head_ok, eb_head_issues = checker.check_latest_verdict(
         [copilot_prior_not_clean_review, copilot_empty_balanced_review_item],
         head_oid="b36fe3bb",
+        review_comments=[],
     )
     check(
         "check_latest_verdict: an empty Balanced Copilot review on HEAD clears "
         "earlier not-clean Copilot verdict (ai-config#4318)",
         eb_head_ok and not any("NOT clean" in i for i in eb_head_issues),
+    )
+
+    eb_none_ok, eb_none_issues = checker.check_latest_verdict(
+        [copilot_prior_not_clean_review, copilot_empty_balanced_review_item],
+        head_oid="b36fe3bb",
+        review_comments=None,
+    )
+    check(
+        "check_latest_verdict: an empty Balanced Copilot review on HEAD does not "
+        "clear when review_comments is None (fails closed) (ai-config#4318)",
+        (not eb_none_ok) and any("NOT clean" in i for i in eb_none_issues),
     )
 
     eb_inline_ok, eb_inline_issues = checker.check_latest_verdict(
@@ -8476,6 +8488,56 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         "check_review_comments: two Copilot login spellings do not satisfy a "
         "two-provider quorum on their own",
         (not two_ok) and any("quorum" in i.lower() for i in two_issues),
+    )
+
+    # Fetch failure on inline review comments must fail closed (propagate exception, ai-config#4318)
+    class FakePRFetchFailure:
+        def __init__(self):
+            self.pr_num = "4318"
+            self.repo = TEST_REPO
+            self.head_sha = "b36fe3bb00"
+            self.branch = "fix/test"
+            self.state = "OPEN"
+            self.review_decision = ""
+            self.is_draft = False
+            self.comments = []
+            self.reviews = [
+                Review({
+                    "state": "COMMENTED",
+                    "author": {"login": "copilot-pull-request-reviewer"},
+                    "commit": {"oid": "b36fe3bb00"},
+                    "body": copilot_closer_look_body,
+                    "submittedAt": "2026-10-01T00:00:00Z",
+                }),
+                Review({
+                    "state": "COMMENTED",
+                    "author": {"login": "copilot-pull-request-reviewer"},
+                    "commit": {"oid": "b36fe3bb00"},
+                    "body": copilot_empty_balanced_closer_look_body,
+                    "submittedAt": "2026-10-02T00:00:00Z",
+                }),
+            ]
+            self.review_requests = []
+            self.pending_review_requests = []
+            self.status_checks = []
+
+        def get_reviews(self):
+            return self.reviews
+
+        def get_comments(self):
+            return self.comments
+
+        def get_review_comments(self):
+            raise RuntimeError("API rate limit exceeded")
+
+    fetch_failed_raised = False
+    try:
+        original_check_review_comments(FakePRFetchFailure())
+    except RuntimeError as exc:
+        fetch_failed_raised = "API rate limit exceeded" in str(exc)
+    check(
+        "check_review_comments: get_review_comments fetch failure propagates (fails closed) (ai-config#4318)",
+        fetch_failed_raised,
     )
 
     # --- check_review_threads tests (ai-config#3586) ---

@@ -545,7 +545,8 @@ In that session the ai-config plugin had not loaded (see `claude-code-settings.m
 
 - **Do:** cut a worktree for your branch before your first edit, even in a checkout you expect to have to yourself.
 - **Do:** when you did work in a shared checkout, run `git branch --show-current` immediately before every commit and push, and compare it with the PR's head branch.
-- **Don't:** rewrite a peer's branch to undo a stray commit; copy the commit to your own branch and report it.
+- **Don't:** rewrite a peer's branch to undo a stray commit;
+  copy the commit to your own branch and report it.
 
 ## An unisolated subagent's live edits get read by a dirty-tree check as YOUR uncommitted work
 

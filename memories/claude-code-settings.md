@@ -192,7 +192,8 @@ Later, because no worktree hooks were active, the session committed to a peer se
 
 `claude plugin list` reports what is installed on disk, not what is loaded in the session asking.
 
-- **Do:** when a Morrison-Lab keyword or rule seems unknown, check for `~/.claude/plugins/synced/*/ai-config/`. If it's there, read its `CLAUDE.md`, `AGENTS.md`, and the keyword's `skills/<name>/SKILL.md` before replying, and tell the user a new session will load it properly.
+- **Do:** when a Morrison-Lab keyword or rule seems unknown, check for `~/.claude/plugins/synced/*/ai-config/`.
+  If it's there, read its `CLAUDE.md`, `AGENTS.md`, and the keyword's `skills/<name>/SKILL.md` before replying, and tell the user a new session will load it properly.
 - **Don't:** read `claude plugin list` saying `loaded` as evidence that the current session has the plugin's skills or hooks.
 
 ## A cloud session in ai-config loads no plugin, so `hooks/hooks.json` is inert there unless a skills-directory plugin carries it

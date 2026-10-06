@@ -428,24 +428,11 @@ def main() -> int:
     except Exception:
         return 0
 
-    # Harness-mode exception: automated non-interactive runs whose output is posted
-    # somewhere by a harness are permitted to omit the declaration
-    # (shared/workflow/flag-session-boundaries.md:45-50).
-    # Requires an explicit non-interactive harness mode signal; generic CI status
-    # (e.g. CI=true in an interactive container) does not exempt the reply.
-    is_harness_mode = (
-        payload.get("non_interactive") is True
-        or payload.get("nonInteractive") is True
-        or payload.get("interactive") is False
-        or payload.get("harness_mode") is True
-        or payload.get("harnessMode") is True
-        or os.environ.get("CLAUDE_NON_INTERACTIVE") in {"true", "True", "1"}
-        or os.environ.get("NON_INTERACTIVE") in {"true", "True", "1"}
-        or os.environ.get("HARNESS_MODE") in {"true", "True", "1"}
-    )
-    if is_harness_mode:
-        return 0
-
+    # Note: shared/workflow/flag-session-boundaries.md:45-50 permits omitting the
+    # declaration in non-interactive runs whose output is posted somewhere by a harness,
+    # but the Stop hook event payload does not currently carry an interactivity discriminator.
+    # The hook is registered as warn-only (systemMessage, non-blocking), so warning in
+    # automated runs does not abort execution or block the session.
     text = extract_text_from_payload(payload)
     if not text or has_stopping_point_declaration(text):
         return 0

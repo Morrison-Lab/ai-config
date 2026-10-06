@@ -1017,31 +1017,18 @@ if not run_direct_payload(mixed_payload_t2, tmpdir=mixed_sess_dir):
 else:
     print("PASS: mixed identified/ID-less turn 2 warns")
 
-# Test: Interactive missing-declaration reply with CI=true must warn (generic CI is not harness mode)
+# Test: Interactive missing-declaration reply with CI=true or GITHUB_ACTIONS=true warns
 if not run_direct_payload({"reply": "No stopping point declaration here."}, env={"CI": "true"}):
-    print("FAIL: interactive missing-declaration reply with CI=true did not warn")
+    print("FAIL: missing-declaration reply with CI=true did not warn")
     failed += 1
 else:
-    print("PASS: interactive missing-declaration reply with CI=true warns")
+    print("PASS: missing-declaration reply with CI=true warns")
 
-# Test: Explicit non-interactive harness mode exceptions pass without warning
-if run_direct_payload({"reply": "No stopping point declaration here."}, env={"CLAUDE_NON_INTERACTIVE": "true"}):
-    print("FAIL: CLAUDE_NON_INTERACTIVE=true warned")
+if not run_direct_payload({"reply": "No stopping point declaration here."}, env={"GITHUB_ACTIONS": "true"}):
+    print("FAIL: missing-declaration reply with GITHUB_ACTIONS=true did not warn")
     failed += 1
 else:
-    print("PASS: CLAUDE_NON_INTERACTIVE=true passes without warning")
-
-if run_direct_payload({"reply": "No stopping point declaration here."}, env={"NON_INTERACTIVE": "true"}):
-    print("FAIL: NON_INTERACTIVE=true warned")
-    failed += 1
-else:
-    print("PASS: NON_INTERACTIVE=true passes without warning")
-
-if run_direct_payload({"reply": "No stopping point declaration here.", "non_interactive": True}):
-    print("FAIL: payload non_interactive=True warned")
-    failed += 1
-else:
-    print("PASS: payload non_interactive=True passes without warning")
+    print("PASS: missing-declaration reply with GITHUB_ACTIONS=true warns")
 
 # Test: Whitespace preservation during chunk reconstruction (assistant branch)
 whitespace_assistant_transcript = [

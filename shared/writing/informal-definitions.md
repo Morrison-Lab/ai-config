@@ -238,11 +238,13 @@ is the sibling case in
    "riding along" case above), **split it out** rather than leaving both
    concepts sharing one id --- each gets its own div, its own id, and its
    own example.
-5. If it's shape 3's motivation/justification commentary rather than a
-   second concept, **move it to a `::: notes` aside** immediately after
-   the definition div, rather than deleting it --- the document's own
-   convention already uses `::: notes` throughout for exactly this kind
-   of "why this matters" content, so the fix is relocation, not loss.
+5. If it's shape 3's commentary rather than a second concept,
+   **move it out of the div** rather than deleting it,
+   so the fix is relocation, not loss:
+   motivation, rationale or a usage rule into a remark after the definition div
+   (`::: {.remark .notes}` to keep it off the slides,
+   per [`quarto-remarks-vs-callouts`](quarto-remarks-vs-callouts.md)),
+   and an example into an example div.
 
 ## A bolded keyword is the signal; every such term gets its own div
 

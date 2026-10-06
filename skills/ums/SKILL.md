@@ -214,7 +214,7 @@ committed pass.
      filtered for two unrelated numbered-list false positives ---
      `skills/cli/references/conditions.md`'s own "Pattern 1/2/3/4"
      and `skills/detect-informal-definitions/SKILL.md`'s
-     "Pattern 1"/"Pattern 2" ---
+     "Pattern 1"/"Pattern 2"/"Pattern 3" ---
      and one synthetic test fixture,
      `scripts/test_check_mistake_patterns.py`,
      which types pattern numbers that never existed to exercise the regex).

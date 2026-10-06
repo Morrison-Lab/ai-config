@@ -74,6 +74,8 @@ can satisfy them while defeating their purpose.
 
 ## How this relates to other entries
 
+[`no-cheap-fixes`](no-cheap-fixes.md) is the same gap from the other side: this principle asks a rule's author to key it to the state it cares about, and that one asks whoever applies a fix to aim at that state too.
+
 [`CLAUDE.md`](../../CLAUDE.md)'s "Record both the pattern and the
 anti-pattern" section already asks that a Do/Don't pair be
 **falsifiable**: naming the near-miss the correction actually ruled

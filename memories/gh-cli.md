@@ -743,7 +743,7 @@
   Measured 2026-09-01 on [#2975](https://github.com/Morrison-Lab/ai-config/pull/2975) through [#2979](https://github.com/Morrison-Lab/ai-config/pull/2979) and [#2983](https://github.com/Morrison-Lab/ai-config/pull/2983).
 
   - **Do:** poll `reviews` (count, login, and `commit.oid`) for the landed review rather than `reviewRequests`.
-  - **Do:** match the inline-comment author case-insensitively, since it is `Copilot` there and `copilot-pull-request-reviewer` on the review.
+  - **Do:** normalize bot logins across surfaces (mapping both `copilot-pull-request-reviewer` and `Copilot` to a common bot identity) when correlating inline comments with reviews, rather than comparing raw strings or only lowering case.
   - **Don't:** read an empty `reviewRequests` as a failed request, nor as a review on its way --- it discriminates nothing, so read the check run and the posted review instead.
   - **Don't:** read a review on an older `commit.oid` as the verdict on the head you just pushed.
 

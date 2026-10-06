@@ -85,7 +85,7 @@ def check(name: str, condition: bool):
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from scripts.lib.pull_request import PullRequest
+from scripts.lib.pull_request import PullRequest, Review
 
 original_check_ci_runs = checker.check_ci_runs
 def wrapped_check_ci_runs(sha, repo, *args, **kwargs):
@@ -6745,8 +6745,108 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     )
     check(
         "check_latest_verdict: an empty Balanced Copilot review does not "
-        "supersede an earlier not-clean Copilot verdict",
+        "supersede an earlier not-clean Copilot verdict without matching HEAD",
         (not eb_ok) and any("NOT clean" in i for i in eb_issues),
+    )
+
+    eb_head_ok, eb_head_issues = checker.check_latest_verdict(
+        [copilot_prior_not_clean_review, copilot_empty_balanced_review_item],
+        head_oid="b36fe3bb",
+        review_comments=[],
+    )
+    check(
+        "check_latest_verdict: an empty Balanced Copilot review on HEAD clears "
+        "earlier not-clean Copilot verdict (ai-config#4318)",
+        eb_head_ok and not any("NOT clean" in i for i in eb_head_issues),
+    )
+
+    eb_none_ok, eb_none_issues = checker.check_latest_verdict(
+        [copilot_prior_not_clean_review, copilot_empty_balanced_review_item],
+        head_oid="b36fe3bb",
+        review_comments=None,
+    )
+    check(
+        "check_latest_verdict: an empty Balanced Copilot review on HEAD does not "
+        "clear when review_comments is None (fails closed) (ai-config#4318)",
+        (not eb_none_ok) and any("NOT clean" in i for i in eb_none_issues),
+    )
+    check(
+        "check_latest_verdict: unsupplied review_comments reports NOTE (ai-config#4318)",
+        any("NOTE: review comments not supplied" in i for i in eb_none_issues),
+    )
+
+    def _raising_rcs():
+        raise RuntimeError("network failure")
+
+    eb_raise_ok, eb_raise_issues = checker.check_latest_verdict(
+        [copilot_prior_not_clean_review, copilot_empty_balanced_review_item],
+        head_oid="b36fe3bb",
+        review_comments=_raising_rcs,
+    )
+    check(
+        "check_latest_verdict: an empty Balanced Copilot review on HEAD does not "
+        "clear when review_comments raises (fails closed) (ai-config#4318)",
+        (not eb_raise_ok) and any("NOT clean" in i for i in eb_raise_issues),
+    )
+    check(
+        "check_latest_verdict: review_comments fetch error reports NOTE (ai-config#4318)",
+        any("NOTE: could not fetch review comments" in i and "network failure" in i for i in eb_raise_issues),
+    )
+
+    def _payload_error_rcs():
+        raise checker.PayloadError("missing review_comments")
+
+    payload_error_propagated = False
+    try:
+        checker.check_latest_verdict(
+            [copilot_prior_not_clean_review, copilot_empty_balanced_review_item],
+            head_oid="b36fe3bb",
+            review_comments=_payload_error_rcs,
+        )
+    except checker.PayloadError:
+        payload_error_propagated = True
+
+    check(
+        "check_latest_verdict: PayloadError propagates (not caught as a PR finding) (ai-config#4318)",
+        payload_error_propagated,
+    )
+
+    eb_inline_ok, eb_inline_issues = checker.check_latest_verdict(
+        [copilot_prior_not_clean_review, copilot_empty_balanced_review_item],
+        head_oid="b36fe3bb",
+        review_comments=[{
+            "author": {"login": "Copilot"},
+            "commit_id": "b36fe3bb",
+        }],
+    )
+    check(
+        "check_latest_verdict: an empty Balanced Copilot review on HEAD does not "
+        "clear when live inline comments with REST login 'Copilot' remain on HEAD (ai-config#4318)",
+        (not eb_inline_ok) and any("NOT clean" in i for i in eb_inline_issues),
+    )
+
+    eb_inline_bot_ok, eb_inline_bot_issues = checker.check_latest_verdict(
+        [copilot_prior_not_clean_review, copilot_empty_balanced_review_item],
+        head_oid="b36fe3bb",
+        review_comments=[{
+            "author": {"login": "copilot-pull-request-reviewer[bot]"},
+            "commit_id": "b36fe3bb",
+        }],
+    )
+    check(
+        "check_latest_verdict: an empty Balanced Copilot review on HEAD does not "
+        "clear when live inline comments with bot login remain on HEAD (ai-config#4318)",
+        (not eb_inline_bot_ok) and any("NOT clean" in i for i in eb_inline_bot_issues),
+    )
+
+    eb_diff_ok, eb_diff_issues = checker.check_latest_verdict(
+        [copilot_prior_not_clean_review, copilot_empty_balanced_review_item],
+        head_oid="differentsha",
+    )
+    check(
+        "check_latest_verdict: an empty Balanced Copilot review on older commit does not "
+        "clear standing not-clean on HEAD (ai-config#4318)",
+        (not eb_diff_ok) and any("NOT clean" in i for i in eb_diff_issues),
     )
 
     check(
@@ -8428,6 +8528,56 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         "check_review_comments: two Copilot login spellings do not satisfy a "
         "two-provider quorum on their own",
         (not two_ok) and any("quorum" in i.lower() for i in two_issues),
+    )
+
+    # Fetch failure on inline review comments must fail closed (propagate exception, ai-config#4318)
+    class FakePRFetchFailure:
+        def __init__(self):
+            self.pr_num = "4318"
+            self.repo = TEST_REPO
+            self.head_sha = "b36fe3bb00"
+            self.branch = "fix/test"
+            self.state = "OPEN"
+            self.review_decision = ""
+            self.is_draft = False
+            self.comments = []
+            self.reviews = [
+                Review({
+                    "state": "COMMENTED",
+                    "author": {"login": "copilot-pull-request-reviewer"},
+                    "commit": {"oid": "b36fe3bb00"},
+                    "body": copilot_closer_look_body,
+                    "submittedAt": "2026-10-01T00:00:00Z",
+                }),
+                Review({
+                    "state": "COMMENTED",
+                    "author": {"login": "copilot-pull-request-reviewer"},
+                    "commit": {"oid": "b36fe3bb00"},
+                    "body": copilot_empty_balanced_closer_look_body,
+                    "submittedAt": "2026-10-02T00:00:00Z",
+                }),
+            ]
+            self.review_requests = []
+            self.pending_review_requests = []
+            self.status_checks = []
+
+        def get_reviews(self):
+            return self.reviews
+
+        def get_comments(self):
+            return self.comments
+
+        def get_review_comments(self):
+            raise RuntimeError("API rate limit exceeded")
+
+    ok_fetch_fail, issues_fetch_fail = original_check_review_comments(FakePRFetchFailure())
+    check(
+        "check_review_comments: get_review_comments fetch failure fails closed without crashing (ai-config#4318)",
+        (not ok_fetch_fail) and any("NOT clean" in i for i in issues_fetch_fail),
+    )
+    check(
+        "check_review_comments: get_review_comments fetch failure includes NOTE (ai-config#4318)",
+        any("could not fetch review comments" in i and "API rate limit exceeded" in i for i in issues_fetch_fail),
     )
 
     # --- check_review_threads tests (ai-config#3586) ---

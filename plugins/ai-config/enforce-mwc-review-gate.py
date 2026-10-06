@@ -609,6 +609,13 @@ def copilot_is_empty_balanced_closer_look(raw_body):
     return COPILOT_EMPTY_BALANCED_TEMPLATE.fullmatch(normalized) is not None
 
 
+def _normalize_bot_login_for_inline(login):
+    cleaned = (login or "").strip().lower().replace("[bot]", "")
+    if cleaned in ("copilot", "copilot-pull-request-reviewer"):
+        return "copilot"
+    return cleaned
+
+
 def _has_live_inline_bot_item(review_comments, login, head_oid):
     """True when `review_comments` (the PR's inline review comments, in the
     REST `pulls/{n}/comments` shape) has one authored by `login` and tied to
@@ -630,13 +637,19 @@ def _has_live_inline_bot_item(review_comments, login, head_oid):
     """
     if not head_oid:
         return True
+    target_norm = _normalize_bot_login_for_inline(login)
     for c in review_comments or ():
-        c_login = (c.get("author") or {}).get("login", "")
-        if c_login != login:
+        c_login = (c.get("author") or c.get("user") or {}).get("login", "")
+        if _normalize_bot_login_for_inline(c_login) != target_norm:
             continue
         commit_id = c.get("commit_id") or ""
         original_commit_id = c.get("original_commit_id") or ""
-        if commit_id == head_oid or original_commit_id == head_oid:
+        if (
+            commit_id == head_oid
+            or original_commit_id == head_oid
+            or (commit_id and len(commit_id) >= ABBREV_SHA_LEN and head_oid.startswith(commit_id[:ABBREV_SHA_LEN]))
+            or (original_commit_id and len(original_commit_id) >= ABBREV_SHA_LEN and head_oid.startswith(original_commit_id[:ABBREV_SHA_LEN]))
+        ):
             return True
     return False
 
@@ -653,13 +666,14 @@ def latest_bot_review_states(reviews, head_oid="", review_comments=None):
     A 'Needs a closer look' heading gets one narrow carve-out
     ([ai-config#4004](https://github.com/Morrison-Lab/ai-config/issues/4004), `copilot_is_empty_balanced_closer_look`): an empty
     BALANCED review under that heading states no verdict at all, so this
-    round is skipped entirely rather than setting NOT_CLEAN -- and,
-    exactly like an ordinary round with no recognizable verdict, it also
-    does not touch any standing state an earlier round already set. This
-    is checked only when `is_negative` fired SOLELY off the heading (never
-    when `NOT_CLEAN_VERDICT_RE` or the suppressed-block-over-affirmative
-    check also independently matched), so a genuinely blocking phrase
-    elsewhere in the same body is never carved out.
+    round is skipped entirely rather than setting NOT_CLEAN. When evaluating
+    the current head commit (and having no live inline review comments on that
+    head), it also clears any standing not-clean state an earlier round set
+    ([ai-config#4318](https://github.com/Morrison-Lab/ai-config/issues/4318)), since the reviewer has re-evaluated the current head
+    with zero findings and no live comments. This is checked only when
+    `is_negative` fired SOLELY off the heading (never when `NOT_CLEAN_VERDICT_RE`
+    or the suppressed-block-over-affirmative check also independently matched),
+    so a genuinely blocking phrase elsewhere in the same body is never carved out.
 
     The carve-out is ALSO gated on `_has_live_inline_bot_item` finding no
     current-head inline review comment from the same bot login
@@ -705,6 +719,8 @@ def latest_bot_review_states(reviews, head_oid="", review_comments=None):
             and copilot_is_empty_balanced_closer_look(raw_body)
             and not _has_live_inline_bot_item(review_comments, login, head_oid)
         ):
+            if head_oid and oid and len(oid) >= ABBREV_SHA_LEN and head_oid.startswith(oid):
+                states.pop(login, None)
             continue
         if is_negative:
             states[login] = "NOT_CLEAN"

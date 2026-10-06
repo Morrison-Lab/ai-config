@@ -207,6 +207,41 @@ class TestPullRequest(unittest.TestCase):
         self.assertIn("-F", second_cmd)
         self.assertIn("cursor=cur1", second_cmd)
 
+    @patch('subprocess.run')
+    @patch.object(PullRequest, '_fetch_pr_data')
+    def test_get_review_comments(self, mock_fetch, mock_run):
+        mock_fetch.return_value = self.mock_data
+        comments_json = json.dumps([
+            {
+                "author": {"login": "copilot-pull-request-reviewer"},
+                "commit_id": "abcd123",
+                "original_commit_id": "abcd123"
+            }
+        ])
+        mock_run.return_value = MagicMock(stdout=comments_json)
+
+        pr = PullRequest("123", "owner/repo")
+        comments = pr.get_review_comments()
+        self.assertEqual(len(comments), 1)
+        self.assertEqual(comments[0]["author"]["login"], "copilot-pull-request-reviewer")
+        self.assertEqual(comments[0]["commit_id"], "abcd123")
+
+        # Caching check
+        comments_again = pr.get_review_comments()
+        self.assertIs(comments, comments_again)
+        mock_run.assert_called_once()
+
+    @patch.object(PullRequest, '_fetch_pr_data')
+    def test_get_review_comments_fetch_failure_propagates(self, mock_fetch):
+        mock_fetch.return_value = self.mock_data
+        def failing_fetcher(cmd):
+            raise RuntimeError("API rate limit exceeded")
+
+        pr = PullRequest("123", "owner/repo", fetcher=failing_fetcher)
+        with self.assertRaises(RuntimeError) as ctx:
+            pr.get_review_comments()
+        self.assertIn("API rate limit exceeded", str(ctx.exception))
+
 
 if __name__ == '__main__':
     unittest.main()

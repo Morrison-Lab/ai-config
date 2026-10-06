@@ -408,6 +408,64 @@ def test_review_threads_handling():
         check("fetch_review_threads returns None on error", threads is None)
 
 
+def test_review_comments_handling():
+    # 1. review_comments is absent when not gathered
+    payload = build_pr_payload.build_payload(
+        "example-org/example-repo", PR_RAW, [], [], COMMITS_RAW, CHECK_RUNS_RAW
+    )
+    check("review_comments is absent when not gathered", "review_comments" not in payload)
+    check("pr.reviewComments is absent when not gathered", "reviewComments" not in payload["pr"])
+
+    # 2. review_comments mapped and carried through when provided
+    sample_comments = [
+        {
+            "user": {"login": "Copilot"},
+            "commit_id": "c1",
+            "original_commit_id": "c0",
+            "body": "inline feedback",
+        }
+    ]
+    payload = build_pr_payload.build_payload(
+        "example-org/example-repo",
+        PR_RAW,
+        [],
+        [],
+        COMMITS_RAW,
+        CHECK_RUNS_RAW,
+        review_comments_raw=sample_comments,
+    )
+    expected_mapped = [
+        {"author": {"login": "Copilot"}, "commit_id": "c1", "original_commit_id": "c0"}
+    ]
+    check("review_comments carried through when provided", payload.get("review_comments") == expected_mapped)
+    check("pr.reviewComments carried through when provided", payload["pr"].get("reviewComments") == expected_mapped)
+
+
+def test_fetch_payload_integration():
+    def fake_rest_get(endpoint, token, envelope=None):
+        if "/pulls/123/comments" in endpoint:
+            return [{"user": {"login": "Copilot"}, "commit_id": "c1", "original_commit_id": "c0"}]
+        if "/pulls/123/reviews" in endpoint:
+            return []
+        if "/issues/123/comments" in endpoint:
+            return []
+        if "/pulls/123/commits" in endpoint:
+            return COMMITS_RAW
+        if "/check-runs" in endpoint:
+            return CHECK_RUNS_RAW
+        if "/pulls/123" in endpoint:
+            return PR_RAW
+        return []
+
+    with patch.object(build_pr_payload, "rest_get", side_effect=fake_rest_get):
+        with patch.object(build_pr_payload, "fetch_actions_runs", return_value={}):
+            with patch.object(build_pr_payload, "fetch_review_threads", return_value=[]):
+                payload = build_pr_payload.fetch_payload("example-org/example-repo", 123, "token")
+                check("fetch_payload runs without UnboundLocalError/NameError", isinstance(payload, dict))
+                check("fetch_payload includes review_threads", "review_threads" in payload)
+                check("fetch_payload includes review_comments", "review_comments" in payload)
+
+
 def main():
     test_run_ids_from_check_runs()
     test_build_payload_carries_actions_runs()
@@ -423,6 +481,8 @@ def main():
     test_rest_get_paginates_enveloped_check_runs()
     test_main_fails_fast_with_no_token()
     test_review_threads_handling()
+    test_review_comments_handling()
+    test_fetch_payload_integration()
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

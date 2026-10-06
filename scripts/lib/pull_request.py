@@ -126,6 +126,34 @@ class PullRequest:
     def get_comments(self) -> List[IssueComment]:
         return [IssueComment(c) for c in (self._data.get("comments") or [])]
 
+    @property
+    def review_comments(self) -> List[Dict[str, Any]]:
+        if "reviewComments" in self._data:
+            return self._data.get("reviewComments") or []
+        return self.get_review_comments()
+
+    def get_review_comments(self) -> List[Dict[str, Any]]:
+        if not hasattr(self, "_review_comments_data") or self._review_comments_data is None:
+            cmd = [
+                "gh", "api", f"repos/{self.repo}/pulls/{self.pr_num}/comments",
+                "--paginate", "--jq",
+                "[.[] | {author: {login: (.user.login // \"\")}, commit_id: (.commit_id // \"\"), original_commit_id: (.original_commit_id // \"\")}]"
+            ]
+            stdout = self._fetcher(cmd)
+            data = []
+            for chunk in stdout.strip().split("\n"):
+                if chunk.strip():
+                    parsed = json.loads(chunk)
+                    if isinstance(parsed, list):
+                        data.extend(parsed)
+                    elif isinstance(parsed, dict):
+                        if "comments" in parsed and isinstance(parsed["comments"], list):
+                            data.extend(parsed["comments"])
+                        else:
+                            data.append(parsed)
+            self._review_comments_data = data
+        return self._review_comments_data
+
     def get_check_runs(self) -> List[CheckRun]:
         if self._check_runs is None:
             cmd = ["gh", "api", f"repos/{self.repo}/commits/{self.head_sha}/check-runs?per_page=100"]

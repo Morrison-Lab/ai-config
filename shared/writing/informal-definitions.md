@@ -190,8 +190,10 @@ which is shape 1 written in math rather than in prose.
 A "cross-validation choice procedure" div whose display also defines
 the chosen index $\hat l(T) \eqdef \argmin_l \ldots$ is this shape.
 Count the defining operators in each definition div,
-skipping nested callouts such as the Source callout,
-at any nesting depth and with any number of colons in the fence.
+wherever it is nested and with any number of colons in its fence.
+Lines inside any div nested within a definition div are skipped,
+callout or not, such as the Source callout;
+a nested definition div is counted on its own.
 `OPS` is the operator set, a regular expression:
 extend it to whatever the project writes for "is defined as".
 
@@ -238,19 +240,23 @@ so a source file cannot see a repeat across includes,
 and the render has already separated math from code, so a `$$` in a code chunk cannot pair wrongly.
 
 ```bash
-python3 - _site/<page>.html <<'EOF'
+python3 -c '
 import collections, html, re, sys
-
 for path in sys.argv[1:]:
     page = open(path, encoding="utf-8").read()
     seen = collections.Counter()
-    for m in re.finditer(r'<span class="math display">(.*?)</span>', page, re.S):
-        seen[re.sub(r"\s+", "", html.unescape(m.group(1)))] += 1
+    for m in re.finditer(r"<span class=.math display.>(.*?)</span>", page, re.S):
+        body = re.sub(r"\\tag\{[^}]*\}", "", html.unescape(m.group(1)))
+        seen[re.sub(r"\s+", "", body)] += 1
     for body, count in seen.items():
         if count > 1:
             print(f"{path}: {count}x {body[:70]}")
-EOF
+' _site/<page>.html
 ```
+
+Quarto appends `\tag{N}` to every labelled display,
+so the lister strips tags before comparing;
+otherwise two identical labelled displays would never match.
 
 A hit is a candidate, not a finding:
 a proof may legitimately restate an earlier display.

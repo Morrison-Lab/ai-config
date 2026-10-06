@@ -1041,6 +1041,68 @@ if not run_direct_payload(mixed_payload_t2, tmpdir=mixed_sess_dir):
 else:
     print("PASS: mixed identified/ID-less turn 2 warns")
 
+# Test: Retry fixture containing harness Stop-hook feedback record (Copilot review finding)
+harness_feedback_sess_dir = tempfile.mkdtemp()
+harness_feedback_tscript_t1 = os.path.join(harness_feedback_sess_dir, "t1.jsonl")
+with open(harness_feedback_tscript_t1, "w", encoding="utf-8") as f:
+    f.write(json.dumps({"type": "user", "message": {"content": "user prompt"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"content": "initial reply missing stopping point"}}) + "\n")
+
+harness_feedback_tscript_t1_retry = os.path.join(harness_feedback_sess_dir, "t1_retry.jsonl")
+with open(harness_feedback_tscript_t1_retry, "w", encoding="utf-8") as f:
+    f.write(json.dumps({"type": "user", "message": {"content": "user prompt"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"content": "initial reply missing stopping point"}}) + "\n")
+    f.write(json.dumps({
+        "type": "user",
+        "isMeta": True,
+        "content": "Stop hook blocked termination: State stopping point before ending the turn.",
+    }) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"content": "initial reply missing stopping point"}}) + "\n")
+
+harness_feedback_payload_t1 = {
+    "session_id": "sess_harness_feedback_1",
+    "transcript_path": harness_feedback_tscript_t1,
+}
+harness_feedback_payload_t1_retry = {
+    "session_id": "sess_harness_feedback_1",
+    "transcript_path": harness_feedback_tscript_t1_retry,
+}
+
+if not run_direct_payload(harness_feedback_payload_t1, tmpdir=harness_feedback_sess_dir):
+    print("FAIL: harness feedback turn 1 did not warn")
+    failed += 1
+else:
+    print("PASS: harness feedback turn 1 warns")
+
+if run_direct_payload(harness_feedback_payload_t1_retry, tmpdir=harness_feedback_sess_dir):
+    print("FAIL: harness feedback retry was not deduplicated (hook feedback altered turn_id)")
+    failed += 1
+else:
+    print("PASS: harness feedback retry is deduplicated across Stop hook feedback injection")
+
+harness_feedback_tscript_sdk = os.path.join(harness_feedback_sess_dir, "t_sdk.jsonl")
+with open(harness_feedback_tscript_sdk, "w", encoding="utf-8") as f:
+    f.write(json.dumps({"type": "user", "message": {"content": "user prompt"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"content": "initial reply missing stopping point"}}) + "\n")
+    f.write(json.dumps({
+        "type": "user",
+        "isMeta": True,
+        "promptSource": "sdk",
+        "content": "Scheduled check-in continuation.",
+    }) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"content": "reply to scheduled check-in"}}) + "\n")
+
+harness_feedback_payload_sdk = {
+    "session_id": "sess_harness_feedback_1",
+    "transcript_path": harness_feedback_tscript_sdk,
+}
+
+if not run_direct_payload(harness_feedback_payload_sdk, tmpdir=harness_feedback_sess_dir):
+    print("FAIL: scheduled sdk continuation was wrongly skipped as harness meta")
+    failed += 1
+else:
+    print("PASS: scheduled sdk continuation is recognized as a new turn")
+
 # Test: Interactive missing-declaration reply with CI=true or GITHUB_ACTIONS=true warns
 if not run_direct_payload({"reply": "No stopping point declaration here."}, env={"CI": "true"}):
     print("FAIL: missing-declaration reply with CI=true did not warn")

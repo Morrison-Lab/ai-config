@@ -27,15 +27,26 @@ except Exception:
     strip_code = strip_fences = None
 
 try:
-    from transcript_meta import is_skill_load_meta
+    from transcript_meta import is_harness_meta, is_skill_load_meta
 except Exception as _exc:  # broken install: degrade, do not fail open silently
     print(f"require-stopping-point: cannot load scripts/lib/transcript_meta.py "
-          f"({_exc}); a mid-turn skill load will wrongly reset the "
-          f"accumulated reply",
+          f"({_exc}); a mid-turn skill load or hook feedback will wrongly "
+          f"reset the accumulated turn",
           file=sys.stderr)
 
     def is_skill_load_meta(entry):  # noqa: D103 -- fail-open fallback
-        return False
+        return bool(isinstance(entry, dict) and entry.get("isMeta") and entry.get("sourceToolUseID"))
+
+    def is_harness_meta(entry):  # noqa: D103 -- fail-open fallback
+        if not isinstance(entry, dict):
+            return False
+        if not bool(entry.get("isMeta")):
+            return False
+        if bool(entry.get("sourceToolUseID")):
+            return False
+        if entry.get("promptSource") == "sdk":
+            return False
+        return True
 
 # In a project-thread session every user-visible sentence is the `text` input
 # of an `mcp__hearthbot__reply` tool call, never an assistant text block.
@@ -367,7 +378,7 @@ def extract_turn_id(payload: dict) -> str:
                 if not isinstance(event, dict):
                     continue
 
-                if event.get("isMeta") and event.get("sourceToolUseID"):
+                if is_skill_load_meta(event) or is_harness_meta(event):
                     continue
                 if event.get("isSidechain"):
                     continue

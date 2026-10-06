@@ -1940,6 +1940,7 @@ Take the pending request from the scorer's own output, or from the payload
 that same run consumed, rather than from a separate fetch made alongside it.
 
 Only the named reviewer clears it, by reviewing or by being un-requested.
+A request made correctly is cleared by its reviewer, not by the session.
 Where the request was created in error --- by a session requesting human
 review before any AI verdict, against this corpus's own ordering rule ---
 withdrawing it is repair rather than gaming the gate, and the
@@ -1951,7 +1952,34 @@ See
 - **Do:** read every blocker line the scorer prints, not the first one.
 - **Do:** take a pending request from the scorer's own output, or from the
   payload that run consumed.
+- **Do:** say the request is still pending, and leave clearing it to its
+  reviewer.
+- **Do:** after an interrupted command, read the PR's timeline for each step
+  the command contained before saying any of them did not run.
+- **Do:** run a write that changes a PR's reviewers as a command of its own,
+  never chained in front of a long wait, so it can be approved or rejected by
+  itself and its outcome is unambiguous.
+  This is the same shape as [`pr-on-claim`](pr-on-claim.md)'s own-call rule,
+  for a different reason; no hook enforces it yet.
 - **Don't:** compare a hand-fetched `requested_reviewers` against a payload
   built at another moment and read the difference as a field asymmetry.
 - **Don't:** read a still-failing exit after a verdict fix as the fix having
   failed --- check whether a second blocker line is doing it.
+- **Don't:** withdraw a person's pending review request yourself because that
+  person told you to merge the PR (a per-PR [`mwc`](../../skills/mwc/SKILL.md),
+  "merge it").
+  A merge instruction is not an un-request, and the carve-out above covers only
+  a request made in error.
+
+(Measured 2026-10-06 on
+[Morrison-Lab/lds#415](https://github.com/Morrison-Lab/lds/pull/415).
+The session had requested the maintainer's review under that repository's
+CLAUDE.md, which has the maintainer merge content PRs, so the request was not
+made in error.
+After the maintainer's per-PR `mwc`, the session removed the request in one
+command that then waited on post-build workflows, and the maintainer interrupted
+that command.
+The PR's timeline shows `review_request_removed` at 06:54:05Z with actor
+`dem-extra1`, the account the session's token acts as, not the maintainer's
+`d-morrison`, so the removal had run before the interruption, and the session's
+next reply wrongly said it would not remove the request.)

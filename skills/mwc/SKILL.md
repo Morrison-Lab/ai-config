@@ -33,6 +33,8 @@ without asking confirmation before every merge.
   A clean automated review from every available provider evaluating the current HEAD commit is strictly required for autonomous merge under MWC;
   a reviewer skip notice (e.g. for quota exhaustion or workflow edits) or a fallback self-review does NOT waive this requirement, grant merge authority under MWC, or clear missing external review.
   **A PR/MR does not count as clean for MWC if there are reviews still running.**
+  A pending review request counts, and a per-PR `mwc` from the requested reviewer does not withdraw it
+  ([`fully-clean`](../../shared/workflow/fully-clean.md#a-pending-review-request-is-a-second-independent-blocker)).
   If one reviewer has reviewed a commit and reported clean,
   but another review is still running
   (for example, Copilot review running after Claude finishes,

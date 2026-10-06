@@ -40,7 +40,8 @@ read it before running this skill; the steps below are the short version.
    introduces new technical content.
 2. **Grep for candidates** using the three patterns in [`informal-definitions.md`](../../shared/writing/informal-definitions.md#the-detection-heuristic) --- a bolded term followed by defining language (`\eqdef`, "is the", "="), a naming sentence ending "is:"/"are:" immediately before a display equation, and a clause that gives a symbol its meaning ("let $X$ be", "write $X$ for", "denotes").
    Run all three;
-   each catches phrasing the others miss, and none of them makes formatting the test:
+   each catches phrasing the others miss,
+   and formatting does not decide candidacy: a term with its bold removed is still a candidate.
    ```bash
    # Pattern 1: bolded term followed by defining language
    rg -n '\*\*[A-Za-z][a-zA-Z .-]{2,60}\*\*[^.]*(\\eqdef|is (defined|the)\b|=)' <file>

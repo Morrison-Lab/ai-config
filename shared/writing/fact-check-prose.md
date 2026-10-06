@@ -62,12 +62,15 @@ so.
   merge de-duplicates identical lines") can be wrong in a specific,
   checkable way; a two-minute constructed repro settles it definitively where
   recall alone can't.
-- **Protections, sandboxes, and security controls.** When prose documents how to
-  configure a protection (a sandbox, an allowlist, a permission, a firewall),
+- **Protections, sandboxes, and security controls.**
+  When prose documents how to configure a protection
+  (a sandbox, an allowlist, a permission, a firewall),
   check and state every way around it before pushing:
   what happens in non-default modes,
   which platforms the control does not run on (and whether it fails open or closed),
-  what overrides it (precedence of user, project, or CLI settings; list merging vs replacement),
+  what overrides it
+  (precedence of user, project, or CLI settings;
+  list merging vs replacement),
   and what escape hatches or unmonitored tools exist.
   Do not document a protection from its setup section alone.
 - **Document-internal reasoning.** Work through the logic of any argument the

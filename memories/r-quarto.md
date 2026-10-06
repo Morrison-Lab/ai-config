@@ -1054,7 +1054,8 @@ exclude them in `lychee.toml` rather than treating the check failure as a broken
 
 When a table's columns are too cramped in the PDF (or docx) output, wrap it in `::: {.landscape}` rather than squeezing column widths or splitting the table.
 The class is Quarto's own (its `landscape.lua` filter), so it needs no extension, and other formats ignore it.
-User directive, 2026-10-05, on [Morrison-Lab/lds#412](https://github.com/Morrison-Lab/lds/pull/412); lds's `.github/copilot-instructions.md` already states it.
+User directive, 2026-10-05, on [Morrison-Lab/lds#412](https://github.com/Morrison-Lab/lds/pull/412);
+lds's `.github/copilot-instructions.md` already states it.
 
 ## Inline R: avoid scientific notation with `formatC(..., format="d", big.mark=",")`
 

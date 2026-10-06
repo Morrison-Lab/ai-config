@@ -187,7 +187,7 @@ def last_text(path: str) -> str:
                             payload = _reply_payload(b)
                             if payload.strip():
                                 last_reply = payload
-                    elif isinstance(blocks, str) and blocks.strip():
+                    elif isinstance(blocks, str):
                         text = blocks
                     else:
                         text = ""
@@ -228,7 +228,7 @@ def last_text(path: str) -> str:
                     )
                     has_tool_calls = bool(event.get("tool_calls"))
                     content = event.get("content")
-                    if isinstance(content, str) and content.strip():
+                    if isinstance(content, str):
                         text = content
                     elif isinstance(content, list):
                         text = "".join(
@@ -335,10 +335,48 @@ def main() -> int:
         payload = json.load(sys.stdin)
     except Exception:
         return 0
+
+    # Harness-mode exception: automated non-interactive runs whose output is posted
+    # somewhere by a harness are permitted to omit the declaration
+    # (shared/workflow/flag-session-boundaries.md).
+    if (
+        payload.get("harness_mode")
+        or payload.get("non_interactive")
+        or payload.get("is_non_interactive")
+        or os.environ.get("HARNESS_MODE") in {"1", "true", "True"}
+        or os.environ.get("NON_INTERACTIVE") in {"1", "true", "True"}
+        or os.environ.get("CLAUDE_NON_INTERACTIVE") in {"1", "true", "True"}
+    ):
+        return 0
+
     text = extract_text_from_payload(payload)
     if not text or has_stopping_point_declaration(text):
         return 0
-    key = hashlib.sha256(text.encode()).hexdigest()[:16]
+
+    # Scope sentinel deduplication to current session and turn so identical replies
+    # in later turns or other sessions are not silently suppressed.
+    session_id = (
+        payload.get("session_id")
+        or payload.get("sessionId")
+        or os.environ.get("CLAUDE_SESSION_ID")
+        or os.environ.get("SESSION_ID")
+        or ""
+    )
+    turn_id = (
+        str(payload.get("turn_id"))
+        if payload.get("turn_id") is not None
+        else (
+            str(payload.get("turnId"))
+            if payload.get("turnId") is not None
+            else (
+                str(payload.get("step_index"))
+                if payload.get("step_index") is not None
+                else ""
+            )
+        )
+    )
+    key_src = f"{session_id}:{turn_id}:{text}"
+    key = hashlib.sha256(key_src.encode()).hexdigest()[:16]
     sentinel = os.path.join(tempfile.gettempdir(), f".claude-stopping-point-{key}")
     if os.path.exists(sentinel):
         return 0

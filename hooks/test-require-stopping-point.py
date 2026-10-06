@@ -52,15 +52,18 @@ def run(text, tmpdir=None, raw_lines=None, key_name="transcript_path"):
     return _has_warning(res.stdout)
 
 
-def run_direct_payload(payload):
-    tmpdir = tempfile.mkdtemp()
-    env = dict(os.environ, TMPDIR=tmpdir, TEMP=tmpdir, TMP=tmpdir)
+def run_direct_payload(payload, env=None, tmpdir=None):
+    if tmpdir is None:
+        tmpdir = tempfile.mkdtemp()
+    base_env = dict(os.environ, TMPDIR=tmpdir, TEMP=tmpdir, TMP=tmpdir)
+    if env:
+        base_env.update(env)
     res = subprocess.run(
         [sys.executable, HOOK],
         input=json.dumps(payload),
         text=True,
         capture_output=True,
-        env=env,
+        env=base_env,
     )
     assert res.returncode == 0, f"Hook exited with code {res.returncode}: {res.stderr}"
     return _has_warning(res.stdout)
@@ -734,6 +737,135 @@ if not run("", raw_lines=back_to_back_assistant_no_id_transcript):
     failed += 1
 else:
     print("PASS: back-to-back assistant events without IDs and without stopping point warns")
+
+# Test: Scope sentinel deduplication to session and turn
+shared_sentinel_tmpdir = tempfile.mkdtemp()
+sess_turn_payload_1 = {
+    "reply": "No stopping point declaration here.",
+    "session_id": "sess_1",
+    "turn_id": "turn_1",
+}
+sess_turn_payload_retry = {
+    "reply": "No stopping point declaration here.",
+    "session_id": "sess_1",
+    "turn_id": "turn_1",
+}
+sess_turn_payload_next_turn = {
+    "reply": "No stopping point declaration here.",
+    "session_id": "sess_1",
+    "turn_id": "turn_2",
+}
+sess_turn_payload_next_sess = {
+    "reply": "No stopping point declaration here.",
+    "session_id": "sess_2",
+    "turn_id": "turn_1",
+}
+
+if not run_direct_payload(sess_turn_payload_1, tmpdir=shared_sentinel_tmpdir):
+    print("FAIL: first invocation with session/turn did not warn")
+    failed += 1
+else:
+    print("PASS: first invocation with session/turn warns")
+
+if run_direct_payload(sess_turn_payload_retry, tmpdir=shared_sentinel_tmpdir):
+    print("FAIL: same-turn retry was not deduplicated")
+    failed += 1
+else:
+    print("PASS: same-turn retry is deduplicated")
+
+if not run_direct_payload(sess_turn_payload_next_turn, tmpdir=shared_sentinel_tmpdir):
+    print("FAIL: identical missing-declaration in later turn was silently ignored")
+    failed += 1
+else:
+    print("PASS: identical missing-declaration in later turn warns")
+
+if not run_direct_payload(sess_turn_payload_next_sess, tmpdir=shared_sentinel_tmpdir):
+    print("FAIL: identical missing-declaration in another session was silently ignored")
+    failed += 1
+else:
+    print("PASS: identical missing-declaration in another session warns")
+
+# Test: Harness-mode exceptions
+if run_direct_payload({"reply": "No stopping point declaration here.", "harness_mode": True}):
+    print("FAIL: harness_mode payload warned")
+    failed += 1
+else:
+    print("PASS: harness_mode payload passes without warning")
+
+if run_direct_payload({"reply": "No stopping point declaration here.", "non_interactive": True}):
+    print("FAIL: non_interactive payload warned")
+    failed += 1
+else:
+    print("PASS: non_interactive payload passes without warning")
+
+if run_direct_payload({"reply": "No stopping point declaration here."}, env={"HARNESS_MODE": "1"}):
+    print("FAIL: HARNESS_MODE env warned")
+    failed += 1
+else:
+    print("PASS: HARNESS_MODE env passes without warning")
+
+if run_direct_payload({"reply": "No stopping point declaration here."}, env={"CLAUDE_NON_INTERACTIVE": "1"}):
+    print("FAIL: CLAUDE_NON_INTERACTIVE env warned")
+    failed += 1
+else:
+    print("PASS: CLAUDE_NON_INTERACTIVE env passes without warning")
+
+# Test: Whitespace preservation during chunk reconstruction (assistant branch)
+whitespace_assistant_transcript = [
+    json.dumps({
+        "type": "assistant",
+        "message": {
+            "id": "msg_ws",
+            "content": "**Stopping Point**: Clean stopping point reached --- session",
+        },
+    }),
+    json.dumps({
+        "type": "assistant",
+        "message": {
+            "id": "msg_ws",
+            "content": " ",
+        },
+    }),
+    json.dumps({
+        "type": "assistant",
+        "message": {
+            "id": "msg_ws",
+            "content": "done.",
+        },
+    }),
+]
+if run("", raw_lines=whitespace_assistant_transcript):
+    print("FAIL: assistant string chunks with whitespace-only chunk warned")
+    failed += 1
+else:
+    print("PASS: assistant string chunks with whitespace-only chunk passes")
+
+# Test: Whitespace preservation in MODEL/PLANNER_RESPONSE reconstruction
+whitespace_model_transcript = [
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "id": "model_ws",
+        "content": "**Stopping Point**: Clean stopping point reached --- session",
+    }),
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "id": "model_ws",
+        "content": " ",
+    }),
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "id": "model_ws",
+        "content": "done.",
+    }),
+]
+if run("", raw_lines=whitespace_model_transcript):
+    print("FAIL: MODEL string chunks with whitespace-only chunk warned")
+    failed += 1
+else:
+    print("PASS: MODEL string chunks with whitespace-only chunk passes")
 
 raise SystemExit(bool(failed))
 

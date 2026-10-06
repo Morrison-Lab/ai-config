@@ -14,11 +14,11 @@ HOOK = (
 def _has_warning(stdout: str) -> bool:
     if not stdout.strip():
         return False
-    try:
-        data = json.loads(stdout)
-        return "systemMessage" in data and bool(data["systemMessage"])
-    except Exception:
-        return "systemMessage" in stdout
+    data = json.loads(stdout)
+    assert not (data.get("decision") == "block" or "reason" in data), (
+        f"Hook emitted blocking decision or reason: {stdout}"
+    )
+    return "systemMessage" in data and bool(data.get("systemMessage"))
 
 
 def run(text, tmpdir=None, raw_lines=None, key_name="transcript_path"):
@@ -582,6 +582,100 @@ if run(qa_reply_with_decl):
     failed += 1
 else:
     print("PASS: conversational question-answering reply with clean stopping point passes (#4308)")
+
+# Regression test: Different message.id sequence (msg_prior with declaration, msg_final without declaration)
+diff_msg_id_transcript = [
+    json.dumps({
+        "type": "assistant",
+        "message": {
+            "id": "msg_prior",
+            "content": [{"type": "text", "text": "Task complete.\n\n**Stopping Point**: Clean stopping point reached --- session done."}],
+        },
+    }),
+    json.dumps({
+        "type": "assistant",
+        "message": {
+            "id": "msg_final",
+            "content": [{"type": "text", "text": "By the way, here is some follow-up info."}],
+        },
+    }),
+]
+if not run("", raw_lines=diff_msg_id_transcript):
+    print("FAIL: different message.id sequence without stopping point did not warn")
+    failed += 1
+else:
+    print("PASS: different message.id sequence without stopping point warns")
+
+diff_msg_id_clean_transcript = [
+    json.dumps({
+        "type": "assistant",
+        "message": {
+            "id": "msg_prior",
+            "content": [{"type": "text", "text": "Task complete."}],
+        },
+    }),
+    json.dumps({
+        "type": "assistant",
+        "message": {
+            "id": "msg_final",
+            "content": [{"type": "text", "text": "Final response.\n\n**Stopping Point**: Clean stopping point reached --- session done."}],
+        },
+    }),
+]
+if run("", raw_lines=diff_msg_id_clean_transcript):
+    print("FAIL: different message.id sequence with stopping point warned")
+    failed += 1
+else:
+    print("PASS: different message.id sequence with stopping point passes")
+
+# Regression test: Gemini / Antigravity transcript with tool_calls boundary
+gemini_tool_boundary_transcript = [
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "content": "Initial step.\n\n**Stopping Point**: Clean stopping point reached --- session done.",
+        "tool_calls": [{"name": "run_command", "args": {"CommandLine": "dir"}}],
+    }),
+    json.dumps({
+        "type": "USER_INPUT",
+        "source": "USER_EXPLICIT",
+        "content": [{"type": "tool_result", "content": "file1.txt\nfile2.txt"}],
+    }),
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "content": "Here is the directory listing: file1.txt, file2.txt.",
+    }),
+]
+if not run("", raw_lines=gemini_tool_boundary_transcript):
+    print("FAIL: Antigravity transcript with tool_calls boundary without stopping point did not warn")
+    failed += 1
+else:
+    print("PASS: Antigravity transcript with tool_calls boundary without stopping point warns")
+
+gemini_tool_boundary_clean_transcript = [
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "content": "Initial step.",
+        "tool_calls": [{"name": "run_command", "args": {"CommandLine": "dir"}}],
+    }),
+    json.dumps({
+        "type": "USER_INPUT",
+        "source": "USER_EXPLICIT",
+        "content": [{"type": "tool_result", "content": "file1.txt\nfile2.txt"}],
+    }),
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "content": "Here is the listing.\n\n**Stopping Point**: Clean stopping point reached --- session done.",
+    }),
+]
+if run("", raw_lines=gemini_tool_boundary_clean_transcript):
+    print("FAIL: Antigravity transcript with tool_calls boundary with clean stopping point warned")
+    failed += 1
+else:
+    print("PASS: Antigravity transcript with tool_calls boundary with clean stopping point passes")
 
 raise SystemExit(bool(failed))
 

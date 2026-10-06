@@ -198,7 +198,11 @@ def last_text(path: str) -> str:
                         consecutive_assistant = False
                         curr_msg_id = None
                     elif text:
-                        if consecutive_assistant or (msg_id and msg_id == curr_msg_id):
+                        is_same_message = (
+                            (msg_id and curr_msg_id and msg_id == curr_msg_id)
+                            or (consecutive_assistant and not msg_id and not curr_msg_id)
+                        )
+                        if is_same_message:
                             if last_text_val and text.startswith(last_text_val):
                                 last_text_val = text
                             else:
@@ -211,6 +215,7 @@ def last_text(path: str) -> str:
                     event.get("type") in {"PLANNER_RESPONSE", "GENERIC"}
                     or event.get("source") == "MODEL"
                 ):
+                    has_tool_calls = bool(event.get("tool_calls"))
                     content = event.get("content")
                     if isinstance(content, str) and content.strip():
                         text = content
@@ -221,7 +226,13 @@ def last_text(path: str) -> str:
                         )
                     else:
                         text = ""
-                    if text:
+
+                    if has_tool_calls:
+                        if text.strip():
+                            last_text_val = text
+                        consecutive_assistant = False
+                        curr_msg_id = None
+                    elif text:
                         if consecutive_assistant:
                             if last_text_val and text.startswith(last_text_val):
                                 last_text_val = text

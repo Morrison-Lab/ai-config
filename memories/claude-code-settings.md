@@ -180,6 +180,22 @@ told otherwise (ai-config#2528).
   first-versus-union rule as the whole divergence when the runner also
   matches commented-out and non-`enabledPlugins` text.
 
+## A plugin synced from claude.ai mid-session stays unloaded until the next session
+
+Measured 2026-10-05 in a Claude desktop app session, Code tab, on Linux.
+The session started at about 16:30 with no ai-config plugin and no `~/.claude/CLAUDE.md`.
+At 17:06 claude.ai synced the plugin into `~/.claude/plugins/synced/<id>/ai-config/`, and `claude plugin list` then reported it as `loaded`.
+The running session still had none of it.
+Its SessionStart hook never fired, no ai-config skill (`daytb`, `mwc`, `ums`) was in its skill listing, and no hook ran on any tool call.
+So the user's `daytb` read as an unknown word, and the session asked a question it should have answered itself.
+Later, because no worktree hooks were active, the session committed to a peer session's branch (`subagent-worktrees.md`, third occurrence).
+
+`claude plugin list` reports what is installed on disk, not what is loaded in the session asking.
+
+- **Do:** when a Morrison-Lab keyword or rule seems unknown, check for `~/.claude/plugins/synced/*/ai-config/`.
+  If it's there, read its `CLAUDE.md`, `AGENTS.md`, and the keyword's `skills/<name>/SKILL.md` before replying, and tell the user a new session will load it properly.
+- **Don't:** read `claude plugin list` saying `loaded` as evidence that the current session has the plugin's skills or hooks.
+
 ## A cloud session in ai-config loads no plugin, so `hooks/hooks.json` is inert there unless a skills-directory plugin carries it
 
 The hook catalog reaches Claude Code only through a **plugin**: a project's

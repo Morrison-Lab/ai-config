@@ -272,6 +272,17 @@ assert src.count(anchor) == 1, f"anchor matched {src.count(anchor)} times"
 src = src.replace(anchor, replacement)
 ```
 
+**An `mwc` grant does not reach the auto-mode classifier.**
+Measured 2026-10-05 in a Claude desktop app session (Code tab).
+The user had typed `mwc`, and `check-pr-fully-clean.py` reported lds#411 fully clean on the head SHA it then pinned.
+`gh pr merge 411 --merge --match-head-commit <sha>` was still refused with `[Merge Without Review]`.
+The classifier also refused `mcp__ccd_pr__set_monitor` (turning Auto-fix on), giving no reason.
+In both cases the user had asked for the action.
+The user then left auto mode, and the same merge went through the ordinary permission prompt.
+So under auto mode, `mwc` authorizes the merge but cannot carry it out.
+
+- **Do:** when auto mode refuses a merge the `mwc` gate passed, report the PR, its pinned SHA and the checker's verdict.
+  Say that leaving auto mode, or adding a permission rule for `gh pr merge`, lets the merge run.
 - **Do:** report a refused command and its stated reason to the user, and
   stop.
 - **Do:** assert an exact match count per replacement, and read the result

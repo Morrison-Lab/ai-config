@@ -653,13 +653,14 @@ def latest_bot_review_states(reviews, head_oid="", review_comments=None):
     A 'Needs a closer look' heading gets one narrow carve-out
     ([ai-config#4004](https://github.com/Morrison-Lab/ai-config/issues/4004), `copilot_is_empty_balanced_closer_look`): an empty
     BALANCED review under that heading states no verdict at all, so this
-    round is skipped entirely rather than setting NOT_CLEAN -- and,
-    exactly like an ordinary round with no recognizable verdict, it also
-    does not touch any standing state an earlier round already set. This
-    is checked only when `is_negative` fired SOLELY off the heading (never
-    when `NOT_CLEAN_VERDICT_RE` or the suppressed-block-over-affirmative
-    check also independently matched), so a genuinely blocking phrase
-    elsewhere in the same body is never carved out.
+    round is skipped entirely rather than setting NOT_CLEAN. When evaluating
+    the current head commit (and having no live inline review comments on that
+    head), it also clears any standing not-clean state an earlier round set
+    ([ai-config#4318](https://github.com/Morrison-Lab/ai-config/issues/4318)), since the reviewer has re-evaluated the current head
+    with zero findings and no live comments. This is checked only when
+    `is_negative` fired SOLELY off the heading (never when `NOT_CLEAN_VERDICT_RE`
+    or the suppressed-block-over-affirmative check also independently matched),
+    so a genuinely blocking phrase elsewhere in the same body is never carved out.
 
     The carve-out is ALSO gated on `_has_live_inline_bot_item` finding no
     current-head inline review comment from the same bot login
@@ -705,6 +706,8 @@ def latest_bot_review_states(reviews, head_oid="", review_comments=None):
             and copilot_is_empty_balanced_closer_look(raw_body)
             and not _has_live_inline_bot_item(review_comments, login, head_oid)
         ):
+            if head_oid and oid and len(oid) >= ABBREV_SHA_LEN and head_oid.startswith(oid):
+                states.pop(login, None)
             continue
         if is_negative:
             states[login] = "NOT_CLEAN"

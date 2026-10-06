@@ -974,6 +974,103 @@ class TestEvaluate(unittest.TestCase):
         self.assertEqual(decision["decision"], "deny")
         self.assertIn("copilot-pull-request-reviewer", decision["reason"])
 
+    def test_copilot_empty_balanced_on_head_clears_older_not_clean(self):
+        """A bot review on HEAD matching the empty Balanced carve-out clears an
+        older not-clean verdict when there are no live inline comments on HEAD (ai-config#4318)."""
+        older_sha = "1111111111111111111111111111111111111111"
+        state = pr(
+            reviews=[
+                review(
+                    "copilot-pull-request-reviewer",
+                    "COMMENTED",
+                    body="### Changes recommended\n\nFound a race condition.",
+                    commit=older_sha,
+                ),
+                review(
+                    "copilot-pull-request-reviewer",
+                    "COMMENTED",
+                    body=self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY,
+                    commit=HEAD,
+                ),
+            ],
+            comments=[CLEAN_VERDICT],
+            review_comments=[inline_comment(
+                "copilot-pull-request-reviewer",
+                commit_id=older_sha,
+                original_commit_id=older_sha,
+            )],
+        )
+        bot_states = gate.latest_bot_review_states(
+            state["reviews"], state["headRefOid"], state["reviewComments"]
+        )
+        self.assertNotIn("copilot-pull-request-reviewer", bot_states)
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "allow")
+
+    def test_copilot_empty_balanced_on_older_commit_does_not_clear_standing_not_clean(self):
+        """An empty Balanced review on an older commit (not matching HEAD) does
+        NOT clear standing not-clean state on HEAD (ai-config#4318)."""
+        older_sha1 = "1111111111111111111111111111111111111111"
+        older_sha2 = "2222222222222222222222222222222222222222"
+        state = pr(
+            reviews=[
+                review(
+                    "copilot-pull-request-reviewer",
+                    "COMMENTED",
+                    body="### Changes recommended\n\nFound a race condition.",
+                    commit=older_sha1,
+                ),
+                review(
+                    "copilot-pull-request-reviewer",
+                    "COMMENTED",
+                    body=self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY,
+                    commit=older_sha2,
+                ),
+            ],
+            comments=[CLEAN_VERDICT],
+        )
+        bot_states = gate.latest_bot_review_states(
+            state["reviews"], state["headRefOid"], state["reviewComments"]
+        )
+        self.assertEqual(bot_states.get("copilot-pull-request-reviewer"), "NOT_CLEAN")
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("copilot-pull-request-reviewer", decision["reason"])
+
+    def test_copilot_empty_balanced_on_head_with_live_inline_item_does_not_clear(self):
+        """An empty Balanced review on HEAD does not clear an older not-clean
+        verdict if an inline review comment from the bot is still live on HEAD (ai-config#4318)."""
+        older_sha = "1111111111111111111111111111111111111111"
+        state = pr(
+            reviews=[
+                review(
+                    "copilot-pull-request-reviewer",
+                    "COMMENTED",
+                    body="### Changes recommended\n\nFound a race condition.",
+                    commit=older_sha,
+                ),
+                review(
+                    "copilot-pull-request-reviewer",
+                    "COMMENTED",
+                    body=self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY,
+                    commit=HEAD,
+                ),
+            ],
+            comments=[CLEAN_VERDICT],
+            review_comments=[inline_comment(
+                "copilot-pull-request-reviewer",
+                commit_id=HEAD,
+                original_commit_id=older_sha,
+            )],
+        )
+        bot_states = gate.latest_bot_review_states(
+            state["reviews"], state["headRefOid"], state["reviewComments"]
+        )
+        self.assertEqual(bot_states.get("copilot-pull-request-reviewer"), "NOT_CLEAN")
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("copilot-pull-request-reviewer", decision["reason"])
+
     def test_bot_short_oid_does_not_clear_or_match_head(self):
         """A 1-character commit oid in a bot review is not head-bound."""
         short_sha = HEAD[0]

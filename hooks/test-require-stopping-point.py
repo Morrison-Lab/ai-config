@@ -929,6 +929,50 @@ if not run_direct_payload(adapter_payload_t2, tmpdir=adapter_sess_dir):
 else:
     print("PASS: adapter-shaped turn 2 warns")
 
+# Test: id-less 2-line non-cumulative transcripts sharing the same missing declaration text
+idless_sess_dir = tempfile.mkdtemp()
+idless_tscript_t1 = os.path.join(idless_sess_dir, "t1.jsonl")
+with open(idless_tscript_t1, "w", encoding="utf-8") as f:
+    f.write(json.dumps({"type": "user", "message": {"content": "turn 1"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"content": "identical undeclared reply"}}) + "\n")
+
+idless_payload_t1 = {
+    "session_id": "sess_idless_1",
+    "transcript_path": idless_tscript_t1,
+}
+idless_payload_t1_retry = {
+    "session_id": "sess_idless_1",
+    "transcript_path": idless_tscript_t1,
+}
+
+idless_tscript_t2 = os.path.join(idless_sess_dir, "t2.jsonl")
+with open(idless_tscript_t2, "w", encoding="utf-8") as f:
+    f.write(json.dumps({"type": "user", "message": {"content": "turn 2"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"content": "identical undeclared reply"}}) + "\n")
+
+idless_payload_t2 = {
+    "session_id": "sess_idless_1",
+    "transcript_path": idless_tscript_t2,
+}
+
+if not run_direct_payload(idless_payload_t1, tmpdir=idless_sess_dir):
+    print("FAIL: id-less turn 1 did not warn")
+    failed += 1
+else:
+    print("PASS: id-less turn 1 warns")
+
+if run_direct_payload(idless_payload_t1_retry, tmpdir=idless_sess_dir):
+    print("FAIL: id-less turn 1 retry was not deduplicated")
+    failed += 1
+else:
+    print("PASS: id-less turn 1 retry is deduplicated")
+
+if not run_direct_payload(idless_payload_t2, tmpdir=idless_sess_dir):
+    print("FAIL: id-less turn 2 was silently suppressed by turn 1 sentinel")
+    failed += 1
+else:
+    print("PASS: id-less turn 2 warns")
+
 # Test: Harness-mode exceptions
 if run_direct_payload({"reply": "No stopping point declaration here.", "harness_mode": True}):
     print("FAIL: harness_mode payload warned")

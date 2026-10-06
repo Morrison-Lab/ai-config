@@ -5,15 +5,29 @@ An HTML comment (`<!-- Source: ... -->`), a commit message,
 or a PR description is not an attribution:
 no reader of the rendered website, slides, handout or paper ever sees it.
 
-This covers every source a reader would want to know about:
+This covers every outside source a reader would want to know about:
 
 - the book or paper an item follows;
-- the course site, notes, or repository it was adapted from;
+- another course's site, notes, or repository it was adapted from;
 - the person whose lecture, notes or code it was adapted from.
 
-When the source credits its own upstream,
+When such a source credits its own upstream,
 carry that credit along,
 so the chain reaches the reader rather than stopping one hop short.
+
+## The maintainer's own repositories need no attribution
+
+Content taken from the maintainer's own repositories and course sites
+(the Morrison-Lab sites, such as rme, lds, pds and sds)
+needs no attribution when it moves into another of them
+(user directive, 2026-10-05).
+They are one body of material by the same author,
+so a "Source" callout naming the sister site credits the reader's own course to itself.
+A link to a sister site that sends the reader to further reading
+is a cross-reference, not an attribution, and stays.
+
+- **Do:** credit the book, paper, or outside person an item follows, and drop a credit whose only source is a sister lab site.
+- **Don't:** add a "Source" callout that says only "adapted from the rme notes" or "the lds notes' definition of ...".
 
 ## Where the credit goes
 
@@ -39,16 +53,14 @@ so the credit travels with the fragment when another site includes it:
 ::: {.callout-note collapse="true"}
 #### Source
 
-Adapted from the rme notes'
-[definition of overfitting](https://morrison-lab.github.io/rme/chapters/predictor-selection.html#def-overfitting);
-see also @james2021islr2e [sec. 5.1].
+@james2021islr2e [sec. 5.1].
 :::
 
 :::
 ```
 
 Cite books and papers through the bibliography (`@key [locator]`),
-and link a site's rendered page at the item's anchor,
+and link an outside site's rendered page at the item's anchor,
 checking that the anchor exists and holds the text the credit points to.
 
 ## What stays in a comment

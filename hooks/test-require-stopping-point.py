@@ -785,6 +785,87 @@ if not run_direct_payload(sess_turn_payload_next_sess, tmpdir=shared_sentinel_tm
 else:
     print("PASS: identical missing-declaration in another session warns")
 
+# Test: Scope sentinel deduplication with realistic Claude Code fields (session_id, prompt_id, transcript_path)
+claude_sess_dir = tempfile.mkdtemp()
+claude_payload_turn1 = {
+    "session_id": "claude_sess_1",
+    "prompt_id": "prompt_001",
+    "reply": "No stopping point declaration here.",
+}
+claude_payload_turn1_retry = {
+    "session_id": "claude_sess_1",
+    "prompt_id": "prompt_001",
+    "reply": "No stopping point declaration here.",
+}
+claude_payload_turn2 = {
+    "session_id": "claude_sess_1",
+    "prompt_id": "prompt_002",
+    "reply": "No stopping point declaration here.",
+}
+
+if not run_direct_payload(claude_payload_turn1, tmpdir=claude_sess_dir):
+    print("FAIL: Claude Code prompt_id turn 1 did not warn")
+    failed += 1
+else:
+    print("PASS: Claude Code prompt_id turn 1 warns")
+
+if run_direct_payload(claude_payload_turn1_retry, tmpdir=claude_sess_dir):
+    print("FAIL: Claude Code prompt_id turn 1 retry was not deduplicated")
+    failed += 1
+else:
+    print("PASS: Claude Code prompt_id turn 1 retry is deduplicated")
+
+if not run_direct_payload(claude_payload_turn2, tmpdir=claude_sess_dir):
+    print("FAIL: Claude Code prompt_id turn 2 was silently suppressed by turn 1 sentinel")
+    failed += 1
+else:
+    print("PASS: Claude Code prompt_id turn 2 warns")
+
+# Test: Scope sentinel deduplication using transcript event IDs when payload lacks turn_id/prompt_id
+tscript_turn1 = os.path.join(claude_sess_dir, "transcript1.jsonl")
+with open(tscript_turn1, "w", encoding="utf-8") as f:
+    f.write(json.dumps({"type": "user", "promptId": "p_turn_1", "message": {"content": "hello"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"id": "msg_turn_1", "content": "No stopping point"}}) + "\n")
+
+payload_tscript_turn1 = {
+    "session_id": "claude_sess_2",
+    "transcript_path": tscript_turn1,
+}
+payload_tscript_turn1_retry = {
+    "session_id": "claude_sess_2",
+    "transcript_path": tscript_turn1,
+}
+
+tscript_turn2 = os.path.join(claude_sess_dir, "transcript2.jsonl")
+with open(tscript_turn2, "w", encoding="utf-8") as f:
+    f.write(json.dumps({"type": "user", "promptId": "p_turn_1", "message": {"content": "hello"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"id": "msg_turn_1", "content": "No stopping point"}}) + "\n")
+    f.write(json.dumps({"type": "user", "promptId": "p_turn_2", "message": {"content": "hello again"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"id": "msg_turn_2", "content": "No stopping point"}}) + "\n")
+
+payload_tscript_turn2 = {
+    "session_id": "claude_sess_2",
+    "transcript_path": tscript_turn2,
+}
+
+if not run_direct_payload(payload_tscript_turn1, tmpdir=claude_sess_dir):
+    print("FAIL: transcript turn 1 did not warn")
+    failed += 1
+else:
+    print("PASS: transcript turn 1 warns")
+
+if run_direct_payload(payload_tscript_turn1_retry, tmpdir=claude_sess_dir):
+    print("FAIL: transcript turn 1 retry was not deduplicated")
+    failed += 1
+else:
+    print("PASS: transcript turn 1 retry is deduplicated")
+
+if not run_direct_payload(payload_tscript_turn2, tmpdir=claude_sess_dir):
+    print("FAIL: transcript turn 2 was silently suppressed by turn 1 sentinel")
+    failed += 1
+else:
+    print("PASS: transcript turn 2 warns")
+
 # Test: Harness-mode exceptions
 if run_direct_payload({"reply": "No stopping point declaration here.", "harness_mode": True}):
     print("FAIL: harness_mode payload warned")

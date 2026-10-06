@@ -330,6 +330,57 @@ def extract_text_from_payload(payload):
     return ""
 
 
+def extract_turn_id(payload: dict) -> str:
+    """Extract turn or prompt identifier from payload or transcript."""
+    for key in (
+        "prompt_id",
+        "promptId",
+        "turn_id",
+        "turnId",
+        "step_index",
+        "stepIndex",
+    ):
+        val = payload.get(key)
+        if val is not None:
+            return str(val)
+    tpath = (
+        payload.get("transcript_path")
+        or payload.get("transcriptPath")
+        or payload.get("transcript")
+        or payload.get("history_file")
+        or ""
+    )
+    if tpath and os.path.exists(tpath):
+        try:
+            with open(tpath, "r", encoding="utf-8") as f:
+                last_id = ""
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        event = json.loads(line)
+                    except Exception:
+                        continue
+                    if not isinstance(event, dict):
+                        continue
+                    ev_id = (
+                        event.get("prompt_id")
+                        or event.get("promptId")
+                        or (event.get("message") or {}).get("id")
+                        or event.get("id")
+                        or event.get("step_index")
+                        or event.get("stepIndex")
+                    )
+                    if ev_id is not None:
+                        last_id = str(ev_id)
+                if last_id:
+                    return last_id
+        except Exception:
+            pass
+    return ""
+
+
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
@@ -362,19 +413,7 @@ def main() -> int:
         or os.environ.get("SESSION_ID")
         or ""
     )
-    turn_id = (
-        str(payload.get("turn_id"))
-        if payload.get("turn_id") is not None
-        else (
-            str(payload.get("turnId"))
-            if payload.get("turnId") is not None
-            else (
-                str(payload.get("step_index"))
-                if payload.get("step_index") is not None
-                else ""
-            )
-        )
-    )
+    turn_id = extract_turn_id(payload)
     key_src = f"{session_id}:{turn_id}:{text}"
     key = hashlib.sha256(key_src.encode()).hexdigest()[:16]
     sentinel = os.path.join(tempfile.gettempdir(), f".claude-stopping-point-{key}")

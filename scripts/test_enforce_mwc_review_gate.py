@@ -33,11 +33,14 @@ gate = load_gate()
 HEAD = "8d7864c66c90ce495ae53deeaa8f1e86f3cf18b7"
 
 
-def comment(body, login="github-actions"):
-    return {"author": {"login": login}, "body": body}
+def comment(body, login="github-actions", createdAt=None):
+    c = {"author": {"login": login}, "body": body}
+    if createdAt is not None:
+        c["createdAt"] = createdAt
+    return c
 
 
-def review(login, state, body="", commit=HEAD, assoc="MEMBER"):
+def review(login, state, body="", commit=HEAD, assoc="MEMBER", submittedAt=None):
     """A review record in `gh pr view --json reviews`' own shape.
 
     `commit.oid` and `authorAssociation` default to admissible values so a
@@ -48,6 +51,8 @@ def review(login, state, body="", commit=HEAD, assoc="MEMBER"):
          "authorAssociation": assoc}
     if commit is not None:
         r["commit"] = {"oid": commit}
+    if submittedAt is not None:
+        r["submittedAt"] = submittedAt
     return r
 
 
@@ -1072,6 +1077,166 @@ class TestEvaluate(unittest.TestCase):
         self.assertEqual(decision["decision"], "deny")
         self.assertIn("copilot-pull-request-reviewer", decision["reason"])
 
+    def test_copilot_unavailable_notice_clears_older_not_clean(self):
+        """An unavailable/quota-exhausted review notice from Copilot clears an
+        older not-clean verdict when there are no live inline comments on HEAD (ai-config#4329)."""
+        older_sha = "1111111111111111111111111111111111111111"
+        state = pr(
+            reviews=[
+                review(
+                    "copilot-pull-request-reviewer",
+                    "COMMENTED",
+                    body="### Changes recommended\n\nFound a race condition.",
+                    commit=older_sha,
+                    submittedAt="2026-10-06T10:00:00Z",
+                ),
+                review(
+                    "copilot-pull-request-reviewer",
+                    "COMMENTED",
+                    body="Copilot was unable to review this pull request because the user who requested the review has reached their quota limit.",
+                    commit=HEAD,
+                    submittedAt="2026-10-06T11:00:00Z",
+                ),
+            ],
+            comments=[CLEAN_VERDICT],
+            review_comments=[inline_comment(
+                "copilot-pull-request-reviewer",
+                commit_id=older_sha,
+                original_commit_id=older_sha,
+            )],
+        )
+        bot_states = gate.latest_bot_review_states(
+            state["reviews"], state["headRefOid"], state["reviewComments"], state["comments"]
+        )
+        self.assertNotIn("copilot-pull-request-reviewer", bot_states)
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "allow")
+
+    def test_copilot_unavailable_comment_clears_older_not_clean(self):
+        """An unavailable/quota-exhausted issue comment clears an older not-clean
+        verdict when dated after that verdict and there are no live inline comments on HEAD (ai-config#4329)."""
+        older_sha = "1111111111111111111111111111111111111111"
+        state = pr(
+            reviews=[
+                review(
+                    "copilot-pull-request-reviewer",
+                    "COMMENTED",
+                    body="### Changes recommended\n\nFound a race condition.",
+                    commit=older_sha,
+                    submittedAt="2026-10-06T10:00:00Z",
+                ),
+            ],
+            comments=[
+                CLEAN_VERDICT,
+                comment(
+                    "Copilot was unable to review this pull request because the user who requested the review has reached their quota limit.",
+                    login="copilot-pull-request-reviewer",
+                    createdAt="2026-10-06T11:00:00Z",
+                ),
+            ],
+            review_comments=[],
+        )
+        bot_states = gate.latest_bot_review_states(
+            state["reviews"], state["headRefOid"], state["reviewComments"], state["comments"]
+        )
+        self.assertNotIn("copilot-pull-request-reviewer", bot_states)
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "allow")
+
+    def test_copilot_unavailable_notice_with_live_inline_item_does_not_clear(self):
+        """An unavailable notice does NOT clear an older not-clean verdict if an
+        inline review comment is still live on HEAD (ai-config#4329)."""
+        older_sha = "1111111111111111111111111111111111111111"
+        state = pr(
+            reviews=[
+                review(
+                    "copilot-pull-request-reviewer",
+                    "COMMENTED",
+                    body="### Changes recommended\n\nFound a race condition.",
+                    commit=older_sha,
+                    submittedAt="2026-10-06T10:00:00Z",
+                ),
+                review(
+                    "copilot-pull-request-reviewer",
+                    "COMMENTED",
+                    body="Copilot was unable to review this pull request because the user who requested the review has reached their quota limit.",
+                    commit=HEAD,
+                    submittedAt="2026-10-06T11:00:00Z",
+                ),
+            ],
+            comments=[CLEAN_VERDICT],
+            review_comments=[inline_comment(
+                "copilot-pull-request-reviewer",
+                commit_id=HEAD,
+                original_commit_id=older_sha,
+            )],
+        )
+        bot_states = gate.latest_bot_review_states(
+            state["reviews"], state["headRefOid"], state["reviewComments"], state["comments"]
+        )
+        self.assertEqual(bot_states.get("copilot-pull-request-reviewer"), "NOT_CLEAN")
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("copilot-pull-request-reviewer", decision["reason"])
+
+    def test_copilot_unavailable_before_negative_review_does_not_clear(self):
+        """An unavailable notice dated before a negative review does NOT clear the negative review (ai-config#4329)."""
+        older_sha = "1111111111111111111111111111111111111111"
+        state = pr(
+            reviews=[
+                review(
+                    "copilot-pull-request-reviewer",
+                    "COMMENTED",
+                    body="Copilot was unable to review this pull request because the user who requested the review has reached their quota limit.",
+                    commit=older_sha,
+                    submittedAt="2026-10-06T10:00:00Z",
+                ),
+                review(
+                    "copilot-pull-request-reviewer",
+                    "COMMENTED",
+                    body="### Changes recommended\n\nFound a race condition.",
+                    commit=HEAD,
+                    submittedAt="2026-10-06T11:00:00Z",
+                ),
+            ],
+            comments=[CLEAN_VERDICT],
+            review_comments=[],
+        )
+        bot_states = gate.latest_bot_review_states(
+            state["reviews"], state["headRefOid"], state["reviewComments"], state["comments"]
+        )
+        self.assertEqual(bot_states.get("copilot-pull-request-reviewer"), "NOT_CLEAN")
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+
+    def test_copilot_unavailable_does_not_clear_changes_requested(self):
+        """An unavailable notice never clears a formal CHANGES_REQUESTED review (ai-config#4329)."""
+        state = pr(
+            reviews=[
+                review(
+                    "copilot-pull-request-reviewer",
+                    "CHANGES_REQUESTED",
+                    commit=HEAD,
+                    submittedAt="2026-10-06T10:00:00Z",
+                ),
+                review(
+                    "copilot-pull-request-reviewer",
+                    "COMMENTED",
+                    body="Copilot was unable to review this pull request because the user who requested the review has reached their quota limit.",
+                    commit=HEAD,
+                    submittedAt="2026-10-06T11:00:00Z",
+                ),
+            ],
+            comments=[CLEAN_VERDICT],
+            review_comments=[],
+        )
+        bot_states = gate.latest_bot_review_states(
+            state["reviews"], state["headRefOid"], state["reviewComments"], state["comments"]
+        )
+        self.assertEqual(bot_states.get("copilot-pull-request-reviewer"), "CHANGES_REQUESTED")
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+
     def test_bot_short_oid_does_not_clear_or_match_head(self):
         """A 1-character commit oid in a bot review is not head-bound."""
         short_sha = HEAD[0]
@@ -1955,6 +2120,26 @@ class TestMain(unittest.TestCase):
                     f"{base}\ngit push"):
             decision, _ = self.run_main(self.payload(cmd), side_effect=[])
             self.assertEqual(decision["decision"], "deny", cmd)
+
+    def test_quoted_parentheses_and_semicolons_in_non_merge_command_not_gated(self):
+        """gh commands with parentheses or semicolons in titles/bodies are not misidentified as chained merges (ai-config#4326)."""
+        for cmd in (
+            'gh issue create -R owner/repo --title "fix merge (notes)"',
+            'gh issue create -R owner/repo --title "fix: merge; notes"',
+            'gh pr comment 123 --body "Merge (rebase) will happen next"',
+        ):
+            decision, run_mock = self.run_main(self.payload(cmd))
+            self.assertEqual(decision["decision"], "allow", cmd)
+            run_mock.assert_not_called()
+
+    def test_quoted_parentheses_in_merge_subject_not_denied_as_chained(self):
+        """Parentheses in quoted --subject or --body do not trigger chained merge denial (ai-config#4326)."""
+        cmd = 'gh pr merge 1427 -R Lacaedemon/sparta --squash --subject "fix(hooks): test (#4308)" --body "Closes #4308"'
+        decision, run_mock = self.run_main(
+            self.payload(cmd),
+            view=pr(comments=[CLEAN_VERDICT]),
+        )
+        self.assertEqual(decision["decision"], "allow")
 
     def test_gh_api_merge_resolves_pr_from_url(self):
         """The API route must gate the PR named in the URL, not the

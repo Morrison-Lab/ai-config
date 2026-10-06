@@ -6770,6 +6770,28 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         "clear when review_comments is None (fails closed) (ai-config#4318)",
         (not eb_none_ok) and any("NOT clean" in i for i in eb_none_issues),
     )
+    check(
+        "check_latest_verdict: unsupplied review_comments reports NOTE (ai-config#4318)",
+        any("NOTE: review comments not supplied" in i for i in eb_none_issues),
+    )
+
+    def _raising_rcs():
+        raise RuntimeError("network failure")
+
+    eb_raise_ok, eb_raise_issues = checker.check_latest_verdict(
+        [copilot_prior_not_clean_review, copilot_empty_balanced_review_item],
+        head_oid="b36fe3bb",
+        review_comments=_raising_rcs,
+    )
+    check(
+        "check_latest_verdict: an empty Balanced Copilot review on HEAD does not "
+        "clear when review_comments raises (fails closed) (ai-config#4318)",
+        (not eb_raise_ok) and any("NOT clean" in i for i in eb_raise_issues),
+    )
+    check(
+        "check_latest_verdict: review_comments fetch error reports NOTE (ai-config#4318)",
+        any("NOTE: could not fetch review comments" in i and "network failure" in i for i in eb_raise_issues),
+    )
 
     eb_inline_ok, eb_inline_issues = checker.check_latest_verdict(
         [copilot_prior_not_clean_review, copilot_empty_balanced_review_item],
@@ -8530,14 +8552,14 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         def get_review_comments(self):
             raise RuntimeError("API rate limit exceeded")
 
-    fetch_failed_raised = False
-    try:
-        original_check_review_comments(FakePRFetchFailure())
-    except RuntimeError as exc:
-        fetch_failed_raised = "API rate limit exceeded" in str(exc)
+    ok_fetch_fail, issues_fetch_fail = original_check_review_comments(FakePRFetchFailure())
     check(
-        "check_review_comments: get_review_comments fetch failure propagates (fails closed) (ai-config#4318)",
-        fetch_failed_raised,
+        "check_review_comments: get_review_comments fetch failure fails closed without crashing (ai-config#4318)",
+        (not ok_fetch_fail) and any("NOT clean" in i for i in issues_fetch_fail),
+    )
+    check(
+        "check_review_comments: get_review_comments fetch failure includes NOTE (ai-config#4318)",
+        any("could not fetch review comments" in i and "API rate limit exceeded" in i for i in issues_fetch_fail),
     )
 
     # --- check_review_threads tests (ai-config#3586) ---

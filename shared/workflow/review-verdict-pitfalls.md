@@ -1579,3 +1579,11 @@ What the entry records is that the two signals *can* disagree, not that they dis
 
 - **Do:** name the review-gating check when you report a PR clean, and say which comment's verdict field you read to confirm it.
 - **Don't:** let a check whose name asserts the property stand in for the artifact that carries it --- that naming is what makes this case hard to doubt.
+
+**An eleventh case: lazy review-item fetches can raise exceptions and abort fully-clean checks rather than failing closed.**
+When an automated review checker lazy-loads supplemental review data (such as inline review comments on `/pulls/{n}/comments` to verify whether an empty Balanced review on HEAD is clean of live inline comments), fetch errors (network outage, rate limits, or missing payload keys under `--from-json`) must be caught and handled to fail closed (preserving standing not-clean state with an informational `NOTE:`) rather than propagating uncaught and crashing the check.
+Additionally, pre-gathered offline payloads (`--from-json`) must maintain endpoint parity with live API calls (`PayloadFetcher._api()` and `build-pr-payload.py` must populate `review_comments` and `pr.reviewComments`), or offline validation runs will fail with unmapped API errors.
+
+- **Do:** fail closed gracefully with an informational `NOTE:` if lazy fetches for inline comments raise an exception, preserving standing not-clean state without aborting the check ([ai-config#4318](https://github.com/Morrison-Lab/ai-config/issues/4318), [PR #4319](https://github.com/Morrison-Lab/ai-config/pull/4319)).
+- **Do:** maintain API endpoint parity across `pull_request.py`, `payload_fetcher.py`, and `build-pr-payload.py` whenever introducing new REST or GraphQL calls.
+- **Don't:** let lazy fetch exceptions crash the checker or crash `--from-json` runs through missing payload mappings.

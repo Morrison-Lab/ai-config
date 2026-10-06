@@ -279,6 +279,78 @@ def main():
     check("pending review request in flight exits 1 (not clean)", code == 1)
     check("...and names in-flight reviewer", "copilot-pull-request-reviewer" in out)
 
+    # --- review_comments endpoint and Copilot empty-Balanced carve-out in --from-json ---
+    f_comments = PayloadFetcher({**base_payload(), "review_comments": [{"id": 1, "body": "test"}]})
+    res_comments = json.loads(f_comments(["gh", "api", "repos/o/r/pulls/1/comments?per_page=100"]))
+    check("routing: pulls/comments served from review_comments", res_comments == [{"id": 1, "body": "test"}])
+
+    f_pr_comments = PayloadFetcher({
+        **base_payload(),
+        "pr": {**base_payload()["pr"], "reviewComments": [{"id": 2, "body": "from_pr"}]},
+    })
+    res_pr_comments = json.loads(f_pr_comments(["gh", "api", "repos/o/r/pulls/1/comments?per_page=100"]))
+    check("routing: pulls/comments served from pr.reviewComments fallback", res_pr_comments == [{"id": 2, "body": "from_pr"}])
+
+    f_bad_comments = PayloadFetcher({**base_payload(), "review_comments": "not-a-list"})
+    try:
+        f_bad_comments(["gh", "api", "repos/o/r/pulls/1/comments"])
+        check("non-list review_comments raises PayloadError", False)
+    except PayloadError:
+        check("non-list review_comments raises PayloadError", True)
+
+    f_missing_comments = PayloadFetcher(base_payload())
+    try:
+        f_missing_comments(["gh", "api", "repos/o/r/pulls/1/comments"])
+        check("missing review_comments raises PayloadError", False)
+    except PayloadError:
+        check("missing review_comments raises PayloadError", True)
+
+    # End-to-end Copilot empty-Balanced carve-out under --from-json
+    old_sha = "1111111111111111111111111111111111111111"
+    copilot_prior_not_clean = {
+        "body": (
+            "<!-- ccr-overview-v2 -->\n\n"
+            "## Copilot review overview\n\n"
+            "### Changes recommended\n\n"
+            "**Review effort:** Balanced  \n"
+            "**Findings:** 1"
+        ),
+        "author": {"login": "Copilot"},
+        "submittedAt": "2026-08-30T01:10:00Z",
+        "commit": {"oid": old_sha},
+        "state": "COMMENTED",
+    }
+    copilot_empty_balanced = {
+        "body": (
+            "<!-- ccr-overview-v2 -->\n\n"
+            "## Copilot review overview\n\n"
+            "### Needs a closer look\n\n"
+            "The broad changes warrant final human review.\n\n"
+            "**Review effort:** Balanced  \n"
+            "**Findings:** None"
+        ),
+        "author": {"login": "Copilot"},
+        "submittedAt": "2026-08-30T01:20:00Z",
+        "commit": {"oid": HEAD},
+        "state": "COMMENTED",
+    }
+    # Clean when review_comments is empty
+    p_copilot_clean = base_payload()
+    p_copilot_clean["pr"]["reviews"] = [copilot_prior_not_clean, copilot_empty_balanced]
+    p_copilot_clean["review_comments"] = []
+    code, out = run_script(p_copilot_clean)
+    check("copilot empty-Balanced with empty review_comments exits 0 in --from-json", code == 0)
+    check("...and reports FULLY CLEAN", "FULLY CLEAN" in out)
+
+    # Blocks when review_comments has live inline comment on HEAD
+    p_copilot_blocked = base_payload()
+    p_copilot_blocked["pr"]["reviews"] = [copilot_prior_not_clean, copilot_empty_balanced]
+    p_copilot_blocked["review_comments"] = [
+        {"author": {"login": "Copilot"}, "commit_id": HEAD}
+    ]
+    code, out = run_script(p_copilot_blocked)
+    check("copilot empty-Balanced with live inline comment exits 1 in --from-json", code == 1)
+
     # An end-to-end run WITHOUT -R must exercise resolve_repo through the
     # payload rather than shelling out; a run WITH a realistic Actions URL
     # must exercise the actions/runs call site.

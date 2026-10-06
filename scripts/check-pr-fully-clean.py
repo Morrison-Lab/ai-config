@@ -326,7 +326,7 @@ def get_pr_info(pr_num: str, repo: str):
 
 def _is_bot_author(login: Optional[str]) -> bool:
     """Return True if *login* belongs to an automated review bot."""
-    login_str = str(login or "")
+    login_str = str(login or "").lower()
     if not login_str:
         return False
     return (
@@ -3298,6 +3298,7 @@ def check_latest_verdict(
 
     expired_ledgers = []
     payload_decided = []
+    review_comment_notes = []
     for item in dated:
         _kind, when, body, _oid, state = item[:5]
         author = item[5] if len(item) > 5 else ""
@@ -3360,20 +3361,32 @@ def check_latest_verdict(
                 and _oid
                 and len(_oid) >= 7
                 and head_oid.startswith(_oid)
-                and review_comments is not None
             ):
-                rcs = review_comments() if callable(review_comments) else review_comments
-                if rcs is not None and not _has_live_inline_bot_item(rcs, identity, head_oid):
-                    per_reviewer.pop(identity, None)
-                    if latest_identity == identity:
-                        if per_reviewer:
-                            latest_identity = max(per_reviewer, key=lambda k: per_reviewer[k][1])
-                            latest_verdict, latest_when, latest_author = per_reviewer[latest_identity]
-                        else:
-                            latest_identity = ""
-                            latest_verdict = ""
-                            latest_when = ""
-                            latest_author = ""
+                if review_comments is None:
+                    review_comment_notes.append(
+                        f"NOTE: review comments not supplied to verify absence of inline comments for {identity}; "
+                        "preserving standing not-clean state"
+                    )
+                else:
+                    try:
+                        rcs = review_comments() if callable(review_comments) else review_comments
+                    except Exception as exc:
+                        rcs = None
+                        review_comment_notes.append(
+                            f"NOTE: could not fetch review comments to verify absence of inline comments for {identity} ({exc}); "
+                            "preserving standing not-clean state"
+                        )
+                    if rcs is not None and not _has_live_inline_bot_item(rcs, identity, head_oid):
+                        per_reviewer.pop(identity, None)
+                        if latest_identity == identity:
+                            if per_reviewer:
+                                latest_identity = max(per_reviewer, key=lambda k: per_reviewer[k][1])
+                                latest_verdict, latest_when, latest_author = per_reviewer[latest_identity]
+                            else:
+                                latest_identity = ""
+                                latest_verdict = ""
+                                latest_when = ""
+                                latest_author = ""
 
     per_bits = ", ".join(
         f"{identity}={verdict}"
@@ -3411,7 +3424,7 @@ def check_latest_verdict(
         return False, [
             f"Latest verdict-bearing review statement ({latest_when}) is NOT clean, "
             "and no later comment supersedes it with a clean verdict"
-        ] + ledger_notes + payload_notes
+        ] + ledger_notes + payload_notes + review_comment_notes
 
     # Global latest is clean (or NONE), but another reviewer's latest may
     # still be not-clean -- the #2274 hole: a later all-clear from a
@@ -3457,6 +3470,7 @@ def check_latest_verdict(
         )
     issues.extend(ledger_notes)
     issues.extend(payload_notes)
+    issues.extend(review_comment_notes)
     blocking = [i for i in issues if not i.startswith("NOTE: ")]
     return len(blocking) == 0, issues
 

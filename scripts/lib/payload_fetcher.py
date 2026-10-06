@@ -252,4 +252,20 @@ class PayloadFetcher:
                 }
             })
 
+        if "/comments" in path and "/pulls/" in path:
+            comments = self.payload.get("review_comments")
+            if comments is None and isinstance(self.payload.get("pr"), dict):
+                comments = self.payload["pr"].get("reviewComments")
+            if comments is None:
+                raise PayloadError(
+                    "payload has no 'review_comments' (or 'pr.reviewComments') key, needed for "
+                    "verifying inline review comments.\n"
+                    "Gather it via `build-pr-payload.py` or include it in the payload."
+                )
+            if not isinstance(comments, list):
+                raise PayloadError(
+                    f"payload 'review_comments' must be a list, got {type(comments).__name__}."
+                )
+            return json.dumps(comments)
+
         raise PayloadError(f"no payload mapping for gh api path: {path}")

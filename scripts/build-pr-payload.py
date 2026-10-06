@@ -185,6 +185,7 @@ def build_payload(
     check_runs_raw: List[Dict[str, Any]],
     actions_runs: Optional[Dict[str, Dict[str, Any]]] = None,
     review_threads_raw: Optional[List[Dict[str, Any]]] = None,
+    review_comments_raw: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Map REST JSON to the shape scripts/lib/payload_fetcher.py expects.
 
@@ -269,6 +270,16 @@ def build_payload(
         payload["actions_runs"] = actions_runs
     if review_threads_raw is not None:
         payload["review_threads"] = review_threads_raw
+    if review_comments_raw is not None:
+        pr["reviewComments"] = [
+            {
+                "author": {"login": (c.get("user") or {}).get("login", "")},
+                "commit_id": c.get("commit_id") or "",
+                "original_commit_id": c.get("original_commit_id") or "",
+            }
+            for c in review_comments_raw
+        ]
+        payload["review_comments"] = pr["reviewComments"]
     return payload
 
 
@@ -362,7 +373,15 @@ def fetch_payload(owner_repo: str, pr_number: int, token: str) -> Dict[str, Any]
         f"{base}/commits/{pr_raw['head']['sha']}/check-runs", token, envelope="check_runs"
     )
     actions_runs = fetch_actions_runs(owner_repo, run_ids_from_check_runs(check_runs_raw), token)
-    review_threads = fetch_review_threads(owner_repo, pr_number, token)
+    try:
+        review_comments_raw = rest_get(f"{base}/pulls/{pr_number}/comments", token)
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"warning: failed to fetch pulls comments ({exc}); "
+            "review_comments will be omitted from payload",
+            file=sys.stderr,
+        )
+        review_comments_raw = None
     return build_payload(
         owner_repo,
         pr_raw,
@@ -372,6 +391,7 @@ def fetch_payload(owner_repo: str, pr_number: int, token: str) -> Dict[str, Any]
         check_runs_raw,
         actions_runs,
         review_threads,
+        review_comments_raw,
     )
 
 

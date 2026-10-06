@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Stop-hook guard: require a stopping-point declaration in each final reply."""
+"""Stop-hook guard: warn when a stopping-point declaration is missing from a final reply.
+
+Treats the last reply of a turn as a stopping point, including conversational
+question-answering replies (#4308). Warns via systemMessage rather than blocking
+when that reply omits an explicit statement of whether the session is done or not.
+Handles streamed assistant chunk concatenation (#2500).
+"""
 from __future__ import annotations
 
 import hashlib
@@ -96,6 +102,8 @@ def last_text(path: str) -> str:
     last_text_val = ""
     last_reply = ""
     saw_reply_tool = False
+    curr_msg_id = None
+    consecutive_assistant = False
     try:
         with open(path, encoding="utf-8", errors="ignore") as f:
             for line in f:
@@ -142,6 +150,8 @@ def last_text(path: str) -> str:
                         last_text_val = ""
                         last_reply = ""
                         saw_reply_tool = False
+                    curr_msg_id = None
+                    consecutive_assistant = False
                     continue
                 if event.get("isSidechain"):
                     continue
@@ -151,14 +161,22 @@ def last_text(path: str) -> str:
                         or event.get("content")
                         or []
                     )
+                    msg_id = (event.get("message") or {}).get("id") or event.get("id")
+                    has_non_reply_tool = (
+                        isinstance(blocks, list)
+                        and any(
+                            isinstance(b, dict)
+                            and b.get("type") == "tool_use"
+                            and not REPLY_TOOL_RX.search(b.get("name") or "")
+                            for b in blocks
+                        )
+                    )
                     if isinstance(blocks, list):
                         text = "".join(
                             b.get("text", "")
                             for b in blocks
                             if isinstance(b, dict) and b.get("type") == "text"
                         )
-                        if text.strip():
-                            last_text_val = text
                         for b in blocks:
                             if (
                                 isinstance(b, dict)
@@ -170,21 +188,48 @@ def last_text(path: str) -> str:
                             if payload.strip():
                                 last_reply = payload
                     elif isinstance(blocks, str) and blocks.strip():
-                        last_text_val = blocks
+                        text = blocks
+                    else:
+                        text = ""
+
+                    if has_non_reply_tool:
+                        if text.strip():
+                            last_text_val = text
+                        consecutive_assistant = False
+                        curr_msg_id = None
+                    elif text:
+                        if consecutive_assistant or (msg_id and msg_id == curr_msg_id):
+                            if last_text_val and text.startswith(last_text_val):
+                                last_text_val = text
+                            else:
+                                last_text_val += text
+                        else:
+                            last_text_val = text
+                            consecutive_assistant = True
+                            curr_msg_id = msg_id
                 elif (
                     event.get("type") in {"PLANNER_RESPONSE", "GENERIC"}
                     or event.get("source") == "MODEL"
                 ):
                     content = event.get("content")
                     if isinstance(content, str) and content.strip():
-                        last_text_val = content
+                        text = content
                     elif isinstance(content, list):
                         text = "".join(
                             (b.get("text", "") if isinstance(b, dict) else str(b))
                             for b in content
                         )
-                        if text.strip():
+                    else:
+                        text = ""
+                    if text:
+                        if consecutive_assistant:
+                            if last_text_val and text.startswith(last_text_val):
+                                last_text_val = text
+                            else:
+                                last_text_val += text
+                        else:
                             last_text_val = text
+                            consecutive_assistant = True
     except Exception:
         return ""
     chosen = last_reply if saw_reply_tool else last_text_val
@@ -193,7 +238,7 @@ def last_text(path: str) -> str:
 
 def _extract_from_blocks(blocks):
     """Extract assistant text from a list of blocks respecting reply-tool precedence."""
-    last_text_val = ""
+    last_text_parts = []
     last_reply = ""
     saw_reply_tool = False
     for b in blocks:
@@ -201,13 +246,14 @@ def _extract_from_blocks(blocks):
             continue
         if b.get("type") == "text":
             txt = b.get("text") or ""
-            if txt.strip():
-                last_text_val = txt
+            if txt:
+                last_text_parts.append(txt)
         if b.get("type") == "tool_use" and REPLY_TOOL_RX.search(b.get("name") or ""):
             saw_reply_tool = True
         payload = _reply_payload(b)
         if payload.strip():
             last_reply = payload
+    last_text_val = "".join(last_text_parts)
     chosen = last_reply if saw_reply_tool else last_text_val
     return chosen if chosen.strip() else ""
 
@@ -270,8 +316,7 @@ def main() -> int:
     print(
         json.dumps(
             {
-                "decision": "block",
-                "reason": (
+                "systemMessage": (
                     "State whether the session is done or not using "
                     "`**Stopping Point**: Clean stopping point reached --- session done; UMS executed; no follow-up items pending` or "
                     "`**Stopping Point**: Not a clean stopping point / work remains queued: session not done; <details>` "

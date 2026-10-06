@@ -4,7 +4,21 @@ import subprocess
 import sys
 import tempfile
 
-HOOK = sys.argv[1]
+HOOK = (
+    sys.argv[1]
+    if len(sys.argv) > 1
+    else os.path.join(os.path.dirname(__file__), "require-stopping-point.py")
+)
+
+
+def _has_warning(stdout: str) -> bool:
+    if not stdout.strip():
+        return False
+    try:
+        data = json.loads(stdout)
+        return "systemMessage" in data and bool(data["systemMessage"])
+    except Exception:
+        return "systemMessage" in stdout
 
 
 def run(text, tmpdir=None, raw_lines=None, key_name="transcript_path"):
@@ -35,7 +49,7 @@ def run(text, tmpdir=None, raw_lines=None, key_name="transcript_path"):
     )
     os.unlink(path)
     assert res.returncode == 0, f"Hook exited with code {res.returncode}: {res.stderr}"
-    return '"decision": "block"' in res.stdout or '"decision":"block"' in res.stdout
+    return _has_warning(res.stdout)
 
 
 def run_direct_payload(payload):
@@ -49,7 +63,7 @@ def run_direct_payload(payload):
         env=env,
     )
     assert res.returncode == 0, f"Hook exited with code {res.returncode}: {res.stderr}"
-    return '"decision": "block"' in res.stdout or '"decision":"block"' in res.stdout
+    return _has_warning(res.stdout)
 
 
 def reply_transcript(reply_text, narration_text=None):
@@ -80,7 +94,7 @@ def reply_transcript(reply_text, narration_text=None):
     )
     os.unlink(path)
     assert res.returncode == 0, f"Hook exited with code {res.returncode}: {res.stderr}"
-    return '"decision": "block"' in res.stdout or '"decision":"block"' in res.stdout
+    return _has_warning(res.stdout)
 
 
 cases = [
@@ -263,17 +277,17 @@ def multi_turn_transcript(turn1_reply, turn2_text):
     )
     os.unlink(path)
     assert res.returncode == 0, f"Hook exited with code {res.returncode}: {res.stderr}"
-    return '"decision": "block"' in res.stdout or '"decision":"block"' in res.stdout
+    return _has_warning(res.stdout)
 
 # Multi-turn test: turn 1 reply-tool state must not leak into turn 2 plain-text
 if not multi_turn_transcript(CLEAN_DECL, MISSING_DECL):
-    print("FAIL: turn 2 plain-text missing stopping point did not block after turn 1 used reply-tool")
+    print("FAIL: turn 2 plain-text missing stopping point did not warn after turn 1 used reply-tool")
     failed += 1
 else:
-    print("PASS: turn 2 plain-text missing stopping point blocks after turn 1 reply-tool")
+    print("PASS: turn 2 plain-text missing stopping point warns after turn 1 reply-tool")
 
 if multi_turn_transcript(MISSING_DECL, CLEAN_DECL):
-    print("FAIL: turn 2 plain-text clean stopping point blocked because turn 1 reply-tool lacked declaration")
+    print("FAIL: turn 2 plain-text clean stopping point warned because turn 1 reply-tool lacked declaration")
     failed += 1
 else:
     print("PASS: turn 2 plain-text clean stopping point passes despite turn 1 reply-tool lacking declaration")
@@ -306,17 +320,17 @@ def tool_result_transcript(reply_text):
     )
     os.unlink(path)
     assert res.returncode == 0, f"Hook exited with code {res.returncode}: {res.stderr}"
-    return '"decision": "block"' in res.stdout or '"decision":"block"' in res.stdout
+    return _has_warning(res.stdout)
 
 
 if not tool_result_transcript(MISSING_DECL):
-    print("FAIL: reply-tool followed by tool_result did not block when declaration was missing")
+    print("FAIL: reply-tool followed by tool_result did not warn when declaration was missing")
     failed += 1
 else:
-    print("PASS: reply-tool followed by tool_result blocks when declaration is missing")
+    print("PASS: reply-tool followed by tool_result warns when declaration is missing")
 
 if tool_result_transcript(CLEAN_DECL):
-    print("FAIL: reply-tool followed by tool_result blocked despite clean declaration")
+    print("FAIL: reply-tool followed by tool_result warned despite clean declaration")
     failed += 1
 else:
     print("PASS: reply-tool followed by tool_result passes when declaration is present")
@@ -369,12 +383,12 @@ def meta_mid_turn_transcript(reply_text):
     )
     os.unlink(path)
     assert res.returncode == 0, f"Hook exited with code {res.returncode}: {res.stderr}"
-    return '"decision": "block"' in res.stdout or '"decision":"block"' in res.stdout
+    return _has_warning(res.stdout)
 
 
 if meta_mid_turn_transcript(CLEAN_DECL):
     print(
-        "FAIL: reply-tool delivery with a clean declaration blocked after a "
+        "FAIL: reply-tool delivery with a clean declaration warned after a "
         "mid-turn skill load (isMeta) (ai-config#3860)"
     )
     failed += 1
@@ -389,17 +403,17 @@ else:
 # user turn, it wipes `saw_reply_tool`/`last_reply`, the trailing tool-only
 # assistant entry sets nothing, and `extract_text_from_payload` returns "" --
 # which the hook reads as "nothing to check" rather than "no declaration",
-# so the miss silently produces NO block instead of the block it should.
+# so the miss silently produces NO warning instead of the warning it should.
 if not meta_mid_turn_transcript(MISSING_DECL):
     print(
-        "FAIL: reply-tool delivery missing its declaration did not block "
+        "FAIL: reply-tool delivery missing its declaration did not warn "
         "after a mid-turn skill load (isMeta) -- the load silently erased "
         "the missing-declaration signal (ai-config#3860)"
     )
     failed += 1
 else:
     print(
-        "PASS: reply-tool delivery missing its declaration still blocks "
+        "PASS: reply-tool delivery missing its declaration still warns "
         "after a mid-turn skill load (isMeta)"
     )
 
@@ -451,7 +465,7 @@ def scheduled_continuation_transcript(reply_text):
     )
     os.unlink(path)
     assert res.returncode == 0, f"Hook exited with code {res.returncode}: {res.stderr}"
-    return '"decision": "block"' in res.stdout or '"decision":"block"' in res.stdout
+    return _has_warning(res.stdout)
 
 
 if scheduled_continuation_transcript(MISSING_DECL):
@@ -468,6 +482,106 @@ else:
         "sourceToolUseID) opens a new turn, expiring an old turn's "
         "missing-declaration reply exactly as a real user message would"
     )
+
+# Streamed chunks test cases (ai-config#2500)
+def streamed_chunks_transcript(chunks, msg_id="msg_1"):
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(json.dumps({"type": "user", "message": {"content": "do task"}}) + "\n")
+        for chunk in chunks:
+            f.write(
+                json.dumps(
+                    {
+                        "type": "assistant",
+                        "message": {
+                            "id": msg_id,
+                            "content": [{"type": "text", "text": chunk}],
+                        },
+                    }
+                )
+                + "\n"
+            )
+    tmpdir = tempfile.mkdtemp()
+    env = dict(os.environ, TMPDIR=tmpdir, TEMP=tmpdir, TMP=tmpdir)
+    res = subprocess.run(
+        [sys.executable, HOOK],
+        input=json.dumps({"transcript_path": path}),
+        text=True,
+        capture_output=True,
+        env=env,
+    )
+    os.unlink(path)
+    assert res.returncode == 0, f"Hook exited with code {res.returncode}: {res.stderr}"
+    return _has_warning(res.stdout)
+
+
+# Test 1: Declaration split across chunk boundary (#2500)
+split_chunks = [
+    "Here is the final summary of the work done.\n\n**Stopping Point**: Clean stopping point reached --- ",
+    "session done; UMS executed; no follow-up items pending.",
+]
+if streamed_chunks_transcript(split_chunks):
+    print("FAIL: streamed chunks with declaration split across chunk boundary warned (#2500)")
+    failed += 1
+else:
+    print("PASS: streamed chunks with declaration split across chunk boundary passes (#2500)")
+
+# Test 2: Streamed chunks with cumulative updates
+cumulative_chunks = [
+    "Completed task.",
+    "Completed task.\n\n**Stopping Point**: Clean stopping point reached --- session done.",
+]
+if streamed_chunks_transcript(cumulative_chunks):
+    print("FAIL: streamed chunks with cumulative update warned (#2500)")
+    failed += 1
+else:
+    print("PASS: streamed chunks with cumulative update passes (#2500)")
+
+# Test 3: Declaration in first chunk, trailing prose in second chunk
+trailing_chunks = [
+    "Completed task.\n\n**Stopping Point**: Clean stopping point reached --- session done.\n",
+    "\nHave a great day!",
+]
+if streamed_chunks_transcript(trailing_chunks):
+    print("FAIL: declaration in first chunk with trailing chunk warned (#2500)")
+    failed += 1
+else:
+    print("PASS: declaration in first chunk with trailing chunk passes (#2500)")
+
+# Test 4: Streamed chunks missing declaration entirely
+missing_chunks = [
+    "Here is the answer to your question.\n",
+    "Nothing is left for you to do.",
+]
+if not streamed_chunks_transcript(missing_chunks):
+    print("FAIL: streamed chunks missing declaration did not warn (#2500)")
+    failed += 1
+else:
+    print("PASS: streamed chunks missing declaration warns (#2500)")
+
+# Conversational question-answering final replies (ai-config#4308)
+qa_reply_without_decl = (
+    "The branch was already auto-deleted on merge.\n"
+    "We encountered proxy denials earlier.\n\n"
+    "Nothing is left for you to do."
+)
+if not run(qa_reply_without_decl):
+    print("FAIL: conversational question-answering reply without stopping point did not warn (#4308)")
+    failed += 1
+else:
+    print("PASS: conversational question-answering reply without stopping point warns (#4308)")
+
+qa_reply_with_decl = (
+    "The branch was already auto-deleted on merge.\n"
+    "We encountered proxy denials earlier.\n\n"
+    "Nothing is left for you to do.\n\n"
+    "**Stopping Point**: Clean stopping point reached --- session done; UMS executed; no follow-up items pending."
+)
+if run(qa_reply_with_decl):
+    print("FAIL: conversational question-answering reply with clean stopping point warned (#4308)")
+    failed += 1
+else:
+    print("PASS: conversational question-answering reply with clean stopping point passes (#4308)")
 
 raise SystemExit(bool(failed))
 

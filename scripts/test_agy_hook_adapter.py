@@ -2552,6 +2552,8 @@ class TestAgyHookAdapter(unittest.TestCase):
                 adapter.main()
             self.assertTrue(mock_run.called)
             called_payload = mock_run.call_args[0][1]
+            self.assertEqual(called_payload.get("session_id"), "abcdef01-2345-6789-abcd-ef0123456789")
+
     def test_refresh_session_heartbeat_updates_existing_session_file(self):
         adapter = load_adapter()
         with tempfile.TemporaryDirectory() as td:

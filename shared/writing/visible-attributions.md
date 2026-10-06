@@ -11,23 +11,34 @@ This covers every outside source a reader would want to know about:
 - another course's site, notes, or repository it was adapted from;
 - the person whose lecture, notes or code it was adapted from.
 
-When such a source credits its own upstream,
+When a source credits its own upstream,
 carry that credit along,
 so the chain reaches the reader rather than stopping one hop short.
 
-## The maintainer's own repositories need no attribution
+## The maintainer's own repositories need not be credited
 
-Content taken from the maintainer's own repositories and course sites
-(the Morrison-Lab sites, such as rme, lds, pds and sds)
-needs no attribution when it moves into another of them
-(user directive, 2026-10-05).
-They are one body of material by the same author,
-so a "Source" callout naming the sister site credits the reader's own course to itself.
+Content taken from the maintainer's own repositories
+(Morrison-Lab and d-morrison, such as rme, lds, pds and sds)
+does not have to be attributed to them
+(user directive, 2026-10-05:
+"you don't have to give attributions for content taken from my other repos").
+The exemption covers only that hop.
+What the repository itself credits is still carried:
+a book or paper it follows,
+and any person outside the lab whose lecture or notes it adapted,
+since several of those repositories hold other authors' work
+(lds, for one, credits its notes to Kameron Decker Harris and Brian Hutchinson).
 A link to a sister site that sends the reader to further reading
-is a cross-reference, not an attribution, and stays.
+is a cross-reference, not an attribution, and is unaffected.
 
-- **Do:** credit the book, paper, or outside person an item follows, and drop a credit whose only source is a sister lab site.
-- **Don't:** add a "Source" callout that says only "adapted from the rme notes" or "the lds notes' definition of ...".
+The directive removes a requirement; it does not forbid a credit.
+So leave the sister-repository credit out of new work,
+but do not strip one that already exists unless the maintainer asks.
+
+- **Do:** credit the outside book, paper or person an item follows,
+  even when it reached you through a sister repository.
+- **Don't:** report a missing sister-repository credit as a review finding,
+  or delete an existing one unasked.
 
 ## Where the credit goes
 
@@ -71,15 +82,18 @@ what was checked in a PDF,
 a page number not yet verified,
 or a wording edit made while porting.
 
-- **Do:** end each adapted or sourced item with PSW's collapsed "Source" callout.
+- **Do:** end each item adapted from an outside source with PSW's collapsed "Source" callout.
 - **Don't:** leave an attribution only in an HTML comment.
 
 (Morrison-Lab/sds, 2026-10-05:
 every item ported from rme or lds, or following ISLR or ESL,
 carried its credit only in a `<!-- Source: ... -->` comment.
-The owner's correction was that attributions should be reader-visible,
+The maintainer's correction was that attributions should be reader-visible,
 and in divs;
 [sds#72](https://github.com/Morrison-Lab/sds/pull/72)
 moved all 20 into PSW's Source callouts,
 after a first attempt that invented an `.attribution` class
-was caught for contradicting PSW.)
+was caught for contradicting PSW.
+Later the same day the maintainer added that credits to their own repositories are not needed,
+so the PR then dropped its rme and lds credits
+and kept those to ISLR, ESL, Dobson and the outside lecturers.)

@@ -812,6 +812,9 @@ Three citation rules live canonically in PSW's Citations and evidence chapter:
 - [Adapting another course's material](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#adapting-another-courses-material):
   write our own version and credit it in a collapsed `.callout-note` titled "Source"
   (a `::: notes` div only on a site whose stylesheet sets `.notes` apart);
-  [`visible-attributions`](visible-attributions.md) covers where the credit goes in included fragments.
+  [`visible-attributions`](visible-attributions.md) covers where the credit goes in included fragments,
+  and the one exception PSW does not state:
+  content from the maintainer's own repositories need not be credited to them
+  ([psw#119](https://github.com/Morrison-Lab/psw/issues/119) proposes adding it to PSW).
 
 Link those sections rather than restating them here.

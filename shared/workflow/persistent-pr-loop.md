@@ -16,7 +16,10 @@ Start the loop if it is not already running, then answer.
 
 ## Turn on Auto-fix in the Claude desktop app
 
-In the Claude desktop app's Code tab, turn on the PR's **Auto-fix** switch (the CI popover's checkbox, or `mcp__ccd_pr__set_monitor` with `auto_fix: true`) right after opening or binding a PR (owner directive, 2026-10-05).
+In the Claude desktop app's Code tab,
+turn on the PR's **Auto-fix** switch
+(the CI popover's checkbox, or `mcp__ccd_pr__set_monitor` with `auto_fix: true`)
+right after opening or binding a PR (owner directive, 2026-10-05).
 There it is the loop:
 the app wakes the session with a `<ci-monitor-event>` on CI failures, merge conflicts and review comments,
 and its own instructions forbid self-scheduled CI polling, so do not also arm a timer to poll checks.
@@ -29,7 +32,7 @@ leave pre-existing failures alone and note them in the PR description,
 don't weaken a check to get green (a spelling exception, `--allow-skips`, a loosened threshold) unless the flagged item is really correct,
 and hand a failure that turns on content or reasoning back to the reviewer instead of patching it.
 Comments that carry no finding, like a quota refusal or a preview-URL sticky, need no reply or push
-(see `memories/claude-code.md`).
+(see [`memories/claude-code.md`](../../memories/claude-code.md)).
 
 ## Forge polling after push
 

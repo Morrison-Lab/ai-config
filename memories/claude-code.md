@@ -27,7 +27,7 @@
   request via `/feedback`.
 - **Update 2026-10-05: the desktop app now exposes `mcp__ccd_pr__set_monitor`**,
   which sets Auto-fix for the session's bound PR (`auto_fix` and `address_comments` together).
-  Under auto mode, its permission check refused the call on lds#411,
+  Under auto mode, its permission check refused the call on [lds#411](https://github.com/Morrison-Lab/lds/pull/411),
   so the user may still have to tick the box.
   The bullet below predates the tool.
 - **No tool on the agent's side can toggle this itself.**

@@ -334,6 +334,7 @@ What decides it is the review list filtered by the reviewer's own login, never t
 |---|---|---|
 | REST `pulls/<N>/reviews`, and `pull_request_read` `get_reviews` | `user.login` | `copilot-pull-request-reviewer[bot]` |
 | `gh pr view <N> --json reviews` | `author.login` | `copilot-pull-request-reviewer` (no `[bot]`) |
+| REST `pulls/<N>/comments` (inline review comments) | `user.login` | `Copilot` |
 
 Measured on `Morrison-Lab/ai-config#1005`, which carries a real Copilot review.
 So a reader who takes the field name from one surface and the value from the other reproduces the exact false negative this section warns about.

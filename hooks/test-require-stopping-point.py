@@ -27,7 +27,8 @@ def _has_warning(stdout: str) -> bool:
     if not stdout.strip():
         return False
     data = json.loads(stdout)
-    assert not (data.get("decision") == "block" or "reason" in data), (
+    decision = str(data.get("decision") or "").strip().lower()
+    assert decision not in {"block", "deny"} and "reason" not in data, (
         f"Hook emitted blocking decision or reason: {stdout}"
     )
     return "systemMessage" in data and bool(data.get("systemMessage"))
@@ -885,7 +886,7 @@ adapter_sess_dir = tempfile.mkdtemp()
 adapter_tscript_t1 = os.path.join(adapter_sess_dir, "t1.jsonl")
 with open(adapter_tscript_t1, "w", encoding="utf-8") as f:
     f.write(json.dumps({"type": "user", "message": {"content": "turn 1"}}) + "\n")
-    f.write(json.dumps({"type": "assistant", "message": {"id": "msg_a1", "content": "undeclared reply 1"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"id": "msg_a1", "content": "identical undeclared reply"}}) + "\n")
 
 adapter_payload_t1 = {
     "session_id": "sess_adapter_1",
@@ -899,9 +900,9 @@ adapter_payload_t1_retry = {
 adapter_tscript_t2 = os.path.join(adapter_sess_dir, "t2.jsonl")
 with open(adapter_tscript_t2, "w", encoding="utf-8") as f:
     f.write(json.dumps({"type": "user", "message": {"content": "turn 1"}}) + "\n")
-    f.write(json.dumps({"type": "assistant", "message": {"id": "msg_a1", "content": "undeclared reply 1"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"id": "msg_a1", "content": "identical undeclared reply"}}) + "\n")
     f.write(json.dumps({"type": "user", "message": {"content": "turn 2"}}) + "\n")
-    f.write(json.dumps({"type": "assistant", "message": {"id": "msg_a2", "content": "undeclared reply 2"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"id": "msg_a2", "content": "identical undeclared reply"}}) + "\n")
 
 adapter_payload_t2 = {
     "session_id": "sess_adapter_1",
@@ -970,18 +971,77 @@ if not run_direct_payload(idless_payload_t2, tmpdir=idless_sess_dir):
 else:
     print("PASS: id-less turn 2 warns")
 
-# Test: Harness-mode exceptions (GITHUB_ACTIONS and CI)
-if run_direct_payload({"reply": "No stopping point declaration here."}, env={"GITHUB_ACTIONS": "true"}):
-    print("FAIL: GITHUB_ACTIONS=true warned")
-    failed += 1
-else:
-    print("PASS: GITHUB_ACTIONS=true passes without warning")
+# Test: Mixed identified turn 1 followed by ID-less turn 2 with identical reply text
+mixed_sess_dir = tempfile.mkdtemp()
+mixed_tscript_t1 = os.path.join(mixed_sess_dir, "t1.jsonl")
+with open(mixed_tscript_t1, "w", encoding="utf-8") as f:
+    f.write(json.dumps({"type": "user", "message": {"content": "turn 1 prompt"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"id": "msg_identified_1", "content": "same missing declaration"}}) + "\n")
 
-if run_direct_payload({"reply": "No stopping point declaration here."}, env={"CI": "true"}):
-    print("FAIL: CI=true warned")
+mixed_payload_t1 = {
+    "session_id": "sess_mixed_1",
+    "transcript_path": mixed_tscript_t1,
+}
+mixed_payload_t1_retry = {
+    "session_id": "sess_mixed_1",
+    "transcript_path": mixed_tscript_t1,
+}
+
+mixed_tscript_t2 = os.path.join(mixed_sess_dir, "t2.jsonl")
+with open(mixed_tscript_t2, "w", encoding="utf-8") as f:
+    f.write(json.dumps({"type": "user", "message": {"content": "turn 1 prompt"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"id": "msg_identified_1", "content": "same missing declaration"}}) + "\n")
+    f.write(json.dumps({"type": "user", "message": {"content": "turn 2 prompt"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"content": "same missing declaration"}}) + "\n")
+
+mixed_payload_t2 = {
+    "session_id": "sess_mixed_1",
+    "transcript_path": mixed_tscript_t2,
+}
+
+if not run_direct_payload(mixed_payload_t1, tmpdir=mixed_sess_dir):
+    print("FAIL: mixed identified/ID-less turn 1 did not warn")
     failed += 1
 else:
-    print("PASS: CI=true passes without warning")
+    print("PASS: mixed identified/ID-less turn 1 warns")
+
+if run_direct_payload(mixed_payload_t1_retry, tmpdir=mixed_sess_dir):
+    print("FAIL: mixed identified/ID-less turn 1 retry was not deduplicated")
+    failed += 1
+else:
+    print("PASS: mixed identified/ID-less turn 1 retry is deduplicated")
+
+if not run_direct_payload(mixed_payload_t2, tmpdir=mixed_sess_dir):
+    print("FAIL: mixed identified/ID-less turn 2 was silently suppressed by turn 1 identifier leakage")
+    failed += 1
+else:
+    print("PASS: mixed identified/ID-less turn 2 warns")
+
+# Test: Interactive missing-declaration reply with CI=true must warn (generic CI is not harness mode)
+if not run_direct_payload({"reply": "No stopping point declaration here."}, env={"CI": "true"}):
+    print("FAIL: interactive missing-declaration reply with CI=true did not warn")
+    failed += 1
+else:
+    print("PASS: interactive missing-declaration reply with CI=true warns")
+
+# Test: Explicit non-interactive harness mode exceptions pass without warning
+if run_direct_payload({"reply": "No stopping point declaration here."}, env={"CLAUDE_NON_INTERACTIVE": "true"}):
+    print("FAIL: CLAUDE_NON_INTERACTIVE=true warned")
+    failed += 1
+else:
+    print("PASS: CLAUDE_NON_INTERACTIVE=true passes without warning")
+
+if run_direct_payload({"reply": "No stopping point declaration here."}, env={"NON_INTERACTIVE": "true"}):
+    print("FAIL: NON_INTERACTIVE=true warned")
+    failed += 1
+else:
+    print("PASS: NON_INTERACTIVE=true passes without warning")
+
+if run_direct_payload({"reply": "No stopping point declaration here.", "non_interactive": True}):
+    print("FAIL: payload non_interactive=True warned")
+    failed += 1
+else:
+    print("PASS: payload non_interactive=True passes without warning")
 
 # Test: Whitespace preservation during chunk reconstruction (assistant branch)
 whitespace_assistant_transcript = [

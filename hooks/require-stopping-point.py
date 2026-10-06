@@ -365,6 +365,35 @@ def extract_turn_id(payload: dict) -> str:
                     continue
                 if not isinstance(event, dict):
                     continue
+
+                # Reset identifier at genuine prompt boundaries (excluding tool results,
+                # skill-load metadata, and sidechains) so an ID-less subsequent turn reaches
+                # the content hash fallback rather than inheriting the prior turn's ID.
+                if event.get("isMeta") and event.get("sourceToolUseID"):
+                    continue
+                if event.get("isSidechain"):
+                    continue
+                etype = event.get("type") or event.get("role") or ""
+                source = event.get("source") or ""
+                if etype in {"user", "USER_INPUT"} or source == "USER_EXPLICIT":
+                    blocks = (
+                        (event.get("message") or {}).get("content")
+                        or event.get("content")
+                        or []
+                    )
+                    is_tool_result = (
+                        event.get("type") == "tool_result"
+                        or (
+                            isinstance(blocks, list)
+                            and any(
+                                isinstance(b, dict) and b.get("type") == "tool_result"
+                                for b in blocks
+                            )
+                        )
+                    )
+                    if not is_tool_result:
+                        last_id = ""
+
                 ev_id = None
                 for k in (
                     "prompt_id",
@@ -402,8 +431,19 @@ def main() -> int:
     # Harness-mode exception: automated non-interactive runs whose output is posted
     # somewhere by a harness are permitted to omit the declaration
     # (shared/workflow/flag-session-boundaries.md:45-50).
-    # Real CI harness environments set GITHUB_ACTIONS or CI.
-    if os.environ.get("GITHUB_ACTIONS") in {"true", "True", "1"} or os.environ.get("CI") in {"true", "True", "1"}:
+    # Requires an explicit non-interactive harness mode signal; generic CI status
+    # (e.g. CI=true in an interactive container) does not exempt the reply.
+    is_harness_mode = (
+        payload.get("non_interactive") is True
+        or payload.get("nonInteractive") is True
+        or payload.get("interactive") is False
+        or payload.get("harness_mode") is True
+        or payload.get("harnessMode") is True
+        or os.environ.get("CLAUDE_NON_INTERACTIVE") in {"true", "True", "1"}
+        or os.environ.get("NON_INTERACTIVE") in {"true", "True", "1"}
+        or os.environ.get("HARNESS_MODE") in {"true", "True", "1"}
+    )
+    if is_harness_mode:
         return 0
 
     text = extract_text_from_payload(payload)

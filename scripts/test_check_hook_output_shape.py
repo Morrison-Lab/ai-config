@@ -206,6 +206,25 @@ case(
     needle="never inspects 'additionalContext' or 'systemMessage'",
 )
 
+# --- 4b. Test-side payload inspection via imported helper module (ai-config#4308) ---
+IMPORTED_HELPER_FILES = dict(CLEAN_FILES)
+IMPORTED_HELPER_FILES["hooks/test-warn-stop.py"] = (
+    'from stopping_point_test_support import check_warn\n'
+    'check_warn(\'{"systemMessage": "warning"}\')\n'
+)
+IMPORTED_HELPER_FILES["scripts/lib/stopping_point_test_support.py"] = (
+    'import json\n'
+    'def check_warn(out):\n'
+    '    assert json.loads(out).get("systemMessage")\n'
+)
+
+case(
+    "test-side payload inspection via imported helper module passes (#4308)",
+    CLEAN_HOOKS_JSON,
+    IMPORTED_HELPER_FILES,
+    want_exit=0,
+)
+
 # --- 5b. Warn-only PreToolUse hook with no delivery channel at all (#3068) ---
 # The defect: the hook printed its warning to stderr and exited 0, which
 # reaches the debug log and nobody else. Before this rule the hook fell

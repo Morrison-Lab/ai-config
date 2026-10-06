@@ -5,15 +5,41 @@ An HTML comment (`<!-- Source: ... -->`), a commit message,
 or a PR description is not an attribution:
 no reader of the rendered website, slides, handout or paper ever sees it.
 
-This covers every source a reader would want to know about:
+This covers every outside source a reader would want to know about:
 
 - the book or paper an item follows;
-- the course site, notes, or repository it was adapted from;
+- another course's site, notes, or repository it was adapted from;
 - the person whose lecture, notes or code it was adapted from.
 
-When the source credits its own upstream,
+When a source credits its own upstream,
 carry that credit along,
 so the chain reaches the reader rather than stopping one hop short.
+
+## The maintainer's own repositories need not be credited
+
+Content taken from the maintainer's own repositories
+(Morrison-Lab and d-morrison, such as rme, lds, pds and sds)
+does not have to be attributed to them
+(user directive, 2026-10-05:
+"you don't have to give attributions for content taken from my other repos").
+The exemption covers only that hop.
+What the repository itself credits is still carried:
+a book or paper it follows,
+and any person other than the maintainer whose lecture or notes it adapted,
+since several of those repositories hold other authors' work
+(lds, for one, credits its notes to Kameron Decker Harris and Brian Hutchinson).
+A link to a sister site that sends the reader to further reading
+is a cross-reference, not an attribution, and is unaffected.
+
+The directive removes a requirement.
+It does not forbid a credit.
+So a sister-repository credit may be left out of new work,
+but do not strip one that already exists unless the maintainer asks.
+
+- **Do:** credit the outside book, paper or person an item follows,
+  even when it reached you through a sister repository.
+- **Don't:** report a missing sister-repository credit as a review finding,
+  or delete an existing one unasked.
 
 ## Where the credit goes
 
@@ -39,16 +65,14 @@ so the credit travels with the fragment when another site includes it:
 ::: {.callout-note collapse="true"}
 #### Source
 
-Adapted from the rme notes'
-[definition of overfitting](https://morrison-lab.github.io/rme/chapters/predictor-selection.html#def-overfitting);
-see also @james2021islr2e [sec. 5.1].
+@james2021islr2e [sec. 5.1].
 :::
 
 :::
 ```
 
 Cite books and papers through the bibliography (`@key [locator]`),
-and link a site's rendered page at the item's anchor,
+and link an outside site's rendered page at the item's anchor,
 checking that the anchor exists and holds the text the credit points to.
 
 ## What stays in a comment
@@ -59,15 +83,19 @@ what was checked in a PDF,
 a page number not yet verified,
 or a wording edit made while porting.
 
-- **Do:** end each adapted or sourced item with PSW's collapsed "Source" callout.
+- **Do:** end each item adapted from an outside source with PSW's collapsed "Source" callout.
 - **Don't:** leave an attribution only in an HTML comment.
 
 (Morrison-Lab/sds, 2026-10-05:
 every item ported from rme or lds, or following ISLR or ESL,
 carried its credit only in a `<!-- Source: ... -->` comment.
-The owner's correction was that attributions should be reader-visible,
+The maintainer's correction was that attributions should be reader-visible,
 and in divs;
 [sds#72](https://github.com/Morrison-Lab/sds/pull/72)
 moved all 20 into PSW's Source callouts,
 after a first attempt that invented an `.attribution` class
-was caught for contradicting PSW.)
+was caught for contradicting PSW.
+Later the same day the maintainer added that credits to their own repositories are not needed,
+pointing at one of the PR's rme credits,
+so the PR's commit `714dd913` dropped its rme and lds credits,
+and `aae43d26` kept those to ISLR, ESL, Dobson and the lecturers the lds notes credit.)

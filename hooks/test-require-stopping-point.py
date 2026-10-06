@@ -501,23 +501,28 @@ else:
     )
 
 # Streamed chunks test cases (ai-config#2500)
-def streamed_chunks_transcript(chunks, msg_id="msg_1", env=None):
+def streamed_chunks_transcript(chunks, msg_id="msg_1", env=None, cumulative=False):
     fd, path = tempfile.mkstemp(suffix=".jsonl")
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write(json.dumps({"type": "user", "message": {"content": "do task"}}) + "\n")
         for chunk in chunks:
-            f.write(
-                json.dumps(
-                    {
-                        "type": "assistant",
-                        "message": {
-                            "id": msg_id,
-                            "content": [{"type": "text", "text": chunk}],
-                        },
-                    }
-                )
-                + "\n"
-            )
+            if isinstance(chunk, dict):
+                text = chunk.get("text", "")
+                is_cum = chunk.get("cumulative", cumulative)
+            else:
+                text = chunk
+                is_cum = cumulative
+            evt = {
+                "type": "assistant",
+                "message": {
+                    "id": msg_id,
+                    "content": [{"type": "text", "text": text}],
+                },
+            }
+            if is_cum:
+                evt["cumulative"] = True
+                evt["message"]["cumulative"] = True
+            f.write(json.dumps(evt) + "\n")
     tmpdir = tempfile.mkdtemp()
     res = subprocess.run(
         [sys.executable, HOOK],
@@ -547,11 +552,22 @@ cumulative_chunks = [
     "Completed task.",
     "Completed task.\n\n**Stopping Point**: Clean stopping point reached --- session done.",
 ]
-if streamed_chunks_transcript(cumulative_chunks):
+if streamed_chunks_transcript(cumulative_chunks, cumulative=True):
     print("FAIL: streamed chunks with cumulative update warned (#2500)")
     failed += 1
 else:
     print("PASS: streamed chunks with cumulative update passes (#2500)")
+
+# Test 2b: Assistant cumulative update where final snapshot removes declaration warns
+cumulative_removal_chunks = [
+    "Completed task.\n\n**Stopping Point**: Clean stopping point reached --- session done.",
+    "Completed task without declaration.",
+]
+if not streamed_chunks_transcript(cumulative_removal_chunks, cumulative=True):
+    print("FAIL: assistant cumulative snapshot removing declaration did not warn (replacement not exercised)")
+    failed += 1
+else:
+    print("PASS: assistant cumulative snapshot removing declaration warns")
 
 # Test 3: Declaration in first chunk, trailing prose in second chunk
 trailing_chunks = [
@@ -605,6 +621,51 @@ if run("", raw_lines=asterisk_model_chunks):
     failed += 1
 else:
     print("PASS: MODEL delta fragments starting with first chunk text preserve all text")
+
+# Test 5b: MODEL cumulative update tests (passes when final snapshot has declaration, warns when removed)
+model_cumulative_pass_chunks = [
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "id": "model_cum_1",
+        "cumulative": True,
+        "content": "Work in progress...",
+    }),
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "id": "model_cum_1",
+        "cumulative": True,
+        "content": "Completed task.\n\n**Stopping Point**: Clean stopping point reached --- session done.",
+    }),
+]
+if run("", raw_lines=model_cumulative_pass_chunks):
+    print("FAIL: MODEL cumulative update warned")
+    failed += 1
+else:
+    print("PASS: MODEL cumulative update passes")
+
+model_cumulative_warn_chunks = [
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "id": "model_cum_2",
+        "cumulative": True,
+        "content": "Completed task.\n\n**Stopping Point**: Clean stopping point reached --- session done.",
+    }),
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "id": "model_cum_2",
+        "cumulative": True,
+        "content": "Completed task without declaration.",
+    }),
+]
+if not run("", raw_lines=model_cumulative_warn_chunks):
+    print("FAIL: MODEL cumulative snapshot removing declaration did not warn (replacement not exercised)")
+    failed += 1
+else:
+    print("PASS: MODEL cumulative snapshot removing declaration warns")
 
 # Test 6: User-shaped isMeta harness event between same-ID fragments does not reset accumulated reply (Copilot review finding)
 harness_interleaved_chunks = [

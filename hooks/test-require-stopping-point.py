@@ -16,6 +16,13 @@ subject = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(subject)
 
 
+def make_test_env(tmpdir, extra_env=None):
+    env = dict(os.environ, TMPDIR=tmpdir, TEMP=tmpdir, TMP=tmpdir, GITHUB_ACTIONS="", CI="")
+    if extra_env:
+        env.update(extra_env)
+    return env
+
+
 def _has_warning(stdout: str) -> bool:
     if not stdout.strip():
         return False
@@ -26,7 +33,7 @@ def _has_warning(stdout: str) -> bool:
     return "systemMessage" in data and bool(data.get("systemMessage"))
 
 
-def run(text, tmpdir=None, raw_lines=None, key_name="transcript_path"):
+def run(text, tmpdir=None, raw_lines=None, key_name="transcript_path", env=None):
     if tmpdir is None:
         tmpdir = tempfile.mkdtemp()
     fd, path = tempfile.mkstemp(suffix=".jsonl")
@@ -44,13 +51,12 @@ def run(text, tmpdir=None, raw_lines=None, key_name="transcript_path"):
                 )
                 + "\n"
             )
-    env = dict(os.environ, TMPDIR=tmpdir, TEMP=tmpdir, TMP=tmpdir, GITHUB_ACTIONS="", CI="")
     res = subprocess.run(
         [sys.executable, HOOK],
         input=json.dumps({key_name: path}),
         text=True,
         capture_output=True,
-        env=env,
+        env=make_test_env(tmpdir, env),
     )
     os.unlink(path)
     assert res.returncode == 0, f"Hook exited with code {res.returncode}: {res.stderr}"
@@ -60,21 +66,18 @@ def run(text, tmpdir=None, raw_lines=None, key_name="transcript_path"):
 def run_direct_payload(payload, env=None, tmpdir=None):
     if tmpdir is None:
         tmpdir = tempfile.mkdtemp()
-    base_env = dict(os.environ, TMPDIR=tmpdir, TEMP=tmpdir, TMP=tmpdir, GITHUB_ACTIONS="", CI="")
-    if env:
-        base_env.update(env)
     res = subprocess.run(
         [sys.executable, HOOK],
         input=json.dumps(payload),
         text=True,
         capture_output=True,
-        env=base_env,
+        env=make_test_env(tmpdir, env),
     )
     assert res.returncode == 0, f"Hook exited with code {res.returncode}: {res.stderr}"
     return _has_warning(res.stdout)
 
 
-def reply_transcript(reply_text, narration_text=None):
+def reply_transcript(reply_text, narration_text=None, env=None):
     fd, path = tempfile.mkstemp(suffix=".jsonl")
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         blocks = []
@@ -92,13 +95,12 @@ def reply_transcript(reply_text, narration_text=None):
             + "\n"
         )
     tmpdir = tempfile.mkdtemp()
-    env = dict(os.environ, TMPDIR=tmpdir, TEMP=tmpdir, TMP=tmpdir)
     res = subprocess.run(
         [sys.executable, HOOK],
         input=json.dumps({"transcript_path": path}),
         text=True,
         capture_output=True,
-        env=env,
+        env=make_test_env(tmpdir, env),
     )
     os.unlink(path)
     assert res.returncode == 0, f"Hook exited with code {res.returncode}: {res.stderr}"
@@ -257,7 +259,7 @@ for payload, expected, label in direct_cases:
         print(f"FAIL {label} (expected block={expected}, got {got})")
         failed += 1
 
-def multi_turn_transcript(turn1_reply, turn2_text):
+def multi_turn_transcript(turn1_reply, turn2_text, env=None):
     fd, path = tempfile.mkstemp(suffix=".jsonl")
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write(json.dumps({"type": "user", "message": {"content": "do turn 1"}}) + "\n")
@@ -275,13 +277,12 @@ def multi_turn_transcript(turn1_reply, turn2_text):
             "message": {"content": [{"type": "text", "text": turn2_text}]},
         }) + "\n")
     tmpdir = tempfile.mkdtemp()
-    env = dict(os.environ, TMPDIR=tmpdir, TEMP=tmpdir, TMP=tmpdir)
     res = subprocess.run(
         [sys.executable, HOOK],
         input=json.dumps({"transcript_path": path}),
         text=True,
         capture_output=True,
-        env=env,
+        env=make_test_env(tmpdir, env),
     )
     os.unlink(path)
     assert res.returncode == 0, f"Hook exited with code {res.returncode}: {res.stderr}"
@@ -301,7 +302,7 @@ else:
     print("PASS: turn 2 plain-text clean stopping point passes despite turn 1 reply-tool lacking declaration")
 
 
-def tool_result_transcript(reply_text):
+def tool_result_transcript(reply_text, env=None):
     fd, path = tempfile.mkstemp(suffix=".jsonl")
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write(json.dumps({"type": "user", "message": {"content": "do task"}}) + "\n")
@@ -318,13 +319,12 @@ def tool_result_transcript(reply_text):
             "message": {"content": [{"type": "tool_result", "tool_use_id": "call_1", "content": "delivered"}]},
         }) + "\n")
     tmpdir = tempfile.mkdtemp()
-    env = dict(os.environ, TMPDIR=tmpdir, TEMP=tmpdir, TMP=tmpdir)
     res = subprocess.run(
         [sys.executable, HOOK],
         input=json.dumps({"transcript_path": path}),
         text=True,
         capture_output=True,
-        env=env,
+        env=make_test_env(tmpdir, env),
     )
     os.unlink(path)
     assert res.returncode == 0, f"Hook exited with code {res.returncode}: {res.stderr}"
@@ -381,13 +381,12 @@ def meta_mid_turn_transcript(reply_text):
             }]},
         }) + "\n")
     tmpdir = tempfile.mkdtemp()
-    env = dict(os.environ, TMPDIR=tmpdir, TEMP=tmpdir, TMP=tmpdir)
     res = subprocess.run(
         [sys.executable, HOOK],
         input=json.dumps({"transcript_path": path}),
         text=True,
         capture_output=True,
-        env=env,
+        env=make_test_env(tmpdir),
     )
     os.unlink(path)
     assert res.returncode == 0, f"Hook exited with code {res.returncode}: {res.stderr}"
@@ -426,7 +425,7 @@ else:
     )
 
 
-def scheduled_continuation_transcript(reply_text):
+def scheduled_continuation_transcript(reply_text, env=None):
     """A scheduled check-in continuation (ScheduleWakeup/cron fire, via a
     queue enqueue/dequeue pair) ALSO arrives as `isMeta: true`, but with no
     `sourceToolUseID`. Unlike a loaded skill's body it IS a genuine new
@@ -463,13 +462,12 @@ def scheduled_continuation_transcript(reply_text):
             }]},
         }) + "\n")
     tmpdir = tempfile.mkdtemp()
-    env = dict(os.environ, TMPDIR=tmpdir, TEMP=tmpdir, TMP=tmpdir)
     res = subprocess.run(
         [sys.executable, HOOK],
         input=json.dumps({"transcript_path": path}),
         text=True,
         capture_output=True,
-        env=env,
+        env=make_test_env(tmpdir, env),
     )
     os.unlink(path)
     assert res.returncode == 0, f"Hook exited with code {res.returncode}: {res.stderr}"
@@ -492,7 +490,7 @@ else:
     )
 
 # Streamed chunks test cases (ai-config#2500)
-def streamed_chunks_transcript(chunks, msg_id="msg_1"):
+def streamed_chunks_transcript(chunks, msg_id="msg_1", env=None):
     fd, path = tempfile.mkstemp(suffix=".jsonl")
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write(json.dumps({"type": "user", "message": {"content": "do task"}}) + "\n")
@@ -510,13 +508,12 @@ def streamed_chunks_transcript(chunks, msg_id="msg_1"):
                 + "\n"
             )
     tmpdir = tempfile.mkdtemp()
-    env = dict(os.environ, TMPDIR=tmpdir, TEMP=tmpdir, TMP=tmpdir)
     res = subprocess.run(
         [sys.executable, HOOK],
         input=json.dumps({"transcript_path": path}),
         text=True,
         capture_output=True,
-        env=env,
+        env=make_test_env(tmpdir, env),
     )
     os.unlink(path)
     assert res.returncode == 0, f"Hook exited with code {res.returncode}: {res.stderr}"

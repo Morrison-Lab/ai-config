@@ -109,6 +109,16 @@ See [`prefer-systemic-solutions-over-one-off-fixes`](shared/principles/prefer-sy
 
 - **Do:** diagnose root causes, fix underlying mechanisms, and install automated guards or structural invariants.
 - **Don't:** settle for a one-off patch that leaves the defect class open to recur elsewhere.
+
+## No cheap fixes
+
+A fix is done when the rule behind the finding is met, not when the finding stops matching.
+Name that rule, check the fixed state against it, and when a reviewer offers several fixes, take the one that meets it.
+See [`no-cheap-fixes`](shared/principles/no-cheap-fixes.md).
+
+- **Do:** check each fix against the rule behind the finding, not the finding's wording.
+- **Don't:** take a fix because it silences a check, such as un-bolding a definition hidden in another div instead of giving it its own.
+
 ## Research existing solutions before implementing (DRW)
 
 Before writing custom code or helpers, check for an existing solution (DRW, don't reinvent the wheel) in our repos, standard libraries, and trusted upstream ecosystems (base R, tidyverse / r-lib, PyPI, npm).
@@ -383,40 +393,25 @@ A resulting lockfile change (`renv.lock`, `environment.yml`) is a repo change an
 
 ## Strict Merge Control Policy
 
-- **NEVER merge any PR or MR without explicit user permission.**
-  Autonomous merging is strictly forbidden unless the user explicitly grants session permission (`/mwc`, `/maw`) or an explicit merge instruction (`/merge-it`, "merge this PR").
-- **Never merge over open review findings or treat reviewer skip notice as approval.**
-  Under `mwc`, a PR must be fully clean across CI and review (see [`fully-clean.md`](shared/workflow/fully-clean.md));
-  any reviewer's standing not-clean vetoes merge.
-  ARD every item across PR history before merge, then request fresh reviews.
-- **Never call a document-producing PR ready, or merge it, before viewing every page of its render.**
-  For a Word, PDF, slide, or manuscript render, view every page at the current head and post the evidence first, per [`review-rendered-documents`](shared/workflow/review-rendered-documents.md);
-  green CI is not enough.
-- **Never describe a PR as merge-ready without a clean review verdict on the latest commit.**
-  `mergeStateStatus: CLEAN` is conflict-free plus passing checks, not a review verdict;
-  report missing review as blocked on review.
-- **Revert premature or defective merges immediately.**
-  Open a revert PR on `main` immediately and continue on original branch per [`revert-premature-merge.md`](shared/workflow/revert-premature-merge.md);
-  reopen closed issues (`gh issue reopen <N>`) per [`revert-merge.md`](shared/workflow/revert-merge.md).
-- **Infrastructure PRs carry a standing `mwc` grant in pushable repos.**
-  A PR whose diff is purely infrastructure (CI workflows, scripts, config, rules, memories, skills, docs) may be merged without asking once fully clean.
-  Where `hooks/no-unauthorized-merge.py` is active, clear with `ALLOW_MERGE=1` on that command and state qualification.
-  See [`strict-merge-policy`](shared/workflow/strict-merge-policy.md) and [`AGENTS.cases.md`](AGENTS.cases.md).
+- **NEVER merge a PR or MR without explicit user permission**: a session grant (`/mwc`, `/maw`) or a merge instruction for that PR.
+- **Merge only a fully clean PR** ([`fully-clean`](shared/workflow/fully-clean.md)): any standing not-clean review vetoes it, and a skip notice is not approval.
+- **View every page of a document render before calling its PR ready** ([`review-rendered-documents`](shared/workflow/review-rendered-documents.md)).
+- **Revert a premature or defective merge at once**, and reopen the issues it closed.
+- **A purely infrastructure PR carries a standing `mwc` grant** in pushable repos once fully clean.
+
+Detail, hook overrides, and cases: [`strict-merge-policy`](shared/workflow/strict-merge-policy.md).
 
 - **Do:** merge a fully clean infrastructure PR without asking, stating why it qualified.
 - **Don't:** extend the grant to a PR that mixes infrastructure with content, or merge one whose review was skipped.
+
 ## Only work PRs scoped to the user or Actions app
 
-Before pushing to, editing, commenting on, reviewing, resolving threads on, dispatching a paid review of, or merging any PR, resolve the invoking user and read the PR's author and assignees.
-Proceed only when the author or assignee is that user (or alias in `memories/reviewing-prs.md`), the user explicitly requested work on that PR by name, or the author is `github-actions`.
-An explicit exclusion ("do not touch" followed by PR number) is a veto that removes that PR before any positive arm is evaluated.
-A review-only run dispatched naming the target PR reviews and stops there.
-Post both human-readable Markdown and machine-readable `review-data` JSON payloads.
-When no identity operation is available, fail closed.
-See [`pr-scope`](shared/workflow/pr-scope.md) and [`memories/reviewing-prs.md`](memories/reviewing-prs.md).
+Before pushing to, commenting on, reviewing, or merging any PR, read its author and assignees.
+Proceed only when the author or an assignee is the invoking user (or an alias), the user named that PR, or the author is `github-actions`;
+an explicit "do not touch" vetoes the PR first, and a missing identity check fails closed.
+Detail: [`pr-scope`](shared/workflow/pr-scope.md) and [`memories/reviewing-prs.md`](memories/reviewing-prs.md).
 
 - **Do:** verify author, assignees, or explicit user requests before interacting with any PR.
-- **Do:** treat "do not touch" as an absolute exclusion veto overriding all other positive matches.
 - **Don't:** interact with out-of-scope PRs or infer scope from claim comments.
 
 ## Always arm a persistent PR loop

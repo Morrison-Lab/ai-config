@@ -50,6 +50,10 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
    - Tests covering new branches, error paths, and edge cases --- and whether a passing test would still pass if the code under it were broken.
    - Documentation, manifests, and catalogs still in sync with the implementation.
    - Duplication of something the repo (or a trustworthy upstream) already provides.
+   - In prose with definition divs, every term or symbol the text gives a meaning to, whether bolded, italicised, or introduced by a "let X be" clause, has its own definition div ([`informal-definitions`](../../shared/writing/informal-definitions.md)).
+     Judge by content, not formatting.
+   - When you suggest a fix, suggest only fixes that meet the rule behind the finding.
+     Never offer a cosmetic option, such as dropping the bold from a hidden definition, as an acceptable alternative ([`no-cheap-fixes`](../../shared/principles/no-cheap-fixes.md)).
 
 5. **Deliver a structured verdict**
    - `### Summary of Changes`: a brief neutral summary of the inspected diff.

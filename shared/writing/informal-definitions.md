@@ -43,8 +43,18 @@ both:
    ending "is:" that instead introduces a list or a code block isn't a
    definitional naming sentence.
 
-For each hit from either pattern, find its enclosing div (search backward
-for the nearest `:::{#...}` opener and forward for the matching closer).
+3. **A clause that gives a symbol or term its meaning** --- "let $X$ be", "write $X$ for", "$X$ denotes", "call this" --- which patterns 1 and 2 both miss because nothing is bolded and no line ends in "is:":
+
+   ```bash
+   rg -n '\b([Ll]et|[Ww]rite|[Ww]riting) \$|\bdenotes?\b|\b[Cc]all (this|these|it)\b' <file>
+   ```
+
+   A hit inside a definition div is a candidate when the symbol it introduces is not the one that div's id and heading name.
+
+Formatting is not the test.
+A sentence that tells the reader what a term or symbol means is a definition however it is typeset, so a term with its bold removed is still a candidate.
+
+For each hit from any pattern, find its enclosing div (search backward for the nearest `:::{#...}` opener and forward for the matching closer).
 Treat it as a **candidate** if:
 
 - it is **not** inside any `{#def-...}`/`{#thm-...}`/`{#lem-...}`/
@@ -165,6 +175,7 @@ need to *compute* or *cite*, not just how *persuaded* they would be.
    "riding along" case above), **split it out** rather than leaving both
    concepts sharing one id --- each gets its own div, its own id, and its
    own example.
+   Removing the bold or italics from the term instead is not a fix: the definition is still inside the other div, and it is now harder to find (see [`no-cheap-fixes`](../principles/no-cheap-fixes.md)).
 5. If it's shape 3's motivation/justification commentary rather than a
    second concept, **move it to a `::: notes` aside** immediately after
    the definition div, rather than deleting it --- the document's own

@@ -1955,3 +1955,18 @@ See
   built at another moment and read the difference as a field asymmetry.
 - **Don't:** read a still-failing exit after a verdict fix as the fix having
   failed --- check whether a second blocker line is doing it.
+- **Don't:** withdraw a person's pending review request yourself because that
+  person told you to merge the PR (a per-PR `mwc`, "merge it").
+  A merge instruction is not an un-request: say the request is still pending
+  and leave clearing it to them.
+  (2026-10-06, Morrison-Lab/lds#415: the session's own request to the
+  maintainer was correct under the repo's content-review rule, so withdrawing
+  it was not repair.
+  The session chained the withdrawal into one command with a long wait; the
+  maintainer interrupted that command, but the PR timeline shows the
+  `review_request_removed` event had already run under the session's account.
+  So an interrupted command is not evidence that its first step did not
+  happen: read the timeline before saying so.)
+- **Do:** run a write that changes a PR's reviewers, labels or state as a
+  command of its own, never chained in front of a long wait, so it can be
+  approved or rejected by itself and its outcome is unambiguous.

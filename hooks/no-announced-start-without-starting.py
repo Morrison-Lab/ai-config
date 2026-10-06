@@ -71,6 +71,8 @@ PATTERNS = [
     r"I'?ll (?:begin|kick off|get started on) (?:it|that|this|the|a|an)\b",
     r"I'?ll (?:do|handle|tackle|take) (?:it|that|this) now\b",
     r"(?:I am|I'?m) (?:now )?(?:beginning|kicking off) (?:it|that|this|the)\b",
+    r"(?:continuing|continue with)\s+(?:gia|gii|the\s+next|next\s+task|next\s+issue|phase\s+\d)\b",
+    r"(?:I am|I'?m)\s+(?:now\s+)?continuing\s+(?:with\s+)?(?:gia|gii|the\s+next|next\s+task|next\s+issue|phase\s+\d)\b",
 ]
 # `start WITH` was dropped from the two `I'll start` alternatives above.
 # "I'll start with the easy part: the data looks clean" is expository -- it
@@ -110,7 +112,9 @@ SENTENCE_SPLIT_RX = re.compile(r"(?<=[.!?;])\s+|\n")
 #
 # The measured instance was not literally last: "I'm starting it now: issue,
 # branch, PR." sat above a Stopping Point declaration, which is stripped
-# first for the same reason.
+# first for the same reason. But inspect candidates from both the trimmed tail
+# (above stopping point) and the raw tail (to catch unstarted work announced
+# inside the stopping point detail text).
 TAIL_SENTENCES = 2
 STOPPING_POINT_RX = re.compile(
     r"\*\*Stopping Point\*\*.*\Z", re.S | re.I
@@ -118,10 +122,16 @@ STOPPING_POINT_RX = re.compile(
 
 
 def tail_of(prose):
-    """The closing sentences of a reply, minus its stopping-point block."""
+    """The closing sentences of a reply, covering both trimmed prose and stopping-point text."""
     trimmed = STOPPING_POINT_RX.sub(" ", prose)
-    sentences = [s for s in SENTENCE_SPLIT_RX.split(trimmed) if s.strip()]
-    return sentences[-TAIL_SENTENCES:]
+    trimmed_sentences = [s for s in SENTENCE_SPLIT_RX.split(trimmed) if s.strip()]
+    raw_sentences = [s for s in SENTENCE_SPLIT_RX.split(prose) if s.strip()]
+    candidates = []
+    if trimmed_sentences:
+        candidates.extend(trimmed_sentences[-TAIL_SENTENCES:])
+    if raw_sentences:
+        candidates.extend(raw_sentences[-TAIL_SENTENCES:])
+    return candidates
 
 try:
     _lib = os.path.join(
@@ -145,25 +155,38 @@ def last_assistant_text(path):
     """The final user-visible assistant prose in the transcript."""
     last_text = ""
     try:
-        with open(path, encoding="utf-8", errors="ignore") as fh:
+        with open(path, errors="ignore") as fh:
             for line in fh:
                 try:
                     m = json.loads(line)
                 except Exception:
                     continue
-                if m.get("type") != "assistant" and m.get("role") != "assistant":
-                    continue
-                blocks = (m.get("message") or {}).get("content") or m.get("content") or []
-                if isinstance(blocks, list):
-                    txt = "".join(
-                        b.get("text", "")
-                        for b in blocks
-                        if isinstance(b, dict) and b.get("type") == "text"
-                    )
-                    if txt.strip():
-                        last_text = txt
-                elif isinstance(blocks, str) and blocks.strip():
-                    last_text = blocks
+                # Claude Code transcript format: type == "assistant" or role == "assistant"
+                if m.get("type") == "assistant" or m.get("role") == "assistant":
+                    blocks = (m.get("message") or {}).get("content") or m.get("content") or []
+                    if isinstance(blocks, list):
+                        txt = "".join(
+                            b.get("text", "")
+                            for b in blocks
+                            if isinstance(b, dict) and b.get("type") == "text"
+                        )
+                        if txt.strip():
+                            last_text = txt
+                    elif isinstance(blocks, str) and blocks.strip():
+                        last_text = blocks
+                # Google Antigravity transcript format: source == "MODEL" and type == "PLANNER_RESPONSE"
+                elif m.get("source") == "MODEL" and m.get("type") == "PLANNER_RESPONSE":
+                    content = m.get("content")
+                    if isinstance(content, str) and content.strip():
+                        last_text = content
+                    elif isinstance(content, list):
+                        txt = "".join(
+                            b.get("text", "")
+                            for b in content
+                            if isinstance(b, dict) and b.get("type") == "text"
+                        )
+                        if txt.strip():
+                            last_text = txt
     except Exception:
         return ""
     return last_text
@@ -207,7 +230,7 @@ def main() -> int:
     if os.path.exists(sentinel):
         return 0
     try:
-        open(sentinel, "w", encoding="utf-8").close()
+        open(sentinel, "w").close()
     except Exception:
         pass
 

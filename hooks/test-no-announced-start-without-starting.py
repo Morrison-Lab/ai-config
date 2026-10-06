@@ -40,8 +40,17 @@ def say(text):
     }
 
 
+def say_antigravity(text):
+    return {
+        "step_index": 1,
+        "source": "MODEL",
+        "type": "PLANNER_RESPONSE",
+        "content": text,
+    }
+
+
 def run(messages):
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".jsonl", delete=False) as fh:
+    with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as fh:
         for m in messages:
             fh.write(json.dumps(m) + "\n")
         path = fh.name
@@ -72,13 +81,14 @@ CASES_BLOCK = [
     # the window and the measured instance goes unmatched.
     "I'm starting it now: issue, branch, PR.\n\n"
     "**Stopping Point**: Not a clean stopping point / work remains queued: "
-    "session not done; #1045 awaiting CI. Seven arrays run until 06:30. Then #1016, #1036, "
+    "#1045 awaiting CI. Seven arrays run until 06:30. Then #1016, #1036, "
     "#1015, #1007 and #1000.",
     "I'll begin the refactor.",
     "I am now starting the month_pool propagation fix.",
     "I'll do that now.",
     "Starting on it now.",
     "I'll get started on the migration.",
+    "**Stopping Point**: Not a clean stopping point / work remains queued: Continuing GIA Phase 2 to claim and implement the next backlog issue.",
 ]
 
 CASES_PASS = [
@@ -112,7 +122,7 @@ CASES_PASS = [
     "Filed the issue and cut the branch.",
     # No commitment at all.
     "The sweep is 76 of 175 chunks in, with no failures.",
-    "**Stopping Point**: Clean stopping point reached --- session done; UMS executed; no follow-up items pending.",
+    "**Stopping Point**: Clean stopping point reached.",
     # Quoting the rule must not trip it.
     "The banned shape is `I'll start on it` with nothing following.",
 ]
@@ -133,6 +143,16 @@ def main():
             print(f"FAIL (should pass): {text!r}")
         else:
             print(f"PASS allow: {text[:60]!r}")
+
+    # Test Antigravity transcript schema directly.
+    clear_sentinels()
+    agy_text = "**Stopping Point**: Not a clean stopping point / work remains queued: Continuing GIA Phase 2 to claim and implement the next backlog issue."
+    agy_out = run([say_antigravity(agy_text)])
+    if not agy_out or json.loads(agy_out).get("decision") != "block":
+        failures += 1
+        print(f"FAIL Antigravity schema test: out={agy_out}")
+    else:
+        print("PASS Antigravity schema block")
 
     # The guard must fire once per distinct message, so a second identical
     # Stop does not block forever.

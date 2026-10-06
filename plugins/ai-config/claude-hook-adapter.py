@@ -281,6 +281,64 @@ def find_repo_root(start_file=None):
 
     return candidate
 
+def refresh_session_heartbeat(session_id: str | None, repo_root: str | None = None):
+    """Touch the heartbeat timestamp in .git/ai-sessions/<session_id>.session.
+
+    In Antigravity on Windows, sessions have an empty pid= in their registration file.
+    When long operations (e.g. Quarto renders or CI suites) run for >30 minutes,
+    no-unauthorized-merge's is_session_alive() check fails because time.time() - heartbeat > 1800.
+    Updating heartbeat on every PreInvocation and PreToolUse keeps the active session alive.
+    """
+    if not session_id:
+        return
+    import time
+    from pathlib import Path
+    try:
+        now_ts = str(int(time.time()))
+        dirs = []
+        for p in (os.getcwd(), repo_root):
+            if not p:
+                continue
+            try:
+                out = subprocess.check_output(
+                    ["git", "rev-parse", "--git-common-dir"],
+                    text=True,
+                    stderr=subprocess.DEVNULL,
+                    cwd=p,
+                ).strip()
+                cp = Path(out)
+                if not cp.is_absolute():
+                    cp = (Path(p) / cp).resolve()
+                if cp not in dirs:
+                    dirs.append(cp)
+            except Exception:
+                pass
+            pg = Path(p) / ".git"
+            if pg.is_dir() and pg.resolve() not in dirs:
+                dirs.append(pg.resolve())
+
+        clean_sid = re.sub(r"[^A-Za-z0-9_-]", "_", session_id)
+        for cd in dirs:
+            reg_dir = cd / "ai-sessions"
+            if not reg_dir.exists():
+                continue
+            sess_file = reg_dir / f"{clean_sid}.session"
+            if sess_file.is_file():
+                lines = sess_file.read_text(encoding="utf-8", errors="ignore").splitlines()
+                new_lines = []
+                updated = False
+                for line in lines:
+                    if line.startswith("heartbeat="):
+                        new_lines.append(f"heartbeat={now_ts}")
+                        updated = True
+                    else:
+                        new_lines.append(line)
+                if not updated:
+                    new_lines.append(f"heartbeat={now_ts}")
+                sess_file.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+    except Exception as exc:
+        print(f"claude-hook-adapter: heartbeat refresh failed: {exc}", file=sys.stderr)
+
 def main():
     try:
         payload = json.load(sys.stdin)
@@ -333,16 +391,23 @@ def main():
     # Common fields for Claude payload
     transcript_path = payload.get("transcriptPath") or payload.get("transcript_path")
     session_id = (
-        payload.get("session_id")
-        or payload.get("sessionId")
-        or payload.get("sessionID")
+        payload.get("conversationId")
         or payload.get("conversation_id")
-        or payload.get("conversationId")
+        or payload.get("sessionId")
+        or payload.get("session_id")
     )
     if not session_id and isinstance(transcript_path, str):
         m = re.search(r"[/\\](?:brain|conversations)[/\\]([0-9a-fA-F-]{36})", transcript_path)
         if m:
             session_id = m.group(1)
+    if not transcript_path and session_id:
+        app_data = os.environ.get("ANTIGRAVITY_APP_DATA") or os.path.expanduser("~/.gemini/antigravity")
+        candidate_tp = os.path.join(app_data, "brain", session_id, ".system_generated", "logs", "transcript.jsonl")
+        if os.path.isfile(candidate_tp):
+            transcript_path = candidate_tp
+
+    if session_id and event_type in ("PreToolUse", "PreInvocation"):
+        refresh_session_heartbeat(session_id, repo_root)
 
     if event_type == "PreToolUse":
         tool_call = payload.get("toolCall") or {}
@@ -361,6 +426,9 @@ def main():
             }
             if transcript_path:
                 bash_payload["transcript_path"] = transcript_path
+            if session_id:
+                bash_payload["session_id"] = session_id
+                bash_payload["conversation_id"] = session_id
             for group in pre_tool_groups:
                 if matches_tool(group.get("matcher", ""), "Bash"):
                     tasks_to_run.append((extract_hook_list(group), bash_payload, tool_cwd, "run_command"))
@@ -408,7 +476,6 @@ def main():
                     "tool_input": {
                         "subagent_type": sub.get("TypeName") or sub.get("typeName"),
                         "isolation": normalize_isolation(raw_workspace),
-                        "model": sub.get("Model") or sub.get("model"),
                         # The raw Antigravity Workspace value, preserved for
                         # any downstream consumer that wants it -- it is not
                         # the same concept as `isolation` above, so it is

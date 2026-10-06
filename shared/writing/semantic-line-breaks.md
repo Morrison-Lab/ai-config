@@ -491,6 +491,16 @@ and [Morrison-Lab/ai-config#3789](https://github.com/Morrison-Lab/ai-config/issu
 detected multi-sentence lines rose across `ai-config` from 21,807 to 24,682
 (+13.2%), and the blind spot was closed across both the gate and reformatter.)
 
+**A bullet with an inline bold heading ending in a period triggers the multi-sentence check.**
+When a list item begins with a bold label terminating with a full stop
+on the same line as the descriptive body (`- **Heading.** Description...`),
+the sentence splitter treats `.** ` as a sentence boundary.
+Because the line contains the heading plus the following sentence,
+`check-new-line-breaks` flags the line for packing more than one sentence.
+To satisfy the rule, either place the body text on an indented newline
+after the bold label, or use a colon instead of a period (`- **Heading:** Description...`).
+(Measured 2026-10-05 on [ai-config#4317](https://github.com/Morrison-Lab/ai-config/pull/4317).)
+
 **That check WAS advisory --- it warned and exited 0 --- and stopped being so
 on 2026-08-18.**
 `Morrison-Lab/gha@e91b8bf` ("fail by default when violations are found",

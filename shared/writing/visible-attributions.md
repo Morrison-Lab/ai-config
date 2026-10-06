@@ -25,14 +25,15 @@ does not have to be attributed to them
 The exemption covers only that hop.
 What the repository itself credits is still carried:
 a book or paper it follows,
-and any person outside the lab whose lecture or notes it adapted,
+and any person other than the maintainer whose lecture or notes it adapted,
 since several of those repositories hold other authors' work
 (lds, for one, credits its notes to Kameron Decker Harris and Brian Hutchinson).
 A link to a sister site that sends the reader to further reading
 is a cross-reference, not an attribution, and is unaffected.
 
-The directive removes a requirement; it does not forbid a credit.
-So leave the sister-repository credit out of new work,
+The directive removes a requirement.
+It does not forbid a credit.
+So a sister-repository credit may be left out of new work,
 but do not strip one that already exists unless the maintainer asks.
 
 - **Do:** credit the outside book, paper or person an item follows,
@@ -95,5 +96,6 @@ moved all 20 into PSW's Source callouts,
 after a first attempt that invented an `.attribution` class
 was caught for contradicting PSW.
 Later the same day the maintainer added that credits to their own repositories are not needed,
-so the PR then dropped its rme and lds credits
-and kept those to ISLR, ESL, Dobson and the outside lecturers.)
+pointing at one of the PR's rme credits,
+so the PR's commit `714dd913` dropped its rme and lds credits,
+and `aae43d26` kept those to ISLR, ESL, Dobson and the lecturers the lds notes credit.)

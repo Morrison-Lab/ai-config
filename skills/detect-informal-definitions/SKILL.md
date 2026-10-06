@@ -61,6 +61,12 @@ read it before running this skill; the steps below are the short version.
    Is it part of a deliberately informal list? Is it actually cited
    downstream? Drop anything that fails the "new, theoretical, not-a-list,
    worth-citing" bar.
+   Then check each definition div's display, and its Source callout,
+   per [the display must define the term](../../shared/writing/informal-definitions.md#the-display-must-define-the-term-and-only-the-term):
+   one defined quantity per definition div
+   (a second defining operator or a defining "where" clause is a second one),
+   a display of the defined object rather than of a use of it,
+   and no example, usage rule or rationale inside the div.
 5. **Fix each confirmed finding**, per the fragment's fix menu:
    - Wrap it in its own formal-definition div, with its own id and
      heading.
@@ -71,6 +77,11 @@ read it before running this skill; the steps below are the short version.
    - If it was riding along inside a different concept's div, split it
      out into its own div rather than leaving both sharing one id.
    - Never remove the bold or italics instead: the definition stays hidden in the other div ([`no-cheap-fixes`](../../shared/principles/no-cheap-fixes.md)).
+   - Move commentary, examples and usage rules out of the div
+     into a remark, an example div or a callout (fix step 5).
+   - Give a second quantity defined in a display its own div (fix step 6),
+     and correct a display that shows something other than the defined object (fix step 7),
+     keeping any quantity the old display defined in a div of its own.
 6. **Re-scan** the touched section after editing — a newly-added
    definition can itself introduce a forward reference (see
    `fix-forward-references`) if its worked example isn't moved to sit

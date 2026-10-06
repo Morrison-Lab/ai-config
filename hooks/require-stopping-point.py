@@ -200,7 +200,13 @@ def last_text(path: str) -> str:
                     elif text:
                         is_same_message = (
                             (msg_id and curr_msg_id and msg_id == curr_msg_id)
-                            or (consecutive_assistant and not msg_id and not curr_msg_id)
+                            or (
+                                consecutive_assistant
+                                and not msg_id
+                                and not curr_msg_id
+                                and last_text_val
+                                and text.startswith(last_text_val)
+                            )
                         )
                         if is_same_message:
                             if last_text_val and text.startswith(last_text_val):
@@ -215,6 +221,11 @@ def last_text(path: str) -> str:
                     event.get("type") in {"PLANNER_RESPONSE", "GENERIC"}
                     or event.get("source") == "MODEL"
                 ):
+                    msg_id = (
+                        (event.get("message") or {}).get("id")
+                        or event.get("id")
+                        or (str(event["step_index"]) if "step_index" in event else None)
+                    )
                     has_tool_calls = bool(event.get("tool_calls"))
                     content = event.get("content")
                     if isinstance(content, str) and content.strip():
@@ -233,7 +244,17 @@ def last_text(path: str) -> str:
                         consecutive_assistant = False
                         curr_msg_id = None
                     elif text:
-                        if consecutive_assistant:
+                        is_same_message = (
+                            (msg_id and curr_msg_id and msg_id == curr_msg_id)
+                            or (
+                                consecutive_assistant
+                                and not msg_id
+                                and not curr_msg_id
+                                and last_text_val
+                                and text.startswith(last_text_val)
+                            )
+                        )
+                        if is_same_message:
                             if last_text_val and text.startswith(last_text_val):
                                 last_text_val = text
                             else:
@@ -241,6 +262,7 @@ def last_text(path: str) -> str:
                         else:
                             last_text_val = text
                             consecutive_assistant = True
+                            curr_msg_id = msg_id
     except Exception:
         return ""
     chosen = last_reply if saw_reply_tool else last_text_val

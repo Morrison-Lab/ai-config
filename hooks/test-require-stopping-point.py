@@ -677,5 +677,63 @@ if run("", raw_lines=gemini_tool_boundary_clean_transcript):
 else:
     print("PASS: Antigravity transcript with tool_calls boundary with clean stopping point passes")
 
+# Regression test: Back-to-back MODEL events with no tool_calls (reviewer finding)
+back_to_back_model_warn_transcript = [
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "content": "First response.\n\n**Stopping Point**: Clean stopping point reached --- session done.",
+    }),
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "content": "Second response without stopping point declaration.",
+    }),
+]
+if not run("", raw_lines=back_to_back_model_warn_transcript):
+    print("FAIL: back-to-back MODEL events without stopping point did not warn")
+    failed += 1
+else:
+    print("PASS: back-to-back MODEL events without stopping point warns")
+
+back_to_back_model_clean_transcript = [
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "content": "First response without declaration.",
+    }),
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "content": "Second response.\n\n**Stopping Point**: Clean stopping point reached --- session done.",
+    }),
+]
+if run("", raw_lines=back_to_back_model_clean_transcript):
+    print("FAIL: back-to-back MODEL events with clean stopping point warned")
+    failed += 1
+else:
+    print("PASS: back-to-back MODEL events with clean stopping point passes")
+
+# Regression test: Back-to-back assistant events without IDs
+back_to_back_assistant_no_id_transcript = [
+    json.dumps({
+        "type": "assistant",
+        "message": {
+            "content": [{"type": "text", "text": "First response.\n\n**Stopping Point**: Clean stopping point reached --- session done."}],
+        },
+    }),
+    json.dumps({
+        "type": "assistant",
+        "message": {
+            "content": [{"type": "text", "text": "Second response without stopping point declaration."}],
+        },
+    }),
+]
+if not run("", raw_lines=back_to_back_assistant_no_id_transcript):
+    print("FAIL: back-to-back assistant events without IDs and without stopping point did not warn")
+    failed += 1
+else:
+    print("PASS: back-to-back assistant events without IDs and without stopping point warns")
+
 raise SystemExit(bool(failed))
 

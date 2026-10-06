@@ -156,6 +156,118 @@ condition --- is part of the specification, not motivation for it.
 The test is whether removing the sentence changes what a reader would
 need to *compute* or *cite*, not just how *persuaded* they would be.
 
+The same test applies to examples and usage rules, not only to motivation,
+and to the div's collapsed "Source" callout
+([`visible-attributions.md`](visible-attributions.md)) as much as to its body.
+"such as the degree of a polynomial fit" is an example;
+"scored once, after the choice is made" is a rule for using a test set;
+"given a name here because this page compares several such rules" is rationale,
+and a Source callout holds only the credit.
+Fix step 5 below says which box each one moves to.
+
+- **Do:** move an example into an example div after the definition,
+  and other material into the box
+  [`quarto-remarks-vs-callouts`](quarto-remarks-vs-callouts.md)'s test picks:
+  a remark for commentary on the math, such as rationale,
+  and a callout for guidance to the reader,
+  such as a `.callout-warning` for a usage rule that guards against a trap.
+- **Don't:** leave a "such as ..." clause, a "used only once ..." rule,
+  or a "named here because ..." aside in the definition or in its Source callout.
+
+## The display must define the term, and only the term
+
+A definition div's display equation is where a reader looks for what the term *is*,
+so check the display against the div's id and heading,
+not only the prose around it.
+Two shapes slip past the three detection patterns above,
+because those patterns read the prose,
+and here the prose names the right term while the display is well-formed.
+
+**Shape 4: two quantities in one definition div.**
+A display carrying two defining operators, or one followed by a "where $X = \ldots$" clause,
+defines a second quantity inside another term's div,
+which is shape 1 written in math rather than in prose.
+A "cross-validation choice procedure" div whose display also defines
+the chosen index $\hat l(T) \eqdef \argmin_l \ldots$ is this shape.
+Count the defining operators in each definition div,
+wherever it is nested and with any number of colons in its fence.
+Lines inside any div nested within a definition div are skipped,
+callout or not, such as the Source callout;
+a nested definition div is counted on its own.
+`OPS` is the operator set, a regular expression:
+extend it to whatever the project writes for "is defined as".
+
+```bash
+OPS='\\eqdef|\\triangleq|:=|\\coloneqq' awk '
+  FNR == 1 { d = 0; split("", id); split("", n); split("", at) }
+  /^:::+ *$/ { if (d > 0 && id[d] != "" && n[d] > 1) print FILENAME ":" at[d] ": " id[d] ": " n[d] " definitions"; if (d > 0) d--; next }
+  /^:::+/ { d++; id[d] = ""; n[d] = 0; if (match($0, /#def-[A-Za-z0-9_-]+/)) { id[d] = substr($0, RSTART + 1, RLENGTH - 1); at[d] = FNR }; next }
+  d > 0 && id[d] != "" { t = $0; n[d] += gsub(ENVIRON["OPS"], "", t) }
+' <files>
+```
+
+It is plain POSIX awk, tested under mawk.
+It counts an operator anywhere in the div's own lines,
+so `:=` in a code chunk inside a definition div is a false hit.
+Then read each definition div's "where" clauses by hand,
+since a "where" that only names a symbol already defined is fine.
+
+- **Do:** give the second quantity its own div, and cite it from the first.
+- **Don't:** leave a second defining operator, or a defining "where" clause, in a definition div.
+
+**Shape 5: the display shows a use or a consequence, not the defined object.**
+Read the display's left-hand side as the term the heading names,
+and check that the right-hand side depends on everything the heading says it does.
+Four ways it fails:
+
+- the display defines a different quantity,
+  such as a "validation set" div whose only display is $\hat l \eqdef \argmin \ldots$,
+  the choice made with the set rather than the set;
+- the display is a quantity *computed from* the term,
+  such as a "test set" div that displays the test mean squared error rather than the set;
+- an index in the heading is missing from the right-hand side,
+  such as a "fold-based standard error of procedure $g$" whose right-hand side has no $g$,
+  so it is identical to the unindexed definition and the dependence exists only in prose;
+- the display repeats an earlier display,
+  such as a "nested cross-validation" div whose display matches the plain cross-validation one,
+  so the thing that makes it nested appears nowhere in the math.
+
+The last is mechanical: list display bodies that occur more than once on a page.
+Run it over the rendered HTML (`_site/<page>.html` after `quarto render <page>.qmd --to html`),
+not the source:
+a page is often assembled from one-div include files,
+so a source file cannot see a repeat across includes,
+and the render has already separated math from code, so a `$$` in a code chunk cannot pair wrongly.
+
+```bash
+python3 -c '
+import collections, html, re, sys
+for path in sys.argv[1:]:
+    page = open(path, encoding="utf-8").read()
+    seen = collections.Counter()
+    for m in re.finditer(r"<span class=.math display.>(.*?)</span>", page, re.S):
+        body = re.sub(r"\\tag\{[^}]*\}", "", html.unescape(m.group(1)))
+        seen[re.sub(r"\s+", "", body)] += 1
+    for body, count in seen.items():
+        if count > 1:
+            print(f"{path}: {count}x {body[:70]}")
+' _site/<page>.html
+```
+
+Quarto appends `\tag{N}` to every labelled display,
+so the lister strips tags before comparing;
+otherwise two identical labelled displays would never match.
+
+A hit is a candidate, not a finding:
+a proof may legitimately restate an earlier display.
+A display that collapses to its own left-hand side only after macro expansion
+is the sibling case in
+[`fact-check-prose.md`](fact-check-prose.md#a-definition-can-resolve-render-and-still-say-nothing).
+
+- **Do:** display the defined object itself, with every index the heading names on the right-hand side.
+- **Don't:** display a different quantity, a statistic computed from the term,
+  or a formula already displayed for a different term.
+
 ## Fixing a confirmed finding
 
 1. **Wrap it in its own formal-definition div**, with its own id and
@@ -173,11 +285,33 @@ need to *compute* or *cite*, not just how *persuaded* they would be.
    concepts sharing one id --- each gets its own div, its own id, and its
    own example.
    Removing the bold or italics from the term instead is not a fix: the definition is still inside the other div, and it is now harder to find (see [`no-cheap-fixes`](../principles/no-cheap-fixes.md)).
-5. If it's shape 3's motivation/justification commentary rather than a
-   second concept, **move it to a `::: notes` aside** immediately after
-   the definition div, rather than deleting it --- the document's own
-   convention already uses `::: notes` throughout for exactly this kind
-   of "why this matters" content, so the fix is relocation, not loss.
+5. If it's shape 3's commentary rather than a second concept,
+   **move it out of the div** rather than deleting it,
+   so the fix is relocation, not loss.
+   Choose the box by
+   [`quarto-remarks-vs-callouts`](quarto-remarks-vs-callouts.md)'s test,
+   as [`quarto-divs-for-typed-content`](quarto-divs-for-typed-content.md) requires:
+   - an example goes into an example div;
+   - commentary on the math (motivation, rationale, naming, scope)
+     goes into a remark after the definition div
+     (`::: {.remark .notes}` to keep it off the slides);
+   - guidance to the reader, such as a usage rule or a trap to avoid,
+     goes into the matching callout (`.callout-warning` for a trap).
+6. If a definition div defines a second quantity in its display (shape 4),
+   **give that quantity its own div** before the first,
+   and have the first cite it, as step 4 does for a term in the prose.
+7. If the display shows something other than the defined object (shape 5),
+   **correct the math, not the placement**:
+   display the defined object itself,
+   with every index or argument the heading names on its right-hand side.
+   When the displaced formula defines a quantity of its own,
+   such as a choice made with the term or a statistic computed from it,
+   keep that quantity: give it its own div per step 6 and cite it,
+   since the fix is relocation, not loss.
+   A display that repeats another term's display means the two terms
+   are not yet told apart in the math,
+   so add the index or argument that tells them apart
+   rather than rewording the prose around the same formula.
 
 ## A bolded keyword is one signal; every defined term gets its own div
 

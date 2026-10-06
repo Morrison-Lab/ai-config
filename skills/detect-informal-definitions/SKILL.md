@@ -80,7 +80,8 @@ read it before running this skill; the steps below are the short version.
    - Move commentary, examples and usage rules out of the div
      into a remark, an example div or a callout (fix step 5).
    - Give a second quantity defined in a display its own div (fix step 6),
-     and correct a display that shows something other than the defined object (fix step 7).
+     and correct a display that shows something other than the defined object (fix step 7),
+     keeping any quantity the old display defined in a div of its own.
 6. **Re-scan** the touched section after editing — a newly-added
    definition can itself introduce a forward reference (see
    `fix-forward-references`) if its worked example isn't moved to sit

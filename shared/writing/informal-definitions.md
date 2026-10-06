@@ -304,6 +304,10 @@ is the sibling case in
    **correct the math, not the placement**:
    display the defined object itself,
    with every index or argument the heading names on its right-hand side.
+   When the displaced formula defines a quantity of its own,
+   such as a choice made with the term or a statistic computed from it,
+   keep that quantity: give it its own div per step 6 and cite it,
+   since the fix is relocation, not loss.
    A display that repeats another term's display means the two terms
    are not yet told apart in the math,
    so add the index or argument that tells them apart

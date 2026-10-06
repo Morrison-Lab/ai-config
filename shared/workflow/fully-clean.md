@@ -1952,15 +1952,6 @@ See
 - **Do:** read every blocker line the scorer prints, not the first one.
 - **Do:** take a pending request from the scorer's own output, or from the
   payload that run consumed.
-- **Don't:** compare a hand-fetched `requested_reviewers` against a payload
-  built at another moment and read the difference as a field asymmetry.
-- **Don't:** read a still-failing exit after a verdict fix as the fix having
-  failed --- check whether a second blocker line is doing it.
-- **Don't:** withdraw a person's pending review request yourself because that
-  person told you to merge the PR (a per-PR [`mwc`](../../skills/mwc/SKILL.md),
-  "merge it").
-  A merge instruction is not an un-request, and the carve-out above covers only
-  a request made in error.
 - **Do:** say the request is still pending, and leave clearing it to its
   reviewer.
 - **Do:** after an interrupted command, read the PR's timeline for each step
@@ -1970,6 +1961,15 @@ See
   itself and its outcome is unambiguous.
   This is the same shape as [`pr-on-claim`](pr-on-claim.md)'s own-call rule,
   for a different reason; no hook enforces it yet.
+- **Don't:** compare a hand-fetched `requested_reviewers` against a payload
+  built at another moment and read the difference as a field asymmetry.
+- **Don't:** read a still-failing exit after a verdict fix as the fix having
+  failed --- check whether a second blocker line is doing it.
+- **Don't:** withdraw a person's pending review request yourself because that
+  person told you to merge the PR (a per-PR [`mwc`](../../skills/mwc/SKILL.md),
+  "merge it").
+  A merge instruction is not an un-request, and the carve-out above covers only
+  a request made in error.
 
 (Measured 2026-10-06 on
 [Morrison-Lab/lds#415](https://github.com/Morrison-Lab/lds/pull/415).

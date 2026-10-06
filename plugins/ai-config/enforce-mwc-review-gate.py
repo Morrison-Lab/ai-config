@@ -609,6 +609,13 @@ def copilot_is_empty_balanced_closer_look(raw_body):
     return COPILOT_EMPTY_BALANCED_TEMPLATE.fullmatch(normalized) is not None
 
 
+def _normalize_bot_login_for_inline(login):
+    cleaned = (login or "").strip().lower().replace("[bot]", "")
+    if cleaned in ("copilot", "copilot-pull-request-reviewer"):
+        return "copilot"
+    return cleaned
+
+
 def _has_live_inline_bot_item(review_comments, login, head_oid):
     """True when `review_comments` (the PR's inline review comments, in the
     REST `pulls/{n}/comments` shape) has one authored by `login` and tied to
@@ -630,13 +637,19 @@ def _has_live_inline_bot_item(review_comments, login, head_oid):
     """
     if not head_oid:
         return True
+    target_norm = _normalize_bot_login_for_inline(login)
     for c in review_comments or ():
-        c_login = (c.get("author") or {}).get("login", "")
-        if c_login != login:
+        c_login = (c.get("author") or c.get("user") or {}).get("login", "")
+        if _normalize_bot_login_for_inline(c_login) != target_norm:
             continue
         commit_id = c.get("commit_id") or ""
         original_commit_id = c.get("original_commit_id") or ""
-        if commit_id == head_oid or original_commit_id == head_oid:
+        if (
+            commit_id == head_oid
+            or original_commit_id == head_oid
+            or (commit_id and len(commit_id) >= ABBREV_SHA_LEN and head_oid.startswith(commit_id[:ABBREV_SHA_LEN]))
+            or (original_commit_id and len(original_commit_id) >= ABBREV_SHA_LEN and head_oid.startswith(original_commit_id[:ABBREV_SHA_LEN]))
+        ):
             return True
     return False
 

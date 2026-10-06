@@ -3189,7 +3189,11 @@ def _has_live_inline_bot_item(review_comments, login, head_oid):
     """
     if not head_oid or not review_comments or not login:
         return False
-    login_lower = login.lower().replace("[bot]", "")
+    target_norm = EXCLUSIVE_BOT_IDENTITY.get(
+        login.lower(), login.lower().replace("[bot]", "")
+    )
+    if target_norm.lower() in ("copilot", "copilot-pull-request-reviewer"):
+        target_norm = "Copilot"
     for c in review_comments:
         c_login = ""
         commit_id = ""
@@ -3203,7 +3207,12 @@ def _has_live_inline_bot_item(review_comments, login, head_oid):
             c_login = getattr(c, "author_login", "")
             commit_id = getattr(c, "commit_id", "")
             original_commit_id = getattr(c, "original_commit_id", "")
-        if c_login.lower().replace("[bot]", "") != login_lower:
+        c_norm = EXCLUSIVE_BOT_IDENTITY.get(
+            c_login.lower(), c_login.lower().replace("[bot]", "")
+        )
+        if c_norm.lower() in ("copilot", "copilot-pull-request-reviewer"):
+            c_norm = "Copilot"
+        if c_norm != target_norm:
             continue
         if (
             (commit_id and len(commit_id) >= 7 and head_oid.startswith(commit_id[:7]))
@@ -3350,7 +3359,7 @@ def check_latest_verdict(
                 and head_oid.startswith(_oid)
             ):
                 rcs = review_comments() if callable(review_comments) else (review_comments or [])
-                if not _has_live_inline_bot_item(rcs, author, head_oid):
+                if not _has_live_inline_bot_item(rcs, identity, head_oid):
                     per_reviewer.pop(identity, None)
                     if latest_identity == identity:
                         if per_reviewer:

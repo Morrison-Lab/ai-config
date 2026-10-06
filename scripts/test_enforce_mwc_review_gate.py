@@ -322,23 +322,24 @@ class TestEvaluate(unittest.TestCase):
         Copilot's formal negative state while a real inline finding was
         still live)."""
         body = self.COPILOT_EMPTY_BALANCED_CLOSER_LOOK_BODY
-        state = pr(
-            reviews=[review(
-                "copilot-pull-request-reviewer",
-                "COMMENTED",
-                body=body,
-                commit=HEAD,
-            )],
-            comments=[CLEAN_VERDICT],
-            review_comments=[inline_comment("copilot-pull-request-reviewer", commit_id=HEAD)],
-        )
-        bot_states = gate.latest_bot_review_states(
-            state["reviews"], state["headRefOid"], state["reviewComments"]
-        )
-        self.assertEqual(bot_states.get("copilot-pull-request-reviewer"), "NOT_CLEAN")
-        decision = gate.evaluate(MERGE_CMD, state)
-        self.assertEqual(decision["decision"], "deny")
-        self.assertIn("not clean", decision["reason"])
+        for inline_login in ("copilot-pull-request-reviewer", "Copilot"):
+            state = pr(
+                reviews=[review(
+                    "copilot-pull-request-reviewer",
+                    "COMMENTED",
+                    body=body,
+                    commit=HEAD,
+                )],
+                comments=[CLEAN_VERDICT],
+                review_comments=[inline_comment(inline_login, commit_id=HEAD)],
+            )
+            bot_states = gate.latest_bot_review_states(
+                state["reviews"], state["headRefOid"], state["reviewComments"]
+            )
+            self.assertEqual(bot_states.get("copilot-pull-request-reviewer"), "NOT_CLEAN", inline_login)
+            decision = gate.evaluate(MERGE_CMD, state)
+            self.assertEqual(decision["decision"], "deny", inline_login)
+            self.assertIn("not clean", decision["reason"], inline_login)
 
     def test_copilot_empty_balanced_with_stale_inline_comment_still_allows(self):
         """A stale inline comment from an EARLIER commit (neither its

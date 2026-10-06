@@ -6763,14 +6763,28 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         [copilot_prior_not_clean_review, copilot_empty_balanced_review_item],
         head_oid="b36fe3bb",
         review_comments=[{
+            "author": {"login": "Copilot"},
+            "commit_id": "b36fe3bb",
+        }],
+    )
+    check(
+        "check_latest_verdict: an empty Balanced Copilot review on HEAD does not "
+        "clear when live inline comments with REST login 'Copilot' remain on HEAD (ai-config#4318)",
+        (not eb_inline_ok) and any("NOT clean" in i for i in eb_inline_issues),
+    )
+
+    eb_inline_bot_ok, eb_inline_bot_issues = checker.check_latest_verdict(
+        [copilot_prior_not_clean_review, copilot_empty_balanced_review_item],
+        head_oid="b36fe3bb",
+        review_comments=[{
             "author": {"login": "copilot-pull-request-reviewer[bot]"},
             "commit_id": "b36fe3bb",
         }],
     )
     check(
         "check_latest_verdict: an empty Balanced Copilot review on HEAD does not "
-        "clear when live inline comments remain on HEAD (ai-config#4318)",
-        (not eb_inline_ok) and any("NOT clean" in i for i in eb_inline_issues),
+        "clear when live inline comments with bot login remain on HEAD (ai-config#4318)",
+        (not eb_inline_bot_ok) and any("NOT clean" in i for i in eb_inline_bot_issues),
     )
 
     eb_diff_ok, eb_diff_issues = checker.check_latest_verdict(

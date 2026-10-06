@@ -155,7 +155,7 @@ def last_assistant_text(path):
     """The final user-visible assistant prose in the transcript."""
     last_text = ""
     try:
-        with open(path, errors="ignore") as fh:
+        with open(path, encoding="utf-8", errors="ignore") as fh:
             for line in fh:
                 try:
                     m = json.loads(line)
@@ -230,7 +230,7 @@ def main() -> int:
     if os.path.exists(sentinel):
         return 0
     try:
-        open(sentinel, "w").close()
+        open(sentinel, "w", encoding="utf-8").close()
     except Exception:
         pass
 

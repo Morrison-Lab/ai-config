@@ -50,7 +50,7 @@ def say_antigravity(text):
 
 
 def run(messages):
-    with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as fh:
+    with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False, encoding="utf-8") as fh:
         for m in messages:
             fh.write(json.dumps(m) + "\n")
         path = fh.name

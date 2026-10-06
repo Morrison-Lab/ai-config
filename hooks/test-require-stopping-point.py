@@ -1090,7 +1090,7 @@ with open(harness_feedback_tscript_sdk, "w", encoding="utf-8") as f:
         "promptSource": "sdk",
         "content": "Scheduled check-in continuation.",
     }) + "\n")
-    f.write(json.dumps({"type": "assistant", "message": {"content": "reply to scheduled check-in"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"content": "initial reply missing stopping point"}}) + "\n")
 
 harness_feedback_payload_sdk = {
     "session_id": "sess_harness_feedback_1",

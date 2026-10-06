@@ -499,7 +499,8 @@ Because the line contains the heading plus the following sentence,
 `check-new-line-breaks` flags the line for packing more than one sentence.
 To satisfy the rule, either place the body text on an indented newline
 after the bold label, or use a colon instead of a period (`- **Heading:** Description...`).
-(Measured 2026-10-05 on [ai-config#4317](https://github.com/Morrison-Lab/ai-config/pull/4317).)
+(Measured 2026-10-05 on [ai-config#4317](https://github.com/Morrison-Lab/ai-config/pull/4317) at commit `51991db7`:
+run 37412702737 flagged four `- **Heading.** Description` lines in `fact-check-prose.md`.)
 
 **That check WAS advisory --- it warned and exited 0 --- and stopped being so
 on 2026-08-18.**

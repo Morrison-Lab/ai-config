@@ -36,7 +36,7 @@ skill's procedure, if the policy itself changes).
 ### 1. Identify the target and extract checkable units
 
 A PR/MR diff (`gh pr diff <N>` / `glab mr diff <N>`), a file, or pasted text.
-Read the changed prose and pull out three kinds of units to check:
+Read the changed prose and pull out the checkable units:
 
 - **Factual claims** — statements that cite a value, a behavior, a result, an
   external fact ("X was introduced in version Y", "the estimator is

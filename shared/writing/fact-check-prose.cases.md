@@ -274,5 +274,5 @@ Second, the sandbox did not run on native Windows, where commands ran without it
 unless `failIfUnavailable` made Claude Code refuse to start (caught by Copilot).
 Third, a project's `.claude/settings.json` or `.claude/settings.local.json`
 overrode user-level `sandbox.enabled` (caught by Copilot as a missed finding).
-All three were present in the source documentation fetched before writing.)
+All three were present in the source documentation fetched before writing (the [Claude Code settings reference](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/settings)).)
 

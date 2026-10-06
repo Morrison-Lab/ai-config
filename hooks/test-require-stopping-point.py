@@ -10,6 +10,11 @@ HOOK = (
     else os.path.join(os.path.dirname(__file__), "require-stopping-point.py")
 )
 
+import importlib.util
+_spec = importlib.util.spec_from_file_location("subject", HOOK)
+subject = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(subject)
+
 
 def _has_warning(stdout: str) -> bool:
     if not stdout.strip():
@@ -865,6 +870,64 @@ if not run_direct_payload(payload_tscript_turn2, tmpdir=claude_sess_dir):
     failed += 1
 else:
     print("PASS: transcript turn 2 warns")
+
+# Test: step_index 0 preservation in extract_turn_id
+tscript_step_zero = os.path.join(claude_sess_dir, "step_zero.jsonl")
+with open(tscript_step_zero, "w", encoding="utf-8") as f:
+    f.write(json.dumps({"step_index": 0, "content": "hello world"}) + "\n")
+
+extracted_zero = subject.extract_turn_id({"transcript_path": tscript_step_zero})
+if extracted_zero != "0":
+    print(f"FAIL: extract_turn_id for step_index: 0 returned {extracted_zero!r}, expected '0'")
+    failed += 1
+else:
+    print("PASS: extract_turn_id preserves step_index: 0")
+
+# Test: claude-hook-adapter shape (session_id + transcript_path only, multi-turn)
+adapter_sess_dir = tempfile.mkdtemp()
+adapter_tscript_t1 = os.path.join(adapter_sess_dir, "t1.jsonl")
+with open(adapter_tscript_t1, "w", encoding="utf-8") as f:
+    f.write(json.dumps({"type": "user", "message": {"content": "turn 1"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"id": "msg_a1", "content": "undeclared reply 1"}}) + "\n")
+
+adapter_payload_t1 = {
+    "session_id": "sess_adapter_1",
+    "transcript_path": adapter_tscript_t1,
+}
+adapter_payload_t1_retry = {
+    "session_id": "sess_adapter_1",
+    "transcript_path": adapter_tscript_t1,
+}
+
+adapter_tscript_t2 = os.path.join(adapter_sess_dir, "t2.jsonl")
+with open(adapter_tscript_t2, "w", encoding="utf-8") as f:
+    f.write(json.dumps({"type": "user", "message": {"content": "turn 1"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"id": "msg_a1", "content": "undeclared reply 1"}}) + "\n")
+    f.write(json.dumps({"type": "user", "message": {"content": "turn 2"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"id": "msg_a2", "content": "undeclared reply 2"}}) + "\n")
+
+adapter_payload_t2 = {
+    "session_id": "sess_adapter_1",
+    "transcript_path": adapter_tscript_t2,
+}
+
+if not run_direct_payload(adapter_payload_t1, tmpdir=adapter_sess_dir):
+    print("FAIL: adapter-shaped turn 1 did not warn")
+    failed += 1
+else:
+    print("PASS: adapter-shaped turn 1 warns")
+
+if run_direct_payload(adapter_payload_t1_retry, tmpdir=adapter_sess_dir):
+    print("FAIL: adapter-shaped turn 1 retry was not deduplicated")
+    failed += 1
+else:
+    print("PASS: adapter-shaped turn 1 retry is deduplicated")
+
+if not run_direct_payload(adapter_payload_t2, tmpdir=adapter_sess_dir):
+    print("FAIL: adapter-shaped turn 2 was silently suppressed by turn 1 sentinel")
+    failed += 1
+else:
+    print("PASS: adapter-shaped turn 2 warns")
 
 # Test: Harness-mode exceptions
 if run_direct_payload({"reply": "No stopping point declaration here.", "harness_mode": True}):

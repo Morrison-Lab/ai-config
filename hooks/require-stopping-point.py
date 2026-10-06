@@ -341,8 +341,8 @@ def extract_turn_id(payload: dict) -> str:
         "stepIndex",
     ):
         val = payload.get(key)
-        if val is not None:
-            return str(val)
+        if val is not None and str(val).strip():
+            return str(val).strip()
     tpath = (
         payload.get("transcript_path")
         or payload.get("transcriptPath")
@@ -354,28 +354,41 @@ def extract_turn_id(payload: dict) -> str:
         try:
             with open(tpath, "r", encoding="utf-8") as f:
                 last_id = ""
+                line_count = 0
                 for line in f:
                     line = line.strip()
                     if not line:
                         continue
+                    line_count += 1
                     try:
                         event = json.loads(line)
                     except Exception:
                         continue
                     if not isinstance(event, dict):
                         continue
-                    ev_id = (
-                        event.get("prompt_id")
-                        or event.get("promptId")
-                        or (event.get("message") or {}).get("id")
-                        or event.get("id")
-                        or event.get("step_index")
-                        or event.get("stepIndex")
-                    )
+                    ev_id = None
+                    for k in (
+                        "prompt_id",
+                        "promptId",
+                        "turn_id",
+                        "turnId",
+                        "step_index",
+                        "stepIndex",
+                    ):
+                        val = event.get(k)
+                        if val is not None and str(val).strip():
+                            ev_id = str(val).strip()
+                            break
+                    if ev_id is None:
+                        val = (event.get("message") or {}).get("id") or event.get("id")
+                        if val is not None and str(val).strip():
+                            ev_id = str(val).strip()
                     if ev_id is not None:
-                        last_id = str(ev_id)
+                        last_id = ev_id
                 if last_id:
                     return last_id
+                if line_count > 0:
+                    return f"line_{line_count}"
         except Exception:
             pass
     return ""

@@ -266,3 +266,21 @@ Antigravity provides built-in system tools for managing asynchronous background 
   - `Action='list'`: List active direct subagents with their conversation IDs and live state.
   - `Action='kill'`: Terminate specific subagents and all their descendants (`ConversationIds` required).
   - `Action='kill_all'`: Terminate all subagents and all their descendants.
+
+## Antigravity MWC session liveness and heartbeat expiration (`ai-session.sh heartbeat`)
+
+- In `hooks/no-unauthorized-merge.py`, `check_mwc_active()` calls `is_session_alive(sess_file)`.
+- When an Antigravity session registers via `ai-session.sh enable-mwc --id <conversation_id>`, the generated `<id>.session` file typically leaves `pid=` blank.
+- Without a valid PID, `is_session_alive()` falls back to `(time.time() - heartbeat) < 1800` (a 30-minute expiration window).
+- If a session runs longer than 30 minutes before merging, the heartbeat expires and `check_mwc_active()` returns False, causing `no-unauthorized-merge.py` to block `gh pr merge`.
+- **Systemic Fix (2026-10-06):** `plugins/ai-config/claude-hook-adapter.py` now implements `refresh_session_heartbeat()`, automatically updating `heartbeat=<now>` in `.git/ai-sessions/<session_id>.session` on every `PreInvocation` and `PreToolUse` event so active Antigravity sessions never expire.
+
+## Antigravity transcript schema vs Claude Code transcript schema in Stop hooks
+
+- Claude Code stores user and assistant messages with `m.get("type") == "assistant"` or `m.get("role") == "assistant"`.
+- Antigravity stores trajectory steps where assistant replies are recorded with `m.get("source") == "MODEL"` and `m.get("type") == "PLANNER_RESPONSE"`.
+- Hooks inspecting the assistant's final text (such as `hooks/no-announced-start-without-starting.py`) must support both schemas (`m.get("source") == "MODEL" and m.get("type") == "PLANNER_RESPONSE"` in addition to `"assistant"`).
+- Otherwise, `last_assistant_text()` returns `""` on Antigravity transcripts, making stop guards completely inert.
+- When evaluating announced work, guards must also inspect candidates from the raw message tail, not just the text preceding `**Stopping Point**:`, so that unstarted continuation promises placed inside or alongside the stopping point detail text are caught and blocked.
+  (Observed in live Antigravity sessions 2026-10-06.)
+

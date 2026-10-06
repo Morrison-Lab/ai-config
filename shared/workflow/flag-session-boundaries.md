@@ -82,7 +82,8 @@ The contradiction is invisible from the inside when both land in one message, be
 They are not separate to the reader, who gets a request for input and a claim that nothing is pending in the same breath.
 
 An unboxed question or offer in prose is just as open, and harder to spot because nothing marks it --- "I can file an issue on that if you want" is an offer whether or not it sits in a box.
-[`tag-chat-output`](../writing/tag-chat-output.md) says how to mark them in the first place; this check catches the ones that were not.
+[`tag-chat-output`](../writing/tag-chat-output.md) says how to mark them in the first place;
+this check catches the ones that were not.
 (Measured 2026-10-05 in a Morrison-Lab/lbt session: a reply ended with that unboxed offer and then "The session is done", and the user answered that open questions for them mean the session is not done.)
 
 **`git log origin/<default-branch>..HEAD` plus `git status --short` decides whether the session produced anything durable.**

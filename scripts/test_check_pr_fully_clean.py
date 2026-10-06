@@ -6793,6 +6793,24 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         any("NOTE: could not fetch review comments" in i and "network failure" in i for i in eb_raise_issues),
     )
 
+    def _payload_error_rcs():
+        raise checker.PayloadError("missing review_comments")
+
+    payload_error_propagated = False
+    try:
+        checker.check_latest_verdict(
+            [copilot_prior_not_clean_review, copilot_empty_balanced_review_item],
+            head_oid="b36fe3bb",
+            review_comments=_payload_error_rcs,
+        )
+    except checker.PayloadError:
+        payload_error_propagated = True
+
+    check(
+        "check_latest_verdict: PayloadError propagates (not caught as a PR finding) (ai-config#4318)",
+        payload_error_propagated,
+    )
+
     eb_inline_ok, eb_inline_issues = checker.check_latest_verdict(
         [copilot_prior_not_clean_review, copilot_empty_balanced_review_item],
         head_oid="b36fe3bb",

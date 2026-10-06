@@ -3370,6 +3370,8 @@ def check_latest_verdict(
                 else:
                     try:
                         rcs = review_comments() if callable(review_comments) else review_comments
+                    except PayloadError:
+                        raise
                     except Exception as exc:
                         rcs = None
                         review_comment_notes.append(

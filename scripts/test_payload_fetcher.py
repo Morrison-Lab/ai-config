@@ -351,6 +351,14 @@ def main():
     code, out = run_script(p_copilot_blocked)
     check("copilot empty-Balanced with live inline comment exits 1 in --from-json", code == 1)
 
+    # Missing review_comments key in --from-json when carve-out evaluated exits 2 (usage error), NOT 1
+    p_copilot_missing = base_payload()
+    p_copilot_missing["pr"]["reviews"] = [copilot_prior_not_clean, copilot_empty_balanced]
+    # base_payload() does not include review_comments or pr.reviewComments
+    code, out = run_script(p_copilot_missing)
+    check("copilot empty-Balanced missing review_comments exits 2 (usage error), NOT 1", code == 2)
+    check("...and names unusable payload in message", "payload is unusable" in out)
+
     # An end-to-end run WITHOUT -R must exercise resolve_repo through the
     # payload rather than shelling out; a run WITH a realistic Actions URL
     # must exercise the actions/runs call site.

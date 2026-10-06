@@ -57,7 +57,7 @@ You verify exactly one of four kinds of unit per invocation:
    verify every way around it against the source documentation:
    check what happens in non-default modes,
    where it does not run (platforms, fail-open vs fail-closed),
-   precedence overrides (user vs project settings, flags),
+   precedence overrides (user vs project settings, environment variables, CLI flags, list merge vs replacement),
    and escape hatches or exclusions.
 
 Report, for your one unit only:

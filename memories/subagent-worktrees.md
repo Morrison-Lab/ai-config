@@ -533,6 +533,20 @@ The reviewer noticed the tree had changed mid-flight and fell back to `git show 
 **Second occurrence, 2026-09-09: the trigger is any write to the tree, not `git checkout`.**
 Recorded in [`shared/workflow/adversarial-self-review.md`](../shared/workflow/adversarial-self-review.md), since the rule it yields binds the dispatcher rather than the worktree.
 
+**Third occurrence, 2026-10-05: a peer *session* switched the primary checkout, and the commit landed on its branch.**
+Two Claude desktop sessions shared `~/Documents/GitHub/lds` with no worktree for either, against AGENTS.md "Worktree isolation".
+One session opened lds#411 from `claude/statquest-videos`.
+The other then checked out `claude/geeksforgeeks-links`, its own PR stacked on #411, in that same directory.
+When the first session came back to fix a review finding, it ran `git pull`, edited, committed and pushed without checking the branch.
+The fix went onto the peer's branch, along with a merge of `main`, and the peer then found two commits in its tree that it hadn't made.
+It did no harm only because the peer's branch was stacked on #411, so it would have received the same change anyway.
+The recovery was to cherry-pick the commit onto the right branch from a fresh worktree, leave the peer's branch unrewritten, and tell the user.
+In that session the ai-config plugin had not loaded (see `claude-code-settings.md`, "A plugin synced from claude.ai mid-session"), so none of the worktree hooks were active to catch it.
+
+- **Do:** cut a worktree for your branch before your first edit, even in a checkout you expect to have to yourself.
+- **Do:** when you did work in a shared checkout, run `git branch --show-current` immediately before every commit and push, and compare it with the PR's head branch.
+- **Don't:** rewrite a peer's branch to undo a stray commit; copy the commit to your own branch and report it.
+
 ## An unisolated subagent's live edits get read by a dirty-tree check as YOUR uncommitted work
 
 The rule to set `isolation` on every `Agent` call is stated in

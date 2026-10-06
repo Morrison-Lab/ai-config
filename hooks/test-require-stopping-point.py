@@ -794,21 +794,25 @@ else:
     print("PASS: different message.id sequence with stopping point passes")
 
 # Regression test: Gemini / Antigravity transcript with tool_calls boundary
+# Uses same-ID text fragments separated by a tool-call-only MODEL record, with no intervening
+# USER_INPUT reset, so that disabling the has_tool_calls guard fails the test.
 gemini_tool_boundary_transcript = [
     json.dumps({
         "type": "PLANNER_RESPONSE",
         "source": "MODEL",
+        "id": "model_tc_1",
         "content": "Initial step.\n\n**Stopping Point**: Clean stopping point reached --- session done.",
-        "tool_calls": [{"name": "run_command", "args": {"CommandLine": "dir"}}],
-    }),
-    json.dumps({
-        "type": "USER_INPUT",
-        "source": "USER_EXPLICIT",
-        "content": [{"type": "tool_result", "content": "file1.txt\nfile2.txt"}],
     }),
     json.dumps({
         "type": "PLANNER_RESPONSE",
         "source": "MODEL",
+        "id": "model_tc_1",
+        "tool_calls": [{"name": "run_command", "args": {"CommandLine": "dir"}}],
+    }),
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "id": "model_tc_1",
         "content": "Here is the directory listing: file1.txt, file2.txt.",
     }),
 ]
@@ -822,17 +826,19 @@ gemini_tool_boundary_clean_transcript = [
     json.dumps({
         "type": "PLANNER_RESPONSE",
         "source": "MODEL",
+        "id": "model_tc_2",
         "content": "Initial step.",
-        "tool_calls": [{"name": "run_command", "args": {"CommandLine": "dir"}}],
-    }),
-    json.dumps({
-        "type": "USER_INPUT",
-        "source": "USER_EXPLICIT",
-        "content": [{"type": "tool_result", "content": "file1.txt\nfile2.txt"}],
     }),
     json.dumps({
         "type": "PLANNER_RESPONSE",
         "source": "MODEL",
+        "id": "model_tc_2",
+        "tool_calls": [{"name": "run_command", "args": {"CommandLine": "dir"}}],
+    }),
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "id": "model_tc_2",
         "content": "Here is the listing.\n\n**Stopping Point**: Clean stopping point reached --- session done.",
     }),
 ]

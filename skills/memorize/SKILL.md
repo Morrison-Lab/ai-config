@@ -103,6 +103,9 @@ those forms — this skill is what it hands off to once memory is the answer.
 4. **Write** a concise bullet (one line preferred), matching the file's voice;
    include the *why* if it isn't obvious. Don't record what the repo already
    documents (code structure, git history) — capture only the non-obvious.
+   When the entry records where a directive or fact came from, cite that
+   source as a link to the PR, issue or comment it arose on, not as a bare
+   repository name (ai-config#4310's first review caught exactly that).
 5. **Commit & push** the change so it persists. What that means depends on
    where step 2 wrote it:
    - **Project's own repo, owned** — commit, push a branch, and open a PR

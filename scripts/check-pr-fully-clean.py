@@ -2409,6 +2409,41 @@ def _copilot_is_empty_balanced_closer_look(
     return True
 
 
+def is_copilot_empty_balanced_closer_look(
+    body: str, scan: str = None, cited: bytearray = None
+) -> bool:
+    """True when `body` is an empty Balanced 'Needs a closer look' Copilot review
+    ([ai-config#4004](https://github.com/Morrison-Lab/ai-config/issues/4004), [ai-config#4318](https://github.com/Morrison-Lab/ai-config/issues/4318)).
+    """
+    if not body:
+        return False
+    if scan is None or cited is None:
+        scan, cited = strip_cited_finding_vocab_with_mask(body)
+    comment_spans = _find_html_comment_spans(scan, cited, match_is_cited)
+    comment_span_starts = [s for s, _ in comment_spans]
+    details_spans = _find_details_regions(
+        scan, comment_spans, comment_span_starts, cited, match_is_cited
+    )
+    details_span_starts = [s for s, _ in details_spans]
+
+    for m in COPILOT_CHANGES_RECOMMENDED_HEADER.finditer(scan):
+        if not match_is_cited(cited, match_content_start(m), m.end()):
+            return False
+
+    for m in COPILOT_NEEDS_A_CLOSER_LOOK_HEADER.finditer(scan):
+        if not match_is_cited(cited, match_content_start(m), m.end()):
+            is_live = not (
+                _position_in_spans(m.start(), comment_span_starts, comment_spans)
+                or _position_in_spans(match_content_start(m), comment_span_starts, comment_spans)
+                or _position_in_spans(m.start(), details_span_starts, details_spans)
+                or _position_in_spans(match_content_start(m), details_span_starts, details_spans)
+            )
+            if is_live and _copilot_is_empty_balanced_closer_look(scan, cited, m):
+                return True
+            return False
+    return False
+
+
 def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str:
     """Classify a Copilot formal review body as 'not-clean', 'clean', or ''.
 
@@ -3148,10 +3183,44 @@ def _is_expired_driver_ledger(
         return False
 
 
+def _has_live_inline_bot_item(review_comments, login, head_oid):
+    """True when review_comments (in the REST pulls/{n}/comments shape) has one
+    authored by login and tied to the current head commit.
+    """
+    if not head_oid or not review_comments or not login:
+        return False
+    login_lower = login.lower().replace("[bot]", "")
+    for c in review_comments:
+        c_login = ""
+        commit_id = ""
+        original_commit_id = ""
+        if isinstance(c, dict):
+            user = c.get("author") or c.get("user") or {}
+            c_login = user.get("login") or ""
+            commit_id = c.get("commit_id") or ""
+            original_commit_id = c.get("original_commit_id") or ""
+        else:
+            c_login = getattr(c, "author_login", "")
+            commit_id = getattr(c, "commit_id", "")
+            original_commit_id = getattr(c, "original_commit_id", "")
+        if c_login.lower().replace("[bot]", "") != login_lower:
+            continue
+        if (
+            (commit_id and len(commit_id) >= 7 and head_oid.startswith(commit_id[:7]))
+            or (original_commit_id and len(original_commit_id) >= 7 and head_oid.startswith(original_commit_id[:7]))
+            or commit_id == head_oid
+            or original_commit_id == head_oid
+        ):
+            return True
+    return False
+
+
 def check_latest_verdict(
     all_items: List[Tuple[Any, ...]],
     approved_authors: Optional[Set[str]] = None,
     commit_activity: Optional[Dict[str, str]] = None,
+    head_oid: str = "",
+    review_comments: Optional[List[Dict[str, Any]]] = None,
 ) -> Tuple[bool, List[str]]:
     """Fail when any reviewer's latest verdict-bearing statement is not clean.
 
@@ -3167,6 +3236,11 @@ def check_latest_verdict(
     reviewer does not: any standing not-clean vetoes, including under mwc
     (ai-config#2274). Reviewers are keyed on `_reviewer_identity`, because
     Claude and Antigravity both post as `github-actions[bot]`.
+
+    An empty Balanced Copilot review on the current HEAD commit with no live
+    inline review comments on that head clears standing not-clean state for
+    Copilot ([ai-config#4318](https://github.com/Morrison-Lab/ai-config/issues/4318)), since the reviewer re-evaluated the current head
+    with zero findings and no live comments.
 
     Formal-review authors whose latest GitHub state is APPROVED have
     superseded their own earlier CHANGES_REQUESTED; pass those logins as
@@ -3266,6 +3340,27 @@ def check_latest_verdict(
             latest_verdict, latest_when = verdict, when
             latest_identity, latest_author = identity, author
             per_reviewer[identity] = (verdict, when, author)
+        elif identity == "Copilot" and is_copilot_empty_balanced_closer_look(body):
+            # An empty Balanced 'Needs a closer look' review on HEAD with no live
+            # inline comments clears standing not-clean state (ai-config#4318).
+            if (
+                head_oid
+                and _oid
+                and len(_oid) >= 7
+                and head_oid.startswith(_oid)
+            ):
+                rcs = review_comments() if callable(review_comments) else (review_comments or [])
+                if not _has_live_inline_bot_item(rcs, author, head_oid):
+                    per_reviewer.pop(identity, None)
+                    if latest_identity == identity:
+                        if per_reviewer:
+                            latest_identity = max(per_reviewer, key=lambda k: per_reviewer[k][1])
+                            latest_verdict, latest_when, latest_author = per_reviewer[latest_identity]
+                        else:
+                            latest_identity = ""
+                            latest_verdict = ""
+                            latest_when = ""
+                            latest_author = ""
 
     per_bits = ", ".join(
         f"{identity}={verdict}"
@@ -3597,6 +3692,12 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
             issues.append(f"No automated review comments or reviews found on PR #{pr_num}")
         return False, issues
 
+    def _lazy_rcs():
+        rc = getattr(pr, "review_comments", None)
+        if rc is None and hasattr(pr, "get_review_comments"):
+            rc = pr.get_review_comments()
+        return rc or []
+
     # Criterion 4, evaluated over the WHOLE review history rather than only the
     # items matching HEAD: a not-clean verdict at an earlier commit stands until
     # a later CLEAN from the SAME reviewer supersedes it. A later CLEAN from a
@@ -3608,6 +3709,8 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
             if state == "APPROVED"
         },
         commit_activity=_commit_activity(pr),
+        head_oid=sha,
+        review_comments=_lazy_rcs,
     )
     issues.extend(verdict_issues)
 

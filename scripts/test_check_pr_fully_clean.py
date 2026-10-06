@@ -6745,8 +6745,42 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     )
     check(
         "check_latest_verdict: an empty Balanced Copilot review does not "
-        "supersede an earlier not-clean Copilot verdict",
+        "supersede an earlier not-clean Copilot verdict without matching HEAD",
         (not eb_ok) and any("NOT clean" in i for i in eb_issues),
+    )
+
+    eb_head_ok, eb_head_issues = checker.check_latest_verdict(
+        [copilot_prior_not_clean_review, copilot_empty_balanced_review_item],
+        head_oid="b36fe3bb",
+    )
+    check(
+        "check_latest_verdict: an empty Balanced Copilot review on HEAD clears "
+        "earlier not-clean Copilot verdict (ai-config#4318)",
+        eb_head_ok and not any("NOT clean" in i for i in eb_head_issues),
+    )
+
+    eb_inline_ok, eb_inline_issues = checker.check_latest_verdict(
+        [copilot_prior_not_clean_review, copilot_empty_balanced_review_item],
+        head_oid="b36fe3bb",
+        review_comments=[{
+            "author": {"login": "copilot-pull-request-reviewer[bot]"},
+            "commit_id": "b36fe3bb",
+        }],
+    )
+    check(
+        "check_latest_verdict: an empty Balanced Copilot review on HEAD does not "
+        "clear when live inline comments remain on HEAD (ai-config#4318)",
+        (not eb_inline_ok) and any("NOT clean" in i for i in eb_inline_issues),
+    )
+
+    eb_diff_ok, eb_diff_issues = checker.check_latest_verdict(
+        [copilot_prior_not_clean_review, copilot_empty_balanced_review_item],
+        head_oid="differentsha",
+    )
+    check(
+        "check_latest_verdict: an empty Balanced Copilot review on older commit does not "
+        "clear standing not-clean on HEAD (ai-config#4318)",
+        (not eb_diff_ok) and any("NOT clean" in i for i in eb_diff_issues),
     )
 
     check(

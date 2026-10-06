@@ -19,8 +19,7 @@ comparison never sees it as a definition to track in the first place.
 
 ## The detection heuristic
 
-Two independent patterns, each catching phrasing the other misses --- run
-both:
+Three independent patterns, each catching phrasing the others miss --- run all three:
 
 1. **A bolded or otherwise emphasized term, immediately followed by
    language that states a precise meaning** --- "is", "is defined as",
@@ -59,9 +58,7 @@ Treat it as a **candidate** if:
 
 - it is **not** inside any `{#def-...}`/`{#thm-...}`/`{#lem-...}`/
   `{#cor-...}` div at all (plain prose), **or**
-- it **is** inside such a div, but that div's id and heading name a
-  *different* concept than the one this sentence bolds (a second concept
-  riding along inside another's definition).
+- it **is** inside such a div, but that div's id and heading name a *different* concept than the one this sentence defines (a second concept riding along inside another's definition).
 
 ## Confirming a candidate
 
@@ -182,7 +179,7 @@ need to *compute* or *cite*, not just how *persuaded* they would be.
    convention already uses `::: notes` throughout for exactly this kind
    of "why this matters" content, so the fix is relocation, not loss.
 
-## A bolded keyword is the signal; every such term gets its own div
+## A bolded keyword is one signal; every defined term gets its own div
 
 PSW's [Guidelines for defining terms](https://morrison-lab.github.io/psw/chapters/defining-terms.html#guidelines-for-defining-terms)
 is the canonical statement: one `#def-` div per term, commentary after the div,

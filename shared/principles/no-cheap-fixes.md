@@ -17,7 +17,7 @@ Ask: if the person who wrote the rule read only the fixed text, would they say i
 This is [`no-gameable-rules`](no-gameable-rules.md) from the other side.
 That principle asks rule *authors* to key a rule to the state it cares about;
 this one asks whoever *applies* a fix to aim at that state too, including when the rule or the reviewer offers a cheaper path.
-It is narrower than [`prefer-systemic-solutions-over-one-off-fixes`](prefer-systemic-solutions-over-one-off-fixes.md): a one-off fix can be honest, but a cheap fix only hides the defect.
+It is distinct from [`prefer-systemic-solutions-over-one-off-fixes`](prefer-systemic-solutions-over-one-off-fixes.md): that principle is about how far a fix reaches, and this one is about whether it meets the rule at all.
 
 ## Re-reviewing a fix
 
@@ -33,8 +33,7 @@ When you ask a reviewer to confirm a fix, brief it with the finding and the rule
 
 (2026-10-05, Morrison-Lab/sds#72.
 A reviewer flagged "fitting procedure" as a second bolded term inside `def-expected-generalization-error`, and offered either its own div or "drop the bold and leave it as plain explanation".
-The session dropped the bold,
-although [`informal-definitions`](../writing/informal-definitions.md)'s fixing steps already said to split such a concept out into its own div.
+The session dropped the bold, although [`informal-definitions`](../writing/informal-definitions.md)'s fixing steps already said to split such a concept out into its own div.
 Its next re-review brief said the term was "no longer bolded" and asked the reviewer to confirm it, which it did, and Claude Code Review called the PR ready.
 The user caught it, called it malicious compliance after already saying "everything goes in a div", and set the rule "no cheap fixes".
 A sweep then found five more definitions hidden in the same PR, including "let $\hat y^{(-j)}$ be" and "let $\mathrm{MSE}_j$ be" clauses that no formatting-based check had flagged;

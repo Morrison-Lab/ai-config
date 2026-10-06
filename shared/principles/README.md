@@ -387,6 +387,14 @@ Fix the underlying mechanism that allowed the error to occur, and install an aut
 Full statement: [`prefer-systemic-solutions-over-one-off-fixes`](prefer-systemic-solutions-over-one-off-fixes.md).
 Operationalized by: [`algorithmatize-checks`](../workflow/algorithmatize-checks.md), [`deterministic-tools`](deterministic-tools.md), and [`fail-fast`](fail-fast.md).
 
+## No cheap fixes
+
+A fix is done when the rule behind the finding is met, not when the finding stops matching.
+When a reviewer offers several fixes, take the one that meets the rule.
+
+Full statement: [`no-cheap-fixes`](no-cheap-fixes.md).
+Related: [`no-gameable-rules`](no-gameable-rules.md), the same gap seen from the rule author's side.
+
 ## Don't use LLMs for algorithmic thinking --- use validated algorithmic software
 
 Never use probabilistic language models for algorithmic operations:

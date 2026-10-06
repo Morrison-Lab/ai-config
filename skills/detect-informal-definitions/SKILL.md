@@ -38,16 +38,16 @@ read it before running this skill; the steps below are the short version.
 
 1. **Identify the target.** A file, a PR/MR diff, or pasted prose that
    introduces new technical content.
-2. **Grep for candidates** using the two patterns in
-   [`informal-definitions.md`](../../shared/writing/informal-definitions.md#the-detection-heuristic) ---
-   a bolded term followed by defining language (`\eqdef`, "is the", "="),
-   and a naming sentence ending "is:"/"are:" immediately before a display equation.
-   Run both; each catches phrasing the other misses:
+2. **Grep for candidates** using the three patterns in [`informal-definitions.md`](../../shared/writing/informal-definitions.md#the-detection-heuristic) --- a bolded term followed by defining language (`\eqdef`, "is the", "="), a naming sentence ending "is:"/"are:" immediately before a display equation, and a clause that gives a symbol its meaning ("let $X$ be", "write $X$ for", "denotes").
+   Run all three;
+   each catches phrasing the others miss, and none of them makes formatting the test:
    ```bash
    # Pattern 1: bolded term followed by defining language
    rg -n '\*\*[A-Za-z][a-zA-Z .-]{2,60}\*\*[^.]*(\\eqdef|is (defined|the)\b|=)' <file>
    # Pattern 2: naming sentence ending with is: or are: before display math
    rg -n '\bis:\s*$|\bare:\s*$' <file>
+   # Pattern 3: a clause that introduces notation
+   rg -n '\b([Ll]et|[Ww]rite|[Ww]riting) \$|\bdenotes?\b|\b[Cc]all (this|these|it)\b' <file>
    ```
 3. **For each hit, find its enclosing div** (search backward for the
    nearest `:::{#...}` opener, forward for its matching closer). It's a
@@ -69,6 +69,7 @@ read it before running this skill; the steps below are the short version.
      new id explicitly.
    - If it was riding along inside a different concept's div, split it
      out into its own div rather than leaving both sharing one id.
+   - Never remove the bold or italics instead: the definition stays hidden in the other div ([`no-cheap-fixes`](../../shared/principles/no-cheap-fixes.md)).
 6. **Re-scan** the touched section after editing — a newly-added
    definition can itself introduce a forward reference (see
    `fix-forward-references`) if its worked example isn't moved to sit

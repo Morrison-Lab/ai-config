@@ -526,3 +526,17 @@ in the same session where its own subagent had just read that quiz from `/home/u
 - **Do:** run `ls /home/user` and `git -C <dir> remote -v` before saying a repository is unreachable,
   then call `add_repo`, which reports `already_present` for an attached one.
 - **Don't:** read the system prompt's Repository Scope list as the set of repositories the session holds.
+
+## Merging and upstream tracking in a cloud session, measured 2026-10-05
+
+Measured in a claude.ai cloud session ([session](https://claude.ai/code/session_01KkqWejv7rnc4K6X4g1qwYw)) working [Morrison-Lab/lds#412](https://github.com/Morrison-Lab/lds/pull/412) and [Morrison-Lab/ai-config#4310](https://github.com/Morrison-Lab/ai-config/pull/4310).
+
+- `gh pr merge` fails with `403 GitHub GraphQL is not available from Claude Code sessions`.
+  The REST equivalent is `gh api -X PUT repos/<o>/<r>/pulls/<n>/merge -f merge_method=squash -f sha=<head>`.
+- The auto-mode classifier denied that REST merge on `Morrison-Lab/lds#412` as "Merge Without Review" under a session `/mwc` grant, and allowed the identical call on `Morrison-Lab/ai-config#4310` under the standing ai-config grant.
+  The denial is a harness decision that the `mwc` grant cannot clear.
+  - **Do:** report a classifier-denied merge to the user and leave the merge to them.
+  - **Don't:** retry the merge in another call shape, or treat the `mwc` grant as having failed.
+- A repo attached with `add_repo` is cloned `--depth 1` with a main-only fetch refspec, so a pushed feature branch has no upstream tracking ref, and `git branch --set-upstream-to` fails.
+  Add `+refs/heads/<b>:refs/remotes/origin/<b>` to `remote.origin.fetch`, fetch, then set `branch.<b>.remote` and `branch.<b>.merge`.
+- Already recorded above, and re-measured the same day: branch deletion through `gh api -X DELETE .../git/refs/heads/<b>` is refused by the proxy, and `build-pr-payload.py` gets review threads from `gh api repos/<o>/<r>/pulls/<n>/ccr/review_threads`.

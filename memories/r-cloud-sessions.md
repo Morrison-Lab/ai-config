@@ -91,6 +91,12 @@ which keeps the R-toolchain and R-package material that applies anywhere.
   (the render dies with `File 'fontawesome5.sty' not found`).
   - **Do:** read `quarto check` after installing TinyTeX in a container.
   - **Don't:** trust `quarto install tinytex`'s exit code, or a tailed log.
+
+  Measured 2026-10-05 in a cloud session ([session](https://claude.ai/code/session_01KkqWejv7rnc4K6X4g1qwYw)): `quarto install tinytex` failed on the same GitHub API 403, and R's `tinytex::install_tinytex()` worked.
+  `mirror.ctan.org` was blocked, and `tlmgr option repository https://mirrors.mit.edu/CTAN/systems/texlive/tlnet` worked.
+  `upload.wikimedia.org` was blocked by the egress policy, and the `commons.wikimedia.org` and `en.wikipedia.org` APIs answered HTTP 429 to nearly every request for over 30 minutes;
+  `commons.wikimedia.org/w/thumb.php?f=<file>&w=<px>` returned a PNG once.
+
   **Before accepting "uninstallable," try `install.packages()` straight from a
   source CRAN mirror** (`options(repos = c(CRAN = "https://cloud.r-project.org"));
   install.packages(c("knitr", "rmarkdown", "DT"))`, no P3M) — it builds sass/DT

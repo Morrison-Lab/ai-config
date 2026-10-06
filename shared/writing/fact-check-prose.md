@@ -62,6 +62,17 @@ so.
   merge de-duplicates identical lines") can be wrong in a specific,
   checkable way; a two-minute constructed repro settles it definitively where
   recall alone can't.
+- **Protections, sandboxes, and security controls.**
+  When prose documents how to configure a protection
+  (a sandbox, an allowlist, a permission, a firewall),
+  check and state every way around it before pushing:
+  what happens in non-default modes,
+  which platforms the control does not run on (and whether it fails open or closed),
+  what overrides it
+  (precedence of user, project, or CLI settings;
+  list merging vs replacement),
+  and what escape hatches or unmonitored tools exist.
+  Do not document a protection from its setup section alone.
 - **Document-internal reasoning.** Work through the logic of any argument the
   document makes, not just its individual factual claims --- this includes
   **formal mathematical reasoning** (derivations, proofs, algebraic steps ---
@@ -1609,5 +1620,34 @@ needs the defining comment or documentation as its source.
   or from the immediate fix you want to land.
 - **Don't:** use an exclusion list meant for missing identifiers
   to silence transient upstream outages for valid entries.
+
+(Case record: [`fact-check-prose.cases.md`](fact-check-prose.cases.md).)
+
+## When documenting a protection, check every way around it before the first push
+
+Before pushing prose that instructs readers how to configure a protection
+(a sandbox, an allowlist, a permission, a firewall, or a security guard),
+check and state every way around it before the first push.
+Reading only the setup or "how to turn it on" documentation
+produces instructions that promise safety while leaving common bypasses unmentioned.
+Fetch and read the full source documentation covering limits, precedence, and execution modes.
+
+Specifically verify and state each of these four dimensions:
+
+- **Modes:** what happens to the blocked case in every mode,
+  not only the default one (e.g. bypass vs prompt vs strict).
+- **Platforms:** where the control does not run,
+  and what happens there (whether it fails open or fails closed).
+- **Precedence:** what can override the setting
+  (project vs user configuration, local overrides, environment variables, CLI flags),
+  and whether list-valued options merge or replace.
+- **Escape hatches:** retries, exclusions, exceptions,
+  or commands and tools the control does not govern.
+
+- **Do:** read the sections on limits, platform support, and precedence
+  before writing prose that explains how to configure a protection.
+- **Do:** explicitly state what happens when running under non-default modes or unsupported platforms.
+- **Don't:** document a security control or sandbox from its "how to enable" section alone.
+- **Don't:** assume a control fails closed everywhere without confirming its behavior across platforms.
 
 (Case record: [`fact-check-prose.cases.md`](fact-check-prose.cases.md).)

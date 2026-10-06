@@ -260,3 +260,19 @@ DOI**, to be removed once a DOI is verified.
 the proposal violated the list's own stated rule.
 The agent found this only after later reading the file, and corrected it in
 chat and on the PR.)
+
+## When documenting a protection, check every way around it before the first push
+
+([wai#269](https://github.com/Morrison-Lab/wai/pull/269), 2026-10-05: on documenting network protection for local
+Claude Code sessions, reviewers found three gaps after the first draft.
+All three had the same cause: documenting a setting from its "how to turn it on"
+part while skipping the sections on limits, modes, and precedence in the cited docs.
+First, `sandbox.network.allowedDomains` alone did not block other hosts:
+in `bypassPermissions` mode other hosts were allowed without a prompt unless
+`strictAllowlist` was set (caught by adversarial self-review).
+Second, the sandbox did not run on native Windows, where commands ran without it,
+unless `failIfUnavailable` made Claude Code refuse to start (caught by Copilot).
+Third, a project's `.claude/settings.json` or `.claude/settings.local.json`
+overrode user-level `sandbox.enabled` (caught by Copilot as a missed finding).
+All three were present in the source documentation fetched before writing (the [Claude Code settings reference](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/settings)).)
+

@@ -37,6 +37,7 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
      A sentence describing a tool can be true while the code beside it implements a different tool than the one that exists.
    - Read every cited source against what it actually says, rather than checking that the link resolves.
    - For a claim about *why* something behaves as it does, ask what else would explain the same observation.
+   - Where prose documents how to configure a protection (a sandbox, an allowlist, a permission, a firewall), check every way around it: verify whether the prose accounts for non-default modes, platform limitations (fails open vs closed), precedence overrides (user vs project settings, environment variables, CLI flags, list merge vs replacement), and escape hatches against the upstream documentation.
 
 3. **Check quality and repo conventions**
    - Semantic line breaks (one clause or sentence per line in Markdown) and ASCII punctuation in source files.

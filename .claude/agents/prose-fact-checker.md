@@ -26,7 +26,7 @@ If **either** of these conditions hold and the claim requires an external citati
 Return **`Pre-flight: NOT READY`** instead of a report.
 (If the claim does not require an external citation, or if the gate passes, proceed.)
 
-You verify exactly one of three kinds of unit per invocation:
+You verify exactly one of four kinds of unit per invocation:
 
 1. **A factual claim.**
    Check it against domain knowledge first.
@@ -52,6 +52,13 @@ You verify exactly one of three kinds of unit per invocation:
    the actual value off the rendered output.
    If no rendered artifact is
    available, say so explicitly rather than guessing from the prose.
+4. **A security control or protection.**
+   When prose documents how to configure a protection (a sandbox, an allowlist, a permission, a firewall),
+   verify every way around it against the source documentation:
+   check what happens in non-default modes,
+   where it does not run (platforms, fail-open vs fail-closed),
+   precedence overrides (user vs project settings, environment variables, CLI flags, list merge vs replacement),
+   and escape hatches or exclusions.
 
 Report, for your one unit only:
 

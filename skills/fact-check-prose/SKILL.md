@@ -36,7 +36,7 @@ skill's procedure, if the policy itself changes).
 ### 1. Identify the target and extract checkable units
 
 A PR/MR diff (`gh pr diff <N>` / `glab mr diff <N>`), a file, or pasted text.
-Read the changed prose and pull out three kinds of units to check:
+Read the changed prose and pull out the checkable units:
 
 - **Factual claims** — statements that cite a value, a behavior, a result, an
   external fact ("X was introduced in version Y", "the estimator is
@@ -59,6 +59,10 @@ Read the changed prose and pull out three kinds of units to check:
 - **Config list and allowlist criteria** --- when prose describes why an entry
   belongs on an allowlist or exclusion list, or what its entries have in common,
   verify the claim against the defining comment or documentation in code.
+- **Protections, sandboxes, and security controls** --- when prose documents
+  how to configure a protection (a sandbox, an allowlist, a permission, a firewall),
+  check each mode, platform limitation, precedence rule, and escape hatch against
+  source documentation before pushing.
 
 ### 2. Pre-flight Readiness Gate (Hard Stop)
 
@@ -100,6 +104,14 @@ Separately from accuracy, check that the claim is **defended**: does the
 surrounding text give reasoning for it, or does it carry a citation? A
 claim can be accurate and still undefended — flag both kinds of gap, not
 just outright inaccuracy.
+
+When prose documents how to configure a protection or security control,
+verify four specific dimensions against the upstream source docs:
+- **Modes:** what happens in non-default modes (e.g. bypass vs prompt vs strict).
+- **Platforms:** where it does not run, and whether it fails open or fails closed.
+- **Precedence:** what overrides it (project vs user settings, flags, env vars),
+  and whether list-valued options merge or replace.
+- **Escape hatches:** retries, exclusions, exceptions, or unmonitored tools.
 
 ### 4. Verify document-internal reasoning
 

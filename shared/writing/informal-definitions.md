@@ -297,6 +297,17 @@ is the sibling case in
      (`::: {.remark .notes}` to keep it off the slides);
    - guidance to the reader, such as a usage rule or a trap to avoid,
      goes into the matching callout (`.callout-warning` for a trap).
+6. If a definition div defines a second quantity in its display (shape 4),
+   **give that quantity its own div** before the first,
+   and have the first cite it, as step 4 does for a term in the prose.
+7. If the display shows something other than the defined object (shape 5),
+   **correct the math, not the placement**:
+   display the defined object itself,
+   with every index or argument the heading names on its right-hand side.
+   A display that repeats another term's display means the two terms
+   are not yet told apart in the math,
+   so add the index or argument that tells them apart
+   rather than rewording the prose around the same formula.
 
 ## A bolded keyword is one signal; every defined term gets its own div
 

@@ -77,6 +77,10 @@ read it before running this skill; the steps below are the short version.
    - If it was riding along inside a different concept's div, split it
      out into its own div rather than leaving both sharing one id.
    - Never remove the bold or italics instead: the definition stays hidden in the other div ([`no-cheap-fixes`](../../shared/principles/no-cheap-fixes.md)).
+   - Move commentary, examples and usage rules out of the div
+     into a remark, an example div or a callout (fix step 5).
+   - Give a second quantity defined in a display its own div (fix step 6),
+     and correct a display that shows something other than the defined object (fix step 7).
 6. **Re-scan** the touched section after editing — a newly-added
    definition can itself introduce a forward reference (see
    `fix-forward-references`) if its worked example isn't moved to sit

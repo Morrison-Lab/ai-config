@@ -81,6 +81,11 @@ A `QUESTION`, `OFFER`, or `BLOCKER` box is by definition something the user has 
 The contradiction is invisible from the inside when both land in one message, because posing the question and declaring the stop feel like separate acts performed at different moments.
 They are not separate to the reader, who gets a request for input and a claim that nothing is pending in the same breath.
 
+An unboxed question or offer in prose is just as open, and harder to spot because nothing marks it --- "I can file an issue on that if you want" is an offer whether or not it sits in a box.
+[`tag-chat-output`](../writing/tag-chat-output.md) says how to mark them in the first place;
+this check catches the ones that were not.
+(Measured 2026-10-05 in a Morrison-Lab/lbt session: a reply ended with that unboxed offer and then "The session is done", and the user answered that open questions for them mean the session is not done.)
+
 **`git log origin/<default-branch>..HEAD` plus `git status --short` decides whether the session produced anything durable.**
 An empty range and a clean tree mean this branch carries nothing.
 That is not the same as the session having produced nothing: one that merged its own PR and then ran [`post-merge`](../../skills/post-merge/SKILL.md)'s cleanup leaves an identical reading while having finished the most a session can finish.
@@ -91,9 +96,9 @@ The remedy converts it rather than excusing it: file it or commit it, and it bec
 
 - **Do:** name the specific thing that finished, in the declaration itself.
 - **Do:** state explicitly whether the session is done or not, including running UMS and filing any noticed follow-up items.
-- **Do:** run both checks --- boxed markers in this turn, and the commit range plus tree state --- before writing the word clean.
+- **Do:** run both checks --- questions, offers, and blockers put to the user in this turn, boxed or not, and the commit range plus tree state --- before writing the word clean.
 - **Don't:** read "none of the disqualifiers apply" as "clean" --- that list is necessary and not sufficient.
-- **Don't:** declare a clean stopping point in a turn that also posts a `QUESTION`, `OFFER`, or `BLOCKER` box.
+- **Don't:** declare a clean stopping point in a turn that also puts a question, offer, or blocker to the user, whether in a `QUESTION`, `OFFER`, or `BLOCKER` box or in plain prose.
 - **Don't:** count exploration, diagnosis, or an uncommitted local change as a completion.
 - **Don't:** end a turn without declaring whether the session is done or ongoing.
 

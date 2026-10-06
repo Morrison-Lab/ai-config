@@ -2552,7 +2552,63 @@ class TestAgyHookAdapter(unittest.TestCase):
                 adapter.main()
             self.assertTrue(mock_run.called)
             called_payload = mock_run.call_args[0][1]
-            self.assertEqual(called_payload.get("session_id"), "abcdef01-2345-6789-abcd-ef0123456789")
+    def test_refresh_session_heartbeat_updates_existing_session_file(self):
+        adapter = load_adapter()
+        with tempfile.TemporaryDirectory() as td:
+            reg_dir = os.path.join(td, ".git", "ai-sessions")
+            os.makedirs(reg_dir)
+            sess_path = os.path.join(reg_dir, "test.session-1.session")
+            with open(sess_path, "w", encoding="utf-8") as fh:
+                fh.write("started=1000\nheartbeat=1000\npid=\n")
+
+            with patch("subprocess.check_output", return_value=os.path.join(td, ".git")):
+                adapter.refresh_session_heartbeat("test.session-1", td)
+
+            with open(sess_path, "r", encoding="utf-8") as fh:
+                content = fh.read()
+            self.assertIn("started=1000", content)
+            self.assertNotIn("heartbeat=1000", content)
+            self.assertIn("heartbeat=", content)
+
+    def test_session_id_sessionID_key_supported(self):
+        adapter = load_adapter()
+        payload = {
+            "toolCall": {"name": "run_command", "args": {"CommandLine": "ls"}},
+            "sessionID": "custom-session-id.123",
+        }
+        with patch.object(adapter, "find_repo_root", return_value=ROOT), \
+             patch("builtins.open", mock_open(read_data=json.dumps(MOCK_HOOKS_DEF))), \
+             patch("os.path.exists", return_value=True), \
+             patch.object(adapter, "run_hook_command") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout='{"decision": "allow"}', stderr="")
+            with patch("sys.stdin", io.StringIO(json.dumps(payload))), patch("sys.stdout", new_callable=io.StringIO):
+                adapter.main()
+            self.assertTrue(mock_run.called)
+            called_payload = mock_run.call_args[0][1]
+            self.assertEqual(called_payload.get("session_id"), "custom-session-id.123")
+
+    def test_invoke_subagent_forwards_model_field(self):
+        adapter = load_adapter()
+        payload = {
+            "toolCall": {
+                "name": "invoke_subagent",
+                "args": {
+                    "Subagents": [
+                        {"TypeName": "reviewer", "Model": "flash", "Prompt": "check this"}
+                    ]
+                }
+            }
+        }
+        with patch.object(adapter, "find_repo_root", return_value=ROOT), \
+             patch("builtins.open", mock_open(read_data=json.dumps(MOCK_HOOKS_DEF))), \
+             patch("os.path.exists", return_value=True), \
+             patch.object(adapter, "run_hook_command") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout='{"decision": "allow"}', stderr="")
+            with patch("sys.stdin", io.StringIO(json.dumps(payload))), patch("sys.stdout", new_callable=io.StringIO):
+                adapter.main()
+            self.assertTrue(mock_run.called)
+            called_payload = mock_run.call_args[0][1]
+            self.assertEqual(called_payload.get("tool_input", {}).get("model"), "flash")
 
 if __name__ == "__main__":
     unittest.main()

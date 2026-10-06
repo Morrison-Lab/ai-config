@@ -317,7 +317,7 @@ def refresh_session_heartbeat(session_id: str | None, repo_root: str | None = No
             if pg.is_dir() and pg.resolve() not in dirs:
                 dirs.append(pg.resolve())
 
-        clean_sid = re.sub(r"[^A-Za-z0-9_-]", "_", session_id)
+        clean_sid = re.sub(r"[^A-Za-z0-9._-]", "_", session_id)
         for cd in dirs:
             reg_dir = cd / "ai-sessions"
             if not reg_dir.exists():
@@ -395,6 +395,7 @@ def main():
         or payload.get("conversation_id")
         or payload.get("sessionId")
         or payload.get("session_id")
+        or payload.get("sessionID")
     )
     if not session_id and isinstance(transcript_path, str):
         m = re.search(r"[/\\](?:brain|conversations)[/\\]([0-9a-fA-F-]{36})", transcript_path)
@@ -476,6 +477,7 @@ def main():
                     "tool_input": {
                         "subagent_type": sub.get("TypeName") or sub.get("typeName"),
                         "isolation": normalize_isolation(raw_workspace),
+                        "model": sub.get("Model") or sub.get("model"),
                         # The raw Antigravity Workspace value, preserved for
                         # any downstream consumer that wants it -- it is not
                         # the same concept as `isolation` above, so it is

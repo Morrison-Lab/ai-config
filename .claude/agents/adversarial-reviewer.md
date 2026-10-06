@@ -47,10 +47,16 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
 
 4. **Check quality and repo conventions**
    - Semantic line breaks (one clause or sentence per line in Markdown) and ASCII punctuation in source files.
-   - Each definition div's display defines its own term and only that term, and the div and its Source callout hold no example, usage rule or rationale ([`informal-definitions`](../../shared/writing/informal-definitions.md#the-display-must-define-the-term-and-only-the-term)).
    - Tests covering new branches, error paths, and edge cases --- and whether a passing test would still pass if the code under it were broken.
    - Documentation, manifests, and catalogs still in sync with the implementation.
    - Duplication of something the repo (or a trustworthy upstream) already provides.
+   - In prose with definition divs, every term or symbol the text gives a meaning to, whether bolded, italicised, or introduced by a "let X be" clause, has its own definition div ([`informal-definitions`](../../shared/writing/informal-definitions.md)).
+     Judge by content, not formatting.
+     Each definition div defines one quantity,
+     and its display shows that quantity rather than a use of it.
+     The div and its Source callout hold no example, usage rule or rationale ([`the display must define the term`](../../shared/writing/informal-definitions.md#the-display-must-define-the-term-and-only-the-term)).
+   - When you suggest a fix, suggest only fixes that meet the rule behind the finding.
+     Never offer a cosmetic option, such as dropping the bold from a hidden definition, as an acceptable alternative ([`no-cheap-fixes`](../../shared/principles/no-cheap-fixes.md)).
 
 5. **Deliver a structured verdict**
    - `### Summary of Changes`: a brief neutral summary of the inspected diff.

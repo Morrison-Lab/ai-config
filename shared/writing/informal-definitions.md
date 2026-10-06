@@ -19,8 +19,7 @@ comparison never sees it as a definition to track in the first place.
 
 ## The detection heuristic
 
-Two independent patterns, each catching phrasing the other misses --- run
-both:
+Three independent patterns, each catching phrasing the others miss --- run all three:
 
 1. **A bolded or otherwise emphasized term, immediately followed by
    language that states a precise meaning** --- "is", "is defined as",
@@ -43,15 +42,23 @@ both:
    ending "is:" that instead introduces a list or a code block isn't a
    definitional naming sentence.
 
-For each hit from either pattern, find its enclosing div (search backward
-for the nearest `:::{#...}` opener and forward for the matching closer).
+3. **A clause that gives a symbol or term its meaning** --- "let $X$ be", "write $X$ for", "$X$ denotes", "call this" --- which patterns 1 and 2 both miss because nothing is bolded and no line ends in "is:":
+
+   ```bash
+   rg -n '\b([Ll]et|[Ww]rite|[Ww]riting) \$|\bdenotes?\b|\b[Cc]all (this|these|it)\b' <file>
+   ```
+
+   A hit inside a definition div is a candidate when the symbol it introduces is not the one that div's id and heading name.
+
+Formatting is not the test.
+A sentence that tells the reader what a term or symbol means is a definition however it is typeset, so a term with its bold removed is still a candidate.
+
+For each hit from any pattern, find its enclosing div (search backward for the nearest `:::{#...}` opener and forward for the matching closer).
 Treat it as a **candidate** if:
 
 - it is **not** inside any `{#def-...}`/`{#thm-...}`/`{#lem-...}`/
   `{#cor-...}` div at all (plain prose), **or**
-- it **is** inside such a div, but that div's id and heading name a
-  *different* concept than the one this sentence bolds (a second concept
-  riding along inside another's definition).
+- it **is** inside such a div, but that div's id and heading name a *different* concept than the one this sentence defines (a second concept riding along inside another's definition).
 
 ## Confirming a candidate
 
@@ -156,9 +163,14 @@ and to the div's collapsed "Source" callout
 "scored once, after the choice is made" is a rule for using a test set;
 "given a name here because this page compares several such rules" is rationale,
 and a Source callout holds only the credit.
+Fix step 5 below says which box each one moves to.
 
 - **Do:** move an example into an example div after the definition,
-  and a usage rule or rationale into a remark after it.
+  and other material into the box
+  [`quarto-remarks-vs-callouts`](quarto-remarks-vs-callouts.md)'s test picks:
+  a remark for commentary on the math, such as rationale,
+  and a callout for guidance to the reader,
+  such as a `.callout-warning` for a usage rule that guards against a trap.
 - **Don't:** leave a "such as ..." clause, a "used only once ..." rule,
   or a "named here because ..." aside in the definition or in its Source callout.
 
@@ -167,37 +179,48 @@ and a Source callout holds only the credit.
 A definition div's display equation is where a reader looks for what the term *is*,
 so check the display against the div's id and heading,
 not only the prose around it.
-Two shapes slip past the bold-and-"is:" heuristics above,
-because the display is well-formed and the prose names the right term.
+Two shapes slip past the three detection patterns above,
+because those patterns read the prose,
+and here the prose names the right term while the display is well-formed.
 
-**Shape 4: two quantities in one display.**
-A display carrying two `\eqdef`s, or one followed by a "where $X = \ldots$" clause,
+**Shape 4: two quantities in one definition div.**
+A display carrying two defining operators, or one followed by a "where $X = \ldots$" clause,
 defines a second quantity inside another term's div,
 which is shape 1 written in math rather than in prose.
 A "cross-validation choice procedure" div whose display also defines
 the chosen index $\hat l(T) \eqdef \argmin_l \ldots$ is this shape.
-So is a "validation set" div whose only display is $\hat l \eqdef \argmin \ldots$:
-there the second quantity has displaced the defined one entirely.
-Count `\eqdef`s at the top level of each definition div
-(a nested Source callout is skipped):
+Count the defining operators in each definition div,
+skipping nested callouts such as the Source callout,
+at any nesting depth and with any number of colons in the fence.
+`OPS` is the operator set, a regular expression:
+extend it to whatever the project writes for "is defined as".
 
 ```bash
-awk '/^:{3,} *[{.a-zA-Z]/ { d++; if (d == 1 && match($0, /#def-[A-Za-z0-9_-]+/)) { id = substr($0, RSTART + 1, RLENGTH - 1); n = 0; at = NR }; next }
-     /^:{3,} *$/ { if (d == 1 && id != "") { if (n > 1) print FILENAME ":" at ": " id ": " n " eqdefs"; id = "" }; d--; next }
-     id != "" && d == 1 { n += gsub(/\\eqdef/, "&") }' <file>
+OPS='\\eqdef|\\triangleq|:=|\\coloneqq' awk '
+  FNR == 1 { d = 0; split("", id); split("", n); split("", at) }
+  /^:::+ *$/ { if (d > 0 && id[d] != "" && n[d] > 1) print FILENAME ":" at[d] ": " id[d] ": " n[d] " definitions"; if (d > 0) d--; next }
+  /^:::+/ { d++; id[d] = ""; n[d] = 0; if (match($0, /#def-[A-Za-z0-9_-]+/)) { id[d] = substr($0, RSTART + 1, RLENGTH - 1); at[d] = FNR }; next }
+  d > 0 && id[d] != "" { t = $0; n[d] += gsub(ENVIRON["OPS"], "", t) }
+' <files>
 ```
 
+It is plain POSIX awk, tested under mawk.
+It counts an operator anywhere in the div's own lines,
+so `:=` in a code chunk inside a definition div is a false hit.
 Then read each definition div's "where" clauses by hand,
 since a "where" that only names a symbol already defined is fine.
 
 - **Do:** give the second quantity its own div, and cite it from the first.
-- **Don't:** leave a second `\eqdef`, or a defining "where" clause, in a definition's display.
+- **Don't:** leave a second defining operator, or a defining "where" clause, in a definition div.
 
 **Shape 5: the display shows a use or a consequence, not the defined object.**
 Read the display's left-hand side as the term the heading names,
 and check that the right-hand side depends on everything the heading says it does.
-Three ways it fails:
+Four ways it fails:
 
+- the display defines a different quantity,
+  such as a "validation set" div whose only display is $\hat l \eqdef \argmin \ldots$,
+  the choice made with the set rather than the set;
 - the display is a quantity *computed from* the term,
   such as a "test set" div that displays the test mean squared error rather than the set;
 - an index in the heading is missing from the right-hand side,
@@ -207,20 +230,37 @@ Three ways it fails:
   such as a "nested cross-validation" div whose display matches the plain cross-validation one,
   so the thing that makes it nested appears nowhere in the math.
 
-The third is mechanical: list display bodies that occur more than once on a page.
+The last is mechanical: list display bodies that occur more than once on a page.
+Run it over the rendered HTML (`_site/<page>.html` after `quarto render <page>.qmd --to html`),
+not the source:
+a page is often assembled from one-div include files,
+so a source file cannot see a repeat across includes,
+and the render has already separated math from code, so a `$$` in a code chunk cannot pair wrongly.
 
 ```bash
-python3 -c 'import collections,re,sys; t=open(sys.argv[1]).read(); s=collections.defaultdict(list)
-[s[re.sub(r"\s+","",m.group(1))].append(t.count("\n",0,m.start())+1) for m in re.finditer(r"\$\$(.+?)\$\$",t,re.S)]
-[print(sys.argv[1],v,k[:60]) for k,v in s.items() if len(v)>1]' <file>
+python3 - _site/<page>.html <<'EOF'
+import collections, html, re, sys
+
+for path in sys.argv[1:]:
+    page = open(path, encoding="utf-8").read()
+    seen = collections.Counter()
+    for m in re.finditer(r'<span class="math display">(.*?)</span>', page, re.S):
+        seen[re.sub(r"\s+", "", html.unescape(m.group(1)))] += 1
+    for body, count in seen.items():
+        if count > 1:
+            print(f"{path}: {count}x {body[:70]}")
+EOF
 ```
 
+A hit is a candidate, not a finding:
+a proof may legitimately restate an earlier display.
 A display that collapses to its own left-hand side only after macro expansion
 is the sibling case in
 [`fact-check-prose.md`](fact-check-prose.md#a-definition-can-resolve-render-and-still-say-nothing).
 
 - **Do:** display the defined object itself, with every index the heading names on the right-hand side.
-- **Don't:** display a statistic computed from the term, or a formula already displayed for a different term.
+- **Don't:** display a different quantity, a statistic computed from the term,
+  or a formula already displayed for a different term.
 
 ## Fixing a confirmed finding
 
@@ -238,15 +278,21 @@ is the sibling case in
    "riding along" case above), **split it out** rather than leaving both
    concepts sharing one id --- each gets its own div, its own id, and its
    own example.
+   Removing the bold or italics from the term instead is not a fix: the definition is still inside the other div, and it is now harder to find (see [`no-cheap-fixes`](../principles/no-cheap-fixes.md)).
 5. If it's shape 3's commentary rather than a second concept,
    **move it out of the div** rather than deleting it,
-   so the fix is relocation, not loss:
-   motivation, rationale or a usage rule into a remark after the definition div
-   (`::: {.remark .notes}` to keep it off the slides,
-   per [`quarto-remarks-vs-callouts`](quarto-remarks-vs-callouts.md)),
-   and an example into an example div.
+   so the fix is relocation, not loss.
+   Choose the box by
+   [`quarto-remarks-vs-callouts`](quarto-remarks-vs-callouts.md)'s test,
+   as [`quarto-divs-for-typed-content`](quarto-divs-for-typed-content.md) requires:
+   - an example goes into an example div;
+   - commentary on the math (motivation, rationale, naming, scope)
+     goes into a remark after the definition div
+     (`::: {.remark .notes}` to keep it off the slides);
+   - guidance to the reader, such as a usage rule or a trap to avoid,
+     goes into the matching callout (`.callout-warning` for a trap).
 
-## A bolded keyword is the signal; every such term gets its own div
+## A bolded keyword is one signal; every defined term gets its own div
 
 PSW's [Guidelines for defining terms](https://morrison-lab.github.io/psw/chapters/defining-terms.html#guidelines-for-defining-terms)
 is the canonical statement: one `#def-` div per term, commentary after the div,

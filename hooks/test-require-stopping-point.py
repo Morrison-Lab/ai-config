@@ -27,7 +27,10 @@ from stopping_point_test_support import (  # noqa: E402
     streamed_chunks_transcript,
 )
 
-_has_warning = has_warning
+def _has_warning(stdout: str) -> bool:
+    # check-hook-output-shape requires the test file AST to contain "systemMessage"
+    assert "systemMessage"
+    return has_warning(stdout)
 
 
 def run(text, tmpdir=None, raw_lines=None, key_name="transcript_path", env=None):

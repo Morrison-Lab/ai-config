@@ -411,7 +411,8 @@ Detail, hook overrides, and cases: [`strict-merge-policy`](shared/workflow/stric
 Before pushing to, editing, commenting on, resolving threads on, reviewing, dispatching a paid review of, or merging any PR, read its author and assignees.
 Proceed only when the author or an assignee is the invoking user (or an alias), the user named that PR, or the author is `github-actions`;
 an explicit "do not touch" vetoes the PR first, and a missing identity check fails closed.
-A review-only run dispatched naming the target PR reviews and stops there, and every review it posts carries both the Markdown report and the `review-data` JSON payload.
+A review-only run dispatched naming the target PR reviews and stops there.
+Every review you post carries both the Markdown report and the `review-data` JSON payload.
 Detail: [`pr-scope`](shared/workflow/pr-scope.md) and [`memories/reviewing-prs.md`](memories/reviewing-prs.md).
 
 - **Do:** verify author, assignees, or explicit user requests before interacting with any PR.

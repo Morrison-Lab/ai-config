@@ -47,6 +47,7 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
 
 4. **Check quality and repo conventions**
    - Semantic line breaks (one clause or sentence per line in Markdown) and ASCII punctuation in source files.
+   - Each definition div's display defines its own term and only that term, and the div and its Source callout hold no example, usage rule or rationale ([`informal-definitions`](../../shared/writing/informal-definitions.md#the-display-must-define-the-term-and-only-the-term)).
    - Tests covering new branches, error paths, and edge cases --- and whether a passing test would still pass if the code under it were broken.
    - Documentation, manifests, and catalogs still in sync with the implementation.
    - Duplication of something the repo (or a trustworthy upstream) already provides.

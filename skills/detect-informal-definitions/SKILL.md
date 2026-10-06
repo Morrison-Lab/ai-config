@@ -60,6 +60,10 @@ read it before running this skill; the steps below are the short version.
    Is it part of a deliberately informal list? Is it actually cited
    downstream? Drop anything that fails the "new, theoretical, not-a-list,
    worth-citing" bar.
+   Then check each definition div's display, and its Source callout,
+   per [the display must define the term](../../shared/writing/informal-definitions.md#the-display-must-define-the-term-and-only-the-term):
+   one `\eqdef` per display, the defined object rather than a use of it,
+   and no example, usage rule or rationale inside the div.
 5. **Fix each confirmed finding**, per the fragment's fix menu:
    - Wrap it in its own formal-definition div, with its own id and
      heading.

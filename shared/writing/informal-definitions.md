@@ -149,6 +149,79 @@ condition --- is part of the specification, not motivation for it.
 The test is whether removing the sentence changes what a reader would
 need to *compute* or *cite*, not just how *persuaded* they would be.
 
+The same test applies to examples and usage rules, not only to motivation,
+and to the div's collapsed "Source" callout
+([`visible-attributions.md`](visible-attributions.md)) as much as to its body.
+"such as the degree of a polynomial fit" is an example;
+"scored once, after the choice is made" is a rule for using a test set;
+"given a name here because this page compares several such rules" is rationale,
+and a Source callout holds only the credit.
+
+- **Do:** move an example into an example div after the definition,
+  and a usage rule or rationale into a remark after it.
+- **Don't:** leave a "such as ..." clause, a "used only once ..." rule,
+  or a "named here because ..." aside in the definition or in its Source callout.
+
+## The display must define the term, and only the term
+
+A definition div's display equation is where a reader looks for what the term *is*,
+so check the display against the div's id and heading,
+not only the prose around it.
+Two shapes slip past the bold-and-"is:" heuristics above,
+because the display is well-formed and the prose names the right term.
+
+**Shape 4: two quantities in one display.**
+A display carrying two `\eqdef`s, or one followed by a "where $X = \ldots$" clause,
+defines a second quantity inside another term's div,
+which is shape 1 written in math rather than in prose.
+A "cross-validation choice procedure" div whose display also defines
+the chosen index $\hat l(T) \eqdef \argmin_l \ldots$ is this shape.
+So is a "validation set" div whose only display is $\hat l \eqdef \argmin \ldots$:
+there the second quantity has displaced the defined one entirely.
+Count `\eqdef`s at the top level of each definition div
+(a nested Source callout is skipped):
+
+```bash
+awk '/^:{3,} *[{.a-zA-Z]/ { d++; if (d == 1 && match($0, /#def-[A-Za-z0-9_-]+/)) { id = substr($0, RSTART + 1, RLENGTH - 1); n = 0; at = NR }; next }
+     /^:{3,} *$/ { if (d == 1 && id != "") { if (n > 1) print FILENAME ":" at ": " id ": " n " eqdefs"; id = "" }; d--; next }
+     id != "" && d == 1 { n += gsub(/\\eqdef/, "&") }' <file>
+```
+
+Then read each definition div's "where" clauses by hand,
+since a "where" that only names a symbol already defined is fine.
+
+- **Do:** give the second quantity its own div, and cite it from the first.
+- **Don't:** leave a second `\eqdef`, or a defining "where" clause, in a definition's display.
+
+**Shape 5: the display shows a use or a consequence, not the defined object.**
+Read the display's left-hand side as the term the heading names,
+and check that the right-hand side depends on everything the heading says it does.
+Three ways it fails:
+
+- the display is a quantity *computed from* the term,
+  such as a "test set" div that displays the test mean squared error rather than the set;
+- an index in the heading is missing from the right-hand side,
+  such as a "fold-based standard error of procedure $g$" whose right-hand side has no $g$,
+  so it is identical to the unindexed definition and the dependence exists only in prose;
+- the display repeats an earlier display,
+  such as a "nested cross-validation" div whose display matches the plain cross-validation one,
+  so the thing that makes it nested appears nowhere in the math.
+
+The third is mechanical: list display bodies that occur more than once on a page.
+
+```bash
+python3 -c 'import collections,re,sys; t=open(sys.argv[1]).read(); s=collections.defaultdict(list)
+[s[re.sub(r"\s+","",m.group(1))].append(t.count("\n",0,m.start())+1) for m in re.finditer(r"\$\$(.+?)\$\$",t,re.S)]
+[print(sys.argv[1],v,k[:60]) for k,v in s.items() if len(v)>1]' <file>
+```
+
+A display that collapses to its own left-hand side only after macro expansion
+is the sibling case in
+[`fact-check-prose.md`](fact-check-prose.md#a-definition-can-resolve-render-and-still-say-nothing).
+
+- **Do:** display the defined object itself, with every index the heading names on the right-hand side.
+- **Don't:** display a statistic computed from the term, or a formula already displayed for a different term.
+
 ## Fixing a confirmed finding
 
 1. **Wrap it in its own formal-definition div**, with its own id and

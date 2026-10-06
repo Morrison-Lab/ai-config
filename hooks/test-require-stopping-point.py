@@ -260,6 +260,30 @@ direct_cases = [
         True,
         "direct message narration clean + missing reply-tool blocks",
     ),
+    (
+        {
+            "message": {
+                "content": [
+                    {"type": "text", "text": "Work completed.\n\n**Stopping Point**: Clean stopping point reached --- "},
+                    {"type": "text", "text": "session done; UMS executed; no follow-up items pending."},
+                ]
+            }
+        },
+        False,
+        "direct message with declaration split across text blocks passes",
+    ),
+    (
+        {
+            "message": {
+                "content": [
+                    {"type": "text", "text": "Work completed.\n\n**Stopping Point**: Incomplete draft --- "},
+                    {"type": "text", "text": "session not completed without clean stopping point."},
+                ]
+            }
+        },
+        True,
+        "direct message with split text blocks missing declaration blocks",
+    ),
 ]
 
 for payload, expected, label in direct_cases:

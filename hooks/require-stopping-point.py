@@ -363,6 +363,7 @@ def extract_turn_id(payload: dict) -> str:
                 content = f.read()
             current_turn_id = ""
             prompt_lines_so_far = []
+            last_prompt_unhashed = False
             for line in content.splitlines():
                 line_str = line.strip()
                 if not line_str:
@@ -418,15 +419,19 @@ def extract_turn_id(payload: dict) -> str:
                                 ev_id = str(val).strip()
                         if ev_id is not None:
                             current_turn_id = ev_id
+                            last_prompt_unhashed = False
                         else:
-                            # Prompt lacks an ID: hash the transcript up to and including
-                            # this prompt boundary so subsequent assistant retries within
-                            # this turn share the exact same stable identity.
-                            prefix = "\n".join(prompt_lines_so_far)
-                            current_turn_id = hashlib.sha256(prefix.encode("utf-8")).hexdigest()[:16]
+                            # Prompt lacks an ID: defer hashing until after the scan
+                            # so each final prefix is hashed only once, avoiding quadratic
+                            # hashing across growing prompt histories.
+                            current_turn_id = None
+                            last_prompt_unhashed = True
 
             if current_turn_id:
                 return current_turn_id
+            if last_prompt_unhashed and prompt_lines_so_far:
+                prefix = "\n".join(prompt_lines_so_far)
+                return hashlib.sha256(prefix.encode("utf-8")).hexdigest()[:16]
 
             # Fallback for transcripts with no genuine prompt boundary
             last_id = ""

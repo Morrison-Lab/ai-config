@@ -13,6 +13,12 @@ When reporting stopping point status:
 Never leave the user guessing whether additional tasks remain queued or if a clean stopping point has been reached.
 (User corrections / directives, 2026-08-17, 2026-08-18, 2026-09-29.)
 
+**A conversational question-answering reply concluding a turn is a stopping point.**
+When answering a question at the end of a session or turn (e.g. explaining a diagnosis, answering "why not?", or clarifying why a branch was deleted), that reply is the stopping point of the turn.
+Phrasing about the user's tasks (such as "Nothing is left for you to do" or "Nothing further is needed from you") is about the user's workload, not the session's state, and does not substitute for explicitly stating whether the session is done (`session is done` or `session not done`).
+State explicitly whether the session is done or not on that final reply, exactly as on any other turn-concluding message.
+(User directive, 2026-10-05, Morrison-Lab/lbt; [#4308](https://github.com/Morrison-Lab/ai-config/issues/4308).)
+
 **Arm resumption before every non-clean pause.**
 Whenever work remains at a pause, create a timer or equivalent wake mechanism
 that will resume the next concrete step before ending the turn.
@@ -101,6 +107,8 @@ The remedy converts it rather than excusing it: file it or commit it, and it bec
 - **Don't:** declare a clean stopping point in a turn that also puts a question, offer, or blocker to the user, whether in a `QUESTION`, `OFFER`, or `BLOCKER` box or in plain prose.
 - **Don't:** count exploration, diagnosis, or an uncommitted local change as a completion.
 - **Don't:** end a turn without declaring whether the session is done or ongoing.
+- **Do:** include the explicit stopping-point and session-done declaration on conversational and question-answering replies concluding a turn.
+- **Don't:** substitute user-workload phrasing like "Nothing is left for you to do" for an explicit declaration of whether the session is done.
 
 (Directive from the user, 2026-08-19:
 "cai: that wasn't a real stopping point; you haven't finished anything".

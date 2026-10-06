@@ -38,15 +38,24 @@ except Exception as _exc:  # broken install: degrade, do not fail open silently
         return bool(isinstance(entry, dict) and entry.get("isMeta") and entry.get("sourceToolUseID"))
 
     def is_harness_meta(entry):  # noqa: D103 -- fail-open fallback
-        if not isinstance(entry, dict):
-            return False
-        if not bool(entry.get("isMeta")):
-            return False
-        if bool(entry.get("sourceToolUseID")):
-            return False
-        if entry.get("promptSource") == "sdk":
-            return False
-        return True
+        return bool(
+            isinstance(entry, dict)
+            and entry.get("isMeta")
+            and not entry.get("sourceToolUseID")
+            and entry.get("promptSource") != "sdk"
+        )
+
+try:
+    from turn_id import extract_turn_id
+except Exception as _exc:
+    print(
+        f"require-stopping-point: cannot load scripts/lib/turn_id.py ({_exc}); "
+        f"turn id extraction will fail back to empty",
+        file=sys.stderr,
+    )
+
+    def extract_turn_id(payload: dict) -> str:  # noqa: D103 -- fallback
+        return ""
 
 # In a project-thread session every user-visible sentence is the `text` input
 # of an `mcp__hearthbot__reply` tool call, never an assistant text block.
@@ -334,143 +343,6 @@ def extract_text_from_payload(payload):
             res = _extract_from_blocks(val)
             if res:
                 return res
-    return ""
-
-
-def extract_turn_id(payload: dict) -> str:
-    """Extract turn or prompt identifier from payload or transcript."""
-    for key in (
-        "prompt_id",
-        "promptId",
-        "turn_id",
-        "turnId",
-        "step_index",
-        "stepIndex",
-    ):
-        val = payload.get(key)
-        if val is not None and str(val).strip():
-            return str(val).strip()
-    tpath = (
-        payload.get("transcript_path")
-        or payload.get("transcriptPath")
-        or payload.get("transcript")
-        or payload.get("history_file")
-        or ""
-    )
-    if tpath and os.path.exists(tpath):
-        try:
-            with open(tpath, "r", encoding="utf-8") as f:
-                content = f.read()
-            current_turn_id = ""
-            prompt_lines_so_far = []
-            last_prompt_unhashed = False
-            for line in content.splitlines():
-                line_str = line.strip()
-                if not line_str:
-                    continue
-                try:
-                    event = json.loads(line_str)
-                except Exception:
-                    continue
-                if not isinstance(event, dict):
-                    continue
-
-                if is_skill_load_meta(event) or is_harness_meta(event):
-                    continue
-                if event.get("isSidechain"):
-                    continue
-
-                etype = event.get("type") or event.get("role") or ""
-                source = event.get("source") or ""
-                if etype in {"user", "USER_INPUT"} or source == "USER_EXPLICIT":
-                    blocks = (
-                        (event.get("message") or {}).get("content")
-                        or event.get("content")
-                        or []
-                    )
-                    is_tool_result = (
-                        event.get("type") == "tool_result"
-                        or (
-                            isinstance(blocks, list)
-                            and any(
-                                isinstance(b, dict) and b.get("type") == "tool_result"
-                                for b in blocks
-                            )
-                        )
-                    )
-                    if not is_tool_result:
-                        prompt_lines_so_far.append(line_str)
-                        ev_id = None
-                        for k in (
-                            "prompt_id",
-                            "promptId",
-                            "turn_id",
-                            "turnId",
-                            "step_index",
-                            "stepIndex",
-                        ):
-                            val = event.get(k)
-                            if val is not None and str(val).strip():
-                                ev_id = str(val).strip()
-                                break
-                        if ev_id is None:
-                            val = (event.get("message") or {}).get("id") or event.get("id")
-                            if val is not None and str(val).strip():
-                                ev_id = str(val).strip()
-                        if ev_id is not None:
-                            current_turn_id = ev_id
-                            last_prompt_unhashed = False
-                        else:
-                            # Prompt lacks an ID: defer hashing until after the scan
-                            # so each final prefix is hashed only once, avoiding quadratic
-                            # hashing across growing prompt histories.
-                            current_turn_id = None
-                            last_prompt_unhashed = True
-
-            if current_turn_id:
-                return current_turn_id
-            if last_prompt_unhashed and prompt_lines_so_far:
-                prefix = "\n".join(prompt_lines_so_far)
-                return hashlib.sha256(prefix.encode("utf-8")).hexdigest()[:16]
-
-            # Fallback for transcripts with no genuine prompt boundary
-            last_id = ""
-            for line in content.splitlines():
-                line_str = line.strip()
-                if not line_str:
-                    continue
-                try:
-                    event = json.loads(line_str)
-                except Exception:
-                    continue
-                if not isinstance(event, dict):
-                    continue
-                ev_id = None
-                for k in (
-                    "prompt_id",
-                    "promptId",
-                    "turn_id",
-                    "turnId",
-                    "step_index",
-                    "stepIndex",
-                ):
-                    val = event.get(k)
-                    if val is not None and str(val).strip():
-                        ev_id = str(val).strip()
-                        break
-                if ev_id is None:
-                    val = (event.get("message") or {}).get("id") or event.get("id")
-                    if val is not None and str(val).strip():
-                        ev_id = str(val).strip()
-                if ev_id is not None:
-                    last_id = ev_id
-
-            if last_id:
-                return last_id
-            if content.strip():
-                return hashlib.sha256(content.encode("utf-8")).hexdigest()[:16]
-        except Exception:
-            pass
     return ""
 
 

@@ -15,33 +15,19 @@ _spec = importlib.util.spec_from_file_location("subject", HOOK)
 subject = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(subject)
 
+_LIB = os.path.realpath(
+    os.path.join(os.path.dirname(__file__), "..", "scripts", "lib")
+)
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
 
-def make_test_env(tmpdir, extra_env=None):
-    env = dict(
-        os.environ,
-        TMPDIR=tmpdir,
-        TEMP=tmpdir,
-        TMP=tmpdir,
-        GITHUB_ACTIONS="",
-        CI="",
-        NON_INTERACTIVE="",
-        CLAUDE_NON_INTERACTIVE="",
-        HARNESS_MODE="",
-    )
-    if extra_env:
-        env.update(extra_env)
-    return env
+from stopping_point_test_support import (  # noqa: E402
+    has_warning,
+    make_test_env,
+    streamed_chunks_transcript,
+)
 
-
-def _has_warning(stdout: str) -> bool:
-    if not stdout.strip():
-        return False
-    data = json.loads(stdout)
-    decision = str(data.get("decision") or "").strip().lower()
-    assert decision not in {"block", "deny"} and "reason" not in data, (
-        f"Hook emitted blocking decision or reason: {stdout}"
-    )
-    return "systemMessage" in data and bool(data.get("systemMessage"))
+_has_warning = has_warning
 
 
 def run(text, tmpdir=None, raw_lines=None, key_name="transcript_path", env=None):
@@ -525,39 +511,6 @@ else:
     )
 
 # Streamed chunks test cases (ai-config#2500)
-def streamed_chunks_transcript(chunks, msg_id="msg_1", env=None, cumulative=False):
-    fd, path = tempfile.mkstemp(suffix=".jsonl")
-    with os.fdopen(fd, "w", encoding="utf-8") as f:
-        f.write(json.dumps({"type": "user", "message": {"content": "do task"}}) + "\n")
-        for chunk in chunks:
-            if isinstance(chunk, dict):
-                text = chunk.get("text", "")
-                is_cum = chunk.get("cumulative", cumulative)
-            else:
-                text = chunk
-                is_cum = cumulative
-            evt = {
-                "type": "assistant",
-                "message": {
-                    "id": msg_id,
-                    "content": [{"type": "text", "text": text}],
-                },
-            }
-            if is_cum:
-                evt["cumulative"] = True
-                evt["message"]["cumulative"] = True
-            f.write(json.dumps(evt) + "\n")
-    tmpdir = tempfile.mkdtemp()
-    res = subprocess.run(
-        [sys.executable, HOOK],
-        input=json.dumps({"transcript_path": path}),
-        text=True,
-        capture_output=True,
-        env=make_test_env(tmpdir, env),
-    )
-    os.unlink(path)
-    assert res.returncode == 0, f"Hook exited with code {res.returncode}: {res.stderr}"
-    return _has_warning(res.stdout)
 
 
 # Test 1: Declaration split across chunk boundary (#2500)

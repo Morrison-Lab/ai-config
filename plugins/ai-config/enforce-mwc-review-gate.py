@@ -183,8 +183,19 @@ REVIEWER_UNAVAILABLE_MARKERS = (
 
 
 def is_reviewer_unavailable_notice(body):
-    """True when *body* says the reviewer could not review due to quota or outage."""
+    """True when *body* says the reviewer could not review due to quota or outage.
+
+    Guarded against review/verdict markers so a self-review or finding that quotes
+    an outage notice is never misclassified as an outage notice (ai-config#1862).
+    """
     if not body:
+        return False
+    if (
+        VERDICT_MARKER_RE.search(body)
+        or COPILOT_NEGATIVE_HEADER.search(body)
+        or COPILOT_AFFIRMATIVE_HEADER.search(body)
+        or "<!-- ccr-overview-v2 -->" in body
+    ):
         return False
     window = body[:200].lower()
     return any(marker in window for marker in REVIEWER_UNAVAILABLE_MARKERS)
@@ -732,8 +743,15 @@ def latest_bot_review_states(reviews, head_oid="", review_comments=None, comment
         if state == "DISMISSED":
             states.pop(login, None)
             continue
-        raw_body = r.get("body", "") or ""
         submitted_at = r.get("submittedAt") or r.get("submitted_at") or ""
+        if state in ("CHANGES_REQUESTED", "REJECTED"):
+            states[login] = (state, submitted_at)
+            continue
+        if state == "APPROVED":
+            states[login] = ("APPROVED", submitted_at)
+            continue
+
+        raw_body = r.get("body", "") or ""
 
         if is_reviewer_unavailable_notice(raw_body):
             norm_login = _normalize_bot_login_for_inline(login)
@@ -741,12 +759,6 @@ def latest_bot_review_states(reviews, head_oid="", review_comments=None, comment
                 unavailable_since[norm_login] = submitted_at
             continue
 
-        if state in ("CHANGES_REQUESTED", "REJECTED"):
-            states[login] = (state, submitted_at)
-            continue
-        if state == "APPROVED":
-            states[login] = ("APPROVED", submitted_at)
-            continue
         oid = ((r.get("commit") or {}).get("oid") or "")
         is_negative_header = bool(COPILOT_NEGATIVE_HEADER.search(raw_body))
         is_not_clean_verdict = bool(NOT_CLEAN_VERDICT_RE.search(raw_body))
@@ -784,7 +796,14 @@ def latest_bot_review_states(reviews, head_oid="", review_comments=None, comment
             norm_login = _normalize_bot_login_for_inline(login)
             if norm_login in unavailable_since:
                 outage_when = unavailable_since[norm_login]
-                if not t or not outage_when or outage_when >= t:
+                # Fail closed on missing timestamps: an untimestamped outage notice
+                # can only clear an untimestamped review (e.g. test fixtures). If the
+                # review carries a timestamp, the outage notice MUST carry a timestamp
+                # dated at or after that review (parity with check-pr-fully-clean.py:
+                # outage_when > when).
+                if bool(outage_when) and bool(t) and outage_when >= t:
+                    continue
+                if not bool(t) and (not bool(outage_when) or outage_when):
                     continue
         result[login] = st
     return result
@@ -1391,42 +1410,56 @@ def mask_shell_literals(cmd):
 
     Replaces characters inside single-quoted strings (which are strictly literal)
     and non-substitution characters inside double-quoted strings with '_'.
-    Command substitutions inside double quotes ($(...) and `...`) remain unmasked.
+    Command substitutions inside double quotes ($(...) and `...`) remain unmasked
+    and their internal command strings are parsed in subshell/backtick contexts.
     """
     out = []
     i = 0
     n = len(cmd)
-    state = "NORMAL"
+    stack = ["NORMAL"]  # "NORMAL", "SINGLE", "DOUBLE", "SUBSHELL", "BACKTICK"
 
     while i < n:
         ch = cmd[i]
-        if state == "NORMAL":
+        top = stack[-1]
+
+        if top == "NORMAL":
             if ch == "'":
-                state = "SINGLE"
+                stack.append("SINGLE")
                 out.append(ch)
                 i += 1
             elif ch == '"':
-                state = "DOUBLE"
+                stack.append("DOUBLE")
                 out.append(ch)
                 i += 1
             elif ch == "\\" and i + 1 < n:
                 out.append("\\")
                 out.append("_")
                 i += 2
+            elif ch == "$" and i + 1 < n and cmd[i + 1] == "(":
+                stack.append("SUBSHELL")
+                out.append("$")
+                out.append("(")
+                i += 2
+            elif ch == "`":
+                stack.append("BACKTICK")
+                out.append("`")
+                i += 1
             else:
                 out.append(ch)
                 i += 1
-        elif state == "SINGLE":
+
+        elif top == "SINGLE":
             if ch == "'":
-                state = "NORMAL"
+                stack.pop()
                 out.append(ch)
                 i += 1
             else:
                 out.append("_")
                 i += 1
-        elif state == "DOUBLE":
+
+        elif top == "DOUBLE":
             if ch == '"':
-                state = "NORMAL"
+                stack.pop()
                 out.append(ch)
                 i += 1
             elif ch == "\\" and i + 1 < n:
@@ -1438,15 +1471,73 @@ def mask_shell_literals(cmd):
                     out.append("_")
                     out.append("_")
                 i += 2
+            elif ch == "$" and i + 1 < n and cmd[i + 1] == "(":
+                stack.append("SUBSHELL")
+                out.append("$")
+                out.append("(")
+                i += 2
             elif ch == "`":
+                stack.append("BACKTICK")
+                out.append("`")
+                i += 1
+            else:
+                out.append("_")
+                i += 1
+
+        elif top == "SUBSHELL":
+            if ch == ")":
+                stack.pop()
+                out.append(")")
+                i += 1
+            elif ch == "'":
+                stack.append("SINGLE")
                 out.append(ch)
                 i += 1
+            elif ch == '"':
+                stack.append("DOUBLE")
+                out.append(ch)
+                i += 1
+            elif ch == "\\" and i + 1 < n:
+                out.append("\\")
+                out.append(cmd[i + 1])
+                i += 2
             elif ch == "$" and i + 1 < n and cmd[i + 1] == "(":
+                stack.append("SUBSHELL")
+                out.append("$")
+                out.append("(")
+                i += 2
+            elif ch == "`":
+                stack.append("BACKTICK")
+                out.append("`")
+                i += 1
+            else:
+                out.append(ch)
+                i += 1
+
+        elif top == "BACKTICK":
+            if ch == "`":
+                stack.pop()
+                out.append("`")
+                i += 1
+            elif ch == "'":
+                stack.append("SINGLE")
+                out.append(ch)
+                i += 1
+            elif ch == '"':
+                stack.append("DOUBLE")
+                out.append(ch)
+                i += 1
+            elif ch == "\\" and i + 1 < n:
+                out.append("\\")
+                out.append(cmd[i + 1])
+                i += 2
+            elif ch == "$" and i + 1 < n and cmd[i + 1] == "(":
+                stack.append("SUBSHELL")
                 out.append("$")
                 out.append("(")
                 i += 2
             else:
-                out.append("_")
+                out.append(ch)
                 i += 1
 
     return "".join(out)

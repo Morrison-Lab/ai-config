@@ -1237,6 +1237,86 @@ class TestEvaluate(unittest.TestCase):
         decision = gate.evaluate(MERGE_CMD, state)
         self.assertEqual(decision["decision"], "deny")
 
+    def test_copilot_unavailable_comment_with_empty_created_at_does_not_clear_timestamped_review(self):
+        """An outage comment with missing/empty createdAt timestamp fails closed and
+        does NOT clear a timestamped negative review (ai-config#4329)."""
+        older_sha = "1111111111111111111111111111111111111111"
+        state = pr(
+            reviews=[
+                review(
+                    "copilot-pull-request-reviewer",
+                    "COMMENTED",
+                    body="### Changes recommended\n\nFound a race condition.",
+                    commit=older_sha,
+                    submittedAt="2026-10-06T10:00:00Z",
+                ),
+            ],
+            comments=[
+                CLEAN_VERDICT,
+                comment(
+                    "Copilot was unable to review this pull request because the user who requested the review has reached their quota limit.",
+                    login="copilot-pull-request-reviewer",
+                    createdAt="",  # empty timestamp fails closed
+                ),
+            ],
+            review_comments=[],
+        )
+        bot_states = gate.latest_bot_review_states(
+            state["reviews"], state["headRefOid"], state["reviewComments"], state["comments"]
+        )
+        self.assertEqual(bot_states.get("copilot-pull-request-reviewer"), "NOT_CLEAN")
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+
+    def test_copilot_review_quoting_outage_with_negative_header_does_not_clear(self):
+        """A review body quoting the outage notice in its opening text while containing
+        a negative header is not misclassified as an outage notice (ai-config#1862)."""
+        state = pr(
+            reviews=[
+                review(
+                    "copilot-pull-request-reviewer",
+                    "COMMENTED",
+                    body=(
+                        "Copilot was unable to review this pull request because the user who requested the review has reached their quota limit.\n\n"
+                        "### Changes recommended\n\nFound a race condition."
+                    ),
+                    commit=HEAD,
+                    submittedAt="2026-10-06T11:00:00Z",
+                ),
+            ],
+            comments=[CLEAN_VERDICT],
+            review_comments=[],
+        )
+        bot_states = gate.latest_bot_review_states(
+            state["reviews"], state["headRefOid"], state["reviewComments"], state["comments"]
+        )
+        self.assertEqual(bot_states.get("copilot-pull-request-reviewer"), "NOT_CLEAN")
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+
+    def test_copilot_review_with_changes_requested_and_outage_body_does_not_clear(self):
+        """A formal CHANGES_REQUESTED review whose body contains the outage notice is
+        recorded as CHANGES_REQUESTED and never cleared by the notice (ai-config#4329)."""
+        state = pr(
+            reviews=[
+                review(
+                    "copilot-pull-request-reviewer",
+                    "CHANGES_REQUESTED",
+                    body="Copilot was unable to review this pull request because the user who requested the review has reached their quota limit.",
+                    commit=HEAD,
+                    submittedAt="2026-10-06T11:00:00Z",
+                ),
+            ],
+            comments=[CLEAN_VERDICT],
+            review_comments=[],
+        )
+        bot_states = gate.latest_bot_review_states(
+            state["reviews"], state["headRefOid"], state["reviewComments"], state["comments"]
+        )
+        self.assertEqual(bot_states.get("copilot-pull-request-reviewer"), "CHANGES_REQUESTED")
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+
     def test_bot_short_oid_does_not_clear_or_match_head(self):
         """A 1-character commit oid in a bot review is not head-bound."""
         short_sha = HEAD[0]
@@ -2233,8 +2313,11 @@ class TestMain(unittest.TestCase):
         backtick = chr(96)
         # side_effect=[] makes any gh call fail loudly: these four must be
         # denied by the chain check alone, before any state fetch.
-        for cmd in (f"VAR=$({base})", f"VAR={backtick}{base}{backtick}",
-                    f"echo $({base})", f"({base})"):
+        for cmd in (f"VAR=$({base})", f'VAR="$({base})"',
+                    f"VAR={backtick}{base}{backtick}", f'VAR="{backtick}{base}{backtick}"',
+                    f"echo $({base})", f'echo "$({base})"',
+                    f'echo "{backtick}{base}{backtick}"',
+                    f"({base})", f'({base} --subject "fix(hooks): test")'):
             decision, _ = self.run_main(self.payload(cmd), side_effect=[])
             self.assertEqual(decision["decision"], "deny", cmd)
             self.assertIn("chained", decision["reason"], cmd)

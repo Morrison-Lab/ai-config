@@ -223,6 +223,23 @@ def find_same_sha_success(cancelled: Dict[str, Any], runs: List[Dict[str, Any]])
     return None
 
 
+def parse_runs(out: str) -> List[Dict[str, Any]]:
+    """Parse workflow runs from gh api --paginate --jq '.workflow_runs[]'.
+
+    `--jq '.workflow_runs[]'` flattens every page into NDJSON (one JSON object
+    per line), avoiding both `--slurp` (unsupported on gh CLI 2.46) and custom
+    multi-document stream decoding. See `scripts/rotate-claude-token.py:176`
+    for the same pattern.
+    """
+    runs: List[Dict[str, Any]] = []
+    for line in out.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        runs.append(json.loads(line))
+    return runs
+
+
 def find_next_branch_run(
     repo: str, cancelled: Dict[str, Any]
 ) -> Optional[Dict[str, Any]]:
@@ -268,13 +285,11 @@ def find_next_branch_run(
             "-f",
             f"branch={branch}",
             "--paginate",
-            "--slurp",
+            "--jq",
+            ".workflow_runs[]",
         ]
     )
-    pages = json.loads(out)
-    candidates: List[Dict[str, Any]] = []
-    for page in pages:
-        candidates.extend(page.get("workflow_runs", []))
+    candidates = parse_runs(out)
     later = [
         r
         for r in candidates
@@ -299,14 +314,11 @@ def fetch_runs(repo: str, sha: str) -> List[Dict[str, Any]]:
             "-f",
             f"head_sha={sha}",
             "--paginate",
-            "--slurp",
+            "--jq",
+            ".workflow_runs[]",
         ]
     )
-    pages = json.loads(out)
-    runs: List[Dict[str, Any]] = []
-    for page in pages:
-        runs.extend(page.get("workflow_runs", []))
-    return runs
+    return parse_runs(out)
 
 
 def evaluate(runs: List[Dict[str, Any]], repo: Optional[str] = None) -> int:

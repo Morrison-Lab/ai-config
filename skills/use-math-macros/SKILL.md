@@ -296,6 +296,20 @@ fixed by changing to `\exp{-\frac{x^2}{2}}` and `\exp{x^8}`.
   use `\vec{b}` or `\vecf{b}`.
   ([`Morrison-Lab/mds#48`](https://github.com/Morrison-Lab/mds/pull/48), 2026-09-29.)
 
+## Prefer command operator macros that take arguments over manual delimiter wrappers
+
+There should be very few instances where it is necessary to write `\cb` (curly braces), `\sb` (square brackets), or `\paren` directly with a bare operator.
+Instead, use the functional command version of the operator macro that takes its operand as an argument and wraps it in delimiters automatically:
+
+- **Expectation**: write `\Expf{X}` or `\E{X}` (expands to `\distop{E}\sb{X}`), not bare operator `\Ep` followed by manual `\sb{X}` (`\Ep\sb{X}`).
+- **Variance / Covariance**: write `\Var{X}` or `\Cov{X, Y}`, not `\Vart\paren{X}`.
+- **Probability / Quantile**: write `\Prf{A}` or `\Qf{p}`, not `\Pr\paren{A}` or `\Q\paren{p}`.
+- **Exponential**: write `\expf{x}` or `\exp{x}` (or `e^{x}`), not `\expt\paren{x}`.
+- **Indicator**: write `\indicp{P}` or `\indic{A}(x)`.
+
+Reserve direct `\sb{...}`, `\cb{...}`, and `\paren{...}` for mathematical grouping, sets ($\cb{1, \dots, n}$), evaluation limits, or raw algebra that does not denote an operator with a dedicated macro.
+(Directive from the user, 2026-10-07.)
+
 ## Anti-patterns
 
 - ❌ Inventing a macro name not defined in `macros.qmd` — it silently breaks the

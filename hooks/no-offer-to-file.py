@@ -46,6 +46,19 @@ PATTERNS = [
     r"((it|one|them)(?=\s*([.!?)\n]|$))|me to (file|record|save|capture|note|open an issue))",
     r"\b(file|filing|issue|memory|memories|record|recording)\b[^\n]{0,240}?"
     r"\b(just )?say the word\b",
+    # Attaching the repository a fix or issue belongs in is covered by the
+    # non-destructive grant too (ai-config#4337): "filing it upstream would
+    # need add_repo" in place of calling add_repo is the same offer.
+    # Each names a repository (or add_repo itself) and an offer or deferral
+    # frame, so "should I attach the file?" and a sentence explaining what a
+    # hook would need do not match.
+    r"\b(fil(e|ing)|report(ing)?|upstream|fix(ing)?)\b[^.!?\n]{0,80}?"
+    r"\b(would|will) (need|require) (an? )?`?add_repo`?",
+    r"(want me to|should i|shall i|would you like me to|let me know if i should) "
+    r"((call |run )?`?add_repo`?|(attach|add) (it |the |that |this )?(`?[\w./-]+`? )?"
+    r"(repo|repository|repos|repositories)\b)",
+    r"i (can|could) (attach|add) (it|the|that|this)\b[^.!?\n]{0,60}?"
+    r"\b(repo|repository|repos|repositories)\b[^.!?\n]{0,60}?(\?|if you (want|like)|for you)",
 ]
 RX = re.compile("|".join(PATTERNS), re.I)
 

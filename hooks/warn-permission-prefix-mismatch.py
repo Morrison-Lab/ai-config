@@ -6,8 +6,8 @@ literal start of the command (one observation, cause not isolated). `ALLOW_UNREV
 with `ALLOW_UNREVIEWED_PUSH=1 git push`, so the rule the user already has most likely
 does not cover it, the auto-mode classifier may deny the override, and the agent asks
 the user for a rule that exists (measured 2026-10-07, Morrison-Lab/mlr;
-memories/claude-code-hooks.md, "A permission allow-rule matches the command's
-literal prefix").
+memories/claude-code-hooks.md, "A `git -C` probably defeats a permission
+allow-rule's prefix match (one observation)").
 
 Trigger: the command starts with one or more `VAR=val` assignments, then
 `git`, then at least one global option (`-C <path>`, `-c k=v`, `--git-dir`,

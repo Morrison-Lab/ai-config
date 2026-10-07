@@ -69,9 +69,6 @@ When a new entry lands after `main` has appended one of its own, take the next n
   Corrected by user: "stop saying mergeable when there's red CI and/or no clean review".
   Never use "mergeable" as a status verdict or conflate git mergeability with PR readiness;
   explicitly report CI check status and review verdict.
-  Re-hit 2026-10-07 (Antigravity session, working `Morrison-Lab/lds` [PR #454](https://github.com/Morrison-Lab/lds/pull/454)):
-  reported stopping status on an open PR without checking that base conflicts (`mergeable: CONFLICTING`, `mergeStateStatus: DIRTY`) had prevented GitHub Actions from scheduling or running any CI workflows.
-  Always verify `mergeable == MERGEABLE` and confirm CI workflows are actually scheduled/running (`gh pr checks <N>`).
   Re-hit 2026-09-03 (Antigravity session, working `ucdavis/epi204` wrap-up):
   reported unrelated open [PR #384](https://github.com/ucdavis/epi204/pull/384) in wrap-up dashboard
   as "Ready for self-merge" based on green CI checks
@@ -97,6 +94,9 @@ When a new entry lands after `main` has appended one of its own, take the next n
   is what stops a shape match becoming a second wrong attribution.
   Never transcribe a fallback review's prose
   or call a PR ready for merge without `check-pr-fully-clean.py` exiting 0.
+  Re-hit 2026-10-07 (Antigravity session, working `Morrison-Lab/lds` [PR #454](https://github.com/Morrison-Lab/lds/pull/454)):
+  reported stopping status on an open PR without checking that base conflicts (`mergeable: CONFLICTING`, `mergeStateStatus: DIRTY`) had prevented GitHub Actions from scheduling or running any CI workflows.
+  Always verify `mergeable == MERGEABLE` and confirm CI workflows are actually scheduled/running (`gh pr checks <N>`).
 - **Canonical Rule**: `AGENTS.md` ("Get a clean automated review before asking a person to review"),
   `fully-clean.md`, and `hooks/no-incomplete-check-enumeration.py`.
 - **Do:** Run `python3 scripts/check-pr-fully-clean.py <N> -R <owner>/<repo>`

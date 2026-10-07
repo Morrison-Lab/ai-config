@@ -394,7 +394,8 @@ A resulting lockfile change (`renv.lock`, `environment.yml`) is a repo change an
 The grant also covers attaching a repository to the session (`add_repo` in a cloud session) when the work needs it, since attaching only widens what the session can read.
 What you then post there is a separate decision:
 "Gate external repository communication on membership" above still applies to every issue, PR, and comment.
-In a repository where that gate passes (the gate's own check passes for that specific repository; administering its organization alone is not enough),
+In a repository where the gate's own check passes
+(for that specific repository, since administering its organization is not enough),
 file the issue or open the PR without offering first, and link it back.
 Anywhere else, follow [`upstream-issues`](shared/workflow/upstream-issues.md) and draft for approval.
 

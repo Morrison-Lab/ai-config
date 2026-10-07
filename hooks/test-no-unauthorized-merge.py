@@ -102,6 +102,7 @@ BLOCK = [
     ("$EMPTY gh pr merge 411", "empty variable expansion before the command word"),
     ("${EMPTY} gh pr merge 411", "braced empty variable expansion before the command word"),
     ("cd /tmp && ALLOW_MERGE=0 gh pr merge 411", "ALLOW_MERGE=0 is not an override"),
+    ("env ALLOW_MERGE=0 gh pr merge 411", "env with ALLOW_MERGE=0 is not an override"),
     ("cd /tmp && echo ALLOW_MERGE=1 && gh pr merge 411", "override in a DIFFERENT segment does not authorize the merge segment"),
     ("cat <<EOF\n$(gh pr merge 411)\nEOF", "live subshell inside an UNQUOTED heredoc still executes"),
     ("cat <<EOF\n`gh pr merge 411`\nEOF", "live backtick inside an UNQUOTED heredoc still executes"),
@@ -585,6 +586,10 @@ ALLOW = [
     ("\tALLOW_MERGE=1 gh pr merge 411", "ALLOW_MERGE=1 with a leading tab"),
     ("echo start; ALLOW_MERGE=1 gh pr merge 411", "ALLOW_MERGE=1 after a semicolon separator"),
     ('cd /tmp && ALLOW_MERGE="1" gh pr merge 411', "quoted ALLOW_MERGE after cd &&"),
+    ("env ALLOW_MERGE=1 gh pr merge 411 --squash", "env wrapper with ALLOW_MERGE=1"),
+    ("env FOO=bar ALLOW_MERGE=1 gh pr merge 411 --squash", "env wrapper with preceding env var and ALLOW_MERGE=1"),
+    ("/usr/bin/env ALLOW_MERGE=1 gh pr merge 411 --squash", "/usr/bin/env wrapper with ALLOW_MERGE=1"),
+    ("cd /tmp && env ALLOW_MERGE=1 gh pr merge 411 --squash", "cd && env ALLOW_MERGE=1"),
     # --- ai-config#1279 defect 2: prose, quotes, greps and literals ---------
     # fail-fast.md: "test that mentions, greps, and quotes of the gated command
     # pass". Blocking these is what stopped the guard being documented, bug-

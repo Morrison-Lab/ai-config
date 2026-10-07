@@ -290,9 +290,11 @@ PERMISSIVE_MERGE_PATTERNS = _merge_patterns(PERMISSIVE_LEAD)
 # `cd /repo && ALLOW_MERGE=1 <merge>` was not (ai-config#1279, defect 4), and the
 # refusal message printed the segment `.strip()`ed, removing the very character
 # that caused the mismatch. Leading whitespace in a segment is inert in bash, so
-# accepting it authorizes nothing a bare `ALLOW_MERGE=1 ...` did not already.
+# An optional `env` (or `/usr/bin/env`) command wrapper prefix is also permitted
+# (#4325), as shells on Windows or scripts commonly prefix child process env vars
+# with `env`.
 ALLOW_ENV_FLAG = re.compile(
-    r"^\s*(?:(?:export\s+)?[A-Za-z_][A-Za-z0-9_]*=(?:\"[^\"]*\"|'[^']*'|\S*)\s+)*ALLOW_MERGE=(?:\"1\"|'1'|1\b)"
+    r"^\s*(?:(?:/usr/bin/)?env\s+)?(?:(?:export\s+)?[A-Za-z_][A-Za-z0-9_]*=(?:\"[^\"]*\"|'[^']*'|\S*)\s+)*ALLOW_MERGE=(?:\"1\"|'1'|1\b)"
 )
 SPLIT = re.compile(r"&&|\|\||;|\||\n")
 

@@ -138,3 +138,4 @@ To avoid overflowing context windows with monolithic instructions:
   moving non-contiguous sections creates numbering gaps unless downstream headings and citations are renumbered
   or stub pointers are preserved in place.
 
+

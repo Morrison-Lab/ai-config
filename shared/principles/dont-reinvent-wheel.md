@@ -82,6 +82,16 @@ build-vs-use decision criteria);
 [`prefer-packaged-functions`](../coding/prefer-packaged-functions.md)
 is the R-function special case of this principle.
 
+## Post-hoc DRW violations and retiring internal tools
+
+DRW violations may also arise post-hoc:
+when an internal tool was originally built, no external tool existed that fulfilled the need.
+Over time, new external tools or upstream packages evolve to replicate what our internal tool does.
+If the external tool matches or exceeds our internal tool's capabilities,
+retire the internal tool to decrease maintenance burden.
+File an issue proposing retirement rather than replacing it during an unrelated task;
+see [`file-pre-existing-violations`](../workflow/file-pre-existing-violations.md).
+
 ## A stale, un-migrated local copy is the least reliable place to fix a bug
 
 Before patching a bug in a repo's own CI/workflow file --- or any other

@@ -21,6 +21,10 @@ Two more kinds are filed on the same terms
   Examples: a wrong claim you later retracted, or a guessed identifier you acted on.
   The fix is in the conversation, but the lesson is not.
   The issue records what went wrong and what would have prevented it.
+- **A pre-existing guideline violation:** a legacy construct or post-hoc DRW violation
+  where upstream tools now match or exceed our internal implementation.
+  The issue plans retirement to reduce maintenance burden
+  (see [`file-pre-existing-violations`](file-pre-existing-violations.md)).
 
 - **Do:** file the concern or your own mistake before the report that mentions it, and link the issue from that report.
 - **Don't:** leave a concern or a self-correction only in chat because it seems minor, already fixed, or not yet a bug.

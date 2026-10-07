@@ -36,7 +36,11 @@ Read that section's boundary first: a defect inside your own diff is never
 deferrable, however cleanly the issue is written.
 
 **Pre-existing guideline violations.**
-When you notice pre-existing violations of our guidelines during work in a repository --- such as post-hoc DRW violations where new external tools replicate or exceed internal tools, per [`file-pre-existing-violations`](../../shared/workflow/file-pre-existing-violations.md) --- file them as issues rather than letting them pass unrecorded or expanding your active task's scope.
+When you notice pre-existing violations of our guidelines during work in a repository ---
+such as post-hoc DRW violations where new external tools replicate or exceed internal tools,
+per [`file-pre-existing-violations`](../../shared/workflow/file-pre-existing-violations.md) ---
+file them as issues rather than letting them pass unrecorded
+or expanding your active task's scope.
 
 ## Procedure
 

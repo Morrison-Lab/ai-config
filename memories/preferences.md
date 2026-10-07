@@ -231,7 +231,7 @@
   - **Do:** ensure every PR opened or pushed to by this session has merged or closed before declaring the session done.
   - **Don't:** declare a clean stopping point or say the session is done while any uncommitted file, unpushed commit, un-PRed branch, or open PR authored by this session exists.
   - **Don't:** declare a clean stopping point over a PR awaiting review or CI, even if passing.
-  (User corrections / directives, 2026-08-17, 2026-08-18, 2026-08-30, 2026-09-29, 2026-10-06 / Issues #4128, #4270;
+  (User corrections / directives, 2026-08-17, 2026-08-18, 2026-08-30, 2026-09-29, 2026-10-06 / Issues #4128, #4328;
   see [`shared/workflow/flag-session-boundaries.md`](../shared/workflow/flag-session-boundaries.md).)
 
 - **AI Capability & Memory Changes (`cai` / `ca`)**: Whenever a session creates or updates AI capabilities, memories, or skill definitions (`cai`, `ca`, `ums`), immediately branch off `main` in `Morrison-Lab/ai-config` (or the working repo), commit, push to origin, open a PR, request review, and drive to clean (or merge under `mwc`). Never leave `cai` or memory edits sitting uncommitted in a local working directory or wait for the user to prompt for a push. (User correction, 2026-08-17.)

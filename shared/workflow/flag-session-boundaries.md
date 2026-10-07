@@ -139,7 +139,7 @@ Even when local tests pass, preview builds succeed, or automated checks are comp
 - **Don't:** say a session is done when there are uncommitted, unpushed, or un-PRed changes, or open PRs authored by that session.
 - **Don't:** treat clean checks or an approved PR as "session done" before the PR actually merges.
 
-(Directive from the user, 2026-10-06.)
+(Directive from the user, 2026-10-06; [#4328](https://github.com/Morrison-Lab/ai-config/issues/4328).)
 
 **Run `wrap-up`'s state sweep *before* flagging a stopping point, not after the user asks for one.**
 The paragraph above says not to flag while live state remains; it doesn't say how to know.

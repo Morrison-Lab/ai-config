@@ -1263,10 +1263,16 @@ def extract_actions_run_id(check):
     url = check.get("detailsUrl") or check.get("details_url") or check.get("html_url") or ""
     m = ACTIONS_RUN_ID_RE.search(url)
     if m:
-        return int(m.group(1))
-    suite = check.get("check_suite") or {}
-    if isinstance(suite, dict) and suite.get("id"):
-        return int(suite["id"])
+        try:
+            return int(m.group(1))
+        except (ValueError, TypeError):
+            pass
+    suite = check.get("check_suite")
+    if isinstance(suite, dict) and suite.get("id") is not None:
+        try:
+            return int(suite["id"])
+        except (ValueError, TypeError):
+            pass
     return None
 
 

@@ -30,6 +30,7 @@ WARN = [
     ("W7", 'Q="x y" git -C /r push', RULES, "quoted assignment value"),
     ("W8", P + "git -C /r pull", RULES, "space-star rule form"),
     ("W6", P + "git -C /r push && echo done", RULES, "chained after"),
+    ("W9", P + "git -C /a -C b push", RULES, "repeated -C composes paths"),
 ]
 SILENT = [
     ("S1", P + "git push -u origin b", RULES, "already the rule form"),
@@ -46,6 +47,7 @@ SILENT = [
     ("S7", P + "git --weird-opt push", RULES, "unknown option, no guess"),
 ]
 CASES = {c[0]: c for c in WARN + SILENT}
+C_ONLY = {"W1", "W6", "W7", "W8"}  # warn cases whose only option is -C
 EXPECTED = {c[0]: "WARN" for c in WARN} | {c[0]: "silent" for c in SILENT}
 
 
@@ -64,8 +66,13 @@ def verdict(hook, case):
     if "permissionDecision" in hso:
         sys.exit("FATAL: warn-only hook emitted permissionDecision")
     ctx = hso.get("additionalContext") or ""
-    if ctx and "starts with `" not in ctx:
-        sys.exit(f"FATAL: warning lacks the rule-prefix suggestion: {ctx!r}")
+    # -C-only commands get the run-from-<dir> rewrite; any other global
+    # option must NOT be told to drop it (that changes git's behavior)
+    if ctx and cid in C_ONLY and "starts with `" not in ctx:
+        return "BADREMEDY"
+    if ctx and cid not in C_ONLY and (
+            "starts with `" in ctx or "would change what git does" not in ctx):
+        return "BADREMEDY"
     if ctx and "'&&'" in ctx:
         sys.exit(f"FATAL: suggestion quotes a shell operator: {ctx!r}")
     return "WARN" if ctx else "silent"
@@ -139,6 +146,17 @@ MUTATIONS = {
     "M6_user_settings_files": (
         [('os.path.join(home, "settings.local.json")]', '"/nonexistent"]')],
         {"D1"}),
+    "M11_remedy_scoped_to_dash_c": (
+        [("            remedy = REMEDY_C if only_c else REMEDY_OTHER",
+          "            remedy = REMEDY_C")], {"W2", "W3", "W4", "W9"}),
+    "M12_dash_c_gets_rewrite": (
+        [("            remedy = REMEDY_C if only_c else REMEDY_OTHER",
+          "            remedy = REMEDY_OTHER")], {"W1", "W6", "W7", "W8"}),
+    "M13_single_dash_c_only": (
+        [('only_c = len(opts) == 2 and opts[0] == "-C"',
+          'only_c = len(opts) % 2 == 0 and all('
+          'opts[i] == "-C" for i in range(0, len(opts), 2))')],
+        {"W9"}),
     "M7_project_settings_glob": (
         [('"settings*.json"))', '"nonexistent.json"))')], {"D2"}),
 }

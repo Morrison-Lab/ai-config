@@ -52,20 +52,28 @@ When a substantive change requires or benefits from structural refactoring:
    sharp,
    and focused exclusively on the substantive modification.
 
-Cross-reference both PRs in their descriptions:
-PR 1 notes "Stacked PR with substantive change: #Y",
-and PR 2 notes "Base refactor PR: #X".
+Lead the substantive PR's description with the merge-order alert prescribed by [`surface-merge-order`](../workflow/surface-merge-order.md) and [`stack-prs`](../../skills/stack-prs/SKILL.md):
+
+```markdown
+> [!IMPORTANT]
+> Merge #<base-N> first --- this PR is stacked on its branch.
+
+Stacked on #<base-N>.
+```
+
+Note the dependent PR on the base refactor PR as well ("Stacked PR with substantive change: #<stacked-N>").
 
 ## Do and Don't
 
 - **Do:** split work into a pure behavior-preserving refactor PR and a separate substantive modification PR stacked on top of it.
 - **Do:** verify that the base refactoring PR introduces zero behavioral change and passes all existing tests untouched.
 - **Do:** point the substantive PR's base to the refactor branch using [`stack-prs`](../../skills/stack-prs/SKILL.md) so its diff shows only the substantive modification.
-- **Do:** clearly cross-reference both PRs in their descriptions so reviewers understand the merge order.
+- **Do:** format PR merge-order notices using the established `> [!IMPORTANT]` alert and `Stacked on #<base-N>` convention per [`surface-merge-order`](../workflow/surface-merge-order.md) and [`stack-prs`](../../skills/stack-prs/SKILL.md).
 - **Don't:** commingle structural refactoring and substantive modifications in a single commit or PR.
 - **Don't:** sneak logic or behavioral fixes into a "refactoring" PR;
   keep the refactor strictly behavior-preserving.
 - **Don't:** settle for a large, noisy diff where behavioral alterations hide among moved or reformatted lines.
+- **Don't:** invent ad-hoc cross-reference phrasing when standardized stacking conventions already exist.
 
 (2026-10-07, Morrison-Lab/ai-config#4339:
 directive from Douglas Ezra Morrison:

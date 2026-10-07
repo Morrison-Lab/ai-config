@@ -12,6 +12,8 @@ literal prefix").
 Trigger: the command starts with one or more `VAR=val` assignments, then
 `git`, then at least one global option (`-C <path>`, `-c k=v`, `--git-dir`,
 `--work-tree`, `--no-pager`, ...) before the subcommand.
+The env-assignment requirement is a deliberate narrowing (the override-push
+shape that was measured); plain `git -C /r push` is left alone.
 Check: no allow rule in the user/project settings matches the command as
 written, but one would match it with the global options removed.
 Output: additionalContext (plus systemMessage outside Antigravity) suggesting
@@ -38,10 +40,10 @@ _FLAG_OPTS = {"--no-pager", "-P", "-p", "--paginate", "--bare",
 _RULE = re.compile(r"\ABash\((.*):\*\)\Z", re.DOTALL)
 
 NOTE = (
-    "Permission-rule prefix mismatch: `{orig}` carries a git global option "
+    "Permission-rule prefix mismatch (likely cause, not proven): `{orig}` carries a git global option "
     "before the subcommand, so it does not start with `{stripped}`, which "
     "the allow rule `Bash({rule}:*)` in {src} matches. Claude Code matches "
-    "allow rules against the literal command prefix, so this command will "
+    "allow rules against the literal command prefix, so this command may "
     "prompt or be classifier-denied although the rule exists. Run it from "
     "the repo's cwd as `{stripped} ...` (no `-C`, no `cd` chain) instead of "
     "asking the user to add a rule."
@@ -128,7 +130,7 @@ def find_mismatch(command):
         return None
     for prefix, src in rules:
         if matches(prefix, stripped):
-            return {"orig": " ".join(full[:len(assigns) + 1 + len(opts) + 1]),
+            return {"orig": shlex.join(full[:len(assigns) + 1 + len(opts)]),
                     "stripped": prefix, "rule": prefix, "src": src}
     return None
 

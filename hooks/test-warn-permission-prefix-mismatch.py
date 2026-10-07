@@ -62,6 +62,33 @@ def verdict(hook, case):
     return "WARN" if hso.get("additionalContext") else "silent"
 
 
+# default (non-override) search path: user settings under HOME, project
+# settings under cwd
+HOME = os.path.join(TMP, "home")
+PROJ = os.path.join(TMP, "proj")
+os.makedirs(os.path.join(HOME, ".claude"))
+os.makedirs(os.path.join(PROJ, ".claude"))
+with open(os.path.join(HOME, ".claude", "settings.local.json"), "w") as fh:
+    json.dump({"permissions": {"allow": ["Bash(FOO=1 git push:*)"]}}, fh)
+with open(os.path.join(PROJ, ".claude", "settings.team.json"), "w") as fh:
+    json.dump({"permissions": {"allow": ["Bash(BAR=1 git push:*)"]}}, fh)
+
+
+def default_verdict(hook, cmd):
+    env = {k: v for k, v in os.environ.items()
+           if k != "WARN_PREFIX_SETTINGS_FILES"}
+    env["HOME"] = HOME
+    proc = subprocess.run(
+        [sys.executable, hook], text=True, capture_output=True, cwd=PROJ,
+        env=env, input=json.dumps(
+            {"tool_name": "Bash", "tool_input": {"command": cmd}}))
+    return "WARN" if proc.stdout.strip() else "silent"
+
+
+DEFAULT = [("D1", "FOO=1 git -C /r push", "WARN", "user settings.local.json"),
+           ("D2", "BAR=1 git -C /r push", "WARN", "project settings*.json"),
+           ("D3", "BAZ=1 git -C /r push", "silent", "no rule anywhere")]
+
 wrong = 0
 for cid, case in CASES.items():
     got = verdict(HOOK, case)
@@ -71,7 +98,11 @@ for payload in ({"tool_name": "Read", "tool_input": {}}, {}):
     proc = subprocess.run([sys.executable, HOOK], text=True,
                           capture_output=True, input=json.dumps(payload))
     wrong += bool(proc.stdout.strip()) or proc.returncode != 0
-print(f"{len(CASES) - wrong}/{len(CASES)} correct")
+for cid, cmd, exp, desc in DEFAULT:
+    got = default_verdict(HOOK, cmd)
+    wrong += got != exp
+    print(f"  {got:<6} {cid:<3} default search path: {desc}")
+print(f"{len(CASES) - wrong}/{len(CASES)} correct (plus default-path cases)")
 
 MUTATIONS = {
     "M1_requires_assignment": (
@@ -88,6 +119,11 @@ MUTATIONS = {
     "M5_unknown_option_bails": (
         [("            return None  # unknown option: do not guess",
           "            j += 1")], {"S7"}),
+    "M6_user_settings_files": (
+        [('os.path.join(home, "settings.local.json")]', '"/nonexistent"]')],
+        {"D1"}),
+    "M7_project_settings_glob": (
+        [('"settings*.json"))', '"nonexistent.json"))')], {"D2"}),
 }
 mw = 0
 for name, (edits, flips) in MUTATIONS.items():
@@ -102,6 +138,8 @@ for name, (edits, flips) in MUTATIONS.items():
     try:
         flipped = {cid for cid, c in CASES.items()
                    if verdict(path, c) != EXPECTED[cid]}
+        flipped |= {cid for cid, cmd, exp, _ in DEFAULT
+                    if default_verdict(path, cmd) != exp}
     finally:
         os.unlink(path)
     ok = flipped >= flips and bool(flipped)

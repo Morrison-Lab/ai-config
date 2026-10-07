@@ -1061,9 +1061,9 @@ the measured string is `[Safety Bypass Flag]`.
 
 Measured 2026-10-07 (`Morrison-Lab/mlr`): `hooks/no-push-without-self-review.py` refused a push, and the override `ALLOW_UNREVIEWED_PUSH=1 git -C /path/to/repo push -u origin <branch>` was then denied by the auto-mode classifier.
 The agent told the user to add a Bash permission rule for `ALLOW_UNREVIEWED_PUSH=1 git push`, but `~/.claude/settings.json` already held `Bash(ALLOW_UNREVIEWED_PUSH=1 git push:*)`.
-The command missed the rule only because `-C <path>` sits between `git` and `push`, breaking the prefix match.
+The command most likely missed the rule because `-C <path>` sits between `git` and `push`, breaking the prefix match (one observation, consistent with literal-prefix matching but not isolated from the intermittent classifier denial recorded above).
 Re-run as `ALLOW_UNREVIEWED_PUSH=1 git push -u origin <branch>` from the repo's cwd, it succeeded.
-This is a third cause of the override denial, distinct from the classifier's `[Safety Bypass Flag]` flakiness above, and the one the user can do nothing about.
+This is a candidate further cause of the override denial, distinct from the classifier's `[Safety Bypass Flag]` flakiness above, and the one the user can do nothing about.
 The `git -C <literal path> push` advice elsewhere in this corpus is right for the guards' parsing and wrong for allow-rule matching, so choose the cwd form whenever a rule exists.
 
 - **Do:** before telling the user a permission rule is missing, grep `~/.claude/settings.json`, `~/.claude/settings.local.json`, and the project `.claude/settings*.json` for it.

@@ -75,7 +75,7 @@ VERDICT_MARKER_RE = re.compile(r"^\s*#{2,4}\s*Verdict\b", re.MULTILINE)
 # logins bare (no [bot] suffix); REST reports the suffixed form.
 VERDICT_AUTHOR_LOGINS = {"github-actions", "claude"}
 REVIEWER_BOT_LOGINS = VERDICT_AUTHOR_LOGINS | {
-    "copilot-pull-request-reviewer", "coderabbitai", "gemini-code-assist",
+    "copilot", "copilot-pull-request-reviewer", "coderabbitai", "gemini-code-assist",
     "jules",
 }
 FENCE_RE = re.compile(r"^\s*(```|~~~).*?^\s*\1\s*$", re.MULTILINE | re.DOTALL)
@@ -174,6 +174,51 @@ COPILOT_SUPPRESSED_BLOCK = re.compile(
     r"\b(?:Suppressed\s+comments|Comments\s+suppressed\s+due\s+to\s+low\s+confidence)\b",
     re.IGNORECASE,
 )
+REVIEWER_UNAVAILABLE_MARKERS = (
+    "unable to review this pull request because the user who requested the "
+    "review has reached their quota limit",
+    "unable to review this pull request because the user has reached their "
+    "quota limit",
+)
+
+# The body markers that make a comment look like a review regardless of author.
+# Replicated from scripts/check-pr-fully-clean.py for strict parity (ai-config#4329).
+REVIEW_BODY_MARKERS = (
+    "\U0001f916",
+    "### \U0001f916",
+    "code review",
+    "**claude finished",
+    "## verdict",
+    "### verdict",
+    "_posted by codex (ai agent)",
+    "_posted by opencode (ai agent)",
+    "verdict:",
+    "review-data:",
+)
+
+
+def has_review_body_marker(body):
+    """True when *body* carries a marker that makes it read as a review."""
+    body_lower = body.lower()
+    return any(marker in body_lower for marker in REVIEW_BODY_MARKERS)
+
+
+def is_reviewer_unavailable_notice(body):
+    """True when *body* says the reviewer could not review due to quota or outage.
+
+    Guarded by the same review-body-marker precedence the notice test uses, so
+    a self-review that opens by quoting the outage it stands in for is still
+    read as the review it is. Replicated from scripts/check-pr-fully-clean.py
+    for strict parity (ai-config#4329).
+    """
+    if not body:
+        return False
+    if has_review_body_marker(body):
+        return False
+    window = body[:200].lower()
+    return any(marker in window for marker in REVIEWER_UNAVAILABLE_MARKERS)
+
+
 # `copilot_is_empty_balanced_closer_look`'s carve-out, at its own call site
 # in `latest_bot_review_states`, went through three heuristic designs in a
 # row ([ai-config#4004](https://github.com/Morrison-Lab/ai-config/issues/4004)) -- reading the heading/effort/findings patterns anywhere
@@ -242,8 +287,9 @@ ALLOW = {"decision": "allow"}
 
 
 def is_bot_login(login):
-    return (login.endswith("[bot]")
-            or login.removesuffix("[bot]") in REVIEWER_BOT_LOGINS)
+    norm = (login or "").strip().lower()
+    return (norm.endswith("[bot]")
+            or norm.removesuffix("[bot]") in REVIEWER_BOT_LOGINS)
 
 
 def human_review_body_approves(body):
@@ -654,7 +700,7 @@ def _has_live_inline_bot_item(review_comments, login, head_oid):
     return False
 
 
-def latest_bot_review_states(reviews, head_oid="", review_comments=None):
+def latest_bot_review_states(reviews, head_oid="", review_comments=None, comments=None):
     """Latest standing per bot author.
 
     Tracks whether any bot review (e.g. Copilot, Coderabbit) submitted a formal
@@ -687,9 +733,29 @@ def latest_bot_review_states(reviews, head_oid="", review_comments=None):
     defaults to `None` (treated as empty) for callers -- tests included --
     that have no inline-comment data to supply; production always passes
     the real fetched list.
+
+    An unavailable/quota-exhausted notice ([ai-config#4329](https://github.com/Morrison-Lab/ai-config/issues/4329), parity with
+    scripts/check-pr-fully-clean.py) also clears a standing NOT_CLEAN verdict
+    when dated strictly after that verdict, provided no inline review comments
+    from that bot remain live on the current head. An unavailable notice never
+    clears a formal CHANGES_REQUESTED or REJECTED state.
     """
     review_comments = review_comments or []
+    comments = comments or []
     states = {}
+    unavailable_since = {}
+
+    for c in comments:
+        login = (c.get("author") or {}).get("login", "")
+        if not login or not is_bot_login(login):
+            continue
+        c_body = c.get("body", "") or ""
+        if is_reviewer_unavailable_notice(c_body):
+            when = c.get("createdAt") or c.get("created_at") or ""
+            norm_login = _normalize_bot_login_for_inline(login)
+            if when >= unavailable_since.get(norm_login, ""):
+                unavailable_since[norm_login] = when
+
     for r in reviews:
         login = (r.get("author") or {}).get("login", "")
         if not login or not is_bot_login(login):
@@ -698,13 +764,16 @@ def latest_bot_review_states(reviews, head_oid="", review_comments=None):
         if state == "DISMISSED":
             states.pop(login, None)
             continue
+        submitted_at = r.get("submittedAt") or r.get("submitted_at") or ""
         if state in ("CHANGES_REQUESTED", "REJECTED"):
-            states[login] = state
+            states[login] = (state, submitted_at)
             continue
         if state == "APPROVED":
-            states[login] = "APPROVED"
+            states[login] = ("APPROVED", submitted_at)
             continue
+
         raw_body = r.get("body", "") or ""
+
         oid = ((r.get("commit") or {}).get("oid") or "")
         is_negative_header = bool(COPILOT_NEGATIVE_HEADER.search(raw_body))
         is_not_clean_verdict = bool(NOT_CLEAN_VERDICT_RE.search(raw_body))
@@ -723,7 +792,13 @@ def latest_bot_review_states(reviews, head_oid="", review_comments=None):
                 states.pop(login, None)
             continue
         if is_negative:
-            states[login] = "NOT_CLEAN"
+            states[login] = ("NOT_CLEAN", submitted_at)
+            continue
+
+        if is_reviewer_unavailable_notice(raw_body):
+            norm_login = _normalize_bot_login_for_inline(login)
+            if submitted_at >= unavailable_since.get(norm_login, ""):
+                unavailable_since[norm_login] = submitted_at
             continue
 
         is_affirmative = bool(
@@ -732,10 +807,24 @@ def latest_bot_review_states(reviews, head_oid="", review_comments=None):
         )
         if is_affirmative:
             if head_oid and oid and len(oid) >= ABBREV_SHA_LEN and head_oid.startswith(oid):
-                states[login] = "CLEAN"
-            elif states.get(login) == "CLEAN":
+                states[login] = ("CLEAN", submitted_at)
+            elif states.get(login) and states[login][0] == "CLEAN":
                 states.pop(login, None)
-    return states
+
+    result = {}
+    for login, (st, t) in states.items():
+        if st == "NOT_CLEAN" and not _has_live_inline_bot_item(review_comments, login, head_oid):
+            norm_login = _normalize_bot_login_for_inline(login)
+            if norm_login in unavailable_since:
+                outage_when = unavailable_since[norm_login]
+                # Parity with check-pr-fully-clean.py (outage_when > when):
+                # An outage notice clears a standing not-clean review only when its
+                # timestamp is strictly after that review's timestamp. If the outage
+                # notice is untimestamped, or timestamps are tied, it cannot clear (fails closed).
+                if (outage_when or "") > (t or ""):
+                    continue
+        result[login] = st
+    return result
 
 
 def payload_code_mask(body):
@@ -1263,7 +1352,7 @@ def evaluate(cmd, pr_data):
         )
 
     review_comments = pr_data.get("reviewComments", []) or []
-    bot_states = latest_bot_review_states(reviews, head_oid, review_comments)
+    bot_states = latest_bot_review_states(reviews, head_oid, review_comments, comments)
     bot_blockers = [k for k, v in bot_states.items() if v in ("CHANGES_REQUESTED", "REJECTED", "NOT_CLEAN")]
     if bot_blockers:
         return deny(
@@ -1332,6 +1421,143 @@ VALUE_FLAGS = {
     "-R", "--repo", "-t", "--subject", "-b", "--body", "-F", "--body-file",
     "-A", "--author-email", "--match-head-commit",
 }
+
+
+def mask_shell_literals(cmd):
+    """Mask literal characters inside quotes while preserving command substitutions.
+
+    Replaces characters inside single-quoted strings (which are strictly literal)
+    and non-substitution characters inside double-quoted strings with '_'.
+    Command substitutions inside double quotes ($(...) and `...`) remain unmasked
+    and their internal command strings are parsed in subshell/backtick contexts.
+
+    Note: This hook is deployed as a standalone script under the staged plugin
+    directory (~/.gemini/config/plugins/ai-config/), where scripts/lib/ is not
+    on sys.path, so it cannot import scripts/lib/shellcmd.py directly.
+    """
+    out = []
+    i = 0
+    n = len(cmd)
+    stack = ["NORMAL"]  # "NORMAL", "SINGLE", "DOUBLE", "SUBSHELL", "BACKTICK"
+
+    while i < n:
+        ch = cmd[i]
+        top = stack[-1]
+
+        if top == "NORMAL":
+            if ch == "'":
+                stack.append("SINGLE")
+                out.append(ch)
+                i += 1
+            elif ch == '"':
+                stack.append("DOUBLE")
+                out.append(ch)
+                i += 1
+            elif ch == "\\" and i + 1 < n:
+                out.append("\\")
+                out.append("_")
+                i += 2
+            elif ch == "$" and i + 1 < n and cmd[i + 1] == "(":
+                stack.append("SUBSHELL")
+                out.append("$")
+                out.append("(")
+                i += 2
+            elif ch == "`":
+                stack.append("BACKTICK")
+                out.append("`")
+                i += 1
+            else:
+                out.append(ch)
+                i += 1
+
+        elif top == "SINGLE":
+            if ch == "'":
+                stack.pop()
+                out.append(ch)
+                i += 1
+            else:
+                out.append("_")
+                i += 1
+
+        elif top == "DOUBLE":
+            if ch == '"':
+                stack.pop()
+                out.append(ch)
+                i += 1
+            elif ch == "\\" and i + 1 < n:
+                out.append("_")
+                out.append("_")
+                i += 2
+            elif ch == "$" and i + 1 < n and cmd[i + 1] == "(":
+                stack.append("SUBSHELL")
+                out.append("$")
+                out.append("(")
+                i += 2
+            elif ch == "`":
+                stack.append("BACKTICK")
+                out.append("`")
+                i += 1
+            else:
+                out.append("_")
+                i += 1
+
+        elif top == "SUBSHELL":
+            if ch == ")":
+                stack.pop()
+                out.append(")")
+                i += 1
+            elif ch == "'":
+                stack.append("SINGLE")
+                out.append(ch)
+                i += 1
+            elif ch == '"':
+                stack.append("DOUBLE")
+                out.append(ch)
+                i += 1
+            elif ch == "\\" and i + 1 < n:
+                out.append("\\")
+                out.append(cmd[i + 1])
+                i += 2
+            elif ch == "$" and i + 1 < n and cmd[i + 1] == "(":
+                stack.append("SUBSHELL")
+                out.append("$")
+                out.append("(")
+                i += 2
+            elif ch == "`":
+                stack.append("BACKTICK")
+                out.append("`")
+                i += 1
+            else:
+                out.append(ch)
+                i += 1
+
+        elif top == "BACKTICK":
+            if ch == "`":
+                stack.pop()
+                out.append("`")
+                i += 1
+            elif ch == "'":
+                stack.append("SINGLE")
+                out.append(ch)
+                i += 1
+            elif ch == '"':
+                stack.append("DOUBLE")
+                out.append(ch)
+                i += 1
+            elif ch == "\\" and i + 1 < n:
+                out.append("\\")
+                out.append(cmd[i + 1])
+                i += 2
+            elif ch == "$" and i + 1 < n and cmd[i + 1] == "(":
+                stack.append("SUBSHELL")
+                out.append("$")
+                out.append("(")
+                i += 2
+            else:
+                out.append(ch)
+                i += 1
+
+    return "".join(out)
 
 
 def parse_gh_pr_merge(cmd):
@@ -1441,7 +1667,7 @@ def fetch_pr_data(cmd, cwd):
         )
     comments_result = run_gh(
         ["api", f"repos/{url_match.group(1)}/issues/{url_match.group(2)}/comments",
-         "--paginate", "--jq", "[.[] | {author: {login: (.user.login // \"\")}, body: .body}]"],
+         "--paginate", "--jq", "[.[] | {author: {login: (.user.login // \"\")}, body: .body, createdAt: (.created_at // \"\")}]"],
         cwd,
     )
     if comments_result.returncode != 0:
@@ -1540,7 +1766,8 @@ def main():
     # still registers as a merge (the chain check below then denies it).
     # "(", "$(", and backticks join the split set so a merge wrapped in a
     # subshell or command substitution becomes its own segment and registers.
-    segments = re.split(r"[;&|\n(\x60]|\$\(", cmd)
+    masked_cmd = mask_shell_literals(cmd)
+    segments = re.split(r"[;&|\n(\x60]|\$\(", masked_cmd)
     is_merge = any(
         parse_gh_pr_merge(seg)[0] or GH_API_MERGE_RE.search(seg)
         for seg in segments
@@ -1551,7 +1778,7 @@ def main():
 
     # Merges must run standalone so the PR state inspected here is the state
     # the merge executes against.
-    if any(ch in cmd for ch in CHAIN_CHARS):
+    if any(ch in masked_cmd for ch in CHAIN_CHARS):
         print(json.dumps(deny(
             "Merge commands (gh pr merge, etc) must be executed on their own, "
             "not chained, piped, backgrounded, or wrapped in command "

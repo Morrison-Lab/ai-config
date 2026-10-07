@@ -231,6 +231,66 @@ def check_hook_sources(
     return errors
 
 
+def resolve_test_constants(test_path: Path, hooks_dir: Path) -> tuple[set[str], str | None]:
+    """Extract string constants from a test file and any locally imported modules.
+
+    Traverses local imports (e.g. from hooks/ or scripts/lib/) so tests that
+    delegate payload shape verification to modular test support helpers have
+    their helpers' assertions recognized (ai-config#4308).
+    """
+    try:
+        source = test_path.read_text(encoding="utf-8")
+        tree = ast.parse(source)
+    except SyntaxError as err:
+        return set(), f"{test_path.name} could not be parsed as Python ({err})"
+
+    constants = set()
+    queue = []
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            constants.add(node.value)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            queue.append(node.module)
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                queue.append(alias.name)
+
+    root = hooks_dir.parent
+    scripts_lib = root / "scripts" / "lib"
+    visited_paths = {test_path.resolve()}
+
+    while queue:
+        mod_name = queue.pop()
+        mod_rel_path = Path(*mod_name.split(".")).with_suffix(".py")
+        candidates = [
+            hooks_dir / f"{mod_name}.py",
+            scripts_lib / f"{mod_name}.py",
+            root / mod_rel_path,
+        ]
+        for candidate in candidates:
+            if candidate.is_file():
+                resolved = candidate.resolve()
+                if resolved not in visited_paths:
+                    visited_paths.add(resolved)
+                    try:
+                        mod_source = candidate.read_text(encoding="utf-8")
+                        mod_tree = ast.parse(mod_source)
+                        for node in ast.walk(mod_tree):
+                            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                                constants.add(node.value)
+                            elif isinstance(node, ast.ImportFrom) and node.module:
+                                queue.append(node.module)
+                            elif isinstance(node, ast.Import):
+                                for alias in node.names:
+                                    queue.append(alias.name)
+                    except Exception:
+                        pass
+                break
+
+    return constants, None
+
+
 def check_hook_tests(
     hooks_dir: Path,
     registered: dict[str, list[tuple[str, str]]]
@@ -259,10 +319,9 @@ def check_hook_tests(
         is_warn_only_stop = "Stop" in events and not has_decision
         is_warn_only_pretool = "PreToolUse" in events and not has_decision and (has_system_message or has_additional_context)
 
-        test_source = test_path.read_text(encoding="utf-8")
-        test_constants, test_err = parse_string_constants(test_source)
+        test_constants, test_err = resolve_test_constants(test_path, hooks_dir)
         if test_err:
-            errors.append(f"FAIL: {test_path.name} {test_err}")
+            errors.append(f"FAIL: {test_err}")
             continue
 
         if is_warn_only_stop:

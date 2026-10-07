@@ -61,6 +61,14 @@ On first render, Quarto appends
 If `.quarto/` is already
   present, `/.quarto/` is redundant (the unanchored form already covers the root).
   Remove `/.quarto/` only when `.quarto/` is already present; keep `**/*.quarto_ipynb`.
+- **Proof-like divs (`proof`, `remark`, `solution`) emit `.proof-title`, not `.theorem-title`, with trailing whitespace inside the span.**
+  Quarto's `theorem.lua` outputs `<span class="theorem-title">` followed by a sibling `pandoc.Space()`,
+  leaving the title span with no trailing whitespace.
+  In contrast, `proof.lua` puts `pandoc.Str(". ")` inside `<span class="proof-title">` and immediately follows with the body text without leading whitespace.
+  Any client-side anchor relocation (such as `div-anchors.js`) must query `.proof-title` alongside `.theorem-title`,
+  trim trailing whitespace from the title's last text node before appending the non-breaking separator (`\u00A0`) and anchor link,
+  and insert a separating space before subsequent sibling nodes to prevent anchor and body text from colliding
+  (1st occurrence, 2026-10-06 on `Morrison-Lab/qwt` #160).
 - **Manuscript projects do NOT support `repo-url` / `repo-actions` natively.**
   `book` and `website` inherit `base-website` schema (which includes these keys);
   `manuscript-schema` is `closed: true` with no `super`, so the keys are silently

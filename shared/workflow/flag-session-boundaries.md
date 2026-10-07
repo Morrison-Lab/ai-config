@@ -8,10 +8,17 @@ The last message you post before stopping MUST explicitly state whether or not t
 Whenever ending a session, completing a turn, or wrapping up work (whether finishing a single task, a multi-issue backlog loop like `gii`/`gia`, a PR stack sweep, or an automated session wrap-up like `mwc`/`wrap-up`), ALWAYS include an explicit `**Stopping Point**` declaration that says whether the session is done or not.
 When reporting stopping point status:
 - Explicitly state whether the session is done or not.
+  A session is NOT done while any pull request opened or pushed to by this session remains open (unmerged and unclosed) --- even after delivering completed implementation work (opening the PR), work remains to monitor CI and drive the review to clean or merge.
 - Include running UMS (or confirming no new learnings accumulated since the last pass).
 - Confirm that any follow-up items noticed during the turn or task have been filed.
 Never leave the user guessing whether additional tasks remain queued or if a clean stopping point has been reached.
-(User corrections / directives, 2026-08-17, 2026-08-18, 2026-09-29.)
+(User corrections / directives, 2026-08-17, 2026-08-18, 2026-09-29, 2026-10-06.)
+
+**A conversational question-answering reply concluding a turn is a stopping point.**
+When answering a question at the end of a session or turn (e.g. explaining a diagnosis, answering "why not?", or clarifying why a branch was deleted), that reply is the stopping point of the turn.
+Phrasing about the user's tasks (such as "Nothing is left for you to do" or "Nothing further is needed from you") is about the user's workload, not the session's state, and does not substitute for explicitly stating whether the session is done (`session is done` or `session not done`).
+State explicitly whether the session is done or not on that final reply, exactly as on any other turn-concluding message.
+(User directive, 2026-10-05, Morrison-Lab/lbt; [#4308](https://github.com/Morrison-Lab/ai-config/issues/4308).)
 
 **Arm resumption before every non-clean pause.**
 Whenever work remains at a pause, create a timer or equivalent wake mechanism
@@ -101,6 +108,9 @@ The remedy converts it rather than excusing it: file it or commit it, and it bec
 - **Don't:** declare a clean stopping point in a turn that also puts a question, offer, or blocker to the user, whether in a `QUESTION`, `OFFER`, or `BLOCKER` box or in plain prose.
 - **Don't:** count exploration, diagnosis, or an uncommitted local change as a completion.
 - **Don't:** end a turn without declaring whether the session is done or ongoing.
+- **Don't:** declare a clean completed stopping point or report that the session is done while any pull request opened or pushed to by this session remains open (unmerged and unclosed).
+- **Do:** include the explicit stopping-point and session-done declaration on conversational and question-answering replies concluding a turn.
+- **Don't:** substitute user-workload phrasing like "Nothing is left for you to do" for an explicit declaration of whether the session is done.
 
 (Directive from the user, 2026-08-19:
 "cai: that wasn't a real stopping point; you haven't finished anything".

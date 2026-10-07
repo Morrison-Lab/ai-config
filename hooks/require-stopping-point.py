@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Stop-hook guard: require a stopping-point declaration in each final reply."""
+"""Stop-hook guard: warn when a stopping-point declaration is missing from a final reply.
+
+Treats the last reply of a turn as a stopping point, including conversational
+question-answering replies (#4308). Warns via systemMessage rather than blocking
+when that reply omits an explicit statement of whether the session is done or not.
+Handles streamed assistant chunk concatenation (#2500).
+"""
 from __future__ import annotations
 
 import hashlib
@@ -21,15 +27,35 @@ except Exception:
     strip_code = strip_fences = None
 
 try:
-    from transcript_meta import is_skill_load_meta
+    from transcript_meta import is_harness_meta, is_skill_load_meta
 except Exception as _exc:  # broken install: degrade, do not fail open silently
     print(f"require-stopping-point: cannot load scripts/lib/transcript_meta.py "
-          f"({_exc}); a mid-turn skill load will wrongly reset the "
-          f"accumulated reply",
+          f"({_exc}); a mid-turn skill load or hook feedback will wrongly "
+          f"reset the accumulated turn",
           file=sys.stderr)
 
     def is_skill_load_meta(entry):  # noqa: D103 -- fail-open fallback
-        return False
+        return bool(isinstance(entry, dict) and entry.get("isMeta") and entry.get("sourceToolUseID"))
+
+    def is_harness_meta(entry):  # noqa: D103 -- fail-open fallback
+        return bool(
+            isinstance(entry, dict)
+            and entry.get("isMeta")
+            and not entry.get("sourceToolUseID")
+            and entry.get("promptSource") != "sdk"
+        )
+
+try:
+    from turn_id import extract_turn_id
+except Exception as _exc:
+    print(
+        f"require-stopping-point: cannot load scripts/lib/turn_id.py ({_exc}); "
+        f"turn id extraction will fail back to empty",
+        file=sys.stderr,
+    )
+
+    def extract_turn_id(payload: dict) -> str:  # noqa: D103 -- fallback
+        return ""
 
 # In a project-thread session every user-visible sentence is the `text` input
 # of an `mcp__hearthbot__reply` tool call, never an assistant text block.
@@ -96,6 +122,8 @@ def last_text(path: str) -> str:
     last_text_val = ""
     last_reply = ""
     saw_reply_tool = False
+    curr_msg_id = None
+    consecutive_assistant = False
     try:
         with open(path, encoding="utf-8", errors="ignore") as f:
             for line in f:
@@ -108,15 +136,13 @@ def last_text(path: str) -> str:
                     continue
                 etype = event.get("type") or event.get("role") or ""
                 source = event.get("source") or ""
-                if is_skill_load_meta(event):
-                    # A loaded skill body arrives as a `type: "user"` entry
-                    # with `isMeta: true` and a `sourceToolUseID`. It was
-                    # never a real prompt, so it must not reset the
-                    # accumulated reply the way a genuine new user turn does
-                    # (ai-config#3860). `isMeta` alone is not this test: a
-                    # scheduled check-in continuation also carries `isMeta:
-                    # true` but no `sourceToolUseID`, and it IS a genuine
-                    # new turn -- see scripts/lib/transcript_meta.py.
+                if is_skill_load_meta(event) or is_harness_meta(event):
+                    # A loaded skill body or harness metadata (system notification,
+                    # hook feedback) carries `isMeta: true`. It was never a real
+                    # user prompt, so it must not reset the accumulated reply the way
+                    # a genuine new user turn does (ai-config#3860, ai-config#4308).
+                    # A scheduled check-in continuation (promptSource: "sdk") is a
+                    # genuine new turn and is not matched by is_harness_meta.
                     continue
                 if (
                     etype == "user"
@@ -142,6 +168,8 @@ def last_text(path: str) -> str:
                         last_text_val = ""
                         last_reply = ""
                         saw_reply_tool = False
+                    curr_msg_id = None
+                    consecutive_assistant = False
                     continue
                 if event.get("isSidechain"):
                     continue
@@ -151,14 +179,22 @@ def last_text(path: str) -> str:
                         or event.get("content")
                         or []
                     )
+                    msg_id = (event.get("message") or {}).get("id") or event.get("id")
+                    has_non_reply_tool = (
+                        isinstance(blocks, list)
+                        and any(
+                            isinstance(b, dict)
+                            and b.get("type") == "tool_use"
+                            and not REPLY_TOOL_RX.search(b.get("name") or "")
+                            for b in blocks
+                        )
+                    )
                     if isinstance(blocks, list):
                         text = "".join(
                             b.get("text", "")
                             for b in blocks
                             if isinstance(b, dict) and b.get("type") == "text"
                         )
-                        if text.strip():
-                            last_text_val = text
                         for b in blocks:
                             if (
                                 isinstance(b, dict)
@@ -169,22 +205,80 @@ def last_text(path: str) -> str:
                             payload = _reply_payload(b)
                             if payload.strip():
                                 last_reply = payload
-                    elif isinstance(blocks, str) and blocks.strip():
-                        last_text_val = blocks
+                    elif isinstance(blocks, str):
+                        text = blocks
+                    else:
+                        text = ""
+
+                    if has_non_reply_tool:
+                        if text.strip():
+                            last_text_val = text
+                        consecutive_assistant = False
+                        curr_msg_id = None
+                    elif text:
+                        is_same_message = bool(
+                            msg_id and curr_msg_id and msg_id == curr_msg_id
+                        )
+                        if is_same_message:
+                            is_cumulative = bool(
+                                event.get("cumulative")
+                                or (event.get("message") or {}).get("cumulative")
+                                or event.get("update_mode") == "cumulative"
+                                or event.get("mode") in {"replace", "cumulative"}
+                            )
+                            if is_cumulative:
+                                last_text_val = text
+                            else:
+                                last_text_val += text
+                        else:
+                            last_text_val = text
+                            consecutive_assistant = True
+                            curr_msg_id = msg_id
                 elif (
                     event.get("type") in {"PLANNER_RESPONSE", "GENERIC"}
                     or event.get("source") == "MODEL"
                 ):
+                    msg_id = (
+                        (event.get("message") or {}).get("id")
+                        or event.get("id")
+                        or (str(event["step_index"]) if "step_index" in event else None)
+                    )
+                    has_tool_calls = bool(event.get("tool_calls"))
                     content = event.get("content")
-                    if isinstance(content, str) and content.strip():
-                        last_text_val = content
+                    if isinstance(content, str):
+                        text = content
                     elif isinstance(content, list):
                         text = "".join(
                             (b.get("text", "") if isinstance(b, dict) else str(b))
                             for b in content
                         )
+                    else:
+                        text = ""
+
+                    if has_tool_calls:
                         if text.strip():
                             last_text_val = text
+                        consecutive_assistant = False
+                        curr_msg_id = None
+                    elif text:
+                        is_same_message = bool(
+                            msg_id and curr_msg_id and msg_id == curr_msg_id
+                        )
+                        if is_same_message:
+                            is_cumulative = bool(
+                                event.get("cumulative")
+                                or (event.get("message") or {}).get("cumulative")
+                                or event.get("update_mode") == "cumulative"
+                                or event.get("mode") in {"replace", "cumulative"}
+                            )
+                            if is_cumulative:
+                                last_text_val = text
+                            else:
+                                last_text_val += text
+                        else:
+                            last_text_val = text
+                            consecutive_assistant = True
+                            curr_msg_id = msg_id
     except Exception:
         return ""
     chosen = last_reply if saw_reply_tool else last_text_val
@@ -193,7 +287,7 @@ def last_text(path: str) -> str:
 
 def _extract_from_blocks(blocks):
     """Extract assistant text from a list of blocks respecting reply-tool precedence."""
-    last_text_val = ""
+    last_text_parts = []
     last_reply = ""
     saw_reply_tool = False
     for b in blocks:
@@ -201,13 +295,14 @@ def _extract_from_blocks(blocks):
             continue
         if b.get("type") == "text":
             txt = b.get("text") or ""
-            if txt.strip():
-                last_text_val = txt
+            if txt:
+                last_text_parts.append(txt)
         if b.get("type") == "tool_use" and REPLY_TOOL_RX.search(b.get("name") or ""):
             saw_reply_tool = True
         payload = _reply_payload(b)
         if payload.strip():
             last_reply = payload
+    last_text_val = "".join(last_text_parts)
     chosen = last_reply if saw_reply_tool else last_text_val
     return chosen if chosen.strip() else ""
 
@@ -256,10 +351,28 @@ def main() -> int:
         payload = json.load(sys.stdin)
     except Exception:
         return 0
+
+    # Note: shared/workflow/flag-session-boundaries.md:45-50 permits omitting the
+    # declaration in non-interactive runs whose output is posted somewhere by a harness,
+    # but the Stop hook event payload does not currently carry an interactivity discriminator.
+    # The hook is registered as warn-only (systemMessage, non-blocking), so warning in
+    # automated runs does not abort execution or block the session.
     text = extract_text_from_payload(payload)
     if not text or has_stopping_point_declaration(text):
         return 0
-    key = hashlib.sha256(text.encode()).hexdigest()[:16]
+
+    # Scope sentinel deduplication to current session and turn so identical replies
+    # in later turns or other sessions are not silently suppressed.
+    session_id = (
+        payload.get("session_id")
+        or payload.get("sessionId")
+        or os.environ.get("CLAUDE_SESSION_ID")
+        or os.environ.get("SESSION_ID")
+        or ""
+    )
+    turn_id = extract_turn_id(payload)
+    key_src = f"{session_id}:{turn_id}:{text}"
+    key = hashlib.sha256(key_src.encode()).hexdigest()[:16]
     sentinel = os.path.join(tempfile.gettempdir(), f".claude-stopping-point-{key}")
     if os.path.exists(sentinel):
         return 0
@@ -270,12 +383,11 @@ def main() -> int:
     print(
         json.dumps(
             {
-                "decision": "block",
-                "reason": (
+                "systemMessage": (
                     "State whether the session is done or not using "
                     "`**Stopping Point**: Clean stopping point reached --- session done; UMS executed; no follow-up items pending` or "
                     "`**Stopping Point**: Not a clean stopping point / work remains queued: session not done; <details>` "
-                    "before ending the turn."
+                    "before ending the turn (unless this is an automated non-interactive run whose output is posted by a harness; shared/workflow/flag-session-boundaries.md:45-50)."
                 ),
             }
         )

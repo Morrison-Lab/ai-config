@@ -4,10 +4,33 @@ import subprocess
 import sys
 import tempfile
 
-HOOK = sys.argv[1]
+HOOK = (
+    sys.argv[1]
+    if len(sys.argv) > 1
+    else os.path.join(os.path.dirname(__file__), "require-stopping-point.py")
+)
+
+import importlib.util
+_spec = importlib.util.spec_from_file_location("subject", HOOK)
+subject = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(subject)
+
+_LIB = os.path.realpath(
+    os.path.join(os.path.dirname(__file__), "..", "scripts", "lib")
+)
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+
+from stopping_point_test_support import (  # noqa: E402
+    has_warning,
+    make_test_env,
+    streamed_chunks_transcript,
+)
+
+_has_warning = has_warning
 
 
-def run(text, tmpdir=None, raw_lines=None, key_name="transcript_path"):
+def run(text, tmpdir=None, raw_lines=None, key_name="transcript_path", env=None):
     if tmpdir is None:
         tmpdir = tempfile.mkdtemp()
     fd, path = tempfile.mkstemp(suffix=".jsonl")
@@ -25,34 +48,33 @@ def run(text, tmpdir=None, raw_lines=None, key_name="transcript_path"):
                 )
                 + "\n"
             )
-    env = dict(os.environ, TMPDIR=tmpdir, TEMP=tmpdir, TMP=tmpdir)
     res = subprocess.run(
         [sys.executable, HOOK],
         input=json.dumps({key_name: path}),
         text=True,
         capture_output=True,
-        env=env,
+        env=make_test_env(tmpdir, env),
     )
     os.unlink(path)
     assert res.returncode == 0, f"Hook exited with code {res.returncode}: {res.stderr}"
-    return '"decision": "block"' in res.stdout or '"decision":"block"' in res.stdout
+    return _has_warning(res.stdout)
 
 
-def run_direct_payload(payload):
-    tmpdir = tempfile.mkdtemp()
-    env = dict(os.environ, TMPDIR=tmpdir, TEMP=tmpdir, TMP=tmpdir)
+def run_direct_payload(payload, env=None, tmpdir=None):
+    if tmpdir is None:
+        tmpdir = tempfile.mkdtemp()
     res = subprocess.run(
         [sys.executable, HOOK],
         input=json.dumps(payload),
         text=True,
         capture_output=True,
-        env=env,
+        env=make_test_env(tmpdir, env),
     )
     assert res.returncode == 0, f"Hook exited with code {res.returncode}: {res.stderr}"
-    return '"decision": "block"' in res.stdout or '"decision":"block"' in res.stdout
+    return _has_warning(res.stdout)
 
 
-def reply_transcript(reply_text, narration_text=None):
+def reply_transcript(reply_text, narration_text=None, env=None):
     fd, path = tempfile.mkstemp(suffix=".jsonl")
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         blocks = []
@@ -70,17 +92,16 @@ def reply_transcript(reply_text, narration_text=None):
             + "\n"
         )
     tmpdir = tempfile.mkdtemp()
-    env = dict(os.environ, TMPDIR=tmpdir, TEMP=tmpdir, TMP=tmpdir)
     res = subprocess.run(
         [sys.executable, HOOK],
         input=json.dumps({"transcript_path": path}),
         text=True,
         capture_output=True,
-        env=env,
+        env=make_test_env(tmpdir, env),
     )
     os.unlink(path)
     assert res.returncode == 0, f"Hook exited with code {res.returncode}: {res.stderr}"
-    return '"decision": "block"' in res.stdout or '"decision":"block"' in res.stdout
+    return _has_warning(res.stdout)
 
 
 cases = [
@@ -225,6 +246,30 @@ direct_cases = [
         True,
         "direct message narration clean + missing reply-tool blocks",
     ),
+    (
+        {
+            "message": {
+                "content": [
+                    {"type": "text", "text": "Work completed.\n\n**Stopping Point**: Clean stopping point reached --- "},
+                    {"type": "text", "text": "session done; UMS executed; no follow-up items pending."},
+                ]
+            }
+        },
+        False,
+        "direct message with declaration split across text blocks passes",
+    ),
+    (
+        {
+            "message": {
+                "content": [
+                    {"type": "text", "text": "Work completed.\n\n**Stopping Point**: Incomplete draft --- "},
+                    {"type": "text", "text": "session not completed without clean stopping point."},
+                ]
+            }
+        },
+        True,
+        "direct message with split text blocks missing declaration blocks",
+    ),
 ]
 
 for payload, expected, label in direct_cases:
@@ -235,7 +280,7 @@ for payload, expected, label in direct_cases:
         print(f"FAIL {label} (expected block={expected}, got {got})")
         failed += 1
 
-def multi_turn_transcript(turn1_reply, turn2_text):
+def multi_turn_transcript(turn1_reply, turn2_text, env=None):
     fd, path = tempfile.mkstemp(suffix=".jsonl")
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write(json.dumps({"type": "user", "message": {"content": "do turn 1"}}) + "\n")
@@ -253,33 +298,32 @@ def multi_turn_transcript(turn1_reply, turn2_text):
             "message": {"content": [{"type": "text", "text": turn2_text}]},
         }) + "\n")
     tmpdir = tempfile.mkdtemp()
-    env = dict(os.environ, TMPDIR=tmpdir, TEMP=tmpdir, TMP=tmpdir)
     res = subprocess.run(
         [sys.executable, HOOK],
         input=json.dumps({"transcript_path": path}),
         text=True,
         capture_output=True,
-        env=env,
+        env=make_test_env(tmpdir, env),
     )
     os.unlink(path)
     assert res.returncode == 0, f"Hook exited with code {res.returncode}: {res.stderr}"
-    return '"decision": "block"' in res.stdout or '"decision":"block"' in res.stdout
+    return _has_warning(res.stdout)
 
 # Multi-turn test: turn 1 reply-tool state must not leak into turn 2 plain-text
 if not multi_turn_transcript(CLEAN_DECL, MISSING_DECL):
-    print("FAIL: turn 2 plain-text missing stopping point did not block after turn 1 used reply-tool")
+    print("FAIL: turn 2 plain-text missing stopping point did not warn after turn 1 used reply-tool")
     failed += 1
 else:
-    print("PASS: turn 2 plain-text missing stopping point blocks after turn 1 reply-tool")
+    print("PASS: turn 2 plain-text missing stopping point warns after turn 1 reply-tool")
 
 if multi_turn_transcript(MISSING_DECL, CLEAN_DECL):
-    print("FAIL: turn 2 plain-text clean stopping point blocked because turn 1 reply-tool lacked declaration")
+    print("FAIL: turn 2 plain-text clean stopping point warned because turn 1 reply-tool lacked declaration")
     failed += 1
 else:
     print("PASS: turn 2 plain-text clean stopping point passes despite turn 1 reply-tool lacking declaration")
 
 
-def tool_result_transcript(reply_text):
+def tool_result_transcript(reply_text, env=None):
     fd, path = tempfile.mkstemp(suffix=".jsonl")
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write(json.dumps({"type": "user", "message": {"content": "do task"}}) + "\n")
@@ -296,27 +340,26 @@ def tool_result_transcript(reply_text):
             "message": {"content": [{"type": "tool_result", "tool_use_id": "call_1", "content": "delivered"}]},
         }) + "\n")
     tmpdir = tempfile.mkdtemp()
-    env = dict(os.environ, TMPDIR=tmpdir, TEMP=tmpdir, TMP=tmpdir)
     res = subprocess.run(
         [sys.executable, HOOK],
         input=json.dumps({"transcript_path": path}),
         text=True,
         capture_output=True,
-        env=env,
+        env=make_test_env(tmpdir, env),
     )
     os.unlink(path)
     assert res.returncode == 0, f"Hook exited with code {res.returncode}: {res.stderr}"
-    return '"decision": "block"' in res.stdout or '"decision":"block"' in res.stdout
+    return _has_warning(res.stdout)
 
 
 if not tool_result_transcript(MISSING_DECL):
-    print("FAIL: reply-tool followed by tool_result did not block when declaration was missing")
+    print("FAIL: reply-tool followed by tool_result did not warn when declaration was missing")
     failed += 1
 else:
-    print("PASS: reply-tool followed by tool_result blocks when declaration is missing")
+    print("PASS: reply-tool followed by tool_result warns when declaration is missing")
 
 if tool_result_transcript(CLEAN_DECL):
-    print("FAIL: reply-tool followed by tool_result blocked despite clean declaration")
+    print("FAIL: reply-tool followed by tool_result warned despite clean declaration")
     failed += 1
 else:
     print("PASS: reply-tool followed by tool_result passes when declaration is present")
@@ -359,22 +402,21 @@ def meta_mid_turn_transcript(reply_text):
             }]},
         }) + "\n")
     tmpdir = tempfile.mkdtemp()
-    env = dict(os.environ, TMPDIR=tmpdir, TEMP=tmpdir, TMP=tmpdir)
     res = subprocess.run(
         [sys.executable, HOOK],
         input=json.dumps({"transcript_path": path}),
         text=True,
         capture_output=True,
-        env=env,
+        env=make_test_env(tmpdir),
     )
     os.unlink(path)
     assert res.returncode == 0, f"Hook exited with code {res.returncode}: {res.stderr}"
-    return '"decision": "block"' in res.stdout or '"decision":"block"' in res.stdout
+    return _has_warning(res.stdout)
 
 
 if meta_mid_turn_transcript(CLEAN_DECL):
     print(
-        "FAIL: reply-tool delivery with a clean declaration blocked after a "
+        "FAIL: reply-tool delivery with a clean declaration warned after a "
         "mid-turn skill load (isMeta) (ai-config#3860)"
     )
     failed += 1
@@ -389,22 +431,22 @@ else:
 # user turn, it wipes `saw_reply_tool`/`last_reply`, the trailing tool-only
 # assistant entry sets nothing, and `extract_text_from_payload` returns "" --
 # which the hook reads as "nothing to check" rather than "no declaration",
-# so the miss silently produces NO block instead of the block it should.
+# so the miss silently produces NO warning instead of the warning it should.
 if not meta_mid_turn_transcript(MISSING_DECL):
     print(
-        "FAIL: reply-tool delivery missing its declaration did not block "
+        "FAIL: reply-tool delivery missing its declaration did not warn "
         "after a mid-turn skill load (isMeta) -- the load silently erased "
         "the missing-declaration signal (ai-config#3860)"
     )
     failed += 1
 else:
     print(
-        "PASS: reply-tool delivery missing its declaration still blocks "
+        "PASS: reply-tool delivery missing its declaration still warns "
         "after a mid-turn skill load (isMeta)"
     )
 
 
-def scheduled_continuation_transcript(reply_text):
+def scheduled_continuation_transcript(reply_text, env=None):
     """A scheduled check-in continuation (ScheduleWakeup/cron fire, via a
     queue enqueue/dequeue pair) ALSO arrives as `isMeta: true`, but with no
     `sourceToolUseID`. Unlike a loaded skill's body it IS a genuine new
@@ -441,17 +483,16 @@ def scheduled_continuation_transcript(reply_text):
             }]},
         }) + "\n")
     tmpdir = tempfile.mkdtemp()
-    env = dict(os.environ, TMPDIR=tmpdir, TEMP=tmpdir, TMP=tmpdir)
     res = subprocess.run(
         [sys.executable, HOOK],
         input=json.dumps({"transcript_path": path}),
         text=True,
         capture_output=True,
-        env=env,
+        env=make_test_env(tmpdir, env),
     )
     os.unlink(path)
     assert res.returncode == 0, f"Hook exited with code {res.returncode}: {res.stderr}"
-    return '"decision": "block"' in res.stdout or '"decision":"block"' in res.stdout
+    return _has_warning(res.stdout)
 
 
 if scheduled_continuation_transcript(MISSING_DECL):
@@ -468,6 +509,777 @@ else:
         "sourceToolUseID) opens a new turn, expiring an old turn's "
         "missing-declaration reply exactly as a real user message would"
     )
+
+# Streamed chunks test cases (ai-config#2500)
+
+
+# Test 1: Declaration split across chunk boundary (#2500)
+split_chunks = [
+    "Here is the final summary of the work done.\n\n**Stopping Point**: Clean stopping point reached --- ",
+    "session done; UMS executed; no follow-up items pending.",
+]
+if streamed_chunks_transcript(split_chunks):
+    print("FAIL: streamed chunks with declaration split across chunk boundary warned (#2500)")
+    failed += 1
+else:
+    print("PASS: streamed chunks with declaration split across chunk boundary passes (#2500)")
+
+# Test 2: Streamed chunks with cumulative updates
+cumulative_chunks = [
+    "Completed task.",
+    "Completed task.\n\n**Stopping Point**: Clean stopping point reached --- session done.",
+]
+if streamed_chunks_transcript(cumulative_chunks, cumulative=True):
+    print("FAIL: streamed chunks with cumulative update warned (#2500)")
+    failed += 1
+else:
+    print("PASS: streamed chunks with cumulative update passes (#2500)")
+
+# Test 2b: Assistant cumulative update where final snapshot removes declaration warns
+cumulative_removal_chunks = [
+    "Completed task.\n\n**Stopping Point**: Clean stopping point reached --- session done.",
+    "Completed task without declaration.",
+]
+if not streamed_chunks_transcript(cumulative_removal_chunks, cumulative=True):
+    print("FAIL: assistant cumulative snapshot removing declaration did not warn (replacement not exercised)")
+    failed += 1
+else:
+    print("PASS: assistant cumulative snapshot removing declaration warns")
+
+# Test 3: Declaration in first chunk, trailing prose in second chunk
+trailing_chunks = [
+    "Completed task.\n\n**Stopping Point**: Clean stopping point reached --- session done.\n",
+    "\nHave a great day!",
+]
+if streamed_chunks_transcript(trailing_chunks):
+    print("FAIL: declaration in first chunk with trailing chunk warned (#2500)")
+    failed += 1
+else:
+    print("PASS: declaration in first chunk with trailing chunk passes (#2500)")
+
+# Test 4: Streamed chunks missing declaration entirely
+missing_chunks = [
+    "Here is the answer to your question.\n",
+    "Nothing is left for you to do.",
+]
+if not streamed_chunks_transcript(missing_chunks):
+    print("FAIL: streamed chunks missing declaration did not warn (#2500)")
+    failed += 1
+else:
+    print("PASS: streamed chunks missing declaration warns (#2500)")
+
+# Test 5: Delta fragments where second chunk starts with first chunk text (Copilot review finding)
+asterisk_delta_chunks = [
+    "*",
+    "*Stopping Point**: Clean stopping point reached --- session done.",
+]
+if streamed_chunks_transcript(asterisk_delta_chunks):
+    print("FAIL: assistant delta fragments starting with first chunk text lost asterisk")
+    failed += 1
+else:
+    print("PASS: assistant delta fragments starting with first chunk text preserve all text")
+
+asterisk_model_chunks = [
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "id": "model_star",
+        "content": "*",
+    }),
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "id": "model_star",
+        "content": "*Stopping Point**: Clean stopping point reached --- session done.",
+    }),
+]
+if run("", raw_lines=asterisk_model_chunks):
+    print("FAIL: MODEL delta fragments starting with first chunk text lost asterisk")
+    failed += 1
+else:
+    print("PASS: MODEL delta fragments starting with first chunk text preserve all text")
+
+# Test 5b: MODEL cumulative update tests (passes when final snapshot has declaration, warns when removed)
+model_cumulative_pass_chunks = [
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "id": "model_cum_1",
+        "cumulative": True,
+        "content": "Work in progress...",
+    }),
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "id": "model_cum_1",
+        "cumulative": True,
+        "content": "Completed task.\n\n**Stopping Point**: Clean stopping point reached --- session done.",
+    }),
+]
+if run("", raw_lines=model_cumulative_pass_chunks):
+    print("FAIL: MODEL cumulative update warned")
+    failed += 1
+else:
+    print("PASS: MODEL cumulative update passes")
+
+model_cumulative_warn_chunks = [
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "id": "model_cum_2",
+        "cumulative": True,
+        "content": "Completed task.\n\n**Stopping Point**: Clean stopping point reached --- session done.",
+    }),
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "id": "model_cum_2",
+        "cumulative": True,
+        "content": "Completed task without declaration.",
+    }),
+]
+if not run("", raw_lines=model_cumulative_warn_chunks):
+    print("FAIL: MODEL cumulative snapshot removing declaration did not warn (replacement not exercised)")
+    failed += 1
+else:
+    print("PASS: MODEL cumulative snapshot removing declaration warns")
+
+# Test 6: User-shaped isMeta harness event between same-ID fragments does not reset accumulated reply (Copilot review finding)
+harness_interleaved_chunks = [
+    json.dumps({
+        "type": "user",
+        "message": {"content": "do task"},
+    }),
+    json.dumps({
+        "type": "assistant",
+        "message": {
+            "id": "msg_interleaved_1",
+            "content": [{"type": "text", "text": "**Stopping Point**: Clean stopping point reached --- "}],
+        },
+    }),
+    json.dumps({
+        "type": "user",
+        "isMeta": True,
+        "content": "[SYSTEM NOTIFICATION: Hook execution completed]",
+    }),
+    json.dumps({
+        "type": "assistant",
+        "message": {
+            "id": "msg_interleaved_1",
+            "content": [{"type": "text", "text": "session done; UMS executed; no follow-up items pending."}],
+        },
+    }),
+]
+if run("", raw_lines=harness_interleaved_chunks):
+    print("FAIL: harness isMeta event interleaved between same-ID fragments reset reply and caused false warning")
+    failed += 1
+else:
+    print("PASS: harness isMeta event interleaved between same-ID fragments preserves reply")
+
+
+# Conversational question-answering final replies (ai-config#4308)
+qa_reply_without_decl = (
+    "The branch was already auto-deleted on merge.\n"
+    "We encountered proxy denials earlier.\n\n"
+    "Nothing is left for you to do."
+)
+if not run(qa_reply_without_decl):
+    print("FAIL: conversational question-answering reply without stopping point did not warn (#4308)")
+    failed += 1
+else:
+    print("PASS: conversational question-answering reply without stopping point warns (#4308)")
+
+qa_reply_with_decl = (
+    "The branch was already auto-deleted on merge.\n"
+    "We encountered proxy denials earlier.\n\n"
+    "Nothing is left for you to do.\n\n"
+    "**Stopping Point**: Clean stopping point reached --- session done; UMS executed; no follow-up items pending."
+)
+if run(qa_reply_with_decl):
+    print("FAIL: conversational question-answering reply with clean stopping point warned (#4308)")
+    failed += 1
+else:
+    print("PASS: conversational question-answering reply with clean stopping point passes (#4308)")
+
+# Regression test: Different message.id sequence (msg_prior with declaration, msg_final without declaration)
+diff_msg_id_transcript = [
+    json.dumps({
+        "type": "assistant",
+        "message": {
+            "id": "msg_prior",
+            "content": [{"type": "text", "text": "Task complete.\n\n**Stopping Point**: Clean stopping point reached --- session done."}],
+        },
+    }),
+    json.dumps({
+        "type": "assistant",
+        "message": {
+            "id": "msg_final",
+            "content": [{"type": "text", "text": "By the way, here is some follow-up info."}],
+        },
+    }),
+]
+if not run("", raw_lines=diff_msg_id_transcript):
+    print("FAIL: different message.id sequence without stopping point did not warn")
+    failed += 1
+else:
+    print("PASS: different message.id sequence without stopping point warns")
+
+diff_msg_id_clean_transcript = [
+    json.dumps({
+        "type": "assistant",
+        "message": {
+            "id": "msg_prior",
+            "content": [{"type": "text", "text": "Task complete."}],
+        },
+    }),
+    json.dumps({
+        "type": "assistant",
+        "message": {
+            "id": "msg_final",
+            "content": [{"type": "text", "text": "Final response.\n\n**Stopping Point**: Clean stopping point reached --- session done."}],
+        },
+    }),
+]
+if run("", raw_lines=diff_msg_id_clean_transcript):
+    print("FAIL: different message.id sequence with stopping point warned")
+    failed += 1
+else:
+    print("PASS: different message.id sequence with stopping point passes")
+
+# Regression test: Gemini / Antigravity transcript with tool_calls boundary
+# Uses same-ID text fragments separated by a tool-call-only MODEL record, with no intervening
+# USER_INPUT reset, so that disabling the has_tool_calls guard fails the test.
+gemini_tool_boundary_transcript = [
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "id": "model_tc_1",
+        "content": "Initial step.\n\n**Stopping Point**: Clean stopping point reached --- session done.",
+    }),
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "id": "model_tc_1",
+        "tool_calls": [{"name": "run_command", "args": {"CommandLine": "dir"}}],
+    }),
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "id": "model_tc_1",
+        "content": "Here is the directory listing: file1.txt, file2.txt.",
+    }),
+]
+if not run("", raw_lines=gemini_tool_boundary_transcript):
+    print("FAIL: Antigravity transcript with tool_calls boundary without stopping point did not warn")
+    failed += 1
+else:
+    print("PASS: Antigravity transcript with tool_calls boundary without stopping point warns")
+
+gemini_tool_boundary_clean_transcript = [
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "id": "model_tc_2",
+        "content": "Initial step.",
+    }),
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "id": "model_tc_2",
+        "tool_calls": [{"name": "run_command", "args": {"CommandLine": "dir"}}],
+    }),
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "id": "model_tc_2",
+        "content": "Here is the listing.\n\n**Stopping Point**: Clean stopping point reached --- session done.",
+    }),
+]
+if run("", raw_lines=gemini_tool_boundary_clean_transcript):
+    print("FAIL: Antigravity transcript with tool_calls boundary with clean stopping point warned")
+    failed += 1
+else:
+    print("PASS: Antigravity transcript with tool_calls boundary with clean stopping point passes")
+
+# Regression test: Back-to-back MODEL events with no tool_calls (reviewer finding)
+back_to_back_model_warn_transcript = [
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "content": "First response.\n\n**Stopping Point**: Clean stopping point reached --- session done.",
+    }),
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "content": "Second response without stopping point declaration.",
+    }),
+]
+if not run("", raw_lines=back_to_back_model_warn_transcript):
+    print("FAIL: back-to-back MODEL events without stopping point did not warn")
+    failed += 1
+else:
+    print("PASS: back-to-back MODEL events without stopping point warns")
+
+back_to_back_model_clean_transcript = [
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "content": "First response without declaration.",
+    }),
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "content": "Second response.\n\n**Stopping Point**: Clean stopping point reached --- session done.",
+    }),
+]
+if run("", raw_lines=back_to_back_model_clean_transcript):
+    print("FAIL: back-to-back MODEL events with clean stopping point warned")
+    failed += 1
+else:
+    print("PASS: back-to-back MODEL events with clean stopping point passes")
+
+# Regression test: Back-to-back assistant events without IDs
+back_to_back_assistant_no_id_transcript = [
+    json.dumps({
+        "type": "assistant",
+        "message": {
+            "content": [{"type": "text", "text": "First response.\n\n**Stopping Point**: Clean stopping point reached --- session done."}],
+        },
+    }),
+    json.dumps({
+        "type": "assistant",
+        "message": {
+            "content": [{"type": "text", "text": "Second response without stopping point declaration."}],
+        },
+    }),
+]
+if not run("", raw_lines=back_to_back_assistant_no_id_transcript):
+    print("FAIL: back-to-back assistant events without IDs and without stopping point did not warn")
+    failed += 1
+else:
+    print("PASS: back-to-back assistant events without IDs and without stopping point warns")
+
+# Test: Scope sentinel deduplication to session and turn
+shared_sentinel_tmpdir = tempfile.mkdtemp()
+sess_turn_payload_1 = {
+    "reply": "No stopping point declaration here.",
+    "session_id": "sess_1",
+    "turn_id": "turn_1",
+}
+sess_turn_payload_retry = {
+    "reply": "No stopping point declaration here.",
+    "session_id": "sess_1",
+    "turn_id": "turn_1",
+}
+sess_turn_payload_next_turn = {
+    "reply": "No stopping point declaration here.",
+    "session_id": "sess_1",
+    "turn_id": "turn_2",
+}
+sess_turn_payload_next_sess = {
+    "reply": "No stopping point declaration here.",
+    "session_id": "sess_2",
+    "turn_id": "turn_1",
+}
+
+if not run_direct_payload(sess_turn_payload_1, tmpdir=shared_sentinel_tmpdir):
+    print("FAIL: first invocation with session/turn did not warn")
+    failed += 1
+else:
+    print("PASS: first invocation with session/turn warns")
+
+if run_direct_payload(sess_turn_payload_retry, tmpdir=shared_sentinel_tmpdir):
+    print("FAIL: same-turn retry was not deduplicated")
+    failed += 1
+else:
+    print("PASS: same-turn retry is deduplicated")
+
+if not run_direct_payload(sess_turn_payload_next_turn, tmpdir=shared_sentinel_tmpdir):
+    print("FAIL: identical missing-declaration in later turn was silently ignored")
+    failed += 1
+else:
+    print("PASS: identical missing-declaration in later turn warns")
+
+if not run_direct_payload(sess_turn_payload_next_sess, tmpdir=shared_sentinel_tmpdir):
+    print("FAIL: identical missing-declaration in another session was silently ignored")
+    failed += 1
+else:
+    print("PASS: identical missing-declaration in another session warns")
+
+# Test: Scope sentinel deduplication with realistic Claude Code fields (session_id, prompt_id, transcript_path)
+claude_sess_dir = tempfile.mkdtemp()
+claude_payload_turn1 = {
+    "session_id": "claude_sess_1",
+    "prompt_id": "prompt_001",
+    "reply": "No stopping point declaration here.",
+}
+claude_payload_turn1_retry = {
+    "session_id": "claude_sess_1",
+    "prompt_id": "prompt_001",
+    "reply": "No stopping point declaration here.",
+}
+claude_payload_turn2 = {
+    "session_id": "claude_sess_1",
+    "prompt_id": "prompt_002",
+    "reply": "No stopping point declaration here.",
+}
+
+if not run_direct_payload(claude_payload_turn1, tmpdir=claude_sess_dir):
+    print("FAIL: Claude Code prompt_id turn 1 did not warn")
+    failed += 1
+else:
+    print("PASS: Claude Code prompt_id turn 1 warns")
+
+if run_direct_payload(claude_payload_turn1_retry, tmpdir=claude_sess_dir):
+    print("FAIL: Claude Code prompt_id turn 1 retry was not deduplicated")
+    failed += 1
+else:
+    print("PASS: Claude Code prompt_id turn 1 retry is deduplicated")
+
+if not run_direct_payload(claude_payload_turn2, tmpdir=claude_sess_dir):
+    print("FAIL: Claude Code prompt_id turn 2 was silently suppressed by turn 1 sentinel")
+    failed += 1
+else:
+    print("PASS: Claude Code prompt_id turn 2 warns")
+
+# Test: Scope sentinel deduplication using transcript event IDs when payload lacks turn_id/prompt_id
+tscript_turn1 = os.path.join(claude_sess_dir, "transcript1.jsonl")
+with open(tscript_turn1, "w", encoding="utf-8") as f:
+    f.write(json.dumps({"type": "user", "promptId": "p_turn_1", "message": {"content": "hello"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"id": "msg_turn_1", "content": "No stopping point"}}) + "\n")
+
+payload_tscript_turn1 = {
+    "session_id": "claude_sess_2",
+    "transcript_path": tscript_turn1,
+}
+payload_tscript_turn1_retry = {
+    "session_id": "claude_sess_2",
+    "transcript_path": tscript_turn1,
+}
+
+tscript_turn2 = os.path.join(claude_sess_dir, "transcript2.jsonl")
+with open(tscript_turn2, "w", encoding="utf-8") as f:
+    f.write(json.dumps({"type": "user", "promptId": "p_turn_1", "message": {"content": "hello"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"id": "msg_turn_1", "content": "No stopping point"}}) + "\n")
+    f.write(json.dumps({"type": "user", "promptId": "p_turn_2", "message": {"content": "hello again"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"id": "msg_turn_2", "content": "No stopping point"}}) + "\n")
+
+payload_tscript_turn2 = {
+    "session_id": "claude_sess_2",
+    "transcript_path": tscript_turn2,
+}
+
+if not run_direct_payload(payload_tscript_turn1, tmpdir=claude_sess_dir):
+    print("FAIL: transcript turn 1 did not warn")
+    failed += 1
+else:
+    print("PASS: transcript turn 1 warns")
+
+if run_direct_payload(payload_tscript_turn1_retry, tmpdir=claude_sess_dir):
+    print("FAIL: transcript turn 1 retry was not deduplicated")
+    failed += 1
+else:
+    print("PASS: transcript turn 1 retry is deduplicated")
+
+if not run_direct_payload(payload_tscript_turn2, tmpdir=claude_sess_dir):
+    print("FAIL: transcript turn 2 was silently suppressed by turn 1 sentinel")
+    failed += 1
+else:
+    print("PASS: transcript turn 2 warns")
+
+# Test: step_index 0 preservation in extract_turn_id
+tscript_step_zero = os.path.join(claude_sess_dir, "step_zero.jsonl")
+with open(tscript_step_zero, "w", encoding="utf-8") as f:
+    f.write(json.dumps({"step_index": 0, "content": "hello world"}) + "\n")
+
+extracted_zero = subject.extract_turn_id({"transcript_path": tscript_step_zero})
+if extracted_zero != "0":
+    print(f"FAIL: extract_turn_id for step_index: 0 returned {extracted_zero!r}, expected '0'")
+    failed += 1
+else:
+    print("PASS: extract_turn_id preserves step_index: 0")
+
+# Test: claude-hook-adapter shape (session_id + transcript_path only, multi-turn)
+adapter_sess_dir = tempfile.mkdtemp()
+adapter_tscript_t1 = os.path.join(adapter_sess_dir, "t1.jsonl")
+with open(adapter_tscript_t1, "w", encoding="utf-8") as f:
+    f.write(json.dumps({"type": "user", "message": {"content": "turn 1"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"id": "msg_a1", "content": "identical undeclared reply"}}) + "\n")
+
+adapter_payload_t1 = {
+    "session_id": "sess_adapter_1",
+    "transcript_path": adapter_tscript_t1,
+}
+
+adapter_tscript_t1_retry = os.path.join(adapter_sess_dir, "t1_retry.jsonl")
+with open(adapter_tscript_t1_retry, "w", encoding="utf-8") as f:
+    f.write(json.dumps({"type": "user", "message": {"content": "turn 1"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"id": "msg_a1", "content": "identical undeclared reply"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"id": "msg_a1_retry", "content": "identical undeclared reply"}}) + "\n")
+
+adapter_payload_t1_retry = {
+    "session_id": "sess_adapter_1",
+    "transcript_path": adapter_tscript_t1_retry,
+}
+
+adapter_tscript_t2 = os.path.join(adapter_sess_dir, "t2.jsonl")
+with open(adapter_tscript_t2, "w", encoding="utf-8") as f:
+    f.write(json.dumps({"type": "user", "message": {"content": "turn 1"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"id": "msg_a1", "content": "identical undeclared reply"}}) + "\n")
+    f.write(json.dumps({"type": "user", "message": {"content": "turn 2"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"id": "msg_a2", "content": "identical undeclared reply"}}) + "\n")
+
+adapter_payload_t2 = {
+    "session_id": "sess_adapter_1",
+    "transcript_path": adapter_tscript_t2,
+}
+
+if not run_direct_payload(adapter_payload_t1, tmpdir=adapter_sess_dir):
+    print("FAIL: adapter-shaped turn 1 did not warn")
+    failed += 1
+else:
+    print("PASS: adapter-shaped turn 1 warns")
+
+if run_direct_payload(adapter_payload_t1_retry, tmpdir=adapter_sess_dir):
+    print("FAIL: adapter-shaped turn 1 retry with appended assistant message was not deduplicated")
+    failed += 1
+else:
+    print("PASS: adapter-shaped turn 1 retry with appended assistant message is deduplicated")
+
+if not run_direct_payload(adapter_payload_t2, tmpdir=adapter_sess_dir):
+    print("FAIL: adapter-shaped turn 2 was silently suppressed by turn 1 sentinel")
+    failed += 1
+else:
+    print("PASS: adapter-shaped turn 2 warns")
+
+# Test: id-less 2-line non-cumulative transcripts sharing the same missing declaration text
+idless_sess_dir = tempfile.mkdtemp()
+idless_tscript_t1 = os.path.join(idless_sess_dir, "t1.jsonl")
+with open(idless_tscript_t1, "w", encoding="utf-8") as f:
+    f.write(json.dumps({"type": "user", "message": {"content": "turn 1"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"content": "identical undeclared reply"}}) + "\n")
+
+idless_payload_t1 = {
+    "session_id": "sess_idless_1",
+    "transcript_path": idless_tscript_t1,
+}
+
+idless_tscript_t1_retry = os.path.join(idless_sess_dir, "t1_retry.jsonl")
+with open(idless_tscript_t1_retry, "w", encoding="utf-8") as f:
+    f.write(json.dumps({"type": "user", "message": {"content": "turn 1"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"content": "identical undeclared reply"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"content": "identical undeclared reply"}}) + "\n")
+
+idless_payload_t1_retry = {
+    "session_id": "sess_idless_1",
+    "transcript_path": idless_tscript_t1_retry,
+}
+
+idless_tscript_t2 = os.path.join(idless_sess_dir, "t2.jsonl")
+with open(idless_tscript_t2, "w", encoding="utf-8") as f:
+    f.write(json.dumps({"type": "user", "message": {"content": "turn 2"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"content": "identical undeclared reply"}}) + "\n")
+
+idless_payload_t2 = {
+    "session_id": "sess_idless_1",
+    "transcript_path": idless_tscript_t2,
+}
+
+if not run_direct_payload(idless_payload_t1, tmpdir=idless_sess_dir):
+    print("FAIL: id-less turn 1 did not warn")
+    failed += 1
+else:
+    print("PASS: id-less turn 1 warns")
+
+if run_direct_payload(idless_payload_t1_retry, tmpdir=idless_sess_dir):
+    print("FAIL: id-less turn 1 retry was not deduplicated")
+    failed += 1
+else:
+    print("PASS: id-less turn 1 retry is deduplicated")
+
+if not run_direct_payload(idless_payload_t2, tmpdir=idless_sess_dir):
+    print("FAIL: id-less turn 2 was silently suppressed by turn 1 sentinel")
+    failed += 1
+else:
+    print("PASS: id-less turn 2 warns")
+
+# Test: Mixed identified turn 1 followed by ID-less turn 2 with identical reply text
+mixed_sess_dir = tempfile.mkdtemp()
+mixed_tscript_t1 = os.path.join(mixed_sess_dir, "t1.jsonl")
+with open(mixed_tscript_t1, "w", encoding="utf-8") as f:
+    f.write(json.dumps({"type": "user", "message": {"content": "turn 1 prompt"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"id": "msg_identified_1", "content": "same missing declaration"}}) + "\n")
+
+mixed_payload_t1 = {
+    "session_id": "sess_mixed_1",
+    "transcript_path": mixed_tscript_t1,
+}
+mixed_payload_t1_retry = {
+    "session_id": "sess_mixed_1",
+    "transcript_path": mixed_tscript_t1,
+}
+
+mixed_tscript_t2 = os.path.join(mixed_sess_dir, "t2.jsonl")
+with open(mixed_tscript_t2, "w", encoding="utf-8") as f:
+    f.write(json.dumps({"type": "user", "message": {"content": "turn 1 prompt"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"id": "msg_identified_1", "content": "same missing declaration"}}) + "\n")
+    f.write(json.dumps({"type": "user", "message": {"content": "turn 2 prompt"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"content": "same missing declaration"}}) + "\n")
+
+mixed_payload_t2 = {
+    "session_id": "sess_mixed_1",
+    "transcript_path": mixed_tscript_t2,
+}
+
+if not run_direct_payload(mixed_payload_t1, tmpdir=mixed_sess_dir):
+    print("FAIL: mixed identified/ID-less turn 1 did not warn")
+    failed += 1
+else:
+    print("PASS: mixed identified/ID-less turn 1 warns")
+
+if run_direct_payload(mixed_payload_t1_retry, tmpdir=mixed_sess_dir):
+    print("FAIL: mixed identified/ID-less turn 1 retry was not deduplicated")
+    failed += 1
+else:
+    print("PASS: mixed identified/ID-less turn 1 retry is deduplicated")
+
+if not run_direct_payload(mixed_payload_t2, tmpdir=mixed_sess_dir):
+    print("FAIL: mixed identified/ID-less turn 2 was silently suppressed by turn 1 identifier leakage")
+    failed += 1
+else:
+    print("PASS: mixed identified/ID-less turn 2 warns")
+
+# Test: Retry fixture containing harness Stop-hook feedback record (Copilot review finding)
+harness_feedback_sess_dir = tempfile.mkdtemp()
+harness_feedback_tscript_t1 = os.path.join(harness_feedback_sess_dir, "t1.jsonl")
+with open(harness_feedback_tscript_t1, "w", encoding="utf-8") as f:
+    f.write(json.dumps({"type": "user", "message": {"content": "user prompt"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"content": "initial reply missing stopping point"}}) + "\n")
+
+harness_feedback_tscript_t1_retry = os.path.join(harness_feedback_sess_dir, "t1_retry.jsonl")
+with open(harness_feedback_tscript_t1_retry, "w", encoding="utf-8") as f:
+    f.write(json.dumps({"type": "user", "message": {"content": "user prompt"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"content": "initial reply missing stopping point"}}) + "\n")
+    f.write(json.dumps({
+        "type": "user",
+        "isMeta": True,
+        "content": "Stop hook blocked termination: State stopping point before ending the turn.",
+    }) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"content": "initial reply missing stopping point"}}) + "\n")
+
+harness_feedback_payload_t1 = {
+    "session_id": "sess_harness_feedback_1",
+    "transcript_path": harness_feedback_tscript_t1,
+}
+harness_feedback_payload_t1_retry = {
+    "session_id": "sess_harness_feedback_1",
+    "transcript_path": harness_feedback_tscript_t1_retry,
+}
+
+if not run_direct_payload(harness_feedback_payload_t1, tmpdir=harness_feedback_sess_dir):
+    print("FAIL: harness feedback turn 1 did not warn")
+    failed += 1
+else:
+    print("PASS: harness feedback turn 1 warns")
+
+if run_direct_payload(harness_feedback_payload_t1_retry, tmpdir=harness_feedback_sess_dir):
+    print("FAIL: harness feedback retry was not deduplicated (hook feedback altered turn_id)")
+    failed += 1
+else:
+    print("PASS: harness feedback retry is deduplicated across Stop hook feedback injection")
+
+harness_feedback_tscript_sdk = os.path.join(harness_feedback_sess_dir, "t_sdk.jsonl")
+with open(harness_feedback_tscript_sdk, "w", encoding="utf-8") as f:
+    f.write(json.dumps({"type": "user", "message": {"content": "user prompt"}}) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"content": "initial reply missing stopping point"}}) + "\n")
+    f.write(json.dumps({
+        "type": "user",
+        "isMeta": True,
+        "promptSource": "sdk",
+        "content": "Scheduled check-in continuation.",
+    }) + "\n")
+    f.write(json.dumps({"type": "assistant", "message": {"content": "initial reply missing stopping point"}}) + "\n")
+
+harness_feedback_payload_sdk = {
+    "session_id": "sess_harness_feedback_1",
+    "transcript_path": harness_feedback_tscript_sdk,
+}
+
+if not run_direct_payload(harness_feedback_payload_sdk, tmpdir=harness_feedback_sess_dir):
+    print("FAIL: scheduled sdk continuation was wrongly skipped as harness meta")
+    failed += 1
+else:
+    print("PASS: scheduled sdk continuation is recognized as a new turn")
+
+# Test: Interactive missing-declaration reply with CI=true or GITHUB_ACTIONS=true warns
+if not run_direct_payload({"reply": "No stopping point declaration here."}, env={"CI": "true"}):
+    print("FAIL: missing-declaration reply with CI=true did not warn")
+    failed += 1
+else:
+    print("PASS: missing-declaration reply with CI=true warns")
+
+if not run_direct_payload({"reply": "No stopping point declaration here."}, env={"GITHUB_ACTIONS": "true"}):
+    print("FAIL: missing-declaration reply with GITHUB_ACTIONS=true did not warn")
+    failed += 1
+else:
+    print("PASS: missing-declaration reply with GITHUB_ACTIONS=true warns")
+
+# Test: Whitespace preservation during chunk reconstruction (assistant branch)
+whitespace_assistant_transcript = [
+    json.dumps({
+        "type": "assistant",
+        "message": {
+            "id": "msg_ws",
+            "content": "**Stopping Point**: Clean stopping point reached --- session",
+        },
+    }),
+    json.dumps({
+        "type": "assistant",
+        "message": {
+            "id": "msg_ws",
+            "content": " ",
+        },
+    }),
+    json.dumps({
+        "type": "assistant",
+        "message": {
+            "id": "msg_ws",
+            "content": "done.",
+        },
+    }),
+]
+if run("", raw_lines=whitespace_assistant_transcript):
+    print("FAIL: assistant string chunks with whitespace-only chunk warned")
+    failed += 1
+else:
+    print("PASS: assistant string chunks with whitespace-only chunk passes")
+
+# Test: Whitespace preservation in MODEL/PLANNER_RESPONSE reconstruction
+whitespace_model_transcript = [
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "id": "model_ws",
+        "content": "**Stopping Point**: Clean stopping point reached --- session",
+    }),
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "id": "model_ws",
+        "content": " ",
+    }),
+    json.dumps({
+        "type": "PLANNER_RESPONSE",
+        "source": "MODEL",
+        "id": "model_ws",
+        "content": "done.",
+    }),
+]
+if run("", raw_lines=whitespace_model_transcript):
+    print("FAIL: MODEL string chunks with whitespace-only chunk warned")
+    failed += 1
+else:
+    print("PASS: MODEL string chunks with whitespace-only chunk passes")
 
 raise SystemExit(bool(failed))
 

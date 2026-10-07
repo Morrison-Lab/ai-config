@@ -1576,6 +1576,13 @@
             "timeout": 10,
             "script": "no-announced-start-without-starting.py",
             "why": "CLAUDE.md 'no empty promises' and the dont-stop-keep-working directive -- blocks a reply that ends by announcing work in the present progressive or immediate future without having begun it. Distinct from no-empty-promise.py, which asks whether a mechanism shipped; a turn that filed an issue and then closed on 'I'll start on it' satisfies that and still never starts."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/require-stopping-point.py\"'",
+            "timeout": 10,
+            "script": "require-stopping-point.py",
+            "why": "A stopping-point declaration is an explicit standing preference, not a best-effort recap (shared/workflow/flag-session-boundaries.md). Warns via systemMessage on any final reply that omits stating whether the session is done or not, including conversational question-answering replies (#4308); handles streamed chunk concatenation (#2500)."
           }
         ]
       }

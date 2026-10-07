@@ -1,5 +1,7 @@
 # File pre-existing violations of guidelines as issues
 
+This policy specializes the lab's general ["If you see something, say something" rule](report-mistakes-proactively.md)
+to pre-existing guideline violations and software maintenance drift.
 When you notice pre-existing violations of our guidelines during work in a repository,
 file them as issues in the owning repository's tracker rather than letting them pass unrecorded.
 

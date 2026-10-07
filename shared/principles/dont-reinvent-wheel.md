@@ -86,14 +86,11 @@ is the R-function special case of this principle.
 
 DRW violations may also arise post-hoc:
 when an internal tool was originally built, no external tool existed that fulfilled the need.
-Over time, new external tools or upstream packages become available that replicate what our internal tool does.
-If the external tool matches or exceeds our own tool's internal functionality,
-we can retire our internal tool to decrease our software maintenance burden.
-
-When you notice a post-hoc DRW violation in a repository,
-do not delete or replace the tool as an incidental change inside an unrelated feature or bug fix.
-Instead, file an issue in that repository's tracker detailing the external tool and proposing retirement of the internal tool,
-per [`file-pre-existing-violations`](../workflow/file-pre-existing-violations.md).
+Over time, new external tools or upstream packages evolve to replicate what our internal tool does.
+If the external tool matches or exceeds our internal tool's capabilities,
+retire the internal tool to decrease maintenance burden.
+File an issue proposing retirement rather than replacing it during an unrelated task;
+see [`file-pre-existing-violations`](../workflow/file-pre-existing-violations.md).
 
 ## A stale, un-migrated local copy is the least reliable place to fix a bug
 

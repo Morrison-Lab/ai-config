@@ -138,23 +138,4 @@ To avoid overflowing context windows with monolithic instructions:
   moving non-contiguous sections creates numbering gaps unless downstream headings and citations are renumbered
   or stub pointers are preserved in place.
 
----
-
-## 8. Pre-existing guideline violations and post-hoc DRW retirement
-
-- **Filing pre-existing violations:**
-  When agents or contributors notice pre-existing guideline violations in a repository
-  (not introduced by the current task),
-  they must file them as issues in the owning repository's tracker
-  rather than letting them pass unrecorded or expanding active branch scope.
-- **Post-hoc DRW violations:**
-  A tool or helper built in-house may be legitimate when written because no suitable external solution existed.
-  Over time, new external tools or upstream packages evolve that replicate or exceed its capabilities.
-  Once noticed, this becomes a post-hoc DRW violation:
-  the internal tool should be retired to reduce maintenance burden.
-  Filing an issue tracks the retirement and upstream migration
-  as a clean, scoped unit of work
-  ([ai-config#4349](https://github.com/Morrison-Lab/ai-config/issues/4349),
-  [`file-pre-existing-violations`](../shared/workflow/file-pre-existing-violations.md)).
-
 

@@ -371,16 +371,25 @@ def _fetch_review_threads_ccr(owner_repo: str, pr_number: int, token: str) -> Op
     ``GET /repos/{o}/{r}/pulls/{n}/ccr/review_threads`` as the replacement
     (ai-config#4220). Measured 2026-10-07, it answers a bare list of
     ``{"resolved", "outdated", "path", "line", "comment_ids"}`` objects, so
-    each is mapped onto the GraphQL node shape the payload carries.
+    each is mapped onto the fields of the GraphQL node shape the payload
+    carries. ``id`` is a surrogate (the comma-joined comment ids), not a
+    GraphQL thread node id; the fully-clean check only prints it.
+    (Measured on Morrison-Lab/rpt#192, one unresolved outdated thread, and
+    Morrison-Lab/rme#1221, ``[]`` for a PR with no inline comments.)
 
-    One unpaginated GET: the route is not known to honour ``page``, and
-    rest_get's short-page stop would loop forever on a route that ignores it
-    while returning 100 or more threads. Returns None, with a warning, when
-    the route is unavailable (a session outside that proxy) or answers
-    something other than a list, so the payload still omits
-    'review_threads' rather than reporting zero threads it never saw.
+    One GET asking for 100 threads: the route is not known to honour
+    ``page``, and rest_get's short-page stop would loop forever on a route
+    that ignores it. Because a cap could truncate silently, an answer of
+    100 or more threads, or one carrying a ``rel="next"`` Link header, is
+    refused rather than trusted. Returns None, with a warning, when the
+    route is unavailable (a session outside that proxy), answers something
+    other than a list of objects, or may be truncated, so the payload omits
+    'review_threads' rather than reporting threads it never saw as clean.
     """
-    url = f"https://api.github.com/repos/{owner_repo}/pulls/{pr_number}/ccr/review_threads"
+    url = (
+        f"https://api.github.com/repos/{owner_repo}/pulls/{pr_number}"
+        "/ccr/review_threads?per_page=100"
+    )
     req = urllib.request.Request(
         url,
         headers={
@@ -392,6 +401,7 @@ def _fetch_review_threads_ccr(owner_repo: str, pr_number: int, token: str) -> Op
     try:
         with urllib.request.urlopen(req) as resp:
             data = json.load(resp)
+            link = (getattr(resp, "headers", None) or {}).get("Link") or ""
     except Exception as exc:  # noqa: BLE001
         print(
             f"warning: CCR review_threads route failed ({exc}); "
@@ -403,6 +413,13 @@ def _fetch_review_threads_ccr(owner_repo: str, pr_number: int, token: str) -> Op
         print(
             f"warning: CCR review_threads route answered {type(data).__name__}, "
             "not a list of threads; review_threads will be omitted from payload",
+            file=sys.stderr,
+        )
+        return None
+    if len(data) >= 100 or 'rel="next"' in link:
+        print(
+            f"warning: CCR review_threads route returned {len(data)} threads and may be "
+            "truncated; review_threads will be omitted from payload",
             file=sys.stderr,
         )
         return None

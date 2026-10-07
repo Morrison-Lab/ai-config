@@ -254,14 +254,29 @@ A bare `$\exp$` (the function name, no argument) makes the macro swallow the clo
 MathJax renders that without complaint; lualatex fails with `Missing \right. inserted`.
 So an HTML render is no evidence that the PDF builds.
 
+Similarly, writing `\exp\paren{...}` or `\exp(...)` triggers delimiter failures in LaTeX:
+because `\exp` wraps its mandatory `#1` in `\cb{#1}`,
+passing `\paren` makes `\exp` take `\paren` as `#1`,
+leaving unbalanced delimiters in LuaLaTeX (`! Missing delimiter (. inserted)`).
+Writing `\exp(...)` makes `\exp` consume only the opening parenthesis `(` as `#1`,
+leaving the closing `)` unmatched.
+The required form is `\exp{...}` or `e^{...}`.
+
 Measured 2026-09-28 on `Morrison-Lab/pds`: Quarto Publish run 36516449603 failed on `$\exp$` in `_subfiles/_sec-distributions.qmd`.
 Fixed by Morrison-Lab/pds#34, which spelled out "the exponential function";
 the zero-argument `\expt` also works.
 Tracked in Morrison-Lab/pds#33.
+Recurred 2026-10-06 on `Morrison-Lab/mds#175`
+with `\exp\paren{-\frac{x^2}{2}}` and `\exp(x^8)`,
+breaking LuaLaTeX compilation with missing delimiter errors;
+fixed by changing to `\exp{-\frac{x^2}{2}}` and `\exp{x^8}`.
 
+- **Do:** write `\exp{...}` or `e^{...}` when applying the exponential function to an argument.
 - **Do:** name the function in prose, or use a zero-argument form (`\expt`), when no argument is meant.
 - **Do:** grep for bare uses, e.g. `grep -rnE '\\(exp|vec|v)([^a-zA-Z{]|$)' --include='*.qmd'`, and render the PDF target when touching math.
   The grep is a candidate finder: it also flags valid space-separated arguments (`\vec \beta`) and the definitions themselves, so read each hit.
+- **Don't:** write `\exp\paren{...}` or `\exp(...)` — `\exp` takes a mandatory `#1` wrapped in `\cb{#1}`.
+  Use `\exp{...}` or `e^{...}` instead.
 - **Don't:** write a bare `$\exp$` (or `\vec`, `\v`).
 - **Don't:** treat a clean HTML render as evidence the PDF builds.
 
@@ -270,7 +285,13 @@ Tracked in Morrison-Lab/pds#33.
 - **Undefined matrix and vector shorthands (`\mA`, `\vw`)**: while `macros.qmd` defines `\mX` (`\matr{X}`), `\mx`, `\vx` (`\vecf{x}`), `\va`, etc., it does **not** define arbitrary shorthands like `\mA` or `\vw`.
   Bare `\mA` or `\vw` are undefined and break LuaLaTeX during PDF compilation.
   Use `\matr{A}` for matrices and `\vec{w}` or `\vecf{w}` for vectors.
-- **Latin vector collision with `\vb`**: `macros.qmd` defines `\def\b{\beta}` and `\def\vb{\vec \b}`, which expands to Greek `\vec{\beta}` rather than Latin vector `b`.
+- **Undefined square bracket macro (`\bracket`)**: `macros.qmd` does **not** define `\bracket{...}`.
+  Using `\bracket{...}` (such as for definite integral evaluation limits)
+  fails in LaTeX as an undefined control sequence.
+  Use `\sb{...}` (square bracket) instead
+  (`\sb{...}` wraps in `\mathopen{}\left[...\right]\mathclose{}`).
+  ([`Morrison-Lab/mds#175`](https://github.com/Morrison-Lab/mds/pull/175), 2026-10-06.)
+- **Latin vector collision with `\vb`**: `macros.qmd` defines `\def\b{\beta}` and `\def\vb{\vec \b}`, which expands to Greek `\vec{\beta}` rather than Latin vector $b$.
   When denoting a Latin vector (such as an intercept or bias vector $b$), do not use `\vb`;
   use `\vec{b}` or `\vecf{b}`.
   ([`Morrison-Lab/mds#48`](https://github.com/Morrison-Lab/mds/pull/48), 2026-09-29.)
@@ -281,6 +302,11 @@ Tracked in Morrison-Lab/pds#33.
   render. Verify every command resolves (step 4).
 - ❌ Using bare `\mA` or `\vw` expecting them to expand to matrices or vectors --- they are undefined in `macros.qmd` and break LuaLaTeX during PDF compilation.
   Use `\matr{A}` and `\vec{w}` / `\vecf{w}` instead.
+- ❌ Using `\bracket{...}` for square brackets — `\bracket` is undefined in `macros.qmd`.
+  Use `\sb{...}` instead.
+- ❌ Writing `\exp\paren{...}` or `\exp(...)` — `\exp` wraps its mandatory `#1` in `\cb{#1}`;
+  passing `\paren` or `(...)` breaks delimiter balance in LuaLaTeX (`! Missing delimiter (. inserted)`).
+  Use `\exp{...}` or `e^{...}` instead.
 - ❌ Using `\vb` for Latin vector $b$ (e.g. bias or intercept) --- `macros.qmd` defines `\vb` as `\vec{\beta}` (Greek beta), colliding with Latin vector $b$.
   Use `\vec{b}` or `\vecf{b}` instead.
 - ❌ Running `git submodule update --remote` in a checkout that is running

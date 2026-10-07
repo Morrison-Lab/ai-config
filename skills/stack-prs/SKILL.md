@@ -22,6 +22,7 @@ does it directly when you already know you want to branch off another PR.
 
 - "stack this on #N", "stack-prs", "branch off that PR", "make this depend on
   PR #N".
+- Substantive modification following a refactor: always refactor before modifying substance ([refactor-before-modifying-substance](../../shared/principles/refactor-before-modifying-substance.md)), stacking the substantive PR on top of the behavior-preserving refactor PR so reviewers see what actually changes.
 - The decision question itself — "should I stack this?", "does this need to
   stack on #N?" — routes here too: the gate below is the answer.
 - New work may need another open PR's code, or might conflict with it

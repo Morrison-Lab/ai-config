@@ -31,6 +31,7 @@ Two changes are independent if:
 - They'd have different reviewers in an ideal world
 
 Examples:
+- Refactor + substantive modification (behavior change, bug fix, feature) → split: always refactor before modifying substance in a dedicated behavior-preserving PR, and stack the substantive change on top ([refactor-before-modifying-substance](../../shared/principles/refactor-before-modifying-substance.md), [`stack-prs`](../stack-prs/SKILL.md))
 - Bug fix + unrelated refactor → split
 - Feature + the test for that feature → keep together
 - CI template fix + documentation update for that fix → keep together

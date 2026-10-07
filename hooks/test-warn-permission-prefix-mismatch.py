@@ -63,7 +63,12 @@ def verdict(hook, case):
     hso = json.loads(proc.stdout).get("hookSpecificOutput") or {}
     if "permissionDecision" in hso:
         sys.exit("FATAL: warn-only hook emitted permissionDecision")
-    return "WARN" if hso.get("additionalContext") else "silent"
+    ctx = hso.get("additionalContext") or ""
+    if ctx and "starts with `" not in ctx:
+        sys.exit(f"FATAL: warning lacks the rule-prefix suggestion: {ctx!r}")
+    if ctx and "'&&'" in ctx:
+        sys.exit(f"FATAL: suggestion quotes a shell operator: {ctx!r}")
+    return "WARN" if ctx else "silent"
 
 
 # default (non-override) search path: user settings under HOME, project

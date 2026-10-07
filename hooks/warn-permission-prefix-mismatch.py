@@ -48,9 +48,10 @@ NOTE = (
     "start with the prefix of the allow rule `Bash({rule}:*)` in {src}, "
     "which the option-free form does match. Allow rules appear to match the "
     "literal command prefix, so this command may "
-    "prompt or be classifier-denied although the rule exists. Run it from "
-    "the repo's cwd as `{stripped}` (no `-C`, no `cd` chain) instead of "
-    "asking the user to add a rule."
+    "prompt or be classifier-denied although the rule exists. Drop the "
+    "global option so the command starts with `{rule}`, run from the repo's "
+    "cwd (only valid when the cwd is the repo the option pointed at), "
+    "instead of asking the user to add a rule."
 )
 
 
@@ -133,7 +134,7 @@ def find_mismatch(command):
     for prefix, src in rules:
         if matches(prefix, stripped):
             return {"orig": shlex.join(full[:len(assigns) + 1 + len(opts)]),
-                    "stripped": shlex.join(stripped), "rule": prefix, "src": src}
+                    "rule": prefix, "src": src}
     return None
 
 

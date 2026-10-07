@@ -57,6 +57,11 @@ An open issue or PR often contains requirements, allowlists, or prior user direc
 (User directive, 2026-08-23:
 "always yes".)
 
+(User directive, 2026-10-06, ai-config#4337:
+"you should have attached the macros repo without waiting for me to tell you to".
+A session loading `Morrison-Lab/macros` in `Morrison-Lab/lds` had found an upstream defect, written that filing it "would need add_repo", and waited.
+After attaching, it filed [macros#106](https://github.com/Morrison-Lab/macros/pull/106), [#107](https://github.com/Morrison-Lab/macros/issues/107) and [#108](https://github.com/Morrison-Lab/macros/issues/108) the same evening.)
+
 ## Strict Merge Control Policy --- Infrastructure PRs standing MWC grant
 
 (User directives, 2026-09-28:

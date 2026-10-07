@@ -407,6 +407,36 @@ def test_review_threads_handling():
         threads = build_pr_payload.fetch_review_threads("example-org/example-repo", 123, "tok")
         check("fetch_review_threads returns None on error", threads is None)
 
+    # 5. a refused GraphQL query falls back to the CCR route (ai-config#4220)
+    ccr_data = [
+        {"resolved": False, "outdated": True, "path": "NEWS.md", "line": None, "comment_ids": [41, 42]},
+        {"resolved": True, "outdated": False, "path": "R/x.R", "line": 7, "comment_ids": [43]},
+    ]
+    with patch.object(build_pr_payload, "_fetch_review_threads_graphql", return_value=None):
+        with patch("urllib.request.urlopen", return_value=FakeResp()) as opened:
+            with patch("json.load", return_value=ccr_data):
+                threads = build_pr_payload.fetch_review_threads("example-org/example-repo", 123, "tok")
+        called = opened.call_args[0][0].full_url
+    check("CCR fallback hits the ccr/review_threads route",
+          called.endswith("/repos/example-org/example-repo/pulls/123/ccr/review_threads"))
+    check("CCR fallback maps threads onto the GraphQL node shape", threads == [
+        {"id": "41,42", "isResolved": False, "isOutdated": True, "path": "NEWS.md", "line": None},
+        {"id": "43", "isResolved": True, "isOutdated": False, "path": "R/x.R", "line": 7},
+    ])
+
+    # 6. GraphQL success never consults the CCR route
+    with patch.object(build_pr_payload, "_fetch_review_threads_graphql", return_value=sample_threads):
+        with patch.object(build_pr_payload, "_fetch_review_threads_ccr") as ccr:
+            threads = build_pr_payload.fetch_review_threads("example-org/example-repo", 123, "tok")
+    check("GraphQL success skips the CCR route", threads == sample_threads and not ccr.called)
+
+    # 7. a CCR answer that is not a list is refused, not read as zero threads
+    with patch.object(build_pr_payload, "_fetch_review_threads_graphql", return_value=None):
+        with patch("urllib.request.urlopen", return_value=FakeResp()):
+            with patch("json.load", return_value={"message": "not available"}):
+                threads = build_pr_payload.fetch_review_threads("example-org/example-repo", 123, "tok")
+    check("non-list CCR answer yields None", threads is None)
+
 
 def test_review_comments_handling():
     # 1. review_comments is absent when not gathered

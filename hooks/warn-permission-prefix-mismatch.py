@@ -138,8 +138,9 @@ def find_mismatch(command):
         return None
     for prefix, src in rules:
         if matches(prefix, stripped):
-            only_c = len(opts) % 2 == 0 and all(
-                opts[i] == "-C" for i in range(0, len(opts), 2))
+            # exactly one `-C <dir>`: repeated -C composes paths, so there
+            # is no single directory to run from
+            only_c = len(opts) == 2 and opts[0] == "-C"
             remedy = REMEDY_C if only_c else REMEDY_OTHER
             return {"orig": shlex.join(full[:len(assigns) + 1 + len(opts)]),
                     "rule": prefix, "src": src, "only_c": only_c,

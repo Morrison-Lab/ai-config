@@ -30,6 +30,7 @@ WARN = [
     ("W7", 'Q="x y" git -C /r push', RULES, "quoted assignment value"),
     ("W8", P + "git -C /r pull", RULES, "space-star rule form"),
     ("W6", P + "git -C /r push && echo done", RULES, "chained after"),
+    ("W9", P + "git -C /a -C b push", RULES, "repeated -C composes paths"),
 ]
 SILENT = [
     ("S1", P + "git push -u origin b", RULES, "already the rule form"),
@@ -147,10 +148,15 @@ MUTATIONS = {
         {"D1"}),
     "M11_remedy_scoped_to_dash_c": (
         [("            remedy = REMEDY_C if only_c else REMEDY_OTHER",
-          "            remedy = REMEDY_C")], {"W2", "W3", "W4"}),
+          "            remedy = REMEDY_C")], {"W2", "W3", "W4", "W9"}),
     "M12_dash_c_gets_rewrite": (
         [("            remedy = REMEDY_C if only_c else REMEDY_OTHER",
           "            remedy = REMEDY_OTHER")], {"W1", "W6", "W7", "W8"}),
+    "M13_single_dash_c_only": (
+        [('only_c = len(opts) == 2 and opts[0] == "-C"',
+          'only_c = len(opts) % 2 == 0 and all('
+          'opts[i] == "-C" for i in range(0, len(opts), 2))')],
+        {"W9"}),
     "M7_project_settings_glob": (
         [('"settings*.json"))', '"nonexistent.json"))')], {"D2"}),
 }

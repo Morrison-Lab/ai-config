@@ -20,6 +20,10 @@ the count and the check that settles it: `git fetch`, then
 `git ls-tree -r --name-only origin/<branch> -- <paths>` or
 `git cat-file -e origin/<branch>:<path>`.
 
+Also reads `--porcelain=v2 -b` (`# branch.ab +0 -N`, `? path`). Limit: the
+behind count comes from the local remote-tracking ref, so a checkout that
+has not fetched recently reports up to date and stays silent.
+
 WARNS, never blocks: PostToolUse runs after the command, and the files may
 well be new. It only ever adds `additionalContext`. Fails OPEN (exit 0, no
 output) on any parse trouble, a non-Bash tool, a command that is not a
@@ -27,12 +31,16 @@ output) on any parse trouble, a non-Bash tool, a command that is not a
 """
 import json
 import re
+import shlex
 import sys
 
 MAX_PATHS = 10
 
 # `git status`, tolerating global options before the subcommand (`git -C d status`).
-RX_GIT_STATUS = re.compile(r"\bgit\b[^|;&\n]*?\bstatus\b")
+# `status` must be the subcommand: only option tokens may sit between.
+RX_GIT_STATUS = re.compile(
+    r"\bgit(?:\s+(?:-[Cc]\s+\S+|--?[A-Za-z][^\s]*))*\s+status\b"
+)
 
 # `-sb` / `--porcelain -b` header: `## main...origin/main [behind 23]`,
 # `## main...origin/main [ahead 2, behind 23]`. Plain `ahead` has no "behind".
@@ -50,9 +58,12 @@ RX_LONG_DIVERGED = re.compile(
     r"Your branch and '(?P<up>[^']+)' have diverged,\s+and have \d+ and "
     r"(?P<n>\d+) different commits? each"
 )
-RX_LONG_LOCAL = re.compile(r"^On branch (?P<local>\S+)", re.M)
+# `--porcelain=v2 -b`: `# branch.ab +0 -23`, `# branch.upstream origin/main`.
+RX_V2_AB = re.compile(r"^# branch\.ab \+\d+ -(?P<n>\d+)$", re.M)
+RX_V2_UP = re.compile(r"^# branch\.upstream (?P<up>\S+)$", re.M)
 
-RX_SHORT_UNTRACKED = re.compile(r"^\?\? (?P<path>.+)$", re.M)
+# `?? path` (short/porcelain v1) and `? path` (porcelain v2).
+RX_SHORT_UNTRACKED = re.compile(r"^\?\??  ?(?P<path>.+)$", re.M)
 RX_LONG_UNTRACKED_HEAD = re.compile(r"^Untracked files:\s*$", re.M)
 
 
@@ -65,6 +76,10 @@ def behind_info(text):
         m = rx.search(text)
         if m:
             return int(m.group("n")), m.group("up")
+    m = RX_V2_AB.search(text)
+    if m and int(m.group("n")) > 0:
+        up = RX_V2_UP.search(text)
+        return int(m.group("n")), up.group("up") if up else None
     return None
 
 
@@ -96,10 +111,17 @@ def stdout_of(payload):
     return ""
 
 
+def unquote_path(path):
+    """Strip git's plain double quotes (a name with a space); keep C-escapes."""
+    if len(path) > 1 and path[0] == path[-1] == '"' and "\\" not in path:
+        return path[1:-1]
+    return path
+
+
 def build_message(count, upstream, paths):
     ref = upstream or "origin/<branch>"
     shown = paths[:MAX_PATHS]
-    listed = " ".join(shown)
+    listed = " ".join(shlex.quote(unquote_path(p)) for p in shown)
     more = f" (and {len(paths) - len(shown)} more)" if len(paths) > len(shown) else ""
     plural = "commit" if count == 1 else "commits"
     return (
@@ -109,7 +131,10 @@ def build_message(count, upstream, paths):
         "calling them new or adding them, run `git fetch`, then "
         f"`git ls-tree -r --name-only {ref} -- {listed}` (or "
         f"`git cat-file -e {ref}:<path>` per path). Only a path absent from "
-        "that listing is new."
+        "that listing is new. Status prints paths relative to the current "
+        "directory, so run the check from there or from the repository root "
+        "with root-relative paths. The behind count is only as fresh as the "
+        "last fetch."
     )
 
 

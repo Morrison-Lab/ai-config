@@ -68,7 +68,24 @@ LONG_AHEAD_ONLY = (
     "Untracked files:\n\tbooks/mcs.pdf\n\n"
 )
 IGNORED_ONLY = "## main...origin/main [behind 23]\n!! build/\n"
-FILE_QUOTING_OUTPUT = SB_BEHIND  # text a non-git command might print
+V2_BEHIND = (
+    "# branch.oid abc\n# branch.head main\n# branch.upstream origin/main\n"
+    "# branch.ab +0 -3\n? books/mcs.pdf\n"
+)
+V2_AHEAD_ONLY = (
+    "# branch.oid abc\n# branch.head main\n# branch.upstream origin/main\n"
+    "# branch.ab +2 -0\n? books/mcs.pdf\n"
+)
+SB_MANY = "## main...origin/main [behind 4]\n" + "".join(
+    f"?? f{i}.txt\n" for i in range(13))
+LONG_BEHIND_TWO_SECTIONS = (
+    "On branch main\nYour branch is behind 'origin/main' by 2 commits, and "
+    "can be fast-forwarded.\n\nChanges not staged for commit:\n"
+    "\tmodified:   README.md\n\nUntracked files:\n"
+    '  (use "git add <file>..." to include in what will be committed)\n'
+    "\tnew.pdf\n\n"
+)
+FILE_QUOTING_OUTPUT = SB_BEHIND # text a non-git command might print
 
 
 def payload(command, stdout, tool="Bash", response=None):
@@ -116,6 +133,18 @@ CASES = {
             "non-Bash tool"),
     "S11": (payload("git status -sb", "", response="garbage"), False,
             "tool_response that is not a dict: fail open"),
+    "W7": (payload("git status --porcelain=v2 -b", V2_BEHIND), True,
+           "porcelain v2: branch.ab with behind > 0 and a '? path' entry"),
+    "W8": (payload("git status -sb", SB_MANY), True,
+           "more than MAX_PATHS untracked paths are truncated, not dropped"),
+    "W9": (payload("git status", LONG_BEHIND_TWO_SECTIONS), True,
+           "long form: untracked section after a blank line is still read"),
+    "S14": (payload("git status --porcelain=v2 -b", V2_AHEAD_ONLY), False,
+            "porcelain v2: behind count 0"),
+    "S15": (payload("git log --grep status", SB_BEHIND), False,
+            "'status' is an argument of another git subcommand"),
+    "S16": (payload("git diff status.txt", SB_BEHIND), False,
+            "'status' is a filename of another git subcommand"),
     "S13": ({"tool_name": "Bash", "tool_input": "git status -sb",
              "tool_response": {"stdout": SB_BEHIND}}, False,
             "tool_input of the wrong type raises inside the hook: fail open"),
@@ -165,6 +194,36 @@ ok = "1 commit behind" in msg1
 wrong += not ok
 print(f"  {'ok  ' if ok else 'WRONG'} singular wording: 1 commit behind")
 
+def message_for(command, stdout):
+    out = run(HOOK, json.dumps(payload(command, stdout))).stdout
+    return json.loads(out)["hookSpecificOutput"]["additionalContext"]
+
+
+for label, msg_text, needle in (
+    ("truncation names the remainder",
+     message_for("git status -sb", SB_MANY), "(and 3 more)"),
+    ("truncation drops the 11th path",
+     message_for("git status -sb", SB_MANY), "f10.txt"),
+    ("upstream-less header falls back to origin/<branch>",
+     message_for("git status -sb", "## main [behind 3]\n?? a.txt\n"),
+     "behind origin/<branch>"),
+    ("quoted name is unquoted then shell-quoted",
+     message_for("git status -sb",
+                 '## main...origin/main [behind 3]\n?? "my file.pdf"\n'),
+     "-- 'my file.pdf'"),
+    ("v2 upstream is used as the ref",
+     message_for("git status --porcelain=v2 -b", V2_BEHIND),
+     "origin/main"),
+    ("freshness limit is stated",
+     message_for("git status -sb", SB_BEHIND),
+     "only as fresh as the last fetch"),
+):
+    present = needle in msg_text
+    if label == "truncation drops the 11th path":
+        present = not present
+    wrong += not present
+    print(f"  {'ok  ' if present else 'WRONG'} message: {label}")
+
 # --- fail-open on malformed input --------------------------------------------
 for label, text in (("empty stdin", ""), ("non-JSON stdin", "not json"),
                     ("JSON list", "[]")):
@@ -183,13 +242,13 @@ MUTATIONS = {
         [('    m = RX_SHORT_BEHIND.search(text)\n    if m:\n'
           '        return int(m.group("n")), m.group("up")',
           "    pass")],
-        {"W1", "W3", "W4", "W6"},
+        {"W1", "W3", "W4", "W6", "W8"},
     ),
     "M2_long_behind": (
         "long-form 'Your branch is behind' is recognised",
         [("    for rx in (RX_LONG_BEHIND, RX_LONG_DIVERGED):",
           "    for rx in (RX_LONG_DIVERGED,):")],
-        {"W2"},
+        {"W2", "W9"},
     ),
     "M3_diverged": (
         "long-form diverged output reports its behind half",
@@ -205,13 +264,13 @@ MUTATIONS = {
     "M5_require_behind": (
         "untracked alone does not warn: a behind signal is required",
         [("        if info is None:\n            return 0\n", "        if info is None:\n            info = (0, None)\n")],
-        {"S1", "S3", "S4", "S6"},
+        {"S1", "S3", "S4", "S6", "S14"},
     ),
     "M6_git_status_gate": (
         "the command must be a `git ... status`",
         [("        if not RX_GIT_STATUS.search(command):\n            return 0\n",
           "")],
-        {"S7", "S12"},
+        {"S7", "S12", "S15", "S16"},
     ),
     "M7_bash_gate": (
         "only the Bash tool is inspected",
@@ -223,7 +282,24 @@ MUTATIONS = {
         "long-form 'Untracked files:' section is parsed",
         [("    head = RX_LONG_UNTRACKED_HEAD.search(text)\n    if head:",
           "    head = None\n    if head:")],
-        {"W2", "W5"},
+        {"W2", "W5", "W9"},
+    ),
+    "M10_v2_behind": (
+        "porcelain v2 branch.ab is read",
+        [("    m = RX_V2_AB.search(text)\n    if m and int(m.group(\"n\")) > 0:",
+          "    m = None\n    if m and int(m.group(\"n\")) > 0:")],
+        {"W7"},
+    ),
+    "M11_v2_zero": (
+        "porcelain v2 with zero behind does not warn",
+        [("    if m and int(m.group(\"n\")) > 0:", "    if m:")],
+        {"S14"},
+    ),
+    "M12_subcommand_only": (
+        "`status` must be the git subcommand, not any later word",
+        [('r"\\bgit(?:\\s+(?:-[Cc]\\s+\\S+|--?[A-Za-z][^\\s]*))*\\s+status\\b"',
+          'r"\\bgit\\b[^|;&\\n]*?\\bstatus\\b"')],
+        {"S15", "S16"},
     ),
     "M9_fail_open": (
         "any exception exits 0 silently",

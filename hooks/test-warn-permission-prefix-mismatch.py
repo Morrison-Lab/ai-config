@@ -77,9 +77,9 @@ HOME = os.path.join(TMP, "home")
 PROJ = os.path.join(TMP, "proj")
 os.makedirs(os.path.join(HOME, ".claude"))
 os.makedirs(os.path.join(PROJ, ".claude"))
-with open(os.path.join(HOME, ".claude", "settings.local.json"), "w") as fh:
+with open(os.path.join(HOME, ".claude", "settings.local.json"), "w", encoding="utf-8") as fh:
     json.dump({"permissions": {"allow": ["Bash(FOO=1 git push:*)"]}}, fh)
-with open(os.path.join(PROJ, ".claude", "settings.team.json"), "w") as fh:
+with open(os.path.join(PROJ, ".claude", "settings.team.json"), "w", encoding="utf-8") as fh:
     json.dump({"permissions": {"allow": ["Bash(BAR=1 git push:*)"]}}, fh)
 
 
@@ -87,6 +87,7 @@ def default_verdict(hook, cmd):
     env = {k: v for k, v in os.environ.items()
            if k != "WARN_PREFIX_SETTINGS_FILES"}
     env["HOME"] = HOME
+    env["USERPROFILE"] = HOME
     proc = subprocess.run(
         [sys.executable, hook], text=True, capture_output=True, cwd=PROJ,
         env=env, input=json.dumps(

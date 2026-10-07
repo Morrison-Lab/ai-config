@@ -391,17 +391,12 @@ The grant covers installing and updating software: R, R packages (including thro
 Do it whenever it helps, without asking (owner directive, 2026-10-02).
 A resulting lockfile change (`renv.lock`, `environment.yml`) is a repo change and goes through the normal PR flow.
 
-The grant also covers attaching a repository to the session (`add_repo` in a cloud session) when the work needs it, since attaching only widens what the session can read.
-What you then post there is a separate decision:
-"Gate external repository communication on membership" above still applies to every issue, PR, and comment.
-In a repository where the gate's own check passes
-(for that specific repository, since administering its organization is not enough),
-file the issue or open the PR without offering first, and link it back.
-Anywhere else, follow [`upstream-issues`](shared/workflow/upstream-issues.md) and draft for approval.
+It covers attaching a repository the work needs (`add_repo`).
+Posting there still passes the membership gate above;
+where it does, file or fix without offering first.
 
-- **Do:** attach the repository as soon as the work needs it,
-  and file or fix there once the membership gate passes.
-- **Don't:** write "would need `add_repo`" or offer to attach it, and then wait (ai-config#4337).
+- **Do:** attach the repository as soon as the work needs it.
+- **Don't:** write "would need `add_repo`" and wait (ai-config#4337).
 
 ## Strict Merge Control Policy
 

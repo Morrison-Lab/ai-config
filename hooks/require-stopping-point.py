@@ -98,9 +98,10 @@ def _reply_payload(block):
     return txt if isinstance(txt, str) else ""
 
 
-def has_stopping_point_declaration(text: str) -> bool:
+def _scan_stopping_point_candidates(text: str):
+    """Yield combined candidate text blocks around stopping point / status line anchors."""
     if not text:
-        return False
+        return
     if strip_code is not None:
         stripped = strip_code(text, swallow_unclosed=False)
     elif strip_fences is not None:
@@ -121,47 +122,36 @@ def has_stopping_point_declaration(text: str) -> bool:
                 if RX_SECTION_BREAK.match(nxt) and not RX_LINE.search(nxt):
                     break
                 combined_parts.append(nxt)
-            combined = " ".join(combined_parts)
-            if RX_SESSION_STATUS.search(combined):
-                return True
+            yield " ".join(combined_parts)
+
+
+def has_stopping_point_declaration(text: str) -> bool:
+    for candidate in _scan_stopping_point_candidates(text):
+        if RX_SESSION_STATUS.search(candidate):
+            return True
     return False
 
 
 def asserts_session_done(text: str) -> bool:
     """Return True if text asserts that the session is done/finished/complete, rather than not done."""
-    if not text:
-        return False
-    if strip_code is not None:
-        stripped = strip_code(text, swallow_unclosed=False)
-    elif strip_fences is not None:
-        stripped = strip_fences(text, swallow_unclosed=False)
-    else:
-        stripped = text
-    lines = stripped.splitlines()
-    for i, line in enumerate(lines):
-        if RX_INDENTED_CODE.match(line):
-            continue
-        line_no_inline = INLINE_CODE_RX.sub("", line)
-        if RX_LINE.search(line_no_inline):
-            combined_parts = [line_no_inline]
-            for j in range(i + 1, min(len(lines), i + 6)):
-                nxt = INLINE_CODE_RX.sub("", lines[j]).strip()
-                if not nxt:
-                    continue
-                if RX_SECTION_BREAK.match(nxt) and not RX_LINE.search(nxt):
-                    break
-                combined_parts.append(nxt)
-            combined = " ".join(combined_parts)
-            if RX_SESSION_DONE.search(combined) and not RX_SESSION_NOT_DONE.search(combined):
-                return True
+    for candidate in _scan_stopping_point_candidates(text):
+        if RX_SESSION_DONE.search(candidate) and not RX_SESSION_NOT_DONE.search(candidate):
+            return True
     return False
 
 
 def check_session_done_disqualification(text: str, cwd: str = "") -> str:
-    """Return a reason string if the text asserts 'session is done' but repo state disqualifies it.
+    """Return a reason string if text asserts 'session is done' but local git state disqualifies it.
 
-    Per #4328: never say a session is done when there are uncommitted,
-    unpushed, or un-PRed changes, or open PRs authored by that session.
+    Checks the local repository conditions of #4328 (uncommitted changes or unpushed
+    commits). Conditions requiring forge access (un-PRed branches or open session
+    PRs) are enforced via reviewer and workflow policies rather than local git hooks.
+
+    Without a `cwd` in the hook payload, repository state is unknowable (falling back
+    to os.getcwd() would inspect the hook process's parent directory, which falsely
+    couples unrelated test runners or daemon processes to whatever working directory
+    launched them). When `cwd` is absent or invalid, the check safely returns "" and
+    falls back to the transcript-only stopping point declaration check.
     """
     if not text or not cwd or not os.path.isdir(cwd):
         return ""
@@ -176,7 +166,7 @@ def check_session_done_disqualification(text: str, cwd: str = "") -> str:
             cwd=cwd,
             capture_output=True,
             text=True,
-            timeout=2,
+            timeout=10,
         )
         if res.returncode == 0 and res.stdout.strip():
             return "uncommitted changes in working tree"
@@ -190,7 +180,7 @@ def check_session_done_disqualification(text: str, cwd: str = "") -> str:
             cwd=cwd,
             capture_output=True,
             text=True,
-            timeout=2,
+            timeout=10,
         )
         if res.returncode == 0:
             count = int(res.stdout.strip() or "0")
@@ -203,7 +193,7 @@ def check_session_done_disqualification(text: str, cwd: str = "") -> str:
                     cwd=cwd,
                     capture_output=True,
                     text=True,
-                    timeout=2,
+                    timeout=10,
                 )
                 if base_res.returncode == 0:
                     count = int(base_res.stdout.strip() or "0")

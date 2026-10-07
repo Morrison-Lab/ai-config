@@ -8,8 +8,8 @@ The last message you post before stopping MUST explicitly state whether or not t
 Whenever ending a session, completing a turn, or wrapping up work (whether finishing a single task, a multi-issue backlog loop like `gii`/`gia`, a PR stack sweep, or an automated session wrap-up like `mwc`/`wrap-up`), ALWAYS include an explicit `**Stopping Point**` declaration that says whether the session is done or not.
 When reporting stopping point status:
 - Explicitly state whether the session is done or not.
-  Never say a session is done when there are uncommitted, unpushed, or un-PRed changes,
-  or open PRs authored by that session ---
+  Never say a session is done while any disqualifying condition applies
+  (see four-condition enumeration below) ---
   even after delivering completed implementation work (opening the PR),
   work remains to monitor CI and drive the review to clean or merge.
 - Include running UMS (or confirming no new learnings accumulated since the last pass).
@@ -112,7 +112,9 @@ The remedy converts it rather than excusing it: file it or commit it, and it bec
 - **Don't:** declare a clean stopping point in a turn that also puts a question, offer, or blocker to the user, whether in a `QUESTION`, `OFFER`, or `BLOCKER` box or in plain prose.
 - **Don't:** count exploration, diagnosis, or an uncommitted local change as a completion.
 - **Don't:** end a turn without declaring whether the session is done or ongoing.
-- **Don't:** declare a clean completed stopping point or report that the session is done when there are uncommitted, unpushed, or un-PRed changes, or open PRs authored by that session.
+- **Don't:** declare a clean completed stopping point or report that the session is done
+  while any disqualifying condition applies
+  (uncommitted, unpushed, un-PRed, or open session PRs).
 - **Do:** include the explicit stopping-point and session-done declaration on conversational and question-answering replies concluding a turn.
 - **Don't:** substitute user-workload phrasing like "Nothing is left for you to do" for an explicit declaration of whether the session is done.
 

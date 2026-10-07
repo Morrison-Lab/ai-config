@@ -1359,5 +1359,29 @@ if run_direct_payload(payload_unpushed_not_done):
 else:
     print("PASS: not-done declaration over unpushed commits passes (#4328)")
 
+# Direct tests for cwd absent: safely returns "" rather than inspecting unrelated working tree
+disq = subject.check_session_done_disqualification(
+    "**Stopping Point**: Clean stopping point reached --- session done; UMS executed; no follow-up items pending.",
+    cwd="",
+)
+if disq != "":
+    print(f"FAIL: check_session_done_disqualification without cwd should return empty string, got {disq!r}")
+    failed += 1
+else:
+    print("PASS: check_session_done_disqualification safely returns empty string when cwd is empty")
+
+# Direct tests for asserts_session_done and scan helper
+if not subject.asserts_session_done("**Stopping Point**: Clean stopping point reached --- session done; UMS executed."):
+    print("FAIL: asserts_session_done returned False for session done")
+    failed += 1
+else:
+    print("PASS: asserts_session_done recognizes session done")
+
+if subject.asserts_session_done("**Stopping Point**: Not a clean stopping point / work remains queued: session not done; details"):
+    print("FAIL: asserts_session_done returned True for session not done")
+    failed += 1
+else:
+    print("PASS: asserts_session_done correctly rejects session not done")
+
 raise SystemExit(bool(failed))
 

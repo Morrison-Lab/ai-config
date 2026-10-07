@@ -224,9 +224,9 @@
   Whenever ending a session, completing a turn, or wrapping up work (whether finishing a single task, a multi-issue backlog loop like `gii`/`gia`, a PR stack sweep, or an automated session wrap-up like `mwc`/`wrap-up`), ALWAYS include an explicit `**Stopping Point**` declaration that says whether the session is done or not.
   Explicitly say whether the session is done or not when reporting stopping point status (e.g. `**Stopping Point**: Clean stopping point reached --- session done; UMS executed; no follow-up items pending` or `**Stopping Point**: Not a clean stopping point / work remains queued: session not done; ...`).
   Include confirming UMS pass (or no new learnings accumulated) and that any follow-up items noticed during the turn or task have been filed.
-  Never finish or stop without stating whether or not a clean stopping point has been reached and whether the session is done.
   If you opened PRs and haven't driven them to clean (and merged them if `mwc` is active), it is NOT a clean stopping point --- explicitly state that the PR remains in flight and unmerged.
-  (User corrections / directives, 2026-08-17, 2026-08-18, 2026-08-30, 2026-09-29 / Issue #4128.)
+  A session is NOT done while any PR it opened or pushed to remains open (unmerged and unclosed) --- even after completing the delivery cycle of committing, reviewing, pushing, and opening the PR, the session remains active and not done (`Session Done: No`) until the PR is merged or closed.
+  (User corrections / directives, 2026-08-17, 2026-08-18, 2026-08-30, 2026-09-29 / Issue #4128, 2026-10-06.)
 
 - **AI Capability & Memory Changes (`cai` / `ca`)**: Whenever a session creates or updates AI capabilities, memories, or skill definitions (`cai`, `ca`, `ums`), immediately branch off `main` in `Morrison-Lab/ai-config` (or the working repo), commit, push to origin, open a PR, request review, and drive to clean (or merge under `mwc`). Never leave `cai` or memory edits sitting uncommitted in a local working directory or wait for the user to prompt for a push. (User correction, 2026-08-17.)
 - Keep PRs focused on a single concern:

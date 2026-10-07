@@ -36,6 +36,7 @@ These instructions define standardized operating rules for Antigravity operating
 16. **Deliver completed implementation work:** When asked to implement, edit, or write up a change on a feature branch, do not stop at an uncommitted or unpushed worktree.
     Complete the delivery cycle: commit scoped changes, run adversarial self-review to a clean verdict, push the branch, and open or update its Pull Request automatically without waiting for the user to ask.
 17. **Say whether the session is done when reporting stopping point status:** When ending a turn and reporting stopping point status, explicitly state whether the session is done or not, including running UMS (or confirming no new learnings accumulated) and filing noticed follow-up items.
+    A session is NOT done while any pull request opened or pushed to by the session remains open.
 18. **Proactively suggest better alternatives:** If there's another way to accomplish the same goal more simply, cleanly, or reliably, proactively suggest and recommend that alternative rather than blindly implementing a proposed mechanism.
 19. **Use real-world examples for general practice:** When we do or see something that would be a good example for general practice, actively capture and incorporate it as a concrete before-and-after example in shared documentation.
 20. **Search tracker and AGENTS.md before building or denying a policy:** Search `AGENTS.md`, `CLAUDE.md`, `memories/`, `shared/`, and open issues before answering "no" to whether a policy exists or implementing a capability request.
@@ -45,6 +46,7 @@ These instructions define standardized operating rules for Antigravity operating
 - **Autonomous Delivery Cycle on Feature Branches:** When working on a task in a branch or worktree, complete the full delivery pipeline (implement, verify/render, adversarial review via subagent, push, and open PR).
   Do not stop after verifying local edits to ask or wait for the user to prompt "pr?";
   proceed with pushing and opening the PR immediately under the standing "Default to action without asking" grant.
+  Opening the PR does not conclude the session: the session is NOT done while its PR remains open, and must continue to monitor CI and drive reviews.
 - **Reactive Wakeup vs Background Task Polling:** In Antigravity, background commands, subagents, and schedules resume execution reactively via incoming messages (`MESSAGE_PRIORITY_HIGH`).
   Do NOT poll `manage_task(Action='status')` in a loop.
   End the tool turn and let the system wake up when ready.

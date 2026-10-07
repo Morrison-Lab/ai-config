@@ -8,11 +8,15 @@ The last message you post before stopping MUST explicitly state whether or not t
 Whenever ending a session, completing a turn, or wrapping up work (whether finishing a single task, a multi-issue backlog loop like `gii`/`gia`, a PR stack sweep, or an automated session wrap-up like `mwc`/`wrap-up`), ALWAYS include an explicit `**Stopping Point**` declaration that says whether the session is done or not.
 When reporting stopping point status:
 - Explicitly state whether the session is done or not.
-  A session is NOT done while any pull request opened or pushed to by this session remains open (unmerged and unclosed) --- even after delivering completed implementation work (opening the PR), work remains to monitor CI and drive the review to clean or merge.
+  Never say a session is done while any disqualifying condition applies
+  (see four-condition enumeration below) ---
+  even after delivering completed implementation work (opening the PR),
+  work remains to monitor CI and drive the review to clean or merge.
 - Include running UMS (or confirming no new learnings accumulated since the last pass).
 - Confirm that any follow-up items noticed during the turn or task have been filed.
 Never leave the user guessing whether additional tasks remain queued or if a clean stopping point has been reached.
-(User corrections / directives, 2026-08-17, 2026-08-18, 2026-09-29, 2026-10-06.)
+(User corrections / directives, 2026-08-17, 2026-08-18, 2026-09-29, 2026-10-06;
+[#4328](https://github.com/Morrison-Lab/ai-config/issues/4328).)
 
 **A conversational question-answering reply concluding a turn is a stopping point.**
 When answering a question at the end of a session or turn (e.g. explaining a diagnosis, answering "why not?", or clarifying why a branch was deleted), that reply is the stopping point of the turn.
@@ -108,13 +112,25 @@ The remedy converts it rather than excusing it: file it or commit it, and it bec
 - **Don't:** declare a clean stopping point in a turn that also puts a question, offer, or blocker to the user, whether in a `QUESTION`, `OFFER`, or `BLOCKER` box or in plain prose.
 - **Don't:** count exploration, diagnosis, or an uncommitted local change as a completion.
 - **Don't:** end a turn without declaring whether the session is done or ongoing.
-- **Don't:** declare a clean completed stopping point or report that the session is done while any pull request opened or pushed to by this session remains open (unmerged and unclosed).
+- **Don't:** declare a clean completed stopping point or report that the session is done
+  while any disqualifying condition applies
+  (uncommitted, unpushed, un-PRed, or open session PRs).
 - **Do:** include the explicit stopping-point and session-done declaration on conversational and question-answering replies concluding a turn.
 - **Don't:** substitute user-workload phrasing like "Nothing is left for you to do" for an explicit declaration of whether the session is done.
 
 (Directive from the user, 2026-08-19:
 "cai: that wasn't a real stopping point; you haven't finished anything".
 See [`flag-session-boundaries.cases.md`](flag-session-boundaries.cases.md), "A clean declaration over a session that committed nothing".)
+
+**Never say a session is done when there are uncommitted, unpushed, or un-PRed changes, or open PRs authored by that session.**
+A declaration that a session is done means no further action is owed by or in-flight for this session.
+Four conditions strictly disqualify declaring that the session is done:
+1. **Uncommitted changes:** the git working tree or index has modified, staged, or untracked changes (`git status --porcelain` is not empty).
+2. **Unpushed changes:** commits exist locally that have not been pushed to the remote tracking branch (`git log @{u}..HEAD` or `git status` shows unpushed commits).
+3. **Un-PRed changes:** a feature branch has been pushed or worked on without opening a pull request to deliver the change.
+4. **Open PRs authored by that session:** any PR opened or pushed to by this session remains open (unmerged and unclosed).
+Even after delivering completed implementation work (opening the PR), work remains to monitor CI, run automated reviews, and drive the review to clean or merge.
+(User directive, 2026-10-06, [#4328](https://github.com/Morrison-Lab/ai-config/issues/4328).)
 
 **That unmerged-PR clause in the disqualifier list above is a bright line, not a judgment call, and it was narrowed deliberately.**
 It used to read "a PR I'm actively babysitting", which invites the question of whether *this* PR still counts as active --- and the answer always sounds like no.

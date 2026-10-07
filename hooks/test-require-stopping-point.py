@@ -1281,5 +1281,107 @@ if run("", raw_lines=whitespace_model_transcript):
 else:
     print("PASS: MODEL string chunks with whitespace-only chunk passes")
 
+
+# Tests for #4328: limitations on "session done"
+def make_git_repo(dirty=False, unpushed=False):
+    tmpdir = tempfile.mkdtemp()
+    subprocess.run(["git", "init", "-b", "main"], cwd=tmpdir, capture_output=True, check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=tmpdir, capture_output=True, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=tmpdir, capture_output=True, check=True)
+    readme = os.path.join(tmpdir, "README.md")
+    with open(readme, "w", encoding="utf-8") as f:
+        f.write("Initial\n")
+    subprocess.run(["git", "add", "README.md"], cwd=tmpdir, capture_output=True, check=True)
+    subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=tmpdir, capture_output=True, check=True)
+    if unpushed:
+        subprocess.run(["git", "checkout", "-b", "feature"], cwd=tmpdir, capture_output=True, check=True)
+        feature_file = os.path.join(tmpdir, "feature.txt")
+        with open(feature_file, "w", encoding="utf-8") as f:
+            f.write("feature\n")
+        subprocess.run(["git", "add", "feature.txt"], cwd=tmpdir, capture_output=True, check=True)
+        subprocess.run(["git", "commit", "-m", "Unpushed feature commit"], cwd=tmpdir, capture_output=True, check=True)
+    if dirty:
+        with open(readme, "a", encoding="utf-8") as f:
+            f.write("Dirty modification\n")
+    return tmpdir
+
+
+dirty_repo = make_git_repo(dirty=True)
+payload_dirty = {
+    "cwd": dirty_repo,
+    "text": "**Stopping Point**: Clean stopping point reached --- session done; UMS executed; no follow-up items pending.",
+}
+if not run_direct_payload(payload_dirty):
+    print("FAIL: clean declaration over dirty working tree did not warn (#4328)")
+    failed += 1
+else:
+    print("PASS: clean declaration over dirty working tree warns (#4328)")
+
+payload_not_done = {
+    "cwd": dirty_repo,
+    "text": "**Stopping Point**: Not a clean stopping point / work remains queued: session not done; uncommitted changes in working tree.",
+}
+if run_direct_payload(payload_not_done):
+    print("FAIL: not-done declaration over dirty working tree warned (#4328)")
+    failed += 1
+else:
+    print("PASS: not-done declaration over dirty working tree passes (#4328)")
+
+clean_repo = make_git_repo(dirty=False)
+payload_clean = {
+    "cwd": clean_repo,
+    "text": "**Stopping Point**: Clean stopping point reached --- session done; UMS executed; no follow-up items pending.",
+}
+if run_direct_payload(payload_clean):
+    print("FAIL: clean declaration over clean repo warned (#4328)")
+    failed += 1
+else:
+    print("PASS: clean declaration over clean repo passes (#4328)")
+
+unpushed_repo = make_git_repo(dirty=False, unpushed=True)
+payload_unpushed = {
+    "cwd": unpushed_repo,
+    "text": "**Stopping Point**: Clean stopping point reached --- session done; UMS executed; no follow-up items pending.",
+}
+if not run_direct_payload(payload_unpushed):
+    print("FAIL: clean declaration over unpushed commits did not warn (#4328)")
+    failed += 1
+else:
+    print("PASS: clean declaration over unpushed commits warns (#4328)")
+
+payload_unpushed_not_done = {
+    "cwd": unpushed_repo,
+    "text": "**Stopping Point**: Not a clean stopping point / work remains queued: session not done; unpushed feature branch.",
+}
+if run_direct_payload(payload_unpushed_not_done):
+    print("FAIL: not-done declaration over unpushed commits warned (#4328)")
+    failed += 1
+else:
+    print("PASS: not-done declaration over unpushed commits passes (#4328)")
+
+# Direct tests for cwd absent: safely returns "" rather than inspecting unrelated working tree
+disq = subject.check_session_done_disqualification(
+    "**Stopping Point**: Clean stopping point reached --- session done; UMS executed; no follow-up items pending.",
+    cwd="",
+)
+if disq != "":
+    print(f"FAIL: check_session_done_disqualification without cwd should return empty string, got {disq!r}")
+    failed += 1
+else:
+    print("PASS: check_session_done_disqualification safely returns empty string when cwd is empty")
+
+# Direct tests for asserts_session_done and scan helper
+if not subject.asserts_session_done("**Stopping Point**: Clean stopping point reached --- session done; UMS executed."):
+    print("FAIL: asserts_session_done returned False for session done")
+    failed += 1
+else:
+    print("PASS: asserts_session_done recognizes session done")
+
+if subject.asserts_session_done("**Stopping Point**: Not a clean stopping point / work remains queued: session not done; details"):
+    print("FAIL: asserts_session_done returned True for session not done")
+    failed += 1
+else:
+    print("PASS: asserts_session_done correctly rejects session not done")
+
 raise SystemExit(bool(failed))
 

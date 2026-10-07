@@ -226,7 +226,8 @@
   Include confirming UMS pass (or no new learnings accumulated) and that any follow-up items noticed during the turn or task have been filed.
   If you opened PRs and haven't driven them to clean (and merged them if `mwc` is active), it is NOT a clean stopping point --- explicitly state that the PR remains in flight and unmerged.
   A session is NOT done while any PR it opened or pushed to remains open (unmerged and unclosed) --- even after completing the delivery cycle of committing, reviewing, pushing, and opening the PR, the session remains active and not done (`Session Done: No`) until the PR is merged or closed.
-  (User corrections / directives, 2026-08-17, 2026-08-18, 2026-08-30, 2026-09-29 / Issue #4128, 2026-10-06.)
+  Never say a session is done when there are uncommitted, unpushed, or un-PRed changes, or open PRs authored by that session.
+  (User corrections / directives, 2026-08-17, 2026-08-18, 2026-08-30, 2026-09-29 / Issue #4128, 2026-10-06 / Issues #4336, #4328.)
 
 - **AI Capability & Memory Changes (`cai` / `ca`)**: Whenever a session creates or updates AI capabilities, memories, or skill definitions (`cai`, `ca`, `ums`), immediately branch off `main` in `Morrison-Lab/ai-config` (or the working repo), commit, push to origin, open a PR, request review, and drive to clean (or merge under `mwc`). Never leave `cai` or memory edits sitting uncommitted in a local working directory or wait for the user to prompt for a push. (User correction, 2026-08-17.)
 - Keep PRs focused on a single concern:

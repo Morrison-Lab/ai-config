@@ -82,9 +82,11 @@ See [`flag-session-boundaries`](shared/workflow/flag-session-boundaries.md).
 ## Say whether the session is done when reporting stopping point status
 
 When ending a turn and reporting stopping point status, explicitly state whether the session is done or not, confirming that UMS has run (or no new learnings accumulated) and that all follow-up items noticed during the turn or task have been filed.
+Never say a session is done when there are uncommitted, unpushed, or un-PRed changes, or open PRs authored by that session.
 See [`flag-session-boundaries`](shared/workflow/flag-session-boundaries.md).
 
 - **Do:** explicitly state "session is done" or "session is not done" with concrete remaining queued steps at every stopping point report.
+- **Don't:** say a session is done when there are uncommitted, unpushed, or un-PRed changes, or open PRs authored by that session.
 
 ## Terminate superseded and abandoned background tasks
 

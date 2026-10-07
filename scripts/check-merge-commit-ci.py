@@ -223,33 +223,31 @@ def find_same_sha_success(cancelled: Dict[str, Any], runs: List[Dict[str, Any]])
     return None
 
 
-def parse_paginated_json(text: str) -> List[Dict[str, Any]]:
-    """Parse JSON pages emitted by gh api --paginate.
+def parse_runs(out: str) -> List[Dict[str, Any]]:
+    """Parse workflow runs from gh api --paginate --jq '.workflow_runs[]'.
 
-    Without --slurp, gh api --paginate outputs concatenated JSON documents
-    (one per page), separated by whitespace. Using json.JSONDecoder().raw_decode
-    walks across the stream without needing --slurp (which gh CLI 2.46 lacks).
-    If a page or mock wraps pages in a top-level list, both list and dict pages
-    are handled.
+    `--jq '.workflow_runs[]'` flattens every page into NDJSON (one JSON object
+    per line), avoiding both `--slurp` (unsupported on gh CLI 2.46) and custom
+    multi-document stream decoding. See `scripts/rotate-claude-token.py:176`
+    for the same pattern.
     """
-    items: List[Dict[str, Any]] = []
-    text = text.strip()
-    if not text:
-        return items
-    decoder = json.JSONDecoder()
-    pos = 0
-    while pos < len(text):
-        while pos < len(text) and text[pos].isspace():
-            pos += 1
-        if pos >= len(text):
-            break
-        doc, end = decoder.raw_decode(text, pos)
-        if isinstance(doc, list):
-            items.extend(doc)
-        elif isinstance(doc, dict):
-            items.append(doc)
-        pos = end
-    return items
+    runs: List[Dict[str, Any]] = []
+    for line in out.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        item = json.loads(line)
+        if isinstance(item, list):
+            for entry in item:
+                if isinstance(entry, dict) and "workflow_runs" in entry:
+                    runs.extend(entry.get("workflow_runs", []))
+                elif isinstance(entry, dict):
+                    runs.append(entry)
+        elif isinstance(item, dict) and "workflow_runs" in item:
+            runs.extend(item.get("workflow_runs", []))
+        elif isinstance(item, dict):
+            runs.append(item)
+    return runs
 
 
 def find_next_branch_run(
@@ -297,12 +295,11 @@ def find_next_branch_run(
             "-f",
             f"branch={branch}",
             "--paginate",
+            "--jq",
+            ".workflow_runs[]",
         ]
     )
-    pages = parse_paginated_json(out)
-    candidates: List[Dict[str, Any]] = []
-    for page in pages:
-        candidates.extend(page.get("workflow_runs", []))
+    candidates = parse_runs(out)
     later = [
         r
         for r in candidates
@@ -327,13 +324,11 @@ def fetch_runs(repo: str, sha: str) -> List[Dict[str, Any]]:
             "-f",
             f"head_sha={sha}",
             "--paginate",
+            "--jq",
+            ".workflow_runs[]",
         ]
     )
-    pages = parse_paginated_json(out)
-    runs: List[Dict[str, Any]] = []
-    for page in pages:
-        runs.extend(page.get("workflow_runs", []))
-    return runs
+    return parse_runs(out)
 
 
 def evaluate(runs: List[Dict[str, Any]], repo: Optional[str] = None) -> int:

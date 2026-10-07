@@ -557,36 +557,33 @@ check(
     out,
 )
 
-# --- parse_paginated_json() tests ------------------------------------------
+# --- parse_runs() tests ----------------------------------------------------
 
-check("parse_paginated_json: empty string returns empty list", mod.parse_paginated_json("") == [])
-check("parse_paginated_json: whitespace returns empty list", mod.parse_paginated_json("   \n\t  ") == [])
+check("parse_runs: empty string returns empty list", mod.parse_runs("") == [])
+check("parse_runs: whitespace returns empty list", mod.parse_runs("   \n\t  ") == [])
 
-single_page = _json.dumps({"workflow_runs": [run("a")]})
+single_ndjson = _json.dumps(run("a"))
 check(
-    "parse_paginated_json: single object page",
-    mod.parse_paginated_json(single_page) == [{"workflow_runs": [run("a")]}],
+    "parse_runs: single NDJSON line",
+    mod.parse_runs(single_ndjson) == [run("a")],
 )
 
-two_pages_newline = _json.dumps({"workflow_runs": [run("a")]}) + "\n" + _json.dumps({"workflow_runs": [run("b")]})
+multiple_ndjson = _json.dumps(run("a")) + "\n" + _json.dumps(run("b"))
 check(
-    "parse_paginated_json: concatenated pages with newline",
-    mod.parse_paginated_json(two_pages_newline)
-    == [{"workflow_runs": [run("a")]}, {"workflow_runs": [run("b")]}],
+    "parse_runs: multiple NDJSON lines",
+    mod.parse_runs(multiple_ndjson) == [run("a"), run("b")],
 )
 
-two_pages_compact = _json.dumps({"workflow_runs": [run("a")]}) + _json.dumps({"workflow_runs": [run("b")]})
+raw_page_dict = _json.dumps({"workflow_runs": [run("a"), run("b")]})
 check(
-    "parse_paginated_json: concatenated pages without whitespace",
-    mod.parse_paginated_json(two_pages_compact)
-    == [{"workflow_runs": [run("a")]}, {"workflow_runs": [run("b")]}],
+    "parse_runs: raw page dict compatibility",
+    mod.parse_runs(raw_page_dict) == [run("a"), run("b")],
 )
 
 legacy_array = _json.dumps([{"workflow_runs": [run("a")]}, {"workflow_runs": [run("b")]}])
 check(
-    "parse_paginated_json: legacy array wrapped pages",
-    mod.parse_paginated_json(legacy_array)
-    == [{"workflow_runs": [run("a")]}, {"workflow_runs": [run("b")]}],
+    "parse_runs: legacy array wrapped pages compatibility",
+    mod.parse_runs(legacy_array) == [run("a"), run("b")],
 )
 
 # --- fetch_runs & find_next_branch_run pagination and flag tests -----------
@@ -602,9 +599,9 @@ def fake_gh_recorder(output):
     return fake
 
 
-# fetch_runs without --slurp across multiple pages
+# fetch_runs with --jq .workflow_runs[] across multiple NDJSON lines
 recorded_args.clear()
-mod.run_gh = fake_gh_recorder(two_pages_newline)
+mod.run_gh = fake_gh_recorder(multiple_ndjson)
 try:
     fetched = mod.fetch_runs("acme/widgets", SHA_DEADBEEF)
 finally:
@@ -621,16 +618,21 @@ check(
     str(recorded_args[0]),
 )
 check(
-    "fetch_runs: runs are concatenated across paginated JSON documents",
+    "fetch_runs: --jq .workflow_runs[] IS passed to gh api",
+    "--jq" in recorded_args[0] and ".workflow_runs[]" in recorded_args[0],
+    str(recorded_args[0]),
+)
+check(
+    "fetch_runs: runs are parsed across NDJSON lines",
     [r["name"] for r in fetched] == ["a", "b"],
     str(fetched),
 )
 
-# find_next_branch_run without --slurp across multiple pages
+# find_next_branch_run with --jq .workflow_runs[] across multiple NDJSON lines
 recorded_args.clear()
-page1 = _json.dumps({"workflow_runs": [FAILED_RUN_Z]})
-page2 = _json.dumps({"workflow_runs": [SUCCESS_RUN_Y]})
-mod.run_gh = fake_gh_recorder(page1 + "\n" + page2)
+line1 = _json.dumps(FAILED_RUN_Z)
+line2 = _json.dumps(SUCCESS_RUN_Y)
+mod.run_gh = fake_gh_recorder(line1 + "\n" + line2)
 try:
     next_found = mod.find_next_branch_run("acme/widgets", CANCELLED_RUN_B)
 finally:
@@ -647,7 +649,12 @@ check(
     str(recorded_args[0]),
 )
 check(
-    "find_next_branch_run: finds candidate across multiple paginated documents",
+    "find_next_branch_run: --jq .workflow_runs[] IS passed to gh api",
+    "--jq" in recorded_args[0] and ".workflow_runs[]" in recorded_args[0],
+    str(recorded_args[0]),
+)
+check(
+    "find_next_branch_run: finds candidate across NDJSON lines",
     next_found == FAILED_RUN_Z,
     str(next_found),
 )

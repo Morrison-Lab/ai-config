@@ -232,11 +232,14 @@ The [`google-antigravity/antigravity-sdk-python`](https://github.com/google-anti
 - Neither active `/mwc` session grant nor `ALLOW_MERGE=1` overrides this review-gate requirement in `enforce-mwc-review-gate.py` (which evaluates review and CI status directly rather than delegating review vetting to a command-line wrapper).
 - In repositories without automated bot review workflows, merges must be executed either via an affirmative human review from another repository member or directly by the human from their terminal outside the Antigravity agent hook harness.
   (Observed in live Antigravity sessions 2026-09-11.)
-- **Exempt superseded CANCELLED checks in statusCheckRollup (ai-config#3800):** GitHub Actions concurrency groups (`cancel-in-progress: true`) cancel an in-progress workflow run when a new push or PR event occurs on the same branch.
+- **Exempt superseded CANCELLED checks in statusCheckRollup (ai-config#3800, #4347):** GitHub Actions concurrency groups (`cancel-in-progress: true`) cancel an in-progress workflow run when a new push or PR event occurs on the same branch.
   This leaves a `CANCELLED` check run in `statusCheckRollup` alongside the subsequent run's `SUCCESS` entry for the exact same check name and workflow (ai-config#1697, #3343).
-  The merge gate must ignore `CANCELLED` conclusions only when superseded by a later `SUCCESS` entry in the same workflow;
-  otherwise, benign concurrency cancellation permanently blocks automated merge under MWC.
-  (Observed in live Antigravity sessions 2026-09-19 on PR #3797.)
+  In `enforce-mwc-review-gate.py`, tracking workflow-level latest success across ANY job with the same `workflowName` introduces an unsound bypass.
+  A cancelled check must only be excused if that specific check/job was genuinely rerun and completed successfully in a superseding run (match job/check name and run/suite),
+  not merely because an unrelated sibling job in the same workflow finished later.
+  Otherwise, benign concurrency cancellation permanently blocks automated merge under MWC,
+  while an un-rerun cancelled job can silently slip past the gate.
+  (Observed in live Antigravity sessions 2026-09-19 on PR #3797, and 2026-10-07 on PR #4347.)
 - **No parentheses in `gh pr merge` commit subjects or arguments:**
   `plugins/ai-config/enforce-mwc-review-gate.py` bans command-chaining and substitution characters in `` CHAIN_CHARS = (";", "&", "|", "\n", "$(", "`", "(") ``.
   Passing parenthetical issue references in arguments (such as `--subject "fix: description (#1234)"` or `--body "(closes #1234)"`) trips the guard and blocks the merge.

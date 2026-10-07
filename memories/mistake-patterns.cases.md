@@ -12,6 +12,18 @@ Write every cross-reference by name, never by position.
 A record here and the entry it belongs to sit in different files, so "above" and "below" are false the moment a record moves --- and they stay present while becoming false, which is why a content comparison cannot catch them.
 What does not: the Mistake, Canonical Rule, Fix, or Do/Don't lines, which are what a reader consults the entry for.
 
+## Gate maintenance: 1250-line cap breaches from appending to full files
+
+- **5th occurrence, 2026-10-07** (ai-config#4348, PR #4348):
+  `memories/mistake-patterns.md` sat at 1244 lines (6 lines of headroom).
+  A PR attempting to append Pattern 62 (+17 lines) pushed the file to 1261 lines,
+  breaching `scripts/check-memory-file-size.py --strict` in CI `validate.yml`.
+  Appending new patterns to memory files within 10 lines of the limit fails CI;
+  files at or near the cap must be split or condensed, not appended past 1250 lines.
+  (Prior: 4th occurrence on `mistake-patterns.md`, 2026-09-09 on PR #3386;
+  3rd on `preferences.md`, 2026-08-25 on ai-config#2262;
+  see also `skills/ums/SKILL.md`).
+
 ## Pattern 12: Arming Auto-Merge While Review Findings Are Still Open or at an Unreviewed Head After Sync
 
 - **1st occurrence, 2026-08-26** on `ai-config#2226`:

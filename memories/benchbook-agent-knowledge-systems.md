@@ -115,3 +115,26 @@ To avoid overflowing context windows with monolithic instructions:
 - **Link discipline:** Page bodies must link only to canonical URLs or wiki pages,
   storing local raw file paths in frontmatter (`raw_file:`) only.
   Linking raw file paths within page bodies creates brittle links that break upon archival.
+
+---
+
+## 7. Memory file size caps and splitting discipline
+
+- **Strict line cap (`scripts/check-memory-file-size.py`):**
+  Memory files under `memories/` have an enforced 1250-line limit (`DEFAULT_MAX_LINES`),
+  validated via `scripts/check-memory-file-size.py --strict` in CI (`validate.yml`).
+- **Warning band and pre-append checks:**
+  The checker warns when files are within 100 lines of the cap.
+  Appending new patterns or lessons to memory files (such as `memories/mistake-patterns.md`)
+  when the file is within 10 lines of the 1250-line limit breaches `scripts/check-memory-file-size.py --strict` in CI `validate.yml`.
+- **Split or condense rather than overflowing:**
+  Files at or near the cap must be split into satellite files
+  (e.g., extracting occurrence ledgers into `*.cases.md` or topical satellites per ai-config#694)
+  or condensed before adding new entries;
+  files must never be appended past 1250 lines.
+- **Contiguity invariant awareness:**
+  When splitting a file with sequential numbering constraints like `memories/mistake-patterns.md`
+  (checked by `scripts/check-mistake-patterns.py`),
+  moving non-contiguous sections creates numbering gaps unless downstream headings and citations are renumbered
+  or stub pointers are preserved in place.
+

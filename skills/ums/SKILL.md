@@ -175,7 +175,13 @@ committed pass.
      A net-positive append fails
      `scripts/test_check_memory_file_size.py`
      even when every new sentence is a real lesson
-     (4th occurrence, 2026-09-09 on `memories/mistake-patterns.md`,
+     (5th occurrence, 2026-10-07 on `memories/mistake-patterns.md`, PR #4348:
+     `main` sat at 1244 lines with 6 lines of headroom,
+     and appending Pattern 62 pushed the file to 1261 lines,
+     breaching `scripts/check-memory-file-size.py --strict` in CI `validate.yml`;
+     files within 10 lines of the 1250-line limit must be split or condensed,
+     not appended past the cap;
+     4th occurrence, 2026-09-09 on `memories/mistake-patterns.md`,
      found by a scheduled PR-sweep session rather than by a push: `main` sat
      exactly at the cap, 1250 lines / 61 `## Pattern` headings, at the exact
      value `--max-lines` defaults to, with zero headroom -- confirmed via

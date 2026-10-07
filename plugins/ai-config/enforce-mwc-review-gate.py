@@ -817,11 +817,11 @@ def latest_bot_review_states(reviews, head_oid="", review_comments=None, comment
             if norm_login in unavailable_since:
                 outage_when = unavailable_since[norm_login]
                 # Fail closed on missing timestamps: if the review carries a timestamp,
-                # the outage notice MUST carry a timestamp dated at or after that review
+                # the outage notice MUST carry a timestamp strictly after that review
                 # (parity with check-pr-fully-clean.py: outage_when > when); an untimestamped
                 # outage notice can never clear a timestamped review. If the review is
                 # untimestamped (e.g. test fixtures), any outage notice clears it.
-                if bool(outage_when) and bool(t) and outage_when >= t:
+                if bool(outage_when) and bool(t) and outage_when > t:
                     continue
                 if not bool(t) and (not bool(outage_when) or outage_when):
                     continue

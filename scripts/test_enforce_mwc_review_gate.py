@@ -1268,6 +1268,38 @@ class TestEvaluate(unittest.TestCase):
         decision = gate.evaluate(MERGE_CMD, state)
         self.assertEqual(decision["decision"], "deny")
 
+    def test_copilot_unavailable_comment_with_same_timestamp_does_not_clear(self):
+        """An outage comment with identical timestamp to a negative review does NOT
+        clear the review; parity with check-pr-fully-clean.py requires strict > (ai-config#4329)."""
+        older_sha = "1111111111111111111111111111111111111111"
+        state = pr(
+            reviews=[
+                review(
+                    "copilot-pull-request-reviewer",
+                    "COMMENTED",
+                    body="### Changes recommended\n\nFound a race condition.",
+                    commit=older_sha,
+                    submittedAt="2026-10-06T11:00:00Z",
+                ),
+            ],
+            comments=[
+                CLEAN_VERDICT,
+                comment(
+                    "Copilot was unable to review this pull request because the user who requested the review has reached their quota limit.",
+                    login="copilot-pull-request-reviewer",
+                    createdAt="2026-10-06T11:00:00Z",  # identical timestamp does NOT clear
+                ),
+            ],
+            review_comments=[],
+        )
+        bot_states = gate.latest_bot_review_states(
+            state["reviews"], state["headRefOid"], state["reviewComments"], state["comments"]
+        )
+        self.assertEqual(bot_states.get("copilot-pull-request-reviewer"), "NOT_CLEAN")
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("not clean", decision["reason"])
+
     def test_copilot_review_quoting_outage_with_negative_header_does_not_clear(self):
         """A review body quoting the outage notice in its opening text while containing
         a negative header is not misclassified as an outage notice (ai-config#1862)."""
@@ -3381,6 +3413,46 @@ class UnavailableNoticeParityTests(unittest.TestCase):
     def test_review_body_markers_match(self):
         self.assertEqual(gate.REVIEW_BODY_MARKERS, self.checker.REVIEW_BODY_MARKERS)
         self.assertEqual(gate.REVIEWER_UNAVAILABLE_MARKERS, self.checker.REVIEWER_UNAVAILABLE_MARKERS)
+
+    def test_outage_notice_timestamp_comparison_parity(self):
+        """Both gate and check_latest_verdict must agree on whether an outage notice
+        clears a not-clean review: strict > required, tie does NOT clear (ai-config#4329)."""
+        review_body = "### Changes recommended\n\nFound a race condition."
+        outage_body = (
+            "Copilot was unable to review this pull request because the user who "
+            "requested the review has reached their quota limit."
+        )
+        for rel, review_time, outage_time, expect_cleared in [
+            ("equal", "2026-10-06T11:00:00Z", "2026-10-06T11:00:00Z", False),
+            ("strictly_greater", "2026-10-06T11:00:00Z", "2026-10-06T11:00:01Z", True),
+            ("strictly_less", "2026-10-06T11:00:01Z", "2026-10-06T11:00:00Z", False),
+        ]:
+            with self.subTest(rel=rel):
+                reviews = [{
+                    "author": {"login": "copilot-pull-request-reviewer"},
+                    "state": "COMMENTED",
+                    "body": review_body,
+                    "commit": {"oid": "1111111111111111111111111111111111111111"},
+                    "submittedAt": review_time,
+                }]
+                comments = [
+                    {"author": {"login": "github-actions"}, "body": "### Verdict: clean", "createdAt": "2026-10-06T12:00:00Z"},
+                    {"author": {"login": "copilot-pull-request-reviewer"}, "body": outage_body, "createdAt": outage_time},
+                ]
+                bot_states = gate.latest_bot_review_states(reviews, HEAD, [], comments)
+                is_gate_cleared = "copilot-pull-request-reviewer" not in bot_states
+
+                all_items = [
+                    ("review", review_time, review_body, "1111111111111111111111111111111111111111", "COMMENTED", "copilot-pull-request-reviewer"),
+                    ("comment", "2026-10-06T12:00:00Z", "### Verdict: clean", HEAD, "", "github-actions"),
+                    ("comment", outage_time, outage_body, HEAD, "", "copilot-pull-request-reviewer"),
+                ]
+                is_clean, issues = self.checker.check_latest_verdict(all_items)
+                is_checker_cleared = is_clean
+
+                self.assertEqual(is_gate_cleared, expect_cleared)
+                self.assertEqual(is_checker_cleared, expect_cleared)
+                self.assertEqual(is_gate_cleared, is_checker_cleared)
 
 
 if __name__ == "__main__":

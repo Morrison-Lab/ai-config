@@ -590,6 +590,7 @@ ALLOW = [
     ("env FOO=bar ALLOW_MERGE=1 gh pr merge 411 --squash", "env wrapper with preceding env var and ALLOW_MERGE=1"),
     ("/usr/bin/env ALLOW_MERGE=1 gh pr merge 411 --squash", "/usr/bin/env wrapper with ALLOW_MERGE=1"),
     ("cd /tmp && env ALLOW_MERGE=1 gh pr merge 411 --squash", "cd && env ALLOW_MERGE=1"),
+    ('A="" A="" ALLOW_MERGE=1 gh pr merge 411 --squash', "repeated empty string assignments before ALLOW_MERGE=1"),
     # --- ai-config#1279 defect 2: prose, quotes, greps and literals ---------
     # fail-fast.md: "test that mentions, greps, and quotes of the gated command
     # pass". Blocking these is what stopped the guard being documented, bug-

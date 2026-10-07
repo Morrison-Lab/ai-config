@@ -294,7 +294,7 @@ PERMISSIVE_MERGE_PATTERNS = _merge_patterns(PERMISSIVE_LEAD)
 # (#4325), as shells on Windows or scripts commonly prefix child process env vars
 # with `env`.
 ALLOW_ENV_FLAG = re.compile(
-    r"^\s*(?:(?:/usr/bin/)?env\s+)?(?:(?:export\s+)?[A-Za-z_][A-Za-z0-9_]*=(?:\"[^\"]*\"|'[^']*'|\S*)\s+)*ALLOW_MERGE=(?:\"1\"|'1'|1\b)"
+    r"^\s*(?:(?:/usr/bin/)?env\s+)?(?:(?:export\s+)?[A-Za-z_][A-Za-z0-9_]*=(?:\"[^\"]*\"|'[^']*'|[^\s\"']*)\s+)*ALLOW_MERGE=(?:\"1\"|'1'|1\b)"
 )
 SPLIT = re.compile(r"&&|\|\||;|\||\n")
 

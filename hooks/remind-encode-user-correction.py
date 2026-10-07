@@ -59,6 +59,8 @@ PATTERNS = [
     r"\bI(?:'ve| have) (?:said|asked you|explained) (?:this |that |it )?"
     r"(?:before|already|again|many|multiple|several|\d)",
     r"\bdidn't I (?:tell|say|ask)\b",
+    r"\bhaven'?t I (?:told you|said|asked)(?: that)?\b",
+    r"\bhity\b",
     r"\b(?:as|like) I (?:said|told you|asked)(?: you)? (?:before|earlier|already|last)\b",
     r"\bhow many times (?:do I have to|must I|have I (?:told|said|asked))\b",
     r"\bfor the (?:second|third|fourth|fifth|nth|\d+(?:st|nd|rd|th)) time\b",

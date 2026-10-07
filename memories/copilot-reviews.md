@@ -260,7 +260,7 @@ ai-config#2969 (ai-config#694 pattern) to keep both files well under the
   - **Don't:** treat "the fullmatch now covers the structural shape" as proof it covers every VOCABULARY-level finding too -- a template that accepts a wide-open prose paragraph still needs its own content-level guards for phrases a structural check cannot see.
   - **Don't:** let an empty Balanced "Needs a closer look" round count toward a clean-review quorum.
   - **Don't:** let an empty Balanced review on an *older* commit clear a standing not-clean verdict from an earlier round, or let it clear one when live inline comments remain on HEAD ([ai-config#4318](https://github.com/Morrison-Lab/ai-config/issues/4318)).
-  - **Don't:** allow an unavailable notice to clear a formal `CHANGES_REQUESTED` review state or clear a timestamped review with an untimestamped notice ([ai-config#4329](https://github.com/Morrison-Lab/ai-config/issues/4329), [PR #4331](https://github.com/Morrison-Lab/ai-config/pull/4331)).
+  - **Don't:** allow an unavailable notice to clear a formal `CHANGES_REQUESTED` review state, clear a timestamped review with an untimestamped notice, or clear a review sharing the identical timestamp (strict `>` required) ([ai-config#4329](https://github.com/Morrison-Lab/ai-config/issues/4329), [PR #4331](https://github.com/Morrison-Lab/ai-config/pull/4331)).
   - **Don't:** compare raw login strings across different API surfaces or use review-level logins in inline comment mocks.
   - **Don't:** let lazy fetch exceptions crash the checker or crash `--from-json` runs through missing payload mappings.
   - **Don't:** assume fixing one classifier (e.g. `check-pr-fully-clean.py`) reaches a sibling classifier that reads the same review body independently.

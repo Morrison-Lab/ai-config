@@ -69,6 +69,7 @@ GRAPHQL_MERGE_RE = re.compile(
 GH_API_MERGE_RE = re.compile(
     r"\bgh api\b[^|;&\n]*?repos/(\S+?/\S+?)/pulls/(\d+)/merge\b"
 )
+ACTIONS_RUN_ID_RE = re.compile(r"/actions/runs/(\d+)")
 VERDICT_MARKER_RE = re.compile(r"^\s*#{2,4}\s*Verdict\b", re.MULTILINE)
 # Logins the review workflows post verdicts under (memories/gh-cli.md: the
 # login varies by repo and run). GraphQL review/comment payloads report bot
@@ -1258,6 +1259,17 @@ def evaluate_verdict(comments, head_oid):
     return "none"
 
 
+def extract_actions_run_id(check):
+    url = check.get("detailsUrl") or check.get("details_url") or check.get("html_url") or ""
+    m = ACTIONS_RUN_ID_RE.search(url)
+    if m:
+        try:
+            return int(m.group(1))
+        except (ValueError, TypeError):
+            pass
+    return None
+
+
 def evaluate(cmd, pr_data):
     """Pure decision function: merge command + PR state -> hook decision."""
     if GRAPHQL_MERGE_RE.search(cmd):
@@ -1285,6 +1297,7 @@ def evaluate(cmd, pr_data):
     # Concurrency `cancel-in-progress` leaves a superseded run `cancelled` beside
     # a later success with the same job name and workflow on the same SHA (ai-config#1697, #3343, #3800).
     latest_success = {}
+    latest_success_run_id = {}
     for idx, check in enumerate(status_rollup):
         conc = (check.get("conclusion") or "").upper()
         st = (check.get("state") or "").upper()
@@ -1296,6 +1309,9 @@ def evaluate(cmd, pr_data):
             cand = (ts, idx)
             if cand > latest_success.get(key, ("", -1)):
                 latest_success[key] = cand
+            run_id = extract_actions_run_id(check)
+            if run_id is not None and run_id > latest_success_run_id.get(key, -1):
+                latest_success_run_id[key] = run_id
 
     failures = []
     for idx, check in enumerate(status_rollup):
@@ -1309,7 +1325,12 @@ def evaluate(cmd, pr_data):
         cand = (ts, idx)
 
         if conc in BLOCKED_CI_CONCLUSIONS:
-            if conc == "CANCELLED" and latest_success.get(key, ("", -1)) > cand:
+            run_id = extract_actions_run_id(check)
+            is_superseded_cancelled = conc == "CANCELLED" and (
+                latest_success.get(key, ("", -1)) > cand
+                or (run_id is not None and latest_success_run_id.get(key, -1) > run_id)
+            )
+            if is_superseded_cancelled:
                 continue
             failures.append(name)
         elif status in PENDING_CI_STATUSES or st in BLOCKED_STATUS_STATES:
@@ -1725,12 +1746,17 @@ def fetch_pr_data(cmd, cwd):
         existing_urls = {
             c.get("detailsUrl") for c in existing_rollup if c.get("detailsUrl")
         }
+        existing_workflows = {
+            c.get("name"): c.get("workflowName") for c in existing_rollup if c.get("workflowName")
+        }
         for cr in check_runs:
             details = cr.get("details_url") or cr.get("html_url") or ""
             if details and details in existing_urls:
                 continue
+            name = cr.get("name") or ""
             existing_rollup.append({
-                "name": cr.get("name") or "",
+                "name": name,
+                "workflowName": existing_workflows.get(name, ""),
                 "status": (cr.get("status") or "").upper(),
                 "conclusion": (cr.get("conclusion") or "").upper(),
                 "completedAt": cr.get("completed_at") or "",

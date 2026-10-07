@@ -2619,6 +2619,77 @@ class TestMain(unittest.TestCase):
         )
         self.assertEqual(decision["decision"], "allow")
 
+    def test_check_runs_from_rest_concurrency_cancelled_run_superseded_by_workflow(self):
+        """A cancelled check-run from an earlier superseded run is cleared when the workflow later succeeded."""
+        state = pr(
+            comments=[CLEAN_VERDICT],
+            checks=[
+                {
+                    "name": "review / preempt-previous",
+                    "workflowName": "Claude Code Review",
+                    "conclusion": "SUCCESS",
+                    "status": "COMPLETED",
+                    "completedAt": "2026-10-07T08:00:37Z",
+                    "detailsUrl": "https://github.com/o/r/actions/runs/2/job/1",
+                },
+                {
+                    "name": "review / require-clean-verdict",
+                    "workflowName": "Claude Code Review",
+                    "conclusion": "SUCCESS",
+                    "status": "COMPLETED",
+                    "completedAt": "2026-10-07T08:04:20Z",
+                    "detailsUrl": "https://github.com/o/r/actions/runs/2/job/2",
+                },
+            ],
+        )
+        view_payload = {k: state[k] for k in
+                        ("url", "author", "reviews", "statusCheckRollup",
+                         "headRefOid", "reviewRequests") if k in state}
+        rest_check_runs = [
+            {
+                "name": "review / preempt-previous",
+                "status": "completed",
+                "conclusion": "cancelled",
+                "completed_at": "2026-10-07T08:00:50Z",
+                "details_url": "https://github.com/o/r/actions/runs/1/job/1",
+            },
+        ]
+        decision, _ = self.run_main(
+            self.payload(MERGE_CMD),
+            side_effect=[gh_result(stdout=json.dumps(view_payload)),
+                         gh_result(stdout=json.dumps(state["comments"])),
+                         gh_result(stdout=json.dumps([])),
+                         gh_result(stdout=json.dumps(rest_check_runs))],
+        )
+        self.assertEqual(decision["decision"], "allow")
+
+    def test_cancelled_check_with_later_succeeding_unrelated_sibling_job_denies(self):
+        """A cancelled check must NOT be cleared by a later-succeeding unrelated job in the same workflow."""
+        state = pr(
+            comments=[CLEAN_VERDICT],
+            checks=[
+                {
+                    "name": "build",
+                    "workflowName": "CI",
+                    "conclusion": "CANCELLED",
+                    "status": "COMPLETED",
+                    "completedAt": "2026-10-07T08:00:00Z",
+                    "detailsUrl": "https://github.com/o/r/actions/runs/1/job/1",
+                },
+                {
+                    "name": "lint",
+                    "workflowName": "CI",
+                    "conclusion": "SUCCESS",
+                    "status": "COMPLETED",
+                    "completedAt": "2026-10-07T08:05:00Z",
+                    "detailsUrl": "https://github.com/o/r/actions/runs/1/job/2",
+                },
+            ],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("build", decision["reason"])
+
     def test_check_runs_from_rest_unresolved_cancelled_run_denies(self):
         state = pr(comments=[CLEAN_VERDICT], checks=[])
         view_payload = {k: state[k] for k in

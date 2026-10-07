@@ -999,6 +999,9 @@ This applies to LaTeX math in any project, repo, or format (Quarto, R Markdown, 
 Keep the submodule up to date, and add new semantic macros to it (via a PR to `Morrison-Lab/macros`, which carries a standing `mwc` grant) whenever a needed concept has no macro, rather than defining one-off commands inline.
 (Directive from the user, 2026-10-02, on a manuscript equation that wrote out an expectation in raw LaTeX: "you're supposed to always use semantic macros wherever applicable, and add new semantic macros as needed";
 then "anytime we're writing latex math in any project/repo/etc, use the macros repo".)
+More generally, there should be very few instances where it's necessary to use `\cb` or `\sb` directly; instead write and use command versions of operator macros that take arguments and wrap them in delimiters automatically (e.g. `\Expf{X}` / `\E{X}`, `\Var{X}`, `\Prf{A}`, `\expf{x}`), rather than manually chaining bare operators with delimiter macros like `\Ep\sb{X}`.
+Direct use of `\cb`, `\sb`, `\paren` is reserved for raw sets, manual brackets, or arithmetic groupings that do not denote standard operators.
+(Directive from the user, 2026-10-07: "more generally, there should be very few instances where it's necessary to use \cb or \sb directly; instead we should write command versions of operator macros that take arguments and wrap them in delimiters, like `\expf` does".)
 When the macros PR can't happen in the session, a repo-local macro file is the stopgap, and every macro added to one gets an issue in `Morrison-Lab/macros` in the same turn, listing its definition and meaning, so it reaches the shared library.
 (Directive from the user, 2026-10-05, after [Morrison-Lab/sds#54](https://github.com/Morrison-Lab/sds/pull/54) added 13 repo-local macros without one: "any time you create new macros like that, you should file an issue in macros".
 Filed afterwards as [Morrison-Lab/macros#103](https://github.com/Morrison-Lab/macros/issues/103).)

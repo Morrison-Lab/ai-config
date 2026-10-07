@@ -283,12 +283,13 @@ def build_payload(
     return payload
 
 
-def fetch_review_threads(owner_repo: str, pr_number: int, token: str) -> Optional[List[Dict[str, Any]]]:
+def _fetch_review_threads_graphql(owner_repo: str, pr_number: int, token: str) -> Optional[List[Dict[str, Any]]]:
     """Fetch review threads via GraphQL if reachable.
 
     Returns None if GraphQL is unreachable (e.g. pinned-proxy environment
-    or token without GraphQL scope), warning on stderr so the omission is
-    visible. The payload will then omit 'review_threads', causing
+    or token without GraphQL scope), warning on stderr so the fallback is
+    visible. fetch_review_threads then tries the CCR route; only when both
+    fail does the payload omit 'review_threads', causing
     check-pr-fully-clean.py --from-json to fail fast (exit 2) rather than
     silently assuming zero unresolved threads.
     """
@@ -327,14 +328,14 @@ def fetch_review_threads(owner_repo: str, pr_number: int, token: str) -> Optiona
             err_body = exc.read().decode("utf-8", "replace")
             print(
                 f"warning: GraphQL reviewThreads query failed ({exc.code} {err_body}); "
-                "review_threads will be omitted from payload",
+                "trying the CCR review_threads route",
                 file=sys.stderr,
             )
             return None
         except Exception as exc:  # noqa: BLE001
             print(
                 f"warning: GraphQL reviewThreads query failed ({exc}); "
-                "review_threads will be omitted from payload",
+                "trying the CCR review_threads route",
                 file=sys.stderr,
             )
             return None
@@ -342,7 +343,7 @@ def fetch_review_threads(owner_repo: str, pr_number: int, token: str) -> Optiona
         if "errors" in data:
             print(
                 f"warning: GraphQL reviewThreads returned errors ({data['errors']}); "
-                "review_threads will be omitted from payload",
+                "trying the CCR review_threads route",
                 file=sys.stderr,
             )
             return None
@@ -361,6 +362,85 @@ def fetch_review_threads(owner_repo: str, pr_number: int, token: str) -> Optiona
         if not cursor:
             break
     return nodes
+
+
+def _fetch_review_threads_ccr(owner_repo: str, pr_number: int, token: str) -> Optional[List[Dict[str, Any]]]:
+    """Fetch review threads through the cloud-session proxy's CCR route.
+
+    claude.ai cloud and project sessions refuse GraphQL with a 403 that names
+    ``GET /repos/{o}/{r}/pulls/{n}/ccr/review_threads`` as the replacement
+    (ai-config#4220). Measured 2026-10-07, it answers a bare list of
+    ``{"resolved", "outdated", "path", "line", "comment_ids"}`` objects, so
+    each is mapped onto the fields of the GraphQL node shape the payload
+    carries. ``id`` is a surrogate (the comma-joined comment ids), not a
+    GraphQL thread node id; the fully-clean check only prints it.
+    (Measured on Morrison-Lab/rpt#192, one unresolved outdated thread, and
+    Morrison-Lab/rme#1221, ``[]`` for a PR with no inline comments.)
+
+    One GET asking for 100 threads: the route is not known to honour
+    ``page``, and rest_get's short-page stop would loop forever on a route
+    that ignores it. Because a cap could truncate silently, an answer of
+    100 or more threads, or one carrying a ``rel="next"`` Link header, is
+    refused rather than trusted. Returns None, with a warning, when the
+    route is unavailable (a session outside that proxy), answers something
+    other than a list of objects, or may be truncated, so the payload omits
+    'review_threads' rather than reporting threads it never saw as clean.
+    """
+    url = (
+        f"https://api.github.com/repos/{owner_repo}/pulls/{pr_number}"
+        "/ccr/review_threads?per_page=100"
+    )
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "User-Agent": USER_AGENT,
+        },
+    )
+    try:
+        with urllib.request.urlopen(req) as resp:
+            data = json.load(resp)
+            link = (getattr(resp, "headers", None) or {}).get("Link") or ""
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"warning: CCR review_threads route failed ({exc}); "
+            "review_threads will be omitted from payload",
+            file=sys.stderr,
+        )
+        return None
+    if not isinstance(data, list) or not all(isinstance(t, dict) for t in data):
+        print(
+            f"warning: CCR review_threads route answered {type(data).__name__}, "
+            "not a list of threads; review_threads will be omitted from payload",
+            file=sys.stderr,
+        )
+        return None
+    if len(data) >= 100 or 'rel="next"' in link:
+        print(
+            f"warning: CCR review_threads route returned {len(data)} threads and may be "
+            "truncated; review_threads will be omitted from payload",
+            file=sys.stderr,
+        )
+        return None
+    return [
+        {
+            "id": ",".join(str(c) for c in t.get("comment_ids") or []),
+            "isResolved": bool(t.get("resolved")),
+            "isOutdated": bool(t.get("outdated")),
+            "path": t.get("path") or "",
+            "line": t.get("line"),
+        }
+        for t in data
+    ]
+
+
+def fetch_review_threads(owner_repo: str, pr_number: int, token: str) -> Optional[List[Dict[str, Any]]]:
+    """Review threads from GraphQL, else from the CCR route, else None."""
+    threads = _fetch_review_threads_graphql(owner_repo, pr_number, token)
+    if threads is not None:
+        return threads
+    return _fetch_review_threads_ccr(owner_repo, pr_number, token)
 
 
 def fetch_payload(owner_repo: str, pr_number: int, token: str) -> Dict[str, Any]:

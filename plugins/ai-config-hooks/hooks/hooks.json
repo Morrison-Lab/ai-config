@@ -1378,6 +1378,20 @@
         ]
       }
     ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-untracked-in-behind-checkout.py\"'",
+            "timeout": 10,
+            "script": "warn-untracked-in-behind-checkout.py",
+            "why": "ai-config#4360 -- 2026-10-07, mlr: an agent ran `git status -sb` in a checkout whose header read `[behind 23]`, saw `?? books/mcs.pdf` and `?? books/mml-book.pdf`, and told the user the files were new and needed adding. They were byte-identical to files already on origin/main (uploaded through the GitHub web interface); the checkout had not pulled. Reads the Bash tool's stdout and, when a `git status` reports the checkout behind its upstream (`[behind N]` or 'Your branch is behind') AND lists untracked files, adds context saying the paths may already exist upstream and naming the check (`git fetch`, then `git ls-tree -r --name-only origin/<branch> -- <paths>` or `git cat-file -e`). Warns and never blocks: PostToolUse runs after the command, and the files may well be new. Fails open on any parse trouble."
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [

@@ -21,3 +21,14 @@ A fetch naming a missing ref truncates `.git/FETCH_HEAD` to zero bytes, and `rev
 Resolve and **print** the SHA in the same command as the fetch, then use the printed value: [`fully-clean`](../shared/workflow/fully-clean.md) records that a shell variable does not survive into a later tool call.
 
 [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md)'s "A ref that resolves to a different commit than it did a moment ago" carries the worked case and the pattern/anti-pattern pair (ai-config#3704).
+
+## Untracked files in a checkout that is behind upstream may already exist upstream
+
+A `git status` that reports `[behind N]` (`-sb` form) or `Your branch is behind` (long form) and also lists `??` entries shows files the checkout has not pulled, not necessarily files the repository lacks.
+Measured 2026-10-07 (mlr): `git status -sb` printed `## main...origin/main [behind 23]` with `?? books/mcs.pdf` and `?? books/mml-book.pdf`, and the files were reported as new.
+They were byte-identical to files already on origin/main, uploaded through the GitHub web interface.
+
+- **Do:** run `git fetch`, then `git ls-tree -r --name-only origin/<branch> -- <paths>` (or `git cat-file -e origin/<branch>:<path>`) before calling untracked files in a behind checkout new or adding them.
+- **Don't:** treat `??` in a stale checkout as proof that a file is absent from the repository.
+
+`hooks/warn-untracked-in-behind-checkout.py` adds this as context after such a `git status` ([ai-config#4360](https://github.com/Morrison-Lab/ai-config/issues/4360)).

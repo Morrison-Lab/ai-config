@@ -35,11 +35,17 @@ import shlex
 import sys
 
 MAX_PATHS = 10
+SIMPLE_ESCAPES = {"n": "\n", "t": "\t", "a": "\a", "b": "\b", "f": "\f",
+                  "r": "\r", "v": "\v"}
 
 # `git status`, tolerating global options before the subcommand (`git -C d status`).
 # `status` must be the subcommand: only option tokens may sit between.
+# The alternatives are disjoint (`-C`/`-c` take a value, other short flags
+# take none, long options are `--name[=value]`), so matching cannot backtrack
+# exponentially. A value may be quoted (`git -C "my dir" status`).
 RX_GIT_STATUS = re.compile(
-    r"\bgit(?:\s+(?:-[Cc]\s+\S+|--?[A-Za-z][^\s]*))*\s+status\b"
+    r"(?<![\w-])git(?:\s+(?:-[Cc]\s+(?:\"[^\"]*\"|'[^']*'|\S+)"
+    r"|--[A-Za-z][\w-]*(?:=\S+)?|-[A-BD-Za-bd-z]))*\s+status\b"
 )
 
 # `-sb` / `--porcelain -b` header: `## main...origin/main [behind 23]`,
@@ -112,10 +118,27 @@ def stdout_of(payload):
 
 
 def unquote_path(path):
-    """Strip git's plain double quotes (a name with a space); keep C-escapes."""
-    if len(path) > 1 and path[0] == path[-1] == '"' and "\\" not in path:
-        return path[1:-1]
-    return path
+    """Undo git's C-style quoting (a name with a space or non-ASCII bytes)."""
+    if not (len(path) > 1 and path[0] == path[-1] == '"'):
+        return path
+    body = path[1:-1]
+    out = bytearray()
+    i = 0
+    while i < len(body):
+        ch = body[i]
+        if ch != "\\" or i + 1 >= len(body):
+            out += ch.encode("utf-8")
+            i += 1
+        elif body[i + 1] in "01234567":
+            j = i + 1
+            while j < min(i + 4, len(body)) and body[j] in "01234567":
+                j += 1
+            out.append(int(body[i + 1:j], 8) & 0xFF)
+            i = j
+        else:
+            out += SIMPLE_ESCAPES.get(body[i + 1], body[i + 1]).encode("utf-8")
+            i += 2
+    return out.decode("utf-8", errors="replace")
 
 
 def build_message(count, upstream, paths):
@@ -131,10 +154,11 @@ def build_message(count, upstream, paths):
         "calling them new or adding them, run `git fetch`, then "
         f"`git ls-tree -r --name-only {ref} -- {listed}` (or "
         f"`git cat-file -e {ref}:<path>` per path). Only a path absent from "
-        "that listing is new. Status prints paths relative to the current "
-        "directory, so run the check from there or from the repository root "
-        "with root-relative paths. The behind count is only as fresh as the "
-        "last fetch."
+        "that listing is new. Paths are as `git status` printed them: "
+        "relative to the current directory in `-s`/long form, to the "
+        "repository root in `--porcelain`. `ls-tree` pathspecs are "
+        "cwd-relative and `cat-file` paths are root-relative, so adjust. "
+        "The behind count is only as fresh as the last fetch."
     )
 
 

@@ -85,7 +85,9 @@ LONG_BEHIND_TWO_SECTIONS = (
     '  (use "git add <file>..." to include in what will be committed)\n'
     "\tnew.pdf\n\n"
 )
-FILE_QUOTING_OUTPUT = SB_BEHIND # text a non-git command might print
+SB_NONASCII = '## main...origin/main [behind 3]\n?? "caf\\303\\251.txt"\n'
+SB_SPACE = '## main...origin/main [behind 3]\n?? "my file.pdf"\n'
+NON_GIT_OUTPUT = SB_BEHIND  # status-shaped text a non-git command might print
 
 
 def payload(command, stdout, tool="Bash", response=None):
@@ -123,7 +125,7 @@ CASES = {
            "long form behind, nothing untracked"),
     "S6": (payload("git status", LONG_AHEAD_ONLY), False,
            "long form ahead only"),
-    "S7": (payload("cat notes.txt", FILE_QUOTING_OUTPUT), False,
+    "S7": (payload("cat notes.txt", NON_GIT_OUTPUT), False,
            "non-git command whose output contains the signals"),
     "S8": (payload("echo 'we are behind schedule'", "we are behind schedule\n"),
            False, "non-git command containing the word 'behind'"),
@@ -139,6 +141,12 @@ CASES = {
            "more than MAX_PATHS untracked paths are truncated, not dropped"),
     "W9": (payload("git status", LONG_BEHIND_TWO_SECTIONS), True,
            "long form: untracked section after a blank line is still read"),
+    "W10": (payload('git -C "my dir" status -sb', SB_BEHIND), True,
+            "quoted -C value containing a space"),
+    "W11": (payload("git status -sb", SB_NONASCII), True,
+            "C-escaped non-ASCII name is decoded in the pathspec"),
+    "W12": (payload("git status -sb", SB_SPACE), True,
+            "double-quoted name with a space is unquoted then shell-quoted"),
     "S14": (payload("git status --porcelain=v2 -b", V2_AHEAD_ONLY), False,
             "porcelain v2: behind count 0"),
     "S15": (payload("git log --grep status", SB_BEHIND), False,
@@ -170,10 +178,25 @@ def warned(hook, case_payload):
     return bool(ctx["additionalContext"])
 
 
+# Cases whose verdict also depends on the message text: id -> needle.
+NEEDLES = {
+    "W11": "-- 'café.txt'",
+    "W12": "-- 'my file.pdf'",
+}
+
+
+def case_warned(hook, case_id, case_payload):
+    got = warned(hook, case_payload)
+    if got is True and case_id in NEEDLES:
+        ctx = json.loads(run(hook, json.dumps(case_payload)).stdout)
+        return NEEDLES[case_id] in ctx["hookSpecificOutput"]["additionalContext"]
+    return got
+
+
 wrong = 0
 print("cases:")
 for case_id, (pl, expected, desc) in CASES.items():
-    got = warned(HOOK, pl)
+    got = case_warned(HOOK, case_id, pl)
     ok = got == expected
     wrong += not ok
     print(f"  {'ok  ' if ok else 'WRONG'} {case_id:<4} {desc}")
@@ -242,7 +265,7 @@ MUTATIONS = {
         [('    m = RX_SHORT_BEHIND.search(text)\n    if m:\n'
           '        return int(m.group("n")), m.group("up")',
           "    pass")],
-        {"W1", "W3", "W4", "W6", "W8"},
+        {"W1", "W3", "W4", "W6", "W8", "W10", "W11", "W12"},
     ),
     "M2_long_behind": (
         "long-form 'Your branch is behind' is recognised",
@@ -297,9 +320,21 @@ MUTATIONS = {
     ),
     "M12_subcommand_only": (
         "`status` must be the git subcommand, not any later word",
-        [('r"\\bgit(?:\\s+(?:-[Cc]\\s+\\S+|--?[A-Za-z][^\\s]*))*\\s+status\\b"',
-          'r"\\bgit\\b[^|;&\\n]*?\\bstatus\\b"')],
+        [('    r"|--[A-Za-z][\\w-]*(?:=\\S+)?|-[A-BD-Za-bd-z]))*\\s+status\\b"',
+          '    r"|--[A-Za-z][\\w-]*(?:=\\S+)?|-[A-BD-Za-bd-z]|\\S+))*\\s+status\\b"')],
         {"S15", "S16"},
+    ),
+    "M13_quoted_option_value": (
+        "a quoted `-C` value is one token",
+        [('(?:\\"[^\\"]*\\"|\'[^\']*\'|\\S+)"', '(?:\\S+)"')],
+        {"W10"},
+    ),
+    "M14_unquote_path": (
+        "git's C-style path quoting is undone before the pathspec is built",
+        [('    if not (len(path) > 1 and path[0] == path[-1] == \'"\'):\n'
+          '        return path',
+          '    return path')],
+        {"W11", "W12"},
     ),
     "M9_fail_open": (
         "any exception exits 0 silently",
@@ -326,7 +361,7 @@ with tempfile.TemporaryDirectory() as tmp:
         with open(path, "w", encoding="utf-8") as handle:
             handle.write(mutated)
         flipped = {cid for cid, (pl, expected, _d) in CASES.items()
-                   if warned(path, pl) != expected}
+                   if case_warned(path, cid, pl) != expected}
         ok = flipped == expected_flips
         mutation_wrong += not ok
         if not flipped and expected_flips:

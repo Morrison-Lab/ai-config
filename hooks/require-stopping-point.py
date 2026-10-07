@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
 import tempfile
 
@@ -71,6 +72,14 @@ RX_SESSION_STATUS = re.compile(
     r"\bsession\s+(?:is\s+)?(?:not\s+done|done|not\s+finished|finished|not\s+complete|complete|ongoing|in\s+progress)\b",
     re.IGNORECASE,
 )
+RX_SESSION_NOT_DONE = re.compile(
+    r"\bsession\s+(?:is\s+)?(?:not\s+done|not\s+finished|not\s+complete|ongoing|in\s+progress)\b",
+    re.IGNORECASE,
+)
+RX_SESSION_DONE = re.compile(
+    r"\bsession\s+(?:is\s+)?(?:done|finished|complete)\b",
+    re.IGNORECASE,
+)
 RX_SECTION_BREAK = re.compile(r"^(?:#{1,6}\s+|[-*+]\s+|\d+\.\s+)")
 RX_INDENTED_CODE = re.compile(r"^(?: {4,}|\t)(?![-*]\s+|\d+\.\s+)")
 INLINE_CODE_RX = re.compile(r"`[^`\n]+`")
@@ -116,6 +125,95 @@ def has_stopping_point_declaration(text: str) -> bool:
             if RX_SESSION_STATUS.search(combined):
                 return True
     return False
+
+
+def asserts_session_done(text: str) -> bool:
+    """Return True if text asserts that the session is done/finished/complete, rather than not done."""
+    if not text:
+        return False
+    if strip_code is not None:
+        stripped = strip_code(text, swallow_unclosed=False)
+    elif strip_fences is not None:
+        stripped = strip_fences(text, swallow_unclosed=False)
+    else:
+        stripped = text
+    lines = stripped.splitlines()
+    for i, line in enumerate(lines):
+        if RX_INDENTED_CODE.match(line):
+            continue
+        line_no_inline = INLINE_CODE_RX.sub("", line)
+        if RX_LINE.search(line_no_inline):
+            combined_parts = [line_no_inline]
+            for j in range(i + 1, min(len(lines), i + 6)):
+                nxt = INLINE_CODE_RX.sub("", lines[j]).strip()
+                if not nxt:
+                    continue
+                if RX_SECTION_BREAK.match(nxt) and not RX_LINE.search(nxt):
+                    break
+                combined_parts.append(nxt)
+            combined = " ".join(combined_parts)
+            if RX_SESSION_DONE.search(combined) and not RX_SESSION_NOT_DONE.search(combined):
+                return True
+    return False
+
+
+def check_session_done_disqualification(text: str, cwd: str = "") -> str:
+    """Return a reason string if the text asserts 'session is done' but repo state disqualifies it.
+
+    Per #4328: never say a session is done when there are uncommitted,
+    unpushed, or un-PRed changes, or open PRs authored by that session.
+    """
+    if not text or not cwd or not os.path.isdir(cwd):
+        return ""
+
+    if not asserts_session_done(text):
+        return ""
+
+    # 1. Check uncommitted changes in working tree or index
+    try:
+        res = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+        if res.returncode == 0 and res.stdout.strip():
+            return "uncommitted changes in working tree"
+    except Exception:
+        pass
+
+    # 2. Check unpushed commits relative to upstream or default branch
+    try:
+        res = subprocess.run(
+            ["git", "rev-list", "--count", "@{u}..HEAD"],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+        if res.returncode == 0:
+            count = int(res.stdout.strip() or "0")
+            if count > 0:
+                return f"{count} unpushed commit(s)"
+        else:
+            for base in ("origin/HEAD", "origin/main", "origin/master", "main", "master"):
+                base_res = subprocess.run(
+                    ["git", "rev-list", "--count", f"{base}..HEAD"],
+                    cwd=cwd,
+                    capture_output=True,
+                    text=True,
+                    timeout=2,
+                )
+                if base_res.returncode == 0:
+                    count = int(base_res.stdout.strip() or "0")
+                    if count > 0:
+                        return f"{count} unpushed commit(s)"
+                    break
+    except Exception:
+        pass
+
+    return ""
 
 
 def last_text(path: str) -> str:
@@ -358,7 +456,14 @@ def main() -> int:
     # The hook is registered as warn-only (systemMessage, non-blocking), so warning in
     # automated runs does not abort execution or block the session.
     text = extract_text_from_payload(payload)
-    if not text or has_stopping_point_declaration(text):
+    if not text:
+        return 0
+
+    cwd = payload.get("cwd") or ""
+    disqualification = check_session_done_disqualification(text, cwd)
+    has_decl = has_stopping_point_declaration(text)
+
+    if has_decl and not disqualification:
         return 0
 
     # Scope sentinel deduplication to current session and turn so identical replies
@@ -371,7 +476,7 @@ def main() -> int:
         or ""
     )
     turn_id = extract_turn_id(payload)
-    key_src = f"{session_id}:{turn_id}:{text}"
+    key_src = f"{session_id}:{turn_id}:{text}:{disqualification}"
     key = hashlib.sha256(key_src.encode()).hexdigest()[:16]
     sentinel = os.path.join(tempfile.gettempdir(), f".claude-stopping-point-{key}")
     if os.path.exists(sentinel):
@@ -380,18 +485,24 @@ def main() -> int:
         open(sentinel, "w", encoding="utf-8").close()
     except Exception:
         pass
-    print(
-        json.dumps(
-            {
-                "systemMessage": (
-                    "State whether the session is done or not using "
-                    "`**Stopping Point**: Clean stopping point reached --- session done; UMS executed; no follow-up items pending` or "
-                    "`**Stopping Point**: Not a clean stopping point / work remains queued: session not done; <details>` "
-                    "before ending the turn (unless this is an automated non-interactive run whose output is posted by a harness; shared/workflow/flag-session-boundaries.md:45-50)."
-                ),
-            }
+
+    if disqualification:
+        msg = (
+            f"Never say a session is done when there are uncommitted, unpushed, or un-PRed changes, "
+            f"or open PRs authored by that session (#4328; shared/workflow/flag-session-boundaries.md). "
+            f"The session has {disqualification}; state that the session is not done "
+            f"(e.g. `**Stopping Point**: Not a clean stopping point / work remains queued: session not done; <details>`)."
         )
-    )
+    else:
+        msg = (
+            "State whether the session is done or not using "
+            "`**Stopping Point**: Clean stopping point reached --- session done; UMS executed; no follow-up items pending` or "
+            "`**Stopping Point**: Not a clean stopping point / work remains queued: session not done; <details>` "
+            "before ending the turn (unless this is an automated non-interactive run whose output is posted by a harness; shared/workflow/flag-session-boundaries.md:45-50). "
+            "Never say a session is done when there are uncommitted, unpushed, or un-PRed changes, or open PRs authored by that session (#4328)."
+        )
+
+    print(json.dumps({"systemMessage": msg}))
     return 0
 
 

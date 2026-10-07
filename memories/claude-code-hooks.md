@@ -1057,7 +1057,7 @@ An earlier record of this named the classifier's reason as `[Auto-Mode Bypass]`;
 the measured string is `[Safety Bypass Flag]`.
 `memories/claude-code-transcripts.md` records one session where the inline `ALLOW_UNREVIEWED_PUSH=1 git push` form was denied and `env ALLOW_UNREVIEWED_PUSH=1 git push` succeeded, so the alternate form is worth the one attempt it costs before concluding the deadlock.)
 
-## A permission allow-rule matches the command's literal prefix, so `git -C` probably defeats it
+## A `git -C` probably defeats a permission allow-rule's prefix match (one observation)
 
 Measured 2026-10-07 (`Morrison-Lab/mlr`): `hooks/no-push-without-self-review.py` refused a push, and the override `ALLOW_UNREVIEWED_PUSH=1 git -C /path/to/repo push -u origin <branch>` was then denied by the auto-mode classifier.
 The agent told the user to add a Bash permission rule for `ALLOW_UNREVIEWED_PUSH=1 git push`, but `~/.claude/settings.json` already held `Bash(ALLOW_UNREVIEWED_PUSH=1 git push:*)`.

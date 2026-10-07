@@ -287,8 +287,9 @@ ALLOW = {"decision": "allow"}
 
 
 def is_bot_login(login):
-    return (login.endswith("[bot]")
-            or login.removesuffix("[bot]") in REVIEWER_BOT_LOGINS)
+    norm = (login or "").strip().lower()
+    return (norm.endswith("[bot]")
+            or norm.removesuffix("[bot]") in REVIEWER_BOT_LOGINS)
 
 
 def human_review_body_approves(body):
@@ -816,14 +817,11 @@ def latest_bot_review_states(reviews, head_oid="", review_comments=None, comment
             norm_login = _normalize_bot_login_for_inline(login)
             if norm_login in unavailable_since:
                 outage_when = unavailable_since[norm_login]
-                # Fail closed on missing timestamps: if the review carries a timestamp,
-                # the outage notice MUST carry a timestamp strictly after that review
-                # (parity with check-pr-fully-clean.py: outage_when > when); an untimestamped
-                # outage notice can never clear a timestamped review. If the review is
-                # untimestamped (e.g. test fixtures), any outage notice clears it.
-                if bool(outage_when) and bool(t) and outage_when > t:
-                    continue
-                if not bool(t) and (not bool(outage_when) or outage_when):
+                # Parity with check-pr-fully-clean.py (outage_when > when):
+                # An outage notice clears a standing not-clean review only when its
+                # timestamp is strictly after that review's timestamp. If the outage
+                # notice is untimestamped, or timestamps are tied, it cannot clear (fails closed).
+                if (outage_when or "") > (t or ""):
                     continue
         result[login] = st
     return result

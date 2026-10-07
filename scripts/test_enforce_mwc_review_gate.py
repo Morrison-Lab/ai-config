@@ -1130,7 +1130,7 @@ class TestEvaluate(unittest.TestCase):
                 CLEAN_VERDICT,
                 comment(
                     "Copilot was unable to review this pull request because the user who requested the review has reached their quota limit.",
-                    login="copilot-pull-request-reviewer",
+                    login="Copilot",
                     createdAt="2026-10-06T11:00:00Z",
                 ),
             ],
@@ -1255,7 +1255,7 @@ class TestEvaluate(unittest.TestCase):
                 CLEAN_VERDICT,
                 comment(
                     "Copilot was unable to review this pull request because the user who requested the review has reached their quota limit.",
-                    login="copilot-pull-request-reviewer",
+                    login="Copilot",
                     createdAt="",  # empty timestamp fails closed
                 ),
             ],
@@ -1286,7 +1286,7 @@ class TestEvaluate(unittest.TestCase):
                 CLEAN_VERDICT,
                 comment(
                     "Copilot was unable to review this pull request because the user who requested the review has reached their quota limit.",
-                    login="copilot-pull-request-reviewer",
+                    login="Copilot",
                     createdAt="2026-10-06T11:00:00Z",  # identical timestamp does NOT clear
                 ),
             ],
@@ -1382,6 +1382,17 @@ class TestEvaluate(unittest.TestCase):
                 state["reviews"], state["headRefOid"], state["reviewComments"], state["comments"]
             )
             self.assertEqual(bot_states.get("copilot-pull-request-reviewer"), "NOT_CLEAN", disclosure)
+
+    def test_is_bot_login_case_insensitive(self):
+        """is_bot_login is case-insensitive so authentic REST logins like 'Copilot' are recognized (ai-config#4329)."""
+        for login in (
+            "Copilot", "Copilot[bot]", "copilot", "copilot[bot]",
+            "copilot-pull-request-reviewer", "copilot-pull-request-reviewer[bot]",
+            "Claude", "Claude[bot]", "github-actions", "github-actions[bot]",
+        ):
+            self.assertTrue(gate.is_bot_login(login), f"Expected True for {login}")
+        for login in ("human-user", "octocat", "", None):
+            self.assertFalse(gate.is_bot_login(login), f"Expected False for {login}")
 
     def test_bot_short_oid_does_not_clear_or_match_head(self):
         """A 1-character commit oid in a bot review is not head-bound."""
@@ -3422,37 +3433,38 @@ class UnavailableNoticeParityTests(unittest.TestCase):
             "Copilot was unable to review this pull request because the user who "
             "requested the review has reached their quota limit."
         )
-        for rel, review_time, outage_time, expect_cleared in [
-            ("equal", "2026-10-06T11:00:00Z", "2026-10-06T11:00:00Z", False),
-            ("strictly_greater", "2026-10-06T11:00:00Z", "2026-10-06T11:00:01Z", True),
-            ("strictly_less", "2026-10-06T11:00:01Z", "2026-10-06T11:00:00Z", False),
-        ]:
-            with self.subTest(rel=rel):
-                reviews = [{
-                    "author": {"login": "copilot-pull-request-reviewer"},
-                    "state": "COMMENTED",
-                    "body": review_body,
-                    "commit": {"oid": "1111111111111111111111111111111111111111"},
-                    "submittedAt": review_time,
-                }]
-                comments = [
-                    {"author": {"login": "github-actions"}, "body": "### Verdict: clean", "createdAt": "2026-10-06T12:00:00Z"},
-                    {"author": {"login": "copilot-pull-request-reviewer"}, "body": outage_body, "createdAt": outage_time},
-                ]
-                bot_states = gate.latest_bot_review_states(reviews, HEAD, [], comments)
-                is_gate_cleared = "copilot-pull-request-reviewer" not in bot_states
+        for comment_login in ("Copilot", "copilot-pull-request-reviewer"):
+            for rel, review_time, outage_time, expect_cleared in [
+                ("equal", "2026-10-06T11:00:00Z", "2026-10-06T11:00:00Z", False),
+                ("strictly_greater", "2026-10-06T11:00:00Z", "2026-10-06T11:00:01Z", True),
+                ("strictly_less", "2026-10-06T11:00:01Z", "2026-10-06T11:00:00Z", False),
+            ]:
+                with self.subTest(login=comment_login, rel=rel):
+                    reviews = [{
+                        "author": {"login": "copilot-pull-request-reviewer"},
+                        "state": "COMMENTED",
+                        "body": review_body,
+                        "commit": {"oid": "1111111111111111111111111111111111111111"},
+                        "submittedAt": review_time,
+                    }]
+                    comments = [
+                        {"author": {"login": "github-actions"}, "body": "### Verdict: clean", "createdAt": "2026-10-06T12:00:00Z"},
+                        {"author": {"login": comment_login}, "body": outage_body, "createdAt": outage_time},
+                    ]
+                    bot_states = gate.latest_bot_review_states(reviews, HEAD, [], comments)
+                    is_gate_cleared = "copilot-pull-request-reviewer" not in bot_states
 
-                all_items = [
-                    ("review", review_time, review_body, "1111111111111111111111111111111111111111", "COMMENTED", "copilot-pull-request-reviewer"),
-                    ("comment", "2026-10-06T12:00:00Z", "### Verdict: clean", HEAD, "", "github-actions"),
-                    ("comment", outage_time, outage_body, HEAD, "", "copilot-pull-request-reviewer"),
-                ]
-                is_clean, issues = self.checker.check_latest_verdict(all_items)
-                is_checker_cleared = is_clean
+                    all_items = [
+                        ("review", review_time, review_body, "1111111111111111111111111111111111111111", "COMMENTED", "copilot-pull-request-reviewer"),
+                        ("comment", "2026-10-06T12:00:00Z", "### Verdict: clean", HEAD, "", "github-actions"),
+                        ("comment", outage_time, outage_body, HEAD, "", comment_login),
+                    ]
+                    is_clean, issues = self.checker.check_latest_verdict(all_items)
+                    is_checker_cleared = is_clean
 
-                self.assertEqual(is_gate_cleared, expect_cleared)
-                self.assertEqual(is_checker_cleared, expect_cleared)
-                self.assertEqual(is_gate_cleared, is_checker_cleared)
+                    self.assertEqual(is_gate_cleared, expect_cleared)
+                    self.assertEqual(is_checker_cleared, expect_cleared)
+                    self.assertEqual(is_gate_cleared, is_checker_cleared)
 
 
 if __name__ == "__main__":

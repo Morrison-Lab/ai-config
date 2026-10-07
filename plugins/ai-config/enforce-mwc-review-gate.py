@@ -181,24 +181,44 @@ REVIEWER_UNAVAILABLE_MARKERS = (
     "quota limit",
 )
 
+# The body markers that make a comment look like a review regardless of author.
+# Replicated from scripts/check-pr-fully-clean.py for strict parity (ai-config#4329).
+REVIEW_BODY_MARKERS = (
+    "\U0001f916",
+    "### \U0001f916",
+    "code review",
+    "**claude finished",
+    "## verdict",
+    "### verdict",
+    "_posted by codex (ai agent)",
+    "_posted by opencode (ai agent)",
+    "verdict:",
+    "review-data:",
+)
+
+
+def has_review_body_marker(body):
+    """True when *body* carries a marker that makes it read as a review."""
+    body_lower = body.lower()
+    return any(marker in body_lower for marker in REVIEW_BODY_MARKERS)
+
 
 def is_reviewer_unavailable_notice(body):
     """True when *body* says the reviewer could not review due to quota or outage.
 
-    Guarded against review/verdict markers so a self-review or finding that quotes
-    an outage notice is never misclassified as an outage notice (ai-config#1862).
+    Guarded by the same review-body-marker precedence the notice test uses, so
+    a self-review that opens by quoting the outage it stands in for is still
+    read as the review it is. Replicated from scripts/check-pr-fully-clean.py
+    for strict parity (ai-config#4329).
     """
     if not body:
         return False
-    if (
-        VERDICT_MARKER_RE.search(body)
-        or COPILOT_NEGATIVE_HEADER.search(body)
-        or COPILOT_AFFIRMATIVE_HEADER.search(body)
-        or "<!-- ccr-overview-v2 -->" in body
-    ):
+    if has_review_body_marker(body):
         return False
     window = body[:200].lower()
     return any(marker in window for marker in REVIEWER_UNAVAILABLE_MARKERS)
+
+
 # `copilot_is_empty_balanced_closer_look`'s carve-out, at its own call site
 # in `latest_bot_review_states`, went through three heuristic designs in a
 # row ([ai-config#4004](https://github.com/Morrison-Lab/ai-config/issues/4004)) -- reading the heading/effort/findings patterns anywhere
@@ -753,12 +773,6 @@ def latest_bot_review_states(reviews, head_oid="", review_comments=None, comment
 
         raw_body = r.get("body", "") or ""
 
-        if is_reviewer_unavailable_notice(raw_body):
-            norm_login = _normalize_bot_login_for_inline(login)
-            if submitted_at >= unavailable_since.get(norm_login, ""):
-                unavailable_since[norm_login] = submitted_at
-            continue
-
         oid = ((r.get("commit") or {}).get("oid") or "")
         is_negative_header = bool(COPILOT_NEGATIVE_HEADER.search(raw_body))
         is_not_clean_verdict = bool(NOT_CLEAN_VERDICT_RE.search(raw_body))
@@ -780,6 +794,12 @@ def latest_bot_review_states(reviews, head_oid="", review_comments=None, comment
             states[login] = ("NOT_CLEAN", submitted_at)
             continue
 
+        if is_reviewer_unavailable_notice(raw_body):
+            norm_login = _normalize_bot_login_for_inline(login)
+            if submitted_at >= unavailable_since.get(norm_login, ""):
+                unavailable_since[norm_login] = submitted_at
+            continue
+
         is_affirmative = bool(
             (COPILOT_AFFIRMATIVE_HEADER.search(raw_body) and not COPILOT_SUPPRESSED_BLOCK.search(raw_body))
             or CLEAN_VERDICT_RE.search(raw_body)
@@ -796,11 +816,11 @@ def latest_bot_review_states(reviews, head_oid="", review_comments=None, comment
             norm_login = _normalize_bot_login_for_inline(login)
             if norm_login in unavailable_since:
                 outage_when = unavailable_since[norm_login]
-                # Fail closed on missing timestamps: an untimestamped outage notice
-                # can only clear an untimestamped review (e.g. test fixtures). If the
-                # review carries a timestamp, the outage notice MUST carry a timestamp
-                # dated at or after that review (parity with check-pr-fully-clean.py:
-                # outage_when > when).
+                # Fail closed on missing timestamps: if the review carries a timestamp,
+                # the outage notice MUST carry a timestamp dated at or after that review
+                # (parity with check-pr-fully-clean.py: outage_when > when); an untimestamped
+                # outage notice can never clear a timestamped review. If the review is
+                # untimestamped (e.g. test fixtures), any outage notice clears it.
                 if bool(outage_when) and bool(t) and outage_when >= t:
                     continue
                 if not bool(t) and (not bool(outage_when) or outage_when):

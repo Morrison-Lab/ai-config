@@ -1317,6 +1317,40 @@ class TestEvaluate(unittest.TestCase):
         decision = gate.evaluate(MERGE_CMD, state)
         self.assertEqual(decision["decision"], "deny")
 
+    def test_self_review_quoting_outage_with_agent_disclosure_does_not_clear(self):
+        """A self-review status comment quoting the outage notice with an agent disclosure
+        marker is not misclassified as an outage notice and does not clear older not-clean (ai-config#4329)."""
+        older_sha = "1111111111111111111111111111111111111111"
+        for disclosure in (
+            "_Posted by Codex (AI agent) --- not written by a human._",
+            "_Posted by OpenCode (AI agent) --- not written by a human._",
+            "verdict: not-clean",
+            '<!-- review-data: {"verdict": "NOT_CLEAN"} -->',
+        ):
+            state = pr(
+                reviews=[
+                    review(
+                        "copilot-pull-request-reviewer",
+                        "COMMENTED",
+                        body="### Changes recommended\n\nFound a race condition.",
+                        commit=older_sha,
+                        submittedAt="2026-10-06T10:00:00Z",
+                    ),
+                ],
+                comments=[
+                    comment(
+                        f"Copilot was unable to review this pull request because the user who requested the review has reached their quota limit.\n\n{disclosure}",
+                        login="github-actions",
+                        createdAt="2026-10-06T11:00:00Z",
+                    ),
+                ],
+                review_comments=[],
+            )
+            bot_states = gate.latest_bot_review_states(
+                state["reviews"], state["headRefOid"], state["reviewComments"], state["comments"]
+            )
+            self.assertEqual(bot_states.get("copilot-pull-request-reviewer"), "NOT_CLEAN", disclosure)
+
     def test_bot_short_oid_does_not_clear_or_match_head(self):
         """A 1-character commit oid in a bot review is not head-bound."""
         short_sha = HEAD[0]
@@ -3302,6 +3336,51 @@ class ReviewPayloadParityTests(unittest.TestCase):
             "plain\n\n```\nfenced\n```\n\nspan `here` and plain again\n")
         self.assertIn(1, mask)
         self.assertIn(0, mask)
+
+
+class UnavailableNoticeParityTests(unittest.TestCase):
+    """The gate's unavailable-notice handling must agree with scripts/check-pr-fully-clean.py (ai-config#4329)."""
+
+    SAMPLE_BODIES = [
+        # Pure unavailable notices
+        "Copilot was unable to review this pull request because the user who requested the review has reached their quota limit.",
+        "Copilot was unable to review this pull request because the user has reached their quota limit.",
+        "Unable to review this pull request because the user who requested the review has reached their quota limit.",
+        # Outage notice quoted in review with review markers (should NOT be classified as unavailable)
+        "Copilot was unable to review this pull request because the user who requested the review has reached their quota limit.\n\n### Changes recommended\n\nFound a race condition.",
+        "Copilot was unable to review this pull request because the user who requested the review has reached their quota limit.\n\n### Verdict: clean\n\nAll good.",
+        "Copilot was unable to review this pull request because the user who requested the review has reached their quota limit.\n\n## Verdict\nclean",
+        "Copilot was unable to review this pull request because the user who requested the review has reached their quota limit.\n\n_Posted by Codex (AI agent) --- not written by a human._",
+        "Copilot was unable to review this pull request because the user who requested the review has reached their quota limit.\n\n_Posted by OpenCode (AI agent) --- not written by a human._",
+        "Copilot was unable to review this pull request because the user who requested the review has reached their quota limit.\n\nverdict: clean",
+        "Copilot was unable to review this pull request because the user who requested the review has reached their quota limit.\n\n<!-- review-data: {} -->",
+        "Copilot was unable to review this pull request because the user who requested the review has reached their quota limit.\n\n<!-- ccr-overview-v2 -->",
+        "Copilot was unable to review this pull request because the user who requested the review has reached their quota limit.\n\n🤖 Code review notes:",
+        "Copilot was unable to review this pull request because the user who requested the review has reached their quota limit.\n\n**Claude finished reviewing**",
+        # Completely unrelated comments
+        "Looks good to me!",
+        "### Verdict: clean",
+        "",
+    ]
+
+    @classmethod
+    def setUpClass(cls):
+        checker_path = os.path.join(ROOT, "scripts", "check-pr-fully-clean.py")
+        spec = importlib.util.spec_from_file_location("check_pr_fully_clean", checker_path)
+        cls.checker = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.checker)
+
+    def test_is_reviewer_unavailable_notice_agrees(self):
+        for body in self.SAMPLE_BODIES:
+            with self.subTest(body=body[:50]):
+                self.assertEqual(
+                    gate.is_reviewer_unavailable_notice(body),
+                    self.checker.is_reviewer_unavailable_notice(body),
+                )
+
+    def test_review_body_markers_match(self):
+        self.assertEqual(gate.REVIEW_BODY_MARKERS, self.checker.REVIEW_BODY_MARKERS)
+        self.assertEqual(gate.REVIEWER_UNAVAILABLE_MARKERS, self.checker.REVIEWER_UNAVAILABLE_MARKERS)
 
 
 if __name__ == "__main__":

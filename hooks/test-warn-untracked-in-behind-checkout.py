@@ -88,7 +88,11 @@ LONG_BEHIND_TWO_SECTIONS = (
 SB_NONASCII = '## main...origin/main [behind 3]\n?? "caf\\303\\251.txt"\n'
 SB_ESCAPES = ('## main...origin/main [behind 3]\n'
               '?? "x\\"y\\\\z\\tw"\n')
-SB_OCTAL = '## main...origin/main [behind 3]\n?? "\\1011"\n'
+LONG_HOSTILE_REF = (
+    "On branch main\nYour branch is behind 'origin/x;rm -rf ~' by 2 commits, "
+    "and can be fast-forwarded.\n\nUntracked files:\n\ta.txt\n\n"
+)
+SB_OCTAL ='## main...origin/main [behind 3]\n?? "\\1011"\n'
 SB_SPACE ='## main...origin/main [behind 3]\n?? "my file.pdf"\n'
 NON_GIT_OUTPUT = SB_BEHIND  # status-shaped text a non-git command might print
 
@@ -160,6 +164,10 @@ CASES = {
             "'git' as the tail of another word"),
     "S18": (payload('git ' + '-C "a" ' * 40 + "log", SB_BEHIND), False,
             "many quoted -C values and no status: linear time, no hang"),
+    "W16": (payload("git status", LONG_HOSTILE_REF), True,
+            "upstream ref with shell metacharacters is quoted in the commands"),
+    "S19": (payload("git status -sb", "## " + "a...b" * 30000 + " [\n?? x\n"),
+            False, "very long '## a...b...' line: linear time, no hang"),
     "S14": (payload("git status --porcelain=v2 -b", V2_AHEAD_ONLY), False,
             "porcelain v2: behind count 0"),
     "S15": (payload("git log --grep status", SB_BEHIND), False,
@@ -200,6 +208,7 @@ NEEDLES = {
     "W12": "-- 'my file.pdf'",
     "W14": "-- 'x\"y\\z\tw'",
     "W15": "-- A1",
+    "W16": "--name-only 'origin/x;rm -rf ~' -- a.txt",
 }
 
 
@@ -281,7 +290,8 @@ MUTATIONS = {
     "M1_short_behind": (
         "`-sb` header `[behind N]` is recognised",
         [('    m = RX_SHORT_BEHIND.search(text)\n    if m:\n'
-          '        return int(m.group("n")), m.group("up")',
+          '        return int(m.group("n")), '
+          'm.group("branches").partition("...")[2] or None',
           "    pass")],
         {"W1", "W3", "W4", "W6", "W8", "W10", "W11", "W12", "W13", "W14",
          "W15"},
@@ -290,7 +300,7 @@ MUTATIONS = {
         "long-form 'Your branch is behind' is recognised",
         [("    for rx in (RX_LONG_BEHIND, RX_LONG_DIVERGED):",
           "    for rx in (RX_LONG_DIVERGED,):")],
-        {"W2", "W9"},
+        {"W2", "W9", "W16"},
     ),
     "M3_diverged": (
         "long-form diverged output reports its behind half",
@@ -306,7 +316,7 @@ MUTATIONS = {
     "M5_require_behind": (
         "untracked alone does not warn: a behind signal is required",
         [("        if info is None:\n            return 0\n", "        if info is None:\n            info = (0, None)\n")],
-        {"S1", "S3", "S4", "S6", "S14"},
+        {"S1", "S3", "S4", "S6", "S14", "S19"},
     ),
     "M6_git_status_gate": (
         "the command must be a `git ... status`",
@@ -324,7 +334,7 @@ MUTATIONS = {
         "long-form 'Untracked files:' section is parsed",
         [("    head = RX_LONG_UNTRACKED_HEAD.search(text)\n    if head:",
           "    head = None\n    if head:")],
-        {"W2", "W5", "W9"},
+        {"W2", "W5", "W9", "W16"},
     ),
     "M10_v2_behind": (
         "porcelain v2 branch.ab is read",
@@ -363,6 +373,18 @@ MUTATIONS = {
         "a simple escape such as backslash-t is translated",
         [("SIMPLE_ESCAPES.get(body[i + 1], body[i + 1])", "body[i + 1]")],
         {"W14"},
+    ),
+    "M19_quote_ref": (
+        "the upstream ref is shell-quoted in the suggested commands",
+        [("    ref_cmd = shlex.quote(upstream) if upstream else ref",
+          "    ref_cmd = ref")],
+        {"W16"},
+    ),
+    "M20_linear_header": (
+        "the `## local...upstream` header is matched without quadratic scans",
+        [(r'''r"^## (?P<branches>\S+) \[''',
+          r'''r"^## (?P<branches>\S+?(?:\.\.\.\S+)?) \[''')],
+        {"S19"},
     ),
     "M18_separate_long_value": (
         "`--git-dir <path>` consumes its separate value",

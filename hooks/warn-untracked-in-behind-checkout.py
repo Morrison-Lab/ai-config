@@ -20,8 +20,9 @@ the count and the check that settles it: `git fetch`, then
 `git ls-tree -r --name-only origin/<branch> -- <paths>` or
 `git cat-file -e origin/<branch>:<path>`.
 
-Also reads `--porcelain=v2 -b` (`# branch.ab +0 -N`, `? path`). Limit: the
-behind count comes from the local remote-tracking ref, so a checkout that
+Also reads `--porcelain=v2 -b` (`# branch.ab +0 -N`, `? path`). Limits: a backslash-escaped
+quote inside a quoted `git -C` value is not recognised, so that command is
+skipped silently; the behind count comes from the local remote-tracking ref, so a checkout that
 has not fetched recently reports up to date and stays silent.
 
 WARNS, never blocks: PostToolUse runs after the command, and the files may
@@ -56,9 +57,10 @@ RX_GIT_STATUS = re.compile(
 
 # `-sb` / `--porcelain -b` header: `## main...origin/main [behind 23]`,
 # `## main...origin/main [ahead 2, behind 23]`. Plain `ahead` has no "behind".
+# The branch token is matched whole (`local...upstream`) and split afterwards,
+# which keeps the match linear on a long `## a...a...` line.
 RX_SHORT_BEHIND = re.compile(
-    r"^## (?P<local>\S+?)(?:\.\.\.(?P<up>\S+))?"
-    r" \[(?:ahead \d+, )?behind (?P<n>\d+)\]",
+    r"^## (?P<branches>\S+) \[(?:ahead \d+, )?behind (?P<n>\d+)\]",
     re.M,
 )
 # Long form: "Your branch is behind 'origin/main' by 23 commits, ..."
@@ -83,7 +85,7 @@ def behind_info(text):
     """Return (count, upstream-or-None) when `text` reports a behind checkout."""
     m = RX_SHORT_BEHIND.search(text)
     if m:
-        return int(m.group("n")), m.group("up")
+        return int(m.group("n")), m.group("branches").partition("...")[2] or None
     for rx in (RX_LONG_BEHIND, RX_LONG_DIVERGED):
         m = rx.search(text)
         if m:
@@ -149,6 +151,8 @@ def unquote_path(path):
 
 def build_message(count, upstream, paths):
     ref = upstream or "origin/<branch>"
+    # The ref comes from command output and may hold shell metacharacters.
+    ref_cmd = shlex.quote(upstream) if upstream else ref
     shown = paths[:MAX_PATHS]
     listed = " ".join(shlex.quote(unquote_path(p)) for p in shown)
     more = f" (and {len(paths) - len(shown)} more)" if len(paths) > len(shown) else ""
@@ -158,8 +162,8 @@ def build_message(count, upstream, paths):
         f"path(s) it lists may already exist upstream: {listed}{more}. A "
         "stale checkout shows a file it has not pulled as untracked. Before "
         "calling them new or adding them, run `git fetch`, then "
-        f"`git ls-tree -r --name-only {ref} -- {listed}` (or "
-        f"`git cat-file -e {ref}:<path>` per path). Only a path absent from "
+        f"`git ls-tree -r --name-only {ref_cmd} -- {listed}` (or "
+        f"`git cat-file -e {ref_cmd}:<path>` per path). Only a path absent from "
         "that listing is new. Paths are as `git status` printed them: "
         "relative to the current directory in `-s`/long form, to the "
         "repository root in `--porcelain`. `ls-tree` pathspecs are "

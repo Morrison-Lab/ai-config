@@ -236,17 +236,7 @@ def parse_runs(out: str) -> List[Dict[str, Any]]:
         line = line.strip()
         if not line:
             continue
-        item = json.loads(line)
-        if isinstance(item, list):
-            for entry in item:
-                if isinstance(entry, dict) and "workflow_runs" in entry:
-                    runs.extend(entry.get("workflow_runs", []))
-                elif isinstance(entry, dict):
-                    runs.append(entry)
-        elif isinstance(item, dict) and "workflow_runs" in item:
-            runs.extend(item.get("workflow_runs", []))
-        elif isinstance(item, dict):
-            runs.append(item)
+        runs.append(json.loads(line))
     return runs
 
 

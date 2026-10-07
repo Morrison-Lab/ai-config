@@ -162,7 +162,7 @@ LATER_SUCCESS_RUN_B = workflow_run(
 def fake_gh_branch_runs(page_runs):
     def fake_gh(args):
         if args[:2] == ["api", "repos/acme/widgets/actions/workflows/42/runs"]:
-            return _json.dumps([{"workflow_runs": page_runs}])
+            return "\n".join(_json.dumps(r) for r in page_runs)
         raise AssertionError(f"unexpected gh call: {args}")
 
     return fake_gh
@@ -502,13 +502,13 @@ def fake_gh_factory(sha_runs_json, sha=SHA_DEADBEEF):
 
 
 code, out = with_fake_gh(
-    fake_gh_factory(_json.dumps([{"workflow_runs": [run("publish")]}])),
+    fake_gh_factory(_json.dumps(run("publish"))),
     [],
 )
 check("main(): resolves repo/sha and reports clean end to end", code == 0, out)
 check("main(): names the SHA it checked", SHA_DEADBEEF in out, out)
 
-code, out = with_fake_gh(fake_gh_factory(_json.dumps([{"workflow_runs": []}])), [])
+code, out = with_fake_gh(fake_gh_factory(""), [])
 check(
     "main(): no runs on the resolved SHA still exits 3, not 0 "
     "(this is the mds incident's exact shape)",
@@ -518,9 +518,7 @@ check(
 
 code, out = with_fake_gh(
     fake_gh_factory(
-        _json.dumps(
-            [{"workflow_runs": [{**run("publish"), "conclusion": "failure"}]}]
-        ),
+        _json.dumps({**run("publish"), "conclusion": "failure"}),
         sha=SHA_CAFEF00D,
     ),
     ["--sha", SHA_CAFEF00D],
@@ -541,7 +539,7 @@ def fake_gh_no_head_lookup(args):
     if args[:2] == ["api", f"repos/acme/widgets/commits/{SHA_CAFEF00D}"]:
         return SHA_CAFEF00D + "\n"
     if "actions/runs" in args[1]:
-        return _json.dumps([{"workflow_runs": [run("publish")]}])
+        return _json.dumps(run("publish"))
     raise AssertionError(f"unexpected gh call: {args}")
 
 
@@ -573,19 +571,6 @@ check(
     "parse_runs: multiple NDJSON lines",
     mod.parse_runs(multiple_ndjson) == [run("a"), run("b")],
 )
-
-raw_page_dict = _json.dumps({"workflow_runs": [run("a"), run("b")]})
-check(
-    "parse_runs: raw page dict compatibility",
-    mod.parse_runs(raw_page_dict) == [run("a"), run("b")],
-)
-
-legacy_array = _json.dumps([{"workflow_runs": [run("a")]}, {"workflow_runs": [run("b")]}])
-check(
-    "parse_runs: legacy array wrapped pages compatibility",
-    mod.parse_runs(legacy_array) == [run("a"), run("b")],
-)
-
 # --- fetch_runs & find_next_branch_run pagination and flag tests -----------
 
 recorded_args = []

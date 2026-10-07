@@ -395,6 +395,16 @@ When a reviewer offers several fixes, take the one that meets the rule.
 Full statement: [`no-cheap-fixes`](no-cheap-fixes.md).
 Related: [`no-gameable-rules`](no-gameable-rules.md), the same gap seen from the rule author's side.
 
+## Always refactor before modifying substance
+
+Always refactor before modifying substance,
+and do the modifications in a separate PR stacked on top of the refactor PR,
+so it is easier to see what is actually changing.
+Never bundle structural refactoring and substantive modifications into the same pull request.
+
+Full statement: [`refactor-before-modifying-substance`](refactor-before-modifying-substance.md).
+Operationalized by: [`split-concerns`](../../skills/split-concerns/SKILL.md) and [`stack-prs`](../../skills/stack-prs/SKILL.md).
+
 ## Don't use LLMs for algorithmic thinking --- use validated algorithmic software
 
 Never use probabilistic language models for algorithmic operations:

@@ -16,6 +16,8 @@ Any correction from the user,
 and the user saying they had to repeat themselves,
 get the same treatment:
 each means a rule was missed or never recorded where this session could read it.
+Phrases like "haven't I told you (that)" or its shorthand "hity"
+are explicit markers of this signal.
 
 ## Anti-patterns to strictly avoid
 

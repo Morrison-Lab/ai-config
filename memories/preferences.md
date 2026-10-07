@@ -39,6 +39,16 @@
   Never tone-police, scold the user, debate politeness, emit canned corporate apologies, or offer defensive excuses.
   Immediately halt, inspect recent actions/state to diagnose the root cause, remediate the defect completely in that same turn, trigger an urgent UMS pass, and implement mechanical enforcement.
   See [`shared/workflow/user-profanity-signal.md`](../shared/workflow/user-profanity-signal.md). (User directive / Issue #2644, 2026-08-31.)
+- **User shorthand "hity" / "haven't I told you (that)"**:
+  "hity" is user shorthand for "haven't I told you (that)".
+  Whenever the user says either "hity" or "haven't I told you (that)", it is an explicit correction indicating a repeated miss, regression, or unrecorded instruction.
+  Immediately treat it as an urgent defect signal: fix the instance in that turn, trigger an urgent UMS/CAI pass, and commit the general rule to the repo that owns it (ai-config if cross-repo) with mechanical enforcement.
+  (User directive / Issue #4332, 2026-10-06.)
+- **Always refactor before modifying substance**:
+  Always refactor before modifying substance, and do the modifications in a separate PR stacked on top of the refactor PR, so it is easier to see what is actually changing.
+  Never bundle structural refactoring and substantive modifications into a single PR.
+  See [`shared/principles/refactor-before-modifying-substance.md`](../shared/principles/refactor-before-modifying-substance.md).
+  (User directive / Issue #4339, 2026-10-07.)
 - **Do:** use hosted/cloud models for delegated work and adversarial review; if
   hosted quota is unavailable, report the blocker or use deterministic checks instead.
 - **Don't:** run Ollama, LM Studio, llama.cpp, or any other local/on-device model.

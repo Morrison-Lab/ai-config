@@ -32,6 +32,8 @@ FIRES = [
     "I told you yesterday to use Pacific time",
     "I've said this before",
     "didn't I tell you to always link PRs?",
+    "haven't I told you about Pacific time?",
+    "hity to use Pacific time",
     "as I said before, Pacific time",
     "how many times do I have to say this",
     "for the third time: use semantic line breaks",

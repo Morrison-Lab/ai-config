@@ -557,5 +557,100 @@ check(
     out,
 )
 
+# --- parse_paginated_json() tests ------------------------------------------
+
+check("parse_paginated_json: empty string returns empty list", mod.parse_paginated_json("") == [])
+check("parse_paginated_json: whitespace returns empty list", mod.parse_paginated_json("   \n\t  ") == [])
+
+single_page = _json.dumps({"workflow_runs": [run("a")]})
+check(
+    "parse_paginated_json: single object page",
+    mod.parse_paginated_json(single_page) == [{"workflow_runs": [run("a")]}],
+)
+
+two_pages_newline = _json.dumps({"workflow_runs": [run("a")]}) + "\n" + _json.dumps({"workflow_runs": [run("b")]})
+check(
+    "parse_paginated_json: concatenated pages with newline",
+    mod.parse_paginated_json(two_pages_newline)
+    == [{"workflow_runs": [run("a")]}, {"workflow_runs": [run("b")]}],
+)
+
+two_pages_compact = _json.dumps({"workflow_runs": [run("a")]}) + _json.dumps({"workflow_runs": [run("b")]})
+check(
+    "parse_paginated_json: concatenated pages without whitespace",
+    mod.parse_paginated_json(two_pages_compact)
+    == [{"workflow_runs": [run("a")]}, {"workflow_runs": [run("b")]}],
+)
+
+legacy_array = _json.dumps([{"workflow_runs": [run("a")]}, {"workflow_runs": [run("b")]}])
+check(
+    "parse_paginated_json: legacy array wrapped pages",
+    mod.parse_paginated_json(legacy_array)
+    == [{"workflow_runs": [run("a")]}, {"workflow_runs": [run("b")]}],
+)
+
+# --- fetch_runs & find_next_branch_run pagination and flag tests -----------
+
+recorded_args = []
+
+
+def fake_gh_recorder(output):
+    def fake(args):
+        recorded_args.append(args)
+        return output
+
+    return fake
+
+
+# fetch_runs without --slurp across multiple pages
+recorded_args.clear()
+mod.run_gh = fake_gh_recorder(two_pages_newline)
+try:
+    fetched = mod.fetch_runs("acme/widgets", SHA_DEADBEEF)
+finally:
+    mod.run_gh = original_run_gh
+
+check(
+    "fetch_runs: --slurp is NOT passed to gh api",
+    "--slurp" not in recorded_args[0],
+    str(recorded_args[0]),
+)
+check(
+    "fetch_runs: --paginate IS passed to gh api",
+    "--paginate" in recorded_args[0],
+    str(recorded_args[0]),
+)
+check(
+    "fetch_runs: runs are concatenated across paginated JSON documents",
+    [r["name"] for r in fetched] == ["a", "b"],
+    str(fetched),
+)
+
+# find_next_branch_run without --slurp across multiple pages
+recorded_args.clear()
+page1 = _json.dumps({"workflow_runs": [FAILED_RUN_Z]})
+page2 = _json.dumps({"workflow_runs": [SUCCESS_RUN_Y]})
+mod.run_gh = fake_gh_recorder(page1 + "\n" + page2)
+try:
+    next_found = mod.find_next_branch_run("acme/widgets", CANCELLED_RUN_B)
+finally:
+    mod.run_gh = original_run_gh
+
+check(
+    "find_next_branch_run: --slurp is NOT passed to gh api",
+    "--slurp" not in recorded_args[0],
+    str(recorded_args[0]),
+)
+check(
+    "find_next_branch_run: --paginate IS passed to gh api",
+    "--paginate" in recorded_args[0],
+    str(recorded_args[0]),
+)
+check(
+    "find_next_branch_run: finds candidate across multiple paginated documents",
+    next_found == FAILED_RUN_Z,
+    str(next_found),
+)
+
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(1 if failures else 0)

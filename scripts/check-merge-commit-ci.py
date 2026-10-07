@@ -223,6 +223,35 @@ def find_same_sha_success(cancelled: Dict[str, Any], runs: List[Dict[str, Any]])
     return None
 
 
+def parse_paginated_json(text: str) -> List[Dict[str, Any]]:
+    """Parse JSON pages emitted by gh api --paginate.
+
+    Without --slurp, gh api --paginate outputs concatenated JSON documents
+    (one per page), separated by whitespace. Using json.JSONDecoder().raw_decode
+    walks across the stream without needing --slurp (which gh CLI 2.46 lacks).
+    If a page or mock wraps pages in a top-level list, both list and dict pages
+    are handled.
+    """
+    items: List[Dict[str, Any]] = []
+    text = text.strip()
+    if not text:
+        return items
+    decoder = json.JSONDecoder()
+    pos = 0
+    while pos < len(text):
+        while pos < len(text) and text[pos].isspace():
+            pos += 1
+        if pos >= len(text):
+            break
+        doc, end = decoder.raw_decode(text, pos)
+        if isinstance(doc, list):
+            items.extend(doc)
+        elif isinstance(doc, dict):
+            items.append(doc)
+        pos = end
+    return items
+
+
 def find_next_branch_run(
     repo: str, cancelled: Dict[str, Any]
 ) -> Optional[Dict[str, Any]]:
@@ -268,10 +297,9 @@ def find_next_branch_run(
             "-f",
             f"branch={branch}",
             "--paginate",
-            "--slurp",
         ]
     )
-    pages = json.loads(out)
+    pages = parse_paginated_json(out)
     candidates: List[Dict[str, Any]] = []
     for page in pages:
         candidates.extend(page.get("workflow_runs", []))
@@ -299,10 +327,9 @@ def fetch_runs(repo: str, sha: str) -> List[Dict[str, Any]]:
             "-f",
             f"head_sha={sha}",
             "--paginate",
-            "--slurp",
         ]
     )
-    pages = json.loads(out)
+    pages = parse_paginated_json(out)
     runs: List[Dict[str, Any]] = []
     for page in pages:
         runs.extend(page.get("workflow_runs", []))

@@ -1242,3 +1242,20 @@ Pattern 34's `\u0061` example and this one's `\u0077` are the same trick.
 - **Don't:** scan the entire `argv` list for global flags with a simple loop over `enumerate(argv)`.
 - **Don't:** hand-roll an option scanner when `shellcmd.git_subcommand` is already available in the repo.
 
+## Pattern 62: Failing to Verify PR Mergeability and CI Triggering on Creation
+
+- **Mistake**: opening or pushing a PR branch without immediately verifying its mergeability status (`mergeable == MERGEABLE`, `mergeStateStatus == CLEAN`) and confirming that CI check workflows were triggered.
+  When a PR has merge conflicts with base (`mergeable: CONFLICTING`, `mergeStateStatus: DIRTY`), GitHub Actions does not trigger or run CI workflows, leaving the PR in an unmonitored stalled state.
+- **Direction of failure**: silently stalled PR pipeline.
+  The agent reports stopping status thinking CI is running in the background when in fact CI was completely blocked by a merge conflict.
+- **Example**: 2026-10-07, `Morrison-Lab/lds#454` (`move_optimization_chapter_mds`).
+  PR #454 was opened while `chapters/math-prereqs.qmd` conflicted with recent base changes on `origin/main`.
+  The agent reported the PR was open without checking that `statusCheckRollup` was empty and `mergeStateStatus` was `DIRTY`, leaving CI un-triggered until user pointed it out.
+- **Fix**: immediately after opening or pushing a PR, query `gh pr view <N> --json mergeable,mergeStateStatus,statusCheckRollup`.
+  If `mergeable` is `CONFLICTING` or `mergeStateStatus` is `DIRTY`, immediately fetch `origin/main`, merge and resolve conflicts, re-run local verification / adversarial checks, and push to unblock CI.
+- **Do:** verify `mergeable == MERGEABLE` and `mergeStateStatus == CLEAN` immediately after `gh pr create` / `git push`.
+- **Do:** verify that CI checks have actually been scheduled / started (`gh pr checks <N>`).
+- **Don't:** assume CI is running in the background without checking `gh pr view <N> --json mergeable,mergeStateStatus`.
+
+
+

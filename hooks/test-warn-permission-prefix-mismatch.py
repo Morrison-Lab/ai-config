@@ -18,7 +18,7 @@ TMP = tempfile.mkdtemp()
 RULES = os.path.join(TMP, "settings.json")
 with open(RULES, "w", encoding="utf-8") as fh:
     json.dump({"permissions": {"allow": [
-        "Bash(ALLOW_UNREVIEWED_PUSH=1 git push:*)", "Bash(git push:*)"]}}, fh)
+        "Bash(ALLOW_UNREVIEWED_PUSH=1 git push:*)", "Bash(git push:*)", 'Bash(Q="x y" git push:*)', "Bash(ALLOW_UNREVIEWED_PUSH=1 git pull *)"]}}, fh)
 EMPTY = os.path.join(TMP, "none.json")
 
 P = "ALLOW_UNREVIEWED_PUSH=1 "
@@ -27,7 +27,8 @@ WARN = [
     ("W2", P + "git -c core.x=1 push", RULES, "-c k=v"),
     ("W3", P + "git --git-dir=/r/.git push", RULES, "--git-dir=value"),
     ("W4", P + "git --no-pager -C /r push", RULES, "two global options"),
-    ("W7", P + "git -C/r push", RULES, "attached -C<path> form"),
+    ("W7", 'Q="x y" git -C /r push', RULES, "quoted assignment value"),
+    ("W8", P + "git -C /r pull", RULES, "space-star rule form"),
     ("W6", P + "git -C /r push && echo done", RULES, "chained after"),
 ]
 SILENT = [
@@ -119,8 +120,10 @@ MUTATIONS = {
     "M4_stripped_must_match_rule": (
         [("        if matches(prefix, stripped):",
           "        if True:")], {"S4"}),
-    "M8_attached_option_form": (
-        [(r"|\A-[Cc].", "")], {"W7"}),
+    "M8_space_star_rule_form": (
+        [('(?::\\*| \\*)', '(?::\\*)')], {"W8"}),
+    "M10_shell_split_prefix": (
+        [("ptoks = shlex.split(prefix)", "ptoks = prefix.split()")], {"W7"}),
     "M9_tool_name_guard": (
         [('("Bash", "bash")', '("Bash", "bash", "Read")')],
         {"S9"}),

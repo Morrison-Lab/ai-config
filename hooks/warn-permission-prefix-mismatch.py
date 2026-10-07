@@ -19,6 +19,10 @@ written, but one would match it with the global options removed.
 Output: additionalContext (plus systemMessage outside Antigravity) suggesting
 the cwd form. Never blocks. Fails open on any trouble.
 
+Limits (silent, never a false warning): only `Bash(<prefix>:*)` and
+`Bash(<prefix> *)` rules are read; exact-match and deny/ask rules are not.
+Prefixes are shell-split, so quoted assignment values compare as one token.
+
 Test hook: WARN_PREFIX_SETTINGS_FILES (os.pathsep-separated) replaces the
 default settings-file search.
 """
@@ -36,7 +40,7 @@ _VALUE_OPTS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace",
 _FLAG_OPTS = {"--no-pager", "-P", "-p", "--paginate", "--bare",
               "--no-replace-objects", "--literal-pathspecs",
               "--no-optional-locks", "--no-lazy-fetch"}
-_RULE = re.compile(r"\ABash\((.*):\*\)\Z", re.DOTALL)
+_RULE = re.compile(r"\ABash\((.*?)(?::\*| \*)\)\Z", re.DOTALL)
 
 NOTE = (
     "Permission-rule prefix mismatch (likely cause, not proven): `{orig}` "
@@ -71,7 +75,7 @@ def parse(toks):
             j += 2
         elif t in _FLAG_OPTS or re.match(
                 r"\A(--git-dir|--work-tree|--namespace|--exec-path|"
-                r"--config-env)=|\A-[Cc].", t):
+                r"--config-env)=", t):
             j += 1
         else:
             return None  # unknown option: do not guess
@@ -109,7 +113,10 @@ def allow_prefixes():
 
 
 def matches(prefix, toks):
-    ptoks = prefix.split()
+    try:
+        ptoks = shlex.split(prefix)
+    except ValueError:
+        return False
     return bool(ptoks) and toks[:len(ptoks)] == ptoks
 
 

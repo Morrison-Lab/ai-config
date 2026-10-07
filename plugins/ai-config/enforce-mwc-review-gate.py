@@ -1267,12 +1267,6 @@ def extract_actions_run_id(check):
             return int(m.group(1))
         except (ValueError, TypeError):
             pass
-    suite = check.get("check_suite")
-    if isinstance(suite, dict) and suite.get("id") is not None:
-        try:
-            return int(suite["id"])
-        except (ValueError, TypeError):
-            pass
     return None
 
 

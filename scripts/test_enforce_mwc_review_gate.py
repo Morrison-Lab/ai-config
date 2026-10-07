@@ -2663,6 +2663,33 @@ class TestMain(unittest.TestCase):
         )
         self.assertEqual(decision["decision"], "allow")
 
+    def test_cancelled_check_with_later_succeeding_unrelated_sibling_job_denies(self):
+        """A cancelled check must NOT be cleared by a later-succeeding unrelated job in the same workflow."""
+        state = pr(
+            comments=[CLEAN_VERDICT],
+            checks=[
+                {
+                    "name": "build",
+                    "workflowName": "CI",
+                    "conclusion": "CANCELLED",
+                    "status": "COMPLETED",
+                    "completedAt": "2026-10-07T08:00:00Z",
+                    "detailsUrl": "https://github.com/o/r/actions/runs/1/job/1",
+                },
+                {
+                    "name": "lint",
+                    "workflowName": "CI",
+                    "conclusion": "SUCCESS",
+                    "status": "COMPLETED",
+                    "completedAt": "2026-10-07T08:05:00Z",
+                    "detailsUrl": "https://github.com/o/r/actions/runs/1/job/2",
+                },
+            ],
+        )
+        decision = gate.evaluate(MERGE_CMD, state)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("build", decision["reason"])
+
     def test_check_runs_from_rest_unresolved_cancelled_run_denies(self):
         state = pr(comments=[CLEAN_VERDICT], checks=[])
         view_payload = {k: state[k] for k in

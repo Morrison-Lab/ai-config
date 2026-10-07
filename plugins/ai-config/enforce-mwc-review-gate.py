@@ -69,6 +69,7 @@ GRAPHQL_MERGE_RE = re.compile(
 GH_API_MERGE_RE = re.compile(
     r"\bgh api\b[^|;&\n]*?repos/(\S+?/\S+?)/pulls/(\d+)/merge\b"
 )
+ACTIONS_RUN_ID_RE = re.compile(r"/actions/runs/(\d+)")
 VERDICT_MARKER_RE = re.compile(r"^\s*#{2,4}\s*Verdict\b", re.MULTILINE)
 # Logins the review workflows post verdicts under (memories/gh-cli.md: the
 # login varies by repo and run). GraphQL review/comment payloads report bot
@@ -1258,6 +1259,17 @@ def evaluate_verdict(comments, head_oid):
     return "none"
 
 
+def extract_actions_run_id(check):
+    url = check.get("detailsUrl") or check.get("details_url") or check.get("html_url") or ""
+    m = ACTIONS_RUN_ID_RE.search(url)
+    if m:
+        return int(m.group(1))
+    suite = check.get("check_suite") or {}
+    if isinstance(suite, dict) and suite.get("id"):
+        return int(suite["id"])
+    return None
+
+
 def evaluate(cmd, pr_data):
     """Pure decision function: merge command + PR state -> hook decision."""
     if GRAPHQL_MERGE_RE.search(cmd):
@@ -1285,7 +1297,7 @@ def evaluate(cmd, pr_data):
     # Concurrency `cancel-in-progress` leaves a superseded run `cancelled` beside
     # a later success with the same job name and workflow on the same SHA (ai-config#1697, #3343, #3800).
     latest_success = {}
-    workflow_latest_success = {}
+    latest_success_run_id = {}
     for idx, check in enumerate(status_rollup):
         conc = (check.get("conclusion") or "").upper()
         st = (check.get("state") or "").upper()
@@ -1297,8 +1309,9 @@ def evaluate(cmd, pr_data):
             cand = (ts, idx)
             if cand > latest_success.get(key, ("", -1)):
                 latest_success[key] = cand
-            if workflow and ts > workflow_latest_success.get(workflow, ""):
-                workflow_latest_success[workflow] = ts
+            run_id = extract_actions_run_id(check)
+            if run_id is not None and run_id > latest_success_run_id.get(key, -1):
+                latest_success_run_id[key] = run_id
 
     failures = []
     for idx, check in enumerate(status_rollup):
@@ -1312,9 +1325,10 @@ def evaluate(cmd, pr_data):
         cand = (ts, idx)
 
         if conc in BLOCKED_CI_CONCLUSIONS:
+            run_id = extract_actions_run_id(check)
             is_superseded_cancelled = conc == "CANCELLED" and (
                 latest_success.get(key, ("", -1)) > cand
-                or (workflow and workflow_latest_success.get(workflow, "") > ts)
+                or (run_id is not None and latest_success_run_id.get(key, -1) > run_id)
             )
             if is_superseded_cancelled:
                 continue

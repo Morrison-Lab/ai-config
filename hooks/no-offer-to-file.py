@@ -46,6 +46,12 @@ PATTERNS = [
     r"((it|one|them)(?=\s*([.!?)\n]|$))|me to (file|record|save|capture|note|open an issue))",
     r"\b(file|filing|issue|memory|memories|record|recording)\b[^\n]{0,240}?"
     r"\b(just )?say the word\b",
+    # Attaching the repository a fix or issue belongs in is covered by the
+    # non-destructive grant too (ai-config#4337): "filing it upstream would
+    # need add_repo" in place of calling add_repo is the same offer.
+    r"\b(would|will) (need|require) (an? )?`?add_repo`?",
+    r"(want me to|should i|shall i) (attach|add_repo|add the (repo|repository))\b",
+    r"i (can|could) attach (it|the|that|this)\b[^.!?\n]{0,60}?\b(repo|repository)\b[^.!\n]*\?",
 ]
 RX = re.compile("|".join(PATTERNS), re.I)
 

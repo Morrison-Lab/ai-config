@@ -72,6 +72,18 @@ CASES = [
     ([TOOL, say("I could file an issue about this?")], True, "i could file an issue blocks"),
     ([TOOL, say("Want me to file the issue and open that PR?")], True, "bundled offer blocks"),
 
+    # Offering to attach the repository a fix belongs in (ai-config#4337)
+    (
+        [TOOL, say("Filing the delimited-def problem upstream (would need add_repo) is still open.")],
+        True,
+        "'would need add_repo' blocks",
+    ),
+    ([TOOL, say("Want me to attach the macros repo and file it?")], True, "want me to attach blocks"),
+    ([TOOL, say("I can attach the upstream repository too if that helps?")], True, "i can attach the repo ... ? blocks"),
+    ([TOOL, say("Attached Morrison-Lab/macros with add_repo and filed macros#108.")], False, "past-tense attach report passes"),
+    ([TOOL, say("add_repo attached the repository, so the clone ran next.")], False, "add_repo mentioned as done passes"),
+    ([TOOL, say("I attached it with `add_repo`; it would need a clone after that, which I ran.")], False, "attach done plus clone note passes"),
+
     # Statement-shaped offers (no question mark): both let through before
     (
         [TOOL, say(

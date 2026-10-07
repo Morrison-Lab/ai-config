@@ -40,12 +40,18 @@ SIMPLE_ESCAPES = {"n": "\n", "t": "\t", "a": "\a", "b": "\b", "f": "\f",
 
 # `git status`, tolerating global options before the subcommand (`git -C d status`).
 # `status` must be the subcommand: only option tokens may sit between.
-# The alternatives are disjoint (`-C`/`-c` take a value, other short flags
-# take none, long options are `--name[=value]`), so matching cannot backtrack
-# exponentially. A value may be quoted (`git -C "my dir" status`).
+# Each token has exactly one parse, so matching cannot backtrack
+# exponentially: `-C`/`-c` and `--git-dir`/`--work-tree`/`--namespace` take a
+# separate value (quoted, or starting with a non-quote character, so the value
+# branches are disjoint), other long options are `--name[=value]` (the lookahead
+# keeps the three value-taking names out of that branch), other short flags
+# take none. A value may be quoted (`git -C "my dir" status`).
+_VAL = r"(?:\"[^\"]*\"|'[^']*'|[^\s\"']\S*)"
 RX_GIT_STATUS = re.compile(
-    r"(?<![\w-])git(?:\s+(?:-[Cc]\s+(?:\"[^\"]*\"|'[^']*'|\S+)"
-    r"|--[A-Za-z][\w-]*(?:=\S+)?|-[A-BD-Za-bd-z]))*\s+status\b"
+    r"(?<![\w-])git(?:\s+(?:-[Cc]\s+" + _VAL
+    + r"|--(?:git-dir|work-tree|namespace)\s+" + _VAL
+    + r"|--(?!(?:git-dir|work-tree|namespace)(?![\w=-]))[A-Za-z][\w-]*(?:=\S+)?"
+    + r"|-[A-BD-Za-bd-z]))*\s+status\b"
 )
 
 # `-sb` / `--porcelain -b` header: `## main...origin/main [behind 23]`,

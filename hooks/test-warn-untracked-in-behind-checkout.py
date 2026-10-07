@@ -86,7 +86,10 @@ LONG_BEHIND_TWO_SECTIONS = (
     "\tnew.pdf\n\n"
 )
 SB_NONASCII = '## main...origin/main [behind 3]\n?? "caf\\303\\251.txt"\n'
-SB_SPACE = '## main...origin/main [behind 3]\n?? "my file.pdf"\n'
+SB_ESCAPES = ('## main...origin/main [behind 3]\n'
+              '?? "x\\"y\\\\z\\tw"\n')
+SB_OCTAL = '## main...origin/main [behind 3]\n?? "\\1011"\n'
+SB_SPACE ='## main...origin/main [behind 3]\n?? "my file.pdf"\n'
 NON_GIT_OUTPUT = SB_BEHIND  # status-shaped text a non-git command might print
 
 
@@ -147,6 +150,16 @@ CASES = {
             "C-escaped non-ASCII name is decoded in the pathspec"),
     "W12": (payload("git status -sb", SB_SPACE), True,
             "double-quoted name with a space is unquoted then shell-quoted"),
+    "W13": (payload("git --git-dir /x/repo status -sb", SB_BEHIND), True,
+            "long global option with a separate value"),
+    "W14": (payload("git status -sb", SB_ESCAPES), True,
+            "escaped quote, backslash and tab are decoded"),
+    "W15": (payload("git status -sb", SB_OCTAL), True,
+            "an octal escape stops after three digits"),
+    "S17": (payload("legit status -sb", SB_BEHIND), False,
+            "'git' as the tail of another word"),
+    "S18": (payload('git ' + '-C "a" ' * 40 + "log", SB_BEHIND), False,
+            "many quoted -C values and no status: linear time, no hang"),
     "S14": (payload("git status --porcelain=v2 -b", V2_AHEAD_ONLY), False,
             "porcelain v2: behind count 0"),
     "S15": (payload("git log --grep status", SB_BEHIND), False,
@@ -163,12 +176,15 @@ CASES = {
 
 def run(hook, stdin_text):
     proc = subprocess.run([sys.executable, hook], input=stdin_text,
-                          capture_output=True, text=True, timeout=30)
+                          capture_output=True, text=True, timeout=10)
     return proc
 
 
 def warned(hook, case_payload):
-    proc = run(hook, json.dumps(case_payload))
+    try:
+        proc = run(hook, json.dumps(case_payload))
+    except subprocess.TimeoutExpired:
+        return "TIMEOUT"  # a hang (e.g. catastrophic backtracking) is a failure
     if proc.returncode != 0:
         return "CRASH"
     if not proc.stdout.strip():
@@ -182,6 +198,8 @@ def warned(hook, case_payload):
 NEEDLES = {
     "W11": "-- 'café.txt'",
     "W12": "-- 'my file.pdf'",
+    "W14": "-- 'x\"y\\z\tw'",
+    "W15": "-- A1",
 }
 
 
@@ -265,7 +283,8 @@ MUTATIONS = {
         [('    m = RX_SHORT_BEHIND.search(text)\n    if m:\n'
           '        return int(m.group("n")), m.group("up")',
           "    pass")],
-        {"W1", "W3", "W4", "W6", "W8", "W10", "W11", "W12"},
+        {"W1", "W3", "W4", "W6", "W8", "W10", "W11", "W12", "W13", "W14",
+         "W15"},
     ),
     "M2_long_behind": (
         "long-form 'Your branch is behind' is recognised",
@@ -293,7 +312,7 @@ MUTATIONS = {
         "the command must be a `git ... status`",
         [("        if not RX_GIT_STATUS.search(command):\n            return 0\n",
           "")],
-        {"S7", "S12", "S15", "S16"},
+        {"S7", "S12", "S15", "S16", "S17", "S18"},
     ),
     "M7_bash_gate": (
         "only the Bash tool is inspected",
@@ -320,21 +339,42 @@ MUTATIONS = {
     ),
     "M12_subcommand_only": (
         "`status` must be the git subcommand, not any later word",
-        [('    r"|--[A-Za-z][\\w-]*(?:=\\S+)?|-[A-BD-Za-bd-z]))*\\s+status\\b"',
-          '    r"|--[A-Za-z][\\w-]*(?:=\\S+)?|-[A-BD-Za-bd-z]|\\S+))*\\s+status\\b"')],
-        {"S15", "S16"},
+        [(r'''    + r"|-[A-BD-Za-bd-z]))*\s+status\b"''',
+          r'''    + r"|-[A-BD-Za-bd-z]|\S+))*\s+status\b"''')],
+        {"S15", "S16", "S18"},
     ),
     "M13_quoted_option_value": (
         "a quoted `-C` value is one token",
-        [('(?:\\"[^\\"]*\\"|\'[^\']*\'|\\S+)"', '(?:\\S+)"')],
+        [(r'''_VAL = r"(?:\"[^\"]*\"|'[^']*'|[^\s\"']\S*)"''',
+          r'''_VAL = r"(?:[^\s\"']\S*)"''')],
         {"W10"},
+    ),
+    "M15_git_word_boundary": (
+        "`git` must be a whole word, not the tail of `legit` or `--git-dir`",
+        [(r"(?<![\w-])git(?:", "git(?:")],
+        {"S17"},
+    ),
+    "M16_octal_cap": (
+        "an octal escape takes at most three digits",
+        [("j < min(i + 4, len(body))", "j < min(i + 5, len(body))")],
+        {"W15"},
+    ),
+    "M17_simple_escapes": (
+        "a simple escape such as backslash-t is translated",
+        [("SIMPLE_ESCAPES.get(body[i + 1], body[i + 1])", "body[i + 1]")],
+        {"W14"},
+    ),
+    "M18_separate_long_value": (
+        "`--git-dir <path>` consumes its separate value",
+        [('    + r"|--(?:git-dir|work-tree|namespace)\\s+" + _VAL\n', "")],
+        {"W13"},
     ),
     "M14_unquote_path": (
         "git's C-style path quoting is undone before the pathspec is built",
         [('    if not (len(path) > 1 and path[0] == path[-1] == \'"\'):\n'
           '        return path',
           '    return path')],
-        {"W11", "W12"},
+        {"W11", "W12", "W14", "W15"},
     ),
     "M9_fail_open": (
         "any exception exits 0 silently",

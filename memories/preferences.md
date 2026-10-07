@@ -225,8 +225,13 @@
   Explicitly say whether the session is done or not when reporting stopping point status (e.g. `**Stopping Point**: Clean stopping point reached --- session done; UMS executed; no follow-up items pending` or `**Stopping Point**: Not a clean stopping point / work remains queued: session not done; ...`).
   Include confirming UMS pass (or no new learnings accumulated) and that any follow-up items noticed during the turn or task have been filed.
   Never finish or stop without stating whether or not a clean stopping point has been reached and whether the session is done.
+  **Never say a session is done when there are uncommitted, unpushed, or un-PRed changes, or open PRs authored by that session.**
   If you opened PRs and haven't driven them to clean (and merged them if `mwc` is active), it is NOT a clean stopping point --- explicitly state that the PR remains in flight and unmerged.
-  (User corrections / directives, 2026-08-17, 2026-08-18, 2026-08-30, 2026-09-29 / Issue #4128.)
+  - **Do:** state "session not done" whenever there are uncommitted changes, unpushed commits, un-PRed branches, or open PRs authored by this session.
+  - **Do:** ensure every PR opened or pushed to by this session has merged or closed before declaring the session done.
+  - **Don't:** declare a clean stopping point or say the session is done while any uncommitted file, unpushed commit, un-PRed branch, or open PR authored by this session exists.
+  - **Don't:** declare a clean stopping point over a PR awaiting review or CI, even if passing.
+  (User corrections / directives, 2026-08-17, 2026-08-18, 2026-08-30, 2026-09-29, 2026-10-06 / Issues #4128, #4270; see [`shared/workflow/flag-session-boundaries.md`](../shared/workflow/flag-session-boundaries.md).)
 
 - **AI Capability & Memory Changes (`cai` / `ca`)**: Whenever a session creates or updates AI capabilities, memories, or skill definitions (`cai`, `ca`, `ums`), immediately branch off `main` in `Morrison-Lab/ai-config` (or the working repo), commit, push to origin, open a PR, request review, and drive to clean (or merge under `mwc`). Never leave `cai` or memory edits sitting uncommitted in a local working directory or wait for the user to prompt for a push. (User correction, 2026-08-17.)
 - Keep PRs focused on a single concern:

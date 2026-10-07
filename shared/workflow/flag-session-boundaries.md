@@ -130,6 +130,17 @@ Open PRs belonging to *other* sessions do not trigger this --- `wrap-up`'s sweep
 - **Don't:** treat "green checks, just awaiting review" as not-live --- it is the archetypal live PR.
 - **Don't:** flag a stopping point and disclose the open PR in the same breath, which is the same too-early flag [`run-ums-proactively`](run-ums-proactively.md)'s "Recommending that the session end is itself a UMS trigger" section rejects.
 
+**Never say a session is done when there are uncommitted, unpushed, or un-PRed changes, or open PRs authored by that session.**
+A session cannot be declared done or at a clean stopping point while changes remain uncommitted in any worktree, commits remain unpushed on any branch, pushed commits lack an opened PR, or any PR opened or pushed to by this session remains open and unmerged.
+Even when local tests pass, preview builds succeed, or automated checks are completely green, an open PR or unpushed work represents active, in-flight delivery that has not landed.
+
+- **Do:** confirm zero uncommitted edits, zero unpushed commits, zero un-PRed branches, and zero open PRs authored by this session before stating "session done".
+- **Do:** declare "session not done" whenever any uncommitted change, unpushed commit, un-PRed branch, or open PR authored by this session remains.
+- **Don't:** say a session is done when there are uncommitted, unpushed, or un-PRed changes, or open PRs authored by that session.
+- **Don't:** treat clean checks or an approved PR as "session done" before the PR actually merges.
+
+(Directive from the user, 2026-10-06.)
+
 **Run `wrap-up`'s state sweep *before* flagging a stopping point, not after the user asks for one.**
 The paragraph above says not to flag while live state remains; it doesn't say how to know.
 Answering that from memory only covers the PRs and branches *this conversation* created, which is exactly the blind spot: a bot-opened PR, a leftover branch from the harness or an earlier session in the same container, or another session's PR in the same repo never entered the conversation, so nothing about them feels outstanding.

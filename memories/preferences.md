@@ -224,9 +224,9 @@
   Whenever ending a session, completing a turn, or wrapping up work (whether finishing a single task, a multi-issue backlog loop like `gii`/`gia`, a PR stack sweep, or an automated session wrap-up like `mwc`/`wrap-up`), ALWAYS include an explicit `**Stopping Point**` declaration that says whether the session is done or not.
   Explicitly say whether the session is done or not when reporting stopping point status (e.g. `**Stopping Point**: Clean stopping point reached --- session done; UMS executed; no follow-up items pending` or `**Stopping Point**: Not a clean stopping point / work remains queued: session not done; ...`).
   Include confirming UMS pass (or no new learnings accumulated) and that any follow-up items noticed during the turn or task have been filed.
-  Never finish or stop without stating whether or not a clean stopping point has been reached and whether the session is done.
-  If you opened PRs and haven't driven them to clean (and merged them if `mwc` is active), it is NOT a clean stopping point --- explicitly state that the PR remains in flight and unmerged.
-  (User corrections / directives, 2026-08-17, 2026-08-18, 2026-08-30, 2026-09-29 / Issue #4128.)
+  Never say a session is done when there are uncommitted, unpushed, or un-PRed changes, or open PRs authored by that session (User directive, 2026-10-06).
+  If you opened PRs and haven't driven them to clean (and merged them if `mwc` is active), it is NOT a clean stopping point --- explicitly state that the session is not done and the PR remains in flight.
+  (User corrections / directives, 2026-08-17, 2026-08-18, 2026-08-30, 2026-09-29, 2026-10-06 / Issue #4128.)
 
 - **AI Capability & Memory Changes (`cai` / `ca`)**: Whenever a session creates or updates AI capabilities, memories, or skill definitions (`cai`, `ca`, `ums`), immediately branch off `main` in `Morrison-Lab/ai-config` (or the working repo), commit, push to origin, open a PR, request review, and drive to clean (or merge under `mwc`). Never leave `cai` or memory edits sitting uncommitted in a local working directory or wait for the user to prompt for a push. (User correction, 2026-08-17.)
 - Keep PRs focused on a single concern:
@@ -710,6 +710,8 @@
   Also: don't give the code chunk *inside* a `#fig-`/`#tbl-` div a `fig-`/`tbl-`-prefixed `#| label:` --- that registers a second, redundant cross-reference id.
   Give the enclosed chunk a plain label and let the div own the `@fig-`/`@tbl-` reference.
   Refs: <https://quarto.org/docs/authoring/figures.html#figure-divs>; ucdavis/bcs#220, #223.
+- In Quarto documents, every technical concept or definition must be enclosed in a formal Quarto definition div (`::: {#def-...}`) with bolded terms and an `#id` anchor rather than introduced in informal running prose.
+  Pair with a worked example (`::: {#exm-...}`) where applicable (User directive, 2026-10-06).
 - For where to place a cross-repository concept anchor (e.g. `[]{#sec-...}` linking from `lds` or `mlds` into `pds`), see [`memories/quarto-sites.md`](quarto-sites.md)'s "Place cross-repository concept anchors" entry.
 - When a memory, skill, or doc entry points at a location in *another* file, don't cite a specific line number --- it goes stale the moment that file changes, and a later reader who looks it up comes up empty.
   Quote the section heading or symbol name (e.g. the `## Foo` heading) or use a vaguer reference instead.

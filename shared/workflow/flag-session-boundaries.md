@@ -8,11 +8,15 @@ The last message you post before stopping MUST explicitly state whether or not t
 Whenever ending a session, completing a turn, or wrapping up work (whether finishing a single task, a multi-issue backlog loop like `gii`/`gia`, a PR stack sweep, or an automated session wrap-up like `mwc`/`wrap-up`), ALWAYS include an explicit `**Stopping Point**` declaration that says whether the session is done or not.
 When reporting stopping point status:
 - Explicitly state whether the session is done or not.
-  Never say a session is done when there are uncommitted, unpushed, or un-PRed changes, or open PRs authored by that session --- even after delivering completed implementation work (opening the PR), work remains to monitor CI and drive the review to clean or merge.
+  Never say a session is done when there are uncommitted, unpushed, or un-PRed changes,
+  or open PRs authored by that session ---
+  even after delivering completed implementation work (opening the PR),
+  work remains to monitor CI and drive the review to clean or merge.
 - Include running UMS (or confirming no new learnings accumulated since the last pass).
 - Confirm that any follow-up items noticed during the turn or task have been filed.
 Never leave the user guessing whether additional tasks remain queued or if a clean stopping point has been reached.
-(User corrections / directives, 2026-08-17, 2026-08-18, 2026-09-29, 2026-10-06; [#4328](https://github.com/Morrison-Lab/ai-config/issues/4328).)
+(User corrections / directives, 2026-08-17, 2026-08-18, 2026-09-29, 2026-10-06;
+[#4328](https://github.com/Morrison-Lab/ai-config/issues/4328).)
 
 **A conversational question-answering reply concluding a turn is a stopping point.**
 When answering a question at the end of a session or turn (e.g. explaining a diagnosis, answering "why not?", or clarifying why a branch was deleted), that reply is the stopping point of the turn.

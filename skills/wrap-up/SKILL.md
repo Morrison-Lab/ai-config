@@ -79,7 +79,9 @@ List, don't bury:
 - **Leftover git worktrees** — agent isolation and `session-lock` leave
   worktrees behind (esp. ones whose PR already merged). Flag them and offer to
   run `clean-worktrees` (`cw`) to sweep the dead ones.
-- Never report "all done" or that the session is done when there are uncommitted, unpushed, or un-PRed changes, or open PRs authored by that session --- name what remains and say whose call
+- Never report "all done" or that the session is done
+  when there are uncommitted, unpushed, or un-PRed changes, or open PRs authored by that session ---
+  name what remains and say whose call
   it is (e.g. "PR #25 is the bot's; yours to merge or close").
 
 ### 3. Report a linked final summary
@@ -130,7 +132,10 @@ reference, not a confirmation.
 
 **Then close the reply with an explicit stopping-point statement (the last message you post before stopping should always state whether or not this is a clean stopping point for the session, and explicitly declare whether the session is done or ongoing):**
 
-- **Clean stopping point reached** (nothing open or pending; no uncommitted, unpushed, or un-PRed changes, and no open PRs authored by this session) — end with an explicit stopping-point statement, e.g. `**Stopping Point**: Clean stopping point reached --- session done; UMS executed; no follow-up items pending`.
+- **Clean stopping point reached** (nothing open or pending;
+  no uncommitted, unpushed, or un-PRed changes, and no open PRs authored by this session) ---
+  end with an explicit stopping-point statement,
+  e.g. `**Stopping Point**: Clean stopping point reached --- session done; UMS executed; no follow-up items pending`.
   A silent trailing summary leaves the user unsure whether you're actually done or just paused.
 - **Not a clean stopping point** (something open or in flight) — an ambiguous review item, a deadlock needing a human reviewer, pending CI/review jobs, unmerged PRs, or a choice only the user can make — state explicitly `**Stopping Point**: Not a clean stopping point / work remains queued: session not done; [reason/open items]`, and end the reply **with the open question(s) / pending tasks**, last and clearly visible.
 

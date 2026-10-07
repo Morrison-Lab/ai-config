@@ -1289,19 +1289,19 @@ def make_git_repo(dirty=False, unpushed=False):
     subprocess.run(["git", "config", "user.name", "Test"], cwd=tmpdir, capture_output=True, check=True)
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=tmpdir, capture_output=True, check=True)
     readme = os.path.join(tmpdir, "README.md")
-    with open(readme, "w") as f:
+    with open(readme, "w", encoding="utf-8") as f:
         f.write("Initial\n")
     subprocess.run(["git", "add", "README.md"], cwd=tmpdir, capture_output=True, check=True)
     subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=tmpdir, capture_output=True, check=True)
     if unpushed:
         subprocess.run(["git", "checkout", "-b", "feature"], cwd=tmpdir, capture_output=True, check=True)
         feature_file = os.path.join(tmpdir, "feature.txt")
-        with open(feature_file, "w") as f:
+        with open(feature_file, "w", encoding="utf-8") as f:
             f.write("feature\n")
         subprocess.run(["git", "add", "feature.txt"], cwd=tmpdir, capture_output=True, check=True)
         subprocess.run(["git", "commit", "-m", "Unpushed feature commit"], cwd=tmpdir, capture_output=True, check=True)
     if dirty:
-        with open(readme, "a") as f:
+        with open(readme, "a", encoding="utf-8") as f:
             f.write("Dirty modification\n")
     return tmpdir
 

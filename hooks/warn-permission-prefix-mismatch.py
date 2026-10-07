@@ -3,8 +3,8 @@
 
 Claude Code matches a `Bash(<prefix>:*)` allow rule against the literal start
 of the command. `ALLOW_UNREVIEWED_PUSH=1 git -C /repo push` does not start
-with `ALLOW_UNREVIEWED_PUSH=1 git push`, so the rule the user already has does
-not cover it, the auto-mode classifier denies the override, and the agent asks
+with `ALLOW_UNREVIEWED_PUSH=1 git push`, so the rule the user already has most likely
+does not cover it, the auto-mode classifier may deny the override, and the agent asks
 the user for a rule that exists (measured 2026-10-07, Morrison-Lab/mlr;
 memories/claude-code-hooks.md, "A permission allow-rule matches the command's
 literal prefix").
@@ -30,7 +30,6 @@ import shlex
 import sys
 
 _ASSIGN = re.compile(r"\A[A-Za-z_][A-Za-z0-9_]*=")
-_SEPARATORS = {"&&", "||", ";", "|", "&", "(", ")", ";;"}
 # global options taking a separate value argument
 _VALUE_OPTS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace",
                "--exec-path", "--super-prefix", "--config-env"}
@@ -40,12 +39,13 @@ _FLAG_OPTS = {"--no-pager", "-P", "-p", "--paginate", "--bare",
 _RULE = re.compile(r"\ABash\((.*):\*\)\Z", re.DOTALL)
 
 NOTE = (
-    "Permission-rule prefix mismatch (likely cause, not proven): `{orig}` carries a git global option "
-    "before the subcommand, so it does not start with `{stripped}`, which "
-    "the allow rule `Bash({rule}:*)` in {src} matches. Claude Code matches "
-    "allow rules against the literal command prefix, so this command may "
+    "Permission-rule prefix mismatch (likely cause, not proven): `{orig}` "
+    "carries a git global option before the subcommand, so it does not "
+    "start with the prefix of the allow rule `Bash({rule}:*)` in {src}, "
+    "which the option-free form does match. Allow rules appear to match the "
+    "literal command prefix, so this command may "
     "prompt or be classifier-denied although the rule exists. Run it from "
-    "the repo's cwd as `{stripped} ...` (no `-C`, no `cd` chain) instead of "
+    "the repo's cwd as `{stripped}` (no `-C`, no `cd` chain) instead of "
     "asking the user to add a rule."
 )
 
@@ -53,12 +53,7 @@ NOTE = (
 def split_command(command):
     lex = shlex.shlex(command, posix=True, punctuation_chars=True)
     lex.whitespace_split = True
-    toks = []
-    for tok in lex:
-        if tok in _SEPARATORS:
-            break
-        toks.append(tok)
-    return toks
+    return list(lex)
 
 
 def parse(toks):
@@ -131,7 +126,7 @@ def find_mismatch(command):
     for prefix, src in rules:
         if matches(prefix, stripped):
             return {"orig": shlex.join(full[:len(assigns) + 1 + len(opts)]),
-                    "stripped": prefix, "rule": prefix, "src": src}
+                    "stripped": shlex.join(stripped), "rule": prefix, "src": src}
     return None
 
 

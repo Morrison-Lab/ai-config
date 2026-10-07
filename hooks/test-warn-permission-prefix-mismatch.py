@@ -27,6 +27,7 @@ WARN = [
     ("W2", P + "git -c core.x=1 push", RULES, "-c k=v"),
     ("W3", P + "git --git-dir=/r/.git push", RULES, "--git-dir=value"),
     ("W4", P + "git --no-pager -C /r push", RULES, "two global options"),
+    ("W7", P + "git -C/r push", RULES, "attached -C<path> form"),
     ("W6", P + "git -C /r push && echo done", RULES, "chained after"),
 ]
 SILENT = [
@@ -40,6 +41,7 @@ SILENT = [
      "git is not the first command"),
     ("S8", "FOO=1 " + P + "git -C /r push", RULES,
      "extra leading assignment: rule could not match even without -C"),
+    ("S9", P + "git -C /r push", RULES, "non-Bash tool carrying a command"),
     ("S7", P + "git --weird-opt push", RULES, "unknown option, no guess"),
 ]
 CASES = {c[0]: c for c in WARN + SILENT}
@@ -47,10 +49,11 @@ EXPECTED = {c[0]: "WARN" for c in WARN} | {c[0]: "silent" for c in SILENT}
 
 
 def verdict(hook, case):
-    _, cmd, settings, _ = case
+    cid, cmd, settings, _ = case
+    tool = "Read" if cid == "S9" else "Bash"
     proc = subprocess.run(
         [sys.executable, hook], text=True, capture_output=True,
-        input=json.dumps({"tool_name": "Bash", "tool_input": {"command": cmd}}),
+        input=json.dumps({"tool_name": tool, "tool_input": {"command": cmd}}),
         env={**os.environ, "WARN_PREFIX_SETTINGS_FILES": settings})
     if proc.returncode != 0:
         sys.exit(f"FATAL: exit {proc.returncode}: {proc.stderr}")
@@ -116,6 +119,11 @@ MUTATIONS = {
     "M4_stripped_must_match_rule": (
         [("        if matches(prefix, stripped):",
           "        if True:")], {"S4"}),
+    "M8_attached_option_form": (
+        [(r"|\A-[Cc].", "")], {"W7"}),
+    "M9_tool_name_guard": (
+        [('("Bash", "bash")', '("Bash", "bash", "Read")')],
+        {"S9"}),
     "M5_unknown_option_bails": (
         [("            return None  # unknown option: do not guess",
           "            j += 1")], {"S7"}),

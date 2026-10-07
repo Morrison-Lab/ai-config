@@ -2818,7 +2818,7 @@ DENY_TAIL = (
     "verdict can exist for the guard to check: an initial empty PR branch (per "
     "pr-on-claim), an auto-mode session where no subagent tool exists, "
     "or an emergency. Write it as `ALLOW_UNREVIEWED_PUSH=1 git push ...` from the "
-    "repo's cwd: `git -C <path>` or any flag before `push` misses the user's "
+    "repo's cwd: `git -C <path>` or any flag before `push` probably misses the user's "
     "`Bash(ALLOW_UNREVIEWED_PUSH=1 git push:*)` allow rule. In auto mode, if the "
     "permission classifier denies the env prefix, grep the settings files for that "
     "rule before asking the user to add one. "

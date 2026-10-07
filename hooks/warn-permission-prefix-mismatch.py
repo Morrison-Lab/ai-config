@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""PreToolUse warn-only guard: a git global option defeats an allow-rule prefix.
+"""PreToolUse warn-only guard: a git global option likely defeats an allow-rule prefix.
 
-Claude Code matches a `Bash(<prefix>:*)` allow rule against the literal start
-of the command. `ALLOW_UNREVIEWED_PUSH=1 git -C /repo push` does not start
+Claude Code appears to match a `Bash(<prefix>:*)` allow rule against the
+literal start of the command (one observation, cause not isolated). `ALLOW_UNREVIEWED_PUSH=1 git -C /repo push` does not start
 with `ALLOW_UNREVIEWED_PUSH=1 git push`, so the rule the user already has most likely
 does not cover it, the auto-mode classifier may deny the override, and the agent asks
 the user for a rule that exists (measured 2026-10-07, Morrison-Lab/mlr;
@@ -157,8 +157,8 @@ def main():
                                   "additionalContext": NOTE.format(**hit)}}
     if not os.environ.get("ANTIGRAVITY_AGENT"):
         out["systemMessage"] = (
-            f"Allow rule `Bash({hit['rule']}:*)` will not match this command "
-            "because of the git global option; run it from the repo's cwd "
+            f"Allow rule `Bash({hit['rule']}:*)` likely will not match this "
+            "command because of the git global option; run it from the repo's cwd "
             "without `-C`.")
     print(json.dumps(out))
     return 0

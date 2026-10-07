@@ -1064,7 +1064,7 @@ The agent told the user to add a Bash permission rule for `ALLOW_UNREVIEWED_PUSH
 The command most likely missed the rule because `-C <path>` sits between `git` and `push`, breaking the prefix match (one observation, consistent with literal-prefix matching but not isolated from the intermittent classifier denial recorded above).
 Re-run as `ALLOW_UNREVIEWED_PUSH=1 git push -u origin <branch>` from the repo's cwd, it succeeded.
 This is a candidate further cause of the override denial, distinct from the classifier's `[Safety Bypass Flag]` flakiness above.
-The `git -C <literal path> push` advice elsewhere in this corpus is right for the guards' parsing but probably wrong for allow-rule matching, so choose the cwd form whenever a rule exists.
+`hooks/no-clobbering-push.py` and `hooks/flag-chained-push.py` both recognize `git -C <dir> push`, so that form suits the guards' parsing; it probably does not suit allow-rule matching, so choose the cwd form whenever a rule exists.
 
 - **Do:** before telling the user a permission rule is missing, grep `~/.claude/settings.json`, `~/.claude/settings.local.json`, and the project `.claude/settings*.json` for it.
 - **Do:** write commands in the exact prefix form an allow-rule matches: `ALLOW_UNREVIEWED_PUSH=1 git push ...` from the repo's cwd, with no `git -C` and no other flag before the subcommand.

@@ -736,7 +736,7 @@ def latest_bot_review_states(reviews, head_oid="", review_comments=None, comment
 
     An unavailable/quota-exhausted notice ([ai-config#4329](https://github.com/Morrison-Lab/ai-config/issues/4329), parity with
     scripts/check-pr-fully-clean.py) also clears a standing NOT_CLEAN verdict
-    when dated at or after that verdict, provided no inline review comments
+    when dated strictly after that verdict, provided no inline review comments
     from that bot remain live on the current head. An unavailable notice never
     clears a formal CHANGES_REQUESTED or REJECTED state.
     """
@@ -1430,6 +1430,10 @@ def mask_shell_literals(cmd):
     and non-substitution characters inside double-quoted strings with '_'.
     Command substitutions inside double quotes ($(...) and `...`) remain unmasked
     and their internal command strings are parsed in subshell/backtick contexts.
+
+    Note: This hook is deployed as a standalone script under the staged plugin
+    directory (~/.gemini/config/plugins/ai-config/), where scripts/lib/ is not
+    on sys.path, so it cannot import scripts/lib/shellcmd.py directly.
     """
     out = []
     i = 0

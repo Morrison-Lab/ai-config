@@ -31,12 +31,12 @@ Morrison-Lab maintains focused notes repositories, each with a standardized 3-le
 | `psw` | `Morrison-Lab/psw` | Principles of Scientific Writing | Style guide for scientific writing, grammar, conciseness, defining terms, mathematical notation, avoiding AI tells, paper organization |
 | `rme` | `Morrison-Lab/rme` | Regression Models for Epidemiology | Linear/logistic/Poisson/Cox regression, confounding, effect modification, model selection, survival analysis, epidemiology study designs |
 | `mds` | `Morrison-Lab/mds` | Mathematics for Data Science | Linear algebra, multivariate calculus, optimization, matrix decompositions, vector spaces |
-| `lds` | `Morrison-Lab/lds` | Machine Learning for Data Science | Supervised and unsupervised learning, deep learning, classification, clustering, dimensionality reduction |
+| `lds` | `Morrison-Lab/lds` (private) | Machine Learning for Data Science | Supervised and unsupervised learning, deep learning, classification, clustering, dimensionality reduction |
 | `pds` | `Morrison-Lab/pds` | Probability for Data Science | Random variables, probability distributions, expectations, conditioning, joint distributions, limit theorems |
 | `sds` | `Morrison-Lab/sds` | Statistics for Data Science | Statistical inference, point and interval estimation, hypothesis testing, likelihood theory, resampling, bootstrap |
 | `wai` | `Morrison-Lab/wai` | Working with AI | Agentic workflows, prompting, LLM capabilities and failure modes, harness integration, AI-assisted development |
 | `win` | `Morrison-Lab/win` | What If Notes | Causal inference, counterfactuals, DAGs, propensity scores, g-methods, target trials |
-| `araomm` | `Morrison-Lab/araomm` | Applied Regression Analysis | Lecture notes based on Kleinbaum et al., Applied Regression Analysis and Other Multivariable Methods |
+| `araomm` | `Morrison-Lab/araomm` (private) | Applied Regression Analysis | Lecture notes based on Kleinbaum et al., Applied Regression Analysis and Other Multivariable Methods |
 
 *(Note: `cai` / `config-ai` routes AI configuration and agent policies to `ai-config`.)*
 

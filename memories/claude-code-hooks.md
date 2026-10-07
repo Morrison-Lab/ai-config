@@ -1057,6 +1057,21 @@ An earlier record of this named the classifier's reason as `[Auto-Mode Bypass]`;
 the measured string is `[Safety Bypass Flag]`.
 `memories/claude-code-transcripts.md` records one session where the inline `ALLOW_UNREVIEWED_PUSH=1 git push` form was denied and `env ALLOW_UNREVIEWED_PUSH=1 git push` succeeded, so the alternate form is worth the one attempt it costs before concluding the deadlock.)
 
+## A permission allow-rule matches the command's literal prefix, so `git -C` defeats it
+
+Measured 2026-10-07 (`Morrison-Lab/mlr`): `hooks/no-push-without-self-review.py` refused a push, and the override `ALLOW_UNREVIEWED_PUSH=1 git -C /path/to/repo push -u origin <branch>` was then denied by the auto-mode classifier.
+The agent told the user to add a Bash permission rule for `ALLOW_UNREVIEWED_PUSH=1 git push`, but `~/.claude/settings.json` already held `Bash(ALLOW_UNREVIEWED_PUSH=1 git push:*)`.
+The command missed the rule only because `-C <path>` sits between `git` and `push`, breaking the prefix match.
+Re-run as `ALLOW_UNREVIEWED_PUSH=1 git push -u origin <branch>` from the repo's cwd, it succeeded.
+This is a third cause of the override denial, distinct from the classifier's `[Safety Bypass Flag]` flakiness above, and the one the user can do nothing about.
+The `git -C <literal path> push` advice elsewhere in this corpus is right for the guards' parsing and wrong for allow-rule matching, so choose the cwd form whenever a rule exists.
+
+- **Do:** before telling the user a permission rule is missing, grep `~/.claude/settings.json`, `~/.claude/settings.local.json`, and the project `.claude/settings*.json` for it.
+- **Do:** write commands in the exact prefix form an allow-rule matches: `ALLOW_UNREVIEWED_PUSH=1 git push ...` from the repo's cwd, with no `git -C` and no other flag before the subcommand.
+- **Don't:** recommend adding a permission rule without having read the settings first.
+
+`hooks/warn-permission-prefix-mismatch.py` (warn-only, [#4351](https://github.com/Morrison-Lab/ai-config/issues/4351)) flags the decidable half: an env-prefixed `git` command with a global option whose option-free form an allow rule would match.
+
 ## Mutation-testing a guard when you may not write into the live `hooks/` directory
 
 The section above prescribes placing the mutant **inside** `hooks/`, or setting `PYTHONPATH` as a fallback.

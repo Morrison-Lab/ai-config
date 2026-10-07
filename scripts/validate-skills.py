@@ -80,7 +80,12 @@ MARKETPLACE_DESCRIPTION_LIMIT = 1024
 # about nine entries of runway rather than a comfortable cushion, so the
 # catalog's growth stays visible. It buys time again and still does not fix the
 # cause; #1852 remains the lever that scales.
-SKILL_LISTING_BUDGET_CHARS = 9_400
+#
+# Stepped again 2026-10-07 (ai-config#4327). The catalog reached 6 characters
+# of headroom at 209 skills. Stepping to 10,000 restores modest runway for notes
+# routing skills (send-notes, psw, rme, etc.) and future additions while keeping
+# growth visible.
+SKILL_LISTING_BUDGET_CHARS = 10_000
 LISTING_ENTRY_OVERHEAD_CHARS = 8
 
 # How close to the cap counts as "nearly spent", expressed in ENTRIES rather

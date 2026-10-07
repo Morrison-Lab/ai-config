@@ -507,3 +507,19 @@ the hook proposal is [ai-config#4267](https://github.com/Morrison-Lab/ai-config/
 
 An anchored `pkill -f` pattern (above) stops the self-kill only.
 It remains the fallback when no handle exists and the pattern is specific to your own command line.
+
+## Locating a just-downloaded file: sort by recency and search publisher IDs, not expected names
+
+A browser saves a download under the publisher's identifier, not the title.
+Springer books arrived as `978-0-387-76371-2.pdf` (the ISBN) and `b98952.pdf` (the DOI suffix), so a filter on the title or author surname (`grep -i "liu|sorensen"`, `mdfind` on author names) matched neither, in the very folder that had just been listed.
+The empty result then read as "the file is not on this machine", which was a claim about the machine drawn from a claim about the filter.
+
+- **Do:** when locating a file someone just downloaded, list the target folders sorted by modification time, newest first (`ls -lt <dir> | head`), and search by the DOI suffix or ISBN as well as the title.
+- **Don't:** report a downloaded file as absent after filtering only by the names you expected.
+
+This is not decidable by a hook: whether a search used the right terms is a judgment about its inputs, not a property of the command.
+It is a memory entry only.
+
+(2026-10-07, two Springer books downloaded in a browser;
+reported missing after a title/author search, found under their ISBN and DOI-suffix names.
+[ai-config#4358](https://github.com/Morrison-Lab/ai-config/issues/4358).)

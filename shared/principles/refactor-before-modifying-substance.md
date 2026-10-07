@@ -61,8 +61,6 @@ Lead the substantive PR's description with the merge-order alert prescribed by [
 Stacked on #<base-N>.
 ```
 
-Note the dependent PR on the base refactor PR as well ("Stacked PR with substantive change: #<stacked-N>").
-
 ## Do and Don't
 
 - **Do:** split work into a pure behavior-preserving refactor PR and a separate substantive modification PR stacked on top of it.

@@ -48,11 +48,16 @@ NOTE = (
     "start with the prefix of the allow rule `Bash({rule}:*)` in {src}, "
     "which the option-free form does match. Allow rules appear to match the "
     "literal command prefix, so this command may "
-    "prompt or be classifier-denied although the rule exists. Drop the "
-    "global option so the command starts with `{rule}`, run from the repo's "
-    "cwd (only valid when the cwd is the repo the option pointed at), "
-    "instead of asking the user to add a rule."
+    "prompt or be classifier-denied although the rule exists. {remedy}"
 )
+
+# Only `-C <dir>` has a behavior-preserving rewrite (run from <dir>);
+# dropping `-c`, `--git-dir` and the rest changes what git does.
+REMEDY_C = ("Drop `-C <dir>` so the command starts with `{rule}`, and run it "
+            "with <dir> as the cwd, instead of asking the user to add a rule.")
+REMEDY_OTHER = ("Dropping this option would change what git does, so do not "
+                "just delete it: keep the command as-is and expect a prompt, "
+                "or confirm with the user that the rule should cover it.")
 
 
 def split_command(command):
@@ -133,8 +138,12 @@ def find_mismatch(command):
         return None
     for prefix, src in rules:
         if matches(prefix, stripped):
+            only_c = len(opts) % 2 == 0 and all(
+                opts[i] == "-C" for i in range(0, len(opts), 2))
+            remedy = REMEDY_C if only_c else REMEDY_OTHER
             return {"orig": shlex.join(full[:len(assigns) + 1 + len(opts)]),
-                    "rule": prefix, "src": src}
+                    "rule": prefix, "src": src, "only_c": only_c,
+                    "remedy": remedy.format(rule=prefix)}
     return None
 
 
@@ -158,8 +167,10 @@ def main():
     if not os.environ.get("ANTIGRAVITY_AGENT"):
         out["systemMessage"] = (
             f"Allow rule `Bash({hit['rule']}:*)` likely will not match this "
-            "command because of the git global option; run it from the repo's cwd "
-            "without `-C`.")
+            "command because of the git global option. " + (
+                "Run it from the -C directory without `-C`."
+                if hit["only_c"] else
+                "Dropping the option would change what git does."))
     print(json.dumps(out))
     return 0
 

@@ -2298,6 +2298,40 @@ class TestMain(unittest.TestCase):
         )
         self.assertEqual(decision["decision"], "allow")
 
+    def test_quoted_escaped_backticks_and_dollars_in_merge_subject_not_denied_as_chained(self):
+        """Escaped backticks or dollars in quoted --subject or --body do not trigger chained merge denial (ai-config#4326)."""
+        for cmd in (
+            r'gh pr merge 1427 -R Lacaedemon/sparta --squash --subject "fix: handle \`foo\` case" --body "Closes #1"',
+            r'gh pr merge 1427 -R Lacaedemon/sparta --squash --subject "fix: cost \$100 case" --body "Closes #1"',
+        ):
+            decision, run_mock = self.run_main(
+                self.payload(cmd),
+                view=pr(comments=[CLEAN_VERDICT]),
+            )
+            self.assertEqual(decision["decision"], "allow", cmd)
+
+    def test_mask_shell_literals_unit(self):
+        """Unit tests for mask_shell_literals covering escaped characters and substitutions (ai-config#4326)."""
+        # Escaped backticks/dollars in double quotes are masked
+        self.assertEqual(
+            gate.mask_shell_literals(r'--subject "fix: handle \`foo\` case \$100"'),
+            '--subject "' + ('_' * 30) + '"',
+        )
+        # Single-quoted literals are masked
+        self.assertEqual(
+            gate.mask_shell_literals("--subject 'fix: `foo` $100'"),
+            "--subject '" + ("_" * 15) + "'",
+        )
+        # Unescaped command substitutions in double quotes are preserved
+        self.assertEqual(
+            gate.mask_shell_literals('echo "prefix $(whoami) suffix"'),
+            'echo "_______$(whoami)_______"',
+        )
+        self.assertEqual(
+            gate.mask_shell_literals('echo "prefix `whoami` suffix"'),
+            'echo "_______`whoami`_______"',
+        )
+
     def test_gh_api_merge_resolves_pr_from_url(self):
         """The API route must gate the PR named in the URL, not the
         checked-out branch's PR."""

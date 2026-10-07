@@ -1485,13 +1485,8 @@ def mask_shell_literals(cmd):
                 out.append(ch)
                 i += 1
             elif ch == "\\" and i + 1 < n:
-                nxt = cmd[i + 1]
-                if nxt in ('$', '`'):
-                    out.append(ch)
-                    out.append(nxt)
-                else:
-                    out.append("_")
-                    out.append("_")
+                out.append("_")
+                out.append("_")
                 i += 2
             elif ch == "$" and i + 1 < n and cmd[i + 1] == "(":
                 stack.append("SUBSHELL")

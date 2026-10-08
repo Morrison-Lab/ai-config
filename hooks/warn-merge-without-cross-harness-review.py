@@ -86,6 +86,8 @@ NON_REVIEW_ARGS = frozenset({
 })
 # `timeout` options that take a separate argument (`-s KILL`, `-k 5`).
 TIMEOUT_ARG_OPTS = frozenset({"-s", "--signal", "-k", "--kill-after"})
+# A help or version flag anywhere in the call (`codex exec --help`).
+HELP_FLAGS = frozenset({"-h", "--help", "--version"})
 ENV_ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 # Both spellings of the MCP auto-merge tool are in use: this server exposes
 # `enable_pr_auto_merge`, while enforce-mwc-review-gate.py expects
@@ -149,17 +151,24 @@ def _peel_wrappers(rest):
 def _is_reviewer(rest, clis):
     rest = _peel_wrappers(rest)
     return (len(rest) > 1 and os.path.basename(rest[0]) in clis
-            and rest[1] not in NON_REVIEW_ARGS)
+            and rest[1] not in NON_REVIEW_ARGS
+            and not HELP_FLAGS.intersection(rest[1:]))
 
 
 def _shell_events(sib, command, clis):
-    """Ordered events in *command*: 'push' or 'review', by text position."""
+    """Events in *command* as (kind, piece), kind 'push' or 'review'.
+
+    `piece` numbers the expansion the event came from: 0 for the command
+    itself, then each nested `bash -c` operand. Events within one piece are
+    in text order; events in different pieces are not ordered at all, since
+    the expansions are listed outer-first rather than in execution order.
+    """
     events = []
-    for line in sib.shell_c_expansions(command):
+    for piece, line in enumerate(sib.shell_c_expansions(command)):
         for argv in sib.simple_commands(line) or []:
             parsed = sib.git_subcommand(argv)
             if parsed and parsed[0] == "push":
-                events.append("push")
+                events.append(("push", piece))
             # strip_env peels `timeout` but not its options and duration, so
             # also test the raw argv with leading assignments dropped.
             raw = list(argv)
@@ -167,16 +176,30 @@ def _shell_events(sib, command, clis):
                 raw = raw[1:]
             if (_is_reviewer(sib.strip_env(argv)[1], clis)
                     or _is_reviewer(raw, clis)):
-                events.append("review")
+                events.append(("review", piece))
     return events
+
+
+def _fresh(events):
+    """True when the command's last review runs after every push in it.
+
+    Only order within one expansion piece is known, so a push in a different
+    piece from the last review makes the review stale: crediting it could
+    credit a review that ran before the push.
+    """
+    pushes = [(i, p) for i, (k, p) in enumerate(events) if k == "push"]
+    if not pushes:
+        return True
+    last_i, last_piece = [(i, p) for i, (k, p) in enumerate(events)
+                          if k == "review"][-1]
+    return all(p == last_piece and i < last_i for i, p in pushes)
 
 
 def scan(sib, path, clis):
     """Return (last_push_seq, [seq of successful reviewer calls]).
 
-    A push and a review in ONE command are ordered by their position in the
-    text, as the sibling orders a push and an instrument run: the push counts
-    at seq - 0.5, a review after it at seq, a review before it at seq - 1.
+    A push and a review in one command count the push at seq - 0.5, a review
+    that `_fresh` places after every push at seq, and any other at seq - 1.
     """
     last_push = -1
     pending = {}
@@ -194,13 +217,12 @@ def scan(sib, path, clis):
                     continue
                 try:
                     events = _shell_events(sib, cmd, clis)
-                    pushes = [i for i, e in enumerate(events) if e == "push"]
-                    if pushes:
+                    kinds = [k for k, _p in events]
+                    if "push" in kinds:
                         last_push = max(last_push, seq - 0.5)
-                    runs = [i for i, e in enumerate(events) if e == "review"]
-                    if runs and not rec.get("isSidechain"):
-                        fresh = not pushes or max(runs) > max(pushes)
-                        pending[b.get("id")] = seq if fresh else seq - 1
+                    if "review" in kinds and not rec.get("isSidechain"):
+                        pending[b.get("id")] = (
+                            seq if _fresh(events) else seq - 1)
                 except Exception:
                     continue
             elif kind == "tool_result" and b.get("tool_use_id") in pending:
@@ -210,12 +232,17 @@ def scan(sib, path, clis):
     return last_push, reviews
 
 
+def _shell_command(tool_input):
+    """The command text under whichever key the harness uses."""
+    return (tool_input.get("command") or tool_input.get("CommandLine")
+            or tool_input.get("cmd") or tool_input.get("script"))
+
+
 def _targets(sib, tool, tool_input):
     """[(number|None, repo|None)] for every merge this call performs."""
     if tool == sib.MCP_MERGE_TOOL or RX_AUTO_MERGE_TOOL.match(tool):
         return sib._merge_targets(sib.MCP_MERGE_TOOL, tool_input)
-    command = (tool_input.get("command") or tool_input.get("CommandLine")
-               or tool_input.get("cmd") or tool_input.get("script"))
+    command = _shell_command(tool_input)
     if not isinstance(command, str):
         return []
     return [hit for hit in map(sib._gh_merge, _argvs(sib, command)) if hit]
@@ -248,7 +275,7 @@ def main() -> int:
         clis = CROSS_HARNESS_CLIS - {own_harness()}
         last_push, reviews = scan(sib, path, clis)
         if tool in sib.SHELL_TOOLS and sib._push_before_merge(
-                tool_input.get("command") or ""):
+                _shell_command(tool_input) or ""):
             reviews = []
     except Exception:
         return 0
@@ -262,7 +289,8 @@ def main() -> int:
                                   "additionalContext": note}}
     if not os.environ.get("ANTIGRAVITY_AGENT"):
         out["systemMessage"] = (
-            f"Merging {target} with no cross-model, cross-harness review "
+            f"Merging (or arming auto-merge for) {target} with no "
+            f"cross-model, cross-harness review "
             f"since the last push ({GATE}).")
     print(json.dumps(out))
     return 0

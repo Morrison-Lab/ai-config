@@ -144,6 +144,15 @@ def main():
           run(MERGE, [step("nohup bash /tmp/w/run.sh > /tmp/w/log 2>&1 &")])[0])
     check("warns when timeout wraps only a --version call",
           run(MERGE, [step("timeout 30 codex --version")])[0])
+    check("warns when a nested bash -c review precedes a push",
+          run(MERGE, [step("bash -c 'codex exec review' && git push origin b")])[0])
+    check("warns when the push and review sit in different expansions",
+          run(MERGE, [step("bash -c 'git push origin b' && codex exec review")])[0])
+    check("warns when a subcommand only printed its help",
+          run(MERGE, [step("codex exec --help")])[0])
+    check("warns on a PowerShell-keyed merge that pushes first",
+          run("", [CODEX], tool_input={
+              "CommandLine": "git push origin b; gh pr merge 12 --squash"})[0])
     check("warns on the instrument-then-merge chain the sibling discharges",
           run("python3 scripts/check-pr-fully-clean.py 12 && gh pr merge 12",
               [])[0])

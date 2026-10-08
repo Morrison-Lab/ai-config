@@ -432,7 +432,15 @@ def main():
                 bash_payload["conversation_id"] = session_id
             for group in pre_tool_groups:
                 if matches_tool(group.get("matcher", ""), "Bash"):
-                    tasks_to_run.append((extract_hook_list(group), bash_payload, tool_cwd, "run_command"))
+                    # Avoid duplicate execution: run_command in Antigravity already
+                    # directly invokes enforce-mwc-review-gate.py via plugins/ai-config/hooks.json.
+                    hooks = [
+                        h for h in extract_hook_list(group)
+                        if "enforce-mwc-review-gate.py" not in h.get("command", "")
+                        and h.get("script") != "enforce-mwc-review-gate.py"
+                    ]
+                    if hooks:
+                        tasks_to_run.append((hooks, bash_payload, tool_cwd, "run_command"))
 
         elif tool_name == "invoke_subagent":
             # Dual-case lookup, like every other args.get(...) or

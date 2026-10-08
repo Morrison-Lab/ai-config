@@ -86,6 +86,8 @@ and ended the turn waiting on a pending publish job until the user asked why.)
   every time, not only when a push-triggered workflow is already suspected.
 - **Do:** run step 4's UMS pass while a merge-commit run is still pending,
   and finish step 1.1 at the check-in.
+- **Don't:** end a turn to wait on a pending merge-commit run
+  with step 4's UMS pass not yet run.
 - **Don't:** read the PR's own green CI as covering a workflow that only
   triggers on `push`.
 

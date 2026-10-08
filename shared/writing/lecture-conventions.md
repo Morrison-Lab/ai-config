@@ -8,11 +8,13 @@ This fragment is the agent-facing copy: follow the rules, and link to psw instea
 ## Structure
 
 - **Build the lecture from exercise and solution pairs.**
-  Pose each data manipulation, analysis, calculation, derivation or proof in an `#exr-` div, and put the worked answer in a `#sol-` div with the same slug.
+  Pose each data manipulation, analysis, calculation, derivation or proof in an `#exr-` div, and put the worked answer in the repository's solution div (`::: solution` or the `.sol` class), with a `#sol-` id sharing the exercise's slug.
+  [`quarto-divs-for-typed-content`](quarto-divs-for-typed-content.md) defines the solution div, and a repository uses the syntax its own `student-qmd` setup expects.
 - **Put a slide break between an exercise and its solution** (`{{< slidebreak >}}`, never `---`), so the prompt is on screen alone while students work.
 - **Ask before defining.**
   Precede a `#def-` or `#thm-` div with an exercise that asks the question it answers.
   The solution answers informally, and the formal div follows the solution div, never inside it.
+  [`informal-definitions`](informal-definitions.md) states the underlying rule.
 - **One bottom-level prompt per exercise.**
   Do not write one exercise with parts (a) through (e).
 - **Subfiles hold one unit each and start with no heading.**
@@ -47,4 +49,5 @@ The detailed rules are in [`plain-prose`](plain-prose.md), [`ai-tells`](ai-tells
 ## Related
 
 - [`definition-crossrefs`](definition-crossrefs.md), [`informal-definitions`](informal-definitions.md), [`forward-references`](forward-references.md), [`semantic-line-breaks`](semantic-line-breaks.md)
+- [`quarto-divs-for-typed-content`](quarto-divs-for-typed-content.md): which div type holds which content.
 - [`quarto-revealjs-div-styling`](quarto-revealjs-div-styling.md): style div boxes on slides as on the web page.

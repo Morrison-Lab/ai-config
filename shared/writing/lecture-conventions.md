@@ -42,6 +42,11 @@ This fragment is the agent-facing copy: follow the rules, and link to psw instea
   This holds for lectures and for the prerequisite sites (`mds`, `pds`, `sds`), not only for one deck.
   Do not leave a page that is only definitions and algebra.
   The wording is canonical in psw's "Show each idea applied and in a figure".
+- **Follow every abstract div with its own concrete `#exm-` div.**
+  This covers each definition, theorem, lemma, corollary and any other abstract div (Ezra, 2026-10-08).
+  Place the example directly after the div it illustrates.
+  A related theorem or corollary does not exempt the definition: the definition still gets its own example, and so does the theorem.
+  The rule holds in every repository, including `mds`, `pds`, `sds`, `lds` and `rme`.
 - **Put media links beside the content they support.**
   See [`media-links-beside-content`](media-links-beside-content.md).
 - **Place each topic in the earliest course site whose readers need it.**

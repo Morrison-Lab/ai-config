@@ -1359,6 +1359,10 @@ class _TranscriptScanner:
         self.last_verdict_seq = None
         self.reviewer_call_ids = set()
         self.active_reviewer_task_ids = set()
+        # Hand-backs whose sender is not yet a known reviewer id: the harness
+        # writes the queue-operation enqueue before the dispatch result that
+        # carries the agent id, so these are re-checked as ids register.
+        self.pending_handbacks = []
         self.pending_omo_uses = {}
         self.ambiguous_omo_names = set()
         self.cur_dir = None
@@ -1412,6 +1416,7 @@ class _TranscriptScanner:
                     if tid_match:
                         self.active_reviewer_task_ids.add(tid_match.group(1))
                         self.active_reviewer_task_ids.add(f"agent-{tid_match.group(1)}")
+                    self._resolve_pending_handbacks()
                     if self._matches_head_verdict(out_text):
                         self.last_verdict_seq = self.seq
 
@@ -1438,24 +1443,43 @@ class _TranscriptScanner:
                 if self._matches_head_verdict(content_text):
                     self.last_verdict_seq = self.seq
 
-    def handle_subagent_handback(self, record, text):
-        """Process subagent handback message containing review verdict."""
+    def handle_subagent_handback(self, record):
+        """Process a subagent hand-back carrying a review verdict.
+
+        A hand-back counts only when a harness-written field names its sender
+        and that sender is one of this session's reviewer dispatch ids -- the
+        same rule the push guard applies (ai-config#3045). Text that merely
+        quotes a hand-back marker, as a Read result or a pasted report can, is
+        not a hand-back.
+        """
         if not self.reviewer_call_ids and not self.active_reviewer_task_ids:
             return
-        sender_id = str(record.get("sender") or "")
-        is_tracked_sender = (
-            sender_id in self.active_reviewer_task_ids
-            or f"agent-{sender_id}" in self.active_reviewer_task_ids
-            or (sender_id.startswith("agent-") and sender_id[6:] in self.active_reviewer_task_ids)
-        )
-        is_handback_marker = bool(re.search(
-            r"(?:^|\n)\s*(?:(?:This agent's report was delivered to you as a message|\[Subagent hand-back|SubagentHandback)\b)",
-            text, re.I
-        ))
-        if is_tracked_sender or is_handback_marker:
-            if self._matches_head_verdict(text):
-                self.seq += 1
-                self.last_verdict_seq = self.seq
+        for sender_ids, text in self.guard._handback_candidates(record):
+            if not text:
+                continue
+            if self._sender_is_tracked(sender_ids):
+                self._accept_handback(text)
+            else:
+                self.pending_handbacks.append((sender_ids, text))
+
+    def _sender_is_tracked(self, sender_ids):
+        return any(self.guard._id_is_tracked(s, self.active_reviewer_task_ids)
+                   for s in sender_ids)
+
+    def _accept_handback(self, text):
+        if self._matches_head_verdict(text):
+            self.seq += 1
+            self.last_verdict_seq = self.seq
+
+    def _resolve_pending_handbacks(self):
+        """Accept queued hand-backs whose sender has since registered."""
+        still_pending = []
+        for sender_ids, text in self.pending_handbacks:
+            if self._sender_is_tracked(sender_ids):
+                self._accept_handback(text)
+            else:
+                still_pending.append((sender_ids, text))
+        self.pending_handbacks = still_pending
 
     def handle_block(self, b, record):
         """Process an individual tool_use or tool_result block."""
@@ -1514,6 +1538,7 @@ class _TranscriptScanner:
                     if tid_match:
                         self.active_reviewer_task_ids.add(tid_match.group(1))
                         self.active_reviewer_task_ids.add(f"agent-{tid_match.group(1)}")
+                    self._resolve_pending_handbacks()
 
                     if self._matches_head_verdict(res_text, call_id=call_id):
                         self.last_verdict_seq = self.seq
@@ -1529,19 +1554,7 @@ class _TranscriptScanner:
         self.handle_reviewer_record(record)
         self.handle_task_notification(record)
 
-        msg = record.get("message")
-        if isinstance(msg, dict):
-            content = msg.get("content")
-            if isinstance(content, str):
-                self.handle_subagent_handback(record, content)
-            elif isinstance(content, list):
-                for blk in content:
-                    if isinstance(blk, dict) and blk.get("type") in ("text", None):
-                        t = blk.get("text") or blk.get("content")
-                        if isinstance(t, str) and t:
-                            self.handle_subagent_handback(record, t)
-        elif isinstance(record.get("content"), str):
-            self.handle_subagent_handback(record, record["content"])
+        self.handle_subagent_handback(record)
 
         for b in self.guard._iter_blocks(record):
             self.handle_block(b, record)

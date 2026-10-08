@@ -218,14 +218,18 @@ HEREDOC_EXECUTOR = re.compile(
 # `| tee bash`, where the name is only an argument (#4394 review, rounds 1-2).
 # A wrapper's own arguments are skipped without parsing them, so
 # `| sudo -u root grep bash` over-matches, the cheap direction. A wrapper not
-# in this list is a missed executor, so add one when it is found.
+# in this list is a missed executor, so add one when it is found. The skip
+# stops at a bare `)` (the end of a `>(...)` stage) but steps over a whole
+# `$(...)`, one level deep, so `| sudo -u $(whoami) bash` is still seen
+# (#4394 review, round 3).
 STAGE_WRAPPERS = (
     r"sudo|doas|timeout|nice|ionice|nohup|time|stdbuf|setsid|unbuffer"
     r"|chrt|taskset|xargs"
 )
 STDIN_EXECUTOR = re.compile(
     r"(?:\|&?|>\()\s*" + ENV_WRAP
-    + r"(?:(?:[/\w.-]+/)?(?:" + STAGE_WRAPPERS + r")\b[^|;&\n)]*?(?<![\w.-]))?"
+    + r"(?:(?:[/\w.-]+/)?(?:" + STAGE_WRAPPERS + r")\b"
+    r"(?:\$\([^()\n]*\)|[^|;&\n)])*?(?<![\w.-]))?"
     r"(?:[/\w.-]+/)?"
     r"(?:(?:" + EXEC_PROGS + r"|xargs)(?=[\s)]|$)|(?:source|\.)(?=[ \t]))"
 )

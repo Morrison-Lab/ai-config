@@ -488,7 +488,8 @@ Handling a secret carefully in your own code does not prevent it: the leak happe
 Case, 2026-09-13 ([ai-config#3626](https://github.com/Morrison-Lab/ai-config/issues/3626)): a liveness check on a background probe,
 `ps -eo pid,etime,command | grep -E "itpm2|curl" | grep -v grep`,
 printed the probe's `curl -H "Authorization: Bearer <token>"` argv, so a live Databricks OAuth token reached the transcript.
-The token came from a shell variable, which is the recommended form; the `command` column printed it anyway.
+The token came from a shell variable, which is the recommended form.
+The `command` column printed it anyway.
 
 Measured 2026-10-08 on Linux procps, against a background process carrying a marker in its argv.
 These print argv: `ps <pid>` (a dashless PID switches to BSD output), `ps aux`, `ps -aux`, `ps -ef`, `ps -eo pid,args`, `ps -O rss -e` (`-O` adds to the default columns, which include `command`), `ps -e --context`, `ps -e -o%a` (its leading part only: the `%a` column is fixed-width), `pgrep -af`, and `top -bc` when the line is wide enough (`-w 512`).
@@ -506,7 +507,8 @@ A shell's own `set -x` trace prints the expanded words too: `set -x; curl -H "Au
 - **Don't:** run `ps <pid>`, `ps aux`, `ps -ef`, `ps -O <col>`, `ps -o args`/`command`/`cmd`, BSD `ps ... e`, `pgrep -a`, `pstree -a`, `top -c`, or `cat /proc/<pid>/cmdline` on a host where any process may carry a credential in argv.
 - **Don't:** turn on `set -x` around a command that expands a secret.
 - **Do:** when you must measure a listing (a review, a fact-check), print only a count: `ps axe -o pid,comm | grep -c PATH=`, never the matched lines.
-  Use a marker process that keeps its argv, `sh -c 'sleep 90; :' marker`; `bash -c 'sleep 90'` can exec `sleep` directly and drop the marker.
+  Use a marker process that keeps its argv, `sh -c 'sleep 90; :' marker`.
+  `bash -c 'sleep 90'` can exec `sleep` directly and drop the marker.
   Stop it with `kill $!` from the shell that started it, not `pkill -f marker`, whose pattern is in the caller's own argv (see the `pgrep -f` self-match section at the top of this file).
 - **Don't:** brief a subagent to measure listing behaviour without that count-only rule.
   Case, 2026-10-08 (this entry's own review): a reviewer told only to measure ran `ps axe -o pid,comm | grep sleep`, which printed the container's environment, a session token included, into its transcript.

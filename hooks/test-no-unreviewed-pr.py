@@ -2405,6 +2405,15 @@ def _canonical_fetch_and_cache():
             return False, "an expired entry did not trigger a refetch"
         if mod._canonical_moratorium_end() is not None or len(calls) != n + 1:
             return False, "an unreadable main was not negatively cached"
+        inside = time.time() - mod.CANONICAL_NEGATIVE_TTL_SECONDS + 60
+        os.utime(cache, (inside, inside))
+        if mod._canonical_moratorium_end() is not None or len(calls) != n + 1:
+            return False, "a negative entry inside its TTL was refetched"
+        past = time.time() - mod.CANONICAL_NEGATIVE_TTL_SECONDS - 60
+        os.utime(cache, (past, past))
+        mod._canonical_moratorium_end()
+        if len(calls) != n + 2:
+            return False, "a negative entry past its own TTL was still used"
         os.unlink(cache)
         mod._fetch_canonical_source = fetch_returning("no constant here")
         if mod._canonical_moratorium_end() is not None:

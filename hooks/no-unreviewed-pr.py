@@ -285,10 +285,11 @@ def _read_canonical_cache(path, now):
         return False, None
     finally:
         os.close(fd)
-    # A future mtime (clock skew) is not fresh: it would never expire.
+    # A future mtime (clock skew) is not fresh: it would never expire. A few
+    # seconds are tolerated for coarse filesystem mtime rounding.
     ttl = (CANONICAL_NEGATIVE_TTL_SECONDS if raw == _UNREADABLE
            else CANONICAL_TTL_SECONDS)
-    if age < 0 or age > ttl:
+    if age < -5 or age > ttl:
         return False, None
     if raw == _UNREADABLE:
         return True, None

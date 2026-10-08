@@ -2508,6 +2508,8 @@ def main() -> int:
         ("label, bullet None", "Blocking findings:\n- None"),
         ("heading, bullet None", "### Blocking findings\n\n- None."),
         ("label then another label", "**Blocking findings:** None.\n\n**Non-blocking:** a nit."),
+        ("heading None, then a non-blocking label",
+         "### Blocking findings\n\nNone.\n\n**Non-blocking findings:**\n- a nit."),
     ):
         check(f"classify_verdict: empty Blocking findings ({_label}) stays clean",
               checker.classify_verdict(_body + _tail, "") == "clean")
@@ -2527,6 +2529,14 @@ def main() -> int:
          "### Blocking findings\n\nNone\n\n#### Nit\n- real blocker: crash"),
         ("prose 'Blocking issues none of which'",
          "Blocking issues none of which are fixed."),
+        # The three bypasses agy found on #4427 at 9757202d.
+        ("label, bullet None, blank, loose second item",
+         "**Blocking findings:**\n- None\n\n- Critical: RCE via yaml.load()."),
+        ("label: None, blank, an item",
+         "**Blocking findings:** None\n\n- Defect: auth bypass."),
+        ("heading: None, blank, indented code starting '#'",
+         "### Blocking findings: None\n\n    # CRITICAL: overflow\n"
+         "    memcpy(dest, src, len);"),
     ):
         check(f"classify_verdict: Blocking findings ({_label}) stays not-clean",
               checker.classify_verdict(_body + _tail, "") == "not-clean")

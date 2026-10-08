@@ -2453,6 +2453,17 @@ def _canonical_fetch_and_cache():
             return False, "a symlinked cache entry was followed"
         if len(calls) != n + 1:
             return False, "a symlinked cache entry did not force a refetch"
+        with open(decoy, encoding="ascii") as fh:
+            if fh.read() != "2030-12-31":
+                return False, "writing the cache overwrote a symlink's target"
+        if hasattr(os, "mkfifo"):
+            os.unlink(cache)
+            os.mkfifo(cache)
+            n = len(calls)
+            if mod._canonical_moratorium_end() != datetime.date(2030, 3, 1):
+                return False, "a FIFO at the cache path was read as an entry"
+            if len(calls) != n + 1:
+                return False, "a FIFO at the cache path did not force a refetch"
         os.environ["NO_UNREVIEWED_PR_DISABLE_LIVE_CHECK"] = "1"
         n = len(calls)
         if mod._canonical_moratorium_end() is not None or len(calls) != n:
@@ -2832,19 +2843,16 @@ def main():
     # main extended the moratorium and not because the fixture stopped arming.
     _later = (_end + datetime.timedelta(days=60)).isoformat()
     _same = _end.isoformat()
-    if blocks_with_canonical(AFTER, _later, armed):
-        print("FAIL: a stale copy still demands while main's moratorium stands")
-        failures += 1
-    elif not blocks_with_canonical(AFTER, _same, armed):
-        print("FAIL: the guard goes inert when main's moratorium has ended too")
-        failures += 1
-    elif not blocks_with_canonical(AFTER, "none", armed):
-        print("FAIL: the guard goes inert when main cannot be read")
-        failures += 1
-    else:
-        print("PASS: past its own date the guard defers to main's, and fires "
-              "when main's has passed or cannot be read")
-        passes += 1
+    for _canon, _want, _label in (
+            (_later, False, "stays silent while main's moratorium stands"),
+            (_same, True, "fires when main's moratorium has ended too"),
+            ("none", True, "fires when main cannot be read")):
+        if blocks_with_canonical(AFTER, _canon, armed) == _want:
+            print("PASS: past its own date the guard " + _label)
+            passes += 1
+        else:
+            print("FAIL: past its own date the guard no longer " + _label)
+            failures += 1
 
     # The fetch parses main's real file, so the pattern must match this
     # file's own declaration; a reworded constant would otherwise read as

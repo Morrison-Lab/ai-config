@@ -98,6 +98,7 @@ import os
 import re
 import shlex
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -272,11 +273,15 @@ def _canonical_cache_path():
 def _read_canonical_cache(path, now):
     """(hit, value): hit is False when there is no fresh, trusted entry."""
     try:
-        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        # O_NONBLOCK so a FIFO planted at the path cannot hang the open.
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+                     | getattr(os, "O_NONBLOCK", 0))
     except OSError:
         return False, None
     try:
         st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode):
+            return False, None
         if hasattr(os, "getuid") and st.st_uid != os.getuid():
             return False, None
         age = now - st.st_mtime

@@ -17,6 +17,13 @@
             "timeout": 10,
             "script": "inject-core-rules.py",
             "why": "ai-config#4206 -- a plugin has no instruction-file slot, so AGENTS.md and CLAUDE.md shipped inside the plugin and were never read; a project thread saw the rules only after cloning ai-config by hand. At session start, names AGENTS.md and CLAUDE.md, orders AGENTS.md read in full and lists its headings, within the 10,000-character hook-output cap, wherever the plugin is enabled; uses an ai-config checkout's own files when the project is one."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-stale-plugin-pin.py\"'",
+            "timeout": 10,
+            "script": "warn-stale-plugin-pin.py",
+            "why": "ai-config#2439 -- the plugin cache pin that runs hooks does not advance when the marketplace clone updates, so merged hook fixes went unrun for weeks with nothing saying so. At session start, compares each applicable ai-config pin in installed_plugins.json against the local marketplace clone's HEAD and, when it lags, names the commit count and the per-scope update commands."
           }
         ]
       }

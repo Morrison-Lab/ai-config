@@ -119,6 +119,20 @@ diff before.txt after.txt
 
 A non-empty diff is the defect: nothing was edited, so the two conversions should match.
 
+**Re-measured 2026-10-08 on a synthetic document, so this one is reproducible.**
+The skill's copy measured was `/mnt/skills/public/docx/scripts/merge_runs.py`
+dated 2026-10-06 (md5 `0bf6ac0b4c40368f1094129999c5e095`),
+which still has no `fldChar` or `instrText` handling.
+The document was one paragraph of seven runs, none with `<w:rPr>`:
+a text run, then `begin`, `instrText`, `separate`, `(15)`, `end` as separate runs,
+then a closing text run.
+`merge_runs.py` reported `Merged 6 runs`,
+leaving one run holding the text, all three `fldChar` markers, the `instrText`, and the result.
+Under pandoc 3.1.3 the original converts to
+`modern ggplot2-based visualizations (15) and more text after.`
+and the merged copy converts to an empty line: the whole paragraph is gone.
+Rendering in Word was not checked.
+
 The diagnosis matters as much as the fact.
 The corruption is indistinguishable from "my edits broke the document",
 so the natural response is to hunt through your own edits.

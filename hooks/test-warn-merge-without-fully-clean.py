@@ -22,7 +22,14 @@ DIRTY_OUT = "Exit code 1\n\nPR is NOT fully clean:\n - finding"
 
 
 def step(cmd, out="", is_error=False, sidechain=False):
-    return {"cmd": cmd, "out": out, "is_error": is_error, "sidechain": sidechain}
+    return {"cmd": cmd, "out": out, "is_error": is_error, "sidechain": sidechain,
+            "tool": "Bash"}
+
+
+def mcp_step(tool):
+    """A non-Bash tool call (e.g. an MCP push) with an empty result."""
+    return {"cmd": "", "out": "ok", "is_error": False, "sidechain": False,
+            "tool": tool}
 
 
 def clean(n=12, repo="-R Morrison-Lab/ai-config", out=CLEAN_OUT, **kw):
@@ -39,7 +46,7 @@ def transcript(steps):
             fh.write(json.dumps({
                 "type": "assistant", "isSidechain": s["sidechain"],
                 "message": {"content": [{"type": "tool_use", "id": tid,
-                                         "name": "Bash",
+                                         "name": s["tool"],
                                          "input": {"command": s["cmd"]}}]},
             }) + "\n")
             fh.write(json.dumps({
@@ -267,6 +274,58 @@ def main():
           run("FOO=1 " + IC + "5" + R + " && " + M5, [])[0])
     check("warns: 2>&1 on the merge side only is not on the instrument",
           run(IC + "5" + R + " && " + M5 + " 2>&1 ; echo x", [])[0])
+
+    # --- round 4 -----------------------------------------------------------
+    # item 1: the instrument's own value flags
+    check("silent: `--quorum 2 5` is PR 5 (the value 2 is not the PR)",
+          not run(M5, [step(IC + "--quorum 2 5" + R, OUT5)])[0])
+    check("warns: `--quorum 2 5` run does NOT cover PR 2",
+          run("gh pr merge 2 -R Morrison-Lab/ai-config",
+              [step(IC + "--quorum 2 5" + R, OUT5)])[0])
+    check("silent: --from-json FILE then the number",
+          not run(M5, [step(IC + "--from-json /tmp/p.json 5" + R, OUT5)])[0])
+    check("silent: -R value before the number",
+          not run(M5, [step(IC + "-R Morrison-Lab/ai-config 5", OUT5)])[0])
+    # the set is derived from the script, not remembered
+    import importlib.util
+    import argparse
+    spec = importlib.util.spec_from_file_location(
+        "hook_under_test", HOOK)
+    hook = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(hook)
+    script = os.path.join(os.path.dirname(HOOKS_DIR), "scripts",
+                          "check-pr-fully-clean.py")
+    spec2 = importlib.util.spec_from_file_location("instr_under_test", script)
+    instr = importlib.util.module_from_spec(spec2)
+    spec2.loader.exec_module(instr)
+    seen = []
+    real = argparse.ArgumentParser.add_argument
+
+    def spy(self, *names, **kw):
+        if names and names[0].startswith("-") and kw.get("action") not in (
+                "store_true", "store_false", "count", "help", "version"):
+            seen.extend(names)
+        return real(self, *names, **kw)
+
+    argparse.ArgumentParser.add_argument = spy
+    try:
+        instr.parse_args(["5"])
+    finally:
+        argparse.ArgumentParser.add_argument = real
+    check("INSTRUMENT_VALUE_FLAGS equals the script's value-taking options",
+          set(seen) == set(hook.INSTRUMENT_VALUE_FLAGS))
+
+    # item 2: pushes made through MCP stale earlier runs
+    for tool in ("mcp__github__push_files", "mcp__github__create_or_update_file",
+                 "mcp__github__delete_file",
+                 "mcp__github__update_pull_request_branch"):
+        check("warns: " + tool + " after a clean run",
+              run(M5, [step(IC + "5" + R, OUT5), mcp_step(tool)])[0])
+        check("silent: " + tool + " BEFORE the clean run",
+              not run(M5, [mcp_step(tool), step(IC + "5" + R, OUT5)])[0])
+    check("silent: an unrelated MCP read after a clean run is not a push",
+          not run(M5, [step(IC + "5" + R, OUT5),
+                       mcp_step("mcp__github__get_file_contents")])[0])
 
     # --- placeholders (item 6) ---------------------------------------------
     check("silent: {owner}/{repo} placeholder repo on the merge matches any",

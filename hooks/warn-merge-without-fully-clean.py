@@ -78,6 +78,11 @@ LIMITS
   CLEAN line. With several runs in one command, each is credited by the PR
   its own "<repo>#N is FULLY CLEAN" line names; a run whose number is a shell
   variable or absent is credited only for the PRs the output names.
+* Pushes are recognised from `git push` in Bash and from the GitHub MCP tools
+  `push_files`, `create_or_update_file`, `delete_file` and
+  `update_pull_request_branch`. Other routes that move a head are not seen:
+  `gh api` writes to refs or contents, the GitHub web UI, a push by another
+  session or the `@claude` agent, and `gh pr update-branch`.
 * A merge whose own command pushes first makes every earlier run stale.
 * Env-prefixed (`FOO=1 python3 ...`), `timeout`-wrapped, `python`, `uv run`
   and other wrapper forms are not the strict in-command form (the transcript
@@ -115,6 +120,11 @@ SHELL_TOOLS = frozenset({
     "terminal", "shell",
 })
 MCP_MERGE_TOOL = "mcp__github__merge_pull_request"
+# GitHub MCP tools that move a PR branch's head, so they stale earlier runs.
+MCP_PUSH_TOOLS = frozenset({
+    "mcp__github__push_files", "mcp__github__create_or_update_file",
+    "mcp__github__delete_file", "mcp__github__update_pull_request_branch",
+})
 INSTRUMENT = "check-pr-fully-clean.py"
 
 RUNNERS = frozenset({
@@ -129,6 +139,9 @@ RUNNER_SUBCOMMANDS = frozenset({"run", "exec"})
 GH_VALUE_FLAGS = frozenset({"-R", "--repo", "-t", "--subject", "-b", "--body",
                             "-F", "--body-file", "--match-head-commit",
                             "-A", "--author-email"})
+# Options of scripts/check-pr-fully-clean.py that take a separate value, from
+# its parse_args() (a test derives this set from the script and compares).
+INSTRUMENT_VALUE_FLAGS = frozenset({"--quorum", "--from-json", "-R", "--repo"})
 RX_PR_NUM = re.compile(r"^\d+$")
 RX_PR_URL = re.compile(r"/pull/(\d+)(?:[/?#].*)?$")
 RX_CLEAN_LINE = re.compile(r"\bis FULLY CLEAN\b")
@@ -174,14 +187,18 @@ def _flag_value(args, names):
     return None
 
 
-def _pr_number(args):
-    """The PR number named by positional operands in *args*, or None."""
+def _pr_number(args, value_flags=GH_VALUE_FLAGS):
+    """The PR number named by positional operands in *args*, or None.
+
+    *value_flags* are the options of the command being parsed that take a
+    separate value, whose value must not be read as the PR number.
+    """
     skip = False
     for tok in args:
         if skip:
             skip = False
             continue
-        if tok in GH_VALUE_FLAGS:
+        if tok in value_flags:
             skip = True
             continue
         if tok.startswith("-"):
@@ -255,7 +272,8 @@ def _instrument_run(rest):
             return None
     else:
         return None
-    return _pr_number(args), _known_repo(_flag_value(args, ("-R", "--repo")))
+    return (_pr_number(args, INSTRUMENT_VALUE_FLAGS),
+            _known_repo(_flag_value(args, ("-R", "--repo"))))
 
 
 def records(path):
@@ -336,7 +354,9 @@ def scan(path):
     for seq, rec in enumerate(records(path)):
         for b in _blocks(rec):
             kind = b.get("type")
-            if kind == "tool_use" and b.get("name") in SHELL_TOOLS:
+            if kind == "tool_use" and b.get("name") in MCP_PUSH_TOOLS:
+                last_push = max(last_push, seq)
+            elif kind == "tool_use" and b.get("name") in SHELL_TOOLS:
                 cmd = (b.get("input") or {}).get("command")
                 if not isinstance(cmd, str):
                     continue

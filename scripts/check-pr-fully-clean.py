@@ -1991,9 +1991,29 @@ _BLOCKING_SECTION_NOUN = re.compile(
     r"\s+(?:findings|issues|defects|items|blockers|problems)\b", re.IGNORECASE)
 
 
+def _blocking_section_lines(scan_body: str, section_start: int,
+                            level: int) -> list:
+    """Non-blank, non-rule lines up to the next heading of level <= *level*.
+
+    A subheading's content belongs to the section, so a child `####` under a
+    `###` cannot carry a blocker past the check (ai-config#4428 review).
+    """
+    stop = re.search(r"(?m)^[ \t]*#{1,%d}\s" % level, scan_body[section_start:])
+    section = (scan_body[section_start:section_start + stop.start()]
+               if stop else scan_body[section_start:])
+    lines = [ln.strip() for ln in section.splitlines()]
+    return [ln for ln in lines if ln and not re.match(r"^[-*_\s]{3,}$", ln)]
+
+
 def _is_empty_blocking_section(scan_body: str, match_start: int,
                                match_end: int) -> bool:
-    """True when a "Blocking findings" heading or label declares the section empty."""
+    """True when a "Blocking findings" heading or label declares the section empty.
+
+    The declaration must be the section's ONLY content: a none-word on the
+    heading line followed by an item, a label whose paragraph continues, or a
+    subheading carrying an item each stay not-clean, since exempting a real
+    blocker is the dangerous direction.
+    """
     if scan_body[match_start:match_end].lower() != "blocking":
         return False
     noun = _BLOCKING_SECTION_NOUN.match(scan_body, match_end)
@@ -2005,20 +2025,25 @@ def _is_empty_blocking_section(scan_body: str, match_start: int,
         line_end = len(scan_body)
     lead = scan_body[line_start:match_start]
     rest = scan_body[noun.end():line_end].lstrip("*_: \t-")
-    if re.match(r"^[ \t]*#{1,6}[ \t]+[*_]*$", lead):
-        if rest:
-            return bool(_EMPTY_DECLARATION.match(rest))
-        section_start = line_end + 1
-        next_heading = re.search(r"(?m)^[ \t]*#{1,6}\s",
-                                 scan_body[section_start:])
-        section = (scan_body[section_start:section_start + next_heading.start()]
-                   if next_heading else scan_body[section_start:])
-        lines = [ln.strip() for ln in section.splitlines()]
-        lines = [ln for ln in lines if ln and not re.match(r"^[-*_\s]{3,}$", ln)]
-        return len(lines) == 1 and bool(_EMPTY_DECLARATION.match(lines[0]))
-    if re.match(r"^[ \t]*(?:[-*+][ \t]+)?[*_]*$", lead):
-        return bool(rest) and bool(_EMPTY_DECLARATION.match(rest))
-    return False
+    heading = re.match(r"^[ \t]*(#{1,6})[ \t]+[*_]*$", lead)
+    if heading:
+        lines = _blocking_section_lines(scan_body, line_end + 1,
+                                        len(heading.group(1)))
+    elif re.match(r"^[ \t]*(?:[-*+][ \t]+)?[*_]*$", lead):
+        # A label's section is its own paragraph: everything up to the next
+        # blank line or heading, so a continuation line cannot hide.
+        nxt = re.search(r"\n[ \t]*\n|\n[ \t]*#{1,6}\s", scan_body[line_end:])
+        para = scan_body[line_end:line_end + nxt.start()] if nxt else scan_body[line_end:]
+        lines = [ln.strip() for ln in para.splitlines() if ln.strip()]
+        if not nxt and lines:
+            return False
+    else:
+        return False
+    if rest:
+        return not lines and bool(_EMPTY_DECLARATION.match(rest))
+    if len(lines) != 1:
+        return False
+    return bool(_EMPTY_DECLARATION.match(re.sub(r"^[-*+][ \t]+", "", lines[0])))
 
 
 def _is_exempt_findings_heading(

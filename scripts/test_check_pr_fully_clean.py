@@ -2505,6 +2505,9 @@ def main() -> int:
         ("heading, rule, None.", "### Blocking findings\n\n---\n\nNone."),
         ("heading: none", "### Blocking findings: none"),
         ("bold label: None.", "**Blocking findings:** None."),
+        ("label, bullet None", "Blocking findings:\n- None"),
+        ("heading, bullet None", "### Blocking findings\n\n- None."),
+        ("label then another label", "**Blocking findings:** None.\n\n**Non-blocking:** a nit."),
     ):
         check(f"classify_verdict: empty Blocking findings ({_label}) stays clean",
               checker.classify_verdict(_body + _tail, "") == "clean")
@@ -2516,6 +2519,12 @@ def main() -> int:
         ("heading, None, then an item",
          "### Blocking findings\n\nNone.\n\n- The cache leaks."),
         ("label with an item", "**Blocking findings:** the cache leaks."),
+        ("heading: None, then an item",
+         "### Blocking findings: None\n- crash"),
+        ("label: None, then a continuation line",
+         "Blocking findings: None\nThe build fails."),
+        ("heading None, then a subheading with an item",
+         "### Blocking findings\n\nNone\n\n#### Nit\n- real blocker: crash"),
         ("prose 'Blocking issues none of which'",
          "Blocking issues none of which are fixed."),
     ):

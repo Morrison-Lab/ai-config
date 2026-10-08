@@ -208,6 +208,8 @@ def _check_live_pr(num, repo=None):
 # window expired into an active session and cost a round of requests before
 # anyone noticed. Three months puts the re-review far from the day-to-day and
 # still refuses to become permanent by default.
+# Keep this declaration on one line in this exact form: stale copies read
+# main's value through _RX_CONST below (ai-config#3141).
 MORATORIUM_END = datetime.date(2026, 12, 1)
 
 
@@ -233,46 +235,107 @@ def moratorium_active(today=None):
 # MORATORIUM_END computes the moratorium as over and demands the forbidden
 # request, every turn, until the plugin updates (ai-config#3141: measured
 # firing from snapshots weeks behind main, on several machines). So once the
-# local constant has passed, ask main what the date is before demanding
-# anything. The fetch runs only past expiry, so it costs nothing while the
-# moratorium stands, and its answer is cached for the day.
+# local constant has passed, and only when the guard would otherwise block,
+# ask main what the date is before demanding anything.
 #
 # Asking main can only make this guard QUIETER, and only when main itself
 # says the moratorium stands, which is the directive the hook exists to
 # follow. Disabling the fetch (the tests' env var) makes the guard louder,
-# which is the safe direction for an env-readable switch.
+# which is the safe direction for an env-readable switch. Three limits keep
+# that quieting honest:
+#   * a date more than CANONICAL_MAX_DAYS ahead is refused, so a typo or a
+#     hostile response cannot silence the guard indefinitely;
+#   * the answer, or the fact that main could not be read, is cached for
+#     CANONICAL_TTL_SECONDS, so an offline machine pays the timeout at most
+#     once an hour rather than on every turn;
+#   * the cache lives in the user's own ~/.claude, is opened without
+#     following symlinks, and is trusted only when this user owns it, so no
+#     other local account can pre-plant a far-future date.
 CANONICAL_URL = ("https://raw.githubusercontent.com/Morrison-Lab/ai-config/"
                  "main/hooks/no-unreviewed-pr.py")
+CANONICAL_TTL_SECONDS = 3600
+CANONICAL_MAX_DAYS = 366
 _RX_CONST = re.compile(
     r"^MORATORIUM_END = datetime\.date\((\d{4}), (\d{1,2}), (\d{1,2})\)", re.M)
+_UNREADABLE = "unreadable"
+
+
+def _canonical_cache_path():
+    return os.path.join(os.path.expanduser("~"), ".claude",
+                        ".no-unreviewed-pr-moratorium-end")
+
+
+def _read_canonical_cache(path, now):
+    """(hit, value): hit is False when there is no fresh, trusted entry."""
+    try:
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    except OSError:
+        return False, None
+    try:
+        st = os.fstat(fd)
+        if hasattr(os, "getuid") and st.st_uid != os.getuid():
+            return False, None
+        if now - st.st_mtime > CANONICAL_TTL_SECONDS:
+            return False, None
+        raw = os.read(fd, 64).decode("ascii", "replace").strip()
+    except OSError:
+        return False, None
+    finally:
+        os.close(fd)
+    if raw == _UNREADABLE:
+        return True, None
+    try:
+        return True, datetime.date.fromisoformat(raw)
+    except ValueError:
+        return False, None
+
+
+def _write_canonical_cache(path, value):
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        tmp = "%s.%d" % (path, os.getpid())
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL
+                     | getattr(os, "O_NOFOLLOW", 0), 0o600)
+        with os.fdopen(fd, "w", encoding="ascii") as fh:
+            fh.write(value)
+        os.replace(tmp, path)
+    except OSError:
+        pass
+
+
+def _parse_canonical_end(src):
+    """main's MORATORIUM_END from its source text, or None."""
+    match = _RX_CONST.search(src)
+    if not match:
+        return None
+    try:
+        return datetime.date(*map(int, match.groups()))
+    except ValueError:
+        return None
+
+
+def _fetch_canonical_source():
+    import urllib.request
+    with urllib.request.urlopen(CANONICAL_URL, timeout=5) as resp:
+        return resp.read(1 << 20).decode("utf-8", "replace")
 
 
 def _canonical_moratorium_end():
-    """main's MORATORIUM_END, or None when it cannot be read."""
+    """main's MORATORIUM_END, or None when it cannot be read or trusted."""
     if os.environ.get("NO_UNREVIEWED_PR_DISABLE_LIVE_CHECK"):
         return None
-    cache = os.path.join(tempfile.gettempdir(),
-                         f".claude-moratorium-end-{_today().isoformat()}")
-    try:
-        with open(cache, encoding="utf-8") as fh:
-            return datetime.date.fromisoformat(fh.read().strip())
-    except (OSError, ValueError):
-        pass
-    try:
-        import urllib.request
-        with urllib.request.urlopen(CANONICAL_URL, timeout=5) as resp:
-            src = resp.read(1 << 20).decode("utf-8", "replace")
-        match = _RX_CONST.search(src)
-        if not match:
-            return None
-        end = datetime.date(*map(int, match.groups()))
-    except Exception:
+    import time
+    path = _canonical_cache_path()
+    hit, end = _read_canonical_cache(path, time.time())
+    if not hit:
+        try:
+            end = _parse_canonical_end(_fetch_canonical_source())
+        except Exception:
+            end = None
+        _write_canonical_cache(path, end.isoformat() if end else _UNREADABLE)
+    if end is not None and (
+            end - _today()).days > CANONICAL_MAX_DAYS:
         return None
-    try:
-        with open(cache, "w", encoding="utf-8") as fh:
-            fh.write(end.isoformat())
-    except OSError:
-        pass
     return end
 
 
@@ -2628,9 +2691,6 @@ def main() -> int:
     # is no request to demand, so there is nothing to scan for.
     if moratorium_active():
         return 0
-    canonical_end = _canonical_moratorium_end()
-    if canonical_end is not None and _today() < canonical_end:
-        return 0
 
     try:
         payload = json.load(sys.stdin)
@@ -2654,6 +2714,12 @@ def main() -> int:
     obligations = active_obligations
 
     if not obligations:
+        return 0
+
+    # Past this copy's own date, and only now that a block is due: a stale
+    # copy defers to main's date (ai-config#3141).
+    canonical_end = _canonical_moratorium_end()
+    if canonical_end is not None and _today() < canonical_end:
         return 0
 
     named = sorted({o["num"] for o in obligations if o["num"]}, key=int)

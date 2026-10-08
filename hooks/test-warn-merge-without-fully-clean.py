@@ -145,8 +145,78 @@ def main():
     INSTR = "python3 scripts/check-pr-fully-clean.py 12 -R Morrison-Lab/ai-config"
     check("silent: instrument && merge in ONE command",
           not run(INSTR + " && " + MERGE, [])[0])
-    check("silent: instrument && other && merge",
-          not run(INSTR + " && echo ok && " + MERGE, [])[0])
+    check("warns: instrument && other && merge (only the strict form discharges)",
+          run(INSTR + " && echo ok && " + MERGE, [])[0])
+    NL = chr(10)
+    check("silent: newline after && is allowed",
+          not run(INSTR + " &&" + NL + MERGE, [])[0])
+    check("silent: cd <path> && instrument && merge",
+          not run("cd /tmp/wt && " + INSTR + " && " + MERGE, [])[0])
+    check("silent: path-prefixed script",
+          not run("python3 /w/scripts/check-pr-fully-clean.py 12 -R Morrison-Lab/ai-config"
+                  " && " + MERGE, [])[0])
+    check("silent: instrument without -R, merge with -R",
+          not run("python3 scripts/check-pr-fully-clean.py 12 && " + MERGE, [])[0])
+    check("warns: a newline BETWEEN them is a separator, not &&",
+          run(INSTR + NL + MERGE, [])[0])
+    check("warns: leading || before the instrument",
+          run("false || " + INSTR + " && " + MERGE, [])[0])
+    check("warns: --help instead of a number",
+          run("python3 scripts/check-pr-fully-clean.py --help && " + MERGE, [])[0])
+    check("warns: instrument with NO number",
+          run("python3 scripts/check-pr-fully-clean.py -R Morrison-Lab/ai-config && "
+              + MERGE, [])[0])
+    check("warns: merge names no number",
+          run(INSTR + " && gh pr merge --squash", [])[0])
+    check("warns: an extra segment after the merge",
+          run(INSTR + " && " + MERGE + " && echo done", [])[0])
+    check("warns: an extra segment before cd",
+          run("echo hi && cd /x && " + INSTR + " && " + MERGE, [])[0])
+    check("warns: a trailing command on a new line after the merge",
+          run(INSTR + " && " + MERGE + NL + "rm -rf x", [])[0])
+    check("warns: a ; after the merge (extra segment)",
+          run(INSTR + " && " + MERGE + " ; echo x", [])[0])
+    check("warns: a pipe after the merge",
+          run(INSTR + " && " + MERGE + " | tee log", [])[0])
+    check("warns: a || after the merge",
+          run(INSTR + " && " + MERGE + " || true", [])[0])
+    check("warns: a two-token non-cd prefix segment",
+          run("echo hi && " + INSTR + " && " + MERGE, [])[0])
+    check("warns: bare `cd` with no path",
+          run("cd && " + INSTR + " && " + MERGE, [])[0])
+    check("warns: `cd` with two paths",
+          run("cd a b && " + INSTR + " && " + MERGE, [])[0])
+    check("warns: a flag other than -R after the instrument number",
+          run("python3 scripts/check-pr-fully-clean.py 12 -X Morrison-Lab/ai-config"
+              " && " + MERGE, [])[0])
+    check("warns: gh api merge after the instrument is not the strict form",
+          run(INSTR + " && gh api -X PUT repos/Morrison-Lab/ai-config/pulls/12/merge",
+              [])[0])
+    check("warns: strict form but merge for a DIFFERENT number",
+          run(INSTR + " && gh pr merge 13 -R Morrison-Lab/ai-config", [])[0])
+    check("warns: wrong interpreter (python, not python3)",
+          run("python scripts/check-pr-fully-clean.py 12 -R Morrison-Lab/ai-config"
+              " && " + MERGE, [])[0])
+    check("warns: script outside scripts/",
+          run("python3 tools/check-pr-fully-clean.py 12 -R Morrison-Lab/ai-config"
+              " && " + MERGE, [])[0])
+
+    # --- push and run in ONE command (item 4) -----------------------------
+    P2 = lambda cmd: run(MERGE, [step(cmd, CLEAN_OUT)])[0]
+    check("silent: `git push && check` credits the run as after the push",
+          not P2("git push origin b && " + INSTR))
+    check("warns: `check && git push` leaves the run stale",
+          P2(INSTR + " && git push origin b"))
+    check("silent: check && push && check (the last run is after the push)",
+          not P2(INSTR + " && git push origin b && " + INSTR))
+
+    # --- placeholders (item 6) ---------------------------------------------
+    check("silent: {owner}/{repo} placeholder repo on the merge matches any",
+          not run("gh pr merge 12 -R '{owner}/{repo}'", [clean()])[0])
+    check("silent: placeholder repo on the instrument run matches any",
+          not run(MERGE, [clean(repo="-R '{owner}/{repo}'")])[0])
+    check("warns: placeholder merge but NO run at all",
+          run("gh pr merge 12 -R '{owner}/{repo}'", [])[0])
     check("warns: instrument ; merge (a `;` join does not discharge)",
           run(INSTR + " ; " + MERGE, [])[0])
     check("warns: instrument || merge (a `||` join does not discharge)",
@@ -175,6 +245,12 @@ def main():
           run("gh api --method PUT repos/Morrison-Lab/ai-config/pulls/12/merge", [])[0])
     check("warns on gh api -XPUT /repos/.../merge",
           run("gh api -XPUT /repos/Morrison-Lab/ai-config/pulls/12/merge", [])[0])
+    check("warns on gh api merge with a trailing slash",
+          run(API + "/", [])[0])
+    check("warns on gh api merge with a query string",
+          run(API + "?x=1", [])[0])
+    check("silent on gh api merge with a query string after a clean run",
+          not run(API + "?x=1", [clean()])[0])
     check("silent on gh api GET .../pulls/N/merge (a read)",
           not run("gh api repos/Morrison-Lab/ai-config/pulls/12/merge", [])[0])
     check("silent on gh api PUT to a non-merge endpoint",

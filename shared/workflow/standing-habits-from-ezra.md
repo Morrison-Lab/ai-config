@@ -57,12 +57,12 @@ Claude quota is scarce, so Claude plans and verifies, and other models do bulk w
 - **Do:** name every model you use when you brief it.
 - **Don't:** use the UCDH Codex plan outside UCDH projects, or the UCDH Databricks workspace outside the `hac` group on the UCDH GitLab.
 - **Do:** use free models (ones that cost no quota, such as OpenCode's free tier) in any project or session whenever they help, for any task (Ezra, 2026-10-08).
-- **Do:** let only the UCDH Codex account directly view restricted data: PHI under HIPAA, FERPA student records, and other regulated data.
-  That account is itself limited to UCDH projects, so no model views restricted data outside one.
+- **Do:** at present, let only the UCDH Codex account directly view restricted data: PHI under HIPAA, FERPA student records, and other regulated data.
+  (Inferred: that account is itself limited to UCDH projects, so no model may view restricted data outside one.)
 - **Don't:** show restricted data to any other model, free or paid, whether by pasting it into a brief or by pointing the model at a file that holds it.
   Student data counts, because it is a FERPA education record.
 - **Don't:** treat models run on lab-owned hardware as cleared for restricted data.
-  Ezra named them as a possible future route (2026-10-08), but on-device inference stays prohibited by [`manage-quota`](manage-quota.md) until he approves it.
+  Ezra named them as a possible route (2026-10-08), but they are not yet cleared, and [`manage-quota`](manage-quota.md) still prohibits on-device inference.
 
 ## Choose a model for each task
 

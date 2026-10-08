@@ -30,7 +30,8 @@ body that merely mentions `ps aux` stays silent), and a quoted remote command
 lines or environments:
 
     ps       with a UNIX `-f`/`-F`, any BSD-style option cluster (`aux`, `ax`,
-             `x`), `-O`/BSD `O` (which preload the default `command` column),
+             `x`), a dashless PID operand (`ps 1234`, `ps $pid`, which
+             switches procps to BSD output), `-O`/BSD `O` (which preload the default `command` column),
              `--context`, BSD `e` (environments, even with `c` or an `-o`
              format), or an explicit format naming `args`/`command`/`cmd`/`%a`
              --- unless BSD `c` is present, which swaps argv for the name in
@@ -75,8 +76,10 @@ Commands over 20000 characters are not examined, so a pathological input
 cannot push the scan past the hook's timeout.
 
 It stays silent on the forms that print only a name: `pgrep -f <pattern>`
-(PIDs only), `ps -eo pid,etime,comm`, `ps -e`, and BSD `c` (`ps axc`), which
-replaces argv with the executable name.
+(PIDs only), `ps -p <pid>`, `ps -eo pid,etime,comm`, `ps -e`, BSD `c`
+(`ps axc`), which replaces argv with the executable name, and
+`/proc/self/cmdline`, which is the shell's own argv. `/proc/self/environ`
+still fires: the shell's own environment is where the session's tokens live.
 
 WHY THIS WARNS RATHER THAN BLOCKS
 ---------------------------------
@@ -119,6 +122,21 @@ WRAPPER_OPERANDS = {name: 0 for name in COMMAND_WRAPPERS}
 WRAPPER_OPERANDS.update({"timeout": 1, "watch": 0, "xargs": 0, "setsid": 0,
                          "flock": 1, "ssh": 1, "busybox": 0})
 
+# Short flags that TAKE A VALUE, per wrapper; every other flag takes none, so
+# `sudo -E ps`, `xargs -0 ps` and `watch -d ps` reach the lister.
+WRAPPER_VALUE_FLAGS = {
+    "sudo": set("ugpCDhrtTU"), "doas": set("uC"), "env": set("uCS"),
+    "timeout": set("sk"), "nice": set("n"), "ionice": set("cnpt"),
+    "stdbuf": set("ioe"), "watch": set("nq"), "xargs": set("adEeIiLlnPs"),
+    "flock": set("wEn"), "ssh": set("BbcDEeFIiJLlmOoPpQRSWw"),
+    "docker": set("euw"), "podman": set("euw"), "nerdctl": set("euw"),
+    "kubectl": set("cn"),
+}
+# Long flags that take a separate value; any other `--flag` takes none.
+WRAPPER_VALUE_LONG = {"--user", "--group", "--signal", "--kill-after",
+                      "--namespace", "--container", "--env", "--workdir",
+                      "--interval", "--chdir", "--unset"}
+
 # Container CLIs run a command only under `exec <container>`; `docker ps`
 # lists containers and must not be read as procps `ps`.
 CONTAINER_CLIS = {"docker", "podman", "kubectl", "nerdctl"}
@@ -129,7 +147,7 @@ ARGV_KEYS = {"args", "command", "cmd", "%a"}
 # `ps` options that take a value, so the value is not misread as a BSD option
 # cluster (`ps -C curl` names a process, it is not BSD `curl`) and so a letter
 # inside an attached value (`ps -Cxterm`) is not read as an option.
-PS_UNIX_VALUE_OPTS = set("CGgNpqstUuoO")
+PS_UNIX_VALUE_OPTS = set("CGgpqstUuoO")
 PS_LONG_VALUE_OPTS = {"--cols", "--columns", "--rows", "--lines", "--width",
                       "--format", "--group", "--Group", "--pid", "--ppid",
                       "--quick-pid", "--sid", "--tty", "--user", "--User",
@@ -138,8 +156,13 @@ PS_BSD_VALUE_OPTS = set("oOptUk")
 
 RX_REDIRECT = re.compile(r"\A\d*(?:[<>]|&>)")
 
+# Any process's `environ`, the shell's own included, since the session's
+# environment is where its tokens live. `cmdline` of `self`, `thread-self` or
+# `$$` is the shell's own argv, not another process's, so it is exempt.
 RX_PROC_LEAK = re.compile(
-    r"/proc/[^/\s]+/(?:task/[^/\s]+/)?(?:cmdline|environ)")
+    r"/proc/[^/\s]+/(?:task/[^/\s]+/)?environ"
+    r"|/proc/(?!(?:self|thread-self|\$\$)/)[^/\s]+/"
+    r"(?:task/[^/\s]+/)?cmdline")
 
 # Programs that only test for a /proc file rather than print it.
 PROC_TESTERS = {"test", "[", "[[", "ls", "stat", "readlink", "realpath"}
@@ -177,6 +200,7 @@ def _resolve(argv):
             operands, index = WRAPPER_OPERANDS[name], index + 1
         else:
             return index, busybox
+        value_flags = WRAPPER_VALUE_FLAGS.get(name, set())
         after_option = False
         while index < len(argv):
             token = argv[index]
@@ -185,11 +209,20 @@ def _resolve(argv):
                 after_option = False
                 continue
             if token.startswith("-") and len(token) > 1:
-                # Only a bare `-n` or `--name` can take the next token as its
-                # value; `-n1` and `--name=v` carry theirs.
-                after_option = (len(token) == 2
-                                or (token.startswith("--") and "=" not in token))
+                # Only a value-taking flag whose value is not attached
+                # (`-n 1`, `--user me`) consumes the next token: `-n1`,
+                # `--user=me`, `-E` and `-0` do not.
+                if token.startswith("--"):
+                    after_option = token in WRAPPER_VALUE_LONG
+                else:
+                    cluster = token[1:]
+                    taker = next((pos for pos, ch in enumerate(cluster)
+                                  if ch in value_flags), None)
+                    after_option = taker == len(cluster) - 1
                 index += 1
+                continue
+            if ENV_ASSIGNMENT.match(token):
+                index += 1  # `env FOO=1 ps`, `sudo FOO=1 ps`
                 continue
             if after_option:
                 after_option = False
@@ -227,6 +260,12 @@ def _ps_prints_argv(args, busybox=False):
         nxt = args[i + 1] if i + 1 < len(args) else ""
         if RX_REDIRECT.match(tok):
             break  # `ps aux > out`: `out` is a file, not an option cluster
+        if re.fullmatch(r"\d+(?:,\d+)*|\$.*", tok):
+            # A dashless PID list (`ps 1234`, `ps $pid`) switches procps to
+            # BSD output, which carries the COMMAND column (measured).
+            bsd = True
+            i += 1
+            continue
         if tok.startswith("--"):
             name, eq, value = tok.partition("=")
             if name == "--format":

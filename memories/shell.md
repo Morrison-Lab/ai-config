@@ -491,8 +491,8 @@ printed the probe's `curl -H "Authorization: Bearer <token>"` argv, so a live Da
 The token came from a shell variable, which is the recommended form; the `command` column printed it anyway.
 
 Measured 2026-10-08 on Linux procps, against a background process carrying a marker in its argv.
-These print argv: `ps aux`, `ps -aux`, `ps -ef`, `ps -eo pid,args`, `ps -O rss -e` (`-O` adds to the default columns, which include `command`), `ps -e --context`, `ps -e -o%a`, `pgrep -af`, and `top -bc` when the line is wide enough (`-w 512`).
-These do not: `ps -e`, `ps -eo pid,etime,comm`, `pgrep -f`, and `top -b`.
+These print argv: `ps <pid>` (a dashless PID switches to BSD output), `ps aux`, `ps -aux`, `ps -ef`, `ps -eo pid,args`, `ps -O rss -e` (`-O` adds to the default columns, which include `command`), `ps -e --context`, `ps -e -o%a`, `pgrep -af`, and `top -bc` when the line is wide enough (`-w 512`).
+These do not: `ps -e`, `ps -eo pid,etime,comm`, `ps -p <pid>`, `pgrep -f`, and `top -b`.
 BSD `c` swaps argv for the executable name in every column, so `ps axc`, `ps -ef c` and `ps -e -o pid,args c` print none.
 The `top` rows hold for a default config only: `-c` reverses the toggle remembered in the toprc rather than setting it, so under a toprc that saved it on, `top -b` prints argv and `top -bc` does not.
 BSD `e` prints each process's environment, which is no safer, and does so even with `c` (`ps axce`) or an explicit format (`ps axe -o pid,comm` printed 13 environments).
@@ -502,7 +502,7 @@ A shell's own `set -x` trace prints the expanded words too: `set -x; curl -H "Au
 
 - **Do:** test liveness with `pgrep -f <pattern>`, which prints PIDs only, and get detail with `ps -o pid,etime,comm -p <pid>`.
 - **Do:** keep your own secrets out of argv: pass them on stdin, in a file (`curl -H @file`, documented as `<header/@file>` in curl 8.5.0), or in an environment variable that nothing echoes.
-- **Don't:** run `ps aux`, `ps -ef`, `ps -O <col>`, `ps -o args`/`command`/`cmd`, BSD `ps ... e`, `pgrep -a`, `pstree -a`, `top -c`, or `cat /proc/<pid>/cmdline` on a host where any process may carry a credential in argv.
+- **Don't:** run `ps <pid>`, `ps aux`, `ps -ef`, `ps -O <col>`, `ps -o args`/`command`/`cmd`, BSD `ps ... e`, `pgrep -a`, `pstree -a`, `top -c`, or `cat /proc/<pid>/cmdline` on a host where any process may carry a credential in argv.
 - **Don't:** turn on `set -x` around a command that expands a secret.
 
 [`hooks/flag-argv-printing-process-listing.py`](../hooks/flag-argv-printing-process-listing.py) warns, without blocking, on the argv-printing forms above, including through `xargs`, `ssh`, `docker exec`, and `$(...)`.

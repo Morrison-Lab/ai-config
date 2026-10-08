@@ -127,6 +127,21 @@ for cmd in [
     "grep curl /proc/1/cmdline",
     "timeout 5 ps aux",
     "ssh -p 22 host ps aux",
+    # review round 3 (measured): a dashless PID list switches to BSD output
+    "ps 1234",
+    "ps $$",
+    'ps "$pid"',
+    "ps 12,34",
+    # no-value wrapper flags and env assignments do not hide the lister
+    "sudo -E ps aux",
+    "sudo -n ps -ef",
+    "xargs -0 ps -fp",
+    "pgrep -f x | xargs -r ps -o pid,args -p",
+    "watch -d ps aux",
+    "env FOO=1 ps -ef",
+    "sudo -u me -E ps aux",
+    # the shell's own environment holds the session's tokens
+    "cat /proc/$$/environ",
 ]:
     check(cmd, True)
 
@@ -187,6 +202,12 @@ for cmd in [
     "rg -n /proc/1/cmdline hooks",
     # `top -c` reverses the toprc state; plain batch mode is the default-off case
     "top -b -n1",
+    # review round 3: -N takes no value; own argv is not another's
+    "ps -N -C bash",
+    "cat /proc/self/cmdline",
+    "cat /proc/$$/cmdline",
+    "ps -p 1234",
+    "ps -p $pid -o pid,comm",
 ]:
     check(cmd, False)
 

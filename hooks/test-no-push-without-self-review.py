@@ -3946,6 +3946,14 @@ def alias_cases() -> tuple[int, int]:
              f"git -C {REPO} p origin feature", reviewed(), True, "verdict is for commit"),
             ("an alias in the -C repository's own config is read",
              f"git -C {OTHER} pp origin main", reviewed(), True, None),
+            # Read from the hook's cwd, this alias was missed and the command
+            # dropped as not-a-push: a silent allow (#4406 review).
+            ("an alias read through --git-dir is refused as a redirected push",
+             f"git --git-dir={OTHER}/.git pp origin main", reviewed(), True,
+             "another repository"),
+            ("the same with --git-dir as a separate word",
+             f"git --git-dir {OTHER}/.git pp origin main", reviewed(), True,
+             "another repository"),
             ("a `!` shell alias naming push is refused",
              f"git -C {REPO} -c 'alias.x=!git push origin feature' x", reviewed(),
              True, "alias"),

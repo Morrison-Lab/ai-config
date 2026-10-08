@@ -1162,6 +1162,30 @@ def _git_subcommand_index(argv: list[str]) -> int | None:
     return None
 
 
+def _repo_overrides(prefix: list[str]) -> list[str]:
+    """The `--git-dir`/`--work-tree`/`--namespace` options among git's globals.
+
+    Forwarded to the alias read so `git --git-dir=other/.git p` reads `other`'s
+    `alias.p`, as git will. Reading the hook's cwd instead missed the alias and
+    dropped the command as not-a-push, which allowed it outright; once the
+    expansion is found to push, `iter_pushes` refuses it as REDIRECTED like the
+    literal spelling (#4406 review).
+    """
+    out: list[str] = []
+    i = 1
+    while i < len(prefix):
+        tok = prefix[i]
+        head = tok.partition("=")[0]
+        if head in REPO_REDIRECT_OPTS:
+            if "=" in tok:
+                out.append(tok)
+            elif i + 1 < len(prefix):
+                out += [tok, prefix[i + 1]]
+                i += 1
+        i += 1
+    return out
+
+
 def _expand_push_alias(rest: list[str], env: list[str],
                        directory: str | None):
     """The push argv a git alias expands to, None, or UNRESOLVED_ALIAS.
@@ -1195,6 +1219,7 @@ def _expand_push_alias(rest: list[str], env: list[str],
         seen += 1
         try:
             value = _run_git(directory, env, *_config_overrides(rest[:i]),
+                             *_repo_overrides(rest[:i]),
                              "config", "--get", f"alias.{word}")
         except TimeoutError:
             return UNRESOLVED_ALIAS

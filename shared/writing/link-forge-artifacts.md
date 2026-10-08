@@ -17,9 +17,11 @@ Give the direct link (a URL, or a clickable path for a file) in the reply that m
 
 **Resolve whether a bare number is a PR or an issue before linking it.**
 GitHub numbers PRs and issues from one sequence, and the path segment names the type: `/pull/N` for a PR, `/issues/N` for an issue.
-One query answers it.
-`GET /repos/{owner}/{repo}/issues/{n}` returns a `pull_request` key only for a PR.
-The MCP `issue_read` tool (method `get`) returns an `html_url` that already carries the right path, for a PR number too.
+One query answers it, and the ways to run it are already recorded:
+`git ls-remote origin refs/pull/<N>/head` in a clone
+([`memories/git.md`](../../memories/git.md#classify-a-bare-nnnn-as-issue-or-pr-with-git-ls-remote-origin-refspullnnnnhead)),
+or the `pull_request` key from the issues API (`memories/gh-cli.md`).
+The MCP `issue_read` tool (method `get`) also answers it: its `html_url` carries the right path for a PR number too.
 
 - **Do:** look the number up and link it with the path the forge returns.
 - **Don't:** default every unresolved number to `/issues/N` because checking looked costly.

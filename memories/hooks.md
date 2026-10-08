@@ -108,6 +108,29 @@ Blocking hooks deny execution (exit code 2), while warning hooks emit actionable
 | [`warn-stale-issue-edit.py`](../hooks/warn-stale-issue-edit.py) | Warn | Warns when editing code for an issue without a fresh `VIEW_ISSUE` and remote default-branch check. | Run `gh issue view <N>` (or `VIEW_ISSUE`) and check `git fetch origin main` / `origin/main` before modifying files for an issue. |
 | [`flag-unmeasured-timestamp.py`](../hooks/flag-unmeasured-timestamp.py) | Warn | Warns when editing or writing to session notebooks (`session-*.md`) or memory files (`memory/*.md`) stating a Pacific clock time without a date reading in the turn. | Run `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"` before writing or appending timestamps to session notebooks or memory files. |
 
+### 2.5 Widening a Bash hook to raw command text: strip what only quotes the pattern
+
+A widening that fixes false negatives by scanning more of the command can start firing on text that merely *mentions* the pattern.
+In a Bash command the commonest such carriers are a heredoc commit message (`git commit -m "$(cat <<'EOF' ... EOF)"`), a PR or issue body, and a `#` comment.
+
+Measured 2026-10-08 on [ai-config#4398](https://github.com/Morrison-Lab/ai-config/pull/4398), a warn-only `PreToolUse` hook.
+A round-1 review fix made it scan the raw command text for `$(...)` substitutions.
+It then fired on ordinary commit messages whose heredoc bodies described the pattern.
+`scripts/lib/shellcmd.py` already strips two of the three: `_heredoc_free` blanks heredoc bodies and `_comment_free` drops unquoted comments, and `simple_commands` applies both before splitting.
+It does not strip the third.
+A body passed inline survives as an ordinary argument: `simple_commands("gh pr create --body 'see $(echo hi)'")` keeps `see $(echo hi)` as one argv element.
+Quoting decides whether that text runs.
+Inside single quotes `$(...)` is literal and never executes, while inside double quotes it does, so a scan for substitutions has to track quote state rather than only strip heredocs and comments.
+
+This is not the cheap false positive a warn-only hook may accept.
+[4.6](#46-asymmetric-error-costs-in-warn-only-hooks-prefer-over-warning-to-brittle-narrowing) accepts over-warning on a rare argument shape.
+A heredoc commit message describing the hook's own pattern is what every commit to that hook is likely to carry, so the false positive lands on the hook's own maintenance.
+
+- **Do:** when widening what a hook scans, add NO-FIRE tests in the same change for a heredoc commit message, a PR body, and a comment that each quote the pattern.
+- **Do:** strip heredoc bodies and comments with `shellcmd`'s helpers, and skip single-quoted spans, before scanning for a substitution;
+  never scan the unstripped command string.
+- **Don't:** fix a false negative by switching to raw-text matching without a test that the commonest benign carriers stay silent.
+
 ---
 
 ## 3. `Stop` Hooks (Completion & Output Validation)
@@ -271,25 +294,6 @@ and the regression was surfaced by Claude code review.
 - **Do:** audit all early-return guards between the function signature and the modified branch whenever adding new supported tools or command shapes.
 - **Do:** add unit tests for every distinct tool or prefix added to an alternative branch.
 - **Don't:** assume that because an adjacent sibling function implemented the widened guard correctly, a duplicate or sibling function in the same file did as well without direct inspection.
-
-### 3.5 Widening a Bash hook to raw command text: strip what only quotes the pattern
-
-The mirror of 3.4.
-A widening that fixes false negatives by scanning more of the command can start firing on text that merely *mentions* the pattern.
-In a Bash command the commonest such carriers are a heredoc commit message (`git commit -m "$(cat <<'EOF' ... EOF)"`), a PR or issue body, and a `#` comment.
-
-Measured 2026-10-08 on [ai-config#4398](https://github.com/Morrison-Lab/ai-config/pull/4398), a warn-only `PreToolUse` hook.
-A round-1 review fix made it scan the raw command text for `$(...)` substitutions.
-It then fired on ordinary commit messages whose heredoc bodies described the pattern.
-`scripts/lib/shellcmd.py` already strips both carriers: `_heredoc_free` blanks heredoc bodies and `_comment_free` drops unquoted comments, and `simple_commands` applies both before splitting.
-
-This is not the false positive that 4.6 below says to accept.
-That section accepts a rare argument shape.
-A heredoc commit message describing the hook's own pattern is what every commit to that hook is likely to carry, so the false positive lands on the hook's own maintenance.
-
-- **Do:** when widening what a hook scans, add NO-FIRE tests in the same change for a heredoc commit message, a PR body, and a comment that each quote the pattern.
-- **Do:** run the widened text through `shellcmd`'s stripping helpers (or `simple_commands`) rather than matching the raw command string.
-- **Don't:** fix a false negative by switching to raw-text matching without a test that the commonest benign carriers stay silent.
 
 ---
 

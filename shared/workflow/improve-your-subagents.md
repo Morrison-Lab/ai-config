@@ -240,4 +240,5 @@ this section is the briefing side.
 - **Do:** when a brief asks for a measurement whose command can print environment, credentials, or config, require count-only output (`grep -c`, `wc -l`, or line lengths via `awk '{print length($0)}'`), and say so in the brief.
 - **Do:** state in the brief that matching lines from such a command are not to be printed, even piped through `grep`.
 - **Don't:** brief "measure how `ps` behaves" (or `env`, or `/proc`) and leave the agent to choose a command whose output it will then echo.
-- **Don't:** treat a `ps -o` field list as keeping the environment out; the `e` modifier appends it regardless.
+- **Don't:** treat a `ps -o` field list as keeping the environment out,
+  since the `e` modifier appends it regardless.

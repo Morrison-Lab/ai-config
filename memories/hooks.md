@@ -122,7 +122,7 @@ The same `$(...)` in a double-quoted argument or under an unquoted `<<EOF` delim
 `scripts/lib/shellcmd.py` helps with part of this and not all of it.
 `_comment_free` drops unquoted comments.
 `_heredoc_free` blanks every heredoc body whatever its delimiter's quoting (measured: `<<EOF` and `<<'EOF'` both came back blank), so using it as-is hides a substitution that would run.
-#4398's hook does use it as-is, and its docstring lists the unquoted-heredoc miss as a deliberate trade for silence.
+The hook [ai-config#4398](https://github.com/Morrison-Lab/ai-config/pull/4398) adds does use it as-is, and its docstring lists the unquoted-heredoc miss as a deliberate trade for silence.
 The Do list below is the design without that hole, and the missing quoted-only stripper is tracked in [ai-config#4408](https://github.com/Morrison-Lab/ai-config/issues/4408).
 A body passed inline is not stripped at all: `simple_commands("gh pr create --body 'see $(echo hi)'")` keeps `see $(echo hi)` as one argv element.
 

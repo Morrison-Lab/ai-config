@@ -39,9 +39,10 @@ Known limit, accepted: the check only needs a host to be NAMED, so a
 `curl https://gitlab.com/api/v4/user` counts even when the intended host is
 another; the guard cannot know which host was intended.
 
-Known limit, accepted: the credential-expiry reading needs a forge word
-(GitLab, GitHub, glab, gh, PAT, auth) in the same sentence, so an expiry
-statement that names none is not read.
+Known limit, accepted: the credential-expiry reading needs the user's own
+credential as its subject ("your token", "the token you ..."), so an expiry
+statement phrased otherwise is not read; and a login command followed by
+"in the README / docs / CI / example" is read as describing, not asking.
 
 ## Why this warns rather than blocks
 
@@ -76,21 +77,22 @@ REPLY_TOOL_RX = re.compile(r"(^|__)(reply|post_message|update_message)$", re.I)
 
 RX_CLAIM = re.compile(
     r"(?P<imper>\b(?:re-?run|run|execute|try|use)\W{0,3}(?:" + MARKER +
-    r"|(?:glab|gh)\s+auth\s+login\b(?!\s+--with-token)))"
+    r"|(?:glab|gh)\s+auth\s+login\b(?!\s+--with-token))"
+    r"(?!\s+(?:in|inside|within|from|for|on)\s+(?:the\s+|our\s+|this\s+|a\s+)?"
+    r"(?:readme|example|docs?|documentation|ci|pipelines?|tests?|scripts?|fixtures?)\b))"
     r"|(?:\b(?:please |you(?:'ll| will)? (?:need|have) to |you need to |"
     r"you must |can you |could you |will you |go ahead and |just )"
     r"re-?authenticat\w*)"
     r"|(?:\bre-?authenticat(?:e|ion)\b[^.\n]{0,40}\b(?:required|needed|necessary)\b)"
     r"|(?:\b(?:log|sign) ?in again\b)"
-    r"|(?P<expiry>\b(?:token|credentials?|pat|login|authentication)\b"
+    r"|(?P<expiry>\b(?:your\s+(?:[\w-]+\s+){0,3}(?:token|credentials?|pat)"
+    r"|the\s+(?:[\w-]+\s+){0,2}(?:token|credentials?|pat)\s+you)\b"
     r"[^.\n]{0,30}\b(?:expired|(?:been|was|were|got|is|are) revoked|gone stale|is invalid)\b)",
     re.I,
 )
-# The expiry arm is about forge credentials only: "the login page expired"
-# or "the CI token was revoked" is not. A forge word must share the sentence.
-RX_FORGE_CONTEXT = re.compile(
-    r"\b(?:gitlab|github|glab|gh|pat|private-token|personal access token|"
-    r"access token|api token|auth)\b", re.I)
+# The expiry arm is about the USER'S OWN credentials ("your GitLab token",
+# "the token you gave me"): "the login page expired", "the CI token was
+# revoked" and a fixture's "token expired" describe something else.
 # Text before a bare/backticked login command that makes it a request to the
 # user: nothing, an opener clause ("To fix this,"), polite words, or a modal
 # addressed to "you". "Tests run gh auth login" and "warns when you run ..."
@@ -191,14 +193,6 @@ def mark_auth_commands(text):
     return CODE_SPAN_RE.sub(_span, joined)
 
 
-def _sentence_of(prose, start, end):
-    """The sentence of PROSE containing the span [start, end)."""
-    s_start = max(
-        (b.end() for b in RX_SENTENCE_END.finditer(prose, 0, start)), default=0)
-    after = RX_SENTENCE_END.search(prose, end)
-    return prose[s_start:after.start() if after else len(prose)]
-
-
 def find_claim(text):
     """The first reauthentication claim in TEXT (code-aware), or None."""
     prose = strip_code(mark_auth_commands(text))
@@ -211,9 +205,6 @@ def find_claim(text):
                 or RX_NEGATED_INSIDE.search(m.group(0))):
             continue
         if m.group("imper") and not RX_ADDRESSED_PREFIX.search(prefix):
-            continue
-        if m.group("expiry") and not RX_FORGE_CONTEXT.search(
-                _sentence_of(prose, m.start(), m.end())):
             continue
         return m
     return None

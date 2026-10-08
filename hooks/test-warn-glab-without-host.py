@@ -85,6 +85,8 @@ SHOULD_WARN = [
      "a valueless --hostname names no host"),
     ("W15", "glab api --hostname= user", "plain",
      "an empty --hostname= names no host"),
+    ("W16", "glab repo clone group/project", "plain",
+     "a positional owner/repo carries no host"),
     ("W13", "(cd {selfhosted} && glab mr list); glab api user", "plain",
      "a cd inside a subshell must not leak into the next command"),
 ]
@@ -117,6 +119,20 @@ SHOULD_STAY_SILENT = [
      "a GL_HOST prefix names the host"),
     ("S17", "(cd {selfhosted} && glab mr list)", "plain",
      "a cd INTO the checkout within the same subshell"),
+    ("S18", "glab repo clone git.example.com/grp/repo", "plain",
+     "a host-qualified positional (repo clone)"),
+    ("S19", "glab repo view https://git.example.com/a/b", "plain",
+     "a URL positional (repo view)"),
+    ("S20", "GITLAB_URI=gitlab.example.org glab api user", "plain",
+     "GITLAB_URI prefix"),
+    ("S21", "GITLAB_URL=https://gitlab.example.org glab api user", "plain",
+     "GITLAB_URL prefix"),
+    ("S22", "export GITLAB_URL=https://gitlab.example.org; glab api user", "plain",
+     "an earlier export of GITLAB_URL"),
+    ("S23", "GITLAB_URI=gitlab.example.org; glab api user", "plain",
+     "a bare GITLAB_URI assignment statement"),
+    ("S24", "glab mr list --help", "plain", "--help contacts no host"),
+    ("S25", "glab api -h", "plain", "-h contacts no host"),
     ("S15", "GITLAB_HOST=gitlab.example.org; glab api user", "plain",
      "a bare GITLAB_HOST assignment statement sets the host"),
     ("S14", "glab api -R gitlab.example.org/g/p projects/1", "plain",
@@ -152,7 +168,7 @@ FAKE_SELFHOSTED = make_fake_glab("gitlab.example.org")
 
 def run_hook(hook_path, data, extra_env=None, fake=None):
     env = {k: v for k, v in os.environ.items()
-           if k not in ("GITLAB_HOST", "GL_HOST")}
+           if k not in ("GITLAB_HOST", "GL_HOST", "GITLAB_URI", "GITLAB_URL")}
     env["PATH"] = (fake or FAKE_DEFAULT) + os.pathsep + env.get("PATH", "")
     env.update(extra_env or {})
     proc = subprocess.run(
@@ -213,11 +229,12 @@ cfg = run_hook(HOOK, payload("glab api user", "plain"), fake=FAKE_SELFHOSTED)
 cfg_ok = not cfg.strip()
 print(f"\n  {'ok  ' if cfg_ok else 'WRONG'} CONFIGURED  a self-hosted `glab config get host` silences the warning")
 wrong += not cfg_ok
-GL_ENV = run_hook(HOOK, payload("glab api user", "plain"),
-                  {"GL_HOST": "gitlab.example.org"})
-gl_ok = not GL_ENV.strip()
-print(f"  {'ok  ' if gl_ok else 'WRONG'} GL_HOST  GL_HOST in the hook environment silences the warning")
-wrong += not gl_ok
+for var in ("GL_HOST", "GITLAB_URI", "GITLAB_URL"):
+    got = run_hook(HOOK, payload("glab api user", "plain"),
+                   {var: "gitlab.example.org"})
+    var_ok = not got.strip()
+    print(f"  {'ok  ' if var_ok else 'WRONG'} {var}  {var} in the hook environment silences the warning")
+    wrong += not var_ok
 
 # The message must carry the remedy, and an Antigravity run must not double-print.
 out = json.loads(run_hook(HOOK, payload("glab api user", "plain")))
@@ -227,7 +244,7 @@ print(f"\n  {'ok  ' if message_ok else 'WRONG'} MESSAGE  names --hostname and se
 wrong += not message_ok
 
 total = len(SHOULD_WARN) + len(SHOULD_STAY_SILENT) + len(NON_COMMAND_PAYLOADS)
-print(f"\n{total + 4 - wrong}/{total + 4} correct"
+print(f"\n{total + 6 - wrong}/{total + 6} correct"
       + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
 
 EXPECTED = {cid: "WARN" for cid, *_ in SHOULD_WARN}
@@ -252,13 +269,14 @@ MUTATIONS = {
     ),
     "M3_env_prefix": (
         "dropping the GITLAB_HOST prefix exemption makes S5 warn",
-        [('env_value(env, "GITLAB_HOST") or ', '')],
-        {"S5"},
+        [('env_value(env, var) or ', '')],
+        {"S5", "S16", "S20", "S21"},
     ),
     "M4_export": (
         "dropping the export exemption makes S6 warn",
-        [('if names_host(rest) or exported_host:', 'if names_host(rest):')],
-        {"S6", "S15"},
+        [('if help_requested(rest) or names_host(rest) or exported_host:',
+          'if help_requested(rest) or names_host(rest):')],
+        {"S6", "S15", "S22", "S23"},
     ),
     "M5_cwd_remote": (
         "ignoring the cwd remote makes S7, S13 and S17 warn",
@@ -305,6 +323,22 @@ MUTATIONS = {
         [('        if tok.startswith("--hostname=") and tok != "--hostname=":',
           '        if tok.startswith("--hostname="):')],
         {"W15"},
+    ),
+    "M15_positional_host": (
+        "a host-qualified positional must name the host",
+        [('                and RX_HOST_REPO.match(tok)):', '                and False):')],
+        {"S18", "S19"},
+    ),
+    "M16_help": (
+        "--help / -h must be exempt",
+        [('if help_requested(rest) or ', 'if ')],
+        {"S24", "S25"},
+    ),
+    "M17_host_env_vars": (
+        "GITLAB_URI / GITLAB_URL must count like GITLAB_HOST / GL_HOST",
+        [('HOST_ENV_VARS = ("GITLAB_HOST", "GL_HOST", "GITLAB_URI", "GITLAB_URL")',
+          'HOST_ENV_VARS = ("GITLAB_HOST", "GL_HOST")')],
+        {"S20", "S21", "S22", "S23"},
     ),
     "M10_value_flags": (
         "value-taking flags must be skipped when finding the subcommand",

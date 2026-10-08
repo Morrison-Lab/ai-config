@@ -19,8 +19,8 @@ A `glab` subcommand that talks to a GitLab project (`api`, `issue`, `mr`,
 
   * no `--hostname` / `--hostname=`,
   * no `-R/--repo` carrying a host (`HOST/OWNER/REPO` or a URL),
-  * no `GITLAB_HOST` assignment on the command or in an earlier
-    `export GITLAB_HOST=` of the same command line,
+  * no host variable (`GITLAB_HOST`, `GL_HOST`, `GITLAB_URI`, `GITLAB_URL`)
+    assigned on the command or exported earlier on the same command line,
   * and the working directory (the hook input's `cwd`, moved by any `cd`
     earlier in the same command) is not inside a git repository whose remote
     is a host other than gitlab.com / github.com.
@@ -73,6 +73,11 @@ HOST_SENSITIVE = {
     "deploy-key", "iteration", "user", "runner", "securefile", "token",
     "cluster", "stack", "ssh-key", "gpg-key",
 }
+
+# Environment variables glab reads to pick a host. Verified against glab
+# 1.106.0's own help text: "GITLAB_HOST, GITLAB_URI, GITLAB_URL: specify a
+# GitLab host to make request to" and "GITLAB_HOST or GL_HOST".
+HOST_ENV_VARS = ("GITLAB_HOST", "GL_HOST", "GITLAB_URI", "GITLAB_URL")
 
 # Flags whose next token is their value, so it is not the subcommand.
 VALUE_FLAGS = {"-R", "--repo", "--hostname"}
@@ -133,6 +138,11 @@ def names_host(rest):
     """True when the glab argv itself carries a --hostname or host-qualified -R."""
     args = rest[1:]
     for i, tok in enumerate(args):
+        # A host-qualified positional (`repo clone git.example.com/g/r`, a URL).
+        prev = args[i - 1] if i else ""
+        if (not tok.startswith("-") and prev not in VALUE_FLAGS
+                and RX_HOST_REPO.match(tok)):
+            return True
         if tok == "--hostname" and i + 1 < len(args) and not args[i + 1].startswith("-"):
             return True
         if tok.startswith("--hostname=") and tok != "--hostname=":
@@ -147,6 +157,18 @@ def names_host(rest):
         if value is not None and RX_HOST_REPO.match(value):
             return True
     return False
+
+
+def help_requested(rest):
+    """True for `--help` / `-h`, which prints usage and contacts no host."""
+    return any(tok in ("--help", "-h") for tok in rest[1:])
+
+
+def sets_host(tokens):
+    """True when any of TOKENS assigns a non-empty host variable."""
+    return any(
+        t.startswith(var + "=") and t != var + "="
+        for t in tokens for var in HOST_ENV_VARS)
 
 
 def configured_host():
@@ -179,13 +201,11 @@ def find_offense(command, cwd):
     for scope, argv in cmds:
         env, rest = strip_env(argv)
         if argv and argv[0] == "export":
-            exported_host = exported_host or any(
-                t.startswith("GITLAB_HOST=") and t != "GITLAB_HOST=" for t in argv[1:])
+            exported_host = exported_host or sets_host(argv[1:])
             continue
         if not rest:
             # A bare assignment statement (`GITLAB_HOST=h; glab ...`).
-            exported_host = exported_host or any(
-                t.startswith("GITLAB_HOST=") and t != "GITLAB_HOST=" for t in argv)
+            exported_host = exported_host or sets_host(argv)
             continue
         prog = os.path.basename(rest[0])
         if prog in ("cd", "pushd", "popd"):
@@ -196,10 +216,9 @@ def find_offense(command, cwd):
         sub = glab_subcommand(rest)
         if sub not in HOST_SENSITIVE:
             continue
-        if names_host(rest) or exported_host:
+        if help_requested(rest) or names_host(rest) or exported_host:
             continue
-        if (env_value(env, "GITLAB_HOST") or env_value(env, "GL_HOST")
-                or os.environ.get("GITLAB_HOST") or os.environ.get("GL_HOST")):
+        if any(env_value(env, var) or os.environ.get(var) for var in HOST_ENV_VARS):
             continue
         cur_dir = dir_of(scope)
         if cur_dir is not None and cwd_names_host(cur_dir):

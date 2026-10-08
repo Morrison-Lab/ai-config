@@ -1076,3 +1076,19 @@ A hook that triggers on several regex phrase families can pass a suite while one
 - **Don't:** match against the raw message, where a quoted or pasted phrase fires the hook.
 
 
+
+## Fixing a trust check in one hook: sweep the hooks that reimplement it (#4368)
+
+`hooks/no-push-without-self-review.py` and `hooks/no-unshipped-commit.py` both decide whether a reviewer hand-back counts.
+The Stop guard imports the push guard for most of its helpers, but it carried its own copy of the hand-back test.
+#4368's first push fixed the forgeable marker match in the push guard only.
+The review of that push found the identical regex still live in `handle_subagent_handback`, with a test asserting the old behavior.
+
+Importing a module for some helpers does not mean every related rule goes through it.
+So the place a fix lands says nothing about whether the defect is gone.
+The decidable check is a grep for the literal being removed, across `hooks/` and its tests, before the first push.
+The cure is delegation rather than a second edit, so the two hooks cannot drift apart again.
+
+- **Do:** before pushing a fix to a guard's acceptance rule, grep `hooks/` for the removed pattern's distinctive literal (here `Subagent hand-back`) and fix every live copy in the same PR.
+- **Do:** replace a reimplemented copy with a call into the module that owns the rule.
+- **Don't:** treat a sibling hook that imports the guard as covered by the guard's fix.

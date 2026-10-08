@@ -147,6 +147,11 @@ for cmd in [
     "ssh -v host ps aux",
     "ps 2 2>/dev/null",
     "ps aux 2>/dev/null",
+    # review round 5: another command's discard does not silence this one
+    "nohup curl -s https://x >/dev/null 2>&1 & sleep 1; ps aux | grep curl",
+    "curl -s https://x > /dev/null & ps -eo pid,etime,command | grep curl",
+    "ps -eo pid,etime,command | grep curl; make >/dev/null",
+    "ps aux | grep curl && wc -l f",
     # a filter alone still prints the matched lines
     "ps aux | grep curl",
     "ps aux | grep curl | head",
@@ -229,6 +234,10 @@ for cmd in [
     "cat /proc/$$/environ",
     "ps --help all",
     "ps --version",
+    "ps aux | grep foo | awk '{print $2}'",
+    "ps aux | grep foo | grep -v grep | awk '{print $2}'",
+    "make >/dev/null; ps aux | wc -l",
+    "ps aux 2>&1 | wc -l",
     "ps -p 1 2>/dev/null",
     "ps -o pid,comm -p $pid 2>&1",
 ]:

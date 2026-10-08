@@ -70,21 +70,23 @@ KNOWN HOLES, so silence is not read as coverage:
 - `docker top` and `docker run --pid=host ... ps aux`;
 - `top -b` under a toprc that saved the command-line toggle on;
 - other tools that print argv: `htop`, `atop`, `lsof +c0`,
-  `systemctl status`;
+  `systemctl status`, `w` (its WHAT column), `pidstat -l`;
 - the session's OWN environment (`env`, `printenv`, `export -p`,
   `/proc/self/environ`), which is out of scope: this guard is about other
   processes' data, and those dumps are a separate habit to break.
 
-Commands over 20000 characters are not examined, so a pathological input
+Commands over 10000 characters are not examined, so a pathological input
 cannot push the scan past the hook's timeout.
 
 It stays silent on the forms that print only a name: `pgrep -f <pattern>`
 (PIDs only), `ps -p <pid>`, `ps -eo pid,etime,comm`, `ps -e`, BSD `c`
 (`ps axc`), which replaces argv with the executable name, and
 `/proc/self/cmdline`, which is the shell's own argv. It also stays silent
-when the listing's output never reaches the transcript: piped into `wc` or
-`grep -c`/`-q`/`-l` (through any `grep`, `sort`, `head`-style filters), or
-redirected to `/dev/null`.
+when the listing's output never reaches the transcript: its own pipeline
+ends in `wc`, `grep -c`/`-q`/`-l`, or a single-field `awk '{print $N}'`
+(through any `grep`, `sort`, `head`-style filters), or sends stdout to
+`/dev/null`. Only the listing's own pipeline counts: a `>/dev/null` on a
+command before a `;` or `&` does not silence it.
 
 WHY THIS WARNS RATHER THAN BLOCKS
 ---------------------------------
@@ -161,6 +163,9 @@ PS_BSD_VALUE_OPTS = set("oOptUk")
 
 RX_REDIRECT = re.compile(r"\A\d*(?:[<>]|&>)")
 
+# A single-field awk projection, `{print $2}`, which prints no argv.
+RX_AWK_ONE_FIELD = re.compile(r"\{\s*print\s+\$\d+\s*;?\s*\}")
+
 # Stdout (or both streams) sent to /dev/null; `2>/dev/null` is not this.
 RX_STDOUT_DISCARD = re.compile(r"(?:^|[\s;|&])(?:1?>|&>)\s*/dev/null\b")
 
@@ -178,7 +183,7 @@ GREP_QUIET_LONG = {"--files-with-matches", "--files-without-match", "--count",
                    "--quiet", "--silent"}
 
 MAX_DEPTH = 3
-MAX_COMMAND = 20000
+MAX_COMMAND = 10000
 MAX_BODIES = 64
 
 
@@ -436,10 +441,10 @@ def _substitutions(text):
 def _discarded(argv, following, line):
     """Whether the listing's output never reaches the transcript.
 
-    True for a redirect to /dev/null, or a pipe that ends in a counter (`wc`,
-    `grep -c/-q/-l`) through only filtering commands. `simple_commands` drops
-    the separators, so a `|` anywhere in the line is the evidence of a pipe:
-    `ps aux; wc -l f` is misread as discarded, which costs a miss.
+    LINE is the listing's own PIPELINE (see `_pipelines`), so FOLLOWING holds
+    only the commands its output is piped into. True for stdout sent to
+    /dev/null, or a pipe that ends in a counter (`wc`, `grep -c/-q/-l`) or a
+    single-field `awk '{print $N}'` through only filtering commands.
     """
     # Read on the raw line: the tokenizer splits `2>/dev/null` into `2`, `>`,
     # which loses whether the redirect is stdout or stderr.
@@ -460,8 +465,49 @@ def _discarded(argv, following, line):
             continue
         if name in ("sort", "uniq", "head", "tail", "cut", "tr"):
             continue
+        if name in ("awk", "gawk", "mawk") and any(
+                RX_AWK_ONE_FIELD.fullmatch(tok) for tok in nxt[1:]):
+            return True  # `awk '{print $2}'` projects the PID column only
         return False
     return False
+
+
+def _pipelines(text):
+    """TEXT split into top-level pipelines, on `;`, `&`, `&&`, `||`, newline.
+
+    Quotes and parentheses are respected, and the `&` of a redirection
+    (`2>&1`, `&>`) is not a separator.
+    """
+    parts, start, depth, i, n, quote = [], 0, 0, 0, len(text), None
+    while i < n:
+        ch = text[i]
+        if quote:
+            if ch == "\\" and quote == '"':
+                i += 2
+                continue
+            if ch == quote:
+                quote = None
+            i += 1
+            continue
+        if ch == "\\":
+            i += 2
+            continue
+        if ch in "'\"":
+            quote = ch
+        elif ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth = max(0, depth - 1)
+        elif depth == 0 and (ch in ";\n" or text.startswith("||", i)
+                             or (ch == "&" and text[i - 1:i] != ">"
+                                 and text[i + 1:i + 2] != ">")):
+            parts.append(text[start:i])
+            i += 2 if text[i:i + 2] in ("&&", "||") else 1
+            start = i
+            continue
+        i += 1
+    parts.append(text[start:])
+    return [part for part in parts if part.strip()]
 
 
 def find_leak(command, depth=0):
@@ -473,13 +519,16 @@ def find_leak(command, depth=0):
             found = find_leak(body, depth + 1)
             if found:
                 return found
+        for pipeline in _pipelines(live):
+            argvs = simple_commands(pipeline) or []
+            for k, argv in enumerate(argvs):
+                found = _leak(argv)
+                if found and not _discarded(argv, argvs[k + 1:], pipeline):
+                    return found
         argvs = simple_commands(line)
         if not argvs:
             continue
-        for k, argv in enumerate(argvs):
-            found = _leak(argv)
-            if found and not _discarded(argv, argvs[k + 1:], line):
-                return found
+        for argv in argvs:
             # A quoted remote or container command (`ssh host 'ps aux'`,
             # `docker exec c sh -c "ps aux"`) is one token; read it as a line.
             first = argv[0] if argv else ""

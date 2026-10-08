@@ -127,7 +127,7 @@ The Do list below is the design without that hole, and the missing quoted-only s
 A body passed inline is not stripped at all: `simple_commands("gh pr create --body 'see $(echo hi)'")` keeps `see $(echo hi)` as one argv element.
 
 This is not the cheap false positive a warn-only hook may accept.
-[4.6](#46-asymmetric-error-costs-in-warn-only-hooks-prefer-over-warning-to-brittle-narrowing) accepts over-warning on a rare argument shape.
+That trade is for over-warning on a rare argument shape, such as an unusual wrapper flag.
 A heredoc commit message describing the hook's own pattern is what every commit to that hook is likely to carry, so the false positive lands on the hook's own maintenance.
 
 - **Do:** when widening what a hook scans, add NO-FIRE tests in the same change for a `<<'EOF'` heredoc commit message, a single-quoted or `--body-file` PR body, and a comment that each quote the pattern.

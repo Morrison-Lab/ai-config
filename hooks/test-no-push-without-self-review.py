@@ -2806,10 +2806,10 @@ def subagent_push_cases() -> tuple[int, int]:
     check("a parent's clean review of HEAD allows a subagent push with no review of its own",
           rc == 0 and not blocked_of(out), reason_of(out)[:200])
 
-    # 5. A traversal-shaped agent_id resolves to nothing, so only the parent
-    #    is read.
-    #    The clean review sits where the traversal would land, so only the
-    #    guard keeps it out.
+    # 5. A traversal-shaped agent_id resolves to nothing,
+    #    so only the parent is read.
+    #    The clean review sits where the traversal would land,
+    #    so only the guard keeps it out.
     rc, out = run_hook_in_subagent(PUSH, parent_other, None,
                                    payload_agent_id="up/../../planted",
                                    extra_files={"agent-up/keep.jsonl": [],
@@ -2829,6 +2829,30 @@ def subagent_push_cases() -> tuple[int, int]:
             "requestShape": "foreground"},
     })
     check("a nested hand-back review beside the subagent's transcript is found",
+          rc == 0 and not blocked_of(out), reason_of(out)[:200])
+
+    # 7. An agent_id carrying the `agent-` prefix names the same file.
+    rc, out = run_hook_in_subagent(PUSH, parent_other, reviewed(body()),
+                                   payload_agent_id="agent-sub0001agent")
+    check("an agent_id with the agent- prefix finds the subagent's transcript",
+          rc == 0 and not blocked_of(out), reason_of(out)[:200])
+
+    # 8. A non-string agent_id is ignored, so only the parent is read.
+    rc, out = run_hook_in_subagent(PUSH, parent_other, reviewed(body()),
+                                   payload_agent_id=["sub0001agent"])
+    check("a non-string agent_id is not followed",
+          rc == 0 and blocked_of(out), reason_of(out)[:200])
+
+    # 9. An agent_id with no transcript of its own falls back to the parent.
+    rc, out = run_hook_in_subagent(PUSH, parent_other, None)
+    check("an agent_id with no transcript of its own is judged by the parent",
+          rc == 0 and blocked_of(out), reason_of(out)[:200])
+
+    # 10. The subagent's own clean verdict at HEAD is not vetoed
+    #     by a parent's blocking verdict on the same head.
+    rc, out = run_hook_in_subagent(PUSH, reviewed(body("Needs more work")),
+                                   reviewed(body()))
+    check("a parent's blocking verdict does not veto the subagent's clean one",
           rc == 0 and not blocked_of(out), reason_of(out)[:200])
 
     return failures, ran
@@ -4234,7 +4258,8 @@ def main():
                    structured_payload_cases, transcript_scoping_cases,
                    cd_tracking_cases, fallback_cases,
                    fingerprint_guidance_cases, fingerprint_resolution_cases,
-                   omo_cases, handback_cases, subagent_push_cases, codex_cases, external_reviewer_cases,
+                   omo_cases, handback_cases, subagent_push_cases,
+                   codex_cases, external_reviewer_cases,
                    symlinked_plugin_root_cases, exempt_repo_cases,
                    alias_cases, deny_resilience_cases):
             f, r = fn()

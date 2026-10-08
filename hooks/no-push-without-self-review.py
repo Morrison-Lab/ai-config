@@ -2411,8 +2411,7 @@ def _own_subagent_transcript(transcript_path: str, agent_id) -> str:
     if not transcript_path or not isinstance(agent_id, str) or not agent_id:
         return ""
     raw = agent_id[len("agent-"):] if agent_id.startswith("agent-") else agent_id
-    if not raw or "/" in raw or "\\" in raw or raw in (".", "..") \
-            or raw != os.path.basename(raw):
+    if not raw or "/" in raw or "\\" in raw or raw in (".", ".."):
         return ""
     path = os.path.join(_subagents_dir(transcript_path), f"agent-{raw}.jsonl")
     return path if os.path.isfile(path) else ""
@@ -3289,7 +3288,9 @@ def main() -> int:
             # a tool call made inside a subagent; that subagent's own
             # transcript sits beside the parent's. Read it first, and fall
             # back to the parent so a coordinator's review of this exact head
-            # still counts.
+            # still counts. Either clean verdict at HEAD allows the push, so a
+            # parent's blocking verdict does not veto the subagent's own clean
+            # one: the subagent's review is the one about its own work.
             sub_path = _own_subagent_transcript(
                 transcript_path, payload.get("agent_id")
             )

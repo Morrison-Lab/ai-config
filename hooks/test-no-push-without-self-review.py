@@ -2718,6 +2718,117 @@ def handback_cases() -> tuple[int, int]:
     return failures, ran
 
 
+def run_hook_in_subagent(cmd: str, parent_events: list, own_events: list | None,
+                         agent_id="sub0001agent", extra_files: dict | None = None,
+                         payload_agent_id="default") -> tuple[int, dict]:
+    """Run the hook as a tool call made INSIDE a subagent (ai-config#2496):
+    the payload carries the PARENT's transcript_path plus `agent_id`, and the
+    subagent's own transcript sits at `<dir>/<session>/subagents/agent-<id>.jsonl`.
+    `extra_files` maps a file name under `subagents/` to its events (a list)
+    or JSON object (a dict)."""
+    tmpdir = tempfile.mkdtemp(prefix="npwsr-insub-")
+    try:
+        tpath = os.path.join(tmpdir, "sess.jsonl")
+        with open(tpath, "w", encoding="utf-8") as f:
+            for ev in parent_events:
+                f.write(json.dumps(ev) + "\n")
+        sub = os.path.join(tmpdir, "sess", "subagents")
+        os.makedirs(sub, exist_ok=True)
+        files = dict(extra_files or {})
+        if own_events is not None:
+            files[f"agent-{agent_id}.jsonl"] = own_events
+        for name, content in files.items():
+            with open(os.path.join(sub, name), "w", encoding="utf-8") as f:
+                if isinstance(content, dict):
+                    json.dump(content, f)
+                else:
+                    for ev in content:
+                        f.write(json.dumps(ev) + "\n")
+        payload = {"tool_name": "Bash", "tool_input": {"command": cmd},
+                   "transcript_path": tpath}
+        aid = agent_id if payload_agent_id == "default" else payload_agent_id
+        if aid is not None:
+            payload["agent_id"] = aid
+        res = subprocess.run([sys.executable, HOOK], input=json.dumps(payload),
+                             capture_output=True, text=True, cwd=REPO,
+                             env=os.environ)
+        data = json.loads(res.stdout) if res.stdout.strip() else {}
+        return res.returncode, data
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def subagent_push_cases() -> tuple[int, int]:
+    """A push made inside a subagent is judged by that subagent's own
+    transcript first, then the parent's (ai-config#2496)."""
+    failures = 0
+    ran = 0
+
+    def check(label, ok, detail=""):
+        nonlocal failures, ran
+        ran += 1
+        if ok:
+            print(f"PASS: {label}")
+        else:
+            print(f"FAIL: {label}{' - ' + detail if detail else ''}")
+            failures += 1
+
+    def blocked_of(out):
+        return (out.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+
+    def reason_of(out):
+        return (out.get("hookSpecificOutput") or {}).get("permissionDecisionReason", "")
+
+    parent_other = reviewed(body(commit=OTHER_HEAD))
+
+    # 1. The reported incident: the subagent's own clean review of HEAD, the
+    #    coordinator's clean review of a different commit.
+    rc, out = run_hook_in_subagent(PUSH, parent_other, reviewed(body()))
+    check("a subagent's own clean review of HEAD allows its push",
+          rc == 0 and not blocked_of(out), reason_of(out)[:200])
+
+    # 2. Control: the same layout without `agent_id` reads only the parent,
+    #    whose verdict names another commit.
+    rc, out = run_hook_in_subagent(PUSH, parent_other, reviewed(body()),
+                                   payload_agent_id=None)
+    check("without agent_id the parent's verdict for another commit still refuses",
+          rc == 0 and blocked_of(out), reason_of(out)[:200])
+
+    # 3. The subagent's own blocking verdict refuses, and says so.
+    rc, out = run_hook_in_subagent(PUSH, [], reviewed(body("Needs more work")))
+    check("a subagent's own blocking verdict refuses its push",
+          rc == 0 and blocked_of(out)
+          and "returned a blocking verdict" in reason_of(out), reason_of(out)[:200])
+
+    # 4. The coordinator's review of this exact head still counts.
+    rc, out = run_hook_in_subagent(PUSH, reviewed(body()), [])
+    check("a parent's clean review of HEAD allows a subagent push with no review of its own",
+          rc == 0 and not blocked_of(out), reason_of(out)[:200])
+
+    # 5. A traversal-shaped agent_id resolves to nothing, so only the parent
+    #    is read.
+    rc, out = run_hook_in_subagent(PUSH, parent_other, reviewed(body()),
+                                   payload_agent_id="../sub0001agent")
+    check("a traversal-shaped agent_id is not followed",
+          rc == 0 and blocked_of(out), reason_of(out)[:200])
+
+    # 6. A nested reviewer whose report is delivered by hand-back: its
+    #    transcript and .meta.json sit beside the subagent's own.
+    call_id = _fresh_id()
+    own = [agent_call(call_id=call_id),
+           agent_result(call_id, handback_pointer("rev0006agent"))]
+    rc, out = run_hook_in_subagent(PUSH, parent_other, own, extra_files={
+        "agent-rev0006agent.jsonl": [subagenthandback_use(body())],
+        "agent-rev0006agent.meta.json": {
+            "agentType": "adversarial-reviewer", "toolUseId": call_id,
+            "requestShape": "foreground"},
+    })
+    check("a nested hand-back review beside the subagent's transcript is found",
+          rc == 0 and not blocked_of(out), reason_of(out)[:200])
+
+    return failures, ran
+
+
 def codex_cases() -> tuple[int, int]:
     """Codex's native `spawn_agent` subagent dispatch (ai-config#3707).
 
@@ -4118,7 +4229,7 @@ def main():
                    structured_payload_cases, transcript_scoping_cases,
                    cd_tracking_cases, fallback_cases,
                    fingerprint_guidance_cases, fingerprint_resolution_cases,
-                   omo_cases, handback_cases, codex_cases, external_reviewer_cases,
+                   omo_cases, handback_cases, subagent_push_cases, codex_cases, external_reviewer_cases,
                    symlinked_plugin_root_cases, exempt_repo_cases,
                    alias_cases, deny_resilience_cases):
             f, r = fn()

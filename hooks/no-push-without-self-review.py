@@ -2385,10 +2385,37 @@ def _subagents_dir(transcript_path: str) -> str:
     Measured layout (Claude Code desktop, Windows, 2026-09-25): a transcript
     at `<dir>/<session-id>.jsonl` has its subagents under
     `<dir>/<session-id>/subagents/`.
+
+    A transcript that is itself a subagent's (`.../subagents/agent-<id>.jsonl`,
+    read when the push is made inside that subagent, ai-config#2496) maps to
+    the same `subagents/` directory, on the inference that nested dispatches
+    are stored beside it rather than one level deeper. Not yet measured.
     """
+    parent = os.path.dirname(transcript_path)
+    if os.path.basename(parent) == "subagents":
+        return parent
     base = os.path.basename(transcript_path)
     session_id = base[:-len(".jsonl")] if base.lower().endswith(".jsonl") else base
     return os.path.join(os.path.dirname(transcript_path), session_id, "subagents")
+
+
+def _own_subagent_transcript(transcript_path: str, agent_id) -> str:
+    """The calling subagent's own transcript, or "" when this push is not
+    made inside a subagent or that file does not exist (ai-config#2496).
+
+    The path follows the layout `_subagents_dir` documents and the hooks
+    reference shows for SubagentStop's `agent_transcript_path`:
+    `<dir>/<session-id>/subagents/agent-<agent_id>.jsonl`. An id that is not
+    a bare filename component resolves to "" rather than to a traversal.
+    """
+    if not transcript_path or not isinstance(agent_id, str) or not agent_id:
+        return ""
+    raw = agent_id[len("agent-"):] if agent_id.startswith("agent-") else agent_id
+    if not raw or "/" in raw or "\\" in raw or raw in (".", "..") \
+            or raw != os.path.basename(raw):
+        return ""
+    path = os.path.join(_subagents_dir(transcript_path), f"agent-{raw}.jsonl")
+    return path if os.path.isfile(path) else ""
 
 
 def _read_json_file(path: str):
@@ -3255,9 +3282,29 @@ def main() -> int:
                 )
                 if fallback and os.path.exists(fallback):
                     transcript_path = fallback
-            is_clean, reason = verify_review(
-                transcript_path, directory, argv, env
+            # A push made INSIDE a subagent carries the PARENT session's
+            # transcript_path, so its own foreground reviews were never read
+            # and it was judged by whatever the coordinator last reviewed
+            # (ai-config#2496). Claude Code adds `agent_id` to the payload of
+            # a tool call made inside a subagent; that subagent's own
+            # transcript sits beside the parent's. Read it first, and fall
+            # back to the parent so a coordinator's review of this exact head
+            # still counts.
+            sub_path = _own_subagent_transcript(
+                transcript_path, payload.get("agent_id")
             )
+            if sub_path:
+                is_clean, reason = verify_review(sub_path, directory, argv, env)
+                if not is_clean:
+                    parent_clean, _ = verify_review(
+                        transcript_path, directory, argv, env
+                    )
+                    if parent_clean:
+                        is_clean = True
+            else:
+                is_clean, reason = verify_review(
+                    transcript_path, directory, argv, env
+                )
             if not is_clean:
                 deny(reason)
                 return 0

@@ -501,7 +501,16 @@ def test_review_comments_handling():
 
 
 def test_fetch_payload_integration():
+    compare_calls = []
+    compare_fail = []
+
     def fake_rest_get(endpoint, token, envelope=None):
+        if "/compare/" in endpoint:
+            compare_calls.append(endpoint)
+            if compare_fail:
+                raise RuntimeError("HTTP 502")
+            return {"ahead_by": 2, "commits": [{"sha": "x"}],
+                    "files": [{"filename": ".github/workflows/v.yml", "patch": "+x"}]}
         if "/pulls/123/comments" in endpoint:
             return [{"user": {"login": "Copilot"}, "commit_id": "c1", "original_commit_id": "c0"}]
         if "/pulls/123/reviews" in endpoint:
@@ -523,6 +532,21 @@ def test_fetch_payload_integration():
                 check("fetch_payload runs without UnboundLocalError/NameError", isinstance(payload, dict))
                 check("fetch_payload includes review_threads", "review_threads" in payload)
                 check("fetch_payload includes review_comments", "review_comments" in payload)
+                check("fetch_payload carries a compact base_compare (ai-config#2982)",
+                      payload.get("base_compare") == {
+                          "ahead_by": 2,
+                          "files": [{"filename": ".github/workflows/v.yml"}]})
+                head, base = PR_RAW["head"]["sha"], PR_RAW["base"]["ref"]
+                check("fetch_payload compares head...base, in that order",
+                      compare_calls and compare_calls[-1].endswith(f"/compare/{head}...{base}"))
+                compare_fail.append(True)
+                payload = build_pr_payload.fetch_payload("example-org/example-repo", 123, "token")
+                check("a failed comparison is recorded, not omitted",
+                      "error" in (payload.get("base_compare") or {}))
+    check("compact_compare marks a non-object comparison as an error",
+          "error" in build_pr_payload.compact_compare([]))
+    check("compact_compare marks a non-list files as an error",
+          "error" in build_pr_payload.compact_compare({"ahead_by": 1, "files": "x"}))
 
 
 def main():

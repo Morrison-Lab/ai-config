@@ -23,8 +23,8 @@ NOT COVERED. A `FULLY CLEAN` line here is not the whole of that fragment's
 "Findings hide on several surfaces" check, and the difference is mechanical
 rather than a matter of thoroughness. Both halves of the mechanism say so.
 scripts/lib/payload_fetcher.py, which governs the `--from-json` path, maps
-`gh pr view`, `gh repo view`, and three `gh api` reads (`/check-runs`,
-`/actions/runs/`, and `graphql`); the default path's own call sites are
+`gh pr view`, `gh repo view`, and four `gh api` reads (`/check-runs`,
+`/actions/runs/`, `/compare/`, and `graphql`); the default path's own call sites are
 `gh pr view --json`, `gh api graphql` for review threads, the `/check-runs`
 read in scripts/lib/pull_request.py, `gh repo view` for repo resolution, and the
 two `/actions/runs/` reads below. No `<summary>`-scoped match on `suppressed`
@@ -71,6 +71,7 @@ import shlex
 import subprocess
 import sys
 import unicodedata
+import urllib.parse
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -758,6 +759,69 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
                 f"'{conclusion}'")
 
     return len(issues) == 0, issues
+
+
+WORKFLOW_DIR = ".github/workflows/"
+# GitHub's compare endpoint lists at most this many files.
+COMPARE_FILE_CAP = 300
+
+
+def check_base_drift(pr) -> Tuple[bool, List[str]]:
+    """Refuse a head the base branch has added a CI gate behind.
+
+    Every other criterion reads the PR head, so a branch cut before a new
+    check landed on the base passes all of them and still turns the base red
+    on merge: #2965 did exactly that to `validate` on main (ai-config#2982).
+    `mergeStateStatus` cannot see it either, since nothing conflicts.
+
+    Blocking when the base gained commits since the merge base AND one of
+    them touched `.github/workflows/`, which is where a new check would be
+    added. A gate added only by editing a script an existing workflow already
+    runs is not caught. Drift with no workflow change is a NOTE.
+    """
+    if pr.state and pr.state != "OPEN":
+        return True, []
+    base, sha = pr.base_ref, pr.head_sha
+    if not base or not sha:
+        return True, ["NOTE: base drift not checked: the PR names no base branch "
+                      "or head SHA (ai-config#2982)"]
+    quoted = urllib.parse.quote(base, safe="/")
+    try:
+        data = json.loads(fetch(["gh", "api", f"repos/{pr.repo}/compare/{sha}...{quoted}"]))
+    except RuntimeError as exc:
+        # Exit 2, not a NOTE: a NOTE would pass the PR on a gate that never
+        # ran, and exit 1 would read as a verdict about the PR.
+        die(f"Could not read how far {base} has moved past this head: {exc}")
+    if not isinstance(data, dict) or data.get("_not_in_payload"):
+        return True, ["NOTE: base drift not checked: the payload has no "
+                      "'base_compare' (rebuild it with build-pr-payload.py; "
+                      "ai-config#2982)"]
+    behind = data.get("ahead_by")
+    raw_files = data.get("files")
+    if (not isinstance(behind, int) or isinstance(behind, bool) or behind < 0
+            or not isinstance(raw_files, (list, type(None)))):
+        return False, [f"Could not read how far {base} has moved past this head "
+                       f"(compare 'ahead_by' was {behind!r}, 'files' a "
+                       f"{type(raw_files).__name__}; ai-config#2982)"]
+    if behind == 0:
+        return True, []
+    files = [f.get("filename") or "" for f in (raw_files or []) if isinstance(f, dict)]
+    gates = sorted({n for n in files if n.startswith(WORKFLOW_DIR)})
+    if not gates:
+        if len(files) >= COMPARE_FILE_CAP:
+            return False, [
+                f"{base} gained {behind} commit(s) since this head's merge base "
+                f"and the comparison lists {len(files)} files, the endpoint's "
+                f"cap, so a {WORKFLOW_DIR} change cannot be ruled out. Merge "
+                f"{base} into the branch and let CI re-run (ai-config#2982)"]
+        return True, [f"NOTE: head is {behind} commit(s) behind {base}; none "
+                      f"of them changed {WORKFLOW_DIR} (ai-config#2982)"]
+    shown = ", ".join(gates[:5]) + (" ..." if len(gates) > 5 else "")
+    return False, [
+        f"{base} gained {behind} commit(s) since this head's merge base, "
+        f"including changes to {shown}. A check added there never ran on this "
+        f"head, so green CI here does not show it passes. Merge {base} into "
+        f"the branch and let CI re-run (ai-config#2982)"]
 
 
 def check_review_threads(pr) -> Tuple[bool, List[str]]:
@@ -3935,8 +3999,9 @@ def main():
     ci_ok, ci_issues = check_ci_runs(pr)
     threads_ok, thread_issues = check_review_threads(pr)
     review_ok, review_issues = check_review_comments(pr, args.quorum)
+    drift_ok, drift_issues = check_base_drift(pr)
 
-    all_issues = ci_issues + thread_issues + review_issues
+    all_issues = ci_issues + thread_issues + review_issues + drift_issues
 
     # NOTE-prefixed issues are informational (unreadable-format warnings) and
     # do not block -- only real findings or missing reviews cause a failure.

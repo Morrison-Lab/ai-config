@@ -72,7 +72,7 @@ class PullRequest:
         fields = [
             "headRefOid", "headRefName", "state", "commits",
             "reviewDecision", "reviews", "comments", "reviewRequests",
-            "isDraft",
+            "isDraft", "baseRefName",
         ]
         cmd = ["gh", "pr", "view", self.pr_num, "--repo", self.repo, "--json", ",".join(fields)]
         stdout = self._fetcher(cmd)
@@ -112,6 +112,10 @@ class PullRequest:
         (ai-config#3651).
         """
         return bool(self._data.get("isDraft"))
+
+    @property
+    def base_ref(self) -> str:
+        return (self._data.get("baseRefName") or "")
 
     @property
     def commit_date(self) -> str:

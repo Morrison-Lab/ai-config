@@ -50,6 +50,7 @@ import os
 import re
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Any, Dict, List, Optional
 
@@ -463,7 +464,7 @@ def fetch_payload(owner_repo: str, pr_number: int, token: str) -> Dict[str, Any]
             file=sys.stderr,
         )
         review_comments_raw = None
-    return build_payload(
+    payload = build_payload(
         owner_repo,
         pr_raw,
         reviews_raw,
@@ -474,6 +475,31 @@ def fetch_payload(owner_repo: str, pr_number: int, token: str) -> Dict[str, Any]
         review_threads,
         review_comments_raw,
     )
+    # A failed fetch is recorded rather than omitted, so the checker refuses
+    # the payload (exit 2) instead of scoring around the missing gate.
+    base_ref = urllib.parse.quote(pr_raw["base"]["ref"], safe="/")
+    try:
+        compare = rest_get(f"{base}/compare/{pr_raw['head']['sha']}...{base_ref}", token)
+    except Exception as exc:  # noqa: BLE001
+        payload["base_compare"] = {"error": f"fetch failed: {exc}"}
+    else:
+        payload["base_compare"] = compact_compare(compare)
+    return payload
+
+
+def compact_compare(compare: Any) -> Dict[str, Any]:
+    """Keep only what check_base_drift reads (ai-config#2982): the full
+    comparison carries every commit object and patch."""
+    if not isinstance(compare, dict):
+        return {"error": f"the comparison was a {type(compare).__name__}, not an object"}
+    files = compare.get("files")
+    if files is not None and not isinstance(files, list):
+        return {"error": f"the comparison's 'files' was a {type(files).__name__}"}
+    return {
+        "ahead_by": compare.get("ahead_by"),
+        "files": [{"filename": f.get("filename") or ""}
+                  for f in (files or []) if isinstance(f, dict)],
+    }
 
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:

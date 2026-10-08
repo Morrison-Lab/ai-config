@@ -66,8 +66,22 @@ retry, or schedule a check-in, rather than moving on.
 This step applies whether the merge happened under an explicit instruction or under an `mwc` grant ---
 the grant covers the merge decision, not what happens on `main` afterward.
 
+A run that is merely **in progress** (or exit 3) is a wait, not a failure,
+and it does not hold up step 4.
+Arm the check-in, then run steps 2 to 4 now: the PR's learnings are already
+known, and a UMS pass deferred behind a CI wait is the pause
+[`run-ums-proactively`](../../shared/workflow/run-ums-proactively.md) forbids.
+Only a **failed** run comes before everything else.
+(Measured 2026-10-08, Morrison-Lab/lds#460 and Morrison-Lab/mlg#69: a session
+reported both merges, said the UMS pass would follow the merge-commit check,
+and ended the turn waiting on a pending publish job until the user asked why.)
+
 - **Do:** run this check against the merge commit before step 5's report,
   every time, not only when a push-triggered workflow is already suspected.
+- **Do:** run step 4's UMS pass while a merge-commit run is still pending,
+  and finish step 1.1 at the check-in.
+- **Don't:** read "fix it before anything else" as covering a run that has
+  not failed --- that phrase is about a red run, not a queued one.
 - **Don't:** read the PR's own green CI as covering a workflow that only
   triggers on `push`.
 

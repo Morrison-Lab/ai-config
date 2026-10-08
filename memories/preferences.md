@@ -1018,7 +1018,7 @@ instead we should write command versions of operator macros that take arguments 
 When the macros PR can't happen in the session, a repo-local macro file is the stopgap, and every macro added to one gets an issue in `Morrison-Lab/macros` in the same turn, listing its definition and meaning, so it reaches the shared library.
 (Directive from the user, 2026-10-05, after [Morrison-Lab/sds#54](https://github.com/Morrison-Lab/sds/pull/54) added 13 repo-local macros without one: "any time you create new macros like that, you should file an issue in macros".
 Filed afterwards as [Morrison-Lab/macros#103](https://github.com/Morrison-Lab/macros/issues/103).)
-A semantic macro is named for meaning, not for the letter it prints: outside a passage about the notation itself, write no Greek letter in math, raw (`\delta`) or inside a letter-named macro (`\vdelta`, `\hbeta`, `\eps`) (see `skills/use-math-macros/SKILL.md`, "No Greek letters in math source").
+A semantic macro is named for meaning, not for the letter it prints: outside a passage about the notation itself, write no Greek letter in math, raw (`\delta`) or inside a letter-named macro (`\vdelta`, `\hb`, `\eps`) (see `skills/use-math-macros/SKILL.md`, "No Greek letters in math source").
 (Directive from the user, 2026-10-08: "I don't want any hardcoded greek letters in latex expression, even in compounds like \vdelta;
 that's still not a semantic macro".)
 `scripts/check-raw-math.py` lints for raw operators, and `hooks/warn-raw-math-notation.py` warns at write time.

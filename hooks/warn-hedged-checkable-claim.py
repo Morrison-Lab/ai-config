@@ -34,7 +34,7 @@ HEDGE = re.compile(
     r"\b(likely|probably|presumably|i think|should be(?! (able|fine|ok|okay)\b))\b",
     re.I)
 CHECKABLE = re.compile(
-    r"(?<![\w/&.-])(?:[\w.-]+/[\w.-]+)?#\d{1,5}\b"
+    r"(?<![\w/&.-])(?:[\w.-]+/[\w.-]+|[\w-]+)?#\d{1,5}\b"
     r"|/(?:pull|pulls|issues)/\d+"
     r"|\b(?:ci|checks?|check runs?|build|builds|green|red|passing|passed|"
     r"failing|failed|merged|open|closed|conflicts?)\b",

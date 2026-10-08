@@ -296,6 +296,19 @@ fixed by changing to `\exp{-\frac{x^2}{2}}` and `\exp{x^8}`.
   use `\vec{b}` or `\vecf{b}`.
   ([`Morrison-Lab/mds#48`](https://github.com/Morrison-Lab/mds/pull/48), 2026-09-29.)
 
+## No Greek letters in math source: name macros for meaning
+
+A semantic macro is named for what a symbol means, not for the letter it prints.
+`\vdelta`, `\vbeta`, `\hb`, `\bfbeta`, `\vth`, `\eps` and `\lam` only spell a Greek letter, so they are no more semantic than the raw `\delta`.
+Outside a passage that discusses the notation itself (a symbol table, a note on which letter a field uses), write no Greek letter in a math expression, either raw or inside a letter-named macro.
+Use the macro that names the concept (`\vcoef`, `\regcoef`, `\mean`, `\lincomp`, `\odds`, `\rate`, `\haz`, `\sigmoid`), and when none exists, add one named for the concept to `Morrison-Lab/macros` first (step 6).
+For example, write the backpropagation error as `\backerr^{(\ell)}`, not `\vdelta^{(\ell)}`, and the step size as `\learnrate`, not `\eta`, once those two are added to `Morrison-Lab/macros` (step 6).
+One letter often means different things on different pages (`\sigma` for a standard deviation and for the sigmoid;
+`\lambda` for a rate, a penalty and an eigenvalue), so choose the macro from each use's meaning, not from the letter.
+(Directive from the user, 2026-10-08: "except when we're discussing notation directly, I don't want any hardcoded greek letters in latex expression, even in compounds like \vdelta;
+that's still not a semantic macro".
+Prose rule: [`Morrison-Lab/psw#136`](https://github.com/Morrison-Lab/psw/pull/136); detection: [`Morrison-Lab/ai-config#4381`](https://github.com/Morrison-Lab/ai-config/issues/4381).)
+
 ## Prefer command operator macros that take arguments over manual delimiter wrappers
 
 There should be very few instances where it is necessary to write `\cb` (curly braces), `\sb` (square brackets), or `\paren` directly with a bare operator.

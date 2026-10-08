@@ -246,9 +246,10 @@ def moratorium_active(today=None):
 # that quieting honest:
 #   * a date more than CANONICAL_MAX_DAYS ahead is refused, so a typo or a
 #     hostile response cannot silence the guard indefinitely;
-#   * the answer, or the fact that main could not be read, is cached for
-#     CANONICAL_TTL_SECONDS, so an offline machine pays the timeout at most
-#     once an hour rather than on every turn;
+#   * an answer is cached for CANONICAL_TTL_SECONDS (an hour), and the fact
+#     that main could not be read for CANONICAL_NEGATIVE_TTL_SECONDS (five
+#     minutes), so an offline machine pays the timeout at most once per
+#     five minutes rather than on every turn;
 #   * the cache lives in the user's own ~/.claude, is opened without
 #     following symlinks, and is trusted only when this user owns it, so no
 #     other local account can pre-plant a far-future date.

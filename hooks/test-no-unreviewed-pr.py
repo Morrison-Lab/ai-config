@@ -2857,7 +2857,8 @@ def main():
     # The fetch parses main's real file, so the pattern must match this
     # file's own declaration; a reworded constant would otherwise read as
     # unreadable and quietly restore the stale-copy demand.
-    _src = open(HOOK, encoding="utf-8").read()
+    with open(HOOK, encoding="utf-8") as _fh:
+        _src = _fh.read()
     _m = hookmod._RX_CONST.search(_src)
     if _m and _dt.date(*map(int, _m.groups())) == hookmod.MORATORIUM_END:
         print("PASS: the canonical pattern parses the subject's own constant")

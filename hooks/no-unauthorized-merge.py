@@ -210,10 +210,45 @@ HEREDOC_EXECUTOR = re.compile(
 # commands from stdin, but it does not run a quoted operand, so it stays out of
 # EXEC_PROGS's other consumers. Over-matching costs a scan of quoted text in a
 # command that pipes into a shell, which is the cheap direction.
+#
+# The executor may be anywhere in the receiving stage, not only first: a
+# closed list of wrappers (`sudo`) let `| sudo -u root bash`, `| timeout 5
+# bash` and `| nice bash` through, the same enumeration failure the heredoc
+# anchor above records (#4394 review). So the stage is scanned up to the next
+# pipe or statement boundary for an executor word standing alone.
 STDIN_EXECUTOR = re.compile(
-    r"(?:\|&?|>\()\s*" + ENV_WRAP + r"(?:sudo\s+)?(?:[/\w.-]+/)?"
-    r"(?:(?:" + EXEC_PROGS + r"|xargs)\b|(?:source|\.)(?=[ \t]))"
+    r"(?:\|&?|>\()[^|;&\n]*?(?<![\w.-])(?:[/\w.-]+/)?"
+    r"(?:(?:" + EXEC_PROGS + r"|xargs)(?=[\s)]|$)|(?:source|\.)(?=[ \t]))"
 )
+
+
+def unmask_piped_statements(inert: str, masked: str) -> str:
+    """Return `inert` with each statement that pipes into an executor dequoted.
+
+    A statement ends at `;`, `&&`, `||` or a newline outside parentheses and
+    braces, so `(echo "<merge>"; true) | bash` stays one statement while an
+    unrelated `echo "<merge>" | tee f; curl ... | bash` does not lend its
+    neighbour's shell to the quoted text (#4394 review). Both inputs have the
+    same length, and so does the result, so offsets into either still apply.
+    """
+    pieces, start, depth, i = [], 0, 0, 0
+    while i <= len(inert):
+        ch = inert[i] if i < len(inert) else "\n"
+        two = inert[i:i + 2]
+        if ch in "({":
+            depth += 1
+        elif ch in ")}":
+            depth = max(depth - 1, 0)
+        sep = 2 if two in ("&&", "||") else 1 if ch in ";\n" else 0
+        if sep and (depth == 0 or i >= len(inert)):
+            stmt = inert[start:i]
+            if STDIN_EXECUTOR.search(stmt):
+                stmt = re.sub(r"[\"']", " ", masked[start:i])
+            pieces.append(stmt + inert[i:i + sep])
+            start = i = i + sep
+            continue
+        i += 1
+    return "".join(pieces)
 
 
 def executes_its_input_ends(text: str) -> list:
@@ -2115,15 +2150,15 @@ def offending(command: str, payload: dict | None = None):
     # Text piped into a shell is a script, wherever its quotes sit: SPLIT puts
     # `echo "gh pr merge N"` and `| bash` in different segments, so the quote
     # has no executor before it in its own segment and pass 2 masks it as
-    # prose (ai-config#3639). When anything in the command feeds stdin to an
-    # executor, pass 2 reads the quote-UNmasked text instead, with each quote
-    # character blanked (length-preserving) so the command word inside a
-    # quoted span sits at a command position. The grant and label checks below
+    # prose (ai-config#3639). In a statement that feeds stdin to an executor,
+    # pass 2 reads the quote-UNmasked text instead, with each quote character
+    # blanked (length-preserving) so the command word inside a quoted span
+    # sits at a command position. Only that statement: another one joined by
+    # `;` or `&&` keeps its quotes masked. The grant and label checks below
     # read the same view, so they see the merge pass 2 found. Detection reads
     # the quote-masked text, so a pipe-to-shell merely quoted in a body does
     # not trigger it.
-    if STDIN_EXECUTOR.search(inert_command):
-        inert_command = re.sub(r"[\"']", " ", masked_command)
+    inert_command = unmask_piped_statements(inert_command, masked_command)
 
     for start, end in zip(starts, ends):
         orig_seg = unquoted_command[start:end]

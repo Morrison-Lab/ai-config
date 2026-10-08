@@ -35,6 +35,22 @@ def tool(command):
         {"type": "tool_use", "id": "t1", "input": {"command": command}}]}}
 
 
+def mcp(name):
+    return {"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "id": "t1", "name": name,
+         "input": {"method": "get", "pullNumber": 9}}]}}
+
+
+def write_mention(text):
+    return {"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "id": "t1", "name": "Write",
+         "input": {"file_path": "/x", "content": text}}]}}
+
+
+def sidechain(entry):
+    return dict(entry, isSidechain=True)
+
+
 def tool_result():
     return {"type": "user", "message": {"content": [
         {"type": "tool_result", "tool_use_id": "t1", "content": "ok"}]}}
@@ -81,6 +97,33 @@ CASES = [
      "final message has no status language -> silent"),
     ([user("status?"), say("https://github.com/o/r/pull/9 pipeline passing")], True,
      "github pull URL with pipeline wording -> fires"),
+    ([user("status?"), mcp("mcp__github__pull_request_read"), tool_result(),
+      say("PR #9 checks are passing.")], False,
+     "GitHub MCP pull_request_read -> silent"),
+    ([user("status?"), mcp("mcp__ccd_pr__get_status"), tool_result(),
+      say("PR #9 checks are passing.")], False,
+     "ccd_pr get_status -> silent"),
+    ([user("status?"), write_mention("mergeable has_conflicts"),
+      tool_result(), say("PR #9 checks are passing.")], True,
+     "mention in non-shell tool input does not discharge -> fires"),
+    ([user("status?"), say("Fixed issue #12; the build is passing locally.")], False,
+     "issue number is not a PR reference -> silent"),
+    ([user("status?"), say("Reviewed #4380 and the checks pass for it.")], True,
+     "bare 'pass' wording -> fires"),
+    ([user("status?"), say("Opened PR #9. The nightly build is red.")], False,
+     "reference and status in different sentences -> silent"),
+    ([user("status?"), sidechain(tool("gh pr view 9 --json mergeable")),
+      say("PR #9 checks are passing.")], True,
+     "sidechain (subagent) query does not discharge -> fires"),
+    ([user("status?"), say("PR #9 checks are passing."),
+      sidechain(say("Subagent note, nothing to see."))], True,
+     "sidechain text is not the final message -> fires"),
+    ([user("old"), tool("gh pr view 9 --json mergeable"), tool_result(),
+      say("ok"),
+      {"type": "user", "isMeta": True, "promptSource": "sdk",
+       "message": {"content": "scheduled check-in"}},
+      say("PR #9 checks are passing.")], True,
+     "sdk wake continuation opens a new turn -> fires"),
 ]
 
 def run(events):
@@ -103,6 +146,8 @@ def run(events):
         # decision); anything else reaches nobody.
         if not payload.get("systemMessage"):
             SHAPE_ERRORS.append(sorted(payload))
+        if "mergeStateStatus" not in (payload.get("systemMessage") or ""):
+            SHAPE_ERRORS.append(["message-lacks-remedy"])
         if payload.get("decision") == "block":
             SHAPE_ERRORS.append(["must-not-block"])
         return True

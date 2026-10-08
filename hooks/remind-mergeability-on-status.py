@@ -41,7 +41,7 @@ if _LIB not in sys.path:
     sys.path.insert(0, _LIB)
 try:
     from fences import strip_code
-    from transcript_meta import is_skill_load_meta
+    from transcript_meta import is_harness_meta, is_skill_load_meta
 except Exception as _exc:  # broken install: degrade loudly, never crash a Stop
     print(f"remind-mergeability-on-status: cannot load scripts/lib "
           f"({_exc}); staying silent", file=sys.stderr)
@@ -53,7 +53,7 @@ RX_PR_REF = re.compile(
     r"|/-/merge_requests/\d+"
     r"|/merge_requests/\d+"
     r"|(?<![\w/])![0-9]+\b"
-    r"|(?<![\w&/])#[0-9]+\b"
+    r"|(?<![\w&/])(?<!issue )(?<!issues )(?<!step )#[0-9]+\b"
     r"|\b(?:PR|MR|pull request|merge request)s?\s+#?!?\d+",
     re.I,
 )
@@ -62,19 +62,24 @@ RX_PR_REF = re.compile(
 # a short window by a state word (either order), so "CI is green" and "green
 # pipeline" both count while a bare "check" (a verb) does not.
 _SUBJECT = r"(?:pipelines?|ci|checks?|builds?|jobs?)"
-_STATE = r"(?:green|passing|passed|passes|success(?:ful(?:ly)?)?|running|in\s+progress|pending|failed|failing|red)"
+_STATE = r"(?:green|passing|pass|passed|passes|success(?:ful(?:ly)?)?|running|in\s+progress|pending|queued|complete|completed|fail|failed|failing|canceled|red)"
 RX_STATUS = re.compile(
     rf"\b{_SUBJECT}\b[^.\n]{{0,40}}\b{_STATE}\b"
     rf"|\b{_STATE}\b[^.\n]{{0,40}}\b{_SUBJECT}\b",
     re.I,
 )
 
-# Any query of mergeability. Searched over tool_use inputs (the command text),
-# so a `gh pr view --json mergeable,mergeStateStatus` or a `glab mr view` counts.
+# Any query of mergeability. Searched over a shell tool's `command` text only
+# (never Write/Edit content, Agent prompts, or search patterns, which can
+# mention these words without reading anything), so a
+# `gh pr view --json mergeable,mergeStateStatus` or a `glab mr view` counts.
+# MCP reads carry no such words in their input, so they are matched by tool
+# name instead.
+RX_MCP_MERGEABILITY_TOOL = re.compile(
+    r"(?:^|__)(?:pull_request_read|get_status)$|(?:^|__)get_merge_request$", re.I)
 RX_MERGEABILITY_QUERY = re.compile(
     r"has_conflicts|detailed_merge_status|merge_status|mergeStateStatus"
-    r"|\bmergeable(?:_state)?\b|\bglab\s+mr\s+view\b|\bgh\s+pr\s+view\b[^\n]*\bmergeable\b"
-    r"|\bgh\s+pr\s+checks\b[^\n]*\bmergeable\b",
+    r"|\bmergeable(?:_state)?\b|\bglab\s+mr\s+view\b",
     re.I,
 )
 
@@ -88,9 +93,11 @@ def _blocks(entry):
 
 def _is_real_prompt(entry):
     """True for a user record the person typed (not a tool_result or meta)."""
-    if entry.get("type") != "user":
+    if entry.get("type") != "user" or entry.get("isSidechain"):
         return False
-    if is_skill_load_meta(entry) or entry.get("isMeta"):
+    # A harness injection is not a prompt; an sdk wake continuation is (it is a
+    # genuine new turn, see scripts/lib/transcript_meta.py).
+    if is_skill_load_meta(entry) or is_harness_meta(entry):
         return False
     content = _blocks(entry)
     if isinstance(content, str):
@@ -113,7 +120,7 @@ def scan(path):
             if _is_real_prompt(entry):
                 text, queried = "", False
                 continue
-            if entry.get("type") != "assistant":
+            if entry.get("type") != "assistant" or entry.get("isSidechain"):
                 continue
             content = _blocks(entry)
             if isinstance(content, str):
@@ -127,8 +134,11 @@ def scan(path):
                 if block.get("type") == "text":
                     text = block.get("text") or ""
                 elif block.get("type") == "tool_use":
-                    blob = json.dumps(block.get("input") or {})
-                    if RX_MERGEABILITY_QUERY.search(blob):
+                    inp = block.get("input") or {}
+                    cmd = inp.get("command") if isinstance(inp, dict) else None
+                    if isinstance(cmd, str) and RX_MERGEABILITY_QUERY.search(cmd):
+                        queried = True
+                    elif RX_MCP_MERGEABILITY_TOOL.search(block.get("name") or ""):
                         queried = True
     return text, queried
 
@@ -149,10 +159,13 @@ def main() -> int:
         return 0
     prose = strip_code(text)
     prose = re.sub(r"(?m)^\s*>.*$", " ", prose)
-    if not (RX_PR_REF.search(prose) and RX_STATUS.search(prose)):
+    # Reference and status wording must share a sentence, so an unrelated
+    # issue number and an unrelated build remark do not combine.
+    sentences = re.split(r"(?<=[.!?])\s+|\n", prose)
+    if not any(RX_PR_REF.search(x) and RX_STATUS.search(x) for x in sentences):
         return 0
 
-    key = hashlib.sha256(text.encode()).hexdigest()[:16]
+    key = hashlib.sha256((path + ":" + text).encode()).hexdigest()[:16]
     sentinel = os.path.join(tempfile.gettempdir(), f".claude-mergeability-status-{key}")
     if os.path.exists(sentinel):
         return 0

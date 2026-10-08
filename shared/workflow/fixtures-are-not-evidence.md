@@ -785,7 +785,9 @@ which is the shape of the problem in one sentence.)
 
 ## An alternative no fixture can isolate may be DEAD, not merely untested
 
-Every section above treats a masking fixture as a defect in the **test**: the
+Most sections above treat a masking fixture as a defect in the **test**
+(the fourth direction is the exception: there the defect is the proposed
+expected value): the
 setup supplies a second route to the observable, so the remedy is to assert
 the reason, isolate the fixture, or rewrite the row and re-run the control.
 Each of those presumes the property under test is real and the row is what
@@ -814,8 +816,11 @@ A URL path matched against `/comments` and `/replies` cannot distinguish them
 when every reply URL the API issues contains `/comments` as a prefix segment,
 so the `/replies` arm is unreachable by construction rather than by omission.
 Note the direction of the check: the co-occurrence is a fact about the
-**upstream format**, so it is settled by reading that format's documentation or
-a real response, never by trying more fixtures.
+**upstream format read against the competing arm**.
+The format's documentation or a real response says which substrings every
+reply URL carries, and the competing arm's own pattern says which of those it
+already matches; you need both, and no number of further fixtures supplies
+either.
 
 The same reading applies to a fixture whose value satisfies two arms at once
 for an unrelated reason --- a `/discussions` path that also contains
@@ -826,13 +831,21 @@ is why the two have to be told apart rather than treated as one symptom.
 - **Do:** ask whether an isolating input can exist, once a second attempt at
   isolating an alternative has failed.
 - **Do:** settle co-occurrence from the upstream format's own documentation or
-  a real response, rather than from further fixture attempts.
+  a real response, read against the competing arm's pattern, rather than from
+  further fixture attempts.
 - **Do:** report an unreachable alternative as a finding about the
   implementation --- dead code to remove, or a predicate to restate ---
   instead of as a coverage gap to fill.
 - **Don't:** read "no test pins this" as "this needs a test";
   it is equally consistent with "this can never fire", and the two call for
   opposite changes.
+  The discriminator is whether an admissible input reaches the arm alone:
+  if one exists, write the test, as
+  [`fact-check-code-logic`](../coding/fact-check-code-logic.md#a-misleading-test-label-also-licenses-a-deletion-which-is-the-direction-with-no-mutation-available)
+  prescribes; if the domain rules one out, delete or restate the arm.
+  ([ai-config#2174](https://github.com/Morrison-Lab/ai-config/issues/2174)
+  found the two entries prescribing opposite changes with neither naming
+  this.)
 - **Don't:** keep generating fixtures for an arm whose domain rules out an
   isolating input --- the search does not terminate, and its failure is the
   answer rather than an obstacle.

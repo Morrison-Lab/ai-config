@@ -580,21 +580,38 @@ they share `_SENT_BREAK_RE`.
 It arrives in the prose this corpus writes constantly: a quoted fragment
 trailing off, or a `[...]` elision inside a citation.
 
-`_SENT_BREAK_RE` matches `[.!?]` followed by any run of closing punctuation
-`` [`"')\]*_] `` and then whitespace and an uppercase letter or markup.
-A `.` is the first character of `...`, and `]` and `"` are both in that closing
-class, so `[...] Text` and `... " And` each match --- the line is then read as
-packing two sentences and flagged, however short it is.
-A lowercase follower does not match, which is why the same construct passes
-mid-clause and fails only when the next word is capitalized.
+`_SENT_BREAK_RE` matches `[.!?]`, then any run of closing punctuation
+`` [`"')\]*_] ``, then whitespace, and then looks ahead for
+`` [A-Z0-9"'`*\[(_] ``: an uppercase letter, a digit, or a markup or quote
+character.
+The match lands on the **last** `.` of `...`, since only that one is followed
+by whitespace.
+In `[...] Text` the `]` is consumed by the closing class and `T` satisfies the
+lookahead.
+In `... " And` the space comes straight after the dots, so the closing class
+consumes nothing, and the lookahead is satisfied by the `"` itself --- the
+capital is never examined.
+Either way the line is read as packing two sentences and flagged, however
+short it is.
+So the trigger is "the next character is not a lowercase letter", which is
+wider than "the next word is capitalized": `... "and" then` splits too.
+The lowercase branch, `_SENT_BREAK_LOWER_RE`, does not rescue a lowercase
+follower either way, because it requires two lowercase letters before the
+`.` and an ellipsis puts a `.` there.
 
-Verified 2026-08-24 by running the gate's own `_SENT_BREAK_RE` from
-`check-new-line-breaks.py` at the pinned SHA over four inputs:
-`... " And`, `[...] Everything`, and an ordinary `one. Two` each split into two
-segments, while `... continues` stayed one.
+Verified 2026-10-08 by running `split_sentences` from
+`scripts/vendor/gha-check-new-line-breaks.py`, vendored at
+`Morrison-Lab/gha@5e3525b3` (the SHA in that file's `.pin`):
+`He said "wait... " And left`, `Quote [...] Everything else`,
+`wait... "and" then`, and an ordinary `one. Two` each split into two segments,
+while `wait... continues` and `wait... and then` stayed one
+([ai-config#2174](https://github.com/Morrison-Lab/ai-config/issues/2174)
+corrected an earlier version of this paragraph that named the first `.`, read
+the `"` as part of the closing class, and quoted a narrower lookahead).
 
 - **Do:** break after a `[...]` elision or a trailing-off quotation whenever
-  the next word is capitalized, exactly as after a full stop.
+  the next character is anything but a lowercase letter, exactly as after a
+  full stop.
 - **Do:** treat a flagged line whose only `.` is inside an ellipsis as a real
   finding rather than a false positive.
 - **Don't:** assume an ellipsis is inert because it is not a sentence end in

@@ -668,7 +668,8 @@ See [`fact-check-code-logic.cases.md`](fact-check-code-logic.cases.md),
 
 ### A test that legitimately passes both ways still has to say so
 
-**Misleading label**, above, is a test whose name overstates what it checks.
+**Misleading label**, above, is a test whose name says one property is under test
+while the assertion checks another.
 This is the case that survives even a careful author: a test whose assertion
 is exactly right, that genuinely and correctly passes against both the old
 code and the new, and whose comment says nothing about that --- so its
@@ -713,13 +714,17 @@ says exactly that, rather than presenting it as a second regression case.)
 
 ### A misleading test label also licenses a DELETION, which is the direction with no mutation available
 
-The **Misleading label** entry above treats a test name that overstates its
-assertion as a source of false confidence in a fix.
+The **Misleading label** entry above treats a test name that says one property
+is under test, while the assertion checks another, as a source of false
+confidence in a fix.
 It runs the other way too, and that direction is the dangerous one, because the
 remedy the list prescribes cannot be applied to it.
 Mutating the fix is what exposes a test that does not depend on it.
 There is no fix to mutate when the change under consideration is *removing*
-code, and a suite that stays green is the entire evidence on offer.
+code, and a suite that stays green is the only evidence the suite itself
+offers.
+The substitute measurement is outside it: the first **Do** below, an input
+inside one pattern's domain and outside the other's.
 
 The shape is a clause you judge redundant because a neighbouring pattern
 appears to subsume it.
@@ -749,6 +754,11 @@ A caller reading only the pass/fail bit sees no difference at all.
 - **Don't:** read a green suite as evidence that a clause is unreachable ---
   it is evidence the clause is untested, which is the argument for a test
   rather than for a deletion.
+  The exception is a clause no admissible input can reach alone, which is dead
+  rather than untested; see
+  [`fixtures-are-not-evidence`](../workflow/fixtures-are-not-evidence.md#an-alternative-no-fixture-can-isolate-may-be-dead-not-merely-untested)
+  for how to tell the two apart
+  ([ai-config#2174](https://github.com/Morrison-Lab/ai-config/issues/2174)).
 - **Don't:** trust an anchored pattern to cover the unanchored case;
   `^marker` and `marker` agree on every example that starts with the marker.
 

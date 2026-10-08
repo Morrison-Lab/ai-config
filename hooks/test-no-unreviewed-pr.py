@@ -2324,6 +2324,162 @@ def blocks_at(when, events):
         os.unlink(path)
 
 
+CANONICAL_RUNNER = """
+import datetime, importlib.util, os, sys
+os.environ["NO_UNREVIEWED_PR_DISABLE_LIVE_CHECK"] = "1"
+spec = importlib.util.spec_from_file_location("_h", sys.argv[1])
+m = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m)
+m._today = lambda: datetime.date.fromisoformat(sys.argv[2])
+_c = None if sys.argv[3] == "none" else datetime.date.fromisoformat(sys.argv[3])
+m._canonical_moratorium_end = lambda: _c
+sys.exit(m.main())
+"""
+
+
+def blocks_with_canonical(when, canonical, events):
+    """blocks_at, with main's MORATORIUM_END stubbed ("none" = unreadable)."""
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w") as fh:
+        for e in events:
+            fh.write(json.dumps(e) + "\n")
+    tmpdir = tempfile.mkdtemp()
+    try:
+        out = subprocess.run(
+            [sys.executable, "-c", CANONICAL_RUNNER, HOOK, when, canonical],
+            input=json.dumps({"transcript_path": path}),
+            capture_output=True, text=True,
+            env=dict(os.environ, TMPDIR=tmpdir),
+        ).stdout
+        return "block" in out
+    finally:
+        os.unlink(path)
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def _canonical_fetch_and_cache():
+    """Drive the REAL _canonical_moratorium_end with only the network stubbed.
+
+    Returns (ok, reason). HOME points at a throwaway directory so the cache
+    the function writes is this test's own.
+    """
+    import time
+    mod = load_hook()
+    today = datetime.date(2030, 1, 1)
+    mod._today = lambda: today
+    calls = []
+
+    def fetch_returning(src):
+        def _f():
+            calls.append(src)
+            return src
+        return _f
+
+    def fetch_raising():
+        calls.append("raise")
+        raise OSError("offline")
+
+    saved_home = os.environ.get("HOME")
+    saved_flag = os.environ.pop("NO_UNREVIEWED_PR_DISABLE_LIVE_CHECK", None)
+    home = tempfile.mkdtemp()
+    os.environ["HOME"] = home
+    try:
+        cache = mod._canonical_cache_path()
+        mod._fetch_canonical_source = fetch_returning(
+            "x\nMORATORIUM_END = datetime.date(2030, 3, 1)\n")
+        if mod._canonical_moratorium_end() != datetime.date(2030, 3, 1):
+            return False, "did not parse main's constant"
+        if not os.path.exists(cache):
+            return False, "did not write the cache"
+        mod._fetch_canonical_source = fetch_raising
+        n = len(calls)
+        if mod._canonical_moratorium_end() != datetime.date(2030, 3, 1):
+            return False, "a fresh cache entry was not used"
+        if len(calls) != n:
+            return False, "refetched despite a fresh cache entry"
+        stale = time.time() - mod.CANONICAL_TTL_SECONDS - 60
+        os.utime(cache, (stale, stale))
+        if mod._canonical_moratorium_end() is not None:
+            return False, "an expired entry was trusted after a failed fetch"
+        if len(calls) != n + 1:
+            return False, "an expired entry did not trigger a refetch"
+        if mod._canonical_moratorium_end() is not None or len(calls) != n + 1:
+            return False, "an unreadable main was not negatively cached"
+        inside = time.time() - mod.CANONICAL_NEGATIVE_TTL_SECONDS + 60
+        os.utime(cache, (inside, inside))
+        if mod._canonical_moratorium_end() is not None or len(calls) != n + 1:
+            return False, "a negative entry inside its TTL was refetched"
+        past = time.time() - mod.CANONICAL_NEGATIVE_TTL_SECONDS - 60
+        os.utime(cache, (past, past))
+        mod._canonical_moratorium_end()
+        if len(calls) != n + 2:
+            return False, "a negative entry past its own TTL was still used"
+        os.unlink(cache)
+        mod._fetch_canonical_source = fetch_returning("no constant here")
+        if mod._canonical_moratorium_end() is not None:
+            return False, "a body without the constant returned a date"
+        os.unlink(cache)
+        mod._fetch_canonical_source = fetch_returning(
+            "MORATORIUM_END = datetime.date(2030, 13, 1)\n")
+        if mod._canonical_moratorium_end() is not None:
+            return False, "an invalid date returned a value"
+        os.unlink(cache)
+        far = today + datetime.timedelta(days=mod.CANONICAL_MAX_DAYS + 30)
+        mod._fetch_canonical_source = fetch_returning(
+            "MORATORIUM_END = datetime.date(%d, %d, %d)\n"
+            % (far.year, far.month, far.day))
+        if mod._canonical_moratorium_end() is not None:
+            return False, "a far-future date was trusted"
+        n = len(calls)
+        if mod._canonical_moratorium_end() is not None or len(calls) != n:
+            return False, "a cached far-future date was trusted"
+        os.unlink(cache)
+        good = "MORATORIUM_END = datetime.date(2030, 3, 1)\n"
+        mod._fetch_canonical_source = fetch_returning(good)
+        mod._canonical_moratorium_end()
+        future = time.time() + 3600
+        os.utime(cache, (future, future))
+        n = len(calls)
+        mod._canonical_moratorium_end()
+        if len(calls) != n + 1:
+            return False, "a future-dated cache entry was treated as fresh"
+        os.unlink(cache)
+        decoy = os.path.join(home, "decoy")
+        with open(decoy, "w", encoding="ascii") as fh:
+            fh.write("2030-12-31")
+        os.symlink(decoy, cache)
+        n = len(calls)
+        if mod._canonical_moratorium_end() != datetime.date(2030, 3, 1):
+            return False, "a symlinked cache entry was followed"
+        if len(calls) != n + 1:
+            return False, "a symlinked cache entry did not force a refetch"
+        with open(decoy, encoding="ascii") as fh:
+            if fh.read() != "2030-12-31":
+                return False, "writing the cache overwrote a symlink's target"
+        if hasattr(os, "mkfifo"):
+            os.unlink(cache)
+            os.mkfifo(cache)
+            n = len(calls)
+            if mod._canonical_moratorium_end() != datetime.date(2030, 3, 1):
+                return False, "a FIFO at the cache path was read as an entry"
+            if len(calls) != n + 1:
+                return False, "a FIFO at the cache path did not force a refetch"
+        os.environ["NO_UNREVIEWED_PR_DISABLE_LIVE_CHECK"] = "1"
+        n = len(calls)
+        if mod._canonical_moratorium_end() is not None or len(calls) != n:
+            return False, "the disable flag did not skip the read"
+        return True, ""
+    finally:
+        os.environ.pop("NO_UNREVIEWED_PR_DISABLE_LIVE_CHECK", None)
+        shutil.rmtree(home, ignore_errors=True)
+        if saved_home is None:
+            os.environ.pop("HOME", None)
+        else:
+            os.environ["HOME"] = saved_home
+        if saved_flag is not None:
+            os.environ["NO_UNREVIEWED_PR_DISABLE_LIVE_CHECK"] = saved_flag
+
+
 def obligations_of(events):
     hookmod = load_hook()
     fd, path = tempfile.mkstemp(suffix=".jsonl")
@@ -2679,6 +2835,45 @@ def main():
         passes += 1
     else:
         print("FAIL: the subject's default clock is not date.today()")
+        failures += 1
+
+    # --- a stale copy asks main before demanding (ai-config#3141) ----------
+    # Same armed transcript, same post-expiry clock; the only difference is
+    # what main's constant says, so a silent first case is silent because
+    # main extended the moratorium and not because the fixture stopped arming.
+    _later = (_end + datetime.timedelta(days=60)).isoformat()
+    _same = _end.isoformat()
+    for _canon, _want, _label in (
+            (_later, False, "stays silent while main's moratorium stands"),
+            (_same, True, "fires when main's moratorium has ended too"),
+            ("none", True, "fires when main cannot be read")):
+        if blocks_with_canonical(AFTER, _canon, armed) == _want:
+            print("PASS: past its own date the guard " + _label)
+            passes += 1
+        else:
+            print("FAIL: past its own date the guard no longer " + _label)
+            failures += 1
+
+    # The fetch parses main's real file, so the pattern must match this
+    # file's own declaration; a reworded constant would otherwise read as
+    # unreadable and quietly restore the stale-copy demand.
+    with open(HOOK, encoding="utf-8") as _fh:
+        _src = _fh.read()
+    _m = hookmod._RX_CONST.search(_src)
+    if _m and _dt.date(*map(int, _m.groups())) == hookmod.MORATORIUM_END:
+        print("PASS: the canonical pattern parses the subject's own constant")
+        passes += 1
+    else:
+        print("FAIL: the canonical pattern does not parse MORATORIUM_END")
+        failures += 1
+
+    ok, why = _canonical_fetch_and_cache()
+    if ok:
+        print("PASS: the real canonical read parses, caches, refuses far-future "
+              "dates and caches an unreadable main")
+        passes += 1
+    else:
+        print(f"FAIL: canonical read: {why}")
         failures += 1
 
     if _redaction_wording():

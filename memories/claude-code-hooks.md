@@ -1125,7 +1125,12 @@ this scanner is structure-aware, so they shield everything.
 `NOT_HOOKABLE` is the other escape and needs one of the literal shapes `not mechaniz...`, `no decidable condition`, or `cannot be caught by a hook`.
 An argument that the condition *is* decidable but is already mechanized elsewhere matches none of them.
 
+`MECHANISM_CITED` is the third escape, added by ai-config#4410 for a mechanism built in another repository or by a subagent, which writes no `hooks/` path into the watched transcript.
+It needs a line that starts with the label `Mechanism:` (an optional list bullet and bold markers are allowed) followed on that same line by a GitHub issue or PR URL.
+The word mid-sentence, the URL on a different line, or a non-GitHub URL does not discharge it.
+
 - **Do:** write the full hooks/<name>.py path, unbackticked, in the same message as the admission.
+- **Do:** cite a mechanism built elsewhere on its own line, `Mechanism: <issue or PR URL>`, in the same message as the admission.
 - **Do:** use one of the literal `NOT_HOOKABLE` phrasings rather than a paraphrase when that is the honest answer.
 - **Don't:** write a bare basename --- how README.md and memories/hooks.md refer to hooks --- which matches nothing.
 - **Don't:** file a new guard on the strength of this reminder without searching the tracker first;

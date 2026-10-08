@@ -682,12 +682,12 @@
   So this instance does not upgrade the claim.
   What is measured on #3010 is that reviews arrived;
   that they arrived *over an empty pending read* rests entirely on the session's own report, from the one session whose self-counting is known to have been wrong.
-  The `ucdavis/bcs` #648/#649/#650 record further down this file is the zero-review candidate for the other direction, and it is confounded too: [`challenge-the-assignment.cases.md`](../shared/workflow/challenge-the-assignment.cases.md) records `_argv_close`'s docstring in `hooks/no-unreviewed-pr.py` documenting HTTP 200 on this endpoint as what GitHub returns for an already merged or closed PR, adding nobody by design, and that confound was confirmed to apply to some of those four calls without being shown to explain all of them.
+  The `ucdavis/bcs` record --- four `requested_reviewers` POSTs on PRs #648, #649 and #650, each accepted with HTTP 200 and each leaving no Copilot review or pending request --- is the zero-review candidate for the other direction, and it is confounded too: [`challenge-the-assignment.cases.md`](../shared/workflow/challenge-the-assignment.cases.md) records `_argv_close`'s docstring in `hooks/no-unreviewed-pr.py` documenting HTTP 200 on this endpoint as what GitHub returns for an already merged or closed PR, adding nobody by design, and that confound was confirmed to apply to some of those four calls without being shown to explain all of them.
   Both candidate directions are therefore unconfirmed, and the honest statement stays *unreliable*, not *uninformative*.
 
   - **Do:** poll the review bodies on the head when you need to know whether a reviewer engaged.
   - **Do:** read `review_requested` timeline events as a lower bound on requests that actually **added** a reviewer, never as a POST count.
-    Why a POST can add nobody is unsettled here --- the untested 422 reconciliation below is one account, a silent no-op another --- so take the bound from the events themselves and leave the mechanism open.
+    Why a POST can add nobody is unsettled here --- one account, untested, is that GitHub answers `422` when the requested reviewer is already pending; a silent no-op is another --- so take the bound from the events themselves and leave the mechanism open.
   - **Don't:** treat an empty pending read as evidence the request failed, nor as evidence a review is coming;
     that was already the rule and neither new data point changes it.
   - **Don't:** cite either direction as settled --- the bcs status-code confound is open, and the #3010 empty reads are unverifiable after the fact.

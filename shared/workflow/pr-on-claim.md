@@ -141,9 +141,10 @@ See [`pr-on-claim.cases.md`](pr-on-claim.cases.md), "The blocking message prescr
 **That message's verification query counts reviews on the PR, not reviews of the current head.**
 
 `[.reviews[] | select((.author.login // "") | startswith("copilot"))] | length` returns every Copilot review the PR ever received, including one submitted against a diff that no longer exists.
-On ai-config#3010 it returned 1 while the only review on record predated a force-push, so it read as satisfied over a diff nothing had reviewed --- the same head-scoping gap [`fully-clean`](fully-clean.md) closes by requiring `reviews[].commit.oid` in its payload.
+On [ai-config#3010](https://github.com/Morrison-Lab/ai-config/pull/3010) it returned 1 while the only review on record predated a force-push, so it read as satisfied over a diff nothing had reviewed --- the same head-scoping gap [`fully-clean`](fully-clean.md) closes by requiring `reviews[].commit.oid` in its payload.
 
-- **Do:** compare each review's `submittedAt` against the last push, or match `commit.oid` against the head, before reading a non-zero count as an answer.
+- **Do:** match each review's `commit.oid` against the current head before reading a non-zero count as an answer.
+  `submittedAt` only orders reviews: a review of an older commit can be submitted after a later push, which [ai-config#3048](https://github.com/Morrison-Lab/ai-config/issues/3048) records happening on [ai-config#3010](https://github.com/Morrison-Lab/ai-config/pull/3010) itself.
 - **Don't:** treat a count of reviews on the PR as a count of reviews of the diff you just pushed.
 
 **A PreToolUse block for this was considered and rejected -- the Stop hook stays the only guard.**
@@ -209,15 +210,15 @@ See [`pr-on-claim.rationale.md`](pr-on-claim.rationale.md) for the full mechanis
 **The race has a second, sharper failure direction, and it is worse than a cancellation: no `ready_for_review` run at all.**
 A cancelled run at least leaves a check to read and a run to re-run.
 This direction leaves nothing --- no cancelled run, no red check, just an event GitHub never fired.
-Measured on `Morrison-Lab/gha#702`, 2026-08-28: `git push` and `gh pr ready` issued in the same shell invocation, roughly 3 seconds apart, produced only the push's `pull_request`/`synchronize` run --- which correctly skipped, since the PR was still draft in its own event payload --- and no `ready_for_review` run whatsoever, confirmed by listing every run of the caller workflow in the window (`gh run list --workflow=<caller>.yml`), not by reading a single run's conclusion.
+Measured on [`Morrison-Lab/gha#702`](https://github.com/Morrison-Lab/gha/issues/702), 2026-08-28: `git push` and `gh pr ready` issued in the same shell invocation, roughly 3 seconds apart, produced only the push's `pull_request`/`synchronize` run --- which correctly skipped, since the PR was still draft in its own event payload --- and no `ready_for_review` run whatsoever, confirmed by listing every run of the caller workflow in the window (`gh run list --workflow=<caller>.yml`), not by reading a single run's conclusion.
 The PR sat CI-green and comment-free, which reads from the thread exactly like "review pending" rather than like anything broken.
-The same push-then-ready sequence with roughly 30 seconds between the two commands, on `Morrison-Lab/gha#704` the same hour, produced both runs, with the `ready_for_review` one reviewing normally.
+The same push-then-ready sequence with roughly 30 seconds between the two commands, on [`Morrison-Lab/gha#704`](https://github.com/Morrison-Lab/gha/issues/704) the same hour, produced both runs, with the `ready_for_review` one reviewing normally.
 Recovery: dispatch the review workflow directly with the PR number (`gh workflow run <caller>.yml -f pr_number=<N>`), since re-mentioning the bot has nothing to react to when no run exists.
 
 - **Do:** leave a deliberate gap of tens of seconds, not one or two, between the final push and `gh pr ready`.
 - **Do:** confirm a `ready_for_review` run actually exists (`gh run list --workflow=<caller>.yml`) before waiting on its review, rather than trusting green CI and silence to mean review-in-flight.
 - **Don't:** read a green-CI, comment-free PR as "review pending" without checking that a run exists for the ready event --- an absent run and a slow one look identical from the thread.
-- **Don't:** assume a several-second gap is safe because an earlier incident used one too --- gha#702's roughly-3-second gap dropped the run entirely, while gha#704's roughly-30-second gap produced both runs cleanly.
+- **Don't:** assume a several-second gap is safe because an earlier incident used one too --- [gha#702](https://github.com/Morrison-Lab/gha/issues/702)'s roughly-3-second gap dropped the run entirely, while [gha#704](https://github.com/Morrison-Lab/gha/issues/704)'s roughly-30-second gap produced both runs cleanly.
 
 **Check whether the race can even arise before paying for that wait --- on
 many repos it cannot, and the check is one field.**
@@ -261,7 +262,7 @@ Every rule above assumes the check gets run.
 The measured failure is that it does not, and that nothing about the moment suggests it was skipped.
 
 Measured on `Morrison-Lab/wai`, 2026-08-19/20.
-Five branches attacked the same `check-non-standard-chars` failure across roughly five hours: `fix/replace-em-dashes` (20:14), `fix/replace-em-dashes-v2` (23:29), `fix/replace-all-non-standard-chars` (23:38), `fix/all-non-standard-chars` (00:16, which became #77), and `fix/ascii-punctuation` (01:16, which became #78).
+Five branches attacked the same `check-non-standard-chars` failure across roughly five hours: `fix/replace-em-dashes` (20:14), `fix/replace-em-dashes-v2` (23:29), `fix/replace-all-non-standard-chars` (23:38), `fix/all-non-standard-chars` (00:16, which became [wai#77](https://github.com/Morrison-Lab/wai/issues/77)), and `fix/ascii-punctuation` (01:16, which became [wai#78](https://github.com/Morrison-Lab/wai/issues/78)).
 Three further branches --- `fix/fix-review-77`, `fix/fix-review-77-cleanup`, and `fix/fix-review-findings` --- addressed review findings on those five.
 Two reached PRs and duplicated each other.
 
@@ -273,7 +274,7 @@ Filing an issue and opening a PR against it is the issue-first workflow performe
 The more sessions working a repo, the likelier a collision and the less any single session can observe it.
 So the check matters most exactly when the evidence for needing it is least visible, which is why judgment does not reach it and an instrument has to.
 
-**One of those duplicates was actively dangerous, not merely wasteful.** #77 was cut from an unrelated PR's branch while targeting `main`, so it carried that PR's content two review rounds stale.
+**One of those duplicates was actively dangerous, not merely wasteful.** [wai#77](https://github.com/Morrison-Lab/wai/issues/77) was cut from an unrelated PR's branch while targeting `main`, so it carried that PR's content two review rounds stale.
 Merging it would have shipped a version of that PR's content which that PR's own reviewer had already rejected, under a title describing something else entirely.
 A duplicate is not always the cheaper of two equivalent paths;
 check what else the branch is carrying before picking one.

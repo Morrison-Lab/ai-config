@@ -27,7 +27,8 @@ each recheck and each delegated scan.
 A review-only run that CI or a skill invocation dispatched naming the target
 PR (an `@claude review`, a `claude-code-review.yml` run) is an explicit
 request, whoever authored the PR; it reviews and stops there.
-Every review you post carries both representations of its verdict, whoever
+Every review you post or produce --- a forge comment, a local report, or one
+composed in-transcript --- carries both representations of its verdict, whoever
 asked for it and whether or not anything dispatched it: the human-readable
 Markdown report, and the machine-readable `review-data` JSON payload, per
 [`adversarial-self-review.md`](adversarial-self-review.md)'s "Structured review data" section.

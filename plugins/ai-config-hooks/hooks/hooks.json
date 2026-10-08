@@ -810,6 +810,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-merge-without-cross-harness-review.py\"'",
+            "timeout": 20,
+            "script": "warn-merge-without-cross-harness-review.py",
+            "why": "ai-config#3099: shared/workflow/adversarial-self-review.md requires a merge verdict from a reviewer whose model AND harness both differ from the authoring session's, and nothing enforced it -- no-unauthorized-merge.py checks authorization and warn-merge-without-fully-clean.py checks the instrument, so merges reviewed only by Claude (an Agent subagent, the CI claude-review workflow) passed both, on 2026-09-02 and again on 2026-10-08. Warns, never denies, on gh pr merge, a REST merge, the MCP merge tool or MCP auto-merge, unless the transcript holds, after the last push, a non-sidechain non-error call to a cross-harness reviewer CLI (codex, opencode, agy, gemini, cursor-agent, or claude from a non-Claude harness) or a dtc/dto/adv/agy-review-workflow/delegate-to-databricks skill. Merge and push recognition are imported from warn-merge-without-fully-clean.py. Warn because the invocation is decidable and the verdict and the configured model are not."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/flag-unmeasured-digest.py\"'",
             "timeout": 10,
             "script": "flag-unmeasured-digest.py",
@@ -970,6 +977,13 @@
             "timeout": 20,
             "script": "warn-merge-without-fully-clean.py",
             "why": "ai-config#4399: on 2026-10-08 two ai-config PRs were merged on gh pr checks, mergeStateStatus and a hand-parsed review verdict, and scripts/check-pr-fully-clean.py ran only afterwards when a Stop hook objected to the wording. no-unauthorized-merge.py gates permission to merge, not cleanliness. Warns, never denies, unless the transcript holds a Bash run of check-pr-fully-clean.py for that PR number (and -R repo when both name one) whose result shows the 'is FULLY CLEAN' line for that PR, after the last push (git push or an MCP push tool); a NOT-fully-clean line vetoes. Warn rather than deny because the transcript is a lossy witness (a peer session, a resumed session, or an unseen push by another session) and a deny on an inference teaches an escape-variable reflex. Command position via shellcmd, so a quoted or echoed merge is inert."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-merge-without-cross-harness-review.py\"'",
+            "timeout": 20,
+            "script": "warn-merge-without-cross-harness-review.py",
+            "why": "ai-config#3099: shared/workflow/adversarial-self-review.md requires a merge verdict from a reviewer whose model AND harness both differ from the authoring session's, and nothing enforced it -- no-unauthorized-merge.py checks authorization and warn-merge-without-fully-clean.py checks the instrument, so merges reviewed only by Claude (an Agent subagent, the CI claude-review workflow) passed both, on 2026-09-02 and again on 2026-10-08. Warns, never denies, on gh pr merge, a REST merge, the MCP merge tool or MCP auto-merge, unless the transcript holds, after the last push, a non-sidechain non-error call to a cross-harness reviewer CLI (codex, opencode, agy, gemini, cursor-agent, or claude from a non-Claude harness) or a dtc/dto/adv/agy-review-workflow/delegate-to-databricks skill. Merge and push recognition are imported from warn-merge-without-fully-clean.py. Warn because the invocation is decidable and the verdict and the configured model are not."
           },
           {
             "type": "command",

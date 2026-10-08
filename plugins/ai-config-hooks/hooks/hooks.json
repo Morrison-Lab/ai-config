@@ -1420,7 +1420,7 @@
         ]
       },
       {
-        "matcher": "mcp__hearthbot__.*|mcp__github__(add_issue_comment|update_issue_comment|add_reply_to_pull_request_comment|add_comment_to_pending_review|pull_request_review_write)",
+        "matcher": "mcp__hearthbot__.*|mcp__github__add_issue_comment|mcp__github__update_issue_comment|mcp__github__add_reply_to_pull_request_comment|mcp__github__add_comment_to_pending_review|mcp__github__pull_request_review_write",
         "hooks": [
           {
             "type": "command",

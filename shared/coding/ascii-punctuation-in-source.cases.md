@@ -95,3 +95,10 @@ Three probes, on a throwaway file:
 Probes 1 and 2 fix the behaviour; probe 3 is why the mechanism is left open,
 since it contradicts the reading probes 1 and 2 suggest.
 The hook ships the `chr(0x201C)` form instead, and its own source is ASCII.)
+
+(2nd occurrence, 2026-10-08, ai-config#4385:
+an Edit `new_string` written as a regex escape for U+2026 landed as the literal glyph,
+and `scripts/check-ascii-punctuation.py` stayed green on it,
+since U+2026 is outside that checker's seven-glyph set.
+An adversarial reviewer's byte-level grep caught it;
+a Python script that built the backslash with `chr(92)` fixed it.)

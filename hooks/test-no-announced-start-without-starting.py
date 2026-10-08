@@ -87,6 +87,14 @@ CASES_BLOCK = [
     "I am now starting the month_pool propagation fix.",
     "I'll do that now.",
     "Starting on it now.",
+    # Measured 2026-10-08: the verbless form, followed by the plan it
+    # announced and no tool call.
+    "Starting now. I'll delete the caches first, then move the two folders "
+    "to D: and leave links behind so their old paths still work.",
+    "Done scanning. **Starting now.**",
+    "Starting now...",
+    "Starting now\u2026",
+    "Starting immediately.",
     "I'll get started on the migration.",
     "**Stopping Point**: Not a clean stopping point / work remains queued: Continuing GIA Phase 2 to claim and implement the next backlog issue.",
 ]
@@ -123,6 +131,18 @@ CASES_PASS = [
     # No commitment at all.
     "The sweep is 76 of 175 chunks in, with no failures.",
     "**Stopping Point**: Clean stopping point reached.",
+    # Expository "starting now": a rule taking effect, not work announced.
+    "Starting now, the rule covers every repo.",
+    "Starting now: the rule takes effect for every repo.",
+    # A heading titled "Starting now", and a `;`-split fragment carrying its
+    # own plan.
+    "## Starting now\n\nThe rule covers repos.",
+    "Starting now; deleting caches.",
+    # A colon-led lead-in followed by the delivered content.
+    "Starting now: the summary follows.\n\n"
+    "The scan found 35 GB of caches.\n\n"
+    "Two folders can move to D:.\n\n"
+    "Nothing was deleted.",
     # Quoting the rule must not trip it.
     "The banned shape is `I'll start on it` with nothing following.",
 ]

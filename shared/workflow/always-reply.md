@@ -86,3 +86,17 @@ nothing, and a claim about the **work**: `Nothing to report.` and
 `No change.` are deliberately not matched, since a no-change tick is
 behaviour this file requires.
 Tracked as ai-config#1579.)
+
+**Not every `No response requested.` is a model lapse.**
+The string has been observed as a stand-in assistant turn the model never generated,
+in a desktop session branched at a user interrupt.
+The transcript marks such a turn with `"model":"<synthetic>"` and 0 output tokens.
+The model-side duty is unchanged:
+the next real reply still reports what finished before the interrupt.
+(Measured 2026-10-08 in session `b6f20ba3`, transcript line 188:
+`"model":"<synthetic>"`, `"stop_reason":"stop_sequence"`, `output_tokens` 0,
+and a parent that is a `[Request interrupted by user]` message from another session.)
+
+- **Do:** check the transcript's `model` field
+  before recording a placeholder reply as a recurrence of this rule.
+- **Don't:** count a `<synthetic>` stand-in as a model lapse.

@@ -254,9 +254,13 @@ def moratorium_active(today=None):
 CANONICAL_URL = ("https://raw.githubusercontent.com/Morrison-Lab/ai-config/"
                  "main/hooks/no-unreviewed-pr.py")
 CANONICAL_TTL_SECONDS = 3600
+# A failed read is remembered for less time than an answer, so a brief
+# network drop does not keep a stale copy loud for the full hour.
+CANONICAL_NEGATIVE_TTL_SECONDS = 300
 CANONICAL_MAX_DAYS = 366
 _RX_CONST = re.compile(
-    r"^MORATORIUM_END = datetime\.date\((\d{4}), (\d{1,2}), (\d{1,2})\)", re.M)
+    r"^MORATORIUM_END\s*=\s*datetime\.date\(\s*(\d{4})\s*,\s*(\d{1,2})\s*,"
+    r"\s*(\d{1,2})\s*,?\s*\)", re.M)
 _UNREADABLE = "unreadable"
 
 
@@ -275,13 +279,17 @@ def _read_canonical_cache(path, now):
         st = os.fstat(fd)
         if hasattr(os, "getuid") and st.st_uid != os.getuid():
             return False, None
-        if now - st.st_mtime > CANONICAL_TTL_SECONDS:
-            return False, None
+        age = now - st.st_mtime
         raw = os.read(fd, 64).decode("ascii", "replace").strip()
     except OSError:
         return False, None
     finally:
         os.close(fd)
+    # A future mtime (clock skew) is not fresh: it would never expire.
+    ttl = (CANONICAL_NEGATIVE_TTL_SECONDS if raw == _UNREADABLE
+           else CANONICAL_TTL_SECONDS)
+    if age < 0 or age > ttl:
+        return False, None
     if raw == _UNREADABLE:
         return True, None
     try:
@@ -291,6 +299,7 @@ def _read_canonical_cache(path, now):
 
 
 def _write_canonical_cache(path, value):
+    tmp = None
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         tmp = "%s.%d" % (path, os.getpid())
@@ -299,8 +308,17 @@ def _write_canonical_cache(path, value):
         with os.fdopen(fd, "w", encoding="ascii") as fh:
             fh.write(value)
         os.replace(tmp, path)
+        tmp = None
     except OSError:
         pass
+    finally:
+        # A leftover tmp would make every later O_EXCL open from a recycled
+        # pid fail, so the cache could never be written again.
+        if tmp is not None:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
 
 
 def _parse_canonical_end(src):

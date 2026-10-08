@@ -2497,6 +2497,31 @@ def main() -> int:
             is not None,
         )
 
+    # ai-config#4428: "Blocking findings: None" says nothing blocks.
+    _tail = "\n\n### Verdict\n\nVerdict: Ready for merge\n"
+    for _label, _body in (
+        ("heading, blank, None.", "### Blocking findings\n\nNone."),
+        ("heading, None.", "### Blocking findings\nNone."),
+        ("heading, rule, None.", "### Blocking findings\n\n---\n\nNone."),
+        ("heading: none", "### Blocking findings: none"),
+        ("bold label: None.", "**Blocking findings:** None."),
+    ):
+        check(f"classify_verdict: empty Blocking findings ({_label}) stays clean",
+              checker.classify_verdict(_body + _tail, "") == "clean")
+        check(f"_unresolved_finding_pattern: empty Blocking findings ({_label}) "
+              "is no finding",
+              checker._unresolved_finding_pattern(_body + _tail) is None)
+    for _label, _body in (
+        ("heading with an item", "### Blocking findings\n\n1. The cache leaks."),
+        ("heading, None, then an item",
+         "### Blocking findings\n\nNone.\n\n- The cache leaks."),
+        ("label with an item", "**Blocking findings:** the cache leaks."),
+        ("prose 'Blocking issues none of which'",
+         "Blocking issues none of which are fixed."),
+    ):
+        check(f"classify_verdict: Blocking findings ({_label}) stays not-clean",
+              checker.classify_verdict(_body + _tail, "") == "not-clean")
+
     check(
         "classify_verdict: '### Findings (non-blocking)' heading in clean review stays clean",
         checker.classify_verdict(

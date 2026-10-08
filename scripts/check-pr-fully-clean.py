@@ -1978,6 +1978,49 @@ def _section_has_unresolved_blocking_items(
     return False
 
 
+# "Blocking findings: None" is how reviewers (agy, Claude, Codex) say that
+# nothing blocks, and `_BARE_REJECTION` reads its "Blocking" as a rejection
+# (ai-config#4428). Exempt it only when the heading or label declares the
+# section empty and nothing else stands in it: a heading followed by a real
+# item, or a label followed by anything but a none-word, stays not-clean.
+_EMPTY_DECLARATION = re.compile(
+    r"^[*_]*\s*(?:none|n/a|none\s+identified|none\s+found)\s*[.!]?\s*[*_]*\s*$",
+    re.IGNORECASE,
+)
+_BLOCKING_SECTION_NOUN = re.compile(
+    r"\s+(?:findings|issues|defects|items|blockers|problems)\b", re.IGNORECASE)
+
+
+def _is_empty_blocking_section(scan_body: str, match_start: int,
+                               match_end: int) -> bool:
+    """True when a "Blocking findings" heading or label declares the section empty."""
+    if scan_body[match_start:match_end].lower() != "blocking":
+        return False
+    noun = _BLOCKING_SECTION_NOUN.match(scan_body, match_end)
+    if not noun:
+        return False
+    line_start = scan_body.rfind("\n", 0, match_start) + 1
+    line_end = scan_body.find("\n", match_end)
+    if line_end == -1:
+        line_end = len(scan_body)
+    lead = scan_body[line_start:match_start]
+    rest = scan_body[noun.end():line_end].lstrip("*_: \t-")
+    if re.match(r"^[ \t]*#{1,6}[ \t]+[*_]*$", lead):
+        if rest:
+            return bool(_EMPTY_DECLARATION.match(rest))
+        section_start = line_end + 1
+        next_heading = re.search(r"(?m)^[ \t]*#{1,6}\s",
+                                 scan_body[section_start:])
+        section = (scan_body[section_start:section_start + next_heading.start()]
+                   if next_heading else scan_body[section_start:])
+        lines = [ln.strip() for ln in section.splitlines()]
+        lines = [ln for ln in lines if ln and not re.match(r"^[-*_\s]{3,}$", ln)]
+        return len(lines) == 1 and bool(_EMPTY_DECLARATION.match(lines[0]))
+    if re.match(r"^[ \t]*(?:[-*+][ \t]+)?[*_]*$", lead):
+        return bool(rest) and bool(_EMPTY_DECLARATION.match(rest))
+    return False
+
+
 def _is_exempt_findings_heading(
     scan_body: str, match_start: int, match_end: int
 ) -> bool:
@@ -2917,6 +2960,8 @@ def classify_verdict(body: str, state: str = "", author: str = "") -> str:
                     continue
                 if _is_exempt_findings_heading(scan, match.start(), match.end()):
                     continue
+                if _is_empty_blocking_section(scan, match.start(), match.end()):
+                    continue
             if pat == r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b":
                 suffix = scan[match.end():match.end() + 60]
                 if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
@@ -3157,6 +3202,8 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
                 if _is_resolved_blocking_mention(scan_body, match, cited):
                     continue
                 if _is_exempt_findings_heading(scan_body, match.start(), match.end()):
+                    continue
+                if _is_empty_blocking_section(scan_body, match.start(), match.end()):
                     continue
             if pat == _FINDINGS_HEADING_PATTERN:
                 # The section-resolution check REPLACES the 60-char suffix

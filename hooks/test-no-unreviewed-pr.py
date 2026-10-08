@@ -2343,16 +2343,18 @@ def blocks_with_canonical(when, canonical, events):
     with os.fdopen(fd, "w") as fh:
         for e in events:
             fh.write(json.dumps(e) + "\n")
+    tmpdir = tempfile.mkdtemp()
     try:
         out = subprocess.run(
             [sys.executable, "-c", CANONICAL_RUNNER, HOOK, when, canonical],
             input=json.dumps({"transcript_path": path}),
             capture_output=True, text=True,
-            env=dict(os.environ, TMPDIR=tempfile.mkdtemp()),
+            env=dict(os.environ, TMPDIR=tmpdir),
         ).stdout
         return "block" in out
     finally:
         os.unlink(path)
+        shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 def _canonical_fetch_and_cache():
@@ -2379,7 +2381,8 @@ def _canonical_fetch_and_cache():
 
     saved_home = os.environ.get("HOME")
     saved_flag = os.environ.pop("NO_UNREVIEWED_PR_DISABLE_LIVE_CHECK", None)
-    os.environ["HOME"] = tempfile.mkdtemp()
+    home = tempfile.mkdtemp()
+    os.environ["HOME"] = home
     try:
         cache = mod._canonical_cache_path()
         mod._fetch_canonical_source = fetch_returning(
@@ -2418,8 +2421,37 @@ def _canonical_fetch_and_cache():
             % (far.year, far.month, far.day))
         if mod._canonical_moratorium_end() is not None:
             return False, "a far-future date was trusted"
+        n = len(calls)
+        if mod._canonical_moratorium_end() is not None or len(calls) != n:
+            return False, "a cached far-future date was trusted"
+        os.unlink(cache)
+        good = "MORATORIUM_END = datetime.date(2030, 3, 1)\n"
+        mod._fetch_canonical_source = fetch_returning(good)
+        mod._canonical_moratorium_end()
+        future = time.time() + 3600
+        os.utime(cache, (future, future))
+        n = len(calls)
+        mod._canonical_moratorium_end()
+        if len(calls) != n + 1:
+            return False, "a future-dated cache entry was treated as fresh"
+        os.unlink(cache)
+        decoy = os.path.join(home, "decoy")
+        with open(decoy, "w", encoding="ascii") as fh:
+            fh.write("2030-12-31")
+        os.symlink(decoy, cache)
+        n = len(calls)
+        if mod._canonical_moratorium_end() != datetime.date(2030, 3, 1):
+            return False, "a symlinked cache entry was followed"
+        if len(calls) != n + 1:
+            return False, "a symlinked cache entry did not force a refetch"
+        os.environ["NO_UNREVIEWED_PR_DISABLE_LIVE_CHECK"] = "1"
+        n = len(calls)
+        if mod._canonical_moratorium_end() is not None or len(calls) != n:
+            return False, "the disable flag did not skip the read"
         return True, ""
     finally:
+        os.environ.pop("NO_UNREVIEWED_PR_DISABLE_LIVE_CHECK", None)
+        shutil.rmtree(home, ignore_errors=True)
         if saved_home is None:
             os.environ.pop("HOME", None)
         else:

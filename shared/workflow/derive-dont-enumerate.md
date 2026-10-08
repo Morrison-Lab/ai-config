@@ -596,7 +596,7 @@ When only that one check is wanted, scope the same derived run to it rather than
 python3 scripts/run-local-validation.py --base origin/main --only new-line-breaks
 ```
 
-- **Do:** derive the pre-push checks from the whole workflow file, `uses:` jobs included, by running `run-local-validation.py`.
+- **Do:** count a workflow's `uses:` jobs as checks when listing what CI runs, not only its `run:` steps.
 - **Don't:** treat "every `run:` step of `validate.yml`" as the complete set;
   a job whose check step is a `uses:` of a composite action has no `run:` line to find.
 

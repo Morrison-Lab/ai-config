@@ -7,7 +7,7 @@ Each heading names the rule the record supports.
 
 ## Run the reviewer POST as the sole command
 
-([Morrison-Lab/rpt#181](https://github.com/Morrison-Lab/rpt/issues/181), 2026-08-03: the POST was chained ahead of `gh pr view`/`gh pr checks` in one call across six turns, so the hook re-fired every Stop;
+([Morrison-Lab/rpt#181](https://github.com/Morrison-Lab/rpt/pull/181), 2026-08-03: the POST was chained ahead of `gh pr view`/`gh pr checks` in one call across six turns, so the hook re-fired every Stop;
 running the POST bare discharged it.
 The failure was misread as the hook not recognizing a Copilot quota refusal, which it was not about.)
 
@@ -20,7 +20,7 @@ Re-running the POST bare discharged it and produced a second, identical refusal 
 
 ## The blocking message prescribes a non-dischargeable shape
 
-([Morrison-Lab/ai-config#3010](https://github.com/Morrison-Lab/ai-config/pull/3010), 2026-09-02, and the third occurrence of the chained-request mistake after the [rpt#181](https://github.com/Morrison-Lab/rpt/issues/181) and [ai-config#1139](https://github.com/Morrison-Lab/ai-config/pull/1139) cases above.
+([Morrison-Lab/ai-config#3010](https://github.com/Morrison-Lab/ai-config/pull/3010), 2026-09-02, and the third occurrence of the chained-request mistake after the [rpt#181](https://github.com/Morrison-Lab/rpt/pull/181) and [ai-config#1139](https://github.com/Morrison-Lab/ai-config/pull/1139) cases above.
 The session ran the request across a run of successive turns, chaining the block message's own verify command after the POST each time, which is what left the request non-last;
 the hook fired after every one of them, and the loop ended on the first turn that ran the POST as the sole command in its call.
 Four Copilot reviews landed on the PR while this was going on, at `15:51:54Z`, `16:43:37Z`, `16:47:16Z`, and `17:00:45Z`.
@@ -83,7 +83,7 @@ diff --stat` against expectations, not because anything failed.)
 
 ## Marking a draft ready is a push-landed checkpoint
 
-(Morrison-Lab/gha#427, 2026-08-06: a changelog fix was committed locally,
+([Morrison-Lab/gha#427](https://github.com/Morrison-Lab/gha/pull/427), 2026-08-06: a changelog fix was committed locally,
 self-reviewed, and the PR body updated, then `gh pr ready` ran and review was
 requested --- but `git push` never ran, so the branch head stayed at the empty
 `start:` scaffold and the reviewer reported the diff empty and the described fix

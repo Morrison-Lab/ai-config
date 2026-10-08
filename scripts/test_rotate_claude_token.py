@@ -217,6 +217,25 @@ check(
     ],
 )
 
+with_gh(
+    FakeGh(
+        {"owner/repo": secrets_payload("TOK", "2026-07-31T09:00:00Z")},
+        fail_for={"variable"},
+    )
+)
+try:
+    rct.rotate(
+        "owner/repo",
+        "TOK",
+        "s3cret",
+        "2026-07-28T00:00:00Z",
+        account="test@example.com",
+    )
+    var_fail_raised = False
+except rct.GhError:
+    var_fail_raised = True
+check("rotate raises when variable set fails", var_fail_raised)
+
 # The security-critical property: a recorded secret value in argv would be
 # visible to `ps` and land in shell history, so pin it rather than trust it.
 set_calls = [c for c in fake.calls if c["args"][0] == "secret"]
@@ -407,6 +426,30 @@ check(
         "test@example.com",
     ],
 )
+
+with_gh(
+    OrgFakeGh(
+        {
+            "/orgs/acme/actions/secrets": org_secrets_payload(
+                ("TOK", "2026-08-27T09:00:00Z", "all")
+            )
+        },
+        fail_for={"variable"},
+    )
+)
+try:
+    rct.rotate_org(
+        "acme",
+        "TOK",
+        "s3cret",
+        "2026-08-26T00:00:00Z",
+        "all",
+        account="test@example.com",
+    )
+    org_var_fail_raised = False
+except rct.GhError:
+    org_var_fail_raised = True
+check("rotate_org raises when variable set fails", org_var_fail_raised)
 
 with_gh(
     OrgFakeGh(
@@ -787,6 +830,43 @@ with patch.object(rct_real.subprocess, "run", _rec):
     rct_real.gh(["api", "/user", "--jq", ".login"])
 check("gh() decodes subprocess output as UTF-8 explicitly",
       recorded.get("encoding") == "utf-8")
+
+# --- current_claude_account --------------------------------------------
+
+with patch.object(
+    rct_real.subprocess,
+    "run",
+    side_effect=FileNotFoundError("claude not found"),
+):
+    check(
+        "current_claude_account returns None on FileNotFoundError (missing CLI)",
+        rct_real.current_claude_account() is None,
+    )
+
+import subprocess as _real_sub  # noqa: E402
+
+with patch.object(
+    rct_real.subprocess,
+    "run",
+    side_effect=_real_sub.SubprocessError("invocation failed"),
+):
+    check(
+        "current_claude_account returns None on SubprocessError",
+        rct_real.current_claude_account() is None,
+    )
+
+
+class _InvalidJson:
+    returncode = 0
+    stdout = "not-json"
+    stderr = ""
+
+
+with patch.object(rct_real.subprocess, "run", lambda *a, **kw: _InvalidJson()):
+    check(
+        "current_claude_account returns None on JSONDecodeError",
+        rct_real.current_claude_account() is None,
+    )
 
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

@@ -105,9 +105,18 @@ def current_claude_account() -> str | None:
             data = json.loads(res.stdout)
             if data.get("loggedIn"):
                 return data.get("email") or data.get("orgName")
-    except Exception:
+    except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
         pass
     return None
+
+
+def set_account_variable(
+    target_args: list[str],
+    account: str,
+    variable: str = DEFAULT_ACCOUNT_VARIABLE,
+) -> None:
+    """Set `variable` to `account` on the specified target (`--org` or `--repo`)."""
+    gh(["variable", "set", variable, *target_args, "--body", account])
 
 
 def gh(args: list[str], stdin: str | None = None) -> str:
@@ -327,23 +336,10 @@ def rotate_org(
         args.extend(["--repos", ",".join(selected)])
     gh(args, stdin=token)
     if account:
-        var_args = [
-            "variable",
-            "set",
-            DEFAULT_ACCOUNT_VARIABLE,
-            "--org",
-            org,
-            "--visibility",
-            visibility,
-            "--body",
-            account,
-        ]
+        var_args = ["--org", org, "--visibility", visibility]
         if visibility == "selected" and selected:
             var_args.extend(["--repos", ",".join(selected)])
-        try:
-            gh(var_args)
-        except GhError:
-            pass
+        set_account_variable(var_args, account)
     info = org_secret_info(org, secret)
     if info is None:
         raise GhError(f"{secret} is absent from org {org} after the write")
@@ -405,20 +401,7 @@ def rotate(
     """
     gh(["secret", "set", secret, "--repo", repo], stdin=token)
     if account:
-        try:
-            gh(
-                [
-                    "variable",
-                    "set",
-                    DEFAULT_ACCOUNT_VARIABLE,
-                    "--repo",
-                    repo,
-                    "--body",
-                    account,
-                ]
-            )
-        except GhError:
-            pass
+        set_account_variable(["--repo", repo], account)
     current = secret_updated_at(repo, secret)
     if current is None:
         raise GhError(f"{secret} is absent from {repo} after the write")

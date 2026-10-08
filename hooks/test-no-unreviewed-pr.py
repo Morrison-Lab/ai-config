@@ -2324,6 +2324,37 @@ def blocks_at(when, events):
         os.unlink(path)
 
 
+CANONICAL_RUNNER = """
+import datetime, importlib.util, os, sys
+os.environ["NO_UNREVIEWED_PR_DISABLE_LIVE_CHECK"] = "1"
+spec = importlib.util.spec_from_file_location("_h", sys.argv[1])
+m = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m)
+m._today = lambda: datetime.date.fromisoformat(sys.argv[2])
+_c = None if sys.argv[3] == "none" else datetime.date.fromisoformat(sys.argv[3])
+m._canonical_moratorium_end = lambda: _c
+sys.exit(m.main())
+"""
+
+
+def blocks_with_canonical(when, canonical, events):
+    """blocks_at, with main's MORATORIUM_END stubbed ("none" = unreadable)."""
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w") as fh:
+        for e in events:
+            fh.write(json.dumps(e) + "\n")
+    try:
+        out = subprocess.run(
+            [sys.executable, "-c", CANONICAL_RUNNER, HOOK, when, canonical],
+            input=json.dumps({"transcript_path": path}),
+            capture_output=True, text=True,
+            env=dict(os.environ, TMPDIR=tempfile.mkdtemp()),
+        ).stdout
+        return "block" in out
+    finally:
+        os.unlink(path)
+
+
 def obligations_of(events):
     hookmod = load_hook()
     fd, path = tempfile.mkstemp(suffix=".jsonl")
@@ -2679,6 +2710,38 @@ def main():
         passes += 1
     else:
         print("FAIL: the subject's default clock is not date.today()")
+        failures += 1
+
+    # --- a stale copy asks main before demanding (ai-config#3141) ----------
+    # Same armed transcript, same post-expiry clock; the only difference is
+    # what main's constant says, so a silent first case is silent because
+    # main extended the moratorium and not because the fixture stopped arming.
+    _later = (_end + datetime.timedelta(days=60)).isoformat()
+    _same = _end.isoformat()
+    if blocks_with_canonical(AFTER, _later, armed):
+        print("FAIL: a stale copy still demands while main's moratorium stands")
+        failures += 1
+    elif not blocks_with_canonical(AFTER, _same, armed):
+        print("FAIL: the guard goes inert when main's moratorium has ended too")
+        failures += 1
+    elif not blocks_with_canonical(AFTER, "none", armed):
+        print("FAIL: the guard goes inert when main cannot be read")
+        failures += 1
+    else:
+        print("PASS: past its own date the guard defers to main's, and fires "
+              "when main's has passed or cannot be read")
+        passes += 1
+
+    # The fetch parses main's real file, so the pattern must match this
+    # file's own declaration; a reworded constant would otherwise read as
+    # unreadable and quietly restore the stale-copy demand.
+    _src = open(HOOK, encoding="utf-8").read()
+    _m = hookmod._RX_CONST.search(_src)
+    if _m and _dt.date(*map(int, _m.groups())) == hookmod.MORATORIUM_END:
+        print("PASS: the canonical pattern parses the subject's own constant")
+        passes += 1
+    else:
+        print("FAIL: the canonical pattern does not parse MORATORIUM_END")
         failures += 1
 
     if _redaction_wording():

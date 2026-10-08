@@ -228,6 +228,54 @@ def moratorium_active(today=None):
     return (today if today is not None else _today()) < MORATORIUM_END
 
 
+# A STALE copy of this file cannot see an extension. The installed plugin is
+# a per-commit snapshot, so an older build still carrying an earlier
+# MORATORIUM_END computes the moratorium as over and demands the forbidden
+# request, every turn, until the plugin updates (ai-config#3141: measured
+# firing from snapshots weeks behind main, on several machines). So once the
+# local constant has passed, ask main what the date is before demanding
+# anything. The fetch runs only past expiry, so it costs nothing while the
+# moratorium stands, and its answer is cached for the day.
+#
+# Asking main can only make this guard QUIETER, and only when main itself
+# says the moratorium stands, which is the directive the hook exists to
+# follow. Disabling the fetch (the tests' env var) makes the guard louder,
+# which is the safe direction for an env-readable switch.
+CANONICAL_URL = ("https://raw.githubusercontent.com/Morrison-Lab/ai-config/"
+                 "main/hooks/no-unreviewed-pr.py")
+_RX_CONST = re.compile(
+    r"^MORATORIUM_END = datetime\.date\((\d{4}), (\d{1,2}), (\d{1,2})\)", re.M)
+
+
+def _canonical_moratorium_end():
+    """main's MORATORIUM_END, or None when it cannot be read."""
+    if os.environ.get("NO_UNREVIEWED_PR_DISABLE_LIVE_CHECK"):
+        return None
+    cache = os.path.join(tempfile.gettempdir(),
+                         f".claude-moratorium-end-{_today().isoformat()}")
+    try:
+        with open(cache, encoding="utf-8") as fh:
+            return datetime.date.fromisoformat(fh.read().strip())
+    except (OSError, ValueError):
+        pass
+    try:
+        import urllib.request
+        with urllib.request.urlopen(CANONICAL_URL, timeout=5) as resp:
+            src = resp.read(1 << 20).decode("utf-8", "replace")
+        match = _RX_CONST.search(src)
+        if not match:
+            return None
+        end = datetime.date(*map(int, match.groups()))
+    except Exception:
+        return None
+    try:
+        with open(cache, "w", encoding="utf-8") as fh:
+            fh.write(end.isoformat())
+    except OSError:
+        pass
+    return end
+
+
 # Opening a PR, or taking a draft out of draft, via the CLI. The structured
 # harness/MCP tools are matched by NAME below, not by this pattern -- a
 # command string never contains `create_pull_request`, but a doc that quotes
@@ -2579,6 +2627,9 @@ def main() -> int:
     # Checked before the transcript is read: while the moratorium stands there
     # is no request to demand, so there is nothing to scan for.
     if moratorium_active():
+        return 0
+    canonical_end = _canonical_moratorium_end()
+    if canonical_end is not None and _today() < canonical_end:
         return 0
 
     try:

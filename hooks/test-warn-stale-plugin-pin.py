@@ -54,22 +54,22 @@ def git(repo, *args):
 
 def make_root(tmp):
     root = tmp / "plugins"
-    clone = root / "marketplaces" / "Morrison-Lab"
-    clone.mkdir(parents=True)
-    git(clone, "init", "-q")
+    mkt = root / "marketplaces" / "Morrison-Lab"
+    mkt.mkdir(parents=True)
+    git(mkt, "init", "-q", "-b", "main")
     shas = []
     for i in range(3):
-        (clone / "f").write_text(str(i))
-        git(clone, "add", "f")
-        git(clone, "commit", "-q", "-m", f"c{i}")
-        shas.append(git(clone, "rev-parse", "HEAD"))
+        (mkt / "f").write_text(str(i), encoding="utf-8")
+        git(mkt, "add", "f")
+        git(mkt, "commit", "-q", "-m", f"c{i}")
+        shas.append(git(mkt, "rev-parse", "HEAD"))
     return root, shas
 
 
 def run(root, record, cwd):
     if record is not None:
         path = root / "installed_plugins.json"
-        path.write_text(record if isinstance(record, str) else json.dumps(record))
+        path.write_text(record if isinstance(record, str) else json.dumps(record), encoding="utf-8")
     env = {**os.environ, "AI_CONFIG_PLUGINS_DIR": str(root)}
     env.pop("CLAUDE_PROJECT_DIR", None)
     out = subprocess.run(
@@ -141,7 +141,7 @@ def main():
         shutil.rmtree(root / "marketplaces")
         rc, ctx, err = run(root, record({"scope": "user", "gitCommitSha": shas[0]}), project)
         check("9 missing clone reports on stderr",
-              rc == 0 and ctx == "" and "no git clone" in err, err)
+              rc == 0 and ctx == "" and "cannot compare" in err, err)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     if failures:

@@ -100,7 +100,7 @@ RX_CLAIM = re.compile(
 # addressed to "you". "Tests run gh auth login" and "warns when you run ..."
 # describe rather than ask.
 RX_ADDRESSED_PREFIX = re.compile(
-    r"^\s*(?:[^,:;]{0,60}[,:;]\s*)?(?:(?:please|now|then|just|first|next|also|and|so)\s+)*"
+    r"^\s*(?:[^,:;]{0,60}[,:;]\s*)?(?:(?:please|now|then|just|first|next|also|and|so)\s){0,3}"
     r"(?:you\s+(?:can|could|should|will\s+need\s+to|need\s+to|must|have\s+to)\s+"
     r"|(?:can|could|will)\s+you\s+|go\s+ahead\s+and\s+)?$", re.I)
 # "log in again" is about the forge only with forge context in its sentence:

@@ -41,7 +41,7 @@ def make_dir(kind):
         "github": "git@github.com:owner/repo.git",
     }
     if kind in urls:
-        subprocess.run(["git", "init", "-q", path], check=True)
+        subprocess.run(["git", "init", "-q", "-b", "main", path], check=True)
         subprocess.run(["git", "-C", path, "remote", "add", "origin", urls[kind]],
                        check=True)
     return path
@@ -156,7 +156,7 @@ NON_COMMAND_PAYLOADS = [
 def make_fake_glab(config_host):
     d = tempfile.mkdtemp(prefix="fake-glab-", dir=ROOT)
     path = os.path.join(d, "glab")
-    with open(path, "w") as handle:
+    with open(path, "w", encoding="utf-8") as handle:
         handle.write("#!/bin/sh\necho " + config_host + "\n")
     os.chmod(path, 0o755)
     return d

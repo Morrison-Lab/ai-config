@@ -1415,14 +1415,41 @@ def blocking_verdict_ts(reviewed):
 
 path_blocking = blocking_verdict_ts(rev_head)
 assert subject.is_pre_push_review_in_flight(rev_root, path_blocking) is False
-assert subject.is_push_held_by_blocking_review(rev_root, path_blocking) is True
+assert subject.is_push_held_by_blocking_review(path_blocking) is True
 assert subject.decide(rev_root, path_blocking) == ""
-# Control: a blocking verdict on a DIFFERENT commit (HEAD has moved on to a
-# fix) does not hold the push; re-dispatching the reviewer is the next step.
-# (decide() is not asserted here: #4109's in-flight scan already reads a
-# verdict for another commit as "HEAD not yet reviewed".)
-path_blocking_old = blocking_verdict_ts("0" * 40)
-assert subject.is_push_held_by_blocking_review(rev_root, path_blocking_old) is False
+# The push guard refuses on any blocking verdict, so a report with no
+# Reviewed-Commit line (or a malformed one) holds the push too.
+h_nofp, path_nofp = tempfile.mkstemp()
+with open(path_async, "r", encoding="utf-8") as src, os.fdopen(h_nofp, "w") as dst:
+    dst.write(src.read())
+    dst.write(json.dumps({
+        "type": "user",
+        "origin": {"kind": "task-notification", "task_id": "a29a955ac15b38f72"},
+        "sender": "a29a955ac15b38f72",
+        "content": "### Verdict: Needs more work\n\nNo fingerprint here.\n"
+    }) + "\n")
+assert subject.is_push_held_by_blocking_review(path_nofp) is True
+assert subject.decide(rev_root, path_nofp) == ""
+# Control: a LATER clean verdict on HEAD releases the hold, and the ordinary
+# demand to push returns.
+h_later, path_later = tempfile.mkstemp()
+with open(path_blocking, "r", encoding="utf-8") as src, os.fdopen(h_later, "w") as dst:
+    dst.write(src.read())
+    dst.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t9", "name": "Agent", "input": {"subagent_type": "adversarial-reviewer", "prompt": "Review changes on HEAD"}}]}
+    }) + "\n")
+    dst.write(json.dumps({
+        "type": "user",
+        "message": {"content": [{"type": "tool_result", "tool_use_id": "t9", "content": f"### Verdict: Ready for merge\n\nReviewed-Commit: {rev_head}\n"}]}
+    }) + "\n")
+assert subject.is_push_held_by_blocking_review(path_later) is False
+reason_later = subject.decide(rev_root, path_later)
+assert "1 commit(s) on HEAD are not on its upstream" in reason_later, reason_later
+# The switched-away-branch call site defers too: commit on a branch, switch
+# off it, and a blocking verdict still holds that branch's push.
+assert subject.is_push_deferred(rev_root, path_blocking, branch="feat-rev",
+                                session_cwd=rev_root) is True
 
 # Case 4: Errored dispatch -> not in flight
 h_err, path_err = tempfile.mkstemp()

@@ -1323,37 +1323,36 @@ def _has_completed_head_review(guard, path, head_sha):
     return False
 
 
-def is_push_held_by_blocking_review(cwd, path, branch=None):
-    """True if the latest self-review is blocking and names this HEAD.
+def is_push_held_by_blocking_review(path):
+    """True if the latest self-review in the transcript is blocking.
 
     `no-push-without-self-review.py` refuses every push while the latest
-    verdict is blocking, so demanding a push of the very commit that verdict
-    read leaves no way to end the turn while the fix round runs, typically in
-    a subagent (ai-config#3270). The work owed is the fix, not the push. Once
-    a fix commit moves HEAD past the reviewed commit, this is False again and
-    the ordinary demand returns, since re-dispatching the reviewer is then a
-    step the session can take.
+    verdict is `needs_work`, whatever commit it names and whether or not it
+    names one, so demanding a push then leaves no way to end the turn while
+    the fix round runs, typically in a subagent (ai-config#3270). The work
+    owed is the fix and a fresh review, and the push guard still enforces
+    that at the next push; this only stops asking for a push it must refuse.
+    The condition is the guard's own, read the same way, so the two cannot
+    disagree about which verdicts hold a push.
     """
-    if not path or not os.path.isfile(path) or not cwd:
+    if not path or not os.path.isfile(path):
         return False
     guard = _load_review_guard()
     if guard is None:
         return False
-    head_sha = _rev_parse(cwd, branch or "HEAD")
-    if not head_sha:
-        return False
     try:
-        verdict, reviewed_commits, _ = guard.read_latest_review(path)
-    except Exception:
+        verdict, _, _ = guard.read_latest_review(path)
+    except Exception as exc:
+        print(f"no-unshipped-commit: cannot read the latest review ({exc})",
+              file=sys.stderr)
         return False
-    return verdict == "needs_work" and any(
-        _sha_matches(sha, head_sha) for sha in reviewed_commits)
+    return verdict == "needs_work"
 
 
 def is_push_deferred(cwd, path, branch=None, session_cwd=None):
     """True when the push guard would rightly refuse the push this hook asks for."""
     return (is_pre_push_review_in_flight(cwd, path, branch=branch, session_cwd=session_cwd)
-            or is_push_held_by_blocking_review(cwd, path, branch=branch))
+            or is_push_held_by_blocking_review(path))
 
 
 def _is_verdict_covering_head(text, guard, head_sha, path=None, call_id=None):

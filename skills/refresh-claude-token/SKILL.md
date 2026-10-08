@@ -149,8 +149,7 @@ and rotates through the script.
 **Mind which account is logged in, without minting anything to find out.**
 The command mints from whichever account the local CLI is currently
 authenticated as,
-with no account picker and no confirmation naming it,
-and nothing afterwards records which account a given token came from.
+with no account picker and no confirmation naming it.
 `claude auth status` answers that on its own,
 so run it *before* deciding to rotate rather than minting a token to
 discover the answer:
@@ -158,6 +157,12 @@ discover the answer:
 ```bash
 claude auth status
 ```
+
+`scripts/rotate-claude-token.py` automatically reads the active account identity via
+`claude auth status` (or `--account <email>`) and sets the companion GitHub Actions
+variable `CLAUDE_CODE_ACCOUNT_EMAIL` at the org/repo level alongside the secret, so
+reusable review workflows (gha#1018) can name which account quota was hit when a
+review is skipped.
 
 ### 3. Rotate
 

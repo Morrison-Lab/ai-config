@@ -80,6 +80,7 @@ import subprocess
 import sys
 
 DEFAULT_SECRET = "CLAUDE_CODE_OAUTH_TOKEN"
+DEFAULT_ACCOUNT_VARIABLE = "CLAUDE_CODE_ACCOUNT_EMAIL"
 # One OAuth token and nothing else. `claude setup-token` writes its whole
 # screen to stdout, so piping it in once stored 2039 characters of prose as
 # the org secret (ai-config#4129).
@@ -89,6 +90,33 @@ DEFAULT_WORKERS = 8
 
 class GhError(RuntimeError):
     """A `gh` invocation failed. Carries the stderr for reporting."""
+
+
+def current_claude_account() -> str | None:
+    """Read the currently authenticated Claude email or org name from `claude auth status`."""
+    try:
+        res = subprocess.run(
+            ["claude", "auth", "status"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if res.returncode == 0:
+            data = json.loads(res.stdout)
+            if data.get("loggedIn"):
+                return data.get("email") or data.get("orgName")
+    except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
+        pass
+    return None
+
+
+def set_account_variable(
+    target_args: list[str],
+    account: str,
+    variable: str = DEFAULT_ACCOUNT_VARIABLE,
+) -> None:
+    """Set `variable` to `account` on the specified target (`--org` or `--repo`)."""
+    gh(["variable", "set", variable, *target_args, "--body", account])
 
 
 def gh(args: list[str], stdin: str | None = None) -> str:
@@ -277,7 +305,12 @@ def org_selected_repos(org: str, secret: str) -> list[str]:
 
 
 def rotate_org(
-    org: str, secret: str, token: str, previous: str, visibility: str
+    org: str,
+    secret: str,
+    token: str,
+    previous: str,
+    visibility: str,
+    account: str | None = None,
 ) -> str:
     """Set the org-level `secret`, then confirm `updated_at` actually moved.
 
@@ -291,6 +324,7 @@ def rotate_org(
     with no repos would keep the secret detached from every repo.
     """
     args = ["secret", "set", secret, "--org", org, "--visibility", visibility]
+    selected: list[str] = []
     if visibility == "selected":
         selected = org_selected_repos(org, secret)
         if not selected:
@@ -301,6 +335,11 @@ def rotate_org(
             )
         args.extend(["--repos", ",".join(selected)])
     gh(args, stdin=token)
+    if account:
+        var_args = ["--org", org, "--visibility", visibility]
+        if visibility == "selected" and selected:
+            var_args.extend(["--repos", ",".join(selected)])
+        set_account_variable(var_args, account)
     info = org_secret_info(org, secret)
     if info is None:
         raise GhError(f"{secret} is absent from org {org} after the write")
@@ -348,13 +387,21 @@ def find_targets(
     return sorted(targets), sorted(errors)
 
 
-def rotate(repo: str, secret: str, token: str, previous: str) -> str:
+def rotate(
+    repo: str,
+    secret: str,
+    token: str,
+    previous: str,
+    account: str | None = None,
+) -> str:
     """Set `secret` on `repo`, then confirm `updated_at` actually moved.
 
     Returns the new `updated_at`. Raises GhError if the write failed or if the
     timestamp did not change, so a silent no-op cannot pass for a rotation.
     """
     gh(["secret", "set", secret, "--repo", repo], stdin=token)
+    if account:
+        set_account_variable(["--repo", repo], account)
     current = secret_updated_at(repo, secret)
     if current is None:
         raise GhError(f"{secret} is absent from {repo} after the write")
@@ -447,7 +494,15 @@ def main() -> None:
         action="store_true",
         help="actually rotate (default: preview only, changing nothing)",
     )
+    parser.add_argument(
+        "--account",
+        help="Claude account email/identifier to record in companion variable CLAUDE_CODE_ACCOUNT_EMAIL (default: auto-detected from `claude auth status`)",
+    )
     args = parser.parse_args()
+
+    account = args.account or (
+        current_claude_account() if args.secret == DEFAULT_SECRET else None
+    )
 
     try:
         repos, owners = collect_repos(args)
@@ -457,6 +512,8 @@ def main() -> None:
     if owners:
         print(f"Owners swept: {', '.join(owners)}")
     print(f"Repos inspected: {len(repos)}")
+    if account:
+        print(f"Claude account identity to record: {account}")
 
     targets, errors = find_targets(repos, args.secret, args.workers)
     # The org sweep runs off the same owners list; with --repos there are no
@@ -524,7 +581,12 @@ def main() -> None:
         for org, previous, visibility in org_targets:
             try:
                 current = rotate_org(
-                    org, args.secret, token, previous, visibility
+                    org,
+                    args.secret,
+                    token,
+                    previous,
+                    visibility,
+                    account=account,
                 )
             except GhError as exc:
                 print(f"  FAILED  org:{org}: {exc}", file=sys.stderr)
@@ -537,7 +599,9 @@ def main() -> None:
         print(f"\nRotating {len(targets)} repo(s):")
         for repo, previous in targets:
             try:
-                current = rotate(repo, args.secret, token, previous)
+                current = rotate(
+                    repo, args.secret, token, previous, account=account
+                )
             except GhError as exc:
                 print(f"  FAILED  {repo}: {exc}", file=sys.stderr)
                 errors.append((repo, str(exc)))

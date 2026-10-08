@@ -73,7 +73,7 @@ RX_CLAIM = re.compile(
     r"re-?authenticat\w*)"
     r"|(?:\bre-?authenticat(?:e|ion)\b[^.\n]{0,40}\b(?:required|needed|necessary)\b)"
     r"|(?:\b(?:log|sign) ?in again\b)"
-    r"|(?:\b(?:token|credentials?|pat|session|login|authentication)\b"
+    r"|(?:\b(?:token|credentials?|pat|login|authentication)\b"
     r"[^.\n]{0,30}\b(?:expired|(?:been|was|were|got|is|are) revoked|gone stale|is invalid)\b)",
     re.I,
 )
@@ -151,8 +151,6 @@ def find_claim(text):
     for m in RX_CLAIM.finditer(prose):
         sent_start = max(prose.rfind(".", 0, m.start()), prose.rfind("\n", 0, m.start())) + 1
         prefix = prose[sent_start:m.start()]
-        if MARKER in m.group(0):
-            return m
         if RX_NEGATED_BEFORE.search(prefix) or RX_NEGATED_INSIDE.search(m.group(0)):
             continue
         return m

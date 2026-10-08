@@ -77,6 +77,10 @@ SHOULD_WARN = [
      "an EMPTY GITLAB_HOST names no host"),
     ("W10", "/opt/homebrew/bin/glab api user", "plain",
      "glab invoked by absolute path"),
+    ("W11", "glab -R group/project mr list", "plain",
+     "a leading -R with its value must not be read as the subcommand"),
+    ("W12", "glab --repo group/project issue list", "plain",
+     "a leading --repo with its value must not be read as the subcommand"),
 ]
 
 SHOULD_STAY_SILENT = [
@@ -103,6 +107,8 @@ SHOULD_STAY_SILENT = [
     ("S12", "gh api user", "plain", "gh is out of scope for this hook"),
     ("S13", "cd /tmp && cd " + "{selfhosted}" + " && glab api user", "plain",
      "a cd INTO the self-hosted checkout before glab"),
+    ("S15", "GITLAB_HOST=gitlab.example.org; glab api user", "plain",
+     "a bare GITLAB_HOST assignment statement sets the host"),
     ("S14", "glab api -R gitlab.example.org/g/p projects/1", "plain",
      "-R host before the endpoint"),
 ]
@@ -205,7 +211,7 @@ MUTATIONS = {
     "M4_export": (
         "dropping the export exemption makes S6 warn",
         [('if names_host(rest) or exported_host:', 'if names_host(rest):')],
-        {"S6"},
+        {"S6", "S15"},
     ),
     "M5_cwd_remote": (
         "ignoring the cwd remote makes S7 and S13 warn",
@@ -234,6 +240,11 @@ MUTATIONS = {
         "second token) warn",
         [('if prog != "glab":', 'if False:')],
         {"S12"},
+    ),
+    "M10_value_flags": (
+        "value-taking flags must be skipped when finding the subcommand",
+        [('        if tok in VALUE_FLAGS:', '        if False:')],
+        {"W11", "W12"},
     ),
 }
 

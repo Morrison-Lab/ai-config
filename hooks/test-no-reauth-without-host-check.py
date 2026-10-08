@@ -131,6 +131,10 @@ SHOULD_STAY_SILENT = [
     ("S12", [user("go"), bash("curl -s https://h.example.org/user"),
              final(CLAIM)],
      "curl to /user (GitHub-style) verifies the token"),
+    ("S13", [user("go"), FAILED, final("Do not run `glab auth login` yet; the host was wrong.")],
+     "a negated auth-login instruction"),
+    ("S14", [user("go"), FAILED, final("The session lock expired, so I retried.")],
+     "'session lock expired' is not a credential claim"),
 ]
 
 BAD_TRANSCRIPTS = ["missing", "empty", "garbage"]
@@ -251,7 +255,7 @@ MUTATIONS = {
         "negated and conditional claims must be skipped",
         [('        if RX_NEGATED_BEFORE.search(prefix) or RX_NEGATED_INSIDE.search(m.group(0)):\n'
           '            continue\n', '')],
-        {"S7", "S9"},
+        {"S7", "S9", "S13"},
     ),
     "M6_code_stripping": (
         "code spans and fences must be ignored",

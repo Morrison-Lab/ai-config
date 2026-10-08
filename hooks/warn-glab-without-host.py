@@ -64,9 +64,14 @@ HOST_SENSITIVE = {
     "cluster", "stack", "ssh-key", "gpg-key",
 }
 
+# Flags whose next token is their value, so it is not the subcommand.
+VALUE_FLAGS = {"-R", "--repo", "--hostname"}
+
 # Hosts a remote can name that glab would NOT treat as the intended GitLab.
 NOT_GITLAB_HOSTS = {"gitlab.com", "www.gitlab.com", "github.com"}
 
+# Approximation: any dotted first path segment reads as a host, so a group
+# name that merely contains a dot (`my.grp/sub/repo`) is taken for one.
 RX_HOST_REPO = re.compile(r"^(?:[a-z][a-z0-9+.-]*://)?[^/\s]+\.[^/\s]+/[^/\s]+/", re.I)
 RX_REMOTE_HOST = re.compile(
     r"^(?:[a-z][a-z0-9+.-]*://)?(?:[^@/\s]+@)?([^:/\s]+)", re.I)
@@ -100,8 +105,15 @@ def cwd_names_host(cwd):
 
 
 def glab_subcommand(rest):
-    """First non-flag token after `glab`, or None."""
+    """First non-flag token after `glab`, skipping value-taking flags."""
+    skip = False
     for tok in rest[1:]:
+        if skip:
+            skip = False
+            continue
+        if tok in VALUE_FLAGS:
+            skip = True
+            continue
         if not tok.startswith("-"):
             return tok
     return None
@@ -139,6 +151,9 @@ def find_offense(command, cwd):
                 t.startswith("GITLAB_HOST=") and t != "GITLAB_HOST=" for t in argv[1:])
             continue
         if not rest:
+            # A bare assignment statement (`GITLAB_HOST=h; glab ...`).
+            exported_host = exported_host or any(
+                t.startswith("GITLAB_HOST=") and t != "GITLAB_HOST=" for t in argv)
             continue
         prog = os.path.basename(rest[0])
         if prog in ("cd", "pushd", "popd"):

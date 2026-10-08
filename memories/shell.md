@@ -509,7 +509,8 @@ A shell's own `set -x` trace prints the expanded words too: `set -x; curl -H "Au
 - **Don't:** brief a subagent to measure listing behaviour without that count-only rule.
   Case, 2026-10-08 (this entry's own review): a reviewer told only to measure ran `ps axe -o pid,comm | grep sleep`, which printed the container's environment, a session token included, into its transcript.
 
-[`hooks/flag-argv-printing-process-listing.py`](../hooks/flag-argv-printing-process-listing.py) warns, without blocking, on the argv-printing forms above, including through `xargs`, `ssh`, `docker exec`, and `$(...)`.
+[`hooks/flag-argv-printing-process-listing.py`](../hooks/flag-argv-printing-process-listing.py) warns, without blocking, on the procps `ps`, `pgrep`, `pstree`, `top` and `/proc` forms above, including through `xargs`, `ssh`, `docker exec`, and `$(...)`.
+It does not read `set -x`, and it models procps rather than macOS or busybox `ps`.
 Its docstring lists the forms it cannot see, such as `eval "$cmd"`.
 
 ## Stop a process by its own handle, not by image name

@@ -43,8 +43,9 @@ lines or environments:
              saved `c` on, plain `top -b` prints argv and is not caught
              (listed under KNOWN HOLES)
     a read of `/proc/<pid>/cmdline` or `/proc/<pid>/environ` (also under
-             `task/<tid>/`), unless the command only tests for the file
-             (`test`, `[`, `ls`, `grep -l/-L/-c/-q`)
+             `task/<tid>/`), unless the command only names the file as an
+             operand of a tester (`test`, `[`, `[[`, `ls`, `stat`,
+             `readlink`, `realpath`, `echo`, `printf`, `grep -l/-L/-c/-q`)
 
 A lister is found past wrappers (`sudo`, `timeout 5`, `watch`, `xargs`,
 `setsid`, `flock <file>`, `ssh <host>`, `busybox`) and past
@@ -319,9 +320,11 @@ def _ps_prints_argv(args, busybox=False):
             continue
         cluster = tok[1:] if dashed else tok
         value_opts = PS_UNIX_VALUE_OPTS if dashed else PS_BSD_VALUE_OPTS
-        if dashed and "x" in cluster and re.fullmatch(r"[auxwe]+", cluster):
-            # procps reads `ps -aux` as BSD `aux` (UNIX ps has no `-x`); a
-            # cluster carrying a value option (`-Ux`, `-Cxterm`) is not this.
+        if (dashed and "x" in cluster and cluster.isalpha()
+                and cluster[0] not in PS_UNIX_VALUE_OPTS - {"u"}):
+            # procps reads `ps -aux` (and `-auxf`, `-aufx`) as BSD: UNIX ps
+            # has no `-x`. A cluster opening with a value option (`-Ux`,
+            # `-Cxterm`, `-pxx`) names a user, command or PID instead.
             dashed, value_opts = False, PS_BSD_VALUE_OPTS
         bsd = bsd or not dashed
         for pos, ch in enumerate(cluster):

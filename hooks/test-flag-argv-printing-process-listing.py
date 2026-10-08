@@ -131,6 +131,10 @@ for cmd in [
     "ps aux | awk '{print $12}'",
     # review round 7: a tester fed a /proc file on stdin prints it
     "xargs -0 -n1 echo < /proc/1/environ",
+    # review round 8 (measured): a dashed BSD cluster with trailing letters
+    "ps -auxf",
+    "ps -aufx",
+    "ps -ux",
     "xargs -0 printf '%s\\n' < /proc/1/environ",
     "cat /proc/$pid/cmdline",
     "ps aux | grep foo | awk '{print $2}'",
@@ -241,6 +245,7 @@ for cmd in [
     "ps --version",
     "ps $$",
     "echo /proc/1/cmdline",
+    "ps -axo pid,comm",
     "make >/dev/null; ps aux | wc -l",
     "ps aux 2>&1 | wc -l",
     "ps -p 1 2>/dev/null",

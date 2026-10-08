@@ -867,10 +867,10 @@ PUSH_REMEDY = ("Push the branch, open or verify its PR, then report status. "
 # The push guard refuses every push while the latest self-review is blocking,
 # so once a later commit has moved past the commit that review read, the next
 # step the session can take is a fresh review, not the push (ai-config#3270).
-REVIEW_REMEDY = ("The latest adversarial self-review is blocking and does not "
-                 "name this commit, so a push will be refused: address its "
-                 "findings, commit, re-dispatch the reviewer, then push and "
-                 "open or verify the PR.")
+REVIEW_REMEDY = ("The latest adversarial self-review is blocking, so a push "
+                 "will be refused until a fresh review comes back clean: "
+                 "address or rebut its findings, commit any fix, re-dispatch "
+                 "the reviewer, then push and open or verify the PR.")
 
 
 _REVIEW_GUARD = None
@@ -1391,8 +1391,14 @@ def is_push_held_by_blocking_review(path, cwd=None, branch=None):
 
 def is_push_deferred(cwd, path, branch=None, session_cwd=None):
     """True when the push guard would rightly refuse the push this hook asks for."""
-    return (is_pre_push_review_in_flight(cwd, path, branch=branch, session_cwd=session_cwd)
-            or is_push_held_by_blocking_review(path, cwd=cwd, branch=branch))
+    if is_pre_push_review_in_flight(cwd, path, branch=branch, session_cwd=session_cwd):
+        return True
+    if is_push_held_by_blocking_review(path, cwd=cwd, branch=branch):
+        print("no-unshipped-commit: unpushed commits are held by a blocking "
+              "self-review; the findings and a fresh review are still owed "
+              "(ai-config#3270).", file=sys.stderr)
+        return True
+    return False
 
 
 def _is_verdict_covering_head(text, guard, head_sha, path=None, call_id=None):

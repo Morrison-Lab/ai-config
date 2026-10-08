@@ -2009,12 +2009,26 @@ def scan(path):
     # push never re-arms review for a PR that can no longer take one.
     live = {}
     text = ""
+    # A compacted session's transcript can carry its pre-compaction history
+    # twice (measured on ai-config#2996: 4000 of 5135 `uuid`s repeated). Read
+    # unguarded, each `gh pr create` then arms two obligations while one
+    # request clears only one, so the guard re-fires on a discharged PR. A
+    # line whose `uuid` was already read is the same event, not a new one.
+    # Lines without a `uuid` are kept: nothing identifies them as repeats.
+    seen_uuids = set()
     with open(path, encoding="utf-8", errors="ignore") as fh:
         for line in fh:
             try:
                 m = json.loads(line)
             except Exception:
                 continue
+            if not isinstance(m, dict):
+                continue
+            uuid = m.get("uuid")
+            if isinstance(uuid, str) and uuid:
+                if uuid in seen_uuids:
+                    continue
+                seen_uuids.add(uuid)
             blocks = (m.get("message") or {}).get("content") or m.get("content") or []
             if isinstance(blocks, str):
                 blocks = [{"type": "text", "text": blocks}]

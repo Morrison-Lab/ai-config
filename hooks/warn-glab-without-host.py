@@ -25,6 +25,12 @@ A `glab` subcommand that talks to a GitLab project (`api`, `issue`, `mr`,
     earlier in the same command) is not inside a git repository whose remote
     is a host other than gitlab.com / github.com.
 
+Known limits, accepted: a remote on any host other than gitlab.com or
+github.com (bitbucket.org, codeberg.org) counts as naming a host, because
+glab would try it; a `GITLAB_HOST` in the hook's own process environment
+silences the warning, but one exported only in the user's later shell state
+cannot be seen.
+
 ## Why this warns rather than blocks
 
 Plenty of correct invocations match: a user whose only GitLab is gitlab.com,
@@ -166,7 +172,7 @@ def find_offense(command, cwd):
             continue
         if names_host(rest) or exported_host:
             continue
-        if env_value(env, "GITLAB_HOST"):
+        if env_value(env, "GITLAB_HOST") or os.environ.get("GITLAB_HOST"):
             continue
         if cur_dir is not None and cwd_names_host(cur_dir):
             continue

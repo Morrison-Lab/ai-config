@@ -127,10 +127,12 @@ NON_COMMAND_PAYLOADS = [
 ]
 
 
-def run_hook(hook_path, data):
+def run_hook(hook_path, data, extra_env=None):
+    env = {k: v for k, v in os.environ.items() if k != "GITLAB_HOST"}
+    env.update(extra_env or {})
     proc = subprocess.run(
         [sys.executable, hook_path], input=json.dumps(data),
-        capture_output=True, text=True)
+        capture_output=True, text=True, env=env)
     if proc.returncode != 0:
         sys.exit(f"FATAL: hook exited {proc.returncode} on {data!r}\n"
                  f"{proc.stderr.strip()}")
@@ -174,6 +176,13 @@ for data, desc in NON_COMMAND_PAYLOADS:
     wrong += got != "silent"
     print(f"  {got:<6} {desc}")
 
+# A GITLAB_HOST inherited by the hook process names the host.
+inherited = run_hook(HOOK, payload("glab api user", "plain"),
+                     {"GITLAB_HOST": "gitlab.example.org"})
+inherit_ok = not inherited.strip()
+print(f"\n  {'ok  ' if inherit_ok else 'WRONG'} INHERITED  GITLAB_HOST in the hook environment silences the warning")
+wrong += not inherit_ok
+
 # The message must carry the remedy, and an Antigravity run must not double-print.
 out = json.loads(run_hook(HOOK, payload("glab api user", "plain")))
 ctx = out["hookSpecificOutput"]["additionalContext"]
@@ -182,7 +191,7 @@ print(f"\n  {'ok  ' if message_ok else 'WRONG'} MESSAGE  names --hostname and se
 wrong += not message_ok
 
 total = len(SHOULD_WARN) + len(SHOULD_STAY_SILENT) + len(NON_COMMAND_PAYLOADS)
-print(f"\n{total - (wrong - (not message_ok))}/{total} correct"
+print(f"\n{total + 2 - wrong}/{total + 2} correct"
       + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
 
 EXPECTED = {cid: "WARN" for cid, *_ in SHOULD_WARN}
@@ -205,7 +214,7 @@ MUTATIONS = {
     ),
     "M3_env_prefix": (
         "dropping the GITLAB_HOST prefix exemption makes S5 warn",
-        [('if env_value(env, "GITLAB_HOST"):', 'if False:')],
+        [('env_value(env, "GITLAB_HOST") or ', '')],
         {"S5"},
     ),
     "M4_export": (

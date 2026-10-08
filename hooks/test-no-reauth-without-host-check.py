@@ -90,6 +90,8 @@ SHOULD_WARN = [
      "the message is a reply-tool payload, not an assistant text block"),
     ("W9", [user("go"), FAILED, final("Your credentials were revoked, it seems.")],
      "'credentials were revoked' with no check"),
+    ("W11", [user("go"), FAILED, final("Please run glab auth login and tell me when done.")],
+     "the login command written without backticks"),
     ("W10", [user("go"), FAILED, final("Looks like you must log in again.")],
      "'log in again' as an instruction"),
 ]
@@ -131,6 +133,11 @@ SHOULD_STAY_SILENT = [
     ("S12", [user("go"), bash("curl -s https://h.example.org/user"),
              final(CLAIM)],
      "curl to /user (GitHub-style) verifies the token"),
+    ("S15", [user("go"), FAILED, final("If glab says Unauthenticated, run `glab auth login`.")],
+     "a sentence that opens with a conditional"),
+    ("S16", [user("go"), bash("curl -s https://h.example.org/api/v4/user"),
+             final(CLAIM), user("next"), bash("ls")],
+     "an earlier verified turn's claim is not re-evaluated in a later tool-only turn"),
     ("S13", [user("go"), FAILED, final("Do not run `glab auth login` yet; the host was wrong.")],
      "a negated auth-login instruction"),
     ("S14", [user("go"), FAILED, final("The session lock expired, so I retried.")],
@@ -253,9 +260,9 @@ MUTATIONS = {
     ),
     "M5_negation": (
         "negated and conditional claims must be skipped",
-        [('        if RX_NEGATED_BEFORE.search(prefix) or RX_NEGATED_INSIDE.search(m.group(0)):\n'
-          '            continue\n', '')],
-        {"S7", "S9", "S13"},
+        [('        if (RX_NEGATED_BEFORE.search(prefix) or RX_CONDITIONAL_OPENING.search(prefix)\n'
+          '                or RX_NEGATED_INSIDE.search(m.group(0))):', '        if False:')],
+        {"S7", "S9", "S13", "S15"},
     ),
     "M6_code_stripping": (
         "code spans and fences must be ignored",
@@ -287,6 +294,11 @@ MUTATIONS = {
         [('                        if REPLY_TOOL_RX.search(b.get("name") or ""):',
           '                        if False:')],
         {"W8"},
+    ),
+    "M11_text_reset": (
+        "a new prompt must discard the earlier turn's final message",
+        [('                    text = ""  # and an earlier turn\'s message is not this turn\'s', '                    pass')],
+        {"S16"},
     ),
 }
 

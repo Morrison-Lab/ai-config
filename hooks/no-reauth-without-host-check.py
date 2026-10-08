@@ -35,6 +35,10 @@ for. A code span or fenced block whose whole content is an auth-login command
 is therefore kept as a marker, and only the imperative form in front of it
 ("run", "re-run", "try", "use") counts.
 
+Known limit, accepted: the check only needs a host to be NAMED, so a
+`curl https://gitlab.com/api/v4/user` counts even when the intended host is
+another; the guard cannot know which host was intended.
+
 ## Why this warns rather than blocks
 
 Sometimes re-authentication really is needed and the check was made some
@@ -67,7 +71,8 @@ MARKER = "AUTHCMD"
 REPLY_TOOL_RX = re.compile(r"(^|__)(reply|post_message|update_message)$", re.I)
 
 RX_CLAIM = re.compile(
-    r"(?:\b(?:re-?run|run|execute|try|use)\W{0,3}" + MARKER + r")"
+    r"(?:\b(?:re-?run|run|execute|try|use)\W{0,3}(?:" + MARKER +
+    r"|(?:glab|gh)\s+auth\s+login\b))"
     r"|(?:\b(?:please |you(?:'ll| will)? (?:need|have) to |you need to |"
     r"you must |can you |could you |will you |go ahead and |just )"
     r"re-?authenticat\w*)"
@@ -82,6 +87,8 @@ RX_CLAIM = re.compile(
 RX_NEGATED_BEFORE = re.compile(
     r"(?:\bnot|n['\N{RIGHT SINGLE QUOTATION MARK}]t|\bnever|\bno longer|\bif|\bwhether|\bunless|"
     r"\bin case|\bcheck(?:ing)? (?:if|whether))\s+(?:\w+\s+){0,4}$", re.I)
+# A sentence that OPENS with a conditional ("If glab says X, run ...").
+RX_CONDITIONAL_OPENING = re.compile(r"^\s*(?:if|unless|whether|should|in case)\b", re.I)
 RX_NEGATED_INSIDE = re.compile(r"\b(?:not|never|n['\N{RIGHT SINGLE QUOTATION MARK}]t)\s+(?:\w+\s+)?(?:expired|revoked)", re.I)
 
 RX_HOST_ASSIGN = re.compile(r"\b(?:GITLAB_HOST|GH_HOST)=\S+")
@@ -151,7 +158,8 @@ def find_claim(text):
     for m in RX_CLAIM.finditer(prose):
         sent_start = max(prose.rfind(".", 0, m.start()), prose.rfind("\n", 0, m.start())) + 1
         prefix = prose[sent_start:m.start()]
-        if RX_NEGATED_BEFORE.search(prefix) or RX_NEGATED_INSIDE.search(m.group(0)):
+        if (RX_NEGATED_BEFORE.search(prefix) or RX_CONDITIONAL_OPENING.search(prefix)
+                or RX_NEGATED_INSIDE.search(m.group(0))):
             continue
         return m
     return None
@@ -182,6 +190,7 @@ def scan(path):
                 if any(b.get("type") == "text" and b.get("text", "").strip()
                        for b in _blocks(m)):
                     verified = False  # a new real prompt starts a new turn
+                    text = ""  # and an earlier turn's message is not this turn's
             elif role == "assistant":
                 for b in _blocks(m):
                     btype = b.get("type")

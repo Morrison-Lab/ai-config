@@ -1996,7 +1996,41 @@ _BLOCKING_SECTION_NOUN = re.compile(
 # opening a non-blocking section, such as "**Non-blocking:**".
 _SECTION_STOP = (r"(?m)^ {0,3}(?:#{1,%d}(?:[ \t]|$)"
                  r"|(?:[-*+][ \t]+)?[*_]*[ \t]*"
-                 r"(?:non-?blocking|optional|nits?|minor|suggestions?)\b[^\n]*:)")
+                 r"(?:non-?blocking|optional|nits?|minor|suggestions?)"
+                 r"(?:[ \t]+(?:findings|issues|items|notes|comments))?[*_]*[ \t]*:)")
+_LIST_ITEM = re.compile(r"^ {0,3}(?:[-*+]|\d{1,9}[.)])[ \t]")
+_BOLD_LABEL = re.compile(r"^ {0,3}(?:[-*+][ \t]+)?(?:\*\*|__)[^*_\n]+:")
+
+
+def _label_section_lines(scan_body: str, section_start: int,
+                         list_indent: int) -> list:
+    """Lines that belong to a "Blocking findings:" label.
+
+    The label owns the lines directly under it and, across blank lines, any
+    loose list items or indented blocks that continue them; a new prose
+    paragraph, a heading, or another bold label ends it (ai-config#4428).
+    When the label is itself a list item (*list_indent* >= 0), a sibling or
+    outer item ends it, while a nested item stays inside.
+    """
+    out, blank = [], False
+    for raw in scan_body[section_start:].splitlines():
+        line = raw.rstrip()
+        if not line.strip():
+            blank = True
+            continue
+        if re.match(_SECTION_STOP % 6, line, re.IGNORECASE):
+            break
+        sibling = (list_indent >= 0 and _LIST_ITEM.match(line)
+                   and len(line) - len(line.lstrip()) <= list_indent)
+        if _BOLD_LABEL.match(line) or sibling:
+            break
+        if blank and not (_LIST_ITEM.match(line) or line.startswith("    ")
+                          or line.startswith("\t")):
+            break
+        blank = False
+        if not re.match(r"^[-*_\s]{3,}$", line):
+            out.append(line.strip())
+    return out
 
 
 def _blocking_section_lines(scan_body: str, section_start: int,
@@ -2036,14 +2070,15 @@ def _is_empty_blocking_section(scan_body: str, match_start: int,
     lead = scan_body[line_start:match_start]
     rest = scan_body[noun.end():line_end].lstrip("*_: \t-")
     heading = re.match(r"^ {0,3}(#{1,6})[ \t]+[*_]*$", lead)
+    label = re.match(r"^ {0,3}([-*+][ \t]+)?[*_]*$", lead)
     if heading:
-        level = len(heading.group(1))
-    elif re.match(r"^ {0,3}(?:[-*+][ \t]+)?[*_]*$", lead):
-        # A label's section runs to the next heading of any level.
-        level = 6
+        lines = _blocking_section_lines(scan_body, line_end + 1,
+                                        len(heading.group(1)))
+    elif label:
+        indent = (len(lead) - len(lead.lstrip()) if label.group(1) else -1)
+        lines = _label_section_lines(scan_body, line_end + 1, indent)
     else:
         return False
-    lines = _blocking_section_lines(scan_body, line_end + 1, level)
     if rest:
         return not lines and bool(_EMPTY_DECLARATION.match(rest))
     if len(lines) != 1:

@@ -2510,6 +2510,16 @@ def main() -> int:
         ("label then another label", "**Blocking findings:** None.\n\n**Non-blocking:** a nit."),
         ("heading None, then a non-blocking label",
          "### Blocking findings\n\nNone.\n\n**Non-blocking findings:**\n- a nit."),
+        # Ordinary label-form reviews the round-2 fix wrongly made not-clean.
+        ("label None, blank, bold summary",
+         "**Blocking findings:** None.\n\n**Summary:** small and well tested."),
+        ("label None, blank, prose", "Blocking findings: None.\n\nOverall it looks good."),
+        ("label as list item, sibling items",
+         "- Blocking findings: None\n- Tests: pass\n- Docs: updated"),
+        ("label None, blank, checked list",
+         "Blocking findings: None\n\nChecked:\n- tests\n- docs"),
+        ("label None, next line bold label",
+         "**Blocking findings:** None.\n**Verified:** all 3 files read."),
     ):
         check(f"classify_verdict: empty Blocking findings ({_label}) stays clean",
               checker.classify_verdict(_body + _tail, "") == "clean")
@@ -2537,6 +2547,10 @@ def main() -> int:
         ("heading: None, blank, indented code starting '#'",
          "### Blocking findings: None\n\n    # CRITICAL: overflow\n"
          "    memcpy(dest, src, len);"),
+        ("label as list item, nested item under it",
+         "- Blocking findings: None\n  - Data loss on save."),
+        ("heading None, then a 'Minor regression:' prose line",
+         "### Blocking findings: None\nMinor regression: deletes user data."),
     ):
         check(f"classify_verdict: Blocking findings ({_label}) stays not-clean",
               checker.classify_verdict(_body + _tail, "") == "not-clean")

@@ -1117,6 +1117,106 @@ REDIRECTS_REPO = re.compile(r"\A(?:GIT_DIR|GIT_WORK_TREE|GIT_NAMESPACE)=")
 # Distinct from None, which means "the hook's own cwd" and is a real answer.
 REDIRECTED = object()
 
+# A git alias whose expansion this guard could not read (a `!` shell alias, an
+# unparsable value, a chain too deep, or the time budget running out). The
+# alias may well push, so `main` refuses rather than guessing (ai-config#1993).
+UNRESOLVED_ALIAS = object()
+
+# git runs a builtin before it consults `alias.*`, so a builtin name can never be
+# an alias and needs no config read. The set only has to be a subset of git's
+# builtins: a name missing from it costs one `git config` call, while a name
+# wrongly listed would hide an alias, so external commands such as `lfs` are not
+# in it. `push` is absent because the sibling's `_argv_push` decides it.
+_GIT_BUILTINS = frozenset("""
+    add am apply archive bisect blame branch bundle cat-file check-ignore
+    checkout cherry cherry-pick clean clone commit config count-objects
+    describe diff diff-files diff-index diff-tree fetch for-each-ref
+    format-patch fsck gc grep hash-object help init log ls-files ls-remote
+    ls-tree merge merge-base mv name-rev notes pull range-diff rebase reflog
+    remote reset restore rev-list rev-parse revert rm shortlog show show-ref
+    sparse-checkout stash status submodule switch symbolic-ref tag update-ref
+    var version worktree write-tree
+""".split())
+
+# git itself stops a self-referencing chain; this bound only caps the work.
+_ALIAS_DEPTH = 8
+
+
+def _git_subcommand_index(argv: list[str]) -> int | None:
+    """Index of the subcommand in a `git ...` argv, skipping global options.
+
+    Mirrors the skip in the sibling's `_argv_push`, so both read the same word.
+    """
+    if not argv or argv[0] != "git":
+        return None
+    i = 1
+    while i < len(argv):
+        a = argv[i]
+        if a in ("-C", "-c", "--git-dir", "--work-tree", "--namespace"):
+            i += 2
+            continue
+        if a.startswith("-"):
+            i += 1
+            continue
+        return i
+    return None
+
+
+def _expand_push_alias(rest: list[str], env: list[str],
+                       directory: str | None):
+    """The push argv a git alias expands to, None, or UNRESOLVED_ALIAS.
+
+    `_argv_push` matches only the literal subcommand `push`, so `git p origin`
+    under `alias.p = push` reached no guard at all (ai-config#1993). This reads
+    `alias.<word>` through `_run_git`, under the push's own environment, its own
+    `-c` options, and its `-C` directory, then re-runs the push test on the
+    expansion. A chain (`alias.a = b`, `alias.b = push`) is followed.
+
+    Returns None when the command is not an alias of a push. Refuses rather than
+    guesses when the expansion cannot be read: a `!` alias naming `push` runs
+    an arbitrary shell command, and running out of time must not fail open the
+    way an exception reaching `main` does. A `!` alias that hides the word
+    (`!git p$x`) is not caught.
+
+    The config is read in the push's `-C` directory, else the hook's cwd. A
+    repository-local alias defined only in a directory an earlier `cd` moved to
+    is not seen; a global or `-c` alias, the common case, is.
+    """
+    seen = 0
+    while True:
+        i = _git_subcommand_index(rest)
+        if i is None:
+            return None
+        word = rest[i]
+        if word in _GIT_BUILTINS or word == "push":
+            return None
+        if seen >= _ALIAS_DEPTH:
+            return UNRESOLVED_ALIAS
+        seen += 1
+        try:
+            value = _run_git(directory, env, *_config_overrides(rest[:i]),
+                             "config", "--get", f"alias.{word}")
+        except TimeoutError:
+            return UNRESOLVED_ALIAS
+        if value is None:
+            return None
+        if value.startswith("!"):
+            # A shell alias cannot be parsed reliably. Refuse when it names a
+            # push, and let `!git log --graph` and its kind through, since
+            # refusing every shell alias would deny commands that push nothing.
+            if re.search(r"\bpush\b", value):
+                return UNRESOLVED_ALIAS
+            return None
+        try:
+            expansion = shlex.split(value)
+        except ValueError:
+            return UNRESOLVED_ALIAS
+        if not expansion:
+            return None
+        rest = rest[:i] + expansion + rest[i + 1:]
+        if _SIBLING._argv_push(rest):
+            return rest
+
 
 # POSIX shlex treats an unquoted backslash as an escape, so
 # `git -C C:\Users\foo\AppData\Local\Temp\npwsr-abc push origin main` parses as
@@ -1179,8 +1279,34 @@ def _posixize_windows_paths(command: str) -> str:
     return "".join(out)
 
 
-def iter_pushes(command: str):
+def _alias_config_dir(rest: list[str], env: list[str]) -> str | None:
+    """Where to read `alias.*` for this git command: its `-C` path, else cwd.
+
+    A redirected repository is read from cwd too: if the alias does push, the
+    push is then refused as REDIRECTED, so precision there buys nothing.
+    """
+    if any(REDIRECTS_REPO.match(tok) for tok in env):
+        return None
+    i = _git_subcommand_index(rest) or len(rest)
+    directory = None
+    j = 1
+    while j < i - 1:
+        if rest[j] == "-C":
+            value = _native_path(rest[j + 1])
+            directory = os.path.join(directory, value) if directory else value
+            j += 2
+            continue
+        j += 1
+    return directory
+
+
+def iter_pushes(command: str, resolve_aliases: bool = False):
     """Yield (env, argv, directory) for each `git push` simple command.
+
+    With `resolve_aliases`, a git command whose subcommand is an alias of
+    `push` counts too, with `argv` the expanded form, and one whose alias
+    cannot be read yields `directory` UNRESOLVED_ALIAS (ai-config#1993). It is
+    off by default because it runs git, which only `main` budgets for.
 
     `directory` is the push's own absolute `-C`, else the push's relative `-C`
     resolved within the directory a `cd`/`pushd` put it in (subshell scoping
@@ -1239,8 +1365,18 @@ def iter_pushes(command: str):
         if not argv:
             continue
         env, rest = _strip_env(argv)
-        if not rest or not _SIBLING._argv_push(rest):
+        if not rest:
             continue
+        if not _SIBLING._argv_push(rest):
+            if not resolve_aliases:
+                continue
+            expanded = _expand_push_alias(rest, env, _alias_config_dir(rest, env))
+            if expanded is None:
+                continue
+            if expanded is UNRESOLVED_ALIAS:
+                pushes.append((env, rest, UNRESOLVED_ALIAS))
+                continue
+            rest = expanded
         directory = None
         if any(REDIRECTS_REPO.match(tok) for tok in env):
             directory = REDIRECTED
@@ -1270,8 +1406,8 @@ def iter_pushes(command: str):
         hints = [None] * len(pushes)
     for (env, rest, directory), hint in zip(pushes, hints):
         effective_dir = directory
-        if effective_dir is REDIRECTED:
-            yield env, rest, REDIRECTED
+        if effective_dir is REDIRECTED or effective_dir is UNRESOLVED_ALIAS:
+            yield env, rest, effective_dir
             continue
         if effective_dir is None:
             effective_dir = hint
@@ -3015,9 +3151,16 @@ def main() -> int:
             return 0
 
         _DEADLINE[0] = time.monotonic() + BUDGET_SECONDS
-        for env, argv, directory in iter_pushes(cmd):
+        for env, argv, directory in iter_pushes(cmd, resolve_aliases=True):
             if has_allow_override(env):
                 continue
+            if directory is UNRESOLVED_ALIAS:
+                deny("this git command runs an alias whose expansion this guard "
+                     "could not read (a `!` shell alias naming `push`, an "
+                     "unparsable value, or a chain too deep), so whether it "
+                     "pushes, and what, cannot be determined; spell the push "
+                     "out as `git push ...`")
+                return 0
             if _has_config_env(argv):
                 deny("this push carries `--config-env`, whose value comes from "
                      "an environment variable this guard cannot read, so what "

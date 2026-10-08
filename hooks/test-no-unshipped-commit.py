@@ -1398,6 +1398,32 @@ assert subject.is_pre_push_review_in_flight(rev_root, path_verdict) is False
 reason_after = subject.decide(rev_root, path_verdict)
 assert "1 commit(s) on HEAD are not on its upstream" in reason_after, reason_after
 
+# Case 3b (ai-config#3270): the verdict on HEAD is BLOCKING. The push guard
+# refuses every push until the findings are fixed, so demanding a push of the
+# reviewed commit deadlocks the turn while the fix round runs; stay quiet.
+def blocking_verdict_ts(reviewed):
+    h, p = tempfile.mkstemp()
+    with open(path_async, "r", encoding="utf-8") as src, os.fdopen(h, "w") as dst:
+        dst.write(src.read())
+        dst.write(json.dumps({
+            "type": "user",
+            "origin": {"kind": "task-notification", "task_id": "a29a955ac15b38f72"},
+            "sender": "a29a955ac15b38f72",
+            "content": f"### Verdict: Needs more work\n\nReviewed-Commit: {reviewed}\n"
+        }) + "\n")
+    return p
+
+path_blocking = blocking_verdict_ts(rev_head)
+assert subject.is_pre_push_review_in_flight(rev_root, path_blocking) is False
+assert subject.is_push_held_by_blocking_review(rev_root, path_blocking) is True
+assert subject.decide(rev_root, path_blocking) == ""
+# Control: a blocking verdict on a DIFFERENT commit (HEAD has moved on to a
+# fix) does not hold the push; re-dispatching the reviewer is the next step.
+# (decide() is not asserted here: #4109's in-flight scan already reads a
+# verdict for another commit as "HEAD not yet reviewed".)
+path_blocking_old = blocking_verdict_ts("0" * 40)
+assert subject.is_push_held_by_blocking_review(rev_root, path_blocking_old) is False
+
 # Case 4: Errored dispatch -> not in flight
 h_err, path_err = tempfile.mkstemp()
 with os.fdopen(h_err, "w") as stream:

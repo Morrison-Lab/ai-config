@@ -1323,6 +1323,39 @@ def _has_completed_head_review(guard, path, head_sha):
     return False
 
 
+def is_push_held_by_blocking_review(cwd, path, branch=None):
+    """True if the latest self-review is blocking and names this HEAD.
+
+    `no-push-without-self-review.py` refuses every push while the latest
+    verdict is blocking, so demanding a push of the very commit that verdict
+    read leaves no way to end the turn while the fix round runs, typically in
+    a subagent (ai-config#3270). The work owed is the fix, not the push. Once
+    a fix commit moves HEAD past the reviewed commit, this is False again and
+    the ordinary demand returns, since re-dispatching the reviewer is then a
+    step the session can take.
+    """
+    if not path or not os.path.isfile(path) or not cwd:
+        return False
+    guard = _load_review_guard()
+    if guard is None:
+        return False
+    head_sha = _rev_parse(cwd, branch or "HEAD")
+    if not head_sha:
+        return False
+    try:
+        verdict, reviewed_commits, _ = guard.read_latest_review(path)
+    except Exception:
+        return False
+    return verdict == "needs_work" and any(
+        _sha_matches(sha, head_sha) for sha in reviewed_commits)
+
+
+def is_push_deferred(cwd, path, branch=None, session_cwd=None):
+    """True when the push guard would rightly refuse the push this hook asks for."""
+    return (is_pre_push_review_in_flight(cwd, path, branch=branch, session_cwd=session_cwd)
+            or is_push_held_by_blocking_review(cwd, path, branch=branch))
+
+
 def _is_verdict_covering_head(text, guard, head_sha, path=None, call_id=None):
     """True if text contains a review report covering head_sha."""
     found, shas = guard.parse_report_all(text or "")
@@ -1678,7 +1711,7 @@ def decide(cwd, path):
     if not cwd:
         if not pending:
             return ""
-        if is_pre_push_review_in_flight(cwd, path):
+        if is_push_deferred(cwd, path):
             return ""
         return ("A commit was made with no later push or PR creation, and "
                 "repository state is unavailable to check. " + PUSH_REMEDY)
@@ -1691,13 +1724,13 @@ def decide(cwd, path):
         if count is None:
             if not pending:
                 return ""
-            if is_pre_push_review_in_flight(cwd, path):
+            if is_push_deferred(cwd, path):
                 return ""
             return ("The unshipped count for this branch is undefined --- no "
                     "upstream is configured, or git failed to answer --- and the "
                     "transcript shows a commit with no later push or PR "
                     "creation. " + PUSH_REMEDY)
-        if is_pre_push_review_in_flight(cwd, path):
+        if is_push_deferred(cwd, path):
             return ""
         return f"{count} commit(s) on HEAD are not on its upstream. {PUSH_REMEDY}"
 
@@ -1747,10 +1780,10 @@ def decide(cwd, path):
             checked_out_branches.add(wt_branch)
         count = unpushed_count(wt_path)
         if count is not None and count > 0:
-            if not is_pre_push_review_in_flight(wt_path, path, branch=wt_branch, session_cwd=cwd):
+            if not is_push_deferred(wt_path, path, branch=wt_branch, session_cwd=cwd):
                 unpushed_wts.append((wt, count))
         elif count is None:
-            if not is_pre_push_review_in_flight(wt_path, path, branch=wt_branch, session_cwd=cwd):
+            if not is_push_deferred(wt_path, path, branch=wt_branch, session_cwd=cwd):
                 undefined_wts.append(wt)
 
     # Check switched-away branches (local branches this session committed on,
@@ -1765,12 +1798,12 @@ def decide(cwd, path):
             if upstream:
                 b_count = unpushed_count_branch(cwd, branch, upstream)
                 if b_count is not None and b_count > 0:
-                    if not is_pre_push_review_in_flight(cwd, path, branch=branch, session_cwd=cwd):
+                    if not is_push_deferred(cwd, path, branch=branch, session_cwd=cwd):
                         unpushed_branches.append((branch, b_count))
             elif pending:
                 b_count = unpushed_commits_against_remotes(cwd, branch)
                 if b_count is not None and b_count > 0:
-                    if not is_pre_push_review_in_flight(cwd, path, branch=branch, session_cwd=cwd):
+                    if not is_push_deferred(cwd, path, branch=branch, session_cwd=cwd):
                         unpushed_branches.append((branch, b_count))
 
     if unpushed_wts or unpushed_branches or (pending and undefined_wts):

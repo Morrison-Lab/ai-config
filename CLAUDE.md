@@ -778,6 +778,18 @@ and reject.
 
 [`shared/workflow/metacognitive-monitoring.md`](shared/workflow/metacognitive-monitoring.md)
 
+## Check it; don't hedge about it
+
+Never say "likely", "probably", "presumably", "I think" or "should be" about something you can check.
+A PR's merge state, a check's result, whether an issue is open and whether a file exists are each one call away.
+Make the call, then state the result (Ezra, 2026-10-08).
+If the item cannot be checked from this session, say that plainly instead of guessing.
+
+- **Do:** read the PR or check, then write "it is merged" or "two checks are still running".
+- **Don't:** write "it is probably waiting on CI" when the check runs are one read away.
+
+`hooks/warn-hedged-checkable-claim.py` warns, never blocks, when a hedge shares a sentence with a PR or issue reference, a CI or check word, or merged, open or closed, in a reply or a GitHub comment.
+
 ## Question the assignment, not only the claims
 
 The rule above governs **claims** --- the ones you generate as much as the ones

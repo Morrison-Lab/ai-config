@@ -2359,7 +2359,69 @@ def _handback_report_text(transcript_path: str, call_id, res_text: str) -> str |
     return _last_subagent_handback_message(subagent_jsonl)
 
 
-def read_latest_review(transcript_path: str) -> tuple[str | None, list[str], bool]:
+def _id_is_tracked(sender_id: str, tracked: set[str]) -> bool:
+    """True when `sender_id` names a tracked reviewer, with or without `agent-`."""
+    if not sender_id:
+        return False
+    return (sender_id in tracked
+            or f"agent-{sender_id}" in tracked
+            or (sender_id.startswith("agent-") and sender_id[6:] in tracked))
+
+
+AGENT_MESSAGE_FROM = re.compile(r'\s*<agent-message from="([\w-]+)">')
+
+
+def _is_assistant_record(record: dict) -> bool:
+    """True for a record the model itself wrote, which no hand-back can be."""
+    message = record.get("message")
+    return (
+        record.get("source") == "MODEL"
+        or record.get("type") == "assistant"
+        or (isinstance(message, dict) and message.get("role") == "assistant")
+    )
+
+
+def _handback_candidates(record: dict) -> list[tuple[list[str], str]]:
+    """(sender ids, text) for each hand-back shape whose sender a harness wrote.
+
+    Four shapes, each identified by a structured field rather than by text a
+    quoted report could carry: a record-level `sender`; a `queue-operation`
+    enqueue whose content opens with the harness's `<agent-message from=...>`
+    wrapper; an `attachment` of type `queued_command` whose `origin` is a peer
+    hand-back; and a record whose own `origin` is one. The last three were
+    measured on a web-thread transcript, 2026-10-07 (ai-config#3045).
+    """
+    out: list[tuple[list[str], str]] = []
+    message = record.get("message")
+    body_text = _result_text(message if isinstance(message, dict) else record)
+    sender = str(record.get("sender") or "")
+    if sender:
+        out.append(([sender], body_text))
+    if record.get("type") == "queue-operation" and record.get("operation") == "enqueue":
+        content = record.get("content")
+        m = AGENT_MESSAGE_FROM.match(content) if isinstance(content, str) else None
+        if m:
+            out.append(([m.group(1)], content))
+    for holder, text in ((record.get("attachment"), None), (record, body_text)):
+        if not isinstance(holder, dict):
+            continue
+        origin = holder.get("origin")
+        if not (isinstance(origin, dict) and origin.get("kind") == "peer"
+                and origin.get("handback")):
+            continue
+        if holder is not record and holder.get("type") != "queued_command":
+            continue
+        ids = _task_ids(origin, ("senderTaskId", "from"))
+        if text is None:
+            prompt = holder.get("prompt")
+            text = prompt if isinstance(prompt, str) else ""
+        out.append((ids, text or str(origin.get("body") or "")))
+    return out
+
+
+def read_latest_review(
+    transcript_path: str, _known_task_ids: frozenset[str] | None = None,
+) -> tuple[str | None, list[str], bool]:
     """(verdict, reviewed_commits, saw_reviewer_call) from the transcript.
 
     `reviewed_commits` is every `Reviewed-Commit:` line the winning report
@@ -2390,6 +2452,8 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, list[str], boo
     """
     reviewer_call_ids: set[str] = set()
     reviewer_task_ids: set[str] = set()
+    known_task_ids = set(_known_task_ids or ())
+    unresolved_handback = False
     saw_reviewer_call = False
     verdict: str | None = None
     reviewed_commits: list[str] = []
@@ -2491,11 +2555,7 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, list[str], boo
                                 verdict, reviewed_commits = found, shas
                 continue
 
-            is_assistant = (
-                record.get("source") == "MODEL"
-                or record.get("type") == "assistant"
-                or (isinstance(record.get("message"), dict) and record["message"].get("role") == "assistant")
-            )
+            is_assistant = _is_assistant_record(record)
 
             record_is_reviewer = _is_reviewer_record(record)
             if record_is_reviewer:
@@ -2509,24 +2569,26 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, list[str], boo
                         verdict, reviewed_commits = found, shas
 
             # Handback delivery as direct transcript messages from subagent
+            # A hand-back counts only when a HARNESS-WRITTEN field names its
+            # sender and that sender is one of our own reviewer dispatches.
+            # Matching marker text instead (`[Subagent hand-back]` and its
+            # siblings) admitted any record quoting a report -- a Read of a
+            # file, a pasted message -- measured on a real web-thread
+            # transcript (ai-config#3045). The queue-operation enqueue is
+            # written BEFORE the dispatch result that carries the agent id, so
+            # an unmatched candidate triggers one more pass with the final id
+            # set rather than being dropped.
             if saw_reviewer_call and not is_assistant:
-                sender_id = str(record.get("sender") or "")
-                is_tracked_sender = (
-                    sender_id in reviewer_task_ids
-                    or f"agent-{sender_id}" in reviewer_task_ids
-                    or (sender_id.startswith("agent-") and sender_id[6:] in reviewer_task_ids)
-                )
-                text = _result_text(
-                    record.get("message") if isinstance(record.get("message"), dict) else record
-                )
-                is_handback_marker = bool(re.search(
-                    r"(?:^|\n)\s*(?:(?:This agent's report was delivered to you as a message|\[Subagent hand-back|SubagentHandback)\b)",
-                    text, re.I
-                ))
-                if (is_tracked_sender or is_handback_marker) and text:
-                    found, shas = parse_report_all(text)
-                    if found:
-                        verdict, reviewed_commits = found, shas
+                tracked_ids = reviewer_task_ids | known_task_ids
+                for sender_ids, text in _handback_candidates(record):
+                    if not text:
+                        continue
+                    if any(_id_is_tracked(s, tracked_ids) for s in sender_ids):
+                        found, shas = parse_report_all(text)
+                        if found:
+                            verdict, reviewed_commits = found, shas
+                    elif _known_task_ids is None:
+                        unresolved_handback = True
 
             for b in _iter_blocks(record):
                 b_type = b.get("type")
@@ -2631,6 +2693,8 @@ def read_latest_review(transcript_path: str) -> tuple[str | None, list[str], boo
                             saw_reviewer_call = True
                             verdict, reviewed_commits = found, shas
 
+    if unresolved_handback:
+        return read_latest_review(transcript_path, frozenset(reviewer_task_ids))
     return verdict, reviewed_commits, saw_reviewer_call
 
 

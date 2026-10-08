@@ -124,16 +124,27 @@ def main():
           run(MERGE, [step("claude -p 'review'")])[0])
     check("warns when the reviewer word is only echoed",
           run(MERGE, [step("echo codex exec review")])[0])
+    check("warns when a skill was only loaded, with no reviewer call",
+          run(MERGE, [skill("dtc")])[0])
+    check("warns when the CLI only printed its version",
+          run(MERGE, [step("codex --version")])[0])
+    check("warns when the CLI was only logged in",
+          run(MERGE, [step("opencode auth login")])[0])
+    check("warns on a bare CLI word with no arguments",
+          run(MERGE, [step("gemini")])[0])
+    check("warns on the instrument-then-merge chain the sibling discharges",
+          run("python3 scripts/check-pr-fully-clean.py 12 && gh pr merge 12",
+              [])[0])
 
     # --- silent -----------------------------------------------------------
     check("silent after a codex run following the last push",
           not run(MERGE, [PUSH, CODEX])[0])
     check("silent after an opencode run",
           not run(MERGE, [OPENCODE])[0])
-    check("silent after the dtc skill",
-          not run(MERGE, [skill("dtc")])[0])
-    check("silent after a plugin-qualified delegate-to-opencode skill",
-          not run(MERGE, [skill("ai-config:delegate-to-opencode")])[0])
+    check("silent after the dtc skill plus the codex call it makes",
+          not run(MERGE, [skill("dtc"), CODEX])[0])
+    check("silent after an env-prefixed codex call",
+          not run(MERGE, [step("OPENAI_API_KEY=x codex exec review")])[0])
     check("silent on the MCP merge tool after a codex run",
           not run("", [CODEX], tool_name="mcp__github__merge_pull_request",
                   tool_input=MCP_MERGE)[0])

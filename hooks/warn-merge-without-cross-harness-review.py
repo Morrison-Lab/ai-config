@@ -22,16 +22,21 @@ before the gap was noticed.
         (`gh pr merge`, `gh api -X PUT .../pulls/N/merge`,
          `mcp__github__merge_pull_request`, `mcp__github__enable_pr_auto_merge`)
     AND NOT  this session's transcript holds, after the last push, a
-             non-sidechain call that invoked a cross-harness reviewer and
-             whose result is not an error:
-               * a Bash command whose command word is one of the CLIs in
-                 CROSS_HARNESS_CLIS, minus this session's own harness; or
-               * a Skill call naming one of CROSS_HARNESS_SKILLS.
+             non-sidechain Bash call whose result is not an error and in
+             which a simple command's command word is one of the CLIs in
+             CROSS_HARNESS_CLIS, minus this session's own harness, with a
+             first argument that is not a housekeeping one (NON_REVIEW_ARGS:
+             `--version`, `--help`, `login`, `auth`, ...).
 
-Merge recognition (command position via `scripts/lib/shellcmd.py`, so an
-echoed or heredoc'd merge is inert) and push detection are imported from
-`warn-merge-without-fully-clean.py` rather than re-derived, so the two merge
-warnings cannot disagree about what a merge or a push is.
+A skill (`dtc`, `dto`, `adv`) is not credited by being loaded: loading one
+runs nothing. Its reviewer CLI call, which is a Bash call, is what counts.
+
+Merge recognition reuses `_gh_merge` and push recognition reuses `_events`,
+`_push_before_merge` and `MCP_PUSH_TOOLS` from
+`warn-merge-without-fully-clean.py`, so the two merge warnings cannot disagree
+about what a merge or a push is. The sibling's strict `check && merge` chain
+discharge is deliberately NOT reused: passing the fully-clean instrument says
+nothing about who reviewed.
 
 ## What it cannot see, and why it warns rather than denies
 
@@ -43,6 +48,10 @@ warnings cannot disagree about what a merge or a push is.
 * A multi-backend harness (`opencode`, `cursor-agent`) qualifies only when
   its configured model also differs. The model is a config file away, not on
   the command line, so the hook takes the harness as the signal.
+* The session's own harness is read from the environment: Antigravity when
+  `ANTIGRAVITY_AGENT` is set, Claude Code otherwise. Under another harness
+  (Codex, OpenCode, Gemini CLI) that default is wrong: its own CLI would be
+  credited and `claude` excluded.
 * A review run in another session or by a human is invisible here.
 
 Each is a false-silence or a false-warning a deny would turn into an escape-
@@ -56,19 +65,18 @@ import sys
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 
-# Reviewer CLIs by harness. Every entry here is a harness other than Claude
-# Code's; `claude` is listed so a non-Claude session reviewing through it
-# still counts.
+# Reviewer CLIs, one per harness. The session's own harness is removed at run
+# time, so `claude` counts only from a non-Claude session.
 CROSS_HARNESS_CLIS = frozenset({
     "codex", "opencode", "agy", "gemini", "cursor-agent", "claude",
 })
-# Skills that dispatch to a cross-harness reviewer CLI.
-CROSS_HARNESS_SKILLS = frozenset({
-    "adv", "agy-review-workflow", "delegate-to-codex", "dtc",
-    "delegate-to-opencode", "dto", "delegate-to-databricks",
+# A first argument that makes the invocation housekeeping, not a review.
+NON_REVIEW_ARGS = frozenset({
+    "-v", "-V", "--version", "version", "-h", "--help", "help",
+    "login", "logout", "auth", "config", "mcp", "update", "upgrade",
+    "install", "models",
 })
 AUTO_MERGE_TOOL = "mcp__github__enable_pr_auto_merge"
-SKILL_TOOLS = frozenset({"Skill", "skill"})
 GATE = "shared/workflow/adversarial-self-review.md"
 
 NOTE = (
@@ -78,10 +86,10 @@ NOTE = (
     "are required for merging') needs a verdict from a reviewer whose model "
     "AND harness both differ from this session's. An Agent subagent and the "
     "CI claude-review workflow are both Claude and do not qualify. Run one "
-    "of {clis} (or the dtc/dto/adv skills) on the shipping head first. If no "
-    "qualifying reviewer is reachable here, the gate's own answer is that "
-    "the merge waits for a human or a differently-provisioned session "
-    "(ai-config#3099)."
+    "of {clis} (for example through the dtc or dto skill) on the shipping "
+    "head first. If no qualifying reviewer is reachable here, the gate's own "
+    "answer is that the merge waits for a human or a differently-provisioned "
+    "session (ai-config#3099)."
 )
 
 
@@ -94,29 +102,24 @@ def _sibling():
 
 
 def own_harness():
-    """The CLI name of the harness running this hook."""
+    """The CLI name of the harness running this hook (see the docstring)."""
     if os.environ.get("ANTIGRAVITY_AGENT"):
         return "agy"
     return "claude"
 
 
-def _reviewer_call(sib, block, clis):
-    """True when a tool_use block invokes a cross-harness reviewer."""
-    name = block.get("name")
-    inp = block.get("input") or {}
-    if name in SKILL_TOOLS:
-        skill = str(inp.get("skill") or inp.get("name") or "").lstrip("/")
-        return skill.split(":")[-1] in CROSS_HARNESS_SKILLS
-    if name not in sib.SHELL_TOOLS:
-        return False
-    cmd = inp.get("command")
-    if not isinstance(cmd, str):
-        return False
-    for line in sib.shell_c_expansions(cmd):
+def _argvs(sib, command):
+    for line in sib.shell_c_expansions(command):
         for argv in sib.simple_commands(line) or []:
-            _env, rest = sib.strip_env(argv)
-            if rest and os.path.basename(rest[0]) in clis:
-                return True
+            yield sib.strip_env(argv)[1]
+
+
+def _reviewer_call(sib, command, clis):
+    """True when a shell command invokes a cross-harness reviewer CLI."""
+    for rest in _argvs(sib, command):
+        if (len(rest) > 1 and os.path.basename(rest[0]) in clis
+                and rest[1] not in NON_REVIEW_ARGS):
+            return True
     return False
 
 
@@ -134,16 +137,13 @@ def scan(sib, path, clis):
                     last_push = max(last_push, seq)
                     continue
                 cmd = (b.get("input") or {}).get("command")
-                if name in sib.SHELL_TOOLS and isinstance(cmd, str):
-                    try:
-                        if any(e is None for e in sib._events(cmd)):
-                            last_push = max(last_push, seq)
-                    except Exception:
-                        pass
-                if rec.get("isSidechain"):
+                if name not in sib.SHELL_TOOLS or not isinstance(cmd, str):
                     continue
                 try:
-                    if _reviewer_call(sib, b, clis):
+                    if any(e is None for e in sib._events(cmd)):
+                        last_push = max(last_push, seq)
+                    if not rec.get("isSidechain") and _reviewer_call(
+                            sib, cmd, clis):
                         pending[b.get("id")] = seq
                 except Exception:
                     continue
@@ -155,9 +155,14 @@ def scan(sib, path, clis):
 
 
 def _targets(sib, tool, tool_input):
-    if tool == AUTO_MERGE_TOOL:
+    """[(number|None, repo|None)] for every merge this call performs."""
+    if tool in (sib.MCP_MERGE_TOOL, AUTO_MERGE_TOOL):
         return sib._merge_targets(sib.MCP_MERGE_TOOL, tool_input)
-    return sib._merge_targets(tool, tool_input)
+    command = (tool_input.get("command") or tool_input.get("CommandLine")
+               or tool_input.get("cmd") or tool_input.get("script"))
+    if not isinstance(command, str):
+        return []
+    return [hit for hit in map(sib._gh_merge, _argvs(sib, command)) if hit]
 
 
 def main() -> int:

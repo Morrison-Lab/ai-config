@@ -98,6 +98,7 @@ import os
 import re
 import shlex
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -208,6 +209,8 @@ def _check_live_pr(num, repo=None):
 # window expired into an active session and cost a round of requests before
 # anyone noticed. Three months puts the re-review far from the day-to-day and
 # still refuses to become permanent by default.
+# Keep this declaration on one line in this exact form: stale copies read
+# main's value through _RX_CONST below (ai-config#3141).
 MORATORIUM_END = datetime.date(2026, 12, 1)
 
 
@@ -226,6 +229,139 @@ def _today():
 def moratorium_active(today=None):
     """True while the Copilot request this guard demands is forbidden."""
     return (today if today is not None else _today()) < MORATORIUM_END
+
+
+# A STALE copy of this file cannot see an extension. The installed plugin is
+# a per-commit snapshot, so an older build still carrying an earlier
+# MORATORIUM_END computes the moratorium as over and demands the forbidden
+# request, every turn, until the plugin updates (ai-config#3141: measured
+# firing from snapshots weeks behind main, on several machines). So once the
+# local constant has passed, and only when the guard would otherwise block,
+# ask main what the date is before demanding anything.
+#
+# Asking main can only make this guard QUIETER, and only when main itself
+# says the moratorium stands, which is the directive the hook exists to
+# follow. Disabling the fetch (the tests' env var) makes the guard louder,
+# which is the safe direction for an env-readable switch. Three limits keep
+# that quieting honest:
+#   * a date more than CANONICAL_MAX_DAYS ahead is refused, so a typo or a
+#     hostile response cannot silence the guard indefinitely;
+#   * an answer is cached for CANONICAL_TTL_SECONDS (an hour), and the fact
+#     that main could not be read for CANONICAL_NEGATIVE_TTL_SECONDS (five
+#     minutes), so an offline machine pays the timeout at most once per
+#     five minutes rather than on every turn;
+#   * the cache lives in the user's own ~/.claude, is opened without
+#     following symlinks, and is trusted only when this user owns it, so no
+#     other local account can pre-plant a far-future date.
+CANONICAL_URL = ("https://raw.githubusercontent.com/Morrison-Lab/ai-config/"
+                 "main/hooks/no-unreviewed-pr.py")
+CANONICAL_TTL_SECONDS = 3600
+# A failed read is remembered for less time than an answer, so a brief
+# network drop does not keep a stale copy loud for the full hour.
+CANONICAL_NEGATIVE_TTL_SECONDS = 300
+CANONICAL_MAX_DAYS = 366
+_RX_CONST = re.compile(
+    r"^MORATORIUM_END\s*=\s*datetime\.date\(\s*(\d{4})\s*,\s*(\d{1,2})\s*,"
+    r"\s*(\d{1,2})\s*,?\s*\)", re.M)
+_UNREADABLE = "unreadable"
+
+
+def _canonical_cache_path():
+    return os.path.join(os.path.expanduser("~"), ".claude",
+                        ".no-unreviewed-pr-moratorium-end")
+
+
+def _read_canonical_cache(path, now):
+    """(hit, value): hit is False when there is no fresh, trusted entry."""
+    try:
+        # O_NONBLOCK so a FIFO planted at the path cannot hang the open.
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+                     | getattr(os, "O_NONBLOCK", 0))
+    except OSError:
+        return False, None
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode):
+            return False, None
+        if hasattr(os, "getuid") and st.st_uid != os.getuid():
+            return False, None
+        age = now - st.st_mtime
+        raw = os.read(fd, 64).decode("ascii", "replace").strip()
+    except OSError:
+        return False, None
+    finally:
+        os.close(fd)
+    # A future mtime (clock skew) is not fresh: it would never expire. A few
+    # seconds are tolerated for coarse filesystem mtime rounding.
+    ttl = (CANONICAL_NEGATIVE_TTL_SECONDS if raw == _UNREADABLE
+           else CANONICAL_TTL_SECONDS)
+    if age < -5 or age > ttl:
+        return False, None
+    if raw == _UNREADABLE:
+        return True, None
+    try:
+        return True, datetime.date.fromisoformat(raw)
+    except ValueError:
+        return False, None
+
+
+def _write_canonical_cache(path, value):
+    tmp = None
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        tmp = "%s.%d" % (path, os.getpid())
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL
+                     | getattr(os, "O_NOFOLLOW", 0), 0o600)
+        with os.fdopen(fd, "w", encoding="ascii") as fh:
+            fh.write(value)
+        os.replace(tmp, path)
+        tmp = None
+    except OSError:
+        pass
+    finally:
+        # A leftover tmp would make every later O_EXCL open from a recycled
+        # pid fail, so the cache could never be written again.
+        if tmp is not None:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+
+
+def _parse_canonical_end(src):
+    """main's MORATORIUM_END from its source text, or None."""
+    match = _RX_CONST.search(src)
+    if not match:
+        return None
+    try:
+        return datetime.date(*map(int, match.groups()))
+    except ValueError:
+        return None
+
+
+def _fetch_canonical_source():
+    import urllib.request
+    with urllib.request.urlopen(CANONICAL_URL, timeout=5) as resp:
+        return resp.read(1 << 20).decode("utf-8", "replace")
+
+
+def _canonical_moratorium_end():
+    """main's MORATORIUM_END, or None when it cannot be read or trusted."""
+    if os.environ.get("NO_UNREVIEWED_PR_DISABLE_LIVE_CHECK"):
+        return None
+    import time
+    path = _canonical_cache_path()
+    hit, end = _read_canonical_cache(path, time.time())
+    if not hit:
+        try:
+            end = _parse_canonical_end(_fetch_canonical_source())
+        except Exception:
+            end = None
+        _write_canonical_cache(path, end.isoformat() if end else _UNREADABLE)
+    if end is not None and (
+            end - _today()).days > CANONICAL_MAX_DAYS:
+        return None
+    return end
 
 
 # Opening a PR, or taking a draft out of draft, via the CLI. The structured
@@ -2603,6 +2739,12 @@ def main() -> int:
     obligations = active_obligations
 
     if not obligations:
+        return 0
+
+    # Past this copy's own date, and only now that a block is due: a stale
+    # copy defers to main's date (ai-config#3141).
+    canonical_end = _canonical_moratorium_end()
+    if canonical_end is not None and _today() < canonical_end:
         return 0
 
     named = sorted({o["num"] for o in obligations if o["num"]}, key=int)

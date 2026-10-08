@@ -323,6 +323,19 @@ Instead, use the functional command version of the operator macro that takes its
 Reserve direct `\sb{...}`, `\cb{...}`, and `\paren{...}` for mathematical grouping, sets ($\cb{1, \dots, n}$), evaluation limits, or raw algebra that does not denote an operator with a dedicated macro.
 (Directive from the user, 2026-10-07.)
 
+## Prefer dot products over transpose products and inner products
+
+When two vectors multiply to give a number, write a dot product, `\dprod{\vx}{\vbeta}` ($\vx \cdot \vbeta$),
+not a transpose product (`\vx^\top \vbeta`, `\vx' \vbeta`, `\tprod{\vx}{\vbeta}`)
+or inner-product brackets (`\langle \vx, \vbeta \rangle`, `\iprod{\vx}{\vbeta}`).
+For example, write a linear model as $f(\vx) = \dprod{\vx}{\vbeta}$, not $f(\vx) = \vx^\top \vbeta$.
+Keep the transpose where the product is not a dot product of two vectors:
+a matrix product (`\tp{X} X`), an outer product, or a quadratic form (`\tprod{\vx}{\matr{A}} \vx`).
+Keep inner-product brackets where the text means a general inner product,
+such as the definition of an inner product space.
+The prose rule is psw's [Writing dot products](https://github.com/Morrison-Lab/psw/pull/135).
+(Directive from the user, 2026-10-08, on `Morrison-Lab/lds#488`.)
+
 ## Anti-patterns
 
 - ❌ Inventing a macro name not defined in `macros.qmd` — it silently breaks the

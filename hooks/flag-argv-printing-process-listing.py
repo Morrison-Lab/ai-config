@@ -15,26 +15,43 @@ OAuth bearer token landed in the session transcript.
 
 The secret was handled correctly at every point in the code. The leak happened
 at the INSPECTION step, which is why careful secret handling does not prevent
-it: argv is readable by every process on the host, and any listing that prints
-it copies whatever credentials it holds into the tool output, including those
-of processes this session did not start.
+it: argv is readable by any process that can see it in /proc, which on a
+default Linux mount (no `hidepid`, one PID namespace) is every process on the
+host. Any listing that prints it copies whatever credentials it holds into the
+tool output, including those of processes this session did not start.
 
 WHAT IT CHECKS
 --------------
-Every simple command in the Bash command line, including those inside a
-shell's `-c` argument, for a program that prints OTHER processes' command
-lines or environments:
+Every simple command in the Bash command line --- including those inside a
+shell's `-c` argument, a `$(...)` or backtick substitution (quoted or not),
+and a quoted remote command (`ssh host 'ps aux'`) --- for a program that
+prints OTHER processes' command lines or environments:
 
     ps       with a UNIX `-f`/`-F`, any BSD-style option cluster (`aux`, `ax`,
-             `x`), or an explicit format naming `args`/`command`/`cmd`
+             `x`), `-O`/BSD `O` (which preload the default `command` column),
+             BSD `e` (environments, even with `c` or an `-o` format), or an
+             explicit format naming `args`/`command`/`cmd`
     pgrep    with `-a` / `--list-full`
     pstree   with `-a` / `--arguments`
     top      with `-c`
-    a read of `/proc/<pid>/cmdline` or `/proc/<pid>/environ`
+    a read of `/proc/<pid>/cmdline` or `/proc/<pid>/environ` (also under
+             `task/<tid>/`), unless the command only tests for the file
+             (`test`, `[`, `ls`, `grep -l/-L/-c/-q`)
 
-The `ps` grammar modelled is Linux procps. macOS's BSD `ps` prints argv
-for more forms than this (plain `ps -e` among them), so silence there is
-weaker evidence than it is on Linux.
+A lister is found past wrappers (`sudo`, `timeout 5`, `watch`, `xargs`,
+`setsid`, `flock <file>`, `ssh <host>`, `busybox`) and past
+`docker`/`podman`/`kubectl`/`nerdctl exec`, since a remote or container
+listing prints into the same transcript.
+
+The `ps` grammar modelled is Linux procps. macOS's BSD `ps` prints argv for
+more forms than this (plain `ps -e` among them), so silence there is weaker
+evidence than it is on Linux. Busybox `ps` prints argv by default, so
+`busybox ps` fires unless an `-o` format names no argv column.
+
+KNOWN HOLES, so silence is not read as coverage: an argv-printing command
+assembled at run time (`eval "$cmd"`, a script file, a variable as the
+program name), a heredoc fed to a shell, and other tools that print argv
+(`htop`, `atop`, `lsof +c0`, `systemctl status`) are not examined.
 
 It stays silent on the forms that print only a name: `pgrep -f <pattern>`
 (PIDs only), `ps -eo pid,etime,comm`, `ps -e`, and BSD `c` (`ps axc`), which
@@ -64,8 +81,7 @@ try:
     if _LIB not in sys.path:
         sys.path.insert(0, _LIB)
     from shellcmd import (COMMAND_WRAPPERS, ENV_ASSIGNMENT, SHELL_KEYWORDS,
-                          WRAPPER_ARG_WINDOW, shell_c_expansions,
-                          simple_commands)
+                          shell_c_expansions, simple_commands)
 except Exception as _exc:  # broken install; fail open and say so
     print(f"flag-argv-printing-process-listing: cannot load "
           f"scripts/lib/shellcmd.py ({_exc}); not evaluating",
@@ -74,11 +90,23 @@ except Exception as _exc:  # broken install; fail open and say so
 
 LISTERS = {"ps", "pgrep", "pstree", "top"}
 
+# Programs that run the command after them, beyond shellcmd's own set.
+WRAPPERS = {"watch", "xargs", "setsid", "flock", "ssh", "busybox"}
+
+# Container CLIs run the command after them only under `exec`; `docker ps`
+# lists containers and must not be read as procps `ps`.
+CONTAINER_CLIS = {"docker", "podman", "kubectl", "nerdctl"}
+
+# How far past a wrapper to look for a lister. Ten covers
+# `kubectl exec -n ns pod -c box -- ps` and `ssh -i key -p 22 host ps`.
+LOOKAHEAD = 10
+
 # Format keys whose column is the full argv rather than the executable name.
 ARGV_KEYS = {"args", "command", "cmd"}
 
-# `ps` options that take a separate value, so the value is not misread as a
-# BSD option cluster (`ps -C curl` names a process, it is not BSD `curl`).
+# `ps` options that take a value, so the value is not misread as a BSD option
+# cluster (`ps -C curl` names a process, it is not BSD `curl`) and so a letter
+# inside an attached value (`ps -Cxterm`) is not read as an option.
 PS_UNIX_VALUE_OPTS = set("CGgNpqstUuoO")
 PS_LONG_VALUE_OPTS = {"--cols", "--columns", "--rows", "--lines", "--width",
                       "--format", "--group", "--Group", "--pid", "--ppid",
@@ -86,37 +114,59 @@ PS_LONG_VALUE_OPTS = {"--cols", "--columns", "--rows", "--lines", "--width",
                       "--sort"}
 PS_BSD_VALUE_OPTS = set("oOptUk")
 
-RX_PROC_LEAK = re.compile(r"/proc/[^/\s]+/(?:cmdline|environ)")
+RX_PROC_LEAK = re.compile(
+    r"/proc/[^/\s]+/(?:task/[^/\s]+/)?(?:cmdline|environ)")
+
+# Programs that only test for a /proc file rather than print it.
+PROC_TESTERS = {"test", "[", "[[", "ls", "stat", "readlink", "realpath"}
+GREP_PROGS = {"grep", "egrep", "fgrep", "rg"}
+GREP_QUIET_LONG = {"--files-with-matches", "--files-without-match", "--count",
+                   "--quiet", "--silent"}
+
+MAX_DEPTH = 3
+
+
+def _head(argv):
+    """Index of ARGV's first token that is not an assignment, keyword or wrapper."""
+    index = 0
+    while index < len(argv):
+        token = argv[index]
+        if (ENV_ASSIGNMENT.match(token) or token in SHELL_KEYWORDS
+                or os.path.basename(token) in COMMAND_WRAPPERS):
+            index += 1
+            continue
+        return index
+    return None
 
 
 def _program(argv):
-    """Index of ARGV's program token if it is a lister, else None.
+    """`(index, via_busybox)` of ARGV's lister, or None.
 
-    Leading assignments, shell keywords, and wrappers (`sudo`, `timeout 5`,
-    `watch`) are skipped; past a wrapper, look ahead a bounded distance for a
-    lister rather than modelling each wrapper's option grammar.
+    Leading assignments and shell keywords are skipped. Past a wrapper, look
+    ahead a bounded distance for a lister rather than modelling each wrapper's
+    option grammar.
     """
-    index, after_wrapper = 0, False
+    index, busybox = 0, False
+    while index < len(argv) and (ENV_ASSIGNMENT.match(argv[index])
+                                 or argv[index] in SHELL_KEYWORDS):
+        index += 1
     while index < len(argv):
-        token = argv[index]
-        name = os.path.basename(token)
-        if ENV_ASSIGNMENT.match(token) or token in SHELL_KEYWORDS:
-            index += 1
-            after_wrapper = False
-            continue
-        if name in COMMAND_WRAPPERS or name == "watch":
-            index += 1
-            after_wrapper = True
-            continue
+        name = os.path.basename(argv[index])
         if name in LISTERS:
-            return index
-        if after_wrapper:
-            window = argv[index:index + WRAPPER_ARG_WINDOW]
-            hit = next((offset for offset, candidate in enumerate(window)
-                        if os.path.basename(candidate) in LISTERS), None)
-            if hit is not None:
-                return index + hit
-        return None
+            return index, busybox
+        wraps = (name in COMMAND_WRAPPERS or name in WRAPPERS
+                 or (name in CONTAINER_CLIS
+                     and "exec" in argv[index + 1:index + 3]))
+        if not wraps:
+            return None
+        busybox = busybox or name == "busybox"
+        window = argv[index + 1:index + 1 + LOOKAHEAD]
+        hit = next((offset for offset, candidate in enumerate(window, start=1)
+                    if os.path.basename(candidate) in LISTERS
+                    or os.path.basename(candidate) in WRAPPERS), None)
+        if hit is None:
+            return None
+        index += hit
     return None
 
 
@@ -130,10 +180,12 @@ def _format_keys(spec):
     return keys
 
 
-def _ps_prints_argv(args):
+def _ps_prints_argv(args, busybox=False):
     # `replaced`: an `-o`/`o`/`--format` replaced the default columns, so only
-    # the named keys count. `-O` ADDS to the default, so it does not.
-    formats, full, bsd, replaced = [], False, [], False
+    # the named keys count. `-O`/`O` ADD to the default columns, which include
+    # `command`, so they set `full` instead.
+    formats, full, replaced = [], False, False
+    bsd, bsd_c, env = False, False, False
     i = 0
     while i < len(args):
         tok = args[i]
@@ -147,49 +199,47 @@ def _ps_prints_argv(args):
                 i += 1
             i += 1
             continue
-        if tok.startswith("-") and len(tok) > 1:
-            cluster = tok[1:]
-            # procps reads `ps -aux` as BSD `aux` (UNIX ps has no `-x`), so a
-            # dashed cluster carrying `x` prints argv like the BSD form.
-            if "x" in cluster:
-                full = True
-            for pos, ch in enumerate(cluster):
-                if ch in "fF":
-                    full = True
-                if ch in PS_UNIX_VALUE_OPTS:
-                    value = cluster[pos + 1:]
-                    if not value:
-                        value = nxt
-                        i += 1
-                    if ch in "oO":
-                        formats.append(value)
-                        replaced = replaced or ch == "o"
-                    break
+        dashed = tok.startswith("-") and len(tok) > 1
+        if not dashed and not re.fullmatch(r"[A-Za-z]+", tok):
             i += 1
             continue
-        if re.fullmatch(r"[A-Za-z]+", tok):
-            bsd.append(tok)
-            for pos, ch in enumerate(tok):
-                if ch in PS_BSD_VALUE_OPTS:
-                    value = tok[pos + 1:]
-                    if not value:
-                        value = nxt
-                        i += 1
-                    if ch in "oO":
-                        formats.append(value)
-                        replaced = replaced or ch == "o"
-                    break
+        cluster = tok[1:] if dashed else tok
+        value_opts = PS_UNIX_VALUE_OPTS if dashed else PS_BSD_VALUE_OPTS
+        if dashed and "x" in cluster and re.fullmatch(r"[auxwe]+", cluster):
+            # procps reads `ps -aux` as BSD `aux` (UNIX ps has no `-x`); a
+            # cluster carrying a value option (`-Ux`, `-Cxterm`) is not this.
+            dashed, value_opts = False, PS_BSD_VALUE_OPTS
+        bsd = bsd or not dashed
+        for pos, ch in enumerate(cluster):
+            if dashed and ch in "fF":
+                full = True
+            if not dashed and ch == "e":
+                env = True
+            if not dashed and ch == "c":
+                bsd_c = True
+            if ch in value_opts:
+                value = cluster[pos + 1:]
+                if not value:
+                    value = nxt
+                    i += 1
+                if ch == "o":
+                    formats.append(value)
+                    replaced = True
+                elif ch == "O":
+                    formats.append(value)
+                    full = True
+                break
         i += 1
+    if env:
+        return True  # BSD `e` prints every process's environment
     keys = set().union(*(_format_keys(spec) for spec in formats)) if formats else set()
     if keys & ARGV_KEYS:
         return True
     if replaced:
         return False
-    if full:
+    if full or busybox:
         return True
-    # BSD mode prints argv unless `c` swaps it for the executable name; `e`
-    # appends the environment, which is worse, so it fires even with `c`.
-    return any("c" not in tok or "e" in tok for tok in bsd)
+    return bsd and not bsd_c
 
 
 def _cluster_has(args, short, longs):
@@ -201,30 +251,84 @@ def _cluster_has(args, short, longs):
     return False
 
 
+def _proc_leak(argv):
+    hits = [tok for tok in argv if RX_PROC_LEAK.fullmatch(tok)]
+    if not hits:
+        return None
+    head = _head(argv)
+    name = os.path.basename(argv[head]) if head is not None else ""
+    if name in PROC_TESTERS:
+        return None
+    if name in GREP_PROGS and any(
+            tok in GREP_QUIET_LONG
+            or (tok.startswith("-") and not tok.startswith("--")
+                and set(tok[1:]) & set("lLcq"))
+            for tok in argv[head + 1:]):
+        return None
+    return f"reads `{hits[0]}`"
+
+
 def _leak(argv):
     """A description of how ARGV prints other processes' argv, or None."""
-    for tok in argv:
-        if RX_PROC_LEAK.fullmatch(tok):
-            return f"reads `{tok}`"
-    index = _program(argv)
-    if index is None:
+    found = _proc_leak(argv)
+    if found:
+        return found
+    located = _program(argv)
+    if located is None:
         return None
+    index, busybox = located
     name = os.path.basename(argv[index])
     args = argv[index + 1:]
     shown = " ".join(argv[index:])
-    if name == "ps" and _ps_prints_argv(args):
-        return f"`{shown}` lists full command lines"
-    if name == "pgrep" and _cluster_has(args, "a", {"--list-full"}):
-        return f"`{shown}` lists full command lines"
-    if name == "pstree" and _cluster_has(args, "a", {"--arguments"}):
-        return f"`{shown}` lists full command lines"
-    if name == "top" and _cluster_has(args, "c", set()):
+    if ((name == "ps" and _ps_prints_argv(args, busybox))
+            or (name == "pgrep" and _cluster_has(args, "a", {"--list-full"}))
+            or (name == "pstree" and _cluster_has(args, "a", {"--arguments"}))
+            or (name == "top" and _cluster_has(args, "c", set()))):
         return f"`{shown}` lists full command lines"
     return None
 
 
-def find_leak(command):
+def _substitutions(text):
+    """Bodies of `$(...)` and backtick substitutions outside single quotes."""
+    bodies, i, n, in_double = [], 0, len(text), False
+    while i < n:
+        ch = text[i]
+        if ch == "\\":
+            i += 2
+            continue
+        if ch == "'" and not in_double:
+            close = text.find("'", i + 1)
+            i = n if close == -1 else close + 1
+            continue
+        if ch == '"':
+            in_double = not in_double
+        elif ch == "`":
+            close = text.find("`", i + 1)
+            if close == -1:
+                break
+            bodies.append(text[i + 1:close])
+            i = close + 1
+            continue
+        elif text.startswith("$(", i):
+            depth, j = 1, i + 2
+            while j < n and depth:
+                depth += {"(": 1, ")": -1}.get(text[j], 0)
+                j += 1
+            bodies.append(text[i + 2:j - 1])
+            i = j
+            continue
+        i += 1
+    return bodies
+
+
+def find_leak(command, depth=0):
+    if depth > MAX_DEPTH:
+        return None
     for line in shell_c_expansions(command):
+        for body in _substitutions(line):
+            found = find_leak(body, depth + 1)
+            if found:
+                return found
         argvs = simple_commands(line)
         if not argvs:
             continue
@@ -232,11 +336,24 @@ def find_leak(command):
             found = _leak(argv)
             if found:
                 return found
+            # A quoted remote or container command (`ssh host 'ps aux'`,
+            # `docker exec c sh -c "ps aux"`) is one token; read it as a line.
+            head = _head(argv)
+            if head is None:
+                continue
+            name = os.path.basename(argv[head])
+            if name in WRAPPERS or name in CONTAINER_CLIS:
+                for token in argv[head + 1:]:
+                    if " " in token:
+                        found = find_leak(token, depth + 1)
+                        if found:
+                            return found
     return None
 
 
 NOTE = (
-    "{found}. Process argv is readable by every process on the host, so this "
+    "{found}. Process argv is readable by any process that can see it in "
+    "/proc (on a default Linux mount, every process on the host), so this "
     "prints any credential another process carries on its command line --- a "
     "`curl -H \"Authorization: Bearer ...\"` header, a `--token` flag --- into "
     "the transcript, including processes this session did not start "

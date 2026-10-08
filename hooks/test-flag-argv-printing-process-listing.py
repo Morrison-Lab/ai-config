@@ -87,6 +87,37 @@ for cmd in [
     "bash -c 'ps aux | grep curl'",
     "sleep 1; ps -ef | head",
     "if true; then ps aux; fi",
+    # review round 1 (measured on procps-ng 4.0.4): -O preloads `command`
+    "ps -O rss -e",
+    "ps -e -O pid",
+    "ps O rss",
+    # BSD `e` prints environments even under an explicit -o format
+    "ps axe -o pid,comm",
+    "ps -e -o pid,comm e",
+    "ps -e eo pid,comm",
+    # wrappers that run the listing
+    "pgrep -f curl | xargs ps -fp",
+    "pgrep -f curl | xargs ps -o pid,args -p",
+    "setsid ps aux",
+    "flock /tmp/l ps aux",
+    "sudo -u me ps aux",
+    # command substitutions, quoted or not
+    'out="$(ps -eo pid,args)"; echo "$out"',
+    "printf '%s\\n' \"$(pgrep -af curl)\"",
+    'echo "$(ps aux)"',
+    "echo `ps aux`",
+    "echo $(ps aux)",
+    # remote and container listings print into the same transcript
+    "ssh host ps aux",
+    "ssh host 'ps aux'",
+    "ssh -i key -p 22 host 'ps -ef | grep curl'",
+    "docker exec c ps aux",
+    "kubectl exec p -- ps aux",
+    "docker exec c sh -c 'ps aux'",
+    "busybox ps",
+    "busybox ps -o pid,args",
+    # per-thread /proc paths
+    "cat /proc/1234/task/1235/cmdline",
 ]:
     check(cmd, True)
 
@@ -111,6 +142,21 @@ for cmd in [
     'git commit -m "see /proc/1/cmdline"',
     "ls /proc/1",
     "grep -rn 'ps -ef' docs/",
+    # review round 1: a letter inside an attached value is not an option
+    "ps -Cx",
+    "ps -Cxterm",
+    "ps -pxx",
+    "ps -Ux",
+    # existence tests on /proc files print no contents
+    "[ -e /proc/$pid/cmdline ] && echo alive",
+    "test -r /proc/1/environ",
+    "ls /proc/*/cmdline",
+    "grep -l curl /proc/*/cmdline",
+    # container CLIs outside `exec`, and single-quoted text, run nothing
+    "docker ps -a",
+    "docker ps --format '{{.ID}}'",
+    "echo '$(ps aux)'",
+    "busybox ps -o pid,comm",
 ]:
     check(cmd, False)
 

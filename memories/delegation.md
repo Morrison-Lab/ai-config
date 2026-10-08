@@ -15,6 +15,15 @@ this section is self-contained.
 >
 > - **Do:** check which project the work belongs to before routing to `codex` or Databricks.
 > - **Don't:** read the "codex first" order below as covering non-UCDH projects.
+>
+> **Free models are open to every project, but restricted data is not** (user directive, 2026-10-08:
+> "all our projects and sessions can use free models anytime they are useful, except for directly viewing restricted data (PHI/HIPAA, FERPA, etc);
+> at present, those data can only be handled by our UCDH Codex account").
+> Free-tier models need no quota justification, so route any task to them when they suffice.
+> Restricted data goes only to the UCDH Codex account; see [`standing-habits-from-ezra`](../shared/workflow/standing-habits-from-ezra.md#send-bulk-work-to-other-models).
+>
+> - **Do:** check whether a brief, or a file it names, carries restricted data before choosing any model other than UCDH Codex.
+> - **Don't:** read "free" as "cleared for restricted data".
 
 > [!IMPORTANT]
 > **`agy` (Google Antigravity) is confirmed usable as a dispatchable subagent, effective 2026-09-02** (user directives that day: "start using agy as a subagent where feasible", "use agy cli for it").

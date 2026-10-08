@@ -376,5 +376,35 @@ with tempfile.TemporaryDirectory() as tmp:
           hp.probe_interpreter(sys.executable,
                                str(present), timeout=0.0) == "timeout")
 
+# --- drifted copies (ai-config#3094) ------------------------------------------
+# A registered copy of a repo hook whose bytes differ is a stale guard firing.
+REPO_HOOK = INSTALLER.resolve().parent.parent / "hooks" / "no-push-without-self-review.py"
+with tempfile.TemporaryDirectory() as tmp:
+    home = Path(tmp) / "claude"
+    copy = home / "hooks" / REPO_HOOK.name
+    copy.parent.mkdir(parents=True)
+    copy.write_bytes(REPO_HOOK.read_bytes() + b"# stale" + NL.encode())
+    write_settings(home, settings_with(f'python3 "{copy}"'))
+    result = run_check(home)
+    check("--check exits non-zero over a drifted copy of a repo hook",
+          result.returncode == 1)
+    check("--check names the drifted copy and counts it",
+          f"DRIFTED  {copy}" in result.stdout and "drifted=1" in result.stdout)
+    copy.write_bytes(REPO_HOOK.read_bytes())
+    result = run_check(home)
+    check("an identical copy is not drifted",
+          result.returncode == 0 and "drifted=0" in result.stdout)
+    write_settings(home, settings_with(f'python3 "{REPO_HOOK}"'))
+    result = run_check(home)
+    check("the repo's own hook file is not a drifted copy",
+          result.returncode == 0 and "drifted=0" in result.stdout)
+    other = home / "hooks" / "my-own-guard.py"
+    other.write_text("import sys" + NL, encoding="utf-8")
+    write_settings(home, settings_with(f'python3 "{other}"'))
+    result = run_check(home)
+    check("a script no repo hook shares a name with is not drifted",
+          result.returncode == 0 and "drifted=0" in result.stdout)
+
+
 print(NL + f"{passes} passed, {failures} failed")
 sys.exit(1 if failures else 0)

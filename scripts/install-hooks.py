@@ -368,6 +368,29 @@ def check_interpreters(rows: list[dict]) -> int:
     return len(blind)
 
 
+def drifted_copies(rows: list[dict], hooks_dir: Path = REPO / "hooks") -> list[dict]:
+    """Registered scripts that are copies of a repo hook with other content.
+
+    A copy outside this checkout that shares a hook's file name but not its
+    bytes is a stale guard still firing (ai-config#3094). A path resolving to
+    the repo's own file is not a copy, so it is never reported.
+    """
+    found = []
+    for row in rows:
+        if row["status"] != "ok" or not row["path"]:
+            continue
+        registered = Path(row["path"])
+        repo_copy = hooks_dir / registered.name
+        if not repo_copy.is_file():
+            continue
+        if registered.resolve() == repo_copy.resolve():
+            continue
+        if registered.read_bytes() == repo_copy.read_bytes():
+            continue
+        found.append(dict(row, repo_copy=repo_copy))
+    return found
+
+
 def check_registered_paths() -> int:
     """Report every registered hook whose script path does not resolve.
 
@@ -401,17 +424,30 @@ def check_registered_paths() -> int:
             print(f"  SKIPPED  {row['command']}")
             print(f"           registered on {where} in {row['settings']} ({reason})")
 
+    drifted = drifted_copies(rows)
+    for row in drifted:
+        where = f"{row['event']}/{row['matcher']}" if row["matcher"] else row["event"]
+        print(f"  DRIFTED  {row['path']}")
+        print(f"           differs from {row['repo_copy']}; registered on {where} "
+              f"in {row['settings']}")
+
     counts = {s: sum(1 for r in rows if r["status"] == s)
               for s in ("ok", "missing", "skipped")}
     print()
     print(f"examined {len(rows)} registered hook command(s) in "
           + ", ".join(str(p) for p in files))
     print(f"  ok={counts['ok']} missing={counts['missing']} "
-          f"skipped={counts['skipped']}")
+          f"skipped={counts['skipped']} drifted={len(drifted)}")
 
     blind = check_interpreters(rows)
 
-    if not counts["missing"] and not blind:
+    if drifted:
+        print()
+        print("A drifted copy is the code that runs: a fix merged here is not in")
+        print("force until the copy is refreshed from this checkout. Refresh it;")
+        print("do not delete it, since the registration would then deny every")
+        print("call its matcher names (ai-config#3094).")
+    if not counts["missing"] and not blind and not drifted:
         print()
         print("Every registered hook path resolves.")
         return 0

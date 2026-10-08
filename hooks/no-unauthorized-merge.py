@@ -211,13 +211,22 @@ HEREDOC_EXECUTOR = re.compile(
 # EXEC_PROGS's other consumers. Over-matching costs a scan of quoted text in a
 # command that pipes into a shell, which is the cheap direction.
 #
-# The executor may be anywhere in the receiving stage, not only first: a
-# closed list of wrappers (`sudo`) let `| sudo -u root bash`, `| timeout 5
-# bash` and `| nice bash` through, the same enumeration failure the heredoc
-# anchor above records (#4394 review). So the stage is scanned up to the next
-# pipe or statement boundary for an executor word standing alone.
+# The executor is the receiving stage's first word, or follows a leading
+# wrapper that runs its trailing command. Allowing only a bare `sudo` let
+# `| sudo -u root bash`, `| timeout 5 bash` and `| nice bash` through; scanning
+# the whole stage for any executor word then blocked `| grep bash` and
+# `| tee bash`, where the name is only an argument (#4394 review, rounds 1-2).
+# A wrapper's own arguments are skipped without parsing them, so
+# `| sudo -u root grep bash` over-matches, the cheap direction. A wrapper not
+# in this list is a missed executor, so add one when it is found.
+STAGE_WRAPPERS = (
+    r"sudo|doas|timeout|nice|ionice|nohup|time|stdbuf|setsid|unbuffer"
+    r"|chrt|taskset|xargs"
+)
 STDIN_EXECUTOR = re.compile(
-    r"(?:\|&?|>\()[^|;&\n]*?(?<![\w.-])(?:[/\w.-]+/)?"
+    r"(?:\|&?|>\()\s*" + ENV_WRAP
+    + r"(?:(?:[/\w.-]+/)?(?:" + STAGE_WRAPPERS + r")\b[^|;&\n)]*?(?<![\w.-]))?"
+    r"(?:[/\w.-]+/)?"
     r"(?:(?:" + EXEC_PROGS + r"|xargs)(?=[\s)]|$)|(?:source|\.)(?=[ \t]))"
 )
 

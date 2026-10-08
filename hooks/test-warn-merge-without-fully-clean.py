@@ -210,6 +210,64 @@ def main():
     check("silent: check && push && check (the last run is after the push)",
           not P2(INSTR + " && git push origin b && " + INSTR))
 
+    # --- round 3 -----------------------------------------------------------
+    IC = "python3 scripts/check-pr-fully-clean.py "
+    R = " -R Morrison-Lab/ai-config"
+    OUT5 = "Morrison-Lab/ai-config#5 is FULLY CLEAN on HEAD aaaa1111!"
+    OUT6 = "Morrison-Lab/ai-config#6 is FULLY CLEAN on HEAD bbbb2222!"
+    M5 = "gh pr merge 5 -R Morrison-Lab/ai-config"
+    M6 = "gh pr merge 6 -R Morrison-Lab/ai-config"
+    # item 1: the merge's own command pushes first
+    check("warns: `git push && gh pr merge` after an earlier clean run",
+          run("git push origin b && " + M5, [step(IC + "5" + R, OUT5)])[0])
+    check("warns: push then merge joined by ; also stales earlier runs",
+          run("git push origin b ; " + M5, [step(IC + "5" + R, OUT5)])[0])
+    check("silent: merge then push in one command keeps the earlier run",
+          not run(M5 + " && git push origin b", [step(IC + "5" + R, OUT5)])[0])
+    check("silent: earlier clean run, merge command with no push",
+          not run(M5, [step(IC + "5" + R, OUT5)])[0])
+    # item 2: several runs in one command
+    TWO = step(IC + "5" + R + " && " + IC + "6" + R, OUT5 + chr(10) + OUT6)
+    check("silent: `check 5 && check 6` credits #5", not run(M5, [TWO])[0])
+    check("silent: `check 5 && check 6` credits #6", not run(M6, [TWO])[0])
+    check("warns: `check 5 && check 6` does not credit #7",
+          run("gh pr merge 7 -R Morrison-Lab/ai-config", [TWO])[0])
+    ONLY6 = step(IC + "5" + R + " && " + IC + "6" + R, OUT6)
+    check("warns: only #6 named in the output, so #5 is not credited",
+          run(M5, [ONLY6])[0])
+    check("silent: only #6 named in the output credits #6", not run(M6, [ONLY6])[0])
+    check("silent: no per-PR naming, no NOT-clean line: all explicit runs credited",
+          not run(M5, [step(IC + "5" + R + " && " + IC + "6" + R,
+                            "ok is FULLY CLEAN")])[0])
+    check("warns: no per-PR naming but a NOT-clean line present",
+          run(M5, [step(IC + "5" + R + " && " + IC + "6" + R,
+                        "ok is FULLY CLEAN" + chr(10) + "NOT fully clean")])[0])
+    check("silent: failing #6 does not veto the attributed clean #5",
+          not run(M5, [step(IC + "5" + R + " && " + IC + "6" + R,
+                            OUT5 + chr(10) + "PR is NOT fully clean")])[0])
+    # item 3: shell-variable or missing run number
+    check("warns: run number is a shell variable and output names nothing",
+          run(M5, [step(IC + "$PR" + R, "is FULLY CLEAN")])[0])
+    check("warns: run number missing and output names nothing",
+          run(M5, [step(IC + R.strip(), "is FULLY CLEAN")])[0])
+    check("silent: variable run number but the output names #5",
+          not run(M5, [step(IC + "$PR" + R, OUT5)])[0])
+    check("warns: variable run number, output names #6 only",
+          run(M5, [step(IC + "$PR" + R, OUT6)])[0])
+    # item 4: strict-chain spellings
+    check("silent: strict chain with --repo o/r",
+          not run(IC + "5 --repo Morrison-Lab/ai-config && " + M5, [])[0])
+    check("silent: strict chain with --repo=o/r",
+          not run(IC + "5 --repo=Morrison-Lab/ai-config && " + M5, [])[0])
+    check("silent: strict chain with a trailing 2>&1 on the instrument",
+          not run(IC + "5" + R + " 2>&1 && " + M5, [])[0])
+    check("warns: strict chain, --repo for a DIFFERENT repo",
+          run(IC + "5 --repo=other/repo && " + M5, [])[0])
+    check("warns: env-prefixed instrument is not the strict form",
+          run("FOO=1 " + IC + "5" + R + " && " + M5, [])[0])
+    check("warns: 2>&1 on the merge side only is not on the instrument",
+          run(IC + "5" + R + " && " + M5 + " 2>&1 ; echo x", [])[0])
+
     # --- placeholders (item 6) ---------------------------------------------
     check("silent: {owner}/{repo} placeholder repo on the merge matches any",
           not run("gh pr merge 12 -R '{owner}/{repo}'", [clean()])[0])

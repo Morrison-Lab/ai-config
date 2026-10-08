@@ -58,30 +58,34 @@ python3 scripts/check-merge-commit-ci.py -R <owner>/<repo> --sha "$merge_sha"
 ```
 
 Exit 0 is clean.
-Exit 1 means a run failed or is still in progress ---
-fix it before anything else,
+Exit 1 means a run failed or is still in progress, and the two are handled differently.
+A **failed** run comes before everything else ---
+fix it first,
 per [`fixing-mistakes-is-top-priority`](../../shared/workflow/fixing-mistakes-is-top-priority.md).
-Exit 3 means no workflow runs are attached to that SHA yet, which is not a clean verdict;
-retry, or schedule a check-in, rather than moving on.
+Exit 3 means no workflow runs are attached to that SHA yet, which is not a clean verdict.
 This step applies whether the merge happened under an explicit instruction or under an `mwc` grant ---
 the grant covers the merge decision, not what happens on `main` afterward.
 
-A run that is merely **in progress** (or exit 3) is a wait, not a failure,
-and it does not hold up step 4.
-Arm the check-in, then run steps 2 to 4 now: the PR's learnings are already
-known, and a UMS pass deferred behind a CI wait is the pause
+A run still **in progress**, or exit 3, is a wait rather than a failure.
+Arm a check-in that re-runs this step
+(for exit 3, with the bound
+[`verify-merge-commit-ci`](../../shared/workflow/verify-merge-commit-ci.md) sets),
+then carry on with the rest of the procedure through step 4 now.
+The PR's learnings are already known,
+and a UMS pass deferred behind a CI wait is the pause
 [`run-ums-proactively`](../../shared/workflow/run-ums-proactively.md) forbids.
-Only a **failed** run comes before everything else.
-(Measured 2026-10-08, Morrison-Lab/lds#460 and Morrison-Lab/mlg#69: a session
-reported both merges, said the UMS pass would follow the merge-commit check,
+Step 5's report still waits for this step to come back clean at the check-in.
+(Measured 2026-10-08 on
+[Morrison-Lab/lds#460](https://github.com/Morrison-Lab/lds/pull/460) and
+[Morrison-Lab/mlg#69](https://github.com/Morrison-Lab/mlg/pull/69):
+a session reported both merges,
+said the UMS pass would follow the merge-commit check,
 and ended the turn waiting on a pending publish job until the user asked why.)
 
 - **Do:** run this check against the merge commit before step 5's report,
   every time, not only when a push-triggered workflow is already suspected.
 - **Do:** run step 4's UMS pass while a merge-commit run is still pending,
   and finish step 1.1 at the check-in.
-- **Don't:** read "fix it before anything else" as covering a run that has
-  not failed --- that phrase is about a red run, not a queued one.
 - **Don't:** read the PR's own green CI as covering a workflow that only
   triggers on `push`.
 
@@ -981,6 +985,8 @@ Do-Confirm; per
 - [ ] The merge actually landed (step 1's verification, not the notification).
 - [ ] Step 1.1's instrument ran against the merge commit and reported clean
       (exit 0) --- not merely that the PR's own CI was green.
+      When it was pending, that clean reading came from the check-in,
+      and step 4 did not wait for it.
 - [ ] The local branch is tidied and `main` is fast-forwarded.
 - [ ] Every deferred item has a filed follow-up issue.
 - [ ] Step 3.75 ran `install-hooks.py --fix` on this ai-config merge, and the

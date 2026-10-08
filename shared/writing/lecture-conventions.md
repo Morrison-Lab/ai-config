@@ -47,6 +47,11 @@ This fragment is the agent-facing copy: follow the rules, and link to psw instea
   Place the example directly after the div it illustrates.
   A related theorem or corollary does not exempt the definition: the definition still gets its own example, and so does the theorem.
   The rule holds in every repository, including `mds`, `pds`, `sds`, `lds` and `rme`.
+- **Cross-reference only what the reader has already seen, and only what stays visible.**
+  Never point to a figure, table, equation or result that appears later (Ezra, 2026-10-08).
+  Never point to one that lives inside a solution div, because a reader can fold or hide the solution.
+  Put the figure in an `#exm-` or `#fig-` div outside any solution, and make the example, not the earlier definition, refer to it.
+  See [`forward-references`](forward-references.md).
 - **Put media links beside the content they support.**
   See [`media-links-beside-content`](media-links-beside-content.md).
 - **Place each topic in the earliest course site whose readers need it.**

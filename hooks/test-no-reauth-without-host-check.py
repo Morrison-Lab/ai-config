@@ -149,14 +149,16 @@ BAD_TRANSCRIPTS = ["missing", "empty", "garbage"]
 
 def write_transcript(entries, nonce):
     entries = [json.loads(json.dumps(e)) for e in entries]
-    last = entries[-1]
-    blocks = last["message"]["content"]
-    for b in blocks:
-        if b.get("type") == "text":
-            b["text"] += f"\n\n[nonce {nonce}]"
-        elif b.get("type") == "tool_use" and isinstance(b.get("input"), dict) \
-                and "text" in b["input"]:
-            b["input"]["text"] += f"\n\n[nonce {nonce}]"
+    for entry in entries:
+        content = entry["message"]["content"]
+        if entry["type"] != "assistant" or not isinstance(content, list):
+            continue
+        for b in content:
+            if b.get("type") == "text":
+                b["text"] += f"\n\n[nonce {nonce}]"
+            elif b.get("type") == "tool_use" and isinstance(b.get("input"), dict) \
+                    and "text" in b["input"]:
+                b["input"]["text"] += f"\n\n[nonce {nonce}]"
     fd, path = tempfile.mkstemp(suffix=".jsonl")
     with os.fdopen(fd, "w", encoding="utf-8") as handle:
         for e in entries:

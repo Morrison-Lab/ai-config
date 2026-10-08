@@ -86,6 +86,8 @@ d = run("See `hooks/guard.py:2-11` here.\n")
 check("range end past the file is reported", kinds(d) == ["path-line"])
 d = run("Visit https://example.com:8080/x for more.\n")
 check("a URL port is not a path-line citation", kinds(d) == [])
+d = run("Connect to example.com:443 or host.local:8080 directly.\n")
+check("a bare host:port is not a path-line citation", kinds(d) == [])
 
 # Pre-existing lines are out of scope: doc.md's base line cites :99.
 d = run("Nothing to see.\n")
@@ -98,6 +100,15 @@ d = run('Its comment in `hooks/guard.py` says "refuses every  push while blockin
 check("accurate quote (whitespace differs) is not reported", kinds(d) == [])
 d = run('`hooks/guard.py` is short; "a phrase nobody attributed" stands alone.\n')
 check("a quote with no quotation verb is not attributed", kinds(d) == [])
+
+d = run("`hooks/guard.py` says \u201crefuses every pull while blocking\u201d.\n")
+check("curly-quoted misquote is reported", kinds(d) == ["quote-in-file"])
+
+# An added line beginning "++ " is content, not a file header, and the
+# lines after it in the same hunk are still examined.
+d = run("++ not a header\nSee `hooks/guard.py:40` here.\n")
+check("'++ ' content line keeps the hunk", kinds(d) == ["path-line"]
+      and d["findings"][0]["line"] == 5)
 
 # corpus-state: reported unless the derivation is on the line.
 d = run("This rule is already recorded above.\n")

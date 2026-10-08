@@ -63,7 +63,12 @@ QUOTE_VERB_RE = re.compile(
     r"proposes|proposed)\b",
     re.IGNORECASE,
 )
-QUOTED_RE = re.compile(r"\"(?P<text>[^\"]{12,})\"")
+QUOTED_RE = re.compile(
+    "\"(?P<text>[^\"]{12,})\"|\u201c(?P<curly>[^\u201c\u201d]{12,})\u201d"
+)
+# A `host:port` reads like `name.ext:N`; these "extensions" are domains.
+DOMAIN_EXTS = {"com", "org", "net", "io", "dev", "edu", "gov", "ai", "co",
+               "local", "app", "info", "us", "uk"}
 CORPUS_STATE_RE = re.compile(
     r"\b(already (recorded|covered|documented|stated)|the corpus (has|carries) "
     r"no|nothing in the corpus|nowhere else|no other (site|file|place|rule)|"
@@ -89,18 +94,24 @@ def added_lines(root: Path, base: str) -> dict[str, list[tuple[int, str]]]:
     out: dict[str, list[tuple[int, str]]] = {}
     path = None
     lineno = 0
+    remaining = 0  # new-side lines left in the current hunk
     for raw in diff.splitlines():
-        if raw.startswith("+++ "):
-            target = raw[4:]
+        if remaining == 0 and raw.startswith("+++ "):
+            target = raw[4:].rstrip("\t")
+            if target.startswith('"') and target.endswith('"'):
+                target = target[1:-1].encode().decode("unicode_escape")
+                target = target.encode("latin-1").decode("utf-8", "replace")
             path = target[2:] if target.startswith("b/") else None
             continue
-        if raw.startswith("@@"):
-            m = re.match(r"@@ -\S+ \+(\d+)(?:,\d+)? @@", raw)
+        if remaining == 0 and raw.startswith("@@"):
+            m = re.match(r"@@ -\S+ \+(\d+)(?:,(\d+))? @@", raw)
             lineno = int(m.group(1)) if m else 0
+            remaining = int(m.group(2) if m and m.group(2) is not None else 1)
             continue
-        if path and raw.startswith("+"):
+        if path and remaining and raw.startswith("+"):
             out.setdefault(path, []).append((lineno, raw[1:]))
             lineno += 1
+            remaining -= 1
     return out
 
 
@@ -135,6 +146,8 @@ def check_line(root: Path, citing: str, text: str, issues: bool,
         cited = m.group("path")
         last = int(m.group("end") or m.group("start"))
         target = resolve(root, citing, cited)
+        if target is None and cited.rsplit(".", 1)[-1].lower() in DOMAIN_EXTS:
+            continue
         if target is None:
             findings.append(("path-line", f"`{cited}` does not exist at HEAD"))
             continue
@@ -142,7 +155,8 @@ def check_line(root: Path, citing: str, text: str, issues: bool,
         if last > count:
             findings.append(("path-line",
                              f"`{cited}:{last}` is past the end ({count} lines)"))
-    quotes = [q.group("text") for q in QUOTED_RE.finditer(text)]
+    quotes = [q.group("text") or q.group("curly")
+              for q in QUOTED_RE.finditer(text)]
     if quotes and QUOTE_VERB_RE.search(text):
         for f in FILE_RE.finditer(text):
             target = resolve(root, citing, f.group("path"))
@@ -185,8 +199,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         added = added_lines(root, args.base)
     except subprocess.CalledProcessError as exc:
-        print(f"check-prose-citations: git diff against {args.base} failed: "
-              f"{exc.stderr.strip()}", file=sys.stderr)
+        print(f"::warning::check-prose-citations: git diff against "
+              f"{args.base} failed, so nothing was examined: "
+              f"{exc.stderr.strip()}")
         return 0
 
     results = []
@@ -195,6 +210,8 @@ def main(argv: list[str] | None = None) -> int:
     for path, lines in sorted(added.items()):
         full = root / path
         if not full.is_file():
+            print(f"::warning::check-prose-citations: {path} is in the diff "
+                  f"but not readable at HEAD, so it was not examined")
             continue
         fenced, _, _ = find_fence_spans(full.read_text(errors="replace"))
         for lineno, text in lines:

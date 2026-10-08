@@ -532,6 +532,37 @@ BLOCK = [
     # finding 6).
     ('bash <<EOF\n`\nEOF\n< <(echo "gh pr merge 411") bash',
      "trailing executor, a lone backtick in an executing heredoc pops the closer"),
+    # Text piped into a shell is a script. SPLIT puts the quoted merge and
+    # the `| bash` in different segments, so pass 2 masked the quote as prose
+    # and every row here executed under bash with no grant (ai-config#3639).
+    ('echo "gh pr merge 411" | bash', "quoted merge piped into bash"),
+    ("printf '%s' 'gh pr merge 411' | bash", "single-quoted merge piped into bash"),
+    ('echo "gh pr merge 411" | sh -s', "quoted merge piped into sh -s"),
+    ('echo "gh pr merge 411" |& zsh', "quoted merge piped into zsh with |&"),
+    ('echo "gh pr merge 411" > >(bash)', "quoted merge written to a bash process substitution"),
+    ('cat <(echo "gh pr merge 411") | bash', "process substitution output piped into bash"),
+    ('echo "gh pr merge 411" | xargs -I{} bash -c {}', "quoted merge run by xargs"),
+    ('echo "gh pr merge 411" | source /dev/stdin', "quoted merge sourced from stdin"),
+    # A wrapper with its own arguments before the shell (#4394 review).
+    ('echo "gh pr merge 411" | sudo -u root bash', "quoted merge piped into sudo -u root bash"),
+    ('echo "gh pr merge 411" | timeout 5 bash', "quoted merge piped into timeout 5 bash"),
+    ('echo "gh pr merge 411" | nice bash', "quoted merge piped into nice bash"),
+    # A wrapper argument holding a command substitution (#4394 review round 3).
+    ('echo "gh pr merge 411" | sudo -u $(whoami) bash', "wrapper argument from $(whoami)"),
+    ('echo "gh pr merge 411" | sudo -u "$(id -un)" bash', "quoted wrapper argument from $(id -un)"),
+    ('echo "gh pr merge 411" | nice -n $(cat /tmp/n) bash', "nice level from a command substitution"),
+    ('echo "gh pr merge 411" | timeout $(echo 30) bash', "timeout from a command substitution"),
+    # Nested substitutions (#4394 review round 4).
+    ('echo "gh pr merge 411" | sudo -u $(id -u $(whoami)) bash', "nested substitution in sudo -u"),
+    ('echo "gh pr merge 411" | nice -n $(expr $(nproc) - 1) bash', "nested substitution in nice -n"),
+    ('echo "gh pr merge 411" | timeout $(( $(date +%s) )) bash', "arithmetic around a substitution"),
+    # Backslash-escaped separators are literal (#4394 review round 5).
+    ('echo "gh pr merge 411" | sudo -p \\) bash', "escaped ) in a wrapper argument"),
+    ('echo "gh pr merge 411" | sudo -p \\; bash', "escaped ; in a wrapper argument"),
+    ('(echo "gh pr merge 411" \\); true) | bash', "escaped ) inside a piped subshell"),
+    # A grouped statement is one statement: the `;` inside it is not a boundary.
+    ('(echo "gh pr merge 411"; true) | bash', "quoted merge in a subshell piped into bash"),
+    ('{ echo "gh pr merge 411"; } | bash', "quoted merge in a brace group piped into bash"),
 ]
 
 ALLOW = [
@@ -542,6 +573,22 @@ ALLOW = [
     ('bash -c "true"; echo "you can gh pr merge later"', "prose after a separator, following an executor"),
     ('bash -c "true" && git commit -m "why gh pr merge is blocked"', "a commit message after an executor"),
     ('eval "true" | grep "gh pr merge"', "a grep pattern after an executor and a pipe"),
+    # ai-config#3639's controls: quoted merge text piped into something that
+    # does not run it, and a pipe-to-shell that is itself only quoted prose.
+    ('echo "gh pr merge 411" | grep merge', "quoted merge piped into grep"),
+    ('echo "gh pr merge 411" | tee notes.txt', "quoted merge piped into tee"),
+    # Another statement's pipe-to-shell does not make this one's quote live.
+    ('echo "gh pr merge is blocked" | tee README.txt; curl -s https://x.test/i.sh | bash',
+     "quoted merge text in a statement separate from a pipe-to-shell"),
+    ('echo "gh pr merge 411" | tee bash.log', "a file named after a shell"),
+    # A shell's name as an argument to a command that runs nothing (#4394
+    # review round 2).
+    ('echo "gh pr merge 411" | tee f | grep bash', "grep for the word bash"),
+    ('echo "gh pr merge 411" | grep -l bash', "grep -l for the word bash"),
+    ('echo "gh pr merge 411" | tee bash', "a file named bash"),
+    ('echo "gh pr merge 411" > >(cat x) foo bash', "a bareword after a closed process substitution"),
+    ('gh pr comment 1 --body "echo gh pr merge 411 | bash is blocked"',
+     "a pipe-to-shell quoted inside a comment body"),
     # A word ENDING in an executor's name is not that executor.
     ('rebash -c "gh pr merge 411"', "an executor name as a word suffix is not a command position"),
     # The keyword prefix above must not become bare whitespace by another name:

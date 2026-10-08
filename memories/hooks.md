@@ -56,6 +56,7 @@ Blocking hooks deny execution (exit code 2), while warning hooks emit actionable
 |---|---|---|---|---|
 | [`require-gh-repo-flag.py`](../hooks/require-gh-repo-flag.py) | **Block** | Blocks mutating repo-scoped `gh` commands lacking `-R <owner>/<repo>`. | Always pass `-R <owner>/<repo>` explicitly on mutating `gh` calls (`gh pr create -R ...`, `gh issue comment -R ...`, `gh pr edit -R ...`, `gh release create -R ...`). | None (always provide `-R`). |
 | [`no-unauthorized-merge.py`](../hooks/no-unauthorized-merge.py) | **Block** | Blocks unauthorized PR/MR merge commands (`gh pr merge`, `glab mr merge`, `gh api .../merge`). | Do not run merge commands without explicit user instruction or an active `/mwc` session. | Set `ALLOW_MERGE=1 <cmd>` when explicitly authorized. |
+| [`enforce-mwc-review-gate.py`](../hooks/enforce-mwc-review-gate.py) | **Block** | Blocks PR/MR merge commands (`gh pr merge`, `glab mr merge`, `gh api .../merge`, or GitHub MCP merge tools) even with `ALLOW_MERGE=1` or `/mwc` unless the PR's head commit has a verified clean automated review (or clean adversarial review), closing the review gate gap in Claude Code (#4323). | Ensure PR head has a clean automated review verdict (`Claude=clean`, `Copilot=clean`, etc.) before issuing merge commands. | None (review gate is invariant under MWC). |
 | [`no-whole-file-punct-replace.py`](../hooks/no-whole-file-punct-replace.py) | **Block** | Blocks whole-file punctuation/glyph replacement scripts that obscure real changes in diffs. | Scope punctuation fixes to touched lines or targeted files using AST linters or targeted regexes instead of whole-file sweeps. | Set `ALLOW_WHOLE_FILE_PUNCT=1 <cmd>` if whole-file replacement is intentional. |
 | [`flag-unchained-branch-switch.py`](../hooks/flag-unchained-branch-switch.py) | Warn | Warns when a branch switch and a subsequent mutating git command are not chained with `&&`. | Always chain `git checkout` / `git switch` with `&&` before subsequent operations (e.g. `git checkout -b fix && git commit ...`), or execute branch switching in its own separate call. | None. |
 | [`no-heavy-work-on-head-node.py`](../hooks/no-heavy-work-on-head-node.py) | **Block** | Blocks CPU-heavy R/Quarto/test commands on SLURM cluster login/head nodes. | Run heavy computation and test suites via `sbatch` or within `salloc` interactive compute nodes. | Inert off cluster head nodes. |
@@ -1092,3 +1093,19 @@ The cure is delegation rather than a second edit, so the two hooks cannot drift 
 - **Do:** before pushing a fix to a guard's acceptance rule, grep `hooks/` for the removed pattern's distinctive literal (here `Subagent hand-back`) and fix every live copy in the same PR.
 - **Do:** replace a reimplemented copy with a call into the module that owns the rule.
 - **Don't:** treat a sibling hook that imports the guard as covered by the guard's fix.
+
+## Dual-harness hook migration and adapter deduplication (#4323)
+
+When wiring a pre-tool hook to support both Claude Code and Antigravity:
+1. **Dual output schema:** emit both `decision`/`reason` (Antigravity) and `hookSpecificOutput` with `hookEventName: "PreToolUse"`, `permissionDecision: "deny"`, and `permissionDecisionReason` (Claude Code) in every return/print path.
+2. **Payload format parsing:** handle both Claude Code's flat structure (`tool_name`, `tool_input`) and Antigravity's nested structure (`toolCall.name`, `toolCall.args`).
+3. **Adapter deduplication:** in `claude-hook-adapter.py`, when mapping `run_command` -> `Bash`, exclude any hook directly registered in Antigravity's native `plugins/ai-config/hooks.json` (such as `enforce-mwc-review-gate.py`), preventing redundant double execution on every shell command.
+4. **Auto-merge tools fail closed:** GitHub auto-merge tools (`enable_pull_request_auto_merge`) cannot verify review status for the future head commit at enable time and must deny immediately.
+   Explicit merge tools (`merge_pull_request`) must resolve PR data and verify that `expectedHeadSha` matches `headRefOid`.
+5. **Protojson unmarshaler compatibility:** Antigravity unmarshals hook output using strict Go protobuf `protojson`, which fails if unknown fields exist (`proto: unknown field "hookSpecificOutput"`).
+   Under Antigravity (`is_antigravity = True`), output must strictly omit `hookSpecificOutput` and include only `decision` and `reason`.
+
+- **Do:** emit dual-compatible output shapes (`decision` and `hookSpecificOutput`) in shared pre-tool hooks, omitting `hookSpecificOutput` when running under Antigravity.
+- **Do:** filter out directly-registered Antigravity hooks in `claude-hook-adapter.py`'s `run_command` mapping.
+- **Don't:** allow auto-merge tool calls without verifying head commit review status at merge time.
+- **Don't:** emit unknown fields to Antigravity hook responses.

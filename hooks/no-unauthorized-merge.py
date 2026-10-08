@@ -219,9 +219,11 @@ HEREDOC_EXECUTOR = re.compile(
 # A wrapper's own arguments are skipped without parsing them, so
 # `| sudo -u root grep bash` over-matches, the cheap direction. A wrapper not
 # in this list is a missed executor, so add one when it is found. The skip
-# stops at a bare `)` (the end of a `>(...)` stage) but steps over a whole
-# `$(...)`, one level deep, so `| sudo -u $(whoami) bash` is still seen
-# (#4394 review, round 3).
+# stops at a bare `)`, the end of a `>(...)` stage. A `)` closing a command
+# substitution in a wrapper argument would stop it too, so every balanced
+# `$(...)`, at any depth, is blanked by `blank_substitutions` before this
+# runs: `| sudo -u $(id -u $(whoami)) bash` is still seen (#4394 review,
+# rounds 3-4; a regex can match only a fixed nesting depth).
 STAGE_WRAPPERS = (
     r"sudo|doas|timeout|nice|ionice|nohup|time|stdbuf|setsid|unbuffer"
     r"|chrt|taskset|xargs"
@@ -229,10 +231,32 @@ STAGE_WRAPPERS = (
 STDIN_EXECUTOR = re.compile(
     r"(?:\|&?|>\()\s*" + ENV_WRAP
     + r"(?:(?:[/\w.-]+/)?(?:" + STAGE_WRAPPERS + r")\b"
-    r"(?:\$\([^()\n]*\)|[^|;&\n)])*?(?<![\w.-]))?"
+    r"[^|;&\n)]*?(?<![\w.-]))?"
     r"(?:[/\w.-]+/)?"
     r"(?:(?:" + EXEC_PROGS + r"|xargs)(?=[\s)]|$)|(?:source|\.)(?=[ \t]))"
 )
+
+
+def blank_substitutions(text: str) -> str:
+    """Replace each balanced `$(...)` in `text`, at any depth, with `x`s.
+
+    Length-preserving. An unbalanced `$(` is left as it is. One pass with a
+    stack of open parentheses, so an unbalanced run of `$(` stays linear.
+    """
+    stack, cover = [], [0] * (len(text) + 1)
+    for j, ch in enumerate(text):
+        if ch == "(":
+            stack.append(j - 1 if j and text[j - 1] == "$" else -1)
+        elif ch == ")" and stack:
+            start = stack.pop()
+            if start >= 0:
+                cover[start] += 1
+                cover[j + 1] -= 1
+    out, depth = [], 0
+    for j, ch in enumerate(text):
+        depth += cover[j]
+        out.append("x" if depth else ch)
+    return "".join(out)
 
 
 def unmask_piped_statements(inert: str, masked: str) -> str:
@@ -255,7 +279,7 @@ def unmask_piped_statements(inert: str, masked: str) -> str:
         sep = 2 if two in ("&&", "||") else 1 if ch in ";\n" else 0
         if sep and (depth == 0 or i >= len(inert)):
             stmt = inert[start:i]
-            if STDIN_EXECUTOR.search(stmt):
+            if STDIN_EXECUTOR.search(blank_substitutions(stmt)):
                 stmt = re.sub(r"[\"']", " ", masked[start:i])
             pieces.append(stmt + inert[i:i + sep])
             start = i = i + sep

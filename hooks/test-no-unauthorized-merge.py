@@ -552,6 +552,10 @@ BLOCK = [
     ('echo "gh pr merge 411" | sudo -u "$(id -un)" bash', "quoted wrapper argument from $(id -un)"),
     ('echo "gh pr merge 411" | nice -n $(cat /tmp/n) bash', "nice level from a command substitution"),
     ('echo "gh pr merge 411" | timeout $(echo 30) bash', "timeout from a command substitution"),
+    # Nested substitutions (#4394 review round 4).
+    ('echo "gh pr merge 411" | sudo -u $(id -u $(whoami)) bash', "nested substitution in sudo -u"),
+    ('echo "gh pr merge 411" | nice -n $(expr $(nproc) - 1) bash', "nested substitution in nice -n"),
+    ('echo "gh pr merge 411" | timeout $(( $(date +%s) )) bash', "arithmetic around a substitution"),
     # A grouped statement is one statement: the `;` inside it is not a boundary.
     ('(echo "gh pr merge 411"; true) | bash', "quoted merge in a subshell piped into bash"),
     ('{ echo "gh pr merge 411"; } | bash', "quoted merge in a brace group piped into bash"),

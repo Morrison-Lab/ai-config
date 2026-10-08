@@ -63,9 +63,13 @@ QUOTE_VERB_RE = re.compile(
     r"proposes|proposed)\b",
     re.IGNORECASE,
 )
+# Match every quoted span, short ones included, so that a short quote still
+# consumes its own pair of marks; the length floor is applied afterwards.
+# Applying it in the pattern let the prose BETWEEN two quotes read as a quote.
 QUOTED_RE = re.compile(
-    "\"(?P<text>[^\"]{12,})\"|\u201c(?P<curly>[^\u201c\u201d]{12,})\u201d"
+    "\"(?P<text>[^\"]*)\"|\u201c(?P<curly>[^\u201c\u201d]*)\u201d"
 )
+MIN_QUOTE = 12
 # A `host:port` reads like `name.ext:N`; these "extensions" are domains.
 DOMAIN_EXTS = {"com", "org", "net", "io", "dev", "edu", "gov", "ai", "co",
                "local", "app", "info", "us", "uk"}
@@ -80,7 +84,8 @@ DERIVED_RE = re.compile(r"\b(grep|rg|git grep|ripgrep)\b|\]\(")
 
 def git(args: list[str], cwd: Path) -> str:
     return subprocess.run(
-        ["git", *args], cwd=cwd, capture_output=True, text=True, check=True
+        ["git", *args], cwd=cwd, capture_output=True, text=True,
+        encoding="utf-8", errors="replace", check=True
     ).stdout
 
 
@@ -130,8 +135,15 @@ def issue_body(num: str, repo: str | None, cache: dict[str, str | None]) -> str 
     if num in cache:
         return cache[num]
     target = f"repos/{repo}/issues/{num}" if repo else f"repos/{{owner}}/{{repo}}/issues/{num}"
-    res = subprocess.run(["gh", "api", target, "--jq", ".body"],
-                         capture_output=True, text=True)
+    try:
+        res = subprocess.run(["gh", "api", target, "--jq", ".body"],
+                             capture_output=True, text=True,
+                             encoding="utf-8", errors="replace")
+    except OSError as exc:  # gh not installed: report, never crash
+        print(f"check-prose-citations: cannot run gh for #{num}: {exc}",
+              file=sys.stderr)
+        cache[num] = None
+        return None
     cache[num] = res.stdout if res.returncode == 0 else None
     if res.returncode != 0:
         print(f"check-prose-citations: cannot read issue #{num}: "
@@ -144,7 +156,8 @@ def check_line(root: Path, citing: str, text: str, issues: bool,
     findings: list[tuple[str, str]] = []
     for m in PATH_LINE_RE.finditer(text):
         cited = m.group("path")
-        last = int(m.group("end") or m.group("start"))
+        # max(): an inverted range `:40-2` still cites line 40.
+        last = max(int(m.group("start")), int(m.group("end") or 0))
         target = resolve(root, citing, cited)
         if target is None and cited.rsplit(".", 1)[-1].lower() in DOMAIN_EXTS:
             continue
@@ -155,29 +168,35 @@ def check_line(root: Path, citing: str, text: str, issues: bool,
         if last > count:
             findings.append(("path-line",
                              f"`{cited}:{last}` is past the end ({count} lines)"))
-    quotes = [q.group("text") or q.group("curly")
-              for q in QUOTED_RE.finditer(text)]
+    quotes = [q for m in QUOTED_RE.finditer(text)
+              if len(q := (m.group("text") or m.group("curly") or "")) >= MIN_QUOTE]
     if quotes and QUOTE_VERB_RE.search(text):
+        # A line naming several files may quote only one of them, so a quote
+        # is reported only when NONE of the named files contains it.
+        named = []
         for f in FILE_RE.finditer(text):
             target = resolve(root, citing, f.group("path"))
-            if target is None:
-                continue
-            body = squash(target.read_text(encoding="utf-8", errors="replace"))
-            for q in quotes:
-                if squash(q) not in body:
-                    findings.append(("quote-in-file",
-                                     f"\"{q}\" is not in `{f.group('path')}`"))
+            if target is not None:
+                named.append((f.group("path"), squash(
+                    target.read_text(encoding="utf-8", errors="replace"))))
+        for q in quotes:
+            if named and not any(squash(q) in body for _, body in named):
+                names = ", ".join(f"`{p}`" for p, _ in named)
+                findings.append(("quote-in-file", f"\"{q}\" is not in {names}"))
         if issues:
+            bodies = []
             for i in ISSUE_RE.finditer(text):
                 body = issue_body(i.group("num"), repo, cache)
                 if body is None:
                     findings.append(("quote-in-issue",
                                      f"#{i.group('num')} could not be read"))
                     continue
-                for q in quotes:
-                    if squash(q) not in squash(body):
-                        findings.append(("quote-in-issue",
-                                         f"\"{q}\" is not in #{i.group('num')}'s body"))
+                bodies.append((i.group("num"), squash(body)))
+            for q in quotes:
+                if bodies and not any(squash(q) in b for _, b in bodies):
+                    names = ", ".join(f"#{n}" for n, _ in bodies)
+                    findings.append(("quote-in-issue",
+                                     f"\"{q}\" is not in the body of {names}"))
     if CORPUS_STATE_RE.search(text) and not DERIVED_RE.search(text):
         findings.append(("corpus-state",
                          "claim about corpus state with no query beside it"))

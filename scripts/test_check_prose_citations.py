@@ -41,8 +41,8 @@ def git(root, *args):
     subprocess.run(["git", *args], cwd=root, check=True, capture_output=True)
 
 
-def run(prose: str, extra: dict[str, str] | None = None):
-    """Commit a base, then add `prose` in doc.md on a branch; return results."""
+def run(prose: str, extra: dict[str, str] | None = None, raw: bytes = b""):
+    """Commit a base, then add `prose` (then `raw` bytes) in doc.md; return results."""
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         git(root, "init", "-q", "-b", "main")
@@ -60,6 +60,8 @@ def run(prose: str, extra: dict[str, str] | None = None):
         git(root, "checkout", "-q", "-b", "feat")
         with open(root / "doc.md", "a", encoding="utf-8") as fh:
             fh.write(prose)
+        with open(root / "doc.md", "ab") as fh:
+            fh.write(raw)
         git(root, "commit", "-q", "-am", "prose")
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
@@ -84,6 +86,8 @@ d = run("See `hooks/guard.py:2-10` here.\n")
 check("in-range path-line range is not reported", kinds(d) == [])
 d = run("See `hooks/guard.py:2-11` here.\n")
 check("range end past the file is reported", kinds(d) == ["path-line"])
+d = run("See `hooks/guard.py:40-2` here.\n")
+check("inverted range starting past the file is reported", kinds(d) == ["path-line"])
 d = run("Visit https://example.com:8080/x for more.\n")
 check("a URL port is not a path-line citation", kinds(d) == [])
 d = run("Connect to example.com:443 or host.local:8080 directly.\n")
@@ -103,6 +107,23 @@ check("a quote with no quotation verb is not attributed", kinds(d) == [])
 
 d = run("`hooks/guard.py` says \u201crefuses every pull while blocking\u201d.\n")
 check("curly-quoted misquote is reported", kinds(d) == ["quote-in-file"])
+
+# A quote is checked against the named files together, not each one.
+d = run('`hooks/guard.py` and `other.txt` compare: the first says '
+        '"refuses every push while blocking" plainly.\n', {"other.txt": "unrelated text\n"})
+check("quote found in one of two named files is not reported", kinds(d) == [])
+d = run('`hooks/guard.py` and `other.txt` compare: the first says '
+        '"refuses every pull while blocking" plainly.\n', {"other.txt": "unrelated text\n"})
+check("quote in neither named file is reported once", kinds(d) == ["quote-in-file"])
+
+# A short quote consumes its own marks, so the prose between two quotes is
+# never read as a third quote.
+d = run('`hooks/guard.py` says "short" and then, much later in the line, "x".\n')
+check("prose between two quotes is not a quote", kinds(d) == [])
+
+# A non-UTF-8 added line is examined, not a crash.
+d = run("", raw=b"Caf\xe9 cites `hooks/guard.py:40` here.\n")
+check("non-UTF-8 line is examined and reported", kinds(d) == ["path-line"])
 
 # An added line beginning "++ " is content, not a file header, and the
 # lines after it in the same hunk are still examined.
@@ -130,14 +151,31 @@ d = run("Cite `guard.py:3`.\n")
 check("unresolvable relative path is reported", kinds(d) == ["path-line"])
 
 # quote-in-issue, with the network call replaced by a canned body.
-cpc.issue_body = lambda num, repo, cache: (
-    "The proposal keeps the hook advisory." if num == "42" else None)
+import os  # noqa: E402
+
+# Before stubbing: with gh absent, the real lookup reports, never raises.
+_path = os.environ.get("PATH", "")
+os.environ["PATH"] = ""
+try:
+    check("missing gh reads as an unreadable issue",
+          cpc.issue_body("5", "o/r", {}) is None)
+except OSError:
+    check("missing gh reads as an unreadable issue", False)
+finally:
+    os.environ["PATH"] = _path
+
+cpc.issue_body = lambda num, repo, cache: {
+    "42": "The proposal keeps the hook advisory.",
+    "44": "An unrelated issue body.",
+}.get(num)
 _main = cpc.main
 cpc.main = lambda argv: _main(argv + ["--issues"])
 d = run('#42 proposes "keeps the hook advisory" as the scope.\n')
 check("accurate issue quote is not reported", kinds(d) == [])
 d = run('#42 proposes "makes the hook blocking" as the scope.\n')
 check("issue misquote is reported", kinds(d) == ["quote-in-issue"])
+d = run('#42 and #44 compare: the first proposes "keeps the hook advisory".\n')
+check("issue quote found in one of two issues is not reported", kinds(d) == [])
 d = run('#43 says "an unreadable issue body here" in full.\n')
 check("unreadable issue is reported", kinds(d) == ["quote-in-issue"])
 cpc.main = _main

@@ -78,3 +78,5 @@ all units and applies fixes afterward on the user's go-ahead.
 
 This agent keeps `Bash` for read-only checks (a local render, `git show`, `grep`).
 Avoiding a write-capable shell command is instruction-level discipline rather than a harness guarantee, so it is on you: do not run anything that writes, moves, or deletes a file, pushes, or posts.
+
+A command that can print the environment or credentials (`ps e`/`ps axe`, `env`, `printenv`, `/proc/<pid>/environ`, a config dump) gets count-only output (`grep -c`, `wc -l`) and never its matching lines, whatever the brief asked you to measure ([`improve-your-subagents`](../../shared/workflow/improve-your-subagents.md#a-brief-that-asks-for-a-measurement-must-say-what-output-may-be-printed)).

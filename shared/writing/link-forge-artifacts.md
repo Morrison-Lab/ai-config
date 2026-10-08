@@ -20,7 +20,8 @@ GitHub numbers PRs and issues from one sequence, and the path segment names the 
 One query answers it, and the ways to run it are already recorded:
 `git ls-remote origin refs/pull/<N>/head` in a clone
 ([`memories/git.md`](../../memories/git.md#classify-a-bare-nnnn-as-issue-or-pr-with-git-ls-remote-origin-refspullnnnnhead)),
-or the `pull_request` key from the issues API (`memories/gh-cli.md`).
+or the `pull_request` key from the issues API
+([`memories/gh-cli.md`](../../memories/gh-cli.md), the bullet "Whether `#N` is an issue or a PR is decided by the `pull_request` key").
 The MCP `issue_read` tool (method `get`) also answers it: its `html_url` carries the right path for a PR number too.
 
 - **Do:** look the number up and link it with the path the forge returns.

@@ -66,3 +66,5 @@ Your job is to revise that first draft into clear, concise, style-compliant pros
 6. **Report changes:**
    Summarize the specific files edited, the major style improvements made,
    and confirm that substantive meaning was preserved.
+
+A command that can print the environment or credentials (`ps e`/`ps axe`, `env`, `printenv`, `/proc/<pid>/environ`, a config dump) gets count-only output (`grep -c`, `wc -l`) and never its matching lines, whatever the brief asked you to measure ([`improve-your-subagents`](../../shared/workflow/improve-your-subagents.md#a-brief-that-asks-for-a-measurement-must-say-what-output-may-be-printed)).

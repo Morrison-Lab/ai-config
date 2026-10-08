@@ -113,7 +113,7 @@ Blocking hooks deny execution (exit code 2), while warning hooks emit actionable
 A widening that fixes false negatives by scanning more of the command can start firing on text that merely *mentions* the pattern.
 In a Bash command the commonest such carriers are a heredoc commit message (`git commit -m "$(cat <<'EOF' ... EOF)"`), a PR or issue body, and a `#` comment.
 
-Measured 2026-10-08 on [ai-config#4398](https://github.com/Morrison-Lab/ai-config/pull/4398), a warn-only `PreToolUse` hook.
+Measured 2026-10-08 on [ai-config#4398](https://github.com/Morrison-Lab/ai-config/pull/4398), which adds a warn-only `PreToolUse` hook.
 A round-1 review fix made it scan the raw command text for `$(...)` substitutions.
 It then fired on ordinary commit messages whose heredoc bodies described the pattern.
 `scripts/lib/shellcmd.py` already strips two of the three: `_heredoc_free` blanks heredoc bodies and `_comment_free` drops unquoted comments, and `simple_commands` applies both before splitting.

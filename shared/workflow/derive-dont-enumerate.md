@@ -587,7 +587,7 @@ attributing it additionally to an environment gap would have been a second cause
   the question is whether its output was trusted enough to act on.
 
 Ninth, 2026-10-08, on [ai-config#4398](https://github.com/Morrison-Lab/ai-config/pull/4398), and the population narrowed this time was **the workflow file's jobs**.
-The pre-push pass ran every `run: python3 ...` step of `validate.yml`'s `validate` job, a list that really was complete for that job.
+The pre-push pass ran every `run: python3 ...` step of `validate.yml`'s `validate` job, by hand.
 The PR went red on `new-line-breaks`, a sibling job in the same file whose only check step is `uses: Morrison-Lab/gha/check-new-line-breaks@...`, so a scan for `run:` lines cannot reach it.
 `run-local-validation.py` already covers that job: it maps the `uses:` step to the vendored copy, `scripts/vendor/gha-check-new-line-breaks.py`, and runs it with the job's own `with:` inputs.
 When only that one check is wanted, scope the same derived run to it rather than retyping the job's `with:` inputs by hand:

@@ -223,7 +223,10 @@ def _gh_merge(rest):
     if rest[i:i + 2] != ["pr", "merge"]:
         return None
     args = rest[i + 2:]
-    return _pr_number(args), _known_repo(_flag_value(args, ("-R", "--repo")))
+    # gh also accepts -R/--repo before the subcommand (`gh -R o/r pr merge 12`).
+    repo = (_flag_value(args, ("-R", "--repo"))
+            or _flag_value(rest[1:i], ("-R", "--repo")))
+    return _pr_number(args), _known_repo(repo)
 
 
 def _is_put(args):

@@ -106,6 +106,10 @@ def main():
           run(MERGE, [clean(n=99)])[0])
     check("warns when the run is for a DIFFERENT repo",
           run(MERGE, [clean(repo="-R other/repo")])[0])
+    check("warns on a global `gh -R repo-B pr merge 12` after a clean repo-A run",
+          run("gh -R other/repo pr merge 12", [clean()])[0])
+    check("silent on a global `gh --repo o/r pr merge 12` with a matching run",
+          not run("gh --repo Morrison-Lab/ai-config pr merge 12", [clean()])[0])
     check("warns on a bare `gh pr merge N` with no -R",
           run("gh pr merge 12", [])[0])
     check("warns on a merge buried in a && chain",

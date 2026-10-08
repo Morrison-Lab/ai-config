@@ -12,10 +12,17 @@ Telling the user I replied to a comment, filed an issue, posted a review, kicked
 A comment has no number to recognize the way a PR does, so its link is the *only* way the user can locate it without re-deriving the search themselves.
 Give the direct link (a URL, or a clickable path for a file) in the reply that mentions the item, never a description of where to find it.
 
-- **Do:** link every comment, review, issue, PR, MR, run, published page, or file I mention having posted, created, or acted on, wherever the mention occurs --- table or prose.
+**The rule covers what I name, not only what I created.**
+A page, PR preview, source file, or check run that I only read, fetched, or inspected while answering a question needs its link too.
+Naming "the preview page" or "the example subfile" without a URL makes the user search for the thing they asked about.
+
+- **Do:** link every comment, review, issue, PR, MR, run, check, PR preview, published page, or file I mention, wherever the mention occurs --- table or prose, created by me or only read.
+- **Do:** give a preview page as its preview URL (with a `#anchor` where one exists) and a source file as its blob URL on the branch under discussion.
 - **Don't:** report "I replied to that", "posted the referee report on the MR", or "filed the issue" as a bare fact with no link attached.
+- **Don't:** answer a question about a rendered page or a source file by naming it in plain text.
 
 See [`hyperlink-liberally`](hyperlink-liberally.md) for the general principle covering tools, internal rules, and technical terms.
 
 (Directive from the user, 2026-09-09: telling them a reply had been posted without linking it made them go find it themselves.)
 (Directive from the user, 2026-10-02, after a referee report was posted on a GitLab MR without a link: "give me the link" --- "always".)
+(Directive from the user, 2026-10-08, after an answer named a PR preview page and two source files with no links: "haven't I told you to always provide links?")

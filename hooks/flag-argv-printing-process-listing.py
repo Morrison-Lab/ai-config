@@ -23,7 +23,9 @@ tool output, including those of processes this session did not start.
 WHAT IT CHECKS
 --------------
 Every simple command in the Bash command line --- including those inside a
-shell's `-c` argument, a `$(...)` or backtick substitution (quoted or not;
+shell's `-c` argument, a `$(...)`, backtick or `<(...)` process
+substitution (quoted or not, and masked out of the enclosing command so
+`ps -p $(pgrep x) -o args` keeps its `-o args`;
 heredoc bodies and `#` comments are blanked first, so a commit message or PR
 body that merely mentions `ps aux` stays silent), and a quoted remote command
 (`ssh host 'ps aux'`) --- for a program that prints OTHER processes' command
@@ -190,6 +192,8 @@ PROC_TESTERS = {"test", "[", "[[", "ls", "stat", "readlink", "realpath",
 GREP_PROGS = {"grep", "egrep", "fgrep", "rg"}
 GREP_QUIET_LONG = {"--files-with-matches", "--files-without-match", "--count",
                    "--quiet", "--silent"}
+
+SHELLS = {"sh", "bash", "zsh", "dash", "ash", "ksh"}
 
 MAX_DEPTH = 3
 MAX_COMMAND = 10000
@@ -379,8 +383,15 @@ def _proc_leak(argv, program):
     redirected = [i for i in hits if i and RX_REDIRECT.match(argv[i - 1])]
     if name in PROC_TESTERS and not redirected:
         return None
+    if name == "git" and argv[program + 1:program + 2] == ["grep"]:
+        name, program = "grep", program + 1  # `git grep` patterns too
     if name in GREP_PROGS:
         args = argv[program + 1:]
+        # A pattern given with `-e`/`--regexp` is a search string, not a read.
+        hits = [i for i in hits
+                if argv[i - 1] not in ("-e", "--regexp")]
+        if not hits:
+            return None
         if any(tok in GREP_QUIET_LONG
                or (tok.startswith("-") and not tok.startswith("--")
                    and set(tok[1:]) & set("lLcq"))
@@ -424,13 +435,14 @@ def _leak(argv):
     return None
 
 
-def _substitutions(text):
-    """Bodies of `$(...)` and backtick substitutions outside single quotes.
+def _substitution_spans(text):
+    """`(start, end, body)` of each top-level substitution outside single quotes.
 
+    Covers `$(...)`, backticks, and process substitution `<(...)`/`>(...)`.
     One linear pass; an unclosed `$(` takes the rest of the text as its body.
     """
-    bodies, i, n, in_double = [], 0, len(text), False
-    while i < n and len(bodies) < MAX_BODIES:
+    spans, i, n, in_double = [], 0, len(text), False
+    while i < n and len(spans) < MAX_BODIES:
         ch = text[i]
         if ch == "\\":
             i += 2
@@ -445,19 +457,35 @@ def _substitutions(text):
             close = text.find("`", i + 1)
             if close == -1:
                 break
-            bodies.append(text[i + 1:close])
+            spans.append((i, close + 1, text[i + 1:close]))
             i = close + 1
             continue
-        elif text.startswith("$(", i):
+        elif text[i:i + 2] in ("$(", "<(", ">("):
             depth, j = 1, i + 2
             while j < n and depth:
                 depth += {"(": 1, ")": -1}.get(text[j], 0)
                 j += 1
-            bodies.append(text[i + 2:j - 1] if not depth else text[i + 2:])
+            spans.append((i, j, text[i + 2:j - 1] if not depth else text[i + 2:]))
             i = j
             continue
         i += 1
-    return bodies
+    return spans
+
+
+def _masked(text, spans):
+    """TEXT with each substitution span replaced by one placeholder word.
+
+    The shared tokenizer splits on a substitution's parenthesis, so
+    `ps -p $(pgrep x) -o args` would lose its `-o args`; the bodies are
+    scanned separately.
+    """
+    out, last = [], 0
+    for start, end, _body in spans:
+        out.append(text[last:start])
+        out.append("SUBST")
+        last = end
+    out.append(text[last:])
+    return "".join(out)
 
 
 def _discarded(argv, following, line):
@@ -535,11 +563,12 @@ def find_leak(command, depth=0):
         return None
     for line in shell_c_expansions(command):
         live = _comment_free(_heredoc_free(line))
-        for body in _substitutions(live):
+        spans = _substitution_spans(live)
+        for _start, _end, body in spans:
             found = find_leak(body, depth + 1)
             if found:
                 return found
-        for pipeline in _pipelines(live):
+        for pipeline in _pipelines(_masked(live, spans)):
             argvs = simple_commands(pipeline) or []
             for k, argv in enumerate(argvs):
                 found = _leak(argv)
@@ -549,16 +578,27 @@ def find_leak(command, depth=0):
         if not argvs:
             continue
         for argv in argvs:
-            # A quoted remote or container command (`ssh host 'ps aux'`,
-            # `docker exec c sh -c "ps aux"`) is one token; read it as a line.
+            # A quoted remote command (`ssh host 'ps aux'`) is one token at
+            # the program position, and a container's shell (`docker exec c
+            # sh -c "ps aux"`) carries one after `-c`. Only those are read as
+            # a line; a commit message behind `timeout` is not a command.
             first = argv[0] if argv else ""
-            if (os.path.basename(first) in WRAPPER_OPERANDS
+            if not (os.path.basename(first) in WRAPPER_OPERANDS
                     or os.path.basename(first) in CONTAINER_CLIS):
-                for token in argv[1:]:
-                    if " " in token:
-                        found = find_leak(token, depth + 1)
-                        if found:
-                            return found
+                continue
+            located = _resolve(argv)
+            if located is None:
+                continue
+            index = located[0]
+            program = argv[index]
+            candidates = [program] if " " in program else []
+            if os.path.basename(program) in SHELLS:
+                candidates += [tok for prev, tok in zip(argv[index:], argv[index + 1:])
+                               if prev == "-c" and " " in tok]
+            for token in candidates:
+                found = find_leak(token, depth + 1)
+                if found:
+                    return found
     return None
 
 

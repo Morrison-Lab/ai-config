@@ -506,6 +506,7 @@ A shell's own `set -x` trace prints the expanded words too: `set -x; curl -H "Au
 - **Don't:** turn on `set -x` around a command that expands a secret.
 - **Do:** when you must measure a listing (a review, a fact-check), print only a count: `ps axe -o pid,comm | grep -c PATH=`, never the matched lines.
   Use a marker process that keeps its argv, `sh -c 'sleep 90; :' marker`; `bash -c 'sleep 90'` can exec `sleep` directly and drop the marker.
+  Stop it with `kill $!` from the shell that started it, not `pkill -f marker`, whose pattern is in the caller's own argv (see the `pgrep -f` self-match section at the top of this file).
 - **Don't:** brief a subagent to measure listing behaviour without that count-only rule.
   Case, 2026-10-08 (this entry's own review): a reviewer told only to measure ran `ps axe -o pid,comm | grep sleep`, which printed the container's environment, a session token included, into its transcript.
 

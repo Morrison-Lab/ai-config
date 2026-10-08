@@ -135,6 +135,13 @@ for cmd in [
     "ps -auxf",
     "ps -aufx",
     "ps -ux",
+    # review round 9 (measured): an unquoted $(...) operand must not cut argv
+    "ps -p $(pgrep -f probe) -o pid,etime,command",
+    "ps -p $(cat /tmp/probe.pid) -o pid,etime,args",
+    "ps -p $(pgrep -f probe) -f",
+    "ps -q $(pgrep -f probe) -o args=",
+    "ps -p `pgrep -f probe` -o args",
+    "grep curl <(ps aux)",
     "xargs -0 printf '%s\\n' < /proc/1/environ",
     "cat /proc/$pid/cmdline",
     "ps aux | grep foo | awk '{print $2}'",
@@ -246,6 +253,14 @@ for cmd in [
     "ps $$",
     "echo /proc/1/cmdline",
     "ps -axo pid,comm",
+    "ps -p $(pgrep -f probe) -o pid,etime,comm",
+    # review round 9: message text behind a wrapper is not a command
+    'timeout 60 git commit -m "Warn on argv listings.\n\nps aux and ps -ef print argv."',
+    'env GIT_EDITOR=true git commit -m "Docs.\n\nps -ef prints argv"',
+    'timeout 60 gh pr comment 5 --body "Measured.\nps aux leaked a token"',
+    # a /proc path given as a search pattern
+    "git grep -n '/proc/$pid/cmdline'",
+    "grep -rn -e '/proc/1/cmdline' hooks",
     "make >/dev/null; ps aux | wc -l",
     "ps aux 2>&1 | wc -l",
     "ps -p 1 2>/dev/null",

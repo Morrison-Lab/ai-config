@@ -167,39 +167,37 @@ def check_line(root: Path, citing: str, text: str, issues: bool,
             continue
         count = len(target.read_text(encoding="utf-8", errors="replace").splitlines())
         if int(m.group("start")) == 0:
-            findings.append(("path-line", f"`{cited}:0`: lines are numbered from 1"))
+            findings.append(("path-line", f"`{m.group(0)}`: lines are numbered from 1"))
         elif last > count:
             findings.append(("path-line",
                              f"`{cited}:{last}` is past the end ({count} lines)"))
     quotes = [q for m in QUOTED_RE.finditer(text)
               if len(q := (m.group("text") or m.group("curly") or "")) >= MIN_QUOTE]
     if quotes and QUOTE_VERB_RE.search(text):
-        # A line naming several files may quote only one of them, so a quote
-        # is reported only when NONE of the named files contains it.
-        named = []
+        # A line naming several sources (files, and #N with --issues) may
+        # quote only one of them, so a quote is reported only when NONE of
+        # the named sources contains it.
+        sources = []
         for f in FILE_RE.finditer(text):
             target = resolve(root, citing, f.group("path"))
             if target is not None:
-                named.append((f.group("path"), squash(
+                sources.append((f"`{f.group('path')}`", squash(
                     target.read_text(encoding="utf-8", errors="replace"))))
-        for q in quotes:
-            if named and not any(squash(q) in body for _, body in named):
-                names = ", ".join(f"`{p}`" for p, _ in named)
-                findings.append(("quote-in-file", f"\"{q}\" is not in {names}"))
+        has_issue = False
         if issues:
-            bodies = []
             for i in ISSUE_RE.finditer(text):
                 body = issue_body(i.group("num"), repo, cache)
                 if body is None:
                     findings.append(("quote-in-issue",
                                      f"#{i.group('num')} could not be read"))
                     continue
-                bodies.append((i.group("num"), squash(body)))
-            for q in quotes:
-                if bodies and not any(squash(q) in b for _, b in bodies):
-                    names = ", ".join(f"#{n}" for n, _ in bodies)
-                    findings.append(("quote-in-issue",
-                                     f"\"{q}\" is not in the body of {names}"))
+                has_issue = True
+                sources.append((f"#{i.group('num')}", squash(body)))
+        kind = "quote-in-issue" if has_issue else "quote-in-file"
+        for q in quotes:
+            if sources and not any(squash(q) in body for _, body in sources):
+                names = ", ".join(name for name, _ in sources)
+                findings.append((kind, f"\"{q}\" is not in {names}"))
     if CORPUS_STATE_RE.search(text) and not DERIVED_RE.search(text):
         findings.append(("corpus-state",
                          "claim about corpus state with no query beside it"))

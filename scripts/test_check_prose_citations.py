@@ -88,6 +88,9 @@ d = run("See `hooks/guard.py:2-11` here.\n")
 check("range end past the file is reported", kinds(d) == ["path-line"])
 d = run("See `hooks/guard.py:0` here.\n")
 check("line 0 is reported", kinds(d) == ["path-line"])
+d = run("See `hooks/guard.py:0-3` here.\n")
+check("a range starting at 0 is named in full",
+      "`hooks/guard.py:0-3`" in d["findings"][0]["detail"])
 d = run('`hooks/guard.py:1` says "refuses every pull while blocking".\n')
 check("quote whose source is cited as path:N is checked",
       kinds(d) == ["quote-in-file"])
@@ -181,6 +184,8 @@ d = run('#42 proposes "makes the hook blocking" as the scope.\n')
 check("issue misquote is reported", kinds(d) == ["quote-in-issue"])
 d = run('#42 and #44 compare: the first proposes "keeps the hook advisory".\n')
 check("issue quote found in one of two issues is not reported", kinds(d) == [])
+d = run('Per `hooks/guard.py` and #44, it says "refuses every push while blocking".\n')
+check("quote found in a named file is not reported against #N", kinds(d) == [])
 d = run('#43 says "an unreadable issue body here" in full.\n')
 check("unreadable issue is reported", kinds(d) == ["quote-in-issue"])
 cpc.main = _main

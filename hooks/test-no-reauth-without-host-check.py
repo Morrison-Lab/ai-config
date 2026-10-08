@@ -88,10 +88,15 @@ SHOULD_WARN = [
      "glab api user with NO host names no host: it is the failing call itself"),
     ("W8", [user("go"), FAILED, reply_tool(CLAIM)],
      "the message is a reply-tool payload, not an assistant text block"),
-    ("W9", [user("go"), FAILED, final("Your credentials were revoked, it seems.")],
+    ("W9", [user("go"), FAILED, final("Your GitLab token was revoked, it seems.")],
      "'credentials were revoked' with no check"),
     ("W11", [user("go"), FAILED, final("Please run glab auth login and tell me when done.")],
      "the login command written without backticks"),
+    ("W12", [user("go"), bash("echo curl https://h.example.org/api/v4/user"),
+             final(CLAIM)],
+     "curl as an ARGUMENT of echo is not a token check"),
+    ("W13", [user("go"), FAILED, final("To fix this, run `glab auth login`.")],
+     "a request opened by a clause and a comma"),
     ("W10", [user("go"), FAILED, final("Looks like you must log in again.")],
      "'log in again' as an instruction"),
 ]
@@ -116,12 +121,12 @@ SHOULD_STAY_SILENT = [
             final("Example:\n\n" + FENCE + "\nPlease re-authenticate. The token expired.\n"
                   + FENCE + "\n\nThat is what the test feeds the hook.")],
      "the phrases only inside a fenced block"),
-    ("S7", [user("go"), FAILED, final("The token has not expired; the host was wrong.")],
+    ("S7", [user("go"), FAILED, final("The GitLab token has not expired; the host was wrong.")],
      "a negated expiry claim"),
     ("S8", [user("go"), FAILED, final("The issues list has 12 open items.")],
      "no claim at all"),
     ("S9", [user("go"), FAILED,
-            final("If the token expired I would see a 401 from the right host, "
+            final("If the GitLab token expired I would see a 401 from the right host, "
                   "but I have not seen one.")],
      "a conditional mention"),
     ("S10", [user("go"), bash("curl -s https://h.example.org/api/v4/user"),
@@ -141,6 +146,25 @@ SHOULD_STAY_SILENT = [
     ("S17", [user("go"), FAILED,
              final("If gitlab.com says the token expired, check the host first.")],
      "a dotted hostname must not end the sentence before the conditional opening"),
+    ("S18", [user("go"), FAILED, final("The login page expired after 10 minutes.")],
+     "'login page expired' names no forge credential"),
+    ("S19", [user("go"), FAILED,
+             final("The authentication cookie expired in the browser test.")],
+     "a browser cookie is not a forge token"),
+    ("S20", [user("go"), FAILED,
+             final("The CI token was revoked by the admin last year.")],
+     "a CI token with no forge word in the sentence"),
+    ("S21", [user("go"), FAILED,
+             final("Use gh auth login --with-token to script this.")],
+     "--with-token is scripting, not a request to log in"),
+    ("S22", [user("go"), FAILED, final("Tests run gh auth login in CI.")],
+     "a description of what tests do, not a request"),
+    ("S23", [user("go"), FAILED,
+             final("The hook warns when you run gh auth login without a check.")],
+     "a description of the hook's trigger, not a request"),
+    ("S24", [user("go"), bash("t=$(curl -s https://h.example.org/api/v4/user)"),
+             final(CLAIM)],
+     "curl inside a command substitution still counts"),
     ("S13", [user("go"), FAILED, final("Do not run `glab auth login` yet; the host was wrong.")],
      "a negated auth-login instruction"),
     ("S14", [user("go"), FAILED, final("The session lock expired, so I retried.")],
@@ -222,6 +246,22 @@ for kind in BAD_TRANSCRIPTS:
     wrong += got != "silent"
     print(f"  {got:<6} {kind}")
 
+# A hook that cannot evaluate must say so on stderr (fail open, not silent).
+def stderr_of(stdin_text):
+    proc = subprocess.run([sys.executable, HOOK], input=stdin_text,
+                          capture_output=True, text=True)
+    return proc.returncode, proc.stdout, proc.stderr
+
+
+for desc, stdin_text in (
+        ("no transcript_path", json.dumps({})),
+        ("unreadable transcript path",
+         json.dumps({"transcript_path": "/nonexistent/transcript.jsonl"}))):
+    code, out, err = stderr_of(stdin_text)
+    ok = code == 0 and not out.strip() and "no-reauth-without-host-check" in err
+    wrong += not ok
+    print(f"  {'ok  ' if ok else 'WRONG'} STDERR  {desc}: silent stdout, one-line stderr note")
+
 # Fires at most once per distinct message.
 dup = write_transcript([user("go"), FAILED, final(CLAIM)], uuid.uuid4().hex)
 first, second = run(HOOK, dup), run(HOOK, dup)
@@ -241,14 +281,13 @@ CASES = {cid: entries for cid, entries, _ in SHOULD_WARN + SHOULD_STAY_SILENT}
 MUTATIONS = {
     "M1_curl_check": (
         "a curl to /user no longer counts as a check",
-        [('    if RX_CURL_USER.search(command):\n        return True\n',
+        [('        if _is_curl_segment(seg) and RX_CURL_USER.search(seg):\n            return True\n',
           '')],
-        {"S1", "S10", "S11", "S12"},
+        {"S1", "S10", "S11", "S12", "S24"},
     ),
     "M2_scoped_api_check": (
         "glab/gh api user no longer counts as a check",
-        [('    return any(_segment_verifies(s) for s in RX_SEGMENT_SPLIT.split(command))',
-          '    return False')],
+        [('        if _segment_verifies(seg):\n            return True\n', '')],
         {"S2", "S3", "S4"},
     ),
     "M3_host_required": (
@@ -267,7 +306,7 @@ MUTATIONS = {
         "negated and conditional claims must be skipped",
         [('        if (RX_NEGATED_BEFORE.search(prefix) or RX_CONDITIONAL_OPENING.search(prefix)\n'
           '                or RX_NEGATED_INSIDE.search(m.group(0))):', '        if False:')],
-        {"S7", "S9", "S13", "S15", "S17"},
+        {"S7", "S9", "S15", "S17"},
     ),
     "M6_code_stripping": (
         "code spans and fences must be ignored",
@@ -279,7 +318,7 @@ MUTATIONS = {
         "an auth-login command in a code span or fence must survive stripping",
         [('    prose = strip_code(mark_auth_commands(text))',
           '    prose = strip_code(text)')],
-        {"W2", "W4"},
+        {"W1", "W2", "W4", "W5", "W6", "W7", "W8", "W12", "W13"},
     ),
     "M8_hook_feedback": (
         "hook feedback must not count as a new prompt",
@@ -293,6 +332,28 @@ MUTATIONS = {
           '                       for b in _blocks(m)):',
           '                if True:')],
         {"S10"},
+    ),
+    "M12_curl_command_word": (
+        "curl must be the command word of its segment",
+        [('_is_curl_segment(seg) and ', '')],
+        {"W12"},
+    ),
+    "M13_forge_context": (
+        "an expiry claim needs a forge word in its sentence",
+        [('if m.group("expiry") and not RX_FORGE_CONTEXT.search(',
+          'if False and not RX_FORGE_CONTEXT.search(')],
+        {"S18", "S19", "S20"},
+    ),
+    "M14_addressed_prefix": (
+        "a login command must be addressed to the user",
+        [('if m.group("imper") and not RX_ADDRESSED_PREFIX.search(prefix):',
+          'if False:')],
+        {"S22", "S23"},
+    ),
+    "M15_with_token": (
+        "--with-token is scripting",
+        [(r'(?!\s+--with-token)', '')],
+        {"S21"},
     ),
     "M10_reply_tool": (
         "reply-tool payloads must be read as the final message",

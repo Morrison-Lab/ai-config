@@ -39,6 +39,10 @@ Known limit, accepted: the check only needs a host to be NAMED, so a
 `curl https://gitlab.com/api/v4/user` counts even when the intended host is
 another; the guard cannot know which host was intended.
 
+Known limit, accepted: the credential-expiry reading needs a forge word
+(GitLab, GitHub, glab, gh, PAT, auth) in the same sentence, so an expiry
+statement that names none is not read.
+
 ## Why this warns rather than blocks
 
 Sometimes re-authentication really is needed and the check was made some
@@ -71,17 +75,30 @@ MARKER = "AUTHCMD"
 REPLY_TOOL_RX = re.compile(r"(^|__)(reply|post_message|update_message)$", re.I)
 
 RX_CLAIM = re.compile(
-    r"(?:\b(?:re-?run|run|execute|try|use)\W{0,3}(?:" + MARKER +
-    r"|(?:glab|gh)\s+auth\s+login\b))"
+    r"(?P<imper>\b(?:re-?run|run|execute|try|use)\W{0,3}(?:" + MARKER +
+    r"|(?:glab|gh)\s+auth\s+login\b(?!\s+--with-token)))"
     r"|(?:\b(?:please |you(?:'ll| will)? (?:need|have) to |you need to |"
     r"you must |can you |could you |will you |go ahead and |just )"
     r"re-?authenticat\w*)"
     r"|(?:\bre-?authenticat(?:e|ion)\b[^.\n]{0,40}\b(?:required|needed|necessary)\b)"
     r"|(?:\b(?:log|sign) ?in again\b)"
-    r"|(?:\b(?:token|credentials?|pat|login|authentication)\b"
+    r"|(?P<expiry>\b(?:token|credentials?|pat|login|authentication)\b"
     r"[^.\n]{0,30}\b(?:expired|(?:been|was|were|got|is|are) revoked|gone stale|is invalid)\b)",
     re.I,
 )
+# The expiry arm is about forge credentials only: "the login page expired"
+# or "the CI token was revoked" is not. A forge word must share the sentence.
+RX_FORGE_CONTEXT = re.compile(
+    r"\b(?:gitlab|github|glab|gh|pat|private-token|personal access token|"
+    r"access token|api token|auth)\b", re.I)
+# Text before a bare/backticked login command that makes it a request to the
+# user: nothing, an opener clause ("To fix this,"), polite words, or a modal
+# addressed to "you". "Tests run gh auth login" and "warns when you run ..."
+# describe rather than ask.
+RX_ADDRESSED_PREFIX = re.compile(
+    r"^\s*(?:[^,:;]{0,60}[,:;]\s*)?(?:(?:please|now|then|just|first|next|also|and|so)\s+)*"
+    r"(?:you\s+(?:can|could|should|will\s+need\s+to|need\s+to|must|have\s+to)\s+"
+    r"|(?:can|could|will)\s+you\s+|go\s+ahead\s+and\s+)?$", re.I)
 # A claim that is negated or conditional ("has not expired", "if the token
 # expired") is not an assertion that it did.
 RX_NEGATED_BEFORE = re.compile(
@@ -96,7 +113,7 @@ RX_NEGATED_INSIDE = re.compile(r"\b(?:not|never|n['\N{RIGHT SINGLE QUOTATION MAR
 
 RX_HOST_ASSIGN = re.compile(r"\b(?:GITLAB_HOST|GH_HOST)=\S+")
 RX_CURL_USER = re.compile(
-    r"\bcurl\b[^\n]*https?://[^\s'\"]+/(?:api/v\d+/)?"
+    r"https?://[^\s'\"]+/(?:api/v\d+/)?"
     r"(?:user|personal_access_tokens/self)(?![\w/-])", re.I)
 RX_SEGMENT_SPLIT = re.compile(r"[;&|\n]+")
 
@@ -112,11 +129,30 @@ def _segment_verifies(seg):
         r"(?:^|\s)['\"]?/?(?:api/v\d+/)?user['\"]?(?=\s|$)", m.group(1)))
 
 
+WRAPPERS = {"sudo", "command", "time", "env", "nohup"}
+RX_ASSIGN_TOKEN = re.compile(r"^[A-Za-z_]\w*=[^(]*$")
+RX_HEAD_PREFIX = re.compile(r"^(?:[A-Za-z_]\w*=)?(?:\$\(|\(|`)?")
+
+
+def _is_curl_segment(seg):
+    """True when `curl` is the command word of SEG (not an argument of echo etc.)."""
+    tokens = seg.split()
+    while tokens and (RX_ASSIGN_TOKEN.match(tokens[0]) or tokens[0] in WRAPPERS):
+        tokens.pop(0)
+    if not tokens:
+        return False
+    head = RX_HEAD_PREFIX.sub("", tokens[0])
+    return os.path.basename(head) == "curl"
+
+
 def command_verifies_host(command):
     """True when COMMAND checks a token against a named host."""
-    if RX_CURL_USER.search(command):
-        return True
-    return any(_segment_verifies(s) for s in RX_SEGMENT_SPLIT.split(command))
+    for seg in RX_SEGMENT_SPLIT.split(command):
+        if _is_curl_segment(seg) and RX_CURL_USER.search(seg):
+            return True
+        if _segment_verifies(seg):
+            return True
+    return False
 
 
 def _closes_fence(line, run):
@@ -155,6 +191,14 @@ def mark_auth_commands(text):
     return CODE_SPAN_RE.sub(_span, joined)
 
 
+def _sentence_of(prose, start, end):
+    """The sentence of PROSE containing the span [start, end)."""
+    s_start = max(
+        (b.end() for b in RX_SENTENCE_END.finditer(prose, 0, start)), default=0)
+    after = RX_SENTENCE_END.search(prose, end)
+    return prose[s_start:after.start() if after else len(prose)]
+
+
 def find_claim(text):
     """The first reauthentication claim in TEXT (code-aware), or None."""
     prose = strip_code(mark_auth_commands(text))
@@ -165,6 +209,11 @@ def find_claim(text):
         prefix = prose[sent_start:m.start()]
         if (RX_NEGATED_BEFORE.search(prefix) or RX_CONDITIONAL_OPENING.search(prefix)
                 or RX_NEGATED_INSIDE.search(m.group(0))):
+            continue
+        if m.group("imper") and not RX_ADDRESSED_PREFIX.search(prefix):
+            continue
+        if m.group("expiry") and not RX_FORGE_CONTEXT.search(
+                _sentence_of(prose, m.start(), m.end())):
             continue
         return m
     return None
@@ -218,9 +267,16 @@ def main() -> int:
         return 0
     try:
         payload = json.load(sys.stdin)
-        text, verified = scan(payload.get("transcript_path") or "")
-    except Exception:
-        return 0  # fail open
+        transcript = payload.get("transcript_path") or ""
+        if not transcript:
+            print("no-reauth-without-host-check: no transcript_path in hook "
+                  "input; not evaluating", file=sys.stderr)
+            return 0
+        text, verified = scan(transcript)
+    except Exception as exc:  # fail open, but say so
+        print(f"no-reauth-without-host-check: cannot read transcript "
+              f"({exc}); not evaluating", file=sys.stderr)
+        return 0
 
     if not text or verified:
         return 0

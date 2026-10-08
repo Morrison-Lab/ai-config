@@ -81,6 +81,10 @@ SHOULD_WARN = [
      "a leading -R with its value must not be read as the subcommand"),
     ("W12", "glab --repo group/project issue list", "plain",
      "a leading --repo with its value must not be read as the subcommand"),
+    ("W14", "glab api --hostname", "plain",
+     "a valueless --hostname names no host"),
+    ("W15", "glab api --hostname= user", "plain",
+     "an empty --hostname= names no host"),
     ("W13", "(cd {selfhosted} && glab mr list); glab api user", "plain",
      "a cd inside a subshell must not leak into the next command"),
 ]
@@ -234,7 +238,9 @@ CASES = {cid: (command, kind)
 MUTATIONS = {
     "M1_hostname_flag": (
         "dropping the --hostname exemption makes S1/S2 warn",
-        [('if tok == "--hostname" or tok.startswith("--hostname="):',
+        [('if tok == "--hostname" and i + 1 < len(args) and not args[i + 1].startswith("-"):',
+          'if False:'),
+         ('if tok.startswith("--hostname=") and tok != "--hostname=":',
           'if False:')],
         {"S1", "S2"},
     ),
@@ -287,6 +293,18 @@ MUTATIONS = {
         [('            dirs[scope] = resolve_cd_target(rest, dir_of(scope))',
           '            dirs[(0,)] = resolve_cd_target(rest, dir_of((0,)))')],
         {"W13"},
+    ),
+    "M13_hostname_value": (
+        "--hostname must carry a value",
+        [('        if tok == "--hostname" and i + 1 < len(args) and not args[i + 1].startswith("-"):',
+          '        if tok == "--hostname":')],
+        {"W14"},
+    ),
+    "M14_hostname_equals_value": (
+        "--hostname= must carry a value",
+        [('        if tok.startswith("--hostname=") and tok != "--hostname=":',
+          '        if tok.startswith("--hostname="):')],
+        {"W15"},
     ),
     "M10_value_flags": (
         "value-taking flags must be skipped when finding the subcommand",

@@ -28,7 +28,8 @@ A `glab` subcommand that talks to a GitLab project (`api`, `issue`, `mr`,
 A host set with `glab config set host` or `GL_HOST` also names a host (glab
 reads both before falling back), so those silence the warning.
 
-Known limits, accepted: a remote on any host other than gitlab.com or
+Known limits, accepted: a `GITLAB_HOST=` export made inside a subshell is
+treated as set for the rest of the command; a remote on any host other than gitlab.com or
 github.com (bitbucket.org, codeberg.org) counts as naming a host, because
 glab would try it; a `GITLAB_HOST` in the hook's own process environment
 silences the warning, but one exported only in the user's later shell state
@@ -132,7 +133,9 @@ def names_host(rest):
     """True when the glab argv itself carries a --hostname or host-qualified -R."""
     args = rest[1:]
     for i, tok in enumerate(args):
-        if tok == "--hostname" or tok.startswith("--hostname="):
+        if tok == "--hostname" and i + 1 < len(args) and not args[i + 1].startswith("-"):
+            return True
+        if tok.startswith("--hostname=") and tok != "--hostname=":
             return True
         value = None
         if tok in ("-R", "--repo") and i + 1 < len(args):

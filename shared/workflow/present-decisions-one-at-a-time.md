@@ -21,3 +21,12 @@ Mechanics:
 
 This changes how decisions are *posed*, not whether to ask at all: `research-before-asking` still gates each question, and an `away` grant still means don't block on questions --- resolve them by judgment, or skip-and-note, per that skill's scope.
 And it yields to an explicit request for the full backlog --- `prompt-me-all` / "ask me everything at once" is the user opting into a batch view.
+
+Pose each question where the user reads first.
+When work needs the user (a merge word, a decision, an answer to a question), say so where they read first, not only inside the thread that needs it (Ezra, 2026-10-08).
+In a project with a coordinator session, a thread session asks the coordinator to post the request in the main project chat, and the coordinator posts it there.
+Name the thread, say exactly what is needed, and link the item (PR, issue or question).
+A request that sits only in a thread can wait unseen for hours.
+
+- **Do:** post the ask in the main project or channel chat, with a link to the thread.
+- **Don't:** leave "waiting on you" only in a thread reply or a status checklist.

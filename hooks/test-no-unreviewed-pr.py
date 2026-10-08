@@ -931,6 +931,27 @@ case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
                     say("Three pushes, then one request.")], False,
      "three pushes arm ONE obligation, cleared by one request")
 
+def with_uuids(events, prefix):
+    """Copy `events`, stamping each line with a transcript `uuid`."""
+    return [dict(e, uuid=f"{prefix}{i}") for i, e in enumerate(events)]
+
+
+# Gate: a compacted transcript that repeats its pre-compaction lines (same
+# `uuid`s) arms each open ONCE, so one request discharges it (ai-config#2996).
+_HIST = with_uuids(create("c") + [say("Opened.")], "u")
+case(_HIST + _HIST + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                      say("Requested once after compaction.")], False,
+     "a repeated-uuid history arms one obligation, cleared by one request")
+# Control: the same lines under DIFFERENT uuids are two real events, so the
+# dedup must key on the uuid and not on the content.
+case(_HIST + with_uuids(create("c") + [say("Opened.")], "v")
+     + [bash(REQ_CMD_Q, tid="q"), res("q", OK), say("One request.")], True,
+     "distinct uuids are not collapsed, so one request leaves one open")
+# Control: with no uuid, nothing marks a line as a repeat, so it is kept.
+case(create("c") + create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                                  say("One request.")], True,
+     "uuid-less repeated lines are not collapsed")
+
 # Gate: a drafted PR needs no reviewer, so a push to it must not re-arm.
 case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
                     bash("gh pr ready 1038 --undo", tid="u"), res("u", "{}"),

@@ -251,6 +251,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/enforce-mwc-review-gate.py\"'",
+            "timeout": 30,
+            "script": "enforce-mwc-review-gate.py",
+            "why": "ai-config#4323 -- enforces that any PR merge executed under MWC or ALLOW_MERGE=1 has a verified clean automated review (or explicit clean adversarial review) on its head commit before allowing the merge, closing the review gate gap in Claude Code."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-whole-file-punct-replace.py\"'",
             "timeout": 10,
             "script": "no-whole-file-punct-replace.py",
@@ -935,6 +942,13 @@
             "timeout": 10,
             "script": "no-unauthorized-merge.py",
             "why": "cai 2026-08-04 'I want a mechanistic prohibition, not just a guideline' -- mechanistically blocks unauthorized GitHub MCP PR merge operations (mcp__github__merge_pull_request and defensive auto-merge tool variants) at the PreToolUse boundary unless explicit permission is present."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/enforce-mwc-review-gate.py\"'",
+            "timeout": 30,
+            "script": "enforce-mwc-review-gate.py",
+            "why": "ai-config#4323 -- enforces that any PR merge executed under MWC or ALLOW_MERGE=1 has a verified clean automated review (or explicit clean adversarial review) on its head commit before allowing the merge, closing the review gate gap in Claude Code."
           },
           {
             "type": "command",

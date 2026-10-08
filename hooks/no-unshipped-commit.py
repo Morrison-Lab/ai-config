@@ -864,6 +864,13 @@ def unpushed_commits_against_remotes(cwd, branch):
 
 PUSH_REMEDY = ("Push the branch, open or verify its PR, then report status. "
                "The standing rule is executable work, not a handoff item.")
+# The push guard refuses every push while the latest self-review is blocking,
+# so once a later commit has moved past the commit that review read, the next
+# step the session can take is a fresh review, not the push (ai-config#3270).
+REVIEW_REMEDY = ("The latest adversarial self-review is blocking and does not "
+                 "name this commit, so a push will be refused: address its "
+                 "findings, commit, re-dispatch the reviewer, then push and "
+                 "open or verify the PR.")
 
 
 _REVIEW_GUARD = None
@@ -1323,36 +1330,69 @@ def _has_completed_head_review(guard, path, head_sha):
     return False
 
 
-def is_push_held_by_blocking_review(path):
-    """True if the latest self-review in the transcript is blocking.
+_LATEST_REVIEW_CACHE = {}
 
-    `no-push-without-self-review.py` refuses every push while the latest
-    verdict is `needs_work`, whatever commit it names and whether or not it
-    names one, so demanding a push then leaves no way to end the turn while
-    the fix round runs, typically in a subagent (ai-config#3270). The work
-    owed is the fix and a fresh review, and the push guard still enforces
-    that at the next push; this only stops asking for a push it must refuse.
-    The condition is the guard's own, read the same way, so the two cannot
-    disagree about which verdicts hold a push.
+
+def _latest_review(path):
+    """(verdict, reviewed_commits) from the push guard's own reader, or None.
+
+    Cached per transcript state, since decide() asks once per checkout.
     """
     if not path or not os.path.isfile(path):
-        return False
+        return None
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    key = (path, st.st_mtime_ns, st.st_size)
+    if key in _LATEST_REVIEW_CACHE:
+        return _LATEST_REVIEW_CACHE[key]
     guard = _load_review_guard()
     if guard is None:
-        return False
+        return None
     try:
-        verdict, _, _ = guard.read_latest_review(path)
+        verdict, reviewed_commits, _ = guard.read_latest_review(path)
+        result = (verdict, list(reviewed_commits))
     except Exception as exc:
         print(f"no-unshipped-commit: cannot read the latest review ({exc})",
               file=sys.stderr)
+        result = None
+    _LATEST_REVIEW_CACHE.clear()
+    _LATEST_REVIEW_CACHE[key] = result
+    return result
+
+
+def _latest_review_is_blocking(path):
+    review = _latest_review(path)
+    return bool(review) and review[0] == "needs_work"
+
+
+def is_push_held_by_blocking_review(path, cwd=None, branch=None):
+    """True if the latest self-review is blocking and read this checkout's tip.
+
+    `no-push-without-self-review.py` refuses every push while the latest
+    verdict is `needs_work`, so demanding a push of the commit that review
+    read leaves no way to end the turn while the fix round runs, typically in
+    a subagent (ai-config#3270). The hold is scoped to the checkout or branch
+    whose tip the verdict names, so a blocking verdict on one branch does not
+    quiet another. A verdict naming no commit holds every push, as the guard
+    does. Once a commit moves past the reviewed one, decide() asks for a
+    fresh review instead (REVIEW_REMEDY), which the session can act on.
+    """
+    review = _latest_review(path)
+    if not review or review[0] != "needs_work":
         return False
-    return verdict == "needs_work"
+    if not review[1]:
+        return True
+    head_sha = _rev_parse(cwd, branch or "HEAD") if cwd else None
+    return bool(head_sha) and any(
+        _sha_matches(sha, head_sha) for sha in review[1])
 
 
 def is_push_deferred(cwd, path, branch=None, session_cwd=None):
     """True when the push guard would rightly refuse the push this hook asks for."""
     return (is_pre_push_review_in_flight(cwd, path, branch=branch, session_cwd=session_cwd)
-            or is_push_held_by_blocking_review(path))
+            or is_push_held_by_blocking_review(path, cwd=cwd, branch=branch))
 
 
 def _is_verdict_covering_head(text, guard, head_sha, path=None, call_id=None):
@@ -1707,13 +1747,14 @@ def decide(cwd, path):
     saw_commit, pending, commit_branches, commit_paths = scan_transcript(path)
     if not saw_commit:
         return ""
+    remedy = REVIEW_REMEDY if _latest_review_is_blocking(path) else PUSH_REMEDY
     if not cwd:
         if not pending:
             return ""
         if is_push_deferred(cwd, path):
             return ""
         return ("A commit was made with no later push or PR creation, and "
-                "repository state is unavailable to check. " + PUSH_REMEDY)
+                "repository state is unavailable to check. " + remedy)
 
     worktrees = list_worktrees(cwd)
     if not worktrees:
@@ -1728,10 +1769,10 @@ def decide(cwd, path):
             return ("The unshipped count for this branch is undefined --- no "
                     "upstream is configured, or git failed to answer --- and the "
                     "transcript shows a commit with no later push or PR "
-                    "creation. " + PUSH_REMEDY)
+                    "creation. " + remedy)
         if is_push_deferred(cwd, path):
             return ""
-        return f"{count} commit(s) on HEAD are not on its upstream. {PUSH_REMEDY}"
+        return f"{count} commit(s) on HEAD are not on its upstream. {remedy}"
 
     unpushed_wts = []
     undefined_wts = []
@@ -1810,13 +1851,13 @@ def decide(cwd, path):
             wt, count = unpushed_wts[0]
             wt_real = os.path.realpath(wt["path"]) if os.path.exists(wt["path"]) else wt["path"]
             if wt_real == cwd_real:
-                return f"{count} commit(s) on HEAD are not on its upstream. {PUSH_REMEDY}"
+                return f"{count} commit(s) on HEAD are not on its upstream. {remedy}"
             else:
                 branch_info = f" (branch '{wt['branch']}')" if wt.get("branch") else " (detached HEAD)"
-                return f"{count} commit(s) on worktree '{wt['path']}'{branch_info} are not on its upstream. {PUSH_REMEDY}"
+                return f"{count} commit(s) on worktree '{wt['path']}'{branch_info} are not on its upstream. {remedy}"
         elif not unpushed_wts and len(unpushed_branches) == 1 and not (pending and undefined_wts):
             branch, count = unpushed_branches[0]
-            return f"{count} commit(s) on branch '{branch}' are not on its upstream. {PUSH_REMEDY}"
+            return f"{count} commit(s) on branch '{branch}' are not on its upstream. {remedy}"
         elif not unpushed_wts and not unpushed_branches and len(undefined_wts) == 1:
             wt = undefined_wts[0]
             wt_real = os.path.realpath(wt["path"]) if os.path.exists(wt["path"]) else wt["path"]
@@ -1845,7 +1886,7 @@ def decide(cwd, path):
                 for wt in undefined_wts:
                     branch_info = f" (branch '{wt['branch']}')" if wt.get("branch") else ""
                     items.append(f"worktree '{wt['path']}'{branch_info} has undefined unshipped count (no upstream set)")
-            return f"{'; '.join(items)}. {PUSH_REMEDY}"
+            return f"{'; '.join(items)}. {remedy}"
 
     if not undefined_wts:
         return ""
@@ -1860,18 +1901,18 @@ def decide(cwd, path):
             return ("The unshipped count for this branch is undefined --- no "
                     "upstream is configured, or git failed to answer --- and the "
                     "transcript shows a commit with no later push or PR "
-                    "creation. " + PUSH_REMEDY)
+                    "creation. " + remedy)
         else:
             branch_info = f" (branch '{wt['branch']}')" if wt.get("branch") else ""
             return (f"The unshipped count for worktree '{wt['path']}'{branch_info} is undefined --- no "
                     "upstream is configured, or git failed to answer --- and the "
                     "transcript shows a commit with no later push or PR "
-                    "creation. " + PUSH_REMEDY)
+                    "creation. " + remedy)
 
     return ("The unshipped count for one or more worktrees is undefined --- no "
             "upstream is configured, or git failed to answer --- and the "
             "transcript shows a commit with no later push or PR "
-            "creation. " + PUSH_REMEDY)
+            "creation. " + remedy)
 
 
 # In a project-thread session every user-visible sentence is the `text` input

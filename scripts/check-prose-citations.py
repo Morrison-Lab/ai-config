@@ -56,7 +56,8 @@ PATH_LINE_RE = re.compile(
     r"(?<![\w/.-])(?P<path>[\w.-]+(?:/[\w.-]+)*\.[A-Za-z]{1,5}):(?P<start>\d+)"
     r"(?:-(?P<end>\d+))?(?![\w:])"
 )
-FILE_RE = re.compile(r"`(?P<path>[\w.-]+(?:/[\w.-]+)*\.[A-Za-z]{1,5})`")
+FILE_RE = re.compile(
+    r"`(?P<path>[\w.-]+(?:/[\w.-]+)*\.[A-Za-z]{1,5})(?::\d+(?:-\d+)?)?`")
 ISSUE_RE = re.compile(r"(?<![\w/&])#(?P<num>\d{2,6})\b")
 QUOTE_VERB_RE = re.compile(
     r"\b(says|said|reads|states|stated|writes|wrote|quotes|docstring|"
@@ -165,7 +166,9 @@ def check_line(root: Path, citing: str, text: str, issues: bool,
             findings.append(("path-line", f"`{cited}` does not exist at HEAD"))
             continue
         count = len(target.read_text(encoding="utf-8", errors="replace").splitlines())
-        if last > count:
+        if int(m.group("start")) == 0:
+            findings.append(("path-line", f"`{cited}:0`: lines are numbered from 1"))
+        elif last > count:
             findings.append(("path-line",
                              f"`{cited}:{last}` is past the end ({count} lines)"))
     quotes = [q for m in QUOTED_RE.finditer(text)

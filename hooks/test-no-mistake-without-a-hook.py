@@ -71,6 +71,33 @@ CASES = [
     ([say("My mistake -- we should consider if this is mechanizable."), UNRELATED],
      True, "merely mentioning 'mechanizable' without a negative judgment does not discharge"),
 
+    # Discharged by citing a mechanism built out of this transcript's sight:
+    # another repository, or a delegated subagent (ai-config#2389).
+    ([say("I was wrong."), UNRELATED,
+      say("Mechanism: https://github.com/Morrison-Lab/ai-config/pull/2386 "
+          "adds the guard.")],
+     False, "a mechanism citation with a PR URL discharges it"),
+    ([say("My mistake. The mechanism is tracked in "
+          "https://github.com/Morrison-Lab/ai-config/issues/3771.")],
+     False, "an admission and a mechanism citation in one message discharge it"),
+    ([say("I was wrong."), UNRELATED,
+      say("See https://github.com/Morrison-Lab/ai-config/pull/2386.")],
+     True, "a URL without the word mechanism does not discharge"),
+    ([say("I was wrong."), UNRELATED,
+      say("The mechanism will come later.\n\n"
+          "https://github.com/Morrison-Lab/ai-config/pull/2386")],
+     True, "a mechanism word and a URL on different lines do not discharge"),
+    ([say("I was wrong."), UNRELATED,
+      say("Mechanism: https://example.com/Morrison-Lab/ai-config/pull/2386")],
+     True, "a non-GitHub URL does not discharge"),
+
+    # A compaction summary is a USER record; an admission quoted inside it is
+    # not a fresh admission (ai-config#2389, direction 2).
+    ([{"type": "user", "isCompactSummary": True, "message": {"content": [
+        {"type": "text", "text": "Summary: I was wrong about the count."}]}},
+      UNRELATED],
+     False, "an admission inside a compaction summary does not remind"),
+
     # A UMS/memory write is the SIBLING hook's discharge, not this one's.
     # Recording the learning does not prevent the recurrence.
     ([say("I was wrong."), MEMORY_WRITE, say("Recorded it.")], True,

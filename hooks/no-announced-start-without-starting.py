@@ -68,12 +68,15 @@ PATTERNS = [
     r"(?:I am|I'?m) (?:now )?starting (?:it|that|this|on it|the|a|an|my|our)\b",
     r"(?:I am|I'?m) (?:going to )?(?:start|begin) (?:it|that|this|on it)\s+now\b",
     r"starting (?:it|that|this|on it|work on it) now\b",
-    # The verbless form, as a whole sentence or a colon-led one: "Starting
-    # now." / "Starting now: caches first." Anchored at both ends so an
-    # expository "Starting now, the rule covers every repo" is not matched.
+    # The verbless form as a WHOLE sentence: "Starting now.", "**Starting
+    # now.**", "Starting immediately...". Only punctuation or markdown
+    # dressing may follow, so an expository "Starting now, the rule covers
+    # every repo" or "Starting now: X takes effect" is not matched. Plan-
+    # bearing variants ("Starting now with the caches") are out of scope:
+    # past `now` they are indistinguishable from exposition.
     # Measured 2026-10-08: "Starting now. I'll delete the caches first, then
     # move the two folders to D:" matched none of the alternatives above.
-    r"^\W*(?:starting|beginning) (?:right )?now(?:[.!]?\s*$|\s*:)",
+    r"^\W*(?:starting|beginning) (?:right )?(?:now|immediately)\W*$",
     r"I'?ll (?:begin|kick off|get started on) (?:it|that|this|the|a|an)\b",
     r"I'?ll (?:do|handle|tackle|take) (?:it|that|this) now\b",
     r"(?:I am|I'?m) (?:now )?(?:beginning|kicking off) (?:it|that|this|the)\b",

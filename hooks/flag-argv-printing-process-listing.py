@@ -71,6 +71,7 @@ KNOWN HOLES, so silence is not read as coverage:
 - `top -b` under a toprc that saved the command-line toggle on;
 - other tools that print argv: `htop`, `atop`, `lsof +c0`,
   `systemctl status`, `w` (its WHAT column), `pidstat -l`;
+- a format set in the environment: `PS_FORMAT=args ps -e` prints argv;
 - the session's OWN environment (`env`, `printenv`, `export -p`,
   `/proc/self/environ`), which is out of scope: this guard is about other
   processes' data, and those dumps are a separate habit to break.
@@ -83,8 +84,8 @@ It stays silent on the forms that print only a name: `pgrep -f <pattern>`
 (`ps axc`), which replaces argv with the executable name, and
 `/proc/self/cmdline`, which is the shell's own argv. It also stays silent
 when the listing's output never reaches the transcript: its own pipeline
-ends in `wc`, `grep -c`/`-q`/`-l`, or a single-field `awk '{print $N}'`
-(through any `grep`, `sort`, `head`-style filters), or sends stdout to
+ends in `wc` or `grep -c`/`-q`/`-l` (through any `grep`, `sort`,
+`head`-style filters), or sends stdout to
 `/dev/null`. Only the listing's own pipeline counts: a `>/dev/null` on a
 command before a `;` or `&` does not silence it.
 
@@ -163,9 +164,6 @@ PS_BSD_VALUE_OPTS = set("oOptUk")
 
 RX_REDIRECT = re.compile(r"\A\d*(?:[<>]|&>)")
 
-# A single-field awk projection, `{print $2}`, which prints no argv.
-RX_AWK_ONE_FIELD = re.compile(r"\{\s*print\s+\$\d+\s*;?\s*\}")
-
 # Stdout (or both streams) sent to /dev/null; `2>/dev/null` is not this.
 RX_STDOUT_DISCARD = re.compile(r"(?:^|[\s;|&])(?:1?>|&>)\s*/dev/null\b")
 
@@ -177,7 +175,8 @@ RX_PROC_LEAK = re.compile(
     r"(?:task/[^/\s]+/)?(?:cmdline|environ)")
 
 # Programs that only test for a /proc file rather than print it.
-PROC_TESTERS = {"test", "[", "[[", "ls", "stat", "readlink", "realpath"}
+PROC_TESTERS = {"test", "[", "[[", "ls", "stat", "readlink", "realpath",
+                "echo", "printf"}
 GREP_PROGS = {"grep", "egrep", "fgrep", "rg"}
 GREP_QUIET_LONG = {"--files-with-matches", "--files-without-match", "--count",
                    "--quiet", "--silent"}
@@ -287,9 +286,10 @@ def _ps_prints_argv(args, busybox=False):
             # `ps aux > out`: `out` is a file, not an option cluster; and in
             # `2>/dev/null` the tokenizer splits off a `2` that is no PID.
             break
-        if re.fullmatch(r"\d+(?:,\d+)*|\$.*", tok):
+        if tok != "$$" and re.fullmatch(r"\d+(?:,\d+)*|\$.*", tok):
             # A dashless PID list (`ps 1234`, `ps $pid`) switches procps to
-            # BSD output, which carries the COMMAND column (measured).
+            # BSD output, which carries the COMMAND column (measured). `$$`
+            # is the shell itself, whose own argv is exempt.
             bsd = True
             i += 1
             continue
@@ -393,7 +393,14 @@ def _leak(argv):
     index, busybox = located
     name = os.path.basename(argv[index])
     args = argv[index + 1:]
-    shown = " ".join(argv[index:])
+    shown_args = argv[index:]
+    for pos, tok in enumerate(shown_args):
+        if RX_REDIRECT.match(tok) or (
+                tok.isdigit() and pos + 1 < len(shown_args)
+                and RX_REDIRECT.match(shown_args[pos + 1])):
+            shown_args = shown_args[:pos]  # quote the command, not redirects
+            break
+    shown = " ".join(shown_args)
     if ((name == "ps" and _ps_prints_argv(args, busybox))
             or (name == "pgrep" and _cluster_has(args, "a", {"--list-full"}))
             or (name == "pstree" and _cluster_has(args, "a", {"--arguments"}))
@@ -444,7 +451,8 @@ def _discarded(argv, following, line):
     LINE is the listing's own PIPELINE (see `_pipelines`), so FOLLOWING holds
     only the commands its output is piped into. True for stdout sent to
     /dev/null, or a pipe that ends in a counter (`wc`, `grep -c/-q/-l`) or a
-    single-field `awk '{print $N}'` through only filtering commands.
+    through only filtering commands. An awk projection is not exempt:
+    `awk '{print $12}'` prints one argv word per process.
     """
     # Read on the raw line: the tokenizer splits `2>/dev/null` into `2`, `>`,
     # which loses whether the redirect is stdout or stderr.
@@ -465,9 +473,6 @@ def _discarded(argv, following, line):
             continue
         if name in ("sort", "uniq", "head", "tail", "cut", "tr"):
             continue
-        if name in ("awk", "gawk", "mawk") and any(
-                RX_AWK_ONE_FIELD.fullmatch(tok) for tok in nxt[1:]):
-            return True  # `awk '{print $2}'` projects the PID column only
         return False
     return False
 

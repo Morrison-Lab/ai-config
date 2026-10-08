@@ -128,7 +128,8 @@ for cmd in [
     "ssh -p 22 host ps aux",
     # review round 3 (measured): a dashless PID list switches to BSD output
     "ps 1234",
-    "ps $$",
+    "ps aux | awk '{print $12}'",
+    "ps aux | grep foo | awk '{print $2}'",
     'ps "$pid"',
     "ps 12,34",
     # no-value wrapper flags and env assignments do not hide the lister
@@ -234,8 +235,8 @@ for cmd in [
     "cat /proc/$$/environ",
     "ps --help all",
     "ps --version",
-    "ps aux | grep foo | awk '{print $2}'",
-    "ps aux | grep foo | grep -v grep | awk '{print $2}'",
+    "ps $$",
+    "echo /proc/1/cmdline",
     "make >/dev/null; ps aux | wc -l",
     "ps aux 2>&1 | wc -l",
     "ps -p 1 2>/dev/null",
@@ -265,6 +266,11 @@ p = subprocess.run([sys.executable, HOOK], input="not json",
                    capture_output=True, text=True, timeout=30)
 if p.returncode != 0 or p.stdout.strip():
     FAILURES.append("malformed stdin should fail open silently")
+
+# ------------------------------------------------- the quoted command is exact
+out = check("ps aux 2>/dev/null", True)
+if out is not None and "`ps aux` lists" not in out["hookSpecificOutput"]["additionalContext"]:
+    FAILURES.append("redirect tokens leaked into the quoted command")
 
 # ---------------------------------------------------------- output channels
 out = check("ps aux", True)

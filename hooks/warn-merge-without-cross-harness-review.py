@@ -142,7 +142,9 @@ def _peel_wrappers(rest):
             while rest and rest[0].startswith("-"):
                 takes_arg = rest[0] in TIMEOUT_ARG_OPTS
                 rest = rest[2:] if takes_arg else rest[1:]
-            rest = rest[1:]  # the duration
+            if rest and not rest[0].startswith("-") and (
+                    os.path.basename(rest[0]) not in CROSS_HARNESS_CLIS):
+                rest = rest[1:]  # the duration
         else:
             return rest
     return rest
@@ -212,7 +214,7 @@ def scan(sib, path, clis):
                 if name in sib.MCP_PUSH_TOOLS:
                     last_push = max(last_push, seq)
                     continue
-                cmd = (b.get("input") or {}).get("command")
+                cmd = _shell_command(b.get("input") or {})
                 if name not in sib.SHELL_TOOLS or not isinstance(cmd, str):
                     continue
                 try:
@@ -282,8 +284,8 @@ def main() -> int:
     if any(seq > last_push for seq in reviews):
         return 0
 
-    num, _repo = targets[0]
-    target = f"PR #{num}" if num is not None else "This merge"
+    nums = [f"#{num}" for num, _repo in targets if num is not None]
+    target = "PR " + ", ".join(nums) if nums else "This merge"
     note = NOTE.format(target=target, clis=", ".join(sorted(clis)))
     out = {"hookSpecificOutput": {"hookEventName": "PreToolUse",
                                   "additionalContext": note}}

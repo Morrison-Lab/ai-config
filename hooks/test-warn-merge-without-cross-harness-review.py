@@ -120,9 +120,6 @@ def main():
     check("warns on the long-form MCP auto-merge tool name",
           run("", [], tool_name="mcp__github__enable_pull_request_auto_merge",
               tool_input=MCP_MERGE)[0])
-    check("silent on disabling auto-merge through MCP",
-          not run("", [], tool_name="mcp__github__disable_pr_auto_merge",
-                  tool_input=MCP_MERGE)[0])
     check("warns on a REST merge",
           run("gh api -X PUT repos/Morrison-Lab/ai-config/pulls/12/merge",
               [])[0])
@@ -156,6 +153,9 @@ def main():
     check("warns on the instrument-then-merge chain the sibling discharges",
           run("python3 scripts/check-pr-fully-clean.py 12 && gh pr merge 12",
               [])[0])
+    fired, out = run("gh pr merge 12 --squash && gh pr merge 13 --squash", [])
+    check("warns naming every PR a compound merge targets",
+          fired and "PR #12, #13" in (out or {}).get("systemMessage", ""))
 
     # --- silent -----------------------------------------------------------
     check("silent after a codex run following the last push",
@@ -178,6 +178,14 @@ def main():
     check("silent after a claude CLI run from an Antigravity session",
           not run(MERGE, [step("claude -p 'review'")],
                   env_extra={"ANTIGRAVITY_AGENT": "1"})[0])
+    check("silent after a PowerShell-keyed reviewer call in the transcript",
+          not run(MERGE, [step("", tool_input={
+              "CommandLine": "codex exec review"})])[0])
+    check("silent after a timeout call with no duration",
+          not run(MERGE, [step("timeout codex exec review")])[0])
+    check("silent on disabling auto-merge through MCP",
+          not run("", [], tool_name="mcp__github__disable_pr_auto_merge",
+                  tool_input=MCP_MERGE)[0])
     check("silent on a command that is not a merge",
           not run("git status", [])[0])
     check("silent when a heredoc body names the merge",

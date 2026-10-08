@@ -1024,6 +1024,13 @@ workflow file rather than in the harness.
 
 The `use-preferred-style` skill (alias `style`) spells out the procedure, the PSW chapter links, and a filler/jargon swap table; the `find-ai-tells` skill (alias `ai-tells`) is the scan-after detector counterpart.
 
+## Writing lectures and slides
+
+[shared/writing/lecture-conventions.md](shared/writing/lecture-conventions.md)
+
+Lecture notes pair each exercise with its solution, keep one unit per subfile, and state notation with its alternatives.
+The fragment also covers where media links go and the plain, literal prose that all lecture text uses.
+
 ## Writing style: name the referent, so no pronoun is ambiguous
 
 A specific case of the plain-prose rule above, and the one self-review is worst at catching.

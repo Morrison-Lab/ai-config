@@ -1725,6 +1725,10 @@ Merge synchronously, right after the check, with the merge command pinned.
 Tracked as [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982).
 
 - **Do:** always check for merge conflicts (e.g., using `gh pr view <number> --json mergeable` or `gh pr checks`) at the same time you check for CI and review status.
+  Where `gh` is absent, read `mergeable_state` from the GitHub MCP `pull_request_read` call with `method: get`; `dirty` means a conflict.
+  A fallback for a failing status script owes every check the script made, this one included.
+- **Do:** merge the base branch into a conflicting PR head and push it at once, without waiting for approval, and re-read `mergeable_state` afterwards.
+- **Don't:** call a PR ready, clean, or waiting on review while it conflicts, or end a status check that never read its merge state.
 - **Do:** report a PR as blocked on review when HEAD has no authentic clean verdict, even if GitHub says `CLEAN`.
 - **Don't:** treat green CI plus a clean review as sufficient without independently re-checking merge-conflict state.
 - **Don't:** describe a PR that lacks a clean HEAD review as merge-ready, ready to merge, or "green and merge-ready."

@@ -79,7 +79,6 @@ for cmd in [
     "top -b -n 1 -c",
     "cat /proc/1234/cmdline",
     "tr '\\0' ' ' < /proc/$pid/cmdline",
-    "cat /proc/self/environ",
     "sudo ps aux",
     "timeout 5 ps aux",
     "watch -n1 ps aux",
@@ -140,8 +139,17 @@ for cmd in [
     "watch -d ps aux",
     "env FOO=1 ps -ef",
     "sudo -u me -E ps aux",
-    # the shell's own environment holds the session's tokens
-    "cat /proc/$$/environ",
+    # review round 4: a K=V option value, and exec past global options
+    "ssh -o StrictHostKeyChecking=no host ps aux",
+    "docker exec -e FOO=bar c ps aux",
+    "kubectl -n ns exec pod -- ps aux",
+    "docker compose exec web ps aux",
+    "ssh -v host ps aux",
+    "ps 2 2>/dev/null",
+    "ps aux 2>/dev/null",
+    # a filter alone still prints the matched lines
+    "ps aux | grep curl",
+    "ps aux | grep curl | head",
 ]:
     check(cmd, True)
 
@@ -208,6 +216,21 @@ for cmd in [
     "cat /proc/$$/cmdline",
     "ps -p 1234",
     "ps -p $pid -o pid,comm",
+    # review round 4: output that never reaches the transcript
+    "ps -ef | grep -c marker",
+    "ps aux | wc -l",
+    "cat /proc/1/cmdline | wc -c",
+    "ps aux >/dev/null",
+    "ps aux > /dev/null 2>&1",
+    "ps aux | grep curl | wc -l",
+    "pgrep -af x | grep -q curl",
+    # the session's own environment is out of scope
+    "cat /proc/self/environ",
+    "cat /proc/$$/environ",
+    "ps --help all",
+    "ps --version",
+    "ps -p 1 2>/dev/null",
+    "ps -o pid,comm -p $pid 2>&1",
 ]:
     check(cmd, False)
 

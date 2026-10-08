@@ -504,6 +504,10 @@ A shell's own `set -x` trace prints the expanded words too: `set -x; curl -H "Au
 - **Do:** keep your own secrets out of argv: pass them on stdin, in a file (`curl -H @file`, documented as `<header/@file>` in curl 8.5.0), or in an environment variable that nothing echoes.
 - **Don't:** run `ps <pid>`, `ps aux`, `ps -ef`, `ps -O <col>`, `ps -o args`/`command`/`cmd`, BSD `ps ... e`, `pgrep -a`, `pstree -a`, `top -c`, or `cat /proc/<pid>/cmdline` on a host where any process may carry a credential in argv.
 - **Don't:** turn on `set -x` around a command that expands a secret.
+- **Do:** when you must measure a listing (a review, a fact-check), print only a count: `ps axe -o pid,comm | grep -c PATH=`, never the matched lines.
+  Use a marker process that keeps its argv, `sh -c 'sleep 90; :' marker`; `bash -c 'sleep 90'` can exec `sleep` directly and drop the marker.
+- **Don't:** brief a subagent to measure listing behaviour without that count-only rule.
+  Case, 2026-10-08 (this entry's own review): a reviewer told only to measure ran `ps axe -o pid,comm | grep sleep`, which printed the container's environment, a session token included, into its transcript.
 
 [`hooks/flag-argv-printing-process-listing.py`](../hooks/flag-argv-printing-process-listing.py) warns, without blocking, on the argv-printing forms above, including through `xargs`, `ssh`, `docker exec`, and `$(...)`.
 Its docstring lists the forms it cannot see, such as `eval "$cmd"`.

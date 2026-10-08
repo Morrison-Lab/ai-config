@@ -70,7 +70,10 @@ KNOWN HOLES, so silence is not read as coverage:
 - `docker top` and `docker run --pid=host ... ps aux`;
 - `top -b` under a toprc that saved the command-line toggle on;
 - other tools that print argv: `htop`, `atop`, `lsof +c0`,
-  `systemctl status`.
+  `systemctl status`;
+- the session's OWN environment (`env`, `printenv`, `export -p`,
+  `/proc/self/environ`), which is out of scope: this guard is about other
+  processes' data, and those dumps are a separate habit to break.
 
 Commands over 20000 characters are not examined, so a pathological input
 cannot push the scan past the hook's timeout.
@@ -78,8 +81,10 @@ cannot push the scan past the hook's timeout.
 It stays silent on the forms that print only a name: `pgrep -f <pattern>`
 (PIDs only), `ps -p <pid>`, `ps -eo pid,etime,comm`, `ps -e`, BSD `c`
 (`ps axc`), which replaces argv with the executable name, and
-`/proc/self/cmdline`, which is the shell's own argv. `/proc/self/environ`
-still fires: the shell's own environment is where the session's tokens live.
+`/proc/self/cmdline`, which is the shell's own argv. It also stays silent
+when the listing's output never reaches the transcript: piped into `wc` or
+`grep -c`/`-q`/`-l` (through any `grep`, `sort`, `head`-style filters), or
+redirected to `/dev/null`.
 
 WHY THIS WARNS RATHER THAN BLOCKS
 ---------------------------------
@@ -156,13 +161,15 @@ PS_BSD_VALUE_OPTS = set("oOptUk")
 
 RX_REDIRECT = re.compile(r"\A\d*(?:[<>]|&>)")
 
-# Any process's `environ`, the shell's own included, since the session's
-# environment is where its tokens live. `cmdline` of `self`, `thread-self` or
-# `$$` is the shell's own argv, not another process's, so it is exempt.
+# Stdout (or both streams) sent to /dev/null; `2>/dev/null` is not this.
+RX_STDOUT_DISCARD = re.compile(r"(?:^|[\s;|&])(?:1?>|&>)\s*/dev/null\b")
+
+# Another process's `cmdline` or `environ`. `self`, `thread-self` and `$$`
+# are the shell's own; dumping the session's own environment (`env`,
+# `printenv`, `/proc/self/environ`) is out of scope, as KNOWN HOLES says.
 RX_PROC_LEAK = re.compile(
-    r"/proc/[^/\s]+/(?:task/[^/\s]+/)?environ"
-    r"|/proc/(?!(?:self|thread-self|\$\$)/)[^/\s]+/"
-    r"(?:task/[^/\s]+/)?cmdline")
+    r"/proc/(?!(?:self|thread-self|\$\$)/)[^/\s]+/"
+    r"(?:task/[^/\s]+/)?(?:cmdline|environ)")
 
 # Programs that only test for a /proc file rather than print it.
 PROC_TESTERS = {"test", "[", "[[", "ls", "stat", "readlink", "realpath"}
@@ -180,9 +187,9 @@ def _resolve(argv):
 
     Leading assignments and shell keywords are skipped, then wrappers. Past a
     wrapper only options, their values, and the wrapper's own positional
-    operands are skipped; the first other token is the program. A token after
-    an option is read as that option's value, which can hide a program behind
-    a flag that takes none (`ssh -v host`): the cost is a miss, never a
+    operands are skipped; the first other token is the program. Which flags
+    take a value is listed per wrapper (`WRAPPER_VALUE_FLAGS`); a flag that
+    list gets wrong shifts the walk by one token, which costs a miss, never a
     false warning about some other program's flags.
     """
     index, busybox = 0, False
@@ -192,9 +199,17 @@ def _resolve(argv):
     while index < len(argv):
         name = os.path.basename(argv[index])
         if name in CONTAINER_CLIS:
-            if "exec" not in argv[index + 1:index + 2]:
+            # `exec` may follow global options and `compose`:
+            # `kubectl -n ns exec pod -- ps`, `docker compose exec web ps`.
+            j, cli_flags = index + 1, WRAPPER_VALUE_FLAGS.get(name, set())
+            while j < len(argv) and (argv[j].startswith("-")
+                                     or argv[j] == "compose"):
+                takes = (len(argv[j]) == 2 and argv[j][1] in cli_flags
+                         or argv[j] in WRAPPER_VALUE_LONG)
+                j += 2 if takes else 1
+            if j >= len(argv) or argv[j] != "exec":
                 return index, busybox
-            operands, index = 1, index + 2  # the container (or pod)
+            operands, index = 1, j + 1  # the container (or pod)
         elif name in WRAPPER_OPERANDS:
             busybox = busybox or name == "busybox"
             operands, index = WRAPPER_OPERANDS[name], index + 1
@@ -221,12 +236,14 @@ def _resolve(argv):
                     after_option = taker == len(cluster) - 1
                 index += 1
                 continue
-            if ENV_ASSIGNMENT.match(token):
-                index += 1  # `env FOO=1 ps`, `sudo FOO=1 ps`
-                continue
             if after_option:
+                # Before the assignment test: `ssh -o Key=Value host` and
+                # `docker exec -e FOO=bar c` carry a value shaped like one.
                 after_option = False
                 index += 1
+                continue
+            if ENV_ASSIGNMENT.match(token):
+                index += 1  # `env FOO=1 ps`, `sudo FOO=1 ps`
                 continue
             if operands:
                 operands -= 1
@@ -258,8 +275,13 @@ def _ps_prints_argv(args, busybox=False):
     while i < len(args):
         tok = args[i]
         nxt = args[i + 1] if i + 1 < len(args) else ""
-        if RX_REDIRECT.match(tok):
-            break  # `ps aux > out`: `out` is a file, not an option cluster
+        if tok in ("--help", "--version", "-V"):
+            return False  # prints usage, not processes
+        if RX_REDIRECT.match(tok) or (
+                tok.isdigit() and RX_REDIRECT.match(nxt)):
+            # `ps aux > out`: `out` is a file, not an option cluster; and in
+            # `2>/dev/null` the tokenizer splits off a `2` that is no PID.
+            break
         if re.fullmatch(r"\d+(?:,\d+)*|\$.*", tok):
             # A dashless PID list (`ps 1234`, `ps $pid`) switches procps to
             # BSD output, which carries the COMMAND column (measured).
@@ -411,6 +433,37 @@ def _substitutions(text):
     return bodies
 
 
+def _discarded(argv, following, line):
+    """Whether the listing's output never reaches the transcript.
+
+    True for a redirect to /dev/null, or a pipe that ends in a counter (`wc`,
+    `grep -c/-q/-l`) through only filtering commands. `simple_commands` drops
+    the separators, so a `|` anywhere in the line is the evidence of a pipe:
+    `ps aux; wc -l f` is misread as discarded, which costs a miss.
+    """
+    # Read on the raw line: the tokenizer splits `2>/dev/null` into `2`, `>`,
+    # which loses whether the redirect is stdout or stderr.
+    if RX_STDOUT_DISCARD.search(line):
+        return True
+    if "|" not in line:
+        return False
+    for nxt in following:
+        name = os.path.basename(nxt[0]) if nxt else ""
+        if name == "wc":
+            return True
+        if name in GREP_PROGS:
+            if any(tok in GREP_QUIET_LONG or (
+                    tok.startswith("-") and not tok.startswith("--")
+                    and set(tok[1:]) & set("cql"))
+                   for tok in nxt[1:]):
+                return True
+            continue
+        if name in ("sort", "uniq", "head", "tail", "cut", "tr"):
+            continue
+        return False
+    return False
+
+
 def find_leak(command, depth=0):
     if depth > MAX_DEPTH:
         return None
@@ -423,9 +476,9 @@ def find_leak(command, depth=0):
         argvs = simple_commands(line)
         if not argvs:
             continue
-        for argv in argvs:
+        for k, argv in enumerate(argvs):
             found = _leak(argv)
-            if found:
+            if found and not _discarded(argv, argvs[k + 1:], line):
                 return found
             # A quoted remote or container command (`ssh host 'ps aux'`,
             # `docker exec c sh -c "ps aux"`) is one token; read it as a line.

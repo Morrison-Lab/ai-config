@@ -118,6 +118,15 @@ for cmd in [
     "busybox ps -o pid,args",
     # per-thread /proc paths
     "cat /proc/1234/task/1235/cmdline",
+    # review round 2 (measured on procps-ng 4.0.4)
+    "ps -e --context",
+    "ps -e -o%a",
+    "ps aux > out",
+    "ps aux 2>/dev/null | grep curl",
+    "top -b -n1 --cmdline-toggle",
+    "grep curl /proc/1/cmdline",
+    "timeout 5 ps aux",
+    "ssh -p 22 host ps aux",
 ]:
     check(cmd, True)
 
@@ -157,8 +166,38 @@ for cmd in [
     "docker ps --format '{{.ID}}'",
     "echo '$(ps aux)'",
     "busybox ps -o pid,comm",
+    # review round 2: quoted heredoc bodies and comments run nothing
+    "git commit -m \"$(cat <<'EOF'\nWarn when `ps aux` prints argv\nEOF\n)\"",
+    "git commit -F - <<'EOF'\nWarn on `ps aux` listings\nEOF",
+    "gh pr create --body \"$(cat <<'EOF'\nRemedy: replace `ps -ef` with `pgrep -f`.\nEOF\n)\"",
+    "cat > notes.md <<'EOF'\nnever run $(ps aux) here\nEOF",
+    "ls  # avoid `ps aux` here",
+    # a wrapper's walk stops at a program that is not a wrapper
+    "sudo docker ps -f name=web",
+    "timeout 10 docker ps -af status=exited",
+    "ssh host docker ps -f name=x",
+    "timeout 5 grep ps file",
+    "sudo grep -n ps file",
+    # BSD `c` swaps argv for the name in every column
+    "ps -ef c",
+    "ps -e -o pid,cmd c",
+    "ps -e -o pid,args c",
+    # existence tests behind a wrapper, and a /proc path used as a pattern
+    "timeout 5 test -r /proc/1/environ",
+    "rg -n /proc/1/cmdline hooks",
+    # `top -c` reverses the toprc state; plain batch mode is the default-off case
+    "top -b -n1",
 ]:
     check(cmd, False)
+
+# ------------------------------------------------- bounded on pathological input
+import time
+for n in (2000, 16000):
+    start = time.monotonic()
+    run("echo " + "$( " * n)
+    elapsed = time.monotonic() - start
+    if elapsed > 5:
+        FAILURES.append(f"unclosed $( x{n} took {elapsed:.1f}s (bound 5s)")
 
 # --------------------------------------------------------- tool and payload
 check("ps aux", False, tool="Read")

@@ -491,8 +491,10 @@ printed the probe's `curl -H "Authorization: Bearer <token>"` argv, so a live Da
 The token came from a shell variable, which is the recommended form; the `command` column printed it anyway.
 
 Measured 2026-10-08 on Linux procps, against a background process carrying a marker in its argv.
-These print argv: `ps aux`, `ps -aux`, `ps -ef`, `ps -eo pid,args`, `ps -O rss -e` (`-O` adds to the default columns, which include `command`), `pgrep -af`, and `top -bc` when the line is wide enough (`-w 512`).
-These do not: `ps -e`, `ps axc`, `ps -eo pid,etime,comm`, `pgrep -f`, and `top -b`.
+These print argv: `ps aux`, `ps -aux`, `ps -ef`, `ps -eo pid,args`, `ps -O rss -e` (`-O` adds to the default columns, which include `command`), `ps -e --context`, `ps -e -o%a`, `pgrep -af`, and `top -bc` when the line is wide enough (`-w 512`).
+These do not: `ps -e`, `ps -eo pid,etime,comm`, `pgrep -f`, and `top -b`.
+BSD `c` swaps argv for the executable name in every column, so `ps axc`, `ps -ef c` and `ps -e -o pid,args c` print none.
+The `top` rows hold for a default config only: `-c` reverses the toggle remembered in the toprc rather than setting it, so under a toprc that saved it on, `top -b` prints argv and `top -bc` does not.
 BSD `e` prints each process's environment, which is no safer, and does so even with `c` (`ps axce`) or an explicit format (`ps axe -o pid,comm` printed 13 environments).
 macOS `ps` and busybox `ps` print argv for more forms than procps does, so treat any `ps` there as argv-printing.
 The same listing run through `ssh host` or `docker exec` prints the remote host's or container's argv into the same transcript.

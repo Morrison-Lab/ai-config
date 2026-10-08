@@ -91,16 +91,12 @@ Tracked as ai-config#1579.)
 The string has been observed as a stand-in assistant turn the model never generated,
 in a desktop session branched at a user interrupt.
 The transcript marks such a turn with `"model":"<synthetic>"` and 0 output tokens.
-No model reply ended there, so no Stop hook had a reply to read,
-and the turn is not evidence the rule failed.
-The model-side duty is unchanged: the next real reply still reports what
-finished before the interrupt.
+The model-side duty is unchanged:
+the next real reply still reports what finished before the interrupt.
 (Measured 2026-10-08 in session `b6f20ba3`, transcript line 188:
 `"model":"<synthetic>"`, `"stop_reason":"stop_sequence"`, `output_tokens` 0,
-and a parent that is a `[Request interrupted by user]` message from another session.
-The session first owned the string as its own lapse,
-before reading the transcript.)
+and a parent that is a `[Request interrupted by user]` message from another session.)
 
-- **Do:** check the transcript's `model` field before recording a placeholder
-  reply as a recurrence of this rule.
-- **Don't:** count a `<synthetic>` stand-in as a lapse or patch the hook for it.
+- **Do:** check the transcript's `model` field
+  before recording a placeholder reply as a recurrence of this rule.
+- **Don't:** count a `<synthetic>` stand-in as a model lapse.

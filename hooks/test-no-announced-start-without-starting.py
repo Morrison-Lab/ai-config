@@ -93,6 +93,7 @@ CASES_BLOCK = [
     "to D: and leave links behind so their old paths still work.",
     "Done scanning. **Starting now.**",
     "Starting now...",
+    "Starting now…",
     "Starting immediately.",
     "I'll get started on the migration.",
     "**Stopping Point**: Not a clean stopping point / work remains queued: Continuing GIA Phase 2 to claim and implement the next backlog issue.",

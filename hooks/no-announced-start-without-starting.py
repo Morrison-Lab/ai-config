@@ -69,8 +69,8 @@ PATTERNS = [
     r"(?:I am|I'?m) (?:going to )?(?:start|begin) (?:it|that|this|on it)\s+now\b",
     r"starting (?:it|that|this|on it|work on it) now\b",
     # The verbless form as a WHOLE sentence: "Starting now.", "**Starting
-    # now.**", "Starting immediately...". Only emphasis markers may lead and
-    # only emphasis, `.` or `!` may follow, so an expository "Starting now,
+    # now.**", "Starting right now...". Only emphasis markers may lead and
+    # only emphasis, `.`, `!` or an ellipsis may follow, so an expository "Starting now,
     # the rule covers every repo", "Starting now: X takes effect", a
     # "## Starting now" heading and a "Starting now; ..." fragment are not
     # matched. Plan-bearing variants ("Starting now with the caches") are out
@@ -79,7 +79,7 @@ PATTERNS = [
     # "Starting now." followed by a single delivered sentence still blocks.
     # Measured 2026-10-08: "Starting now. I'll delete the caches first, then
     # move the two folders to D:" matched none of the alternatives above.
-    r"^[\s*_]*(?:starting|beginning) (?:right )?(?:now|immediately)[\s*_.!]*$",
+    r"^[\s*_]*(?:starting|beginning) (?:right )?(?:now|immediately)[\s*_.!…]*$",
     r"I'?ll (?:begin|kick off|get started on) (?:it|that|this|the|a|an)\b",
     r"I'?ll (?:do|handle|tackle|take) (?:it|that|this) now\b",
     r"(?:I am|I'?m) (?:now )?(?:beginning|kicking off) (?:it|that|this|the)\b",

@@ -481,6 +481,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-glab-without-host.py\"",
+            "timeout": 10,
+            "script": "warn-glab-without-host.py",
+            "why": "ai-config#4387. A session ran `glab api` from a folder that is not a git checkout; glab resolved no host, fell back to gitlab.com, answered \"Unauthenticated\", and the agent told the user their token had expired (it had not: the same token returned 200 from the self-hosted /api/v4/user). WARN-ONLY (additionalContext plus systemMessage, never a permissionDecision): fires when a host-sensitive glab subcommand (api, issue, mr, ci, ...) names no host -- no --hostname, no host-qualified -R/--repo, no GITLAB_HOST prefix or earlier export -- and the hook input's cwd (moved by any earlier cd in the command) is not inside a git repo whose remote is a host other than gitlab.com/github.com. Warns rather than blocks because gitlab.com can be the intended host and a profile-level GITLAB_HOST is invisible to the hook. Fails open. Tracked as #4387."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-permission-prefix-mismatch.py\"",
             "timeout": 10,
             "script": "warn-permission-prefix-mismatch.py",
@@ -1516,6 +1523,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-reauth-without-host-check.py\"",
+            "timeout": 10,
+            "script": "no-reauth-without-host-check.py",
+            "why": "ai-config#4387, the other half of warn-glab-without-host.py. An \"Unauthenticated\" from a CLI describes the host it contacted, not the credential. WARN-ONLY (systemMessage, once per distinct message) when the final message asks the user to run `glab auth login` / `gh auth login`, to re-authenticate or log in again, or says a token or credential expired or was revoked, and no tool call since the user's last prompt verified the token against a named host (curl to <host>/api/v4/user or /user, `glab api --hostname H user`, `gh api --hostname H user`, or a GITLAB_HOST=/GH_HOST= prefix on the same call). Fenced blocks and code spans are ignored, except that a span or fence that is just an auth-login command is kept so the usual \"run `glab auth login`\" phrasing is still seen. Fails open."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-placeholder-reply.py\"",
             "timeout": 10,
             "script": "no-placeholder-reply.py",
@@ -1611,6 +1625,13 @@
             "timeout": 10,
             "script": "no-unread-issue-claim.py",
             "why": "An issue's body is frozen at filing time; its comments carry the measurement that already ran, the PR that already shipped half of it, and the decision that was already taken. Warns when the final message reports an issue as open, blocked, or awaiting a decision and nothing in the session read that issue's comments -- a body-only read does not discharge it. Measured twice on Lacaedemon/sparta (ai-config#3823); the second time a decision already taken and documented was reported to the user as theirs to make, across several turns, with two unrelated issues described as blocked behind it. Warns and never blocks: an issue can legitimately be blocked, and the guard can only see that the cheapest supporting evidence was never gathered."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-mergeability-on-status.py\"",
+            "timeout": 10,
+            "script": "remind-mergeability-on-status.py",
+            "why": "ai-config#4380 -- an abridge MR sat conflicted for hours while reported as 'open, pipeline green': the MR was stacked, its base branch moved, and only state and pipeline were read. Warns, never blocks, when the final message reports a PR/MR's pipeline/CI/checks status and no command since the last user prompt read mergeability (has_conflicts, detailed_merge_status, merge_status, mergeable, mergeStateStatus, glab mr view). The status report is right to send; only the missing reading against the actual, possibly stacked, target is owed."
           },
           {
             "type": "command",

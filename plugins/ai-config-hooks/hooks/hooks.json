@@ -796,6 +796,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-merge-without-fully-clean.py\"'",
+            "timeout": 20,
+            "script": "warn-merge-without-fully-clean.py",
+            "why": "ai-config#4399: on 2026-10-08 two ai-config PRs were merged on gh pr checks, mergeStateStatus and a hand-parsed review verdict, and scripts/check-pr-fully-clean.py ran only afterwards when a Stop hook objected to the wording. no-unauthorized-merge.py gates permission to merge, not cleanliness. Warns, never denies, unless the transcript holds a Bash run of check-pr-fully-clean.py for that PR number (and -R repo when both name one) whose result shows the 'is FULLY CLEAN' line for that PR, after the last push (git push or an MCP push tool); a NOT-fully-clean line vetoes. Warn rather than deny because the transcript is a lossy witness (a peer session, a resumed session, or an unseen push by another session) and a deny on an inference teaches an escape-variable reflex. Command position via shellcmd, so a quoted or echoed merge is inert."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/flag-unmeasured-digest.py\"'",
             "timeout": 10,
             "script": "flag-unmeasured-digest.py",
@@ -949,6 +956,13 @@
             "timeout": 10,
             "script": "no-unauthorized-merge.py",
             "why": "cai 2026-08-04 'I want a mechanistic prohibition, not just a guideline' -- mechanistically blocks unauthorized GitHub MCP PR merge operations (mcp__github__merge_pull_request and defensive auto-merge tool variants) at the PreToolUse boundary unless explicit permission is present."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-merge-without-fully-clean.py\"'",
+            "timeout": 20,
+            "script": "warn-merge-without-fully-clean.py",
+            "why": "ai-config#4399: on 2026-10-08 two ai-config PRs were merged on gh pr checks, mergeStateStatus and a hand-parsed review verdict, and scripts/check-pr-fully-clean.py ran only afterwards when a Stop hook objected to the wording. no-unauthorized-merge.py gates permission to merge, not cleanliness. Warns, never denies, unless the transcript holds a Bash run of check-pr-fully-clean.py for that PR number (and -R repo when both name one) whose result shows the 'is FULLY CLEAN' line for that PR, after the last push (git push or an MCP push tool); a NOT-fully-clean line vetoes. Warn rather than deny because the transcript is a lossy witness (a peer session, a resumed session, or an unseen push by another session) and a deny on an inference teaches an escape-variable reflex. Command position via shellcmd, so a quoted or echoed merge is inert."
           },
           {
             "type": "command",

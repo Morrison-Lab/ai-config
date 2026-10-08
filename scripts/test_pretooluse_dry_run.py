@@ -222,6 +222,7 @@ class TestPreToolUseDryRun(unittest.TestCase):
             ("warn-generated-file-stale.py", "Bash"),
             ("warn-paginate-without-slurp.py", "Bash"),
             ("warn-partial-validation-before-push.py", "Bash"),
+            ("warn-merge-without-fully-clean.py", "Bash"),
             ("warn-unmeasured-capability-claim.py", "Bash"),
             ("warn-verdict-line-filter.py", "Bash"),
         ]

@@ -2738,6 +2738,7 @@ def run_hook_in_subagent(cmd: str, parent_events: list, own_events: list | None,
         if own_events is not None:
             files[f"agent-{agent_id}.jsonl"] = own_events
         for name, content in files.items():
+            os.makedirs(os.path.dirname(os.path.join(sub, name)), exist_ok=True)
             with open(os.path.join(sub, name), "w", encoding="utf-8") as f:
                 if isinstance(content, dict):
                     json.dump(content, f)
@@ -2807,8 +2808,12 @@ def subagent_push_cases() -> tuple[int, int]:
 
     # 5. A traversal-shaped agent_id resolves to nothing, so only the parent
     #    is read.
-    rc, out = run_hook_in_subagent(PUSH, parent_other, reviewed(body()),
-                                   payload_agent_id="../sub0001agent")
+    #    The clean review sits where the traversal would land, so only the
+    #    guard keeps it out.
+    rc, out = run_hook_in_subagent(PUSH, parent_other, None,
+                                   payload_agent_id="up/../../planted",
+                                   extra_files={"agent-up/keep.jsonl": [],
+                                                "../planted.jsonl": reviewed(body())})
     check("a traversal-shaped agent_id is not followed",
           rc == 0 and blocked_of(out), reason_of(out)[:200])
 

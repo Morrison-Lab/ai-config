@@ -1454,8 +1454,12 @@ class _TranscriptScanner:
         """
         if not self.reviewer_call_ids and not self.active_reviewer_task_ids:
             return
+        if self.guard._is_assistant_record(record):
+            return
         for sender_ids, text in self.guard._handback_candidates(record):
-            if not text:
+            # A candidate naming no sender can never be tracked, so it is
+            # refused here rather than queued for a recheck that cannot pass.
+            if not text or not sender_ids:
                 continue
             if self._sender_is_tracked(sender_ids):
                 self._accept_handback(text)

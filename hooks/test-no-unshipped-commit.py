@@ -1831,6 +1831,37 @@ assert wt_in_flight([wt_result, wt_enqueue("aUNTRACKED00000000")]) is True, \
     "an enqueued hand-back from an untracked sender must not discharge"
 print("PASS: enqueued hand-back from an untracked sender is refused (ai-config#3045)")
 
+assert wt_in_flight([wt_enqueue("aUNTRACKED00000000"), wt_result]) is True, \
+    "a queued hand-back from an untracked sender must stay refused when an id registers"
+print("PASS: queued untracked hand-back stays refused after the result (ai-config#3045)")
+
+wt_assistant = {"type": "assistant", "sender": wt_agent, "message": {"content": [
+    {"type": "text", "text": wt_report}]}}
+assert wt_in_flight([wt_result, wt_assistant]) is True, \
+    "an assistant record naming the reviewer as sender must not discharge"
+print("PASS: assistant record naming the reviewer is refused (ai-config#3045)")
+
+wt_no_sender = {"type": "attachment", "attachment": {
+    "type": "queued_command", "prompt": wt_report,
+    "origin": {"kind": "peer", "handback": True, "body": wt_report}}}
+assert wt_in_flight([wt_no_sender, wt_result]) is True, \
+    "a peer hand-back naming no sender must not discharge"
+print("PASS: peer hand-back naming no sender is refused (ai-config#3045)")
+
+# The omo transcript shape registers reviewer ids through its own branch, which
+# must also release a hand-back queued before the dispatch result.
+h_omo_hb, path_omo_hb = tempfile.mkstemp()
+with open(path_omo, "r", encoding="utf-8") as src, os.fdopen(h_omo_hb, "w") as dst:
+    dst.write(src.read())
+    dst.write(json.dumps(wt_enqueue("omo123abc")) + "\n")
+    dst.write(json.dumps({
+        "type": "tool_result", "tool_name": "task",
+        "tool_output": "task_id: omo123abc"
+    }) + "\n")
+assert subject.is_pre_push_review_in_flight(rev_root, path_omo_hb) is False, \
+    "an omo dispatch result must release a hand-back queued before it"
+print("PASS: omo dispatch result releases a queued hand-back (ai-config#3045)")
+
 assert wt_in_flight([wt_result, wt_attachment("aUNTRACKED00000000")]) is True, \
     "an attachment hand-back from an untracked sender must not discharge"
 print("PASS: attachment hand-back from an untracked sender is refused (ai-config#3045)")

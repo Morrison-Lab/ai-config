@@ -2371,6 +2371,16 @@ def _id_is_tracked(sender_id: str, tracked: set[str]) -> bool:
 AGENT_MESSAGE_FROM = re.compile(r'\s*<agent-message from="([\w-]+)">')
 
 
+def _is_assistant_record(record: dict) -> bool:
+    """True for a record the model itself wrote, which no hand-back can be."""
+    message = record.get("message")
+    return (
+        record.get("source") == "MODEL"
+        or record.get("type") == "assistant"
+        or (isinstance(message, dict) and message.get("role") == "assistant")
+    )
+
+
 def _handback_candidates(record: dict) -> list[tuple[list[str], str]]:
     """(sender ids, text) for each hand-back shape whose sender a harness wrote.
 
@@ -2545,11 +2555,7 @@ def read_latest_review(
                                 verdict, reviewed_commits = found, shas
                 continue
 
-            is_assistant = (
-                record.get("source") == "MODEL"
-                or record.get("type") == "assistant"
-                or (isinstance(record.get("message"), dict) and record["message"].get("role") == "assistant")
-            )
+            is_assistant = _is_assistant_record(record)
 
             record_is_reviewer = _is_reviewer_record(record)
             if record_is_reviewer:

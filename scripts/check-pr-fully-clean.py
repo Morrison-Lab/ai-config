@@ -1978,114 +1978,6 @@ def _section_has_unresolved_blocking_items(
     return False
 
 
-# "Blocking findings: None" is how reviewers (agy, Claude, Codex) say that
-# nothing blocks, and `_BARE_REJECTION` reads its "Blocking" as a rejection
-# (ai-config#4428). Exempt it only when the heading or label declares the
-# section empty and nothing else stands in it: a heading followed by a real
-# item, or a label followed by anything but a none-word, stays not-clean.
-_EMPTY_DECLARATION = re.compile(
-    r"^[*_]*\s*(?:none|n/a|none\s+identified|none\s+found)\s*[.!]?\s*[*_]*\s*$",
-    re.IGNORECASE,
-)
-_BLOCKING_SECTION_NOUN = re.compile(
-    r"\s+(?:findings|issues|defects|items|blockers|problems)\b", re.IGNORECASE)
-
-
-# A section ends at a real heading (at most three spaces of indent, so an
-# indented code line starting "#" is content, not a heading) or at a label
-# opening a non-blocking section, such as "**Non-blocking:**".
-_SECTION_STOP = (r"(?m)^ {0,3}(?:#{1,%d}(?:[ \t]|$)"
-                 r"|(?:[-*+][ \t]+)?[*_]*[ \t]*"
-                 r"(?:non-?blocking|optional|nits?|minor|suggestions?)"
-                 r"(?:[ \t]+(?:findings|issues|items|notes|comments))?[*_]*[ \t]*:)")
-_LIST_ITEM = re.compile(r"^ {0,3}(?:[-*+]|\d{1,9}[.)])[ \t]")
-_BOLD_LABEL = re.compile(r"^ {0,3}(?:[-*+][ \t]+)?(?:\*\*|__)[^*_\n]+:")
-
-
-def _label_section_lines(scan_body: str, section_start: int,
-                         list_indent: int) -> list:
-    """Lines that belong to a "Blocking findings:" label.
-
-    The label owns the lines directly under it and, across blank lines, any
-    loose list items or indented blocks that continue them; a new prose
-    paragraph, a heading, or another bold label ends it (ai-config#4428).
-    When the label is itself a list item (*list_indent* >= 0), a sibling or
-    outer item ends it, while a nested item stays inside.
-    """
-    out, blank = [], False
-    for raw in scan_body[section_start:].splitlines():
-        line = raw.rstrip()
-        if not line.strip():
-            blank = True
-            continue
-        if re.match(_SECTION_STOP % 6, line, re.IGNORECASE):
-            break
-        sibling = (list_indent >= 0 and _LIST_ITEM.match(line)
-                   and len(line) - len(line.lstrip()) <= list_indent)
-        if _BOLD_LABEL.match(line) or sibling:
-            break
-        if blank and not (_LIST_ITEM.match(line) or line.startswith("    ")
-                          or line.startswith("\t")):
-            break
-        blank = False
-        if not re.match(r"^[-*_\s]{3,}$", line):
-            out.append(line.strip())
-    return out
-
-
-def _blocking_section_lines(scan_body: str, section_start: int,
-                            level: int) -> list:
-    """Non-blank, non-rule lines from *section_start* to the section's end.
-
-    The section runs to the next heading of level <= *level* or the next
-    non-blocking label, across blank lines, so a loose list item, a
-    subheading's content, or an indented code block stays inside it
-    (ai-config#4428 reviews).
-    """
-    stop = re.search(_SECTION_STOP % level, scan_body[section_start:],
-                     re.IGNORECASE)
-    section = (scan_body[section_start:section_start + stop.start()]
-               if stop else scan_body[section_start:])
-    lines = [ln.strip() for ln in section.splitlines()]
-    return [ln for ln in lines if ln and not re.match(r"^[-*_\s]{3,}$", ln)]
-
-
-def _is_empty_blocking_section(scan_body: str, match_start: int,
-                               match_end: int) -> bool:
-    """True when a "Blocking findings" heading or label declares the section empty.
-
-    The declaration must be the section's ONLY content: a none-word followed
-    by any further line before the section ends stays not-clean, since
-    exempting a real blocker is the dangerous direction.
-    """
-    if scan_body[match_start:match_end].lower() != "blocking":
-        return False
-    noun = _BLOCKING_SECTION_NOUN.match(scan_body, match_end)
-    if not noun:
-        return False
-    line_start = scan_body.rfind("\n", 0, match_start) + 1
-    line_end = scan_body.find("\n", match_end)
-    if line_end == -1:
-        line_end = len(scan_body)
-    lead = scan_body[line_start:match_start]
-    rest = scan_body[noun.end():line_end].lstrip("*_: \t-")
-    heading = re.match(r"^ {0,3}(#{1,6})[ \t]+[*_]*$", lead)
-    label = re.match(r"^ {0,3}([-*+][ \t]+)?[*_]*$", lead)
-    if heading:
-        lines = _blocking_section_lines(scan_body, line_end + 1,
-                                        len(heading.group(1)))
-    elif label:
-        indent = (len(lead) - len(lead.lstrip()) if label.group(1) else -1)
-        lines = _label_section_lines(scan_body, line_end + 1, indent)
-    else:
-        return False
-    if rest:
-        return not lines and bool(_EMPTY_DECLARATION.match(rest))
-    if len(lines) != 1:
-        return False
-    return bool(_EMPTY_DECLARATION.match(re.sub(r"^[-*+][ \t]+", "", lines[0])))
-
-
 def _is_exempt_findings_heading(
     scan_body: str, match_start: int, match_end: int
 ) -> bool:
@@ -3025,8 +2917,6 @@ def classify_verdict(body: str, state: str = "", author: str = "") -> str:
                     continue
                 if _is_exempt_findings_heading(scan, match.start(), match.end()):
                     continue
-                if _is_empty_blocking_section(scan, match.start(), match.end()):
-                    continue
             if pat == r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b":
                 suffix = scan[match.end():match.end() + 60]
                 if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
@@ -3267,8 +3157,6 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
                 if _is_resolved_blocking_mention(scan_body, match, cited):
                     continue
                 if _is_exempt_findings_heading(scan_body, match.start(), match.end()):
-                    continue
-                if _is_empty_blocking_section(scan_body, match.start(), match.end()):
                     continue
             if pat == _FINDINGS_HEADING_PATTERN:
                 # The section-resolution check REPLACES the 60-char suffix

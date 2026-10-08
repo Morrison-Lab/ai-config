@@ -2497,64 +2497,6 @@ def main() -> int:
             is not None,
         )
 
-    # ai-config#4428: "Blocking findings: None" says nothing blocks.
-    _tail = "\n\n### Verdict\n\nVerdict: Ready for merge\n"
-    for _label, _body in (
-        ("heading, blank, None.", "### Blocking findings\n\nNone."),
-        ("heading, None.", "### Blocking findings\nNone."),
-        ("heading, rule, None.", "### Blocking findings\n\n---\n\nNone."),
-        ("heading: none", "### Blocking findings: none"),
-        ("bold label: None.", "**Blocking findings:** None."),
-        ("label, bullet None", "Blocking findings:\n- None"),
-        ("heading, bullet None", "### Blocking findings\n\n- None."),
-        ("label then another label", "**Blocking findings:** None.\n\n**Non-blocking:** a nit."),
-        ("heading None, then a non-blocking label",
-         "### Blocking findings\n\nNone.\n\n**Non-blocking findings:**\n- a nit."),
-        # Ordinary label-form reviews the round-2 fix wrongly made not-clean.
-        ("label None, blank, bold summary",
-         "**Blocking findings:** None.\n\n**Summary:** small and well tested."),
-        ("label None, blank, prose", "Blocking findings: None.\n\nOverall it looks good."),
-        ("label as list item, sibling items",
-         "- Blocking findings: None\n- Tests: pass\n- Docs: updated"),
-        ("label None, blank, checked list",
-         "Blocking findings: None\n\nChecked:\n- tests\n- docs"),
-        ("label None, next line bold label",
-         "**Blocking findings:** None.\n**Verified:** all 3 files read."),
-    ):
-        check(f"classify_verdict: empty Blocking findings ({_label}) stays clean",
-              checker.classify_verdict(_body + _tail, "") == "clean")
-        check(f"_unresolved_finding_pattern: empty Blocking findings ({_label}) "
-              "is no finding",
-              checker._unresolved_finding_pattern(_body + _tail) is None)
-    for _label, _body in (
-        ("heading with an item", "### Blocking findings\n\n1. The cache leaks."),
-        ("heading, None, then an item",
-         "### Blocking findings\n\nNone.\n\n- The cache leaks."),
-        ("label with an item", "**Blocking findings:** the cache leaks."),
-        ("heading: None, then an item",
-         "### Blocking findings: None\n- crash"),
-        ("label: None, then a continuation line",
-         "Blocking findings: None\nThe build fails."),
-        ("heading None, then a subheading with an item",
-         "### Blocking findings\n\nNone\n\n#### Nit\n- real blocker: crash"),
-        ("prose 'Blocking issues none of which'",
-         "Blocking issues none of which are fixed."),
-        # The three bypasses agy found on #4427 at 9757202d.
-        ("label, bullet None, blank, loose second item",
-         "**Blocking findings:**\n- None\n\n- Critical: RCE via yaml.load()."),
-        ("label: None, blank, an item",
-         "**Blocking findings:** None\n\n- Defect: auth bypass."),
-        ("heading: None, blank, indented code starting '#'",
-         "### Blocking findings: None\n\n    # CRITICAL: overflow\n"
-         "    memcpy(dest, src, len);"),
-        ("label as list item, nested item under it",
-         "- Blocking findings: None\n  - Data loss on save."),
-        ("heading None, then a 'Minor regression:' prose line",
-         "### Blocking findings: None\nMinor regression: deletes user data."),
-    ):
-        check(f"classify_verdict: Blocking findings ({_label}) stays not-clean",
-              checker.classify_verdict(_body + _tail, "") == "not-clean")
-
     check(
         "classify_verdict: '### Findings (non-blocking)' heading in clean review stays clean",
         checker.classify_verdict(

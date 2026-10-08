@@ -41,6 +41,26 @@ but do not strip one that already exists unless the maintainer asks.
 - **Don't:** report a missing sister-repository credit as a review finding,
   or delete an existing one unasked.
 
+## Material written from scratch names no source
+
+Material the maintainer's group wrote from scratch,
+with no outside source behind it, has nothing to credit,
+so it carries no source line, not even one saying it is new
+(user directive, 2026-10-08:
+"we don't need to state sources for material that we generated ourselves").
+A line such as "Source: new for Fall 2026, written for Midterm 1",
+in the text or in a comment, credits nobody;
+leave it out, and remove it where you find one.
+Material adapted from an outside source is not written from scratch,
+however much it was reworded, and keeps its credit.
+A note on where a worked example's numbers came from
+("the counts are invented for hand computation",
+or the library version that produced them)
+is not a source line, and stays.
+
+- **Do:** leave the source line off a question, example or section you wrote from scratch.
+- **Don't:** add a "new for <term>" or "written for <assessment>" line as if it were a credit.
+
 ## Where the credit goes
 
 Follow PSW's
@@ -99,3 +119,11 @@ Later the same day the maintainer added that credits to their own repositories a
 pointing at one of the PR's rme credits,
 so the PR's commit `714dd913` dropped its rme and lds credits,
 and `aae43d26` kept those to ISLR, ESL, Dobson and the lecturers the lds notes credit.)
+
+(Morrison-Lab/mlg, 2026-10-08:
+23 questions in mlg's question bank ended their answers with
+"Source: new for Fall 2026, written for ...",
+and two more carried the same note in an HTML comment.
+The maintainer pointed at one of them on
+[mlg#67](https://github.com/Morrison-Lab/mlg/pull/67),
+which removed all of them and kept the notes on where each question's numbers came from.)

@@ -1425,6 +1425,18 @@
             "why": "ai-config#4224. The user asked for a link on every artifact a reply names ('always give me hyperlinks!', then 'how many times do I have to tell you that?', 2026-10-02) after the rule was already in memory and repo instructions; the miss happens at composition time, so the rule alone did not fire. Warns, never blocks, when a user-visible reply tool call carries a bare forge reference (#N, !N, owner/repo#N) outside Markdown links, URLs and code. Descriptions without a number ('the referee note') have no lexical marker and are out of scope. Fails open."
           }
         ]
+      },
+      {
+        "matcher": "mcp__hearthbot__.*|mcp__github__add_issue_comment|mcp__github__update_issue_comment|mcp__github__add_reply_to_pull_request_comment|mcp__github__add_comment_to_pending_review|mcp__github__pull_request_review_write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-hedged-checkable-claim.py\"",
+            "timeout": 10,
+            "script": "warn-hedged-checkable-claim.py",
+            "why": "User rule, 2026-10-08: 'don't say likely when you can check'. A hedge (likely, probably, presumably, I think, should be) in the same sentence as a PR or issue reference, a CI or check status word, or merged/open/closed names a state the agent can read in one call. Warns, never blocks, on user-visible reply tools and GitHub comment tools; asks the agent to check and state the result. Fails open."
+          }
+        ]
       }
     ],
     "PostToolUse": [

@@ -1416,8 +1416,9 @@ def blocking_verdict_ts(reviewed):
 path_blocking = blocking_verdict_ts(rev_head)
 assert subject.is_pre_push_review_in_flight(rev_root, path_blocking) is False
 assert subject.is_push_held_by_blocking_review(path_blocking, cwd=rev_root) is True
-# Scoped: the same verdict does not hold a branch whose tip it did not read.
-assert subject.is_push_held_by_blocking_review(path_blocking, cwd=rev_root, branch="main") is False
+# The guard refuses every push while the verdict is blocking, so a branch
+# whose tip the verdict did not read is held too (no deadlock there either).
+assert subject.is_push_held_by_blocking_review(path_blocking, cwd=rev_root, branch="main") is True
 assert subject.decide(rev_root, path_blocking) == ""
 # The push guard refuses on any blocking verdict, so a report with no
 # Reviewed-Commit line (or a malformed one) holds the push too.
@@ -1475,6 +1476,30 @@ reason_mv = subject.decide(mv_root, path_mv)
 assert "2 commit(s) on HEAD are not on its upstream" in reason_mv, reason_mv
 assert "re-dispatch the reviewer" in reason_mv, reason_mv
 assert "Push the branch" not in reason_mv, reason_mv
+# A blocking verdict on branch A holds branch B's unrelated unpushed commit:
+# the guard would refuse B's push too, so demanding it is the #3270 deadlock.
+ab_root, _ab_bare, ab_run = gitrepo(
+    BASE,
+    "git remote add origin BARE",
+    "git push -q -u origin main",
+    "git checkout -q -b feat-a",
+    "git commit --allow-empty -m 'reviewed on A'",
+)
+ab_reviewed = subject._rev_parse(ab_root, "HEAD")
+ab_run("git checkout -q main")
+ab_run("git checkout -q -b feat-b")
+ab_run("git commit --allow-empty -m 'unrelated on B'")
+h_ab, path_ab = tempfile.mkstemp()
+with os.fdopen(h_ab, "w") as dst:
+    dst.write(json.dumps({"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "id": "b1", "name": "Bash", "input": {"command": "git commit -m 'unrelated on B'"}}]}}) + "\n")
+    dst.write(json.dumps({"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "id": "b2", "name": "Agent", "input": {"subagent_type": "adversarial-reviewer", "prompt": "Review changes on feat-a"}}]}}) + "\n")
+    dst.write(json.dumps({"type": "user", "message": {"content": [
+        {"type": "tool_result", "tool_use_id": "b2", "content": f"### Verdict: Needs more work\n\nReviewed-Commit: {ab_reviewed}\n"}]}}) + "\n")
+assert subject.is_push_held_by_blocking_review(path_ab, cwd=ab_root) is True
+assert subject.decide(ab_root, path_ab) == ""
+os.unlink(path_ab)
 for _p in (path_blocking, path_nofp, path_later, path_mv):
     os.unlink(_p)
 

@@ -1367,26 +1367,35 @@ def _latest_review_is_blocking(path):
     return bool(review) and review[0] == "needs_work"
 
 
-def is_push_held_by_blocking_review(path, cwd=None, branch=None):
-    """True if the latest self-review is blocking and read this checkout's tip.
+def _is_strict_ancestor(cwd, ancestor, tip):
+    """True if commit `ancestor` is reachable from `tip` and is not `tip`."""
+    if not cwd or not ancestor or not tip or _sha_matches(ancestor, tip):
+        return False
+    try:
+        return subprocess.run(
+            ["git", "merge-base", "--is-ancestor", ancestor, tip],
+            cwd=cwd, capture_output=True, timeout=5).returncode == 0
+    except Exception:
+        return False
 
-    `no-push-without-self-review.py` refuses every push while the latest
-    verdict is `needs_work`, so demanding a push of the commit that review
-    read leaves no way to end the turn while the fix round runs, typically in
-    a subagent (ai-config#3270). The hold is scoped to the checkout or branch
-    whose tip the verdict names, so a blocking verdict on one branch does not
-    quiet another. A verdict naming no commit holds every push, as the guard
-    does. Once a commit moves past the reviewed one, decide() asks for a
-    fresh review instead (REVIEW_REMEDY), which the session can act on.
+
+def is_push_held_by_blocking_review(path, cwd=None, branch=None):
+    """True if the latest self-review is blocking and no fix has moved past it.
+
+    `no-push-without-self-review.py` refuses every push, on any branch, while
+    the latest verdict is `needs_work`, so demanding a push then leaves no way
+    to end the turn while the fix round runs, typically in a subagent
+    (ai-config#3270). Every checkout is held, as the guard holds every push,
+    with one exception: a tip that descends from a reviewed commit carries a
+    fix the review has not seen. decide() then asks for a fresh review
+    (REVIEW_REMEDY), which is a step the session can take.
     """
     review = _latest_review(path)
     if not review or review[0] != "needs_work":
         return False
-    if not review[1]:
-        return True
     head_sha = _rev_parse(cwd, branch or "HEAD") if cwd else None
-    return bool(head_sha) and any(
-        _sha_matches(sha, head_sha) for sha in review[1])
+    return not any(
+        _is_strict_ancestor(cwd, sha, head_sha) for sha in review[1])
 
 
 def is_push_deferred(cwd, path, branch=None, session_cwd=None):

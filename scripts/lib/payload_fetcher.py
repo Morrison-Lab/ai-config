@@ -170,6 +170,20 @@ class PayloadFetcher:
         return pr
 
     def _api(self, path: str) -> str:
+        if "/compare/" in path:
+            # Optional, unlike the reads above: a payload gathered before
+            # ai-config#2982, or transcribed by hand, has no comparison. The
+            # checker reports that as a NOTE rather than scoring around it.
+            compare = self.payload.get("base_compare")
+            if compare is None:
+                return json.dumps({"_not_in_payload": True})
+            if not isinstance(compare, dict):
+                raise PayloadError(
+                    f"payload 'base_compare' must be an object, got "
+                    f"{type(compare).__name__}."
+                )
+            return json.dumps(compare)
+
         if "/check-runs" in path:
             runs = _require(self.payload, "check_runs", "check-run status")
             if isinstance(runs, list):

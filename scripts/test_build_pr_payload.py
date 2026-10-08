@@ -502,6 +502,9 @@ def test_review_comments_handling():
 
 def test_fetch_payload_integration():
     def fake_rest_get(endpoint, token, envelope=None):
+        if "/compare/" in endpoint:
+            return {"ahead_by": 2, "commits": [{"sha": "x"}],
+                    "files": [{"filename": ".github/workflows/v.yml", "patch": "+x"}]}
         if "/pulls/123/comments" in endpoint:
             return [{"user": {"login": "Copilot"}, "commit_id": "c1", "original_commit_id": "c0"}]
         if "/pulls/123/reviews" in endpoint:
@@ -523,6 +526,10 @@ def test_fetch_payload_integration():
                 check("fetch_payload runs without UnboundLocalError/NameError", isinstance(payload, dict))
                 check("fetch_payload includes review_threads", "review_threads" in payload)
                 check("fetch_payload includes review_comments", "review_comments" in payload)
+                check("fetch_payload carries a compact base_compare (ai-config#2982)",
+                      payload.get("base_compare") == {
+                          "ahead_by": 2,
+                          "files": [{"filename": ".github/workflows/v.yml"}]})
 
 
 def main():

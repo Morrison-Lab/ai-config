@@ -396,6 +396,25 @@ def main():
     except PayloadError:
         check("a non-dict payload raises at construction", True)
 
+    # --- base drift (ai-config#2982): the compare endpoint maps to base_compare ---
+    p = base_payload()
+    p["pr"]["baseRefName"] = "main"
+    p["base_compare"] = {"ahead_by": 2,
+                         "files": [{"filename": ".github/workflows/validate.yml"}]}
+    code, out = run_script(p)
+    check("a base gaining a workflow change exits 1 (#2982)", code == 1)
+    check("...and names the workflow file", "validate.yml" in out)
+    p["base_compare"] = {"ahead_by": 2, "files": [{"filename": "README.md"}]}
+    code, _ = run_script(p)
+    check("base drift with no workflow change still exits 0 (#2982)", code == 0)
+    del p["base_compare"]
+    code, out = run_script(p)
+    check("a payload without base_compare exits 0 with a NOTE (#2982)",
+          code == 0 and "base_compare" in out)
+    p["base_compare"] = ["not", "a", "dict"]
+    code, _ = run_script(p)
+    check("a non-object base_compare exits 2, NOT 0 (#2982)", code == 2)
+
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

@@ -8764,6 +8764,48 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     )
 
 
+    # check_base_drift (ai-config#2982): a head the base gained a workflow
+    # change behind is not clean, since a check added there never ran on it.
+    from types import SimpleNamespace
+
+    def drift(compare, state="OPEN", base="main", sha="sha123"):
+        pr = SimpleNamespace(state=state, base_ref=base, head_sha=sha, repo=TEST_REPO)
+        calls = []
+
+        def fake_fetch(cmd):
+            calls.append(cmd)
+            return json.dumps(compare)
+
+        with patch.object(checker, "fetch", side_effect=fake_fetch):
+            ok, issues = checker.check_base_drift(pr)
+        return ok, issues, calls
+
+    ok, issues, calls = drift({"ahead_by": 3, "files": []}, state="MERGED")
+    check("check_base_drift: a merged PR is skipped (#2982)", ok and issues == [] and calls == [])
+    ok, issues, calls = drift({}, base="")
+    check("check_base_drift: no base branch is a NOTE (#2982)",
+          ok and calls == [] and issues and issues[0].startswith("NOTE"))
+    ok, issues, calls = drift({"_not_in_payload": True})
+    check("check_base_drift: payload without base_compare is a NOTE (#2982)",
+          ok and issues and issues[0].startswith("NOTE")
+          and calls == [["gh", "api", f"repos/{TEST_REPO}/compare/sha123...main"]])
+    ok, issues, _ = drift({"ahead_by": 0, "files": []})
+    check("check_base_drift: an up-to-date head is clean (#2982)", ok and issues == [])
+    ok, issues, _ = drift({"ahead_by": 4, "files": [{"filename": "scripts/x.py"}]})
+    check("check_base_drift: drift with no workflow change is a NOTE (#2982)",
+          ok and issues and issues[0].startswith("NOTE"))
+    ok, issues, _ = drift({"ahead_by": 2, "files": [
+        {"filename": "scripts/x.py"}, {"filename": ".github/workflows/validate.yml"}]})
+    check("check_base_drift: a workflow change on the base blocks (#2982)",
+          not ok and issues and ".github/workflows/validate.yml" in issues[0])
+    ok, issues, _ = drift({"ahead_by": 9, "files": [
+        {"filename": f"f{i}.md"} for i in range(checker.COMPARE_FILE_CAP)]})
+    check("check_base_drift: a capped file list blocks rather than passing (#2982)",
+          not ok and issues and "cap" in issues[0])
+    for bad in (None, "3", True):
+        ok, issues, _ = drift({"ahead_by": bad, "files": []})
+        check(f"check_base_drift: ahead_by={bad!r} blocks (#2982)", not ok and issues)
+
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

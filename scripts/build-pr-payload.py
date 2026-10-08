@@ -463,7 +463,7 @@ def fetch_payload(owner_repo: str, pr_number: int, token: str) -> Dict[str, Any]
             file=sys.stderr,
         )
         review_comments_raw = None
-    return build_payload(
+    payload = build_payload(
         owner_repo,
         pr_raw,
         reviews_raw,
@@ -474,6 +474,36 @@ def fetch_payload(owner_repo: str, pr_number: int, token: str) -> Dict[str, Any]
         review_threads,
         review_comments_raw,
     )
+    try:
+        compare = rest_get(
+            f"{base}/compare/{pr_raw['head']['sha']}...{pr_raw['base']['ref']}", token
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"warning: failed to fetch the base comparison ({exc}); "
+            "base_compare will be omitted and the checker will say so",
+            file=sys.stderr,
+        )
+    else:
+        if isinstance(compare, dict):
+            payload["base_compare"] = compact_compare(compare)
+        else:
+            print(
+                f"warning: the base comparison was a {type(compare).__name__}, "
+                "not an object; base_compare will be omitted",
+                file=sys.stderr,
+            )
+    return payload
+
+
+def compact_compare(compare: Dict[str, Any]) -> Dict[str, Any]:
+    """Keep only what check_base_drift reads (ai-config#2982): the full
+    comparison carries every commit object and patch."""
+    return {
+        "ahead_by": compare.get("ahead_by"),
+        "files": [{"filename": f.get("filename") or ""}
+                  for f in (compare.get("files") or []) if isinstance(f, dict)],
+    }
 
 
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:

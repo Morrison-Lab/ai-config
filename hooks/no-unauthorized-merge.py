@@ -268,18 +268,22 @@ def unmask_piped_statements(inert: str, masked: str) -> str:
     neighbour's shell to the quoted text (#4394 review). Both inputs have the
     same length, and so does the result, so offsets into either still apply.
     """
+    # A backslash-escaped character is literal to the shell, so `\)` or `\;`
+    # must neither end a statement nor stop a wrapper's argument skip
+    # (#4394 review round 5). Blank each escape pair, length-preserving.
+    scan = re.sub(r"\\.", "xx", inert, flags=re.S)
     pieces, start, depth, i = [], 0, 0, 0
-    while i <= len(inert):
-        ch = inert[i] if i < len(inert) else "\n"
-        two = inert[i:i + 2]
+    while i <= len(scan):
+        ch = scan[i] if i < len(scan) else "\n"
+        two = scan[i:i + 2]
         if ch in "({":
             depth += 1
         elif ch in ")}":
             depth = max(depth - 1, 0)
         sep = 2 if two in ("&&", "||") else 1 if ch in ";\n" else 0
-        if sep and (depth == 0 or i >= len(inert)):
+        if sep and (depth == 0 or i >= len(scan)):
             stmt = inert[start:i]
-            if STDIN_EXECUTOR.search(blank_substitutions(stmt)):
+            if STDIN_EXECUTOR.search(blank_substitutions(scan[start:i])):
                 stmt = re.sub(r"[\"']", " ", masked[start:i])
             pieces.append(stmt + inert[i:i + sep])
             start = i = i + sep

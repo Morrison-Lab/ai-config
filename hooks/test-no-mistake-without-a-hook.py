@@ -77,9 +77,25 @@ CASES = [
       say("Mechanism: https://github.com/Morrison-Lab/ai-config/pull/2386 "
           "adds the guard.")],
      False, "a mechanism citation with a PR URL discharges it"),
+    ([say("My mistake.\n\n- **Mechanism:** "
+          "https://github.com/Morrison-Lab/ai-config/issues/3771")],
+     False, "an admission and a bold bulleted citation in one message discharge it"),
+    ([say("I was wrong."), UNRELATED,
+      say("Mechanism: [" + "a long pull request title " * 6 + "](https://"
+          "github.com/Morrison-Lab/ai-config/pull/2386#issuecomment-1)")],
+     False, "a Markdown-link citation with a long title discharges it"),
     ([say("My mistake. The mechanism is tracked in "
           "https://github.com/Morrison-Lab/ai-config/issues/3771.")],
-     False, "an admission and a mechanism citation in one message discharge it"),
+     True, "the word mechanism mid-sentence, without the label, does not discharge"),
+    ([say("I was wrong; no mechanism exists, unlike "
+          "https://github.com/Morrison-Lab/ai-config/issues/9")],
+     True, "a negated mechanism mention beside a URL does not discharge"),
+    ([say("I was wrong, and there is no mechanism: see "
+          "https://github.com/Morrison-Lab/ai-config/issues/9")],
+     True, "a label-shaped phrase mid-line does not discharge"),
+    ([say("I was wrong."), UNRELATED,
+      say("`Mechanism: https://github.com/Morrison-Lab/ai-config/pull/2386`")],
+     True, "a citation inside inline code does not discharge"),
     ([say("I was wrong."), UNRELATED,
       say("See https://github.com/Morrison-Lab/ai-config/pull/2386.")],
      True, "a URL without the word mechanism does not discharge"),

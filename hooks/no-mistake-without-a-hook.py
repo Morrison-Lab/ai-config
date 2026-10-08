@@ -56,9 +56,12 @@ mechanizable, and why, discharges this too.
 A MECHANISM BUILT OUT OF SIGHT IS CITED, NOT WRITTEN
 ----------------------------------------------------
 Hook work done in another repository, or by a subagent in its own worktree,
-leaves no `hooks/` path in this transcript. A line naming the mechanism and
-its issue or PR URL ("Mechanism: https://github.com/<owner>/<repo>/pull/N")
-discharges it (ai-config#2389).
+leaves no `hooks/` path in this transcript. A line that starts with the label
+"Mechanism:" and carries its issue or PR URL
+("Mechanism: https://github.com/<owner>/<repo>/pull/N") discharges it
+(ai-config#2389). The label is required because the bare word next to a URL
+also appears in the opposite claim ("no mechanism exists, unlike <url>").
+The guard cannot tell whether the cited item really is the mechanism.
 """
 import hashlib
 import importlib.util
@@ -110,14 +113,19 @@ NOT_HOOKABLE = re.compile(
 )
 
 # A citation of a mechanism built somewhere this transcript cannot see: an
-# issue or PR URL on the same line as the word "mechanism". Hook work done in
+# issue or PR URL on a line labelled "Mechanism:". Hook work done in
 # another repository, or by a delegated subagent in its own worktree, writes
 # no `hooks/` path into this transcript, so without this the guard recommends
 # the delegation that makes it undischargeable (ai-config#2389).
+# Anchored on a "Mechanism:" LABEL at the start of a line, not on the word
+# anywhere: "no mechanism exists, unlike <url>" names the word and a URL and
+# is the opposite claim, so an unanchored match would silence a real
+# obligation. Within the labelled line the URL may sit anywhere, so a
+# Markdown link with a long title still counts.
 MECHANISM_CITED = re.compile(
-    r"\bmechanism\b[^\n]{0,120}?"
-    r"https://github\.com/[\w.-]+/[\w.-]+/(?:issues|pull)/\d+",
-    re.I,
+    r"^[ \t]*(?:[-*+][ \t]+)?(?:\*\*|__)?Mechanism(?:\*\*|__)?[ \t]*:"
+    r"[^\n]*?https://github\.com/[\w.-]+/[\w.-]+/(?:issues|pull)/\d+",
+    re.I | re.M,
 )
 
 
@@ -256,8 +264,8 @@ def main() -> int:
         "message which is right to send), add tests, mutation-check them, and "
         "register it in hooks/hooks.json. Do NOT activate it before its PR "
         "merges (README's activation gate). If the hook is built in another "
-        "repository or by a subagent, cite it on one line: "
-        "\"Mechanism: <issue or PR URL>\" discharges this.\n"
+        "repository or by a subagent, cite it on a line of its own that "
+        "starts \"Mechanism: <issue or PR URL>\"; that discharges this.\n"
         "  * If no -- say so explicitly, and say why. A hook for a one-off "
         "factual slip or a judgment call misfires and gets switched off, "
         "taking the real cases with it. Stating that it is not mechanizable "

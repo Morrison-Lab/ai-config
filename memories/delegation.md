@@ -18,11 +18,12 @@ this section is self-contained.
 >
 > **Free models are open to every project, but restricted data is not** (user directive, 2026-10-08:
 > "all our projects and sessions can use free models anytime they are useful, except for directly viewing restricted data (PHI/HIPAA, FERPA, etc);
-> at present, those data can only be handled by our UCDH Codex account").
+> at present, those data can only be handled by our UCDH Codex account [...]").
 > Free models (ones that cost no quota, such as OpenCode's free tier) need no quota justification, so use them whenever they are useful.
 > At present, restricted data goes only to the UCDH Codex account; see [`standing-habits-from-ezra`](../shared/workflow/standing-habits-from-ezra.md#send-bulk-work-to-other-models).
 >
-> - **Do:** check whether a brief, or a file it names, carries restricted data before choosing any model other than UCDH Codex.
+> - **Do:** check whether a brief, a file it names, or a command it runs exposes restricted data before choosing any model other than UCDH Codex.
+>   Where UCDH Codex may not run, no model gets the data; ask Ezra.
 > - **Don't:** read "free" as "cleared for restricted data".
 
 > [!IMPORTANT]

@@ -35,10 +35,10 @@ def tool(command):
         {"type": "tool_use", "id": "t1", "input": {"command": command}}]}}
 
 
-def mcp(name):
+def mcp(name, method="get"):
     return {"type": "assistant", "message": {"content": [
         {"type": "tool_use", "id": "t1", "name": name,
-         "input": {"method": "get", "pullNumber": 9}}]}}
+         "input": {"method": method, "pullNumber": 9}}]}}
 
 
 def write_mention(text):
@@ -118,6 +118,21 @@ CASES = [
     ([user("status?"), say("PR #9 checks are passing."),
       sidechain(say("Subagent note, nothing to see."))], True,
      "sidechain text is not the final message -> fires"),
+    ([user("status?"), say("PR #9 merged after the checks passed.")], False,
+     "merged PR report -> silent"),
+    ([user("status?"), say("ai-config#4380 pipeline is green.")], True,
+     "owner-less repo#N reference -> fires"),
+    ([user("status?"), say("Morrison-Lab/ai-config#4380 checks passing.")], True,
+     "owner/repo#N reference -> fires"),
+    ([user("status?"), mcp("mcp__other__get_status"), tool_result(),
+      say("PR #9 checks are passing.")], True,
+     "unrelated MCP get_status does not discharge -> fires"),
+    ([user("status?"), mcp("mcp__github__pull_request_read", "get_files"),
+      tool_result(), say("PR #9 checks are passing.")], True,
+     "pull_request_read get_files does not discharge -> fires"),
+    ([user("status?"), tool("echo mergeable"), tool_result(),
+      say("PR #9 checks are passing.")], True,
+     "shell mention without a forge client does not discharge -> fires"),
     ([user("old"), tool("gh pr view 9 --json mergeable"), tool_result(),
       say("ok"),
       {"type": "user", "isMeta": True, "promptSource": "sdk",

@@ -53,7 +53,7 @@ RX_PR_REF = re.compile(
     r"|/-/merge_requests/\d+"
     r"|/merge_requests/\d+"
     r"|(?<![\w/])![0-9]+\b"
-    r"|(?<![\w&/])(?<!issue )(?<!issues )(?<!step )#[0-9]+\b"
+    r"|(?<![&/])(?<!issue )(?<!issues )(?<!step )#[0-9]+\b"
     r"|\b(?:PR|MR|pull request|merge request)s?\s+#?!?\d+",
     re.I,
 )
@@ -76,7 +76,14 @@ RX_STATUS = re.compile(
 # MCP reads carry no such words in their input, so they are matched by tool
 # name instead.
 RX_MCP_MERGEABILITY_TOOL = re.compile(
-    r"(?:^|__)(?:pull_request_read|get_status)$|(?:^|__)get_merge_request$", re.I)
+    r"^mcp__(?:github|ccd_pr)__(?:pull_request_read|get_status)$", re.I)
+# pull_request_read serves many methods; only these two carry mergeability.
+MCP_MERGEABILITY_METHODS = {"get", "get_status"}
+# A shell command counts only when it runs a forge client, so `echo mergeable`
+# or a grep for the word is not a read.
+RX_FORGE_CLIENT = re.compile(r"\b(?:gh|glab|curl)\b")
+# A report about a PR that is already merged or closed makes mergeability moot.
+RX_TERMINAL_PR = re.compile(r"\b(?:merged|closed|abandoned)\b", re.I)
 RX_MERGEABILITY_QUERY = re.compile(
     r"has_conflicts|detailed_merge_status|merge_status|mergeStateStatus"
     r"|\bmergeable(?:_state)?\b|\bglab\s+mr\s+view\b",
@@ -136,10 +143,13 @@ def scan(path):
                 elif block.get("type") == "tool_use":
                     inp = block.get("input") or {}
                     cmd = inp.get("command") if isinstance(inp, dict) else None
-                    if isinstance(cmd, str) and RX_MERGEABILITY_QUERY.search(cmd):
+                    if (isinstance(cmd, str) and RX_FORGE_CLIENT.search(cmd)
+                            and RX_MERGEABILITY_QUERY.search(cmd)):
                         queried = True
                     elif RX_MCP_MERGEABILITY_TOOL.search(block.get("name") or ""):
-                        queried = True
+                        method = inp.get("method") if isinstance(inp, dict) else None
+                        if method is None or method in MCP_MERGEABILITY_METHODS:
+                            queried = True
     return text, queried
 
 
@@ -162,7 +172,8 @@ def main() -> int:
     # Reference and status wording must share a sentence, so an unrelated
     # issue number and an unrelated build remark do not combine.
     sentences = re.split(r"(?<=[.!?])\s+|\n", prose)
-    if not any(RX_PR_REF.search(x) and RX_STATUS.search(x) for x in sentences):
+    if not any(RX_PR_REF.search(x) and RX_STATUS.search(x)
+               and not RX_TERMINAL_PR.search(x) for x in sentences):
         return 0
 
     key = hashlib.sha256((path + ":" + text).encode()).hexdigest()[:16]

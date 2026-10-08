@@ -1607,6 +1607,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-mergeability-on-status.py\"",
+            "timeout": 10,
+            "script": "remind-mergeability-on-status.py",
+            "why": "ai-config#4380 -- an abridge MR sat conflicted for hours while reported as 'open, pipeline green': the MR was stacked, its base branch moved, and only state and pipeline were read. Warns, never blocks, when the final message reports a PR/MR's pipeline/CI/checks status and no command since the last user prompt read mergeability (has_conflicts, detailed_merge_status, merge_status, mergeable, mergeStateStatus, glab mr view). The status report is right to send; only the missing reading against the actual, possibly stacked, target is owed."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-blocker-without-retry.py\"",
             "timeout": 10,
             "script": "flag-blocker-without-retry.py",

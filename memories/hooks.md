@@ -1081,7 +1081,7 @@ A hook that triggers on several regex phrase families can pass a suite while one
 
 `hooks/no-push-without-self-review.py` and `hooks/no-unshipped-commit.py` both decide whether a reviewer hand-back counts.
 The Stop guard imports the push guard for most of its helpers, but it carried its own copy of the hand-back test.
-#4368's first push fixed the forgeable marker match in the push guard only.
+The first push of #4368 fixed the forgeable marker match in the push guard only.
 The review of that push found the identical regex still live in `handle_subagent_handback`, with a test asserting the old behavior.
 
 Importing a module for some helpers does not mean every related rule goes through it.

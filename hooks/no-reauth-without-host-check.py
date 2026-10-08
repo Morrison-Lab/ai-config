@@ -41,7 +41,9 @@ another; the guard cannot know which host was intended.
 
 Known limit, accepted: the credential-expiry reading needs the user's own
 credential as its subject ("your token", "the token you ..."), so an expiry
-statement phrased otherwise is not read; and a login command followed by
+statement phrased otherwise is not read; "is invalid" counts only at the end
+of its sentence ("Your token is invalid."), "log in again" only with a
+forge or token word in its sentence; and a login command followed by
 "in the README / docs / CI / example" is read as describing, not asking.
 
 ## Why this warns rather than blocks
@@ -84,10 +86,10 @@ RX_CLAIM = re.compile(
     r"you must |can you |could you |will you |go ahead and |just )"
     r"re-?authenticat\w*)"
     r"|(?:\bre-?authenticat(?:e|ion)\b[^.\n]{0,40}\b(?:required|needed|necessary)\b)"
-    r"|(?:\b(?:log|sign) ?in again\b)"
+    r"|(?P<relogin>\b(?:log|sign) ?in again\b)"
     r"|(?P<expiry>\b(?:your\s+(?:[\w-]+\s+){0,3}(?:token|credentials?|pat)"
     r"|the\s+(?:[\w-]+\s+){0,2}(?:token|credentials?|pat)\s+you)\b"
-    r"[^.\n]{0,30}\b(?:expired|(?:been|was|were|got|is|are) revoked|gone stale|is invalid)\b)",
+    r"[^.\n]{0,30}\b(?:expired|(?:been|was|were|got|is|are) revoked|gone stale|is invalid\b(?=\s*(?:[.!?;]|$)))\b)",
     re.I,
 )
 # The expiry arm is about the USER'S OWN credentials ("your GitLab token",
@@ -101,6 +103,10 @@ RX_ADDRESSED_PREFIX = re.compile(
     r"^\s*(?:[^,:;]{0,60}[,:;]\s*)?(?:(?:please|now|then|just|first|next|also|and|so)\s+)*"
     r"(?:you\s+(?:can|could|should|will\s+need\s+to|need\s+to|must|have\s+to)\s+"
     r"|(?:can|could|will)\s+you\s+|go\s+ahead\s+and\s+)?$", re.I)
+# "log in again" is about the forge only with forge context in its sentence:
+# "log in again to the portal" or a dashboard's session timeout is not.
+RX_LOGIN_CONTEXT = re.compile(
+    r"\b(?:glab|gh|gitlab|github|token|credentials?|pat)\b", re.I)
 # A claim that is negated or conditional ("has not expired", "if the token
 # expired") is not an assertion that it did.
 RX_NEGATED_BEFORE = re.compile(
@@ -193,6 +199,14 @@ def mark_auth_commands(text):
     return CODE_SPAN_RE.sub(_span, joined)
 
 
+def _sentence_of(prose, start, end):
+    """The sentence of PROSE containing the span [start, end)."""
+    s_start = max(
+        (b.end() for b in RX_SENTENCE_END.finditer(prose, 0, start)), default=0)
+    after = RX_SENTENCE_END.search(prose, end)
+    return prose[s_start:after.start() if after else len(prose)]
+
+
 def find_claim(text):
     """The first reauthentication claim in TEXT (code-aware), or None."""
     prose = strip_code(mark_auth_commands(text))
@@ -205,6 +219,9 @@ def find_claim(text):
                 or RX_NEGATED_INSIDE.search(m.group(0))):
             continue
         if m.group("imper") and not RX_ADDRESSED_PREFIX.search(prefix):
+            continue
+        if m.group("relogin") and not RX_LOGIN_CONTEXT.search(
+                _sentence_of(prose, m.start(), m.end())):
             continue
         return m
     return None

@@ -7,22 +7,35 @@ This fragment is the agent-facing copy: follow the rules, and link to psw instea
 
 ## Structure
 
-- **Build the lecture from exercise and solution pairs.** Pose each data manipulation, analysis, calculation, derivation or proof in an `#exr-` div, and put the worked answer in a `#sol-` div with the same slug.
+- **Build the lecture from exercise and solution pairs.**
+  Pose each data manipulation, analysis, calculation, derivation or proof in an `#exr-` div, and put the worked answer in a `#sol-` div with the same slug.
 - **Put a slide break between an exercise and its solution** (`{{< slidebreak >}}`, never `---`), so the prompt is on screen alone while students work.
-- **Ask before defining.** Precede a `#def-` or `#thm-` div with an exercise that asks the question it answers. The solution answers informally, and the formal div follows the solution div, never inside it.
-- **One bottom-level prompt per exercise.** Do not write one exercise with parts (a) through (e).
-- **Subfiles hold one unit each and start with no heading.** The chapter file is a spine of headings, slide breaks and `{{< include >}}` calls. Name each unit's file for its div type (`_def-`, `_exr-`, `_sol-`, `_thm-`, `_exm-`, `_fig-`), and decompose further when it is a judgment call.
-- **Never nest one theorem-type div inside another.** A special case gets its own div after the general one and links to it.
-- **Keep body text off section and title slides.** Reveal.js does not scroll them, so put a slide break after the heading.
+- **Ask before defining.**
+  Precede a `#def-` or `#thm-` div with an exercise that asks the question it answers.
+  The solution answers informally, and the formal div follows the solution div, never inside it.
+- **One bottom-level prompt per exercise.**
+  Do not write one exercise with parts (a) through (e).
+- **Subfiles hold one unit each and start with no heading.**
+  The chapter file is a spine of headings, slide breaks and `{{< include >}}` calls.
+  Name each unit's file for its div type (`_def-`, `_exr-`, `_sol-`, `_thm-`, `_exm-`, `_fig-`), and decompose further when it is a judgment call.
+- **Never nest one theorem-type div inside another.**
+  A special case gets its own div after the general one and links to it.
+- **Keep body text off section and title slides.**
+  Reveal.js does not scroll them, so put a slide break after the heading.
 
 ## Content
 
 - **State the notation, and name the alternatives** a reader will meet in other sources, in the definition div or a callout beside it.
 - **Name synonyms and near-synonyms** where a term is defined, and say which one the notes use.
-- **Use real data and compute every number.** Never type or paste output. See [`hypothetical-examples`](hypothetical-examples.md).
-- **Put media links beside the content they support.** See [`media-links-beside-content`](media-links-beside-content.md).
-- **Place each topic in the earliest course site whose readers need it.** See [`course-sequence`](course-sequence.md).
-- **Do not answer graded work in student-facing notes.** Check the grading repository before writing a solution, and use a different example when an exercise is graded.
+- **Use real data and compute every number.**
+  Never type or paste output.
+  See [`hypothetical-examples`](hypothetical-examples.md).
+- **Put media links beside the content they support.**
+  See [`media-links-beside-content`](media-links-beside-content.md).
+- **Place each topic in the earliest course site whose readers need it.**
+  See [`course-sequence`](course-sequence.md).
+- **Do not answer graded work in student-facing notes.**
+  Check the grading repository before writing a solution, and use a different example when an exercise is graded.
 
 ## Prose
 

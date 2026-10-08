@@ -52,6 +52,16 @@ condition, and inventing a hook for it produces a guard that misfires and gets
 switched off -- taking the real cases with it (`algorithmatize-checks`, and
 the draft carve-out in #1041). So stating plainly that a mistake is not
 mechanizable, and why, discharges this too.
+
+A MECHANISM BUILT OUT OF SIGHT IS CITED, NOT WRITTEN
+----------------------------------------------------
+Hook work done in another repository, or by a subagent in its own worktree,
+leaves no `hooks/` path in this transcript. A line that starts with the label
+"Mechanism:" and carries its issue or PR URL
+("Mechanism: https://github.com/<owner>/<repo>/pull/N") discharges it
+(ai-config#2389). The label is required because the bare word next to a URL
+also appears in the opposite claim ("no mechanism exists, unlike <url>").
+The guard cannot tell whether the cited item really is the mechanism.
 """
 import hashlib
 import importlib.util
@@ -102,6 +112,32 @@ NOT_HOOKABLE = re.compile(
     re.I,
 )
 
+# A citation of a mechanism built somewhere this transcript cannot see: an
+# issue or PR URL on a line labelled "Mechanism:". Hook work done in
+# another repository, or by a delegated subagent in its own worktree, writes
+# no `hooks/` path into this transcript, so without this the guard recommends
+# the delegation that makes it undischargeable (ai-config#2389).
+# Anchored on a "Mechanism:" LABEL at the start of a line, not on the word
+# anywhere: "no mechanism exists, unlike <url>" names the word and a URL and
+# is the opposite claim, so an unanchored match would silence a real
+# obligation. Within the labelled line the URL may sit anywhere, so a
+# Markdown link with a long title still counts.
+MECHANISM_CITED = re.compile(
+    r"^[ \t]*(?:[-*+][ \t]+)?(?:\*\*|__)?Mechanism(?:\*\*|__)?[ \t]*:"
+    r"[^\n]*?https://github\.com/[\w.-]+/[\w.-]+/(?:issues|pull)/\d+",
+    re.I | re.M,
+)
+
+
+def discharges(prose):
+    """True when assistant prose itself discharges the obligation."""
+    return bool(
+        NOT_HOOKABLE.search(prose)
+        or HOOK_WORK.search(prose)
+        or MECHANISM_CITED.search(prose)
+    )
+
+
 # Recognizing redundant prose is evidence that the existing written rule did
 # not prevent another written rule. It therefore warrants the same mechanism
 # decision as an explicit error admission.
@@ -140,7 +176,7 @@ def scan(path):
                     hit = hit or REDUNDANT_PROSE.search(prose)
                     if hit:
                         admit_txt, admit_at = hit.group(0), i
-                    if NOT_HOOKABLE.search(prose) or HOOK_WORK.search(prose):
+                    if discharges(prose):
                         done_at = i
 
             if isinstance(blocks, list):
@@ -161,7 +197,7 @@ def scan(path):
                         hit = hit or REDUNDANT_PROSE.search(prose)
                         if hit:
                             admit_txt, admit_at = hit.group(0), i
-                        if NOT_HOOKABLE.search(prose) or HOOK_WORK.search(prose):
+                        if discharges(prose):
                             done_at = i
             elif isinstance(blocks, str) and role == "assistant" and blocks.strip():
                 prose = visible_prose(blocks)
@@ -169,7 +205,7 @@ def scan(path):
                 hit = hit or REDUNDANT_PROSE.search(prose)
                 if hit:
                     admit_txt, admit_at = hit.group(0), i
-                if NOT_HOOKABLE.search(prose) or HOOK_WORK.search(prose):
+                if discharges(prose):
                     done_at = i
     return admit_txt, admit_at, done_at
 
@@ -227,7 +263,9 @@ def main() -> int:
         "hooks/remind-ums-after-error.py for an obligation that follows a "
         "message which is right to send), add tests, mutation-check them, and "
         "register it in hooks/hooks.json. Do NOT activate it before its PR "
-        "merges (README's activation gate).\n"
+        "merges (README's activation gate). If the hook is built in another "
+        "repository or by a subagent, cite it on a line of its own that "
+        "starts \"Mechanism: <issue or PR URL>\"; that discharges this.\n"
         "  * If no -- say so explicitly, and say why. A hook for a one-off "
         "factual slip or a judgment call misfires and gets switched off, "
         "taking the real cases with it. Stating that it is not mechanizable "

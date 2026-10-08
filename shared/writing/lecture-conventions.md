@@ -19,7 +19,7 @@ This fragment is the agent-facing copy: follow the rules, and link to psw instea
   Do not write one exercise with parts (a) through (e).
 - **Put on a slide only what the audience should look at.**
   Put examples and short commentary in `#exm-` and `#rem-` divs, because a `::: notes` div is unboxed plain text on the web page.
-- **Put a long paragraph of commentary in `::: {#rem-name .notes}`.**
+- **Put a long paragraph of commentary in `::: {#rem-name .remark .notes}`.**
   It is speaker notes on the slides and a boxed remark on the web page, which attendees who missed the lecture read, so nothing is lost or said twice.
   Add a separate short `#rem-` box only when the slide needs a takeaway to look at.
   [`quarto-remarks-vs-callouts`](quarto-remarks-vs-callouts.md) says what belongs in a remark.

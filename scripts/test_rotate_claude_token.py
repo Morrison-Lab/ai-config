@@ -61,7 +61,7 @@ class FakeGh:
         for repo in self.fail_for:
             if any(repo in arg for arg in args):
                 raise rct.GhError("HTTP 403: forbidden")
-        if args[0] == "secret":
+        if args[0] in ("secret", "variable"):
             return ""
         for key, value in self.answers.items():
             if any(key in arg for arg in args):
@@ -189,6 +189,32 @@ check(
     "rotate returns the new timestamp when updated_at advances",
     rct.rotate("owner/repo", "TOK", "s3cret", "2026-07-28T00:00:00Z")
     == "2026-07-31T09:00:00Z",
+)
+
+fake_acc = with_gh(
+    FakeGh({"owner/repo": secrets_payload("TOK", "2026-07-31T09:00:00Z")})
+)
+rct.rotate(
+    "owner/repo",
+    "TOK",
+    "s3cret",
+    "2026-07-28T00:00:00Z",
+    account="test@example.com",
+)
+var_calls = [c for c in fake_acc.calls if c["args"][:2] == ["variable", "set"]]
+check(
+    "rotate sets companion variable when account is passed",
+    len(var_calls) == 1
+    and var_calls[0]["args"]
+    == [
+        "variable",
+        "set",
+        "CLAUDE_CODE_ACCOUNT_EMAIL",
+        "--repo",
+        "owner/repo",
+        "--body",
+        "test@example.com",
+    ],
 )
 
 # The security-critical property: a recorded secret value in argv would be
@@ -345,6 +371,41 @@ check(
     and all(
         "s3cret" not in arg for call in fake.calls for arg in call["args"]
     ),
+)
+
+fake_org_acc = with_gh(
+    OrgFakeGh(
+        {
+            "/orgs/acme/actions/secrets": org_secrets_payload(
+                ("TOK", "2026-08-27T09:00:00Z", "all")
+            )
+        }
+    )
+)
+rct.rotate_org(
+    "acme",
+    "TOK",
+    "s3cret",
+    "2026-08-26T00:00:00Z",
+    "all",
+    account="test@example.com",
+)
+var_calls = [c for c in fake_org_acc.calls if c["args"][:2] == ["variable", "set"]]
+check(
+    "rotate_org sets companion variable when account is passed",
+    len(var_calls) == 1
+    and var_calls[0]["args"]
+    == [
+        "variable",
+        "set",
+        "CLAUDE_CODE_ACCOUNT_EMAIL",
+        "--org",
+        "acme",
+        "--visibility",
+        "all",
+        "--body",
+        "test@example.com",
+    ],
 )
 
 with_gh(

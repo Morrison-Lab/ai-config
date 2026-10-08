@@ -281,6 +281,7 @@ NON_OPERATION_TOKENS = {
     "ANTHROPIC_API_KEY",
     "CHANGES_REQUESTED",  # GitHub review state constant, not an operation token
     "CHERRY_PICK_HEAD",
+    "CLAUDE_CODE_ACCOUNT_EMAIL",
     "CLAUDE_CODE_OAUTH_TOKEN",
     "CLAUDE_PROJECT_DIR",  # env var, one of the roots the .mwc marker is resolved from
     "CLAUDE_SESSION_ID",  # env var, the harness's own session id; AI_SESSION_ID's fallback

@@ -138,6 +138,9 @@ SHOULD_STAY_SILENT = [
     ("S16", [user("go"), bash("curl -s https://h.example.org/api/v4/user"),
              final(CLAIM), user("next"), bash("ls")],
      "an earlier verified turn's claim is not re-evaluated in a later tool-only turn"),
+    ("S17", [user("go"), FAILED,
+             final("If gitlab.com says the token expired, check the host first.")],
+     "a dotted hostname must not end the sentence before the conditional opening"),
     ("S13", [user("go"), FAILED, final("Do not run `glab auth login` yet; the host was wrong.")],
      "a negated auth-login instruction"),
     ("S14", [user("go"), FAILED, final("The session lock expired, so I retried.")],
@@ -264,7 +267,7 @@ MUTATIONS = {
         "negated and conditional claims must be skipped",
         [('        if (RX_NEGATED_BEFORE.search(prefix) or RX_CONDITIONAL_OPENING.search(prefix)\n'
           '                or RX_NEGATED_INSIDE.search(m.group(0))):', '        if False:')],
-        {"S7", "S9", "S13", "S15"},
+        {"S7", "S9", "S13", "S15", "S17"},
     ),
     "M6_code_stripping": (
         "code spans and fences must be ignored",

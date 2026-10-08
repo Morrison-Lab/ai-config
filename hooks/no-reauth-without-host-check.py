@@ -89,6 +89,9 @@ RX_NEGATED_BEFORE = re.compile(
     r"\bin case|\bcheck(?:ing)? (?:if|whether))\s+(?:\w+\s+){0,4}$", re.I)
 # A sentence that OPENS with a conditional ("If glab says X, run ...").
 RX_CONDITIONAL_OPENING = re.compile(r"^\s*(?:if|unless|whether|should|in case)\b", re.I)
+# A sentence ends at a newline or at terminal punctuation followed by
+# whitespace, so the dots inside a hostname (gitlab.com) do not end one.
+RX_SENTENCE_END = re.compile(r"\n|[.!?]+(?=\s)")
 RX_NEGATED_INSIDE = re.compile(r"\b(?:not|never|n['\N{RIGHT SINGLE QUOTATION MARK}]t)\s+(?:\w+\s+)?(?:expired|revoked)", re.I)
 
 RX_HOST_ASSIGN = re.compile(r"\b(?:GITLAB_HOST|GH_HOST)=\S+")
@@ -156,7 +159,9 @@ def find_claim(text):
     """The first reauthentication claim in TEXT (code-aware), or None."""
     prose = strip_code(mark_auth_commands(text))
     for m in RX_CLAIM.finditer(prose):
-        sent_start = max(prose.rfind(".", 0, m.start()), prose.rfind("\n", 0, m.start())) + 1
+        sent_start = max(
+            (b.end() for b in RX_SENTENCE_END.finditer(prose, 0, m.start())),
+            default=0)
         prefix = prose[sent_start:m.start()]
         if (RX_NEGATED_BEFORE.search(prefix) or RX_CONDITIONAL_OPENING.search(prefix)
                 or RX_NEGATED_INSIDE.search(m.group(0))):

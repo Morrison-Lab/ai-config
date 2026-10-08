@@ -81,6 +81,8 @@ SHOULD_WARN = [
      "a leading -R with its value must not be read as the subcommand"),
     ("W12", "glab --repo group/project issue list", "plain",
      "a leading --repo with its value must not be read as the subcommand"),
+    ("W13", "(cd {selfhosted} && glab mr list); glab api user", "plain",
+     "a cd inside a subshell must not leak into the next command"),
 ]
 
 SHOULD_STAY_SILENT = [
@@ -107,6 +109,10 @@ SHOULD_STAY_SILENT = [
     ("S12", "gh api user", "plain", "gh is out of scope for this hook"),
     ("S13", "cd /tmp && cd " + "{selfhosted}" + " && glab api user", "plain",
      "a cd INTO the self-hosted checkout before glab"),
+    ("S16", "GL_HOST=gitlab.example.org glab api user", "plain",
+     "a GL_HOST prefix names the host"),
+    ("S17", "(cd {selfhosted} && glab mr list)", "plain",
+     "a cd INTO the checkout within the same subshell"),
     ("S15", "GITLAB_HOST=gitlab.example.org; glab api user", "plain",
      "a bare GITLAB_HOST assignment statement sets the host"),
     ("S14", "glab api -R gitlab.example.org/g/p projects/1", "plain",
@@ -127,8 +133,23 @@ NON_COMMAND_PAYLOADS = [
 ]
 
 
-def run_hook(hook_path, data, extra_env=None):
-    env = {k: v for k, v in os.environ.items() if k != "GITLAB_HOST"}
+def make_fake_glab(config_host):
+    d = tempfile.mkdtemp(prefix="fake-glab-", dir=ROOT)
+    path = os.path.join(d, "glab")
+    with open(path, "w") as handle:
+        handle.write("#!/bin/sh\necho " + config_host + "\n")
+    os.chmod(path, 0o755)
+    return d
+
+
+FAKE_DEFAULT = make_fake_glab("gitlab.com")
+FAKE_SELFHOSTED = make_fake_glab("gitlab.example.org")
+
+
+def run_hook(hook_path, data, extra_env=None, fake=None):
+    env = {k: v for k, v in os.environ.items()
+           if k not in ("GITLAB_HOST", "GL_HOST")}
+    env["PATH"] = (fake or FAKE_DEFAULT) + os.pathsep + env.get("PATH", "")
     env.update(extra_env or {})
     proc = subprocess.run(
         [sys.executable, hook_path], input=json.dumps(data),
@@ -183,6 +204,17 @@ inherit_ok = not inherited.strip()
 print(f"\n  {'ok  ' if inherit_ok else 'WRONG'} INHERITED  GITLAB_HOST in the hook environment silences the warning")
 wrong += not inherit_ok
 
+# glab's own configured host (`glab config get host`) names the host.
+cfg = run_hook(HOOK, payload("glab api user", "plain"), fake=FAKE_SELFHOSTED)
+cfg_ok = not cfg.strip()
+print(f"\n  {'ok  ' if cfg_ok else 'WRONG'} CONFIGURED  a self-hosted `glab config get host` silences the warning")
+wrong += not cfg_ok
+GL_ENV = run_hook(HOOK, payload("glab api user", "plain"),
+                  {"GL_HOST": "gitlab.example.org"})
+gl_ok = not GL_ENV.strip()
+print(f"  {'ok  ' if gl_ok else 'WRONG'} GL_HOST  GL_HOST in the hook environment silences the warning")
+wrong += not gl_ok
+
 # The message must carry the remedy, and an Antigravity run must not double-print.
 out = json.loads(run_hook(HOOK, payload("glab api user", "plain")))
 ctx = out["hookSpecificOutput"]["additionalContext"]
@@ -191,7 +223,7 @@ print(f"\n  {'ok  ' if message_ok else 'WRONG'} MESSAGE  names --hostname and se
 wrong += not message_ok
 
 total = len(SHOULD_WARN) + len(SHOULD_STAY_SILENT) + len(NON_COMMAND_PAYLOADS)
-print(f"\n{total + 2 - wrong}/{total + 2} correct"
+print(f"\n{total + 4 - wrong}/{total + 4} correct"
       + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
 
 EXPECTED = {cid: "WARN" for cid, *_ in SHOULD_WARN}
@@ -223,14 +255,14 @@ MUTATIONS = {
         {"S6", "S15"},
     ),
     "M5_cwd_remote": (
-        "ignoring the cwd remote makes S7 and S13 warn",
+        "ignoring the cwd remote makes S7, S13 and S17 warn",
         [('if cur_dir is not None and cwd_names_host(cur_dir):', 'if False:')],
-        {"S7", "S13"},
+        {"S7", "S13", "S17"},
     ),
     "M6_cwd_gitlabcom_not_host": (
         "treating gitlab.com as a named host silences W2",
-        [('NOT_GITLAB_HOSTS = {"gitlab.com", "www.gitlab.com", "github.com"}',
-          'NOT_GITLAB_HOSTS = {"github.com"}')],
+        [('            if host and host not in NOT_GITLAB_HOSTS:\n                return True',
+          '            if host and host != "github.com":\n                return True')],
         {"W2"},
     ),
     "M7_subcommand_filter": (
@@ -241,14 +273,20 @@ MUTATIONS = {
     "M8_cd_tracking": (
         "ignoring cd makes W6 silent (still in the self-hosted checkout) "
         "and S13 warn",
-        [('cur_dir = resolve_cd_target(rest, cur_dir)', 'pass')],
-        {"W6", "S13"},
+        [('dirs[scope] = resolve_cd_target(rest, dir_of(scope))', 'pass')],
+        {"W6", "S13", "S17"},
     ),
     "M9_program_is_glab": (
         "dropping the program check lets gh api (a sensitive-looking "
         "second token) warn",
         [('if prog != "glab":', 'if False:')],
         {"S12"},
+    ),
+    "M11_subshell_scope": (
+        "a subshell cd must not leak: sharing one directory across scopes makes W13 silent",
+        [('            dirs[scope] = resolve_cd_target(rest, dir_of(scope))',
+          '            dirs[(0,)] = resolve_cd_target(rest, dir_of((0,)))')],
+        {"W13"},
     ),
     "M10_value_flags": (
         "value-taking flags must be skipped when finding the subcommand",

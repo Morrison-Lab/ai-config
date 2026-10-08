@@ -25,6 +25,9 @@ A `glab` subcommand that talks to a GitLab project (`api`, `issue`, `mr`,
     earlier in the same command) is not inside a git repository whose remote
     is a host other than gitlab.com / github.com.
 
+A host set with `glab config set host` or `GL_HOST` also names a host (glab
+reads both before falling back), so those silence the warning.
+
 Known limits, accepted: a remote on any host other than gitlab.com or
 github.com (bitbucket.org, codeberg.org) counts as naming a host, because
 glab would try it; a `GITLAB_HOST` in the hook's own process environment
@@ -53,12 +56,12 @@ try:
     if _LIB not in sys.path:
         sys.path.insert(0, _LIB)
     from shellcmd import (
-        env_value, resolve_cd_target, simple_commands, strip_env,
+        env_value, resolve_cd_target, simple_commands_with_scope, strip_env,
     )
 except Exception as _exc:  # broken install; fail open and say so
     print(f"warn-glab-without-host: cannot load scripts/lib/shellcmd.py "
           f"({_exc}); not evaluating", file=sys.stderr)
-    simple_commands = None
+    simple_commands_with_scope = None
 
 # glab subcommands that act on a GitLab project or the API and so need a host.
 # `auth`, `config`, `version`, `help`, `completion`, `alias`, `check-update`
@@ -143,14 +146,34 @@ def names_host(rest):
     return False
 
 
+def configured_host():
+    """Non-gitlab.com host from `glab config get host`, or None (fails open)."""
+    try:
+        proc = subprocess.run(
+            ["glab", "config", "get", "host"],
+            capture_output=True, text=True, timeout=5)
+    except Exception:
+        return None
+    host = proc.stdout.strip().lower() if proc.returncode == 0 else ""
+    return host if host and host not in NOT_GITLAB_HOSTS else None
+
+
 def find_offense(command, cwd):
     """The first host-less `glab` simple command in COMMAND, as argv, or None."""
-    cmds = simple_commands(command)
+    cmds = simple_commands_with_scope(command)
     if cmds is None:
         return None
-    cur_dir = cwd
+    dirs = {}  # subshell scope -> working directory set inside it
+
+    def dir_of(scope):
+        while scope:
+            if scope in dirs:
+                return dirs[scope]
+            scope = scope[:-1]
+        return cwd
+
     exported_host = False
-    for argv in cmds:
+    for scope, argv in cmds:
         env, rest = strip_env(argv)
         if argv and argv[0] == "export":
             exported_host = exported_host or any(
@@ -163,7 +186,7 @@ def find_offense(command, cwd):
             continue
         prog = os.path.basename(rest[0])
         if prog in ("cd", "pushd", "popd"):
-            cur_dir = resolve_cd_target(rest, cur_dir)
+            dirs[scope] = resolve_cd_target(rest, dir_of(scope))
             continue
         if prog != "glab":
             continue
@@ -172,9 +195,13 @@ def find_offense(command, cwd):
             continue
         if names_host(rest) or exported_host:
             continue
-        if env_value(env, "GITLAB_HOST") or os.environ.get("GITLAB_HOST"):
+        if (env_value(env, "GITLAB_HOST") or env_value(env, "GL_HOST")
+                or os.environ.get("GITLAB_HOST") or os.environ.get("GL_HOST")):
             continue
+        cur_dir = dir_of(scope)
         if cur_dir is not None and cwd_names_host(cur_dir):
+            continue
+        if configured_host():
             continue
         return rest
     return None
@@ -205,7 +232,7 @@ def _read_payload():
 
 
 def main() -> int:
-    if simple_commands is None:
+    if simple_commands_with_scope is None:
         return 0
     payload = _read_payload()
     if payload.get("tool_name") not in (

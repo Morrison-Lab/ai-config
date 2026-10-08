@@ -138,6 +138,12 @@ def main():
           run(MERGE, [step("opencode auth login")])[0])
     check("warns on a bare CLI word with no arguments",
           run(MERGE, [step("gemini")])[0])
+    check("warns when one command reviews and then pushes",
+          run(MERGE, [step("codex exec review && git push origin b")])[0])
+    check("warns on a reviewer launched from a background script",
+          run(MERGE, [step("nohup bash /tmp/w/run.sh > /tmp/w/log 2>&1 &")])[0])
+    check("warns when timeout wraps only a --version call",
+          run(MERGE, [step("timeout 30 codex --version")])[0])
     check("warns on the instrument-then-merge chain the sibling discharges",
           run("python3 scripts/check-pr-fully-clean.py 12 && gh pr merge 12",
               [])[0])
@@ -151,6 +157,12 @@ def main():
           not run(MERGE, [skill("dtc"), CODEX])[0])
     check("silent after an env-prefixed codex call",
           not run(MERGE, [step("OPENAI_API_KEY=x codex exec review")])[0])
+    check("silent when one command pushes and then reviews",
+          not run(MERGE, [step("git push origin b && codex exec review")])[0])
+    check("silent after a timeout-wrapped codex call",
+          not run(MERGE, [step("timeout -k 5 300 codex exec review")])[0])
+    check("silent after a nohup-wrapped opencode call",
+          not run(MERGE, [step("nohup opencode run 'review' &")])[0])
     check("silent on the MCP merge tool after a codex run",
           not run("", [CODEX], tool_name="mcp__github__merge_pull_request",
                   tool_input=MCP_MERGE)[0])

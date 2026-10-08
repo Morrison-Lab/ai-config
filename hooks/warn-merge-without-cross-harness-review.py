@@ -53,6 +53,13 @@ nothing about who reviewed.
   (Codex, OpenCode, Gemini CLI) that default is wrong: its own CLI would be
   credited and `claude` excluded.
 * A review run in another session or by a human is invisible here.
+* `nohup` and `timeout` are looked through, but a reviewer launched from a
+  script (`dtc`'s background `nohup bash "$WORK/run.sh" &`) is not: the
+  command word is `bash`, and the script's contents are not in the
+  transcript. The foreground `codex exec ...` form is credited.
+* `gemini` and `cursor-agent` are credited although the gate fragment's
+  ladder does not list them as active yet: a successful run of either in
+  the transcript is itself the probe that ladder is waiting on.
 
 Each is a false-silence or a false-warning a deny would turn into an escape-
 variable reflex, so this warns, like its sibling. It never blocks, and fails
@@ -77,6 +84,9 @@ NON_REVIEW_ARGS = frozenset({
     "login", "logout", "auth", "config", "mcp", "update", "upgrade",
     "install", "models",
 })
+# `timeout` options that take a separate argument (`-s KILL`, `-k 5`).
+TIMEOUT_ARG_OPTS = frozenset({"-s", "--signal", "-k", "--kill-after"})
+ENV_ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 # Both spellings of the MCP auto-merge tool are in use: this server exposes
 # `enable_pr_auto_merge`, while enforce-mwc-review-gate.py expects
 # `enable_pull_request_auto_merge`. Match both, as no-unauthorized-merge.py does.
@@ -119,17 +129,55 @@ def _argvs(sib, command):
             yield sib.strip_env(argv)[1]
 
 
-def _reviewer_call(sib, command, clis):
-    """True when a shell command invokes a cross-harness reviewer CLI."""
-    for rest in _argvs(sib, command):
-        if (len(rest) > 1 and os.path.basename(rest[0]) in clis
-                and rest[1] not in NON_REVIEW_ARGS):
-            return True
-    return False
+def _peel_wrappers(rest):
+    """Drop leading `nohup` and `timeout [opts] DURATION` from an argv."""
+    while rest:
+        word = os.path.basename(rest[0])
+        if word == "nohup":
+            rest = rest[1:]
+        elif word == "timeout":
+            rest = rest[1:]
+            while rest and rest[0].startswith("-"):
+                takes_arg = rest[0] in TIMEOUT_ARG_OPTS
+                rest = rest[2:] if takes_arg else rest[1:]
+            rest = rest[1:]  # the duration
+        else:
+            return rest
+    return rest
+
+
+def _is_reviewer(rest, clis):
+    rest = _peel_wrappers(rest)
+    return (len(rest) > 1 and os.path.basename(rest[0]) in clis
+            and rest[1] not in NON_REVIEW_ARGS)
+
+
+def _shell_events(sib, command, clis):
+    """Ordered events in *command*: 'push' or 'review', by text position."""
+    events = []
+    for line in sib.shell_c_expansions(command):
+        for argv in sib.simple_commands(line) or []:
+            parsed = sib.git_subcommand(argv)
+            if parsed and parsed[0] == "push":
+                events.append("push")
+            # strip_env peels `timeout` but not its options and duration, so
+            # also test the raw argv with leading assignments dropped.
+            raw = list(argv)
+            while raw and ENV_ASSIGNMENT.match(raw[0]):
+                raw = raw[1:]
+            if (_is_reviewer(sib.strip_env(argv)[1], clis)
+                    or _is_reviewer(raw, clis)):
+                events.append("review")
+    return events
 
 
 def scan(sib, path, clis):
-    """Return (last_push_seq, [seq of successful reviewer calls])."""
+    """Return (last_push_seq, [seq of successful reviewer calls]).
+
+    A push and a review in ONE command are ordered by their position in the
+    text, as the sibling orders a push and an instrument run: the push counts
+    at seq - 0.5, a review after it at seq, a review before it at seq - 1.
+    """
     last_push = -1
     pending = {}
     reviews = []
@@ -145,11 +193,14 @@ def scan(sib, path, clis):
                 if name not in sib.SHELL_TOOLS or not isinstance(cmd, str):
                     continue
                 try:
-                    if any(e is None for e in sib._events(cmd)):
-                        last_push = max(last_push, seq)
-                    if not rec.get("isSidechain") and _reviewer_call(
-                            sib, cmd, clis):
-                        pending[b.get("id")] = seq
+                    events = _shell_events(sib, cmd, clis)
+                    pushes = [i for i, e in enumerate(events) if e == "push"]
+                    if pushes:
+                        last_push = max(last_push, seq - 0.5)
+                    runs = [i for i, e in enumerate(events) if e == "review"]
+                    if runs and not rec.get("isSidechain"):
+                        fresh = not pushes or max(runs) > max(pushes)
+                        pending[b.get("id")] = seq if fresh else seq - 1
                 except Exception:
                     continue
             elif kind == "tool_result" and b.get("tool_use_id") in pending:

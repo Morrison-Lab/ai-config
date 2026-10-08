@@ -61,6 +61,7 @@ open on any internal error.
 import importlib.util
 import json
 import os
+import re
 import sys
 
 HERE = os.path.dirname(os.path.realpath(__file__))
@@ -76,7 +77,11 @@ NON_REVIEW_ARGS = frozenset({
     "login", "logout", "auth", "config", "mcp", "update", "upgrade",
     "install", "models",
 })
-AUTO_MERGE_TOOL = "mcp__github__enable_pr_auto_merge"
+# Both spellings of the MCP auto-merge tool are in use: this server exposes
+# `enable_pr_auto_merge`, while enforce-mwc-review-gate.py expects
+# `enable_pull_request_auto_merge`. Match both, as no-unauthorized-merge.py does.
+RX_AUTO_MERGE_TOOL = re.compile(
+    r"^mcp__github__enable_?(?:pull_?request_?|pr_)?auto_?merge$", re.I)
 GATE = "shared/workflow/adversarial-self-review.md"
 
 NOTE = (
@@ -156,7 +161,7 @@ def scan(sib, path, clis):
 
 def _targets(sib, tool, tool_input):
     """[(number|None, repo|None)] for every merge this call performs."""
-    if tool in (sib.MCP_MERGE_TOOL, AUTO_MERGE_TOOL):
+    if tool == sib.MCP_MERGE_TOOL or RX_AUTO_MERGE_TOOL.match(tool):
         return sib._merge_targets(sib.MCP_MERGE_TOOL, tool_input)
     command = (tool_input.get("command") or tool_input.get("CommandLine")
                or tool_input.get("cmd") or tool_input.get("script"))
@@ -176,8 +181,8 @@ def main() -> int:
     if not isinstance(payload, dict):
         return 0
     tool = payload.get("tool_name") or payload.get("toolName") or ""
-    if tool not in sib.SHELL_TOOLS and tool not in (sib.MCP_MERGE_TOOL,
-                                                    AUTO_MERGE_TOOL):
+    if (tool not in sib.SHELL_TOOLS and tool != sib.MCP_MERGE_TOOL
+            and not RX_AUTO_MERGE_TOOL.match(tool)):
         return 0
     tool_input = payload.get("tool_input")
     if not isinstance(tool_input, dict):

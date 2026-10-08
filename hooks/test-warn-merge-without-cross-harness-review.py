@@ -117,6 +117,12 @@ def main():
     check("warns on arming auto-merge through MCP",
           run("", [], tool_name="mcp__github__enable_pr_auto_merge",
               tool_input=MCP_MERGE)[0])
+    check("warns on the long-form MCP auto-merge tool name",
+          run("", [], tool_name="mcp__github__enable_pull_request_auto_merge",
+              tool_input=MCP_MERGE)[0])
+    check("silent on disabling auto-merge through MCP",
+          not run("", [], tool_name="mcp__github__disable_pr_auto_merge",
+                  tool_input=MCP_MERGE)[0])
     check("warns on a REST merge",
           run("gh api -X PUT repos/Morrison-Lab/ai-config/pulls/12/merge",
               [])[0])

@@ -284,6 +284,9 @@ A clean automated review from every available provider evaluating the current HE
   Pattern 5g above is the PR-monitoring special case of this;
   this pattern covers every other pause --- waiting for user input, an external event, or a decision --- not only an in-flight PR watch.
 - **Example**: 2026-08-26 session: after reporting that PRs were ready for merge, yielded the floor to the user without setting a timer, prompting the feedback "you need to set a timer every time you pause".
+  Re-hit 2026-10-07 (Antigravity session, working `Morrison-Lab/lds` [PR #454](https://github.com/Morrison-Lab/lds/pull/454) and `Morrison-Lab/mds` [PR #191](https://github.com/Morrison-Lab/mds/pull/191)):
+  after autonomous merge was denied by safety hook, reported PR #454 as clean and yielded turn without setting a timer/schedule to watch PR #454 for base drift or merges on `origin/main`, remaining idle until prompted by user.
+  Always arm a timer (`schedule`) or watcher whenever an open PR authored by the session remains unmerged.
 - **Canonical Rule**: `AGENTS.md` ("No empty promises"): "An owed action needs a mechanism that will fire, not only one that records."
 - **Fix**: Whenever pausing execution, stopping for user input, or waiting for a condition, ALWAYS use the `schedule` tool to set a timer (one-shot or cron) so the agent automatically wakes up to check status, rather than waiting indefinitely.
 

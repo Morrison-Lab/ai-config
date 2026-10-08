@@ -133,6 +133,10 @@ CASES_PASS = [
     # Expository "starting now": a rule taking effect, not work announced.
     "Starting now, the rule covers every repo.",
     "Starting now: the rule takes effect for every repo.",
+    # A heading titled "Starting now", and a `;`-split fragment carrying its
+    # own plan.
+    "## Starting now\n\nThe rule covers repos.",
+    "Starting now; deleting caches.",
     # A colon-led lead-in followed by the delivered content.
     "Starting now: the summary follows.\n\n"
     "The scan found 35 GB of caches.\n\n"

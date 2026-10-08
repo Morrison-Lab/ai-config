@@ -19,9 +19,10 @@ This fragment is the agent-facing copy: follow the rules, and link to psw instea
   Do not write one exercise with parts (a) through (e).
 - **Put on a slide only what the audience should look at.**
   Put examples and short commentary in `#exm-` and `#rem-` divs, because a `::: notes` div is unboxed plain text on the web page.
-- **Put a long paragraph of commentary in `::: {#rem-name .remark .notes}`.**
+- **Put a long paragraph of commentary in `::: {#rem-name .notes}`.**
   It is speaker notes on the slides and a boxed remark on the web page, which attendees who missed the lecture read, so nothing is lost or said twice.
   Add a separate short `#rem-` box only when the slide needs a takeaway to look at.
+  [`quarto-remarks-vs-callouts`](quarto-remarks-vs-callouts.md) says what belongs in a remark.
 - **Subfiles hold one unit each and start with no heading.**
   The chapter file is a spine of headings, slide breaks and `{{< include >}}` calls.
   Name each unit's file for its div type (`_def-`, `_exr-`, `_sol-`, `_thm-`, `_exm-`, `_fig-`), and decompose further when it is a judgment call.

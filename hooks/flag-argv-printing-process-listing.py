@@ -57,7 +57,10 @@ accepts only options, their values, and the wrapper's own positional
 operands (`timeout`'s duration, `ssh`'s host), and stops at any other
 program, so `sudo docker ps -f name=web` is docker's filter flag, not procps.
 
-The `ps` grammar modelled is Linux procps. macOS's BSD `ps` prints argv for
+The `ps` and `pgrep` grammar modelled is Linux procps. On macOS and the
+BSDs, `pgrep -lf` prints the full argument list (procps prints only the
+name), so it is a KNOWN HOLE there; warning on it would misfire on Linux.
+Likewise macOS's BSD `ps` prints argv for
 more forms than this (plain `ps -e` among them), so silence there is weaker
 evidence than it is on Linux. Busybox `ps` prints argv by default, so
 `busybox ps` fires unless an `-o` format names no argv column.
@@ -77,6 +80,9 @@ KNOWN HOLES, so silence is not read as coverage:
 - other tools that print argv: `htop`, `atop`, `lsof +c0`,
   `systemctl status`, `w` (its WHAT column), `pidstat -l`;
 - a format set in the environment: `PS_FORMAT=args ps -e` prints argv;
+- `pgrep -lf` on macOS and the BSDs, which prints the full argument list;
+- a substitution nested more than three levels deep
+  (`echo $(echo $(echo $(echo $(ps aux))))`), which the bounded scan skips;
 - the session's OWN environment (`env`, `printenv`, `export -p`,
   `/proc/self/environ`), which is out of scope: this guard is about other
   processes' data, and those dumps are a separate habit to break.
@@ -98,8 +104,10 @@ Inside parentheses the whole group is read as one pipeline, so
 
 It deliberately over-warns where the output feeds a consumer that prints
 nothing (`ps -ef | grep x | awk '{print $2}' | xargs kill`,
-`[ -n "$(ps aux | grep x)" ]`) and on `ps -o args -p $$`: the remedy it
-names, `pgrep`/`pkill`, is the better habit there anyway.
+`[ -n "$(ps aux | grep x)" ]`), on output redirected to a file
+(`ps aux > /tmp/ps.txt`, which is usually printed next), and on
+`ps -o args -p $$`: the remedy it names, `pgrep`/`pkill`, is the better
+habit there anyway.
 
 WHY THIS WARNS RATHER THAN BLOCKS
 ---------------------------------
@@ -493,8 +501,8 @@ def _discarded(argv, following, line):
 
     LINE is the listing's own PIPELINE (see `_pipelines`), so FOLLOWING holds
     only the commands its output is piped into. True for stdout sent to
-    /dev/null, or a pipe that ends in a counter (`wc`, `grep -c/-q/-l`) or a
-    through only filtering commands. An awk projection is not exempt:
+    /dev/null, or a pipe that ends in a counter (`wc`, `grep -c/-q/-l`)
+    reached through only filtering commands. An awk projection is not exempt:
     `awk '{print $12}'` prints one argv word per process.
     """
     # Read on the raw line: the tokenizer splits `2>/dev/null` into `2`, `>`,

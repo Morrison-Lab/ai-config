@@ -491,12 +491,13 @@ printed the probe's `curl -H "Authorization: Bearer <token>"` argv, so a live Da
 The token came from a shell variable, which is the recommended form; the `command` column printed it anyway.
 
 Measured 2026-10-08 on Linux procps, against a background process carrying a marker in its argv.
-These print argv: `ps <pid>` (a dashless PID switches to BSD output), `ps aux`, `ps -aux`, `ps -ef`, `ps -eo pid,args`, `ps -O rss -e` (`-O` adds to the default columns, which include `command`), `ps -e --context`, `ps -e -o%a`, `pgrep -af`, and `top -bc` when the line is wide enough (`-w 512`).
+These print argv: `ps <pid>` (a dashless PID switches to BSD output), `ps aux`, `ps -aux`, `ps -ef`, `ps -eo pid,args`, `ps -O rss -e` (`-O` adds to the default columns, which include `command`), `ps -e --context`, `ps -e -o%a` (its leading part only: the `%a` column is fixed-width), `pgrep -af`, and `top -bc` when the line is wide enough (`-w 512`).
 These do not: `ps -e`, `ps -eo pid,etime,comm`, `ps -p <pid>`, `pgrep -f`, and `top -b`.
 BSD `c` swaps argv for the executable name in every column, so `ps axc`, `ps -ef c` and `ps -e -o pid,args c` print none.
 The `top` rows hold for a default config only: `-c` reverses the toggle remembered in the toprc rather than setting it, so under a toprc that saved it on, `top -b` prints argv and `top -bc` does not.
 BSD `e` prints each process's environment, which is no safer, and does so even with `c` (`ps axce`) or an explicit format (`ps axe -o pid,comm` printed 13 environments).
 macOS `ps` and busybox `ps` print argv for more forms than procps does, so treat any `ps` there as argv-printing.
+On macOS and the BSDs `pgrep -lf` prints the full argument list too, where procps prints only the name, so use `pgrep -f` alone there.
 The same listing run through `ssh host` or `docker exec` prints the remote host's or container's argv into the same transcript.
 A shell's own `set -x` trace prints the expanded words too: `set -x; curl -H "Authorization: Bearer $TOK"` traces the token.
 

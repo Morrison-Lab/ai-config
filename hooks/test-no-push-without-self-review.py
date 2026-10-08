@@ -3921,6 +3921,69 @@ def exempt_repo_cases() -> tuple[int, int]:
     return failures, ran
 
 
+def alias_cases() -> tuple[int, int]:
+    """A git alias of `push` is graded like the push it expands to (#1993).
+
+    Every deny row also checks the reason, so a row denying through the alias
+    refusal cannot pass for one that resolved the expansion, or the reverse.
+    """
+    failures = ran = 0
+    _git(OTHER, "config", "alias.pp", "push")
+    try:
+        for label, command, events, should_deny, reason_has in (
+            ("`alias.p = push` shipping an unreviewed branch is denied",
+             f"git -C {REPO} -c alias.p=push p origin feature", reviewed(), True,
+             "verdict is for commit"),
+            ("`alias.p = push` shipping the reviewed HEAD is allowed",
+             f"git -C {REPO} -c alias.p=push p origin main", reviewed(), False, None),
+            ("an aliased push with no review at all is denied",
+             f"git -C {REPO} -c alias.p=push p origin main", [], True, None),
+            ("a chained alias (`a` -> `b` -> `push`) is followed",
+             f"git -C {REPO} -c alias.a=b -c alias.b=push a origin feature",
+             reviewed(), True, "verdict is for commit"),
+            ("an alias defined through GIT_CONFIG_COUNT is read",
+             "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.p GIT_CONFIG_VALUE_0=push "
+             f"git -C {REPO} p origin feature", reviewed(), True, "verdict is for commit"),
+            ("an alias in the -C repository's own config is read",
+             f"git -C {OTHER} pp origin main", reviewed(), True, None),
+            # Read from the hook's cwd, this alias was missed and the command
+            # dropped as not-a-push: a silent allow (#4406 review).
+            ("an alias read through --git-dir is refused as a redirected push",
+             f"git --git-dir={OTHER}/.git pp origin main", reviewed(), True,
+             "another repository"),
+            ("the same with --git-dir as a separate word",
+             f"git --git-dir {OTHER}/.git pp origin main", reviewed(), True,
+             "another repository"),
+            ("a `!` shell alias naming push is refused",
+             f"git -C {REPO} -c 'alias.x=!git push origin feature' x", reviewed(),
+             True, "alias"),
+            ("a `!` shell alias that pushes nothing is not a push",
+             f"git -C {REPO} -c 'alias.lg=!git log' lg", [], False, None),
+            ("an undefined subcommand is not a push",
+             f"git -C {REPO} p origin feature", [], False, None),
+            ("a builtin is not looked up and is not a push",
+             f"git -C {REPO} status", [], False, None),
+        ):
+            ran += 1
+            rc, out = run_hook(command, events)
+            hso = out.get("hookSpecificOutput") or {}
+            denied = hso.get("permissionDecision") == "deny"
+            reason = hso.get("permissionDecisionReason", "")
+            ok = rc == 0 and denied == should_deny
+            if ok and reason_has:
+                ok = reason_has in reason
+            if ok and should_deny and reason_has != "alias":
+                ok = "could not read" not in reason
+            if ok:
+                print(f"PASS: {label}")
+            else:
+                print(f"FAIL (rc={rc}, denied={denied}, reason={reason[:120]!r}): {label}")
+                failures += 1
+    finally:
+        _git(OTHER, "config", "--unset", "alias.pp")
+    return failures, ran
+
+
 def deny_resilience_cases() -> tuple[int, int]:
     """Test that deny() emission failures never collapse into a silent allow (ai-config#3756).
 
@@ -4057,7 +4120,7 @@ def main():
                    fingerprint_guidance_cases, fingerprint_resolution_cases,
                    omo_cases, handback_cases, codex_cases, external_reviewer_cases,
                    symlinked_plugin_root_cases, exempt_repo_cases,
-                   deny_resilience_cases):
+                   alias_cases, deny_resilience_cases):
             f, r = fn()
             failed += f
             extra += r

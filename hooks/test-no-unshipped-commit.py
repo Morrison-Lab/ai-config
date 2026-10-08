@@ -1499,6 +1499,17 @@ with os.fdopen(h_ab, "w") as dst:
         {"type": "tool_result", "tool_use_id": "b2", "content": f"### Verdict: Needs more work\n\nReviewed-Commit: {ab_reviewed}\n"}]}}) + "\n")
 assert subject.is_push_held_by_blocking_review(path_ab, cwd=ab_root) is True
 assert subject.decide(ab_root, path_ab) == ""
+# An amend after the verdict rewrites the reviewed commit rather than
+# building on it; the branch reflog still shows it was replaced, so the
+# review is owed again rather than held.
+ab_run("git checkout -q feat-a")
+ab_run("git commit -q --amend --allow-empty -m 'amended fix on A'")
+assert subject.is_push_held_by_blocking_review(path_ab, cwd=ab_root) is False
+with open(path_ab, "a", encoding="utf-8") as dst:
+    dst.write(json.dumps({"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "id": "b3", "name": "Bash", "input": {"command": "git commit --amend -m 'amended fix on A'"}}]}}) + "\n")
+reason_amend = subject.decide(ab_root, path_ab)
+assert "re-dispatch the reviewer" in reason_amend, reason_amend
 os.unlink(path_ab)
 for _p in (path_blocking, path_nofp, path_later, path_mv):
     os.unlink(_p)

@@ -1367,15 +1367,32 @@ def _latest_review_is_blocking(path):
     return bool(review) and review[0] == "needs_work"
 
 
-def _is_strict_ancestor(cwd, ancestor, tip):
-    """True if commit `ancestor` is reachable from `tip` and is not `tip`."""
-    if not cwd or not ancestor or not tip or _sha_matches(ancestor, tip):
+def _has_moved_past(cwd, branch, reviewed, tip):
+    """True if `tip` replaced `reviewed` on this checkout's branch.
+
+    Either `reviewed` is a strict ancestor of `tip` (a fix committed on top),
+    or `reviewed` appears in the branch's own reflog (an amend or rebase that
+    rewrote it). An unrelated branch satisfies neither.
+    """
+    if not cwd or not reviewed or not tip or _sha_matches(reviewed, tip):
         return False
     try:
-        return subprocess.run(
-            ["git", "merge-base", "--is-ancestor", ancestor, tip],
-            cwd=cwd, capture_output=True, timeout=5).returncode == 0
-    except Exception:
+        if subprocess.run(
+                ["git", "merge-base", "--is-ancestor", reviewed, tip],
+                cwd=cwd, capture_output=True, timeout=5).returncode == 0:
+            return True
+        name = branch or _current_branch(cwd)
+        if not name:
+            return False
+        log = subprocess.run(
+            ["git", "log", "-g", "--format=%H", f"refs/heads/{name}"],
+            cwd=cwd, capture_output=True, text=True, timeout=5)
+        return log.returncode == 0 and any(
+            _sha_matches(reviewed, line.strip())
+            for line in log.stdout.splitlines())
+    except Exception as exc:
+        print(f"no-unshipped-commit: cannot compare {reviewed} with {tip} "
+              f"({exc})", file=sys.stderr)
         return False
 
 
@@ -1386,16 +1403,17 @@ def is_push_held_by_blocking_review(path, cwd=None, branch=None):
     the latest verdict is `needs_work`, so demanding a push then leaves no way
     to end the turn while the fix round runs, typically in a subagent
     (ai-config#3270). Every checkout is held, as the guard holds every push,
-    with one exception: a tip that descends from a reviewed commit carries a
-    fix the review has not seen. decide() then asks for a fresh review
-    (REVIEW_REMEDY), which is a step the session can take.
+    with one exception: a branch whose tip has moved past a reviewed commit,
+    by a commit on top or by an amend or rebase, carries a fix the review has
+    not seen. decide() then asks for a fresh review (REVIEW_REMEDY), which is
+    a step the session can take.
     """
     review = _latest_review(path)
     if not review or review[0] != "needs_work":
         return False
     head_sha = _rev_parse(cwd, branch or "HEAD") if cwd else None
     return not any(
-        _is_strict_ancestor(cwd, sha, head_sha) for sha in review[1])
+        _has_moved_past(cwd, branch, sha, head_sha) for sha in review[1])
 
 
 def is_push_deferred(cwd, path, branch=None, session_cwd=None):

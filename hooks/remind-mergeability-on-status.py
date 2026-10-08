@@ -77,8 +77,11 @@ RX_STATUS = re.compile(
 # name instead.
 RX_MCP_MERGEABILITY_TOOL = re.compile(
     r"^mcp__(?:github|ccd_pr)__(?:pull_request_read|get_status)$", re.I)
-# pull_request_read serves many methods; only these two carry mergeability.
-MCP_MERGEABILITY_METHODS = {"get", "get_status"}
+# pull_request_read serves many methods; only `get` returns mergeable and
+# mergeable_state. Its `get_status` method is the combined CI-status read
+# (memories/github-mcp-tools.md), so it must not discharge the check. The
+# standalone ccd_pr get_status tool is a different tool and keeps counting.
+MCP_MERGEABILITY_METHODS = {"get"}
 # A shell command counts only when it runs a forge client, so `echo mergeable`
 # or a grep for the word is not a read.
 RX_FORGE_CLIENT = re.compile(r"\b(?:gh|glab|curl)\b")
@@ -147,8 +150,11 @@ def scan(path):
                             and RX_MERGEABILITY_QUERY.search(cmd)):
                         queried = True
                     elif RX_MCP_MERGEABILITY_TOOL.search(block.get("name") or ""):
+                        name = block.get("name") or ""
                         method = inp.get("method") if isinstance(inp, dict) else None
-                        if method is None or method in MCP_MERGEABILITY_METHODS:
+                        if not name.lower().endswith("__pull_request_read"):
+                            queried = True
+                        elif method is None or method in MCP_MERGEABILITY_METHODS:
                             queried = True
     return text, queried
 

@@ -65,6 +65,17 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
   **Do:** before running a copied or generated `glab api` command, scan its
   arguments for `--jq` and replace that flag with a separate `jq` pipeline.
   **Don't:** assume a command copied from `gh api` is valid for `glab api`.
+- **Outside a GitLab checkout, `glab` targets `gitlab.com`, not the self-hosted instance.**
+  `glab` takes its host from `GITLAB_HOST` when that is set, and otherwise from the current directory's git remote.
+  With neither (a home directory, a scratch folder, a parent of the repo) it falls back to `gitlab.com`, so a call against an HC2 project fails as unauthenticated even though the HC2 token is valid.
+  **Repeat occurrence (2026-10-08, [abridge !125](https://hc2-gitlab.ucdmc.ucdavis.edu/health-analytics-core/abridge/-/merge_requests/125)):** a session ran `glab api` outside the abridge checkout and read the failure as an expired token.
+  The PI flagged it as a mistake made before.
+  **Do:** always pass `--hostname hc2-gitlab.ucdmc.ucdavis.edu` to `glab api` for an HC2 call.
+  Other subcommands take `-R hc2-gitlab.ucdmc.ucdavis.edu/<namespace>/<project>` instead, since `glab api` has no `-R`.
+  Setting `GITLAB_HOST=hc2-gitlab.ucdmc.ucdavis.edu` for the command covers both.
+  **Don't:** diagnose a `glab` authentication failure as an expired token before checking which host the call went to.
+  `glab auth status` lists the hosts glab is logged in to;
+  compare them with the failing call's host.
 - **Never inspect GitLab CI/CD variables with the project variables API in an
   agent-visible terminal.**
   On the HC2 self-hosted GitLab instance, measured

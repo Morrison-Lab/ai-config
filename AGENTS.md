@@ -421,7 +421,7 @@ Before pushing to, editing, commenting on, resolving threads on, reviewing, disp
 Proceed only when the author or an assignee is the invoking user (or an alias), the user named that PR, or the author is `github-actions`;
 an explicit "do not touch" vetoes the PR first, and a missing identity check fails closed.
 A review-only run dispatched naming the target PR reviews and stops there.
-Every review you post carries both the Markdown report and the `review-data` JSON payload.
+Every review you post or produce, including a local report or one composed in-transcript, carries both the Markdown report and the `review-data` JSON payload.
 Detail: [`pr-scope`](shared/workflow/pr-scope.md) and [`memories/reviewing-prs.md`](memories/reviewing-prs.md).
 
 - **Do:** verify author, assignees, or explicit user requests before interacting with any PR.

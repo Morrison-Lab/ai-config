@@ -596,6 +596,10 @@ jobs:
         # seen to produce a non-zero, a zero from the corpus scan below is not
         # evidence of anything.
         run: python3 scripts/test_check_bare_fragment_mentions.py
+      - name: Run prose-citation check tests
+        # ai-config#3660: each check's negative control, so a zero from the
+        # advisory step in new-line-breaks is evidence rather than silence.
+        run: python3 scripts/test_check_prose_citations.py
       - name: Run backlog-triage instrument tests
         run: python3 scripts/test_triage_backlog.py
       - name: Run check-rendered-page tests
@@ -753,6 +757,12 @@ jobs:
           # skip-with-a-warning path (no base ref) is no longer reachable
           # from here.
           base-ref: ${{ github.event.pull_request.base.sha }}
+      - name: Check added prose for unverifiable citations (advisory)
+        # ai-config#3660. Rides this job for its full-history checkout and its
+        # pull_request gate. Non-blocking: main() returns 0 whatever it finds,
+        # since the checks are heuristics over prose. HEAD^1 is the base tip,
+        # because the checkout is GitHub's merge commit for the PR.
+        run: python3 scripts/check-prose-citations.py --base HEAD^1
 
   lint-markdown:
     uses: Morrison-Lab/gha/.github/workflows/lint-markdown.yml@v2

@@ -8817,6 +8817,14 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         check(f"check_base_drift: ahead_by={bad!r} blocks", not ok and issues)
     ok, issues, _ = drift({"ahead_by": 2, "files": "x"})
     check("check_base_drift: a non-list files blocks", not ok and issues)
+    fail_pr = SimpleNamespace(state="OPEN", base_ref="main", head_sha="sha123", repo=TEST_REPO)
+    with patch.object(checker, "fetch", side_effect=RuntimeError("HTTP 404")):
+        try:
+            checker.check_base_drift(fail_pr)
+            code = None
+        except SystemExit as exc:
+            code = exc.code
+    check("check_base_drift: a failed live compare exits 2, not 1 or a pass", code == 2)
     _, _, calls = drift({"ahead_by": 0, "files": []}, base="feat#1?x")
     check("check_base_drift: the base name is percent-encoded",
           calls and calls[0][-1].endswith("/compare/sha123...feat%231%3Fx"))

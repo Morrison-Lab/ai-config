@@ -23,8 +23,8 @@ NOT COVERED. A `FULLY CLEAN` line here is not the whole of that fragment's
 "Findings hide on several surfaces" check, and the difference is mechanical
 rather than a matter of thoroughness. Both halves of the mechanism say so.
 scripts/lib/payload_fetcher.py, which governs the `--from-json` path, maps
-`gh pr view`, `gh repo view`, and three `gh api` reads (`/check-runs`,
-`/actions/runs/`, and `graphql`); the default path's own call sites are
+`gh pr view`, `gh repo view`, and four `gh api` reads (`/check-runs`,
+`/actions/runs/`, `/compare/`, and `graphql`); the default path's own call sites are
 `gh pr view --json`, `gh api graphql` for review threads, the `/check-runs`
 read in scripts/lib/pull_request.py, `gh repo view` for repo resolution, and the
 two `/actions/runs/` reads below. No `<summary>`-scoped match on `suppressed`
@@ -786,7 +786,12 @@ def check_base_drift(pr) -> Tuple[bool, List[str]]:
         return True, ["NOTE: base drift not checked: the PR names no base branch "
                       "or head SHA (ai-config#2982)"]
     quoted = urllib.parse.quote(base, safe="/")
-    data = json.loads(fetch(["gh", "api", f"repos/{pr.repo}/compare/{sha}...{quoted}"]))
+    try:
+        data = json.loads(fetch(["gh", "api", f"repos/{pr.repo}/compare/{sha}...{quoted}"]))
+    except RuntimeError as exc:
+        # Exit 2, not a NOTE: a NOTE would pass the PR on a gate that never
+        # ran, and exit 1 would read as a verdict about the PR.
+        die(f"Could not read how far {base} has moved past this head: {exc}")
     if not isinstance(data, dict) or data.get("_not_in_payload"):
         return True, ["NOTE: base drift not checked: the payload has no "
                       "'base_compare' (rebuild it with build-pr-payload.py; "

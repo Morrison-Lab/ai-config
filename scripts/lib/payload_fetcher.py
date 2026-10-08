@@ -117,8 +117,9 @@ class PayloadFetcher:
 
         raise PayloadError(
             f"no payload mapping for command: {' '.join(cmd)}.\n"
-            "This fetcher covers `gh pr view`, `gh repo view`, and the three "
-            "`gh api` reads (`/check-runs`, `/actions/runs/`, and `graphql`). "
+            "This fetcher covers `gh pr view`, `gh repo view`, and the four "
+            "`gh api` reads (`/check-runs`, `/actions/runs/`, `/compare/`, and "
+            "`graphql`). "
             "A new call site needs a new payload key."
         )
 

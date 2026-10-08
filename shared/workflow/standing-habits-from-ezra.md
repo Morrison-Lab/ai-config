@@ -56,7 +56,7 @@ Claude quota is scarce, so Claude plans and verifies, and other models do bulk w
 - **Do:** add Codex only in a UCDH project (the `bcs` and `hac` groups, on any forge), and Databricks only in a `hac`-group project on the UCDH GitLab.
 - **Do:** name every model you use when you brief it.
 - **Don't:** use the UCDH Codex plan outside UCDH projects, or the UCDH Databricks workspace outside the `hac` group on the UCDH GitLab.
-- **Do:** use free models (ones that cost no quota, such as OpenCode's free tier) in any project or session whenever they help, for any task (Ezra, 2026-10-08).
+- **Do:** use free models (ones that cost no quota, such as OpenCode's free tier) in any project or session whenever they help, for any task that does not expose restricted data (Ezra, 2026-10-08).
 - **Do:** at present, let only the UCDH Codex account directly view restricted data: PHI under HIPAA, FERPA student records, and other regulated data.
 - **Do:** in a project where the UCDH Codex account may not run, keep every model away from restricted data, and ask Ezra how to route it.
   The Codex lane above is limited to UCDH projects, and Ezra has not yet said whether restricted data is an exception to that limit.

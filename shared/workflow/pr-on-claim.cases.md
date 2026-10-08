@@ -13,14 +13,14 @@ The failure was misread as the hook not recognizing a Copilot quota refusal, whi
 
 ## "Nothing chained before or after it" includes a formatting pipe
 
-([Morrison-Lab/ai-config#1139](https://github.com/Morrison-Lab/ai-config/issues/1139), 2026-08-04: the pipe variant, in a session that had already cited this rule's reasoning aloud earlier in the same hour.
+([Morrison-Lab/ai-config#1139](https://github.com/Morrison-Lab/ai-config/pull/1139), 2026-08-04: the pipe variant, in a session that had already cited this rule's reasoning aloud earlier in the same hour.
 The request was written `gh api -X POST .../requested_reviewers -f 'reviewers[]=...' 2>&1 | tail -3`, and it genuinely succeeded --- the response named `Copilot` in `requested_reviewers`, and Copilot posted its quota refusal at `07:22:15Z`.
 The hook still fired at Stop, correctly, because `tail` owned the exit status.
 Re-running the POST bare discharged it and produced a second, identical refusal at `07:53:03Z`.)
 
 ## The blocking message prescribes a non-dischargeable shape
 
-([Morrison-Lab/ai-config#3010](https://github.com/Morrison-Lab/ai-config/pull/3010), 2026-09-02, and the third occurrence of the chained-request mistake after the [rpt#181](https://github.com/Morrison-Lab/rpt/issues/181) and [ai-config#1139](https://github.com/Morrison-Lab/ai-config/issues/1139) cases above.
+([Morrison-Lab/ai-config#3010](https://github.com/Morrison-Lab/ai-config/pull/3010), 2026-09-02, and the third occurrence of the chained-request mistake after the [rpt#181](https://github.com/Morrison-Lab/rpt/issues/181) and [ai-config#1139](https://github.com/Morrison-Lab/ai-config/pull/1139) cases above.
 The session ran the request across a run of successive turns, chaining the block message's own verify command after the POST each time, which is what left the request non-last;
 the hook fired after every one of them, and the loop ended on the first turn that ran the POST as the sole command in its call.
 Four Copilot reviews landed on the PR while this was going on, at `15:51:54Z`, `16:43:37Z`, `16:47:16Z`, and `17:00:45Z`.
@@ -53,7 +53,7 @@ A whole-day bound would already be wrong: a request at `18:27:05Z` and a review 
 
 ## The blocked-request test's false positive on auto-requesting repos
 
-([Morrison-Lab/ai-config#1077](https://github.com/Morrison-Lab/ai-config/issues/1077), 2026-08-03: two explicit requests each returned `["Copilot"]` and each left `reviewRequests` empty within a minute, and both were reported as a possible blocked/silent reviewer.
+([Morrison-Lab/ai-config#1077](https://github.com/Morrison-Lab/ai-config/pull/1077), 2026-08-03: two explicit requests each returned `["Copilot"]` and each left `reviewRequests` empty within a minute, and both were reported as a possible blocked/silent reviewer.
 The repo's `main` ruleset carried `copilot_code_review` with `review_on_push: true` and `review_draft_pull_requests: false` as of 2026-08-03, so neither request was ever needed.
 Copilot separately did stay silent on that PR, which is the distinct third state [`review-verdict-pitfalls`](review-verdict-pitfalls.md) records --- the point here is that the empty pending-list was not the evidence for it.
 **This does not describe the repo's current state.**
@@ -63,18 +63,16 @@ Tracked as [ai-config#1148](https://github.com/Morrison-Lab/ai-config/issues/114
 
 ## Request the reviewer in the same step; don't leave it "review owed"
 
-([Morrison-Lab/ai-config#1038](https://github.com/Morrison-Lab/ai-config/issues/1038) and [#1040](https://github.com/Morrison-Lab/ai-config/issues/1040), 2026-08-02: both PRs were opened around 07:00Z and then reported as still owing review requests.
+([Morrison-Lab/ai-config#1038](https://github.com/Morrison-Lab/ai-config/pull/1038) and [#1040](https://github.com/Morrison-Lab/ai-config/pull/1040), 2026-08-02: both PRs were opened around 07:00Z and then reported as still owing review requests.
 They had zero Copilot reviews until the user asked why no review had been requested about ten minutes later.
-The repo's `claude-review` workflow was failing for the same context-closure limit that made [ai-config#1029](https://github.com/Morrison-Lab/ai-config/issues/1029)'s review fail on every attempt, so a PR without the explicit Copilot request had no working reviewer despite review-shaped checks.)
+The repo's `claude-review` workflow was failing for the same context-closure limit that made [ai-config#1029](https://github.com/Morrison-Lab/ai-config/pull/1029)'s review fail on every attempt, so a PR without the explicit Copilot request had no working reviewer despite review-shaped checks.)
 
 ## Do not `Closes` a parent issue on a partial ship
 
-([Morrison-Lab/gha#373](https://github.com/Morrison-Lab/gha/issues/373) / [#516](https://github.com/Morrison-Lab/gha/issues/516) / [#517](https://github.com/Morrison-Lab/gha/issues/517), 2026-08-19: `gi` opened the draft with
-`Closes #373` and shipped only Case B of a later A/B split. The merge
-closed [gha#373](https://github.com/Morrison-Lab/gha/issues/373), so Case A --- a human security decision the issue itself
-said not to fold into an unrelated PR --- left the tracker until wrap-up
-filed [gha#517](https://github.com/Morrison-Lab/gha/issues/517). File the leftover issue before merge and drop `Closes` on the
-parent.)
+([Morrison-Lab/gha#373](https://github.com/Morrison-Lab/gha/issues/373) / [#516](https://github.com/Morrison-Lab/gha/pull/516) / [#517](https://github.com/Morrison-Lab/gha/issues/517), 2026-08-19:
+`gi` opened the draft with `Closes #373` and shipped only Case B of a later A/B split.
+The merge closed [gha#373](https://github.com/Morrison-Lab/gha/issues/373), so Case A --- a human security decision the issue itself said not to fold into an unrelated PR --- left the tracker until wrap-up filed [gha#517](https://github.com/Morrison-Lab/gha/issues/517).
+File the leftover issue before merge and drop `Closes` on the parent.)
 
 ## Verify you switched branches before the second issue's code
 
@@ -93,7 +91,8 @@ requested --- but `git push` never ran, so the branch head stayed at the empty
 
 ## The reviewer-request POST must be the sole command in its call
 
-(Morrison-Lab/ai-config#1367, 2026-08-09: investigated after chaining `gh api ".../requested_reviewers" -X POST ... --silent && echo "requested"` in one Bash call on a `Lacaedemon/sparta` PR; the Stop hook correctly flagged it, and recovery was one extra Bash call.)
+([Morrison-Lab/ai-config#1367](https://github.com/Morrison-Lab/ai-config/issues/1367), 2026-08-09: investigated after chaining `gh api ".../requested_reviewers" -X POST ... --silent && echo "requested"` in one Bash call on a `Lacaedemon/sparta` PR;
+the Stop hook correctly flagged it, and recovery was one extra Bash call.)
 
 ## Three surfaces fail to discriminate a vanished pending request
 
@@ -120,16 +119,16 @@ warns about, met in the direction that flatters the repo.)
 
 ## Requesting Copilot discharges nothing on a dispatch-only repo
 
-([`Morrison-Lab/ai-config#1235`](https://github.com/Morrison-Lab/ai-config/issues/1235), 2026-08-06: opened by a subagent that correctly requested Copilot, which was quota-exhausted and refused.
+([Morrison-Lab/ai-config#1235](https://github.com/Morrison-Lab/ai-config/pull/1235), 2026-08-06: opened by a subagent that correctly requested Copilot, which was quota-exhausted and refused.
 The PR then read 4 check runs, 0 pending and 0 failing, with zero Claude reviews, because nothing had dispatched one.
 `claude-review.yml` there carries `workflow_dispatch` and nothing else, while `ucdavis/bcs`'s `claude-code-review.yml` carries `pull_request: [opened, synchronize, ready_for_review, reopened]` --- and the session had spent the day in the second repo, where every push fired a review and no one ever had to ask.
-`hooks/no-unreviewed-pr.py` had fired correctly on [ai-config#1222](https://github.com/Morrison-Lab/ai-config/issues/1222) earlier in that same session and stayed silent here, discharged by the Copilot POST exactly as its contract says.
+`hooks/no-unreviewed-pr.py` had fired correctly on [ai-config#1222](https://github.com/Morrison-Lab/ai-config/pull/1222) earlier in that same session and stayed silent here, discharged by the Copilot POST exactly as its contract says.
 The user's correction was "you should be requesting ai bot reviews on prs when you think they're ready", followed immediately by "(if github actions isn't triggering one for you)".
 A second correction was needed before this pass ran at all: the first response was to dispatch the missing review and carry on, where `CLAUDE.md`'s "Correcting your own understanding of a technical issue is itself a trigger" puts the pass at the correction rather than after the work the correction unblocked.)
 
 ## A redaction PR must not get an AI reviewer
 
-(Morrison-Lab/ai-config#1392, from `ucdavis/bcs#615`, which removed 47 real participant identifiers.
+([Morrison-Lab/ai-config#1392](https://github.com/Morrison-Lab/ai-config/issues/1392), from `ucdavis/bcs#615`, which removed 47 real participant identifiers.
 `redaction-gate` passed and `ai-review` reported `skipping`, as designed, and the guard then fired on six consecutive turns demanding a request whose only correct response was to refuse.
 Refusing did not discharge it, recording the refusal on the PR did not, and the maintainer deciding "hold, no AI reviewer" did not --- which is the shape [`algorithmatize-checks`](algorithmatize-checks.md) warns about, reached by an unusual route: the threshold was sharp and the **discharge set was incomplete**.)
 

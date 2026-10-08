@@ -151,7 +151,7 @@ def check_line(root: Path, citing: str, text: str, issues: bool,
         if target is None:
             findings.append(("path-line", f"`{cited}` does not exist at HEAD"))
             continue
-        count = len(target.read_text(errors="replace").splitlines())
+        count = len(target.read_text(encoding="utf-8", errors="replace").splitlines())
         if last > count:
             findings.append(("path-line",
                              f"`{cited}:{last}` is past the end ({count} lines)"))
@@ -162,7 +162,7 @@ def check_line(root: Path, citing: str, text: str, issues: bool,
             target = resolve(root, citing, f.group("path"))
             if target is None:
                 continue
-            body = squash(target.read_text(errors="replace"))
+            body = squash(target.read_text(encoding="utf-8", errors="replace"))
             for q in quotes:
                 if squash(q) not in body:
                     findings.append(("quote-in-file",
@@ -213,7 +213,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"::warning::check-prose-citations: {path} is in the diff "
                   f"but not readable at HEAD, so it was not examined")
             continue
-        fenced, _, _ = find_fence_spans(full.read_text(errors="replace"))
+        fenced, _, _ = find_fence_spans(full.read_text(encoding="utf-8", errors="replace"))
         for lineno, text in lines:
             if lineno - 1 in fenced:
                 continue

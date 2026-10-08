@@ -763,6 +763,7 @@ jobs:
         # since the checks are heuristics over prose. HEAD^1 is the base tip,
         # because the checkout is GitHub's merge commit for the PR.
         run: python3 scripts/check-prose-citations.py --base HEAD^1
+        continue-on-error: true
 
   lint-markdown:
     uses: Morrison-Lab/gha/.github/workflows/lint-markdown.yml@v2

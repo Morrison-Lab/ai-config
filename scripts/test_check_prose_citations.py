@@ -50,15 +50,15 @@ def run(prose: str, extra: dict[str, str] | None = None):
         git(root, "config", "user.name", "t")
         (root / "hooks").mkdir()
         (root / "hooks" / "guard.py").write_text(
-            "# The guard refuses every push while blocking.\n" + "x = 1\n" * 9
+            "# The guard refuses every push while blocking.\n" + "x = 1\n" * 9, encoding="utf-8"
         )
-        (root / "doc.md").write_text("# Doc\n\nOld line about `hooks/guard.py:99`.\n")
+        (root / "doc.md").write_text("# Doc\n\nOld line about `hooks/guard.py:99`.\n", encoding="utf-8")
         for name, body in (extra or {}).items():
-            (root / name).write_text(body)
+            (root / name).write_text(body, encoding="utf-8")
         git(root, "add", "-A")
         git(root, "commit", "-q", "-m", "base")
         git(root, "checkout", "-q", "-b", "feat")
-        with open(root / "doc.md", "a") as fh:
+        with open(root / "doc.md", "a", encoding="utf-8") as fh:
             fh.write(prose)
         git(root, "commit", "-q", "-am", "prose")
         out = io.StringIO()

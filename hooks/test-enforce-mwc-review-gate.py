@@ -242,6 +242,8 @@ def main():
         }
     })
     check("Antigravity run_command non-merge allows", out.get("decision") == "allow")
+    check("Antigravity output omits hookSpecificOutput for protojson compatibility",
+          "hookSpecificOutput" not in out)
 
     out = run_main({
         "toolCall": {
@@ -250,6 +252,8 @@ def main():
         }
     })
     check("Antigravity run_command glab mr merge denies", out.get("decision") == "deny")
+    check("Antigravity deny omits hookSpecificOutput for protojson compatibility",
+          "hookSpecificOutput" not in out)
 
     out = run_main({
         "toolCall": {

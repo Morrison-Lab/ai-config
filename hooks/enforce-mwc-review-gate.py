@@ -1834,13 +1834,21 @@ def _read_payload():
         return None, is_dry_run
 
 
+def _emit(decision: dict, is_antigravity: bool = False) -> None:
+    """Serialize and print hook decision, omitting Claude-specific fields under Antigravity."""
+    out = dict(decision) if isinstance(decision, dict) else {"decision": "deny", "reason": "Malformed decision"}
+    if is_antigravity:
+        out.pop("hookSpecificOutput", None)
+    print(json.dumps(out))
+
+
 def main():
     payload, is_dry_run = _read_payload()
     if payload is None:
-        print(json.dumps(deny("Hook could not parse its input payload")))
+        _emit(deny("Hook could not parse its input payload"), False)
         return
     if not payload:
-        print(json.dumps(ALLOW))
+        _emit(ALLOW, False)
         return
 
     # 1. Antigravity format: {"toolCall": {"name": ..., "args": ...}}
@@ -1867,16 +1875,16 @@ def main():
     mcp_merge = is_mcp_merge_tool(tool_name)
 
     if not is_shell_tool and not mcp_merge:
-        print(json.dumps(ALLOW))
+        _emit(ALLOW, is_antigravity)
         return
 
     # Handle MCP merge tools
     if mcp_merge:
         if is_mcp_auto_merge_tool(tool_name):
-            print(json.dumps(deny(
+            _emit(deny(
                 "Strict Merge Control Policy: auto-merge MCP tools cannot be verified for "
                 "head review state at enable time and are denied by enforce-mwc-review-gate.py."
-            )))
+            ), is_antigravity)
             return
 
         tool_input = tool_call.get("args") if is_antigravity else (payload.get("tool_input") or {})
@@ -1895,10 +1903,10 @@ def main():
         )
 
         if not (owner and repo and str(pull_num).strip().isdigit()):
-            print(json.dumps(deny(
+            _emit(deny(
                 f"MCP merge_pull_request call missing required owner, repo, or pull_number: "
                 f"got owner={owner!r}, repo={repo!r}, pull_number={pull_num!r}"
-            )))
+            ), is_antigravity)
             return
 
         repo_slug = f"{str(owner).strip()}/{str(repo).strip()}"
@@ -1906,26 +1914,26 @@ def main():
         try:
             pr_data, error = fetch_pr_data("", cwd, target_repo=repo_slug, target_number=number)
             if error:
-                print(json.dumps(deny(error)))
+                _emit(deny(error), is_antigravity)
                 return
             if expected_sha and isinstance(expected_sha, str) and expected_sha.strip():
                 head_oid = pr_data.get("headRefOid", "") or ""
                 if expected_sha.strip().lower() != head_oid.strip().lower():
-                    print(json.dumps(deny(
+                    _emit(deny(
                         f"Strict Merge Control Policy: expectedHeadSha ({expected_sha.strip()}) "
                         f"does not match current PR head SHA ({head_oid})."
-                    )))
+                    ), is_antigravity)
                     return
             cmd_desc = f"mcp merge_pull_request {repo_slug}#{number}"
-            print(json.dumps(evaluate(cmd_desc, pr_data)))
+            _emit(evaluate(cmd_desc, pr_data), is_antigravity)
         except Exception as e:
-            print(json.dumps(deny(f"Hook exception during MCP PR review check: {e}")))
+            _emit(deny(f"Hook exception during MCP PR review check: {e}"), is_antigravity)
         return
 
     # Denied before any state fetch: the gate cannot resolve which PR a
     # GraphQL merge mutation targets.
     if GRAPHQL_MERGE_RE.search(cmd):
-        print(json.dumps(evaluate(cmd, {})))
+        _emit(evaluate(cmd, {}), is_antigravity)
         return
 
     # Detect merge-ness per chain segment, so "gh pr create; gh pr merge"
@@ -1941,18 +1949,18 @@ def main():
     )
     if is_glab_merge:
         if any(ch in masked_cmd for ch in CHAIN_CHARS):
-            print(json.dumps(deny(
+            _emit(deny(
                 "Merge commands (gh pr merge, etc) must be executed on their own, "
                 "not chained, piped, backgrounded, or wrapped in command "
                 "substitution, so the hook can reliably inspect the PR's review "
                 "status before the merge runs."
-            )))
+            ), is_antigravity)
             return
-        print(json.dumps(deny(
+        _emit(deny(
             "GitLab merge requests (glab mr merge / glab api merge) do not currently "
             "support automated review gate verification in enforce-mwc-review-gate.py "
             "and are denied to fail closed."
-        )))
+        ), is_antigravity)
         return
 
     is_merge = any(
@@ -1960,28 +1968,28 @@ def main():
         for seg in segments
     )
     if not is_merge:
-        print(json.dumps(ALLOW))
+        _emit(ALLOW, is_antigravity)
         return
 
     # Merges must run standalone so the PR state inspected here is the state
     # the merge executes against.
     if any(ch in masked_cmd for ch in CHAIN_CHARS):
-        print(json.dumps(deny(
+        _emit(deny(
             "Merge commands (gh pr merge, etc) must be executed on their own, "
             "not chained, piped, backgrounded, or wrapped in command "
             "substitution, so the hook can reliably inspect the PR's review "
             "status before the merge runs."
-        )))
+        ), is_antigravity)
         return
 
     try:
         pr_data, error = fetch_pr_data(cmd, cwd)
         if error:
-            print(json.dumps(deny(error)))
+            _emit(deny(error), is_antigravity)
             return
-        print(json.dumps(evaluate(cmd, pr_data)))
+        _emit(evaluate(cmd, pr_data), is_antigravity)
     except Exception as e:  # fail closed: an undiagnosed state never merges
-        print(json.dumps(deny(f"Hook exception during PR review check: {e}")))
+        _emit(deny(f"Hook exception during PR review check: {e}"), is_antigravity)
 
 
 if __name__ == "__main__":

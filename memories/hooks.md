@@ -116,19 +116,21 @@ In a Bash command the commonest such carriers are a heredoc commit message (`git
 Measured 2026-10-08 on [ai-config#4398](https://github.com/Morrison-Lab/ai-config/pull/4398), which adds a warn-only `PreToolUse` hook.
 A round-1 review fix made it scan the raw command text for `$(...)` substitutions.
 It then fired on ordinary commit messages whose heredoc bodies described the pattern.
-`scripts/lib/shellcmd.py` already strips two of the three: `_heredoc_free` blanks heredoc bodies and `_comment_free` drops unquoted comments, and `simple_commands` applies both before splitting.
-It does not strip the third.
-A body passed inline survives as an ordinary argument: `simple_commands("gh pr create --body 'see $(echo hi)'")` keeps `see $(echo hi)` as one argv element.
-Quoting decides whether that text runs.
-Inside single quotes `$(...)` is literal and never executes, while inside double quotes it does, so a scan for substitutions has to track quote state rather than only strip heredocs and comments.
+Quoting decides which of those carriers is only text.
+A `$(...)` in a single-quoted argument or in a heredoc body under a quoted delimiter (`<<'EOF'`) never runs.
+The same `$(...)` in a double-quoted argument or under an unquoted `<<EOF` delimiter does run: `bash -c` on `cat <<EOF` with `x $(echo RAN) y` as the body printed `x RAN y`.
+`scripts/lib/shellcmd.py` helps with part of this and not all of it.
+`_comment_free` drops unquoted comments.
+`_heredoc_free` blanks every heredoc body whatever its delimiter's quoting (measured: `<<EOF` and `<<'EOF'` both came back blank), so using it as-is hides a substitution that would run.
+A body passed inline is not stripped at all: `simple_commands("gh pr create --body 'see $(echo hi)'")` keeps `see $(echo hi)` as one argv element.
 
 This is not the cheap false positive a warn-only hook may accept.
 [4.6](#46-asymmetric-error-costs-in-warn-only-hooks-prefer-over-warning-to-brittle-narrowing) accepts over-warning on a rare argument shape.
 A heredoc commit message describing the hook's own pattern is what every commit to that hook is likely to carry, so the false positive lands on the hook's own maintenance.
 
-- **Do:** when widening what a hook scans, add NO-FIRE tests in the same change for a heredoc commit message, a PR body, and a comment that each quote the pattern.
-- **Do:** strip heredoc bodies and comments with `shellcmd`'s helpers, and skip single-quoted spans, before scanning for a substitution;
-  never scan the unstripped command string.
+- **Do:** when widening what a hook scans, add NO-FIRE tests in the same change for a `<<'EOF'` heredoc commit message, a single-quoted or `--body-file` PR body, and a comment that each quote the pattern.
+- **Do:** add FIRE tests in the same change for the forms that run: an unquoted `<<EOF` body and a double-quoted `--body` that each contain a `$(...)`.
+- **Do:** before scanning for a substitution, drop comments, single-quoted spans, and only the heredoc bodies whose delimiter is quoted.
 - **Don't:** fix a false negative by switching to raw-text matching without a test that the commonest benign carriers stay silent.
 
 ---

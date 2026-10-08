@@ -602,7 +602,7 @@ python3 scripts/run-local-validation.py --base origin/main --only new-line-break
 
 ### A red job with one named failure is not evidence about its later steps
 
-The occurrences above are all about which checks get **run**.
+The occurrences above are about which checks get **run**, and whether their output is then read.
 This one is about what a red run, once you have it, actually **tells** you --
 and it is a derivation from how GitHub Actions executes a job, not a judgment
 call.

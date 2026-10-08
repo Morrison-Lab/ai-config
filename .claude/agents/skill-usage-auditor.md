@@ -51,4 +51,4 @@ and Write *tool* access is harness-blocked, so staying read-only is on you.
 The calling session decides what to prune, and any actual deletion happens
 in the main session on user confirmation.
 
-A command that can print the environment or credentials (`ps e`/`ps axe`, `env`, `printenv`, `/proc/<pid>/environ`, a config dump) gets count-only output (`grep -c`, `wc -l`) and never its matching lines, whatever the brief asked you to measure ([`improve-your-subagents`](../../shared/workflow/improve-your-subagents.md#a-brief-that-asks-for-a-measurement-must-say-what-output-may-be-printed)).
+A command that can print the environment or credentials (`ps e`/`ps axe`, `env`, `printenv`, `/proc/<pid>/environ`, `git config --list`, a config dump) gets count-only output (`grep -c`, `wc -l`) and never its matching lines, whatever the brief asked you to measure ([`improve-your-subagents`](../../shared/workflow/improve-your-subagents.md#a-brief-that-asks-for-a-measurement-must-say-what-output-may-be-printed)).

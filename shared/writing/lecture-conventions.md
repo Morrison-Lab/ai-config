@@ -38,6 +38,9 @@ This fragment is the agent-facing copy: follow the rules, and link to psw instea
 - **Use real data and compute every number.**
   Never type or paste output.
   See [`hypothetical-examples`](hypothetical-examples.md).
+- **Favor applied content and graphics** (Ezra, 2026-10-08).
+  Give each topic a data analysis students run themselves, and a plot of the data or the fit wherever one helps.
+  Put each plot in a `#fig-` div with a caption and alt text, and make it from code, not from a typed-in image.
 - **Put media links beside the content they support.**
   See [`media-links-beside-content`](media-links-beside-content.md).
 - **Place each topic in the earliest course site whose readers need it.**

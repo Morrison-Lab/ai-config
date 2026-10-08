@@ -19,7 +19,8 @@ This fragment is the agent-facing copy: follow the rules, and link to psw instea
   Do not write one exercise with parts (a) through (e).
 - **Put examples and commentary in `#exm-` and `#rem-` divs, never in `::: notes`.**
   A notes div is unboxed plain text on the web page and hidden on the slides.
-- **Keep text on slides short.**
+- **Put on a slide only what the audience should look at.**
+  Text that supports the speaker rather than the viewer, such as a long paragraph, belongs in speaker notes.
   Give a long paragraph a one- or two-sentence `#rem-` box and put the rest in a `::: notes` div directly after it, which is speaker notes on the slides.
   The notes add detail and never repeat the box, because the web page shows both.
   To keep a whole remark off the slides, use `::: {#rem-name .remark .notes}`.

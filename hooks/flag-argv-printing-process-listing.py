@@ -61,9 +61,11 @@ evidence than it is on Linux. Busybox `ps` prints argv by default, so
 
 KNOWN HOLES, so silence is not read as coverage:
 
-- a command assembled at run time: `eval "$cmd"`, a script file, a variable
-  as the program name, or a variable inside a /proc path
-  (`for p in /proc/[0-9]*; do cat "$p/cmdline"; done`);
+- a command assembled at run time: `eval "$cmd"`, a script file, another
+  language's `os.system('ps aux')`, a variable as the program name, or a
+  variable holding the /proc prefix (`for p in /proc/[0-9]*; do cat
+  "$p/cmdline"; done`; `/proc/$pid/cmdline` itself is caught);
+- `ps -r`, which procps answers in BSD format with a COMMAND column;
 - a heredoc fed to a shell, and a substitution inside an unquoted heredoc
   (all heredoc bodies are blanked, which trades this miss for silence on
   commit messages);
@@ -86,8 +88,15 @@ It stays silent on the forms that print only a name: `pgrep -f <pattern>`
 when the listing's output never reaches the transcript: its own pipeline
 ends in `wc` or `grep -c`/`-q`/`-l` (through any `grep`, `sort`,
 `head`-style filters), or sends stdout to
-`/dev/null`. Only the listing's own pipeline counts: a `>/dev/null` on a
-command before a `;` or `&` does not silence it.
+`/dev/null`. Only the listing's own top-level pipeline counts: a
+`>/dev/null` on a command before a top-level `;` or `&` does not silence it.
+Inside parentheses the whole group is read as one pipeline, so
+`(ps -ef; true >/dev/null)` is silenced, a miss.
+
+It deliberately over-warns where the output feeds a consumer that prints
+nothing (`ps -ef | grep x | awk '{print $2}' | xargs kill`,
+`[ -n "$(ps aux | grep x)" ]`) and on `ps -o args -p $$`: the remedy it
+names, `pgrep`/`pkill`, is the better habit there anyway.
 
 WHY THIS WARNS RATHER THAN BLOCKS
 ---------------------------------
@@ -362,7 +371,10 @@ def _proc_leak(argv, program):
     if not hits:
         return None
     name = os.path.basename(argv[program]) if program is not None else ""
-    if name in PROC_TESTERS:
+    # A tester exempts only a /proc path it receives as an OPERAND; a stdin
+    # redirect (`xargs -0 -n1 echo < /proc/1/environ`) feeds the contents on.
+    redirected = [i for i in hits if i and RX_REDIRECT.match(argv[i - 1])]
+    if name in PROC_TESTERS and not redirected:
         return None
     if name in GREP_PROGS:
         args = argv[program + 1:]

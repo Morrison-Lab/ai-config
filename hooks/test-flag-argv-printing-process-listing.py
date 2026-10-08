@@ -129,6 +129,10 @@ for cmd in [
     # review round 3 (measured): a dashless PID list switches to BSD output
     "ps 1234",
     "ps aux | awk '{print $12}'",
+    # review round 7: a tester fed a /proc file on stdin prints it
+    "xargs -0 -n1 echo < /proc/1/environ",
+    "xargs -0 printf '%s\\n' < /proc/1/environ",
+    "cat /proc/$pid/cmdline",
     "ps aux | grep foo | awk '{print $2}'",
     'ps "$pid"',
     "ps 12,34",

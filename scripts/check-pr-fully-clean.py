@@ -71,6 +71,7 @@ import shlex
 import subprocess
 import sys
 import unicodedata
+import urllib.parse
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -784,19 +785,22 @@ def check_base_drift(pr) -> Tuple[bool, List[str]]:
     if not base or not sha:
         return True, ["NOTE: base drift not checked: the PR names no base branch "
                       "or head SHA (ai-config#2982)"]
-    data = json.loads(fetch(["gh", "api", f"repos/{pr.repo}/compare/{sha}...{base}"]))
+    quoted = urllib.parse.quote(base, safe="/")
+    data = json.loads(fetch(["gh", "api", f"repos/{pr.repo}/compare/{sha}...{quoted}"]))
     if not isinstance(data, dict) or data.get("_not_in_payload"):
         return True, ["NOTE: base drift not checked: the payload has no "
                       "'base_compare' (rebuild it with build-pr-payload.py; "
                       "ai-config#2982)"]
     behind = data.get("ahead_by")
-    if not isinstance(behind, int) or isinstance(behind, bool):
+    raw_files = data.get("files")
+    if (not isinstance(behind, int) or isinstance(behind, bool) or behind < 0
+            or not isinstance(raw_files, (list, type(None)))):
         return False, [f"Could not read how far {base} has moved past this head "
-                       f"(compare 'ahead_by' was {behind!r}; ai-config#2982)"]
+                       f"(compare 'ahead_by' was {behind!r}, 'files' a "
+                       f"{type(raw_files).__name__}; ai-config#2982)"]
     if behind == 0:
         return True, []
-    files = [f.get("filename") or "" for f in (data.get("files") or [])
-             if isinstance(f, dict)]
+    files = [f.get("filename") or "" for f in (raw_files or []) if isinstance(f, dict)]
     gates = sorted({n for n in files if n.startswith(WORKFLOW_DIR)})
     if not gates:
         if len(files) >= COMPARE_FILE_CAP:

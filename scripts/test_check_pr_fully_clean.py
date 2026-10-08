@@ -8802,9 +8802,24 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         {"filename": f"f{i}.md"} for i in range(checker.COMPARE_FILE_CAP)]})
     check("check_base_drift: a capped file list blocks rather than passing (#2982)",
           not ok and issues and "cap" in issues[0])
-    for bad in (None, "3", True):
+    ok, issues, _ = drift({"ahead_by": 9, "files": [
+        {"filename": f"f{i}.md"} for i in range(checker.COMPARE_FILE_CAP - 1)]})
+    check("check_base_drift: one file under the cap is a NOTE", ok)
+    for lookalike in (".github/workflows-notes.md", "docs/.github/workflows/a.yml"):
+        ok, issues, _ = drift({"ahead_by": 1, "files": [{"filename": lookalike}]})
+        check(f"check_base_drift: {lookalike} is not a workflow change", ok)
+    # A script a workflow runs counts too: it can add a check as surely as YAML.
+    ok, issues, _ = drift({"ahead_by": 1, "files": [
+        {"filename": ".github/workflows/scripts/x.sh"}]})
+    check("check_base_drift: a nested .github/workflows/ script blocks", not ok)
+    for bad in (None, "3", True, -1):
         ok, issues, _ = drift({"ahead_by": bad, "files": []})
-        check(f"check_base_drift: ahead_by={bad!r} blocks (#2982)", not ok and issues)
+        check(f"check_base_drift: ahead_by={bad!r} blocks", not ok and issues)
+    ok, issues, _ = drift({"ahead_by": 2, "files": "x"})
+    check("check_base_drift: a non-list files blocks", not ok and issues)
+    _, _, calls = drift({"ahead_by": 0, "files": []}, base="feat#1?x")
+    check("check_base_drift: the base name is percent-encoded",
+          calls and calls[0][-1].endswith("/compare/sha123...feat%231%3Fx"))
 
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0

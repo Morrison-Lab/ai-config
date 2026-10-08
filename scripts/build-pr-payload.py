@@ -50,6 +50,7 @@ import os
 import re
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Any, Dict, List, Optional
 
@@ -474,35 +475,30 @@ def fetch_payload(owner_repo: str, pr_number: int, token: str) -> Dict[str, Any]
         review_threads,
         review_comments_raw,
     )
+    # A failed fetch is recorded rather than omitted, so the checker refuses
+    # the payload (exit 2) instead of scoring around the missing gate.
+    base_ref = urllib.parse.quote(pr_raw["base"]["ref"], safe="/")
     try:
-        compare = rest_get(
-            f"{base}/compare/{pr_raw['head']['sha']}...{pr_raw['base']['ref']}", token
-        )
+        compare = rest_get(f"{base}/compare/{pr_raw['head']['sha']}...{base_ref}", token)
     except Exception as exc:  # noqa: BLE001
-        print(
-            f"warning: failed to fetch the base comparison ({exc}); "
-            "base_compare will be omitted and the checker will say so",
-            file=sys.stderr,
-        )
+        payload["base_compare"] = {"error": f"fetch failed: {exc}"}
     else:
-        if isinstance(compare, dict):
-            payload["base_compare"] = compact_compare(compare)
-        else:
-            print(
-                f"warning: the base comparison was a {type(compare).__name__}, "
-                "not an object; base_compare will be omitted",
-                file=sys.stderr,
-            )
+        payload["base_compare"] = compact_compare(compare)
     return payload
 
 
-def compact_compare(compare: Dict[str, Any]) -> Dict[str, Any]:
+def compact_compare(compare: Any) -> Dict[str, Any]:
     """Keep only what check_base_drift reads (ai-config#2982): the full
     comparison carries every commit object and patch."""
+    if not isinstance(compare, dict):
+        return {"error": f"the comparison was a {type(compare).__name__}, not an object"}
+    files = compare.get("files")
+    if files is not None and not isinstance(files, list):
+        return {"error": f"the comparison's 'files' was a {type(files).__name__}"}
     return {
         "ahead_by": compare.get("ahead_by"),
         "files": [{"filename": f.get("filename") or ""}
-                  for f in (compare.get("files") or []) if isinstance(f, dict)],
+                  for f in (files or []) if isinstance(f, dict)],
     }
 
 

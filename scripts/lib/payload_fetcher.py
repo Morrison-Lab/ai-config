@@ -182,6 +182,23 @@ class PayloadFetcher:
                     f"payload 'base_compare' must be an object, got "
                     f"{type(compare).__name__}."
                 )
+            if "error" in compare:
+                raise PayloadError(
+                    f"payload 'base_compare' records a failed comparison: "
+                    f"{compare['error']}. Rebuild the payload."
+                )
+            ahead = compare.get("ahead_by")
+            if not isinstance(ahead, int) or isinstance(ahead, bool) or ahead < 0:
+                raise PayloadError(
+                    f"payload 'base_compare.ahead_by' must be a non-negative "
+                    f"integer, got {ahead!r}."
+                )
+            files = compare.get("files")
+            if files is not None and not isinstance(files, list):
+                raise PayloadError(
+                    f"payload 'base_compare.files' must be a list, got "
+                    f"{type(files).__name__}."
+                )
             return json.dumps(compare)
 
         if "/check-runs" in path:

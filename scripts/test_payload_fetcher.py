@@ -411,9 +411,17 @@ def main():
     code, out = run_script(p)
     check("a payload without base_compare exits 0 with a NOTE (#2982)",
           code == 0 and "base_compare" in out)
-    p["base_compare"] = ["not", "a", "dict"]
-    code, _ = run_script(p)
-    check("a non-object base_compare exits 2, NOT 0 (#2982)", code == 2)
+    for label, bad in [
+        ("a non-object base_compare", ["not", "a", "dict"]),
+        ("a recorded fetch failure", {"error": "fetch failed: HTTP 502"}),
+        ("a missing ahead_by", {"files": []}),
+        ("a string ahead_by", {"ahead_by": "3", "files": []}),
+        ("a negative ahead_by", {"ahead_by": -1, "files": []}),
+        ("a non-list files", {"ahead_by": 2, "files": "x"}),
+    ]:
+        p["base_compare"] = bad
+        code, out = run_script(p)
+        check(f"{label} in base_compare exits 2, NOT 0 or 1 (#2982)", code == 2)
 
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0

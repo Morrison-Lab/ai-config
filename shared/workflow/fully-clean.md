@@ -1603,8 +1603,10 @@ That branch added hook bindings to `hooks/hooks.json` before [#2967](https://git
 `check-pr-fully-clean.py` reported [#2965](https://github.com/Morrison-Lab/ai-config/pull/2965) FULLY CLEAN,
 a GIA session merged it under `mwc`,
 and `validate` on `main` went red at `da1a2d03` until [#2983](https://github.com/Morrison-Lab/ai-config/pull/2983) regenerated the manifest.
-`check-pr-fully-clean.py` now reads the compare endpoint and exits 1 when the base gained commits that touch `.github/workflows/` since the head's merge base, or when the file list hits the endpoint's 300-file cap ([#2982](https://github.com/Morrison-Lab/ai-config/issues/2982)).
-That catches the commonest shape, but no path diff can prove the base gained no check through a script or a reusable workflow,
+`check-pr-fully-clean.py` now reads the compare endpoint and exits 1 when the base gained commits that touch anything under `.github/workflows/` since the head's merge base ([#2982](https://github.com/Morrison-Lab/ai-config/issues/2982)).
+It also exits 1 when the list reaches 300 files, the cap [GitHub's compare endpoint](https://docs.github.com/en/rest/commits/commits#compare-two-commits) documents, since a workflow change may then be unlisted.
+Drift that touches no workflow file is a NOTE, and a `--from-json` payload built before this check (no `base_compare` key) passes with a NOTE saying the check did not run.
+That would have caught #2965, but no path diff can prove the base gained no check through a script or a reusable workflow,
 so for a direct merge the rule is the one [`sync-with-main`](sync-with-main.md) already states: a stale merge-base means update first.
 Under a merge queue where every clean-gate check both executes for `merge_group` and is required (or aggregated behind a required check),
 the queue's speculative merge test will cover this once [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) defines the queue form of the gate,

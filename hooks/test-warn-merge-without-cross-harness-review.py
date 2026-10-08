@@ -156,6 +156,9 @@ def main():
     fired, out = run("gh pr merge 12 --squash && gh pr merge 13 --squash", [])
     check("warns naming every PR a compound merge targets",
           fired and "PR #12, #13" in (out or {}).get("systemMessage", ""))
+    fired, out = run("gh pr merge 12 --squash || gh pr merge 12 --merge", [])
+    check("warns naming a repeated PR once",
+          fired and "PR #12 " in (out or {}).get("systemMessage", ""))
 
     # --- silent -----------------------------------------------------------
     check("silent after a codex run following the last push",

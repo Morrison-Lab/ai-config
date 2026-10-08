@@ -284,7 +284,8 @@ def main() -> int:
     if any(seq > last_push for seq in reviews):
         return 0
 
-    nums = [f"#{num}" for num, _repo in targets if num is not None]
+    nums = list(dict.fromkeys(
+        f"#{num}" for num, _repo in targets if num is not None))
     target = "PR " + ", ".join(nums) if nums else "This merge"
     note = NOTE.format(target=target, clis=", ".join(sorted(clis)))
     out = {"hookSpecificOutput": {"hookEventName": "PreToolUse",

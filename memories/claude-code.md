@@ -748,6 +748,11 @@ An unbounded run then measured the mechanism: `ps -o pid=,stat= -p <pid>`
 reported `S`, alive and blocked, *after* the browser authorization completed,
 and `lsof -p <pid> -a -d 0` showed fd 0 as a unix socket.)
 
+The same holds for any command that prompts: `sudo`'s password, a hidden paste, a VPN login.
+In the desktop app, a fenced `bash` block's Run button submits it through `!` too.
+So say beside every such block that it must be typed into the Terminal panel.
+(2nd occurrence, 2026-10-07, mlr session: `sudo` failed with "a password is required" three times, and `gh secret set` reading a paste through `!` stored an empty secret twice, failing the review on Morrison-Lab/wwu#89.)
+
 ## Resuming a subagent mid-run tends to restart its long check, not resume it — verify the process directly before nudging it again
 
 When a background subagent pauses its own turn while a long-running local

@@ -227,9 +227,16 @@
   The up-front empty-PR pattern opens a draft deliberately, and a PR-creation tool may default to draft on its own;
   `AGENTS.md` overrides both defaults once implementation is on the branch head and checks pass.
   - **Do:** before ending a turn that delivered completed work, query live PR state and flip draft to ready (`gh pr ready "<N>"` / `mcp__github__update_pull_request` with `draft=false`, per `tool-mappings.md`'s `MARK_PR_READY`) once the branch head carries the work and validate (or equivalent) is green --- then report the linked PR in past tense.
-  - **Don't:** end a delivery recap with a review-ready PR still in draft because the tool default was draft or because you opened early for CI and forgot the final un-draft step. (User correction, 2026-08-20: [#1707](https://github.com/Morrison-Lab/ai-config/pull/1707) stayed draft after checks passed.)
+  - **Don't:** end a delivery recap with a review-ready PR still in draft because the tool default was draft or because you opened early for CI and forgot the final un-draft step.
+    (User correction, 2026-08-20: [#1707](https://github.com/Morrison-Lab/ai-config/pull/1707) stayed draft after checks passed.)
+    A draft held for a stated reason ("untested") must be un-drafted the moment that reason clears.
+    (Recurrence, 2026-10-07: Morrison-Lab/wwu#89 stayed draft after its VPN instructions were tested end to end;
+    the user asked why.)
   - **Don't:** un-draft a **deliberately draft-gated** dependent PR.
     That PR is review-ready by construction and sits in draft only to block the wrong merge order until its prerequisite merges, so `AGENTS.md`'s draft-status carve-out and this file's own blocking-dependency entry both reserve it --- this rule does not reach it.
+- **Put commands the user must run at the end of the reply**, after any tool work in the same turn.
+  The desktop app folds the text written before a tool call, so a command given there is easy to miss.
+  (User correction, 2026-10-07, mlr session: "why didn't you give me that cat command the same way you gave me the openconnect command?")
 - **Always State Clean Stopping Point When Stopping Work**: The last message posted before stopping any session or turn MUST explicitly state whether or not this is a clean stopping point for the session (e.g. `**Stopping Point**: Clean stopping point reached --- session done; UMS executed; no follow-up items pending` or `**Stopping Point**: Not a clean stopping point / work remains queued: session not done; ...`).
   Whenever ending a session, completing a turn, or wrapping up work (whether finishing a single task, a multi-issue backlog loop like `gii`/`gia`, a PR stack sweep, or an automated session wrap-up like `mwc`/`wrap-up`), ALWAYS include an explicit `**Stopping Point**` declaration that says whether the session is done or not.
   Explicitly say whether the session is done or not when reporting stopping point status (e.g. `**Stopping Point**: Clean stopping point reached --- session done; UMS executed; no follow-up items pending` or `**Stopping Point**: Not a clean stopping point / work remains queued: session not done; ...`).

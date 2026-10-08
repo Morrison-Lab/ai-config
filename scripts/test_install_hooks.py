@@ -404,7 +404,13 @@ with tempfile.TemporaryDirectory() as tmp:
     result = run_check(home)
     check("a script no repo hook shares a name with is not drifted",
           result.returncode == 0 and "drifted=0" in result.stdout)
-
+    elsewhere = Path(tmp) / "project" / "hooks" / REPO_HOOK.name
+    elsewhere.parent.mkdir(parents=True)
+    elsewhere.write_text("import sys" + NL, encoding="utf-8")
+    write_settings(home, settings_with(f'python3 "{elsewhere}"'))
+    result = run_check(home)
+    check("a same-named script outside the user hooks dir is not drifted",
+          result.returncode == 0 and "drifted=0" in result.stdout)
 
 print(NL + f"{passes} passed, {failures} failed")
 sys.exit(1 if failures else 0)

@@ -368,26 +368,37 @@ def check_interpreters(rows: list[dict]) -> int:
     return len(blind)
 
 
-def drifted_copies(rows: list[dict], hooks_dir: Path = REPO / "hooks") -> list[dict]:
+def drifted_copies(rows: list[dict], hooks_dir: Path = REPO / "hooks",
+                   copy_dir: Path | None = None) -> list[dict]:
     """Registered scripts that are copies of a repo hook with other content.
 
-    A copy outside this checkout that shares a hook's file name but not its
-    bytes is a stale guard still firing (ai-config#3094). A path resolving to
-    the repo's own file is not a copy, so it is never reported.
+    A copy in the user hooks directory (``<claude dir>/hooks``, where the
+    retired symlink install and manual copies put them) that shares a repo
+    hook's file name but not its bytes is a stale guard still firing
+    (ai-config#3094). Only that directory is examined: a same-named script
+    elsewhere, such as a project's own ``hooks/``, is not known to be a copy,
+    and advising a refresh would overwrite it. A path resolving to the repo's
+    own file is not a copy either.
     """
+    copy_dir = (copy_dir or claude_dir() / "hooks").resolve()
     found = []
     for row in rows:
         if row["status"] != "ok" or not row["path"]:
             continue
         registered = Path(row["path"])
+        if registered.resolve().parent != copy_dir:
+            continue
         repo_copy = hooks_dir / registered.name
         if not repo_copy.is_file():
             continue
         if registered.resolve() == repo_copy.resolve():
             continue
-        if registered.read_bytes() == repo_copy.read_bytes():
-            continue
-        found.append(dict(row, repo_copy=repo_copy))
+        try:
+            same = registered.read_bytes() == repo_copy.read_bytes()
+        except OSError as exc:
+            sys.exit(f"error: cannot compare {registered} with {repo_copy}: {exc}")
+        if not same:
+            found.append(dict(row, repo_copy=repo_copy))
     return found
 
 

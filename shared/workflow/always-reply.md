@@ -86,3 +86,20 @@ nothing, and a claim about the **work**: `Nothing to report.` and
 `No change.` are deliberately not matched, since a no-change tick is
 behaviour this file requires.
 Tracked as ai-config#1579.)
+
+**Not every `No response requested.` is a model lapse.**
+Claude Code inserts that exact string itself as a stand-in assistant turn
+when a session resumes or branches at a user interrupt.
+The transcript marks it: `"model":"<synthetic>"` and 0 output tokens.
+No Stop hook runs on that path, so `no-placeholder-reply.py` cannot block it,
+and it is not evidence the rule failed.
+The model-side duty is unchanged: the next real reply still reports what
+finished before the interrupt.
+(Measured 2026-10-08, transcript line 188 of a branched desktop session:
+`"model":"<synthetic>","stop_reason":"stop_sequence"`, `output_tokens` 0.
+The session first owned the string as its own lapse, before reading the
+transcript.)
+
+- **Do:** check the transcript's `model` field before recording a placeholder
+  reply as a recurrence of this rule.
+- **Don't:** count a `<synthetic>` stand-in as a lapse or patch the hook for it.

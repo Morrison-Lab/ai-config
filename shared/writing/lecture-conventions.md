@@ -38,6 +38,10 @@ This fragment is the agent-facing copy: follow the rules, and link to psw instea
 - **Use real data and compute every number.**
   Never type or paste output.
   See [`hypothetical-examples`](hypothetical-examples.md).
+- **Give every topic an applied example on real data and at least one figure.**
+  This holds for lectures and for the prerequisite sites (`mds`, `pds`, `sds`), not only for one deck.
+  Do not leave a page that is only definitions and algebra.
+  The wording is canonical in psw's "Show each idea applied and in a figure".
 - **Put media links beside the content they support.**
   See [`media-links-beside-content`](media-links-beside-content.md).
 - **Place each topic in the earliest course site whose readers need it.**

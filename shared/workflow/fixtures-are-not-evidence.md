@@ -787,8 +787,8 @@ which is the shape of the problem in one sentence.)
 
 Most sections above treat a masking fixture as a defect in the **test**
 (the fourth direction is the exception: there the defect is the proposed
-expected value): the
-setup supplies a second route to the observable, so the remedy is to assert
+expected value):
+the setup supplies a second route to the observable, so the remedy is to assert
 the reason, isolate the fixture, or rewrite the row and re-run the control.
 Each of those presumes the property under test is real and the row is what
 failed to pin it.

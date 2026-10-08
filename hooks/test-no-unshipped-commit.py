@@ -1398,6 +1398,122 @@ assert subject.is_pre_push_review_in_flight(rev_root, path_verdict) is False
 reason_after = subject.decide(rev_root, path_verdict)
 assert "1 commit(s) on HEAD are not on its upstream" in reason_after, reason_after
 
+# Case 3b (ai-config#3270): the verdict on HEAD is BLOCKING. The push guard
+# refuses every push until the findings are fixed, so demanding a push of the
+# reviewed commit deadlocks the turn while the fix round runs; stay quiet.
+def blocking_verdict_ts(reviewed):
+    h, p = tempfile.mkstemp()
+    with open(path_async, "r", encoding="utf-8") as src, os.fdopen(h, "w") as dst:
+        dst.write(src.read())
+        dst.write(json.dumps({
+            "type": "user",
+            "origin": {"kind": "task-notification", "task_id": "a29a955ac15b38f72"},
+            "sender": "a29a955ac15b38f72",
+            "content": f"### Verdict: Needs more work\n\nReviewed-Commit: {reviewed}\n"
+        }) + "\n")
+    return p
+
+path_blocking = blocking_verdict_ts(rev_head)
+assert subject.is_pre_push_review_in_flight(rev_root, path_blocking) is False
+assert subject.is_push_held_by_blocking_review(path_blocking, cwd=rev_root) is True
+# The guard refuses every push while the verdict is blocking, so a branch
+# whose tip the verdict did not read is held too (no deadlock there either).
+assert subject.is_push_held_by_blocking_review(path_blocking, cwd=rev_root, branch="main") is True
+assert subject.decide(rev_root, path_blocking) == ""
+# The push guard refuses on any blocking verdict, so a report with no
+# Reviewed-Commit line (or a malformed one) holds the push too.
+h_nofp, path_nofp = tempfile.mkstemp()
+with open(path_async, "r", encoding="utf-8") as src, os.fdopen(h_nofp, "w") as dst:
+    dst.write(src.read())
+    dst.write(json.dumps({
+        "type": "user",
+        "origin": {"kind": "task-notification", "task_id": "a29a955ac15b38f72"},
+        "sender": "a29a955ac15b38f72",
+        "content": "### Verdict: Needs more work\n\nNo fingerprint here.\n"
+    }) + "\n")
+assert subject.is_push_held_by_blocking_review(path_nofp, cwd=rev_root) is True
+assert subject.decide(rev_root, path_nofp) == ""
+# Control: a LATER clean verdict on HEAD releases the hold, and the ordinary
+# demand to push returns.
+h_later, path_later = tempfile.mkstemp()
+with open(path_blocking, "r", encoding="utf-8") as src, os.fdopen(h_later, "w") as dst:
+    dst.write(src.read())
+    dst.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t9", "name": "Agent", "input": {"subagent_type": "adversarial-reviewer", "prompt": "Review changes on HEAD"}}]}
+    }) + "\n")
+    dst.write(json.dumps({
+        "type": "user",
+        "message": {"content": [{"type": "tool_result", "tool_use_id": "t9", "content": f"### Verdict: Ready for merge\n\nReviewed-Commit: {rev_head}\n"}]}
+    }) + "\n")
+assert subject.is_push_held_by_blocking_review(path_later, cwd=rev_root) is False
+reason_later = subject.decide(rev_root, path_later)
+assert "1 commit(s) on HEAD are not on its upstream" in reason_later, reason_later
+# A commit made AFTER the blocking verdict moves HEAD past the reviewed
+# commit: the hook demands again, and asks for a fresh review rather than a
+# push the guard would refuse.
+mv_root, _mv_bare, mv_run = gitrepo(
+    BASE,
+    "git remote add origin BARE",
+    "git push -q -u origin main",
+    "git checkout -q -b feat-mv",
+    "git commit --allow-empty -m 'reviewed commit'",
+)
+mv_reviewed = subject._rev_parse(mv_root, "HEAD")
+mv_run("git commit --allow-empty -m 'fix commit'")
+h_mv, path_mv = tempfile.mkstemp()
+with os.fdopen(h_mv, "w") as dst:
+    dst.write(json.dumps({"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "id": "m1", "name": "Bash", "input": {"command": "git commit -m 'reviewed commit'"}}]}}) + "\n")
+    dst.write(json.dumps({"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "id": "m2", "name": "Agent", "input": {"subagent_type": "adversarial-reviewer", "prompt": "Review changes on HEAD"}}]}}) + "\n")
+    dst.write(json.dumps({"type": "user", "message": {"content": [
+        {"type": "tool_result", "tool_use_id": "m2", "content": f"### Verdict: Needs more work\n\nReviewed-Commit: {mv_reviewed}\n"}]}}) + "\n")
+    dst.write(json.dumps({"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "id": "m3", "name": "Bash", "input": {"command": "git commit -m 'fix commit'"}}]}}) + "\n")
+assert subject.is_push_held_by_blocking_review(path_mv, cwd=mv_root) is False
+reason_mv = subject.decide(mv_root, path_mv)
+assert "2 commit(s) on HEAD are not on its upstream" in reason_mv, reason_mv
+assert "re-dispatch the reviewer" in reason_mv, reason_mv
+assert "Push the branch" not in reason_mv, reason_mv
+# A blocking verdict on branch A holds branch B's unrelated unpushed commit:
+# the guard would refuse B's push too, so demanding it is the #3270 deadlock.
+ab_root, _ab_bare, ab_run = gitrepo(
+    BASE,
+    "git remote add origin BARE",
+    "git push -q -u origin main",
+    "git checkout -q -b feat-a",
+    "git commit --allow-empty -m 'reviewed on A'",
+)
+ab_reviewed = subject._rev_parse(ab_root, "HEAD")
+ab_run("git checkout -q main")
+ab_run("git checkout -q -b feat-b")
+ab_run("git commit --allow-empty -m 'unrelated on B'")
+h_ab, path_ab = tempfile.mkstemp()
+with os.fdopen(h_ab, "w") as dst:
+    dst.write(json.dumps({"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "id": "b1", "name": "Bash", "input": {"command": "git commit -m 'unrelated on B'"}}]}}) + "\n")
+    dst.write(json.dumps({"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "id": "b2", "name": "Agent", "input": {"subagent_type": "adversarial-reviewer", "prompt": "Review changes on feat-a"}}]}}) + "\n")
+    dst.write(json.dumps({"type": "user", "message": {"content": [
+        {"type": "tool_result", "tool_use_id": "b2", "content": f"### Verdict: Needs more work\n\nReviewed-Commit: {ab_reviewed}\n"}]}}) + "\n")
+assert subject.is_push_held_by_blocking_review(path_ab, cwd=ab_root) is True
+assert subject.decide(ab_root, path_ab) == ""
+# An amend after the verdict rewrites the reviewed commit rather than
+# building on it; the branch reflog still shows it was replaced, so the
+# review is owed again rather than held.
+ab_run("git checkout -q feat-a")
+ab_run("git commit -q --amend --allow-empty -m 'amended fix on A'")
+assert subject.is_push_held_by_blocking_review(path_ab, cwd=ab_root) is False
+with open(path_ab, "a", encoding="utf-8") as dst:
+    dst.write(json.dumps({"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "id": "b3", "name": "Bash", "input": {"command": "git commit --amend -m 'amended fix on A'"}}]}}) + "\n")
+reason_amend = subject.decide(ab_root, path_ab)
+assert "re-dispatch the reviewer" in reason_amend, reason_amend
+os.unlink(path_ab)
+for _p in (path_blocking, path_nofp, path_later, path_mv):
+    os.unlink(_p)
+
 # Case 4: Errored dispatch -> not in flight
 h_err, path_err = tempfile.mkstemp()
 with os.fdopen(h_err, "w") as stream:

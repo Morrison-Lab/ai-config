@@ -21,8 +21,17 @@ Decidable from the transcript, so a hook rather than a rule to remember:
 
     the command merges PR N   (`gh pr merge N`, or the MCP merge tool)
     AND NOT  some earlier Bash call ran `scripts/check-pr-fully-clean.py N`
-             whose result shows exit 0 or the "is FULLY CLEAN" line
+             whose result shows the "is FULLY CLEAN" line
              AND that call came AFTER the last `git push` in the transcript
+    AND NOT  the same command runs the instrument for N before the merge,
+             joined to it by `&&` only (a `;` or `||` join, a `git push`
+             between them, or a pipe on the instrument does not discharge)
+
+The evidence is POSITIVE only. An empty result, a backgrounded run ("Command
+running in background with ID: ...") and a result that merely lacks an error
+say nothing about the verdict, so silence is never read as success.
+
+Also recognised as a merge: `gh api -X PUT|--method PUT .../pulls/N/merge`.
 
 A push moves the head, and a clean verdict measures one head, so a run before
 the last push proves nothing about the head being merged.
@@ -56,9 +65,10 @@ LIMITS
 * A merge naming no PR number (`gh pr merge` on the current branch, or a
   branch name) cannot be tied to a number, so any post-push clean run
   discharges it.
-* A run piped into `tail`/`grep` has the pipeline's exit status; the
-  "is FULLY CLEAN" line is accepted as an alternative proof, and a
-  "NOT fully clean" line vetoes either.
+* A "NOT fully clean" line vetoes a result even beside a FULLY CLEAN line.
+* Other merge routes (GraphQL `mergePullRequest`, `glab`, `gh pr merge` via a
+  shell function or alias) are not recognised; `no-unauthorized-merge.py`
+  covers those for permission, and this hook covers only the routes above.
 
 Fails OPEN on any trouble reading the payload or transcript, printing
 nothing; a broken `shellcmd` import writes one line to STDERR. Nothing but the
@@ -67,6 +77,7 @@ warning is ever written to stdout.
 import json
 import os
 import re
+import shlex
 import sys
 
 try:
@@ -76,12 +87,13 @@ try:
     if _LIB not in sys.path:
         sys.path.insert(0, _LIB)
     from shellcmd import (simple_commands, git_subcommand, strip_env,
-                          shell_c_expansions)
+                          shell_c_expansions, _heredoc_free, _comment_free)
 except Exception as _exc:  # broken install: degrade silently, never block
     print(f"warn-merge-without-fully-clean: cannot load "
           f"scripts/lib/shellcmd.py ({_exc}); no warning will be emitted",
           file=sys.stderr)
     simple_commands = git_subcommand = strip_env = shell_c_expansions = None
+    _heredoc_free = _comment_free = None
 
 SHELL_TOOLS = frozenset({
     "Bash", "bash", "PowerShell", "run_command", "execute_command",
@@ -106,7 +118,8 @@ RX_PR_NUM = re.compile(r"^\d+$")
 RX_PR_URL = re.compile(r"/pull/(\d+)(?:[/?#].*)?$")
 RX_CLEAN_LINE = re.compile(r"\bis FULLY CLEAN\b")
 RX_NOT_CLEAN = re.compile(r"NOT fully clean", re.IGNORECASE)
-RX_EXIT_NONZERO = re.compile(r"^Exit code [1-9]", re.MULTILINE)
+RX_API_MERGE = re.compile(r"(?:^|/)repos/([^/]+/[^/]+)/pulls/(\d+)/merge$")
+SHELL_OPS = frozenset("();|&")
 
 NOTE = (
     "About to merge {target}, but this session has no passing "
@@ -166,10 +179,37 @@ def _gh_merge(rest):
     i = 1
     while i < len(rest) and rest[i].startswith("-"):  # global flags
         i += 2 if rest[i] in GH_VALUE_FLAGS else 1
+    if rest[i:i + 1] == ["api"]:
+        return _gh_api_merge(rest[i + 1:])
     if rest[i:i + 2] != ["pr", "merge"]:
         return None
     args = rest[i + 2:]
     return _pr_number(args), _flag_value(args, ("-R", "--repo"))
+
+
+def _is_put(args):
+    """True when *args* carry an explicit PUT method (`-X PUT`, `-XPUT`, ...)."""
+    for i, tok in enumerate(args):
+        if tok in ("-X", "--method") and i + 1 < len(args):
+            if args[i + 1].upper() == "PUT":
+                return True
+        elif tok.startswith("--method="):
+            if tok[9:].upper() == "PUT":
+                return True
+        elif tok.startswith("-X") and tok[2:].upper() == "PUT":
+            return True
+    return False
+
+
+def _gh_api_merge(args):
+    """(number, repo) for `gh api -X PUT repos/<o>/<r>/pulls/<N>/merge`."""
+    if not _is_put(args):
+        return None
+    for tok in args:
+        m = RX_API_MERGE.search(tok)
+        if m:
+            return int(m.group(2)), m.group(1)
+    return None
 
 
 def _instrument_run(rest):
@@ -239,13 +279,14 @@ def _result_text(block):
 
 
 def _passed(block):
-    """True when a tool_result shows the instrument exited 0 / FULLY CLEAN."""
+    """True only on POSITIVE evidence: the "is FULLY CLEAN" line.
+
+    Silence is never success. An empty result, a backgrounded run ("Command
+    running in background with ID: ...") and a result that merely lacks an
+    error all say nothing about the verdict, so none of them passes.
+    """
     text = _result_text(block)
-    if RX_NOT_CLEAN.search(text):
-        return False
-    if RX_CLEAN_LINE.search(text):
-        return True
-    return not block.get("is_error") and not RX_EXIT_NONZERO.search(text)
+    return bool(RX_CLEAN_LINE.search(text)) and not RX_NOT_CLEAN.search(text)
 
 
 def scan(path):
@@ -285,6 +326,70 @@ def _covers(run, num, repo):
     return True
 
 
+def _segments(line):
+    """[(operator_before, argv)] for each simple command in *line*, or None.
+
+    Unlike `simple_commands`, keeps the operator token that joined each
+    command to its predecessor (`&&`, `;`, `||`, `|`, `)&&(`, ...), because
+    only an exact `&&` makes the earlier command a precondition of the later.
+    """
+    if _heredoc_free is None:
+        return None
+    text = _heredoc_free(line)
+    text = re.sub(r"\\\r?\n", " ", text)
+    text = _comment_free(text).replace("\n", ";")
+    try:
+        lex = shlex.shlex(text, posix=True, punctuation_chars=True)
+        lex.whitespace_split = True
+        toks = list(lex)
+    except ValueError:
+        return None
+    segs, cur, op = [], [], None
+    for tok in toks:
+        if tok and set(tok) <= SHELL_OPS:
+            if cur:
+                segs.append((op, strip_env(cur)[1]))
+                cur = []
+            op = tok
+        else:
+            cur.append(tok)
+    if cur:
+        segs.append((op, strip_env(cur)[1]))
+    return segs
+
+
+def _chain_discharged(segs, j, num, repo):
+    """True when an `&&` chain of commands before segment *j* ran the
+    instrument for the same PR, with no `git push` between it and the merge."""
+    k = j
+    while k > 0 and segs[k][0] == "&&":
+        k -= 1
+        rest = segs[k][1]
+        parsed = git_subcommand(rest) if rest else None
+        if parsed and parsed[0] == "push":
+            return False
+        run = _instrument_run(rest)
+        if run is not None and _covers((0, run[0], run[1]), num, repo):
+            return True
+    return False
+
+
+def _bash_merge_targets(command):
+    """Undischarged [(number|None, repo|None)] merges in a shell command."""
+    targets = []
+    for line in shell_c_expansions(command):
+        segs = _segments(line)
+        if segs is None:  # unparseable: fall back to the flat split
+            targets.extend(h for argv in simple_commands(line) or []
+                           for h in [_gh_merge(strip_env(argv)[1])] if h)
+            continue
+        for j, (_op, rest) in enumerate(segs):
+            hit = _gh_merge(rest)
+            if hit and not _chain_discharged(segs, j, *hit):
+                targets.append(hit)
+    return targets
+
+
 def _merge_targets(tool, tool_input):
     """[(number|None, repo|None)] for every merge this call performs."""
     if tool == MCP_MERGE_TOOL:
@@ -299,7 +404,7 @@ def _merge_targets(tool, tool_input):
                or tool_input.get("cmd") or tool_input.get("script"))
     if not isinstance(command, str) or not command.strip():
         return []
-    return list(_walk(command, _gh_merge))
+    return _bash_merge_targets(command)
 
 
 def main() -> int:

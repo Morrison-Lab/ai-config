@@ -129,8 +129,60 @@ def main():
 
     # --- negative: silent ------------------------------------------------
     check("silent after a clean run (FULLY CLEAN line)", not run(MERGE, [clean()])[0])
-    check("silent after a run with plain exit 0 and no marker line",
-          not run(MERGE, [clean(out="done")])[0])
+    check("a NOT-fully-clean line vetoes even beside a FULLY CLEAN line",
+          run(MERGE, [clean(out=CLEAN_OUT + chr(10) + "NOT fully clean")])[0])
+    check("warns after a result with no FULLY CLEAN line, however quiet",
+          run(MERGE, [clean(out="done")])[0])
+    check("warns after a run with EMPTY output",
+          run(MERGE, [clean(out="")])[0])
+    check("warns after a BACKGROUNDED run (no verdict yet)",
+          run(MERGE, [clean(out="Command running in background with ID: bx1")])[0])
+    check("silent when a backgrounded run was later followed by a clean one",
+          not run(MERGE, [clean(out="Command running in background with ID: bx1"),
+                          clean()])[0])
+
+    # --- same-command `&&` chain (item 1) ---------------------------------
+    INSTR = "python3 scripts/check-pr-fully-clean.py 12 -R Morrison-Lab/ai-config"
+    check("silent: instrument && merge in ONE command",
+          not run(INSTR + " && " + MERGE, [])[0])
+    check("silent: instrument && other && merge",
+          not run(INSTR + " && echo ok && " + MERGE, [])[0])
+    check("warns: instrument ; merge (a `;` join does not discharge)",
+          run(INSTR + " ; " + MERGE, [])[0])
+    check("warns: instrument || merge (a `||` join does not discharge)",
+          run(INSTR + " || " + MERGE, [])[0])
+    check("warns: instrument && X ; merge (chain broken by `;`)",
+          run(INSTR + " && echo ok ; " + MERGE, [])[0])
+    check("warns: merge && instrument (instrument AFTER the merge)",
+          run(MERGE + " && " + INSTR, [])[0])
+    check("warns: chained instrument for a DIFFERENT PR",
+          run("python3 scripts/check-pr-fully-clean.py 99 -R Morrison-Lab/ai-config"
+              " && " + MERGE, [])[0])
+    check("warns: chained instrument for a DIFFERENT repo",
+          run("python3 scripts/check-pr-fully-clean.py 12 -R other/repo && " + MERGE,
+              [])[0])
+    check("warns: a git push between the chained instrument and the merge",
+          run(INSTR + " && git push origin b && " + MERGE, [])[0])
+    check("warns: instrument piped to tail then merge (pipe masks status)",
+          run(INSTR + " | tail -3 && " + MERGE, [])[0])
+    check("warns: only a quoted/echoed instrument precedes the merge",
+          run("echo '" + INSTR + "' && " + MERGE, [])[0])
+
+    # --- gh api merge (item 3) ---------------------------------------------
+    API = "gh api -X PUT repos/Morrison-Lab/ai-config/pulls/12/merge"
+    check("warns on gh api -X PUT .../pulls/N/merge", run(API, [])[0])
+    check("warns on gh api --method PUT .../merge",
+          run("gh api --method PUT repos/Morrison-Lab/ai-config/pulls/12/merge", [])[0])
+    check("warns on gh api -XPUT /repos/.../merge",
+          run("gh api -XPUT /repos/Morrison-Lab/ai-config/pulls/12/merge", [])[0])
+    check("silent on gh api GET .../pulls/N/merge (a read)",
+          not run("gh api repos/Morrison-Lab/ai-config/pulls/12/merge", [])[0])
+    check("silent on gh api PUT to a non-merge endpoint",
+          not run("gh api -X PUT repos/Morrison-Lab/ai-config/pulls/12/labels", [])[0])
+    check("silent on gh api merge after a clean run for that PR",
+          not run(API, [clean()])[0])
+    check("warns on gh api merge after a clean run for ANOTHER PR",
+          run(API, [clean(n=99)])[0])
     check("silent when the clean run came AFTER the last push",
           not run(MERGE, [PUSH, clean()])[0])
     check("silent when both the run and the merge omit -R",

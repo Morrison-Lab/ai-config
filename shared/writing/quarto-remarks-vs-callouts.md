@@ -13,7 +13,9 @@ this file decides between two of the boxes.
 ## Which one
 
 - **Remark** (`::: {.remark .notes}` for commentary kept off the slides,
-  `::: remark` for commentary shown on them):
+  `::: remark` for commentary shown on them;
+  a long paragraph gets a short `::: remark` and its detail in a `::: notes` div after it,
+  per [`lecture-conventions`](lecture-conventions.md)):
   commentary on the mathematical content,
   attached to the definition, result or example just before it.
   Typical content:

@@ -630,6 +630,22 @@ attributing it additionally to an environment gap would have been a second cause
 - **Don't:** count an instrument as used because it exists and was named;
   the question is whether its output was trusted enough to act on.
 
+Ninth, 2026-10-08, on [ai-config#4398](https://github.com/Morrison-Lab/ai-config/pull/4398), and the population narrowed this time was **the workflow file's jobs**.
+The pre-push pass ran every `run: python3 ...` step of `validate.yml`'s `validate` job, a list that really was complete for that job.
+The PR went red on `new-line-breaks`, a sibling job in the same file whose only check step is `uses: Morrison-Lab/gha/check-new-line-breaks@...`, so a scan for `run:` lines cannot reach it.
+`run-local-validation.py` already covers that job: it maps the `uses:` step to the vendored copy, `scripts/vendor/gha-check-new-line-breaks.py`, and runs it with the job's own `with:` inputs.
+When only that one check is wanted, the direct form is below.
+The script computes the merge base with `NLB_BASE_REF` itself, and its scope defaults to `auto`, which includes uncommitted edits to tracked files.
+
+```bash
+NLB_BASE_REF=origin/main NLB_PATHS_IGNORE='codex-skills/**,docs/**,_site/**,.quarto/**' \
+  python3 scripts/vendor/gha-check-new-line-breaks.py
+```
+
+- **Do:** derive the pre-push checks from the whole workflow file, `uses:` jobs included, by running `run-local-validation.py`.
+- **Don't:** treat "every `run:` step of `validate.yml`" as the complete set;
+  a job whose check step is a `uses:` of a composite action has no `run:` line to find.
+
 ## In review
 
 Flag a brief, a plan, or a skill step that hands an agent a hard-coded list of PR or issue numbers to work through, where the tracker could gain another before the work finishes.

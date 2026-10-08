@@ -15,6 +15,17 @@ Give the direct link (a URL, or a clickable path for a file) in the reply that m
 - **Do:** link every comment, review, issue, PR, MR, run, published page, or file I mention having posted, created, or acted on, wherever the mention occurs --- table or prose.
 - **Don't:** report "I replied to that", "posted the referee report on the MR", or "filed the issue" as a bare fact with no link attached.
 
+**Resolve whether a bare number is a PR or an issue before linking it.**
+GitHub numbers PRs and issues from one sequence, and the path segment names the type: `/pull/N` for a PR, `/issues/N` for an issue.
+One query answers it.
+`GET /repos/{owner}/{repo}/issues/{n}` returns a `pull_request` key only for a PR.
+The MCP `issue_read` tool (method `get`) returns an `html_url` that already carries the right path, for a PR number too.
+
+- **Do:** look the number up and link it with the path the forge returns.
+- **Don't:** default every unresolved number to `/issues/N` because checking looked costly.
+  A batch of links made that way labels each PR as an issue
+  ([ai-config#4401](https://github.com/Morrison-Lab/ai-config/pull/4401), 2026-10-08).
+
 See [`hyperlink-liberally`](hyperlink-liberally.md) for the general principle covering tools, internal rules, and technical terms.
 
 (Directive from the user, 2026-09-09: telling them a reply had been posted without linking it made them go find it themselves.)

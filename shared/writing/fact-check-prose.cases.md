@@ -78,6 +78,29 @@ superlative in a script comment, false on measurement, in an issue whose own
 note records that it was "Corrected 2026-08-03, twice, after filing ... both
 the same errors it reports".)
 
+A paraphrase of a cited issue is the same condensation, and the citation
+makes it look checked.
+On [ai-config#4401](https://github.com/Morrison-Lab/ai-config/pull/4401)
+(2026-10-08), the session restated
+[ai-config#3048](https://github.com/Morrison-Lab/ai-config/issues/3048)'s
+evidence, "`fbfcde70` reviewed at 16:47, after `8805e772` existed", as a
+review "submitted after a later push", and cited the issue for it.
+The issue's evidence states only that the later commit existed when the
+review was submitted.
+The stronger wording matches the issue's general sentence one line earlier,
+that a review "can be submitted after a later push", which is the likely
+source; the issue never asserts it of the `#3010` instance.
+The adversarial self-review checked the sentence against
+[PR #3010](https://github.com/Morrison-Lab/ai-config/pull/3010)'s review
+timeline, and it did not hold there.
+
+- **Do:** when citing an issue for a specific fact, re-read the sentence that
+  states that fact, and quote or paraphrase that sentence rather than a
+  neighbouring general one.
+- **Don't:** merge an issue's general claim into its evidence sentence and
+  cite the issue for the result; the issue supports each sentence separately,
+  not the blend.
+
 ## An edit made for precision can assert what the loose version never did
 
 (`UCD-SERG/serocalculator`

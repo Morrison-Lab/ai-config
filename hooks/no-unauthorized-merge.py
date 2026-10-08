@@ -203,6 +203,17 @@ DOT_SOURCE_AT_CMD_POS = re.compile(
 HEREDOC_EXECUTOR = re.compile(
     "(?:" + EXEC_AT_CMD_POS.pattern + ")|(?:" + DOT_SOURCE_AT_CMD_POS.pattern + ")"
 )
+# An executor whose STDIN is the command's own output: the right side of a
+# pipe (`| bash`, `|& sh -s`) or an output process substitution
+# (`> >(bash)`). What that executor reads is a script, so quoted text upstream
+# of it is live (ai-config#3639). `xargs` is added here only: it builds and runs
+# commands from stdin, but it does not run a quoted operand, so it stays out of
+# EXEC_PROGS's other consumers. Over-matching costs a scan of quoted text in a
+# command that pipes into a shell, which is the cheap direction.
+STDIN_EXECUTOR = re.compile(
+    r"(?:\|&?|>\()\s*" + ENV_WRAP + r"(?:sudo\s+)?(?:[/\w.-]+/)?"
+    r"(?:(?:" + EXEC_PROGS + r"|xargs)\b|(?:source|\.)(?=[ \t]))"
+)
 
 
 def executes_its_input_ends(text: str) -> list:
@@ -2101,6 +2112,18 @@ def offending(command: str, payload: dict | None = None):
     #    enumeration two review rounds showed cannot be finished -- and instead
     #    removes the text that cannot execute. See PERMISSIVE_LEAD.
     inert_command = mask_inert_quotes(masked_command, unquoted_command)
+    # Text piped into a shell is a script, wherever its quotes sit: SPLIT puts
+    # `echo "gh pr merge N"` and `| bash` in different segments, so the quote
+    # has no executor before it in its own segment and pass 2 masks it as
+    # prose (ai-config#3639). When anything in the command feeds stdin to an
+    # executor, pass 2 reads the quote-UNmasked text instead, with each quote
+    # character blanked (length-preserving) so the command word inside a
+    # quoted span sits at a command position. The grant and label checks below
+    # read the same view, so they see the merge pass 2 found. Detection reads
+    # the quote-masked text, so a pipe-to-shell merely quoted in a body does
+    # not trigger it.
+    if STDIN_EXECUTOR.search(inert_command):
+        inert_command = re.sub(r"[\"']", " ", masked_command)
 
     for start, end in zip(starts, ends):
         orig_seg = unquoted_command[start:end]

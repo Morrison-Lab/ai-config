@@ -532,6 +532,17 @@ BLOCK = [
     # finding 6).
     ('bash <<EOF\n`\nEOF\n< <(echo "gh pr merge 411") bash',
      "trailing executor, a lone backtick in an executing heredoc pops the closer"),
+    # Text piped into a shell is a script. SPLIT puts the quoted merge and
+    # the `| bash` in different segments, so pass 2 masked the quote as prose
+    # and every row here executed under bash with no grant (ai-config#3639).
+    ('echo "gh pr merge 411" | bash', "quoted merge piped into bash"),
+    ("printf '%s' 'gh pr merge 411' | bash", "single-quoted merge piped into bash"),
+    ('echo "gh pr merge 411" | sh -s', "quoted merge piped into sh -s"),
+    ('echo "gh pr merge 411" |& zsh', "quoted merge piped into zsh with |&"),
+    ('echo "gh pr merge 411" > >(bash)', "quoted merge written to a bash process substitution"),
+    ('cat <(echo "gh pr merge 411") | bash', "process substitution output piped into bash"),
+    ('echo "gh pr merge 411" | xargs -I{} bash -c {}', "quoted merge run by xargs"),
+    ('echo "gh pr merge 411" | source /dev/stdin', "quoted merge sourced from stdin"),
 ]
 
 ALLOW = [
@@ -542,6 +553,12 @@ ALLOW = [
     ('bash -c "true"; echo "you can gh pr merge later"', "prose after a separator, following an executor"),
     ('bash -c "true" && git commit -m "why gh pr merge is blocked"', "a commit message after an executor"),
     ('eval "true" | grep "gh pr merge"', "a grep pattern after an executor and a pipe"),
+    # ai-config#3639's controls: quoted merge text piped into something that
+    # does not run it, and a pipe-to-shell that is itself only quoted prose.
+    ('echo "gh pr merge 411" | grep merge', "quoted merge piped into grep"),
+    ('echo "gh pr merge 411" | tee notes.txt', "quoted merge piped into tee"),
+    ('gh pr comment 1 --body "echo gh pr merge 411 | bash is blocked"',
+     "a pipe-to-shell quoted inside a comment body"),
     # A word ENDING in an executor's name is not that executor.
     ('rebash -c "gh pr merge 411"', "an executor name as a word suffix is not a command position"),
     # The keyword prefix above must not become bare whitespace by another name:

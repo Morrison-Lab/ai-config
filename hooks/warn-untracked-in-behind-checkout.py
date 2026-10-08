@@ -20,10 +20,14 @@ the count and the check that settles it: `git fetch`, then
 `git ls-tree -r --name-only origin/<branch> -- <paths>` or
 `git cat-file -e origin/<branch>:<path>`.
 
-Also reads `--porcelain=v2 -b` (`# branch.ab +0 -N`, `? path`). Limits: a backslash-escaped
-quote inside a quoted `git -C` value is not recognised, so that command is
-skipped silently; the behind count comes from the local remote-tracking ref, so a checkout that
-has not fetched recently reports up to date and stays silent.
+Also reads `--porcelain=v2 -b` (`# branch.ab +0 -N`, `? path`).
+
+Limits:
+- A backslash-escaped quote inside a quoted `git -C` value is not recognised,
+  so that command is skipped silently.
+- The behind count comes from the local remote-tracking ref,
+  so a checkout that has not fetched recently reports up to date
+  and stays silent.
 
 WARNS, never blocks: PostToolUse runs after the command, and the files may
 well be new. It only ever adds `additionalContext`. Fails OPEN (exit 0, no

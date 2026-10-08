@@ -102,6 +102,10 @@ def stash_dir() -> Path:
 # Values must be keys of HANDLERS; main() dispatches through HANDLERS.
 EVENT_MAPPING: dict[str, list[str]] = {
     "PreToolUse": ["preToolUse"],
+    # Not bridged yet: Claude PostToolUse scripts read tool_response.stdout,
+    # and Cursor's postToolUse payload has no translated equivalent. See
+    # docs/cursor-hook-mapping.md.
+    "PostToolUse": [],
     "SessionStart": ["sessionStart"],
     "Stop": ["stop"],
     "UserPromptSubmit": ["sessionStart", "postToolUse"],

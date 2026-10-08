@@ -453,6 +453,10 @@ The v2.1 hook schema supports 27 distinct lifecycle events:
   `PreToolUse` (match query: `tool_name`),
   `PostToolUse` (`tool_name`),
   `PostToolUseFailure` (`tool_name`).
+  A `PostToolUse` stdin payload carries `tool_name`, `tool_input` (a Bash call's `command`) and `tool_response` (a Bash call's `stdout` and `stderr`);
+  it adds context with `{"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": ...}}`.
+  `hooks/warn-untracked-in-behind-checkout.py` is the repo's first reader of `tool_response` (ai-config#4360);
+  per Claude Code's hooks documentation, not yet confirmed against a live transcript here, so treat a silent hook as a prompt to print the raw payload.
 - **Prompt & turn lifecycle:**
   `UserPromptSubmit`,
   `Stop`,

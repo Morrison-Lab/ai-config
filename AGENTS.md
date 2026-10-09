@@ -241,12 +241,7 @@ See [`upgrade-to-gha`](shared/workflow/upgrade-to-gha.md).
 
 Treat token cost as a property of a workflow's **shape**: route bounded mechanical work to cheaper models, subagents, or separately-billed CLIs.
 See [`restructure-for-efficiency`](shared/workflow/restructure-for-efficiency.md) and [`merge-queue`](shared/workflow/merge-queue.md).
-
-When Claude quota is low, route bulk, mechanical, and review work to OpenCode Go first.
-Claude orchestrates and verifies what comes back.
-In a cloud session no key is needed, because the proxy injects auth for `opencode.ai`.
-Use the Go endpoint, with the recipe in [`delegate-to-opencode`](skills/delegate-to-opencode/SKILL.md)'s "Cloud sessions" section.
-Never send student data (FERPA records) to any LLM, and never use Codex.
+When Claude quota is low, send bulk, mechanical, and review work to OpenCode Go first (`delegate-to-opencode`, "Cloud sessions"); Claude orchestrates and verifies.
 
 ## Keep ai-config and repo checkouts fresh
 
@@ -280,8 +275,8 @@ When adding an enforcement hook under `hooks/`, author deterministic Python with
 ## Context budget
 
 Keep always-loaded instruction files (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`) compact and budgeted.
-`AGENTS.md` is gated at 32 KiB (32,768 bytes) to fit within OpenAI Codex's `project_doc_max_bytes` default without truncation.
-The closure's total against the Claude Code CLI's instruction limit, the root file's character cap, a per-fragment cap, and a near-cap growth ratchet on the root file all gate CI (`scripts/check-context-closure.py`).
+`AGENTS.md` is gated at 32 KiB (32,768 bytes) to fit Codex's `project_doc_max_bytes` default.
+Other closure limits also gate CI (`scripts/check-context-closure.py`).
 
 ## Worktree isolation
 

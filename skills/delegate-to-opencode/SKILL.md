@@ -181,7 +181,8 @@ curl -s https://opencode.ai/zen/go/v1/chat/completions \
 
 Reuse one UUID across the turns of a conversation.
 Prefer Go models for bulk and mechanical work while Claude quota is low.
-The data rules above still apply: no student data to any hosted model.
+The data rules above still apply: no student data (FERPA records) to any hosted model.
+Never use Codex for this routing.
 
 ## Where opencode sits in the budget ladder
 

@@ -302,7 +302,10 @@ A semantic macro is named for what a symbol means, not for the letter it prints.
 `\vdelta`, `\vbeta`, `\hb`, `\bfbeta`, `\vth`, `\eps` and `\lam` only spell a Greek letter, so they are no more semantic than the raw `\delta`.
 Outside a passage that discusses the notation itself (a symbol table, a note on which letter a field uses), write no Greek letter in a math expression, either raw or inside a letter-named macro.
 Use the macro that names the concept (`\vcoef`, `\regcoef`, `\mean`, `\lincomp`, `\odds`, `\rate`, `\haz`, `\sigmoid`), and when none exists, add one named for the concept to `Morrison-Lab/macros` first (step 6).
-For example, write the backpropagation error as `\backerr^{(\ell)}`, not `\vdelta^{(\ell)}`, and the step size as `\learnrate`, not `\eta`, once those two are added to `Morrison-Lab/macros` (step 6).
+For example, write the backpropagation error as `\backerr^{(\ell)}`, not `\vdelta^{(\ell)}`, and the step size as `\learnrate`, not `\eta`.
+[`Morrison-Lab/macros#113`](https://github.com/Morrison-Lab/macros/pull/113) added a concept macro for each meaning the course sites use
+(`\sdpar`, `\varpar`, `\noise`, `\regpar`, `\param`, `\slack`, `\siglevel` and the rest; `interpretations.tsv` lists them all), so search it before adding one.
+A new name must not clash with a TeX primitive or a package command: `\penalty` (a primitive) broke every PDF, and `siunitx` defines `\ang`.
 One letter often means different things on different pages (`\sigma` for a standard deviation and for the sigmoid;
 `\lambda` for a rate, a penalty and an eigenvalue), so choose the macro from each use's meaning, not from the letter.
 (Directive from the user, 2026-10-08: "except when we're discussing notation directly, I don't want any hardcoded greek letters in latex expression, even in compounds like \vdelta;

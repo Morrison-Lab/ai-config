@@ -67,8 +67,8 @@ more specific.
 
 Also follow the [UCD-SERG Lab Manual](https://ucd-serg.github.io/lab-manual/)
 (source: <https://github.com/UCD-SERG/lab-manual>) and, for prose,
-[*Principles of Scientific Writing*](https://d-morrison.github.io/psw/)
-(source: <https://github.com/d-morrison/psw>).
+[*Principles of Scientific Writing*](https://morrison-lab.github.io/psw/)
+(source: <https://github.com/Morrison-Lab/psw>).
 {END}
 """
 

@@ -1124,5 +1124,5 @@ The push guard still refuses the unreviewed tip until a new verdict lands.
 Each wrong scope looked plausible to a same-model reviewer, and only a trace against the guard's own refusal condition (`verify_review`) decided it.
 
 - **Do:** read the refusal condition of the guard a hook defers to, and copy its scope into the hold.
-- **Do:** carve out only the cases where the session has an action available.
+- **Do:** where the session has an action available, change only the message to name that action, and keep the hold.
 - **Don't:** scope a hold by intuition, such as "only the reviewed branch", without checking what the guard refuses.

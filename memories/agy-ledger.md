@@ -51,7 +51,8 @@ Every `agy --print` review round produced new `[NIT]` items, some repeating item
 `scripts/check-pr-fully-clean.py` reads any item under a `### Findings` heading as open.
 A reply that answers the item does not supersede the review;
 only a later review does.
-So each round otherwise costs a push and a paid Claude review, and on #4427 two rounds of that did not converge.
+So each round otherwise costs a push and a paid Claude review.
+On #4427 two such rounds each ended with a fresh `agy` nit list.
 
 What converged on both PRs was one more `agy` run, with the answered items listed in the brief as context and an instruction to report only new findings.
 On #4427 that run was on the same head, with no push.
@@ -67,6 +68,7 @@ The safeguard is a second reviewer: a `None` from a run with a skip list counts 
 - **Do:** trust that run's `None` only when an independent reviewer has returned a clean verdict on the same head.
 - **Do:** when a push is owed anyway, such as a base sync, fold the nit fixes into it so they cost no extra review cycle.
   When none is owed, make one push carrying every accepted nit fix, after the usual pre-push self-review, then one `agy` run on the pushed head.
+  Wait for the Claude review that the push triggers too, since that is the independent verdict.
 - **Don't:** push once per `agy` round to clear its newest nit list.
 - **Don't:** write "Blocking findings: None" in a review.
   The scorer reads it as not-clean (#4428).

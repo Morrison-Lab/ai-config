@@ -47,6 +47,10 @@ This fragment is the agent-facing copy: follow the rules, and link to psw instea
   Place the example directly after the div it illustrates.
   A related theorem or corollary does not exempt the definition: the definition still gets its own example, and so does the theorem.
   The rule holds in every repository, including `mds`, `pds`, `sds`, `lds` and `rme`.
+- **Keep only the definition in a `#def-` div.**
+  Put the properties of the defined object in a separate `#thm-`, `#lem-` or `#prp-` div after it, with a proof where one is known (Ezra, 2026-10-09).
+  The rule holds in every repository, including `mds`, `pds`, `sds`, `lds` and `rme`.
+  The wording is canonical in psw's "Writing for teaching" chapter.
 - **Present R results with modern packages, even for a base R fit.**
   A model fit with `lm()` or `glm()` shows its coefficients through `parameters::parameters() |> print_md()` or `gtsummary::tbl_regression()`, never a `summary()` or `coef(summary())` printout (Ezra, 2026-10-09).
   Figures use ggplot2, with sjPlot or ggeffects for prediction plots and `performance::check_model()` for diagnostics, never base graphics (`plot()`, `lines()`, `abline()`).

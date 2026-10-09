@@ -351,13 +351,18 @@ The lint and the hook flag each of them, and a rewrite uses the macro that names
 
 - **Manual sizing** (`\big`, `\Big`, `\bigg`, `\Bigg`, with `l`, `r` or `m`): write `\paren{...}`, `\sb{...}`, `\cb{...}`, `\abs{...}` or `\norm{...}`, which size themselves, and `\evalAt{expression}{point}` for an evaluation bar.
   Big operators such as `\bigcup` are not sizing and are not flagged.
+- **Manual `\left` and `\right`**: write `\paren{...}` for parentheses, `\sb{...}` for square brackets, `\set{...}` for braces and `\abs{...}` for bars, instead of `\left( ... \right)` and its relatives.
+  Arrows such as `\leftarrow` are not flagged.
+  A one-sided delimiter (`\left. ... \right|`) has no macro yet.
+  Add one named for the concept when it is needed.
 - **A raw transpose** (`^\top`, `^{\top}`): write `\tp{X}`, or `\pt{...}` for a parenthesized expression.
   Write the product of two vectors as `\dprod{a}{b}` and a matrix with itself as `\stprod{X}`;
   a matrix times a different factor stays `\tp{X}` followed by that factor, because it is not a dot product.
 - **A font command used as a symbol** (`\mathbb`, `\mathcal`, `\mathscr`, `\mathfrak`): search `macros.qmd` for the concept (`\reals`, `\Nat`, `\Lik`, `\Ep`) and add one named for the concept when none exists.
   The same letter means different things on different pages, so choose from the meaning.
 
-(Directive from the user, 2026-10-09: all `\mathbb`, `\mathscr`, `\mathcal` and similar, manual sizing such as `\big`, and `\top` should be checked and replaced with semantic macros.)
+(Directive from the user, 2026-10-09: all `\mathbb`, `\mathscr`, `\mathcal` and similar, manual sizing such as `\big`, and `\top` should be checked and replaced with semantic macros.
+Also 2026-10-09: "there's still manual \left and \right" in the lds notes.)
 
 ### Latin letters with a fixed role: `\outvar`, `\predvar`, `\resid`
 

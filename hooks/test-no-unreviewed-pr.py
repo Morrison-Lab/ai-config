@@ -2725,6 +2725,25 @@ def _test_push_alias(hookmod):
         else:
             failures += 1
             print("FAIL: an alias read past the budget did not arm")
+        # A git config that cannot even be spawned arms too, uncached.
+        hookmod._alias_cache.clear()
+        hookmod._alias_deadline = None
+        real_run = hookmod.subprocess.run
+
+        def spawn_fails(*args, **kwargs):
+            raise OSError(11, "Resource temporarily unavailable")
+        hookmod.subprocess.run = spawn_fails
+        try:
+            got = hookmod.push_ident("git p origin main")
+        finally:
+            hookmod.subprocess.run = real_run
+        if got is True and not hookmod._alias_cache:
+            passes += 1
+            print("PASS: an alias read that cannot spawn git arms")
+        else:
+            failures += 1
+            print(f"FAIL: an unspawnable alias read gave {got}, "
+                  f"cache {hookmod._alias_cache!r}")
     finally:
         hookmod._alias_cache.clear()
         hookmod._alias_deadline = None

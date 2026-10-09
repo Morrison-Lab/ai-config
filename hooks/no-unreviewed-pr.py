@@ -1114,8 +1114,10 @@ def _read_alias(env, prefix, word):
         )
     except subprocess.TimeoutExpired as exc:
         raise TimeoutError("alias read timed out") from exc
-    except OSError:
-        value = None  # no git: no alias, and no push either
+    except OSError as exc:
+        # The push already ran, so git existed; a spawn failure here (EAGAIN,
+        # EMFILE) is an alias that could not be read, not an unset one.
+        raise LookupError("git config could not run") from exc
     else:
         if proc.returncode not in (0, 1):
             # 1 is git's "key not set"; anything else (128 for a corrupt

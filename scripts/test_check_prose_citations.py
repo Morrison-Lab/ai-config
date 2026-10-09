@@ -158,6 +158,21 @@ check("fenced lines are skipped", kinds(d) == [] and d["examined_lines"] == 0)
 d = run("Cite `guard.py:3`.\n")
 check("unresolvable relative path is reported", kinds(d) == ["path-line"])
 
+# A `../` citation never reads outside the repository.
+with tempfile.TemporaryDirectory() as tmp:
+    outside = Path(tmp)
+    (outside / "secret.txt").write_text("x\n" * 50, encoding="utf-8")
+    (outside / "repo").mkdir()
+    check("a citation escaping the repository does not resolve",
+          cpc.resolve(outside / "repo", "doc.md", "../secret.txt") is None)
+    (outside / "repo" / "in.txt").write_text("x\n", encoding="utf-8")
+    check("a citation inside the repository resolves",
+          cpc.resolve(outside / "repo", "doc.md", "in.txt") is not None)
+
+# The file count names only files actually examined.
+d = run("See `hooks/guard.py:2` here.\n")
+check("file count is the examined files", d["files"] == 1)
+
 # quote-in-issue, with the network call replaced by a canned body.
 import os  # noqa: E402
 

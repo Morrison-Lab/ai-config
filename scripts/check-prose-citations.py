@@ -123,6 +123,10 @@ def added_lines(root: Path, base: str) -> dict[str, list[tuple[int, str]]]:
 
 def resolve(root: Path, citing: str, cited: str) -> Path | None:
     for candidate in (root / cited, (root / citing).parent / cited):
+        # Never read outside the repository: a `../` citation would otherwise
+        # report facts about files the PR does not own into the CI log.
+        if not candidate.resolve().is_relative_to(root.resolve()):
+            continue
         if candidate.is_file():
             return candidate
     return None
@@ -226,6 +230,7 @@ def main(argv: list[str] | None = None) -> int:
 
     results = []
     examined = 0
+    files_examined = 0
     cache: dict[str, str | None] = {}
     for path, lines in sorted(added.items()):
         full = root / path
@@ -233,6 +238,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"::warning::check-prose-citations: {path} is in the diff "
                   f"but not readable at HEAD, so it was not examined")
             continue
+        files_examined += 1
         fenced, _, _ = find_fence_spans(full.read_text(encoding="utf-8", errors="replace"))
         for lineno, text in lines:
             if lineno - 1 in fenced:
@@ -245,13 +251,13 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.json:
         print(json.dumps({"examined_lines": examined,
-                          "files": len(added), "findings": results}, indent=2))
+                          "files": files_examined, "findings": results}, indent=2))
         return 0
     for r in results:
         print(f"::warning file={r['file']},line={r['line']}::"
               f"[{r['kind']}] {r['detail']}")
     print(f"check-prose-citations: examined {examined} added line(s) in "
-          f"{len(added)} file(s) against {args.base}; {len(results)} "
+          f"{files_examined} file(s) against {args.base}; {len(results)} "
           f"finding(s) (advisory){'' if args.issues else '; #N quotes not checked (--issues)'}")
     return 0
 

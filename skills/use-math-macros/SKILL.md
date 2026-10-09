@@ -351,10 +351,11 @@ The lint and the hook flag each of them, and a rewrite uses the macro that names
 
 - **Manual sizing** (`\big`, `\Big`, `\bigg`, `\Bigg`, with `l`, `r` or `m`): write `\paren{...}`, `\sb{...}`, `\cb{...}`, `\abs{...}` or `\norm{...}`, which size themselves, and `\evalAt{expression}{point}` for an evaluation bar.
   Big operators such as `\bigcup` are not sizing and are not flagged.
-- **Manual `\left` and `\right`**: write `\paren{...}` for parentheses, `\sb{...}` for square brackets, `\set{...}` for braces and `\abs{...}` for bars, instead of `\left( ... \right)` and its relatives.
+- **Manual `\left` and `\right`**: write `\paren{...}` for parentheses, `\sb{...}` for square brackets, `\set{...}` for a set, `\cb{...}` for other braces and `\abs{...}` for bars, instead of `\left( ... \right)` and its relatives.
+  Write `\evalAt{expression}{point}` for an evaluation bar.
   Arrows such as `\leftarrow` are not flagged.
-  A one-sided delimiter (`\left. ... \right|`) has no macro yet.
-  Add one named for the concept when it is needed.
+  A one-sided delimiter with no matching macro, such as a half-open interval, needs a macro named for the concept.
+  Add one when it is needed.
 - **A raw transpose** (`^\top`, `^{\top}`): write `\tp{X}`, or `\pt{...}` for a parenthesized expression.
   Write the product of two vectors as `\dprod{a}{b}` and a matrix with itself as `\stprod{X}`;
   a matrix times a different factor stays `\tp{X}` followed by that factor, because it is not a dot product.

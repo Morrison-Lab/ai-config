@@ -241,8 +241,10 @@ See [`upgrade-to-gha`](shared/workflow/upgrade-to-gha.md).
 
 Treat token cost as a property of a workflow's **shape**: route bounded mechanical work to cheaper models, subagents, or separately-billed CLIs.
 See [`restructure-for-efficiency`](shared/workflow/restructure-for-efficiency.md) and [`merge-queue`](shared/workflow/merge-queue.md).
-In a cloud session with Claude quota low, send bulk, mechanical, and review work to OpenCode Go first (`delegate-to-opencode`);
-Claude verifies.
+In a cloud session (no `agy` or Codex), send bulk, mechanical, and review work to OpenCode Go (`delegate-to-opencode`) while Claude quota is low.
+Claude checks every result.
+A reviewer must differ from the author in model and harness.
+Never send student or PHI data.
 Elsewhere follow `memories/delegation.md`.
 
 ## Keep ai-config and repo checkouts fresh
@@ -276,9 +278,8 @@ When adding an enforcement hook under `hooks/`, author deterministic Python with
 
 ## Context budget
 
-Keep always-loaded instruction files (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`) compact.
-`AGENTS.md` is gated at 32 KiB to fit Codex's `project_doc_max_bytes` default.
-Other limits also gate CI (`scripts/check-context-closure.py`).
+Keep always-loaded files compact: `AGENTS.md` is gated at 32 KiB.
+Limits: [`context-budget`](shared/workflow/context-budget.md).
 
 ## Worktree isolation
 

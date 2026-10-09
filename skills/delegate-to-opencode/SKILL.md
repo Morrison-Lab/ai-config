@@ -164,13 +164,13 @@ Two routing consequences:
 ## Cloud sessions: OpenCode Go over HTTP, no key needed
 
 A claude.ai cloud session has no `opencode` CLI, but its agent proxy injects the OpenCode credential for `opencode.ai`, so `curl` to the chat endpoint works without a key (verified 2026-10-09).
-This does not hold in a GitHub Actions job, which has no agent proxy: there the same call returns 401 `Missing API key`.
-Use the Go endpoint `https://opencode.ai/zen/go/v1`, which draws on the Go Plus subscription.
+A GitHub Actions review job reported 401 `Missing API key` on the same call and no proxy variable (PR review run 37907648792, 2026-10-09), so do not assume it holds there.
+Use the Go endpoint `https://opencode.ai/zen/go/v1`, which both Go and Go Plus plans serve.
 Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402.
 
-- `/chat/completions`: `glm-5.3`, `glm-5.3-flash`, `kimi-k3`, `deepseek-v4-pro`, `qwen3.8-max`, and others.
+- `/chat/completions`: `glm-5.3`, `glm-5.3-flash`, `kimi-k3`, `deepseek-v4-pro`, and others.
   Use this endpoint in a cloud session.
-  `qwen3.8-max` returned a normal reply here on 2026-10-09, although the vendor's table lists it under `/messages`.
+  `qwen3.8-max` is documented under `/messages`, yet it returned a normal reply here on 2026-10-09, so it is usable on this endpoint.
 - `/messages` (`claude-haiku-5-5`, `minimax-m3`) returned 401 `Missing API key` through the proxy on 2026-10-09, so it is not usable there.
 - `/responses` and `/models` also exist; `/models` lists every id.
 - Send a stable `x-opencode-session` UUID header for each conversation, or the request fails with 400 `MissingSessionID`.
@@ -184,7 +184,8 @@ curl -s https://opencode.ai/zen/go/v1/chat/completions \
 
 Reuse one UUID across the turns of a conversation.
 Prefer Go models for bulk and mechanical work while Claude quota is low.
-The data rules above still apply: no student data (FERPA records) to any hosted model.
+The data rules above still apply: no student data (FERPA records) and no PHI to any hosted model.
+Review work must also meet the model-and-harness independence rule in [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md).
 Never use Codex for this routing.
 
 ## Where opencode sits in the budget ladder

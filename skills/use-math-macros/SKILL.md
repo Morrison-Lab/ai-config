@@ -362,7 +362,7 @@ The lint and the hook flag each of them, and a rewrite uses the macro that names
   The same letter means different things on different pages, so choose from the meaning.
 
 (Directive from the user, 2026-10-09: all `\mathbb`, `\mathscr`, `\mathcal` and similar, manual sizing such as `\big`, and `\top` should be checked and replaced with semantic macros.
-Also 2026-10-09: "there's still manual \left and \right" in the lds notes.)
+Also 2026-10-09: manual left and right delimiters were still in the lds notes.)
 
 ### Latin letters with a fixed role: `\outvar`, `\predvar`, `\resid`
 

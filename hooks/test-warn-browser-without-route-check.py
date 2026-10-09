@@ -161,6 +161,13 @@ warns("_site in a query string is not exempt",
       "mcp__claude-in-chrome__navigate",
       {"url": "https://evil.example/?next=/_site/x"})
 
+warns("?.localhost suffix on a remote host is not exempt",
+      "mcp__claude-in-chrome__navigate", {"url": "https://evil.com?.localhost"})
+warns("#.localhost suffix on a remote host is not exempt",
+      "mcp__claude-in-chrome__navigate", {"url": "https://evil.com#x.localhost"})
+warns("userinfo with ?.localhost is not exempt",
+      "mcp__claude-in-chrome__navigate",
+      {"url": "https://x@evil.com?.localhost"})
 warns("scheme-less remote host with _site is not exempt",
       "mcp__claude-in-chrome__navigate", {"url": "admin.example.com/_site/x"})
 warns("scheme-less host with _site in query is not exempt",

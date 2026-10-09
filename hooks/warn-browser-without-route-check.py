@@ -72,7 +72,7 @@ BROWSER_APPS = re.compile(
 
 # Render-check targets: local development hosts, file URLs, and built-site paths.
 RX_LOCAL = re.compile(
-    r"^\s*(?:(?:https?://)?(?:localhost|127\.0\.0\.1|\[::1\]|[^/\s:]+\.localhost)"
+    r"^\s*(?:(?:https?://)?(?:localhost|127\.0\.0\.1|\[::1\]|[A-Za-z0-9.-]+\.localhost)"
     r"(?::\d+)?(?:[/?#]|$)|file://)",
     re.I,
 )

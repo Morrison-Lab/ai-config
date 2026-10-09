@@ -76,8 +76,14 @@ RX_LOCAL = re.compile(
     r"(?::\d+)?(?:[/?#]|$)|file://)",
     re.I,
 )
-RX_SCHEME = re.compile(r"^\s*[a-z][a-z0-9+.-]*://", re.I)
-RX_SITE_PATH =re.compile(r"(?:^|[/\\])_site[/\\]")
+# A filesystem path: absolute, home-relative, dot-relative, a drive letter, or
+# dotless leading segments (a host has a dot before its first slash).
+RX_FS_PATH = re.compile(r"^\s*(?:[/~]|\.{1,2}[/\\]|[A-Za-z]:[\\/]|[\w-]+[/\\])")
+# User records the harness injects that are not a person's turn.
+RX_INJECTED_USER = re.compile(
+    r"^\s*(?:<(?:system-reminder|task-notification|command-name|"
+    r"local-command-stdout)\b|\[Request interrupted)", re.I)
+RX_SITE_PATH = re.compile(r"(?:^|[/\\])_site[/\\]")
 
 SEARCH_TOOLS = ("WebFetch", "WebSearch", "ToolSearch")
 RX_ROUTE_BASH = re.compile(r"mcp\s+list|command\s+-v|\bwhich\s|--help|\bgh\s+api\b")
@@ -130,8 +136,8 @@ def _is_render_target(url):
         return False
     if RX_LOCAL.match(url):
         return True
-    if RX_SCHEME.match(url):
-        return False  # a `_site/` segment in a remote URL is not a render check
+    if not RX_FS_PATH.match(url):
+        return False  # host-first string such as admin.example.com/_site/x
     return bool(RX_SITE_PATH.search(url))
 
 
@@ -148,10 +154,14 @@ def _is_real_user_message(rec):
         return False
     content = (rec.get("message") or {}).get("content")
     if isinstance(content, str):
-        return True
+        return not RX_INJECTED_USER.match(content)
     if isinstance(content, list):
-        return not any(isinstance(b, dict) and b.get("type") == "tool_result"
-                       for b in content)
+        if any(isinstance(b, dict) and b.get("type") == "tool_result"
+               for b in content):
+            return False
+        texts = [b.get("text") or "" for b in content
+                 if isinstance(b, dict) and b.get("type") == "text"]
+        return not (texts and all(RX_INJECTED_USER.match(t) for t in texts))
     return False
 
 

@@ -161,6 +161,16 @@ warns("_site in a query string is not exempt",
       "mcp__claude-in-chrome__navigate",
       {"url": "https://evil.example/?next=/_site/x"})
 
+warns("scheme-less remote host with _site is not exempt",
+      "mcp__claude-in-chrome__navigate", {"url": "admin.example.com/_site/x"})
+warns("scheme-less host with _site in query is not exempt",
+      "mcp__claude-in-chrome__navigate", {"url": "example.com/?next=/_site/x"})
+for inj in ["<system-reminder>x</system-reminder>",
+            "<task-notification>t</task-notification>",
+            "[Request interrupted by user for tool use]"]:
+    silent(f"injected user record keeps the search: {inj[:18]}",
+           "mcp__claude-in-chrome__navigate", GA, SEARCHED + [("user", inj)])
+
 # ---- back/forward and missing url are not visits
 silent("navigate back", "mcp__claude-in-chrome__navigate", {"url": "back"})
 silent("navigate forward", "mcp__Claude_Browser__navigate", {"url": "forward"})

@@ -241,7 +241,8 @@ See [`upgrade-to-gha`](shared/workflow/upgrade-to-gha.md).
 
 Treat token cost as a property of a workflow's **shape**: route bounded mechanical work to cheaper models, subagents, or separately-billed CLIs.
 See [`restructure-for-efficiency`](shared/workflow/restructure-for-efficiency.md) and [`merge-queue`](shared/workflow/merge-queue.md).
-When Claude quota is low, send bulk, mechanical, and review work to OpenCode Go first (`delegate-to-opencode`, "Cloud sessions"); Claude orchestrates and verifies.
+When Claude quota is low, send bulk, mechanical, and review work to OpenCode Go first (`delegate-to-opencode`, "Cloud sessions");
+Claude orchestrates and verifies.
 
 ## Keep ai-config and repo checkouts fresh
 

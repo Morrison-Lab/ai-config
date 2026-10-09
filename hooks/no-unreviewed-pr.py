@@ -753,7 +753,13 @@ def _argv_draft(argv):
     # `gh pr ready [<N>] --undo` converts a ready PR BACK to draft.
     if len(argv) >= 3 and argv[1] == "pr" and argv[2] == "ready" \
             and _has_flag(argv[3:], "--undo"):
-        num, repo = _verb_ident(argv)
+        # `--undo` is a boolean flag, so the number may follow it
+        # (`gh pr ready --undo 1038`); drop it before reading the number
+        # positionally (ai-config#1095). Only this flag is skipped: skipping
+        # an arbitrary leading flag could read a flag's VALUE as the PR number.
+        num, repo = _verb_ident(
+            argv[:3] + [a for a in argv[3:]
+                        if a != "--undo" and not a.startswith("--undo=")])
         return True, num, repo
     # `gh pr create --draft` opens a NEW draft PR (a draft action for ordering);
     # like any create, its number is in the result, not the command.

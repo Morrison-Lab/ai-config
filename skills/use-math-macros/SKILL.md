@@ -335,13 +335,13 @@ Choose the macro from the meaning:
 
 - `\llik` (or `\score`, `\hess`) for the log-likelihood and its derivatives;
 - `\obsloss{i}` for the loss on observation `i`;
-- `\lpnorm{p}` for the name of an $\ell_p$ norm or penalty;
+- `\lpnorm{p}` for the name of an `\ell_p` norm or penalty;
 - `\lbound` for a lower bound of a set;
 - a Latin letter for a dummy index or a count (`j`, `r`, `m`), unless it clashes with another symbol on the page.
 
 `scripts/check-raw-math.py` and the write-time hook flag a bare `\ell`.
 Keep `\ell` only where the text discusses the notation itself.
-(Directive from the user, 2026-10-09: "\ell is another non-semantic macro".
+(Directive from the user, 2026-10-09: "`\ell` is another non-semantic macro".
 Macros: [`Morrison-Lab/macros#118`](https://github.com/Morrison-Lab/macros/pull/118).)
 
 ### Presentation commands are not notation: sizing, transposes and fonts
@@ -414,7 +414,7 @@ Reserve direct `\sb{...}`, `\cb{...}`, and `\paren{...}` for mathematical groupi
 When two vectors multiply to give a number, write a dot product, `\dprod{\vx}{\vbeta}` ($\vx \cdot \vbeta$),
 not a transpose product (`\vx^\top \vbeta`, `\vx' \vbeta`, `\tprod{\vx}{\vbeta}`)
 or inner-product brackets (`\langle \vx, \vbeta \rangle`, `\iprod{\vx}{\vbeta}`).
-For example, write a linear model as $f(\vx) = \dprod{\vx}{\vbeta}$, not $f(\vx) = \vx^\top \vbeta$.
+For example, write a linear model as `f(\vx) = \dprod{\vx}{\vbeta}`, not `f(\vx) = \vx^\top \vbeta`.
 Keep the transpose where the product is not a dot product of two vectors:
 a matrix product (`\tp{X} X`), an outer product, or a quadratic form (`\tprod{\vx}{\matr{A}} \vx`).
 Keep inner-product brackets where the text means a general inner product,

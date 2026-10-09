@@ -19,6 +19,9 @@ Two sources of rules:
   macros file, mapped from the raw `\\operatorname{X}` (or `\\mathrm{X}`,
   `\\text{X}`) back to `\\NAME`, so a new library operator is covered
   without editing this file.
+
+A third, fixed class, SYMBOL_RULES, flags a bare symbol that spells a letter
+rather than a concept (`\\ell`), naming the concept macros that replace it.
 """
 from __future__ import annotations
 
@@ -36,6 +39,15 @@ BUILTIN_RULES: dict[str, str] = {
     "logit": r"\logit",
     "expit": r"\expit",
 }
+
+# Symbols that spell a letter rather than name a concept. Each maps to the
+# concept macros that replace it; the right one depends on the meaning.
+SYMBOL_RULES: dict[str, str] = {
+    "ell": (r"\llik (log-likelihood), \obsloss{i} (loss on one observation), "
+            r"\lpnorm{p} (the name of an l_p norm) or \lbound (a lower bound); "
+            r"a dummy index takes a Latin letter"),
+}
+_SYMBOL = re.compile(r"\\(" + "|".join(SYMBOL_RULES) + r")(?![A-Za-z])")
 
 # A single letter in bold or sans-serif, or inside \text, is usually a
 # matrix, a complexity class, or prose ("E-value"), so single-letter names
@@ -274,3 +286,5 @@ def find_raw(text: str, rules: dict[str, str] | None = None, markdown: bool = Fa
         for m in rx.finditer(line):
             name = next(g for g in m.groups() if g)
             yield lineno, m.group(0), rules[name]
+        for m in _SYMBOL.finditer(line):
+            yield lineno, m.group(0), SYMBOL_RULES[m.group(1)]

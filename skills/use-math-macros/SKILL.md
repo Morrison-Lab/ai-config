@@ -328,6 +328,22 @@ This is the target state rather than a blocker on current work: write new math t
 (Directive from the user, 2026-10-08: "eventually, we want to remove even non-semantic decorators like \hat in favor of semantic macros like `\est`".
 Prose rule: [psw `chapters/notation/shared-macros.qmd`](https://github.com/Morrison-Lab/psw/blob/main/chapters/notation/shared-macros.qmd); sweep and detection: [`Morrison-Lab/ai-config#4438`](https://github.com/Morrison-Lab/ai-config/issues/4438).)
 
+### `\ell` is a letter too
+
+A bare `\ell` spells a letter, so it is no more semantic than a Greek letter.
+Choose the macro from the meaning:
+
+- `\llik` (or `\score`, `\hess`) for the log-likelihood and its derivatives;
+- `\obsloss{i}` for the loss on observation `i`;
+- `\lpnorm{p}` for the name of an $\ell_p$ norm or penalty;
+- `\lbound` for a lower bound of a set;
+- a Latin letter for a dummy index or a count (`j`, `r`, `m`), unless it clashes with another symbol on the page.
+
+`scripts/check-raw-math.py` and the write-time hook flag a bare `\ell`.
+Keep `\ell` only where the text discusses the notation itself.
+(Directive from the user, 2026-10-09: "\ell is another non-semantic macro".
+Macros: [`Morrison-Lab/macros#118`](https://github.com/Morrison-Lab/macros/pull/118).)
+
 ### Latin letters with a fixed role: `\outvar`, `\predvar`, `\resid`
 
 A Latin letter that stands for a role in a model needs a role macro too.

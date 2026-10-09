@@ -1,0 +1,266 @@
+#!/usr/bin/env python3
+"""Report claims in a prose diff that cite something the reader cannot check.
+
+ai-config#3660.  #3643 took eleven review rounds for a three-file prose change,
+and four of them (rounds 4, 8, 10 and 11) found a claim that a script could have
+checked: a line citation past the end of its file, a phrase attributed to a file
+that contains it nowhere, a quote attributed to an issue whose body does not
+carry it, and "already recorded above" when it was not.
+`shared/workflow/learn-from-review-findings.md` says a finding with a decidable
+condition is one a pre-push check should catch every time thereafter; this is
+that check.
+
+## What it checks
+
+Only the ADDED lines of Markdown and Quarto files in `git diff <base>...HEAD`,
+outside fenced code blocks, so it reports on what the change claims rather than
+on what the corpus already said.
+
+* ``path-line`` --- a `path:N` or `path:N-M` citation.  The file must exist at
+  HEAD (relative to the repo root, or to the citing file's directory) and have
+  at least that many lines.
+* ``quote-in-file`` --- a sentence that names a file, uses a verb of quotation
+  (says, reads, states, ...), and carries a double-quoted phrase.  The phrase
+  must appear in that file, compared with whitespace collapsed.
+* ``quote-in-issue`` --- the same shape naming `#N` instead of a file.  This
+  one needs the network, so it runs only with `--issues` and reads the issue
+  body through `gh api`.
+* ``corpus-state`` --- a claim about what the corpus does or does not contain
+  ("already recorded", "the corpus has no", "nowhere else", ...).  No script
+  can decide these, so each is listed for the author to back with the query
+  that derived it; a line that already names `grep` or `rg`, or links its
+  evidence, is not listed.
+
+## Advisory by construction
+
+It exits 0 whatever it finds.  The checks are heuristics over prose, and a
+false positive on a legitimate paraphrase should cost a glance rather than a
+push.  It reports how many added lines it examined, so a run that examined
+nothing reads differently from a run that found nothing.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+from fences import find_fence_spans  # noqa: E402
+
+PROSE_GLOBS = ("*.md", "*.qmd")
+
+PATH_LINE_RE = re.compile(
+    r"(?<![\w/.-])(?P<path>[\w.-]+(?:/[\w.-]+)*\.[A-Za-z]{1,5}):(?P<start>\d+)"
+    r"(?:-(?P<end>\d+))?(?![\w:])"
+)
+FILE_RE = re.compile(
+    r"`(?P<path>[\w.-]+(?:/[\w.-]+)*\.[A-Za-z]{1,5})(?::\d+(?:-\d+)?)?`")
+ISSUE_RE = re.compile(r"(?<![\w/&])#(?P<num>\d{2,6})\b")
+QUOTE_VERB_RE = re.compile(
+    r"\b(says|said|reads|states|stated|writes|wrote|quotes|docstring|"
+    r"proposes|proposed)\b",
+    re.IGNORECASE,
+)
+# Match every quoted span, short ones included, so that a short quote still
+# consumes its own pair of marks; the length floor is applied afterwards.
+# Applying it in the pattern let the prose BETWEEN two quotes read as a quote.
+QUOTED_RE = re.compile(
+    "\"(?P<text>[^\"]*)\"|\u201c(?P<curly>[^\u201c\u201d]*)\u201d"
+)
+MIN_QUOTE = 12
+# A `host:port` reads like `name.ext:N`; these "extensions" are domains.
+DOMAIN_EXTS = {"com", "org", "net", "io", "dev", "edu", "gov", "ai", "co",
+               "local", "app", "info", "us", "uk"}
+CORPUS_STATE_RE = re.compile(
+    r"\b(already (recorded|covered|documented|stated)|the corpus (has|carries) "
+    r"no|nothing in the corpus|nowhere else|no other (site|file|place|rule)|"
+    r"is the only (site|file|place|rule|instance))\b",
+    re.IGNORECASE,
+)
+DERIVED_RE = re.compile(r"\b(grep|rg|git grep|ripgrep)\b|\]\(")
+
+
+def git(args: list[str], cwd: Path) -> str:
+    return subprocess.run(
+        ["git", *args], cwd=cwd, capture_output=True, text=True,
+        encoding="utf-8", errors="replace", check=True
+    ).stdout
+
+
+def added_lines(root: Path, base: str) -> dict[str, list[tuple[int, str]]]:
+    """{path: [(line_number_at_HEAD, text), ...]} for added prose lines."""
+    diff = git(
+        ["diff", "-U0", "--no-color", "--no-ext-diff", f"{base}...HEAD", "--",
+         *PROSE_GLOBS],
+        root,
+    )
+    out: dict[str, list[tuple[int, str]]] = {}
+    path = None
+    lineno = 0
+    remaining = 0  # new-side lines left in the current hunk
+    for raw in diff.splitlines():
+        if remaining == 0 and raw.startswith("+++ "):
+            target = raw[4:].rstrip("\t")
+            if target.startswith('"') and target.endswith('"'):
+                target = target[1:-1].encode().decode("unicode_escape")
+                target = target.encode("latin-1").decode("utf-8", "replace")
+            path = target[2:] if target.startswith("b/") else None
+            continue
+        if remaining == 0 and raw.startswith("@@"):
+            m = re.match(r"@@ -\S+ \+(\d+)(?:,(\d+))? @@", raw)
+            lineno = int(m.group(1)) if m else 0
+            remaining = int(m.group(2) if m and m.group(2) is not None else 1)
+            continue
+        if path and remaining and raw.startswith("+"):
+            out.setdefault(path, []).append((lineno, raw[1:]))
+            lineno += 1
+            remaining -= 1
+    return out
+
+
+def resolve(root: Path, citing: str, cited: str) -> Path | None:
+    for candidate in (root / cited, (root / citing).parent / cited):
+        # Never read outside the repository: a `../` citation would otherwise
+        # report facts about files the PR does not own into the CI log.
+        if not candidate.resolve().is_relative_to(root.resolve()):
+            continue
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def squash(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def issue_body(num: str, repo: str | None, cache: dict[str, str | None]) -> str | None:
+    if num in cache:
+        return cache[num]
+    target = f"repos/{repo}/issues/{num}" if repo else f"repos/{{owner}}/{{repo}}/issues/{num}"
+    try:
+        res = subprocess.run(["gh", "api", target, "--jq", ".body"],
+                             capture_output=True, text=True,
+                             encoding="utf-8", errors="replace")
+    except OSError as exc:  # gh not installed: report, never crash
+        print(f"check-prose-citations: cannot run gh for #{num}: {exc}",
+              file=sys.stderr)
+        cache[num] = None
+        return None
+    cache[num] = res.stdout if res.returncode == 0 else None
+    if res.returncode != 0:
+        print(f"check-prose-citations: cannot read issue #{num}: "
+              f"{res.stderr.strip()}", file=sys.stderr)
+    return cache[num]
+
+
+def check_line(root: Path, citing: str, text: str, issues: bool,
+               repo: str | None, cache: dict) -> list[tuple[str, str]]:
+    findings: list[tuple[str, str]] = []
+    for m in PATH_LINE_RE.finditer(text):
+        cited = m.group("path")
+        # max(): an inverted range `:40-2` still cites line 40.
+        last = max(int(m.group("start")), int(m.group("end") or 0))
+        target = resolve(root, citing, cited)
+        if target is None and cited.rsplit(".", 1)[-1].lower() in DOMAIN_EXTS:
+            continue
+        if target is None:
+            findings.append(("path-line", f"`{cited}` does not exist at HEAD"))
+            continue
+        count = len(target.read_text(encoding="utf-8", errors="replace").splitlines())
+        if int(m.group("start")) == 0:
+            findings.append(("path-line", f"`{m.group(0)}`: lines are numbered from 1"))
+        elif last > count:
+            findings.append(("path-line",
+                             f"`{cited}:{last}` is past the end ({count} lines)"))
+    quotes = [q for m in QUOTED_RE.finditer(text)
+              if len(q := (m.group("text") or m.group("curly") or "")) >= MIN_QUOTE]
+    if quotes and QUOTE_VERB_RE.search(text):
+        # A line naming several sources (files, and #N with --issues) may
+        # quote only one of them, so a quote is reported only when NONE of
+        # the named sources contains it.
+        sources = []
+        for f in FILE_RE.finditer(text):
+            target = resolve(root, citing, f.group("path"))
+            if target is not None:
+                sources.append((f"`{f.group('path')}`", squash(
+                    target.read_text(encoding="utf-8", errors="replace"))))
+        has_issue = False
+        if issues:
+            for i in ISSUE_RE.finditer(text):
+                body = issue_body(i.group("num"), repo, cache)
+                if body is None:
+                    findings.append(("quote-in-issue",
+                                     f"#{i.group('num')} could not be read"))
+                    continue
+                has_issue = True
+                sources.append((f"#{i.group('num')}", squash(body)))
+        kind = "quote-in-issue" if has_issue else "quote-in-file"
+        for q in quotes:
+            if sources and not any(squash(q) in body for _, body in sources):
+                names = ", ".join(name for name, _ in sources)
+                findings.append((kind, f"\"{q}\" is not in {names}"))
+    if CORPUS_STATE_RE.search(text) and not DERIVED_RE.search(text):
+        findings.append(("corpus-state",
+                         "claim about corpus state with no query beside it"))
+    return findings
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    parser.add_argument("--base", default="origin/main",
+                        help="diff base (default: origin/main)")
+    parser.add_argument("--root", default=".", help="repository root")
+    parser.add_argument("--issues", action="store_true",
+                        help="also check quotes attributed to #N (needs gh)")
+    parser.add_argument("--repo", help="owner/repo for --issues")
+    parser.add_argument("--json", action="store_true")
+    args = parser.parse_args(argv)
+    root = Path(args.root).resolve()
+
+    try:
+        added = added_lines(root, args.base)
+    except subprocess.CalledProcessError as exc:
+        print(f"::warning::check-prose-citations: git diff against "
+              f"{args.base} failed, so nothing was examined: "
+              f"{exc.stderr.strip()}")
+        return 0
+
+    results = []
+    examined = 0
+    files_examined = 0
+    cache: dict[str, str | None] = {}
+    for path, lines in sorted(added.items()):
+        full = root / path
+        if not full.is_file():
+            print(f"::warning::check-prose-citations: {path} is in the diff "
+                  f"but not readable at HEAD, so it was not examined")
+            continue
+        files_examined += 1
+        fenced, _, _ = find_fence_spans(full.read_text(encoding="utf-8", errors="replace"))
+        for lineno, text in lines:
+            if lineno - 1 in fenced:
+                continue
+            examined += 1
+            for kind, detail in check_line(root, path, text, args.issues,
+                                           args.repo, cache):
+                results.append({"file": path, "line": lineno, "kind": kind,
+                                "detail": detail})
+
+    if args.json:
+        print(json.dumps({"examined_lines": examined,
+                          "files": files_examined, "findings": results}, indent=2))
+        return 0
+    for r in results:
+        print(f"::warning file={r['file']},line={r['line']}::"
+              f"[{r['kind']}] {r['detail']}")
+    print(f"check-prose-citations: examined {examined} added line(s) in "
+          f"{files_examined} file(s) against {args.base}; {len(results)} "
+          f"finding(s) (advisory){'' if args.issues else '; #N quotes not checked (--issues)'}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -43,3 +43,22 @@ Each numbered rule is a past mistake on a real dispatch, stated as the action th
   Do not commit the fix yourself.
 - Give your own files, such as a job's log, a name the agent's deletion rule cannot match.
   An agent told it may delete files with a given prefix will delete an orchestrator log carrying that prefix, because it is following the rule it was given.
+
+## Ending an `agy` review loop
+
+Measured on #4427 and #4434, 2026-10-08.
+Every `agy --print` review round produced new `[NIT]` items, some repeating items already answered on the PR.
+`scripts/check-pr-fully-clean.py` reads any item under a `### Findings` heading as open.
+A reply that answers the item does not supersede the review;
+only a later review does.
+So each round otherwise costs a push and a paid Claude review, and on #4427 two rounds of that did not converge.
+
+What converged on both PRs was one more `agy` run, with the answered items listed in the brief as context and an instruction to report only new findings.
+On #4427 that run was on the same head, with no push.
+On #4434 the real nits were fixed in the push that also merged the base, and that push's `agy` run reported `### Findings` as `None.` beside `Ready for merge`, which scored exit 0.
+
+- **Do:** fix the real nits once, answer the rest on the PR, then give `agy` the answered list and ask only for new findings.
+- **Do:** fold nit fixes into a push you owe anyway, such as a base sync, so they cost no extra review cycle.
+- **Don't:** push once per `agy` round to clear its newest nit list.
+- **Don't:** write "Blocking findings: None" in a review.
+  The scorer reads it as not-clean (#4428).

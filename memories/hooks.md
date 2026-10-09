@@ -1109,3 +1109,18 @@ When wiring a pre-tool hook to support both Claude Code and Antigravity:
 - **Do:** filter out directly-registered Antigravity hooks in `claude-hook-adapter.py`'s `run_command` mapping.
 - **Don't:** allow auto-merge tool calls without verifying head commit review status at merge time.
 - **Don't:** emit unknown fields to Antigravity hook responses.
+
+## A hook that defers to a guard's refusal copies the guard's scope (#4431)
+
+On #4431 (fixing #3270), self-review rounds swung between two scopes for a `Stop` hook's hold.
+Holding only the reviewed tip was too narrow and still deadlocked;
+holding every checkout looked like a loophole.
+The Claude review settled it by reading the guard: `no-push-without-self-review.py` refuses every push while the latest verdict is `needs_work`, so the `Stop` hook must hold every checkout too.
+The one carve-out is a branch whose tip has moved past the reviewed commit, as a descendant or with the reviewed commit in the branch's own reflog after an amend or rebase.
+There the session has an action it can take, so the hook says to re-dispatch the reviewer instead.
+
+Each wrong scope looked plausible to a same-model reviewer, and only a trace against the guard's own refusal condition (`verify_review`) decided it.
+
+- **Do:** read the refusal condition of the guard a hook defers to, and copy its scope into the hold.
+- **Do:** carve out only the cases where the session has an action available.
+- **Don't:** scope a hold by intuition, such as "only the reviewed branch", without checking what the guard refuses.

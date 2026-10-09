@@ -349,6 +349,20 @@ until a repo's `latex-macros` pin includes it, keep the existing letters there.
 (Directive from the user, 2026-10-09: "let's use a semantic macro rather than a bare `e`. even `y` should be a macro for outcome variable, and `x` should be a macro for predictor variable(s)".
 Macros: [`Morrison-Lab/macros#117`](https://github.com/Morrison-Lab/macros/pull/117); sweep: [`Morrison-Lab/ai-config#4440`](https://github.com/Morrison-Lab/ai-config/issues/4440).)
 
+### Write a named quantity by its macro, not its definition
+
+Once a quantity has a name and a macro, write the macro rather than re-expanding the expression that defines it.
+This is the macro-level case of [`math-derivation-steps`](../../shared/writing/math-derivation-steps.md)'s "keep each equation simple": every expression stays concise, and the reader sees which quantity it is about.
+When the quantity has no macro yet, add one to `Morrison-Lab/macros` first.
+
+- **Do:** write the gradient of the mean squared error as `\frac{2}{n} \tp{\design} \vprederr`, with the prediction errors named `\vprederr` and defined once in the text as `\vprederr = \design\vcoef - \vy`.
+- **Don't:** write `\frac{2}{n} \tp{\design} \paren{\design\vcoef - \vy}` after the prediction errors already have a name.
+
+The pair uses prediction errors (predicted minus observed);
+`\vy - \design\vcoef` is the vector of residuals, `\vresid`.
+(Directive from the user, 2026-10-09: "remember to always decompose expressions to make each one concise; ... why not use the prediction error macro instead of `\vy - \design \vcoef`?"
+Also tracked as [`Morrison-Lab/psw#140`](https://github.com/Morrison-Lab/psw/issues/140).)
+
 ## Prefer command operator macros that take arguments over manual delimiter wrappers
 
 There should be very few instances where it is necessary to write `\cb` (curly braces), `\sb` (square brackets), or `\paren` directly with a bare operator.

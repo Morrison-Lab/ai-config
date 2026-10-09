@@ -18,7 +18,7 @@ That is a reason to set the route up, or to ask the user for the one step only t
 A task that still needs the browser gets logged per [`deterministic-tools`](../principles/deterministic-tools.md#browser-work-leaves-no-artifact-so-keep-a-log-of-it).
 
 - **Do:** search for a CLI, MCP, or API route before opening a browser, and name what you found in the reply.
-- **Do:** set up a missing route (install the CLI, register the MCP, ask for the one OAuth step) when the task will recur.
+- **Do:** set up a missing route (install the CLI, register the MCP, ask for the one OAuth step) before falling back to the browser.
 - **Don't:** open the browser first because it is already loaded and the task looks small.
 - **Don't:** read a route that needs setup as a route that does not exist.
 
@@ -30,4 +30,4 @@ A check afterwards, on 2026-10-09, found that the Analytics Admin API reference 
 for account data-sharing settings,
 while it documents create and update methods for the property, stream and retention settings set up in the browser on 2026-09-25.
 So the browser was needed for one of the two tasks, and neither was checked beforehand.
-An older preference bullet in `memories/preferences.md` already said the browser is a last resort, but neither `AGENTS.md` nor `CLAUDE.md` loads that file at startup.)
+An older preference bullet in `memories/preferences.md` already said the browser is a last resort, but neither `AGENTS.md` nor `CLAUDE.md` imports that file or quotes the bullet, so no agent saw it at startup.)

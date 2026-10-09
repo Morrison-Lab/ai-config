@@ -102,6 +102,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 
 NO_WINDOW = ({"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)}
              if sys.platform == "win32" else {})
@@ -976,6 +977,157 @@ def _argv_push(argv):
     return _push_re_heads(argv[i + 1:])
 
 
+# A git alias whose expansion could not be read (a `!` shell alias naming
+# `push`, an unparsable value, a chain too deep, or the time budget running
+# out). The alias may well push, so a caller treats it as one rather than
+# guessing (ai-config#1993).
+UNRESOLVED_ALIAS = object()
+
+# git runs a builtin before it consults `alias.*`, so a builtin name can never be
+# an alias and needs no config read. The set only has to be a subset of git's
+# builtins: a name missing from it costs one `git config` call, while a name
+# wrongly listed would hide an alias, so external commands such as `lfs` are not
+# in it. `push` is absent because `_argv_push` decides it.
+_GIT_BUILTINS = frozenset("""
+    add am apply archive bisect blame branch bundle cat-file check-ignore
+    checkout cherry cherry-pick clean clone commit config count-objects
+    describe diff diff-files diff-index diff-tree fetch for-each-ref
+    format-patch fsck gc grep hash-object help init log ls-files ls-remote
+    ls-tree merge merge-base mv name-rev notes pull range-diff rebase reflog
+    remote reset restore rev-list rev-parse revert rm shortlog show show-ref
+    sparse-checkout stash status submodule switch symbolic-ref tag update-ref
+    var version worktree write-tree
+""".split())
+
+# git itself stops a self-referencing chain; this bound only caps the work.
+_ALIAS_DEPTH = 8
+
+
+def _git_subcommand_index(argv):
+    """Index of the subcommand in a `git ...` argv, skipping global options.
+
+    Mirrors the skip in `_argv_push`, so both read the same word.
+    """
+    if not argv or argv[0] != "git":
+        return None
+    i = 1
+    while i < len(argv):
+        a = argv[i]
+        if a in ("-C", "-c", "--git-dir", "--work-tree", "--namespace"):
+            i += 2
+            continue
+        if a.startswith("-"):
+            i += 1
+            continue
+        return i
+    return None
+
+
+def expand_push_alias(rest, read_alias):
+    """The push argv a git alias expands to, None, or UNRESOLVED_ALIAS.
+
+    `_argv_push` matches only the literal subcommand `push`, so `git p origin`
+    under `alias.p = push` reached neither push hook (ai-config#1993). Both
+    hooks expand through this one loop, each supplying its own way of reading
+    config: `read_alias(prefix, word)` returns the value of `alias.<word>` as
+    git would read it for a command whose words before the subcommand are
+    `prefix`, or None when it is unset, and raises TimeoutError when it ran
+    out of time or LookupError when the config could not be read at all. A chain (`alias.a = b`, `alias.b = push`) is followed.
+
+    Returns None when the command is not an alias of a push. Returns
+    UNRESOLVED_ALIAS rather than guessing when the expansion cannot be read: a
+    `!` alias naming `push` runs an arbitrary shell command, and running out of
+    time must not read as "not a push". A `!` alias that hides the word
+    (`!git p$x`) is not caught.
+    """
+    seen = 0
+    while True:
+        i = _git_subcommand_index(rest)
+        if i is None:
+            return None
+        word = rest[i]
+        if word in _GIT_BUILTINS or word == "push":
+            return None
+        if seen >= _ALIAS_DEPTH:
+            return UNRESOLVED_ALIAS
+        seen += 1
+        try:
+            value = read_alias(rest[:i], word)
+        except (TimeoutError, LookupError):
+            return UNRESOLVED_ALIAS
+        if value is None:
+            return None
+        if value.startswith("!"):
+            # A shell alias cannot be parsed reliably. Treat it as unresolved
+            # when it names a push, and let `!git log --graph` and its kind
+            # through, since they push nothing.
+            if re.search(r"\bpush\b", value):
+                return UNRESOLVED_ALIAS
+            return None
+        try:
+            expansion = shlex.split(value)
+        except ValueError:
+            return UNRESOLVED_ALIAS
+        if not expansion:
+            return None
+        rest = rest[:i] + expansion + rest[i + 1:]
+        if _argv_push(rest):
+            return rest
+
+
+_ASSIGNMENT_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
+
+# Total time push_ident may spend reading aliases in one scan. The Stop hook is
+# registered with a 10-second timeout and still has live PR checks to run, so
+# the reads get a slice of it; past the slice a read raises TimeoutError, which
+# arms, the safe direction.
+_ALIAS_READ_BUDGET = 3.0
+_alias_cache = {}
+_alias_deadline = None
+
+
+def _read_alias(env, prefix, word):
+    """`alias.<word>` as git reads it for `prefix` under `env`, or None.
+
+    `prefix` is the command's words before the subcommand, so its `-C`, `-c`,
+    `--git-dir` and `--work-tree` reach the read as they reach git, and `env`
+    is the command's leading assignments, so a `GIT_CONFIG_COUNT` alias is
+    read too. Cached, since one session repeats its aliases.
+    """
+    global _alias_deadline
+    key = (tuple(env), tuple(prefix), word)
+    if key in _alias_cache:
+        return _alias_cache[key]
+    now = time.monotonic()
+    if _alias_deadline is None:
+        _alias_deadline = now + _ALIAS_READ_BUDGET
+    remaining = _alias_deadline - now
+    if remaining <= 0:
+        raise TimeoutError("alias read budget spent")
+    child_env = dict(os.environ)
+    child_env.update(a.split("=", 1) for a in env)
+    try:
+        proc = subprocess.run(
+            ["git", *prefix[1:], "config", "--get", f"alias.{word}"],
+            capture_output=True, text=True, encoding="utf-8",
+            errors="replace", timeout=remaining, env=child_env, **NO_WINDOW,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise TimeoutError("alias read timed out") from exc
+    except OSError as exc:
+        # The push already ran, so git existed; a spawn failure here (EAGAIN,
+        # EMFILE) is an alias that could not be read, not an unset one.
+        raise LookupError("git config could not run") from exc
+    else:
+        if proc.returncode not in (0, 1):
+            # 1 is git's "key not set"; anything else (128 for a corrupt
+            # config or a bad -C path) means the alias could not be read.
+            raise LookupError(f"git config exited {proc.returncode}")
+        value = proc.stdout.strip() if proc.returncode == 0 else None
+    _alias_cache[key] = value
+    return value
+
+
 def push_ident(cmd):
     """True if `cmd` contains a genuine `git push` simple command.
 
@@ -988,12 +1140,29 @@ def push_ident(cmd):
     whenever the push shared a call with anything else (which, measured on this
     corpus, is nearly every push).
 
+    A git alias of `push` arms like the push it expands to, and so does an
+    alias whose expansion cannot be read, since arming is the safe direction
+    (ai-config#1993). Leading `NAME=value` assignments are skipped first, so
+    `GIT_CONFIG_COUNT=1 ... git p` and an assignment ahead of a literal push
+    are both seen.
+
     Fails toward NOT-a-push on a parse error, so a malformed command never arms.
     """
     cmds = _simple_commands(cmd)
     if cmds is None:
         return False
-    return any(_argv_push(a) for a in cmds)
+    for argv in cmds:
+        n = 0
+        while n < len(argv) and _ASSIGNMENT_RE.match(argv[n]):
+            n += 1
+        env, rest = argv[:n], argv[n:]
+        if _argv_push(rest):
+            return True
+        if expand_push_alias(
+                rest, lambda prefix, word: _read_alias(env, prefix, word)
+        ) is not None:
+            return True
+    return False
 
 
 RX_CMD_MERGE = re.compile(

@@ -28,6 +28,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 HOOK = sys.argv[1]
 
@@ -2672,6 +2673,87 @@ def _test_update_branch_and_live_checks():
     return passes, failures
 
 
+def _test_push_alias(hookmod):
+    """A git alias of `push` arms like the push it expands to (#1993).
+
+    Every alias is supplied through `-c` or GIT_CONFIG_COUNT, and the global
+    config is pointed at /dev/null, so no row depends on the machine's own
+    aliases. The negative rows matter as much as the positive ones: an alias
+    that does not push, a dry run through an alias, a `!` alias that pushes
+    nothing, and a quoted example must not arm.
+    """
+    passes = failures = 0
+    old_global = os.environ.get("GIT_CONFIG_GLOBAL")
+    os.environ["GIT_CONFIG_GLOBAL"] = os.devnull
+    hookmod._alias_cache.clear()
+    hookmod._alias_deadline = None
+    rows = [
+        ("git -c alias.p=push p origin main", True),
+        ("git -c alias.p=status p", False),
+        ("git -c alias.a=b -c alias.b=push a origin main", True),
+        ("GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.p "
+         "GIT_CONFIG_VALUE_0=push git p origin main", True),
+        ("git -c 'alias.x=!git push origin main' x", True),
+        ("git -c 'alias.l=!git log --oneline' l", False),
+        ("git -c alias.p=push p --dry-run origin main", False),
+        ("git -c alias.p=push p --delete origin feature", False),
+        ("A=1 git push origin main", True),
+        # Unparsable and too-deep expansions cannot be read, so they arm.
+        ("git -c \"alias.p=push 'unterminated\" p origin main", True),
+        ("git " + " ".join(f"-c alias.a{i}=a{i + 1}" for i in range(9))
+         + " -c alias.a9=status a0 origin main", True),
+        # An unreadable config (git exits 128) arms too.
+        ("git -C /nonexistent-1993 x origin main", True),
+        ("git status && git log --oneline", False),
+        ("echo 'git -c alias.p=push p origin main'", False),
+    ]
+    try:
+        for cmd, want in rows:
+            got = hookmod.push_ident(cmd)
+            if got is want:
+                passes += 1
+                print(f"PASS: push_ident({cmd!r}) is {want}")
+            else:
+                failures += 1
+                print(f"FAIL: push_ident({cmd!r}) is {got}, want {want}")
+        # A spent budget must arm rather than read as "not a push".
+        hookmod._alias_cache.clear()
+        hookmod._alias_deadline = time.monotonic() - 1
+        if hookmod.push_ident("git -c alias.q=status q origin main") is True:
+            passes += 1
+            print("PASS: an alias read past the budget arms")
+        else:
+            failures += 1
+            print("FAIL: an alias read past the budget did not arm")
+        # A git config that cannot even be spawned arms too, uncached.
+        hookmod._alias_cache.clear()
+        hookmod._alias_deadline = None
+        real_run = hookmod.subprocess.run
+
+        def spawn_fails(*args, **kwargs):
+            raise OSError(11, "Resource temporarily unavailable")
+        hookmod.subprocess.run = spawn_fails
+        try:
+            got = hookmod.push_ident("git p origin main")
+        finally:
+            hookmod.subprocess.run = real_run
+        if got is True and not hookmod._alias_cache:
+            passes += 1
+            print("PASS: an alias read that cannot spawn git arms")
+        else:
+            failures += 1
+            print(f"FAIL: an unspawnable alias read gave {got}, "
+                  f"cache {hookmod._alias_cache!r}")
+    finally:
+        hookmod._alias_cache.clear()
+        hookmod._alias_deadline = None
+        if old_global is None:
+            os.environ.pop("GIT_CONFIG_GLOBAL", None)
+        else:
+            os.environ["GIT_CONFIG_GLOBAL"] = old_global
+    return passes, failures
+
+
 def main():
     passes = failures = 0
     hookmod = load_hook()
@@ -2942,6 +3024,10 @@ def main():
         failures += 1
 
     p, f = _test_update_branch_and_live_checks()
+    passes += p
+    failures += f
+
+    p, f = _test_push_alias(hookmod)
     passes += p
     failures += f
 

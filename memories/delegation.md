@@ -27,6 +27,19 @@ this section is self-contained.
 > - **Don't:** read "free" as "cleared for restricted data".
 
 > [!IMPORTANT]
+> **OpenCode Go (`opencode-go/*`) may be used freely**
+> (user directive, 2026-10-09:
+> "we have an opencode go account with plenty of quota;
+> use it.
+> drive down the backlog").
+> This supersedes the 2026-10-08 request to save that quota for adversarial reviews (ai-config#4424).
+> The raised quota covers general dispatchable work (research, drafting, bulk edits, reviews), not only reviews.
+> Restricted data still goes only to the UCDH Codex account, whichever model is free or paid.
+>
+> - **Do:** route dispatchable work to OpenCode Go without reserving it for reviews; pick the cheapest model that suffices.
+> - **Don't:** hold back sidecar work to protect OpenCode Go quota, or read "use it freely" as clearing restricted data.
+
+> [!IMPORTANT]
 > **`agy` (Google Antigravity) is confirmed usable as a dispatchable subagent, effective 2026-09-02** (user directives that day: "start using agy as a subagent where feasible", "use agy cli for it").
 > The 2026-08-20 API-dispatch outage (`429: prepayment credits depleted`, user directive that day, scope corrected 2026-08-23) stays on record as history --- it explains why an earlier version of this banner said "out of service" --- but it never described the CLI, which the 2026-08-25 clarification already carved out as a separate, unaffected path.
 > **A fresh Windows install on 2026-09-02, from the official `google-antigravity/antigravity-cli` GitHub release, confirms the CLI works end to end**: `agy --version` reports 1.1.24, `agy models` lists a real roster, and a headless smoke test returned the expected output in about 5 seconds.

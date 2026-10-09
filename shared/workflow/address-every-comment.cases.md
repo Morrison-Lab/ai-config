@@ -1128,4 +1128,5 @@ They are omitted here for that reason.
 (Morrison-Lab/ai-config#4442, merged 2026-10-09: an `AGENTS.md` rule widened from "attach a repo the work needs" to "attach any repo whenever it would help".
 The edit missed `memories/github-remote-sessions.md`, which still said `add_repo` applied when the session "genuinely needs API or write access".
 The CI review bot caught the stale restatement, and the fix was a second commit.
-The widening was applied to the one file in front of the author; a whole-corpus grep for the concept (`add_repo`) before the first push would have found the memory file.)
+The widening was applied to the one file in front of the author.
+A whole-corpus grep for the concept (`add_repo`) before the first push would have found the memory file.)

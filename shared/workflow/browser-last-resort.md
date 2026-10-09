@@ -15,19 +15,19 @@ Opening the browser because it was the first tool to hand is the failure this ru
 A missing route can also be a missing setup step: an API that needs an OAuth login, or a CLI that is not installed yet.
 That is a reason to set the route up, or to ask the user for the one step only they can do (an OAuth consent screen, say), rather than a reason to fall back to the browser.
 
-Every task that still ends up in the browser goes into the project's browser-task log,
-per [`deterministic-tools`](../principles/deterministic-tools.md#browser-work-leaves-no-artifact-so-keep-a-log-of-it),
-with the scripting route named or "no API" recorded.
+A task that still needs the browser gets logged per [`deterministic-tools`](../principles/deterministic-tools.md#browser-work-leaves-no-artifact-so-keep-a-log-of-it).
 
 - **Do:** search for a CLI, MCP, or API route before opening a browser, and name what you found in the reply.
 - **Do:** set up a missing route (install the CLI, register the MCP, ask for the one OAuth step) when the task will recur.
-- **Do:** log every browser task, with its scripting route or "no API".
 - **Don't:** open the browser first because it is already loaded and the task looks small.
 - **Don't:** read a route that needs setup as a route that does not exist.
 
 (Directive from Ezra Morrison, 2026-10-09:
 "I'd prefer you don't use the browser unless you absolutely need to".
 That day an agent changed Google Analytics account settings in the browser without first checking the Analytics Admin API.
-A check afterwards found the API could have done the earlier property and stream setup but only reads account data-sharing settings,
-so the browser was needed for one of the two tasks, and neither was checked beforehand.
-An older preference bullet in `memories/preferences.md` already said the browser is a last resort, but no agent loads that file at startup.)
+A check afterwards, on 2026-10-09, found that the Analytics Admin API reference documents only a read method,
+[`accounts.getDataSharingSettings`](https://developers.google.com/analytics/devguides/config/admin/v1/rest/v1beta/accounts/getDataSharingSettings),
+for account data-sharing settings,
+while it documents create and update methods for the property, stream and retention settings set up two weeks earlier.
+So the browser was needed for one of the two tasks, and neither was checked beforehand.
+An older preference bullet in `memories/preferences.md` already said the browser is a last resort, but neither `AGENTS.md` nor `CLAUDE.md` loads that file at startup.)

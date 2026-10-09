@@ -59,9 +59,7 @@ Write all LaTeX math, in any repo or format, with the shared semantic macros: [`
 
 ## Check external repository guidelines and PR template before filing
 
-Before filing a PR in an external repository, read its `CONTRIBUTING.md` and `.github/pull_request_template.md`.
-
-- **Don't:** file an external PR from memory or with an internal template.
+Before filing a PR in an external repository, read and follow its `CONTRIBUTING.md` and `.github/pull_request_template.md`, never an internal template or memory.
 
 ## No empty promises
 
@@ -387,7 +385,7 @@ See [`GEMINI.md`](GEMINI.md) and [`memories/antigravity.md`](memories/antigravit
 ## Use the browser only when nothing else can
 
 Before opening a browser, look for a CLI, MCP, or API that can do the task, and say what you found.
-Use a browser only if none can, or the task is visual.
+Use a browser only if none can (or could be set up), or the task is visual.
 See [`browser-last-resort`](shared/workflow/browser-last-resort.md).
 
 ## Default to action without asking

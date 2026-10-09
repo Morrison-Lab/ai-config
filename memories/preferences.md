@@ -390,9 +390,7 @@
 - Always use `glab` (the GitLab CLI) for GitLab operations --- MR comments, file uploads, API calls, pipeline checks --- instead of raw `curl` against the GitLab REST API.
   `glab` handles auth via its own config (no `GITLAB_TOKEN` env var needed), so it works even when a token isn't exported in the current shell.
   Use `glab api` for endpoints without a dedicated subcommand (e.g. `POST /projects/:id/uploads` for file attachments).
-- Treat the browser GUI as a last resort for every task.
-  Prefer a CLI, MCP tool, or direct API whenever the task does not inherently require a visual/browser-only capability.
-  The rule now lives in [`shared/workflow/browser-last-resort.md`](../shared/workflow/browser-last-resort.md), linked from `AGENTS.md`.
+- Treat the browser GUI as a last resort for every task: see [`shared/workflow/browser-last-resort.md`](../shared/workflow/browser-last-resort.md), linked from `AGENTS.md`.
 - Run local validation before pushing R-pkg work: lintr::lint_package(), devtools::document(), devtools::test(), devtools::check(), pkgdown::build_site() (per repo copilot-instructions).
 - Before opening a PR, read the repo's own agent/contributor instructions (CLAUDE.md → the canonical reference it points to, e.g. `.github/copilot-instructions.md` / CONTRIBUTING) and front-load the required pre-PR housekeeping in the FIRST commit instead of discovering it via red CI.
   For R packages this means a NEWS.md entry AND a `usethis::use_version()` DESCRIPTION dev-version bump, even for a docs-only / vignette-only change --- see `r-quarto.md`'s "R-package PR CI gates" section for the full changelog-check / version-check / spellcheck / opt-out-label details.

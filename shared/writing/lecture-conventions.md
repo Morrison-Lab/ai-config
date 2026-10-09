@@ -50,7 +50,7 @@ This fragment is the agent-facing copy: follow the rules, and link to psw instea
 - **Present R results with modern packages, even for a base R fit.**
   A model fit with `lm()` or `glm()` shows its coefficients through `parameters::parameters() |> print_md()` or `gtsummary::tbl_regression()`, never a `summary()` or `coef(summary())` printout (Ezra, 2026-10-09).
   Figures use ggplot2, with sjPlot or ggeffects for prediction plots and `performance::check_model()` for diagnostics, never base graphics (`plot()`, `lines()`, `abline()`).
-  Avoid ggfortify's `autoplot()` for `lm` fits: it warns that `fortify(<lm>)` is deprecated in ggplot2 4.0.
+  Avoid ggfortify's `autoplot()` for `lm` fits: it warns that `fortify(<lm>)` is deprecated.
   Reading a single value out of a fit for inline code (`coef(fit)[["x"]]`) is fine;
   the rule is about what the reader sees.
   Add each package to the repository's render dependencies in the same PR.

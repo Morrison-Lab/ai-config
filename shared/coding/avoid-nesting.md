@@ -1,9 +1,9 @@
-When writing code, **avoid nested function calls and nested function
-definitions where feasible**:
+When writing code, **don't nest function calls**, and avoid nested function definitions where feasible:
 
-- Prefer named intermediate variables (or a pipe, e.g. `|>` / `%>%` in R) over
-  deeply nested calls like `f(g(h(x)))`. Naming each step makes the data flow
-  read top-to-bottom and leaves intermediate values inspectable in a debugger.
+- Don't pass one function call's result straight into another call, as in `f(g(h(x)))`.
+  Give each intermediate result a name, or chain the steps with a pipe (`|>` / `%>%` in R);
+  pipes are fine.
+  Naming each step makes the data flow read top-to-bottom and leaves intermediate values inspectable in a debugger (Ezra Morrison, 2026-10-09: "a policy of no nested function calls (pipes are fine)").
 - Prefer standalone, top-level function definitions over functions defined
   inside other functions. Nested definitions hide reusable logic, complicate
   unit testing, and obscure scope.
@@ -16,9 +16,32 @@ definitions where feasible**:
   - **Don't:** define a helper inside its caller merely because only that
     caller uses it today.
 
-This is a readability/maintainability default, not an absolute rule --- keep the
-nesting when flattening it would be more convoluted (a trivial one-argument
-wrapper, or a closure that genuinely needs the enclosing scope).
+The nested-call rule is a policy, not a default: a nested call is a review finding.
+It covers a call whose result is a value handed to the outer call.
+It does not cover an argument the outer function captures and interprets itself: tidyselect helpers (`all_of()`, `any_of()`, `starts_with()`), data-masked expressions inside `mutate()` / `filter()` / `summarise()`, `aes()` mappings, and formulas.
+Those are part of the outer call's own syntax, and pulling them out would break or obscure it.
+
+The nested-definition rule is a readability/maintainability default, not an absolute rule --- keep the nesting when flattening it would be more convoluted (a trivial one-argument wrapper, or a closure that genuinely needs the enclosing scope).
+
+## Name `if()` conditions before testing them
+
+Pre-compute every `if()` and `while()` condition: assign it to a named logical variable first, then test that name, so the condition inside the parentheses is always a bare name.
+This holds even for a condition with no nested call, such as `is.na(strat)`, because the name is what documents the test:
+
+```r
+# Preferred --- the name states what the test means
+single_plot <- sum(lengths(trace_strat_list)) == 1
+if (single_plot) {
+
+# Avoid --- the inline expression hides a misplaced parenthesis
+if (sum(lengths(trace_strat_list) == 1)) {
+```
+
+For a `while()` loop, compute the named condition before the loop and recompute it at the end of the loop body.
+
+The inline form above was a real bug, fixed in [UCD-SERG/serodynamics#326](https://github.com/UCD-SERG/serodynamics/pull/326).
+`sum(lengths(x) == 1)` counts the strata that hold exactly one plot, so the single-plot branch ran whenever any stratum held one plot, not only when the whole result was one plot.
+Naming the condition makes the author say what it should mean (`single_plot`), which makes a misplaced parenthesis visible in review, and the named value can be inspected in a debugger before the branch runs (Ezra Morrison, 2026-10-09: "a policy that if conditions have to be pre-calculated, so that mistakes like the one fixed in [serodynamics#326] are harder to make").
 
 ## Prefer more, simpler steps over fewer, denser ones
 

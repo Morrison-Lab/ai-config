@@ -352,7 +352,8 @@ The lint and the hook flag each of them, and a rewrite uses the macro that names
 - **Manual sizing** (`\big`, `\Big`, `\bigg`, `\Bigg`, with `l`, `r` or `m`): write `\paren{...}`, `\sb{...}`, `\cb{...}`, `\abs{...}` or `\norm{...}`, which size themselves, and `\evalAt{expression}{point}` for an evaluation bar.
   Big operators such as `\bigcup` are not sizing and are not flagged.
 - **A raw transpose** (`^\top`, `^{\top}`): write `\tp{X}`, or `\pt{...}` for a parenthesized expression.
-  Write the product of two vectors as `\dprod{a}{b}` and a matrix with itself as `\stprod{X}`; a matrix times a different factor stays `\tp{X}` followed by that factor, because it is not a dot product.
+  Write the product of two vectors as `\dprod{a}{b}` and a matrix with itself as `\stprod{X}`;
+  a matrix times a different factor stays `\tp{X}` followed by that factor, because it is not a dot product.
 - **A font command used as a symbol** (`\mathbb`, `\mathcal`, `\mathscr`, `\mathfrak`): search `macros.qmd` for the concept (`\reals`, `\Nat`, `\Lik`, `\Ep`) and add one named for the concept when none exists.
   The same letter means different things on different pages, so choose from the meaning.
 

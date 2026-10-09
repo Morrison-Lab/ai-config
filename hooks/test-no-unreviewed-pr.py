@@ -2701,7 +2701,7 @@ def _test_push_alias(hookmod):
         # Unparsable and too-deep expansions cannot be read, so they arm.
         ("git -c \"alias.p=push 'unterminated\" p origin main", True),
         ("git " + " ".join(f"-c alias.a{i}=a{i + 1}" for i in range(9))
-         + " -c alias.a9=push a0 origin main", True),
+         + " -c alias.a9=status a0 origin main", True),
         # An unreadable config (git exits 128) arms too.
         ("git -C /nonexistent-1993 x origin main", True),
         ("git status && git log --oneline", False),
@@ -2719,7 +2719,7 @@ def _test_push_alias(hookmod):
         # A spent budget must arm rather than read as "not a push".
         hookmod._alias_cache.clear()
         hookmod._alias_deadline = time.monotonic() - 1
-        if hookmod.push_ident("git -c alias.q=push q origin main") is True:
+        if hookmod.push_ident("git -c alias.q=status q origin main") is True:
             passes += 1
             print("PASS: an alias read past the budget arms")
         else:

@@ -360,7 +360,8 @@ When the quantity has no macro yet, add one to `Morrison-Lab/macros` first.
 
 The pair uses prediction errors (predicted minus observed);
 `\vy - \design\vcoef` is the vector of residuals, `\vresid`.
-(Directive from the user, 2026-10-09: "remember to always decompose expressions to make each one concise; ... why not use the prediction error macro instead of `\vy - \design \vcoef`?"
+(Directive from the user, 2026-10-09: "remember to always decompose expressions to make each one concise;
+... why not use the prediction error macro instead of `\vy - \design \vcoef`?"
 Also tracked as [`Morrison-Lab/psw#140`](https://github.com/Morrison-Lab/psw/issues/140).)
 
 ## Prefer command operator macros that take arguments over manual delimiter wrappers

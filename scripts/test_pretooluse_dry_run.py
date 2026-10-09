@@ -197,6 +197,7 @@ class TestPreToolUseDryRun(unittest.TestCase):
         """PreToolUse hooks must degrade silently on non-dict tool_input (ai-config#3772)."""
         hooks_to_test = [
             ("flag-aborted-patch-script.py", "Bash"),
+            ("flag-argv-printing-process-listing.py", "Bash"),
             ("flag-add-a-outside-pathspec.py", "Bash"),
             ("flag-cd-into-main-checkout.py", "Bash"),
             ("flag-chained-push.py", "Bash"),

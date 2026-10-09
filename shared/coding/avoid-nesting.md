@@ -18,14 +18,14 @@ When writing code, **don't nest function calls**, and avoid nested function defi
 
 The nested-call rule is a policy, not a default: a nested call is a review finding.
 It covers a call whose result is a value handed to the outer call.
-It does not cover an argument the outer function captures and interprets itself: tidyselect helpers (`all_of()`, `any_of()`, `starts_with()`), data-masked expressions inside `mutate()` / `filter()` / `summarise()`, `aes()` mappings, and formulas.
+It does not cover an argument the outer function captures and interprets itself: tidyselect helpers (`all_of()`, `any_of()`, `starts_with()`), data-masked expressions inside data-masking verbs such as `mutate()` / `filter()` / `summarise()`, `aes()` mappings, and formulas.
 Those are part of the outer call's own syntax, and pulling them out would break or obscure it.
 
 The nested-definition rule is a readability/maintainability default, not an absolute rule --- keep the nesting when flattening it would be more convoluted (a trivial one-argument wrapper, or a closure that genuinely needs the enclosing scope).
 
 ## Name `if()` conditions before testing them
 
-Pre-compute every `if()` and `while()` condition: assign it to a named logical variable first, then test that name, so the condition inside the parentheses is always a bare name.
+Pre-compute every `if()` and `while()` condition: assign it to a named logical variable first, then test that name, so the condition inside the parentheses is always a bare name (or a literal, as in `while (TRUE)`).
 This holds even for a condition with no nested call, such as `is.na(strat)`, because the name is what documents the test:
 
 ```r

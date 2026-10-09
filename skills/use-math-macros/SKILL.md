@@ -335,8 +335,8 @@ Write `\outvar`/`\Outvar`/`\voutvar` for the outcome variable, not a bare `y` or
 Write `\predvar`/`\Predvar`/`\vpredvar` for a predictor, not a bare `x` or `\vx`.
 Write `\eoutvar` for a predicted outcome.
 Write `\resid`/`\vresid` for a residual (observed minus predicted) and `\prederr` for a prediction error (predicted minus observed), not a bare `e` or `\ve`;
-for an observation used in the fit, the residual is the negative of the prediction error (sds `#thm-prediction-error-residual`).
-For a parameter estimate, write `\erf{\eparam}` (estimate minus truth, sds `#def-estimation-error`).
+for an observation used in the fit, the residual is the negative of the prediction error ([sds `#thm-prediction-error-residual`](https://morrison-lab.github.io/sds/estimation.html#thm-prediction-error-residual)).
+For a parameter estimate, write `\erf{\eparam}` (estimate minus truth, [sds `#def-estimation-error`](https://morrison-lab.github.io/sds/estimation.html#def-estimation-error)).
 A letter used generically (a function argument, an integration variable) stays a letter.
 `\vx` and `\vy` remain defined;
 existing uses are converted in the sweep, [`Morrison-Lab/ai-config#4440`](https://github.com/Morrison-Lab/ai-config/issues/4440), not as a side edit.

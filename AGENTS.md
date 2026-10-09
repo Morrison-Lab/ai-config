@@ -52,7 +52,8 @@ See [`gate-external-communication`](shared/workflow/gate-external-communication.
 
 When authoring analysis figures, prefer `ggplot2` over base graphics wherever the dependency is available or appropriate to add.
 For each plot, consider whether an axis should be extended to show important reference values such as zero.
-When writing display equations, avoid placing multiple equations on one display line unless a special reason makes that layout clearer.
+One equation per display line unless a reason favors more;
+one `=` per math line ([details](shared/writing/math-derivation-steps.md)).
 Label every display equation so it receives an equation number and a stable URL.
 Write all LaTeX math, in any repo or format, with the shared semantic macros: [`use-math-macros`](skills/use-math-macros/SKILL.md).
 

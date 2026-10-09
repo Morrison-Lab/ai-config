@@ -188,7 +188,8 @@ Detail, rationale, and cases: [`shared/writing/tag-chat-output.md`](shared/writi
 
 Apply instructions at once, find recurring patterns, do the work yourself, report unreachable sources, fail on CI error annotations, keep outtakes, leave no thread idle, and name each model you choose.
 Send bulk work to other models: Codex only in UCDH projects (`bcs`, `hac`), Databricks only in the `hac` group on the UCDH GitLab.
-Free models suit any project, but no model except UCDH Codex may handle restricted data (PHI, FERPA) at present.
+Free models suit any project;
+any model may run analysis code on restricted data (PHI, FERPA), but none except UCDH Codex may read identifiable records.
 
 ## Never close a reply by offering to do work you are already allowed to do
 

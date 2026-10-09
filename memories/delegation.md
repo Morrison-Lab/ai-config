@@ -20,10 +20,12 @@ this section is self-contained.
 > "all our projects and sessions can use free models anytime they are useful, except for directly viewing restricted data (PHI/HIPAA, FERPA, etc);
 > at present, those data can only be handled by our UCDH Codex account [...]").
 > Free models (ones that cost no quota, such as OpenCode's free tier) need no quota justification, so use them whenever they are useful.
-> At present, restricted data goes only to the UCDH Codex account; see [`standing-habits-from-ezra`](../shared/workflow/standing-habits-from-ezra.md#send-bulk-work-to-other-models).
+> Any model may write and run code that analyzes restricted data (Ezra, 2026-10-09), but at present only the UCDH Codex account may read identifiable restricted data itself;
+> see [`standing-habits-from-ezra`](../shared/workflow/standing-habits-from-ezra.md#send-bulk-work-to-other-models).
 >
-> - **Do:** check whether a brief, a file it names, or a command it runs exposes restricted data before choosing any model other than UCDH Codex.
->   Where UCDH Codex may not run, no model gets the data; ask Ezra.
+> - **Do:** check whether a brief, a file it names, or a command's output would show identifiable restricted data before choosing any model other than UCDH Codex.
+>   Analysis code that returns only aggregates is fine for any model.
+>   Where UCDH Codex may not run, a person reads the identifiable data.
 > - **Don't:** read "free" as "cleared for restricted data".
 
 > [!IMPORTANT]

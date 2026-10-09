@@ -64,6 +64,19 @@ Check each line against those tells:
   OLS solutions did ("(inner derivative is $-1$)" over a line that also
   factored and summed).
 
+### One equals sign per line
+
+Put at most one equals sign on each line of math, display or inline.
+Split a chain such as `a = b = c` into the rows of an `aligned` display,
+one `&=` per row, and split a row `&= b = c` inside an existing `aligned`
+block the same way.
+Write an "all equal" claim with a quantifier:
+$H_0\colon \beta_j = 0$ for every $j$, not $\beta_1 = \cdots = \beta_p = 0$.
+Separate equations side by side (`x = 1, \quad y = 2`) are not chains.
+The canonical copy is PSW's
+[One equals sign per line](https://morrison-lab.github.io/psw/chapters/notation.html#one-equals-sign-per-line)
+(Ezra, 2026-10-09).
+
 ## Reviewing: name the gap, don't just flag it
 
 [`fact-check-prose.md`](fact-check-prose.md)'s document-internal-reasoning

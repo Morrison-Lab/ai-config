@@ -53,7 +53,6 @@ See [`gate-external-communication`](shared/workflow/gate-external-communication.
 When authoring analysis figures, prefer `ggplot2` over base graphics wherever the dependency is available or appropriate to add.
 For each plot, consider whether an axis should be extended to show important reference values such as zero.
 When writing display equations, avoid placing multiple equations on one display line unless a special reason makes that layout clearer.
-Put at most one equals sign on each line of math, display or inline: split a chain such as `a = b = c` into the rows of an `aligned` display, one `&=` per row (PSW's [One equals sign per line](https://morrison-lab.github.io/psw/chapters/notation.html#one-equals-sign-per-line)).
 Label every display equation so it receives an equation number and a stable URL.
 Write all LaTeX math, in any repo or format, with the shared semantic macros: [`use-math-macros`](skills/use-math-macros/SKILL.md).
 

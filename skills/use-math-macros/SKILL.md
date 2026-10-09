@@ -344,6 +344,20 @@ Keep `\ell` only where the text discusses the notation itself.
 (Directive from the user, 2026-10-09: "\ell is another non-semantic macro".
 Macros: [`Morrison-Lab/macros#118`](https://github.com/Morrison-Lab/macros/pull/118).)
 
+### Presentation commands are not notation: sizing, transposes and fonts
+
+Three more raw forms describe how something is drawn, not what it means.
+The lint and the hook flag each of them, and a rewrite uses the macro that names the concept:
+
+- **Manual sizing** (`\big`, `\Big`, `\bigg`, `\Bigg`, with `l`, `r` or `m`): write `\paren{...}`, `\sb{...}`, `\cb{...}`, `\abs{...}` or `\norm{...}`, which size themselves, and `\evalAt{expression}{point}` for an evaluation bar.
+  Big operators such as `\bigcup` are not sizing and are not flagged.
+- **A raw transpose** (`^\top`, `^{\top}`): write `\tp{X}`, or `\pt{...}` for a parenthesized expression.
+  Write the product of two vectors as `\dprod{a}{b}` and a matrix with itself as `\stprod{X}`; a matrix times a different factor stays `\tp{X}` followed by that factor, because it is not a dot product.
+- **A font command used as a symbol** (`\mathbb`, `\mathcal`, `\mathscr`, `\mathfrak`): search `macros.qmd` for the concept (`\reals`, `\Nat`, `\Lik`, `\Ep`) and add one named for the concept when none exists.
+  The same letter means different things on different pages, so choose from the meaning.
+
+(Directive from the user, 2026-10-09: all `\mathbb`, `\mathscr`, `\mathcal` and similar, manual sizing such as `\big`, and `\top` should be checked and replaced with semantic macros.)
+
 ### Latin letters with a fixed role: `\outvar`, `\predvar`, `\resid`
 
 A Latin letter that stands for a role in a model needs a role macro too.

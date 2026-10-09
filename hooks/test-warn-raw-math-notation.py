@@ -60,6 +60,11 @@ WARN = [
     ("Write", {"file_path": "a.md", "content": "```\n- ```\nx\n```\n\nREAL $\\mathbb{E}[Y]$"}, "\\Ep"),
     ("Write", {"file_path": "a.qmd", "content": "$\\ell(\\theta)$"}, "\\llik"),
     ("Write", {"file_path": "a.qmd", "content": "the $\\ell_1$ penalty"}, "\\lpnorm"),
+    ("Write", {"file_path": "a.qmd", "content": "$\\big( x \\big)$"}, "\\paren"),
+    ("Write", {"file_path": "a.qmd", "content": "$X^\\top y$"}, "\\tp"),
+    ("Write", {"file_path": "a.qmd", "content": "$X^{\\top}$"}, "\\tp"),
+    ("Write", {"file_path": "a.qmd", "content": "$\\mathcal{L}(\\theta)$"}, "concept macro"),
+    ("Write", {"file_path": "a.qmd", "content": "$\\mathbb{R}^n$"}, "concept macro"),
 ]
 for tool, ti, macro in WARN:
     out = hook(tool, ti)
@@ -71,10 +76,13 @@ QUIET = [
     ("Write", {"file_path": "main.py", "content": "s = '\\\\mathbb{E}'"}, "not a math-bearing file type"),
     ("Write", {"file_path": "macros/macros.qmd", "content": "\\def\\Ep{\\mathbb{E}}"}, "the library itself"),
     ("Write", {"file_path": "x.qmd", "content": "\\def\\Ex{\\operatorname{E}}"}, "a definition line"),
-    ("Write", {"file_path": "x.qmd", "content": "$\\mathbb{R}^n$"}, "an operator with no macro rule"),
+    ("Write", {"file_path": "x.qmd", "content": "$\\operatorname{rank}(A)$"}, "an operator with no macro rule"),
     ("Write", {"file_path": "x.qmd", "content": "$\\operatorname{Exp}(x)$"}, "a longer name sharing a prefix"),
     ("Write", {"file_path": "x.qmd", "content": "$\\llik(\\theta)$"}, "the macro already used"),
     ("Write", {"file_path": "x.qmd", "content": "$\\ellipsis$"}, "a longer command sharing a prefix"),
+    ("Write", {"file_path": "x.qmd", "content": "$\\bigcup_i A_i$"}, "a big operator, not delimiter sizing"),
+    ("Write", {"file_path": "x.qmd", "content": "$\\tp{X} \\dprod{a}{b}$"}, "the macros already used"),
+    ("Write", {"file_path": "x.qmd", "content": "$\\mathbf{X}$"}, "bold is not flagged"),
     ("Bash", {"command": "echo '\\mathbb{E}' > a.qmd"}, "not a file-write tool"),
     ("Write", {"file_path": "x.qmd", "content": "$\\mathbf{E}\\mathbf{x}$"}, "a bold matrix named E"),
     ("Write", {"file_path": "x.tex", "content": "$\\mathbf{P}$ and $\\mathsf{P}$"}, "a bold or sans-serif P"),

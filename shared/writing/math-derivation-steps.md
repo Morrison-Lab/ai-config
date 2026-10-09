@@ -75,7 +75,7 @@ $H_0\colon \beta_j = 0$ for every $j$, not $\beta_1 = \cdots = \beta_p = 0$.
 Separate equations side by side (`x = 1, \quad y = 2`) are not chains.
 The canonical copy is PSW's
 [One equals sign per line](https://morrison-lab.github.io/psw/chapters/notation.html#one-equals-sign-per-line)
-(Ezra, 2026-10-09).
+(Ezra, 2026-10-08).
 
 ## Reviewing: name the gap, don't just flag it
 

@@ -19,6 +19,11 @@ Two sources of rules:
   macros file, mapped from the raw `\\operatorname{X}` (or `\\mathrm{X}`,
   `\\text{X}`) back to `\\NAME`, so a new library operator is covered
   without editing this file.
+
+A third, fixed class, SYMBOL_RULES, flags notation that is not a concept:
+a bare letter symbol (`\\ell`), manual delimiter sizing (`\\big(`), a raw
+transpose (`^\\top`) and a font command used as a symbol (`\\mathbb{R}`,
+`\\mathcal{L}`), naming the macros that replace each.
 """
 from __future__ import annotations
 
@@ -36,6 +41,27 @@ BUILTIN_RULES: dict[str, str] = {
     "logit": r"\logit",
     "expit": r"\expit",
 }
+
+# Symbols that spell a letter rather than name a concept. Each maps to the
+# concept macros that replace it; the right one depends on the meaning.
+_BS = "\\\\"
+SYMBOL_RULES: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(_BS + r"ell(?![A-Za-z])"),
+     r"\llik (log-likelihood), \obsloss{i} (loss on one observation), "
+     r"\lpnorm{p} (the name of an l_p norm) or \lbound (a lower bound); "
+     r"a dummy index takes a Latin letter"),
+    # Manual delimiter sizing: the macros size themselves.
+    (re.compile(_BS + r"(?:big|Big|bigg|Bigg)[lrm]?\s*(?:[()\[\]|]|" + _BS + r"[{}|]|"
+                + _BS + r"[lr](?:vert|Vert|brace|floor|ceil|angle)(?![A-Za-z]))"),
+     r"\paren{}, \sb{}, \cb{}, \abs{}, \norm{} or \evalAt{}{} (they size themselves)"),
+    # A raw transpose.
+    (re.compile(r"\^\s*(?:\{\s*" + _BS + r"top\s*\}|" + _BS + r"top(?![A-Za-z]))"),
+     r"\tp{X}, \pt{...}, \dprod{a}{b} (a dot product) or \stprod{X}"),
+    # A font command used to spell a symbol.
+    (re.compile(_BS + r"(?:mathbb|mathcal|mathscr|mathfrak)\s*(?:\{[^{}]*\}|[A-Za-z])"),
+     r"a concept macro: \reals, \Nat, \Lik, \Ep, ... (search macros.qmd; add one "
+     r"named for the concept if none exists)"),
+]
 
 # A single letter in bold or sans-serif, or inside \text, is usually a
 # matrix, a complexity class, or prose ("E-value"), so single-letter names
@@ -271,6 +297,14 @@ def find_raw(text: str, rules: dict[str, str] | None = None, markdown: bool = Fa
         lines = list(_mask_code(lines))
     lines = _mask_definitions("\n".join(lines)).split("\n")
     for lineno, line in enumerate(lines, 1):
+        named = []
         for m in rx.finditer(line):
             name = next(g for g in m.groups() if g)
+            named.append(m.span())
             yield lineno, m.group(0), rules[name]
+        for sym, hint in SYMBOL_RULES:
+            for m in sym.finditer(line):
+                # An operator already named above (\mathbb{E}) is reported once.
+                if any(s < m.end() and m.start() < e for s, e in named):
+                    continue
+                yield lineno, m.group(0), hint

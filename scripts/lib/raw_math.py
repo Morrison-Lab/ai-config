@@ -21,7 +21,7 @@ Two sources of rules:
   without editing this file.
 
 A third, fixed class, SYMBOL_RULES, flags notation that is not a concept:
-a bare letter symbol (`\\ell`), manual delimiter sizing (`\\big(`), a raw
+a bare letter symbol (`\\ell`), manual delimiter sizing (`\\big(`, `\\left(`), a raw
 transpose (`^\\top`) and a font command used as a symbol (`\\mathbb{R}`,
 `\\mathcal{L}`), naming the macros that replace each.
 """
@@ -54,6 +54,9 @@ SYMBOL_RULES: list[tuple[re.Pattern[str], str]] = [
     (re.compile(_BS + r"(?:big|Big|bigg|Bigg)[lrm]?\s*(?:[()\[\]|]|" + _BS + r"[{}|]|"
                 + _BS + r"[lr](?:vert|Vert|brace|floor|ceil|angle)(?![A-Za-z]))"),
      r"\paren{}, \sb{}, \cb{}, \abs{}, \norm{} or \evalAt{}{} (they size themselves)"),
+    # Manual \left ... \right pairs: the same sizing, written by hand.
+    (re.compile(_BS + r"(?:left|right)(?![A-Za-z])"),
+     r"\paren{}, \sb{}, \cb{}, \set{} or \abs{} (they size themselves)"),
     # A raw transpose.
     (re.compile(r"\^\s*(?:\{\s*" + _BS + r"top\s*\}|" + _BS + r"top(?![A-Za-z]))"),
      r"\tp{X}, \pt{...}, \dprod{a}{b} (a dot product) or \stprod{X}"),

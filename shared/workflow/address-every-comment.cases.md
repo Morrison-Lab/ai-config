@@ -1122,3 +1122,12 @@ And a mutation figure is only re-derivable against the suite it was taken from.
 The counts recorded for this episode were taken before later cases landed, so
 re-running the mutation on `main` today gives different denominators.
 They are omitted here for that reason.
+
+## A scope-widening fix makes its stale copies invisible to every diff-scoped sweep
+
+(Morrison-Lab/ai-config#4442, merged 2026-10-09: an `AGENTS.md` rule widened from "attach a repo the work needs" to "attach any repo whenever it would help".
+The first commit edited all three files that state the rule, `memories/github-remote-sessions.md` included.
+In that file it rewrote one sentence of a bullet and left the sentence just above it, which still gated `add_repo` on the session "genuinely needs API or write access".
+The CI review bot caught the contradiction inside the one bullet, and the PR's third commit fixed it.
+So the miss was not an unvisited file but an unread neighbour in a file already open.
+Re-reading the whole bullet, or grepping the open file for `add_repo`, before the first push would have found it.)

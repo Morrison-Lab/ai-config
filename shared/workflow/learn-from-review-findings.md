@@ -16,7 +16,8 @@ So when you Address a finding --- as opposed to Rebut or Defer it, per [`ardi`](
 2. **Ask whether it is algorithmatizable**, per [`algorithmatize-checks`](algorithmatize-checks.md).
    A finding with a decidable condition --- a banned token, a stale cross-reference, a missing test for new logic, a doc a diff falsified --- is one a pre-push check or a hook can catch every time thereafter, so the next reviewer never has to.
    That is the mechanism half of `hooks/no-mistake-without-a-hook.py`, one class of mistake over: the reviewer's finding is the incident, and the guard built from it is what turns "the reviewer keeps catching this" into "the reviewer never sees it again".
-   For prose, `python3 scripts/check-prose-citations.py` is one such check: before a push it reports `path:N` citations past the end of a file, quotes attributed to a file (or, with `--issues`, an issue) that does not contain them, and claims about corpus state with no query beside them (ai-config#3660).
+   For prose, `python3 scripts/check-prose-citations.py` is one such check.
+   Before a push it reports `path:N` citations past the end of a file, quotes attributed to a file (or, with `--issues`, an issue) that does not contain them, and claims about corpus state with no query beside them (ai-config#3660).
 
 The UMS pass itself now fires earlier than Address: on *reading* the review,
 and on critical feedback or a questioned claim that was wrong, per

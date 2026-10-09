@@ -101,6 +101,29 @@ check("a URL port is not a path-line citation", kinds(d) == [])
 d = run("Connect to example.com:443 or host.local:8080 directly.\n")
 check("a bare host:port is not a path-line citation", kinds(d) == [])
 
+# The default (non-JSON) output: one ::warning:: per finding, then a summary.
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    git(root, "init", "-q", "-b", "main")
+    git(root, "config", "user.email", "t@example.invalid")
+    git(root, "config", "user.name", "t")
+    (root / "a.txt").write_text("one\n", encoding="utf-8")
+    (root / "doc.md").write_text("# Doc\n", encoding="utf-8")
+    git(root, "add", "-A")
+    git(root, "commit", "-q", "-m", "base")
+    git(root, "checkout", "-q", "-b", "feat")
+    with open(root / "doc.md", "a", encoding="utf-8") as fh:
+        fh.write("See `a.txt:5` here.\n")
+    git(root, "commit", "-q", "-am", "prose")
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        cpc.main(["--root", str(root), "--base", "main"])
+    text = out.getvalue()
+    check("plain output carries a workflow warning for the finding",
+          "::warning file=doc.md,line=2::[path-line]" in text)
+    check("plain output summarizes what was examined",
+          "examined 1 added line(s) in 1 file(s)" in text)
+
 # Pre-existing lines are out of scope: doc.md's base line cites :99.
 d = run("Nothing to see.\n")
 check("unchanged lines are not examined", kinds(d) == [] and d["examined_lines"] == 1)

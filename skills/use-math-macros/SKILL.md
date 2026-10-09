@@ -316,7 +316,8 @@ Prose rule: [`Morrison-Lab/psw#136`](https://github.com/Morrison-Lab/psw/pull/13
 
 The same rule covers decorators.
 `\hat`, `\tilde` and `\bar` say how a symbol is drawn, not what it means, and a hat can mark an estimate, a fitted value or a transform.
-So `\hat{\mean}` is no more semantic than `\mu`: write `\est{\mean}` (from `Morrison-Lab/macros`, which prints a hat) for an estimate, and the `\est`-based forms where a compound exists (`\ecoef{j}`, `\evcoef`, `\esig`) rather than the hat-based `\hcoef{j}`, `\hvcoef`, `\hs`.
+So `\hat{\mean}` is no more semantic than `\mu`: write `\est{\mean}` (from `Morrison-Lab/macros`, which prints a hat) for an estimate, and the `\est`-based forms where a compound exists (`\ecoef{j}`, `\evcoef`, `\esdpar`) rather than the hat-based `\hcoef{j}`, `\hvcoef`, `\hsdpar`.
+Pick a compound built on a concept macro: `\esig` and `\hs` also spell the Greek letter, so the section above already rules them out.
 When a decorated quantity has no role macro, add one to `Morrison-Lab/macros` first, as for Greek letters.
 Keep `\hat` only where the text discusses the notation itself.
 This is the target state rather than a blocker on current work: write new math this way now, and convert existing hats in their own sweep PRs.
@@ -325,7 +326,7 @@ This is the target state rather than a blocker on current work: write new math t
 - **Don't:** introduce `\hat{...}` or a hat-based compound (`\hcoef`, `\hvb`) in new math.
 
 (Directive from the user, 2026-10-08: "eventually, we want to remove even non-semantic decorators like \hat in favor of semantic macros like `\est`".
-Prose rule: `Morrison-Lab/psw` `chapters/notation/shared-macros.qmd`; detection: [`Morrison-Lab/ai-config#4381`](https://github.com/Morrison-Lab/ai-config/issues/4381).)
+Prose rule: [psw `chapters/notation/shared-macros.qmd`](https://github.com/Morrison-Lab/psw/blob/main/chapters/notation/shared-macros.qmd); sweep and detection: [`Morrison-Lab/ai-config#4438`](https://github.com/Morrison-Lab/ai-config/issues/4438).)
 
 ## Prefer command operator macros that take arguments over manual delimiter wrappers
 

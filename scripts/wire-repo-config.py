@@ -64,6 +64,11 @@ the ai-config plugin), read
 before starting work, and follow it alongside this file.
 This file's own instructions add to those rules, and win only where they are
 more specific.
+
+Also follow the [UCD-SERG Lab Manual](https://ucd-serg.github.io/lab-manual/)
+(source: <https://github.com/UCD-SERG/lab-manual>) and, for prose,
+[*Principles of Scientific Writing*](https://d-morrison.github.io/psw/)
+(source: <https://github.com/d-morrison/psw>).
 {END}
 """
 

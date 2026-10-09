@@ -62,6 +62,10 @@ An open issue or PR often contains requirements, allowlists, or prior user direc
 A session loading `Morrison-Lab/macros` in `Morrison-Lab/lds` had found an upstream defect, written that filing it "would need add_repo", and waited.
 After attaching, it filed [macros#106](https://github.com/Morrison-Lab/macros/pull/106), [#107](https://github.com/Morrison-Lab/macros/issues/107) and [#108](https://github.com/Morrison-Lab/macros/issues/108) the same evening.)
 
+(User directive, 2026-10-09, via `cai` in the `bcs` project:
+"you can always attach other repos whenever it's helpful".
+This widened the grant from repositories the work needs to any repository that would help.)
+
 ## Strict Merge Control Policy --- Infrastructure PRs standing MWC grant
 
 (User directives, 2026-09-28:

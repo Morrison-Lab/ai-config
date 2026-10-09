@@ -163,12 +163,15 @@ Two routing consequences:
 
 ## Cloud sessions: OpenCode Go over HTTP, no key needed
 
-A cloud session has no `opencode` CLI, but the agent proxy injects the OpenCode credential for `opencode.ai` in every session and worker, so `curl` works without a key (verified 2026-10-09).
+A claude.ai cloud session has no `opencode` CLI, but its agent proxy injects the OpenCode credential for `opencode.ai`, so `curl` to the chat endpoint works without a key (verified 2026-10-09).
+This does not hold in a GitHub Actions job, which has no agent proxy: there the same call returns 401 `Missing API key`.
 Use the Go endpoint `https://opencode.ai/zen/go/v1`, which draws on the Go Plus subscription.
 Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402.
 
 - `/chat/completions`: `glm-5.3`, `glm-5.3-flash`, `kimi-k3`, `deepseek-v4-pro`, `qwen3.8-max`, and others.
-- `/messages`: `claude-haiku-5-5`, `minimax-m3`.
+  Use this endpoint in a cloud session.
+  `qwen3.8-max` returned a normal reply here on 2026-10-09, although the vendor's table lists it under `/messages`.
+- `/messages` (`claude-haiku-5-5`, `minimax-m3`) returned 401 `Missing API key` through the proxy on 2026-10-09, so it is not usable there.
 - `/responses` and `/models` also exist; `/models` lists every id.
 - Send a stable `x-opencode-session` UUID header for each conversation, or the request fails with 400 `MissingSessionID`.
 

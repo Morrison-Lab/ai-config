@@ -1117,49 +1117,18 @@ REDIRECTS_REPO = re.compile(r"\A(?:GIT_DIR|GIT_WORK_TREE|GIT_NAMESPACE)=")
 # Distinct from None, which means "the hook's own cwd" and is a real answer.
 REDIRECTED = object()
 
-# A git alias whose expansion this guard could not read (a `!` shell alias, an
-# unparsable value, a chain too deep, or the time budget running out). The
-# alias may well push, so `main` refuses rather than guessing (ai-config#1993).
-UNRESOLVED_ALIAS = object()
-
-# git runs a builtin before it consults `alias.*`, so a builtin name can never be
-# an alias and needs no config read. The set only has to be a subset of git's
-# builtins: a name missing from it costs one `git config` call, while a name
-# wrongly listed would hide an alias, so external commands such as `lfs` are not
-# in it. `push` is absent because the sibling's `_argv_push` decides it.
-_GIT_BUILTINS = frozenset("""
-    add am apply archive bisect blame branch bundle cat-file check-ignore
-    checkout cherry cherry-pick clean clone commit config count-objects
-    describe diff diff-files diff-index diff-tree fetch for-each-ref
-    format-patch fsck gc grep hash-object help init log ls-files ls-remote
-    ls-tree merge merge-base mv name-rev notes pull range-diff rebase reflog
-    remote reset restore rev-list rev-parse revert rm shortlog show show-ref
-    sparse-checkout stash status submodule switch symbolic-ref tag update-ref
-    var version worktree write-tree
-""".split())
-
-# git itself stops a self-referencing chain; this bound only caps the work.
-_ALIAS_DEPTH = 8
-
-
-def _git_subcommand_index(argv: list[str]) -> int | None:
-    """Index of the subcommand in a `git ...` argv, skipping global options.
-
-    Mirrors the skip in the sibling's `_argv_push`, so both read the same word.
-    """
-    if not argv or argv[0] != "git":
-        return None
-    i = 1
-    while i < len(argv):
-        a = argv[i]
-        if a in ("-C", "-c", "--git-dir", "--work-tree", "--namespace"):
-            i += 2
-            continue
-        if a.startswith("-"):
-            i += 1
-            continue
-        return i
-    return None
+# A git alias whose expansion this guard could not read. The alias may well
+# push, so `main` refuses rather than guessing (ai-config#1993). The sentinel,
+# the subcommand index, and the expansion loop live in the sibling, which uses
+# them for its own push-arming, so the two hooks read an alias the same way.
+# With no sibling a fresh sentinel keeps the identity checks below well-defined;
+# every path that would produce one sits behind the deny a missing sibling
+# triggers.
+if _SIBLING is not None:
+    UNRESOLVED_ALIAS = _SIBLING.UNRESOLVED_ALIAS
+    _git_subcommand_index = _SIBLING._git_subcommand_index
+else:
+    UNRESOLVED_ALIAS = object()
 
 
 def _repo_overrides(prefix: list[str]) -> list[str]:
@@ -1190,57 +1159,21 @@ def _expand_push_alias(rest: list[str], env: list[str],
                        directory: str | None):
     """The push argv a git alias expands to, None, or UNRESOLVED_ALIAS.
 
-    `_argv_push` matches only the literal subcommand `push`, so `git p origin`
-    under `alias.p = push` reached no guard at all (ai-config#1993). This reads
-    `alias.<word>` through `_run_git`, under the push's own environment, its own
-    `-c` options, and its `-C` directory, then re-runs the push test on the
-    expansion. A chain (`alias.a = b`, `alias.b = push`) is followed.
-
-    Returns None when the command is not an alias of a push. Refuses rather than
-    guesses when the expansion cannot be read: a `!` alias naming `push` runs
-    an arbitrary shell command, and running out of time must not fail open the
-    way an exception reaching `main` does. A `!` alias that hides the word
-    (`!git p$x`) is not caught.
+    The loop is the sibling's `expand_push_alias`; this supplies the read. It
+    goes through `_run_git`, under the push's own environment, its own `-c`
+    options, its `--git-dir`/`--work-tree`/`--namespace` options, and its `-C`
+    directory, so the alias git will run is the one read, inside this hook's
+    time budget.
 
     The config is read in the push's `-C` directory, else the hook's cwd. A
     repository-local alias defined only in a directory an earlier `cd` moved to
     is not seen; a global or `-c` alias, the common case, is.
     """
-    seen = 0
-    while True:
-        i = _git_subcommand_index(rest)
-        if i is None:
-            return None
-        word = rest[i]
-        if word in _GIT_BUILTINS or word == "push":
-            return None
-        if seen >= _ALIAS_DEPTH:
-            return UNRESOLVED_ALIAS
-        seen += 1
-        try:
-            value = _run_git(directory, env, *_config_overrides(rest[:i]),
-                             *_repo_overrides(rest[:i]),
-                             "config", "--get", f"alias.{word}")
-        except TimeoutError:
-            return UNRESOLVED_ALIAS
-        if value is None:
-            return None
-        if value.startswith("!"):
-            # A shell alias cannot be parsed reliably. Refuse when it names a
-            # push, and let `!git log --graph` and its kind through, since
-            # refusing every shell alias would deny commands that push nothing.
-            if re.search(r"\bpush\b", value):
-                return UNRESOLVED_ALIAS
-            return None
-        try:
-            expansion = shlex.split(value)
-        except ValueError:
-            return UNRESOLVED_ALIAS
-        if not expansion:
-            return None
-        rest = rest[:i] + expansion + rest[i + 1:]
-        if _SIBLING._argv_push(rest):
-            return rest
+    def read(prefix: list[str], word: str) -> str | None:
+        return _run_git(directory, env, *_config_overrides(prefix),
+                        *_repo_overrides(prefix),
+                        "config", "--get", f"alias.{word}")
+    return _SIBLING.expand_push_alias(rest, read)
 
 
 # POSIX shlex treats an unquoted backslash as an escape, so

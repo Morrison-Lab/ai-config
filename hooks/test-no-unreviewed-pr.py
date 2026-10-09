@@ -527,6 +527,17 @@ case([bash("gh pr create --draft --title x", tid="c"), res("c", URL),
 case(create("c") + [bash("gh pr ready 1038 --undo", tid="u"), res("u", "{}"),
                     say("Held as a draft.")], False,
      "gh pr ready --undo is a draft action, not an open one")
+# The flag may come before the number (ai-config#1095): a successful undo
+# clears the PR it names, and only that one.
+case(create("c") + [bash("gh pr ready --undo 1038", tid="u"), res("u", "{}"),
+                    say("Held as a draft.")], False,
+     "gh pr ready --undo <N> clears the PR it names")
+case(create("c") + [bash("gh pr ready --undo=true 1038", tid="u"),
+                    res("u", "{}"), say("Held as a draft.")], False,
+     "gh pr ready --undo=true <N> clears the PR it names")
+case(create("c") + [bash("gh pr ready --undo 42", tid="u"), res("u", "{}"),
+                    say("Held as a draft.")], True,
+     "gh pr ready --undo <other N> does not clear this PR")
 case([use("create_pull_request", tid="c", title="x", body="y"),
       res("c", '{"number":1038,"html_url":"https://github.com/o/r/pull/1038"}'),
       use("update_pull_request", tid="u", owner="o", repo="r",

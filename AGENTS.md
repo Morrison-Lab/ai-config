@@ -393,12 +393,12 @@ The grant covers installing and updating software: R, R packages (including thro
 Do it whenever it helps, without asking (owner directive, 2026-10-02).
 A resulting lockfile change (`renv.lock`, `environment.yml`) is a repo change and goes through the normal PR flow.
 
-It covers attaching a repository the work needs (`add_repo`).
+It covers attaching any repository (`add_repo`) whenever that helps, even only to read it.
 Posting there still passes the membership gate above;
 where it does, file or fix without offering first.
 
-- **Do:** attach the repository as soon as the work needs it.
-- **Don't:** write "would need `add_repo`" and wait (ai-config#4337).
+- **Do:** attach a repository as soon as it would help.
+- **Don't:** ask first, or write "would need `add_repo`" and wait (ai-config#4337).
 
 ## Strict Merge Control Policy
 

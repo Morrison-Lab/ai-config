@@ -68,7 +68,7 @@ PREVIEW_TOOL = "mcp__Claude_Browser__preview_start"
 ACCESS_TOOL = "mcp__computer-use__request_access"
 
 BROWSER_APPS = re.compile(
-    r"\b(chrome|safari|firefox|arc|edge)\b", re.I)
+    r"\b(chrome|safari|firefox|arc|edge)\b|edgemac|thebrowser", re.I)
 
 # Render-check targets: local development hosts, file URLs, and built-site paths.
 RX_LOCAL = re.compile(

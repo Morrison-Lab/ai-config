@@ -73,6 +73,10 @@ warns("builtin navigate", "mcp__Claude_Browser__navigate", GA)
 warns("preview_start with url", "mcp__Claude_Browser__preview_start", GA)
 warns("request_access Chrome", "mcp__computer-use__request_access",
       {"apps": ["Google Chrome"]})
+warns("request_access Edge bundle id", "mcp__computer-use__request_access",
+      {"apps": ["com.microsoft.edgemac"]})
+warns("request_access Arc bundle id", "mcp__computer-use__request_access",
+      {"apps": ["company.thebrowser.Browser"]})
 warns("request_access Safari dict", "mcp__computer-use__request_access",
       {"apps": [{"displayName": "Safari"}]})
 warns("unrelated tool calls do not count as a search",

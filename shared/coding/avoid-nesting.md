@@ -30,7 +30,8 @@ This holds even for a condition with no nested call, such as `is.na(strat)`, bec
 
 ```r
 # Preferred --- the name states what the test means
-single_plot <- sum(lengths(trace_strat_list)) == 1
+n_plots <- trace_strat_list |> lengths() |> sum()
+single_plot <- n_plots == 1
 if (single_plot) {
 
 # Avoid --- the inline expression hides a misplaced parenthesis

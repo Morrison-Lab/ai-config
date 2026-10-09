@@ -33,9 +33,13 @@ This holds even for a condition with no nested call, such as `is.na(strat)`, bec
 n_plots <- trace_strat_list |> lengths() |> sum()
 single_plot <- n_plots == 1
 if (single_plot) {
+  # ...
+}
 
 # Avoid --- the inline expression hides a misplaced parenthesis
 if (sum(lengths(trace_strat_list) == 1)) {
+  # ...
+}
 ```
 
 For a `while()` loop, compute the named condition before the loop and recompute it at the end of the loop body.

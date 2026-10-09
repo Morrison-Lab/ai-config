@@ -527,8 +527,11 @@
 - Reference material derived from a repo's own code constants --- tables of values, spawn layouts, file-format/API semantics --- belongs in THAT repo's docs next to the code, not in central `ai-config` memory.
   A memory copy rots silently when the constants change (nobody editing the game/library code thinks to update a memory in another repo) and isn't discoverable by human contributors.
   Keep the durable *lesson/gotcha* in memory and point at the in-repo docs for the tables. (Learned splitting a sparta scenario cheat-sheet: the lesson "team 0 is stationary by default" now lives in sparta's `CLAUDE.md`; the speed/UID/order-target tables live in sparta's `demos/README.md` + `REPLAY.md` --- ai-config#1 / lacaedemon/sparta#207.)
-- Avoid nested function calls and nested function definitions where feasible --- prefer named intermediate variables (or a pipe, e.g. `|>` / `%>%` in R) over `f(g(h(x)))`, and prefer top-level function definitions over functions defined inside other functions.
-  Keep the nesting only when flattening it would be more convoluted. (CLAUDE.md "Coding style" section has the full rationale.)
+- Don't nest function calls: name each intermediate or use a pipe (`|>` / `%>%` in R) instead of `f(g(h(x)))`;
+  a nested call is a review finding.
+  Name every `if()`/`while()` condition before testing it.
+  Avoid nested function definitions where feasible, keeping one only when flattening it would be more convoluted.
+  ([`avoid-nesting`](../shared/coding/avoid-nesting.md) has the carve-outs and rationale.)
 - Follow the SERG lab manual (https://ucd-serg.github.io/lab-manual/) for coding and collaboration conventions.
 - Always hyperlink named artifacts in prose wherever a URL exists (PRs, MRs, reviews, review comments, issue comments, issues, commits, checks, jobs, pipelines, workflow runs).
   Whenever mentioning pull requests or issues in chat responses, recaps,

@@ -57,8 +57,15 @@ What converged on both PRs was one more `agy` run, with the answered items liste
 On #4427 that run was on the same head, with no push.
 On #4434 the real nits were fixed in the push that also merged the base, and that push's `agy` run reported `### Findings` as `None.` beside `Ready for merge`, which scored exit 0.
 
+A skip list can also hide a real finding.
+On #4431 at `72f7a3e3`, an `agy` run given a skip list reported `None`, while the Claude review of the same head found a real deadlock in the branch scope.
+So a `None` from a run with a skip list counts only beside an independent reviewer's verdict on the same head.
+
 - **Do:** fix the real nits once, answer the rest on the PR, then give `agy` the answered list and ask only for new findings.
-- **Do:** fold nit fixes into a push you owe anyway, such as a base sync, so they cost no extra review cycle.
+- **Do:** list only items that were actually answered on the PR, never a whole area of the diff.
+- **Do:** trust that run's `None` only when an independent reviewer has also reviewed the same head.
+- **Do:** when a push is owed anyway, such as a base sync, fold the nit fixes into it so they cost no extra review cycle.
+  When none is owed, make one push carrying every accepted nit fix, then one `agy` run.
 - **Don't:** push once per `agy` round to clear its newest nit list.
 - **Don't:** write "Blocking findings: None" in a review.
   The scorer reads it as not-clean (#4428).

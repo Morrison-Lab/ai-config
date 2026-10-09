@@ -1114,10 +1114,12 @@ When wiring a pre-tool hook to support both Claude Code and Antigravity:
 
 On #4431 (fixing #3270), self-review rounds swung between two scopes for a `Stop` hook's hold.
 Holding only the reviewed tip was too narrow and still deadlocked;
-holding every checkout looked like a loophole.
+holding every checkout was then challenged as too broad.
 The Claude review settled it by reading the guard: `no-push-without-self-review.py` refuses every push while the latest verdict is `needs_work`, so the `Stop` hook must hold every checkout too.
 The one carve-out is a branch whose tip has moved past the reviewed commit, as a descendant or with the reviewed commit in the branch's own reflog after an amend or rebase.
 There the session has an action it can take, so the hook says to re-dispatch the reviewer instead.
+The carve-out changes only that message, which `hooks/test-no-unshipped-commit.py` asserts.
+The push guard still refuses the unreviewed tip until a new verdict lands.
 
 Each wrong scope looked plausible to a same-model reviewer, and only a trace against the guard's own refusal condition (`verify_review`) decided it.
 

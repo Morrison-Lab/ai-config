@@ -242,6 +242,12 @@ See [`upgrade-to-gha`](shared/workflow/upgrade-to-gha.md).
 Treat token cost as a property of a workflow's **shape**: route bounded mechanical work to cheaper models, subagents, or separately-billed CLIs.
 See [`restructure-for-efficiency`](shared/workflow/restructure-for-efficiency.md) and [`merge-queue`](shared/workflow/merge-queue.md).
 
+When Claude quota is low, route bulk, mechanical, and review work to OpenCode Go first.
+Claude orchestrates and verifies what comes back.
+In a cloud session no key is needed, because the proxy injects auth for `opencode.ai`.
+Use the Go endpoint, with the recipe in [`delegate-to-opencode`](skills/delegate-to-opencode/SKILL.md)'s "Cloud sessions" section.
+Never send student data (FERPA records) to any LLM, and never use Codex.
+
 ## Keep ai-config and repo checkouts fresh
 
 Before starting work, update the current checkout and relevant submodules (`git pull --ff-only`, `git submodule update --init --recursive`).

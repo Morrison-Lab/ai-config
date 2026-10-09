@@ -56,6 +56,11 @@ This fragment is the agent-facing copy: follow the rules, and link to psw instea
   Add each package to the repository's render dependencies in the same PR.
   Ezra's `rme` notes show the patterns;
   the wording is canonical in psw's "Present R results with modern packages".
+- **Use dplyr over base R for data manipulation.**
+  Select columns with `dplyr::select()`, filter rows with `filter()`, add columns with `mutate()`, drop missing rows with `tidyr::drop_na()`, stack data frames with `bind_rows()` and build them with `tibble::tibble()`, chained with `|>`.
+  Never write `df[, cols]`, `df[df$x > 0, ]`, `subset()`, `df$new <- ...`, `complete.cases()`, `rbind()` on data frames, or `data.frame()` (Ezra, 2026-10-09).
+  Indexing a matrix or vector, and reading one value for inline code, is fine.
+  The wording is canonical in psw's "Manipulate data with dplyr, not base R".
 - **Cross-reference only what the reader has already seen.**
   Never point to a figure, table, equation or result that appears later (Ezra, 2026-10-08).
   Put a figure directly after the sentence that refers to it, and make the example that shows the figure, not an earlier definition, refer to it.

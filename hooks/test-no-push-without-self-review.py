@@ -4101,6 +4101,11 @@ def alias_cases() -> tuple[int, int]:
              f"git -C {REPO} -c 'alias.lg=!git log' lg", [], False, None),
             ("an undefined subcommand is not a push",
              f"git -C {REPO} p origin feature", [], False, None),
+            # git config exits 128 here: an alias it cannot read is refused,
+            # not read as unset (#4436 review).
+            ("an alias in an unreadable config is refused",
+             f"git -C {REPO}/no-such-dir-4436 p origin feature", [], True,
+             "alias"),
             ("a builtin is not looked up and is not a push",
              f"git -C {REPO} status", [], False, None),
         ):

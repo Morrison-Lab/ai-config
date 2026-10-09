@@ -1172,7 +1172,8 @@ def _expand_push_alias(rest: list[str], env: list[str],
     def read(prefix: list[str], word: str) -> str | None:
         return _run_git(directory, env, *_config_overrides(prefix),
                         *_repo_overrides(prefix),
-                        "config", "--get", f"alias.{word}")
+                        "config", "--get", f"alias.{word}",
+                        unreadable_raises=True)
     return _SIBLING.expand_push_alias(rest, read)
 
 
@@ -1592,8 +1593,13 @@ _DEADLINE = [0.0]
 _OMO_SEQ = [0]
 
 
-def _run_git(directory: str | None, env: list[str], *args: str) -> str | None:
+def _run_git(directory: str | None, env: list[str], *args: str,
+             unreadable_raises: bool = False) -> str | None:
     """Run one git command inside the shared budget; None if it failed.
+
+    With `unreadable_raises`, only exit 1 (git config's "key not set") reads
+    as None; any other failure raises LookupError, so an alias read that could
+    not run is not mistaken for an unset alias (ai-config#1993).
 
     EVERY git call goes through here, deliberately. An earlier revision budgeted
     only `_rev_parse` and let `_git_config`/`_rev_parse_ref` carry their own
@@ -1644,8 +1650,12 @@ def _run_git(directory: str | None, env: list[str], *args: str) -> str | None:
                              **NO_WINDOW)
     except subprocess.TimeoutExpired:
         raise TimeoutError("ran out of time resolving what this push would ship")
-    except Exception:
+    except Exception as exc:
+        if unreadable_raises:
+            raise LookupError("git could not run") from exc
         return None
+    if unreadable_raises and out.returncode not in (0, 1):
+        raise LookupError(f"git exited {out.returncode}")
     return out.stdout.strip() if out.returncode == 0 else None
 
 
@@ -3141,7 +3151,8 @@ def main() -> int:
             if directory is UNRESOLVED_ALIAS:
                 deny("this git command runs an alias whose expansion this guard "
                      "could not read (a `!` shell alias naming `push`, an "
-                     "unparsable value, or a chain too deep), so whether it "
+                     "unparsable value, a chain too deep, or a git config "
+                     "that could not be read), so whether it "
                      "pushes, and what, cannot be determined; spell the push "
                      "out as `git push ...`")
                 return 0

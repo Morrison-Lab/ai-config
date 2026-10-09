@@ -21,15 +21,21 @@ def transcript(entries):
     """entries: ('user', text) | ('tool_result',) | (tool_name, input_dict)."""
     fh = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False,
                                      encoding="utf-8")
-    for e in entries:
+    last_id = None
+    for n, e in enumerate(entries):
         if e[0] == "user":
             rec = {"type": "user", "message": {"role": "user", "content": e[1]}}
+            if len(e) > 2:
+                rec.update(e[2])
         elif e[0] == "tool_result":
             rec = {"type": "user", "message": {"role": "user", "content": [
-                {"type": "tool_result", "tool_use_id": "x", "content": "ok"}]}}
+                {"type": "tool_result", "tool_use_id": last_id,
+                 "content": "ok"}]}}
         else:
+            last_id = f"toolu_{n}"
             rec = {"type": "assistant", "message": {"content": [
-                {"type": "tool_use", "name": e[0], "input": e[1]}]}}
+                {"type": "tool_use", "id": last_id, "name": e[0],
+                 "input": e[1]}]}}
         fh.write(json.dumps(rec) + "\n")
     fh.close()
     return fh.name
@@ -125,6 +131,40 @@ silent("exempt preview_start localhost", "mcp__Claude_Browser__preview_start",
        {"url": "http://localhost:5173"})
 warns("localhost-lookalike host is not exempt",
       "mcp__claude-in-chrome__navigate", {"url": "https://localhost.evil.com/"})
+
+# ---- the call under evaluation is already the last transcript record
+warns("evaluated call itself in the transcript, unanswered",
+      "mcp__claude-in-chrome__navigate", GA,
+      [USER, ("mcp__claude-in-chrome__navigate", GA)])
+silent("answered earlier browser call suppresses",
+       "mcp__claude-in-chrome__navigate", GA,
+       [USER, ("mcp__claude-in-chrome__navigate", GA), ("tool_result",),
+        ("mcp__claude-in-chrome__navigate", GA)])
+
+# ---- harness-injected user records do not reset the turn
+SEARCHED = [USER, ("WebSearch", {"query": "x"}), ("tool_result",)]
+silent("skill-load meta record keeps the search",
+       "mcp__claude-in-chrome__navigate", GA,
+       SEARCHED + [("user", "skill body",
+                    {"isMeta": True, "sourceToolUseID": "toolu_1"})])
+silent("sidechain user record keeps the search",
+       "mcp__claude-in-chrome__navigate", GA,
+       SEARCHED + [("user", "sub-agent prompt", {"isSidechain": True})])
+silent("hook feedback record keeps the search",
+       "mcp__claude-in-chrome__navigate", GA,
+       SEARCHED + [("user", "[SYSTEM NOTIFICATION - NOT USER INPUT] tick")])
+
+# ---- remote URLs containing _site/ are not render checks
+warns("remote _site path is not exempt", "mcp__claude-in-chrome__navigate",
+      {"url": "https://admin.example.com/_site/x"})
+warns("_site in a query string is not exempt",
+      "mcp__claude-in-chrome__navigate",
+      {"url": "https://evil.example/?next=/_site/x"})
+
+# ---- back/forward and missing url are not visits
+silent("navigate back", "mcp__claude-in-chrome__navigate", {"url": "back"})
+silent("navigate forward", "mcp__Claude_Browser__navigate", {"url": "forward"})
+silent("navigate with no url", "mcp__claude-in-chrome__navigate", {})
 
 # ---- fail open
 silent("missing transcript", "mcp__claude-in-chrome__navigate", GA,

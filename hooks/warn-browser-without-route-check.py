@@ -43,6 +43,23 @@ import os
 import re
 import sys
 
+HERE = os.path.dirname(os.path.realpath(__file__))
+_LIB = os.path.join(os.path.dirname(HERE), "scripts", "lib")
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+try:
+    from transcript_meta import is_hook_feedback, is_skill_load_meta
+except Exception as _exc:  # broken install: degrade loudly, not silently
+    print(f"warn-browser-without-route-check: cannot load "
+          f"scripts/lib/transcript_meta.py ({_exc}); harness-injected user "
+          f"records may reset the turn", file=sys.stderr)
+
+    def is_skill_load_meta(entry):  # noqa: D103
+        return False
+
+    def is_hook_feedback(entry):  # noqa: D103
+        return False
+
 NAV_TOOLS = (
     "mcp__claude-in-chrome__navigate",
     "mcp__Claude_Browser__navigate",
@@ -59,7 +76,8 @@ RX_LOCAL = re.compile(
     r"(?::\d+)?(?:[/?#]|$)|file://)",
     re.I,
 )
-RX_SITE_PATH = re.compile(r"(?:^|[/\\])_site[/\\]")
+RX_SCHEME = re.compile(r"^\s*[a-z][a-z0-9+.-]*://", re.I)
+RX_SITE_PATH =re.compile(r"(?:^|[/\\])_site[/\\]")
 
 SEARCH_TOOLS = ("WebFetch", "WebSearch", "ToolSearch")
 RX_ROUTE_BASH = re.compile(r"mcp\s+list|command\s+-v|\bwhich\s|--help|\bgh\s+api\b")
@@ -85,7 +103,10 @@ def browser_target(tool_name, tool_input):
     if not isinstance(tool_input, dict):
         tool_input = {}
     if tool_name in NAV_TOOLS:
-        return True, _is_render_target(tool_input.get("url"))
+        url = tool_input.get("url")
+        if _is_history_or_empty(url):
+            return False, False
+        return True, _is_render_target(url)
     if tool_name == PREVIEW_TOOL:
         url = tool_input.get("url")
         if not url:
@@ -107,12 +128,23 @@ def browser_target(tool_name, tool_input):
 def _is_render_target(url):
     if not isinstance(url, str) or not url.strip():
         return False
-    return bool(RX_LOCAL.match(url) or RX_SITE_PATH.search(url))
+    if RX_LOCAL.match(url):
+        return True
+    if RX_SCHEME.match(url):
+        return False  # a `_site/` segment in a remote URL is not a render check
+    return bool(RX_SITE_PATH.search(url))
+
+
+def _is_history_or_empty(url):
+    """navigate's documented back/forward, or no url at all: not a visit."""
+    return not isinstance(url, str) or url.strip().lower() in ("", "back", "forward")
 
 
 def _is_real_user_message(rec):
     """True for the user's own turn, False for a tool_result record."""
     if (rec.get("type") or rec.get("role")) != "user":
+        return False
+    if rec.get("isSidechain") or is_skill_load_meta(rec) or is_hook_feedback(rec):
         return False
     content = (rec.get("message") or {}).get("content")
     if isinstance(content, str):
@@ -129,7 +161,17 @@ def _tool_uses(rec):
         return
     for block in content:
         if isinstance(block, dict) and block.get("type") == "tool_use":
-            yield block.get("name") or "", block.get("input") or {}
+            yield (block.get("id") or "", block.get("name") or "",
+                   block.get("input") or {})
+
+
+def _collect_result_ids(rec, out):
+    content = (rec.get("message") or {}).get("content")
+    if not isinstance(content, list):
+        return
+    for block in content:
+        if isinstance(block, dict) and block.get("type") == "tool_result":
+            out.add(block.get("tool_use_id") or "")
 
 
 def is_route_search(name, tool_input):
@@ -149,7 +191,8 @@ def turn_state(transcript_path):
     if not transcript_path or not os.path.exists(transcript_path):
         return None
     searched = False
-    prior_browser_call = False
+    browser_ids = set()
+    result_ids = set()
     with open(transcript_path, "r", encoding="utf-8", errors="replace") as fh:
         for line in fh:
             line = line.strip()
@@ -163,15 +206,19 @@ def turn_state(transcript_path):
                 continue
             if _is_real_user_message(rec):
                 searched = False
-                prior_browser_call = False
+                browser_ids = set()
+                result_ids = set()
                 continue
-            for name, tool_input in _tool_uses(rec):
+            _collect_result_ids(rec, result_ids)
+            for tool_id, name, tool_input in _tool_uses(rec):
                 if is_route_search(name, tool_input):
                     searched = True
                 is_browser, exempt = browser_target(name, tool_input)
-                if is_browser and not exempt:
-                    prior_browser_call = True
-    return searched, prior_browser_call
+                if is_browser and not exempt and tool_id:
+                    browser_ids.add(tool_id)
+    # The call under evaluation is already in the transcript when PreToolUse
+    # runs but has no result yet, so only answered browser calls are "prior".
+    return searched, bool(browser_ids & result_ids)
 
 
 def main():

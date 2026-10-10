@@ -187,6 +187,50 @@ silent("navigate back", "mcp__claude-in-chrome__navigate", {"url": "back"})
 silent("navigate forward", "mcp__Claude_Browser__navigate", {"url": "forward"})
 silent("navigate with no url", "mcp__claude-in-chrome__navigate", {})
 
+# ---- cloud-session twins under mcp__remote-devices__
+warns("remote-devices built-in navigate",
+      "mcp__remote-devices__Claude_Browser__navigate", GA)
+warns("remote-devices preview_start with url",
+      "mcp__remote-devices__Claude_Browser__preview_start", GA)
+warns("remote-devices computer request_access Chrome",
+      "mcp__remote-devices__computer_request_access", {"apps": ["Google Chrome"]})
+silent("remote-devices preview_start by name",
+       "mcp__remote-devices__Claude_Browser__preview_start", {"name": "dev"})
+silent("remote-devices navigate to localhost",
+       "mcp__remote-devices__Claude_Browser__navigate",
+       {"url": "http://localhost:3000"})
+silent("remote-devices request_access non-browser",
+       "mcp__remote-devices__computer_request_access", {"apps": ["Notes"]})
+silent("remote-devices unrelated tool",
+       "mcp__remote-devices__Claude_Browser__read_page", {})
+silent("remote-devices navigate discharged by search",
+       "mcp__remote-devices__Claude_Browser__navigate", GA,
+       [USER, ("WebSearch", {"query": "x"}), ("tool_result",)])
+silent("answered remote-devices navigate counts as prior",
+       "mcp__claude-in-chrome__navigate", GA,
+       [USER, ("mcp__remote-devices__Claude_Browser__navigate", GA),
+        ("tool_result",)])
+
+# ---- a user turn that mixes an injected prefix with typed text re-arms
+warns("injected prefix plus typed text is a real turn",
+      "mcp__claude-in-chrome__navigate", GA,
+      SEARCHED + [("user", "<system-reminder>x</system-reminder>\ndo the next thing")])
+warns("injected block beside a typed text block is a real turn",
+      "mcp__claude-in-chrome__navigate", GA,
+      SEARCHED + [("user", [{"type": "text", "text": "<system-reminder>x</system-reminder>"},
+                            {"type": "text", "text": "next task"}])])
+
+# ---- request_access argument shapes and PowerShell discharge
+warns("request_access string-form apps", "mcp__computer-use__request_access",
+      {"apps": "Firefox"})
+warns("request_access name-key dict", "mcp__computer-use__request_access",
+      {"apps": [{"name": "Arc"}]})
+silent("request_access with no apps", "mcp__computer-use__request_access", {})
+silent("discharged by a PowerShell route check",
+       "mcp__claude-in-chrome__navigate", GA,
+       [USER, ("PowerShell", {"command": "Get-Command gcloud; gcloud --help"}),
+        ("tool_result",)])
+
 # ---- fail open
 silent("missing transcript", "mcp__claude-in-chrome__navigate", GA,
        path="/nonexistent/transcript.jsonl")

@@ -17,6 +17,9 @@ Fires only when ALL of these hold:
        - `mcp__Claude_Browser__preview_start` whose input has a `url`
        - `mcp__computer-use__request_access` whose `apps` name a browser
          (Chrome, Safari, Firefox, Arc, Edge)
+       - the cloud-session twins of those tools under the
+         `mcp__remote-devices__` prefix (the access tool by its
+         `request_access` suffix)
   2. The target is not a render check: localhost, 127.0.0.1, `*.localhost`,
      `file://`, and `_site/` paths are exempt.
   3. No earlier tool call since the last real user message is a route search:
@@ -48,17 +51,18 @@ _LIB = os.path.join(os.path.dirname(HERE), "scripts", "lib")
 if _LIB not in sys.path:
     sys.path.insert(0, _LIB)
 try:
-    from transcript_meta import is_hook_feedback, is_skill_load_meta
+    from transcript_meta import is_real_user_turn
 except Exception as _exc:  # broken install: degrade loudly, not silently
     print(f"warn-browser-without-route-check: cannot load "
           f"scripts/lib/transcript_meta.py ({_exc}); harness-injected user "
           f"records may reset the turn", file=sys.stderr)
 
-    def is_skill_load_meta(entry):  # noqa: D103
-        return False
-
-    def is_hook_feedback(entry):  # noqa: D103
-        return False
+    def is_real_user_turn(entry):  # noqa: D103
+        content = (entry.get("message") or {}).get("content")
+        return entry.get("type") == "user" and not (
+            isinstance(content, list) and any(
+                isinstance(b, dict) and b.get("type") == "tool_result"
+                for b in content))
 
 NAV_TOOLS = (
     "mcp__claude-in-chrome__navigate",
@@ -79,10 +83,6 @@ RX_LOCAL = re.compile(
 # A filesystem path: absolute, home-relative, dot-relative, a drive letter, or
 # dotless leading segments (a host has a dot before its first slash).
 RX_FS_PATH = re.compile(r"^\s*(?:[/~]|\.{1,2}[/\\]|[A-Za-z]:[\\/]|[\w-]+[/\\])")
-# User records the harness injects that are not a person's turn.
-RX_INJECTED_USER = re.compile(
-    r"^\s*(?:<(?:system-reminder|task-notification|command-name|"
-    r"local-command-stdout)\b|\[Request interrupted)", re.I)
 RX_SITE_PATH = re.compile(r"(?:^|[/\\])_site[/\\]")
 
 SEARCH_TOOLS = ("WebFetch", "WebSearch", "ToolSearch")
@@ -99,15 +99,36 @@ MESSAGE = (
     "Before continuing, check for a route (a WebSearch or WebFetch of the "
     "service's API docs, ToolSearch for an MCP, `claude mcp list`, "
     "`command -v <cli>`, a CLI `--help`, `gh api`). In your next reply, say "
-    "which CLI, MCP, or API route you checked, or why none fits.\n\n"
+    "which CLI, MCP, or API route you checked, or why none fits (a task that "
+    "is itself visual, such as checking a deployed preview page, is a "
+    "sufficient reason: say so).\n\n"
     "This is a reminder, not a refusal."
 )
+
+
+REMOTE_PREFIX = "mcp__remote-devices__"
+
+
+def _canonical_tool(name):
+    """Map a cloud-session `mcp__remote-devices__*` tool to its local name.
+
+    A cloud session links the same browser and computer-use tools under the
+    `mcp__remote-devices__` prefix. The computer-use access tool is matched by
+    its `request_access` suffix, since its remote spelling is not fixed.
+    """
+    if not isinstance(name, str) or not name.startswith(REMOTE_PREFIX):
+        return name
+    rest = name[len(REMOTE_PREFIX):]
+    if rest.endswith("request_access"):
+        return ACCESS_TOOL
+    return "mcp__" + rest
 
 
 def browser_target(tool_name, tool_input):
     """(is_browser_call, exempt) for this tool call."""
     if not isinstance(tool_input, dict):
         tool_input = {}
+    tool_name = _canonical_tool(tool_name)
     if tool_name in NAV_TOOLS:
         url = tool_input.get("url")
         if _is_history_or_empty(url):
@@ -144,25 +165,6 @@ def _is_render_target(url):
 def _is_history_or_empty(url):
     """navigate's documented back/forward, or no url at all: not a visit."""
     return not isinstance(url, str) or url.strip().lower() in ("", "back", "forward")
-
-
-def _is_real_user_message(rec):
-    """True for the user's own turn, False for a tool_result record."""
-    if (rec.get("type") or rec.get("role")) != "user":
-        return False
-    if rec.get("isSidechain") or is_skill_load_meta(rec) or is_hook_feedback(rec):
-        return False
-    content = (rec.get("message") or {}).get("content")
-    if isinstance(content, str):
-        return not RX_INJECTED_USER.match(content)
-    if isinstance(content, list):
-        if any(isinstance(b, dict) and b.get("type") == "tool_result"
-               for b in content):
-            return False
-        texts = [b.get("text") or "" for b in content
-                 if isinstance(b, dict) and b.get("type") == "text"]
-        return not (texts and all(RX_INJECTED_USER.match(t) for t in texts))
-    return False
 
 
 def _tool_uses(rec):
@@ -214,7 +216,7 @@ def turn_state(transcript_path):
                 continue
             if not isinstance(rec, dict):
                 continue
-            if _is_real_user_message(rec):
+            if is_real_user_turn(rec):
                 searched = False
                 browser_ids = set()
                 result_ids = set()

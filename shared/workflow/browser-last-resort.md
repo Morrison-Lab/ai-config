@@ -30,4 +30,4 @@ A check afterwards, on 2026-10-09, found that the Analytics Admin API reference 
 for account data-sharing settings,
 while it documents create and update methods for the property, stream and retention settings set up in the browser on 2026-09-25.
 So the browser was needed for one of the two tasks, and neither was checked beforehand.
-A preference bullet in `memories/preferences.md`, present since 2026-09-30 (#4173), already said the browser is a last resort, but neither `AGENTS.md` nor `CLAUDE.md` imports that file or quotes the bullet.)
+A preference bullet in `memories/preferences.md`, added on 2026-09-22 (#3868), already said the browser is a last resort, but neither `AGENTS.md` nor `CLAUDE.md` imports that file or quotes the bullet.)

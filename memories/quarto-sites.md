@@ -726,3 +726,28 @@ Put the justification in the prose around the equation, or in a plain-text `\tex
 - **Don't:** put `@def-...`, `@thm-...` or `@exr-...` inside `\text{}` in math and trust it to link.
 
 ([`Morrison-Lab/sds#54`](https://github.com/Morrison-Lab/sds/pull/54), 2026-10-05: caught on the rendered preview, not by the build.)
+
+## A markdown link whose target is `@sec-...` is not a cross-reference; confirm a link form against the rendered HTML
+
+Quarto resolves `@sec-foo` written as running text, and `[text](#sec-foo)` is a plain in-page anchor.
+The hybrid `[text](@sec-foo)` is neither: Quarto leaves the href as the literal string `@sec-foo`, so the link is broken.
+Measured 2026-10-10 on <https://ucd-serg.github.io/lab-manual/communication.html>, which renders `<a href="@sec-collab-dev">`.
+The build does not fail, and the `?@` sweep in the `check-rendered-refs` skill does not match it, because nothing is unresolved from Quarto's point of view.
+An automated reviewer and the lab manual's own `CLAUDE.md` both called the form valid, so agreement between a reviewer and a project doc is not evidence about what the renderer does.
+Tracked in [UCD-SERG/lab-manual#553](https://github.com/UCD-SERG/lab-manual/issues/553).
+No ai-config fragment recommends the form (grepped `shared/`, `memories/`, and `skills/` for a `](@` target on 2026-10-10).
+
+- **Do:** write `@sec-foo` bare for a cross-reference, or `[text](#sec-foo)` for custom link text within one page, and grep the rendered HTML for `href="@` after adding either.
+- **Do:** confirm a link form against the rendered HTML before recommending it in a review or writing it into a project doc.
+- **Don't:** recommend `[text](@sec-...)` as a cross-reference, or accept it because a reviewer or a repo's `CLAUDE.md` says it is valid.
+
+## Link stub chapters to the new site by explicit heading ids, not by Quarto's automatic ones
+
+When chapters move to a new Quarto website and the old repo keeps stubs that link into the new site, a link such as `new-site/page.html#some-heading` relies on the id Quarto generates from the heading text.
+Rewording the heading changes the id, and the link still loads the page, just not the section.
+`lychee` checks that the page exists and does not check fragments, so the link check stays green.
+
+- **Do:** give every heading a stub links to an explicit `{#sec-...}` id in the new site, and link to that id.
+- **Don't:** link to an automatically generated heading id and rely on the link checker to notice when a rewording breaks it.
+
+([`Morrison-Lab/psc#6`](https://github.com/Morrison-Lab/psc/issues/6), 2026-10-10: tracks adding the ids to the headings the lab-manual stubs link to.)

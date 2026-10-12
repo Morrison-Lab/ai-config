@@ -73,4 +73,3 @@ which is [`algorithmatize-checks`](../shared/workflow/algorithmatize-checks.md)
 applied to a human decision rather than to a verification step.
 That is strictly stronger, which is exactly why it's reserved:
 it suppresses a mistake at the cost of suppressing the PR's own review and auto-merge machinery.
-

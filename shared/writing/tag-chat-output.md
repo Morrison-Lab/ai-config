@@ -56,4 +56,4 @@ Prefixed, no box (informational, frequent):
 
 Keep the markers stable so they become muscle memory.
 The set-apart ❓ **QUESTION** format also gives the `prompt-me` / `prompt-me-all` skills a reliable signal to key off when they sweep the transcript for unanswered questions later.
-The user may tune the emoji set; the full taxonomy and rationale live in `memories/preferences.md`.
+The user may tune the emoji set; the full taxonomy and rationale live in `memories/output-highlighting.md`.

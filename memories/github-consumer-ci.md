@@ -103,3 +103,10 @@ A mutable tag cuts both ways --- it is the single point where an upstream regres
 The action 404s at both `v2` and `main` (`gh api "repos/Morrison-Lab/gha/contents/.github/actions/classify-review-verdict/action.yml?ref=v2"`) because #813 was still open, unmerged --- it exists only on the PR's own branch.
 Downstream: `Morrison-Lab/ai-config`#3000, since `ai-config/.github/workflows/claude-review.yml:50` pins `Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2`;
 `ai-config` PR #2999 is red on `review/post-review`, `review/require-clean-verdict`, and `review/require-review` for exactly this reason, while `review/claude-review` itself passes --- the review runs fine, and only the verdict-classifying step downstream of it fails.)
+
+## A repo's CI token cannot see the org's other private repos
+The `GITHUB_TOKEN` a workflow runs with is scoped to its own repository.
+So the Claude review on one private repo reports a sibling private repo as nonexistent, and flags any comment that cites it as a fabricated reference.
+- **Do:** cite the public or shared source (here `Morrison-Lab/gha`) in committed comments.
+- **Don't:** cite a private sibling repo as provenance in another repo's files.
+(2026-10-07, Morrison-Lab/wwu#91: the review called `Morrison-Lab/mlr` and `Morrison-Lab/mln` nonexistent.)

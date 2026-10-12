@@ -44,5 +44,5 @@ Ask separately whether one PR asserts something the other makes true.
 For a citation the better fix is to dissolve the dependency rather than sequence it,
 by phrasing it as a conditional that is accurate either way ---
 see [`challenge-ambiguous-terminology`](challenge-ambiguous-terminology.md)'s cross-repo citation trap, which applies to a same-repo sibling PR unchanged.
-The rationale behind each surface lives in `memories/preferences.md`,
+The rationale behind each surface lives in `memories/output-highlighting.md`,
 alongside the rest of the taxonomy.

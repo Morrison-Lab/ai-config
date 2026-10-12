@@ -101,7 +101,7 @@ and a parent that is a `[Request interrupted by user]` message from another sess
   before recording a placeholder reply as a recurrence of this rule.
 - **Don't:** count a `<synthetic>` stand-in as a model lapse.
 
-(Second observation, 2026-10-12, in a cloud orchestrator session idle on background-task wakes, session `b444f397`, transcript line 1877:
+(Second observation, 2026-10-11 PDT, in a cloud orchestrator session idle on background-task wakes, session `b444f397`, transcript line 1877:
 the reply was `No response requested.` with `"model":"<synthetic>"`, `"stop_reason":"stop_sequence"` and `output_tokens` 0.
 The `model` check above ran before recording it, so it is filed here as a stand-in, not as a recurrence.
 The orchestrator had first reported it as one.)

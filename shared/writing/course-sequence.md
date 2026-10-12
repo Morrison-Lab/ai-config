@@ -7,6 +7,10 @@ Place content, and direct links, according to it.
 
 ```
 mds -> pds -> sds -+-> lds   (prediction-focused statistics)
+ |      |          |    ^
+ |      +-> ids ---|----+    (information theory)
+ |                 |    |
+ +----> cds -------|----+    (computational complexity)
                    |
                    +-> rme   (model-inference-focused statistics)
                         ^
@@ -24,6 +28,12 @@ mds -> pds -> sds -+-> lds   (prediction-focused statistics)
 - win and cie are complementary views of causal inference.
   They sit outside the statistics chain,
   and rme also depends on them.
+- ids ([*Information Theory for Data Science*](https://morrison-lab.github.io/ids/))
+  and cds ([*Computational Complexity for Data Science*](https://morrison-lab.github.io/cds/))
+  are side branches that lds builds on.
+  ids assumes pds, whose entropy, cross-entropy and Kullback--Leibler divergence it extends;
+  cds assumes mds.
+  sds and rme do not rely on either, but may cite them as further reading.
 
 ## Where content goes
 

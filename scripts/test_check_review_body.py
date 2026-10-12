@@ -155,7 +155,9 @@ for sym in ("classify_verdict", "_unresolved_finding_pattern",
 # timestamped, because `FINDING_PATTERNS` is edited whenever a new not-clean
 # shape is added and nothing else would notice the prose going stale.
 check("the finding-pattern count the docstring states",
-      len(MOD.FINDING_PATTERNS), 18)
+      len(MOD.FINDING_PATTERNS), 19)
+check("the docstring states the current finding-pattern count",
+      "one of nineteen finding patterns" in crb.analyse.__doc__, True)
 check("the findings heading is one of them",
       MOD._FINDINGS_HEADING_PATTERN in MOD.FINDING_PATTERNS, True)
 

@@ -255,6 +255,13 @@ See [`git-tags.md`](git-tags.md) for tag management (force-moving/sliding tags a
   working trees for *untracked* files that never reached any ref
   (`git -C <wt> ls-files --others --exclude-standard -- 'skills/'`).
 
+## Fetch before telling the user what work remains
+A local clone that is behind `origin` makes finished work look outstanding.
+Before saying an issue still needs doing, `git fetch` and check the issue's live state.
+(2026-10-07, mlr session: the agent offered to download two books for Morrison-Lab/mlr#14 while its clone was eight commits behind;
+other sessions had already added them and closed the issue.
+The user asked "aren't those books already in mlr?")
+
 ## Git — looking up a PR's branch name
 - `git branch -r` lists **all** remote branches — useless for finding a specific PR's branch: it has no way to filter by PR number. Don't suggest it as a fallback.
 - Targeted lookup: `gh pr view <N> --json headRefName -q .headRefName` in CLI sessions;

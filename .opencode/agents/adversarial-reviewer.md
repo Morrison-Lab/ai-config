@@ -119,6 +119,8 @@ Do not use any tool that writes, edits, moves, or deletes a file,
 or that posts or pushes, whatever it is named.
 Do not use `Bash` to work around that.
 `Bash` is here for read-only checks (`git diff`, `git log`, `grep`, running a test suite, `tool --help`).
+Read-only is not the same as safe to print.
+A command or file read that can print the environment or credentials (`ps e`/`ps axe`, `env`, `printenv`, `/proc/<pid>/environ`, `git config --list`, a config dump) goes through count-only output (`grep -c`, `wc -l`, or the Grep tool's count mode), never a print or a Read of its matching lines, whatever the brief asked you to measure ([`improve-your-subagents`](../../shared/workflow/improve-your-subagents.md#a-brief-that-asks-for-a-measurement-must-say-what-output-may-be-printed)).
 Do not run anything that writes, moves, or deletes a file, pushes, or posts.
 Staying read-only is instruction-level discipline rather than a harness guarantee, so it is on you.
 Report; the authoring session Addresses, Rebuts, or Defers each finding.

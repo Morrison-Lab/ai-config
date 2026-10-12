@@ -224,3 +224,21 @@ Giving an explicit, sanctioned stopping point removes the incentive to route aro
 - **Do:** tell the subagent explicitly what to do when blocked: leave unpushed commits in the local worktree and report the block to the orchestrator.
 - **Do:** explicitly forbid out-of-band publish routes (Contents API, GraphQL, MCP `push_files`) in the brief when forbidding the override, cross-referencing [`check-before-pushing.md`](check-before-pushing.md).
 - **Don't:** tell an agent "do not use the override" without naming the correct fallback action when push is refused.
+
+## A brief that asks for a measurement must say what output may be printed
+
+A brief that asks an agent to *measure* something gets back whatever the measuring command prints, and the agent's transcript keeps it.
+Some ordinary measurements print secrets as a side effect: a process listing with the environment (`ps e`, `ps axe`), `env` or `printenv`, `/proc/<pid>/environ`, `git config --list`, or a dumped config file.
+The agent chooses the command, so a brief that names only the question leaves the output shape to the agent.
+
+Measured 2026-10-08 on [ai-config#4398](https://github.com/Morrison-Lab/ai-config/pull/4398).
+A review subagent asked to measure `ps` behaviour ran `ps axe -o pid,comm | grep sleep`.
+The `e` modifier appends each process's environment even with an explicit `-o` field list (line lengths of `ps axe -o pid,comm` measured in the thousands of characters, against 39 without `e`), so the matching lines carried the container's environment, a session token included, into the reviewer's transcript.
+The process-listing hazard itself is recorded in that PR;
+this section is the briefing side.
+
+- **Do:** when a brief asks for a measurement whose command can print environment, credentials, or config, require count-only output (`grep -c`, `wc -l`, or line lengths via `awk '{print length($0)}'`), and say so in the brief.
+- **Do:** state in the brief that matching lines from such a command are not to be printed, even piped through `grep`.
+- **Don't:** brief "measure how `ps` behaves" (or `env`, or `/proc`) and leave the agent to choose a command whose output it will then echo.
+- **Don't:** treat a `ps -o` field list as keeping the environment out,
+  since the `e` modifier appends it regardless.

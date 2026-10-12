@@ -23,6 +23,20 @@ It does not reach a private repository's file in a context the user cannot see, 
 - **Don't:** report "I replied to that", "posted the referee report on the MR", or "filed the issue" as a bare fact with no link attached.
 - **Don't:** answer a question about a rendered page or a source file by naming it in plain text.
 
+**Resolve whether a bare number is a PR or an issue before linking it.**
+GitHub numbers PRs and issues from one sequence, and the path segment names the type: `/pull/N` for a PR, `/issues/N` for an issue.
+One query answers it, and the ways to run it are already recorded:
+`git ls-remote origin refs/pull/<N>/head` in a clone
+([`memories/git.md`](../../memories/git.md#classify-a-bare-nnnn-as-issue-or-pr-with-git-ls-remote-origin-refspullnnnnhead)),
+or the `pull_request` key from the issues API
+([`memories/gh-cli.md`](../../memories/gh-cli.md), the bullet "Whether `#N` is an issue or a PR is decided by the `pull_request` key").
+The MCP `issue_read` tool (method `get`) also answers it: its `html_url` carries the right path for a PR number too.
+
+- **Do:** look the number up and link it with the path the forge returns.
+- **Don't:** default every unresolved number to `/issues/N` because checking looked costly.
+  A batch of links made that way labels each PR as an issue
+  ([ai-config#4401](https://github.com/Morrison-Lab/ai-config/pull/4401), 2026-10-08).
+
 See [`hyperlink-liberally`](hyperlink-liberally.md) for the general principle covering tools, internal rules, and technical terms.
 
 (Directive from the user, 2026-09-09: telling them a reply had been posted without linking it made them go find it themselves.)

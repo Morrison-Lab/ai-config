@@ -664,6 +664,26 @@ This entry is the general authoring lesson it implies for any future guard: pref
 - **Do:** when a specific action is genuinely required (an env var, a specific flag), still name the fallback that applies when the harness cannot perform the usual action.
 - **Don't:** write a remedy that assumes every harness can perform the same action synchronously -- a dispatch, a foreground run, a specific tool call -- without naming what to do when it cannot.
 
+## 5.10 Widening a Bash hook's scan: test the benign carriers and the forms that run, in the same change
+
+A widening that fixes false negatives by scanning more of the command can start firing on text that only *mentions* the pattern.
+Measured 2026-10-08 on [ai-config#4398](https://github.com/Morrison-Lab/ai-config/pull/4398), which adds a warn-only `PreToolUse` hook.
+A round-1 review fix made it scan the raw command text for `$(...)` substitutions, and it then fired on ordinary `git commit -m "$(cat <<'EOF' ... EOF)"` messages that described the pattern.
+
+Stripping heredoc bodies is not a safe general fix.
+Whether a body runs depends on the whole pipeline, not only on the delimiter's quoting:
+`bash <<'EOF'` and `cat <<'EOF' | bash` both execute a `$(...)` in a quoted-delimiter body (measured with `echo a $(echo RAN) b` as the body), and an unquoted `cat <<EOF` body expands one.
+[`memories/debugging.md`](debugging.md#security-hook-dont-heuristic-strip-heredoc-bodies-to-silence-a-false-positive) records three stripping attempts on a blocking hook that each opened a full bypass, and concludes that a blocking hook should scan the full token stream and accept the false positive.
+For a warn-only hook, 4.6 above makes the same call for rare argument shapes.
+The #4398 hook took the other side of the trade on purpose: it blanks every heredoc body with `shellcmd`'s `_heredoc_free` and lists the unquoted-heredoc and interpreter-heredoc misses in its docstring.
+A stripper that keeps bodies which can run is tracked in [ai-config#4408](https://github.com/Morrison-Lab/ai-config/issues/4408).
+
+- **Do:** when widening what a hook scans, add both halves of the test matrix in the same change:
+  NO-FIRE cases for a `cat <<'EOF'` commit message, a single-quoted or `--body-file` PR body, and a `#` comment that quote the pattern,
+  and FIRE cases for an unquoted `<<EOF` body, `bash <<'EOF'`, `cat <<'EOF' | bash`, and a double-quoted `--body` that each carry a real `$(...)`.
+- **Do:** decide which side of the false-positive/false-negative trade the hook takes, and write the losing cases into its docstring.
+- **Don't:** silence a commit-message false positive by stripping heredoc bodies without the FIRE cases above in the suite.
+
 ## 6. A guard that keeps firing after you satisfied it: stop, and read the copy that runs
 
 [`keep-checkouts-fresh`](../shared/workflow/keep-checkouts-fresh.md) already carries this defect in full --- the fail-open direction of a dated constant, why the newest cache directory is not a valid proxy for the loaded copy, and the `ps -eo args` capture that resolved it.

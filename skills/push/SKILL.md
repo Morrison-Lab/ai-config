@@ -121,6 +121,12 @@ A step listed as **not runnable locally** (a `uses:`-only job whose check is
 not vendored here, or a step reading a `${{ github.* }}` expression) is a check
 CI will run that this pass did not; say so when you report the push as
 pre-validated.
+A `uses:` job that has a local equivalent (listed in the script's own
+table of them) runs here too; `new-line-breaks`, for one, runs the vendored
+`scripts/vendor/gha-check-new-line-breaks.py`.
+Running only the `validate` job's `run:` steps by hand skips those
+([`derive-dont-enumerate`](../../shared/workflow/derive-dont-enumerate.md#which-local-checks-predict-ci-is-itself-a-derivable-set-not-a-remembered-one),
+the ninth occurrence); `--only new-line-breaks` runs that one check alone.
 `--only REGEX` runs a slice while iterating; the full run is the one that
 counts before the push.
 Any non-zero row is a red CI job waiting to happen: fix it before pushing,

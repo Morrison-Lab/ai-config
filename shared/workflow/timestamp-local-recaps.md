@@ -26,6 +26,8 @@ That inference feels safe because the earlier reading really was measured, but t
 The next real reading, taken when a PR head commit's timestamp was needed, came back 12:21 PDT --- up to an hour behind the invented stamps.
 The brief that dispatched this entry itself asserted that `claim-pr` inserts the timestamp, which the skill's templates do not do.
 The review caught it, and it is the same class of unmeasured claim.)
+(Recurrence, 2026-10-08, comment surface, typed before the read: a claim comment on [ai-config#3048](https://github.com/Morrison-Lab/ai-config/issues/3048#issuecomment-6058960580) went up stamped "04:36 PDT" before the clock was read.
+The reading taken right after returned 04:34 PDT, and the comment was edited to match.)
 
 **Run the clock so its value lands in the transcript, not only in a file.**
 A command of the shape `t=$(TZ=America/Los_Angeles date "+%H:%M %Z")` followed by a heredoc writing `$t` into a notebook does read the clock, and you still never see the reading --- so the next stamp you type comes from a sense of elapsed work exactly as if no command had run.

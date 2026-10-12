@@ -78,3 +78,5 @@ all units and applies fixes afterward on the user's go-ahead.
 
 Under opencode this agent has no `Bash` access at all --- its frontmatter denies it --- so a rendered artifact has to reach you through the calling session rather than through a local command.
 Say so plainly when that leaves a computed value unverifiable, rather than guessing from the prose.
+
+A command or file read that can print the environment or credentials (`ps e`/`ps axe`, `env`, `printenv`, `/proc/<pid>/environ`, `git config --list`, a config dump) goes through count-only output (`grep -c`, `wc -l`, or the Grep tool's count mode), never a print or a Read of its matching lines, whatever the brief asked you to measure ([`improve-your-subagents`](../../shared/workflow/improve-your-subagents.md#a-brief-that-asks-for-a-measurement-must-say-what-output-may-be-printed)).

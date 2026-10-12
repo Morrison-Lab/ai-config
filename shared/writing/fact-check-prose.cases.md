@@ -276,3 +276,28 @@ Third, a project's `.claude/settings.json` or `.claude/settings.local.json`
 overrode user-level `sandbox.enabled` (caught by Copilot as a missed finding).
 All three were present in the source documentation fetched before writing (the [Claude Code settings reference](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/settings)).)
 
+## Claims inherited from the tracking issue or upstream discussion
+
+Supports the bullet of the same name in
+[`fact-check-prose.md`](fact-check-prose.md#what-to-check).
+What this record adds is a source whose conclusion outruns the evidence it
+quotes for it.
+[ai-config#3048](https://github.com/Morrison-Lab/ai-config/issues/3048)
+says, in one sentence, that "a review of an older commit can be submitted
+after a later push --- #3010 itself shows the shape (`fbfcde70` reviewed at
+16:47, after `8805e772` existed)".
+The parenthesis says only that the commit existed, not that it had been
+pushed.
+On [ai-config#4401](https://github.com/Morrison-Lab/ai-config/pull/4401)
+(2026-10-08) the session restated the stronger clause as a fact about #3010
+and cited the issue for it.
+The adversarial self-review checked
+[PR #3010](https://github.com/Morrison-Lab/ai-config/pull/3010)'s timeline:
+`8805e772` was force-pushed at 16:56:00Z, after the 16:47:16Z review of
+`fbfcde70`, so the claim is false for #3010.
+
+- **Do:** read an issue's conclusion against the evidence the issue itself
+  quotes, and restate only what that evidence supports unless the primary
+  record (here, the PR timeline) confirms more.
+- **Don't:** cite an issue for a conclusion its own parenthesis does not
+  support.

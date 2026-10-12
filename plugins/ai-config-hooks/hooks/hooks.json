@@ -789,6 +789,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/flag-argv-printing-process-listing.py\"'",
+            "timeout": 10,
+            "script": "flag-argv-printing-process-listing.py",
+            "why": "Measured 2026-09-13: a liveness check, `ps -eo pid,etime,command | grep -E \"itpm2|curl\" | grep -v grep`, printed a live Databricks bearer token from a probe's `curl -H` argv into the transcript (ai-config#3626). Warns when an argv-printing ps form (-f, -O, BSD options, an args/command/cmd column), pgrep -a, pstree -a, top -c, or a /proc/<pid>/cmdline|environ read would print other processes' argv; warns only, since whether a listing leaks depends on what else runs on the host."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-mutation-in-read-only-reviewer.py\"'",
             "timeout": 10,
             "script": "no-mutation-in-read-only-reviewer.py",

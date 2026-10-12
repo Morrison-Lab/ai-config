@@ -479,6 +479,44 @@ A terminal renders a real newline as a line break and a backslash-n as `\n`, and
 - **Don't:** type a doubled backslash in a heredoc that writes a Python string literal --- two interpreters get a turn at it, not one.
 - **Don't:** answer a collapse by adding more backslashes.
 
+## Process listings print argv, and argv can hold another process's secret
+
+Any listing that prints a process's command line copies whatever credential that command line carries into the tool output, and so into the transcript.
+Argv is readable by any process that can see it in `/proc`, which on a default Linux mount (no `hidepid`, one PID namespace) is every process on the host, so this includes processes your session did not start.
+Handling a secret carefully in your own code does not prevent it: the leak happens at the inspection step.
+
+Case, 2026-09-13 ([ai-config#3626](https://github.com/Morrison-Lab/ai-config/issues/3626)): a liveness check on a background probe,
+`ps -eo pid,etime,command | grep -E "itpm2|curl" | grep -v grep`,
+printed the probe's `curl -H "Authorization: Bearer <token>"` argv, so a live Databricks OAuth token reached the transcript.
+The token came from a shell variable, which is the recommended form.
+The `command` column printed it anyway.
+
+Measured 2026-10-08 on Linux procps, against a background process carrying a marker in its argv.
+These print argv: `ps <pid>` (a dashless PID switches to BSD output), `ps aux`, `ps -aux`, `ps -ef`, `ps -eo pid,args`, `ps -O rss -e` (`-O` adds to the default columns, which include `command`), `ps -e --context`, `ps -e -o%a` (its leading part only: the `%a` column is fixed-width), `pgrep -af`, and `top -bc` when the line is wide enough (`-w 512`).
+These do not: `ps -e`, `ps -eo pid,etime,comm`, `ps -p <pid>`, `pgrep -f`, and `top -b`.
+BSD `c` swaps argv for the executable name in every column, so `ps axc`, `ps -ef c` and `ps -e -o pid,args c` print none.
+The `top` rows hold for a default config only: `-c` reverses the toggle remembered in the toprc rather than setting it, so under a toprc that saved it on, `top -b` prints argv and `top -bc` does not.
+BSD `e` prints each process's environment, which is no safer, and does so even with `c` (`ps axce`) or an explicit format (`ps axe -o pid,comm` printed 13 environments).
+macOS `ps` and busybox `ps` print argv for more forms than procps does, so treat any `ps` there as argv-printing.
+On macOS and the BSDs `pgrep -lf` prints the full argument list too, where procps prints only the name, so use `pgrep -f` alone there.
+The same listing run through `ssh host` or `docker exec` prints the remote host's or container's argv into the same transcript.
+A shell's own `set -x` trace prints the expanded words too: `set -x; curl -H "Authorization: Bearer $TOK"` traces the token.
+
+- **Do:** test liveness with `pgrep -f <pattern>`, which prints PIDs only, and get detail with `ps -o pid,etime,comm -p <pid>`.
+- **Do:** keep your own secrets out of argv: pass them on stdin, in a file (`curl -H @file`, documented as `<header/@file>` in curl 8.5.0), or in an environment variable that nothing echoes.
+- **Don't:** run `ps <pid>`, `ps aux`, `ps -ef`, `ps -O <col>`, `ps -o args`/`command`/`cmd`, BSD `ps ... e`, `pgrep -a`, `pstree -a`, `top -c`, or `cat /proc/<pid>/cmdline` on a host where any process may carry a credential in argv.
+- **Don't:** turn on `set -x` around a command that expands a secret.
+- **Do:** when you must measure a listing (a review, a fact-check), print only a count: `ps axe -o pid,comm | grep -c PATH=`, never the matched lines.
+  Use a marker process that keeps its argv, `sh -c 'sleep 90; :' marker`.
+  `bash -c 'sleep 90'` can exec `sleep` directly and drop the marker.
+  Stop it with `kill $!` from the shell that started it, not `pkill -f marker`, whose pattern is in the caller's own argv (see the `pgrep -f` self-match section at the top of this file).
+- **Don't:** brief a subagent to measure listing behaviour without that count-only rule.
+  Case, 2026-10-08 (this entry's own review): a reviewer told only to measure ran `ps axe -o pid,comm | grep sleep`, which printed the container's environment, a session token included, into its transcript.
+
+[`hooks/flag-argv-printing-process-listing.py`](../hooks/flag-argv-printing-process-listing.py) warns, without blocking, on the procps `ps`, `pgrep`, `pstree`, `top` and `/proc` forms above, including through `xargs`, `ssh`, `docker exec`, and `$(...)`.
+It does not read `set -x`, and it models procps rather than macOS or busybox `ps`.
+Its docstring lists the forms it cannot see, such as `eval "$cmd"`.
+
 ## Stop a process by its own handle, not by image name
 
 The `pkill -f` sections above cover a pattern that matches the caller,

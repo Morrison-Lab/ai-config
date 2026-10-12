@@ -45,7 +45,7 @@ Keep the markers stable so they become muscle memory.
 The user may tune the emoji set over time; the categories and the box-versus-prefix split are the durable part.
 This is the fuller companion to the CLAUDE.md section on tagging chat output by category --- keep the two in sync if either changes.
 
-### Why 🔀 MERGE ORDER works the way it does
+## Why 🔀 MERGE ORDER works the way it does
 
 CLAUDE.md's "Surface merge-order constraints" section carries the procedure ---
 the three surfaces, the draft-gating caveats, and when the convention fires.

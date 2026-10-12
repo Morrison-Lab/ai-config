@@ -598,7 +598,11 @@ attributing it additionally to an environment gap would have been a second cause
 
 Ninth, 2026-10-08, on [ai-config#4398](https://github.com/Morrison-Lab/ai-config/pull/4398), and the population narrowed this time was **the workflow file's jobs**.
 The pre-push pass ran every `run: python3 ...` step of `validate.yml`'s `validate` job, by hand.
-The PR went red on `new-line-breaks`, a sibling job in the same file whose only check step is `uses: Morrison-Lab/gha/check-new-line-breaks@...`, so a scan for `run:` lines cannot reach it.
+The PR went red on `new-line-breaks`, a sibling job in the same file, whose blocking check step is `uses: Morrison-Lab/gha/check-new-line-breaks@...`.
+Two gaps compounded.
+The pass covered one job of the file, and a `uses:` step has no `run:` line, so even a scan of every job's `run:` lines skips it.
+(Since then the same job has gained an advisory `run:` step, so it is no longer invisible to such a scan,
+but its `uses:` step still is.)
 `run-local-validation.py` already covers that job: it maps the `uses:` step to the vendored copy, `scripts/vendor/gha-check-new-line-breaks.py`, and runs it with the job's own `with:` inputs.
 When only that one check is wanted, scope the same derived run to it rather than retyping the job's `with:` inputs by hand:
 
@@ -606,9 +610,9 @@ When only that one check is wanted, scope the same derived run to it rather than
 python3 scripts/run-local-validation.py --base origin/main --only new-line-breaks
 ```
 
-- **Do:** count a workflow's `uses:` jobs as checks when listing what CI runs, not only its `run:` steps.
+- **Do:** count every job in the workflow file, and every `uses:` step in each job, as checks when listing what CI runs.
 - **Don't:** treat "every `run:` step of `validate.yml`" as the complete set;
-  a job whose check step is a `uses:` of a composite action has no `run:` line to find.
+  a `uses:` step of a composite action has no `run:` line to find, whichever job it sits in.
 
 ### A red job with one named failure is not evidence about its later steps
 

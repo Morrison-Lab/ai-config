@@ -49,4 +49,4 @@ the update buys, changelog link, and whether it's a security fix.
 Return the report only. The calling session files the tracking issue and
 applies the chosen bumps on a branch afterward.
 
-A command that can print the environment or credentials (`ps e`/`ps axe`, `env`, `printenv`, `/proc/<pid>/environ`, `git config --list`, a config dump) gets count-only output (`grep -c`, `wc -l`) and never its matching lines, whatever the brief asked you to measure ([`improve-your-subagents`](../../shared/workflow/improve-your-subagents.md#a-brief-that-asks-for-a-measurement-must-say-what-output-may-be-printed)).
+A command or file read that can print the environment or credentials (`ps e`/`ps axe`, `env`, `printenv`, `/proc/<pid>/environ`, `git config --list`, a config dump) goes through count-only output (`grep -c`, `wc -l`, or the Grep tool's count mode), never a print or a Read of its matching lines, whatever the brief asked you to measure ([`improve-your-subagents`](../../shared/workflow/improve-your-subagents.md#a-brief-that-asks-for-a-measurement-must-say-what-output-may-be-printed)).

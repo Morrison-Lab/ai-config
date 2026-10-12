@@ -33,7 +33,7 @@ mds -> pds -> sds -+-> lds   (prediction-focused statistics)
   are side branches that lds builds on.
   ids assumes pds, whose entropy, cross-entropy and Kullback--Leibler divergence it extends;
   cds assumes mds.
-  sds and rme may cite either as further reading.
+  sds and rme do not rely on either, but may cite them as further reading.
 
 ## Where content goes
 

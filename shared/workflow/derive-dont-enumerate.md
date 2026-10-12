@@ -198,13 +198,22 @@ When the claim is about a convention --- what the corpus *says*, and since when
 --- the deriving query runs over commits:
 
 ```bash
-git log -S '<phrase>' --oneline -- <path>    # commits that changed its count
-git log -G '<alternative>' --oneline -- <path>
+git log --all -S '<phrase>' --oneline              # commits that changed its count
+git log --all -G '<alternative>' --oneline
+git log --follow -S '<phrase>' --oneline -- <file> # one file, across renames
 ```
 
-That reaches a variant renamed away, one introduced under different wording,
-and the commit that made the corpus disagree with itself --- none of which a
-snapshot of the tree can show.
+That widens the **time** axis: it reaches a phrasing that has since been
+removed, and the commit that made the corpus disagree with itself --- neither
+of which a snapshot of the tree can show.
+It does not widen the **wording** axis.
+`-S` and `-G` each take a string or regex you supply, so a variant written in
+words you did not think of is as invisible to them as to `git grep`; inferring
+its absence from an empty result is the inference
+[`grep-is-not-coverage`](grep-is-not-coverage.md) forbids.
+Two flags matter: without `--all` only the current branch's history is
+searched, and a `-- <path>` limit does not follow renames unless `--follow`
+is given, which git accepts for a single file only.
 Publish the command beside the claim, per
 [`challenge-the-assignment`](challenge-the-assignment.md), so the width is
 checkable rather than implied.
@@ -213,8 +222,9 @@ checkable rather than implied.
   corpus does, even when you have read whole files rather than grep hits.
 - **Do:** treat unanimity across a hand-picked sample as a fact about the
   sampling, and go looking specifically for a file that disagrees.
-- **Do:** reach for `git log -S`/`-G` when the claim is about a convention
-  over time rather than about the current contents.
+- **Do:** reach for `git log --all -S`/`-G` when the claim is about a
+  convention over time rather than about the current contents, and run one
+  pattern per wording you can name.
 - **Don't:** count files you opened for another reason as a population ---
   they were selected by the belief under test.
 - **Don't:** read "I read these in full" as covering more than "I grepped";

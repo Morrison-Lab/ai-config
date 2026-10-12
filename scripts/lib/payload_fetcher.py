@@ -117,8 +117,9 @@ class PayloadFetcher:
 
         raise PayloadError(
             f"no payload mapping for command: {' '.join(cmd)}.\n"
-            "This fetcher covers `gh pr view`, `gh repo view`, and the three "
-            "`gh api` reads (`/check-runs`, `/actions/runs/`, and `graphql`). "
+            "This fetcher covers `gh pr view`, `gh repo view`, and the four "
+            "`gh api` reads (`/check-runs`, `/actions/runs/`, `/compare/`, and "
+            "`graphql`). "
             "A new call site needs a new payload key."
         )
 
@@ -170,6 +171,37 @@ class PayloadFetcher:
         return pr
 
     def _api(self, path: str) -> str:
+        if "/compare/" in path:
+            # Optional, unlike the reads above: a payload gathered before
+            # ai-config#2982, or transcribed by hand, has no comparison. The
+            # checker reports that as a NOTE rather than scoring around it.
+            compare = self.payload.get("base_compare")
+            if compare is None:
+                return json.dumps({"_not_in_payload": True})
+            if not isinstance(compare, dict):
+                raise PayloadError(
+                    f"payload 'base_compare' must be an object, got "
+                    f"{type(compare).__name__}."
+                )
+            if "error" in compare:
+                raise PayloadError(
+                    f"payload 'base_compare' records a failed comparison: "
+                    f"{compare['error']}. Rebuild the payload."
+                )
+            ahead = compare.get("ahead_by")
+            if not isinstance(ahead, int) or isinstance(ahead, bool) or ahead < 0:
+                raise PayloadError(
+                    f"payload 'base_compare.ahead_by' must be a non-negative "
+                    f"integer, got {ahead!r}."
+                )
+            files = compare.get("files")
+            if files is not None and not isinstance(files, list):
+                raise PayloadError(
+                    f"payload 'base_compare.files' must be a list, got "
+                    f"{type(files).__name__}."
+                )
+            return json.dumps(compare)
+
         if "/check-runs" in path:
             runs = _require(self.payload, "check_runs", "check-run status")
             if isinstance(runs, list):

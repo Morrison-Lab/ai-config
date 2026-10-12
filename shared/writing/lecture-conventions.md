@@ -47,6 +47,24 @@ This fragment is the agent-facing copy: follow the rules, and link to psw instea
   Place the example directly after the div it illustrates.
   A related theorem or corollary does not exempt the definition: the definition still gets its own example, and so does the theorem.
   The rule holds in every repository, including `mds`, `pds`, `sds`, `lds` and `rme`.
+- **Keep only the definition in a `#def-` div.**
+  Put the properties of the defined object in a separate `#thm-`, `#lem-` or `#prp-` div after it, with a proof where one is known (Ezra, 2026-10-09).
+  The rule holds in every repository, including `mds`, `pds`, `sds`, `lds` and `rme`.
+  The wording is canonical in psw's "Writing for teaching" chapter.
+- **Present R results with modern packages, even for a base R fit.**
+  A model fit with `lm()` or `glm()` shows its coefficients through `parameters::parameters() |> print_md()` or `gtsummary::tbl_regression()`, never a `summary()` or `coef(summary())` printout (Ezra, 2026-10-09).
+  Figures use ggplot2, with sjPlot or ggeffects for prediction plots and `performance::check_model()` for diagnostics, never base graphics (`plot()`, `lines()`, `abline()`).
+  Avoid ggfortify's `autoplot()` for `lm` fits: it warns that `fortify(<lm>)` is deprecated.
+  Reading a single value out of a fit for inline code (`coef(fit)[["x"]]`) is fine;
+  the rule is about what the reader sees.
+  Add each package to the repository's render dependencies in the same PR.
+  Ezra's `rme` notes show the patterns;
+  the wording is canonical in psw's "Present R results with modern packages".
+- **Use dplyr over base R for data manipulation.**
+  Select columns with `dplyr::select()`, filter rows with `filter()`, add columns with `mutate()`, drop missing rows with `tidyr::drop_na()`, stack data frames with `bind_rows()` and build them with `tibble::tibble()`, chained with `|>`.
+  Never write `df[, cols]`, `df[df$x > 0, ]`, `subset()`, `df$new <- ...`, `complete.cases()`, `rbind()` on data frames, or `data.frame()` (Ezra, 2026-10-09).
+  Indexing a matrix or vector, and reading one value for inline code, is fine.
+  The wording is canonical in psw's "Manipulate data with dplyr, not base R".
 - **Cross-reference only what the reader has already seen.**
   Never point to a figure, table, equation or result that appears later (Ezra, 2026-10-08).
   Put a figure directly after the sentence that refers to it, and make the example that shows the figure, not an earlier definition, refer to it.

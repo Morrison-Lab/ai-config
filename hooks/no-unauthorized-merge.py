@@ -1278,6 +1278,73 @@ def live_proc_subst_spans(text: str) -> list:
     return spans
 
 
+def _double_quoted_spans(text: str) -> list:
+    """`(open, close, in_subst)` for each double-quoted span, sorted by open.
+
+    Models what a flat regex cannot: inside `"..."` a `$(` starts a command
+    substitution whose own quotes are fresh words, so a `"` there does not
+    close the outer span (ai-config#3646). An unterminated span is not
+    reported, as the regex this replaced did not report one either.
+
+    `in_subst` says the span sits inside a `$( )`, quoted or not. Its text is
+    printed by a command whose output the enclosing command may well run
+    (`eval "$(echo "<merge>")"`, `eval $(echo "<merge>")`), and this scanner
+    does not model which consumers run their input, so such a span is kept
+    live. The flat regex kept most of them live by mispairing their quotes;
+    that was the fail-closed direction reached by accident, and it failed
+    open as soon as an escaped quote shifted the pairing.
+
+    A single quote is skipped only inside a substitution. At top level it is
+    ignored, as the regex ignored it: an apostrophe in an executing heredoc
+    body is unbalanced, and skipping to the next `'` swallowed the rest of
+    the line and hid a merge after it.
+
+    Iterative, with an explicit stack, so a deep `"$("$(...` nest cannot hit
+    Python's recursion limit.
+    """
+    spans, stack, i, n = [], [], 0, len(text)
+    subst_depth = 0
+    while i < n:
+        c = text[i]
+        top = stack[-1] if stack else None
+        if c == "\\":
+            i += 2
+            continue
+        if top is not None and top[0] == "d":
+            if c == '"':
+                _kind, start, nested = stack.pop()
+                spans.append((start, i, nested))
+            elif c == "$" and text.startswith("$(", i):
+                stack.append(["s", 1])
+                subst_depth += 1
+                i += 2
+                continue
+            elif c == "`":
+                k = text.find("`", i + 1)
+                i = i + 1 if k < 0 else k + 1
+                continue
+        elif c == "'" and top is not None:
+            k = text.find("'", i + 1)
+            i = i + 1 if k < 0 else k + 1
+            continue
+        elif c == '"':
+            stack.append(["d", i, subst_depth > 0])
+        elif c == "$" and text.startswith("$(", i):
+            stack.append(["s", 1])
+            subst_depth += 1
+            i += 2
+            continue
+        elif top is not None and c == "(":
+            top[1] += 1
+        elif top is not None and c == ")":
+            top[1] -= 1
+            if top[1] == 0:
+                stack.pop()
+                subst_depth -= 1
+        i += 1
+    return sorted(spans)
+
+
 def mask_inert_quotes(text: str, exec_subject: str | None = None) -> str:
     """Blank quoted spans that bash cannot execute, preserving length.
 
@@ -1364,13 +1431,23 @@ def mask_inert_quotes(text: str, exec_subject: str | None = None) -> str:
 
     live = live_operand_test(text)
 
-    def repl_double(m: "re.Match") -> str:
-        inner = m.group(0)[1:-1]
-        if live(m.start()):
-            return " " + inner + " "
-        return " " + mask_subexpressions(inner) + " "
-
-    text = re.sub(r"\"(?:\\.|[^\"\\])*\"", repl_double, text, flags=re.DOTALL)
+    # The spans come from a scanner rather than a regex, because bash restarts
+    # quoting inside `"$( ... )"`. A flat `"..."` regex closed the outer word
+    # at the first inner quote, so `eval "$(cat <(echo "a\"b"; echo "<merge>"))"`
+    # paired the quotes wrongly and masked the merge as prose (ai-config#3646).
+    # Outer spans come first. A live span keeps its inner text and loses only
+    # its delimiters, so a span nested in it is judged on its own; an inert
+    # span is masked whole, and anything nested in it is already handled. A
+    # span inside a substitution is kept live; see `_double_quoted_spans`.
+    out, masked_to = list(text), -1
+    for start, end, in_subst in _double_quoted_spans(text):
+        if start < masked_to:
+            continue
+        out[start] = out[end] = " "
+        if not in_subst and not live(start):
+            out[start + 1:end] = mask_subexpressions(text[start + 1:end])
+            masked_to = end
+    text = "".join(out)
 
     live = live_operand_test(text)
 

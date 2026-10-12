@@ -560,6 +560,11 @@ BLOCK = [
     ('echo "gh pr merge 411" | sudo -p \\) bash', "escaped ) in a wrapper argument"),
     ('echo "gh pr merge 411" | sudo -p \\; bash', "escaped ; in a wrapper argument"),
     ('(echo "gh pr merge 411" \\); true) | bash', "escaped ) inside a piped subshell"),
+    # Quotes restart inside "$( )", so an escaped quote there must not shift
+    # the pairing of the outer quotes (ai-config#3646).
+    ('eval "$(cat <(x=1 || echo "a\\"b"; echo "gh pr merge 411"))"', "escaped quote before a <( inside eval \"$( )\""),
+    ('eval "$(echo "a\\"b"; cat <(echo "gh pr merge 411"))"', "escaped quote before a <( in a later statement"),
+    ('eval $(echo "gh pr merge 411")', "quoted merge printed into an unquoted eval substitution"),
     # A grouped statement is one statement: the `;` inside it is not a boundary.
     ('(echo "gh pr merge 411"; true) | bash', "quoted merge in a subshell piped into bash"),
     ('{ echo "gh pr merge 411"; } | bash', "quoted merge in a brace group piped into bash"),

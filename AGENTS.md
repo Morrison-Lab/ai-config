@@ -52,16 +52,14 @@ See [`gate-external-communication`](shared/workflow/gate-external-communication.
 
 When authoring analysis figures, prefer `ggplot2` over base graphics wherever the dependency is available or appropriate to add.
 For each plot, consider whether an axis should be extended to show important reference values such as zero.
-When writing display equations, avoid placing multiple equations on one display line unless a special reason makes that layout clearer.
+One equation per display line unless a reason favors more;
+one `=` per math line ([details](shared/writing/math-derivation-steps.md)).
 Label every display equation so it receives an equation number and a stable URL.
 Write all LaTeX math, in any repo or format, with the shared semantic macros: [`use-math-macros`](skills/use-math-macros/SKILL.md).
 
 ## Check external repository guidelines and PR template before filing
 
-Before filing a PR in an external repository, read its `CONTRIBUTING.md` and `.github/pull_request_template.md`.
-
-- **Do:** fetch and follow the external repo's contributing guidelines and PR template sections before opening the PR.
-- **Don't:** file an external PR from memory or with an internal template.
+Before filing a PR in an external repository, read and follow its `CONTRIBUTING.md` and `.github/pull_request_template.md`, never an internal template or memory.
 
 ## No empty promises
 
@@ -210,7 +208,6 @@ See [`run-ums-proactively`](shared/workflow/run-ums-proactively.md).
 Before ending a turn to wait on anything --- CI, a review round, a subagent, or an answer from the user --- run `ums` first if learnings have accumulated.
 See [`run-ums-proactively`](shared/workflow/run-ums-proactively.md).
 
-- **Do:** run `ums` before ending a turn to wait on CI, a review round, a subagent, or an answer from the user, whenever new learnings accumulated.
 - **Do:** arm a wake mechanism alongside the pass, so the pause resumes.
 - **Don't:** leave an accumulated learning in conversation memory across a turn boundary.
 
@@ -240,6 +237,11 @@ See [`upgrade-to-gha`](shared/workflow/upgrade-to-gha.md).
 
 Treat token cost as a property of a workflow's **shape**: route bounded mechanical work to cheaper models, subagents, or separately-billed CLIs.
 See [`restructure-for-efficiency`](shared/workflow/restructure-for-efficiency.md) and [`merge-queue`](shared/workflow/merge-queue.md).
+In a cloud session (no `agy` or Codex), send bulk, mechanical, and review work to OpenCode Go (`delegate-to-opencode`) while Claude quota is low.
+Claude checks every result.
+A reviewer must differ from the author in model and harness.
+Never send student or PHI data.
+Elsewhere follow `memories/delegation.md`.
 
 ## Keep ai-config and repo checkouts fresh
 
@@ -272,9 +274,8 @@ When adding an enforcement hook under `hooks/`, author deterministic Python with
 
 ## Context budget
 
-Keep always-loaded instruction files (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`) compact and budgeted.
-`AGENTS.md` is gated at 32 KiB (32,768 bytes) to fit within OpenAI Codex's `project_doc_max_bytes` default without truncation.
-The closure's total against the Claude Code CLI's instruction limit, the root file's character cap, a per-fragment cap, and a near-cap growth ratchet on the root file all gate CI (`scripts/check-context-closure.py`).
+Keep always-loaded files compact: `AGENTS.md` is gated at 32 KiB.
+Limits: [`context-budget`](shared/workflow/context-budget.md).
 
 ## Worktree isolation
 
@@ -381,6 +382,12 @@ See [`put-prs-in-ready-mode`](shared/workflow/put-prs-in-ready-mode.md).
 
 See [`GEMINI.md`](GEMINI.md) and [`memories/antigravity.md`](memories/antigravity.md) for Antigravity-specific workspace rules, activation scopes, manifests, and hook integration.
 
+## Use the browser only when nothing else can
+
+Before opening a browser, look for a CLI, MCP, or API that can do the task, and say what you found.
+Use a browser only if none can (or could be set up), or the task is visual.
+See [`browser-last-resort`](shared/workflow/browser-last-resort.md).
+
 ## Default to action without asking
 
 The owner grants standing permission for non-destructive steps (branch commits, pushes, opening/updating PRs, read commands, editing memory).
@@ -393,12 +400,12 @@ The grant covers installing and updating software: R, R packages (including thro
 Do it whenever it helps, without asking (owner directive, 2026-10-02).
 A resulting lockfile change (`renv.lock`, `environment.yml`) is a repo change and goes through the normal PR flow.
 
-It covers attaching a repository the work needs (`add_repo`).
+It covers attaching any repository (`add_repo`) whenever that helps, even only to read it.
 Posting there still passes the membership gate above;
 where it does, file or fix without offering first.
 
-- **Do:** attach the repository as soon as the work needs it.
-- **Don't:** write "would need `add_repo`" and wait (ai-config#4337).
+- **Do:** attach a repository as soon as it would help.
+- **Don't:** ask first, or write "would need `add_repo`" and wait (ai-config#4337).
 
 ## Strict Merge Control Policy
 
@@ -421,7 +428,7 @@ Before pushing to, editing, commenting on, resolving threads on, reviewing, disp
 Proceed only when the author or an assignee is the invoking user (or an alias), the user named that PR, or the author is `github-actions`;
 an explicit "do not touch" vetoes the PR first, and a missing identity check fails closed.
 A review-only run dispatched naming the target PR reviews and stops there.
-Every review you post carries both the Markdown report and the `review-data` JSON payload.
+Every review you post or produce, including a local report or one composed in-transcript, carries both the Markdown report and the `review-data` JSON payload.
 Detail: [`pr-scope`](shared/workflow/pr-scope.md) and [`memories/reviewing-prs.md`](memories/reviewing-prs.md).
 
 - **Do:** verify author, assignees, or explicit user requests before interacting with any PR.

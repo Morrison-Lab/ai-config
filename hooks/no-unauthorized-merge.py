@@ -203,6 +203,93 @@ DOT_SOURCE_AT_CMD_POS = re.compile(
 HEREDOC_EXECUTOR = re.compile(
     "(?:" + EXEC_AT_CMD_POS.pattern + ")|(?:" + DOT_SOURCE_AT_CMD_POS.pattern + ")"
 )
+# An executor whose STDIN is the command's own output: the right side of a
+# pipe (`| bash`, `|& sh -s`) or an output process substitution
+# (`> >(bash)`). What that executor reads is a script, so quoted text upstream
+# of it is live (ai-config#3639). `xargs` is added here only: it builds and runs
+# commands from stdin, but it does not run a quoted operand, so it stays out of
+# EXEC_PROGS's other consumers. Over-matching costs a scan of quoted text in a
+# command that pipes into a shell, which is the cheap direction.
+#
+# The executor is the receiving stage's first word, or follows a leading
+# wrapper that runs its trailing command. Allowing only a bare `sudo` let
+# `| sudo -u root bash`, `| timeout 5 bash` and `| nice bash` through; scanning
+# the whole stage for any executor word then blocked `| grep bash` and
+# `| tee bash`, where the name is only an argument (#4394 review, rounds 1-2).
+# A wrapper's own arguments are skipped without parsing them, so
+# `| sudo -u root grep bash` over-matches, the cheap direction. A wrapper not
+# in this list is a missed executor, so add one when it is found. The skip
+# stops at a bare `)`, the end of a `>(...)` stage. A `)` closing a command
+# substitution in a wrapper argument would stop it too, so every balanced
+# `$(...)`, at any depth, is blanked by `blank_substitutions` before this
+# runs: `| sudo -u $(id -u $(whoami)) bash` is still seen (#4394 review,
+# rounds 3-4; a regex can match only a fixed nesting depth).
+STAGE_WRAPPERS = (
+    r"sudo|doas|timeout|nice|ionice|nohup|time|stdbuf|setsid|unbuffer"
+    r"|chrt|taskset|xargs"
+)
+STDIN_EXECUTOR = re.compile(
+    r"(?:\|&?|>\()\s*" + ENV_WRAP
+    + r"(?:(?:[/\w.-]+/)?(?:" + STAGE_WRAPPERS + r")\b"
+    r"[^|;&\n)]*?(?<![\w.-]))?"
+    r"(?:[/\w.-]+/)?"
+    r"(?:(?:" + EXEC_PROGS + r"|xargs)(?=[\s)]|$)|(?:source|\.)(?=[ \t]))"
+)
+
+
+def blank_substitutions(text: str) -> str:
+    """Replace each balanced `$(...)` in `text`, at any depth, with `x`s.
+
+    Length-preserving. An unbalanced `$(` is left as it is. One pass with a
+    stack of open parentheses, so an unbalanced run of `$(` stays linear.
+    """
+    stack, cover = [], [0] * (len(text) + 1)
+    for j, ch in enumerate(text):
+        if ch == "(":
+            stack.append(j - 1 if j and text[j - 1] == "$" else -1)
+        elif ch == ")" and stack:
+            start = stack.pop()
+            if start >= 0:
+                cover[start] += 1
+                cover[j + 1] -= 1
+    out, depth = [], 0
+    for j, ch in enumerate(text):
+        depth += cover[j]
+        out.append("x" if depth else ch)
+    return "".join(out)
+
+
+def unmask_piped_statements(inert: str, masked: str) -> str:
+    """Return `inert` with each statement that pipes into an executor dequoted.
+
+    A statement ends at `;`, `&&`, `||` or a newline outside parentheses and
+    braces, so `(echo "<merge>"; true) | bash` stays one statement while an
+    unrelated `echo "<merge>" | tee f; curl ... | bash` does not lend its
+    neighbour's shell to the quoted text (#4394 review). Both inputs have the
+    same length, and so does the result, so offsets into either still apply.
+    """
+    # A backslash-escaped character is literal to the shell, so `\)` or `\;`
+    # must neither end a statement nor stop a wrapper's argument skip
+    # (#4394 review round 5). Blank each escape pair, length-preserving.
+    scan = re.sub(r"\\.", "xx", inert, flags=re.S)
+    pieces, start, depth, i = [], 0, 0, 0
+    while i <= len(scan):
+        ch = scan[i] if i < len(scan) else "\n"
+        two = scan[i:i + 2]
+        if ch in "({":
+            depth += 1
+        elif ch in ")}":
+            depth = max(depth - 1, 0)
+        sep = 2 if two in ("&&", "||") else 1 if ch in ";\n" else 0
+        if sep and (depth == 0 or i >= len(scan)):
+            stmt = inert[start:i]
+            if STDIN_EXECUTOR.search(blank_substitutions(scan[start:i])):
+                stmt = re.sub(r"[\"']", " ", masked[start:i])
+            pieces.append(stmt + inert[i:i + sep])
+            start = i = i + sep
+            continue
+        i += 1
+    return "".join(pieces)
 
 
 def executes_its_input_ends(text: str) -> list:
@@ -1191,6 +1278,73 @@ def live_proc_subst_spans(text: str) -> list:
     return spans
 
 
+def _double_quoted_spans(text: str) -> list:
+    """`(open, close, in_subst)` for each double-quoted span, sorted by open.
+
+    Models what a flat regex cannot: inside `"..."` a `$(` starts a command
+    substitution whose own quotes are fresh words, so a `"` there does not
+    close the outer span (ai-config#3646). An unterminated span is not
+    reported, as the regex this replaced did not report one either.
+
+    `in_subst` says the span sits inside a `$( )`, quoted or not. Its text is
+    printed by a command whose output the enclosing command may well run
+    (`eval "$(echo "<merge>")"`, `eval $(echo "<merge>")`), and this scanner
+    does not model which consumers run their input, so such a span is kept
+    live. The flat regex kept most of them live by mispairing their quotes;
+    that was the fail-closed direction reached by accident, and it failed
+    open as soon as an escaped quote shifted the pairing.
+
+    A single quote is skipped only inside a substitution. At top level it is
+    ignored, as the regex ignored it: an apostrophe in an executing heredoc
+    body is unbalanced, and skipping to the next `'` swallowed the rest of
+    the line and hid a merge after it.
+
+    Iterative, with an explicit stack, so a deep `"$("$(...` nest cannot hit
+    Python's recursion limit.
+    """
+    spans, stack, i, n = [], [], 0, len(text)
+    subst_depth = 0
+    while i < n:
+        c = text[i]
+        top = stack[-1] if stack else None
+        if c == "\\":
+            i += 2
+            continue
+        if top is not None and top[0] == "d":
+            if c == '"':
+                _kind, start, nested = stack.pop()
+                spans.append((start, i, nested))
+            elif c == "$" and text.startswith("$(", i):
+                stack.append(["s", 1])
+                subst_depth += 1
+                i += 2
+                continue
+            elif c == "`":
+                k = text.find("`", i + 1)
+                i = i + 1 if k < 0 else k + 1
+                continue
+        elif c == "'" and top is not None:
+            k = text.find("'", i + 1)
+            i = i + 1 if k < 0 else k + 1
+            continue
+        elif c == '"':
+            stack.append(["d", i, subst_depth > 0])
+        elif c == "$" and text.startswith("$(", i):
+            stack.append(["s", 1])
+            subst_depth += 1
+            i += 2
+            continue
+        elif top is not None and c == "(":
+            top[1] += 1
+        elif top is not None and c == ")":
+            top[1] -= 1
+            if top[1] == 0:
+                stack.pop()
+                subst_depth -= 1
+        i += 1
+    return sorted(spans)
+
+
 def mask_inert_quotes(text: str, exec_subject: str | None = None) -> str:
     """Blank quoted spans that bash cannot execute, preserving length.
 
@@ -1277,13 +1431,23 @@ def mask_inert_quotes(text: str, exec_subject: str | None = None) -> str:
 
     live = live_operand_test(text)
 
-    def repl_double(m: "re.Match") -> str:
-        inner = m.group(0)[1:-1]
-        if live(m.start()):
-            return " " + inner + " "
-        return " " + mask_subexpressions(inner) + " "
-
-    text = re.sub(r"\"(?:\\.|[^\"\\])*\"", repl_double, text, flags=re.DOTALL)
+    # The spans come from a scanner rather than a regex, because bash restarts
+    # quoting inside `"$( ... )"`. A flat `"..."` regex closed the outer word
+    # at the first inner quote, so `eval "$(cat <(echo "a\"b"; echo "<merge>"))"`
+    # paired the quotes wrongly and masked the merge as prose (ai-config#3646).
+    # Outer spans come first. A live span keeps its inner text and loses only
+    # its delimiters, so a span nested in it is judged on its own; an inert
+    # span is masked whole, and anything nested in it is already handled. A
+    # span inside a substitution is kept live; see `_double_quoted_spans`.
+    out, masked_to = list(text), -1
+    for start, end, in_subst in _double_quoted_spans(text):
+        if start < masked_to:
+            continue
+        out[start] = out[end] = " "
+        if not in_subst and not live(start):
+            out[start + 1:end] = mask_subexpressions(text[start + 1:end])
+            masked_to = end
+    text = "".join(out)
 
     live = live_operand_test(text)
 
@@ -2101,6 +2265,18 @@ def offending(command: str, payload: dict | None = None):
     #    enumeration two review rounds showed cannot be finished -- and instead
     #    removes the text that cannot execute. See PERMISSIVE_LEAD.
     inert_command = mask_inert_quotes(masked_command, unquoted_command)
+    # Text piped into a shell is a script, wherever its quotes sit: SPLIT puts
+    # `echo "gh pr merge N"` and `| bash` in different segments, so the quote
+    # has no executor before it in its own segment and pass 2 masks it as
+    # prose (ai-config#3639). In a statement that feeds stdin to an executor,
+    # pass 2 reads the quote-UNmasked text instead, with each quote character
+    # blanked (length-preserving) so the command word inside a quoted span
+    # sits at a command position. Only that statement: another one joined by
+    # `;` or `&&` keeps its quotes masked. The grant and label checks below
+    # read the same view, so they see the merge pass 2 found. Detection reads
+    # the quote-masked text, so a pipe-to-shell merely quoted in a body does
+    # not trigger it.
+    inert_command = unmask_piped_statements(inert_command, masked_command)
 
     for start, end in zip(starts, ends):
         orig_seg = unquoted_command[start:end]

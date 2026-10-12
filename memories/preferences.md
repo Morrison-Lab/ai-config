@@ -397,8 +397,7 @@
 - Always use `glab` (the GitLab CLI) for GitLab operations --- MR comments, file uploads, API calls, pipeline checks --- instead of raw `curl` against the GitLab REST API.
   `glab` handles auth via its own config (no `GITLAB_TOKEN` env var needed), so it works even when a token isn't exported in the current shell.
   Use `glab api` for endpoints without a dedicated subcommand (e.g. `POST /projects/:id/uploads` for file attachments).
-- Treat the browser GUI as a last resort for every task.
-  Prefer a CLI, MCP tool, or direct API whenever the task does not inherently require a visual/browser-only capability.
+- Treat the browser GUI as a last resort for every task: see [`shared/workflow/browser-last-resort.md`](../shared/workflow/browser-last-resort.md), linked from `AGENTS.md`.
 - Run local validation before pushing R-pkg work: lintr::lint_package(), devtools::document(), devtools::test(), devtools::check(), pkgdown::build_site() (per repo copilot-instructions).
 - Before opening a PR, read the repo's own agent/contributor instructions (CLAUDE.md → the canonical reference it points to, e.g. `.github/copilot-instructions.md` / CONTRIBUTING) and front-load the required pre-PR housekeeping in the FIRST commit instead of discovering it via red CI.
   For R packages this means a NEWS.md entry AND a `usethis::use_version()` DESCRIPTION dev-version bump, even for a docs-only / vignette-only change --- see `r-quarto.md`'s "R-package PR CI gates" section for the full changelog-check / version-check / spellcheck / opt-out-label details.
@@ -534,8 +533,11 @@
 - Reference material derived from a repo's own code constants --- tables of values, spawn layouts, file-format/API semantics --- belongs in THAT repo's docs next to the code, not in central `ai-config` memory.
   A memory copy rots silently when the constants change (nobody editing the game/library code thinks to update a memory in another repo) and isn't discoverable by human contributors.
   Keep the durable *lesson/gotcha* in memory and point at the in-repo docs for the tables. (Learned splitting a sparta scenario cheat-sheet: the lesson "team 0 is stationary by default" now lives in sparta's `CLAUDE.md`; the speed/UID/order-target tables live in sparta's `demos/README.md` + `REPLAY.md` --- ai-config#1 / lacaedemon/sparta#207.)
-- Avoid nested function calls and nested function definitions where feasible --- prefer named intermediate variables (or a pipe, e.g. `|>` / `%>%` in R) over `f(g(h(x)))`, and prefer top-level function definitions over functions defined inside other functions.
-  Keep the nesting only when flattening it would be more convoluted. (CLAUDE.md "Coding style" section has the full rationale.)
+- Don't nest function calls: name each intermediate or use a pipe (`|>` / `%>%` in R) instead of `f(g(h(x)))`;
+  a nested call is a review finding.
+  Name every `if()`/`while()` condition before testing it.
+  Avoid nested function definitions where feasible, keeping one only when flattening it would be more convoluted.
+  ([`avoid-nesting`](../shared/coding/avoid-nesting.md) has the carve-outs and rationale.)
 - Follow the SERG lab manual (https://ucd-serg.github.io/lab-manual/) for coding and collaboration conventions.
 - Always hyperlink named artifacts in prose wherever a URL exists (PRs, MRs, reviews, review comments, issue comments, issues, commits, checks, jobs, pipelines, workflow runs).
   Whenever mentioning pull requests or issues in chat responses, recaps,
@@ -1025,6 +1027,15 @@ instead we should write command versions of operator macros that take arguments 
 When the macros PR can't happen in the session, a repo-local macro file is the stopgap, and every macro added to one gets an issue in `Morrison-Lab/macros` in the same turn, listing its definition and meaning, so it reaches the shared library.
 (Directive from the user, 2026-10-05, after [Morrison-Lab/sds#54](https://github.com/Morrison-Lab/sds/pull/54) added 13 repo-local macros without one: "any time you create new macros like that, you should file an issue in macros".
 Filed afterwards as [Morrison-Lab/macros#103](https://github.com/Morrison-Lab/macros/issues/103).)
+Write a product of two vectors that gives a number as a dot product (`\dprod{\vx}{\vbeta}`),
+not a transpose product or inner-product brackets, wherever feasible;
+the transpose stays for matrix products, outer products and quadratic forms
+(see `skills/use-math-macros/SKILL.md`, "Prefer dot products").
+(Directive from the user, 2026-10-08, on `Morrison-Lab/lds#488`:
+"let's use dot products over transpose products and inner products where feasible".)
+A semantic macro is named for meaning, not for the letter it prints: outside a passage about the notation itself, write no Greek letter in math, raw (`\delta`) or inside a letter-named macro (`\vdelta`, `\hb`, `\eps`) (see `skills/use-math-macros/SKILL.md`, "No Greek letters in math source").
+(Directive from the user, 2026-10-08: "I don't want any hardcoded greek letters in latex expression, even in compounds like \vdelta;
+that's still not a semantic macro".)
 `scripts/check-raw-math.py` lints for raw operators, and `hooks/warn-raw-math-notation.py` warns at write time.
 The `use-math-macros` (alias `macroize`) skill is the executable procedure.
 

@@ -17,7 +17,9 @@ from transcript_meta import (  # noqa: E402
     is_harness_meta,
     is_hook_feedback,
     is_hook_feedback_text,
+    is_real_user_turn,
     is_skill_load_meta,
+    strip_injected_text,
 )
 
 passed = 0
@@ -203,6 +205,49 @@ check("Real user entry does NOT match is_hook_feedback",
       not is_hook_feedback(REAL_USER_WITH_SOURCE_FIELD))
 check("Scheduled continuation does NOT match is_hook_feedback",
       not is_hook_feedback(SCHEDULED_CONTINUATION))
+
+def _user(content, **extra):
+    return {"type": "user", "message": {"content": content}, **extra}
+
+
+def _text(t):
+    return [{"type": "text", "text": t}]
+
+
+check("is_real_user_turn: plain string prompt", is_real_user_turn(_user("fix it")))
+check("is_real_user_turn: text block prompt", is_real_user_turn(_user(_text("fix it"))))
+check("is_real_user_turn: assistant record is not a turn",
+      not is_real_user_turn({"type": "assistant", "message": {"content": "x"}}))
+check("is_real_user_turn: tool_result carrier is not a turn",
+      not is_real_user_turn(_user([{"type": "tool_result", "tool_use_id": "t"}])))
+check("is_real_user_turn: sidechain record is not a turn",
+      not is_real_user_turn(_user("go", isSidechain=True)))
+check("is_real_user_turn: skill body is not a turn",
+      not is_real_user_turn(_user("body", isMeta=True, sourceToolUseID="t")))
+check("is_real_user_turn: hook feedback is not a turn",
+      not is_real_user_turn(_user("Stop hook feedback:\nx")))
+check("is_real_user_turn: wholly injected system-reminder is not a turn",
+      not is_real_user_turn(_user("<system-reminder>x</system-reminder>")))
+check("is_real_user_turn: wholly injected task-notification block is not a turn",
+      not is_real_user_turn(_user(_text("<task-notification>x</task-notification>"))))
+check("is_real_user_turn: interruption notice is not a turn",
+      not is_real_user_turn(_user("[Request interrupted by user for tool use]")))
+check("is_real_user_turn: unclosed injected element is not a turn",
+      not is_real_user_turn(_user("<system-reminder>never closed")))
+check("is_real_user_turn: injected prefix plus typed text IS a turn (string)",
+      is_real_user_turn(_user("<system-reminder>x</system-reminder>\nfix it")))
+check("is_real_user_turn: injected prefix plus typed text IS a turn (one block)",
+      is_real_user_turn(_user(_text("<system-reminder>x</system-reminder>\nfix it"))))
+check("is_real_user_turn: injected block beside a typed block IS a turn",
+      is_real_user_turn(_user(_text("<system-reminder>x</system-reminder>")
+                              + _text("fix it"))))
+check("is_real_user_turn: two stacked injected prefixes then typed text IS a turn",
+      is_real_user_turn(_user("<system-reminder>a</system-reminder>"
+                              "<task-notification>b</task-notification> go")))
+check("is_real_user_turn: two stacked injected elements alone are not a turn",
+      not is_real_user_turn(_user("<system-reminder>a</system-reminder>"
+                                  "<task-notification>b</task-notification>")))
+check("strip_injected_text: non-string yields empty", strip_injected_text(None) == "")
 
 print(f"\n{passed} passed, {failed} failed")
 if failed:

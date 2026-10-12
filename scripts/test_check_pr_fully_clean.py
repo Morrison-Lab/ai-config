@@ -8764,6 +8764,71 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     )
 
 
+    # check_base_drift (ai-config#2982): a head the base gained a workflow
+    # change behind is not clean, since a check added there never ran on it.
+    from types import SimpleNamespace
+
+    def drift(compare, state="OPEN", base="main", sha="sha123"):
+        pr = SimpleNamespace(state=state, base_ref=base, head_sha=sha, repo=TEST_REPO)
+        calls = []
+
+        def fake_fetch(cmd):
+            calls.append(cmd)
+            return json.dumps(compare)
+
+        with patch.object(checker, "fetch", side_effect=fake_fetch):
+            ok, issues = checker.check_base_drift(pr)
+        return ok, issues, calls
+
+    ok, issues, calls = drift({"ahead_by": 3, "files": []}, state="MERGED")
+    check("check_base_drift: a merged PR is skipped (#2982)", ok and issues == [] and calls == [])
+    ok, issues, calls = drift({}, base="")
+    check("check_base_drift: no base branch is a NOTE (#2982)",
+          ok and calls == [] and issues and issues[0].startswith("NOTE"))
+    ok, issues, calls = drift({"_not_in_payload": True})
+    check("check_base_drift: payload without base_compare is a NOTE (#2982)",
+          ok and issues and issues[0].startswith("NOTE")
+          and calls == [["gh", "api", f"repos/{TEST_REPO}/compare/sha123...main"]])
+    ok, issues, _ = drift({"ahead_by": 0, "files": []})
+    check("check_base_drift: an up-to-date head is clean (#2982)", ok and issues == [])
+    ok, issues, _ = drift({"ahead_by": 4, "files": [{"filename": "scripts/x.py"}]})
+    check("check_base_drift: drift with no workflow change is a NOTE (#2982)",
+          ok and issues and issues[0].startswith("NOTE"))
+    ok, issues, _ = drift({"ahead_by": 2, "files": [
+        {"filename": "scripts/x.py"}, {"filename": ".github/workflows/validate.yml"}]})
+    check("check_base_drift: a workflow change on the base blocks (#2982)",
+          not ok and issues and ".github/workflows/validate.yml" in issues[0])
+    ok, issues, _ = drift({"ahead_by": 9, "files": [
+        {"filename": f"f{i}.md"} for i in range(checker.COMPARE_FILE_CAP)]})
+    check("check_base_drift: a capped file list blocks rather than passing (#2982)",
+          not ok and issues and "cap" in issues[0])
+    ok, issues, _ = drift({"ahead_by": 9, "files": [
+        {"filename": f"f{i}.md"} for i in range(checker.COMPARE_FILE_CAP - 1)]})
+    check("check_base_drift: one file under the cap is a NOTE", ok)
+    for lookalike in (".github/workflows-notes.md", "docs/.github/workflows/a.yml"):
+        ok, issues, _ = drift({"ahead_by": 1, "files": [{"filename": lookalike}]})
+        check(f"check_base_drift: {lookalike} is not a workflow change", ok)
+    # A script a workflow runs counts too: it can add a check as surely as YAML.
+    ok, issues, _ = drift({"ahead_by": 1, "files": [
+        {"filename": ".github/workflows/scripts/x.sh"}]})
+    check("check_base_drift: a nested .github/workflows/ script blocks", not ok)
+    for bad in (None, "3", True, -1):
+        ok, issues, _ = drift({"ahead_by": bad, "files": []})
+        check(f"check_base_drift: ahead_by={bad!r} blocks", not ok and issues)
+    ok, issues, _ = drift({"ahead_by": 2, "files": "x"})
+    check("check_base_drift: a non-list files blocks", not ok and issues)
+    fail_pr = SimpleNamespace(state="OPEN", base_ref="main", head_sha="sha123", repo=TEST_REPO)
+    with patch.object(checker, "fetch", side_effect=RuntimeError("HTTP 404")):
+        try:
+            checker.check_base_drift(fail_pr)
+            code = None
+        except SystemExit as exc:
+            code = exc.code
+    check("check_base_drift: a failed live compare exits 2, not 1 or a pass", code == 2)
+    _, _, calls = drift({"ahead_by": 0, "files": []}, base="feat#1?x")
+    check("check_base_drift: the base name is percent-encoded",
+          calls and calls[0][-1].endswith("/compare/sha123...feat%231%3Fx"))
+
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

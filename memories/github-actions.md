@@ -700,32 +700,46 @@ to predict CI gives a confident wrong answer rather than an obviously missing
 one.
 This is
 [`verify-the-right-artifact`](../shared/workflow/verify-the-right-artifact.md)'s
-"one half of a mechanism for the whole" arriving through a pin, which is the
-construct that exists to prevent exactly this.
+"a checkout for the run" shape arriving through a pin, which is the construct
+that exists to prevent exactly this
+([ai-config#2165](https://github.com/Morrison-Lab/ai-config/issues/2165)
+assigns that shape).
 
 **Follow the delegation chain to its end, and count the hops.**
 A pin is worth what the *last* hop is worth, so one unpinned `uses:` anywhere
 below it voids every pin above:
 
 ```bash
-gh api "repos/<owner>/<repo>/contents/<path>/action.yml?ref=<sha>" \
+# <file> is the artifact's own path: <dir>/action.yml for a composite
+# action, .github/workflows/<name>.yml for a reusable workflow.
+gh api "repos/<owner>/<repo>/contents/<file>?ref=<sha>" \
   -H 'Accept: application/vnd.github.raw' | grep -n 'uses:'
 ```
 
-Every ref that command prints must itself be a SHA.
-A composite **action** whose steps nest no `uses:` at all is the terminal case,
-and calling one directly is what makes a pin reach the script --- which is the
-fix this repo took ([ai-config#2165](https://github.com/Morrison-Lab/ai-config/issues/2165)),
+Every ref that command prints must itself be a SHA, and each one is a further
+hop to run the same command on.
+The chain ends at an artifact whose steps nest no `uses:`, or whose every
+nested `uses:` is SHA-pinned to a third-party action you are not auditing.
+Calling a composite action directly removes the reusable-workflow hop, which is
+the fix this repo took ([ai-config#2165](https://github.com/Morrison-Lab/ai-config/issues/2165)),
 recorded in `.github/workflows/validate.yml`'s own `new-line-breaks` comment.
+It does not end the chain: that composite still nests
+`actions/setup-python`, pinned to a SHA
+(`Morrison-Lab/gha` `check-new-line-breaks/action.yml` line 63 at
+`5e3525b3`, read 2026-10-08), so the remaining hop is pinned rather than
+removed.
 
 - **Do:** grep the pinned artifact for nested `uses:` before treating the pin
   as reaching the code, and require a SHA on every hop.
 - **Do:** prefer pinning the composite action over the reusable workflow that
-  wraps it, since removing the hop is what removes the question.
+  wraps it, since each hop removed is one fewer ref to audit.
 - **Don't:** read "I fetched it at the pinned SHA" as having read what runs ---
   that is true of the caller and says nothing about the callee.
-- **Don't:** treat a cross-org boundary as adding safety here.
-  It adds a second party who can move the tag.
+- **Don't:** treat a cross-org boundary as adding safety.
+  Where the callee's owner differs from yours, it adds a second party who can
+  move the tag.
+  (In the incident above it did not: `d-morrison/gha` redirects to
+  `Morrison-Lab/gha`, one transferred repository.)
 
 ## A job's step list identifies which version of a reusable workflow ran
 

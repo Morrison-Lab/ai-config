@@ -155,8 +155,8 @@ When it comes up a third time, propose the script, or write it.
 A task with no API still gets its line: when it recurs, the line is what
 shows that the missing API is worth an upstream request or a workaround.
 
-This composes with `memories/preferences.md`'s rule that the browser is a
-last resort.
+This composes with [`browser-last-resort`](../workflow/browser-last-resort.md)'s
+rule that the browser is a last resort.
 That rule says to prefer a CLI or API when one exists.
 The log catches the tasks where none was known yet.
 

@@ -1603,7 +1603,10 @@ That branch added hook bindings to `hooks/hooks.json` before [#2967](https://git
 `check-pr-fully-clean.py` reported [#2965](https://github.com/Morrison-Lab/ai-config/pull/2965) FULLY CLEAN,
 a GIA session merged it under `mwc`,
 and `validate` on `main` went red at `da1a2d03` until [#2983](https://github.com/Morrison-Lab/ai-config/pull/2983) regenerated the manifest.
-The head-only verdict cannot see this, and no path diff can prove the base gained no check through a script or a reusable workflow,
+`check-pr-fully-clean.py` now reads the compare endpoint and exits 1 when the base gained commits that touch anything under `.github/workflows/` since the head's merge base ([#2982](https://github.com/Morrison-Lab/ai-config/issues/2982)).
+It also exits 1 when the list reaches 300 files, the cap [GitHub's compare endpoint](https://docs.github.com/en/rest/commits/commits#compare-two-commits) documents, since a workflow change may then be unlisted.
+Drift that touches no workflow file is a NOTE, and a `--from-json` payload built before this check (no `base_compare` key) passes with a NOTE saying the check did not run.
+That would have caught #2965, but no path diff can prove the base gained no check through a script or a reusable workflow,
 so for a direct merge the rule is the one [`sync-with-main`](sync-with-main.md) already states: a stale merge-base means update first.
 Under a merge queue where every clean-gate check both executes for `merge_group` and is required (or aggregated behind a required check),
 the queue's speculative merge test will cover this once [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030) defines the queue form of the gate,
@@ -1725,6 +1728,10 @@ Merge synchronously, right after the check, with the merge command pinned.
 Tracked as [#2982](https://github.com/Morrison-Lab/ai-config/issues/2982).
 
 - **Do:** always check for merge conflicts (e.g., using `gh pr view <number> --json mergeable` or `gh pr checks`) at the same time you check for CI and review status.
+  Where `gh` is absent, read `mergeable_state` from the GitHub MCP `pull_request_read` call with `method: get`; `dirty` means a conflict.
+  A fallback for a failing status script owes every check the script made, this one included.
+- **Do:** merge the base branch into a conflicting PR head and push it at once, without waiting for approval, and re-read `mergeable_state` afterwards.
+- **Don't:** call a PR ready, clean, or waiting on review while it conflicts, or end a status check that never read its merge state.
 - **Do:** report a PR as blocked on review when HEAD has no authentic clean verdict, even if GitHub says `CLEAN`.
 - **Don't:** treat green CI plus a clean review as sufficient without independently re-checking merge-conflict state.
 - **Don't:** describe a PR that lacks a clean HEAD review as merge-ready, ready to merge, or "green and merge-ready."

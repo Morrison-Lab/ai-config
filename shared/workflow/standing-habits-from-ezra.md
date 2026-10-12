@@ -56,7 +56,18 @@ Claude quota is scarce, so Claude plans and verifies, and other models do bulk w
 - **Do:** add Codex only in a UCDH project (the `bcs` and `hac` groups, on any forge), and Databricks only in a `hac`-group project on the UCDH GitLab.
 - **Do:** name every model you use when you brief it.
 - **Don't:** use the UCDH Codex plan outside UCDH projects, or the UCDH Databricks workspace outside the `hac` group on the UCDH GitLab.
-- **Don't:** send student data to any model, because it is a FERPA education record.
+- **Do:** use free models (ones that cost no quota, such as OpenCode's free tier) in any project or session whenever they help, for any task that does not expose restricted data (Ezra, 2026-10-08).
+- **Do:** let any model, free or paid, write and run code that analyzes restricted data (PHI under HIPAA, FERPA student records, and other regulated data), as long as the model never reads the identifiable data itself (Ezra, 2026-10-09: "normal models can run code that analyzes the protected data;
+  they just can't read the identifiable data themselves").
+- **Do:** make that code print only aggregates or de-identified output, so what comes back to the model holds no identifiable records.
+- **Do:** at present, let only the UCDH Codex account read identifiable restricted data.
+- **Do:** in a project where the UCDH Codex account may not run, have a person read the identifiable data.
+  Ezra said on 2026-10-09 that Codex gets no exception to its UCDH-only limit for restricted data.
+- **Don't:** show identifiable restricted data to any other model, free or paid, by any route: pasting it into a brief, pointing the model at a file that holds it, or letting it reach the model through a command's or tool's output.
+  Student data counts, because it is a FERPA education record.
+  A command that prints raw rows is a reading route, so run it where the model cannot see its output.
+- **Don't:** treat models run on lab-owned hardware as cleared for restricted data.
+  Ezra named them as a possible route (2026-10-08), but they are not yet cleared, and [`manage-quota`](manage-quota.md) still prohibits on-device inference.
 
 ## Choose a model for each task
 

@@ -15,6 +15,31 @@ this section is self-contained.
 >
 > - **Do:** check which project the work belongs to before routing to `codex` or Databricks.
 > - **Don't:** read the "codex first" order below as covering non-UCDH projects.
+>
+> **Free models are open to every project, but restricted data is not** (user directive, 2026-10-08:
+> "all our projects and sessions can use free models anytime they are useful, except for directly viewing restricted data (PHI/HIPAA, FERPA, etc);
+> at present, those data can only be handled by our UCDH Codex account [...]").
+> Free models (ones that cost no quota, such as OpenCode's free tier) need no quota justification, so use them whenever they are useful.
+> Any model may write and run code that analyzes restricted data (Ezra, 2026-10-09), but at present only the UCDH Codex account may read identifiable restricted data itself;
+> see [`standing-habits-from-ezra`](../shared/workflow/standing-habits-from-ezra.md#send-bulk-work-to-other-models).
+>
+> - **Do:** check whether a brief, a file it names, or a command's output would show identifiable restricted data before choosing any model other than UCDH Codex.
+>   Analysis code that returns only aggregates is fine for any model.
+>   Where UCDH Codex may not run, a person reads the identifiable data.
+> - **Don't:** read "free" as "cleared for restricted data".
+
+> [!IMPORTANT]
+> **OpenCode Go (`opencode-go/*`) may be used freely**
+> (user directive, 2026-10-09:
+> "we have an opencode go account with plenty of quota;
+> use it.
+> drive down the backlog").
+> This supersedes the 2026-10-08 request to save that quota for adversarial reviews (ai-config#4424).
+> The raised quota covers general dispatchable work (research, drafting, bulk edits, reviews), not only reviews.
+> Restricted data still goes only to the UCDH Codex account, whichever model is free or paid.
+>
+> - **Do:** route dispatchable work to OpenCode Go without reserving it for reviews; pick the cheapest model that suffices.
+> - **Don't:** hold back sidecar work to protect OpenCode Go quota, or read "use it freely" as clearing restricted data.
 
 > [!IMPORTANT]
 > **`agy` (Google Antigravity) is confirmed usable as a dispatchable subagent, effective 2026-09-02** (user directives that day: "start using agy as a subagent where feasible", "use agy cli for it").

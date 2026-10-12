@@ -28,6 +28,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 HOOK = sys.argv[1]
 
@@ -526,6 +527,17 @@ case([bash("gh pr create --draft --title x", tid="c"), res("c", URL),
 case(create("c") + [bash("gh pr ready 1038 --undo", tid="u"), res("u", "{}"),
                     say("Held as a draft.")], False,
      "gh pr ready --undo is a draft action, not an open one")
+# The flag may come before the number (ai-config#1095): a successful undo
+# clears the PR it names, and only that one.
+case(create("c") + [bash("gh pr ready --undo 1038", tid="u"), res("u", "{}"),
+                    say("Held as a draft.")], False,
+     "gh pr ready --undo <N> clears the PR it names")
+case(create("c") + [bash("gh pr ready --undo=true 1038", tid="u"),
+                    res("u", "{}"), say("Held as a draft.")], False,
+     "gh pr ready --undo=true <N> clears the PR it names")
+case(create("c") + [bash("gh pr ready --undo 42", tid="u"), res("u", "{}"),
+                    say("Held as a draft.")], True,
+     "gh pr ready --undo <other N> does not clear this PR")
 case([use("create_pull_request", tid="c", title="x", body="y"),
       res("c", '{"number":1038,"html_url":"https://github.com/o/r/pull/1038"}'),
       use("update_pull_request", tid="u", owner="o", repo="r",
@@ -930,6 +942,27 @@ case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
                     bash(REQ_CMD_Q, tid="q2"), res("q2", OK),
                     say("Three pushes, then one request.")], False,
      "three pushes arm ONE obligation, cleared by one request")
+
+def with_uuids(events, prefix):
+    """Copy `events`, stamping each line with a transcript `uuid`."""
+    return [dict(e, uuid=f"{prefix}{i}") for i, e in enumerate(events)]
+
+
+# Gate: a compacted transcript that repeats its pre-compaction lines (same
+# `uuid`s) arms each open ONCE, so one request discharges it (ai-config#2996).
+_HIST = with_uuids(create("c") + [say("Opened.")], "u")
+case(_HIST + _HIST + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                      say("Requested once after compaction.")], False,
+     "a repeated-uuid history arms one obligation, cleared by one request")
+# Control: the same lines under DIFFERENT uuids are two real events, so the
+# dedup must key on the uuid and not on the content.
+case(_HIST + with_uuids(create("c") + [say("Opened.")], "v")
+     + [bash(REQ_CMD_Q, tid="q"), res("q", OK), say("One request.")], True,
+     "distinct uuids are not collapsed, so one request leaves one open")
+# Control: with no uuid, nothing marks a line as a repeat, so it is kept.
+case(create("c") + create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
+                                  say("One request.")], True,
+     "uuid-less repeated lines are not collapsed")
 
 # Gate: a drafted PR needs no reviewer, so a push to it must not re-arm.
 case(create("c") + [bash(REQ_CMD_Q, tid="q"), res("q", OK),
@@ -2303,6 +2336,162 @@ def blocks_at(when, events):
         os.unlink(path)
 
 
+CANONICAL_RUNNER = """
+import datetime, importlib.util, os, sys
+os.environ["NO_UNREVIEWED_PR_DISABLE_LIVE_CHECK"] = "1"
+spec = importlib.util.spec_from_file_location("_h", sys.argv[1])
+m = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m)
+m._today = lambda: datetime.date.fromisoformat(sys.argv[2])
+_c = None if sys.argv[3] == "none" else datetime.date.fromisoformat(sys.argv[3])
+m._canonical_moratorium_end = lambda: _c
+sys.exit(m.main())
+"""
+
+
+def blocks_with_canonical(when, canonical, events):
+    """blocks_at, with main's MORATORIUM_END stubbed ("none" = unreadable)."""
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w") as fh:
+        for e in events:
+            fh.write(json.dumps(e) + "\n")
+    tmpdir = tempfile.mkdtemp()
+    try:
+        out = subprocess.run(
+            [sys.executable, "-c", CANONICAL_RUNNER, HOOK, when, canonical],
+            input=json.dumps({"transcript_path": path}),
+            capture_output=True, text=True,
+            env=dict(os.environ, TMPDIR=tmpdir),
+        ).stdout
+        return "block" in out
+    finally:
+        os.unlink(path)
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def _canonical_fetch_and_cache():
+    """Drive the REAL _canonical_moratorium_end with only the network stubbed.
+
+    Returns (ok, reason). HOME points at a throwaway directory so the cache
+    the function writes is this test's own.
+    """
+    import time
+    mod = load_hook()
+    today = datetime.date(2030, 1, 1)
+    mod._today = lambda: today
+    calls = []
+
+    def fetch_returning(src):
+        def _f():
+            calls.append(src)
+            return src
+        return _f
+
+    def fetch_raising():
+        calls.append("raise")
+        raise OSError("offline")
+
+    saved_home = os.environ.get("HOME")
+    saved_flag = os.environ.pop("NO_UNREVIEWED_PR_DISABLE_LIVE_CHECK", None)
+    home = tempfile.mkdtemp()
+    os.environ["HOME"] = home
+    try:
+        cache = mod._canonical_cache_path()
+        mod._fetch_canonical_source = fetch_returning(
+            "x\nMORATORIUM_END = datetime.date(2030, 3, 1)\n")
+        if mod._canonical_moratorium_end() != datetime.date(2030, 3, 1):
+            return False, "did not parse main's constant"
+        if not os.path.exists(cache):
+            return False, "did not write the cache"
+        mod._fetch_canonical_source = fetch_raising
+        n = len(calls)
+        if mod._canonical_moratorium_end() != datetime.date(2030, 3, 1):
+            return False, "a fresh cache entry was not used"
+        if len(calls) != n:
+            return False, "refetched despite a fresh cache entry"
+        stale = time.time() - mod.CANONICAL_TTL_SECONDS - 60
+        os.utime(cache, (stale, stale))
+        if mod._canonical_moratorium_end() is not None:
+            return False, "an expired entry was trusted after a failed fetch"
+        if len(calls) != n + 1:
+            return False, "an expired entry did not trigger a refetch"
+        if mod._canonical_moratorium_end() is not None or len(calls) != n + 1:
+            return False, "an unreadable main was not negatively cached"
+        inside = time.time() - mod.CANONICAL_NEGATIVE_TTL_SECONDS + 60
+        os.utime(cache, (inside, inside))
+        if mod._canonical_moratorium_end() is not None or len(calls) != n + 1:
+            return False, "a negative entry inside its TTL was refetched"
+        past = time.time() - mod.CANONICAL_NEGATIVE_TTL_SECONDS - 60
+        os.utime(cache, (past, past))
+        mod._canonical_moratorium_end()
+        if len(calls) != n + 2:
+            return False, "a negative entry past its own TTL was still used"
+        os.unlink(cache)
+        mod._fetch_canonical_source = fetch_returning("no constant here")
+        if mod._canonical_moratorium_end() is not None:
+            return False, "a body without the constant returned a date"
+        os.unlink(cache)
+        mod._fetch_canonical_source = fetch_returning(
+            "MORATORIUM_END = datetime.date(2030, 13, 1)\n")
+        if mod._canonical_moratorium_end() is not None:
+            return False, "an invalid date returned a value"
+        os.unlink(cache)
+        far = today + datetime.timedelta(days=mod.CANONICAL_MAX_DAYS + 30)
+        mod._fetch_canonical_source = fetch_returning(
+            "MORATORIUM_END = datetime.date(%d, %d, %d)\n"
+            % (far.year, far.month, far.day))
+        if mod._canonical_moratorium_end() is not None:
+            return False, "a far-future date was trusted"
+        n = len(calls)
+        if mod._canonical_moratorium_end() is not None or len(calls) != n:
+            return False, "a cached far-future date was trusted"
+        os.unlink(cache)
+        good = "MORATORIUM_END = datetime.date(2030, 3, 1)\n"
+        mod._fetch_canonical_source = fetch_returning(good)
+        mod._canonical_moratorium_end()
+        future = time.time() + 3600
+        os.utime(cache, (future, future))
+        n = len(calls)
+        mod._canonical_moratorium_end()
+        if len(calls) != n + 1:
+            return False, "a future-dated cache entry was treated as fresh"
+        os.unlink(cache)
+        decoy = os.path.join(home, "decoy")
+        with open(decoy, "w", encoding="ascii") as fh:
+            fh.write("2030-12-31")
+        os.symlink(decoy, cache)
+        n = len(calls)
+        if mod._canonical_moratorium_end() != datetime.date(2030, 3, 1):
+            return False, "a symlinked cache entry was followed"
+        if len(calls) != n + 1:
+            return False, "a symlinked cache entry did not force a refetch"
+        with open(decoy, encoding="ascii") as fh:
+            if fh.read() != "2030-12-31":
+                return False, "writing the cache overwrote a symlink's target"
+        if hasattr(os, "mkfifo"):
+            os.unlink(cache)
+            os.mkfifo(cache)
+            n = len(calls)
+            if mod._canonical_moratorium_end() != datetime.date(2030, 3, 1):
+                return False, "a FIFO at the cache path was read as an entry"
+            if len(calls) != n + 1:
+                return False, "a FIFO at the cache path did not force a refetch"
+        os.environ["NO_UNREVIEWED_PR_DISABLE_LIVE_CHECK"] = "1"
+        n = len(calls)
+        if mod._canonical_moratorium_end() is not None or len(calls) != n:
+            return False, "the disable flag did not skip the read"
+        return True, ""
+    finally:
+        os.environ.pop("NO_UNREVIEWED_PR_DISABLE_LIVE_CHECK", None)
+        shutil.rmtree(home, ignore_errors=True)
+        if saved_home is None:
+            os.environ.pop("HOME", None)
+        else:
+            os.environ["HOME"] = saved_home
+        if saved_flag is not None:
+            os.environ["NO_UNREVIEWED_PR_DISABLE_LIVE_CHECK"] = saved_flag
+
+
 def obligations_of(events):
     hookmod = load_hook()
     fd, path = tempfile.mkstemp(suffix=".jsonl")
@@ -2495,6 +2684,87 @@ def _test_update_branch_and_live_checks():
     return passes, failures
 
 
+def _test_push_alias(hookmod):
+    """A git alias of `push` arms like the push it expands to (#1993).
+
+    Every alias is supplied through `-c` or GIT_CONFIG_COUNT, and the global
+    config is pointed at /dev/null, so no row depends on the machine's own
+    aliases. The negative rows matter as much as the positive ones: an alias
+    that does not push, a dry run through an alias, a `!` alias that pushes
+    nothing, and a quoted example must not arm.
+    """
+    passes = failures = 0
+    old_global = os.environ.get("GIT_CONFIG_GLOBAL")
+    os.environ["GIT_CONFIG_GLOBAL"] = os.devnull
+    hookmod._alias_cache.clear()
+    hookmod._alias_deadline = None
+    rows = [
+        ("git -c alias.p=push p origin main", True),
+        ("git -c alias.p=status p", False),
+        ("git -c alias.a=b -c alias.b=push a origin main", True),
+        ("GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.p "
+         "GIT_CONFIG_VALUE_0=push git p origin main", True),
+        ("git -c 'alias.x=!git push origin main' x", True),
+        ("git -c 'alias.l=!git log --oneline' l", False),
+        ("git -c alias.p=push p --dry-run origin main", False),
+        ("git -c alias.p=push p --delete origin feature", False),
+        ("A=1 git push origin main", True),
+        # Unparsable and too-deep expansions cannot be read, so they arm.
+        ("git -c \"alias.p=push 'unterminated\" p origin main", True),
+        ("git " + " ".join(f"-c alias.a{i}=a{i + 1}" for i in range(9))
+         + " -c alias.a9=status a0 origin main", True),
+        # An unreadable config (git exits 128) arms too.
+        ("git -C /nonexistent-1993 x origin main", True),
+        ("git status && git log --oneline", False),
+        ("echo 'git -c alias.p=push p origin main'", False),
+    ]
+    try:
+        for cmd, want in rows:
+            got = hookmod.push_ident(cmd)
+            if got is want:
+                passes += 1
+                print(f"PASS: push_ident({cmd!r}) is {want}")
+            else:
+                failures += 1
+                print(f"FAIL: push_ident({cmd!r}) is {got}, want {want}")
+        # A spent budget must arm rather than read as "not a push".
+        hookmod._alias_cache.clear()
+        hookmod._alias_deadline = time.monotonic() - 1
+        if hookmod.push_ident("git -c alias.q=status q origin main") is True:
+            passes += 1
+            print("PASS: an alias read past the budget arms")
+        else:
+            failures += 1
+            print("FAIL: an alias read past the budget did not arm")
+        # A git config that cannot even be spawned arms too, uncached.
+        hookmod._alias_cache.clear()
+        hookmod._alias_deadline = None
+        real_run = hookmod.subprocess.run
+
+        def spawn_fails(*args, **kwargs):
+            raise OSError(11, "Resource temporarily unavailable")
+        hookmod.subprocess.run = spawn_fails
+        try:
+            got = hookmod.push_ident("git p origin main")
+        finally:
+            hookmod.subprocess.run = real_run
+        if got is True and not hookmod._alias_cache:
+            passes += 1
+            print("PASS: an alias read that cannot spawn git arms")
+        else:
+            failures += 1
+            print(f"FAIL: an unspawnable alias read gave {got}, "
+                  f"cache {hookmod._alias_cache!r}")
+    finally:
+        hookmod._alias_cache.clear()
+        hookmod._alias_deadline = None
+        if old_global is None:
+            os.environ.pop("GIT_CONFIG_GLOBAL", None)
+        else:
+            os.environ["GIT_CONFIG_GLOBAL"] = old_global
+    return passes, failures
+
+
 def main():
     passes = failures = 0
     hookmod = load_hook()
@@ -2660,6 +2930,45 @@ def main():
         print("FAIL: the subject's default clock is not date.today()")
         failures += 1
 
+    # --- a stale copy asks main before demanding (ai-config#3141) ----------
+    # Same armed transcript, same post-expiry clock; the only difference is
+    # what main's constant says, so a silent first case is silent because
+    # main extended the moratorium and not because the fixture stopped arming.
+    _later = (_end + datetime.timedelta(days=60)).isoformat()
+    _same = _end.isoformat()
+    for _canon, _want, _label in (
+            (_later, False, "stays silent while main's moratorium stands"),
+            (_same, True, "fires when main's moratorium has ended too"),
+            ("none", True, "fires when main cannot be read")):
+        if blocks_with_canonical(AFTER, _canon, armed) == _want:
+            print("PASS: past its own date the guard " + _label)
+            passes += 1
+        else:
+            print("FAIL: past its own date the guard no longer " + _label)
+            failures += 1
+
+    # The fetch parses main's real file, so the pattern must match this
+    # file's own declaration; a reworded constant would otherwise read as
+    # unreadable and quietly restore the stale-copy demand.
+    with open(HOOK, encoding="utf-8") as _fh:
+        _src = _fh.read()
+    _m = hookmod._RX_CONST.search(_src)
+    if _m and _dt.date(*map(int, _m.groups())) == hookmod.MORATORIUM_END:
+        print("PASS: the canonical pattern parses the subject's own constant")
+        passes += 1
+    else:
+        print("FAIL: the canonical pattern does not parse MORATORIUM_END")
+        failures += 1
+
+    ok, why = _canonical_fetch_and_cache()
+    if ok:
+        print("PASS: the real canonical read parses, caches, refuses far-future "
+              "dates and caches an unreadable main")
+        passes += 1
+    else:
+        print(f"FAIL: canonical read: {why}")
+        failures += 1
+
     if _redaction_wording():
         print("PASS: the block text names the redaction deferral and both "
               "escapes")
@@ -2726,6 +3035,10 @@ def main():
         failures += 1
 
     p, f = _test_update_branch_and_live_checks()
+    passes += p
+    failures += f
+
+    p, f = _test_push_alias(hookmod)
     passes += p
     failures += f
 

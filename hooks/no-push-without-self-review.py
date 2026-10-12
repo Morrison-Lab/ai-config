@@ -1117,6 +1117,65 @@ REDIRECTS_REPO = re.compile(r"\A(?:GIT_DIR|GIT_WORK_TREE|GIT_NAMESPACE)=")
 # Distinct from None, which means "the hook's own cwd" and is a real answer.
 REDIRECTED = object()
 
+# A git alias whose expansion this guard could not read. The alias may well
+# push, so `main` refuses rather than guessing (ai-config#1993). The sentinel,
+# the subcommand index, and the expansion loop live in the sibling, which uses
+# them for its own push-arming, so the two hooks read an alias the same way.
+# With no sibling a fresh sentinel keeps the identity checks below well-defined;
+# every path that would produce one sits behind the deny a missing sibling
+# triggers.
+if _SIBLING is not None:
+    UNRESOLVED_ALIAS = _SIBLING.UNRESOLVED_ALIAS
+    _git_subcommand_index = _SIBLING._git_subcommand_index
+else:
+    UNRESOLVED_ALIAS = object()
+
+
+def _repo_overrides(prefix: list[str]) -> list[str]:
+    """The `--git-dir`/`--work-tree`/`--namespace` options among git's globals.
+
+    Forwarded to the alias read so `git --git-dir=other/.git p` reads `other`'s
+    `alias.p`, as git will. Reading the hook's cwd instead missed the alias and
+    dropped the command as not-a-push, which allowed it outright; once the
+    expansion is found to push, `iter_pushes` refuses it as REDIRECTED like the
+    literal spelling (#4406 review).
+    """
+    out: list[str] = []
+    i = 1
+    while i < len(prefix):
+        tok = prefix[i]
+        head = tok.partition("=")[0]
+        if head in REPO_REDIRECT_OPTS:
+            if "=" in tok:
+                out.append(tok)
+            elif i + 1 < len(prefix):
+                out += [tok, prefix[i + 1]]
+                i += 1
+        i += 1
+    return out
+
+
+def _expand_push_alias(rest: list[str], env: list[str],
+                       directory: str | None):
+    """The push argv a git alias expands to, None, or UNRESOLVED_ALIAS.
+
+    The loop is the sibling's `expand_push_alias`; this supplies the read. It
+    goes through `_run_git`, under the push's own environment, its own `-c`
+    options, its `--git-dir`/`--work-tree`/`--namespace` options, and its `-C`
+    directory, so the alias git will run is the one read, inside this hook's
+    time budget.
+
+    The config is read in the push's `-C` directory, else the hook's cwd. A
+    repository-local alias defined only in a directory an earlier `cd` moved to
+    is not seen; a global or `-c` alias, the common case, is.
+    """
+    def read(prefix: list[str], word: str) -> str | None:
+        return _run_git(directory, env, *_config_overrides(prefix),
+                        *_repo_overrides(prefix),
+                        "config", "--get", f"alias.{word}",
+                        unreadable_raises=True)
+    return _SIBLING.expand_push_alias(rest, read)
+
 
 # POSIX shlex treats an unquoted backslash as an escape, so
 # `git -C C:\Users\foo\AppData\Local\Temp\npwsr-abc push origin main` parses as
@@ -1179,8 +1238,34 @@ def _posixize_windows_paths(command: str) -> str:
     return "".join(out)
 
 
-def iter_pushes(command: str):
+def _alias_config_dir(rest: list[str], env: list[str]) -> str | None:
+    """Where to read `alias.*` for this git command: its `-C` path, else cwd.
+
+    A redirected repository is read from cwd too: if the alias does push, the
+    push is then refused as REDIRECTED, so precision there buys nothing.
+    """
+    if any(REDIRECTS_REPO.match(tok) for tok in env):
+        return None
+    i = _git_subcommand_index(rest) or len(rest)
+    directory = None
+    j = 1
+    while j < i - 1:
+        if rest[j] == "-C":
+            value = _native_path(rest[j + 1])
+            directory = os.path.join(directory, value) if directory else value
+            j += 2
+            continue
+        j += 1
+    return directory
+
+
+def iter_pushes(command: str, resolve_aliases: bool = False):
     """Yield (env, argv, directory) for each `git push` simple command.
+
+    With `resolve_aliases`, a git command whose subcommand is an alias of
+    `push` counts too, with `argv` the expanded form, and one whose alias
+    cannot be read yields `directory` UNRESOLVED_ALIAS (ai-config#1993). It is
+    off by default because it runs git, which only `main` budgets for.
 
     `directory` is the push's own absolute `-C`, else the push's relative `-C`
     resolved within the directory a `cd`/`pushd` put it in (subshell scoping
@@ -1239,8 +1324,18 @@ def iter_pushes(command: str):
         if not argv:
             continue
         env, rest = _strip_env(argv)
-        if not rest or not _SIBLING._argv_push(rest):
+        if not rest:
             continue
+        if not _SIBLING._argv_push(rest):
+            if not resolve_aliases:
+                continue
+            expanded = _expand_push_alias(rest, env, _alias_config_dir(rest, env))
+            if expanded is None:
+                continue
+            if expanded is UNRESOLVED_ALIAS:
+                pushes.append((env, rest, UNRESOLVED_ALIAS))
+                continue
+            rest = expanded
         directory = None
         if any(REDIRECTS_REPO.match(tok) for tok in env):
             directory = REDIRECTED
@@ -1270,8 +1365,8 @@ def iter_pushes(command: str):
         hints = [None] * len(pushes)
     for (env, rest, directory), hint in zip(pushes, hints):
         effective_dir = directory
-        if effective_dir is REDIRECTED:
-            yield env, rest, REDIRECTED
+        if effective_dir is REDIRECTED or effective_dir is UNRESOLVED_ALIAS:
+            yield env, rest, effective_dir
             continue
         if effective_dir is None:
             effective_dir = hint
@@ -1498,8 +1593,13 @@ _DEADLINE = [0.0]
 _OMO_SEQ = [0]
 
 
-def _run_git(directory: str | None, env: list[str], *args: str) -> str | None:
+def _run_git(directory: str | None, env: list[str], *args: str,
+             unreadable_raises: bool = False) -> str | None:
     """Run one git command inside the shared budget; None if it failed.
+
+    With `unreadable_raises`, only exit 1 (git config's "key not set") reads
+    as None; any other failure raises LookupError, so an alias read that could
+    not run is not mistaken for an unset alias (ai-config#1993).
 
     EVERY git call goes through here, deliberately. An earlier revision budgeted
     only `_rev_parse` and let `_git_config`/`_rev_parse_ref` carry their own
@@ -1550,8 +1650,12 @@ def _run_git(directory: str | None, env: list[str], *args: str) -> str | None:
                              **NO_WINDOW)
     except subprocess.TimeoutExpired:
         raise TimeoutError("ran out of time resolving what this push would ship")
-    except Exception:
+    except Exception as exc:
+        if unreadable_raises:
+            raise LookupError("git could not run") from exc
         return None
+    if unreadable_raises and out.returncode not in (0, 1):
+        raise LookupError(f"git exited {out.returncode}")
     return out.stdout.strip() if out.returncode == 0 else None
 
 
@@ -2224,10 +2328,36 @@ def _subagents_dir(transcript_path: str) -> str:
     Measured layout (Claude Code desktop, Windows, 2026-09-25): a transcript
     at `<dir>/<session-id>.jsonl` has its subagents under
     `<dir>/<session-id>/subagents/`.
+
+    A transcript that is itself a subagent's (`.../subagents/agent-<id>.jsonl`,
+    read when the push is made inside that subagent, ai-config#2496) maps to
+    the same `subagents/` directory, on the inference that nested dispatches
+    are stored beside it rather than one level deeper. Not yet measured.
     """
+    parent = os.path.dirname(transcript_path)
+    if os.path.basename(parent) == "subagents":
+        return parent
     base = os.path.basename(transcript_path)
     session_id = base[:-len(".jsonl")] if base.lower().endswith(".jsonl") else base
     return os.path.join(os.path.dirname(transcript_path), session_id, "subagents")
+
+
+def _own_subagent_transcript(transcript_path: str, agent_id) -> str:
+    """The calling subagent's own transcript, or "" when this push is not
+    made inside a subagent or that file does not exist (ai-config#2496).
+
+    The path follows the layout `_subagents_dir` documents and the hooks
+    reference shows for SubagentStop's `agent_transcript_path`:
+    `<dir>/<session-id>/subagents/agent-<agent_id>.jsonl`. An id that is not
+    a bare filename component resolves to "" rather than to a traversal.
+    """
+    if not transcript_path or not isinstance(agent_id, str) or not agent_id:
+        return ""
+    raw = agent_id[len("agent-"):] if agent_id.startswith("agent-") else agent_id
+    if not raw or "/" in raw or "\\" in raw or raw in (".", ".."):
+        return ""
+    path = os.path.join(_subagents_dir(transcript_path), f"agent-{raw}.jsonl")
+    return path if os.path.isfile(path) else ""
 
 
 def _read_json_file(path: str):
@@ -3015,9 +3145,17 @@ def main() -> int:
             return 0
 
         _DEADLINE[0] = time.monotonic() + BUDGET_SECONDS
-        for env, argv, directory in iter_pushes(cmd):
+        for env, argv, directory in iter_pushes(cmd, resolve_aliases=True):
             if has_allow_override(env):
                 continue
+            if directory is UNRESOLVED_ALIAS:
+                deny("this git command runs an alias whose expansion this guard "
+                     "could not read (a `!` shell alias naming `push`, an "
+                     "unparsable value, a chain too deep, or a git config "
+                     "that could not be read), so whether it "
+                     "pushes, and what, cannot be determined; spell the push "
+                     "out as `git push ...`")
+                return 0
             if _has_config_env(argv):
                 deny("this push carries `--config-env`, whose value comes from "
                      "an environment variable this guard cannot read, so what "
@@ -3087,9 +3225,31 @@ def main() -> int:
                 )
                 if fallback and os.path.exists(fallback):
                     transcript_path = fallback
-            is_clean, reason = verify_review(
-                transcript_path, directory, argv, env
+            # A push made INSIDE a subagent carries the PARENT session's
+            # transcript_path, so its own foreground reviews were never read
+            # and it was judged by whatever the coordinator last reviewed
+            # (ai-config#2496). Claude Code adds `agent_id` to the payload of
+            # a tool call made inside a subagent; that subagent's own
+            # transcript sits beside the parent's. Read it first, and fall
+            # back to the parent so a coordinator's review of this exact head
+            # still counts. Either clean verdict at HEAD allows the push, so a
+            # parent's blocking verdict does not veto the subagent's own clean
+            # one: the subagent's review is the one about its own work.
+            sub_path = _own_subagent_transcript(
+                transcript_path, payload.get("agent_id")
             )
+            if sub_path:
+                is_clean, reason = verify_review(sub_path, directory, argv, env)
+                if not is_clean:
+                    parent_clean, _ = verify_review(
+                        transcript_path, directory, argv, env
+                    )
+                    if parent_clean:
+                        is_clean = True
+            else:
+                is_clean, reason = verify_review(
+                    transcript_path, directory, argv, env
+                )
             if not is_clean:
                 deny(reason)
                 return 0

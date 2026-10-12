@@ -171,7 +171,9 @@ See [`finish-wave`](skills/finish-wave/SKILL.md).
 
 ## Link PRs in tables
 
-Link every PR, MR, issue, comment, review, run, published page, or file you mention having posted, created, or acted on, in tables and chat prose alike, e.g. `[#237](https://github.com/<owner>/<repo>/pull/237)`.
+Link every PR, MR, issue, comment, review, run, check, PR preview, published page, or file you mention,
+including ones you only read or inspected, not only ones you posted, created, or acted on,
+in tables and chat prose alike, e.g. `[#237](https://github.com/<owner>/<repo>/pull/237)`.
 Detail, rationale, and cases: [`shared/writing/link-forge-artifacts.md`](shared/writing/link-forge-artifacts.md).
 
 ## Tag chat output by category so long recaps stay scannable
@@ -186,6 +188,8 @@ Detail, rationale, and cases: [`shared/writing/tag-chat-output.md`](shared/writi
 
 Apply instructions at once, find recurring patterns, do the work yourself, report unreachable sources, fail on CI error annotations, keep outtakes, leave no thread idle, and name each model you choose.
 Send bulk work to other models: Codex only in UCDH projects (`bcs`, `hac`), Databricks only in the `hac` group on the UCDH GitLab.
+Free models suit any project;
+any model may run analysis code on restricted data (PHI, FERPA), but none except UCDH Codex may read identifiable records.
 
 ## Never close a reply by offering to do work you are already allowed to do
 
@@ -777,6 +781,18 @@ An answer that arrived with no deliberation owes an alternative you can name
 and reject.
 
 [`shared/workflow/metacognitive-monitoring.md`](shared/workflow/metacognitive-monitoring.md)
+
+## Check it; don't hedge about it
+
+Never say "likely", "probably", "presumably", "I think" or "should be" about something you can check.
+A PR's merge state, a check's result, whether an issue is open and whether a file exists are each one call away.
+Make the call, then state the result (Ezra, 2026-10-08).
+If the item cannot be checked from this session, say that plainly instead of guessing.
+
+- **Do:** read the PR or check, then write "it is merged" or "two checks are still running".
+- **Don't:** write "it is probably waiting on CI" when the check runs are one read away.
+
+`hooks/warn-hedged-checkable-claim.py` warns, never blocks, when a hedge shares a sentence with a PR or issue reference, a CI or check word, or merged, open or closed, in a reply or a GitHub comment.
 
 ## Question the assignment, not only the claims
 

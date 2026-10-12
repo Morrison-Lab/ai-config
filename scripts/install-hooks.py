@@ -368,6 +368,40 @@ def check_interpreters(rows: list[dict]) -> int:
     return len(blind)
 
 
+def drifted_copies(rows: list[dict], hooks_dir: Path = REPO / "hooks",
+                   copy_dir: Path | None = None) -> list[dict]:
+    """Registered scripts that are copies of a repo hook with other content.
+
+    A copy in the user hooks directory (``<claude dir>/hooks``, where the
+    retired symlink install and manual copies put them) that shares a repo
+    hook's file name but not its bytes is a stale guard still firing
+    (ai-config#3094). Only that directory is examined: a same-named script
+    elsewhere, such as a project's own ``hooks/``, is not known to be a copy,
+    and advising a refresh would overwrite it. A path resolving to the repo's
+    own file is not a copy either.
+    """
+    copy_dir = (copy_dir or claude_dir() / "hooks").resolve()
+    found = []
+    for row in rows:
+        if row["status"] != "ok" or not row["path"]:
+            continue
+        registered = Path(row["path"])
+        if registered.resolve().parent != copy_dir:
+            continue
+        repo_copy = hooks_dir / registered.name
+        if not repo_copy.is_file():
+            continue
+        if registered.resolve() == repo_copy.resolve():
+            continue
+        try:
+            same = registered.read_bytes() == repo_copy.read_bytes()
+        except OSError as exc:
+            sys.exit(f"error: cannot compare {registered} with {repo_copy}: {exc}")
+        if not same:
+            found.append(dict(row, repo_copy=repo_copy))
+    return found
+
+
 def check_registered_paths() -> int:
     """Report every registered hook whose script path does not resolve.
 
@@ -401,17 +435,30 @@ def check_registered_paths() -> int:
             print(f"  SKIPPED  {row['command']}")
             print(f"           registered on {where} in {row['settings']} ({reason})")
 
+    drifted = drifted_copies(rows)
+    for row in drifted:
+        where = f"{row['event']}/{row['matcher']}" if row["matcher"] else row["event"]
+        print(f"  DRIFTED  {row['path']}")
+        print(f"           differs from {row['repo_copy']}; registered on {where} "
+              f"in {row['settings']}")
+
     counts = {s: sum(1 for r in rows if r["status"] == s)
               for s in ("ok", "missing", "skipped")}
     print()
     print(f"examined {len(rows)} registered hook command(s) in "
           + ", ".join(str(p) for p in files))
     print(f"  ok={counts['ok']} missing={counts['missing']} "
-          f"skipped={counts['skipped']}")
+          f"skipped={counts['skipped']} drifted={len(drifted)}")
 
     blind = check_interpreters(rows)
 
-    if not counts["missing"] and not blind:
+    if drifted:
+        print()
+        print("A drifted copy is the code that runs: a fix merged here is not in")
+        print("force until the copy is refreshed from this checkout. Refresh it;")
+        print("do not delete it, since the registration would then deny every")
+        print("call its matcher names (ai-config#3094).")
+    if not counts["missing"] and not blind and not drifted:
         print()
         print("Every registered hook path resolves.")
         return 0

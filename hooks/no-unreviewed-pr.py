@@ -98,9 +98,11 @@ import os
 import re
 import shlex
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
+import time
 
 NO_WINDOW = ({"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)}
              if sys.platform == "win32" else {})
@@ -208,6 +210,8 @@ def _check_live_pr(num, repo=None):
 # window expired into an active session and cost a round of requests before
 # anyone noticed. Three months puts the re-review far from the day-to-day and
 # still refuses to become permanent by default.
+# Keep this declaration on one line in this exact form: stale copies read
+# main's value through _RX_CONST below (ai-config#3141).
 MORATORIUM_END = datetime.date(2026, 12, 1)
 
 
@@ -226,6 +230,139 @@ def _today():
 def moratorium_active(today=None):
     """True while the Copilot request this guard demands is forbidden."""
     return (today if today is not None else _today()) < MORATORIUM_END
+
+
+# A STALE copy of this file cannot see an extension. The installed plugin is
+# a per-commit snapshot, so an older build still carrying an earlier
+# MORATORIUM_END computes the moratorium as over and demands the forbidden
+# request, every turn, until the plugin updates (ai-config#3141: measured
+# firing from snapshots weeks behind main, on several machines). So once the
+# local constant has passed, and only when the guard would otherwise block,
+# ask main what the date is before demanding anything.
+#
+# Asking main can only make this guard QUIETER, and only when main itself
+# says the moratorium stands, which is the directive the hook exists to
+# follow. Disabling the fetch (the tests' env var) makes the guard louder,
+# which is the safe direction for an env-readable switch. Three limits keep
+# that quieting honest:
+#   * a date more than CANONICAL_MAX_DAYS ahead is refused, so a typo or a
+#     hostile response cannot silence the guard indefinitely;
+#   * an answer is cached for CANONICAL_TTL_SECONDS (an hour), and the fact
+#     that main could not be read for CANONICAL_NEGATIVE_TTL_SECONDS (five
+#     minutes), so an offline machine pays the timeout at most once per
+#     five minutes rather than on every turn;
+#   * the cache lives in the user's own ~/.claude, is opened without
+#     following symlinks, and is trusted only when this user owns it, so no
+#     other local account can pre-plant a far-future date.
+CANONICAL_URL = ("https://raw.githubusercontent.com/Morrison-Lab/ai-config/"
+                 "main/hooks/no-unreviewed-pr.py")
+CANONICAL_TTL_SECONDS = 3600
+# A failed read is remembered for less time than an answer, so a brief
+# network drop does not keep a stale copy loud for the full hour.
+CANONICAL_NEGATIVE_TTL_SECONDS = 300
+CANONICAL_MAX_DAYS = 366
+_RX_CONST = re.compile(
+    r"^MORATORIUM_END\s*=\s*datetime\.date\(\s*(\d{4})\s*,\s*(\d{1,2})\s*,"
+    r"\s*(\d{1,2})\s*,?\s*\)", re.M)
+_UNREADABLE = "unreadable"
+
+
+def _canonical_cache_path():
+    return os.path.join(os.path.expanduser("~"), ".claude",
+                        ".no-unreviewed-pr-moratorium-end")
+
+
+def _read_canonical_cache(path, now):
+    """(hit, value): hit is False when there is no fresh, trusted entry."""
+    try:
+        # O_NONBLOCK so a FIFO planted at the path cannot hang the open.
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+                     | getattr(os, "O_NONBLOCK", 0))
+    except OSError:
+        return False, None
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode):
+            return False, None
+        if hasattr(os, "getuid") and st.st_uid != os.getuid():
+            return False, None
+        age = now - st.st_mtime
+        raw = os.read(fd, 64).decode("ascii", "replace").strip()
+    except OSError:
+        return False, None
+    finally:
+        os.close(fd)
+    # A future mtime (clock skew) is not fresh: it would never expire. A few
+    # seconds are tolerated for coarse filesystem mtime rounding.
+    ttl = (CANONICAL_NEGATIVE_TTL_SECONDS if raw == _UNREADABLE
+           else CANONICAL_TTL_SECONDS)
+    if age < -5 or age > ttl:
+        return False, None
+    if raw == _UNREADABLE:
+        return True, None
+    try:
+        return True, datetime.date.fromisoformat(raw)
+    except ValueError:
+        return False, None
+
+
+def _write_canonical_cache(path, value):
+    tmp = None
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        tmp = "%s.%d" % (path, os.getpid())
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL
+                     | getattr(os, "O_NOFOLLOW", 0), 0o600)
+        with os.fdopen(fd, "w", encoding="ascii") as fh:
+            fh.write(value)
+        os.replace(tmp, path)
+        tmp = None
+    except OSError:
+        pass
+    finally:
+        # A leftover tmp would make every later O_EXCL open from a recycled
+        # pid fail, so the cache could never be written again.
+        if tmp is not None:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+
+
+def _parse_canonical_end(src):
+    """main's MORATORIUM_END from its source text, or None."""
+    match = _RX_CONST.search(src)
+    if not match:
+        return None
+    try:
+        return datetime.date(*map(int, match.groups()))
+    except ValueError:
+        return None
+
+
+def _fetch_canonical_source():
+    import urllib.request
+    with urllib.request.urlopen(CANONICAL_URL, timeout=5) as resp:
+        return resp.read(1 << 20).decode("utf-8", "replace")
+
+
+def _canonical_moratorium_end():
+    """main's MORATORIUM_END, or None when it cannot be read or trusted."""
+    if os.environ.get("NO_UNREVIEWED_PR_DISABLE_LIVE_CHECK"):
+        return None
+    import time
+    path = _canonical_cache_path()
+    hit, end = _read_canonical_cache(path, time.time())
+    if not hit:
+        try:
+            end = _parse_canonical_end(_fetch_canonical_source())
+        except Exception:
+            end = None
+        _write_canonical_cache(path, end.isoformat() if end else _UNREADABLE)
+    if end is not None and (
+            end - _today()).days > CANONICAL_MAX_DAYS:
+        return None
+    return end
 
 
 # Opening a PR, or taking a draft out of draft, via the CLI. The structured
@@ -616,7 +753,13 @@ def _argv_draft(argv):
     # `gh pr ready [<N>] --undo` converts a ready PR BACK to draft.
     if len(argv) >= 3 and argv[1] == "pr" and argv[2] == "ready" \
             and _has_flag(argv[3:], "--undo"):
-        num, repo = _verb_ident(argv)
+        # `--undo` is a boolean flag, so the number may follow it
+        # (`gh pr ready --undo 1038`); drop it before reading the number
+        # positionally (ai-config#1095). Only this flag is skipped: skipping
+        # an arbitrary leading flag could read a flag's VALUE as the PR number.
+        num, repo = _verb_ident(
+            argv[:3] + [a for a in argv[3:]
+                        if a != "--undo" and not a.startswith("--undo=")])
         return True, num, repo
     # `gh pr create --draft` opens a NEW draft PR (a draft action for ordering);
     # like any create, its number is in the result, not the command.
@@ -840,6 +983,157 @@ def _argv_push(argv):
     return _push_re_heads(argv[i + 1:])
 
 
+# A git alias whose expansion could not be read (a `!` shell alias naming
+# `push`, an unparsable value, a chain too deep, or the time budget running
+# out). The alias may well push, so a caller treats it as one rather than
+# guessing (ai-config#1993).
+UNRESOLVED_ALIAS = object()
+
+# git runs a builtin before it consults `alias.*`, so a builtin name can never be
+# an alias and needs no config read. The set only has to be a subset of git's
+# builtins: a name missing from it costs one `git config` call, while a name
+# wrongly listed would hide an alias, so external commands such as `lfs` are not
+# in it. `push` is absent because `_argv_push` decides it.
+_GIT_BUILTINS = frozenset("""
+    add am apply archive bisect blame branch bundle cat-file check-ignore
+    checkout cherry cherry-pick clean clone commit config count-objects
+    describe diff diff-files diff-index diff-tree fetch for-each-ref
+    format-patch fsck gc grep hash-object help init log ls-files ls-remote
+    ls-tree merge merge-base mv name-rev notes pull range-diff rebase reflog
+    remote reset restore rev-list rev-parse revert rm shortlog show show-ref
+    sparse-checkout stash status submodule switch symbolic-ref tag update-ref
+    var version worktree write-tree
+""".split())
+
+# git itself stops a self-referencing chain; this bound only caps the work.
+_ALIAS_DEPTH = 8
+
+
+def _git_subcommand_index(argv):
+    """Index of the subcommand in a `git ...` argv, skipping global options.
+
+    Mirrors the skip in `_argv_push`, so both read the same word.
+    """
+    if not argv or argv[0] != "git":
+        return None
+    i = 1
+    while i < len(argv):
+        a = argv[i]
+        if a in ("-C", "-c", "--git-dir", "--work-tree", "--namespace"):
+            i += 2
+            continue
+        if a.startswith("-"):
+            i += 1
+            continue
+        return i
+    return None
+
+
+def expand_push_alias(rest, read_alias):
+    """The push argv a git alias expands to, None, or UNRESOLVED_ALIAS.
+
+    `_argv_push` matches only the literal subcommand `push`, so `git p origin`
+    under `alias.p = push` reached neither push hook (ai-config#1993). Both
+    hooks expand through this one loop, each supplying its own way of reading
+    config: `read_alias(prefix, word)` returns the value of `alias.<word>` as
+    git would read it for a command whose words before the subcommand are
+    `prefix`, or None when it is unset, and raises TimeoutError when it ran
+    out of time or LookupError when the config could not be read at all. A chain (`alias.a = b`, `alias.b = push`) is followed.
+
+    Returns None when the command is not an alias of a push. Returns
+    UNRESOLVED_ALIAS rather than guessing when the expansion cannot be read: a
+    `!` alias naming `push` runs an arbitrary shell command, and running out of
+    time must not read as "not a push". A `!` alias that hides the word
+    (`!git p$x`) is not caught.
+    """
+    seen = 0
+    while True:
+        i = _git_subcommand_index(rest)
+        if i is None:
+            return None
+        word = rest[i]
+        if word in _GIT_BUILTINS or word == "push":
+            return None
+        if seen >= _ALIAS_DEPTH:
+            return UNRESOLVED_ALIAS
+        seen += 1
+        try:
+            value = read_alias(rest[:i], word)
+        except (TimeoutError, LookupError):
+            return UNRESOLVED_ALIAS
+        if value is None:
+            return None
+        if value.startswith("!"):
+            # A shell alias cannot be parsed reliably. Treat it as unresolved
+            # when it names a push, and let `!git log --graph` and its kind
+            # through, since they push nothing.
+            if re.search(r"\bpush\b", value):
+                return UNRESOLVED_ALIAS
+            return None
+        try:
+            expansion = shlex.split(value)
+        except ValueError:
+            return UNRESOLVED_ALIAS
+        if not expansion:
+            return None
+        rest = rest[:i] + expansion + rest[i + 1:]
+        if _argv_push(rest):
+            return rest
+
+
+_ASSIGNMENT_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
+
+# Total time push_ident may spend reading aliases in one scan. The Stop hook is
+# registered with a 10-second timeout and still has live PR checks to run, so
+# the reads get a slice of it; past the slice a read raises TimeoutError, which
+# arms, the safe direction.
+_ALIAS_READ_BUDGET = 3.0
+_alias_cache = {}
+_alias_deadline = None
+
+
+def _read_alias(env, prefix, word):
+    """`alias.<word>` as git reads it for `prefix` under `env`, or None.
+
+    `prefix` is the command's words before the subcommand, so its `-C`, `-c`,
+    `--git-dir` and `--work-tree` reach the read as they reach git, and `env`
+    is the command's leading assignments, so a `GIT_CONFIG_COUNT` alias is
+    read too. Cached, since one session repeats its aliases.
+    """
+    global _alias_deadline
+    key = (tuple(env), tuple(prefix), word)
+    if key in _alias_cache:
+        return _alias_cache[key]
+    now = time.monotonic()
+    if _alias_deadline is None:
+        _alias_deadline = now + _ALIAS_READ_BUDGET
+    remaining = _alias_deadline - now
+    if remaining <= 0:
+        raise TimeoutError("alias read budget spent")
+    child_env = dict(os.environ)
+    child_env.update(a.split("=", 1) for a in env)
+    try:
+        proc = subprocess.run(
+            ["git", *prefix[1:], "config", "--get", f"alias.{word}"],
+            capture_output=True, text=True, encoding="utf-8",
+            errors="replace", timeout=remaining, env=child_env, **NO_WINDOW,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise TimeoutError("alias read timed out") from exc
+    except OSError as exc:
+        # The push already ran, so git existed; a spawn failure here (EAGAIN,
+        # EMFILE) is an alias that could not be read, not an unset one.
+        raise LookupError("git config could not run") from exc
+    else:
+        if proc.returncode not in (0, 1):
+            # 1 is git's "key not set"; anything else (128 for a corrupt
+            # config or a bad -C path) means the alias could not be read.
+            raise LookupError(f"git config exited {proc.returncode}")
+        value = proc.stdout.strip() if proc.returncode == 0 else None
+    _alias_cache[key] = value
+    return value
+
+
 def push_ident(cmd):
     """True if `cmd` contains a genuine `git push` simple command.
 
@@ -852,12 +1146,29 @@ def push_ident(cmd):
     whenever the push shared a call with anything else (which, measured on this
     corpus, is nearly every push).
 
+    A git alias of `push` arms like the push it expands to, and so does an
+    alias whose expansion cannot be read, since arming is the safe direction
+    (ai-config#1993). Leading `NAME=value` assignments are skipped first, so
+    `GIT_CONFIG_COUNT=1 ... git p` and an assignment ahead of a literal push
+    are both seen.
+
     Fails toward NOT-a-push on a parse error, so a malformed command never arms.
     """
     cmds = _simple_commands(cmd)
     if cmds is None:
         return False
-    return any(_argv_push(a) for a in cmds)
+    for argv in cmds:
+        n = 0
+        while n < len(argv) and _ASSIGNMENT_RE.match(argv[n]):
+            n += 1
+        env, rest = argv[:n], argv[n:]
+        if _argv_push(rest):
+            return True
+        if expand_push_alias(
+                rest, lambda prefix, word: _read_alias(env, prefix, word)
+        ) is not None:
+            return True
+    return False
 
 
 RX_CMD_MERGE = re.compile(
@@ -2009,12 +2320,26 @@ def scan(path):
     # push never re-arms review for a PR that can no longer take one.
     live = {}
     text = ""
+    # A compacted session's transcript can carry its pre-compaction history
+    # twice (measured on ai-config#2996: 4000 of 5135 `uuid`s repeated). Read
+    # unguarded, each `gh pr create` then arms two obligations while one
+    # request clears only one, so the guard re-fires on a discharged PR. A
+    # line whose `uuid` was already read is the same event, not a new one.
+    # Lines without a `uuid` are kept: nothing identifies them as repeats.
+    seen_uuids = set()
     with open(path, encoding="utf-8", errors="ignore") as fh:
         for line in fh:
             try:
                 m = json.loads(line)
             except Exception:
                 continue
+            if not isinstance(m, dict):
+                continue
+            uuid = m.get("uuid")
+            if isinstance(uuid, str) and uuid:
+                if uuid in seen_uuids:
+                    continue
+                seen_uuids.add(uuid)
             blocks = (m.get("message") or {}).get("content") or m.get("content") or []
             if isinstance(blocks, str):
                 blocks = [{"type": "text", "text": blocks}]
@@ -2589,6 +2914,12 @@ def main() -> int:
     obligations = active_obligations
 
     if not obligations:
+        return 0
+
+    # Past this copy's own date, and only now that a block is due: a stale
+    # copy defers to main's date (ai-config#3141).
+    canonical_end = _canonical_moratorium_end()
+    if canonical_end is not None and _today() < canonical_end:
         return 0
 
     named = sorted({o["num"] for o in obligations if o["num"]}, key=int)

@@ -108,33 +108,6 @@ Blocking hooks deny execution (exit code 2), while warning hooks emit actionable
 | [`warn-stale-issue-edit.py`](../hooks/warn-stale-issue-edit.py) | Warn | Warns when editing code for an issue without a fresh `VIEW_ISSUE` and remote default-branch check. | Run `gh issue view <N>` (or `VIEW_ISSUE`) and check `git fetch origin main` / `origin/main` before modifying files for an issue. |
 | [`flag-unmeasured-timestamp.py`](../hooks/flag-unmeasured-timestamp.py) | Warn | Warns when editing or writing to session notebooks (`session-*.md`) or memory files (`memory/*.md`) stating a Pacific clock time without a date reading in the turn. | Run `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"` before writing or appending timestamps to session notebooks or memory files. |
 
-### 2.5 Widening a Bash hook to raw command text: strip what only quotes the pattern
-
-A widening that fixes false negatives by scanning more of the command can start firing on text that merely *mentions* the pattern.
-In a Bash command the commonest such carriers are a heredoc commit message (`git commit -m "$(cat <<'EOF' ... EOF)"`), a PR or issue body, and a `#` comment.
-
-Measured 2026-10-08 on [ai-config#4398](https://github.com/Morrison-Lab/ai-config/pull/4398), which adds a warn-only `PreToolUse` hook.
-A round-1 review fix made it scan the raw command text for `$(...)` substitutions.
-It then fired on ordinary commit messages whose heredoc bodies described the pattern.
-Quoting decides which of those carriers is only text.
-A `$(...)` in a single-quoted argument or in a heredoc body under a quoted delimiter (`<<'EOF'`) never runs.
-The same `$(...)` in a double-quoted argument or under an unquoted `<<EOF` delimiter does run: `bash -c` on `cat <<EOF` with `x $(echo RAN) y` as the body printed `x RAN y`.
-`scripts/lib/shellcmd.py` helps with part of this and not all of it.
-`_comment_free` drops unquoted comments.
-`_heredoc_free` blanks every heredoc body whatever its delimiter's quoting (measured: `<<EOF` and `<<'EOF'` both came back blank), so using it as-is hides a substitution that would run.
-The hook [ai-config#4398](https://github.com/Morrison-Lab/ai-config/pull/4398) adds does use it as-is, and its docstring lists the unquoted-heredoc miss as a deliberate trade for silence.
-The Do list below is the design without that hole, and the missing quoted-only stripper is tracked in [ai-config#4408](https://github.com/Morrison-Lab/ai-config/issues/4408).
-A body passed inline is not stripped at all: `simple_commands("gh pr create --body 'see $(echo hi)'")` keeps `see $(echo hi)` as one argv element.
-
-This is not the cheap false positive a warn-only hook may accept.
-That trade is for over-warning on a rare argument shape, such as an unusual wrapper flag.
-A heredoc commit message describing the hook's own pattern is what every commit to that hook is likely to carry, so the false positive lands on the hook's own maintenance.
-
-- **Do:** when widening what a hook scans, add NO-FIRE tests in the same change for a `<<'EOF'` heredoc commit message, a single-quoted or `--body-file` PR body, and a comment that each quote the pattern.
-- **Do:** add FIRE tests in the same change for the forms that run: an unquoted `<<EOF` body and a double-quoted `--body` that each contain a `$(...)`.
-- **Do:** before scanning for a substitution, drop comments, single-quoted spans, and only the heredoc bodies whose delimiter is quoted.
-- **Don't:** fix a false negative by switching to raw-text matching without a test that the commonest benign carriers stay silent.
-
 ---
 
 ## 3. `Stop` Hooks (Completion & Output Validation)
@@ -690,6 +663,26 @@ This entry is the general authoring lesson it implies for any future guard: pref
 - **Do:** phrase a guard's remedy around the condition it is checking for, naming the usual action as one way to satisfy it rather than the only way.
 - **Do:** when a specific action is genuinely required (an env var, a specific flag), still name the fallback that applies when the harness cannot perform the usual action.
 - **Don't:** write a remedy that assumes every harness can perform the same action synchronously -- a dispatch, a foreground run, a specific tool call -- without naming what to do when it cannot.
+
+## 5.10 Widening a Bash hook's scan: test the benign carriers and the forms that run, in the same change
+
+A widening that fixes false negatives by scanning more of the command can start firing on text that only *mentions* the pattern.
+Measured 2026-10-08 on [ai-config#4398](https://github.com/Morrison-Lab/ai-config/pull/4398), which adds a warn-only `PreToolUse` hook.
+A round-1 review fix made it scan the raw command text for `$(...)` substitutions, and it then fired on ordinary `git commit -m "$(cat <<'EOF' ... EOF)"` messages that described the pattern.
+
+Stripping heredoc bodies is not a safe general fix.
+Whether a body runs depends on the whole pipeline, not only on the delimiter's quoting:
+`bash <<'EOF'` and `cat <<'EOF' | bash` both execute a `$(...)` in a quoted-delimiter body (measured with `echo a $(echo RAN) b` as the body), and an unquoted `cat <<EOF` body expands one.
+[`memories/debugging.md`](debugging.md#security-hook-dont-heuristic-strip-heredoc-bodies-to-silence-a-false-positive) records three stripping attempts on a blocking hook that each opened a full bypass, and concludes that a blocking hook should scan the full token stream and accept the false positive.
+For a warn-only hook, 4.6 above makes the same call for rare argument shapes.
+The #4398 hook took the other side of the trade on purpose: it blanks every heredoc body with `shellcmd`'s `_heredoc_free` and lists the unquoted-heredoc and interpreter-heredoc misses in its docstring.
+A stripper that keeps bodies which can run is tracked in [ai-config#4408](https://github.com/Morrison-Lab/ai-config/issues/4408).
+
+- **Do:** when widening what a hook scans, add both halves of the test matrix in the same change:
+  NO-FIRE cases for a `cat <<'EOF'` commit message, a single-quoted or `--body-file` PR body, and a `#` comment that quote the pattern,
+  and FIRE cases for an unquoted `<<EOF` body, `bash <<'EOF'`, `cat <<'EOF' | bash`, and a double-quoted `--body` that each carry a real `$(...)`.
+- **Do:** decide which side of the false-positive/false-negative trade the hook takes, and write the losing cases into its docstring.
+- **Don't:** silence a commit-message false positive by stripping heredoc bodies without the FIRE cases above in the suite.
 
 ## 6. A guard that keeps firing after you satisfied it: stop, and read the copy that runs
 

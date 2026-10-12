@@ -106,5 +106,5 @@ the reply was `No response requested.` with `"model":"<synthetic>"`, `"stop_reas
 The `model` check above ran before recording it, so it is filed here as a stand-in, not as a recurrence.
 The orchestrator had first reported it as one.)
 
-- **Do:** when a brief asks for a placeholder reply to be recorded, run the `model` check on the transcript record first and record the result it gives.
-- **Don't:** record a placeholder as a recurrence because the brief called it one.
+- **Don't:** record a placeholder as a recurrence because the brief called it one;
+  a brief's framing is a premise to check ([`challenge-the-assignment`](challenge-the-assignment.md)).

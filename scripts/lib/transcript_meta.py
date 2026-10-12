@@ -126,3 +126,58 @@ def is_hook_feedback(entry: dict) -> bool:
                     return True
     return False
 
+
+# A user record's text that the harness injected, not the person typed: a
+# leading <system-reminder> / <task-notification> / <command-name> /
+# <local-command-stdout> element, or an interruption notice.
+_INJECTED_TAGS = "system-reminder|task-notification|command-name|local-command-stdout"
+_RX_INJECTED_ELEMENT = re.compile(
+    rf"^\s*<(?:{_INJECTED_TAGS})\b[^>]*>.*?(?:</(?:{_INJECTED_TAGS})>|\Z)",
+    re.S | re.I,
+)
+_RX_INTERRUPT = re.compile(r"^\s*\[Request interrupted[^\]]*\]?", re.I)
+
+
+def strip_injected_text(text: str) -> str:
+    """`text` with its leading harness-injected elements removed.
+
+    A record can be wholly injected (nothing remains), or an injected prefix
+    followed by what the person typed (the typed text remains). An unclosed
+    injected element runs to the end of the text.
+    """
+    if not isinstance(text, str):
+        return ""
+    while True:
+        stripped = _RX_INJECTED_ELEMENT.sub("", text, count=1)
+        stripped = _RX_INTERRUPT.sub("", stripped, count=1)
+        if stripped == text:
+            return text.strip()
+        text = stripped
+
+
+def is_real_user_turn(entry: dict) -> bool:
+    """True when `entry` is a turn the person typed, which opens a new turn.
+
+    False for: a non-user record, a sidechain record, a tool_result carrier,
+    a skill body, hook feedback, and a record whose every text is
+    harness-injected. A record mixing an injected prefix with typed text is
+    a real turn.
+    """
+    if not isinstance(entry, dict):
+        return False
+    if (entry.get("type") or entry.get("role")) != "user":
+        return False
+    if entry.get("isSidechain") or is_skill_load_meta(entry) or is_hook_feedback(entry):
+        return False
+    msg = entry.get("message")
+    content = msg.get("content") if isinstance(msg, dict) else entry.get("content")
+    if isinstance(content, str):
+        return bool(strip_injected_text(content))
+    if not isinstance(content, list):
+        return False
+    if any(isinstance(b, dict) and b.get("type") == "tool_result" for b in content):
+        return False
+    texts = [b.get("text") or "" for b in content
+             if isinstance(b, dict) and b.get("type") == "text"]
+    return any(strip_injected_text(t) for t in texts)
+

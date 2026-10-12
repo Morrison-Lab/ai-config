@@ -13,7 +13,7 @@ Read "etc." as the whole category the listed items share, not as the named items
 ## Infer what a request plainly implies
 
 A request carries the implications any careful colleague would act on without being told.
-A request for a resource means giving its direct link (compare [`link-forge-artifacts`](../writing/link-forge-artifacts.md), which covers items you post or act on).
+A request for a resource means giving its direct link (compare [`link-forge-artifacts`](../writing/link-forge-artifacts.md), which covers every item you name).
 
 When the user adds a clarification in parentheses, or as a second message right after the first, it names an inference you were expected to make unprompted.
 If the clarification was not already obvious to you, take it as a correction: a missed inference, not new information.

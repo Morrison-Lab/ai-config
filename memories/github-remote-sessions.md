@@ -25,8 +25,8 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
     see [`github-mcp-tools.md`](github-mcp-tools.md)'s org-gate entry.
     `git ls-remote https://github.com/<owner>/<repo>` works against any public repo whatever the scope is, because it is a git operation and the proxy passes those through unchanged.
     That answers every ref question the REST API would have --- which tags and branches exist, and which shas they point at --- and that is usually the whole reason an out-of-scope repo came up.
-    So the ladder is: MCP tools, then `add_repo` if the repo genuinely needs API or write access, then `git ls-remote` for anything that is only a ref lookup.
-    Attaching a repository the work needs takes no justification beyond that need:
+    So the ladder is: MCP tools, then `add_repo` whenever API access, write access or a full read would help, while `git ls-remote` stays the cheaper route for a question that is only a ref lookup.
+    Attaching a repository takes no justification beyond its helping the work:
     AGENTS.md's "Default to action without asking" covers the attach, and its membership gate still covers anything posted there (ai-config#4337).
     See [`git-tags.md`](git-tags.md)'s "Resolving a tag to a COMMIT sha" for the exact refspec form to ask for. (d-morrison/altdoc#65, 2026-07-26: SHA-pinning seven third-party actions needed tag shas from `actions/`, `r-lib/`, `r-hub/`, `quarto-dev/`, and `JamesIves/`, none of them in session scope, and `add_repo` would have been five pointless scope grants for five ref lookups.)
   - **The `github.com` web host 403s on scope exactly as `api.github.com` does, so `curl -I https://github.com/<owner>/<repo>` answers nothing about whether the repo exists.**

@@ -296,6 +296,111 @@ fixed by changing to `\exp{-\frac{x^2}{2}}` and `\exp{x^8}`.
   use `\vec{b}` or `\vecf{b}`.
   ([`Morrison-Lab/mds#48`](https://github.com/Morrison-Lab/mds/pull/48), 2026-09-29.)
 
+## No Greek letters in math source: name macros for meaning
+
+A semantic macro is named for what a symbol means, not for the letter it prints.
+`\vdelta`, `\vbeta`, `\hb`, `\bfbeta`, `\vth`, `\eps` and `\lam` only spell a Greek letter, so they are no more semantic than the raw `\delta`.
+Outside a passage that discusses the notation itself (a symbol table, a note on which letter a field uses), write no Greek letter in a math expression, either raw or inside a letter-named macro.
+Use the macro that names the concept (`\vcoef`, `\regcoef`, `\mean`, `\lincomp`, `\odds`, `\rate`, `\haz`, `\sigmoid`), and when none exists, add one named for the concept to `Morrison-Lab/macros` first (step 6).
+For example, write the backpropagation error as `\backerr^{(\ell)}`, not `\vdelta^{(\ell)}`, and the step size as `\learnrate`, not `\eta`.
+[`Morrison-Lab/macros#113`](https://github.com/Morrison-Lab/macros/pull/113) added a concept macro for each meaning the course sites use
+(`\sdpar`, `\varpar`, `\noise`, `\regpar`, `\param`, `\slack`, `\siglevel` and the rest; `interpretations.tsv` lists them all), so search it before adding one.
+A new name must not clash with a TeX primitive or a package command: `\penalty` (a primitive) broke every PDF, and `siunitx` defines `\ang`.
+One letter often means different things on different pages (`\sigma` for a standard deviation and for the sigmoid;
+`\lambda` for a rate, a penalty and an eigenvalue), so choose the macro from each use's meaning, not from the letter.
+(Directive from the user, 2026-10-08: "except when we're discussing notation directly, I don't want any hardcoded greek letters in latex expression, even in compounds like \vdelta;
+that's still not a semantic macro".
+Prose rule: [`Morrison-Lab/psw#136`](https://github.com/Morrison-Lab/psw/pull/136); detection: [`Morrison-Lab/ai-config#4381`](https://github.com/Morrison-Lab/ai-config/issues/4381).)
+
+### Decorators name a role too: `\est{}`, not `\hat`
+
+The same rule covers decorators.
+`\hat`, `\tilde` and `\bar` say how a symbol is drawn, not what it means, and a hat can mark an estimate, a fitted value or a transform.
+So `\hat{\mean}` is no more semantic than `\mu`: write `\est{\mean}` (from `Morrison-Lab/macros`, which prints a hat) for an estimate, and the `\est`-based forms where a compound exists (`\ecoef{j}`, `\evcoef`, `\esdpar`) rather than the hat-based `\hcoef{j}`, `\hvcoef`, `\hsdpar`.
+Pick a compound built on a concept macro: `\esig` and `\hs` also spell the Greek letter, so the section above already rules them out.
+When a decorated quantity has no role macro, add one to `Morrison-Lab/macros` first, as for Greek letters.
+Keep `\hat` only where the text discusses the notation itself.
+This is the target state rather than a blocker on current work: write new math this way now, and convert existing hats in their own sweep PRs.
+
+- **Do:** write `\est{\mean}` or `\ecoef{j}` for an estimate in new or edited math.
+- **Don't:** introduce `\hat{...}` or a hat-based compound (`\hcoef`, `\hvb`) in new math.
+
+(Directive from the user, 2026-10-08: "eventually, we want to remove even non-semantic decorators like \hat in favor of semantic macros like `\est`".
+Prose rule: [psw `chapters/notation/shared-macros.qmd`](https://github.com/Morrison-Lab/psw/blob/main/chapters/notation/shared-macros.qmd); sweep and detection: [`Morrison-Lab/ai-config#4438`](https://github.com/Morrison-Lab/ai-config/issues/4438).)
+
+### `\ell` is a letter too
+
+A bare `\ell` spells a letter, so it is no more semantic than a Greek letter.
+Choose the macro from the meaning:
+
+- `\llik` (or `\score`, `\hess`) for the log-likelihood and its derivatives;
+- `\obsloss{i}` for the loss on observation `i`;
+- `\lpnorm{p}` for the name of an `\ell_p` norm or penalty;
+- `\lbound` for a lower bound of a set;
+- a Latin letter for a dummy index or a count (`j`, `r`, `m`), unless it clashes with another symbol on the page.
+
+`scripts/check-raw-math.py` and the write-time hook flag a bare `\ell`.
+Keep `\ell` only where the text discusses the notation itself.
+(Directive from the user, 2026-10-09: "`\ell` is another non-semantic macro".
+Macros: [`Morrison-Lab/macros#118`](https://github.com/Morrison-Lab/macros/pull/118).)
+
+### Presentation commands are not notation: sizing, transposes and fonts
+
+Three more raw forms describe how something is drawn, not what it means.
+The lint and the hook flag each of them, and a rewrite uses the macro that names the concept:
+
+- **Manual sizing** (`\big`, `\Big`, `\bigg`, `\Bigg`, with `l`, `r` or `m`): write `\paren{...}`, `\sb{...}`, `\cb{...}`, `\abs{...}` or `\norm{...}`, which size themselves, and `\evalAt{expression}{point}` for an evaluation bar.
+  Big operators such as `\bigcup` are not sizing and are not flagged.
+- **Manual `\left` and `\right`**: write `\paren{...}` for parentheses, `\sb{...}` for square brackets, `\set{...}` for a set, `\cb{...}` for other braces and `\abs{...}` for bars, instead of `\left( ... \right)` and its relatives.
+  Write `\evalAt{expression}{point}` for an evaluation bar.
+  Arrows such as `\leftarrow` are not flagged.
+  A one-sided delimiter with no matching macro, such as a half-open interval, needs a macro named for the concept.
+  Add one when it is needed.
+- **A raw transpose** (`^\top`, `^{\top}`): write `\tp{X}`, or `\pt{...}` for a parenthesized expression.
+  Write the product of two vectors as `\dprod{a}{b}` and a matrix with itself as `\stprod{X}`;
+  a matrix times a different factor stays `\tp{X}` followed by that factor, because it is not a dot product.
+- **A font command used as a symbol** (`\mathbb`, `\mathcal`, `\mathscr`, `\mathfrak`): search `macros.qmd` for the concept (`\reals`, `\Nat`, `\Lik`, `\Ep`) and add one named for the concept when none exists.
+  The same letter means different things on different pages, so choose from the meaning.
+
+(Directive from the user, 2026-10-09: all `\mathbb`, `\mathscr`, `\mathcal` and similar, manual sizing such as `\big`, and `\top` should be checked and replaced with semantic macros.
+Also 2026-10-09: manual left and right delimiters were still in the lds notes.)
+
+### Latin letters with a fixed role: `\outvar`, `\predvar`, `\resid`
+
+A Latin letter that stands for a role in a model needs a role macro too.
+Write `\outvar`/`\Outvar`/`\voutvar` for the outcome variable, not a bare `y` or `\vy`.
+Write `\predvar`/`\Predvar`/`\vpredvar` for a predictor, not a bare `x` or `\vx`.
+Write `\eoutvar` for a predicted outcome.
+Write `\resid`/`\vresid` for a residual (observed minus predicted) and `\prederr` for a prediction error (predicted minus observed), not a bare `e` or `\ve`;
+for an observation used in the fit, the residual is the negative of the prediction error ([sds `#thm-prediction-error-residual`](https://morrison-lab.github.io/sds/estimation.html#thm-prediction-error-residual)).
+For a parameter estimate, write `\erf{\eparam}` (estimate minus truth, [sds `#def-estimation-error`](https://morrison-lab.github.io/sds/estimation.html#def-estimation-error)).
+A letter used generically (a function argument, an integration variable) stays a letter.
+`\vx` and `\vy` remain defined;
+existing uses are converted in the sweep, [`Morrison-Lab/ai-config#4440`](https://github.com/Morrison-Lab/ai-config/issues/4440), not as a side edit.
+The macros land with `Morrison-Lab/macros#117`;
+until a repo's `latex-macros` pin includes it, keep the existing letters there.
+
+- **Do:** write `\resid_i = \outvar_i - \eoutvar_i` in new or edited math.
+- **Don't:** write `e_i = y_i - \hat{y}_i`.
+
+(Directive from the user, 2026-10-09: "let's use a semantic macro rather than a bare `e`. even `y` should be a macro for outcome variable, and `x` should be a macro for predictor variable(s)".
+Macros: [`Morrison-Lab/macros#117`](https://github.com/Morrison-Lab/macros/pull/117); sweep: [`Morrison-Lab/ai-config#4440`](https://github.com/Morrison-Lab/ai-config/issues/4440).)
+
+### Write a named quantity by its macro, not its definition
+
+Once a quantity has a name and a macro, write the macro rather than re-expanding the expression that defines it.
+This is the macro-level case of [`math-derivation-steps`](../../shared/writing/math-derivation-steps.md)'s "keep each equation simple": every expression stays concise, and the reader sees which quantity it is about.
+When the quantity has no macro yet, add one to `Morrison-Lab/macros` first.
+
+- **Do:** write the gradient of the mean squared error as `\frac{2}{n} \tp{\design} \vprederr`, with the prediction errors named `\vprederr` and defined once in the text as `\vprederr = \design\vcoef - \vy`.
+- **Don't:** write `\frac{2}{n} \tp{\design} \paren{\design\vcoef - \vy}` after the prediction errors already have a name.
+
+The pair uses prediction errors (predicted minus observed);
+`\vy - \design\vcoef` is the vector of residuals, `\vresid`.
+(Directive from the user, 2026-10-09: "remember to always decompose expressions to make each one concise;
+... why not use the prediction error macro instead of `\vy - \design \vcoef`?"
+Also tracked as [`Morrison-Lab/psw#140`](https://github.com/Morrison-Lab/psw/issues/140).)
+
 ## Prefer command operator macros that take arguments over manual delimiter wrappers
 
 There should be very few instances where it is necessary to write `\cb` (curly braces), `\sb` (square brackets), or `\paren` directly with a bare operator.
@@ -309,6 +414,19 @@ Instead, use the functional command version of the operator macro that takes its
 
 Reserve direct `\sb{...}`, `\cb{...}`, and `\paren{...}` for mathematical grouping, sets ($\cb{1, \dots, n}$), evaluation limits, or raw algebra that does not denote an operator with a dedicated macro.
 (Directive from the user, 2026-10-07.)
+
+## Prefer dot products over transpose products and inner products
+
+When two vectors multiply to give a number, write a dot product, `\dprod{\vx}{\vbeta}` ($\vx \cdot \vbeta$),
+not a transpose product (`\vx^\top \vbeta`, `\vx' \vbeta`, `\tprod{\vx}{\vbeta}`)
+or inner-product brackets (`\langle \vx, \vbeta \rangle`, `\iprod{\vx}{\vbeta}`).
+For example, write a linear model as `f(\vx) = \dprod{\vx}{\vbeta}`, not `f(\vx) = \vx^\top \vbeta`.
+Keep the transpose where the product is not a dot product of two vectors:
+a matrix product (`\tp{X} X`), an outer product, or a quadratic form (`\tprod{\vx}{\matr{A}} \vx`).
+Keep inner-product brackets where the text means a general inner product,
+such as the definition of an inner product space.
+The prose rule is psw's [Writing dot products](https://github.com/Morrison-Lab/psw/pull/135).
+(Directive from the user, 2026-10-08, on `Morrison-Lab/lds#488`.)
 
 ## Anti-patterns
 

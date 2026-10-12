@@ -59,7 +59,8 @@ In every session --- at session start, and again periodically during long sessio
    the larger the count, the more fixes the session is running without.
 
    `claude plugin update <plugin>` (verified present in `claude plugin --help` output on this machine) is the remedy once staleness is confirmed --- run it per scope (`claude plugin update ai-config@Morrison-Lab`, and `claude plugin update --scope project ai-config@Morrison-Lab` from each affected project/worktree), then restart the session to pick up the refreshed cache path.
-   [ai-config#2439](https://github.com/Morrison-Lab/ai-config/issues/2439) tracks making this check itself part of the session-start sweep rather than something a session discovers by symptom.
+   [`hooks/warn-stale-plugin-pin.py`](../../hooks/warn-stale-plugin-pin.py) runs this comparison at every session start, against the local marketplace clone rather than `origin/main` ([ai-config#2439](https://github.com/Morrison-Lab/ai-config/issues/2439)).
+   It does not fetch, so a clean start means the pin matches the local clone, and the manual count above is still the check against `origin/main`.
 
    **When a guard's refusal matches the shape of an already-fixed issue, check the installed build before treating it as a live bug or a classifier problem to work around.**
    Measured 2026-09-28 (Claude Code desktop, `Morrison-Lab/mln`): `hooks/no-push-without-self-review.py` refused a push after a foreground `adversarial-reviewer` had returned its CLEAN verdict via `SubagentHandback`, and `ALLOW_UNREVIEWED_PUSH=1` was then denied by the auto-mode classifier's `[Safety Bypass Flag]` --- the exact deadlock shape [`mistake-patterns.md`](../../memories/mistake-patterns.md) Pattern 43 already names.
@@ -153,6 +154,9 @@ In every session --- at session start, and again periodically during long sessio
    That matters because an unresolvable path is not an inert guard: `python3` exits 2 on a file it cannot open, and exit 2 is the `PreToolUse` deny signal, so one stale absolute path denies every tool call its matcher names --- and from inside the session that is indistinguishable from the guard legitimately firing.
    A path this process cannot expand (`${CLAUDE_PLUGIN_ROOT}` is set by the plugin loader, not by the shell) is reported as `skipped` rather than `missing`, since not checkable here is a different finding from not present.
    `--check` exits 1 when any registered path is missing, and also when there is no settings file at all --- the zero case arms nothing, so reporting it as clean would be the pass-path-equals-failure-path shape.
+   It also reports as `DRIFTED` a registered copy of a repo hook in `~/.claude/hooks` whose bytes differ from the repo's file, and exits 1 for that too.
+   Such a copy runs, so nothing fails, but it enforces whatever the hook said when it was copied.
+   Refresh the copy rather than deleting it, since `settings.json` still invokes that path ([ai-config#3094](https://github.com/Morrison-Lab/ai-config/issues/3094)).
    See [ai-config#2392](https://github.com/Morrison-Lab/ai-config/issues/2392) for the two measured occurrences, the second of which lost `Bash` and `Write`/`Edit` together and so had no self-repair path left.
    Four caveats before running `--fix`.
    Check `enabledPlugins` in `settings.json` first: if the ai-config **plugin** is enabled it already loads every hook in `hooks/hooks.json`, and `--fix` then registers each one a second time under a different command string, so every hook fires twice --- the two paths are mutually exclusive, per README.

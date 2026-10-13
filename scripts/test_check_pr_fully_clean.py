@@ -1906,6 +1906,12 @@ def main() -> int:
             "Verdict: All looks good, no new issues"
         ) == "clean",
     )
+    check(
+        "classify_verdict: 'Verdict: Confirming prior review, still looks good, no new issues' is clean",
+        checker.classify_verdict(
+            "Verdict: Confirming prior review, still looks good, no new issues"
+        ) == "clean",
+    )
     # End-to-end check_latest_verdict with real lab-manual#556 fixtures (closes #4471)
     lab_manual_556_r1 = (
         "**Claude finished @dem-extra1's task in 3m 34s** \u2014\u2014 [View job](https://github.com/UCD-SERG/lab-manual/actions/runs/38214553419)\n\n"

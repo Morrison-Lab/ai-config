@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Unit tests for parse-sse.py."""
+"""Unit tests for skills/delegate-to-opencode/scripts/parse-sse.py (ai-config#4469)."""
 from __future__ import annotations
 
+import importlib.util
 import io
 import subprocess
 import sys
@@ -9,24 +10,24 @@ import tempfile
 import unittest
 from pathlib import Path
 
-# Add script directory to sys.path
-SCRIPTS_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(SCRIPTS_DIR))
+ROOT = Path(__file__).resolve().parent.parent
+SCRIPT_PATH = ROOT / "skills" / "delegate-to-opencode" / "scripts" / "parse-sse.py"
 
-import importlib.util
-spec = importlib.util.spec_from_file_location("parse_sse", SCRIPTS_DIR / "parse-sse.py")
-parse_sse = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
-spec.loader.exec_module(parse_sse)  # type: ignore[union-attr]
+spec = importlib.util.spec_from_file_location("parse_sse", SCRIPT_PATH)
+if spec is None or spec.loader is None:
+    raise ImportError(f"Could not load spec for {SCRIPT_PATH}")
+parse_sse = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(parse_sse)
 
 
 class TestParseSSE(unittest.TestCase):
     def test_clean_stream(self) -> None:
         input_data = [
-            ': keep-alive\n',
+            ": keep-alive\n",
             'data: {"choices":[{"delta":{"content":"Hello"}}]}\n',
-            '\n',
+            "\n",
             'data: {"choices":[{"delta":{"content":" world!"}}]}\n',
-            'data: [DONE]\n',
+            "data: [DONE]\n",
         ]
         out = io.StringIO()
         code = parse_sse.parse_sse_stream(input_data, out=out)
@@ -35,7 +36,7 @@ class TestParseSSE(unittest.TestCase):
 
     def test_upstream_failure(self) -> None:
         input_data = [
-            'upstream request failed\n',
+            "upstream request failed\n",
         ]
         out = io.StringIO()
         code = parse_sse.parse_sse_stream(input_data, out=out)
@@ -58,10 +59,9 @@ class TestParseSSE(unittest.TestCase):
         self.assertEqual(code, 1)
 
     def test_cli_stdin(self) -> None:
-        script_path = SCRIPTS_DIR / "parse-sse.py"
         raw_input = 'data: {"choices":[{"delta":{"content":"From STDIN"}}]}\ndata: [DONE]\n'
         proc = subprocess.run(
-            [sys.executable, str(script_path)],
+            [sys.executable, str(SCRIPT_PATH)],
             input=raw_input,
             capture_output=True,
             text=True,
@@ -70,13 +70,12 @@ class TestParseSSE(unittest.TestCase):
         self.assertEqual(proc.stdout, "From STDIN")
 
     def test_cli_file(self) -> None:
-        script_path = SCRIPTS_DIR / "parse-sse.py"
         with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as f:
             f.write('data: {"choices":[{"delta":{"content":"From FILE"}}]}\ndata: [DONE]\n')
             temp_path = Path(f.name)
         try:
             proc = subprocess.run(
-                [sys.executable, str(script_path), str(temp_path)],
+                [sys.executable, str(SCRIPT_PATH), str(temp_path)],
                 capture_output=True,
                 text=True,
                 check=True,

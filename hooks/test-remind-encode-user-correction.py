@@ -63,6 +63,18 @@ FIRES = [
     "this should handle things that seem obvious",
     "that's not what I asked for",
     "you ignored my instruction",
+    # A correction asked as a question (ai-config#4480).
+    "why didn't you update reticulate?",
+    "why not using a semantic macro for the P in P(A)?",
+    "how come you haven't recorded this yet?",
+    "shouldn't you have checked the rendered page?",
+    "did you even check the render?",
+    "haven't we agreed to no compound definitions?",
+    # The same words in a project-thread wake and in a PR review comment event.
+    '<wake reason="mention"><message from="human">why aren\'t we using the macro here?</message></wake>',
+    '<wake reason="external-event"><event source="github" kind="review_comment" '
+    'untrusted-keys="body">' + json.dumps({"body": "why are we not using a semantic macro for F?"})
+    + "</event></wake>",
 ]
 SILENT = [
     "please render the manuscript again",
@@ -96,6 +108,15 @@ SILENT = [
     "every time the CI runs it posts.\nCan you tell me why?",
     "it's not what I wanted to hear but OK",
     "you're doing great",
+    "why didn't the build run on this branch?",
+    "why not merge it now?",
+    "why are we waiting on CI?",
+    "why did you choose pandas here? I am curious about the tradeoff",
+    "did you see the new issue?",
+    "haven't we merged the sibling PR yet?",
+    '<wake reason="external-event"><event source="github" kind="comment" '
+    'untrusted-keys="body">' + json.dumps({"body": "why aren't we using F?\n\n_Posted by Claude Code (AI agent) --- not written by a human._"})
+    + "</event></wake>",
     # Correction words only inside text the user did not type as one.
     "fix this test:\n```\nassert 'I already told you' in out\n```\n",
     "> I already told you to stop\n\nthat's what the reviewer wrote; reply to it",

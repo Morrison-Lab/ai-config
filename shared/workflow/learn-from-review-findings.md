@@ -520,3 +520,40 @@ whether this claim was ever explained anywhere outside this repository.
 Distinct from `algorithmatize-checks.cases.md`'s "a retraction can land the
 OPPOSITE overclaim", which is about a retraction being *wrong*;
 this is about one that is right and incomplete.)
+
+## A repository owner's review comment that implies a rule
+
+A comment from the repository owner on a PR is scrutiny of your work and also the cheapest source of a standing rule the lab will ever get.
+The PR-activity harness delivers it as a relay event, and the natural response is to fix the one line it names and reply "Fixed in `abc123`".
+That discharges the thread and nothing else, so the owner restates the same rule on the next comment or the next PR.
+
+Ezra's review of [sds#111](https://github.com/Morrison-Lab/sds/pull/111) on 2026-10-12 and 2026-10-13 is the case.
+Nine comments in one review, seven of them about conventions, carried five rules:
+
+| Comment | Rule it implies | Recorded before? |
+| --- | --- | --- |
+| "haven't we agreed to no compound definitions?" (and again, "no compound defs?") | One term per `#def-` div | No |
+| "do we need to define the population distribution in terms of CDF? why not its density or probability measure?" | Define an object at the most general level that covers every case, with special cases in remarks | No |
+| "hyperlink 'at random' to a definition?" | Link each technical term at its use | Yes, [`definition-crossrefs`](../writing/definition-crossrefs.md) |
+| "why aren't we using a semantic macro for the P in `P(A)`?", then "again, why not using semantic macro for F in `F(t)`? haven't I told you to use semantic macros everywhere?" | Semantic macros in all math | Yes, [`use-math-macros`](../../skills/use-math-macros/SKILL.md) |
+| "can we represent the count (words inside a text command) in mathematical notation?" | Write a quantity as math, not as words | Not as a rule |
+
+Two of the five were already recorded (2026-10-13, found by `grep -rIl -i -E "compound def|one term per|probability measure" shared memories skills CLAUDE.md AGENTS.md` plus a read of the neighbouring fragments, which is evidence and not proof, per [`grep-is-not-coverage`](grep-is-not-coverage.md)), and the owner still had to repeat the macro rule within an hour: the fix for `P` did not sweep `F`.
+So the response to such a comment has three parts, in this order.
+
+1. **Fix the instance, then sweep for the class.**
+   Search the whole diff, and the sibling files the PR touches, for the same pattern before replying, not after the owner finds the next one.
+2. **Run `ums` in the same turn and record the rule in its global home.**
+   Pick the home by scope, per [`encode-reusable-feedback`](encode-reusable-feedback.md): an `ai-config` fragment for an agent rule, `psw` for a prose or notation rule, the repository's own instructions for a rule that holds only there.
+   Check for an existing entry first and extend it, so a rule already recorded gets a stronger trigger rather than a duplicate.
+3. **Say in the reply which rule you recorded, and where**, with a link, for example "Fixed in `abc123`.
+   Recorded 'one term per definition' in `lecture-conventions` (link)."
+   A reply that names only the fix does not show the owner that the rule will survive the session.
+
+Treat a comment as implying a rule when it carries "haven't we", "I've told you", "again", "always", "everywhere" or "why aren't we", asks a question that names a convention, or repeats a correction made earlier in the PR.
+A comment that only asks about the content ("when?") is a one-off, and saying so discharges it, as above.
+
+- **Do:** after an owner's review comment, sweep the PR for the class, run `ums`, and name the recorded rule and its link in the reply.
+- **Do:** treat a repeated correction as evidence that the first fix was too narrow.
+- **Don't:** reply "Fixed" to a comment phrased as a standing rule and stop there.
+- **Don't:** record the rule only in the project's memory, because a lesson filed where it came up is invisible to every other repository.

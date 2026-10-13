@@ -33,6 +33,18 @@
             "why": "ai-config#2439 -- the plugin cache pin that runs hooks does not advance when the marketplace clone updates, so merged hook fixes went unrun for weeks with nothing saying so. At session start, compares each applicable ai-config pin in installed_plugins.json against the local marketplace clone's HEAD and, when it lags, names the commit count and the per-scope update commands."
           }
         ]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-ums-on-trigger-events.py\"",
+            "timeout": 10,
+            "script": "remind-ums-on-trigger-events.py",
+            "why": "After compaction, learnings held only in the old context may be summarized away: run UMS over what remains (ai-config#4480)."
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [
@@ -230,6 +242,20 @@
             "timeout": 10,
             "script": "remind-encode-user-correction.py",
             "why": "ai-config#4208 -- the user had to repeat a correction across sessions and projects. The UMS reminders key on the agent's own admission or an accepted review finding, so a correction from the user triggered none of them, and the natural landing place outside ai-config was host memory no other project reads. Injects, never blocks, the procedure that commits the general rule in the same turn to the repo that owns it, ai-config for anything beyond one repo."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/require-ums-before-resolve.py\"",
+            "timeout": 10,
+            "script": "require-ums-before-resolve.py",
+            "why": "AGENTS.md 'Run UMS before every pause': a merged-PR event reminds the thread to run its wrap-up (post-merge, including UMS) before resolving. Injects, never blocks."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-ums-on-trigger-events.py\"",
+            "timeout": 10,
+            "script": "remind-ums-on-trigger-events.py",
+            "why": "A coordinator note that steers a thread, or a user reply that is only a grant ('daytb', 'yes, do it'), owes a UMS pass. Injects, never blocks (ai-config#4480)."
           }
         ]
       }
@@ -1468,6 +1494,30 @@
             "timeout": 10,
             "script": "warn-hedged-checkable-claim.py",
             "why": "User rule, 2026-10-08: 'don't say likely when you can check'. A hedge (likely, probably, presumably, I think, should be) in the same sentence as a PR or issue reference, a CI or check status word, or merged/open/closed names a state the agent can read in one call. Warns, never blocks, on user-visible reply tools and GitHub comment tools; asks the agent to check and state the result. Fails open."
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__hearthbot__set_thread_resolved",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/require-ums-before-resolve.py\"",
+            "timeout": 10,
+            "script": "require-ums-before-resolve.py",
+            "why": "A resolved thread loses its message box, so UMS must run first. Denies the first set_thread_resolved(true) of a thread when no UMS tool call follows the last user message; the retry is allowed (ai-config#4480)."
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-ums-on-trigger-events.py\"",
+            "timeout": 10,
+            "script": "remind-ums-on-trigger-events.py",
+            "why": "A git revert or hard reset means work was undone or redone: ask what would have prevented the first attempt and record it (ai-config#4480)."
           }
         ]
       }

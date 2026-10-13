@@ -45,9 +45,10 @@ When someone asks for one missing link on a page, the missing link is a sample o
 Read the whole page for every other named organization, person, tool, book, or concept that has no link, and add those in the same change.
 Check each target URL before adding it.
 
-Measured on [Morrison-Lab/morrison-lab.github.io#7](https://github.com/Morrison-Lab/morrison-lab.github.io/pull/7) (2026-10-13).
+Observed on [Morrison-Lab/morrison-lab.github.io#7](https://github.com/Morrison-Lab/morrison-lab.github.io/pull/7) (2026-10-13).
 When asked to link "SeRG", the first pass searched only for other SeRG mentions.
 It missed UC Davis, Kristen Aiemjoy, two cited books, Quarto, GitHub Actions, and R packages, all on the same short page, and the user had to ask twice more.
 
 - **Do:** after adding the requested link, reread the whole page and link every other unlinked name it carries.
+- **Do:** open each new target URL and confirm it names the entity before linking it.
 - **Don't:** search only for other mentions of the term the user named and report the page done.

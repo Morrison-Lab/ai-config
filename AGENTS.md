@@ -172,11 +172,7 @@ See [`proactively-suggest-alternatives`](shared/principles/proactively-suggest-a
 ## Use real-world examples for general practice
 
 When we do or see something that would be a good example for general practice, actively capture and incorporate it as a concrete before-and-after example in shared guides, rules, and documentation.
-Pair every example with an explicit critique explaining why the refactoring improved clarity, structure, or precision, and cite authentic sources for provenance.
-See [`use-real-world-examples`](shared/principles/use-real-world-examples.md) and [`AGENTS.cases.md`](AGENTS.cases.md).
-
-- **Do:** capture exemplary refactors and tightened constructs from real PRs as before-and-after examples in shared docs.
-- **Don't:** leave great examples of general practice isolated in closed PR diffs.
+See [`use-real-world-examples`](shared/principles/use-real-world-examples.md) (pairing, critique and provenance rules) and [`AGENTS.cases.md`](AGENTS.cases.md).
 ## Search the tracker and AGENTS.md before building or denying a policy
 
 Before answering that a permission or policy does not exist, and before implementing a new policy or capability, search the full policy corpus (`AGENTS.md`, `CLAUDE.md`, `memories/`, `shared/`) and the issue tracker.
@@ -185,6 +181,10 @@ See [`grep-is-not-coverage`](shared/workflow/grep-is-not-coverage.md) and [`AGEN
 - **Do:** search `AGENTS.md`, `CLAUDE.md`, `memories/`, `shared/`, and open issues before answering "no" to whether a policy exists.
 - **Do:** run an all-state tracker search before implementing a capability request.
 - **Don't:** assert that a standing grant or rule does not exist based only on searching `skills/` or `memories/`.
+## Track every useful resource in a repo
+
+Whenever you or a subagent finds a useful resource in any format for any Morrison-Lab repo, course or project, track it in a repo now, from official sources only, to build comprehensive directories of our interests.
+Detail: [`track-useful-resources`](shared/workflow/track-useful-resources.md).
 ## Always give recommendations with questions
 
 Whenever asking the user a question or presenting options for a genuine decision, always provide a clear, specific recommendation.

@@ -52,6 +52,13 @@ What does not: the Mistake, Canonical Rule, Fix, or Do/Don't lines, which are wh
   The 3,924 / 108 / 270 / non-zero off-axis figures were taken against the four designs rejected on the PR branch, which the squash merge as `07847b9` left off `main`;
   recover them with `git fetch origin 'refs/pull/2515/head:refs/remotes/pr/2515'` (`c7ff646`, `4f9d3fc`, `68a14b9`, `a3251bf`) rather than treating them as lost.
   Canonical rule for the general shape: [`verify-the-right-artifact.md`](../shared/workflow/verify-the-right-artifact.md)'s "what a change TRANSFORMS, standing in for what it CONCLUDES".
+- **3rd occurrence, 2026-10-12** ([ai-config#4471](https://github.com/Morrison-Lab/ai-config/issues/4471) / PR [#4477](https://github.com/Morrison-Lab/ai-config/pull/4477)):
+  added conversational verdict heading to `check-pr-fully-clean.py` using `Verdict:[^\n]*\b(?:no\s+new\s+issues|nothing\s+to\s+flag)\b` to catch `### Verdict: Confirming prior review --- still looks good, no new issues`.
+  The open `[^\n]*` wildcard bridged across same-line sentence boundaries without checking preceding text,
+  so `Verdict: 2 blocking items remain from last round. No new issues were introduced in this commit.` classified as clean.
+  Caught by automated review.
+  Fixed by bounding conversational clean headings strictly to enumerated affirmative lead-ins (`confirming prior review`, `still looks good`, `looks good`) without crossing sentence boundaries,
+  and adding negative-control tests for multi-sentence lines stating blocking issues.
 
 ## Pattern 16: Same-Vendor Subagent Fallback When a Reachable CLI Would Give True Independence
 

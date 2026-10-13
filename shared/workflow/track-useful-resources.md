@@ -6,6 +6,7 @@ Each tracked resource is a small contribution to a directory, not a one-off link
 
 ## How
 
+Track it immediately, in the turn where you find it, not at the end of the session: a resource noted "for later" is the one that gets lost.
 Put the resource where readers will find it: a chapter's Further reading or "Read" box, a channels table (lds `chapters/data/channels.csv`), or the archive repo `mlr` for official copies of PDFs.
 If it does not fit the current PR, open a small separate PR or an issue for it.
 Link official sources only: the authors', publisher's or institution's own site, or an open-access host.

@@ -183,7 +183,7 @@ See [`grep-is-not-coverage`](shared/workflow/grep-is-not-coverage.md) and [`AGEN
 - **Don't:** assert that a standing grant or rule does not exist based only on searching `skills/` or `memories/`.
 ## Track every useful resource in a repo
 
-Whenever you or a subagent finds a useful resource in any format for any Morrison-Lab repo, course or project, track it in a repo, from official sources only, to build comprehensive directories of our interests.
+Whenever you or a subagent finds a useful resource in any format for any Morrison-Lab repo, course or project, track it in a repo now, from official sources only, to build comprehensive directories of our interests.
 Detail: [`track-useful-resources`](shared/workflow/track-useful-resources.md).
 ## Always give recommendations with questions
 

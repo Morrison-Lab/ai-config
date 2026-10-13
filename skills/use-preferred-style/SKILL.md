@@ -16,7 +16,7 @@ direct. Say the point in a short sentence. Stack fewer clauses. Drop filler.
 
 The authority is the user's own guide, **Principles of Scientific Writing
 (PSW)**: https://morrison-lab.github.io/psw/.
-PSW covers word choice, conciseness, grammar, and avoiding AI tells --- including
+PSW covers word choice, conciseness, grammar, and avoiding clichés and AI tells --- including
 the nested-dependent-clause rule below, in its own "Conciseness" chapter.
 This skill operationalizes PSW and adds the user's own rule on joining
 independent clauses with coordinating conjunctions rather than subordinate
@@ -176,7 +176,8 @@ Pull the latest rules from it, not from this summary:
 - [Word choice](https://morrison-lab.github.io/psw/chapters/word-choice.html) --- Anglish over Latin; avoiding vague/metaphorical language; minimizing jargon.
 - [Conciseness](https://morrison-lab.github.io/psw/chapters/conciseness.html) --- cut redundancy; active voice; the swap list; limiting nested clauses.
 - [Grammar](https://morrison-lab.github.io/psw/chapters/grammar.html) --- rules 7--8 above: relative and demonstrative pronouns.
-- [Avoiding AI tells](https://morrison-lab.github.io/psw/chapters/avoid-ai-tells.html) --- overused vocabulary, rhetorical reflexes, formatting habits; see also the `find-ai-tells` skill below.
+- [Avoiding clichés](https://morrison-lab.github.io/psw/chapters/avoid-cliches.html) --- overused vocabulary, rhetorical reflexes, formatting habits;
+  see also the `find-ai-tells` skill below.
 - [Defining terms clearly](https://morrison-lab.github.io/psw/chapters/defining-terms.html)
 - [Paper organization](https://morrison-lab.github.io/psw/chapters/paper-organization.html)
 

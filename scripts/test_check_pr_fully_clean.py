@@ -1876,6 +1876,36 @@ def main() -> int:
             "The author addressed all comments with no new issues introduced in this commit."
         ) == "",
     )
+    check(
+        "classify_verdict: 'Verdict: 2 blocking items remain... No new issues...' does not cross sentence boundary",
+        checker.classify_verdict(
+            "Verdict: 2 blocking items remain from last round. No new issues were introduced in this commit."
+        ) != "clean",
+    )
+    check(
+        "classify_verdict: '**Verdict:** The SQL injection fix from round 1 is still missing. No new issues beyond that.' does not classify as clean",
+        checker.classify_verdict(
+            "**Verdict:** The SQL injection fix from round 1 is still missing. No new issues beyond that."
+        ) != "clean",
+    )
+    check(
+        "classify_verdict: 'Verdict: 2 blocking items remain, no new issues' does not classify as clean",
+        checker.classify_verdict(
+            "Verdict: 2 blocking items remain, no new issues"
+        ) != "clean",
+    )
+    check(
+        "classify_verdict: 'Verdict: Looks good with no new issues' is clean",
+        checker.classify_verdict(
+            "Verdict: Looks good with no new issues"
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: 'Verdict: All looks good, no new issues' is clean",
+        checker.classify_verdict(
+            "Verdict: All looks good, no new issues"
+        ) == "clean",
+    )
     # End-to-end check_latest_verdict with real lab-manual#556 fixtures (closes #4471)
     lab_manual_556_r1 = (
         "**Claude finished @dem-extra1's task in 3m 34s** \u2014\u2014 [View job](https://github.com/UCD-SERG/lab-manual/actions/runs/38214553419)\n\n"

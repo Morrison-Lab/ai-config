@@ -2111,7 +2111,7 @@ VERDICT_CLEAN_PATTERNS = [
     r"\bReady\s+for\s+merge\b",
     r"(?:[*_]{1,3})?Verdict(?:[*_]{1,3})?:(?:[*_]{1,3})?\s*(?:Clean|Approved|Ready|No\s+(?:new\s+|blocking\s+)?issues?(?:\s+(?:found|identified))?)\b",
     # Conversational verdict heading (closes #4471, lab-manual#556).
-    r"(?:[*_]{1,3})?Verdict(?:[*_]{1,3})?:[^\n]*\b(?:no\s+new\s+issues|nothing\s+(?:new\s+)?to\s+flag)\b",
+    r"(?:[*_]{1,3})?Verdict(?:[*_]{1,3})?:(?:[*_]{1,3})?\s*(?:(?:confirming\s+(?:prior|previous)\s+review\s*[\u2013\u2014-]*\s*)?(?:all\s+|still\s+)?looks\s+good\s*(?:[,\u2013\u2014-]\s*|\s+with\s+)|confirming\s+(?:prior|previous)\s+review\s*[,\u2013\u2014-]\s*)?(?:no\s+new\s+issues|nothing\s+(?:new\s+)?to\s+flag)\b",
     r"\bno\s+new\s+issues\b",
     r"\bnothing\s+(?:new\s+)?to\s+flag\b",
     r"\bApproved\s+for\s+merge\b",

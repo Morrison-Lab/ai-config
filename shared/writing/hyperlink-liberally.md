@@ -38,3 +38,20 @@ A hyperlink provides 1-click access directly to the authoritative documentation,
 - **Do:** use informative anchor text naming the referenced entity.
 - **Don't:** leave references to external packages, internal policies, or forge items as plain unlinked text.
 - **Don't:** use bare URLs or uninformative labels like "here" as anchor text.
+
+## A request to link one thing is a request to sweep the page
+
+When someone asks for one missing link on a page,
+the missing link is a sample of a gap, not the whole gap.
+Read the whole page for every other named organization, person, tool,
+book, or concept that has no link, and add those in the same change.
+Check each target URL before adding it.
+
+Measured on Morrison-Lab/morrison-lab.github.io#7 (2026-10-13):
+asked to link "SeRG", the first pass searched only for other SeRG mentions.
+It missed UC Davis, Kristen Aiemjoy, two cited books, Quarto,
+GitHub Actions, and R packages, all on the same short page,
+and the user had to ask twice more.
+
+- **Do:** after adding the requested link, reread the whole page and link every other unlinked name it carries.
+- **Don't:** search only for other mentions of the term the user named and report the page done.

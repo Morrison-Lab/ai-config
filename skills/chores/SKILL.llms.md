@@ -84,7 +84,7 @@ That listing is a snapshot. Assignment, the title, and the labels can all change
 
 ### 2. Classify each PR by bump size
 
-Record the head, the base, and the title before classifying; on GitHub use the PR pins and `check-pr-fully-clean.py`, while on GitLab use the MR `sha`, `target_branch`, and `check-mr-fully-clean.py`, since the classification, every read in step 3, and the merge in step 4 are claims about one SHA on one target under one title, and Dependabot can replace the head or retitle the PR between any two of them:
+Record the head, the base, and the title before classifying: on GitHub read the PR pins directly via `gh pr view` as shown below, while on GitLab read the MR `sha`, `target_branch`, and `check-mr-fully-clean.py`. `chores` is CI-gated, not review-gated: `check-pr-fully-clean.py` is the full ARDI instrument for human PRs that requires automated code-review verdicts and quorums (which are skipped on dependency bots; if using `check-pr-fully-clean.py` on a bot PR, pass `--quorum 0`). The classification, every read in step 3, and the merge in step 4 are claims about one SHA on one target under one title, and Dependabot can replace the head or retitle the PR between any two of them:
 
 ``` bash
 PINNED=$(gh pr view "$N" --repo "$REPO" --json headRefOid -q .headRefOid)   # VIEW_PR
@@ -126,6 +126,10 @@ gh pr comment "$N" --repo "$REPO" --body "@dependabot rebase"   # COMMENT_PR —
 ```
 
 For a Renovate PR, tick the rebase checkbox in the PR body (or its Dependency Dashboard) — `@dependabot` comment commands do nothing on Renovate PRs.
+
+#### Automated workflow review requests do not block safe chores
+
+In repositories using workflows like `Morrison-Lab/gha`’s `request-dependabot-review.yml`, an automated review request for the repository maintainer (e.g. `d-morrison`) is automatically attached to bot PRs upon creation. Because `chores` is CI-gated, this automated notification is an informational workflow trigger, not a human review blocker that requires an affirmative review or manual dismissal before merge. Safe patch, minor, and submodule bumps merge on green CI alone. (Major bumps are held and surfaced for the user’s explicit sign-off anyway per step 5).
 
 ### 4. Safe bumps (patch / minor / submodule + green) → merge
 
@@ -182,7 +186,7 @@ Group as **Merged**, **Flagged (major — your call)**, and **Skipped** (failing
 ## Relationship to other skills
 
 - **`check-dependency-updates` / `cdu`** — the audit counterpart. `cdu` *finds* stale pins and opens/drives the bumps itself (or recommends a `dependabot.yml` that automates them); `chores` *processes* the bump PRs that land. Use `cdu` to catch what Dependabot misses, `chores` to clear what it opens.
-- **`ardia` / `gia`** — the human-PR counterpart (drive feature PRs to a clean *review* verdict). `chores` is the bot-PR counterpart (CI-gated bumps). Don’t run `ardi` on a Dependabot PR — `@claude` review is skipped on them by design.
+- **`ardia` / `gia`** — the human-PR counterpart (drive feature PRs to a clean *review* verdict). `ardia` finishes with a `chores` pass over dependency-bot PRs in the swept repos after human PRs reach terminal states, handing bumps to this skill. `chores` is the bot-PR counterpart (CI-gated bumps). Don’t run `ardi` on a Dependabot PR — `@claude` review is skipped on them by design.
 - **`pr-status-all`** — read-only status of every open PR; `chores` is the acting version scoped to bump PRs.
 - **`clean-branches` / `cb`** — Dependabot deletes its own remote branch on merge, but if you checked any out locally, sweep the stragglers there.
 - **`defer-issue`** — if a major bump needs a real code change before it can land (e.g. migrate a removed Action input), file a follow-up issue instead of leaving the PR to rot.

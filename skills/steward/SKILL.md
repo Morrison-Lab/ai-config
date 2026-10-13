@@ -40,6 +40,13 @@ read the linked file before acting on that point.
   in these repos a plainly correct nit gets fixed now,
   in the next push or in a push of its own.
   See [`address-every-comment`](../../shared/workflow/address-every-comment.md).
+- **A repository owner's review comment is scrutiny, and often states a rule.**
+  When it says "haven't we", "again", "everywhere", or asks why a convention was not followed,
+  fix the instance, sweep the PR for the same class,
+  run `ums` in that turn to record the rule in its global home,
+  and name the recorded rule and its link in your reply.
+  See [`learn-from-review-findings`](../../shared/workflow/learn-from-review-findings.md)
+  and [`run-ums-proactively`](../../shared/workflow/run-ums-proactively.md).
 - **Reply before pushing:** on each finding you fix,
   reply naming the not-yet-pushed commit and what it changes,
   as your last write before the push.

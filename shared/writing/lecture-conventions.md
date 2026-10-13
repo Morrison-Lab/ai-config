@@ -51,6 +51,13 @@ This fragment is the agent-facing copy: follow the rules, and link to psw instea
   Put the properties of the defined object in a separate `#thm-`, `#lem-` or `#prp-` div after it, with a proof where one is known (Ezra, 2026-10-09).
   The rule holds in every repository, including `mds`, `pds`, `sds`, `lds` and `rme`.
   The wording is canonical in psw's "Writing for teaching" chapter.
+- **Define one term per `#def-` div.**
+  Never combine two terms, such as a population and its distribution, in one definition (Ezra, 2026-10-12).
+  Give each term its own div and its own id, and let the second link to the first.
+- **Define an object at the most general level that covers every case.**
+  Define a distribution by its probability measure, not its CDF, density or mass function, which exist only in some cases (Ezra, 2026-10-12).
+  Put the special cases in a remark after the definition.
+  Write a count as math, such as `\abs{\set{u \in U : X(u) \in A}}`, not as words inside `\text{}`.
 - **Present R results with modern packages, even for a base R fit.**
   A model fit with `lm()` or `glm()` shows its coefficients through `parameters::parameters() |> print_md()` or `gtsummary::tbl_regression()`, never a `summary()` or `coef(summary())` printout (Ezra, 2026-10-09).
   Figures use ggplot2, with sjPlot or ggeffects for prediction plots and `performance::check_model()` for diagnostics, never base graphics (`plot()`, `lines()`, `abline()`).

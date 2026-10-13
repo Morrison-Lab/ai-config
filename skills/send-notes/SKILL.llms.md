@@ -15,7 +15,7 @@ Morrison-Lab maintains focused notes repositories, each with a standardized 3-le
 
 | Shorthand | Target Repository | Scope / Topic | Typical Content |
 |----|----|----|----|
-| `psw` | `Morrison-Lab/psw` | Principles of Scientific Writing | Style guide for scientific writing, grammar, conciseness, defining terms, mathematical notation, avoiding AI tells, paper organization |
+| `psw` | `Morrison-Lab/psw` | Principles of Scientific Writing | Style guide for scientific writing, grammar, conciseness, defining terms, mathematical notation, avoiding clichés, paper organization |
 | `rme` | `Morrison-Lab/rme` | Regression Models for Epidemiology | Linear/logistic/Poisson/Cox regression, confounding, effect modification, model selection, survival analysis, epidemiology study designs |
 | `mds` | `Morrison-Lab/mds` | Mathematics for Data Science | Linear algebra, multivariate calculus, optimization, matrix decompositions, vector spaces |
 | `lds` | `Morrison-Lab/lds` (private) | Machine Learning for Data Science | Supervised and unsupervised learning, deep learning, classification, clustering, dimensionality reduction |

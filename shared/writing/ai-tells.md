@@ -17,7 +17,7 @@ Watch for:
 - **Clichéd sentence shapes:** the straw objection, personified abstraction,
   colon reveal, answered rhetorical question, reframe, editorializing tail,
   closing aphorism, assistant chatter and the rest.
-  PSW's [Clichéd sentence shapes](https://morrison-lab.github.io/psw/chapters/avoid-ai-tells.html#clichéd-sentence-shapes)
+  PSW's [Clichéd sentence shapes](https://morrison-lab.github.io/psw/chapters/avoid-cliches.html#clichéd-sentence-shapes)
   is the canonical list, with fixes and a worked example;
   gha's `check-ai-tells` scans for the mechanically detectable ones.
   Extend the PSW list, not this bullet.

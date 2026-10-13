@@ -72,6 +72,8 @@ When a user uses profanity or displays intense frustration:
    Project or host memory may hold a copy but never the only one,
    since no other project reads it.
    `hooks/remind-encode-user-correction.py` fires on a correction or repeat request as a reminder.
+   It reads the same signal in a project thread message, in a chat prompt, and in the body of a GitHub review comment event, and in a question ("why didn't you update reticulate?", "why aren't we using a semantic macro?") as well as a statement.
+   `hooks/remind-record-standing-guidance.py` covers statements of a rule ("never", "from now on").
 5. **Prevent recurrence mechanically**:
    Ship an automated check,
    hook,

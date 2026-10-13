@@ -273,3 +273,20 @@ Re-run against a full clone (`git fetch --unshallow`) before reading it.
 - **Don't:** read the age bucket at all from a shallow clone.
 
 See [`run-ums-proactively.cases.md`](run-ums-proactively.cases.md), "Stale records checker baseline and shallow clones".
+
+## Run UMS before a thread is resolved, and when its PR merges
+
+Resolving a project thread removes its message box, so a learning not banked before the call has no later turn in which to be banked.
+The same holds when a thread reports its work done.
+"Run UMS before every pause" already covers this, but nothing ran it: the `post-merge` and `wrap-up` skills include a UMS pass, and no event invoked them.
+
+Two mechanisms now do, both in `hooks/require-ums-before-resolve.py` (ai-config#4480):
+
+- **Before resolve:** the first `set_thread_resolved(true)` of a thread is denied when the transcript has no UMS tool call (a `ums` Skill or Agent dispatch, or a write under an ai-config memory or shared path) since the last user message.
+  Run `ums`, say in the reply what you recorded, then resolve.
+  If nothing was learned, say so in the reply and retry;
+  the retry is allowed, because "nothing was learned" is a legitimate answer that no matcher can judge.
+- **On merge:** a GitHub event reporting a merged PR injects a reminder to run the wrap-up (`post-merge`: verify the merge, tidy the branch, confirm follow-ups, UMS) before the thread is resolved or reported done.
+
+- **Do:** run `ums` in the turn that finishes the work, before the reply that delivers the result and before resolving.
+- **Don't:** resolve a thread as the last act of a turn in which learnings accumulated and nothing recorded them.

@@ -223,6 +223,13 @@
             "timeout": 10,
             "script": "remind-encode-user-correction.py",
             "why": "ai-config#4208 -- the user had to repeat a correction across sessions and projects. The UMS reminders key on the agent's own admission or an accepted review finding, so a correction from the user triggered none of them, and the natural landing place outside ai-config was host memory no other project reads. Injects, never blocks, the procedure that commits the general rule in the same turn to the repo that owns it, ai-config for anything beyond one repo."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/require-ums-before-resolve.py\"'",
+            "timeout": 10,
+            "script": "require-ums-before-resolve.py",
+            "why": "AGENTS.md 'Run UMS before every pause': a merged-PR event reminds the thread to run its wrap-up (post-merge, including UMS) before resolving. Injects, never blocks."
           }
         ]
       }
@@ -1461,6 +1468,18 @@
             "timeout": 10,
             "script": "warn-hedged-checkable-claim.py",
             "why": "User rule, 2026-10-08: 'don't say likely when you can check'. A hedge (likely, probably, presumably, I think, should be) in the same sentence as a PR or issue reference, a CI or check status word, or merged/open/closed names a state the agent can read in one call. Warns, never blocks, on user-visible reply tools and GitHub comment tools; asks the agent to check and state the result. Fails open."
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__hearthbot__set_thread_resolved",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/require-ums-before-resolve.py\"'",
+            "timeout": 10,
+            "script": "require-ums-before-resolve.py",
+            "why": "A resolved thread loses its message box, so UMS must run first. Denies the first set_thread_resolved(true) of a thread when no UMS tool call follows the last user message; the retry is allowed (ai-config#4480)."
           }
         ]
       }

@@ -1693,6 +1693,267 @@ def main() -> int:
         "check_latest_verdict: clean review with **Verdict:** No blocking issues and no findings is clean",
         clean_qmt8_ok and clean_qmt8_issues == [],
     )
+    # Conversational verdict heading: 'looks good with ... nit' (closes #4471, lab-manual#556 real fixture)
+    check(
+        "classify_verdict: '### Verdict: Looks good with one minor nit' is not-clean (closes #4471)",
+        checker.classify_verdict(
+            "### Verdict: Looks good with one minor nit\n\nThe restructuring is clean."
+        ) == "not-clean",
+    )
+    check(
+        "classify_verdict: unbolded 'Verdict: Looks good with one minor nit' is not-clean",
+        checker.classify_verdict(
+            "Verdict: Looks good with one minor nit."
+        ) == "not-clean",
+    )
+    check(
+        "classify_verdict: bold-label '**Verdict:** Looks good with 2 nits' is not-clean",
+        checker.classify_verdict(
+            "**Verdict:** Looks good with 2 nits."
+        ) == "not-clean",
+    )
+    check(
+        "classify_verdict: 'Verdict: Looks good with minor nits' is not-clean",
+        checker.classify_verdict(
+            "Verdict: Looks good with minor nits."
+        ) == "not-clean",
+    )
+    check(
+        "classify_verdict: 'Verdict: Looks good with a nit' is not-clean",
+        checker.classify_verdict(
+            "Verdict: Looks good with a nit."
+        ) == "not-clean",
+    )
+    check(
+        "classify_verdict: 'Verdict: Looks good with one minor issue' is not-clean",
+        checker.classify_verdict(
+            "Verdict: Looks good with one minor issue."
+        ) == "not-clean",
+    )
+    check(
+        "classify_verdict: 'Verdict: Looks good with minor issues' is not-clean",
+        checker.classify_verdict(
+            "Verdict: Looks good with minor issues."
+        ) == "not-clean",
+    )
+    check(
+        "classify_verdict: bold '**Looks good with one minor nit**' is not-clean",
+        checker.classify_verdict(
+            "**Looks good with one minor nit**"
+        ) == "not-clean",
+    )
+    check(
+        "classify_verdict: bullet '- Looks good with one minor nit' is not-clean",
+        checker.classify_verdict(
+            "- Looks good with one minor nit"
+        ) == "not-clean",
+    )
+    # Conversational verdict heading: 'no new issues' / 'nothing new to flag' (closes #4471, lab-manual#556 real fixture)
+    check(
+        "classify_verdict: '### Verdict: Confirming prior review --- still looks good, no new issues' is clean (closes #4471)",
+        checker.classify_verdict(
+            "### Verdict: Confirming prior review \u2014 still looks good, no new issues\n\nAll items resolved."
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: '### Verdict: Still looks good, no new issues' is clean",
+        checker.classify_verdict(
+            "### Verdict: Still looks good, no new issues"
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: '### Verdict: Looks good, no new issues' is clean",
+        checker.classify_verdict(
+            "### Verdict: Looks good, no new issues"
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: '### Verdict: No new issues' is clean",
+        checker.classify_verdict(
+            "### Verdict: No new issues"
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: '### Verdict: No new issues found' is clean",
+        checker.classify_verdict(
+            "### Verdict: No new issues found"
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: '### Verdict: Nothing new to flag' is clean",
+        checker.classify_verdict(
+            "### Verdict: Nothing new to flag"
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: '### Verdict: Nothing to flag' is clean",
+        checker.classify_verdict(
+            "### Verdict: Nothing to flag"
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: '**Verdict:** No new issues' is clean",
+        checker.classify_verdict(
+            "**Verdict:** No new issues."
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: '**Verdict:** Nothing new to flag' is clean",
+        checker.classify_verdict(
+            "**Verdict:** Nothing new to flag."
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: 'Verdict: No new issues' is clean",
+        checker.classify_verdict(
+            "Verdict: No new issues."
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: 'Verdict: Nothing to flag' is clean",
+        checker.classify_verdict(
+            "Verdict: Nothing to flag."
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: standalone 'Nothing new to flag.' is clean",
+        checker.classify_verdict(
+            "Nothing new to flag."
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: bold '**Nothing new to flag.**' is clean",
+        checker.classify_verdict(
+            "**Nothing new to flag.**"
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: bullet '- Nothing new to flag.' is clean",
+        checker.classify_verdict(
+            "- Nothing new to flag."
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: standalone 'No new issues.' is clean",
+        checker.classify_verdict(
+            "No new issues."
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: bold '**No new issues.**' is clean",
+        checker.classify_verdict(
+            "**No new issues.**"
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: bullet '- No new issues.' is clean",
+        checker.classify_verdict(
+            "- No new issues."
+        ) == "clean",
+    )
+    # Negative controls for #4471
+    check(
+        "classify_verdict: 'Verdict: Looks good with one minor nit, no new issues' is not-clean (finding wins)",
+        checker.classify_verdict(
+            "Verdict: Looks good with one minor nit, no new issues."
+        ) == "not-clean",
+    )
+    check(
+        "classify_verdict: 'Verdict: No new issues once tests pass' is disqualified by 'once'",
+        checker.classify_verdict(
+            "Verdict: No new issues once tests pass."
+        ) == "",
+    )
+    check(
+        "classify_verdict: 'Verdict: No new issues, but one item remains' is disqualified by 'but'",
+        checker.classify_verdict(
+            "Verdict: No new issues, but one item remains."
+        ) == "",
+    )
+    check(
+        "classify_verdict: unmarked mid-sentence 'no new issues' does not count as clean",
+        checker.classify_verdict(
+            "The author addressed all comments with no new issues introduced in this commit."
+        ) == "",
+    )
+    check(
+        "classify_verdict: 'Verdict: 2 blocking items remain... No new issues...' does not cross sentence boundary",
+        checker.classify_verdict(
+            "Verdict: 2 blocking items remain from last round. No new issues were introduced in this commit."
+        ) != "clean",
+    )
+    check(
+        "classify_verdict: '**Verdict:** The SQL injection fix from round 1 is still missing. No new issues beyond that.' does not classify as clean",
+        checker.classify_verdict(
+            "**Verdict:** The SQL injection fix from round 1 is still missing. No new issues beyond that."
+        ) != "clean",
+    )
+    check(
+        "classify_verdict: 'Verdict: 2 blocking items remain, no new issues' does not classify as clean",
+        checker.classify_verdict(
+            "Verdict: 2 blocking items remain, no new issues"
+        ) != "clean",
+    )
+    check(
+        "classify_verdict: 'Verdict: Looks good with no new issues' is clean",
+        checker.classify_verdict(
+            "Verdict: Looks good with no new issues"
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: 'Verdict: All looks good, no new issues' is clean",
+        checker.classify_verdict(
+            "Verdict: All looks good, no new issues"
+        ) == "clean",
+    )
+    check(
+        "classify_verdict: 'Verdict: Confirming prior review, still looks good, no new issues' is clean",
+        checker.classify_verdict(
+            "Verdict: Confirming prior review, still looks good, no new issues"
+        ) == "clean",
+    )
+    # End-to-end check_latest_verdict with real lab-manual#556 fixtures (closes #4471)
+    lab_manual_556_r1 = (
+        "**Claude finished @dem-extra1's task in 3m 34s** \u2014\u2014 [View job](https://github.com/UCD-SERG/lab-manual/actions/runs/38214553419)\n\n"
+        "---\n### Code Review\n\n"
+        "- [x] Gather context\n- [x] Post findings\n\n"
+        "---\n\n### Verdict: Looks good with one minor nit\n\n"
+        "The restructuring is clean and the citation corrections are well-reasoned. One inline suggestion posted; one observation below.\n\n"
+        "**Citation corrections (`book.bib`)**\nBoth corrections appear accurate."
+    )
+    lab_manual_556_r2 = (
+        "**Claude finished @dem-extra1's task in 2m 2s** \u2014\u2014 [View job](https://github.com/UCD-SERG/lab-manual/actions/runs/38214948251)\n\n"
+        "---\n### Code Review\n\n"
+        "- [x] Gather context\n- [x] Post findings\n\n"
+        "---\n\n### Verdict: Confirming prior review \u2014 still looks good, no new issues\n\n"
+        "Both findings from the prior review are now resolved by commit `677e7b4`:\n\n"
+        "- **Missing link on `resources.qmd:15`** \u2014 linked.\n- **Orphaned `rougier2014` entry** \u2014 dropped.\n\n"
+        "Nothing new to flag. Summary of what I verified for this pass:\n\n"
+        "**Citation corrections (`book.bib`)**\n- Checked: ok"
+    )
+    check(
+        "classify_verdict: lab-manual#556 R1 real fixture classifies as not-clean",
+        checker.classify_verdict(lab_manual_556_r1, author="claude[bot]") == "not-clean",
+    )
+    check(
+        "classify_verdict: lab-manual#556 R2 real fixture classifies as clean",
+        checker.classify_verdict(lab_manual_556_r2, author="claude[bot]") == "clean",
+    )
+    r1_items = [("comment", "2026-10-12T08:00:00Z", lab_manual_556_r1, "", "", "claude[bot]")]
+    r1_ok, r1_issues = checker.check_latest_verdict(r1_items)
+    check(
+        "check_latest_verdict: lab-manual#556 R1 alone fails with not-clean",
+        (not r1_ok) and any("is NOT clean" in i for i in r1_issues),
+    )
+    r2_items = [
+        ("comment", "2026-10-12T08:00:00Z", lab_manual_556_r1, "", "", "claude[bot]"),
+        ("comment", "2026-10-12T08:30:00Z", lab_manual_556_r2, "", "", "claude[bot]"),
+    ]
+    r2_ok, r2_issues = checker.check_latest_verdict(r2_items)
+    check(
+        "check_latest_verdict: lab-manual#556 R1 superseded by clean R2 passes cleanly",
+        r2_ok and r2_issues == [],
+    )
     # Where the vocabulary guards are still load-bearing after the position
     # guard: this corpus writes semantic line breaks, so a negation or hedge
     # routinely sits at the END of the PREVIOUS line, leaving the phrase itself

@@ -2034,6 +2034,8 @@ VERDICT_NOT_CLEAN_PATTERNS = [
     # already existed for `no changes requested`.
     r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
     r"(?:[*_]{1,3})?Verdict(?:[*_]{1,3})?:(?:[*_]{1,3})?\s*(?:Ready after addressing findings|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock|Partial review)",
+    # 'looks good with ... nit' is not clean (closes #4471, lab-manual#556).
+    r"\blooks\s+good\s+with\s+(?:(?!(?:no|none|zero|nothing)\b)\w+\s+){0,3}(?:nits?|issues?|findings?)\b",
     r"(?<!\bno-)changes\s+requested\b",
     _BARE_REJECTION,
     r"\[FINDINGS_COUNT:\s*[1-9]\d*\]",  # Machine-readable finding count > 0
@@ -2107,7 +2109,11 @@ FINDING_HEADING_NEGATION_SUFFIX = re.compile(
 # success, not the absence of failure" applied to a verdict.
 VERDICT_CLEAN_PATTERNS = [
     r"\bReady\s+for\s+merge\b",
-    r"(?:[*_]{1,3})?Verdict(?:[*_]{1,3})?:(?:[*_]{1,3})?\s*(?:Clean|Approved|Ready|No\s+blocking\s+issues?(?:\s+(?:found|identified))?)\b",
+    r"(?:[*_]{1,3})?Verdict(?:[*_]{1,3})?:(?:[*_]{1,3})?\s*(?:Clean|Approved|Ready|No\s+(?:new\s+|blocking\s+)?issues?(?:\s+(?:found|identified))?)\b",
+    # Conversational verdict heading (closes #4471, lab-manual#556).
+    r"(?:[*_]{1,3})?Verdict(?:[*_]{1,3})?:(?:[*_]{1,3})?\s*(?:(?:confirming\s+(?:prior|previous)\s+review\s*[,\u2013\u2014-]*\s*)?(?:all\s+|still\s+)?looks\s+good\s*(?:[,\u2013\u2014-]\s*|\s+with\s+)|confirming\s+(?:prior|previous)\s+review\s*[,\u2013\u2014-]\s*)?(?:no\s+new\s+issues|nothing\s+(?:new\s+)?to\s+flag)\b",
+    r"\bno\s+new\s+issues\b",
+    r"\bnothing\s+(?:new\s+)?to\s+flag\b",
     r"\bApproved\s+for\s+merge\b",
     # Anthropic code-review plugin clean template (closes #2147).
     r"^[ \t]*(?:\*{1,3})?No\s+issues\s+found\.(?:\*{1,3})?\s+Checked\s+for\s+bugs\s+and\s+(?:CLAUDE|AGENTS)\.md\s+compliance\.",
@@ -2127,12 +2133,15 @@ BARE_CLEAN_PATTERNS = {
     r"\bReady\s+for\s+merge\b",
     r"\bApproved\s+for\s+merge\b",
     r"^[ \t]*(?:\*{1,3})?No\s+issues\s+found\.(?:\*{1,3})?\s+Checked\s+for\s+bugs\s+and\s+(?:CLAUDE|AGENTS)\.md\s+compliance\.",
+    r"\bno\s+new\s+issues\b",
+    r"\bnothing\s+(?:new\s+)?to\s+flag\b",
 }
 BARE_NOT_CLEAN_PATTERNS = {
     _BARE_REJECTION,
     r"\b(?:not|never|no|isn't|aren't|wasn't|cannot|can't|unapproved|rejected)\s+(?:\w+\s+){0,2}(?:clean|approved|ready|lgtm|approval)\b",
     r"\b(?:omitted\s+region\s+was\s+not\s+assessed|diff\s+was\s+truncated)\b",
     r"\bnot\s+(?:an\s+)?approval\s+of\s+the\s+(?:MR|PR)\s+as\s+a\s+whole\b",
+    r"\blooks\s+good\s+with\s+(?:(?!(?:no|none|zero|nothing)\b)\w+\s+){0,3}(?:nits?|issues?|findings?)\b",
 }
 
 # Criterion 3 (HEAD) and criterion 4 (per-reviewer latest) share this list.
@@ -2152,6 +2161,7 @@ FINDING_PATTERNS = [
     r"(?:^|\n)[ \t]*\*\*(?:Minor,?\s+)?Non-blocking\*\*",
     r"\*\*Location:\*\*",
     r"(?:[*_]{1,3})?Verdict(?:[*_]{1,3})?:(?:[*_]{1,3})?\s*(?:Ready after addressing findings|Needs work|Needs more work|Changes requested|Actionable findings|Block(?:ed|ing)?|Rejected|Unapproved|Impasse|Deadlock|Partial review)",
+    r"\blooks\s+good\s+with\s+(?:(?!(?:no|none|zero|nothing)\b)\w+\s+){0,3}(?:nits?|issues?|findings?)\b",
     r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b",
     r"(?<!\bno-)changes\s+requested\b",
     _BARE_REJECTION,

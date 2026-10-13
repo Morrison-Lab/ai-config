@@ -176,7 +176,7 @@ def analyse(body, mod):
     classifier consults FIRST and the adversarial-reviewer persona is required
     to emit; it modelled neither the clean-qualifier gate (`Ready for merge
     once the tests pass` records NO verdict, so it supersedes nothing) nor the
-    bare-pattern marking gate; and it checked one of eighteen finding patterns,
+    bare-pattern marking gate; and it checked one of nineteen finding patterns,
     so a `## Nits` heading -- which vetoes merge under fully-clean.md -- read
     as clean.
 

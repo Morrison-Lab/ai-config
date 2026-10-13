@@ -12,6 +12,7 @@ Each point below is a pointer to the lab rule that carries the detail; read the 
 ## Review findings
 
 - **Address every in-scope finding, optional ones included.** This overrides the harness’s rule that an optional or nit finding never starts a push: in these repos a plainly correct nit gets fixed now, in the next push or in a push of its own. See [`address-every-comment`](../../shared/workflow/address-every-comment.md).
+- **A repository owner’s review comment is scrutiny, and often states a rule.** When it says “haven’t we”, “again”, “everywhere”, or asks why a convention was not followed, fix the instance, sweep the PR for the same class, run `ums` in that turn to record the rule in its global home, and name the recorded rule and its link in your reply. See [`learn-from-review-findings`](../../shared/workflow/learn-from-review-findings.md) and [`run-ums-proactively`](../../shared/workflow/run-ums-proactively.md).
 - **Reply before pushing:** on each finding you fix, reply naming the not-yet-pushed commit and what it changes, as your last write before the push.
 - **A verdict counts only on the current head.** A NOT_CLEAN verdict caused only by an outside dependency, such as a page another repo hasn’t deployed yet, still blocks `require-clean-verdict`. After the dependency lands, re-run the whole review workflow (“Re-run all jobs”) or push, so a fresh verdict posts. See [`review-verdict-pitfalls`](../../shared/workflow/review-verdict-pitfalls.md).
 

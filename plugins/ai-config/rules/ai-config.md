@@ -40,6 +40,7 @@ These instructions define standardized operating rules for Antigravity operating
 18. **Proactively suggest better alternatives:** If there's another way to accomplish the same goal more simply, cleanly, or reliably, proactively suggest and recommend that alternative rather than blindly implementing a proposed mechanism.
 19. **Use real-world examples for general practice:** When we do or see something that would be a good example for general practice, actively capture and incorporate it as a concrete before-and-after example in shared documentation.
 20. **Search tracker and AGENTS.md before building or denying a policy:** Search `AGENTS.md`, `CLAUDE.md`, `memories/`, `shared/`, and open issues before answering "no" to whether a policy exists or implementing a capability request.
+21. **Don't get sidetracked from your primary task:** When working on a primary task, stay on it, including through tangential user input: keep independent lines of thought separate without losing track of them (subagent, fork, tracking issue, or to-do list), unless the user explicitly redirects focus.
 
 ## Antigravity Workflow Conventions
 

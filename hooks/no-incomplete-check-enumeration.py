@@ -250,9 +250,8 @@ def _find_all_claims(text):
 # `### Verdict\n**Ready for merge**`, `Verdict: Clean`, or
 # `**Verdict**: Ready for merge`. These are diff evaluations, not claims
 # that CI check runs are fully enumerated.
-RX_VERDICT_PREFIX = re.compile(
-    r"(?:^|\n)#{1,4}\s*(?:[0-9.]+\s+|[A-Za-z0-9_-]+\s+)*Verdict\b[^\n]*\n*[ \t*_-]*$"
-    r"|(?:\*\*|__)?Verdict(?:\*\*|__)?\s*[:\-\u2014]\s*[ \t*_-]*$",
+RX_VERDICT_LINE = re.compile(
+    r"^(?:#{1,4}\s[^\n]*\bVerdict\b|(?:\*\*|__)?Verdict(?:\*\*|__)?\s*[:\-\u2014]?)$",
     re.I,
 )
 
@@ -262,7 +261,9 @@ def _is_review_verdict(text, hit):
     merge-readiness claim about CI checks (ai-config#4468).
     """
     prefix = text[max(0, hit.start() - 100):hit.start()]
-    if RX_VERDICT_PREFIX.search(prefix):
+    cleaned = prefix.rstrip(" \t\n*_-:")
+    last_line = cleaned.splitlines()[-1].strip() if cleaned else ""
+    if RX_VERDICT_LINE.match(last_line):
         return True
     rd_start = text.rfind("<!-- review-data:", 0, hit.start())
     if rd_start >= 0:

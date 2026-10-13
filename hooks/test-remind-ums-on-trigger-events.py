@@ -7,7 +7,7 @@ import sys
 import tempfile
 
 HOOK = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "remind-ums-on-trigger-events.py")
+    os.path.dirname(os.path.realpath(__file__)), "remind-ums-on-trigger-events.py")
 failures = 0
 
 

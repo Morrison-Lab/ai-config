@@ -11,7 +11,7 @@ import sys
 import tempfile
 
 HOOK = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "require-ums-before-resolve.py")
+    os.path.dirname(os.path.realpath(__file__)), "require-ums-before-resolve.py")
 RESOLVE = "mcp__hearthbot__set_thread_resolved"
 
 

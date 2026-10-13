@@ -75,7 +75,7 @@ _COPULA_CLEFT_RE = re.compile(
 )
 _CLICHE_RE = re.compile(
     r"\b(the whole of it|own-goal|rather than|not the same as|load-bearing|"
-    r"carr(y|ies)|\btells\b|does(n't| not) tell|about what)\b|,\s*however,",
+    r"carr(y|ies)|\btells\b|does(n't| not) tell|about what|things?)\b|,\s*however,",
     re.IGNORECASE,
 )
 
@@ -503,6 +503,12 @@ def run_self_test() -> int:
     check(
         "copula cleft 'is what' flagged",
         len(clefts) == 1 and clefts[0].lower() == "is what",
+    )
+
+    check(
+        "placeholder noun 'thing' flagged, 'something' not",
+        len(find_cliches("The main thing to check is the residuals.")) == 1
+        and not find_cliches("Check something about the residuals."),
     )
 
     cliches = find_cliches(_TEST_CLICHE)

@@ -61,6 +61,9 @@ Watch for:
   Metaphor cliches and sports jargon: "the whole of it" (-> "all of it",
   "the entirety"), "own-goal" (sports jargon for self-inflicted error),
   "load-bearing" (architectural metaphor for "essential").
+  Vague placeholder nouns: "thing"/"things" (-> name the object, quantity,
+  step or idea: "the main thing to check is the residuals" -> "check the
+  residuals first").
   Overused verbs: "carries"/"carry" standing in for a specific verb, and
   "tells"/"doesn't tell"/"does not tell" standing in for a plain verb of report.
   Mid-phrase conjunctive ticks: inserting ", however, " or ", therefore, "
@@ -71,7 +74,7 @@ Watch for:
   ("Note that...", "It is important to remember that...").
   Cue: count them per page, since each is ordinary English at one or two hits
   and a verbal tic at ten ---
-  `grep -ioE "rather than|not the same as|load-bearing|carr(y|ies)|\btells\b|does(n't| not) tell|the whole of it|own-goal|is (what|where|when|how)|\babout what\b|, however," FILE | wc -l`.
+  `grep -ioE "rather than|not the same as|load-bearing|carr(y|ies)|\btells\b|does(n't| not) tell|the whole of it|own-goal|is (what|where|when|how)|\babout what\b|\bthings?\b|, however," FILE | wc -l`.
   Fix: state the claim positively, and keep one contrast per paragraph at most.
   Say what a thing **is**, not what it is not (-> "the lease compares against
   your remote-tracking ref", not "a lease is not the same as a force").

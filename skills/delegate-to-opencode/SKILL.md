@@ -232,8 +232,10 @@ for line in sys.stdin:
 - **Do:** send `"stream": true` and assemble `delta.content` chunks for review-sized prompts.
 - **Do:** run streaming requests with a generous `--max-time` (e.g. `--max-time 900`) in the background.
 - **Do:** prefer `deepseek-v4-pro` over `glm-5.3` for large prompts or reviews in cloud sessions.
-- **Don't:** send non-streaming requests for anything longer than a short prompt; the roughly 30-second gateway cutoff returns 502 or upstream request failure.
-- **Don't:** rely on `glm-5.3` for large prompts; it can stream megabytes of empty deltas or fail upstream.
+- **Don't:** send non-streaming requests for anything longer than a short prompt;
+  the roughly 30-second gateway cutoff returns 502 or upstream request failure.
+- **Don't:** rely on `glm-5.3` for large prompts;
+  it can stream megabytes of empty deltas or fail upstream.
 
 Reuse one UUID across the turns of a conversation.
 Prefer Go models for bulk and mechanical work while Claude quota is low.

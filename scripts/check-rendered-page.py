@@ -60,6 +60,35 @@ SKIP_CLASS = frozenset({
     "cell-output", "csl-entry", "footnotes", "quarto-title-meta",
 })
 
+DEMO_CLASSES = frozenset({
+    "broken-list-demo",
+    "intentional-broken-list",
+    "broken-list-demonstration",
+    "skip-list-check",
+    "broken-list",
+})
+
+RX_DEMO_COMMENT = re.compile(
+    r'\b(?:broken[-_ ]list[-_ ]demo(?:nstration)?|'
+    r'intentional[-_ ]broken[-_ ]list(?:[-_ ]demo(?:nstration)?)?|'
+    r'skip[-_ ](?:broken[-_ ])?list[-_ ]check)\b',
+    re.IGNORECASE,
+)
+
+CONTAINER_TAGS = frozenset({"div", "section", "article", "main", "aside", "span"})
+
+
+class CheckResult(list):
+    """A list of findings that also tracks intentional demonstrations exempted."""
+
+    def __init__(self, findings=(), exempted=()):
+        super().__init__(findings)
+        self.exempted = list(exempted)
+
+
+class _ParaText(str):
+    exempt: bool = False
+
 
 class _Visible(HTMLParser):
     """Collect rendered prose, skipping whole subtrees that are not prose.
@@ -78,27 +107,63 @@ class _Visible(HTMLParser):
         self.per_paragraph = per_paragraph
         self.paragraphs = []
         self._para = None       # buffer while inside a <p>
+        self._para_exempt = False
+        self._pending_exempt = False
+        self.demo_depth = 0
+        self.demo_stack = []
+
+    def _flush_para(self):
+        if self._para is not None:
+            p = _ParaText("".join(self._para))
+            p.exempt = self._para_exempt
+            self.paragraphs.append(p)
+            self._para = None
+            self._para_exempt = False
+
+    def handle_comment(self, data):
+        if RX_DEMO_COMMENT.search(data):
+            if self._para is not None:
+                self._para_exempt = True
+            else:
+                self._pending_exempt = True
 
     def handle_starttag(self, tag, attrs):
-        if self.per_paragraph and tag == "p" and self._para is None:
-            self._para = []
         cls = " ".join(v or "" for k, v in attrs if k == "class").lower()
         # Exact TOKEN membership, not substring containment. `"footnotes" in
         # cls` also matches `gt_footnotes`, a real class gt emits on live
         # pages and nothing to do with document footnotes -- so a genuine
         # defect inside a gt table footer became invisible to every check.
-        skip = tag in SKIP_TAGS or bool(SKIP_CLASS & set(cls.split()))
+        raw_tokens = set(cls.split())
+        skip = tag in SKIP_TAGS or bool(SKIP_CLASS & raw_tokens)
         self.stack.append(skip)
         if skip:
             self.depth += 1
+
+        tokens = {tok.replace("_", "-") for tok in raw_tokens}
+        is_demo = bool(DEMO_CLASSES & tokens)
+        self.demo_stack.append(is_demo)
+        if is_demo:
+            self.demo_depth += 1
+
+        if self.per_paragraph:
+            if tag == "p":
+                if self._para is not None:
+                    self._flush_para()
+                self._para = []
+                self._para_exempt = self._pending_exempt or (self.demo_depth > 0)
+                self._pending_exempt = False
+            elif tag not in CONTAINER_TAGS:
+                self._pending_exempt = False
 
     def handle_endtag(self, tag):
         if self.stack:
             if self.stack.pop():
                 self.depth = max(0, self.depth - 1)
-        if self.per_paragraph and tag == "p" and self._para is not None:
-            self.paragraphs.append("".join(self._para))
-            self._para = None
+        if self.demo_stack:
+            if self.demo_stack.pop():
+                self.demo_depth = max(0, self.demo_depth - 1)
+        if self.per_paragraph and tag == "p":
+            self._flush_para()
 
     def handle_data(self, data):
         if self.depth:
@@ -106,6 +171,13 @@ class _Visible(HTMLParser):
         self.out.append(data)
         if self._para is not None:
             self._para.append(data)
+        elif data.strip() and self._pending_exempt:
+            self._pending_exempt = False
+
+    def close(self):
+        super().close()
+        if self.per_paragraph and self._para is not None:
+            self._flush_para()
 
 
 def _paragraphs(s):
@@ -113,8 +185,9 @@ def _paragraphs(s):
     p = _Visible(per_paragraph=True)
     try:
         p.feed(s)
+        p.close()
     except Exception:
-        return [re.sub(r"<[^>]+>", " ", m)
+        return [_ParaText(re.sub(r"<[^>]+>", " ", m))
                 for m in re.findall(r"<p>.*?</p>", s, re.S)]
     return p.paragraphs
 
@@ -166,12 +239,25 @@ def _list_failed(s):
     puts a `+` right after the ellipsis's final `.`, which the mid-paragraph
     branch read as a bullet marker. `_list_failed` was the one check not
     routed through the parser, and that was the whole of the bug.
+
+    Paragraphs marked as intentional demonstrations (via class
+    `broken-list-demo`, `intentional-broken-list`, `skip-list-check`, etc. on
+    the paragraph or an enclosing div, or an HTML comment matching
+    `RX_DEMO_COMMENT`) are exempted and tracked on the returned result's
+    `.exempted` attribute rather than reported as defects.
     """
     out = []
+    exempted = []
     for para in _paragraphs(s):
-        for a, b in RX_LIST_IN_P.findall("<p>" + para + "</p>"):
-            out.append(html.unescape(a or b).strip()[:90])
-    return out
+        matches = [
+            html.unescape(a or b).strip()[:90]
+            for a, b in RX_LIST_IN_P.findall("<p>" + para + "</p>")
+        ]
+        if getattr(para, "exempt", False):
+            exempted.extend(matches)
+        else:
+            out.extend(matches)
+    return CheckResult(out, exempted=exempted)
 
 
 class _StripCode(HTMLParser):
@@ -347,10 +433,14 @@ def main(argv):
         except Exception as e:
             print(f"FETCH-FAIL  {t}: {e}"); worst = max(worst, 2); continue
         hits = []
+        exempted_all = []
         for label, fn in CHECKS:
             found = fn(s)
             if found:
                 hits.append((label, found))
+            ex = getattr(found, "exempted", [])
+            if ex:
+                exempted_all.append((label, ex))
         if hits:
             worst = max(worst, 1)
             print(f"NOT CLEAN   {t}")
@@ -358,8 +448,17 @@ def main(argv):
                 print(f"  - {label}: {len(found)}")
                 for f in found[:4]:
                     print(f"      {f!r}")
+            for label, ex in exempted_all:
+                n = len(ex)
+                s_plural = "s" if n != 1 else ""
+                print(f"  (exempted: {n} intentional broken-list demonstration{s_plural})")
         else:
-            print(f"clean       {t}   ({len(s):,} bytes, {len(re.findall('<li', s))} list items)")
+            demo_note = ""
+            if exempted_all:
+                total_ex = sum(len(ex) for _, ex in exempted_all)
+                s_plural = "s" if total_ex != 1 else ""
+                demo_note = f"; {total_ex} intentional broken-list demonstration{s_plural} exempted"
+            print(f"clean       {t}   ({len(s):,} bytes, {len(re.findall('<li', s))} list items{demo_note})")
     return worst
 
 if __name__ == "__main__":

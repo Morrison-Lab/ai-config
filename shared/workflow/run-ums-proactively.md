@@ -290,3 +290,35 @@ Two mechanisms now do, both in `hooks/require-ums-before-resolve.py` (ai-config#
 
 - **Do:** run `ums` in the turn that finishes the work, before the reply that delivers the result and before resolving.
 - **Don't:** resolve a thread as the last act of a turn in which learnings accumulated and nothing recorded them.
+
+## Other moments that owe a pass
+
+The triggers above fire on an admission, a read review, a questioned claim or a pause.
+Six more moments owe the same pass (ai-config#4480).
+Each is recorded in its global home, never only in project memory, and the reply names what was recorded.
+
+1. **A coordinator note corrects a thread.**
+   A correction given to one thread is a rule for every thread the coordinator will start.
+   `hooks/remind-ums-on-trigger-events.py` reminds on a relay note that is not a spawn brief.
+2. **A thread finds a workaround for an environment blocker.**
+   Example: installing TinyTeX in a cloud session through `tlmgr` pointed at a CTAN mirror the proxy allows.
+   Record the recipe where the next session's setup reads it (the repository's SessionStart hook and instructions), not only in ai-config, so nobody rediscovers it.
+   This is a rule, not a hook: a workaround has no lexical signature.
+3. **A CI or review failure comes from a convention, not a one-off bug.**
+   Examples: a Julia mid-line semicolon, a DOI-check exclusion.
+   Ask whether a person new to the repository would have hit the same failure, and if so put the convention in the repository's instructions and add the check.
+4. **A thread asks the user something it could have decided.**
+   The tell is a reply that is only a grant ("daytb", "yes, do it", "your call").
+   Record the decision rule that makes the question unnecessary.
+   The hook reminds on such a reply.
+5. **Work is reverted or redone.**
+   Example: a section moved out of a PR it never belonged in.
+   Ask what check or decision would have prevented the first attempt.
+   The hook adds context to `git revert` and `git reset --hard`;
+   a revert made through the GitHub UI or by moving files by hand stays a rule.
+6. **The context is compacted, or the session ends.**
+   After compaction the hook reminds the session to run the pass over what the summary still shows.
+   A session that ends has no later turn, so the pass belongs before the last reply, per "Run UMS before every pause".
+
+- **Do:** treat each of these as the moment to run `ums`, in the turn it happens.
+- **Don't:** wait for a review or a merge to bank a learning that already has a name.

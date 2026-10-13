@@ -172,11 +172,7 @@ See [`proactively-suggest-alternatives`](shared/principles/proactively-suggest-a
 ## Use real-world examples for general practice
 
 When we do or see something that would be a good example for general practice, actively capture and incorporate it as a concrete before-and-after example in shared guides, rules, and documentation.
-Pair every example with an explicit critique explaining why the refactoring improved clarity, structure, or precision, and cite authentic sources for provenance.
-See [`use-real-world-examples`](shared/principles/use-real-world-examples.md) and [`AGENTS.cases.md`](AGENTS.cases.md).
-
-- **Do:** capture exemplary refactors and tightened constructs from real PRs as before-and-after examples in shared docs.
-- **Don't:** leave great examples of general practice isolated in closed PR diffs.
+See [`use-real-world-examples`](shared/principles/use-real-world-examples.md) (pairing, critique and provenance rules) and [`AGENTS.cases.md`](AGENTS.cases.md).
 ## Search the tracker and AGENTS.md before building or denying a policy
 
 Before answering that a permission or policy does not exist, and before implementing a new policy or capability, search the full policy corpus (`AGENTS.md`, `CLAUDE.md`, `memories/`, `shared/`) and the issue tracker.
@@ -187,17 +183,8 @@ See [`grep-is-not-coverage`](shared/workflow/grep-is-not-coverage.md) and [`AGEN
 - **Don't:** assert that a standing grant or rule does not exist based only on searching `skills/` or `memories/`.
 ## Track every useful resource in a repo
 
-Whenever you or a subagent comes across a useful resource for any Morrison-Lab repo, course or project (textbook, article, software package, website, video, course page, or any other format), make sure it is tracked in one or more of our repos before the session ends.
-Put it where readers find it: a chapter's Further reading or "Read" box, a channels table, or the archive repo for official copies of PDFs.
-If it does not fit the current PR, open a small separate PR or issue for it.
-Link official sources only (the authors', publisher's or institution's own site, or open-access hosts), never unauthorized copies.
-The goal (Ezra, 2026-10-13) is to build comprehensive directories of content relevant to all our interests over time, so every tracked resource is a small contribution to a directory, not a one-off link.
-See [`course-repos`](memories/course-repos.md).
-
-- **Do:** check that a resource you cite or find is already tracked, and add it (or file an issue) when it is not.
-- **Do:** pass this rule to subagents that research or read course material.
-- **Don't:** leave a useful resource only in a chat reply or session transcript.
-- **Don't:** link an unauthorized copy, or commit paywalled text.
+Whenever you or a subagent finds a useful resource in any format for any Morrison-Lab repo, course or project, track it in a repo, from official sources only, to build comprehensive directories of our interests.
+Detail: [`track-useful-resources`](shared/workflow/track-useful-resources.md).
 ## Always give recommendations with questions
 
 Whenever asking the user a question or presenting options for a genuine decision, always provide a clear, specific recommendation.

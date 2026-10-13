@@ -112,6 +112,8 @@ It applies where the consuming repo has written the rule down, and that repo own
 
 ## A third destination: OpenRouter, for models neither tier carries
 
+OpenRouter bills pay-as-you-go from a prepaid balance, so under the subscriptions-only rule in [`memories/delegation.md`](../../memories/delegation.md) (Ezra, 2026-10-13) dispatch only to models priced 0/0, such as the stealth previews below, and never spend the balance.
+
 `opencode` reaches OpenRouter as an ordinary provider, and one class of model makes that worth configuring: OpenRouter's **stealth** previews --- anonymized frontier models trialled under codenames, free while they last.
 `stealth/ox-alpha` ("Ox Alpha", a reasoning model for coding and agentic work, 1,048,576-token context, pricing 0/0) was the roster's one entry on 2026-08-23.
 

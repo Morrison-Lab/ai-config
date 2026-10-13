@@ -133,6 +133,30 @@ automatically suspect -- it is the *lack of a fresh instrument reading after
 it* that is the problem, and that is a softer, more inferential signal than
 "you quoted `gh pr checks` and then said fully clean."
 
+CI REVIEWER AND REVIEW VERDICTS -- ai-config#4468 (2026-10-10, wai#274, psc#11)
+-------------------------------------------------------------------------------
+When `ai-config` is loaded as a plugin inside a CI review runner
+(`claude-code-review.yml` in GitHub Actions), the PR reviewer evaluates the
+diff and posts a review comment (concluding with a verdict heading such as
+`### Verdict\n**Ready for merge**` or `<!-- review-data: ... "verdict": "CLEAN" -->`).
+The reviewer does not push, does not merge, and cannot run
+`check-pr-fully-clean.py` (which is absent from consumer repos, while `gh api`
+is denied to the review token). Firing on a review-only CI session created an
+inescapable deadlock: the reviewer withheld CLEAN until every check was green,
+and the last check (`claude-review / require-clean-verdict`) stayed red until
+the reviewer said CLEAN.
+
+A code review verdict is an evaluation of the diff's content, not a terminal
+claim that CI check runs are fully enumerated. A claim phrase located within a
+review verdict heading or structured review block (`_is_review_verdict`)
+evaluates the diff rather than CI check status and is excluded from claim
+evaluation. A blanket environment exemption based on `GITHUB_ACTIONS`/`CI` was
+considered and rejected (ai-config#4481 review finding): it would silence the
+guard for the interactive `@claude` bot (`claude-bot.yml`) before its first push
+in a session. Anchoring on the review verdict content structure directly
+resolves the deadlock for review jobs while preserving the guard for interactive
+bots.
+
 Deliberately narrow on the assertion side either way. A progress report --
 "13 pass, 5 pending" -- is honest and must not trip this; only a terminal
 claim does.
@@ -221,6 +245,34 @@ def _find_all_claims(text):
         matches.append((m.start(), m, False))
     matches.sort(key=lambda t: t[0])
     return [(m, is_core) for _, m, is_core in matches]
+
+
+# Review verdict prefix patterns (ai-config#4468):
+# A code review evaluates the PR diff. Review verdicts commonly conclude with
+# `### Verdict\n**Ready for merge**`, `Verdict: Clean`, or
+# `**Verdict**: Ready for merge`. These are diff evaluations, not claims
+# that CI check runs are fully enumerated.
+RX_VERDICT_LINE = re.compile(
+    r"^(?:#{1,4}\s[^\n]*\bVerdict\b|(?:\*\*|__)?Verdict(?:\*\*|__)?\s*[:\-\u2014]?)$",
+    re.I,
+)
+
+
+def _is_review_verdict(text, hit):
+    """Return True if hit is a code review verdict on a diff rather than a
+    merge-readiness claim about CI checks (ai-config#4468).
+    """
+    prefix = text[max(0, hit.start() - 100):hit.start()]
+    cleaned = prefix.rstrip(" \t\n*_-:")
+    last_line = cleaned.splitlines()[-1].strip() if cleaned else ""
+    if RX_VERDICT_LINE.match(last_line):
+        return True
+    rd_start = text.rfind("<!-- review-data:", 0, hit.start())
+    if rd_start >= 0:
+        rd_end = text.find("-->", rd_start)
+        if rd_end < 0 or rd_end > hit.end():
+            return True
+    return False
 
 # Incomplete instruments for a terminal clean claim.
 # `gh pr checks` can omit runs (bcs#651); `statusCheckRollup` is a short
@@ -704,7 +756,11 @@ def main() -> int:
 
     if not text:
         return 0
-    all_claims = _find_all_claims(text)
+
+    all_claims = [
+        (hit, is_core) for hit, is_core in _find_all_claims(text)
+        if not _is_review_verdict(text, hit)
+    ]
     if not all_claims:
         return 0
 

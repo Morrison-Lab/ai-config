@@ -510,6 +510,64 @@ CASES = [
       say("#1031 is green, awaiting your merge.")],
      "allow",
      "#3838: unrelated partial read does not cause warn on unread second-vocabulary claim for #1031"),
+    # ai-config#4468: review verdicts evaluate diffs and are not CI check claims
+    ([PARTIAL,
+      say("### Verdict\n**Ready for merge**")],
+     "allow",
+     "#4468: review verdict heading '### Verdict\n**Ready for merge**' is not a CI claim"),
+    ([PARTIAL,
+      say("## Verdict\n\n**Ready for merge** with no blocking findings")],
+     "allow",
+     "#4468: review verdict heading '## Verdict\n\n**Ready for merge**' is not a CI claim"),
+    ([PARTIAL,
+      say("### 3. Verdict\n**Ready for merge**")],
+     "allow",
+     "#4468: numbered review verdict heading '### 3. Verdict' allows"),
+    ([PARTIAL,
+      say("### Review Verdict\n**Ready for merge**")],
+     "allow",
+     "#4468: multi-word review verdict heading '### Review Verdict' allows"),
+    ([PARTIAL,
+      say("Verdict: Ready for merge")],
+     "allow",
+     "#4468: inline review verdict 'Verdict: Ready for merge' allows"),
+    ([PARTIAL,
+      say("**Verdict**: Ready for merge")],
+     "allow",
+     "#4468: inline bold review verdict '**Verdict**: Ready for merge' allows"),
+    ([PARTIAL,
+      say("<!-- review-data:\n{\"verdict\": \"ready for merge\"}\n-->\nReviewed commit: a5f4f3f2")],
+     "allow",
+     "#4468: review-data block claim allows"),
+    ([PARTIAL,
+      say("### Verdict\n**Ready for merge**\n\nAll checks are green, ready for you to merge.")],
+     "block",
+     "#4468 negative control: review verdict does not exempt separate ungrounded CI claim in same message"),
+    ([PARTIAL,
+      say("Waiting for the verdict on #651 -- ready to merge.")],
+     "block",
+     "#4468 negative control: general text mentioning 'verdict' before 'ready to merge' still blocks"),
+]
+
+# ai-config#4468: CI environment cases (events, extra_env, want, label)
+# Interactive bot claims before first push still block; review verdicts allow.
+CI_CASES = [
+    ([PARTIAL, say("### Verdict\n**Ready for merge**")],
+     {"GITHUB_ACTIONS": "true"},
+     "allow",
+     "#4468: review verdict in CI (GITHUB_ACTIONS=true) allows"),
+    ([PARTIAL, say("### Verdict\n**Ready for merge**")],
+     {"CI": "true"},
+     "allow",
+     "#4468: review verdict with CI=true allows"),
+    ([PARTIAL, say("21 pass, 0 pending -- ready to merge.")],
+     {"GITHUB_ACTIONS": "true"},
+     "block",
+     "#4468: interactive claim in CI before first push still blocks (claude-bot.yml protection)"),
+    ([PUSH_1034, PARTIAL_1034, say("#1034 is fully clean.")],
+     {"GITHUB_ACTIONS": "true"},
+     "block",
+     "#4468: non-review CI session with push still blocks unverified claim"),
 ]
 
 # (events, must_contain, must_not_contain, label). The WARN explanation must
@@ -633,14 +691,17 @@ CONTENT_CASES = [
 ]
 
 
-def run(events):
+def run(events, extra_env=None):
     td = tempfile.mkdtemp()
     try:
         path = os.path.join(td, "transcript.jsonl")
         with open(path, "w", encoding="utf-8") as fh:
             for e in events:
                 fh.write(json.dumps(e) + "\n")
-        env = dict(os.environ, TMPDIR=td, TEMP=td, TMP=td)
+        env = {k: v for k, v in os.environ.items() if k not in ("GITHUB_ACTIONS", "CI")}
+        env.update(TMPDIR=td, TEMP=td, TMP=td)
+        if extra_env:
+            env.update(extra_env)
         out = subprocess.run(
             [sys.executable, HOOK],
             input=json.dumps({"transcript_path": path}),
@@ -678,6 +739,14 @@ def main():
     for events, want, label in CASES:
         total += 1
         got = classify(run(events))
+        ok = got == want
+        if not ok:
+            failures += 1
+        print(f"{'ok  ' if ok else 'FAIL'}  {want:>5} (got {got:>5}): {label}")
+
+    for events, env, want, label in CI_CASES:
+        total += 1
+        got = classify(run(events, extra_env=env))
         ok = got == want
         if not ok:
             failures += 1

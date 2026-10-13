@@ -214,6 +214,39 @@ CASES = [
     ("a code block quoting a macro is not flagged",
      "<pre><code>\\vL and \\eqdef appear here</code></pre>",
      "unexpanded macro in rendered text", False),
+    # Intentional broken-list demonstrations can be exempted via div class,
+    # paragraph class, or HTML comment.
+    ("a broken list in a broken-list-demo div is exempted",
+     '<div class="broken-list-demo"><p>- a bullet that is an intentional demo</p></div>',
+     "list rendered as a paragraph", False),
+    ("a broken list with broken-list-demo paragraph class is exempted",
+     '<p class="broken-list-demo">- a bullet that is an intentional demo</p>',
+     "list rendered as a paragraph", False),
+    ("a broken list with intentional-broken-list class is exempted",
+     '<div class="intentional-broken-list"><p>- a bullet demo</p></div>',
+     "list rendered as a paragraph", False),
+    ("a broken list with skip-list-check class is exempted",
+     '<div class="skip-list-check"><p>- a bullet demo</p></div>',
+     "list rendered as a paragraph", False),
+    ("a broken list with an HTML comment inside the paragraph is exempted",
+     '<p><!-- intentional-broken-list -->- a bullet demo</p>',
+     "list rendered as a paragraph", False),
+    ("a broken list with an HTML comment preceding the paragraph is exempted",
+     '<!-- intentional-broken-list -->\n<p>- a bullet demo</p>',
+     "list rendered as a paragraph", False),
+    # Negative controls for demonstration exemptions:
+    # 1. Exact class-token matching: substring containment does NOT exempt.
+    ("a class merely containing broken-list-demo as substring is not exempt",
+     '<div class="not-a-broken-list-demo"><p>- a bullet item</p></div>',
+     "list rendered as a paragraph", True),
+    # 2. An intervening non-container tag prevents comment leakage to distant paragraphs.
+    ("an intervening heading prevents comment leakage to distant paragraphs",
+     '<!-- intentional-broken-list -->\n<h2>Section Heading</h2>\n<p>- a bullet item</p>',
+     "list rendered as a paragraph", True),
+    # 3. Exemption is strictly scoped to the broken list check; other checks inside the demo still fire.
+    ("a macro inside a broken-list-demo container is still caught",
+     '<div class="broken-list-demo"><p>- demo item \\brokenmacro</p></div>',
+     "unexpanded macro in rendered text", True),
 ]
 
 
@@ -248,7 +281,15 @@ def main():
     else:
         print(f"FAIL: clean page fired {list(run_checks(clean))}"); failures += 1
 
-    # Exit codes are the contract for CI use.
+    # CheckResult tracks exempted demonstration items on .exempted attribute
+    res = checker._list_failed('<div class="broken-list-demo"><p>- intentional demo</p></div>')
+    if len(res) == 0 and res.exempted == ["- intentional demo"]:
+        print("PASS: CheckResult tracks exempted demonstration matches on .exempted"); passes += 1
+    else:
+        print(f"FAIL: CheckResult expected empty findings and 1 exempted, got findings={list(res)}, exempted={res.exempted}")
+        failures += 1
+
+    # Exit codes and CLI reporting are the contract for CI use.
     import tempfile, os, subprocess
     fd, p = tempfile.mkstemp(suffix=".html"); os.close(fd)
     open(p, "w", encoding="utf-8").write(UNRESOLVED_CITE)
@@ -260,8 +301,45 @@ def main():
     else:
         print(f"FAIL: defective page exited {rc}, want 1"); failures += 1
 
+    # An intentional demonstration exits 0 and reports the exemption in stdout
+    fd, p = tempfile.mkstemp(suffix=".html"); os.close(fd)
+    open(p, "w", encoding="utf-8").write('<div class="broken-list-demo"><p>- intentional demo</p></div>')
+    proc = subprocess.run([sys.executable, str(Path(__file__).parent / "check-rendered-page.py"), p],
+                          capture_output=True, text=True)
+    os.unlink(p)
+    if proc.returncode == 0 and "1 intentional broken-list demonstration exempted" in proc.stdout:
+        print("PASS: an intentional demonstration exits 0 and reports exemption"); passes += 1
+    else:
+        print(f"FAIL: demonstration exited {proc.returncode}, stdout: {proc.stdout!r}"); failures += 1
+
+    # Multiple intentional demonstrations report plural count
+    fd, p = tempfile.mkstemp(suffix=".html"); os.close(fd)
+    open(p, "w", encoding="utf-8").write(
+        '<div class="broken-list-demo"><p>- demo one</p><p>- demo two</p></div>'
+    )
+    proc = subprocess.run([sys.executable, str(Path(__file__).parent / "check-rendered-page.py"), p],
+                          capture_output=True, text=True)
+    os.unlink(p)
+    if proc.returncode == 0 and "2 intentional broken-list demonstrations exempted" in proc.stdout:
+        print("PASS: multiple intentional demonstrations report plural count"); passes += 1
+    else:
+        print(f"FAIL: plural demonstrations exited {proc.returncode}, stdout: {proc.stdout!r}"); failures += 1
+
+    # A defective page with both an unexempted broken list and an exempted demo exits 1 and notes both
+    fd, p = tempfile.mkstemp(suffix=".html"); os.close(fd)
+    open(p, "w", encoding="utf-8").write(
+        '<div class="broken-list-demo"><p>- demo item</p></div><p>- unexempted item</p>'
+    )
+    proc = subprocess.run([sys.executable, str(Path(__file__).parent / "check-rendered-page.py"), p],
+                          capture_output=True, text=True)
+    os.unlink(p)
+    if proc.returncode == 1 and "NOT CLEAN" in proc.stdout and "exempted: 1 intentional broken-list demonstration" in proc.stdout:
+        print("PASS: defective page with exemption notes both defect and exemption"); passes += 1
+    else:
+        print(f"FAIL: defective page with exemption exited {proc.returncode}, stdout: {proc.stdout!r}"); failures += 1
+
     rc = subprocess.run([sys.executable, str(Path(__file__).parent / "check-rendered-page.py"),
-                         "/nonexistent-target-xyz"], capture_output=True).returncode
+                          "/nonexistent-target-xyz"], capture_output=True).returncode
     if rc == 2:
         print("PASS: an unfetchable target exits 2"); passes += 1
     else:

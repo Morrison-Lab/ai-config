@@ -191,6 +191,7 @@ Whenever you or a subagent comes across a useful resource for any Morrison-Lab r
 Put it where readers find it: a chapter's Further reading or "Read" box, a channels table, or the archive repo for official copies of PDFs.
 If it does not fit the current PR, open a small separate PR or issue for it.
 Link official sources only (the authors', publisher's or institution's own site, or open-access hosts), never unauthorized copies.
+The goal (Ezra, 2026-10-13) is to build comprehensive directories of content relevant to all our interests over time, so every tracked resource is a small contribution to a directory, not a one-off link.
 See [`course-repos`](memories/course-repos.md).
 
 - **Do:** check that a resource you cite or find is already tracked, and add it (or file an issue) when it is not.

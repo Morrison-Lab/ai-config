@@ -8920,6 +8920,49 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     check("check_review_comments: pending review request blocks clean status", not ok)
     check("check_review_comments: pending review request names in-flight reviewer", any("copilot-pull-request-reviewer" in i for i in issues))
 
+    # ai-config#4473: pending review request on a dependency-bot PR is an informational note, not a blocker
+    class FakeBotPRWithRequests:
+        def __init__(self, author, review_requests):
+            self.pr_num = "124"
+            self.head_sha = "abc123456789"
+            self.repo = "o/r"
+            self.review_decision = ""
+            self.branch = "feat"
+            self.author = author
+            self.review_requests = review_requests
+
+        def get_comments(self):
+            return []
+
+        def get_reviews(self):
+            return []
+
+    ok_bot, issues_bot = original_check_review_comments(
+        FakeBotPRWithRequests("dependabot[bot]", [{"login": "d-morrison"}]),
+        quorum=0,
+    )
+    blocking_bot = [i for i in issues_bot if not i.startswith("NOTE: ")]
+    notes_bot = [i for i in issues_bot if i.startswith("NOTE: ")]
+    check("check_review_comments: pending review request on dependabot PR is NOTE", any("NOTE: pending review request" in n for n in notes_bot))
+    check("check_review_comments: pending review request on dependabot PR does not block for requests", not any("PR has pending review request" in b for b in blocking_bot))
+
+    ok_renovate, issues_renovate = original_check_review_comments(
+        FakeBotPRWithRequests("app/renovate", [{"login": "d-morrison"}]),
+        quorum=0,
+    )
+    blocking_r = [i for i in issues_renovate if not i.startswith("NOTE: ")]
+    notes_r = [i for i in issues_renovate if i.startswith("NOTE: ")]
+    check("check_review_comments: pending review request on renovate PR is NOTE", any("NOTE: pending review request" in n for n in notes_r))
+    check("check_review_comments: pending review request on renovate PR does not block for requests", not any("PR has pending review request" in b for b in blocking_r))
+
+    # Negative control: human PR still blocks
+    ok_human, issues_human = original_check_review_comments(
+        FakeBotPRWithRequests("d-morrison", [{"login": "someone"}]),
+        quorum=0,
+    )
+    blocking_h = [i for i in issues_human if not i.startswith("NOTE: ")]
+    check("check_review_comments: pending review request on human PR blocks", any("PR has pending review request" in b for b in blocking_h))
+
     # ai-config#3685: text inside an HTML comment is not a stated verdict.
     pre_3685 = "### Verdict\n**Content review: inconclusive, needs a human look**\n\n"
     check(

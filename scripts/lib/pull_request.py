@@ -72,11 +72,20 @@ class PullRequest:
         fields = [
             "headRefOid", "headRefName", "state", "commits",
             "reviewDecision", "reviews", "comments", "reviewRequests",
-            "isDraft", "baseRefName",
+            "isDraft", "baseRefName", "author",
         ]
         cmd = ["gh", "pr", "view", self.pr_num, "--repo", self.repo, "--json", ",".join(fields)]
         stdout = self._fetcher(cmd)
         return json.loads(stdout)
+
+    @property
+    def author(self) -> str:
+        author_data = self._data.get("author")
+        if isinstance(author_data, dict):
+            return author_data.get("login") or ""
+        if isinstance(author_data, str):
+            return author_data
+        return ""
 
     @property
     def review_requests(self) -> List[Dict[str, Any]]:

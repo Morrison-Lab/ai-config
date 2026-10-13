@@ -380,6 +380,31 @@ mutates a PR stays serial.
    is one glance, not a re-investigation. Don't merge anything — opening merges
    is the user's call.
 
+5. **Finish with a chores pass over dependency-bot PRs.**
+   After every in-scope human PR has reached a terminal state
+   (clean, escalated, blocked, or superseded),
+   run the [`chores`](../chores/SKILL.md) skill over any open dependency-bump PRs in the repository.
+   In a multi-repo sweep (e.g. across a list of repos),
+   run the chores pass in each swept repo after its human PRs reach terminal states,
+   or at the end of the multi-repo sweep.
+
+   This ensures bump PRs (from Dependabot or Renovate) never delay the user's own feature PRs during the ARDI loop,
+   while preventing the sweep from reporting "nothing left in scope" while unattended bump PRs sit open.
+   `chores` keeps its own rules:
+   - CI-gated, not review-gated:
+     patch, minor, and submodule bumps merge directly on green CI without waiting for an automated code-review verdict;
+   - Major bumps fetch the changelog,
+     summarize the breaking-change risk,
+     and are flagged for human sign-off;
+   - Automated review requests from workflows like `request-dependabot-review.yml` (e.g. requesting `d-morrison`)
+     are informational triggers on bot PRs,
+     not human blockers that prevent safe patch or minor merges;
+   - Never force-merge failing or pending CI.
+
+   Include the chores pass results
+   (merged bumps, flagged majors, skipped items)
+   directly in or alongside the final wrap-up report.
+
 ## Orchestration
 
 ARDIA serializes every action that **mutates** a PR

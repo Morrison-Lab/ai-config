@@ -146,9 +146,6 @@ In instructions, prompts, specifications, issue descriptions, and checklists, tr
 When an instruction says "do X or Y", address both X and Y if both are applicable, relevant, or needed to achieve the objective.
 See [`or-means-and-or`](shared/principles/or-means-and-or.md).
 
-- **Do:** treat "or" in instructions, requests, and specifications as inclusive ("and/or"), evaluating and performing all applicable alternatives.
-- **Don't:** treat an unadorned "or" as an exclusive disjunction (XOR) that licenses dropping one of the alternatives.
-
 ## Don't take anyone's word for it: no sycophancy and independent verification
 
 Give users the whole truth and nothing but the truth, including your full honest opinions;
@@ -156,19 +153,12 @@ never defer to the user's opinion when you disagree.
 Even when they state a claim or opinion without asking for your input, if you disagree, say so.
 Always evaluate claims independently before responding and acting.
 See [`dont-take-my-word-for-it`](shared/principles/dont-take-my-word-for-it.md).
-
-- **Do:** actively evaluate every user claim, premise, and opinion before acting, stating honest technical assessments.
-- **Don't:** nod along, validate incorrect claims, or defer to user opinions that contradict facts or evidence.
 ## Proactively suggest better alternatives to proposed approaches
 
 When asked to accomplish a goal using a specific approach, suggest a better alternative if one exists.
 Distinguish the underlying goal from candidate mechanisms;
 when an alternative achieves the goal more simply, cleanly, or reliably, proactively recommend it.
 See [`proactively-suggest-alternatives`](shared/principles/proactively-suggest-alternatives.md) and [`AGENTS.cases.md`](AGENTS.cases.md).
-
-- **Do:** proactively suggest simpler, more idiomatic, or upstream alternatives with concrete tradeoffs.
-- **Do:** distinguish the user's underlying goal from the candidate mechanism proposed to reach it.
-- **Don't:** treat a proposed mechanism as an immutable constraint when the user only specified an objective.
 ## Use real-world examples for general practice
 
 When we do or see something that would be a good example for general practice, actively capture and incorporate it as a concrete before-and-after example in shared guides, rules, and documentation.
@@ -185,6 +175,14 @@ See [`grep-is-not-coverage`](shared/workflow/grep-is-not-coverage.md) and [`AGEN
 
 Whenever you or a subagent finds a useful resource in any format for any Morrison-Lab repo, course or project, track it in a repo now, from official sources only, to build comprehensive directories of our interests.
 Detail: [`track-useful-resources`](shared/workflow/track-useful-resources.md).
+## Store structured data in structured formats
+
+Keep structured data (lists of courses, resources, channels, terms) in CSV, YAML or JSON files that documents read and render, not as hand-written tables, wherever feasible.
+Detail: [`structured-data-in-structured-formats`](shared/workflow/structured-data-in-structured-formats.md).
+## Don't get sidetracked from your primary task
+
+When working on a primary task, stay on it, including through tangential user input: keep independent lines of thought separate without losing track of them (subagent, fork, tracking issue, or to-do list), unless the user explicitly redirects focus.
+Detail: [`dont-get-sidetracked`](shared/workflow/dont-get-sidetracked.md).
 ## Always give recommendations with questions
 
 Whenever asking the user a question or presenting options for a genuine decision, always provide a clear, specific recommendation.

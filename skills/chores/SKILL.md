@@ -303,10 +303,12 @@ bump is sitting unflagged.
   that automates them); `chores` *processes* the bump PRs that land. Use `cdu`
   to catch what Dependabot misses, `chores` to clear what it opens.
 - **`ardia` / `gia`** — the human-PR counterpart (drive feature PRs to a clean
-  *review* verdict). `ardia` finishes with a `chores` pass over dependency-bot
-  PRs in the swept repos after human PRs reach terminal states, handing bumps to
-  this skill. `chores` is the bot-PR counterpart (CI-gated bumps). Don't
-  run `ardi` on a Dependabot PR — `@claude` review is skipped on them by design.
+  *review* verdict).
+  `ardia` finishes with a `chores` pass over dependency-bot
+  PRs in the swept repos after human PRs reach terminal states,
+  handing bumps to this skill.
+  `chores` is the bot-PR counterpart (CI-gated bumps).
+  Don't run `ardi` on a Dependabot PR --- `@claude` review is skipped on them by design.
 - **`pr-status-all`** — read-only status of every open PR; `chores` is the
   acting version scoped to bump PRs.
 - **`clean-branches` / `cb`** — Dependabot deletes its own remote branch on

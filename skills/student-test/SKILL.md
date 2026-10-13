@@ -10,7 +10,7 @@ allowed-tools:
   - Agent
 ---
 
-# student-test — can a student answer it from the wording alone?
+# student-test --- can a student answer it from the wording alone?
 
 Give each assessment to a "student" agent that has no access to the solutions, then have a separate grader compare its answers with the key.
 Every wrong or hedged answer is either a student error, a wording problem (ambiguous, or missing information), or a key error.

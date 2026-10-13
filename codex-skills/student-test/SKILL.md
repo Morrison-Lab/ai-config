@@ -1,6 +1,6 @@
 ---
 name: "student-test"
-description: "Test assessments with a simulated student. Use when asked to 'student test', 'test the homework/exam for clarity', 'have a student agent take it', or after changing a homework, exam, quiz or lab."
+description: "Test assessments with a simulated student."
 ---
 
 # student-test (Codex wrapper)

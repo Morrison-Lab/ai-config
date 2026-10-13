@@ -81,9 +81,10 @@ Apply the standing quota optimization rule: **spend CLI-reachable free tiers and
    - *Cost*: Sunk cost within the current usage window (e.g. Codex ~5h window, OpenCode Go $10/mo window).
    - *Best For*: Heavy read fan-outs, multi-file auditing, drafting N artifacts, bounded implementation briefs.
    - *Rule*: Exhaust current subscription window before falling back to Claude tokens.
-3. **Tier C: Prepaid Credit Balance (`openrouter/*`)**
-   - *Cost*: Pay-per-token draw on prepaid balance.
-   - *Best For*: Frontier stealth previews and capable models when free and windowed tiers are exhausted.
+3. **Tier C: Free OpenRouter models only (`openrouter/*`, priced 0/0)**
+   - *Cost*: None for free models.
+     The prepaid balance is pay-per-token and is never spent (subscriptions-only rule in `memories/delegation.md`, Ezra, 2026-10-13).
+   - *Best For*: Frontier stealth previews while they are free, when free and windowed tiers are exhausted.
 4. **Tier D: Orchestrator Claude Tiers (Haiku 4.5, Sonnet 4.6, Opus 4.8 / Fable 5)**
    - *Cost*: Direct API / session token quota.
    - *Best For*: Conductor orchestration, complex judgment, ambiguous design, adversarial review.

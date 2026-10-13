@@ -546,7 +546,8 @@ So the response to such a comment has three parts, in this order.
 2. **Run `ums` in the same turn and record the rule in its global home.**
    Pick the home by scope, per [`encode-reusable-feedback`](encode-reusable-feedback.md): an `ai-config` fragment for an agent rule, `psw` for a prose or notation rule, the repository's own instructions for a rule that holds only there.
    Check for an existing entry first and extend it, so a rule already recorded gets a stronger trigger rather than a duplicate.
-3. **Say in the reply which rule you recorded, and where**, with a link, for example "Fixed in `abc123`. Recorded 'one term per definition' in `lecture-conventions` (link)."
+3. **Say in the reply which rule you recorded, and where**, with a link, for example "Fixed in `abc123`.
+   Recorded 'one term per definition' in `lecture-conventions` (link)."
    A reply that names only the fix does not show the owner that the rule will survive the session.
 
 Treat a comment as implying a rule when it carries "haven't we", "I've told you", "again", "always", "everywhere" or "why aren't we", asks a question that names a convention, or repeats a correction made earlier in the PR.

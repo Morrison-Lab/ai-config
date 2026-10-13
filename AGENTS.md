@@ -175,6 +175,10 @@ See [`grep-is-not-coverage`](shared/workflow/grep-is-not-coverage.md) and [`AGEN
 
 Whenever you or a subagent finds a useful resource in any format for any Morrison-Lab repo, course or project, track it in a repo now, from official sources only, to build comprehensive directories of our interests.
 Detail: [`track-useful-resources`](shared/workflow/track-useful-resources.md).
+## Store structured data in structured formats
+
+Keep structured data (lists of courses, resources, channels, terms) in CSV, YAML or JSON files that documents read and render, not as hand-written tables, wherever feasible.
+Detail: [`structured-data-in-structured-formats`](shared/workflow/structured-data-in-structured-formats.md).
 ## Don't get sidetracked from your primary task
 
 When working on a primary task, stay on it, including through tangential user input: keep independent lines of thought separate without losing track of them (subagent, fork, tracking issue, or to-do list), unless the user explicitly redirects focus.

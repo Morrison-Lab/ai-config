@@ -3681,9 +3681,22 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
     if pending_reviewers is None:
         pending_reviewers = extract_request_names(getattr(pr, "review_requests", []))
     if pending_reviewers:
-        issues.append(
-            f"PR has pending review request(s) still in flight: {', '.join(sorted(pending_reviewers))}"
-        )
+        author_norm = getattr(pr, "author", "") or ""
+        if author_norm.startswith("app/"):
+            author_norm = author_norm[4:]
+        if author_norm.endswith("[bot]"):
+            author_norm = author_norm[:-5]
+        author_norm = author_norm.lower()
+
+        if author_norm in ("dependabot", "renovate"):
+            issues.append(
+                f"NOTE: pending review request(s) for {', '.join(sorted(pending_reviewers))} "
+                "on dependency-bot PR treated as informational (chores is CI-gated; ai-config#4473)"
+            )
+        else:
+            issues.append(
+                f"PR has pending review request(s) still in flight: {', '.join(sorted(pending_reviewers))}"
+            )
 
     # Direct GitHub computed review decision check
     if review_decision in ("CHANGES_REQUESTED", "REJECTED"):

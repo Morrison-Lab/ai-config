@@ -24,7 +24,7 @@ class TestFetchedFieldPlumbing(unittest.TestCase):
     SERVER_SIDE = {
         "headRefOid": "abc", "headRefName": "b", "state": "OPEN",
         "commits": [], "reviewDecision": "", "reviews": [], "comments": [],
-        "reviewRequests": [], "isDraft": True,
+        "reviewRequests": [], "isDraft": True, "author": {"login": "dependabot[bot]"},
     }
 
     def _filtering_fetcher(self, requested):
@@ -45,6 +45,15 @@ class TestFetchedFieldPlumbing(unittest.TestCase):
         self.assertTrue(pr.is_draft,
                         "a draft PR must read as a draft after a real fetch")
 
+    def test_author_survives_the_gh_field_filter(self):
+        requested = []
+        pr = PullRequest("1", "o/r", fetcher=self._filtering_fetcher(requested))
+        self.assertIn("author", requested,
+                      "author must be in the --json field list, or author "
+                      "reads empty for every real PR")
+        self.assertEqual(pr.author, "dependabot[bot]",
+                         "author must read the login after a real fetch")
+
     def test_a_ready_pr_reads_as_ready(self):
         self.SERVER_SIDE = dict(self.SERVER_SIDE, isDraft=False)
         pr = PullRequest("1", "o/r", fetcher=self._filtering_fetcher([]))
@@ -57,6 +66,7 @@ class TestPullRequest(unittest.TestCase):
             "headRefOid": "abcd123",
             "headRefName": "feat/test-branch",
             "state": "OPEN",
+            "author": {"login": "octocat"},
             "commits": [{"committedDate": "2023-10-01T12:00:00Z"}],
             "reviewDecision": "CHANGES_REQUESTED",
             "reviews": [

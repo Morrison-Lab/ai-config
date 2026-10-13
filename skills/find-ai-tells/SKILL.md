@@ -87,7 +87,7 @@ Quick first-pass grep (case-insensitive, prints `file:line`).
 Define the pattern once, then run it through whichever tool is on hand:
 
 ```bash
-tells='delve|leverage|utilize|seamless(ly)?|robust|holistic|nuanced|multifaceted|intricate|tapestry|testament|realm|landscape|beacon|plethora|myriad|pivotal|crucial|paramount|underscore|foster|harness|embark|unlock|elevate|game-?changer|cutting-edge|state-of-the-art|ever-evolving|treasure trove|fast-paced|in the realm of|at the heart of|more than just|shed light|dive in(to)?|deep dive|serves as|stands as|the whole of it|own-goal|about what'
+tells='delve|leverage|utilize|seamless(ly)?|robust|holistic|nuanced|multifaceted|intricate|tapestry|testament|realm|landscape|beacon|plethora|myriad|pivotal|crucial|paramount|underscore|foster|harness|embark|unlock|elevate|game-?changer|cutting-edge|state-of-the-art|ever-evolving|treasure trove|fast-paced|in the realm of|at the heart of|more than just|shed light|dive in(to)?|deep dive|serves as|stands as|the whole of it|own-goal|about what|things?'
 rg -niE "\b($tells)\b" <target>          # ripgrep
 grep -rniE "\b($tells)\b" <target>       # no ripgrep — same pattern, via grep
 ```
@@ -121,10 +121,11 @@ grep -rniE "\b($tells)\b" <target>       # no ripgrep — same pattern, via grep
   ("is what", "is where", "is when", "is how"), "carries"/"carry" and
   "tells"/"doesn't tell"/"does not tell" standing in for a plain verb,
   "load-bearing" standing in for "essential", "the whole of it", "own-goal",
-  mid-phrase conjunctives (", however, "), and indirect "about what".
+  mid-phrase conjunctives (", however, "), indirect "about what", and the vague placeholder noun "thing"/"things"
+  (name the object, quantity, step or idea).
   Each is ordinary English at one or two hits, so count density instead of
   banning them:
-  `grep -ioE "rather than|not the same as|load-bearing|carr(y|ies)|\btells\b|does(n't| not) tell|the whole of it|own-goal|is (what|where|when|how)|\babout what\b|, however," <target> | wc -l`.
+  `grep -ioE "rather than|not the same as|load-bearing|carr(y|ies)|\btells\b|does(n't| not) tell|the whole of it|own-goal|is (what|where|when|how)|\babout what\b|\bthings?\b|, however," <target> | wc -l`.
   Fix: state the claim positively, use direct verbs ("the lease stops collisions",
   not "the lease is what stops collisions"), drop copula clefts, and replace
   metaphor cliches with plain wording.

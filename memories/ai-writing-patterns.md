@@ -106,7 +106,8 @@ the diagnostic signal lies in clustering and mechanical repetition.
   sports cliches ("own-goal");
   metaphors ("the whole of it");
   mid-phrase conjunctives (", however, ");
-  indirect pseudo-questions ("about what").
+  indirect pseudo-questions ("about what");
+  the vague placeholder noun "thing"/"things" (Ezra, 2026-10-13).
   *Fix:* State the claim positively, use direct verbs
   (e.g. "the lease stops collisions", not "the lease is what stops collisions"),
   and drop copula clefts.

@@ -185,6 +185,18 @@ See [`grep-is-not-coverage`](shared/workflow/grep-is-not-coverage.md) and [`AGEN
 - **Do:** search `AGENTS.md`, `CLAUDE.md`, `memories/`, `shared/`, and open issues before answering "no" to whether a policy exists.
 - **Do:** run an all-state tracker search before implementing a capability request.
 - **Don't:** assert that a standing grant or rule does not exist based only on searching `skills/` or `memories/`.
+## Track every useful course resource in a repo
+
+Whenever you or a subagent comes across a useful resource for a course (textbook, article, software package, website, video, course page, or any other format), make sure it is tracked in one or more of the course's repos before the session ends.
+Put it where readers find it: a chapter's Further reading or "Read" box, a channels table, or the archive repo for official copies of PDFs.
+If it does not fit the current PR, open a small separate PR or issue for it.
+Link official sources only (the authors', publisher's or institution's own site, or open-access hosts), never unauthorized copies.
+See [`course-repos`](memories/course-repos.md).
+
+- **Do:** check that a resource you cite or find is already tracked, and add it (or file an issue) when it is not.
+- **Do:** pass this rule to subagents that research or read course material.
+- **Don't:** leave a useful resource only in a chat reply or session transcript.
+- **Don't:** link an unauthorized copy, or commit paywalled text.
 ## Always give recommendations with questions
 
 Whenever asking the user a question or presenting options for a genuine decision, always provide a clear, specific recommendation.

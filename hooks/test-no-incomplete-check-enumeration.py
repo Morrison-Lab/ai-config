@@ -550,19 +550,24 @@ CASES = [
 ]
 
 # ai-config#4468: CI environment cases (events, extra_env, want, label)
+# Interactive bot claims before first push still block; review verdicts allow.
 CI_CASES = [
-    ([PARTIAL, say("21 pass, 0 pending -- ready to merge.")],
+    ([PARTIAL, say("### Verdict\n**Ready for merge**")],
      {"GITHUB_ACTIONS": "true"},
      "allow",
-     "#4468: review-only CI session (GITHUB_ACTIONS=true, no push) allows"),
-    ([PARTIAL, say("21 pass, 0 pending -- ready to merge.")],
+     "#4468: review verdict in CI (GITHUB_ACTIONS=true) allows"),
+    ([PARTIAL, say("### Verdict\n**Ready for merge**")],
      {"CI": "true"},
      "allow",
-     "#4468: review-only CI session (CI=true, no push) allows"),
+     "#4468: review verdict with CI=true allows"),
+    ([PARTIAL, say("21 pass, 0 pending -- ready to merge.")],
+     {"GITHUB_ACTIONS": "true"},
+     "block",
+     "#4468: interactive claim in CI before first push still blocks (claude-bot.yml protection)"),
     ([PUSH_1034, PARTIAL_1034, say("#1034 is fully clean.")],
      {"GITHUB_ACTIONS": "true"},
      "block",
-     "#4468 negative control: non-review CI session with push still blocks unverified claim"),
+     "#4468: non-review CI session with push still blocks unverified claim"),
 ]
 
 # (events, must_contain, must_not_contain, label). The WARN explanation must

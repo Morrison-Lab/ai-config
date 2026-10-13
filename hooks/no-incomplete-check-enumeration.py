@@ -147,13 +147,15 @@ and the last check (`claude-review / require-clean-verdict`) stayed red until
 the reviewer said CLEAN.
 
 A code review verdict is an evaluation of the diff's content, not a terminal
-claim that CI check runs are fully enumerated. Two guards prevent this deadlock:
-  (1) Review-only CI sessions (`is_ci and last_push < 0`) exit 0 immediately.
-      CI check completion is the responsibility of gate workflows
-      (`require-clean-verdict`), not the diff reviewer.
-  (2) A claim phrase located within a review verdict heading or structured
-      review block (`_is_review_verdict`) evaluates the diff rather than
-      CI check status and is excluded from claim evaluation.
+claim that CI check runs are fully enumerated. A claim phrase located within a
+review verdict heading or structured review block (`_is_review_verdict`)
+evaluates the diff rather than CI check status and is excluded from claim
+evaluation. A blanket environment exemption based on `GITHUB_ACTIONS`/`CI` was
+considered and rejected (ai-config#4481 review finding): it would silence the
+guard for the interactive `@claude` bot (`claude-bot.yml`) before its first push
+in a session. Anchoring on the review verdict content structure directly
+resolves the deadlock for review jobs while preserving the guard for interactive
+bots.
 
 Deliberately narrow on the assertion side either way. A progress report --
 "13 pass, 5 pending" -- is honest and must not trip this; only a terminal
@@ -753,20 +755,6 @@ def main() -> int:
         return 0  # fail open
 
     if not text:
-        return 0
-
-    # Review-only CI sessions (ai-config#4468):
-    # In CI review jobs (e.g. claude-code-review.yml in GitHub Actions), the
-    # reviewer evaluates the diff and posts a review verdict. CI status is the
-    # gate workflows' job (e.g. require-clean-verdict). A review session
-    # cannot push (last_push < 0), does not merge, and cannot run
-    # check-pr-fully-clean.py (absent in consumer repos; gh api denied).
-    # Firing here causes an inescapable deadlock where the reviewer withholds
-    # CLEAN until all checks pass, while require-clean-verdict stays red
-    # until the reviewer says CLEAN (observed on wai#274 and psc#11).
-    is_ci = (os.environ.get("GITHUB_ACTIONS") == "true" or
-             os.environ.get("CI") == "true")
-    if is_ci and last_push < 0:
         return 0
 
     all_claims = [

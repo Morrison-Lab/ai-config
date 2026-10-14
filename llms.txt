@@ -5,6 +5,7 @@
 ## Pages
 
 - [SKILL](https://Morrison-Lab.github.io/ai-config/skills/wrap-up/SKILL.llms.md)
+- [SKILL](https://Morrison-Lab.github.io/ai-config/skills/wn/SKILL.llms.md)
 - [SKILL](https://Morrison-Lab.github.io/ai-config/skills/wait-for-results/SKILL.llms.md)
 - [SKILL](https://Morrison-Lab.github.io/ai-config/skills/use-preferred-style/SKILL.llms.md)
 - [SKILL](https://Morrison-Lab.github.io/ai-config/skills/update-memories-and-skills/SKILL.llms.md)
@@ -228,4 +229,5 @@
 - [SKILL](https://Morrison-Lab.github.io/ai-config/skills/ums/SKILL.llms.md)
 - [SKILL](https://Morrison-Lab.github.io/ai-config/skills/use-math-macros/SKILL.llms.md)
 - [SKILL](https://Morrison-Lab.github.io/ai-config/skills/wai/SKILL.llms.md)
+- [SKILL](https://Morrison-Lab.github.io/ai-config/skills/whats-next/SKILL.llms.md)
 - [SKILL](https://Morrison-Lab.github.io/ai-config/skills/workaround-watcher/SKILL.llms.md)

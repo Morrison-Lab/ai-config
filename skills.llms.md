@@ -131,6 +131,7 @@ Most skills also respond to plain-English triggers listed in their `description`
 | [`prompt-me`](skills/prompt-me/SKILL.llms.md) | `pm` | Surface the single most pressing open question (or top N) waiting on user input |
 | [`prompt-me-all`](skills/prompt-me-all/SKILL.llms.md) | `pma` | Restate every open question still waiting on user input, uncapped |
 | [`pending-decisions`](skills/pending-decisions/SKILL.llms.md) | `pd` | Sweep issues/PRs (not just this conversation) for ones waiting on a decision from you, and ask about them one at a time |
+| [`whats-next`](skills/whats-next/SKILL.llms.md) | `wn` | Recommend the concrete next step or action (agent task, user decision, or session archive) |
 | [`checkpoint`](skills/checkpoint/SKILL.llms.md) |  | Save a deliberate mid-task snapshot without ending the session |
 | [`finish-wave`](skills/finish-wave/SKILL.llms.md) | `fw` | Cap an orchestration run at the wave already in flight: grab nothing new, drive the open wave to a terminal state, then ask before the next wave |
 | [`compress-session`](skills/compress-session/SKILL.llms.md) |  | Distill the session into auto memory before context fills up |
@@ -138,6 +139,6 @@ Most skills also respond to plain-English triggers listed in their `description`
 
 ## Full skill list
 
-All 204+ canonical skills are in [`skills/`](https://github.com/Morrison-Lab/ai-config/tree/main/skills) on GitHub. Generated Codex wrappers live in [`codex-skills/`](https://github.com/Morrison-Lab/ai-config/tree/main/codex-skills). Each canonical `SKILL.md` has a `description` field that lists the trigger phrases and a full procedure.
+All 222+ canonical skills are in [`skills/`](https://github.com/Morrison-Lab/ai-config/tree/main/skills) on GitHub. Generated Codex wrappers live in [`codex-skills/`](https://github.com/Morrison-Lab/ai-config/tree/main/codex-skills). Each canonical `SKILL.md` has a `description` field that lists the trigger phrases and a full procedure.
 
 Back to top

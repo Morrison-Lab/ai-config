@@ -427,7 +427,7 @@ Measured 2026-10-13 in a Remote Control session on Ezra's Linux box, `cf463-02`,
 `agy models` listed 13 models, so run it for the current roster rather than reusing that count.
 `agy --print "<prompt>"` worked headless.
 Commands outside `permissions.allow` in `~/.gemini/antigravity-cli/settings.json` were auto-denied, exit 0 came back with summaries that claimed edits never made, and `git diff` was the only reliable check.
-A cloud session cannot use this route: it has no Antigravity login and no documented headless token, so the dispatch has to run on this box.
+A cloud session cannot use this route: it has no Antigravity login and no documented headless token (none found as of 2026-10-13), so the dispatch has to run on this box.
 [`delegate-to-agy`](../skills/delegate-to-agy/SKILL.md) is the mechanism.
 
 ## agy as a cheap adversarial-review lane on macOS

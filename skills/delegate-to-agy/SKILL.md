@@ -21,13 +21,13 @@ Never route work through a Gemini, OpenAI or Anthropic API key.
 
 ## Where it runs
 
-`agy` authenticates with the login the Antigravity app stored on the machine, and it has no documented headless token.
+`agy` authenticates with the login the Antigravity app stored on the machine, and it has no documented headless token (none found as of 2026-10-13).
 So it works only on a machine where Antigravity is signed in.
 
 | Session | Can use `agy`? |
 |---|---|
-| Local Claude Code on Ezra's Linux box | Yes, per the Linux measurement in `memories/delegation.md` ("agy on Linux"). |
-| Remote Control session on that box | Yes. It is his default device. |
+| Local Claude Code on Ezra's Linux box | Expected to work, but unmeasured: the Linux measurement in `memories/delegation.md` ("agy on Linux") was a Remote Control session. |
+| Remote Control session on that box | Yes, measured 2026-10-13. It is his default device. |
 | Cloud session (claude.ai/code, GitHub Actions) | No. `AGENTS.md` records a cloud session as having no `agy`. |
 
 From a cloud session, ask Ezra to start a Remote Control session on the Linux box and run the dispatch there, or fall back to OpenCode Go (`delegate-to-opencode`).
@@ -49,7 +49,7 @@ For Windows, read its "agy on Windows" section first, since the shell and comman
   no claude subagents except reviewers") sends implementation to `agy`, but it worked on Windows only because the user added a `command(*)` allow-rule there.
   Without a rule, headless `agy` writes nothing and exits 0.
   Check `settings.json` first, and ask Ezra before editing it;
-  on a machine with no rule, keep the job on a Claude subagent and say why.
+  on a machine with no rule, ask Ezra to add the rule, or send the job to OpenCode Go, and cite the 2026-09-09 directive as the reason.
 - Restricted data (PHI, FERPA records): `agy` sends the prompt off the machine.
 
 ## Procedure
@@ -71,6 +71,9 @@ Headless `agy` cannot read repo files or run `git diff` on its own.
 Embed the full text of every file the task needs, and for a review embed the diff too, regenerated before every re-dispatch round.
 Write the brief to a scratchpad file with the Write tool, not a heredoc.
 Embed anything from the network yourself.
+Keep the brief under about 100 KB.
+The prompt travels as one command-line argument, and Linux caps a single argument at 128 KiB (not measured with `agy`).
+Split a larger job into several briefs.
 
 ### 3. Dispatch headless, in the background
 
@@ -92,20 +95,23 @@ A `nohup` launcher returning is not the run finishing.
 
 - **Exit 0 proves nothing.**
   A denied tool exits 0 with `jetski: no output produced --- a tool required the "<tool>" permission that headless mode cannot prompt for, so it was auto-denied`.
-  Read `$WORK/err.txt` and `$WORK/out.txt` for that line, and treat empty output as a failure.
+  Read `$WORK/err.txt` and `$WORK/out.txt` for that line, and treat empty output or an `Argument list too long` error as a failure.
+`DONE` appears whether the run succeeded or not.
 - A run can also print a "Completed Work Summary" naming files it never wrote.
   Run `git diff` after any dispatch that might have touched the repo.
 - Re-derive every number it reports.
   `agy` has miscounted lines while reading correctly.
 - Do not edit the allow list or skip permissions on your own to make a run succeed.
-  The memory records conflicting reports on whether `permissions.allow` in `~/.gemini/antigravity-cli/settings.json` is honoured headless (it was on Windows 1.1.28;
-  upstream issue #548 says otherwise), and the allow list is Ezra's call.
+  On Linux 1.3.4 a command outside `permissions.allow` in `~/.gemini/antigravity-cli/settings.json` was auto-denied, so the list does gate headless runs.
+  Upstream issue #548 reports that some versions ignore that file's `command()` grants, so smoke-test a rule before relying on it.
+  The allow list is Ezra's call.
   The memory allows `--dangerously-skip-permissions` only for a fully trusted brief, and this skill never uses it.
   For read-only work, embed the material in the brief instead.
 
 ### 5. Fall back for failures only
 
-If a run fails, times out or returns nothing, redo only those items with a Claude subagent or OpenCode Go.
+If a run fails, times out or returns nothing, redo only those items on OpenCode Go.
+Use a Claude subagent only for a reviewer, per the 2026-09-09 directive.
 No memory entry records what `agy` prints when the subscription window is exhausted, so treat an unexplained failure on every item as possible exhaustion, and say so in the report.
 If the whole window is exhausted, fall back to Claude in the current session, never to a metered API.
 

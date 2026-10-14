@@ -1,0 +1,599 @@
+When writing or reviewing a mathematical derivation --- an algebraic
+manipulation, a proof, a statistical argument --- hold it to a stricter
+completeness bar than ordinary prose reasoning.
+
+This fragment covers three axes.
+The first is **between** displayed lines: how much happens from one line to
+the next.
+The second is **within** a single line: how much structure is packed inside
+one expression.
+That second axis applies to any displayed equation, a standalone definition
+included, not only to a line inside a running derivation, and its remedy
+reaches document scope even though the defect shows up in one line.
+The third is **whether** a line is displayed at all: display versus inline, a decision that is usually never made on purpose rather than made wrongly.
+Two last sections cover how a derivation is laid out in teaching material, and prose that describes a formula: keeping a function apart from its value.
+
+## Writing: don't skip steps
+
+Write out every intermediate step: every distribution, cancellation,
+substitution, application of a named identity or assumption, and change of
+notation. Don't combine two or more operations into a single displayed line.
+A reader should be able to get from one line to the next by checking a single
+mechanical operation, never by re-deriving an omitted one.
+
+This is stricter than ordinary prose, where combining a few closely related
+points in one sentence is fine --- a derivation's whole value is that each
+line is independently checkable, so skipping a step defeats the purpose even
+when the reader could reconstruct it themselves.
+
+The combined steps that survive self-review are the ones that read as a
+single idea:
+
+- "the chain rule applied to each term of the sum" is two rules (derivative
+  of a sum, then the chain rule);
+- a line that distributes a sum operator *and* substitutes
+  $\sum_i y_i = n \bar{y}$ is at least three operations (split the sum,
+  sum a constant, factor out a constant) before the substitution;
+- plugging in an inner derivative *and* pulling the resulting constant out
+  of the sum;
+- "cancel" as one justification:
+  cancelling $a$ in $a + (b - a)$
+  removes the parentheses ($a + b - a$),
+  reorders the terms ($b + a - a$),
+  groups the two that cancel ($b + (a - a)$),
+  replaces $a - a$ with $0$ ($b + 0$),
+  and drops the $+ 0$;
+- "cancel" for factors:
+  cancelling $n$ in $n \cdot \frac{b}{n}$
+  rewrites the division as multiplication by a reciprocal ($n \cdot (b \cdot \frac{1}{n})$),
+  removes the parentheses ($n \cdot b \cdot \frac{1}{n}$),
+  reorders the factors ($b \cdot n \cdot \frac{1}{n}$),
+  groups the two that cancel ($b \cdot (n \cdot \frac{1}{n})$),
+  replaces $n \cdot \frac{1}{n}$ with $1$ ($b \cdot 1$),
+  and drops the $\cdot 1$;
+- prose such as "setting this to zero and dividing by $-2n$ gives",
+  which hides two operations in a sentence rather than a line.
+
+Check each line against those tells:
+
+- **Do:** give each displayed line one operation and its own
+  justification, and prove a fact the step relies on (deviations from a
+  mean sum to zero) in its own block or exercise before citing it.
+- **Don't:** label a line with one justification that names a rule while
+  the line also applies a second rule or a substitution, as sds#54's first
+  OLS solutions did ("(inner derivative is $-1$)" over a line that also
+  factored and summed).
+
+### One equals sign per line
+
+Put at most one equals sign on each line of math, display or inline.
+Split a chain such as `a = b = c` into the rows of an `aligned` display,
+one `&=` per row, and split a row `&= b = c` inside an existing `aligned`
+block the same way.
+Write an "all equal" claim with a quantifier:
+$H_0\colon \beta_j = 0$ for every $j$, not $\beta_1 = \cdots = \beta_p = 0$.
+Separate equations side by side (`x = 1, \quad y = 2`) are not chains.
+The canonical copy is PSW's
+[One equals sign per line](https://morrison-lab.github.io/psw/chapters/notation.html#one-equals-sign-per-line)
+(Ezra, 2026-10-08).
+
+## Reviewing: name the gap, don't just flag it
+
+[`fact-check-prose.md`](fact-check-prose.md)'s document-internal-reasoning
+check already covers whether each *stated* step is valid (verifying it
+follows from the last, checking dimensions/units, checking edge cases). This
+fragment is about a different failure mode: a step that isn't stated at
+all --- the derivation jumps from one line to a non-adjacent one.
+
+When a derivation skips a step:
+
+1. **Point to the exact gap** --- the last line before the jump and the
+   first line after it, not just "this derivation skips steps" in general.
+2. **Name the missing operation** --- what specific move closes the gap
+   (which distribution, cancellation, substitution, identity, or
+   assumption). Don't leave it to the author to guess what you think is
+   missing.
+3. **Draft the missing line(s)** where feasible, so the author can drop them
+   in directly rather than re-deriving the gap themselves --- the same
+   spirit as proposing a concrete fix rather than only naming a problem
+   (see [`challenge-unnecessary-complexity.md`](../workflow/challenge-unnecessary-complexity.md)'s
+   "propose the fix, don't just name the issue" pattern).
+
+A derivation with a plausible-looking but unstated jump is exactly the kind
+of gap a reader skims past --- the same reason
+[`challenge-ambiguous-terminology.md`](../workflow/challenge-ambiguous-terminology.md)
+warns against accepting a plausible reading at face value instead of
+verifying it.
+
+## Keep each equation simple: decompose its internal structure
+
+The rules above govern what happens *between* two displayed lines.
+This one governs what is packed *inside* one of them.
+
+When an equation's operator takes a compound expression as its operand, a
+reader has to parse two structures at once: the outer relation, and whatever
+is nested inside it.
+Give the inner structure its own name, and state the outer relation in terms
+of that name.
+Introducing extra notation is the mechanism rather than a cost to work
+around, because the goal is a simple equation and not a short one.
+
+### Worked example, in three states
+
+A cluster's score contribution, written as one equation that inlines the
+per-observation score:
+
+```latex
+$$U_c = \sum_{i \in c} \nabla_\lambda \log \dens(Y_i \mid \lambda)$$
+```
+
+Decomposed once, by naming the per-observation score:
+
+```latex
+$$
+\begin{aligned}
+U_i &= \nabla_\lambda \log \dens(Y_i \mid \lambda)
+\\
+U_c &= \sum_{i \in c} U_i
+\end{aligned}
+$$
+```
+
+Decomposed again, by naming the per-observation log-likelihood that was still
+nested inside the gradient:
+
+```latex
+$$
+\begin{aligned}
+\llik_i(\lambda) &= \log \dens(Y_i \mid \lambda)
+\\
+U_i &= \nabla_\lambda \llik_i(\lambda)
+\\
+U_c &= \sum_{i \in c} U_i
+\end{aligned}
+$$
+```
+
+Each line of the third state performs exactly one operation: a log, a
+gradient, a sum.
+
+### The rule reapplies to its own output
+
+The second state above is the near-miss worth naming, because it is visibly
+better than the first and therefore reads as finished.
+It is not.
+$U_i$'s own definition still nests a log inside a gradient, which is the same
+defect the first decomposition was made to remove, one level down.
+
+So decomposition is recursive rather than a single split.
+After naming an intermediate, ask the original question again about that
+intermediate's own definition, and keep asking until each line carries one
+operation.
+Stopping at the first split is the failure mode, and it is a comfortable one:
+the diff already shows a clear improvement, so nothing about it prompts
+another look.
+
+### Where to stop: a quantity the reader already accepts
+
+The recursion above says to keep going, so it needs a floor, and "until each
+line carries one operation" is not one.
+A density can always be unfolded further into whatever constructed it.
+
+Stop at the level where an expression names a **modeled quantity the reader
+already accepts** --- usually a density, sometimes a moment, sometimes a data
+summary.
+Operationally: keep naming intermediates until the next unfolding would
+replace an accepted quantity with internal construction the reader does not
+need at this point.
+
+That is what settled the worked example.
+$\Lik_i$ was the right floor not because densities are primitive, but because
+by that point in the document the reader has already accepted the
+marginal-likelihood proposition and should not have to re-open it.
+This is a different question from whether a given name is *cheap* --- whether
+it is reusable, and consistent with notation the document already uses.
+Cheapness decides what a name costs to introduce; the floor decides *how far
+down to go*, which is the question the recursion actually raises.
+
+#### Why the floor is not simply "a single probability expression"
+
+In likelihood-based work, decompositions usually do terminate at a single
+probability expression, and that is a serviceable heuristic.
+It is worth knowing why it is only a heuristic, because the three ways it
+fails are the three ways this rule gets misapplied.
+
+1. **Operators are atomic too, and are not probability expressions.**
+   The irreducible pieces of the worked example include $\nabla_\lambda$,
+   $\log$, $\sum$, $\prod$, and $\int$, each as non-decomposable as the
+   density they act on.
+   Atomicity splits into objects and operations, and only the first family is
+   probabilistic.
+2. **Moment expressions are a parallel family of atoms, not derived ones.**
+   Expectation can be taken as primitive with the density derived, and whole
+   methods deliberately stop at the moment level and never descend to a
+   density: method of moments, GEE, quantile regression, the empirical CDF.
+   The sandwich estimator in the worked example is itself an instance ---
+   its justification is $E[UU^\top]$ against $-E[H]$, and its selling point
+   is remaining valid when the probability model is not correctly specified.
+3. **Atomicity is relative to the exposition, not intrinsic to the
+   expression.**
+   In the same vignette, $\dens(Y_i \mid \lambda)$ is atomic in the
+   sandwich-variance section and *composite* one section earlier, where it
+   unfolds into an integral over the continuous part plus a never-infected
+   term.
+   Nothing about the symbol changed; the level of the argument did.
+
+The third is the load-bearing one, and it is what makes this a test rather
+than a list of primitive kinds.
+You are not looking for an intrinsically irreducible object.
+You are looking for the level at which *this* reader, at *this* point in the
+argument, should stop unfolding --- which is why the same expression can be a
+floor in one section and the thing to decompose in the next.
+
+### Apply it at document scope, not one equation at a time
+
+The recursion above is still local: it fixes the equation in front of you.
+Applying the principle thoroughly asks a wider question --- where does this
+concept *first* enter the document?
+Introduce the name there, so every later section consumes it instead of
+rebuilding what it stands for.
+
+In the same document that meant defining a participant's own likelihood and
+log-likelihood once, in the proposition where the index $i$ first appears, as
+the per-observation mirror of the document's existing full-sample $\Lik$ and
+$\llik$:
+
+```latex
+$$
+\begin{aligned}
+\Lik_i(\lambda) &= \dens(Y = y_i)
+\\
+\llik_i(\lambda) &= \logf{\Lik_i(\lambda)}
+\end{aligned}
+$$
+```
+
+Three later sections then use those names rather than restating what they
+stand for:
+
+```latex
+\Lik(\lambda) = \prod_{i=1}^n \Lik_i(\lambda)
+\llik(\lambda) = \logf{\prod_{i=1}^n \Lik_i(\lambda)} = \sum_{i=1}^n \llik_i(\lambda)
+U_i = \nabla_\lambda \llik_i(\lambda), \qquad U_c = \sum_{i \in c} U_i
+```
+
+The difference from the states above is scope rather than depth.
+Decomposing an equation where it stands is a tidy-up.
+Naming the concept where it first enters is a convention the rest of the
+document can rely on, and it is what lets a construction repeated across
+sections become visible as redundancy.
+
+### What the decomposition buys
+
+Four specific gains.
+Naming them is what makes the rule checkable rather than a matter of taste,
+and the first three double as the test for when *not* to apply it.
+The fourth arrives only once the naming is thorough in the sense just
+described, and it is the strongest argument for the rule.
+
+1. **The named intermediate becomes independently referenceable.**
+   Surrounding prose can now say something about $U_i$ by name --- that it is
+   the quantity the estimating equation sets to zero, that it is what is
+   assumed independent across clusters --- without restating the gradient
+   each time.
+2. **The structure becomes visible at a glance.**
+   The line defining $U_c$ says that it is a sum over its cluster, and says
+   nothing else.
+   In the inlined form that fact is buried inside a summand.
+3. **Each line can be checked on its own.**
+   A reader verifying the per-observation score never has to hold the cluster
+   summation in mind, and a reader verifying the summation never has to
+   re-read the gradient.
+4. **Redundancy that was invisible becomes visible.**
+   Once the participant likelihood had a name, the same integral turned out
+   to have been written out in three separate sections.
+   Naming it collapsed those to one definition and three references.
+
+That fourth gain makes this a DRY check for mathematical prose, not only a
+readability preference.
+While a concept is inlined it can be silently duplicated, because there is no
+symbol whose repetition would give the duplication away, and each copy looks
+necessary where it sits.
+[`challenge-redundant-content.md`](../workflow/challenge-redundant-content.md)
+is the general form; what is specific to math is that the duplication is
+*undetectable* until the decomposition surfaces it.
+
+The prose improves for the same reason.
+Once the notation stopped carrying the concept's internal structure, the
+point that structure had been making --- that each term is the log of an
+integral, so the derivative does not come out cleanly --- moved into the
+sentence, where it reads better than it did inside an equation.
+
+### When not to decompose
+
+Every named intermediate is another symbol a reader has to carry, so the rule
+has a real cost and a real limit.
+
+A name earns itself when it buys at least one of the first three gains above.
+It does not when the expression is already self-contained and shallow, or
+when the name is used exactly once and never referred to again --- there the
+decomposition enlarges the reader's working set and returns nothing.
+Splitting a simple equation in two to satisfy a rule is the failure this
+limit exists to prevent.
+
+The cost also depends on the name, so choose one the document's existing
+notation already implies.
+A symbol that slots into an established pattern is close to free, because a
+reader who knows the pattern can read it without being taught anything.
+In the example above, `\llik` already denoted the full-sample log-likelihood
+in the document being edited, so `\llik_i` reads immediately as its
+per-observation piece, and summing over $i$ recovers the whole.
+The cheapest names of all are a *mirror pair*: `\Lik_i` and `\llik_i` cost a
+reader nothing beyond the subscript, because `\Lik` and `\llik` were already
+the document's full-sample versions of exactly those quantities.
+A symbol invented for one equation and used nowhere else is the expensive
+kind, and it is the kind most likely to fail the earns-itself test above ---
+so reusability and consistency are what make a name cheap, not brevity.
+
+A name that survives into a later section has settled the question on its
+own.
+Reuse across sections is gain 4 arriving, so a name consumed downstream needs
+no further justification, and the earns-itself test is really a test on names
+that stay local.
+
+Note also what this is not.
+[`use-math-macros`](../../skills/use-math-macros/SKILL.md) condenses the
+*symbols* an expression is written with; this rule reduces the *structure* it
+is built from.
+Macroizing a dense equation makes it shorter on the page while leaving its
+nesting depth untouched, so it is not a substitute for decomposing it.
+
+A name introduced this way is new notation, so it carries notation's usual
+obligations: define it where a reader meets it first, per
+[`definition-crossrefs.md`](definition-crossrefs.md), and give it a formal
+construct rather than only prose when it is doing definitional work, per
+[`informal-definitions.md`](informal-definitions.md).
+
+### The same principle, one medium over
+
+This is [`avoid-nesting.md`](../coding/avoid-nesting.md)'s named-intermediate
+rule applied to mathematical notation rather than to code.
+That fragment prefers a named intermediate variable over `f(g(h(x)))`, on the
+grounds that naming each step makes the flow read top-to-bottom and leaves
+the intermediate values inspectable --- gains 2 and 3 above, in a different
+medium.
+
+The parallel runs to the shape of both fragments, not just their advice.
+Each covers a within-one-expression axis and a between-steps axis, and
+`avoid-nesting.md`'s "prefer more, simpler steps over fewer, denser ones" is
+the counterpart of the skipped-step rule at the top of this file.
+
+### Do and don't
+
+- **Do:** pull a compound sub-expression out into its own named symbol, and
+  write the outer equation in terms of that symbol.
+- **Do:** reapply the rule to the intermediate you just named, and keep going
+  until each line carries one operation.
+- **Do:** stop at the level where an expression names a modeled quantity the
+  reader already accepts at that point in the argument.
+- **Do:** introduce the name where the concept first enters the document, not
+  where you happened to notice the dense equation, so later sections consume
+  it instead of rebuilding it.
+- **Do:** pick a name the document's existing notation already implies, so a
+  reader needs no introduction to it.
+- **Do:** check a proposed name against the first three gains above, and drop it
+  when it buys none of them.
+- **Don't:** unfold past that floor into internal construction the reader has
+  already been asked to accept --- and don't decide the floor from the kind
+  of expression, since the same expression can be a floor in one section and
+  composite in the next.
+- **Don't:** stop at the first decomposition because it is plainly better
+  than what you started with --- that is the state that most reads as
+  finished while still nesting.
+- **Don't:** inline a structure that the surrounding prose then has to
+  describe in words, because it has no name to refer to.
+- **Don't:** split a self-contained expression, or introduce a
+  used-once-never-referenced name, merely to have decomposed something.
+
+### In review
+
+Flag a displayed equation whose operand is itself a compound expression,
+where naming that operand would buy one of the first three gains.
+Give it the weight of the other prose-review findings, raised as a suggestion
+rather than a blocker.
+Propose the decomposed form in the finding rather than only observing that
+the equation is dense, per the drafting step in "Reviewing: name the gap"
+above.
+Flag a partial decomposition too: a diff that names one intermediate and
+leaves that intermediate's own definition nesting, which is the second state
+above.
+Read a decomposition's last line as the place to look, since that is where
+the remaining structure collects.
+Flag the opposite as well: a named intermediate used once and never
+referenced has spent a symbol and bought nothing.
+
+The highest-value finding is the document-scope one, and it is the only one
+that needs more than the diff to see.
+When a diff names a concept, grep the rest of the document for the expression
+that concept replaced --- an unnamed concept is duplicated silently, so the
+copies are found by searching, never by reading the diff.
+A diff that decomposes one equation while two other sections still spell the
+same object out has taken the tidy-up and left the DRY gain on the table.
+
+Flag over-decomposition on the same terms: a diff that unfolds a quantity the
+surrounding argument had already established is making the reader re-open a
+settled point.
+Judge that against where the document is, not against the kind of expression,
+and say which earlier result the reader is being sent back to.
+
+(Three directives from the user, 2026-08-09.
+First: "try keep each equation simple, by decomposing out complicated
+internal structures using extra notation.
+for example, in
+<https://ucd-serg.github.io/serocalculator/pr-preview/pr-654/vignettes/methodology.html#eq-anchor-22>,
+why not define U_i as the score contribution of observation i, and then write
+the score contribution of cluster u as a the sum of the U_i's for i \in c?"
+Then, on the result: "note that you should apply the same principle to the
+definition of U_i; the log-likelihood of observation i should get its own
+notation (something like \llik_i) to make U_i's definition simpler."
+Then, on that result in turn: "go even further: $\Lik_i \eqdef p(Y_i \mid
+\lambda)$ and $\llik_i \eqdef \logf{\Lik_i}$.
+apply the principle thoroughly."
+All three quoted verbatim, typo included; that URL is a PR-preview build and
+will stop resolving once the PR closes.
+
+Applied in `UCD-SERG/serocalculator#654`.
+The recursion point is the second directive's, and it is why this fragment
+treats the one-split version as a near-miss rather than as the fix.
+The document-scope point and gain 4 are the third's: applying it thoroughly
+moved the definitions out of the sandwich-variance section entirely and into
+`@prp-full-sample-likelihood`, where the index $i$ first enters
+(`vignettes/methodology.qmd:791-801`), after which three separate sections
+consumed the names instead of restating the integral --- the full-sample
+product at :807, the numerical-MLE log at :829-834, and the score
+contributions in the cluster-robust section.
+The prose gain is visible at :836, where "each $\llik_i$ is the log of an
+integral, so the derivative of this sum doesn't come out cleanly" now says in
+a sentence what had been buried in the notation.
+
+Both `\Lik` and `\llik` were already the vignette's own notation before this
+change --- it defines `$\Lik(\lambda) \eqdef \dens(\text{data} \mid
+\lambda)$` at :472 and `$\llik(\lambda) \eqdef \logf{\Lik(\lambda)}$` at
+:474 --- which is what made `\Lik_i` and `\llik_i` a cheap mirror pair rather
+than two new symbols to learn.
+
+The stopping rule came out of a follow-up exchange on the same example, from
+the question of whether the atoms of statistical notation are essentially
+always single probability expressions, and the user approved encoding the
+answer.
+It is stated here as a test rather than as a taxonomy because complication 3 is real and checkable in this very document: `@prp-marginal-likelihood` at :746 unfolds `$\dens(Y=y)$` into `$\int_0^a \dens(Y=y\mid T=t)\,\lambda\expf{-\lambda t}\,dt$` plus a never-infected term, so the expression that is the floor in the sandwich-variance section is composite two propositions earlier.)
+
+## Choose display or inline, deliberately
+
+The two axes above ask what happens between displayed lines and what happens inside one.
+This third axis asks whether a line should be displayed at all --- a decision that, left unasked, is usually never made on purpose.
+
+The failure here is not choosing wrong.
+It is never posing the question.
+An equation's form gets inherited from whatever neighbouring equation the author copied it from, so the new equation is correct, it renders, and nothing about it looks unfinished --- which is exactly why it survives self-review.
+Ask the question at write time and again at edit time, for every equation you touch: does this want to be display, or inline?
+
+**Display marks an equation the reader will return to.**
+An equation the surrounding prose cites again later, or that carries the step the section's argument turns on, is display --- set apart from the running text and, wherever the format supports it, labeled so a later mention can point back to it rather than restate it (Quarto's `{#eq-...}` div, a LaTeX `\label{}` inside an `equation` environment).
+A named quantity that is never cited again does not automatically earn this: the test is whether the *argument* returns to it, not merely whether it happens to have a name.
+
+**Inline marks an equation that is a grammatical constituent of its own sentence.**
+"the density $f(t)$ is decreasing on $(0, a)$" reads as one sentence with a symbol standing in for a noun phrase;
+setting $f(t)$ on its own display line breaks that sentence in two for no reason the reader can find, and running prose directly into a display line on either side is the specific defect that neighbour-copying habit produces.
+If removing the equation and reading the sentence aloud with a plain noun phrase in its place still parses, the equation belongs inline.
+
+**A definition or a result states its formula as a display equation.**
+Every technical definition and every theorem, corollary or lemma gets
+a prose sentence saying what it means *and* its formula displayed inside the same block,
+built from terms already defined;
+a formula left inline in the sentence is easy to miss and cannot be labeled.
+A purely descriptive definition with no formula (a kind of plot, a kind of variable) stays prose.
+
+**Two equations meant to be compared must be given the same form as each other.**
+A reader can weigh two expressions side by side only when both are shown at the same scale and in the same position relative to the surrounding text --- both inline, or both display, never one of each.
+Mismatched form silently withdraws the comparison the passage is asking the reader to make, even when each individual equation renders correctly on its own.
+
+### The mechanics are format-specific; the question is not
+
+The decision is the same question on every authoring surface this corpus touches, only the syntax differs:
+
+- **Quarto/LaTeX**: `$...$` for inline, `$$...$$` or an `equation`/`align` environment for display --- and in Quarto specifically, display is also what makes an equation crossreferenceable at all (`{#eq-...}`), so choosing inline for an equation the prose later needs to cite forecloses that citation before it is written.
+- **Word/OOXML**: `<m:oMath>` in a normal run for inline, `<m:oMathPara>` wrapping the `<m:oMath>` for display.
+  The two are structurally distinct elements rather than a style applied to one element, so converting between them means moving the equation into (or out of) the paragraph-level wrapper, not toggling an attribute.
+  `m:oMathPara` does not claim its own line by itself: two separate `w:br` elements do that work, one immediately before it and one as the last child inside `m:oMath`, and either can be missing on its own --- see [`memories/office-open-xml.md`](../../memories/office-open-xml.md)'s "`m:oMathPara` does not claim its own line" section for the exact shape and why that gap looks like a display/inline mistake without being one.
+
+### Do and don't: display versus inline
+
+- **Do:** ask "display or inline?" explicitly for every equation you author or edit, rather than copying the form of the nearest neighbouring equation.
+- **Do:** make an equation display, and label it, when the prose returns to it or when it carries the step the argument is making.
+- **Do:** make an equation inline when it is a grammatical constituent of the sentence around it --- test this by reading the sentence aloud with the equation replaced by a plain noun phrase.
+- **Do:** give two equations meant to be compared the same form and scale as each other.
+- **Do:** display the formula of every definition and result (theorem, corollary, lemma) inside its own block, next to its prose statement.
+- **Don't:** let a fresh equation's form default to whatever markup the equation before it happened to use.
+- **Don't:** treat "it renders correctly" as evidence the display/inline choice was made deliberately --- a correct render is fully compatible with the form having never been decided at all.
+- **Don't:** compare two equations set at different scales and expect the reader to do the normalizing.
+- **Don't:** leave a definition's or result's formula inline in its sentence, where it is easy to miss and cannot be labeled.
+
+### In review: display versus inline
+
+A display equation running directly into the sentence that introduces it, with no separating punctuation or paragraph break, is a symptom rather than a diagnosis, and that symptom is ambiguous between two causes with opposite remedies.
+Either the display/inline choice was wrong and the equation should be inline, or the choice was right and the display mechanics are incomplete --- in Quarto/LaTeX a missing blank line around `$$...$$`, in Word/OOXML a missing `w:br` (see the Word/OOXML bullet above).
+**Check the underlying markup before changing anything.**
+Converting a correctly-display equation to inline because it looks glued to its introducing sentence removes the display form the argument actually needed, and does not fix the missing break that caused the symptom.
+
+Flag the inverse too --- an equation the prose cites again later, written inline with no way to reference it.
+Flag a definition or result whose formula appears only inline, or only in its proof.
+And flag a pair of compared equations set at different scales, since that finding is invisible on the diff of either equation alone;
+it shows only once both are read together.
+
+(Directive from the user, 2026-09-09: "let's make a cai policy: every time you write or edit an equation, ask yourself if it should be a display equation or inline".
+A Word manuscript supplement authored three new equations in one section that session, each correctly authored as display, and each rendering ran directly into the sentence introducing it because the equation's `m:oMathPara` was missing one or both of the surrounding `w:br` breaks described above --- the display/inline choice itself was right throughout.
+A checker written afterward --- per file, counting display equations examined and how many missing-break findings each had on either side --- ran first as a negative control over the three untouched original documents, examining 14 display equations in the supplement, 13 in the response letter and none in the manuscript, and finding nothing in any of them.
+On the supplement's working build it then found 7 missing-break findings across 5 defective equations, and 0 after repair, with the repair keeping all five equations display and adding the missing breaks.
+The finding count and the equation count differ because a single equation can be missing a break on either side or both: three of the five were missing only one side, two were missing both, which is 1 + 1 + 1 + 2 + 2 = 7.
+Two of the five defective equations sat in a different section from the three the author knew about, and neither the author nor the user had noticed those two: the defect carries no text of its own, so a build check that only compares accepted versus rejected text was blind to the defect by construction.)
+
+## Teaching material: exercise, solution, theorem, proof
+
+In course notes and other teaching material,
+present a derivation as one or more exercises,
+each followed by its solution,
+then the theorem that records the result,
+with a short proof that cites the exercises.
+The reader meets each question before its answer,
+and the result itself is easy to find without searching through the working.
+
+- **Do:** give each step its own exercise
+  (each partial derivative, solving the resulting equations, the second-derivative check),
+  put each solution right after its exercise with a matching id
+  (`#exr-foo`, `#sol-foo` in Quarto),
+  define notation the exercises use before them,
+  and make the proof a few sentences citing the exercises.
+- **Don't:** state a theorem and then derive it inside one long proof block,
+  or copy the exercises' working into the proof.
+
+Give each theorem, corollary or lemma block one result.
+Two results joined by a semicolon,
+or set side by side with `\qquad` in one display,
+usually belong in two blocks,
+each with its own exercise and proof,
+so that a later step can cite only the result it uses.
+
+- **Do:** split a theorem, corollary or lemma block whose statement joins two results
+  with a semicolon or a `\qquad`.
+- **Don't:** state two results in one block because they share a setting.
+
+When a derivation would add and subtract a term to turn one side into the other,
+start from the other side and simplify it instead.
+To show $Y_i = \mu_i + \varepsilon_i$ with $\varepsilon_i := Y_i - \mu_i$,
+expand $\mu_i + \varepsilon_i$ to $\mu_i + (Y_i - \mu_i)$ and cancel,
+rather than writing $Y_i = Y_i - \mu_i + \mu_i$:
+every line then follows from a definition or a simplification,
+and none asks the reader to accept a term whose purpose shows only later.
+
+- **Do:** derive an equality from the side that a definition expands.
+- **Don't:** add and subtract a term to reach an expression
+  that starting from the other side would reach by simplifying.
+
+## Prose about a formula: a function versus its value
+
+A function and its value at a point are different objects:
+in $\mu_i = \mu(x_i)$, $\mu$ is a function and $\mu(x_i)$ is a number.
+Written with its placeholder argument, $\mu(x)$ already denotes a value,
+so "the value of $\mu(x)$ at $x_i$" reads as a value of a value.
+Either drop the placeholder ("the value of $\mu$ at $x_i$"),
+or keep it and name the substitution ("$\mu(x)$ evaluated at $x_i$").
+
+- **Do:** write "each outcome is centered on a mean function $\mu(x)$
+  evaluated at that outcome's covariate values",
+  "the value of $f$ at 0" or "$f(0)$",
+  and "$L$ evaluated at $\hat\theta$".
+- **Don't:** combine "the value of" with a placeholder argument,
+  as in "the value of a mean function $\mu(x)$ at its own covariate values"
+  (the first wording of `def-cond-gaussian` in Morrison-Lab/sds#54)
+  or "the value of the density $f(x)$ at 0".

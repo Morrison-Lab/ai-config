@@ -133,6 +133,7 @@ field (e.g. "grab an issue", "drive to clean", "update memories and skills").
 | [`back`](skills/back/SKILL.md) | | Cancel the `away` grant and surface a decision log of what was resolved unattended |
 | [`daytb`](skills/daytb/SKILL.md) | `do-as-you-think-best` | Decide the question at hand yourself and report the choice -- scoped to that task, unlike `away`'s whole-session grant |
 | [`delegate-to-codex`](skills/delegate-to-codex/SKILL.md) | `dtc` | Offload heavy read/draft/verify work to the `codex` CLI before spending Claude quota, with Claude fallback |
+| [`delegate-to-agy`](skills/delegate-to-agy/SKILL.md) | `dta` | Offload work to the Antigravity `agy` CLI (subscription login, local machines only) before spending Claude quota, with Claude fallback |
 | [`delegate-to-opencode`](skills/delegate-to-opencode/SKILL.md) | `dto` | Offload work to OpenCode (Go subscription, hosted Zen free, local Ollama) or OpenRouter models |
 | [`rec`](skills/rec/SKILL.md) | `recommend` | Provide clear, actionable recommendations when presenting choices or questions |
 | [`prompt-me`](skills/prompt-me/SKILL.md) | `pm` | Surface the single most pressing open question (or top N) waiting on user input |

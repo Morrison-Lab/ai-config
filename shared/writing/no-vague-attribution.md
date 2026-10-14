@@ -8,10 +8,8 @@ Each one tells the reader that a source exists and withholds it.
 
 Two rules follow.
 
-- **A source exists:** cite it, with a locator, through the repository's bibliography
-  ([`citations`](citations.md)).
-  If the claim came from a lecturer, a slide deck or an earlier version of the text, say so by name
-  ([`visible-attributions`](visible-attributions.md)).
+- **A source exists:** cite it, with a locator, through the repository's bibliography ([`citations`](citations.md)).
+  If the claim came from a lecturer, a slide deck or an earlier version of the text, say so by name ([`visible-attributions`](visible-attributions.md)).
 - **No source exists:** state the claim in the author's voice and own it ("I expect", "we find in the example below"), or cut it.
 
 A reviewer's "this claim has no citation" asks for the source.

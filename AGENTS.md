@@ -52,6 +52,9 @@ See [`gate-external-communication`](shared/workflow/gate-external-communication.
 
 When authoring analysis figures, prefer `ggplot2` over base graphics wherever the dependency is available or appropriate to add.
 For each plot, consider whether an axis should be extended to show important reference values such as zero.
+Avoid scientific notation in axis tick labels where feasible (Ezra, 2026-10-13):
+use plain or comma-formatted labels (`scales::label_comma()` or `label_number()` in ggplot2, a plain `ScalarFormatter` in matplotlib, `tickformat` in plotly, `toLocaleString` in Observable Plot),
+or rescale the units and say so in the axis title.
 One equation per display line unless a reason favors more;
 one `=` per math line ([details](shared/writing/math-derivation-steps.md)).
 Label every display equation so it receives an equation number and a stable URL.

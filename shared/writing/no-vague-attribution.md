@@ -21,6 +21,5 @@ Trace it to its origin first (a slide, a paper, a prior version of the page).
 The origin is usually the right citation, or shows the claim is not worth keeping.
 
 Case: lds#935 (2026-10-14).
-A remark repeated "variance usually dominates the risk" from a lecturer's slides.
-A review bot noted the missing citation, and the first fix replaced "usually" with "instructors often observe".
-That fix hid that the claim was one lecturer's.
+A review bot flagged an uncited claim from a lecturer's slides.
+The first fix wrote "instructors often observe", which hid that it was one lecturer's.

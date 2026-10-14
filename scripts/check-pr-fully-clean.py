@@ -3552,7 +3552,33 @@ def check_latest_verdict(
 
 
 _REVIEW_STRUCTURE_HEADING = re.compile(
-    r"(?im)^#{1,6}\s*(?:(?:Review\s+)?Summary|(?:Critical\s+|Actionable\s+)?Findings|Verdict)\b"
+    r"(?im)^#{1,6}\s*(?:"
+    r"(?:[\[\(]?\d+[.)\]]?\s*)?"
+    r"(?:"
+    r"(?:(?:Review|Executive)\s+)?Summary"
+    r"|(?:Status\s+of\s+(?:Previous\s+)?)?(?:Critical\s+|Actionable\s+|Detailed\s+|Blocking\s+|Non-Blocking\s+|New\s+)?(?:Findings|Defects)"
+    r"|(?:Summary\s+|Review\s+|Final\s+)?Verdict"
+    r")"
+    r")\b"
+)
+_REPORT_SECTION_HEADING = re.compile(
+    r"(?im)^#{1,6}\s*(?:"
+    r"(?:[\[\(]?\d+[.)\]]?\s*)?"
+    r"(?:"
+    r"(?:(?:Review|Executive)\s+)?Summary(?!\s+Verdict\b)"
+    r"|(?:Status\s+of\s+(?:Previous\s+)?)?(?:Critical\s+|Actionable\s+|Detailed\s+|Blocking\s+|Non-Blocking\s+|New\s+)?(?:Findings|Defects)"
+    r")"
+    r")\b"
+)
+_VERDICT_STRUCTURE_RE = re.compile(
+    r"(?im)(?:^#{1,6}\s*(?:(?:[\[\(]?\d+[.)\]]?\s*)?(?:Summary\s+|Review\s+|Final\s+)?Verdict)\b"
+    r"|^(?:\*{1,3}|_{1,3})?Verdict(?:\*{1,3}|_{1,3})?:[ \t]*\S)"
+)
+_REVIEWED_COMMIT_LINE = re.compile(
+    r"(?im)^\*{0,2}(?:Reviewed[- ]Commit|Review(?:ed)?[- ]for[- ]commit|Commit)\*{0,2}[ \t]*:"
+)
+_HEADER_COMMIT_RE = re.compile(
+    r"(?im)^#{1,6}\s*.*?\b(?:of|at|commit)\s+([0-9a-f]{7,40})\b"
 )
 _MULTI_BACKTICK_SPAN_RE = re.compile(
     r"(?<!`)(`{2,})(?!`)(?:[^\n\r]|\r?\n(?![ \t]*\r?\n))*?(?<!`)\1(?!`)"
@@ -3625,23 +3651,34 @@ def _blank_fences_and_spans(body: str) -> str:
 def _is_structured_review_body(body: str) -> bool:
     """True when *body* is shaped like a review REPORT rather than prose.
 
-    Requires both a report heading (Summary / Findings / Verdict families)
-    and a Reviewed-Commit fingerprint line, tested over the CITED-VOCAB
-    STRIPPED body so a casual comment quoting a prior report inside a
-    fence or code span cannot smuggle the structure in (#1202/#2525). The two
-    together are what a pre-push-review or adversarial-self-review report
-    always carries and conversational prose does not, which is what keeps
-    #1798's false-CLEAN direction closed while #2402's supersession path
-    opens.
+    Requires report structure (#4425):
+    - A report heading (Summary / Findings / Defects / Verdict families,
+      including numbered variants like `### 2. Blocking Defects` or `### (1) Blocking findings`),
+      and/or a line-start `Verdict:` label.
+    - And a commit fingerprint: either a `Reviewed-Commit:` line, or a header
+      referencing the reviewed commit (e.g. `## Cross-harness review ... of <sha>`).
+
+    Tested over the CITED-VOCAB STRIPPED body so a casual comment quoting a
+    prior report inside a fence or code span cannot smuggle the structure in
+    (#1202/#2525). The structure keeps #1798's false-CLEAN direction closed while
+    #2402's and #4425's supersession path opens.
     """
     if not body:
         return False
     blanked = _blank_fences_and_spans(body)
     scan = strip_cited_finding_vocab(blanked)
-    if not _REVIEW_STRUCTURE_HEADING.search(scan):
+
+    has_structure = bool(
+        _REVIEW_STRUCTURE_HEADING.search(scan)
+        or _VERDICT_STRUCTURE_RE.search(scan)
+    )
+    if not has_structure:
         return False
-    return bool(re.search(
-        r"(?im)^\*{0,2}Reviewed[- ]Commit\*{0,2}[ \t]*:", scan))
+
+    has_fingerprint = bool(
+        _REVIEWED_COMMIT_LINE.search(scan) or _HEADER_COMMIT_RE.search(scan)
+    )
+    return has_fingerprint
 
 
 def _commit_activity(pr) -> Dict[str, str]:

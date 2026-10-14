@@ -244,6 +244,14 @@ def main():
           not run(M5 + " && git push origin b", [step(IC + "5" + R, OUT5)])[0])
     check("silent: earlier clean run, merge command with no push",
           not run(M5, [step(IC + "5" + R, OUT5)])[0])
+    check("warns: nested bash -c push ahead of merge stales earlier run",
+          run("bash -c 'git push origin b' && " + M5, [step(IC + "5" + R, OUT5)])[0])
+    check("warns: push ahead of nested bash -c merge stales earlier run",
+          run("git push origin b && bash -c '" + M5 + "'", [step(IC + "5" + R, OUT5)])[0])
+    check("warns: nested bash -c with push and then merge stales earlier run",
+          run("bash -c 'git push origin b && " + M5 + "'", [step(IC + "5" + R, OUT5)])[0])
+    check("silent: nested bash -c with merge and then push keeps earlier run",
+          not run("bash -c '" + M5 + " && git push origin b'", [step(IC + "5" + R, OUT5)])[0])
     check("warns on a PowerShell-keyed merge that pushes first",
           run("", [step(IC + "5" + R, OUT5)], tool_input={
               "CommandLine": "git push origin b; " + M5})[0])

@@ -413,16 +413,25 @@ def _covers(run, num, repo):
 
 def _push_before_merge(command):
     """True when *command* runs a `git push` ahead of a `gh pr merge`, which
-    makes every earlier instrument run stale."""
-    pushed = False
-    for line in shell_c_expansions(command):
+    makes every earlier instrument run stale.
+
+    Order is known only within one expansion piece; push and merge in different
+    `bash -c` pieces are treated as unordered, so the push conservatively
+    stales earlier runs.
+    """
+    events = []
+    for piece, line in enumerate(shell_c_expansions(command)):
         for argv in simple_commands(line) or []:
             parsed = git_subcommand(argv)
             if parsed and parsed[0] == "push":
-                pushed = True
-            elif pushed and _gh_merge(strip_env(argv)[1]):
-                return True
-    return False
+                events.append(("push", piece))
+            elif _gh_merge(strip_env(argv)[1]):
+                events.append(("merge", piece))
+    pushes = [(i, p) for i, (k, p) in enumerate(events) if k == "push"]
+    merges = [(i, p) for i, (k, p) in enumerate(events) if k == "merge"]
+    if not pushes or not merges:
+        return False
+    return any(pp != mp or pi < mi for pi, pp in pushes for mi, mp in merges)
 
 
 def _strict_chain_discharged(command):

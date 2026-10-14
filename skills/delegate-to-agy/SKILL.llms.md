@@ -65,7 +65,27 @@ Poll for `$WORK/DONE` in a background Bash task, as `delegate-to-codex` does. A 
 - Re-derive every number it reports. `agy` has miscounted lines while reading correctly.
 - Do not edit the allow list or skip permissions on your own to make a run succeed. On Linux 1.3.4 a command outside `permissions.allow` in `~/.gemini/antigravity-cli/settings.json` was auto-denied, so the list does gate headless runs. Upstream issue \#548 reports that some versions ignore that file’s `command()` grants, so smoke-test a rule before relying on it. The allow list is Ezra’s call. The memory allows `--dangerously-skip-permissions` only for a fully trusted brief, and this skill never uses it. For read-only work, embed the material in the brief instead.
 
-### 5. Fall back for failures only
+### 5. Posting a cross-harness review to a PR
+
+When posting an `agy` review to a PR under a user or Remote Control session, always wrap the output in a standardized header and verdict structure:
+
+``` markdown
+## Cross-harness review (Antigravity agy CLI) of <HEAD_SHA>
+
+Reviewed-Commit: <HEAD_SHA>
+
+<verbatim agy output>
+
+### Verdict
+
+Verdict: <Clean or Needs more work>
+
+_Posted by Antigravity (AI agent) --- not written by a human._
+```
+
+This ensures `check-pr-fully-clean.py` admits the review by construction and allows a clean verdict to supersede any earlier standing not-clean verdicts (#4425).
+
+### 6. Fall back for failures only
 
 If a run fails, times out or returns nothing, redo only those items on OpenCode Go. Use a Claude subagent only for a reviewer, per the 2026-09-09 directive. No memory entry records what `agy` prints when the subscription window is exhausted, so treat an unexplained failure on every item as possible exhaustion, and say so in the report. If the whole window is exhausted, fall back to Claude in the current session, never to a metered API.
 

@@ -380,6 +380,7 @@ cookieconsent.run({
   <li><a href="#when-this-fires" id="toc-when-this-fires" class="nav-link" data-scroll-target="#when-this-fires">When this fires</a></li>
   <li><a href="#usage" id="toc-usage" class="nav-link" data-scroll-target="#usage">Usage</a></li>
   <li><a href="#how-it-works" id="toc-how-it-works" class="nav-link" data-scroll-target="#how-it-works">How it works</a></li>
+  <li><a href="#posting-review-output-to-a-pr" id="toc-posting-review-output-to-a-pr" class="nav-link" data-scroll-target="#posting-review-output-to-a-pr">Posting review output to a PR</a></li>
   <li><a href="#related" id="toc-related" class="nav-link" data-scroll-target="#related">Related</a></li>
   </ul></li>
   </ul>
@@ -436,6 +437,22 @@ cookieconsent.run({
 <li>Parses and validates the structured review findings.</li>
 <li>Exits with a nonzero code on blocking findings (unless <code>--allow-findings</code> is specified).</li>
 </ol>
+</section>
+<section id="posting-review-output-to-a-pr" class="level2">
+<h2 class="anchored" data-anchor-id="posting-review-output-to-a-pr">Posting review output to a PR</h2>
+<p>When posting the review result to a PR comment under a user login (e.g.&nbsp;from local or Remote Control sessions), wrap the output in a header and verdict structure:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">## Cross-harness review (&lt;engine&gt;) of &lt;HEAD_SHA&gt;</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>Reviewed-Commit: <span class="dt">&lt;</span><span class="kw">HEAD_SHA</span><span class="dt">&gt;</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="dt">&lt;</span><span class="kw">verbatim</span><span class="ot"> review output</span><span class="dt">&gt;</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="fu">### Verdict</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>Verdict: <span class="dt">&lt;</span><span class="kw">Clean</span><span class="ot"> or Needs more work</span><span class="dt">&gt;</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>_Posted by &lt;Agent Name&gt; (AI agent) --- not written by a human._</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>This ensures <code>check-pr-fully-clean.py</code> admits the review by construction and allows a clean verdict to supersede any earlier standing not-clean comments (#4425).</p>
 </section>
 <section id="related" class="level2">
 <h2 class="anchored" data-anchor-id="related">Related</h2>

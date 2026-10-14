@@ -386,7 +386,8 @@ cookieconsent.run({
   <li><a href="#write-a-self-contained-brief" id="toc-write-a-self-contained-brief" class="nav-link" data-scroll-target="#write-a-self-contained-brief">2. Write a self-contained brief</a></li>
   <li><a href="#dispatch-headless-in-the-background" id="toc-dispatch-headless-in-the-background" class="nav-link" data-scroll-target="#dispatch-headless-in-the-background">3. Dispatch headless, in the background</a></li>
   <li><a href="#verify-what-came-back" id="toc-verify-what-came-back" class="nav-link" data-scroll-target="#verify-what-came-back">4. Verify what came back</a></li>
-  <li><a href="#fall-back-for-failures-only" id="toc-fall-back-for-failures-only" class="nav-link" data-scroll-target="#fall-back-for-failures-only">5. Fall back for failures only</a></li>
+  <li><a href="#posting-a-cross-harness-review-to-a-pr" id="toc-posting-a-cross-harness-review-to-a-pr" class="nav-link" data-scroll-target="#posting-a-cross-harness-review-to-a-pr">5. Posting a cross-harness review to a PR</a></li>
+  <li><a href="#fall-back-for-failures-only" id="toc-fall-back-for-failures-only" class="nav-link" data-scroll-target="#fall-back-for-failures-only">6. Fall back for failures only</a></li>
   </ul></li>
   <li><a href="#relationship-to-other-skills" id="toc-relationship-to-other-skills" class="nav-link" data-scroll-target="#relationship-to-other-skills">Relationship to other skills</a></li>
   <li><a href="#anti-patterns" id="toc-anti-patterns" class="nav-link" data-scroll-target="#anti-patterns">Anti-patterns</a></li>
@@ -486,8 +487,24 @@ cookieconsent.run({
 <li>Do not edit the allow list or skip permissions on your own to make a run succeed. On Linux 1.3.4 a command outside <code>permissions.allow</code> in <code>~/.gemini/antigravity-cli/settings.json</code> was auto-denied, so the list does gate headless runs. Upstream issue #548 reports that some versions ignore that file’s <code>command()</code> grants, so smoke-test a rule before relying on it. The allow list is Ezra’s call. The memory allows <code>--dangerously-skip-permissions</code> only for a fully trusted brief, and this skill never uses it. For read-only work, embed the material in the brief instead.</li>
 </ul>
 </section>
+<section id="posting-a-cross-harness-review-to-a-pr" class="level3">
+<h3 class="anchored" data-anchor-id="posting-a-cross-harness-review-to-a-pr">5. Posting a cross-harness review to a PR</h3>
+<p>When posting an <code>agy</code> review to a PR under a user or Remote Control session, always wrap the output in a standardized header and verdict structure:</p>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb3"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">## Cross-harness review (Antigravity agy CLI) of &lt;HEAD_SHA&gt;</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>Reviewed-Commit: <span class="dt">&lt;</span><span class="kw">HEAD_SHA</span><span class="dt">&gt;</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="dt">&lt;</span><span class="kw">verbatim</span><span class="ot"> agy output</span><span class="dt">&gt;</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="fu">### Verdict</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>Verdict: <span class="dt">&lt;</span><span class="kw">Clean</span><span class="ot"> or Needs more work</span><span class="dt">&gt;</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>_Posted by Antigravity (AI agent) --- not written by a human._</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>This ensures <code>check-pr-fully-clean.py</code> admits the review by construction and allows a clean verdict to supersede any earlier standing not-clean verdicts (#4425).</p>
+</section>
 <section id="fall-back-for-failures-only" class="level3">
-<h3 class="anchored" data-anchor-id="fall-back-for-failures-only">5. Fall back for failures only</h3>
+<h3 class="anchored" data-anchor-id="fall-back-for-failures-only">6. Fall back for failures only</h3>
 <p>If a run fails, times out or returns nothing, redo only those items on OpenCode Go. Use a Claude subagent only for a reviewer, per the 2026-09-09 directive. No memory entry records what <code>agy</code> prints when the subscription window is exhausted, so treat an unexplained failure on every item as possible exhaustion, and say so in the report. If the whole window is exhausted, fall back to Claude in the current session, never to a metered API.</p>
 </section>
 </section>

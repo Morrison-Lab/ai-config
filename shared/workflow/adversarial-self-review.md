@@ -89,6 +89,16 @@ Python `urllib` (or `requests`) gets HTTP 403 from the agent proxy and cannot be
 On per-model 502 upstream errors,
 loop over candidate models (`deepseek-v4-pro`, `kimi-k3`, `qwen3.8-max`, `glm-5.3`).
 
+When posting a cross-harness review result to a PR comment from a non-bot session
+(such as a local or Remote Control session under a user login),
+wrap the verbatim output in a standardized envelope:
+a header naming the reviewed commit (`## Cross-harness review (<harness>) of <head_sha>`),
+an explicit `Reviewed-Commit: <head_sha>` line,
+and a `### Verdict` heading plus line-start `Verdict:` label.
+This admits the review into `check-pr-fully-clean.py` by construction
+and allows a clean verdict to supersede any earlier standing vetoes
+(ai-config#4425).
+
 A Needs-more-work verdict blocks until a compliant re-dispatch returns
 all-clear at the new head.
 A skip notice, a stub, or a stale-head verdict clears nothing.
@@ -113,6 +123,10 @@ The merge-side rules live with the gate they serve:
   claude only for sessions authored outside Claude,
   or cursor once its headless dispatch is measured),
   and report which harness produced each verdict.
+- **Do:** when posting a cross-harness review to a PR under a user login,
+  wrap the verbatim output with a commit header,
+  `Reviewed-Commit: <sha>`,
+  and a `### Verdict` heading so it is admitted by construction (#4425).
 - **Don't:** merge anything --- under any grant, `mwc` included ---
   without a 100% all-clear adversarial verdict at the shipping head.
   A skip notice, a stub, an older-head verdict,

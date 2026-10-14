@@ -48,6 +48,26 @@ python3 "$REVIEW_SCRIPT" --engine codex
 3.  Parses and validates the structured review findings.
 4.  Exits with a nonzero code on blocking findings (unless `--allow-findings` is specified).
 
+## Posting review output to a PR
+
+When posting the review result to a PR comment under a user login (e.g. from local or Remote Control sessions), wrap the output in a header and verdict structure:
+
+``` markdown
+## Cross-harness review (<engine>) of <HEAD_SHA>
+
+Reviewed-Commit: <HEAD_SHA>
+
+<verbatim review output>
+
+### Verdict
+
+Verdict: <Clean or Needs more work>
+
+_Posted by <Agent Name> (AI agent) --- not written by a human._
+```
+
+This ensures `check-pr-fully-clean.py` admits the review by construction and allows a clean verdict to supersede any earlier standing not-clean comments (#4425).
+
 ## Related
 
 - `pre-push-review`: The underlying script and skill for pre-push reviews.

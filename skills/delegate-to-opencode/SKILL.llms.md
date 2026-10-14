@@ -179,7 +179,23 @@ rm -f "$PAYLOAD_FILE"
 - **Don’t:** send non-streaming requests for anything longer than a short prompt; the roughly 30-second gateway cutoff returns 502 or upstream request failure.
 - **Don’t:** rely on `glm-5.3` for large prompts; it can stream megabytes of empty deltas or fail upstream.
 
-Reuse one UUID across the turns of a conversation. Prefer Go models for bulk and mechanical work while Claude quota is low. The data rules above still apply: no student data (FERPA records) and no PHI to any hosted model. Review work must also meet the model-and-harness independence rule in [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md). Never use Codex for this routing.
+Reuse one UUID across the turns of a conversation. Prefer Go models for bulk and mechanical work while Claude quota is low. The data rules above still apply: no student data (FERPA records) and no PHI to any hosted model. Review work must also meet the model-and-harness independence rule in [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md). When posting an OpenCode review result to a PR comment under a user login (e.g. from local or Remote Control sessions), wrap the output in a standardized envelope:
+
+``` markdown
+## Cross-harness review (OpenCode <model>) of <HEAD_SHA>
+
+Reviewed-Commit: <HEAD_SHA>
+
+<verbatim review output>
+
+### Verdict
+
+Verdict: <Clean or Needs more work>
+
+_Posted by <Agent Name> (AI agent) --- not written by a human._
+```
+
+This ensures `check-pr-fully-clean.py` admits the review by construction and allows a clean verdict to supersede any earlier standing not-clean comments (#4425). Never use Codex for this routing.
 
 ## Where opencode sits in the budget ladder
 

@@ -30,7 +30,8 @@ and frameworks used in this project.
 
 ## Lab Manual & Multi-Harness Integration (UCD-SERG)
 
-- **Source Reference**: [Principles of Scientific Computing](https://github.com/Morrison-Lab/psc) for coding style; [UCD-SERG Lab Manual](https://github.com/UCD-SERG/lab-manual) for SERG collaboration conventions
+- **Source Reference**: [Principles of Scientific Computing](https://github.com/Morrison-Lab/psc) for coding style;
+  [UCD-SERG Lab Manual](https://github.com/UCD-SERG/lab-manual) for SERG collaboration conventions
 - **Semantic Line Breaks (SemBr)**: Break markdown lines at semantic sentence boundaries and clause breaks for clear, mergeable git diffs.
 - **ASCII Compatibility**: Shared documentation fragments under `shared/` must remain pure ASCII (e.g., `---` for em-dashes, straight quotes) to pass lab manual submodule validation.
 - **Agent Attribution**: Forge comments must include explicit agent disclosure markers.

@@ -80,6 +80,15 @@ and an author-dispatched subagent verdict never satisfies that external gate.
 What is added: a merge additionally requires
 the author-dispatched cross-model, cross-harness reviewer's
 100% all-clear adversarial verdict at the shipping head.
+
+In a cloud session (e.g. claude.ai) where no external CLI tools are installed,
+OpenCode Go over HTTP serves as the cross-harness reviewer (see [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md)).
+The cloud session's agent proxy injects credentials for `curl` to `https://opencode.ai/zen/go/v1/chat/completions` with `"stream": true`,
+piped into `skills/delegate-to-opencode/scripts/parse-sse.py`.
+Python `urllib` (or `requests`) gets HTTP 403 from the agent proxy and cannot be used.
+On per-model 502 upstream errors,
+loop over candidate models (`deepseek-v4-pro`, `kimi-k3`, `qwen3.8-max`, `glm-5.3`).
+
 A Needs-more-work verdict blocks until a compliant re-dispatch returns
 all-clear at the new head.
 A skip notice, a stub, or a stale-head verdict clears nothing.

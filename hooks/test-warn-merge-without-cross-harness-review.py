@@ -159,12 +159,37 @@ def main():
     fired, out = run("gh pr merge 12 --squash || gh pr merge 12 --merge", [])
     check("warns naming a repeated PR once",
           fired and "PR #12 " in (out or {}).get("systemMessage", ""))
+    ctx = ((out or {}).get("hookSpecificOutput") or {}).get("additionalContext", "")
+    check("warns with clean un-duplicated text naming the gate",
+          fired and "the gate's own answer is that the merge waits for a human" in ctx)
+    check("warns after an opencode.ai install script curl",
+          run(MERGE, [step("curl -fsSL https://opencode.ai/install | bash")])[0])
+    check("warns after an opencode.ai models endpoint curl",
+          run(MERGE, [step("curl -s https://opencode.ai/zen/go/v1/models")])[0])
+    check("warns after an opencode.ai docs endpoint curl",
+          run(MERGE, [step("curl https://opencode.ai/docs")])[0])
+    check("warns after a look-alike host curl",
+          run(MERGE, [step("curl -s https://opencode.ai.example.com/zen/go/v1/chat/completions -d '{\"model\":\"kimi-k3\"}'")])[0])
+    check("warns after an opencode.ai curl with --help",
+          run(MERGE, [step("curl --help https://opencode.ai/zen/go/v1/chat/completions -d '{\"model\":\"kimi-k3\"}'")])[0])
+    check("warns after an opencode.ai curl with no payload",
+          run(MERGE, [step("curl -s https://opencode.ai/zen/go/v1/chat/completions")])[0])
 
     # --- silent -----------------------------------------------------------
     check("silent after a codex run following the last push",
           not run(MERGE, [PUSH, CODEX])[0])
     check("silent after an opencode run",
           not run(MERGE, [OPENCODE])[0])
+    check("silent after a curl call to opencode.ai chat completions",
+          not run(MERGE, [step("curl -s https://opencode.ai/zen/go/v1/chat/completions -d '{\"model\":\"kimi-k3\"}'")])[0])
+    check("silent after a curl call with --json to opencode.ai",
+          not run(MERGE, [step("curl -s https://opencode.ai/zen/go/v1/chat/completions --json '{\"model\":\"kimi-k3\"}'")])[0])
+    check("silent after a curl call with combined -sd flags to opencode.ai",
+          not run(MERGE, [step("curl -sd '{\"model\":\"kimi-k3\"}' https://opencode.ai/zen/go/v1/chat/completions")])[0])
+    check("silent after a timeout-wrapped curl call to opencode.ai",
+          not run(MERGE, [step("timeout 900 curl -s https://opencode.ai/zen/go/v1/chat/completions -d '{\"model\":\"kimi-k3\"}'")])[0])
+    check("silent after a timeout call with no duration on curl",
+          not run(MERGE, [step("timeout curl -s https://opencode.ai/zen/go/v1/chat/completions -d '{\"model\":\"kimi-k3\"}'")])[0])
     check("silent after the dtc skill plus the codex call it makes",
           not run(MERGE, [skill("dtc"), CODEX])[0])
     check("silent after an env-prefixed codex call",

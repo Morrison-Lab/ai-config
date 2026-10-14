@@ -231,9 +231,41 @@ for line in sys.stdin:
   In testing, it sent ~4.8 MB of deltas in 290 seconds with no `delta.content` before timing out, or returned `upstream request failed`.
   Prefer `deepseek-v4-pro` for review-sized or multi-KB prompts.
 
+**Python `urllib` returns 403 Forbidden; always use `curl`.**
+In a claude.ai cloud session (as observed on 2026-10-13), HTTP requests made via Python's `urllib` (or `requests`) to `https://opencode.ai/zen/go/v1/chat/completions` fail with `403 Forbidden` from the cloud agent proxy, while `curl` with the identical body and headers returns `200 OK`.
+Always invoke `curl` in shell commands rather than Python HTTP libraries when calling the OpenCode Go API in cloud sessions.
+
+**Per-model 502 upstream errors and fallback loop:**
+Both `glm-5.3` and `deepseek-v4-pro` can intermittently return `502 upstream request failed` (as observed on 2026-10-13) even on short diffs (e.g. 1 KB), while `kimi-k3` answers.
+When dispatching a review in a cloud session, implement a fallback loop over candidate models (`deepseek-v4-pro`, `kimi-k3`, `qwen3.8-max`, `glm-5.3`) so a single model's transient 502 does not block the review:
+
+```bash
+set -o pipefail 2>/dev/null || true
+PAYLOAD_FILE=$(mktemp)
+trap 'rm -f "$PAYLOAD_FILE"' EXIT
+for model in deepseek-v4-pro kimi-k3 qwen3.8-max glm-5.3; do
+  echo "Attempting review with $model..."
+  # Build payload into a file to avoid Linux MAX_ARG_STRLEN (128 KiB) limits on large diffs
+  python3 -c "import json, sys; json.dump({'model': sys.argv[1], 'stream': True, 'messages': [{'role': 'user', 'content': 'Review this diff:\n' + sys.stdin.read()}]}, open(sys.argv[2], 'w'))" "$model" "$PAYLOAD_FILE" < diff.patch
+  if curl -N -s --max-time 900 https://opencode.ai/zen/go/v1/chat/completions \
+    -H "Content-Type: application/json" \
+    -H "x-opencode-session: $(python3 -c 'import uuid; print(uuid.uuid4())')" \
+    --data-binary "@$PAYLOAD_FILE" \
+    | python3 skills/delegate-to-opencode/scripts/parse-sse.py > review.txt && [ -s review.txt ]; then
+    break
+  fi
+done
+rm -f "$PAYLOAD_FILE"
+[ -s review.txt ] || { echo "Error: all candidate models failed" >&2; false; }
+```
+
 - **Do:** send `"stream": true` and assemble `delta.content` chunks for review-sized prompts.
 - **Do:** run streaming requests with a generous `--max-time` (e.g. `--max-time 900`) in the background.
 - **Do:** prefer `deepseek-v4-pro` over `glm-5.3` for large prompts or reviews in cloud sessions.
+- **Do:** use `curl` rather than Python `urllib` in cloud sessions;
+  the cloud agent proxy returns 403 Forbidden to `urllib`.
+- **Do:** loop over candidate models (`deepseek-v4-pro`, `kimi-k3`, `qwen3.8-max`, `glm-5.3`) on 502 upstream failures.
+- **Don't:** use Python `urllib` to call the OpenCode Go API in cloud sessions.
 - **Don't:** send non-streaming requests for anything longer than a short prompt;
   the roughly 30-second gateway cutoff returns 502 or upstream request failure.
 - **Don't:** rely on `glm-5.3` for large prompts;

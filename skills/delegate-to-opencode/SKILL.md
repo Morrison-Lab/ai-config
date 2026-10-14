@@ -177,12 +177,67 @@ Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402.
 - `/responses` and `/models` also exist; `/models` lists every id.
 - Send a stable `x-opencode-session` UUID header for each conversation, or the request fails with 400 `MissingSessionID`.
 
+A non-streaming call works for short prompts (such as a smoke test):
+
 ```bash
 curl -s https://opencode.ai/zen/go/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "x-opencode-session: $(python3 -c 'import uuid; print(uuid.uuid4())')" \
   -d '{"model": "glm-5.3", "messages": [{"role": "user", "content": "Reply with exactly the word: PONG"}]}'
 ```
+
+**Non-streaming requests fail for review-sized or substantial prompts.**
+Measured in a claude.ai cloud session on 2026-10-12, a non-streaming request with a ~22 KB diff failed:
+`glm-5.3` returned HTTP 502 after about 30 seconds,
+and `deepseek-v4-pro` returned an empty body with `upstream request failed` (while a `PONG` smoke test on the same endpoint returned 200 in 1.8 seconds).
+The roughly 30-second gateway cutoff requires streaming for anything longer than a trivial prompt.
+
+**Always stream review-sized prompts and assemble `delta.content` chunks.**
+Add `"stream": true` to the payload, pass a generous `--max-time` (e.g. 600 or 900 seconds), and pipe into `scripts/parse-sse.py` (or an inline Python extractor):
+
+```bash
+curl -N -s --max-time 900 https://opencode.ai/zen/go/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "x-opencode-session: $(python3 -c 'import uuid; print(uuid.uuid4())')" \
+  -d '{"model": "deepseek-v4-pro", "stream": true, "messages": [{"role": "user", "content": "Review this diff:\n..."}]}' \
+  | python3 skills/delegate-to-opencode/scripts/parse-sse.py
+```
+
+Inline extractor alternative if running without the helper script:
+
+```bash
+python3 -c '
+import json, sys
+for line in sys.stdin:
+    line = line.strip()
+    if line.startswith("data:"):
+        chunk = line[5:].strip()
+        if chunk == "[DONE]":
+            break
+        try:
+            d = json.loads(chunk)
+            c = d.get("choices", [{}])[0].get("delta", {}).get("content", "")
+            if c:
+                sys.stdout.write(c)
+                sys.stdout.flush()
+        except json.JSONDecodeError:
+            pass
+'
+```
+
+**Model reliability for large prompts in cloud sessions:**
+- `deepseek-v4-pro`: Verified reliable with `"stream": true` on review-sized prompts, returning complete reviews over several minutes.
+- `glm-5.3`: Unreliable on large prompts even when streaming.
+  In testing, it sent ~4.8 MB of deltas in 290 seconds with no `delta.content` before timing out, or returned `upstream request failed`.
+  Prefer `deepseek-v4-pro` for review-sized or multi-KB prompts.
+
+- **Do:** send `"stream": true` and assemble `delta.content` chunks for review-sized prompts.
+- **Do:** run streaming requests with a generous `--max-time` (e.g. `--max-time 900`) in the background.
+- **Do:** prefer `deepseek-v4-pro` over `glm-5.3` for large prompts or reviews in cloud sessions.
+- **Don't:** send non-streaming requests for anything longer than a short prompt;
+  the roughly 30-second gateway cutoff returns 502 or upstream request failure.
+- **Don't:** rely on `glm-5.3` for large prompts;
+  it can stream megabytes of empty deltas or fail upstream.
 
 Reuse one UUID across the turns of a conversation.
 Prefer Go models for bulk and mechanical work while Claude quota is low.

@@ -69,7 +69,7 @@ If the binary is off `PATH`, search for it before concluding it is absent (`memo
 
 Headless `agy` cannot read repo files or run `git diff` on its own.
 Embed the full text of every file the task needs, and for a review embed the diff too, regenerated before every re-dispatch round.
-Write the brief to a scratchpad file with the Write tool, not a heredoc.
+Set `WORK=<scratchpad>/agy-run` and write the brief to `$WORK/prompt.txt` with the Write tool, not a heredoc.
 Embed anything from the network yourself.
 Keep the brief under about 100 KB.
 The prompt travels as one command-line argument, and Linux caps a single argument at 128 KiB (not measured with `agy`).
@@ -96,7 +96,7 @@ A `nohup` launcher returning is not the run finishing.
 - **Exit 0 proves nothing.**
   A denied tool exits 0 with `jetski: no output produced --- a tool required the "<tool>" permission that headless mode cannot prompt for, so it was auto-denied`.
   Read `$WORK/err.txt` and `$WORK/out.txt` for that line, and treat empty output or an `Argument list too long` error as a failure.
-`DONE` appears whether the run succeeded or not.
+  `DONE` appears whether the run succeeded or not.
 - A run can also print a "Completed Work Summary" naming files it never wrote.
   Run `git diff` after any dispatch that might have touched the repo.
 - Re-derive every number it reports.
@@ -120,6 +120,7 @@ If the whole window is exhausted, fall back to Claude in the current session, ne
 - [`delegate-to-codex`](../delegate-to-codex/SKILL.md): the same background-and-poll pattern, for the ChatGPT plan (UCDH projects only).
 - [`delegate-to-opencode`](../delegate-to-opencode/SKILL.md): the cloud-session destination.
 - [`adv`](../adv/SKILL.md): a cross-vendor adversarial review can run through `agy`.
+  The pre-push hook accepts a review only as the sole Bash command in the shape `agy --print '<prompt>'` (`memories/delegation.md`, 2026-09-09 section), so this skill's background launcher does not discharge it.
 - [`agy-review-workflow`](../agy-review-workflow/SKILL.md): the retired API-dispatch workflow, separate from the CLI route.
   Do not dispatch it.
 

@@ -5817,6 +5817,38 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ),
     )
     check(
+        "_is_structured_review_body: Defect Findings and singular Defect headings are recognized (#4425)",
+        checker._is_structured_review_body(
+            "### 2. Defect Findings\nNone.\n\n"
+            "Verdict: Ready for merge\n\n"
+            "Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\n"
+        ) and checker._is_structured_review_body(
+            "### 1. Defect\nNone.\n\n"
+            "Verdict: Ready for merge\n\n"
+            "Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\n"
+        ) and checker._is_structured_review_body(
+            "### 2. Blocking Defect\nNone.\n\n"
+            "Verdict: Ready for merge\n\n"
+            "Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\n"
+        ),
+    )
+    check(
+        "_is_structured_review_body: non-review headers with numbers or prepositions do not qualify as commit fingerprints (#4425 control)",
+        not checker._is_structured_review_body(
+            "## Discussion of 1234567\n\n"
+            "I looked at this.\n\n"
+            "Verdict: Ready for merge\n"
+        ) and not checker._is_structured_review_body(
+            "### 1 of 1000000\n\n"
+            "All good.\n\n"
+            "Verdict: Ready for merge\n"
+        ) and not checker._is_structured_review_body(
+            "## End of 2026101\n\n"
+            "Done.\n\n"
+            "Verdict: Ready for merge\n"
+        ),
+    )
+    check(
         "_is_structured_review_body: numbered headings without any fingerprint is NOT structured body (#4425 control)",
         not checker._is_structured_review_body(
             "### 2. Blocking Defects\nNo blocking defects remain.\n\n"

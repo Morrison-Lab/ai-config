@@ -43,11 +43,12 @@ def transcript(steps):
     with os.fdopen(fd, "w") as fh:
         for i, s in enumerate(steps):
             tid = f"toolu_{i}"
+            inp = s.get("tool_input") if "tool_input" in s else {"command": s["cmd"]}
             fh.write(json.dumps({
                 "type": "assistant", "isSidechain": s["sidechain"],
                 "message": {"content": [{"type": "tool_use", "id": tid,
                                          "name": s["tool"],
-                                         "input": {"command": s["cmd"]}}]},
+                                         "input": inp}]},
             }) + "\n")
             fh.write(json.dumps({
                 "type": "user",
@@ -220,6 +221,12 @@ def main():
           P2(INSTR + " && git push origin b"))
     check("silent: check && push && check (the last run is after the push)",
           not P2(INSTR + " && git push origin b && " + INSTR))
+    check("warns when a nested bash -c run precedes a push",
+          P2("bash -c '" + INSTR + "' && git push origin b"))
+    check("warns when the push and run sit in different expansions",
+          P2("bash -c 'git push origin b' && " + INSTR))
+    check("silent when one command in nested bash -c pushes then runs",
+          not P2("bash -c 'git push origin b && " + INSTR + "'"))
 
     # --- round 3 -----------------------------------------------------------
     IC = "python3 scripts/check-pr-fully-clean.py "
@@ -237,6 +244,32 @@ def main():
           not run(M5 + " && git push origin b", [step(IC + "5" + R, OUT5)])[0])
     check("silent: earlier clean run, merge command with no push",
           not run(M5, [step(IC + "5" + R, OUT5)])[0])
+    check("warns: nested bash -c push ahead of merge stales earlier run",
+          run("bash -c 'git push origin b' && " + M5, [step(IC + "5" + R, OUT5)])[0])
+    check("warns: push ahead of nested bash -c merge stales earlier run",
+          run("git push origin b && bash -c '" + M5 + "'", [step(IC + "5" + R, OUT5)])[0])
+    check("warns: nested bash -c with push and then merge stales earlier run",
+          run("bash -c 'git push origin b && " + M5 + "'", [step(IC + "5" + R, OUT5)])[0])
+    check("silent: nested bash -c with merge and then push keeps earlier run",
+          not run("bash -c '" + M5 + " && git push origin b'", [step(IC + "5" + R, OUT5)])[0])
+    check("warns on a PowerShell-keyed merge that pushes first",
+          run("", [step(IC + "5" + R, OUT5)], tool_input={
+              "CommandLine": "git push origin b; " + M5})[0])
+    check("warns on a cmd-keyed merge that pushes first",
+          run("", [step(IC + "5" + R, OUT5)], tool_input={
+              "cmd": "git push origin b && " + M5})[0])
+    check("warns on a script-keyed merge that pushes first",
+          run("", [step(IC + "5" + R, OUT5)], tool_input={
+              "script": "git push origin b && " + M5})[0])
+    check("silent after a PowerShell-keyed clean run in the transcript",
+          not run(M5, [{"cmd": "", "out": OUT5, "is_error": False, "sidechain": False,
+                        "tool": "PowerShell",
+                        "tool_input": {"CommandLine": IC + "5" + R}}])[0])
+    check("warns when a PowerShell-keyed push follows a clean run in the transcript",
+          run(M5, [step(IC + "5" + R, OUT5),
+                   {"cmd": "", "out": "ok", "is_error": False, "sidechain": False,
+                    "tool": "PowerShell",
+                    "tool_input": {"CommandLine": "git push origin b"}}])[0])
     # item 2: several runs in one command
     TWO = step(IC + "5" + R + " && " + IC + "6" + R, OUT5 + chr(10) + OUT6)
     check("silent: `check 5 && check 6` credits #5", not run(M5, [TWO])[0])

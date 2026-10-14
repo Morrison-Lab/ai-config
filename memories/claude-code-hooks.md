@@ -1190,3 +1190,16 @@ Nothing errors, so the truncation is invisible unless the output length is measu
 - **Don't:** inject a whole file or a growing catalog and assume the model saw all of it.
 - **Don't:** test only that `additionalContext` is present, which passes at any length.
 
+## Nested shell expansions are listed outer-first; audit all callers for piece-awareness
+
+`shell_c_expansions` returns the outer command first (piece 0) followed by each nested `-c` operand.
+Concatenating or assuming textual order across expansions inverts execution order when an event lives in a nested `-c` piece ahead of an outer event (e.g. `bash -c 'cmd1' && cmd2`).
+When updating a hook to tag events with expansion pieces and treat cross-piece events as unordered (such as `_events()` / `scan()`), audit every function in that hook and its siblings that iterates `shell_c_expansions` (such as `_push_before_merge()`).
+Leaving a companion function with a flat `for line in shell_c_expansions` scan preserves the exact same ordering defect and causes false silence on commands like `bash -c 'git push origin b' && gh pr merge 12` (ai-config#4422, PR #4502).
+
+- **Do:** tag events with `(event, piece)` whenever tracking execution order across `shell_c_expansions`.
+- **Do:** treat events in different expansion pieces as unordered, failing safe (stale/warning) rather than assuming outer ran before inner.
+- **Do:** audit all helper functions in the hook and imported sibling modules that iterate `shell_c_expansions` when fixing expansion ordering defects.
+- **Don't:** assume `shell_c_expansions` returns strings in execution order.
+
+

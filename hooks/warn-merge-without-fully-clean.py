@@ -61,8 +61,10 @@ heredoc body that merely names the command is inert. A PRIOR run counts (via
 the transcript) only when `check-pr-fully-clean.py` is the command word or an
 interpreter's first operand and its result shows the FULLY CLEAN line; a
 `grep`, `cat` or `echo` that names it is not a run. A run and a `git push` in
-ONE command are ordered by their position in the text: `git push && check N`
-credits the run as after the push, `check N && git push` leaves it stale.
+ONE command are ordered by their position in the text when both sit in the
+same expansion piece (`git push && check N` credits the run as after the push,
+`check N && git push` leaves it stale); push and run in different `bash -c`
+pieces are treated as unordered, so the push makes the run stale.
 A `{owner}/{repo}` placeholder or any repo token containing `{` is unknown
 and matches any repo, as a missing `-R` does.
 
@@ -333,19 +335,34 @@ def _credited(runs, block):
     return list(runs)  # _covers refuses an unknown number for a named PR
 
 
+def _shell_command(tool_input):
+    """The command text under whichever key the harness uses."""
+    if not isinstance(tool_input, dict):
+        return None
+    cmd = (tool_input.get("command") or tool_input.get("CommandLine")
+           or tool_input.get("cmd") or tool_input.get("script"))
+    return cmd if isinstance(cmd, str) and cmd.strip() else None
+
+
 def _events(command):
-    """Ordered events in *command*: None for a `git push`, else (num, repo)
-    for an instrument run."""
+    """Events in *command* as (event, piece), event None for a `git push`
+    else (num, repo) for an instrument run.
+
+    `piece` numbers the expansion the event came from: 0 for the command
+    itself, then each nested `bash -c` operand. Events within one piece are
+    in text order; events in different pieces are not ordered at all, since
+    the expansions are listed outer-first rather than in execution order.
+    """
     events = []
-    for line in shell_c_expansions(command):
+    for piece, line in enumerate(shell_c_expansions(command)):
         for argv in simple_commands(line) or []:
             _env, rest = strip_env(argv)
             parsed = git_subcommand(argv)
             if parsed and parsed[0] == "push":
-                events.append(None)
+                events.append((None, piece))
             run = _instrument_run(rest)
             if run is not None:
-                events.append(run)
+                events.append((run, piece))
     return events
 
 
@@ -360,22 +377,22 @@ def scan(path):
             if kind == "tool_use" and b.get("name") in MCP_PUSH_TOOLS:
                 last_push = max(last_push, seq)
             elif kind == "tool_use" and b.get("name") in SHELL_TOOLS:
-                cmd = (b.get("input") or {}).get("command")
+                cmd = _shell_command(b.get("input") or {})
                 if not isinstance(cmd, str):
                     continue
                 try:
                     events = _events(cmd)
-                    pushes = [i for i, e in enumerate(events) if e is None]
+                    pushes = [(i, p) for i, (e, p) in enumerate(events) if e is None]
                     if pushes:
                         # A push AFTER a run in the same text makes that run
                         # stale; a push BEFORE it leaves the run fresh.
                         last_push = max(last_push, seq - 0.5)
                     if rec.get("isSidechain"):
                         continue  # a subagent's reading is not this session's
-                    for i, e in enumerate(events):
+                    for i, (e, p) in enumerate(events):
                         if e is None:
                             continue
-                        stale = pushes and max(pushes) > i
+                        stale = any(pp != p or pi > i for pi, pp in pushes)
                         pending.setdefault(b.get("id"), []).append(
                             (seq - 1 if stale else seq, *e))
                 except Exception:
@@ -396,16 +413,25 @@ def _covers(run, num, repo):
 
 def _push_before_merge(command):
     """True when *command* runs a `git push` ahead of a `gh pr merge`, which
-    makes every earlier instrument run stale."""
-    pushed = False
-    for line in shell_c_expansions(command):
+    makes every earlier instrument run stale.
+
+    Order is known only within one expansion piece; push and merge in different
+    `bash -c` pieces are treated as unordered, so the push conservatively
+    stales earlier runs.
+    """
+    events = []
+    for piece, line in enumerate(shell_c_expansions(command)):
         for argv in simple_commands(line) or []:
             parsed = git_subcommand(argv)
             if parsed and parsed[0] == "push":
-                pushed = True
-            elif pushed and _gh_merge(strip_env(argv)[1]):
-                return True
-    return False
+                events.append(("push", piece))
+            elif _gh_merge(strip_env(argv)[1]):
+                events.append(("merge", piece))
+    pushes = [(i, p) for i, (k, p) in enumerate(events) if k == "push"]
+    merges = [(i, p) for i, (k, p) in enumerate(events) if k == "merge"]
+    if not pushes or not merges:
+        return False
+    return any(pp != mp or pi < mi for pi, pp in pushes for mi, mp in merges)
 
 
 def _strict_chain_discharged(command):
@@ -494,9 +520,8 @@ def _merge_targets(tool, tool_input):
             return [(int(num), repo)]
         except (TypeError, ValueError):
             return [(None, repo)]
-    command = (tool_input.get("command") or tool_input.get("CommandLine")
-               or tool_input.get("cmd") or tool_input.get("script"))
-    if not isinstance(command, str) or not command.strip():
+    command = _shell_command(tool_input)
+    if not isinstance(command, str):
         return []
     return _bash_merge_targets(command)
 
@@ -535,7 +560,7 @@ def main() -> int:
         return 0
     fresh = [r for r in passing if r[0] > last_push]
     if tool != MCP_MERGE_TOOL and _push_before_merge(
-            tool_input.get("command") or ""):
+            _shell_command(tool_input) or ""):
         fresh = []  # the merge's own command pushes first: all runs are stale
 
     missing = [(n, r) for n, r in targets

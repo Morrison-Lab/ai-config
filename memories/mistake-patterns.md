@@ -57,46 +57,7 @@ When a new entry lands after `main` has appended one of its own, take the next n
 - **Example**: 2026-08-19 session (cwd `wai`, working `Morrison-Lab/ai-config`):
   told user Morrison-Lab/ai-config#1677 was ready without checking that CI had failed
   (`new-line-breaks` check).
-  Re-hit 2026-08-26 on [#2277](https://github.com/Morrison-Lab/ai-config/pull/2277):
-  reported "Ready for merge" from `statusCheckRollup` plus a local adversarial verdict;
-  `check-pr-fully-clean.py` exited 1 (`No automated review...`).
-  The rollup matched the endpoint that time (8==8);
-  the defect was resting a terminal claim on it.
-  An earlier Fix in this pattern recommended those short rollups ---
-  that was the wrong instrument for a terminal claim.
-  Re-hit 2026-08-31 (Antigravity session, working `ucdavis/matt.contracts` [PR #98](https://github.com/ucdavis/matt.contracts/pull/98)):
-  reported PR as "MERGEABLE" in status recap based on GitHub's git conflict field (`mergeable: MERGEABLE`) while CI checks were red (failing changelog, spellcheck, version check) and external review was not clean.
-  Corrected by user: "stop saying mergeable when there's red CI and/or no clean review".
-  Never use "mergeable" as a status verdict or conflate git mergeability with PR readiness;
-  explicitly report CI check status and review verdict.
-  Re-hit 2026-09-03 (Antigravity session, working `ucdavis/epi204` wrap-up):
-  reported unrelated open [PR #384](https://github.com/ucdavis/epi204/pull/384) in wrap-up dashboard
-  as "Ready for self-merge" based on green CI checks
-  and a fallback self-review comment reading "Ready for merge",
-  without running `scripts/check-pr-fully-clean.py`.
-  `check-pr-fully-clean.py` exited 1 because the automated review had been quota-skipped.
-  A `Stop` guard blocked the claim;
-  which one went unrecorded, and the name first written here,
-  `check-clean-claim.py`, exists in no repository ---
-  not in this corpus's `hooks/`, not in `hooks/hooks.json`,
-  and not in `ucdavis/epi204`, whose tree carries no hooks at all
-  (checked 2026-09-04).
-  Read the guard as unidentified rather than substituting a plausible
-  sibling.
-  Two registered `Stop` hooks match part of this shape ---
-  `no-stale-pr-status.py` and `no-incomplete-check-enumeration.py` ---
-  and nothing in the record says which fired.
-  `no-handrolled-verdict-parse.py` is deliberately NOT a candidate:
-  `hooks/hooks.json` registers it under `PreToolUse`,
-  and its own docstring carries a section explaining why a `Stop`
-  matcher for this failure mode was rejected as too broad.
-  Filtering the candidate list by the hook's registered event
-  is what stops a shape match becoming a second wrong attribution.
-  Never transcribe a fallback review's prose
-  or call a PR ready for merge without `check-pr-fully-clean.py` exiting 0.
-  Re-hit 2026-10-07 (Antigravity session, working `Morrison-Lab/lds` [PR #454](https://github.com/Morrison-Lab/lds/pull/454)):
-  reported stopping status on an open PR without checking that base conflicts (`mergeable: CONFLICTING`, `mergeStateStatus: DIRTY`) had prevented GitHub Actions from scheduling or running any CI workflows.
-  Always verify `mergeable == MERGEABLE` and confirm CI workflows are actually scheduled/running (`gh pr checks <N>`).
+  See [`mistake-patterns.cases.md`](mistake-patterns.cases.md) for 2026-08-26, 2026-08-31, 2026-09-03, and 2026-10-07 case records.
 - **Canonical Rule**: `AGENTS.md` ("Get a clean automated review before asking a person to review"),
   `fully-clean.md`, and `hooks/no-incomplete-check-enumeration.py`.
 - **Do:** Run `python3 scripts/check-pr-fully-clean.py <N> -R <owner>/<repo>`

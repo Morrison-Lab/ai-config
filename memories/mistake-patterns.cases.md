@@ -24,6 +24,33 @@ What does not: the Mistake, Canonical Rule, Fix, or Do/Don't lines, which are wh
   3rd on `preferences.md`, 2026-08-25 on ai-config#2262;
   see also `skills/ums/SKILL.md`).
 
+## Pattern 5c: Declaring PR Ready When CI Is Failing or Incomplete
+
+- **2nd occurrence, 2026-08-26** on [#2277](https://github.com/Morrison-Lab/ai-config/pull/2277):
+  reported "Ready for merge" from `statusCheckRollup` plus a local adversarial verdict;
+  `check-pr-fully-clean.py` exited 1 (`No automated review...`).
+  The rollup matched the endpoint that time (8==8);
+  the defect was resting a terminal claim on it.
+  An earlier Fix in this pattern recommended those short rollups ---
+  that was the wrong instrument for a terminal claim.
+- **3rd occurrence, 2026-08-31** (Antigravity session, working `ucdavis/matt.contracts` [PR #98](https://github.com/ucdavis/matt.contracts/pull/98)):
+  reported PR as "MERGEABLE" in status recap based on GitHub's git conflict field (`mergeable: MERGEABLE`) while CI checks were red (failing changelog, spellcheck, version check) and external review was not clean.
+  Corrected by user: "stop saying mergeable when there's red CI and/or no clean review".
+  Never use "mergeable" as a status verdict or conflate git mergeability with PR readiness;
+  explicitly report CI check status and review verdict.
+- **4th occurrence, 2026-09-03** (Antigravity session, working `ucdavis/epi204` wrap-up):
+  reported unrelated open [PR #384](https://github.com/ucdavis/epi204/pull/384) in wrap-up dashboard
+  as "Ready for self-merge" based on green CI checks
+  and a fallback self-review comment reading "Ready for merge",
+  without running `scripts/check-pr-fully-clean.py`.
+  `check-pr-fully-clean.py` exited 1 because the automated review had been quota-skipped.
+  A `Stop` guard blocked the claim.
+  Never transcribe a fallback review's prose
+  or call a PR ready for merge without `check-pr-fully-clean.py` exiting 0.
+- **5th occurrence, 2026-10-07** (Antigravity session, working `Morrison-Lab/lds` [PR #454](https://github.com/Morrison-Lab/lds/pull/454)):
+  reported stopping status on an open PR without checking that base conflicts (`mergeable: CONFLICTING`, `mergeStateStatus: DIRTY`) had prevented GitHub Actions from scheduling or running any CI workflows.
+  Always verify `mergeable == MERGEABLE` and confirm CI workflows are actually scheduled/running (`gh pr checks <N>`).
+
 ## Pattern 12: Arming Auto-Merge While Review Findings Are Still Open or at an Unreviewed Head After Sync
 
 - **1st occurrence, 2026-08-26** on `ai-config#2226`:

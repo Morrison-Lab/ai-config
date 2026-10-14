@@ -56,6 +56,7 @@ Print axis ticks as plain numbers, not scientific notation ([details](shared/wri
 One equation per display line unless a reason favors more;
 one `=` per math line ([details](shared/writing/math-derivation-steps.md)).
 Include a visual (graph, diagram, figure) wherever one helps a reader, in new work and in existing content you touch, as a plotly graph (3D where a third dimension helps) wherever feasible, with a static fallback for PDF and Word ([details](shared/writing/visuals-everywhere.md)).
+Name the real source of a claim, or write it as the author's own judgement, or cut it; never invent a vague attribution such as "instructors often observe" to satisfy a review note ([details](shared/writing/no-vague-attribution.md)).
 Label every display equation so it receives an equation number and a stable URL.
 Write all LaTeX math, in any repo or format, with the shared semantic macros: [`use-math-macros`](skills/use-math-macros/SKILL.md).
 

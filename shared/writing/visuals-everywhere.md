@@ -15,7 +15,7 @@ Keep a static fallback for PDF and Word, which cannot show a widget;
 lds#642 (`chapters/_subfiles/big-ideas/_fig-risk-surface.qmd`) is the worked pattern: a plotly chunk for HTML output and a static image for the other formats.
 Use plain `ggplot2` or an SVG only where plotly is not feasible, such as a diagram.
 
-A visual follows the figure rules already in force:
+A visual follows these figure rules:
 
 - figures that show estimates carry confidence intervals (error bars or ribbons);
 - axis ticks print plain numbers, not scientific notation ([details](axis-tick-labels.md));

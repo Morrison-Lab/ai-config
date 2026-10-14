@@ -616,10 +616,9 @@ When the user gives an MWC grant (e.g. `/mwc` or "merge when confident"):
 2. Proceed with the task (e.g. driving PRs to clean via `ardi`).
 3. When a PR reaches 100% clean state:
    - **Verify or run cross-model, cross-harness adversarial review**:
-     Confirm the shipping HEAD commit has received a 100% all-clear verdict from an author-dispatched cross-model, cross-harness reviewer ([`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md)).
-     In local sessions, dispatch to `opencode`, `agy` CLI, or `codex` (`dto`, `dtc`, `adv`).
-     In cloud sessions (claude.ai), use `curl` to OpenCode Go (`https://opencode.ai/zen/go/v1/chat/completions`) with `"stream": true` piped to `skills/delegate-to-opencode/scripts/parse-sse.py`, with candidate model fallback (`deepseek-v4-pro`, `kimi-k3`, `qwen3.8-max`, `glm-5.3`) on 502 upstream errors ([`delegate-to-opencode`](../delegate-to-opencode/SKILL.md)).
-     Do not use Python `urllib` (which returns 403 Forbidden through the cloud agent proxy).
+     Confirm the shipping HEAD commit has received a 100% all-clear verdict from an author-dispatched cross-model, cross-harness reviewer,
+     per [Standing Scope & Policy](#standing-scope--policy) above and [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md)
+     (local: `dto`/`dtc`/`adv`; cloud: `curl` to OpenCode Go with candidate model fallback per [`delegate-to-opencode`](../delegate-to-opencode/SKILL.md)).
      Never proceed to the merge command before this verdict is clean.
    - **Verify base currency and pre-merge pins**:
      Run the base-currency check that [`fully-clean`](../../shared/workflow/fully-clean.md) states in its stale-base rule before the merge command.

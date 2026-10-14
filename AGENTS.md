@@ -55,6 +55,8 @@ For each plot, consider whether an axis should be extended to show important ref
 Avoid scientific notation in axis tick labels where feasible (Ezra, 2026-10-13):
 use plain or comma-formatted labels (`scales::label_comma()` or `label_number()` in ggplot2, a plain `ScalarFormatter` in matplotlib, `tickformat` in plotly, `toLocaleString` in Observable Plot),
 or rescale the units and say so in the axis title.
+Logarithmic spacing is fine.
+The rule is about the label format only (1, 10, 100, 1,000, not 1e+03).
 One equation per display line unless a reason favors more;
 one `=` per math line ([details](shared/writing/math-derivation-steps.md)).
 Label every display equation so it receives an equation number and a stable URL.

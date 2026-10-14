@@ -885,6 +885,26 @@ CASES = [
         f"### Verdict: Ready for merge\nReviewed-Commit: {HEAD}\n\n"
         "```\nexample: <!-- a full quoted comment -->\n```\n"), False,
      "a fully fence-quoted comment pair stays inert"),
+    # --- verdict under ATX heading (ai-config#4371) ---
+    (PUSH, reviewed(f"### Verdict\nClean\n\nReviewed-Commit: {HEAD}"), False,
+     "a clean verdict under a ### Verdict heading allows the push (ai-config#4371)"),
+    (PUSH, reviewed(f"### Verdict\n\n**CLEAN**\n\nReviewed-Commit: {HEAD}"), False,
+     "a bold clean verdict with blank line under ### Verdict allows the push (ai-config#4371)"),
+    (PUSH, reviewed(f"### Verdict\nNeeds more work\n\nReviewed-Commit: {HEAD}"), True,
+     "a blocking verdict under a ### Verdict heading denies the push (ai-config#4371)",
+     "returned a blocking verdict"),
+    (PUSH, reviewed(f"> ### Verdict\n> Clean\n\nReviewed-Commit: {HEAD}"), True,
+     "a blockquoted ### Verdict heading with Clean states no verdict",
+     "no verdict came back"),
+    (PUSH, reviewed(f"```markdown\n### Verdict\nClean\n```\n\nReviewed-Commit: {HEAD}"), True,
+     "a fenced ### Verdict heading with Clean states no verdict",
+     "no verdict came back"),
+    (PUSH, reviewed(f"### Verdict\nClean up the lint errors\n\nReviewed-Commit: {HEAD}"), True,
+     "prose starting with Clean under ### Verdict states no verdict",
+     "no verdict came back"),
+    (PUSH, reviewed(f"### Verdict\n\nClean up the lint errors\n\nReviewed-Commit: {HEAD}"), True,
+     "prose after blank line under ### Verdict states no verdict",
+     "no verdict came back"),
     (PUSH, reviewed(
         "### Verdict: Needs more work\n"
         f"Reviewed-Commit: {HEAD}\n\n"
@@ -1722,6 +1742,52 @@ def structured_payload_cases() -> tuple[int, int]:
           '<!-- review-data: {"schema_version": "1.0", "verdict": "NOT_CLEAN", "findings": []} -->')
     v, s = mod.parse_report(r6)
     check("parse_report: CLEAN verdict line + NOT_CLEAN payload is needs_work", v, s, "needs_work", HEAD.lower())
+
+    # 6. Verdict under a heading on its own line (ai-config#4371).
+    heading_positives = [
+        ("### Verdict\nClean", "clean"),
+        ("### Verdict\r\nClean", "clean"),
+        ("### Verdict\n\nClean", "clean"),
+        ("### Verdict\n\n**CLEAN**", "clean"),
+        ("### Verdict\n\n*Clean*", "clean"),
+        ("### Verdict\n__Clean__", "clean"),
+        ("### Verdict\n_Clean_", "clean"),
+        ("### Verdict:\nClean", "clean"),
+        ("## Verdict\nReady for merge", "clean"),
+        ("# Verdict\nNeeds more work", "needs_work"),
+        ("### Final Verdict\nNeeds work", "needs_work"),
+        ("### Review Verdict\nNOT-CLEAN", "needs_work"),
+        ("### Summary Verdict\nNOT_CLEAN", "needs_work"),
+        ("### 3. Verdict\nNOT CLEAN", "needs_work"),
+        ("### **Verdict**\n**Ready for merge**", "clean"),
+        ("### **Verdict:**\nClean.", "clean"),
+    ]
+    for block, want in heading_positives:
+        v, s = mod.parse_report(block + fp)
+        check(f"parse_report: heading verdict block {block!r} reads as {want}", v, s, want, HEAD.lower())
+
+    heading_negatives = [
+        "### Verdict\nClean up the lint errors",
+        "### Verdict\n\nClean up the lint errors",
+        "### Verdict\nClean code was verified",
+        "### Verdict\nSome commentary line\nClean",
+        "> ### Verdict\n> Clean",
+        "> ### Verdict\n> \n> Clean",
+        "    ### Verdict\nClean",
+        "### Verdict\n    Clean",
+        "### Other Heading\nClean",
+        "### Verdict\n\n\n\n\nClean",
+        "```text\n### Verdict\nClean\n```",
+    ]
+    for block in heading_negatives:
+        v, s = mod.parse_report(block + fp)
+        check(f"parse_report: negative heading block {block!r} is no verdict", v, s, None, None)
+
+    # A heading CLEAN still loses to a blocking payload.
+    r7 = ("### Verdict\nClean" + fp + "\n\n"
+          '<!-- review-data: {"schema_version": "1.0", "verdict": "NOT_CLEAN", "findings": []} -->')
+    v, s = mod.parse_report(r7)
+    check("parse_report: heading CLEAN + NOT_CLEAN payload is needs_work", v, s, "needs_work", HEAD.lower())
 
     return failures, ran
 

@@ -192,9 +192,23 @@ VERDICT_LINE = re.compile(
     re.I | re.M,
 )
 
+# A verdict stated under an ATX heading on its own line (ai-config#4371).
+# Matches a heading line whose text is "Verdict" (optionally numbered, emphasized,
+# or qualified with "Final", "Review", or "Summary"), followed by optional
+# blank lines (at most 2), and then a line containing ONLY the verdict phrase
+# (optionally emphasized, e.g. **Clean** or **Ready for merge**).
+# Anchoring the verdict line to line start and end strictly rejects trailing
+# prose such as "Clean up the lint errors" or "Clean code was verified".
+VERDICT_HEADING_BLOCK = re.compile(
+    r"^[ \t]{0,3}#{1,6}[ \t]*(?:\d+[.)][ \t]+)?(?:\*\*)?(?:(?:Final|Review|Summary)[ \t]+)?Verdict(?:\*\*)?:?(?:\*\*)?[ \t]*\r?\n"
+    r"(?:[ \t]*\r?\n){0,2}"
+    r"[ \t]{0,3}(?:\*{1,2}|_{1,2})?(Ready for merge|Needs (?:more )?work|NOT[ _-]?CLEAN|CLEAN)(?:\*{1,2}|_{1,2})?[.!]?[ \t]*\r?$",
+    re.I | re.M,
+)
+
 
 def _verdict_from_match(word: str) -> str:
-    """Map a VERDICT_LINE capture onto "clean" or "needs_work"."""
+    """Map a VERDICT_LINE or VERDICT_HEADING_BLOCK capture onto "clean" or "needs_work"."""
     w = word.lower()
     return "clean" if w.startswith("ready") or w == "clean" else "needs_work"
 
@@ -2192,8 +2206,10 @@ def parse_report_all(text: str) -> tuple[str | None, list[str]]:
     if unresolved:
         return None, []
     matches = list(VERDICT_LINE.finditer(blanked))
+    matches.extend(VERDICT_HEADING_BLOCK.finditer(blanked))
     if not matches:
         return None, []
+    matches.sort(key=lambda m: m.start())
     last = matches[-1]
     verdict = _verdict_from_match(last.group(1))
     shas: list[str] = []
@@ -2962,6 +2978,10 @@ def verify_review(transcript_path: str, directory: str | None,
         return False, (
             "An `adversarial-reviewer` subagent was dispatched, but no verdict came back "
             "as that call's own result.\n"
+            "The report must state a verdict in one of two formats:\n"
+            "  1. Inline: `### Verdict: <phrase>` or `Verdict: <phrase>`\n"
+            "  2. Under a heading: `### Verdict` followed on the next line by `<phrase>`\n"
+            "where <phrase> is `Ready for merge`, `Clean`, `Needs more work`, `Needs work`, or `NOT_CLEAN`.\n"
             "Dispatch it in the foreground (`run_in_background: false`) so its report "
             "returns as the tool result -- a background dispatch returns an agent id, "
             "which carries no verdict, and an errored result carries none either."

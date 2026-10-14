@@ -917,15 +917,14 @@ Derived against the shipped pattern rather than inferred from the symptom:
 | `### Verdict: Ready for merge` | parses |
 | `Verdict: Ready for merge` | parses |
 | `Verdict: **Ready for merge**` | parses |
+| `Verdict: Clean` | parses (ai-config#3991) |
+| `### Verdict` then `Ready for merge` on next line | parses (ai-config#4371) |
 | `**Verdict: Ready for merge**` | IGNORED |
 | `**Verdict: APPROVED**` | IGNORED |
-| `Verdict: Clean` | IGNORED |
-| `### Verdict` then `Ready for merge` on the next line | IGNORED |
 
-Two independent ways to fail, and the second is the surprising one.
-The vocabulary must be exact, so `APPROVED` and `Clean` contribute nothing.
-And the emphasis must not wrap the whole line: `(?:\*\*)?` sits AFTER the colon, so `Verdict: **Ready for merge**` is fine while `**Verdict: Ready for merge**` is not.
-The phrase must also share the line with the `Verdict:` label rather than sitting under a heading.
+The vocabulary must match accepted words (`Ready for merge`, `Clean`, `Needs more work`, `Needs work`, `NOT_CLEAN`), so `APPROVED` contributes nothing.
+The emphasis must not wrap the whole `Verdict:` label: `Verdict: **Ready for merge**` is fine while `**Verdict: Ready for merge**` is not.
+A verdict may sit either on the same line as `Verdict:` or on its own line under an ATX heading like `### Verdict` (ai-config#4371).
 
 Measured 2026-09-15 on ai-config#3701.
 An `adversarial-reviewer` on `haiku` returned a genuinely clean report headed `**Verdict: APPROVED**`, and three successive pushes were refused while quoting a verdict for an earlier commit.

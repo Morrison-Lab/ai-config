@@ -21,7 +21,7 @@ Active delegation budgets include `codex` (ChatGPT plan, operationalized by
 `delegate-to-codex`), `opencode` (OpenCode Go subscription and free hosted
 models via Zen, operationalized by `delegate-to-opencode`), `agy` CLI
 (headless dispatch available since the 2026-08-25 clarification), and
-OpenRouter (prepaid credit balance for frontier/stealth previews).
+OpenRouter (free stealth previews only, never its pay-as-you-go prepaid balance).
 Local and on-device models are prohibited because they can crash the user's
 computer.
 When hosted quota is unavailable, report the blocker or use

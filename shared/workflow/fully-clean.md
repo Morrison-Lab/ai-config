@@ -619,11 +619,11 @@ not-clean; only a later clean from the same reviewer does
 **The standing not-clean can be your own, and clearing it takes a specific comment shape.**
 The rule above is usually read as being about a *reviewer's* verdict, but the per-reviewer scan does not distinguish a bot's identity from a human session's own `gh pr comment` --- so a scoped do-not-merge warning a session posted itself, about a head that has since been replaced, sits exactly the same way and needs the same identity-scoped supersession.
 Prose does not clear it.
-`_is_structured_review_body()` admits a non-bot clean verdict only through the structured-report branch --- a report heading (`## Summary` / `## Findings` / `### Verdict`) plus a line starting `Reviewed-Commit:` --- while a non-bot not-clean is admitted unconditionally, so the two paths are not mirror images.
-The function itself checks only for the heading and the `Reviewed-Commit:` label, not what follows the colon, but writing the full 40-character sha there is still the right convention, since it is what lets a human or another tool confirm which head the withdrawal actually covers.
+`_is_structured_review_body()` admits a non-bot clean verdict only through the structured-report branch --- a report heading (`## Summary` / `## Findings` / `### 2. Blocking Defects` / `### Verdict`, including numbered variants) plus a commit fingerprint (a line starting `Reviewed-Commit:` or a header referencing the commit like `## Cross-harness review ... of <sha>`) --- while a non-bot not-clean is admitted unconditionally, so the two paths are not mirror images (#2402, #4425).
+The function checks for report structure and the commit fingerprint rather than evaluating the SHA itself, but writing the full 40-character sha in `Reviewed-Commit: <sha>` or in the report header is still the right convention, since it is what lets a human or another tool confirm which head the withdrawal actually covers.
 A prose withdrawal ("the blocking concern is withdrawn") that fails the structure gate is silently discarded, with nothing distinguishing "not admitted" from "never commented."
 
-- **Do:** withdraw your own earlier not-clean as a structured report --- `## Summary` / `## Findings` / `### Verdict` headings plus a `Reviewed-Commit: <full sha>` line --- not as prose.
+- **Do:** withdraw your own earlier not-clean as a structured report --- `## Summary` / `## Findings` / `### Verdict` headings (or numbered headings) plus a `Reviewed-Commit: <full sha>` line or a header referencing the commit --- not as prose.
 - **Do:** confirm the withdrawal landed by re-running `check-pr-fully-clean.py` and watching the "examined N dated automated review item(s)" count increase, rather than by re-reading the refusal text.
 - **Do:** avoid the finding-regex vocabulary in the withdrawal itself --- `blocking`, `blocked`, `rejected`, `unapproved`, `impasse`, `deadlock`, `changes requested`, `actionable findings`, `partial review` --- since the scanner reads a clearing comment exactly as it reads a review, and a withdrawal that uses the word "blocking" to say a concern is no longer blocking still matches as a finding.
 - **Don't:** assume a plain-prose withdrawal counted just because it posted without error;
@@ -631,7 +631,8 @@ A prose withdrawal ("the blocking concern is withdrawn") that fails the structur
 - **Don't:** read an unchanged refusal after posting a withdrawal as the supersession rule failing --- check the examined-item count first to tell "not admitted" from "admitted and still not-clean."
 
 (Measured 2026-09-09 driving `d-morrison/rme#1138` to merge: a session's own hours-old, head-scoped do-not-merge comment needed three attempts to clear --- plain prose matched the finding regex on its own word "blocking," a reworded prose-with-`### Verdict`-heading version was silently dropped, and only the full structured-report-plus-`Reviewed-Commit` form was admitted, moving the examined count from 29 to 30.
-The discarded-not-admitted gap this surfaces is tracked separately as ai-config#3461 and is not re-filed here.)
+Measured again 2026-10-08 on `ai-config#4419`: an Antigravity `agy --print` review posted verbatim under `d-morrison` was skipped because its headings were numbered `### 2. Blocking Defects` and it lacked `Reviewed-Commit:`;
+ai-config#4425 updated `check-pr-fully-clean.py` to recognize numbered headings, the `Defects` family, and header commit references.)
 
 This is a different question from how much two reviewers **agreeing** is worth,
 which [`self-review-fallback`](self-review-fallback.md)'s cross-vendor section

@@ -3709,6 +3709,57 @@ def main() -> int:
             (not cas_ok) and any("d-morrison" in i for i in cas_issues),
         )
 
+    # ai-config#4425: an unedited agy review posted under a human login with
+    # numbered headings and header commit reference (e.g. ## Cross-harness
+    # review ... of <sha>) supersedes that same identity's earlier not-clean.
+    human_agy_notclean = {
+        "createdAt": "2026-10-08T20:43:42Z",
+        "author": {"login": "d-morrison"},
+        "authorAssociation": "OWNER",
+        "body": (
+            "## Cross-harness re-review of cbcf19c2\n\n"
+            "### 1. Blocking defects\n1. Issue\n\n"
+            "Verdict: Needs more work\n"
+        ),
+    }
+    agy_clean_round = {
+        "createdAt": "2026-10-08T20:46:12Z",
+        "author": {"login": "d-morrison"},
+        "authorAssociation": "OWNER",
+        "body": (
+            "## Cross-harness review (Antigravity agy CLI 1.2.15, default model --- not reported in output) of efbd6130\n\n"
+            "Run headless (`agy --print`, no tools), given the full hook and test files at `efbd6130`; 58 s. Output verbatim:\n\n"
+            "---\n\n"
+            "### 1. Confirmation of Top-Level `systemMessage` Key\n\n"
+            "Inspection confirms the hook sets top-level systemMessage.\n\n"
+            "---\n\n"
+            "### 2. Blocking Defects\n\n"
+            "**No blocking defects remain.**\n\n"
+            "---\n\n"
+            "### 3. Non-Blocking Findings\n\n"
+            "1. Minor suggestion on variable naming.\n\n"
+            "---\n\n"
+            "Verdict: Ready for merge\n"
+        ),
+    }
+    bot_clean_efbd = {
+        "createdAt": "2026-10-08T20:57:30Z",
+        "author": {"login": "github-actions"},
+        "body": (
+            "**Claude finished review**\n\n### Verdict\n**Ready for merge**\n\n"
+            "Reviewed commit: efbd6130\n"
+        ),
+    }
+    mock_agy_seq = json.dumps({"comments": [human_agy_notclean, agy_clean_round,
+                                            bot_clean_efbd], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_agy_seq):
+        agy_ok, agy_issues = checker.check_review_comments("4419", "efbd6130", TEST_REPO)
+        check(
+            "an unedited agy review with numbered headings and header commit ref "
+            "supersedes the same identity's earlier not-clean (#4425)",
+            agy_ok and agy_issues == [],
+        )
+
     claude_nits_earlier = {
         "createdAt": "2026-08-07T21:56:00Z",
         "author": {"login": "github-actions"},
@@ -5729,6 +5780,66 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         "_is_structured_review_body: fenced block preceding heading does NOT shift containment offsets (#2525)",
         checker._is_structured_review_body(
             "```\nthis is a seventy character fenced block that takes up some space in body\n```\nSome prose with ``two backtick span`` here.\n\n### Verdict\nClean\n\nReviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\n"
+        ),
+    )
+    check(
+        "_is_structured_review_body: agy numbered headings with header commit ref is structured body (#4425)",
+        checker._is_structured_review_body(
+            "## Cross-harness review of efbd6130\n\n"
+            "### 2. Blocking Defects\nNo blocking defects remain.\n\n"
+            "### 3. Non-Blocking Findings\n1. Note.\n\n"
+            "Verdict: Ready for merge\n"
+        ),
+    )
+    check(
+        "_is_structured_review_body: numbered headings with (1) / [2] and Reviewed-Commit is structured body (#4425)",
+        checker._is_structured_review_body(
+            "### (1) Blocking findings\nNone.\n\n"
+            "### [2] Non-blocking findings\nNone.\n\n"
+            "Verdict: Ready for merge\n\n"
+            "Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\n"
+        ),
+    )
+    check(
+        "_is_structured_review_body: Actionable Defects and Critical Findings are recognized (#4425)",
+        checker._is_structured_review_body(
+            "### 2. Actionable Defects\nNone.\n\n"
+            "Verdict: Ready for merge\n\n"
+            "Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\n"
+        ) and checker._is_structured_review_body(
+            "### 1. Critical Findings\nNone.\n\n"
+            "Verdict: Ready for merge\n\n"
+            "Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\n"
+        ) and checker._is_structured_review_body(
+            "### 3. Detailed Defects\nNone.\n\n"
+            "Verdict: Ready for merge\n\n"
+            "Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\n"
+        ),
+    )
+    check(
+        "_is_structured_review_body: non-review headers with numbers or prepositions do not qualify as commit fingerprints (#4425 control)",
+        not checker._is_structured_review_body(
+            "## Discussion of 1234567\n\n"
+            "### Summary\nI looked at this.\n\n"
+            "Verdict: Ready for merge\n"
+        ) and not checker._is_structured_review_body(
+            "### 1 of 1000000\n\n"
+            "### Summary\nAll good.\n\n"
+            "Verdict: Ready for merge\n"
+        ) and not checker._is_structured_review_body(
+            "## End of 2026101\n\n"
+            "### Summary\nDone.\n\n"
+            "Verdict: Ready for merge\n"
+        ) and not checker._HEADER_COMMIT_RE.search("## Discussion of 1234567")
+        and not checker._HEADER_COMMIT_RE.search("### 1 of 1000000")
+        and not checker._HEADER_COMMIT_RE.search("## End of 2026101"),
+    )
+    check(
+        "_is_structured_review_body: numbered headings without any fingerprint is NOT structured body (#4425 control)",
+        not checker._is_structured_review_body(
+            "### 2. Blocking Defects\nNo blocking defects remain.\n\n"
+            "### 3. Non-Blocking Findings\n1. Note.\n\n"
+            "Verdict: Ready for merge\n"
         ),
     )
 

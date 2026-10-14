@@ -108,7 +108,29 @@ A `nohup` launcher returning is not the run finishing.
   The memory allows `--dangerously-skip-permissions` only for a fully trusted brief, and this skill never uses it.
   For read-only work, embed the material in the brief instead.
 
-### 5. Fall back for failures only
+### 5. Posting a cross-harness review to a PR
+
+When posting an `agy` review to a PR under a user or Remote Control session,
+always wrap the output in a standardized header and verdict structure:
+
+```markdown
+## Cross-harness review (Antigravity agy CLI) of <HEAD_SHA>
+
+Reviewed-Commit: <HEAD_SHA>
+
+<verbatim agy output>
+
+### Verdict
+
+Verdict: <Clean or Needs more work>
+
+_Posted by Antigravity (AI agent) --- not written by a human._
+```
+
+This ensures `check-pr-fully-clean.py` admits the review by construction
+and allows a clean verdict to supersede any earlier standing not-clean verdicts (#4425).
+
+### 6. Fall back for failures only
 
 If a run fails, times out or returns nothing, redo only those items on OpenCode Go.
 Use a Claude subagent only for a reviewer, per the 2026-09-09 directive.

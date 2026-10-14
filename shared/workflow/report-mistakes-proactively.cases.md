@@ -104,7 +104,8 @@ The chained-call failure this case records is a search that ran in the same call
 (2026-10-13, project thread on the Stanford and book resources:
 the closing reply listed the ciml.info check (the site was unreachable from the container) and a pds course-title mismatch as "open items for you", with no issue behind either.
 The user asked "are those issues filed?" and then "why not?".
-Both were filed afterwards, as Morrison-Lab/pds#128 and Morrison-Lab/lds#818.
+Both were filed afterwards, as Morrison-Lab/pds#128 and Morrison-Lab/lds#818
+(`lds` is a private repository, so a token without access to it cannot resolve the second reference).
 The rule already said to file a concern before the report that mentions it, so the written rule held the answer and failed at composition time.
 No hook was built: "open item" is ordinary status prose, and a phrase match would fire on every reply that already links its issues.)
 

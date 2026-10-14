@@ -208,8 +208,8 @@ Three instances he named the same day:
   ("Decomposing content into subfiles") asks for one subtopic per subfile.
   `Morrison-Lab/mln`'s `AUTHORING.md` ("Subfiles") adapts it for the
   course notes.
-  The [SERG lab manual](https://ucd-serg.github.io/lab-manual/)'s
-  "Using Includes for Modular Content" (`quarto/advanced-features.qmd`)
+  [Principles of Scientific Computing](https://morrison-lab.github.io/psc/)'s
+  "Using Includes for Modular Content" (`chapters/quarto/advanced-features.qmd`)
   gives the same reasons: a reorder touches only the spine,
   and review sees organization and content changes separately.
 - **Theorem-type divs do not nest.**
@@ -236,8 +236,8 @@ Operationalized by:
 [`tidy-code`](../coding/tidy-code.md) and the "idiomatic" half of the
 review priorities in
 [`gha`'s `CLAUDE.md`](https://github.com/Morrison-Lab/gha/blob/main/CLAUDE.md)
-(the Modularity entry above carries the "modular" half), following the
-[SERG lab manual](https://ucd-serg.github.io/lab-manual/) and the
+(the Modularity entry above carries the "modular" half), following
+[Principles of Scientific Computing](https://morrison-lab.github.io/psc/) and the
 [tidyverse style guide](https://style.tidyverse.org/).
 
 ## Purity — no hidden side effects
@@ -270,7 +270,7 @@ Reserve comments for what code cannot say — a constraint, a why, a
 citation — not a restatement of what the next line does.
 
 Operationalized by:
-the [SERG lab manual's coding-style conventions](https://ucd-serg.github.io/lab-manual/coding-style.html)
+the [coding-style conventions in Principles of Scientific Computing](https://morrison-lab.github.io/psc/chapters/coding-style.html)
 (naming, comments),
 [`decompose-to-functions`](../coding/decompose-to-functions.md)
 (a named function replaces a comment-labeled chunk), and

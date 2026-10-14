@@ -619,7 +619,7 @@ not-clean; only a later clean from the same reviewer does
 **The standing not-clean can be your own, and clearing it takes a specific comment shape.**
 The rule above is usually read as being about a *reviewer's* verdict, but the per-reviewer scan does not distinguish a bot's identity from a human session's own `gh pr comment` --- so a scoped do-not-merge warning a session posted itself, about a head that has since been replaced, sits exactly the same way and needs the same identity-scoped supersession.
 Prose does not clear it.
-`_is_structured_review_body()` admits a non-bot clean verdict only through the structured-report branch --- a report heading (`## Summary` / `## Findings` / `### 2. Blocking Defects` / `### Verdict`, including numbered variants), or a line-start `Verdict:` label, plus a commit fingerprint (a line starting `Reviewed-Commit:` or a header referencing the commit like `## Cross-harness review ... of <sha>`) --- while a non-bot not-clean is admitted unconditionally, so the two paths are not mirror images (#2402, #4425).
+`_is_structured_review_body()` admits a non-bot clean verdict only through the structured-report branch --- a report heading (`## Summary` / `## Findings` / `### 2. Blocking Defects` / `### Verdict`, including numbered variants) plus a commit fingerprint (a line starting `Reviewed-Commit:` or a header referencing the commit like `## Cross-harness review ... of <sha>`) --- while a non-bot not-clean is admitted unconditionally, so the two paths are not mirror images (#2402, #4425).
 The function checks for report structure and the commit fingerprint rather than evaluating the SHA itself, but writing the full 40-character sha in `Reviewed-Commit: <sha>` or in the report header is still the right convention, since it is what lets a human or another tool confirm which head the withdrawal actually covers.
 A prose withdrawal ("the blocking concern is withdrawn") that fails the structure gate is silently discarded, with nothing distinguishing "not admitted" from "never commented."
 
@@ -632,7 +632,7 @@ A prose withdrawal ("the blocking concern is withdrawn") that fails the structur
 
 (Measured 2026-09-09 driving `d-morrison/rme#1138` to merge: a session's own hours-old, head-scoped do-not-merge comment needed three attempts to clear --- plain prose matched the finding regex on its own word "blocking," a reworded prose-with-`### Verdict`-heading version was silently dropped, and only the full structured-report-plus-`Reviewed-Commit` form was admitted, moving the examined count from 29 to 30.
 Measured again 2026-10-08 on `ai-config#4419`: an Antigravity `agy --print` review posted verbatim under `d-morrison` was skipped because its headings were numbered `### 2. Blocking Defects` and it lacked `Reviewed-Commit:`;
-ai-config#4425 updated `check-pr-fully-clean.py` to recognize numbered headings, the `Defects` family, line-start `Verdict:`, and header commit references.)
+ai-config#4425 updated `check-pr-fully-clean.py` to recognize numbered headings, the `Defects` family, and header commit references.)
 
 This is a different question from how much two reviewers **agreeing** is worth,
 which [`self-review-fallback`](self-review-fallback.md)'s cross-vendor section

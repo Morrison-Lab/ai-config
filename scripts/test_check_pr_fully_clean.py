@@ -5836,17 +5836,19 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         "_is_structured_review_body: non-review headers with numbers or prepositions do not qualify as commit fingerprints (#4425 control)",
         not checker._is_structured_review_body(
             "## Discussion of 1234567\n\n"
-            "I looked at this.\n\n"
+            "### Summary\nI looked at this.\n\n"
             "Verdict: Ready for merge\n"
         ) and not checker._is_structured_review_body(
             "### 1 of 1000000\n\n"
-            "All good.\n\n"
+            "### Summary\nAll good.\n\n"
             "Verdict: Ready for merge\n"
         ) and not checker._is_structured_review_body(
             "## End of 2026101\n\n"
-            "Done.\n\n"
+            "### Summary\nDone.\n\n"
             "Verdict: Ready for merge\n"
-        ),
+        ) and not checker._HEADER_COMMIT_RE.search("## Discussion of 1234567")
+        and not checker._HEADER_COMMIT_RE.search("### 1 of 1000000")
+        and not checker._HEADER_COMMIT_RE.search("## End of 2026101"),
     )
     check(
         "_is_structured_review_body: numbered headings without any fingerprint is NOT structured body (#4425 control)",

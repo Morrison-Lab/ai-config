@@ -9,6 +9,12 @@ Where a visual helps:
 - a result whose statement a picture makes obvious (a bound, a convergence rate, a bias-variance tradeoff);
 - a procedure with steps or a structure (a flowchart or a network diagram).
 
+Draw graphs with plotly where feasible (Ezra, 2026-10-14: "use plotly graphs where feasible, including 3d graphs where relevant"):
+an interactive widget on the website and slides, and a 3D plotly surface or scatter where a third dimension shows the idea, such as a risk surface over two parameters.
+Keep a static fallback for PDF and Word, which cannot show a widget;
+lds#642 (`chapters/_subfiles/big-ideas/_fig-risk-surface.qmd`) is the worked pattern: a plotly chunk for HTML output and a static image for the other formats.
+Use plain `ggplot2` or an SVG only where plotly is not feasible, such as a diagram.
+
 A visual follows the figure rules already in force:
 
 - figures that show estimates carry confidence intervals (error bars or ribbons);

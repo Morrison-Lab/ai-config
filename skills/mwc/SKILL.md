@@ -32,6 +32,12 @@ without asking confirmation before every merge.
   Nor does it authorize merging a PR that changes a rendered document (Word, PDF, slides, a manuscript) before that document has been viewed page by page at the current head, with the evidence and an independent referee read of that render posted on the PR ([`review-rendered-documents`](../../shared/workflow/review-rendered-documents.md)).
   A clean automated review from every available provider evaluating the current HEAD commit is strictly required for autonomous merge under MWC;
   a reviewer skip notice (e.g. for quota exhaustion or workflow edits) or a fallback self-review does NOT waive this requirement, grant merge authority under MWC, or clear missing external review.
+  **A cross-model, cross-harness adversarial review evaluating the shipping head is strictly required before merge.**
+  An author-dispatched review from a reviewer differing in BOTH model and harness from the authoring session must return a 100% all-clear verdict on the shipping head before merging,
+  per [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md).
+  An `Agent` subagent in Claude Code and the CI `claude-review` workflow are both Claude and do NOT satisfy this requirement.
+  In local sessions, dispatch to `opencode`, `agy` CLI, or `codex` (via `dto`, `dtc`, or `adv`);
+  in cloud sessions (e.g. claude.ai), run the review via `curl` to OpenCode Go (`https://opencode.ai/zen/go/v1/chat/completions`) streaming into `skills/delegate-to-opencode/scripts/parse-sse.py`, looping over candidate models (`deepseek-v4-pro`, `kimi-k3`, `qwen3.8-max`, `glm-5.3`) on 502s per [`delegate-to-opencode`](../delegate-to-opencode/SKILL.md).
   **A PR/MR does not count as clean for MWC if there are reviews still running.**
   A pending review request counts, and a per-PR `mwc` from the requested reviewer does not withdraw it
   ([`fully-clean`](../../shared/workflow/fully-clean.md#a-pending-review-request-is-a-second-independent-blocker)).
@@ -608,13 +614,23 @@ When the user gives an MWC grant (e.g. `/mwc` or "merge when confident"):
    an `enable-mwc` that reports success still leaves the guard blocking if the
    two sides resolved different ids, which is exactly what ai-config#1279 was.
 2. Proceed with the task (e.g. driving PRs to clean via `ardi`).
-3. When a PR reaches 100% clean state, merge it immediately
-   (default: `gh pr merge "<number>" -R "<owner>/<repo>" --squash --delete-branch --match-head-commit "<pinned-sha>"`,
-   the pin being the `headRefOid` recorded before the instrument ran;
-   on a base that requires a merge queue, stop and report instead, per
-   [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030)),
-   verify the merge landed on GitHub/GitLab,
-   and run the post-merge skill (`post-merge` / `ums`).
+3. When a PR reaches 100% clean state:
+   - **Verify or run cross-model, cross-harness adversarial review**:
+     Confirm the shipping HEAD commit has received a 100% all-clear verdict from an author-dispatched cross-model, cross-harness reviewer,
+     per [Standing Scope & Policy](#standing-scope--policy) above and [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md)
+     (local: `dto`/`dtc`/`adv`; cloud: `curl` to OpenCode Go with candidate model fallback per [`delegate-to-opencode`](../delegate-to-opencode/SKILL.md)).
+     Never proceed to the merge command before this verdict is clean.
+   - **Verify base currency and pre-merge pins**:
+     Run the base-currency check that [`fully-clean`](../../shared/workflow/fully-clean.md) states in its stale-base rule before the merge command.
+   - **Merge**:
+     `gh pr merge "<number>" -R "<owner>/<repo>" --squash --delete-branch --match-head-commit "<pinned-sha>"`,
+     the pin being the `headRefOid` recorded before the instrument ran;
+     on a base that requires a merge queue, stop and report instead, per
+     [#3030](https://github.com/Morrison-Lab/ai-config/issues/3030).
+   - **Wrap up**:
+     Verify the merge landed on GitHub/GitLab,
+     verify CI passed on the merge commit itself (`scripts/check-merge-commit-ci.py`),
+     and run the post-merge skill (`post-merge` / `ums`).
 4. If the user revokes the grant, run `skills/session-lock/scripts/ai-session.sh disable-mwc` immediately.
 
 ## What a re-grant does NOT mean

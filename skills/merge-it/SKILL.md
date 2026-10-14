@@ -75,6 +75,19 @@ Use `glab api --method PUT
   "sha=<pinned-sha>" -f "auto_merge=false"` or the equivalent
 API client; GitLab rejects the request when the source head has moved.
 
+### 1.5. Run or verify cross-model, cross-harness review on the shipping HEAD
+
+Before executing the merge, confirm the shipping HEAD commit has received a 100% all-clear verdict from an author-dispatched cross-model, cross-harness reviewer,
+per [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md).
+A same-harness review (such as an `Agent` subagent in Claude Code or the CI `claude-review` workflow) does not qualify for the merge gate.
+
+- **Local sessions**: dispatch to `opencode`, `agy` CLI, or `codex` (via `dto`, `dtc`, or `adv`).
+- **Cloud sessions**: dispatch via `curl` to OpenCode Go (`https://opencode.ai/zen/go/v1/chat/completions`) streaming into `skills/delegate-to-opencode/scripts/parse-sse.py` per [`delegate-to-opencode`](../delegate-to-opencode/SKILL.md),
+  with model fallback (`deepseek-v4-pro`, `kimi-k3`, `qwen3.8-max`, `glm-5.3`) on 502 upstream errors.
+  Do not use Python `urllib` (which returns 403 Forbidden through the cloud agent proxy).
+
+Never proceed to the merge call without a clean cross-harness review on the shipping head.
+
 ### 2. Merge
 
 - Before the merge command, run the base-currency check that `fully-clean.md` states in its stale-base rule

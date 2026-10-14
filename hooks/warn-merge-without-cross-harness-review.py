@@ -26,10 +26,15 @@ before the gap was noticed.
              which a simple command's command word is one of the CLIs in
              CROSS_HARNESS_CLIS, minus this session's own harness, with a
              first argument that is not a housekeeping one (NON_REVIEW_ARGS:
-             `--version`, `--help`, `login`, `auth`, ...).
+             `--version`, `--help`, `login`, `auth`, ...), or a `curl` call
+             with a data payload to `https://opencode.ai/zen/go/v1/chat/completions`
+             (the cloud-session route when `opencode` qualifies per AGENTS.md policy).
 
 A skill (`dtc`, `dto`, `adv`) is not credited by being loaded: loading one
 runs nothing. Its reviewer CLI call, which is a Bash call, is what counts.
+On a cloud session where `opencode` CLI is unavailable, a `curl` invocation
+targeting `https://opencode.ai/zen/go/v1/chat/completions` counts toward
+`opencode` as an explicit policy grant.
 
 Merge recognition reuses `_gh_merge` and push recognition reuses `_events`,
 `_push_before_merge` and `MCP_PUSH_TOOLS` from
@@ -70,6 +75,7 @@ import json
 import os
 import re
 import sys
+import urllib.parse
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 
@@ -103,9 +109,10 @@ NOTE = (
     "are required for merging') needs a verdict from a reviewer whose model "
     "AND harness both differ from this session's. An Agent subagent and the "
     "CI claude-review workflow are both Claude and do not qualify. Run one "
-    "of {clis} (for example through the dtc or dto skill) on the shipping "
-    "head first. If no qualifying reviewer is reachable here, the gate's own "
-    "answer is that the merge waits for a human or a differently-provisioned "
+    "of {clis} (or in cloud sessions, curl to opencode.ai with candidate "
+    "model fallback per delegate-to-opencode) on the shipping head first. "
+    "If no qualifying reviewer is reachable here, the gate's own answer is "
+    "that the merge waits for a human or a differently-provisioned "
     "session (ai-config#3099)."
 )
 
@@ -143,18 +150,49 @@ def _peel_wrappers(rest):
                 takes_arg = rest[0] in TIMEOUT_ARG_OPTS
                 rest = rest[2:] if takes_arg else rest[1:]
             if rest and not rest[0].startswith("-") and (
-                    os.path.basename(rest[0]) not in CROSS_HARNESS_CLIS):
+                    os.path.basename(rest[0]) not in CROSS_HARNESS_CLIS
+                    and os.path.basename(rest[0]) != "curl"):
                 rest = rest[1:]  # the duration
         else:
             return rest
     return rest
 
 
+def _is_opencode_curl(rest):
+    if HELP_FLAGS.intersection(rest[1:]):
+        return False
+    # A review requires a POST payload with the prompt; a smoke test does not qualify
+    has_data = any(
+        arg.startswith(("-d", "-F", "-sd", "-sF", "--data", "--form", "--json"))
+        or arg in ("-d", "-F", "-sd", "-sF", "--data", "--form", "--json")
+        for arg in rest[1:]
+    )
+    if not has_data:
+        return False
+    for arg in rest[1:]:
+        if "opencode.ai" not in arg.lower():
+            continue
+        try:
+            parts = urllib.parse.urlsplit(arg)
+        except Exception:
+            continue
+        host = parts.netloc.split(":")[0].lower()
+        if host == "opencode.ai" and parts.path.rstrip("/") == "/zen/go/v1/chat/completions":
+            return True
+    return False
+
+
 def _is_reviewer(rest, clis):
     rest = _peel_wrappers(rest)
-    return (len(rest) > 1 and os.path.basename(rest[0]) in clis
-            and rest[1] not in NON_REVIEW_ARGS
-            and not HELP_FLAGS.intersection(rest[1:]))
+    if not rest:
+        return False
+    base = os.path.basename(rest[0])
+    if len(rest) > 1 and base in clis:
+        return (rest[1] not in NON_REVIEW_ARGS
+                and not HELP_FLAGS.intersection(rest[1:]))
+    if base == "curl" and "opencode" in clis:
+        return _is_opencode_curl(rest)
+    return False
 
 
 def _shell_events(sib, command, clis):

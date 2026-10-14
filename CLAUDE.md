@@ -917,7 +917,8 @@ not an exhaustive list.
 
 ## Coding style: avoid nesting; follow the lab manual
 
-Follow the SERG lab manual (https://ucd-serg.github.io/lab-manual/) for coding and collaboration conventions.
+Follow Principles of Scientific Computing (https://morrison-lab.github.io/psc/) for coding conventions,
+and the SERG lab manual (https://ucd-serg.github.io/lab-manual/) for SERG collaboration conventions.
 
 <!-- Shared with the lab manual; edit shared/coding/avoid-nesting.md, not here. -->
 [shared/coding/avoid-nesting.md](shared/coding/avoid-nesting.md)

@@ -65,8 +65,8 @@ before starting work, and follow it alongside this file.
 This file's own instructions add to those rules, and win only where they are
 more specific.
 
-Also follow the [UCD-SERG Lab Manual](https://ucd-serg.github.io/lab-manual/)
-(source: <https://github.com/UCD-SERG/lab-manual>) and, for prose,
+Also follow [*Principles of Scientific Computing*](https://morrison-lab.github.io/psc/)
+(source: <https://github.com/Morrison-Lab/psc>) for code and, for prose,
 [*Principles of Scientific Writing*](https://morrison-lab.github.io/psw/)
 (source: <https://github.com/Morrison-Lab/psw>).
 {END}

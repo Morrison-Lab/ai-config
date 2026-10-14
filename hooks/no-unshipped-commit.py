@@ -1032,7 +1032,10 @@ def _update_dir_branches(branches_by_dir, d, branches, worktree_paths=None):
 
 
 def _parse_subagents(inp):
-    """Extract list of subagent dicts from inp, handling list, dict, and JSON string."""
+    """Extract list of subagent dicts from inp, delegating to review guard if available."""
+    guard = _load_review_guard()
+    if guard is not None and hasattr(guard, "_parse_subagents"):
+        return guard._parse_subagents(inp)
     if not isinstance(inp, dict):
         return []
     raw = inp.get("Subagents") or inp.get("subagents")
@@ -1056,13 +1059,23 @@ def _extract_dispatch_text(inp):
     """Flatten all string fields in a tool input dict/list for pattern matching."""
     texts = []
     if isinstance(inp, dict):
-        for sa in _parse_subagents(inp):
-            texts.append(_extract_dispatch_text(sa))
-        for v in inp.values():
-            if isinstance(v, str):
-                texts.append(v)
-            elif isinstance(v, (list, dict)):
-                texts.append(_extract_dispatch_text(v))
+        subagents = _parse_subagents(inp)
+        if subagents:
+            for sa in subagents:
+                texts.append(_extract_dispatch_text(sa))
+            for k, v in inp.items():
+                if k in ("Subagents", "subagents"):
+                    continue
+                if isinstance(v, str):
+                    texts.append(v)
+                elif isinstance(v, (list, dict)):
+                    texts.append(_extract_dispatch_text(v))
+        else:
+            for v in inp.values():
+                if isinstance(v, str):
+                    texts.append(v)
+                elif isinstance(v, (list, dict)):
+                    texts.append(_extract_dispatch_text(v))
     elif isinstance(inp, list):
         for item in inp:
             if isinstance(item, str):

@@ -429,6 +429,21 @@ CASES = [
     (PUSH, reviewed_subagents([{"TypeName": "research", "Role": "Docs Researcher",
                                 "Prompt": "Search documentation"}]), True,
      "an invoke_subagent dispatch with non-review prompt is refused (ai-config#4499)"),
+    (PUSH, reviewed_subagents([
+        {"TypeName": "general-purpose", "Prompt": "Please look up the API docs for GitHub Actions"},
+        {"Role": "Documentation Retrieval Agent", "Prompt": "Please write a self-review summary of my quarterly performance"}
+    ]), True,
+     "multi-subagent dispatch with split fallback persona and review prompt across distinct subagents is refused (no cross-contamination) (ai-config#4499)"),
+    (PUSH, reviewed_subagents([
+        {"TypeName": "general-purpose", "Prompt": "Please look up the API docs for GitHub Actions"},
+        {"TypeName": "research", "Prompt": "Do an adversarial review of HEAD vs origin/main"}
+    ]), False,
+     "multi-subagent dispatch with a genuine fallback reviewer subagent alongside an unrelated subagent is accepted (ai-config#4499)"),
+    (PUSH, reviewed_subagents([
+        {"TypeName": "general-purpose", "Prompt": "Please look up the API docs for GitHub Actions"},
+        {"TypeName": "research", "Role": "Adversarial Code Reviewer", "Prompt": "Review diff"}
+    ]), False,
+     "multi-subagent dispatch with a direct adversarial reviewer persona alongside an unrelated subagent is accepted (ai-config#4499)"),
     (PUSH, [poison_denial()], True,
      "the guard's own denial in the transcript does not authorize a retry"),
     (PUSH, poison_file_read(), True,

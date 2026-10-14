@@ -1857,6 +1857,54 @@ with os.fdopen(h_agy_neg, "w") as stream:
 assert subject.is_pre_push_review_in_flight(rev_root, path_agy_neg) is False
 assert "1 commit(s) on HEAD are not on its upstream" in subject.decide(rev_root, path_agy_neg)
 
+# Multi-subagent negative control: cross-contamination between distinct subagents must NOT suppress
+h_agy_split, path_agy_split = tempfile.mkstemp()
+with os.fdopen(h_agy_split, "w") as stream:
+    stream.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t_agy7", "name": "Bash", "input": {"command": "git commit -m 'unpushed commit'"}}]}
+    }) + "\n")
+    stream.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t_agy8", "name": "invoke_subagent", "input": {
+            "Subagents": [
+                {"TypeName": "general-purpose", "Prompt": "Search documentation for API parameters"},
+                {"Role": "Documentation Retrieval Agent", "Prompt": "Please write a self-review summary of my quarterly performance"}
+            ]
+        }}]}
+    }) + "\n")
+    stream.write(json.dumps({
+        "type": "user",
+        "message": {"content": [{"type": "tool_result", "tool_use_id": "t_agy8", "content": "Tool is running as a background task with task id: task-998"}]}
+    }) + "\n")
+
+assert subject.is_pre_push_review_in_flight(rev_root, path_agy_split) is False
+assert "1 commit(s) on HEAD are not on its upstream" in subject.decide(rev_root, path_agy_split)
+
+# Multi-subagent positive: genuine reviewer alongside unrelated subagent suppresses in-flight
+h_agy_multi, path_agy_multi = tempfile.mkstemp()
+with os.fdopen(h_agy_multi, "w") as stream:
+    stream.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t_agy9", "name": "Bash", "input": {"command": "git commit -m 'unpushed commit'"}}]}
+    }) + "\n")
+    stream.write(json.dumps({
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "id": "t_agy10", "name": "invoke_subagent", "input": {
+            "Subagents": [
+                {"TypeName": "general-purpose", "Prompt": "Search documentation for API parameters"},
+                {"TypeName": "research", "Role": "Adversarial Reviewer", "Prompt": "Perform adversarial code review on HEAD"}
+            ]
+        }}]}
+    }) + "\n")
+    stream.write(json.dumps({
+        "type": "user",
+        "message": {"content": [{"type": "tool_result", "tool_use_id": "t_agy10", "content": "Tool is running as a background task with task id: task-999"}]}
+    }) + "\n")
+
+assert subject.is_pre_push_review_in_flight(rev_root, path_agy_multi) is True
+assert subject.decide(rev_root, path_agy_multi) == ""
+
 print("PASS: invoke_subagent reviewer in flight suppresses unpushed commit block (ai-config#4499)")
 
 # ai-config#4120: _collect_worktrees_and_branches deduplicates list_worktrees

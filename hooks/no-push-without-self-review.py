@@ -2289,44 +2289,34 @@ def _is_reviewer_dispatch(inp: dict) -> bool:
     Claude-native `tool_use` blocks must agree on what counts (ai-config#2875),
     so both paths call this instead of carrying two copies of the predicate.
     """
+    subagents = _parse_subagents(inp)
+    if subagents:
+        for sa in subagents:
+            sa_types = []
+            for k in ("TypeName", "Role", "name", "role", "agent_type", "subagent_type", "persona"):
+                if sa.get(k):
+                    sa_types.append(str(sa.get(k)))
+            if any(ADVERSARIAL_AGENT_NAME.match(st) for st in sa_types):
+                return True
+            sa_prompt = str(
+                sa.get("prompt") or sa.get("Prompt") or
+                sa.get("instruction") or sa.get("Instruction") or
+                sa.get("description") or sa.get("Description") or ""
+            )
+            if sa_prompt and any(FALLBACK_AGENT_NAME.match(st) for st in sa_types):
+                if REVIEW_PROMPT_RE.search(sa_prompt):
+                    return True
+        return False
+
     sub_types = _agent_subtypes(inp)
     if any(ADVERSARIAL_AGENT_NAME.match(st) for st in sub_types):
         return True
-
-    subagents = _parse_subagents(inp)
-    for sa in subagents:
-        sa_types = []
-        for k in ("TypeName", "Role", "name", "role", "agent_type", "subagent_type", "persona"):
-            if sa.get(k):
-                sa_types.append(str(sa.get(k)))
-        if any(ADVERSARIAL_AGENT_NAME.match(st) for st in sa_types):
-            return True
-        sa_prompt = str(
-            sa.get("prompt") or sa.get("Prompt") or
-            sa.get("instruction") or sa.get("Instruction") or
-            sa.get("description") or sa.get("Description") or ""
-        )
-        if sa_prompt and any(FALLBACK_AGENT_NAME.match(st) for st in sa_types):
-            if REVIEW_PROMPT_RE.search(sa_prompt):
-                return True
 
     prompt = str(
         inp.get("prompt") or inp.get("Prompt") or
         inp.get("instruction") or inp.get("Instruction") or
         inp.get("description") or inp.get("Description") or ""
     )
-    if not prompt and subagents:
-        for sa in subagents:
-            sa_p = str(
-                sa.get("prompt") or sa.get("Prompt") or
-                sa.get("instruction") or sa.get("Instruction") or
-                sa.get("description") or sa.get("Description") or ""
-            )
-            if sa_p:
-                prompt = sa_p
-                if REVIEW_PROMPT_RE.search(prompt):
-                    break
-
     return bool(
         sub_types
         and any(FALLBACK_AGENT_NAME.match(st) for st in sub_types)

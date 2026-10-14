@@ -1247,3 +1247,20 @@ Pattern 34's `\u0061` example and this one's `\u0077` are the same trick.
 - **Do:** test subcommand options that share names with global options (e.g. `git commit -C HEAD`).
 - **Don't:** scan the entire `argv` list for global flags with a simple loop over `enumerate(argv)`.
 - **Don't:** hand-roll an option scanner when `shellcmd.git_subcommand` is already available in the repo.
+
+## Pattern 62: Cross-Contaminating Attribute Matching Across Elements in Multi-Agent Dispatches
+
+- **Mistake**: unioning or combining distinct attributes (such as persona names and task prompts) across different items in a collection or between top-level and nested structures (e.g. `Subagents` arrays in `invoke_subagent`).
+- **Direction of failure**: fail-open authorization bypass.
+  Two unrelated items (such as one fallback subagent with a non-review prompt, and another non-fallback subagent with a review-shaped prompt) combine to falsely satisfy a conjunction check requiring both conditions.
+- **Example**: 2026-10-13, PR [#4500](https://github.com/Morrison-Lab/ai-config/pull/4500) (`hooks/no-push-without-self-review.py`).
+  `_is_reviewer_dispatch` extracted persona types from all subagents in `Subagents` and prompt text from the last matching prompt across subagents,
+  allowing an unrelated fallback persona subagent and a separate non-reviewer subagent with review-like prompt text to falsely authorize a pre-push review gate.
+- **Fix**: evaluate multi-element collections strictly per-item.
+  Validate persona and prompt conditions together on the same element within the per-item loop and return or filter cleanly.
+  Never let a downstream fallback check combine fields across distinct elements.
+  Author discriminative regression tests featuring multi-element negative controls with mismatched split attributes.
+- **Do:** evaluate multi-element dispatches per-item, requiring persona and prompt conjunctions to hold on the same element.
+- **Do:** author multi-element negative control tests that verify split attributes across different items do not combine to pass.
+- **Don't:** union fields across elements in a list before evaluating multi-attribute predicates.
+

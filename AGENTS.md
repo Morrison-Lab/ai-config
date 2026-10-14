@@ -56,8 +56,6 @@ Print axis ticks as plain numbers, not scientific notation ([details](shared/wri
 One equation per display line unless a reason favors more;
 one `=` per math line ([details](shared/writing/math-derivation-steps.md)).
 Include a visual (graph, diagram, figure) wherever one helps a reader, in new work and in existing content you touch, as a plotly graph (3D where a third dimension helps) wherever feasible, with a static fallback for PDF and Word ([details](shared/writing/visuals-everywhere.md)).
-Cite a claim's real source or own it as judgement;
-never invent a vague attribution ([details](shared/writing/no-vague-attribution.md)).
 Label every display equation so it receives an equation number and a stable URL.
 Write all LaTeX math, in any repo or format, with the shared semantic macros: [`use-math-macros`](skills/use-math-macros/SKILL.md).
 
@@ -179,6 +177,11 @@ See [`grep-is-not-coverage`](shared/workflow/grep-is-not-coverage.md) and [`AGEN
 
 Whenever you or a subagent finds a useful resource in any format for any Morrison-Lab repo, course or project, track it in a repo now, from official sources only, to build comprehensive directories of our interests.
 Detail: [`track-useful-resources`](shared/workflow/track-useful-resources.md).
+## No vague attribution
+
+Cite a claim's real source or own it as judgement;
+never invent a vague attribution ([details](shared/writing/no-vague-attribution.md)).
+
 ## Store structured data in structured formats
 
 Keep structured data (lists of courses, resources, channels, terms) in CSV, YAML or JSON files that documents read and render, not as hand-written tables, wherever feasible.

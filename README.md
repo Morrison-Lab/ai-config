@@ -1085,8 +1085,8 @@ activated.")
 - `references/` — reviewed reference material / worked examples (e.g. a cloud
   Setup script). Documentation only: `bootstrap.sh` skips it, so it is **not**
   symlinked into `~/.claude`.
-- `shared/` — single-topic guidance fragments shared with the UCD-SERG lab
-  manual (see below).
+- `shared/` — single-topic guidance fragments shared with published lab
+  guides (see below).
 
 ## Shared content (`shared/`)
 

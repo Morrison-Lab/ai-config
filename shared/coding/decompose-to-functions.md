@@ -17,7 +17,7 @@ logic inline also buries the analysis narrative under implementation detail
 and duplicates code that should have one home. This is the `.qmd`
 counterpart to the standing rule that function definitions live in `R/`.
 [`lms::function_location_linter()`](https://github.com/Morrison-Lab/psc/tree/main/lms)
-(added in [UCD-SERG/lab-manual#403](https://github.com/UCD-SERG/lab-manual/pull/403))
+(added in the lab manual's copy of `lms` by [UCD-SERG/lab-manual#403](https://github.com/UCD-SERG/lab-manual/pull/403), before `lms` moved to psc)
 catches a function *defined* in a `.qmd`; this rule also covers loose chunk
 logic that was never wrapped in a function at all, which no linter flags.
 

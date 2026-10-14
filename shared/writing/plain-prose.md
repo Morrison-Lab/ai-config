@@ -36,6 +36,15 @@ When PSW and this guidance disagree, PSW wins.
   - **Do:** apply those PSW sections when writing or reviewing prose.
   - **Don't:** copy their text here; link the section instead
     (see [`dont-reinvent-wheel`](../principles/dont-reinvent-wheel.md)).
+- **Don't use money words as idioms for trade-offs** (Ezra, 2026-10-14).
+  Avoid "X costs us Y", "this buys us Z" and "at the price of";
+  say what is lost or gained.
+  Keep literal uses: computational or monetary cost,
+  and a cost function the text defines as a term.
+  PSW's rule is in
+  [Avoid vague and metaphorical language](https://morrison-lab.github.io/psw/chapters/word-choice.html#avoid-vague-and-metaphorical-language).
+  - **Do:** write "continuity gives us the intermediate value theorem".
+  - **Don't:** write "continuity buys us the intermediate value theorem".
 - **Follow an abstract or general statement with a concrete example.**
   A general claim is fine when an instance follows it;
   a vague one with no instance is not.

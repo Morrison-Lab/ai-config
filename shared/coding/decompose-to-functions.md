@@ -16,9 +16,9 @@ documented, and linted; a `.qmd` code chunk can be none of these. Keeping
 logic inline also buries the analysis narrative under implementation detail
 and duplicates code that should have one home. This is the `.qmd`
 counterpart to the standing rule that function definitions live in `R/`.
-Once `lms::function_location_linter()` lands (proposed in
-[UCD-SERG/lab-manual#403](https://github.com/UCD-SERG/lab-manual/pull/403)) it
-will catch a function *defined* in a `.qmd`; this rule also covers loose chunk
+[`lms::function_location_linter()`](https://github.com/Morrison-Lab/psc/tree/main/lms)
+(added in the lab manual's copy of `lms` by [UCD-SERG/lab-manual#403](https://github.com/UCD-SERG/lab-manual/pull/403), before `lms` moved to psc)
+catches a function *defined* in a `.qmd`; this rule also covers loose chunk
 logic that was never wrapped in a function at all, which no linter flags.
 
 Apply it when writing an analysis and when reviewing one: a `.qmd` chunk

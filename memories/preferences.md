@@ -538,7 +538,8 @@
   Name every `if()`/`while()` condition before testing it.
   Avoid nested function definitions where feasible, keeping one only when flattening it would be more convoluted.
   ([`avoid-nesting`](../shared/coding/avoid-nesting.md) has the carve-outs and rationale.)
-- Follow the SERG lab manual (https://ucd-serg.github.io/lab-manual/) for coding and collaboration conventions.
+- Follow Principles of Scientific Computing (https://morrison-lab.github.io/psc/) for coding conventions,
+  and the SERG lab manual (https://ucd-serg.github.io/lab-manual/) for SERG collaboration conventions.
 - Always hyperlink named artifacts in prose wherever a URL exists (PRs, MRs, reviews, review comments, issue comments, issues, commits, checks, jobs, pipelines, workflow runs).
   Whenever mentioning pull requests or issues in chat responses, recaps,
   comments, reviews, or documentation,

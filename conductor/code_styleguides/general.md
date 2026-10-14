@@ -28,10 +28,11 @@ and frameworks used in this project.
 - Document *why* something is done, not just *what*.
 - Keep documentation up-to-date with code changes.
 
-## Lab Manual & Multi-Harness Integration (UCD-SERG)
+## Lab Guides & Multi-Harness Integration (psc & UCD-SERG)
 
-- **Source Reference**: [UCD-SERG Lab Manual](https://github.com/UCD-SERG/lab-manual)
+- **Source Reference**: [Principles of Scientific Computing](https://github.com/Morrison-Lab/psc) for coding style;
+  [UCD-SERG Lab Manual](https://github.com/UCD-SERG/lab-manual) for SERG collaboration conventions
 - **Semantic Line Breaks (SemBr)**: Break markdown lines at semantic sentence boundaries and clause breaks for clear, mergeable git diffs.
-- **ASCII Compatibility**: Shared documentation fragments under `shared/` must remain pure ASCII (e.g., `---` for em-dashes, straight quotes) to pass lab manual submodule validation.
+- **ASCII Compatibility**: Shared documentation fragments under `shared/` must remain pure ASCII (e.g., `---` for em-dashes, straight quotes) to pass the ASCII checks in the lab guides that copy them.
 - **Agent Attribution**: Forge comments must include explicit agent disclosure markers.
 - **No Empty Promises**: All behavioral guidelines must be paired with mechanical tests, linters, or hooks.

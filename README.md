@@ -1085,16 +1085,17 @@ activated.")
 - `references/` — reviewed reference material / worked examples (e.g. a cloud
   Setup script). Documentation only: `bootstrap.sh` skips it, so it is **not**
   symlinked into `~/.claude`.
-- `shared/` — single-topic guidance fragments shared with the UCD-SERG lab
-  manual (see below).
+- `shared/` — single-topic guidance fragments shared with published lab
+  guides (see below).
 
 ## Shared content (`shared/`)
 
 `shared/` holds small, single-topic markdown fragments for guidance that lives
-in **both** this repo and the [UCD-SERG lab
-manual](https://ucd-serg.github.io/lab-manual/) (coding style, writing style,
-PR/agent workflow). Each fragment is the one source of truth for its topic, and
-two consumers pull it in:
+in **both** this repo and published lab guides:
+[Principles of Scientific Computing](https://morrison-lab.github.io/psc/) for coding style,
+and the [UCD-SERG lab manual](https://ucd-serg.github.io/lab-manual/) for writing style and PR/agent workflow.
+Each fragment is the one source of truth for its topic,
+and two consumers pull it in:
 
 - **`CLAUDE.md` and `AGENTS.md`** reference it with plain Markdown links
   (e.g. `[shared/writing/plain-prose.md](shared/writing/plain-prose.md)`).

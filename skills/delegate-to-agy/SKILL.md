@@ -11,10 +11,10 @@ allowed-tools:
 
 # delegate-to-agy --- run sidecar work on the Antigravity subscription, not Claude
 
-Standing rule: for heavy, parallelizable read, draft and verify work, spend the Antigravity subscription through the **`agy` CLI** before Claude budget.
+Standing rule: for bounded read-and-answer work, spend the Antigravity subscription through the **`agy` CLI** before Claude budget.
 Claude stays the orchestrator: it writes the briefs, checks the outputs and integrates them, and it is the fallback for anything `agy` cannot finish.
 This skill is the mechanism.
-The preference, the flag traps and the Windows install notes live in `memories/delegation.md`.
+The flag traps, the permission findings and the install notes live in `memories/delegation.md`.
 
 The subscription-only rule applies (Ezra, 2026-10-13): `agy` here means the CLI signed in with the Antigravity app's login.
 Never route work through a Gemini, OpenAI or Anthropic API key.
@@ -22,29 +22,35 @@ Never route work through a Gemini, OpenAI or Anthropic API key.
 ## Where it runs
 
 `agy` authenticates with the login the Antigravity app stored on the machine, and it has no documented headless token.
-So it works only on a machine where Antigravity is signed in:
+So it works only on a machine where Antigravity is signed in.
 
 | Session | Can use `agy`? |
 |---|---|
-| Local Claude Code on Ezra's Linux box (`cf463-02`) | Yes. `agy` 1.3.4 is on `PATH`, logged in (measured 2026-10-13). |
+| Local Claude Code on Ezra's Linux box | Yes, per the Linux measurement in `memories/delegation.md` ("agy on Linux"). |
 | Remote Control session on that box | Yes. It is his default device. |
-| Cloud session (claude.ai/code, GitHub Actions) | No. It has no Antigravity login, and its proxy injects no credential for it. |
+| Cloud session (claude.ai/code, GitHub Actions) | No. `AGENTS.md` records a cloud session as having no `agy`. |
 
 From a cloud session, ask Ezra to start a Remote Control session on the Linux box and run the dispatch there, or fall back to OpenCode Go (`delegate-to-opencode`).
 Do not look for a token, paste a credential, or switch to an API key to get around this.
+This skill is scoped to the Linux and macOS behaviour recorded in the memory.
+For Windows, read its "agy on Windows" section first, since the shell and command-line limits differ.
 
 ## When this fires
 
 - "delegate to agy", "use agy", "use Antigravity", "offload to agy", "dta".
-- Before a heavy read, audit or draft fan-out that would otherwise spend Claude tokens, when the session is on a machine with `agy`.
-- A cross-vendor second opinion on a diff: point `agy` at Claude's output and ask whether it holds up.
+- Before a bounded audit, draft or second-opinion pass that would otherwise spend Claude tokens, when the session is on a machine with `agy`.
 
 ## When NOT to delegate
 
 - A focused authoring or judgment task that needs Claude's own context.
 - The critical-path edit the rest of the work waits on.
+- Implementation on a machine whose `~/.gemini/antigravity-cli/settings.json` has no allow-rule for the tools the job needs.
+  The standing directive (2026-09-09, "use agy only for subagents;
+  no claude subagents except reviewers") sends implementation to `agy`, but it worked on Windows only because the user added a `command(*)` allow-rule there.
+  Without a rule, headless `agy` writes nothing and exits 0.
+  Check `settings.json` first, and ask Ezra before editing it;
+  on a machine with no rule, keep the job on a Claude subagent and say why.
 - Restricted data (PHI, FERPA records): `agy` sends the prompt off the machine.
-- Anything that must write files, unless you will read `git diff` afterwards (see step 4).
 
 ## Procedure
 
@@ -56,58 +62,66 @@ agy --version
 agy models
 ```
 
-Run `agy models` rather than trusting a remembered roster.
-At the 2026-10-13 measurement it listed 13 models, including Gemini, Claude Opus and Sonnet, and GPT-OSS 120B.
+Read the roster from `agy models` itself, never from a remembered list.
 If the binary is off `PATH`, search for it before concluding it is absent (`memories/delegation.md`, "agy on Windows").
 
-### 2. Write the brief to a file
+### 2. Write a self-contained brief
 
-Write the prompt to a scratchpad file with the Write tool, not a heredoc.
-Embed anything from the network in the brief yourself.
-Say which tools the run may use: headless runs cannot answer a permission prompt.
+Headless `agy` cannot read repo files or run `git diff` on its own.
+Embed the full text of every file the task needs, and for a review embed the diff too, regenerated before every re-dispatch round.
+Write the brief to a scratchpad file with the Write tool, not a heredoc.
+Embed anything from the network yourself.
 
-### 3. Dispatch headless
+### 3. Dispatch headless, in the background
 
 ```bash
-agy --model <id> --print-timeout 8m --print="$(cat "$WORK/prompt.txt")" > "$WORK/out.txt" 2> "$WORK/err.txt" < /dev/null
+WORK=<scratchpad>/agy-run
+mkdir -p "$WORK"
+rm -f "$WORK/DONE"
+nohup bash -c 'agy --model <id> --print-timeout 8m --print="$(cat "$0/prompt.txt")" > "$0/out.txt" 2> "$0/err.txt" < /dev/null; touch "$0/DONE"' "$WORK" > /dev/null 2>&1 &
 ```
+
+Poll for `$WORK/DONE` in a background Bash task, as `delegate-to-codex` does.
+A `nohup` launcher returning is not the run finishing.
 
 - Keep the prompt immediately after `--print`, or bind it with `=` as above.
   A flag between `--print` and the prompt becomes the prompt, and the exit status is still 0.
 - Redirect stdin from `/dev/null`.
-- Run anything longer than a minute in the background and poll a DONE marker, as `delegate-to-codex` does.
-  A foreground call dies at the tool timeout.
 
 ### 4. Verify what came back
 
 - **Exit 0 proves nothing.**
-  A run can exit 0 with empty output, or with a summary of edits it never made.
-  Read `$WORK/err.txt` and check the output is non-empty.
-- **Headless auto-denies any command not in `permissions.allow`** in `~/.gemini/antigravity-cli/settings.json`.
-  A denied tool shows up as a named permission error or a thin answer.
-  Prefer read-only briefs.
-  Widen the allow list only for the repos the dispatch should touch, and never with `--dangerously-skip-permissions`.
-- **After any run that was meant to edit files, run `git diff`.**
-  Trust the diff, not the summary.
-- **Re-derive every number it reports.**
+  A denied tool exits 0 with `jetski: no output produced --- a tool required the "<tool>" permission that headless mode cannot prompt for, so it was auto-denied`.
+  Read `$WORK/err.txt` and `$WORK/out.txt` for that line, and treat empty output as a failure.
+- A run can also print a "Completed Work Summary" naming files it never wrote.
+  Run `git diff` after any dispatch that might have touched the repo.
+- Re-derive every number it reports.
   `agy` has miscounted lines while reading correctly.
+- Do not edit the allow list or skip permissions on your own to make a run succeed.
+  The memory records conflicting reports on whether `permissions.allow` in `~/.gemini/antigravity-cli/settings.json` is honoured headless (it was on Windows 1.1.28;
+  upstream issue #548 says otherwise), and the allow list is Ezra's call.
+  The memory allows `--dangerously-skip-permissions` only for a fully trusted brief, and this skill never uses it.
+  For read-only work, embed the material in the brief instead.
 
 ### 5. Fall back for failures only
 
-If a run fails, times out or shows a quota error, redo only those items with a Claude subagent or OpenCode Go.
-If the whole subscription window is exhausted, fall back to Claude in the current session, never to a metered API.
+If a run fails, times out or returns nothing, redo only those items with a Claude subagent or OpenCode Go.
+No memory entry records what `agy` prints when the subscription window is exhausted, so treat an unexplained failure on every item as possible exhaustion, and say so in the report.
+If the whole window is exhausted, fall back to Claude in the current session, never to a metered API.
 
 ## Relationship to other skills
 
 - [`delegate-to-codex`](../delegate-to-codex/SKILL.md): the same background-and-poll pattern, for the ChatGPT plan (UCDH projects only).
 - [`delegate-to-opencode`](../delegate-to-opencode/SKILL.md): the cloud-session destination.
-- [`agy-review-workflow`](../agy-review-workflow/SKILL.md): the retired API-dispatch workflow. Do not use it.
 - [`adv`](../adv/SKILL.md): a cross-vendor adversarial review can run through `agy`.
+- [`agy-review-workflow`](../agy-review-workflow/SKILL.md): the retired API-dispatch workflow, separate from the CLI route.
+  Do not dispatch it.
 
 ## Anti-patterns
 
-- ❌ Reading a clean exit as success: check the output and `git diff`.
+- ❌ Reading a clean exit as success: check the output for the `jetski` line and for empty output.
+- ❌ Pointing headless `agy` at repo paths instead of embedding the text.
 - ❌ Looking for a token or API key to use `agy` from a cloud session.
-- ❌ Granting `command(*)` or skipping permissions broadly to make a run succeed.
+- ❌ Skipping permissions, or granting `command(*)` without Ezra's say-so, to make a run succeed.
 - ❌ Putting a flag between `--print` and the prompt.
 - ❌ Sending restricted data to `agy`.

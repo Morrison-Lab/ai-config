@@ -90,7 +90,7 @@ Claude's: `codex`, `agy`, and OpenCode's `opencode-go/*` tier.
 |---|---|---|
 | `codex` | ChatGPT | [`delegate-to-codex`](../skills/delegate-to-codex/SKILL.md) (alias `dtc`) |
 | `codex --profile <databricks-profile>` | institution-hosted Databricks Model Serving, when configured; `hac`-group projects on the UCDH GitLab only | [`delegate-to-databricks`](../skills/delegate-to-databricks/SKILL.md) |
-| `agy` (Google Antigravity) | API retired, **CLI available** (2026-08-25) | none --- invoke `agy --print` directly |
+| `agy` (Google Antigravity) | API retired, **CLI available** (2026-08-25) | [`delegate-to-agy`](../skills/delegate-to-agy/SKILL.md) (alias `dta`) |
 | `opencode` | OpenCode Go (`opencode-go/*`, $10/mo windowed) + free hosted (`opencode/*`, opencode Zen) | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) (alias `dto`) |
 | `openrouter` | prepaid credit balance (pay-as-you-go: free models only, per the subscriptions-only rule above), reached through OpenCode's `openrouter` provider | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md)'s "A third destination" section |
 | `adv` | Multi-engine local reviewer (`pre-push-review.py`) | [`adv`](../skills/adv/SKILL.md) |
@@ -419,6 +419,16 @@ what matters to a dispatcher is that the run's own report cannot be taken as evi
 - **Don't:** treat any of `--mode plan`, `--mode accept-edits`, `--dangerously-skip-permissions`, or a `permissions.allow` rule as the settled fix for a headless permission denial until one has actually been tried and reported --- this section names the options, not a verdict.
 - **Don't:** expect the `agentapi` transcript file to update instantly;
   it is a log a background process appends to, not a synchronous response.
+
+## agy on Linux (Ezra's work box)
+
+Measured 2026-10-13 in a Remote Control session on Ezra's Linux box, `cf463-02`, his default device for Remote Control.
+`agy` 1.3.4 was on `PATH` and signed in through the Antigravity app's stored login, with no API key.
+`agy models` listed 13 models, so run it for the current roster rather than reusing that count.
+`agy --print "<prompt>"` worked headless.
+Commands outside `permissions.allow` in `~/.gemini/antigravity-cli/settings.json` were auto-denied, exit 0 came back with summaries that claimed edits never made, and `git diff` was the only reliable check.
+A cloud session cannot use this route: it has no Antigravity login and no documented headless token, so the dispatch has to run on this box.
+[`delegate-to-agy`](../skills/delegate-to-agy/SKILL.md) is the mechanism.
 
 ## agy as a cheap adversarial-review lane on macOS
 

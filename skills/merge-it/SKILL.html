@@ -381,6 +381,7 @@ cookieconsent.run({
   <li><a href="#procedure" id="toc-procedure" class="nav-link" data-scroll-target="#procedure">Procedure</a>
   <ul class="collapse">
   <li><a href="#identify-the-pr-and-confirm-its-ready-never-assume" id="toc-identify-the-pr-and-confirm-its-ready-never-assume" class="nav-link" data-scroll-target="#identify-the-pr-and-confirm-its-ready-never-assume">1. Identify the PR and confirm it’s ready — never assume</a></li>
+  <li><a href="#run-or-verify-cross-model-cross-harness-review-on-the-shipping-head" id="toc-run-or-verify-cross-model-cross-harness-review-on-the-shipping-head" class="nav-link" data-scroll-target="#run-or-verify-cross-model-cross-harness-review-on-the-shipping-head">1.5. Run or verify cross-model, cross-harness review on the shipping HEAD</a></li>
   <li><a href="#merge" id="toc-merge" class="nav-link" data-scroll-target="#merge">2. Merge</a></li>
   <li><a href="#verify-the-merge-landed-never-assume" id="toc-verify-the-merge-landed-never-assume" class="nav-link" data-scroll-target="#verify-the-merge-landed-never-assume">3. Verify the merge landed — never assume</a></li>
   <li><a href="#chain-into-post-merge-automatically" id="toc-chain-into-post-merge-automatically" class="nav-link" data-scroll-target="#chain-into-post-merge-automatically">4. Chain into <code>post-merge</code> — automatically</a></li>
@@ -422,6 +423,15 @@ cookieconsent.run({
 <li>If any CI workflow or check run is red or still in progress/queued/pending, or the review still has open findings, <strong>do not merge</strong>. Report what’s blocking instead. (Only merge a not-clean PR if the user explicitly says to anyway.)</li>
 </ul>
 <p>For a GitLab MR, use <code>python3 scripts/check-mr-fully-clean.py &lt;iid&gt; --project &lt;id-or-path&gt; --quorum &lt;number-of-reachable-providers&gt;</code> instead of the GitHub checker. It must print the current full head SHA and a clean verdict. Before the merge call, re-read the MR and confirm its <code>sha</code> and <code>target_branch</code> are unchanged. Use <code>glab api --method PUT   "projects/&lt;project&gt;/merge_requests/&lt;iid&gt;/merge" -f   "sha=&lt;pinned-sha&gt;" -f "auto_merge=false"</code> or the equivalent API client; GitLab rejects the request when the source head has moved.</p>
+</section>
+<section id="run-or-verify-cross-model-cross-harness-review-on-the-shipping-head" class="level3">
+<h3 class="anchored" data-anchor-id="run-or-verify-cross-model-cross-harness-review-on-the-shipping-head">1.5. Run or verify cross-model, cross-harness review on the shipping HEAD</h3>
+<p>Before executing the merge, confirm the shipping HEAD commit has received a 100% all-clear verdict from an author-dispatched cross-model, cross-harness reviewer, per <a href="../../shared/workflow/adversarial-self-review.md"><code>adversarial-self-review</code></a>. A same-harness review (such as an <code>Agent</code> subagent in Claude Code or the CI <code>claude-review</code> workflow) does not qualify for the merge gate.</p>
+<ul>
+<li><strong>Local sessions</strong>: dispatch to <code>opencode</code>, <code>agy</code> CLI, or <code>codex</code> (via <code>dto</code>, <code>dtc</code>, or <code>adv</code>).</li>
+<li><strong>Cloud sessions</strong>: dispatch via <code>curl</code> to OpenCode Go (<code>https://opencode.ai/zen/go/v1/chat/completions</code>) streaming into <code>skills/delegate-to-opencode/scripts/parse-sse.py</code> per <a href="../../skills/delegate-to-opencode/SKILL.html"><code>delegate-to-opencode</code></a>, with model fallback (<code>deepseek-v4-pro</code>, <code>kimi-k3</code>, <code>qwen3.8-max</code>, <code>glm-5.3</code>) on 502 upstream errors. Do not use Python <code>urllib</code> (which returns 403 Forbidden through the cloud agent proxy).</li>
+</ul>
+<p>Never proceed to the merge call without a clean cross-harness review on the shipping head.</p>
 </section>
 <section id="merge" class="level3">
 <h3 class="anchored" data-anchor-id="merge">2. Merge</h3>

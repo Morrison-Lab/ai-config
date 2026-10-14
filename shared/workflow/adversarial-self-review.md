@@ -1353,11 +1353,11 @@ Measured 2026-09-02 against the three consumers, on `Ready for merge`:
 | form | `check-pr-fully-clean.py` | `parse_report` | `enforce-mwc-review-gate.py` |
 | --- | --- | --- | --- |
 | `Verdict: <phrase>` | reads | reads | **no verdict** |
-| `### Verdict` then `**<phrase>**` | reads | **no verdict** | reads |
+| `### Verdict` then `**<phrase>**` | reads | reads | reads |
 | `### Verdict: <phrase>` | reads | reads | reads |
 
-So write `### Verdict: Ready for merge` or `### Verdict: Needs more work` --- the heading and the phrase on one line, which is the only form all three read.
-The phrase matters as much as the form: the pre-push guard accepts `Ready for merge`, `Needs more work`, and `Needs work` and nothing else, so `Verdict: Clean`, `Verdict: Approved`, and `Verdict: Ready` return no verdict there while `check-pr-fully-clean.py` accepts all of them.
+So write `### Verdict: Ready for merge` or `### Verdict: Needs more work` --- or place the phrase under the heading on its own line (ai-config#4371) --- both of which all three consumers read.
+The phrase matters as much as the form: the pre-push guard accepts `Ready for merge`, `Clean`, `Needs more work`, `Needs work`, and `NOT_CLEAN` (ai-config#3991, ai-config#4371), while `check-pr-fully-clean.py` also accepts `Approved` and `Ready`.
 
 - **Do:** append the payload to any review you post or produce, including one nobody dispatched and one no push follows.
 - **Don't:** read this section as binding the persona alone --- the persona is where it is already implemented, not where it applies.

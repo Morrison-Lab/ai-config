@@ -30,4 +30,5 @@ The origin is usually the right citation, or shows the claim is not worth keepin
 
 Case: lds#935 (2026-10-14).
 A review bot flagged an uncited claim from a lecturer's slides.
-The first fix wrote "instructors often observe", which hid that it was one lecturer's.
+The first fix wrote "instructors often observe", which hid that the claim was one lecturer's.
+The right fix names that lecturer and the deck, as the first rule above says.

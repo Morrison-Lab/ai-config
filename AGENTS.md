@@ -55,6 +55,7 @@ For each plot, consider whether an axis should be extended to show important ref
 Print axis ticks as plain numbers, not scientific notation ([details](shared/writing/axis-tick-labels.md)).
 One equation per display line unless a reason favors more;
 one `=` per math line ([details](shared/writing/math-derivation-steps.md)).
+Include a visual (graph, diagram, figure) wherever one helps a reader, in new work and in existing content you touch ([details](shared/writing/visuals-everywhere.md)).
 Label every display equation so it receives an equation number and a stable URL.
 Write all LaTeX math, in any repo or format, with the shared semantic macros: [`use-math-macros`](skills/use-math-macros/SKILL.md).
 

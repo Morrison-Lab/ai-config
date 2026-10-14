@@ -179,7 +179,7 @@ Whenever you or a subagent finds a useful resource in any format for any Morriso
 Detail: [`track-useful-resources`](shared/workflow/track-useful-resources.md).
 ## No vague attribution
 
-Cite a claim's real source or own it as judgement;
+Cite a claim's real source or own it as judgment;
 never invent a vague attribution ([details](shared/writing/no-vague-attribution.md)).
 
 ## Store structured data in structured formats

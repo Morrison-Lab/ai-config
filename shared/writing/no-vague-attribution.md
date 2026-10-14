@@ -1,9 +1,17 @@
 # No vague attribution
 
-Name the real source of a claim, or write the claim as the author's own judgement, or cut it.
+Name the real source of a claim, or write the claim as the author's own judgment, or cut it.
 Never invent a vague attribution to give a claim the look of support.
 
-Phrases that do this: "instructors often observe", "it is well known", "experts agree", "studies show", "in practice, people find", "it is commonly said".
+Phrases that do this:
+
+- "instructors often observe"
+- "it is well known"
+- "experts agree"
+- "studies show"
+- "in practice, people find"
+- "it is commonly said"
+
 Each one tells the reader that a source exists and withholds it.
 
 Two rules follow.
@@ -14,7 +22,7 @@ Two rules follow.
 
 A reviewer's "this claim has no citation" asks for the source.
 Softening the wording, hedging the claim, or swapping in a vague attribution does not answer it.
-Find the source, or remove the claim, or keep the claim and say it is the author's judgement.
+Find the source, or remove the claim, or keep the claim and say it is the author's judgment.
 
 Before adding a hedge to satisfy a review note, ask where the claim came from.
 Trace it to its origin first (a slide, a paper, a prior version of the page).

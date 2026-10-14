@@ -588,7 +588,7 @@ only these specific commands, on this one session and date, were denied.
 ## Argon is the default cross-harness reviewer
 
 Ezra approved Argon, Gemini through the `agy` CLI, as the default non-Claude reviewer on 2026-10-14.
-First use, same day: eight read-only reviews of Morrison-Lab/lds PRs, one `agy --mode plan --print="<brief with the diff inline>"` per PR, run in parallel from scratch checkouts of each PR head.
+First use, same day: eight read-only reviews of [Morrison-Lab/lds](https://github.com/Morrison-Lab/lds) PRs, one `agy --mode plan --print="<brief with the diff inline>"` per PR, run in parallel from scratch checkouts of each PR head.
 
 - A first attempt that told `agy` to run `git diff` itself returned nothing on all eight, with `jetski: no output produced --- a tool required the "command" permission`.
   Embedding the diff in the brief and forbidding tools fixed it.

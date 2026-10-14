@@ -3556,16 +3556,16 @@ _REVIEW_STRUCTURE_HEADING = re.compile(
     r"(?:[\[\(]?\d+[.)\]]?\s*)?"
     r"(?:"
     r"(?:(?:Review|Executive)\s+)?Summary"
-    r"|(?:Status\s+of\s+(?:Previous\s+)?)?(?:Critical\s+|Actionable\s+|Detailed\s+|Blocking\s+|Non-Blocking\s+|New\s+|Defect\s+)?(?:Findings?|Defects?)"
+    r"|(?:Critical\s+|Actionable\s+|Detailed\s+|Blocking\s+|Non-Blocking\s+)?(?:Findings|Defects)"
     r"|(?:Summary\s+|Review\s+|Final\s+)?Verdict"
     r")"
     r")\b"
 )
 _REVIEWED_COMMIT_LINE = re.compile(
-    r"(?im)^\*{0,2}(?:Reviewed[- ]Commit|Review(?:ed)?[- ]for[- ]commit|Commit)\*{0,2}[ \t]*:"
+    r"(?im)^\*{0,2}Reviewed[- ]Commit\*{0,2}[ \t]*:"
 )
 _HEADER_COMMIT_RE = re.compile(
-    r"(?im)^#{1,6}\s*(?:Cross-harness\s+|Adversarial\s+|Self-)?(?:re-)?review\b.*?\b(?:of|for|at|commit)\s+([0-9a-f]{7,40})\b"
+    r"(?im)^#{1,6}\s*(?:Cross-harness\s+|Adversarial\s+|Self-)?(?:re-)?review\b.*?\b(?:of|for|at|commit)\s+(?:[0-9a-f]{7,40})\b"
 )
 _MULTI_BACKTICK_SPAN_RE = re.compile(
     r"(?<!`)(`{2,})(?!`)(?:[^\n\r]|\r?\n(?![ \t]*\r?\n))*?(?<!`)\1(?!`)"

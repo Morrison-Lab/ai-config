@@ -5801,33 +5801,17 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ),
     )
     check(
-        "_is_structured_review_body: Status of Previous Findings is structured body (#4425)",
+        "_is_structured_review_body: Actionable Defects and Critical Findings are recognized (#4425)",
         checker._is_structured_review_body(
-            "### Status of Previous Findings\nAll resolved.\n\n"
-            "Verdict: Ready for merge\n\n"
-            "Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\n"
-        ),
-    )
-    check(
-        "_is_structured_review_body: New Defects Introduced by Delta is structured body (#4425)",
-        checker._is_structured_review_body(
-            "### New Defects Introduced by Delta\nNone.\n\n"
-            "Verdict: Ready for merge\n\n"
-            "Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\n"
-        ),
-    )
-    check(
-        "_is_structured_review_body: Defect Findings and singular Defect headings are recognized (#4425)",
-        checker._is_structured_review_body(
-            "### 2. Defect Findings\nNone.\n\n"
+            "### 2. Actionable Defects\nNone.\n\n"
             "Verdict: Ready for merge\n\n"
             "Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\n"
         ) and checker._is_structured_review_body(
-            "### 1. Defect\nNone.\n\n"
+            "### 1. Critical Findings\nNone.\n\n"
             "Verdict: Ready for merge\n\n"
             "Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\n"
         ) and checker._is_structured_review_body(
-            "### 2. Blocking Defect\nNone.\n\n"
+            "### 3. Detailed Defects\nNone.\n\n"
             "Verdict: Ready for merge\n\n"
             "Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b\n"
         ),

@@ -55,6 +55,8 @@ As in the codex skill, do not infer a data trigger from a repo merely holding se
 
 ## A third destination: OpenRouter, for models neither tier carries
 
+OpenRouter bills pay-as-you-go from a prepaid balance, so under the subscriptions-only rule in [`memories/delegation.md`](../../memories/delegation.md) (Ezra, 2026-10-13) dispatch only to models priced 0/0, such as the stealth previews below, and never spend the balance.
+
 `opencode` reaches OpenRouter as an ordinary provider, and one class of model makes that worth configuring: OpenRouter’s **stealth** previews — anonymized frontier models trialled under codenames, free while they last. `stealth/ox-alpha` (“Ox Alpha”, a reasoning model for coding and agentic work, 1,048,576-token context, pricing 0/0) was the roster’s one entry on 2026-08-23.
 
 The provider is carried by the models.dev registry opencode resolves models from — stealth ids included — but it stays **inactive until the config or the auth store references it**, which is why a machine with no openrouter entry lists no `openrouter/*` ids at all. Any reference activates it: adding the entry below to the existing `provider` block of `opencode.jsonc` took this machine’s `opencode models` from zero `openrouter/*` ids to 360 — the full registry roster, including `stealth/ox-alpha` (which the registry already carried) and 359 ids the entry never named (measured 2026-08-23 on opencode 1.18.21). An empty `"openrouter": {}` therefore activates the same roster; a `models` entry earns its lines only by setting a display name, or by reaching an id the registry does not carry yet:

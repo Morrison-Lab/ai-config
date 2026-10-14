@@ -71,6 +71,16 @@ This is a standing default across all sessions,
 including ultracode/Workflow fan-outs,
 not occasional use.
 
+**Subscriptions and free tiers only (Ezra, 2026-10-13): never route work through a pay-as-you-go API.**
+Dispatch only to destinations covered by a flat-rate subscription or a free tier:
+a ChatGPT plan (`codex`), the Antigravity subscription (`agy` CLI, signed in locally),
+OpenCode Go, and OpenCode's hosted-free tier.
+Do not use a per-token billed key (a Gemini, OpenAI or Anthropic API key, OpenCode Zen's pay-as-you-go `/zen/v1`)
+or a prepaid credit balance such as `openrouter`'s, even when a key is available;
+use `openrouter` only for models it lists as free, and say so before dispatching.
+When every subscription window is exhausted, fall back to Claude in the current session rather than a metered API.
+Institution-provisioned budgets (`delegate-to-databricks`) are not Ezra's own pay-as-you-go spend, and their skill governs them.
+
 **Three of these are metered plans, and the rule is to try all three before
 Claude's: `codex`, `agy`, and OpenCode's `opencode-go/*` tier.
 `opencode`'s hosted-free tier sits outside that window logic entirely, and
@@ -82,7 +92,7 @@ Claude's: `codex`, `agy`, and OpenCode's `opencode-go/*` tier.
 | `codex --profile <databricks-profile>` | institution-hosted Databricks Model Serving, when configured; `hac`-group projects on the UCDH GitLab only | [`delegate-to-databricks`](../skills/delegate-to-databricks/SKILL.md) |
 | `agy` (Google Antigravity) | API retired, **CLI available** (2026-08-25) | none --- invoke `agy --print` directly |
 | `opencode` | OpenCode Go (`opencode-go/*`, $10/mo windowed) + free hosted (`opencode/*`, opencode Zen) | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) (alias `dto`) |
-| `openrouter` | prepaid credit balance, reached through OpenCode's `openrouter` provider | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md)'s "A third destination" section |
+| `openrouter` | prepaid credit balance (pay-as-you-go: free models only, per the subscriptions-only rule above), reached through OpenCode's `openrouter` provider | [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md)'s "A third destination" section |
 | `adv` | Multi-engine local reviewer (`pre-push-review.py`) | [`adv`](../skills/adv/SKILL.md) |
 
 Headless dispatch: `agy --print="<prompt>" [--effort low]`,

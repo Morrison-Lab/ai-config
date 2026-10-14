@@ -355,8 +355,8 @@ ending "shall we accept the current state?".
   A rung qualifies only when both its model and its harness differ from the
   authoring session, and the dispatch waits rather than falling through to a
   same-model or same-harness reviewer.
-  Route the `opencode` rung to an OpenCode Go tier or an OpenRouter stealth or
-  frontier id, since
+  Route the `opencode` rung to an OpenCode Go tier or a free OpenRouter stealth
+  id, since
   [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md)'s "When
   NOT to delegate" section bars the hosted-free Zen ids from judgment-bearing
   work.

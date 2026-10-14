@@ -1031,15 +1031,51 @@ def _update_dir_branches(branches_by_dir, d, branches, worktree_paths=None):
     branches_by_dir[canon] = set(branches)
 
 
+def _parse_subagents(inp):
+    """Extract list of subagent dicts from inp, delegating to review guard if available."""
+    guard = _load_review_guard()
+    if guard is not None and hasattr(guard, "_parse_subagents"):
+        return guard._parse_subagents(inp)
+    if not isinstance(inp, dict):
+        return []
+    raw = inp.get("Subagents") or inp.get("subagents")
+    if isinstance(raw, str):
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, list):
+                raw = parsed
+            elif isinstance(parsed, dict):
+                raw = [parsed]
+        except Exception:
+            return []
+    elif isinstance(raw, dict):
+        raw = [raw]
+    if isinstance(raw, list):
+        return [item for item in raw if isinstance(item, dict)]
+    return []
+
+
 def _extract_dispatch_text(inp):
     """Flatten all string fields in a tool input dict/list for pattern matching."""
     texts = []
     if isinstance(inp, dict):
-        for v in inp.values():
-            if isinstance(v, str):
-                texts.append(v)
-            elif isinstance(v, (list, dict)):
-                texts.append(_extract_dispatch_text(v))
+        subagents = _parse_subagents(inp)
+        if subagents:
+            for sa in subagents:
+                texts.append(_extract_dispatch_text(sa))
+            for k, v in inp.items():
+                if k in ("Subagents", "subagents"):
+                    continue
+                if isinstance(v, str):
+                    texts.append(v)
+                elif isinstance(v, (list, dict)):
+                    texts.append(_extract_dispatch_text(v))
+        else:
+            for v in inp.values():
+                if isinstance(v, str):
+                    texts.append(v)
+                elif isinstance(v, (list, dict)):
+                    texts.append(_extract_dispatch_text(v))
     elif isinstance(inp, list):
         for item in inp:
             if isinstance(item, str):
@@ -1135,10 +1171,32 @@ def _is_dispatch_relevant(inp, tool_name, harness_dirs, cur_dir, target_cwd_real
             v = inp.get(k)
             if isinstance(v, str) and v and v != "inherit":
                 all_paths.add(v)
-        prompt_text = str(
+
+        sub_prompts = []
+        for sa in _parse_subagents(inp):
+            for k in ("Workspace", "workspace", "dir", "directory", "cwd", "Cwd"):
+                v = sa.get(k)
+                if isinstance(v, str) and v and v != "inherit":
+                    all_paths.add(v)
+            sa_p = (
+                sa.get("prompt") or sa.get("Prompt") or
+                sa.get("instruction") or sa.get("Instruction") or
+                sa.get("description") or sa.get("Description") or
+                sa.get("command") or sa.get("cmd") or sa.get("CommandLine")
+            )
+            if isinstance(sa_p, str) and sa_p:
+                sub_prompts.append(sa_p)
+
+        top_p = (
             inp.get("prompt") or inp.get("Prompt") or
+            inp.get("instruction") or inp.get("Instruction") or
+            inp.get("description") or inp.get("Description") or
             inp.get("command") or inp.get("cmd") or inp.get("CommandLine") or ""
         )
+        if isinstance(top_p, str) and top_p:
+            sub_prompts.append(top_p)
+
+        prompt_text = " ".join(sub_prompts)
         prompt_text_lower = prompt_text.lower()
         norm_target = _normalize_dir_key(target_cwd_real)
         norm_target_slash = norm_target.replace("\\", "/").lower()
@@ -1250,6 +1308,14 @@ def _process_agent_tool_use(inp, tool_name, cur_dir, branches_by_dir, target_cwd
             agent_dirs.add(val)
             if agent_cwd is None:
                 agent_cwd = val
+
+    for sa in _parse_subagents(inp):
+        for key in ("cwd", "workdir", "Cwd", "WorkingDirectory", "path", "Workspace", "workspace"):
+            val = sa.get(key)
+            if isinstance(val, str) and val and val != "inherit":
+                agent_dirs.add(val)
+                if agent_cwd is None:
+                    agent_cwd = val
 
     dispatch_dir = agent_cwd or cur_dir or last_commit_dir or effective_cwd
     dispatch_branches = _lookup_dir_branches(branches_by_dir, dispatch_dir, worktree_paths)

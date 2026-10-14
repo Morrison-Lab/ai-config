@@ -173,6 +173,14 @@ def reviewed(text=None, agent_name="adversarial-reviewer", tool="Agent",
             agent_result(call_id, text if text is not None else body(), shape, is_error)]
 
 
+def reviewed_subagents(subagents, text=None, shape="str", is_error=False):
+    call_id = _fresh_id()
+    return [{"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "id": call_id, "name": "invoke_subagent",
+         "input": {"Subagents": subagents}}]}},
+        agent_result(call_id, text if text is not None else body(), shape, is_error)]
+
+
 def poison_denial():
     """The guard's own denial, surfaced back as the blocked call's result."""
     return {"type": "user", "message": {"content": [
@@ -410,6 +418,32 @@ CASES = [
     (PUSH, reviewed(agent_name="general-purpose",
                     prompt="Do an adversarial review of this diff"), False,
      "a fallback subagent with an adversarial review prompt is accepted"),
+    (PUSH, reviewed_subagents([{"TypeName": "research", "Role": "Adversarial Code Reviewer",
+                                "Prompt": "Do an adversarial review of this diff"}]), False,
+     "an invoke_subagent dispatch with a fallback persona and review prompt is accepted (ai-config#4499)"),
+    (PUSH, reviewed_subagents(json.dumps([{"TypeName": "research", "Role": "Adversarial Code Reviewer",
+                                          "Prompt": "Do an adversarial review of this diff"}])), False,
+     "a JSON-encoded Subagents string with fallback persona and review prompt is accepted (ai-config#4499)"),
+    (PUSH, reviewed_subagents([{"TypeName": "adversarial-reviewer", "Prompt": "Check diff"}]), False,
+     "an invoke_subagent dispatch with direct adversarial reviewer persona is accepted (ai-config#4499)"),
+    (PUSH, reviewed_subagents([{"TypeName": "research", "Role": "Docs Researcher",
+                                "Prompt": "Search documentation"}]), True,
+     "an invoke_subagent dispatch with non-review prompt is refused (ai-config#4499)"),
+    (PUSH, reviewed_subagents([
+        {"TypeName": "general-purpose", "Prompt": "Please look up the API docs for GitHub Actions"},
+        {"Role": "Documentation Retrieval Agent", "Prompt": "Please write a self-review summary of my quarterly performance"}
+    ]), True,
+     "multi-subagent dispatch with split fallback persona and review prompt across distinct subagents is refused (no cross-contamination) (ai-config#4499)"),
+    (PUSH, reviewed_subagents([
+        {"TypeName": "general-purpose", "Prompt": "Please look up the API docs for GitHub Actions"},
+        {"TypeName": "research", "Prompt": "Do an adversarial review of HEAD vs origin/main"}
+    ]), False,
+     "multi-subagent dispatch with a genuine fallback reviewer subagent alongside an unrelated subagent is accepted (ai-config#4499)"),
+    (PUSH, reviewed_subagents([
+        {"TypeName": "general-purpose", "Prompt": "Please look up the API docs for GitHub Actions"},
+        {"TypeName": "research", "Role": "Adversarial Code Reviewer", "Prompt": "Review diff"}
+    ]), False,
+     "multi-subagent dispatch with a direct adversarial reviewer persona alongside an unrelated subagent is accepted (ai-config#4499)"),
     (PUSH, [poison_denial()], True,
      "the guard's own denial in the transcript does not authorize a retry"),
     (PUSH, poison_file_read(), True,

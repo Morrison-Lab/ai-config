@@ -231,7 +231,7 @@ REVIEWED_COMMIT = re.compile(
 # (`ai-config:adversarial-reviewer`) is accepted -- the same persona is the same
 # reviewer whichever surface registered it.
 ADVERSARIAL_AGENT_NAME = re.compile(
-    r"\A\s*(?:[\w.-]+[:/])?adversarial[-_ ]?reviewer\s*\Z", re.I
+    r"\A\s*(?:[\w.-]+[:/])?adversarial[-_ ]?(?:code[-_ ]?)?reviewer\s*\Z", re.I
 )
 
 # When no dedicated `adversarial-reviewer` persona is registered in the
@@ -242,7 +242,7 @@ FALLBACK_AGENT_NAME = re.compile(
 )
 
 REVIEW_PROMPT_RE = re.compile(
-    r"\b(?:adversarial[-_ ]?(?:self[-_ ]?)?review|pre[-_ ]?push[-_ ]?review|self[-_ ]?review)\b", re.I
+    r"\b(?:adversarial[-_ ]?(?:(?:self|code)[-_ ]?)*review|pre[-_ ]?push[-_ ]?review|self[-_ ]?review)\b", re.I
 )
 
 # Tool names that dispatch a subagent, lowercased. Membership here does not
@@ -2224,6 +2224,27 @@ def parse_report(text: str) -> tuple[str | None, str | None]:
 
 
 
+def _parse_subagents(inp: dict) -> list[dict]:
+    """Extract list of subagent dicts from inp, handling list, dict, and JSON string."""
+    if not isinstance(inp, dict):
+        return []
+    raw = inp.get("Subagents") or inp.get("subagents")
+    if isinstance(raw, str):
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, list):
+                raw = parsed
+            elif isinstance(parsed, dict):
+                raw = [parsed]
+        except Exception:
+            return []
+    elif isinstance(raw, dict):
+        raw = [raw]
+    if isinstance(raw, list):
+        return [item for item in raw if isinstance(item, dict)]
+    return []
+
+
 def _agent_subtypes(inp: dict) -> list[str]:
     """Subagent names an Agent/Task dispatch names, from any observed key."""
     sub_types: list[str] = []
@@ -2253,12 +2274,10 @@ def _agent_subtypes(inp: dict) -> list[str]:
               "name", "Role", "role", "agent", "persona"):
         if inp.get(k):
             sub_types.append(str(inp.get(k)))
-    if isinstance(inp.get("Subagents"), list):
-        for sa in inp["Subagents"]:
-            if isinstance(sa, dict):
-                for k in ("TypeName", "Role", "name"):
-                    if sa.get(k):
-                        sub_types.append(str(sa.get(k)))
+    for sa in _parse_subagents(inp):
+        for k in ("TypeName", "Role", "name", "role", "agent_type", "subagent_type", "persona"):
+            if sa.get(k):
+                sub_types.append(str(sa.get(k)))
     return sub_types
 
 
@@ -2270,11 +2289,34 @@ def _is_reviewer_dispatch(inp: dict) -> bool:
     Claude-native `tool_use` blocks must agree on what counts (ai-config#2875),
     so both paths call this instead of carrying two copies of the predicate.
     """
+    subagents = _parse_subagents(inp)
+    if subagents:
+        for sa in subagents:
+            sa_types = []
+            for k in ("TypeName", "Role", "name", "role", "agent_type", "subagent_type", "persona"):
+                if sa.get(k):
+                    sa_types.append(str(sa.get(k)))
+            if any(ADVERSARIAL_AGENT_NAME.match(st) for st in sa_types):
+                return True
+            sa_prompt = str(
+                sa.get("prompt") or sa.get("Prompt") or
+                sa.get("instruction") or sa.get("Instruction") or
+                sa.get("description") or sa.get("Description") or ""
+            )
+            if sa_prompt and any(FALLBACK_AGENT_NAME.match(st) for st in sa_types):
+                if REVIEW_PROMPT_RE.search(sa_prompt):
+                    return True
+        return False
+
     sub_types = _agent_subtypes(inp)
     if any(ADVERSARIAL_AGENT_NAME.match(st) for st in sub_types):
         return True
-    prompt = str(inp.get("prompt") or inp.get("Prompt") or inp.get("instruction")
-                 or inp.get("description") or "")
+
+    prompt = str(
+        inp.get("prompt") or inp.get("Prompt") or
+        inp.get("instruction") or inp.get("Instruction") or
+        inp.get("description") or inp.get("Description") or ""
+    )
     return bool(
         sub_types
         and any(FALLBACK_AGENT_NAME.match(st) for st in sub_types)

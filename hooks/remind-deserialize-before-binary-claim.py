@@ -419,6 +419,13 @@ def scan(path):
 
 
 def main() -> int:
+    # The reminder quotes transcript text (an emoji tag, for one), so a
+    # non-UTF-8 console encoding (cp1252) made `print` raise and the hook die
+    # silent with exit 1 (ai-config#1288).
+    # Input too: a non-ASCII transcript_path read as cp1252 would miss the file.
+    for stream in (sys.stdin, sys.stdout):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     try:
         payload = json.load(sys.stdin)
     except Exception:

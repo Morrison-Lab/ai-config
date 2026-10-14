@@ -268,7 +268,7 @@ SILENT = [
 ]
 
 
-def run(records):
+def run(records, **extra_env):
     """Run the hook against a one-off transcript in a private TMPDIR.
 
     A private TMPDIR per case keeps the once-per-escalation sentinel from
@@ -283,8 +283,8 @@ def run(records):
         proc = subprocess.run(
             [sys.executable, HOOK],
             input=json.dumps({"transcript_path": path}),
-            capture_output=True, text=True,
-            env=dict(os.environ, TMPDIR=tmp, TEMP=tmp, TMP=tmp),
+            capture_output=True, text=True, encoding="utf-8",
+            env=dict(os.environ, TMPDIR=tmp, TEMP=tmp, TMP=tmp, **extra_env),
         )
         return proc
     finally:
@@ -301,6 +301,40 @@ for records, desc in REMIND:
         results.append((f"exit{p.returncode}", "exit0", f"exit status: {desc}"))
     if "block" in p.stdout.lower() and "decision" in p.stdout.lower():
         results.append(("blocked", "no-block", f"never blocks: {desc}"))
+
+# A cp1252 console must not change the verdict: the reminder quotes transcript
+# text, and a failed `print` used to kill the hook silent with exit 1
+# (ai-config#1288). Running every REMIND case under it keeps the denominator
+# the same as under UTF-8 instead of letting the encoding pick the outcome.
+for records, desc in REMIND:
+    p = run(records, PYTHONIOENCODING="cp1252")
+    got = "REMIND" if p.stdout.strip() else "silent"
+    results.append((got, "REMIND", f"cp1252 console: {desc}"))
+    if p.returncode != 0:
+        results.append((f"exit{p.returncode}", "exit0",
+                        f"cp1252 console exit status: {desc}"))
+
+# The payload on stdin is read under the same console encoding: a transcript
+# path with a non-ASCII character, sent as raw UTF-8, must still be found.
+uni = os.path.join(tempfile.mkdtemp(), "tést")
+os.makedirs(uni)
+try:
+    uni_path = os.path.join(uni, "transcript.jsonl")
+    with open(uni_path, "w", encoding="utf-8") as fh:
+        for r in REMIND[0][0]:
+            fh.write(json.dumps(r) + "\n")
+    p = subprocess.run(
+        [sys.executable, HOOK],
+        input=json.dumps({"transcript_path": uni_path},
+                         ensure_ascii=False).encode("utf-8"),
+        capture_output=True,
+        env=dict(os.environ, TMPDIR=uni, TEMP=uni, TMP=uni,
+                 PYTHONIOENCODING="cp1252"),
+    )
+    results.append(("REMIND" if p.stdout.strip() else "silent", "REMIND",
+                    "cp1252 console: non-ASCII transcript path is found"))
+finally:
+    shutil.rmtree(os.path.dirname(uni), ignore_errors=True)
 
 for records, desc in SILENT:
     p = run(records)

@@ -1,0 +1,309 @@
+# Google Antigravity & `agy` CLI
+
+Claims below about Antigravity's runtime behavior were checked 2026-08-26 unless a claim carries its own date.
+Re-verify against a live install before relying on any of them, since the primary docs were egress-blocked from this session.
+
+## Hook architecture and schema mapping
+
+Antigravity defines lifecycle events in `plugins/<plugin-name>/hooks.json`.
+
+### `extensionPath` is not supported in command paths
+
+A `command` value is resolved against the terminal's active working directory, not against the plugin's own directory --- and Antigravity has a known bug where that cwd can default to `$HOME` regardless of which project is open.
+A relative command such as `python3 ./claude-hook-adapter.py` therefore fails to launch under conditions this repo cannot control, which fails open: no Stop, PreInvocation, or catalog PreToolUse hook runs at all, silently.
+
+Unlike Claude Code, Antigravity does **not** interpolate variables like
+`${extensionPath}` or `${CLAUDE_PLUGIN_ROOT}` in `hooks.json` commands.
+Commands in `hooks.json` must use absolute paths
+or a path relative to a stable directory like `~/.gemini/config/plugins/...`.
+(Empirical finding verified on macOS 2026-08-29: Antigravity expands `~` when launching the command).
+For example, `ai-config` uses
+`~/.gemini/config/plugins/ai-config/claude-hook-adapter.py`
+backed by a staging directory created in `bootstrap.sh`.
+
+### A Windows hook command must carry no quotes, and `python3` and `~` do not resolve there
+
+Measured 2026-09-09 on Windows 11 ([ai-config#3091](https://github.com/Morrison-Lab/ai-config/issues/3091)).
+`cmd.exe` resolves neither `python3` nor `~`, so the portable POSIX command form cannot be staged verbatim onto a Windows machine.
+The obvious repair, an absolute interpreter path in quotes, does not work either: the launcher hands the whole command to `cmd.exe` as a **single argument**, which re-escapes every embedded quote on the way, so a correctly quoted path arrives with a backslash in front of it and `cmd.exe` reports it as not recognized.
+The same two paths **unquoted** launch and return `{"decision": "allow"}`.
+
+That leaves one correct form, an unquoted absolute interpreter path followed by an unquoted absolute script path, which has no rendering at all when either path contains a space.
+`scripts/render-agy-hooks.py` writes that form (and fails fast on a space, naming `AGY_HOOK_PYTHON` as the override);
+`bootstrap.sh` calls it in place of the `cp` it used to run;
+`scripts/check-agy-hook-commands.py` refuses both the escaped form and any quote, and `scripts/doctor.py` runs it over the installed copy.
+
+- **Do:** render the staged manifest per platform, and leave `plugins/ai-config/hooks.json` in the portable POSIX form.
+- **Do:** re-run `bootstrap.sh` rather than hand-editing the staged `hooks.json`, since a hand repair is what introduced the quoting.
+- **Don't:** quote a path in a Windows hook command, however correctly the JSON escapes it.
+
+### Windows plugin entry paths in `plugins.json` must be clean without quotes or escape characters
+
+Measured 2026-09-23 in an Antigravity Windows session:
+When a plugin path entry in `~/.gemini/config/plugins.json` or its command wrapper carries literal double quotes (e.g. from copy-pasting or nested JSON escaping), Node.js on Windows preserves literal quotes in `argv[1]`.
+Because the argument begins with a quote rather than a drive letter (e.g. `"C:\...` instead of `C:\...`), `path.isAbsolute()` evaluates to false, Node treats the path as relative to cwd, and every subsequent pre-tool hook execution crashes with `MODULE_NOT_FOUND`.
+Keeping `plugins.json` entries strictly formatted as standard unquoted JSON string paths (e.g. `{"entries": [{"path": "C:/Users/.../ai-config"}]}`) immediately restores hook dispatch.
+
+- **Do:** format `plugins.json` paths cleanly without extraneous quotes or escape wrappers.
+- **Don't:** leave quotes inside entry path strings in `plugins.json`.
+
+### A hooked-tool failure leaves headless `agy` reporting success
+
+Same measurement ([ai-config#3091](https://github.com/Morrison-Lab/ai-config/issues/3091)), and it is why the quoting bug survived a full dispatch unnoticed.
+A `run_command` hook that fails to launch is skipped (see this file's fail-open section), the agent then cannot run any shell command, and the headless run still exits 0 and prints a "Completed Work Summary" naming files it never wrote.
+Nothing in the exit code, the stdout, or the summary distinguishes that from a successful dispatch.
+
+- **Do:** verify a dispatched `agy` run's claimed edits against `git status` or `git diff` before believing its summary.
+- **Don't:** read exit 0 plus a work summary as evidence that any file changed.
+
+### Background tasks and console window popups on Windows
+
+Measured 2026-09-21 in an Antigravity Windows session:
+Commands sent to the background by `run_command`
+(either by setting `WaitMsBeforeAsync` smaller than execution time
+or running `.cmd`/`.bat` scripts and `Start-Sleep`)
+spawn visible console windows (`conhost.exe` / `cmd.exe` / `powershell.exe`)
+that disrupt the user's workspace.
+The harness provides the `schedule` tool for non-blocking timers;
+keep synchronous commands fast (< 10 seconds) with `WaitMsBeforeAsync: 10000`
+so they complete without falling into background execution,
+and invoke executables directly (`python scripts/...`)
+rather than through `.cmd` or `.bat` batch wrappers.
+
+- **Do:** use `schedule(DurationSeconds=N, Prompt="...")` for all delayed checks and polling loops.
+- **Don't:** run `Start-Sleep` or long background commands that spawn visible console windows on Windows.
+
+### Lifecycle events & payload mapping
+- **`PreToolUse`**: Passed `{"toolCall": {"name": "<tool_name>", "args": { ... }}}`.
+  Returns `{"decision": "allow" | "deny" | "ask", "reason": "..."}`.
+  - In Antigravity's `hooks.json`, `PreToolUse` handlers are **grouped** under `{ "matcher": "...", "hooks": [ ... ] }`.
+  - The plugin's `PreToolUse` list carries discrete single-tool matcher groups for each tool name (`run_command`, `invoke_subagent`, `send_message`, `define_subagent`, `call_mcp_tool`, `write_to_file`, `replace_file_content`, and wildcard `mcp__github__.*`), rather than combining them into a regex alternation.
+    Whether Antigravity treats `matcher` as a regex alternation with pipes is unverified (2026-08-26), so discrete matcher blocks de-risk completely against silent fail-open if Antigravity's engine uses literal string matching.
+    `run_command` carries both `enforce-mwc-review-gate.py` and `claude-hook-adapter.py`; the other groups carry `claude-hook-adapter.py`.
+  - `call_mcp_tool` maps `ServerName` and `ToolName` to Claude Code's `mcp__{ServerName}__{ToolName}` convention (e.g. `ServerName: "github"`, `ToolName: "merge_pull_request"` -> `mcp__github__merge_pull_request`), unpacking `Arguments` into `tool_input` (tool schema verified live in Antigravity session 2026-09-04).
+  - `write_to_file` maps to `Write` (`file_path: TargetFile`, `content: CodeContent`) (tool schema verified live in Antigravity session 2026-09-04).
+  - `replace_file_content` maps to `Edit` (`file_path: TargetFile`, `old_string: TargetContent`, `new_string: ReplacementContent`) (tool schema verified live in Antigravity session 2026-09-04).
+  - `run_command` maps to Claude Code's `Bash` tool (`{"command": args.get("CommandLine")}`).
+  - `invoke_subagent` passes an array `{"Subagents": [{"TypeName": "...", "Workspace": "...", "Prompt": "..."}]}`.
+    A bridge adapter evaluates all subagents in the list against `Agent` PreToolUse hooks.
+    If any subagent triggers `deny`, the whole tool execution is denied.
+    Subagent isolation requires passing `Workspace: "branch"` in `invoke_subagent`, which `claude-hook-adapter` maps to Claude Code's `isolation: "worktree"` enum (`hooks/flag-unassigned-worktree.py`).
+    On Windows, ensure `~/.gemini/config/plugins/ai-config/claude-hook-adapter.py` is kept synced with `plugins/ai-config/claude-hook-adapter.py`.
+  - `send_message` maps to `SendMessage`.
+  - `define_subagent` maps to `Task`.
+  - Claude PreToolUse hooks may also return a top-level `systemMessage` (shown to the user, independent of the `hookSpecificOutput.permissionDecision` deny/allow verdict).
+    Antigravity's `PreToolUse` schema does not support this top-level field, so the adapter never forwards it directly.
+    On deny it is concatenated into `reason`.
+    On allow it is logged to stderr only.
+- **`Stop`**: Fired on termination attempt (`{"terminationReason": "model_stop", "transcriptPath": "..."}`).
+  - In Antigravity's `hooks.json`, `Stop` handlers are **flat** (a direct list of `{ "type": "command", "command": "..." }` objects without `matcher`/`hooks` wrappers), per Antigravity hook specifications.
+  - To prevent termination (e.g. when unfulfilled obligations or unreviewed commits exist), Antigravity expects `{"decision": "continue", "reason": "..."}`.
+    Any other value (or `{"decision": "allow"}`) allows termination.
+  - `systemMessage` is a **top-level** field accepted on every Claude Code hook event (confirmed in Claude Code's own hooks docs), independent of `decision`.
+    Antigravity's own Stop event is reported to surface it as a warning in the interface, per the same secondary-source synthesis checked 2026-08-26.
+    That surfacing behavior is unconfirmed against a live install, since the primary docs were egress-blocked from this session --- re-verify before relying on it.
+    A warn-only Stop hook (no block/deny decision) still allows the stop, but its message rides along as `{"systemMessage": "..."}` rather than reaching only stderr.
+  - Claude hooks in `hooks/hooks.json` are grouped and output `{"decision": "block", "reason": "..."}`.
+    An adapter must translate `block` to `continue`.
+- **`PreInvocation`**: Fired before the model call.
+  Its documented input fields are `invocationNum`, `initialNumSteps`, `conversationId`, `workspacePaths`, `transcriptPath`, and `artifactDirectoryPath` --- **no prompt text field at all**.
+  A seventh field, `modelName`, is an inference from secondary-source synthesis (checked 2026-08-26), not shown in the example payload those sources reproduce --- treat it as unconfirmed.
+  The adapter's `prompt` extraction (`prompt` / `userPrompt` / `message`, then a `messages` scan for an explicit user/human-authored entry) is therefore a defensive fallback for a payload shape not observed in production, not a mapping of a documented field.
+  Expect `prompt` to be empty on a real Antigravity invocation unless a future payload version adds one.
+  The scan never falls back to an arbitrary last message regardless of role, since that could silently substitute the model's own prior turn for the user's prompt.
+  - In Antigravity's `hooks.json`, `PreInvocation` handlers are also **flat**.
+  - Context injection in Antigravity uses `{"injectSteps": [{"ephemeralMessage": "..."}]}`.
+  - Claude `UserPromptSubmit` hooks may output raw text, or JSON carrying a `systemMessage`/`additionalContext` field, to stdout.
+    The adapter parses JSON when present (falling back to the raw text otherwise), reading `systemMessage`, top-level `additionalContext`, or the nested `hookSpecificOutput.additionalContext` form, and emits one `ephemeralMessage` `injectSteps` entry per hook --- it does not join multiple hooks' output into a single joined string.
+    The caps default to 10KB per message, 30KB total, and 20 messages, and are overridable via `AGY_ADAPTER_MSG_BYTE_CAP`, `AGY_ADAPTER_TOTAL_BYTE_CAP`, and `AGY_ADAPTER_MSG_CAP` (the subagent fanout cap is `AGY_ADAPTER_FANOUT_CAP`, default 50;
+    max hook execution worker threads is `AGY_ADAPTER_MAX_WORKERS`, default 16, clamped to at least 1).
+
+### Fail-open on a hook subprocess timeout or crash is intentional, not a gap
+
+A catalog hook that times out or raises inside `subprocess.run` is skipped, and execution proceeds as if that hook had not run.
+This matches Claude Code's own documented behavior for a command-hook PreToolUse timeout: the hook is killed and Claude continues, since command hooks only block via an explicit exit-code-2 (or a JSON deny) response, never via failing to answer.
+Every hook actually shipped in this repo's catalog (`hooks/*.py`) signals a deny via JSON with exit 0, never via exit code 2, so this fail-open path is reached only by a genuine timeout, crash, or missing script --- never by a hook's own deliberate denial being silently discarded.
+
+### Silent failure prevention
+Harness bridge adapters must be gated by isolated unit tests in CI (`validate.yml`, e.g. `scripts/test_agy_hook_adapter.py`).
+Because an incomplete adapter simply returns `{"decision": "allow"}` when it misses an event, adapter gaps fail silently in production unless tested against synthetic payloads.
+
+## `agy` CLI model execution & print mode
+
+- Model names in `agy --model` must match the registered string format, e.g. `agy --model "Claude Sonnet 4.6 (Thinking)" -p "<prompt>"`.
+- Print mode (`-p` / `--print`) runs a single turn.
+  When prompting reasoning/thinking models (such as Claude Thinking models or reasoning Gemini models) non-interactively without tool access, enforce immediate output in the prompt (e.g., "Provide your full review immediately in this response.
+  Do not use tools or acknowledge with a conversational promise.").
+  Otherwise, tool-using models may output an initial conversational acknowledgment expecting a subsequent tool-use turn.
+
+### Headless `agy -p` invocation quirks (Windows, agy 1.3.5)
+
+Measured 2026-10-15 running a cross-harness Gemini review from a Windows XPS box.
+
+- With `--mode` following, the prompt attached only as `-p="..."`.
+  A bare `-p "..."` followed by `--mode` took `--mode` as the prompt.
+  [`delegation.md`](delegation.md) documents the space form for `--print` without trailing flags;
+  keep the `=` form when other flags follow.
+- With `-p` present, stdin was **not** read as the prompt.
+  `delegation.md` records piping a brief on stdin with no `-p` at all;
+  that is a different invocation and is not contradicted here.
+- Headless mode auto-denies tool permissions (`read_file` included), so the model cannot fetch the diff itself.
+  Embed the whole diff in the prompt and pass `--mode plan`.
+- The Windows command line caps near 32k characters.
+  Truncate the embedded diff (about 24000 characters, leaving headroom under the cap for the prompt template) or pipe a brief file per `delegation.md`.
+  Say in the posted review that the diff was truncated.
+
+- **Do:** `agy -p="<prompt with diff embedded>" --mode plan`, diff truncated to about 24000 characters with a stated notice.
+- **Don't:** combine `-p` with stdin input, put `-p` and its value as separate arguments, or expect the model to read files in headless mode.
+
+## The merge gate is client-side only, and client hooks fail open --- server rules are the only enforcement that survives a delivery failure
+
+Measured 2026-08-30 (Morrison-Lab/ai-config#2676): agy merged Lacaedemon/sparta#1427 over a "Needs more work" verdict.
+Replaying the exact command against `plugins/ai-config/enforce-mwc-review-gate.py` returned deny, so the gate's deny never took effect in the merging session --- either the hook was not launched (this file's own fail-open section: a hook that fails to launch is skipped silently) or its deny was discarded by an adapter gap, and no artifact distinguishes the two.
+Three layers had to fail together, and each is worth checking separately when auditing a bad merge:
+
+1. **Client hook delivery.**
+   No artifact records whether a hook ran;
+   absence of a deny is not evidence of an allow decision.
+2. **Gate logic.**
+   Fix and 61 hermetic test cases are in ai-config#2678 (open as of 2026-08-30);
+   the pre-rewrite gate allowed any PR carrying at least one formal review, whatever the verdict said.
+3. **Server rules.**
+   `require-review` (gha) is delivery-only by design --- it greens when a review ran and posted, saying nothing about the verdict (its own header comment states this).
+   A ruleset with no required status checks (sparta's `main` at the time) blocks nothing.
+   Opt-in verdict gating is proposed as Morrison-Lab/gha#767;
+   sparta's required checks as Lacaedemon/sparta#1432.
+
+- **Do:** treat required status checks in the ruleset as the enforcement layer, and the client hook as UX that catches the mistake earlier.
+- **Don't:** read a green `require-review` as a clean verdict, or a quiet client hook as having allowed the merge.
+
+## Forensics: agy conversations are sqlite DBs, and plugins.json points at the live checkout
+
+- IDE sessions: `~/.gemini/antigravity/conversations/*.db`; CLI sessions: `~/.gemini/antigravity-cli/conversations/*.db`, with prompts in `~/.gemini/antigravity-cli/history.jsonl`.
+  `strings <db> | grep <needle>` recovers commands and hook decisions without a sqlite client;
+  mtimes bracket the session window.
+- Two path layers decide which hook code agy actually runs:
+  `~/.gemini/config/plugins.json` registers the plugin in a **staging runtime directory** (`~/.gemini/config/plugins/ai-config`),
+  where `hooks.json` and `plugin.json` are copied so Antigravity runtime rewrites do not dirty the git checkout.
+  Executable scripts and repository directories (`hooks/`, `scripts/`, `skills/`, `shared/`, `rules/`) are symlinked from the checkout into the staging directory,
+  so adapter and gate updates take effect live while canonical source remains pristine.
+  (Updated 2026-08-31 for Issue #2673).
+
+## Antigravity plugin rules discovery
+
+- Antigravity plugins discover ambient and conditional rules from `<plugin_dir>/rules/*.md` containing YAML frontmatter with `trigger:` and `description:`.
+- Packaging rules under `plugins/ai-config/rules/` (and staging them into `~/.gemini/config/plugins/ai-config/rules`) delivers universal instructions and Antigravity operating guidelines across all host workspaces without requiring manual submodule or local repo configuration.
+
+## Reactive wakeup vs background task polling
+
+- In Antigravity, background commands, subagents, and schedules resume execution reactively via incoming system messages (`MESSAGE_PRIORITY_HIGH`).
+- Do not poll `manage_task(Action='status')` or run repetitive checks in a loop while waiting for a long-running background command or test suite to finish.
+- After launching an asynchronous task or schedule timer, end the tool turn and let the reactive system wakeup resume execution when the process exits or the timer expires.
+  (Observed in live Antigravity sessions 2026-08-30.)
+
+## Python SDK (`antigravity-sdk-python`) vs declarative plugins and CLI
+
+The [`google-antigravity/antigravity-sdk-python`](https://github.com/google-antigravity/antigravity-sdk-python) library is the programmatic Python SDK for building, orchestrating, and embedding Antigravity agents (evaluated 2026-08-31).
+
+- **Declarative plugin & skill boundary:**
+  Antigravity IDE, Desktop 2.0, and `agy` discover skills and hooks declaratively via `plugins/ai-config/plugin.json`, `hooks.json`, and markdown skills.
+  The Python SDK is designed for embedding an agent inside a custom Python application or test process, not for authoring plugin configurations or ambient agent behavior.
+- **Review dispatcher parity (`pre-push-review.py`):**
+  Single-turn local code review uses `agy --print` (alongside `claude`, `codex`, `cursor`, `opencode`) to tap into the user's active local CLI subscription login without extra Python runtime dependencies or API key management.
+- **Future adoption trigger:**
+  Evaluate adopting `antigravity-sdk-python` if building Python-native automated agent benchmarking suites, synthetic skill evaluation harnesses, or headless CI pipelines that require typed step streams and programmatic tool registration.
+
+## Asynchronous subagent dispatch and pre-push self-review (`invoke_subagent`)
+
+- In Antigravity / Gemini CLI, `invoke_subagent` dispatches subagents asynchronously in the background, returning `{conversationId, ...}` immediately.
+- The subagent's completed report arrives as an incoming reactive message from the subagent's conversation ID, rather than as the synchronous tool step result of `invoke_subagent`.
+- Consequently, client-side pre-tool hooks (such as `no-push-without-self-review.py`) that parse the direct tool-result output of the subagent tool call will not find the verdict embedded in the initial dispatch step result.
+- Once the asynchronous subagent has finished and returned its verified clean review report and fingerprint, use the authorized prefix `ALLOW_UNREVIEWED_PUSH=1` for the `git push` invocation.
+  (Observed in live Antigravity sessions 2026-09-01.)
+- That advice was written when the guard admitted a verdict only from an `Agent`-tool result, and its original parenthetical said the `AGENT_TOOLS` set rejects `Bash`/`run_command` output outright.
+  That is no longer true: since #3327 (merged 2026-09-07, six days after the observation above) the guard also admits a `Bash` call in the shape `agy --print '<prompt>'`.
+  So where `agy` is available, dispatching the review that way discharges the guard directly and needs no override at all.
+  The override above is for the case where it is not.
+  No other delegation CLI is recognized, so `codex`, `opencode` and `adv` still need the override.
+- In Windows PowerShell sessions, running
+  `$env:ALLOW_UNREVIEWED_PUSH="1"; git push ...` is split on the semicolon
+  and rejected as a chained command by `hooks/no-push-without-self-review.py`.
+  Run `env ALLOW_UNREVIEWED_PUSH=1 git push ...`
+  (using Git's bundled `usr/bin/env.exe`) instead
+  so the assignment precedes `git` in a single simple command without chaining.
+  (Measured 2026-09-30 in an Antigravity Windows PowerShell session.)
+- In PowerShell, passing multiline markdown with quotes to `gh pr create --body`
+  can cause quote delimiter errors (`unknown arguments [...]`);
+  writing the body to a unique scratch file and passing `--body-file`
+  avoids argument corruption.
+
+## Antigravity hook runner 30s timeout and adapter parallelism
+
+- Antigravity enforces an ambient ~30-second timeout on command hooks declared in `hooks.json`.
+- When an adapter (such as `claude-hook-adapter.py`) runs multiple matching hooks sequentially (e.g. 25+ Python scripts on `run_command` matching `Bash`), cumulative process startup and I/O latency can exceed 30 seconds, causing Antigravity to kill the hook with `signal: killed` (`JSON hook ... failed: command failed: signal: killed`).
+- Command adapters must execute matched hook scripts concurrently (e.g. via `concurrent.futures.ThreadPoolExecutor`) to keep execution latency under ~1-2s and prevent timeouts.
+- Concurrency worker pool size defaults to 16 and is configurable via `AGY_ADAPTER_MAX_WORKERS` (clamped to at least 1).
+
+## Antigravity MWC merge gate and self-approval boundary (`enforce-mwc-review-gate.py`)
+
+- `plugins/ai-config/enforce-mwc-review-gate.py` gates `gh pr merge` tool calls in Antigravity.
+- When a repository lacks external review bots (`github-actions[bot]`, `claude[bot]`, Copilot) or operates under `no-ai-review`, review verdicts posted by local subagents are submitted under the authenticated user/agent account (e.g. `d-morrison`).
+- The gate classifies review comments under non-bot logins as `untrusted-clean`, strictly preventing an agent posting under the user's login from authorizing its own PR merge without human approval.
+- Neither active `/mwc` session grant nor `ALLOW_MERGE=1` overrides this review-gate requirement in `enforce-mwc-review-gate.py` (which evaluates review and CI status directly rather than delegating review vetting to a command-line wrapper).
+- In repositories without automated bot review workflows, merges must be executed either via an affirmative human review from another repository member or directly by the human from their terminal outside the Antigravity agent hook harness.
+  (Observed in live Antigravity sessions 2026-09-11.)
+- **Exempt superseded CANCELLED checks in statusCheckRollup (ai-config#3800, #4347):** GitHub Actions concurrency groups (`cancel-in-progress: true`) cancel an in-progress workflow run when a new push or PR event occurs on the same branch.
+  This leaves a `CANCELLED` check run in `statusCheckRollup` alongside the subsequent run's `SUCCESS` entry for the exact same check name and workflow (ai-config#1697, #3343).
+  In `enforce-mwc-review-gate.py`, tracking workflow-level latest success across ANY job with the same `workflowName` introduces an unsound bypass.
+  A cancelled check must only be excused if that specific check/job was genuinely rerun and completed successfully in a superseding run (match job/check name and run/suite),
+  not merely because an unrelated sibling job in the same workflow finished later.
+  Otherwise, benign concurrency cancellation permanently blocks automated merge under MWC,
+  while an un-rerun cancelled job can silently slip past the gate.
+  (Observed in live Antigravity sessions 2026-09-19 on PR #3797, and 2026-10-07 on PR #4347.)
+- **No parentheses in `gh pr merge` commit subjects or arguments:**
+  `plugins/ai-config/enforce-mwc-review-gate.py` bans command-chaining and substitution characters in `` CHAIN_CHARS = (";", "&", "|", "\n", "$(", "`", "(") ``.
+  Passing parenthetical issue references in arguments (such as `--subject "fix: description (#1234)"` or `--body "(closes #1234)"`) trips the guard and blocks the merge.
+  Execute `gh pr merge -R <repo> <PR> --squash --delete-branch` without parentheses.
+  Splitting on chain characters can also unbalance quotes and cause `shlex.split` to raise `ValueError`,
+  which routes through the fail-closed fallback whenever both `"gh"` and `"merge"` appear in the command line
+  (e.g. a `git commit -m` quoting the phrase alongside parentheses).
+  (Observed in live Antigravity sessions 2026-09-23 in [#3916](https://github.com/Morrison-Lab/ai-config/pull/3916), and 2026-09-29 on PR [#4119](https://github.com/Morrison-Lab/ai-config/pull/4119).)
+- **Rerun cancelled concurrency checks to unblock fully-clean rollup:**
+  When a prior workflow run is cancelled by a higher-priority check or concurrency group (e.g. `review / preempt-previous`), it registers as `cancelled` in the statusCheckRollup, blocking `check-pr-fully-clean.py` and MWC merge.
+  Rerunning the failed/cancelled job via `gh run rerun -R <repo> <run-id> --failed` re-executes the check and clears the cancelled status without requiring a new commit or push.
+- **Verdict heading levels in `enforce-mwc-review-gate.py` (ai-config#3918):**
+  Review bodies commonly format their verdict section as `## Verdict` (H2) or `### Verdict` (H3).
+  `VERDICT_MARKER_RE` must match `#{2,4}\s*Verdict\b` rather than strictly requiring `### Verdict`;
+  otherwise, reviews with `## Verdict` are ignored by the gate and fall back to older comments, resulting in false `stale` merge denials.
+
+## Antigravity native task and subagent management APIs
+
+Antigravity provides built-in system tools for managing asynchronous background tasks and subagents:
+
+- **`manage_task`**: Manage background tasks.
+  - `Action='list'`: List all currently running background tasks.
+  - `Action='kill'`: Cancel the task's execution (`TaskId` required).
+  - `Action='status'`: Check the task's current status and log file location (`TaskId` required).
+  - `Action='send_input'`: Send input to a running task (`TaskId` and `Input` required).
+- **`manage_subagents`**: Manage existing subagents.
+  - `Action='list'`: List active direct subagents with their conversation IDs and live state.
+  - `Action='kill'`: Terminate specific subagents and all their descendants (`ConversationIds` required).
+  - `Action='kill_all'`: Terminate all subagents and all their descendants.
+
+## Antigravity MWC session liveness and heartbeat expiration (`ai-session.sh heartbeat`)
+
+- In `hooks/no-unauthorized-merge.py`, `check_mwc_active()` calls `is_session_alive(sess_file)`.
+- When an Antigravity session registers via `ai-session.sh enable-mwc --id <conversation_id>`, the generated `<id>.session` file typically leaves `pid=` blank.
+- Without a valid PID, `is_session_alive()` falls back to `(time.time() - heartbeat) < 1800` (a 30-minute expiration window).
+- If a session runs longer than 30 minutes before merging, the heartbeat expires and `check_mwc_active()` returns False, causing `no-unauthorized-merge.py` to block `gh pr merge`.
+- **Systemic Fix (2026-10-06):** `plugins/ai-config/claude-hook-adapter.py` now implements `refresh_session_heartbeat()`, automatically updating `heartbeat=<now>` in `.git/ai-sessions/<session_id>.session` on every `PreInvocation` and `PreToolUse` event so active Antigravity sessions never expire.
+
+## Antigravity transcript schema vs Claude Code transcript schema in Stop hooks
+
+- Claude Code stores user and assistant messages with `m.get("type") == "assistant"` or `m.get("role") == "assistant"`.
+- Antigravity stores trajectory steps where assistant replies are recorded with `m.get("source") == "MODEL"` and `m.get("type") == "PLANNER_RESPONSE"`.
+- Hooks inspecting the assistant's final text (such as `hooks/no-announced-start-without-starting.py`) must support both schemas (`m.get("source") == "MODEL" and m.get("type") == "PLANNER_RESPONSE"` in addition to `"assistant"`).
+- Otherwise, `last_assistant_text()` returns `""` on Antigravity transcripts, making stop guards completely inert.
+- When evaluating announced work, guards must also inspect candidates from the raw message tail, not just the text preceding `**Stopping Point**:`, so that unstarted continuation promises placed inside or alongside the stopping point detail text are caught and blocked.
+  (Observed in live Antigravity sessions 2026-10-06.)
+

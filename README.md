@@ -235,8 +235,17 @@ repo's** `.claude/settings.json`:
 }
 ```
 
-Claude Code installs the plugin at session start (needs network access to reach
-GitHub). Plugin skills are namespaced, e.g. `/ai-config:reprexes`,
+Declaring the plugin does not install it.
+Observed 2026-10-15 in a Claude Code cloud session for `Morrison-Lab/rme`:
+the container started with only the default marketplace registered,
+and `claude plugin install ai-config@Morrison-Lab` failed with
+"not found in marketplace" until the marketplace was added.
+So also commit a `SessionStart` hook that adds the marketplace and installs
+the plugin when `CLAUDE_CODE_REMOTE` is `true`
+(needs network access to reach GitHub);
+[`Morrison-Lab/rme`'s `.claude/hooks/install-ai-config.sh`](https://github.com/Morrison-Lab/rme/blob/main/.claude/hooks/install-ai-config.sh)
+is a working example ([rme#1336](https://github.com/Morrison-Lab/rme/pull/1336)).
+Plugin skills are namespaced, e.g. `/ai-config:reprexes`,
 `/ai-config:grade-work`.
 
 Locally (or to try it), run these as slash commands inside a Claude Code

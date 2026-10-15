@@ -249,8 +249,15 @@ marketplaces" section dates that behaviour to v2.1.195
 and <https://code.claude.com/docs/en/discover-plugins>).
 The README's `extraKnownMarketplaces` / `enabledPlugins` snippet is a GitHub
 source, so it is the case the second passage rules out.
-Only a fresh cloud session on a branch carrying the config settles which
+A fresh cloud session settled it on 2026-10-15: the settings-reference
 passage governs.
+A `Morrison-Lab/rme` cloud session, whose `.claude/settings.json` carries the
+snippet, started with only the default marketplace registered, and
+`claude plugin install ai-config@Morrison-Lab` failed with
+"not found in marketplace" until `claude plugin marketplace add
+Morrison-Lab/ai-config` ran.
+The README now pairs the snippet with a `SessionStart` install hook
+([rme#1336](https://github.com/Morrison-Lab/rme/pull/1336)).
 
 `claude plugin validate` does not follow a symlinked `hooks/` directory.
 Its own warning, measured 2026-09-01 on 2.1.258 against a plugin whose

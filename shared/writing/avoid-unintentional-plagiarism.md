@@ -33,7 +33,9 @@ python3 check_source_overlap.py --corpus <dir of extracted .txt> --git-diff orig
 
 Treat bulk-generated commits as the highest risk.
 Find them from commit messages such as "content from multiple sources", from bot authors, and from commits that add whole chapters at once, then run the checker over those files first.
-A file the checker flags and that has no citation is rewritten or cited in its own PR, never fixed silently.
+A flagged paragraph is rewritten from scratch, or turned into a short marked quotation with a citation, in its own PR.
+A citation alone never clears a paragraph that copies the source's wording.
+Never fix a flagged paragraph silently.
 
 ## Limits
 

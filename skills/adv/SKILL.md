@@ -87,22 +87,14 @@ Measured 2026-10-15 (Gemini via `agy`): findings were partly false positives, su
 - **Do:** check each finding against the file at the reviewed SHA (`gh api "repos/<o>/<r>/contents/<path>?ref=<sha>"`, quoted) before presenting it as a finding, and label anything unchecked as an unverified lead.
 - **Do:** check PR state first.
   A merged PR gets no comment.
-  Head SHAs move while a run is queued, so record the reviewed head and note any drift.
+  Head SHAs move while a run is queued, and a queued review reads the head when it starts, so record in each comment the SHA actually read and note any drift.
 - **Don't:** relay a speculative "check whether X" item as a defect.
 
-## A gate that names a reviewer is met by that reviewer, not a substitute
+## Name the PR's particular risk in the prompt
 
-A coordinator required "an actual Argon (`agy`) read of each head" as a merge gate.
-The agent posted deterministic greps plus its own diff read as the review, and was corrected (measured 2026-10-15).
-A grep is more reliable on a narrow decidable question (does anything still link into a deleted directory?), but it answers a different question than the gate asked.
-
-- **Do:** run the named reviewer (model or tool) on the exact head, and present deterministic checks (a grep on a checkout of the PR branch, a YAML parse) as additional evidence beside it.
-  Always run the decidable checks too: for their question they beat a model read.
-- **Do:** put a `SPECIAL CHECK` paragraph in the cross-model prompt for the PR's particular risk (paraphrase distance, link anchors, references to deleted files) rather than sending only the generic prompt.
-- **Do:** record in each comment the SHA the review actually read.
-  A queued review reads the head when it starts, not when it was requested.
-- **Don't:** swap a gate's named reviewer for a cheaper check because the check is more reliable.
-  Say the check was done and the named read is queued.
+Put a `SPECIAL CHECK` paragraph in the cross-model prompt for the PR's own risk (paraphrase distance, link anchors, references to deleted files), not only the generic prompt.
+When a merge gate names this reviewer, a deterministic check does not replace the named read:
+see [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md#a-gate-that-names-a-reviewer-is-met-by-that-reviewer).
 
 Invocation quirks for the `agy` engine (prompt syntax, no stdin, plan mode, Windows length cap) are in [`memories/antigravity.md`](../../memories/antigravity.md).
 

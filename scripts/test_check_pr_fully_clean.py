@@ -4219,6 +4219,60 @@ def main() -> int:
             and any("cancelled" in i for i in collision_issues),
         )
 
+    # A failed run is superseded by a LATER success of the same job in the
+    # same workflow on the same head SHA, but never by an earlier one.
+    def superseded_runs(first, second):
+        return json.dumps({"check_runs": [
+            {"name": "review / require-clean-verdict", "status": "completed",
+             "conclusion": first[0], "completed_at": first[1],
+             "html_url": "https://github.com/o/r/actions/runs/1/job/1"},
+            {"name": "review / require-clean-verdict", "status": "completed",
+             "conclusion": second[0], "completed_at": second[1],
+             "html_url": "https://github.com/o/r/actions/runs/2/job/2"},
+        ]})
+
+    def superseded_router(payload, same_workflow=True):
+        def router(cmd):
+            joined = " ".join(cmd)
+            if "check-runs" in joined:
+                return payload
+            if "/actions/runs/" in joined:
+                run_id = cmd[-1].rsplit("/", 1)[-1]
+                if same_workflow or run_id == "1":
+                    return json.dumps({"path": ".github/workflows/claude-review.yml"})
+                return json.dumps({"path": ".github/workflows/other.yml"})
+            return "{}"
+        return router
+
+    cases = [
+        ("failed run is ignored when a later run of the same job succeeded",
+         superseded_runs(("failure", "2026-10-15T08:00:00Z"),
+                         ("success", "2026-10-15T08:30:00Z")), True, True),
+        ("failed run still blocks when the success is older than it",
+         superseded_runs(("success", "2026-10-15T08:00:00Z"),
+                         ("failure", "2026-10-15T08:30:00Z")), True, False),
+        ("failed run still blocks when the success is from another workflow",
+         superseded_runs(("failure", "2026-10-15T08:00:00Z"),
+                         ("success", "2026-10-15T08:30:00Z")), False, False),
+        ("failed old run re-run after a newer run passed is still superseded",
+         superseded_runs(("failure", "2026-10-15T09:03:57Z"),
+                         ("success", "2026-10-15T09:03:30Z")), True, True),
+    ]
+    # Without a run id in the URL the order is unknown, so the failure blocks.
+    no_id = json.dumps({"check_runs": [
+        {"name": "review / require-clean-verdict", "status": "completed",
+         "conclusion": "failure", "html_url": ""},
+        {"name": "review / require-clean-verdict", "status": "completed",
+         "conclusion": "success",
+         "html_url": "https://github.com/o/r/actions/runs/2/job/2"},
+    ]})
+    cases.append(("failed run with no run id still blocks", no_id, True, False))
+    for label, payload, same_wf, expect_ok in cases:
+        with patch.object(checker, "run_cmd",
+                          side_effect=superseded_router(payload, same_wf)):
+            ok_, issues_ = checker.check_ci_runs("sha123", TEST_REPO)
+            check(label, ok_ == expect_ok)
+
     # A job name is not unique across workflows (#1869). The live case:
     # ucdavis/bcs has `ubuntu-latest (release)` in BOTH R-CMD-check.yaml and
     # check-readme, and a passing check-readme job was nearly read as the

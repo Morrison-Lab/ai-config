@@ -28,6 +28,7 @@ class CheckRun:
         self.status: str = (data.get("status") or "")
         self.conclusion: Optional[str] = data.get("conclusion")
         self.html_url: str = (data.get("html_url") or "")
+        self.completed_at: str = (data.get("completed_at") or "")
 
 class ReviewThread:
     def __init__(self, data: Dict[str, Any]):

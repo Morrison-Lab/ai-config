@@ -690,6 +690,18 @@ def _workflow_path_for_run(run_id: str, repo: str, cache: dict) -> Optional[str]
     return path or None
 
 
+def _run_order(cr: dict) -> Optional[Tuple[int, str]]:
+    """Return (workflow run id, completed_at) for ordering runs, or None.
+
+    Run ids grow with run creation; a re-run keeps its run id, so completed_at
+    breaks ties between attempts of one run.
+    """
+    m = re.search(r"/actions/runs/(\d+)/", cr.get("html_url") or "")
+    if not m:
+        return None
+    return int(m.group(1)), cr.get("completed_at") or ""
+
+
 def _workflow_path_from_check_run(cr: dict, repo: str, cache: dict) -> Optional[str]:
     url = cr.get("html_url") or ""
     m = re.search(r"/actions/runs/(\d+)/", url)
@@ -794,7 +806,8 @@ def _is_own_job(cr: dict, own: Optional[Tuple[str, int]]) -> bool:
 def check_ci_runs(pr) -> Tuple[bool, List[str]]:
     sha = pr.head_sha
     repo = pr.repo
-    check_runs = [{"name": cr.name, "status": cr.status, "conclusion": cr.conclusion, "html_url": cr.html_url} for cr in pr.get_check_runs()]
+    check_runs = [{"name": cr.name, "status": cr.status, "conclusion": cr.conclusion, "html_url": cr.html_url,
+                   "completed_at": cr.completed_at} for cr in pr.get_check_runs()]
 
     issues = []
     if not check_runs:
@@ -818,12 +831,22 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
     # name (#1869) without one run superseding the other.
     workflow_cache: dict = {}
     success_keys = set()
+    # Latest success per (job name, workflow path) as (run id, completed_at),
+    # so a failed run is excused only by a success of a LATER run, never by an
+    # older one (a regression after a pass still blocks). The run id orders
+    # runs, not the completion time: re-running an old failed job re-fails it
+    # and stamps a fresh completed_at on the OLD run, which must not make it
+    # look newer than the run that passed.
+    success_at: Dict[Tuple[str, str], Tuple[int, str]] = {}
     for cr in check_runs:
         if cr.get("status") != "completed" or cr.get("conclusion") != "success":
             continue
         wp = _workflow_path_from_check_run(cr, repo, workflow_cache)
         if wp:
             success_keys.add((cr["name"], wp))
+            order = _run_order(cr)
+            if order and order > success_at.get((cr["name"], wp), (0, "")):
+                success_at[(cr["name"], wp)] = order
 
     own_lookup_reported = False
     for cr in check_runs:
@@ -868,9 +891,16 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
             issues.append(
                 f"Check run '{name}'{where} is still in status '{status}'")
         elif conclusion not in ("success", "neutral", "skipped"):
+            wp = _workflow_path_from_check_run(cr, repo, workflow_cache)
             if conclusion == "cancelled":
-                wp = _workflow_path_from_check_run(cr, repo, workflow_cache)
                 if wp and (name, wp) in success_keys:
+                    continue
+            elif wp:
+                # A failed run is superseded once a later run of the same job
+                # in the same workflow passes on this same head SHA. Without a
+                # run id the order is unknown, so the failure keeps blocking.
+                order = _run_order(cr)
+                if order and success_at.get((name, wp), (0, "")) > order:
                     continue
             issues.append(
                 f"Check run '{name}'{where} completed with conclusion "

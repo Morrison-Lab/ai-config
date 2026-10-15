@@ -52,12 +52,12 @@ One reference adds no commentary to the statement (Ezra, 2026-10-15).
 
 Substantial prose about the source or history of the content is commentary.
 Examples are a comparison of notation, an account of who proved what, and a note that a proof is omitted.
-That prose goes in a `rem-source-` remark div titled "Source: ...".
+That prose goes in a `#rem-source-` remark div titled "Source: ...".
 Place the remark right after the item's div and its proof, in the same subfile.
 A def or thm div never carries that prose.
 
 - **Do:** end a definition div with a "Source:" line that holds only the citation.
-- **Do:** put "Hastie et al. write the quantity as $\generr$, without the argument" in a `rem-source-` remark.
+- **Do:** put "Hastie et al. write the quantity as $\generr$, without the argument" in a `#rem-source-` remark.
 - **Don't:** make a one-line remark div whose only content is a citation.
 - **Don't:** put a paragraph of history inside the definition.
 

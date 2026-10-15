@@ -71,17 +71,11 @@ which frames the credit and keeps it out of the way on the page.
 Do not invent a separate attribution class or style it ad hoc
 (`.small .text-muted`); the callout is the lab's one pattern.
 
-On a definition or result div whose credit is only a citation,
-the credit is the final line
-"Source: @key [locator]."
-inside the div, and substantial source or history prose goes in a `rem-source-` remark div
-(Ezra, 2026-10-15;
+On a definition or result div whose credit is only a citation, the credit is the final line "Source: @key [locator]." inside the div.
+Substantial source or history prose goes in a `#rem-source-` remark div (Ezra, 2026-10-15;
 see [`quarto-remarks-vs-callouts`](quarto-remarks-vs-callouts.md)).
 
-Where content lives in small included fragments,
-put the callout at the end of each item's own div,
-not only at the top of the page,
-so the credit travels with the fragment when another site includes it:
+Where content lives in small included fragments, put the callout at the end of each item's own div, not only at the top of the page, so the credit travels with the fragment when another site includes it:
 
 ```markdown
 ::: {#def-overfitting}
@@ -89,14 +83,12 @@ so the credit travels with the fragment when another site includes it:
 
 ...
 
-::: {.callout-note collapse="true"}
-#### Source
-
-@james2021islr2e [sec. 5.1].
-:::
+Source: @james2021islr2e [sec. 5.1].
 
 :::
 ```
+
+The collapsed callout is for a credit that is more than a citation, such as an adapted course page, and it still goes at the end of the item's div.
 
 Cite books and papers through the bibliography (`@key [locator]`),
 and link an outside site's rendered page at the item's anchor,

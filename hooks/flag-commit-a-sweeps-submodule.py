@@ -54,18 +54,8 @@ git repository.
 """
 import json
 import os
-import re
-import shlex
 import subprocess
 import sys
-
-RX_HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1.*?\n[ \t]*\2\b", re.S)
-
-ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
-LEAD_WORDS = {"then", "do", "else", "!", "time", "sudo", "command", "exec",
-              "nohup", "env"}
-
-_SHELL_OPS = set("();|&")
 
 # `git commit` short options that consume a value (attached or next token),
 # so the rest of a cluster after one of them is that value, not more flags.
@@ -80,40 +70,25 @@ _GIT_VALUE_GLOBAL = {"-C", "-c", "--git-dir", "--work-tree", "--namespace",
                       "--exec-path", "--super-prefix", "--config-env"}
 
 
-def _simple_commands(cmd):
-    """Split a shell command into simple-command argv lists; None on error.
-
-    Same construction as `flag-add-a-outside-pathspec.py`'s
-    `_simple_commands`.
-    """
-    cmd = re.sub(r"\\\r?\n", " ", cmd)
-    cmd = RX_HEREDOC.sub("<<", cmd)
-    cmd = cmd.replace("\n", ";")
-    try:
-        lex = shlex.shlex(cmd, posix=True, punctuation_chars=True)
-        lex.whitespace_split = True
-        toks = list(lex)
-    except ValueError:
-        return None
-    cmds, cur = [], []
-    for t in toks:
-        if t and set(t) <= _SHELL_OPS:
-            if cur:
-                cmds.append(cur)
-                cur = []
-        else:
-            cur.append(t)
-    if cur:
-        cmds.append(cur)
-    return cmds
+# The shared parser blanks heredoc bodies correctly (a command after
+# `<<EOF ... EOF` stays its own command); a private copy did not.
+_LIB = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+    "scripts", "lib")
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+try:
+    from shellcmd import simple_commands as _simple_commands
+    from shellcmd import strip_env as _strip_env
+except Exception as _exc:  # broken install: fail open, like every guard here
+    print("flag-commit-a-sweeps-submodule: cannot load "
+          f"scripts/lib/shellcmd.py ({_exc}); inert", file=sys.stderr)
+    _simple_commands = None
 
 
 def _strip_lead(argv):
-    i = 0
-    while i < len(argv) and (ASSIGNMENT.match(argv[i])
-                              or argv[i] in LEAD_WORDS):
-        i += 1
-    return argv[i:]
+    """argv with leading env assignments, wrappers and keywords removed."""
+    return _strip_env(argv)[1]
 
 
 def _git_invocation(rest):
@@ -189,6 +164,8 @@ def offending(command):
     """(segment, kind, target_dir, pathspecs) for the first matching
     invocation in `command`, or None. `target_dir` is the directory git
     would run in, relative to the session cwd unless absolute."""
+    if _simple_commands is None:
+        return None
     cmds = _simple_commands(command)
     if cmds is None:
         return None

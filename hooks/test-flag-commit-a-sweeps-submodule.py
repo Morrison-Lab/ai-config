@@ -25,6 +25,8 @@ import tempfile
 
 HOOK = os.path.realpath(sys.argv[1])
 ELSEWHERE = tempfile.mkdtemp()  # a cwd that is not the repo under test
+SHELLCMD_LIB = os.path.join(
+    os.path.dirname(os.path.dirname(HOOK)), "scripts", "lib")
 
 
 def _run(cwd, *args):
@@ -130,6 +132,12 @@ SHOULD_WARN = [
     ("W13", moved_pin_only_repo, "git add -u .", "pathspec `.` covers it"),
     ("W14", moved_pin_only_repo, f"git add -u && git commit -m {MSG}",
      "git add -u earlier in a chain"),
+    ("W15", moved_pin_only_repo,
+     "git commit -F - <<EOF\nmsg\nEOF\ngit add -u",
+     "a real command AFTER a heredoc (reviewer repro on #4537)"),
+    ("W16", moved_pin_only_repo,
+     "cat <<'EOF' > note.txt\ngit add -u\nEOF\ngit commit -am 'fix'",
+     "heredoc body mentions the command, then a real one follows"),
 ]
 SHOULD_STAY_SILENT = [
     ("S1", moved_pin_repo, f"git commit -m {MSG}", "no -a: nothing swept"),
@@ -165,6 +173,9 @@ def verdict(hook_path, repo, command, want_text=False):
         [sys.executable, hook_path],
         input=json.dumps({"tool_name": "Bash", "tool_input": {"command": command}}),
         capture_output=True, text=True, cwd=cwd,
+        # Mutants are written to a temp dir, where the hook's own
+        # `scripts/lib` lookup (relative to its file) finds nothing.
+        env={**os.environ, "PYTHONPATH": SHELLCMD_LIB},
     )
     if proc.returncode != 0:
         sys.exit(f"FATAL: hook exited {proc.returncode} on {command!r}\n"
@@ -249,7 +260,7 @@ MUTATIONS = {
         "an `a` inside a short-flag cluster is read as -a",
         [('                if ch == "a":\n                    return True',
           '                if False:\n                    return True')],
-        {"W1", "W2", "W6", "W8", "W9", "W10", "W11", "W12"},
+        {"W1", "W2", "W6", "W8", "W9", "W10", "W11", "W12", "W16"},
     ),
     "M_value_letter_stops_cluster": (
         "a value-taking letter (-m) ends the cluster, so -ma is not -a",
@@ -277,7 +288,7 @@ MUTATIONS = {
         [('        if not f.startswith("--") and "u" in f[1:]:\n'
           "            return True, paths",
           "        if False:\n            return True, paths")],
-        {"W4", "W7", "W13", "W14"},
+        {"W4", "W7", "W13", "W14", "W15"},
     ),
     "M_dash_c_dir": (
         "`git -C <dir>` retargets the repository",
@@ -293,10 +304,7 @@ MUTATIONS = {
     ),
     "M_lead_words": (
         "env assignments and lead words are skipped",
-        [("    while i < len(argv) and (ASSIGNMENT.match(argv[i])\n"
-          "                              or argv[i] in LEAD_WORDS):\n"
-          "        i += 1",
-          "    pass")],
+        [("    return _strip_env(argv)[1]", "    return argv")],
         {"W11"},
     ),
     "M_global_value_options": (

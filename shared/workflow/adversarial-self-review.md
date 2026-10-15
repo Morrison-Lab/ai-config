@@ -145,7 +145,7 @@ A grep answers a narrower question than the gate asked, so it cannot stand in fo
 
 - **Do:** run the named reviewer (a model or tool) on the exact head SHA.
 - **Do:** run the decidable checks as well (does anything still link into a deleted directory, does the YAML parse), and post them beside the named read as additional evidence.
-  On their own question they are the more reliable instrument.
+  For the question they answer, they are the more reliable instrument.
 - **Do:** when the named read is not finished, say the checks are done and the named read is queued.
 - **Don't:** post a grep or your own diff read under a review heading when the gate names another reviewer.
 

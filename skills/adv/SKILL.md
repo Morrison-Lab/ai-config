@@ -93,6 +93,9 @@ Measured 2026-10-15 (Gemini via `agy`): findings were partly false positives, su
 ## Name the PR's particular risk in the prompt
 
 Put a `SPECIAL CHECK` paragraph in the cross-model prompt for the PR's own risk (paraphrase distance, link anchors, references to deleted files), not only the generic prompt.
+
+- **Don't:** send only the generic prompt for a PR with a distinctive risk.
+
 When a merge gate names this reviewer, a deterministic check does not replace the named read:
 see [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md#a-gate-that-names-a-reviewer-is-met-by-that-reviewer).
 

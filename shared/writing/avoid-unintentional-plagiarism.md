@@ -28,9 +28,9 @@ python3 check_source_overlap.py --corpus <dir of extracted .txt> --git-diff orig
 - Web sources (a free online book, a documentation page) go into the corpus as `.txt` files too.
 - Fix every flagged paragraph by rewriting it from scratch, or quote and cite it.
   Mark a hand-checked generic definition or standard formula with `<!-- overlap-ok: reason -->`.
-- A run on named files that reports zero paragraphs examined checked nothing.
-  Treat it as a failure.
-  A `--git-diff` run that adds no prose may report zero legitimately, so confirm that the diff holds prose.
+- Read the `examined` count in the summary line.
+  Zero is legitimate only when the input holds no unquoted prose: a `--git-diff` change that adds none, or a page that is wholly quoted.
+  Confirm that, and treat any other zero as a run that checked nothing.
 
 ## Existing content
 

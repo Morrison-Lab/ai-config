@@ -405,6 +405,24 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-commit-a-sweeps-submodule.py\"",
+            "timeout": 10,
+            "script": "flag-commit-a-sweeps-submodule.py",
+            "why": "2026-10-15, Morrison-Lab/lds#1026: `git commit -am` ran in a checkout whose `latex-macros` submodule sat at a different commit than the index pinned, so `-a` staged the gitlink along with the intended CLAUDE.md edit and moved the pin from 6e227b6 to the older 85c285b; the PR bot flagged it as blocking. flag-add-a-outside-pathspec.py covers `git add -A` and untracked files but not `git commit -a`/`-am`, `git add -u`, or a modified submodule (ai-config#4534). Warns rather than blocks: a deliberate pin bump is legitimate and the hook cannot tell it from an accident. Only fires when `git status --porcelain` shows a submodule whose HEAD differs from the commit the index pins (mode 160000 per `git ls-files -s`); a submodule with only dirty content stays silent.",
+            "_note_reads_live_git_status": [
+              "Reads live `git status`, `git ls-files -s` and the",
+              "submodule's own HEAD at match time, since whether a pin is",
+              "about to move is a fact about the working tree, not the",
+              "command text. Fails open on any git failure, timeout,",
+              "missing `-C` directory, or non-repo cwd.",
+              "",
+              "Emits only `additionalContext` and a `systemMessage`; no",
+              "`permissionDecision`, so the normal permission flow is",
+              "untouched."
+            ]
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-reset-hard-uncommitted-work.py\"",
             "timeout": 10,
             "script": "flag-reset-hard-uncommitted-work.py",

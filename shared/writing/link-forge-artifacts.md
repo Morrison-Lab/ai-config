@@ -42,3 +42,13 @@ See [`hyperlink-liberally`](hyperlink-liberally.md) for the general principle co
 (Directive from the user, 2026-09-09: telling them a reply had been posted without linking it made them go find it themselves.)
 (Directive from the user, 2026-10-02, after a referee report was posted on a GitLab MR without a link: "give me the link" --- "always".)
 (Directive from the user, 2026-10-08, after an answer named a PR preview page and two source files with no links: "haven't I told you to always provide links?")
+
+## Link a PR's project thread too
+
+When a message names a PR, link both the PR by its full URL and the project thread it belongs to, wherever a thread exists and is relevant.
+In a Claude Projects thread, write the thread link as `[thread title](#cmsg_…)`.
+
+- **Do:** write "[#4516](https://github.com/Morrison-Lab/ai-config/pull/4516) and its [thread title](#cmsg_…)".
+- **Don't:** name a PR with only its number, or link the PR and leave the user to find the thread.
+
+(Directive from the user, 2026-10-14: "when you mention PRs, always link to both the PR and the corresponding thread (if relevant)".)

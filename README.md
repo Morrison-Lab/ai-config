@@ -244,7 +244,7 @@ So also commit a `SessionStart` hook that adds the marketplace and installs
 the plugin when `CLAUDE_CODE_REMOTE` is `true`
 (needs network access to reach GitHub);
 [`Morrison-Lab/rme`'s `.claude/hooks/install-ai-config.sh`](https://github.com/Morrison-Lab/rme/blob/main/.claude/hooks/install-ai-config.sh)
-is a working copy ([rme#1336](https://github.com/Morrison-Lab/rme/pull/1336)).
+is a working example ([rme#1336](https://github.com/Morrison-Lab/rme/pull/1336)).
 Plugin skills are namespaced, e.g. `/ai-config:reprexes`,
 `/ai-config:grade-work`.
 

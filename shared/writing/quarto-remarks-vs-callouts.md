@@ -46,19 +46,17 @@ a concrete instance is an example div.
 
 ## Source credits: a bare citation goes in the div, prose goes in a remark
 
-A credit that is only a citation goes inside the definition or result div,
-as a final line
-"Source: @key [locator]."
-(Ezra, 2026-10-15).
-One reference adds no commentary to the statement.
-Substantial prose about the source or history of the content
-(a comparison of notation, an account of who proved what, a note that a proof is omitted)
-is commentary, so it goes in a `rem-source-` remark div titled "Source: ...",
-right after the item's div and its proof, in the same subfile.
+A credit that is only a citation goes inside the definition or result div.
+It is the div's final line, starting "Source:" and followed by the citation.
+One reference adds no commentary to the statement (Ezra, 2026-10-15).
+
+Substantial prose about the source or history of the content is commentary.
+Examples are a comparison of notation, an account of who proved what, and a note that a proof is omitted.
+That prose goes in a `rem-source-` remark div titled "Source: ...".
+Place the remark right after the item's div and its proof, in the same subfile.
 A def or thm div never carries that prose.
 
-- **Do:** end `#def-bonferroni` with the line
-  "Source: @james2021islr2e [ch. 13]."
+- **Do:** end a definition div with a "Source:" line that holds only the citation.
 - **Do:** put "Hastie et al. write the quantity as $\generr$, without the argument" in a `rem-source-` remark.
 - **Don't:** make a one-line remark div whose only content is a citation.
 - **Don't:** put a paragraph of history inside the definition.

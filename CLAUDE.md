@@ -1202,15 +1202,6 @@ self-review confirms the claim, which was never the defect.
 Credit every outside source where readers of the rendered document can see it, in PSW's collapsed "Source" callout at the end of the item it credits, never only in an HTML comment.
 Content taken from the maintainer's own repositories need not be credited to them, though what those repositories credit is still carried.
 
-## Writing style: avoid unintentional plagiarism
-
-[`shared/writing/avoid-unintentional-plagiarism.md`](shared/writing/avoid-unintentional-plagiarism.md)
-
-Credit does not cure a copied passage.
-Write each explanation from the mathematics, the data or the code, never by rewording a source sentence by sentence.
-Quote only with marks and a citation.
-Before pushing prose, run the `check-source-overlap` tool from `Morrison-Lab/gha` against the reference corpus, and treat bulk-generated commits as the highest risk when sweeping existing content.
-
 ## Check the renders, not just the source
 
 [shared/workflow/check-the-renders.md](shared/workflow/check-the-renders.md)

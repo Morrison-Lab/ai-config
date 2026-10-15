@@ -4,6 +4,7 @@ Credit a source where the document's readers can see it.
 An HTML comment (`<!-- Source: ... -->`), a commit message,
 or a PR description is not an attribution:
 no reader of the rendered website, slides, handout or paper ever sees it.
+Credit does not cure a copied passage, though: the text must be the author's own or a marked quotation ([`avoid-unintentional-plagiarism.md`](avoid-unintentional-plagiarism.md)).
 
 This covers every outside source a reader would want to know about:
 

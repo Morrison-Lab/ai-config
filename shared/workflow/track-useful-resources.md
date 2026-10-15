@@ -21,6 +21,9 @@ A directory entry in lds (a course list, a channels table) does not substitute f
 - Respect each resource's license in each repo: link only when it is not adaptable (no license, or a NoDerivatives license), and adapt with attribution only when it is (CC BY and similar).
 - When an existing tracked resource sits in only one repo, add it to the others in the same PR if it is small, otherwise file an issue in each repo.
 - Open one PR per repo, each linking to its own issue and to the PRs in the other repos.
+
+## Where else the rule applies
+
 When a topic or a spinoff of an existing topic has no notes repo, create one for it rather than starting a link-only catalog repo.
 If it does not fit the current PR, open a small separate PR or an issue for it.
 Link official sources only: the authors', publisher's or institution's own site, or an open-access host.

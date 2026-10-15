@@ -3,6 +3,9 @@
 
 Verifies that:
 1. All GitHub Actions check runs for the PR's HEAD commit SHA are completed and passing.
+   When the script runs inside a GitHub Actions job on the PR's own
+   repository, that one job's own still-running check run is a NOTE, not a
+   blocker, because it cannot finish before this script does (ai-config#4521).
 2. An automated review comment evaluating the exact HEAD commit SHA has been posted.
 3. All review comments evaluating the HEAD commit SHA contain zero findings, and no active CHANGES_REQUESTED or REJECTED state exists on the PR.
 4. Every reviewer's latest verdict-bearing statement is clean.
@@ -27,7 +30,7 @@ scripts/lib/payload_fetcher.py, which governs the `--from-json` path, maps
 `/actions/runs/`, `/compare/`, and `graphql`); the default path's own call sites are
 `gh pr view --json`, `gh api graphql` for review threads, the `/check-runs`
 read in scripts/lib/pull_request.py, `gh repo view` for repo resolution, and the
-two `/actions/runs/` reads below. No `<summary>`-scoped match on `suppressed`
+three `/actions/runs/` reads below (the third is the own-job lookup). No `<summary>`-scoped match on `suppressed`
 exists in this file either, so a Copilot finding inside a collapsed `<details>`
 block is invisible too (ai-config#3170): it creates no inline comment and
 states no verdict, so no count performed here can see it. The one exception is a Copilot review
@@ -65,6 +68,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import bisect
 import shlex
@@ -694,6 +698,64 @@ def _workflow_path_from_check_run(cr: dict, repo: str, cache: dict) -> Optional[
     return _workflow_path_for_run(m.group(1), repo, cache)
 
 
+# The caller's own GitHub Actions job, when this script runs inside one on the
+# PR it is scoring (ai-config#4521). Measured on Morrison-Lab/rme#1322
+# (2026-10-15): the `review / claude-review` job ran this script, read its own
+# job as `in_progress`, posted NOT_CLEAN, and every re-run did the same, since
+# a job cannot complete before the process inside it finishes. Cached per repo
+# because main() asks again when it decides whether to add the reviewer note.
+_OWN_JOB_CACHE: Dict[str, Optional[Tuple[str, int]]] = {}
+
+
+def _own_actions_job(repo: str) -> Optional[Tuple[str, int]]:
+    """Return (run id, job id) of the Actions job running this script, or None.
+
+    Only the job itself is identified, never its whole workflow run: a sibling
+    job in the same run can still fail on its own, so it must keep blocking.
+    The job is the one in this run attempt whose `runner_name` is this
+    process's RUNNER_NAME (a runner runs one job at a time), and an Actions
+    job's id is the id in its check run's `html_url` (`.../job/<id>`).
+    Anything that cannot be confirmed returns None, which leaves every
+    in-progress check run blocking as before.
+    """
+    if repo in _OWN_JOB_CACHE:
+        return _OWN_JOB_CACHE[repo]
+    result = None
+    env = os.environ
+    run_id = env.get("GITHUB_RUN_ID", "")
+    attempt = env.get("GITHUB_RUN_ATTEMPT", "") or "1"
+    runner = env.get("RUNNER_NAME", "")
+    if (env.get("GITHUB_ACTIONS") == "true"
+            and env.get("GITHUB_REPOSITORY", "").lower() == repo.lower()
+            and run_id.isdigit() and attempt.isdigit() and runner):
+        try:
+            out = fetch(["gh", "api",
+                         f"repos/{repo}/actions/runs/{run_id}/attempts/{attempt}/jobs?per_page=100"])
+            jobs = json.loads(out).get("jobs")
+        except (RuntimeError, ValueError, AttributeError):
+            jobs = None
+        if isinstance(jobs, list):
+            mine = [j for j in jobs if isinstance(j, dict)
+                    and j.get("runner_name") == runner
+                    and j.get("status") == "in_progress"
+                    and isinstance(j.get("id"), int)
+                    and not isinstance(j.get("id"), bool)]
+            if len(mine) == 1:
+                result = (run_id, mine[0]["id"])
+    _OWN_JOB_CACHE[repo] = result
+    return result
+
+
+_JOB_URL_RE = re.compile(r"/actions/runs/(\d+)/job/(\d+)(?:[/?#]|$)")
+
+
+def _is_own_job(cr: dict, own: Optional[Tuple[str, int]]) -> bool:
+    if own is None:
+        return False
+    m = _JOB_URL_RE.search(cr.get("html_url") or "")
+    return bool(m) and m.group(1) == own[0] and int(m.group(2)) == own[1]
+
+
 def check_ci_runs(pr) -> Tuple[bool, List[str]]:
     sha = pr.head_sha
     repo = pr.repo
@@ -747,6 +809,15 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
             where = f" ({url})" if url else ""
 
         if status != "completed":
+            if _is_own_job(cr, _own_actions_job(repo)):
+                # A NOTE, not a pass: this job's failure on a later run still
+                # blocks through the conclusion branch below.
+                issues.append(
+                    f"NOTE: check run '{name}'{where} is still in status "
+                    f"'{status}', but it is the job running this script, which "
+                    "cannot complete before this script does, so it is not "
+                    "counted (ai-config#4521)")
+                continue
             issues.append(
                 f"Check run '{name}'{where} is still in status '{status}'")
         elif conclusion not in ("success", "neutral", "skipped"):
@@ -758,7 +829,7 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
                 f"Check run '{name}'{where} completed with conclusion "
                 f"'{conclusion}'")
 
-    return len(issues) == 0, issues
+    return not any(not i.startswith("NOTE: ") for i in issues), issues
 
 
 WORKFLOW_DIR = ".github/workflows/"
@@ -4043,6 +4114,23 @@ def main():
     drift_ok, drift_issues = check_base_drift(pr)
 
     all_issues = ci_issues + thread_issues + review_issues + drift_issues
+
+    # Inside the PR's own CI job, the review-verdict criteria describe the PR
+    # BEFORE this job posts anything: the previous round's verdict, or no
+    # verdict on this head yet. A reviewer that copies them into its own
+    # verdict re-posts the previous round's NOT_CLEAN forever (ai-config#4521).
+    # They still block, since a merging agent needs them; the note only says
+    # what they are not.
+    own = _own_actions_job(repo)
+    review_blockers = [i for i in review_issues if not i.startswith("NOTE: ")]
+    if own is not None and review_blockers:
+        all_issues.append(
+            f"NOTE: this script is running inside a CI job on this PR (Actions "
+            f"run {own[0]}, job {own[1]}). The {len(review_blockers)} "
+            "review-verdict item(s) listed as blocking describe the PR before "
+            "this job's own output. A reviewer rendering a verdict on the diff "
+            "must not report them as findings about the diff: they block a "
+            "merge, not the diff (ai-config#4521)")
 
     # NOTE-prefixed issues are informational (unreadable-format warnings) and
     # do not block -- only real findings or missing reviews cause a failure.

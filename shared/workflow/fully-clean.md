@@ -1350,6 +1350,27 @@ this record said all three blocked, and review caught it --- an unverified count
 in prose, inside an entry about an unverified count.
 Tracked as [ai-config#2441](https://github.com/Morrison-Lab/ai-config/issues/2441).)
 
+The checker now excludes the calling job itself
+([ai-config#4521](https://github.com/Morrison-Lab/ai-config/issues/4521),
+after the same loop recurred on
+[rme#1322](https://github.com/Morrison-Lab/rme/pull/1322) on 2026-10-15).
+Run inside GitHub Actions on the PR's own repository,
+it identifies its own job:
+the job in `GITHUB_RUN_ID`'s current attempt whose `runner_name` is `RUNNER_NAME`.
+It reports that job's not-yet-completed check run as a `NOTE` rather than a blocker.
+Only that one job is excluded.
+A sibling job in the same workflow run still blocks,
+a completed failure of the calling job still blocks,
+and if the job cannot be identified, nothing is excluded.
+The review-verdict criteria are unchanged, because a merging agent needs them.
+A standing not-clean from an earlier round,
+or no review yet on this head, still exits `1`.
+When the checker has identified its own job,
+it adds a `NOTE` saying that those items describe the PR before the job's own output,
+so a reviewer must not copy them into its verdict.
+Morrison-Lab/gha#978 goes further for the Claude reviewer
+and denies it the script outright.
+
 (Measured 2026-08-19 on a remote session driving
 [ai-config#1673](https://github.com/Morrison-Lab/ai-config/pull/1673).
 Tracked as

@@ -78,8 +78,24 @@ After any settings change, start a session inside `~/Documents/claude-fetch`, so
 Have it try these as separate Bash commands, plus one tool call:
 
 - `cat ~/.ssh/known_hosts` (must fail; use a file that exists, since a missing file proves nothing);
-- `touch ~/sandbox-probe` (must fail, and the file must not exist afterwards);
+- `touch ~/sandbox-probe` (the file must not exist afterwards;
+  the sandbox may discard the write with exit 0 instead of refusing it);
 - `curl --noproxy '*' https://example.com` (must fail);
 - a `curl` download from an allowlisted host into `inbox/` (must work);
 - `cat` of that download (must fail);
 - the Read tool on that download (must be denied).
+
+## Status on Ezra's machines (2026-10-15)
+
+The settings above are a draft: the download step does not yet work.
+
+- Linux box (cf463-02): the stray write (discarded), the `--noproxy` curl (no DNS) and the Read-tool probe (denied) behaved as required.
+  The `known_hosts` read failed only because that file is missing there, so it proved nothing.
+  The arXiv download got HTTP 200 but could not be saved, because `inbox/` was read-only inside the sandbox even with the `~/` path in `allowWrite`.
+  That run's file denied `~/` but not the inbox itself, so the cause is probably the denied home directory.
+  An absolute `allowWrite` path, and a `chmod 000` right after the download as the Bash-level read block, are untested.
+- Native Windows (XPS8950): the sandbox does not run there.
+  Its Ubuntu WSL2 has bubblewrap, and socat was installed as root;
+  the WSL copy of Claude Code needs a fresh login before a test can run.
+- The box's auto-mode classifier refused editing the folder's `settings.json` ("Self-Modification") and a child `claude -p --settings` launch ("Auto-Mode Bypass").
+  Ezra's approval in the project thread does not reach it, so the next test needs an allow rule in his user-level Claude settings on the box.

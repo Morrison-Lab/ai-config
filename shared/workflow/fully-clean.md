@@ -183,7 +183,9 @@ from a complete one --- so dropping a later standing not-clean yields a
 **`actions_runs` is optional but not inert.**
 Omitting it disables the ai-config#2277 suppression of a `cancelled` run
 superseded by a later success, disables the same suppression of a `failure`
-run superseded by a later run's success (ai-config#3343), and disables
+run superseded by a later run's success (ai-config#3343; same job name,
+workflow file and `event`, ordered by run id, with `completed_at` breaking a
+tie within one run and a missing one failing closed), and disables
 run-based attribution of a verdict whose comment cites its run URL rather than
 a SHA.
 Each omission pushes toward a false **not**-clean, which is the safe direction

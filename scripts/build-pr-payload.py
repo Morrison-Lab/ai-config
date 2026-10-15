@@ -173,7 +173,7 @@ def fetch_actions_runs(owner_repo: str, run_ids: List[str], token: str) -> Dict[
                       "its check runs will not be attributed to a workflow", file=sys.stderr)
                 continue
             raise
-        out[run_id] = {"path": raw.get("path") or ""}
+        out[run_id] = {"path": raw.get("path") or "", "event": raw.get("event") or ""}
     return out
 
 

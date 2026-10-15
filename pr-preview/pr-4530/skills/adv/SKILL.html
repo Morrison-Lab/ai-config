@@ -382,6 +382,7 @@ cookieconsent.run({
   <li><a href="#how-it-works" id="toc-how-it-works" class="nav-link" data-scroll-target="#how-it-works">How it works</a></li>
   <li><a href="#posting-review-output-to-a-pr" id="toc-posting-review-output-to-a-pr" class="nav-link" data-scroll-target="#posting-review-output-to-a-pr">Posting review output to a PR</a></li>
   <li><a href="#verify-cross-model-findings-before-presenting-them" id="toc-verify-cross-model-findings-before-presenting-them" class="nav-link" data-scroll-target="#verify-cross-model-findings-before-presenting-them">Verify cross-model findings before presenting them</a></li>
+  <li><a href="#name-the-prs-particular-risk-in-the-prompt" id="toc-name-the-prs-particular-risk-in-the-prompt" class="nav-link" data-scroll-target="#name-the-prs-particular-risk-in-the-prompt">Name the PR’s particular risk in the prompt</a></li>
   <li><a href="#related" id="toc-related" class="nav-link" data-scroll-target="#related">Related</a></li>
   </ul></li>
   </ul>
@@ -460,9 +461,17 @@ cookieconsent.run({
 <p>A reviewer from another model is a source of leads, not verdicts. Measured 2026-10-15 (Gemini via <code>agy</code>): findings were partly false positives, such as mislabeling which section a reading box sits in, speculative “check whether” items, and mistaking a content-hidden math block for a macro definition.</p>
 <ul>
 <li><strong>Do:</strong> check each finding against the file at the reviewed SHA (<code>gh api "repos/&lt;o&gt;/&lt;r&gt;/contents/&lt;path&gt;?ref=&lt;sha&gt;"</code>, quoted) before presenting it as a finding, and label anything unchecked as an unverified lead.</li>
-<li><strong>Do:</strong> check PR state first. A merged PR gets no comment. Head SHAs move while a run is queued, so record the reviewed head and note any drift.</li>
+<li><strong>Do:</strong> check PR state first. A merged PR gets no comment. Head SHAs move while a run is queued, and a queued review reads the head when it starts, so record in each comment the SHA actually read and note any drift.</li>
 <li><strong>Don’t:</strong> relay a speculative “check whether X” item as a defect.</li>
 </ul>
+</section>
+<section id="name-the-prs-particular-risk-in-the-prompt" class="level2">
+<h2 class="anchored" data-anchor-id="name-the-prs-particular-risk-in-the-prompt">Name the PR’s particular risk in the prompt</h2>
+<p>Put a <code>SPECIAL CHECK</code> paragraph in the cross-model prompt for the PR’s own risk (paraphrase distance, link anchors, references to deleted files), not only the generic prompt.</p>
+<ul>
+<li><strong>Don’t:</strong> send only the generic prompt for a PR with a distinctive risk.</li>
+</ul>
+<p>When a merge gate names this reviewer, a deterministic check does not replace the named read: see <a href="../../shared/workflow/adversarial-self-review.md#a-gate-that-names-a-reviewer-is-met-by-that-reviewer"><code>adversarial-self-review</code></a>.</p>
 <p>Invocation quirks for the <code>agy</code> engine (prompt syntax, no stdin, plan mode, Windows length cap) are in <a href="../../memories/antigravity.md"><code>memories/antigravity.md</code></a>.</p>
 </section>
 <section id="related" class="level2">

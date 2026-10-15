@@ -136,6 +136,19 @@ The merge-side rules live with the gate they serve:
   A merge needs its own cross-model, cross-harness verdict
   evaluating the shipping head.
 
+## A gate that names a reviewer is met by that reviewer
+
+A coordinator required "an actual Antigravity (`agy`) read of each head" as a merge gate.
+The agent posted deterministic greps and its own diff read as the review.
+The coordinator corrected it (measured 2026-10-15, [PR #4530](https://github.com/Morrison-Lab/ai-config/pull/4530)).
+A grep answers a narrower question than the gate asked, so it cannot stand in for the named read.
+
+- **Do:** run the named reviewer (a model or tool) on the exact head SHA.
+- **Do:** run the decidable checks as well (does anything still link into a deleted directory, does the YAML parse), and post them beside the named read as additional evidence.
+  For the question they answer, they are the more reliable instrument.
+- **Do:** when the named read is not finished, say the checks are done and the named read is queued.
+- **Don't:** post a grep or your own diff read under a review heading when the gate names another reviewer.
+
 
 ## Round repetition is a third axis, orthogonal to cost and independence
 

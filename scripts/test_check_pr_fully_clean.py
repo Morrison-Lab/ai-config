@@ -314,6 +314,16 @@ def _test_own_actions_job():
     check("a job on this runner that is not in_progress is not the caller's",
           not ok and len(blocking(issues)) == 2)
 
+    from scripts.lib.payload_fetcher import PayloadFetcher
+    checker._FETCHER = PayloadFetcher({"check_runs": json.loads(check_runs)})
+    try:
+        ok, issues, calls, _ = score(_actions_env(**in_actions))
+    finally:
+        checker._FETCHER = None
+    check("under --from-json the own-job lookup is skipped and says so",
+          not ok and len(blocking(issues)) == 2
+          and "--from-json" in " ".join(lookup_notes(issues)))
+
     ok, issues, _, _ = score(_actions_env(**dict(in_actions, RUNNER_NAME="")))
     check("an empty RUNNER_NAME exempts nothing and says why",
           not ok and len(blocking(issues)) == 2
@@ -396,7 +406,7 @@ def _test_own_actions_job():
     # checker, so a reworded message would silently drop out of the note.
     source = (Path(__file__).parent / "check-pr-fully-clean.py").read_text(encoding="utf-8")
     check("every reviewer-replaceable prefix starts a real review message",
-          all(source.count('"' + p) >= 2
+          all('f"' + p in source
               for p in checker.REVIEWER_REPLACEABLE_PREFIXES))
 
 

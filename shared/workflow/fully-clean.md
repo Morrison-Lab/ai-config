@@ -1364,7 +1364,8 @@ Only that one job is excluded.
 A sibling job in the same workflow run still blocks,
 and so does a completed failure of the calling job.
 When no single job matches,
-nothing is excluded, and a `NOTE` says why.
+nothing is excluded,
+and a `NOTE` says why whenever some check run is still unfinished.
 The review-verdict criteria are unchanged, because a merging agent needs them.
 A standing not-clean from an earlier round,
 or no review yet on this head, still exits `1`.

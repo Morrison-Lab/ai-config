@@ -746,6 +746,10 @@ def _own_actions_job(repo: str) -> Tuple[Optional[Tuple[str, int]], str]:
     if (env.get("GITHUB_ACTIONS") != "true"
             or env.get("GITHUB_REPOSITORY", "").lower() != repo.lower()):
         result: Tuple[Optional[Tuple[str, int]], str] = (None, "")
+    elif _FETCHER is not None:
+        # A --from-json payload has no jobs listing: payload_fetcher answers
+        # every `/actions/runs/` path it cannot key with `{}`.
+        result = (None, "a --from-json payload carries no Actions jobs listing")
     elif not (run_id.isdigit() and attempt.isdigit() and runner):
         result = (None, "GITHUB_RUN_ID, GITHUB_RUN_ATTEMPT or RUNNER_NAME is "
                         "missing or malformed")

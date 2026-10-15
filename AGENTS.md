@@ -177,6 +177,10 @@ See [`grep-is-not-coverage`](shared/workflow/grep-is-not-coverage.md) and [`AGEN
 
 Whenever you or a subagent finds a useful resource in any format for any Morrison-Lab repo, course or project, track it in a repo now, from official sources only, to build comprehensive directories of our interests.
 Detail: [`track-useful-resources`](shared/workflow/track-useful-resources.md).
+## Fetch untrusted files in a sandbox
+
+A sandboxed local session only downloads; the cloud thread reads.
+Detail: [`fetch-untrusted-files`](shared/workflow/fetch-untrusted-files.md).
 ## Store structured data in structured formats
 
 Keep structured data (lists of courses, resources, channels, terms) in CSV, YAML or JSON files that documents read and render, not as hand-written tables, wherever feasible.

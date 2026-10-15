@@ -4177,6 +4177,7 @@ def main() -> int:
             run_id = cmd[-1].rsplit("/", 1)[-1]
             return json.dumps({
                 "path": ".github/workflows/claude-review.yml",
+                "event": "pull_request",
             })
         return "{}"
 
@@ -4274,6 +4275,12 @@ def main() -> int:
         ("a passing push run does not excuse a failing pull_request run",
          [gate_run("failure", 1), gate_run("success", 2)], {},
          {"1": "pull_request", "2": "push"}, False),
+        ("a naive completed_at (no offset) blocks instead of raising",
+         [gate_run("failure", 1, "2026-10-15T08:00:00"),
+          gate_run("success", 1, "2026-10-15T08:30:00Z")], {}, {}, False),
+        ("a run whose event is unknown blocks",
+         [gate_run("failure", 1), gate_run("success", 2)], {},
+         {"1": "", "2": ""}, False),
         ("a cancelled run after an older success still blocks",
          [gate_run("success", 1), gate_run("cancelled", 2)], {}, {}, False),
     ]

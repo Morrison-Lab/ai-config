@@ -336,10 +336,10 @@ def test_cancelled_run_superseded_end_to_end():
          "started_at": "2026-09-01T23:50:00Z", "completed_at": "2026-09-01T23:51:00Z",
          "html_url": "https://github.com/o/r/actions/runs/2/job/2"},
     ]
-    same_workflow = {"1": {"path": ".github/workflows/claude-review.yml"},
-                     "2": {"path": ".github/workflows/claude-review.yml"}}
-    other_workflow = {"1": {"path": ".github/workflows/a.yml"},
-                      "2": {"path": ".github/workflows/b.yml"}}
+    same_workflow = {"1": {"path": ".github/workflows/claude-review.yml", "event": "pull_request"},
+                     "2": {"path": ".github/workflows/claude-review.yml", "event": "pull_request"}}
+    other_workflow = {"1": {"path": ".github/workflows/a.yml", "event": "pull_request"},
+                      "2": {"path": ".github/workflows/b.yml", "event": "pull_request"}}
 
     def score(actions_runs):
         payload = build_pr_payload.build_payload(

@@ -701,9 +701,11 @@ def _completed_at(cr: dict) -> Optional[datetime]:
     """Parse a check run's completed_at; None when absent or unparseable."""
     raw = cr.get("completed_at") or ""
     try:
-        return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
     except ValueError:
         return None
+    # A naive time cannot be compared with an aware one (TypeError).
+    return parsed if parsed.tzinfo is not None else None
 
 
 def _supersedes(success: dict, other: dict) -> bool:
@@ -728,14 +730,15 @@ def _supersede_key(cr: dict, repo: str, cache: dict) -> Optional[Tuple[str, str,
     """(job name, workflow path, event), or None when the workflow is unknown.
 
     The event is part of the key so a passing push run cannot excuse a failing
-    pull_request run. Payloads that predate the field carry no event on either
-    side, so the two compare equal as "".
+    pull_request run. A run whose event is unknown (a payload that predates
+    the field) gets no key, so it is never excused.
     """
     path = _workflow_path_from_check_run(cr, repo, cache)
     if not path:
         return None
     m = re.search(r"/actions/runs/(\d+)/", cr.get("html_url") or "")
-    return cr["name"], path, cache.get(("event", m.group(1)) if m else None) or ""
+    event = cache.get(("event", m.group(1)) if m else None) or ""
+    return (cr["name"], path, event) if event else None
 
 
 def _workflow_path_from_check_run(cr: dict, repo: str, cache: dict) -> Optional[str]:

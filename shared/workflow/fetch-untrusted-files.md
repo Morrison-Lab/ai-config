@@ -11,7 +11,7 @@ So the session that touches the internet never reads what it fetches, and the se
 3. A fetch through Ezra's machine, only when the cloud proxy blocks the host or the content needs his VPN (standing permission, Ezra 2026-10-15;
    never commit paper text).
 
-Link and cite official sources only; see `track-useful-resources`.
+Link and cite official sources only; see [`track-useful-resources`](track-useful-resources.md).
 
 ## The local half: download only
 

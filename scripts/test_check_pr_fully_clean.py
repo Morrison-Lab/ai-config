@@ -169,6 +169,247 @@ def best_of_three(fn, *args):
     return best, value
 
 
+def _actions_env(**overrides):
+    """os.environ with every variable the own-job lookup reads replaced.
+
+    Starts from a copy with those variables removed, so a test run that
+    itself executes inside GitHub Actions (validate.yml) cannot leak the
+    real runner's identity into a case that expects none.
+    """
+    keys = ("GITHUB_ACTIONS", "GITHUB_REPOSITORY", "GITHUB_RUN_ID",
+            "GITHUB_RUN_ATTEMPT", "RUNNER_NAME")
+    env = {k: v for k, v in os.environ.items() if k not in keys}
+    env.update(overrides)
+    return env
+
+
+def _test_own_actions_job():
+    """The caller's own Actions job is a NOTE, never a pass (ai-config#4521).
+
+    Measured on Morrison-Lab/rme#1322: run inside `review / claude-review`,
+    the checker blocked on that same job's `in_progress`, so the reviewer
+    posted NOT_CLEAN every round.
+    """
+    run_url = "https://github.com/octocat/example/actions/runs/555"
+    in_actions = dict(GITHUB_ACTIONS="true", GITHUB_REPOSITORY=TEST_REPO,
+                      GITHUB_RUN_ID="555", GITHUB_RUN_ATTEMPT="2",
+                      RUNNER_NAME="GitHub Actions 7")
+    check_runs = json.dumps({"check_runs": [
+        {"name": "review / claude-review", "status": "in_progress",
+         "conclusion": None, "html_url": f"{run_url}/job/9001"},
+        {"name": "review / sibling", "status": "in_progress",
+         "conclusion": None, "html_url": f"{run_url}/job/9002"},
+        {"name": "build", "status": "completed", "conclusion": "success",
+         "html_url": "https://github.com/octocat/example/actions/runs/1/job/1"},
+    ]})
+    jobs = {"jobs": [
+        {"id": 9001, "runner_name": "GitHub Actions 7", "status": "in_progress"},
+        {"id": 9002, "runner_name": "GitHub Actions 8", "status": "in_progress"},
+    ]}
+
+    def router(jobs_payload):
+        calls = []
+
+        def route(cmd):
+            calls.append(" ".join(cmd))
+            if "/jobs" in cmd[-1]:
+                if isinstance(jobs_payload, Exception):
+                    raise jobs_payload
+                return json.dumps(jobs_payload)
+            if "check-runs" in cmd[-1]:
+                return check_runs
+            return "{}"
+        return route, calls
+
+    def reset():
+        checker._OWN_JOB_CACHE.clear()
+        checker._OWN_JOB_ON_HEAD.clear()
+
+    def score(env, jobs_payload=jobs, runs=None):
+        reset()
+        route, calls = router(jobs_payload)
+
+        def routed(c):
+            if runs is not None and "check-runs" in c[-1]:
+                calls.append(" ".join(c))
+                return runs
+            return route(c)
+
+        with patch.dict(os.environ, env, clear=True), \
+                patch.object(checker, "run_cmd", side_effect=routed):
+            ok, issues = checker.check_ci_runs("sha123", TEST_REPO)
+        on_head = TEST_REPO in checker._OWN_JOB_ON_HEAD
+        reset()
+        return ok, issues, calls, on_head
+
+    def blocking(issues):
+        return [i for i in issues if not i.startswith("NOTE: ")]
+
+    def lookup_notes(issues):
+        return [i for i in issues if i.startswith("NOTE: running inside GitHub Actions")]
+
+    ok, issues, calls, on_head = score(_actions_env(**in_actions))
+    check("own Actions job in progress is a NOTE, not a blocker (#4521)",
+          any(i.startswith("NOTE: check run 'review / claude-review'")
+              and "#4521" in i for i in issues)
+          and not any("claude-review" in i for i in blocking(issues)))
+    check("a sibling job in the caller's own run still blocks (#4521)",
+          not ok and blocking(issues)
+          == ["Check run 'review / sibling' is still in status 'in_progress'"])
+    check("the jobs lookup names the run attempt from GITHUB_RUN_ATTEMPT",
+          any("actions/runs/555/attempts/2/jobs" in c for c in calls))
+    check("matching the own job on the head records it for main()'s note",
+          on_head and not lookup_notes(issues))
+
+    _, _, calls, _ = score(_actions_env(**dict(in_actions, GITHUB_RUN_ATTEMPT="")))
+    check("an empty GITHUB_RUN_ATTEMPT falls back to attempt 1",
+          any("actions/runs/555/attempts/1/jobs" in c for c in calls))
+
+    only_own = json.dumps({"check_runs": [
+        {"name": "review / claude-review", "status": "in_progress",
+         "conclusion": None, "html_url": f"{run_url}/job/9001"}]})
+    ok, issues, _, _ = score(_actions_env(**in_actions), runs=only_own)
+    check("check_ci_runs returns ok when the only open run is the caller's own",
+          ok and len(issues) == 1 and issues[0].startswith("NOTE: "))
+
+    failed_own = json.dumps({"check_runs": [
+        {"name": "review / claude-review", "status": "completed",
+         "conclusion": "failure", "html_url": f"{run_url}/job/9001"}]})
+    ok, issues, _, on_head = score(_actions_env(**in_actions), runs=failed_own)
+    check("a completed failure of the caller's own job still blocks",
+          not ok and not on_head and blocking(issues) == [
+              "Check run 'review / claude-review' completed with conclusion 'failure'"])
+
+    ok, issues, calls, on_head = score(_actions_env())
+    check("outside GitHub Actions the in-progress review job still blocks",
+          not ok and len(blocking(issues)) == 2 and not on_head
+          and not any("/jobs" in c for c in calls))
+    check("outside GitHub Actions no own-job lookup note is printed",
+          not lookup_notes(issues))
+
+    ok, issues, calls, _ = score(_actions_env(
+        **dict(in_actions, GITHUB_REPOSITORY="someone/else")))
+    check("an Actions run in a different repo does not exempt the PR's check run",
+          not ok and len(blocking(issues)) == 2 and not lookup_notes(issues)
+          and not any("/jobs" in c for c in calls))
+
+    ok, issues, _, _ = score(_actions_env(**in_actions),
+                             jobs_payload=RuntimeError("HTTP 403"))
+    check("a failed jobs lookup leaves the caller's own job blocking",
+          not ok and len(blocking(issues)) == 2)
+    check("a failed jobs lookup says why, once (#4521)",
+          len(lookup_notes(issues)) == 1 and "HTTP 403" in lookup_notes(issues)[0])
+
+    twin = {"jobs": [
+        {"id": 9001, "runner_name": "GitHub Actions 7", "status": "in_progress"},
+        {"id": 9002, "runner_name": "GitHub Actions 7", "status": "in_progress"}]}
+    ok, issues, _, _ = score(_actions_env(**in_actions), jobs_payload=twin)
+    check("two in-progress jobs on the same runner name exempt neither",
+          not ok and len(blocking(issues)) == 2
+          and "2 in-progress job(s)" in " ".join(lookup_notes(issues)))
+
+    finished = {"jobs": [
+        {"id": 9001, "runner_name": "GitHub Actions 7", "status": "completed"}]}
+    ok, issues, _, _ = score(_actions_env(**in_actions), jobs_payload=finished)
+    check("a job on this runner that is not in_progress is not the caller's",
+          not ok and len(blocking(issues)) == 2)
+
+    from scripts.lib.payload_fetcher import PayloadFetcher
+    checker._FETCHER = PayloadFetcher({"check_runs": json.loads(check_runs)})
+    try:
+        ok, issues, calls, _ = score(_actions_env(**in_actions))
+    finally:
+        checker._FETCHER = None
+    check("under --from-json the own-job lookup is skipped and says so",
+          not ok and len(blocking(issues)) == 2
+          and "--from-json" in " ".join(lookup_notes(issues)))
+
+    ok, issues, _, _ = score(_actions_env(**dict(in_actions, RUNNER_NAME="")))
+    check("an empty RUNNER_NAME exempts nothing and says why",
+          not ok and len(blocking(issues)) == 2
+          and "RUNNER_NAME" in " ".join(lookup_notes(issues)))
+
+    other_run = json.dumps({"check_runs": [
+        {"name": "review / claude-review", "status": "in_progress",
+         "conclusion": None,
+         "html_url": "https://github.com/octocat/example/actions/runs/556/job/9001"}]})
+    ok, issues, _, _ = score(_actions_env(**in_actions), runs=other_run)
+    check("the same job id under a different run id is not the caller's job",
+          not ok and len(blocking(issues)) == 1)
+
+    # main(), end to end through the real check_ci_runs: the reviewer note
+    # rides alongside a standing NOT_CLEAN, and the exit status still counts
+    # it, so a merging agent's gate is unchanged.
+    from types import SimpleNamespace
+    standing = ("Latest verdict-bearing review statement (2026-10-15T06:37:03Z) "
+                "is NOT clean, and no later comment supersedes it")
+    human = "PR has active formal review state 'CHANGES_REQUESTED' from alice"
+
+    def run_main(env, review_issues, runs=only_own):
+        reset()
+        route, _ = router(jobs)
+
+        def routed(c):
+            return runs if "check-runs" in c[-1] else route(c)
+
+        pr = PullRequest.__new__(PullRequest)
+        pr.pr_num, pr.repo = "1322", TEST_REPO
+        pr._fetcher = lambda c: checker.run_cmd(c)
+        pr._data = {"headRefOid": "sha12345678", "headRefName": "b",
+                    "state": "OPEN", "reviewDecision": ""}
+        pr._check_runs = None
+        out = io.StringIO()
+        args = SimpleNamespace(from_json="", pr_number="1322", repo=TEST_REPO, quorum=1)
+        with patch.dict(os.environ, env, clear=True), \
+                patch.object(checker, "run_cmd", side_effect=routed), \
+                patch.object(checker, "parse_args", return_value=args), \
+                patch.object(checker, "resolve_repo", return_value=TEST_REPO), \
+                patch.object(checker, "get_pr_info", return_value=pr), \
+                patch.object(checker, "check_ci_runs", original_check_ci_runs), \
+                patch.object(checker, "check_review_threads", return_value=(True, [])), \
+                patch.object(checker, "check_review_comments",
+                             return_value=(not review_issues, review_issues)), \
+                patch.object(checker, "check_base_drift", return_value=(True, [])), \
+                contextlib.redirect_stdout(out):
+            try:
+                checker.main()
+                code = 0
+            except SystemExit as exc:
+                code = exc.code
+        reset()
+        return code, out.getvalue()
+
+    note = "running inside a CI job whose check run is on this PR's head"
+    code, text = run_main(_actions_env(**in_actions), [])
+    check("inside its own CI job with nothing else open, main() exits 0 (#4521)",
+          code == 0 and "FULLY CLEAN" in text and note not in text)
+    code, text = run_main(_actions_env(**in_actions), [standing])
+    check("inside its own CI job a standing NOT_CLEAN still exits 1 (#4521)",
+          code == 1 and standing in text)
+    check("inside its own CI job the output tells a reviewer not to echo a standing verdict",
+          note in text and "render a fresh verdict" in text
+          and "1 blocking review item(s)" in text)
+    code, text = run_main(_actions_env(**in_actions), [human])
+    check("a human's CHANGES_REQUESTED gets no reviewer note and still exits 1",
+          code == 1 and human in text and note not in text)
+    code, text = run_main(_actions_env(), [standing])
+    check("outside a CI job no reviewer note is printed",
+          code == 1 and note not in text)
+    code, text = run_main(_actions_env(**in_actions), [standing], runs=json.dumps(
+        {"check_runs": [{"name": "build", "status": "completed",
+                         "conclusion": "success",
+                         "html_url": f"{run_url}/job/1"}]}))
+    check("a job in the repo whose check run is not on this head gets no reviewer note",
+          code == 1 and note not in text)
+
+    # The prefixes are matched against message text built elsewhere in the
+    # checker, so a reworded message would silently drop out of the note.
+    source = (Path(__file__).parent / "check-pr-fully-clean.py").read_text(encoding="utf-8")
+    check("every reviewer-replaceable prefix starts a real review message",
+          all('f"' + p in source
+              for p in checker.REVIEWER_REPLACEABLE_PREFIXES))
+
+
 def main() -> int:
     print("Testing check-pr-fully-clean.py...")
 
@@ -4026,6 +4267,8 @@ def main() -> int:
         "a unique check-run name is left unannotated",
         any(i.startswith("Check run 'unique-job' is still") for i in dupe_issues),
     )
+
+    _test_own_actions_job()
 
     # Test 7: the repository is threaded, not hardcoded (#1243, #1338, #1346, #1391)
     #

@@ -3,6 +3,9 @@
 
 Verifies that:
 1. All GitHub Actions check runs for the PR's HEAD commit SHA are completed and passing.
+   When the script runs inside a GitHub Actions job on the PR's own
+   repository, that one job's own still-running check run is a NOTE, not a
+   blocker, because it cannot finish before this script does (ai-config#4521).
 2. An automated review comment evaluating the exact HEAD commit SHA has been posted.
 3. All review comments evaluating the HEAD commit SHA contain zero findings, and no active CHANGES_REQUESTED or REJECTED state exists on the PR.
 4. Every reviewer's latest verdict-bearing statement is clean.
@@ -27,7 +30,7 @@ scripts/lib/payload_fetcher.py, which governs the `--from-json` path, maps
 `/actions/runs/`, `/compare/`, and `graphql`); the default path's own call sites are
 `gh pr view --json`, `gh api graphql` for review threads, the `/check-runs`
 read in scripts/lib/pull_request.py, `gh repo view` for repo resolution, and the
-two `/actions/runs/` reads below. No `<summary>`-scoped match on `suppressed`
+three `/actions/runs/` reads below (the third is the own-job lookup). No `<summary>`-scoped match on `suppressed`
 exists in this file either, so a Copilot finding inside a collapsed `<details>`
 block is invisible too (ai-config#3170): it creates no inline comment and
 states no verdict, so no count performed here can see it. The one exception is a Copilot review
@@ -65,6 +68,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import bisect
 import shlex
@@ -694,6 +698,99 @@ def _workflow_path_from_check_run(cr: dict, repo: str, cache: dict) -> Optional[
     return _workflow_path_for_run(m.group(1), repo, cache)
 
 
+# The caller's own GitHub Actions job, when this script runs inside one on the
+# PR it is scoring (ai-config#4521). Measured on Morrison-Lab/rme#1322
+# (2026-10-15): the `review / claude-review` job ran this script, read its own
+# job as `in_progress`, posted NOT_CLEAN, and every re-run did the same, since
+# a job cannot complete before the process inside it finishes. Cached per repo
+# so the jobs listing is read once per run.
+_OWN_JOB_CACHE: Dict[str, Tuple[Optional[Tuple[str, int]], str]] = {}
+# Repos whose head check runs included the caller's own job. main() adds the
+# reviewer note only then, so a job that merely shares the repo (a scheduled
+# sweep scoring some other PR) is never told it is reviewing this one.
+_OWN_JOB_ON_HEAD: Set[str] = set()
+# Review blockers that a reviewer's own fresh verdict could replace: no review
+# on this head yet, or a standing not-clean verdict. Formal review states
+# (`CHANGES_REQUESTED` and the like), findings in a review of this head, and
+# unresolved threads are deliberately absent.
+REVIEWER_REPLACEABLE_PREFIXES = (
+    "No automated review",
+    "No review comment has been posted evaluating HEAD",
+    "No valid clean review found for HEAD",
+    "Multi-provider quorum not met",
+    "Latest verdict-bearing",
+)
+
+
+def _own_actions_job(repo: str) -> Tuple[Optional[Tuple[str, int]], str]:
+    """Return ((run id, job id), "") for the Actions job running this script.
+
+    Only the job itself is identified, never its whole workflow run: a sibling
+    job in the same run can still fail on its own, so it must keep blocking.
+    The job is the one in this run attempt whose `runner_name` is this
+    process's RUNNER_NAME (a runner runs one job at a time) and whose status
+    is `in_progress`, and only when exactly one job matches. An Actions job's
+    id is the id in its check run's `html_url` (`.../job/<id>`).
+
+    When it cannot be confirmed, the first element is None and nothing is
+    exempted. The second element then says why, but only when the script IS
+    running inside Actions on this repo; outside Actions it is "", since there
+    is no own job to look for and nothing to explain.
+    """
+    if repo in _OWN_JOB_CACHE:
+        return _OWN_JOB_CACHE[repo]
+    env = os.environ
+    run_id = env.get("GITHUB_RUN_ID", "")
+    attempt = env.get("GITHUB_RUN_ATTEMPT", "") or "1"
+    runner = env.get("RUNNER_NAME", "")
+    if (env.get("GITHUB_ACTIONS") != "true"
+            or env.get("GITHUB_REPOSITORY", "").lower() != repo.lower()):
+        result: Tuple[Optional[Tuple[str, int]], str] = (None, "")
+    elif _FETCHER is not None:
+        # A --from-json payload has no jobs listing: payload_fetcher answers
+        # every `/actions/runs/` path it cannot key with `{}`.
+        result = (None, "a --from-json payload carries no Actions jobs listing")
+    elif not (run_id.isdigit() and attempt.isdigit() and runner):
+        result = (None, "GITHUB_RUN_ID, GITHUB_RUN_ATTEMPT or RUNNER_NAME is "
+                        "missing or malformed")
+    else:
+        try:
+            out = fetch(["gh", "api",
+                         f"repos/{repo}/actions/runs/{run_id}/attempts/{attempt}/jobs?per_page=100"])
+            jobs = json.loads(out).get("jobs")
+        except (RuntimeError, ValueError, AttributeError) as exc:
+            jobs, why = None, f"the jobs listing could not be read ({exc})"
+        else:
+            why = "the jobs listing has no 'jobs' list"
+        mine = []
+        if isinstance(jobs, list):
+            mine = [j for j in jobs if isinstance(j, dict)
+                    and j.get("runner_name") == runner
+                    and j.get("status") == "in_progress"
+                    and isinstance(j.get("id"), int)
+                    and not isinstance(j.get("id"), bool)]
+            why = (f"{len(mine)} in-progress job(s) in run {run_id} attempt "
+                   f"{attempt} ran on runner '{runner}', not exactly one")
+            if len(jobs) >= 100:
+                why += " (the listing holds 100 jobs, its page size, so more may exist)"
+        if len(mine) == 1:
+            result = ((run_id, mine[0]["id"]), "")
+        else:
+            result = (None, why)
+    _OWN_JOB_CACHE[repo] = result
+    return result
+
+
+_JOB_URL_RE = re.compile(r"/actions/runs/(\d+)/job/(\d+)(?:[/?#]|$)")
+
+
+def _is_own_job(cr: dict, own: Optional[Tuple[str, int]]) -> bool:
+    if own is None:
+        return False
+    m = _JOB_URL_RE.search(cr.get("html_url") or "")
+    return bool(m) and m.group(1) == own[0] and int(m.group(2)) == own[1]
+
+
 def check_ci_runs(pr) -> Tuple[bool, List[str]]:
     sha = pr.head_sha
     repo = pr.repo
@@ -728,6 +825,7 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
         if wp:
             success_keys.add((cr["name"], wp))
 
+    own_lookup_reported = False
     for cr in check_runs:
         name = cr["name"]
         status = cr["status"]
@@ -747,6 +845,26 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
             where = f" ({url})" if url else ""
 
         if status != "completed":
+            own, why_not = _own_actions_job(repo)
+            if _is_own_job(cr, own):
+                # A NOTE, not a pass: this job's failure on a later run still
+                # blocks through the conclusion branch below.
+                _OWN_JOB_ON_HEAD.add(repo)
+                issues.append(
+                    f"NOTE: check run '{name}'{where} is still in status "
+                    f"'{status}', but it is the job running this script, which "
+                    "cannot complete before this script does, so it is not "
+                    "counted (ai-config#4521)")
+                continue
+            if why_not and not own_lookup_reported:
+                # Said once, so a failed lookup does not look exactly like the
+                # pre-#4521 loop with nothing explaining why.
+                own_lookup_reported = True
+                issues.append(
+                    "NOTE: running inside GitHub Actions on this repo, but the "
+                    f"calling job could not be identified ({why_not}), so every "
+                    "unfinished check run is counted, the caller's own job "
+                    "included (ai-config#4521)")
             issues.append(
                 f"Check run '{name}'{where} is still in status '{status}'")
         elif conclusion not in ("success", "neutral", "skipped"):
@@ -758,7 +876,7 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
                 f"Check run '{name}'{where} completed with conclusion "
                 f"'{conclusion}'")
 
-    return len(issues) == 0, issues
+    return all(i.startswith("NOTE: ") for i in issues), issues
 
 
 WORKFLOW_DIR = ".github/workflows/"
@@ -4043,6 +4161,28 @@ def main():
     drift_ok, drift_issues = check_base_drift(pr)
 
     all_issues = ci_issues + thread_issues + review_issues + drift_issues
+
+    # Inside a CI job whose own check run is on this head, some review items
+    # describe the PR BEFORE that job posts anything: no review on this head
+    # yet, or a standing not-clean verdict that may be the same reviewer's
+    # previous round. A reviewer that copies those into its own verdict
+    # re-posts that NOT_CLEAN forever (ai-config#4521). They still block,
+    # since a merging agent needs them; the note says which kind they are and
+    # leaves a human's change request or another reviewer's verdict standing.
+    replaceable = [i for i in review_issues
+                   if i.startswith(REVIEWER_REPLACEABLE_PREFIXES)]
+    if repo in _OWN_JOB_ON_HEAD and replaceable:
+        own, _ = _own_actions_job(repo)
+        all_issues.append(
+            f"NOTE: this script is running inside a CI job whose check run is "
+            f"on this PR's head (Actions run {own[0]}, job {own[1]}). "
+            f"{len(replaceable)} blocking review item(s) are a missing review "
+            "on this head or a standing not-clean verdict. If this job is a "
+            "reviewer and the not-clean verdict is its own earlier round, "
+            "those items describe the PR before this job's output: render a "
+            "fresh verdict on the diff rather than copying them into it. A "
+            "human's change request and another reviewer's verdict are not "
+            "covered by this and still stand (ai-config#4521)")
 
     # NOTE-prefixed issues are informational (unreadable-format warnings) and
     # do not block -- only real findings or missing reviews cause a failure.

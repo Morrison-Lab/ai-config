@@ -47,14 +47,16 @@ Run it as a Remote Control session on Ezra's Linux box (cf463-02), started in `~
 - The sandbox wraps shell commands only.
   The Read, Edit, Write and WebFetch tools and MCP servers run outside it, so the `permissions.deny` rules close the Read tool on the inbox and the web tools.
 - The inbox is also in the sandbox's `denyRead`, a narrower deny inside the wider `allowRead`, so a sandboxed Bash command can write a download into `inbox/` but cannot read it back.
-  Both ways to read it are then blocked technically, and the brief repeats the rule.
+  Bash `cat` and the Read tool are then blocked technically, and the brief repeats the rule.
+  Grep and Glob are not guaranteed: Claude Code applies `Read` deny rules to them on a best-effort basis, so the brief tells the session never to search or list the inbox's contents.
 - Do not add an `Edit(...)` deny rule for the inbox.
   Claude Code builds the sandbox's filesystem rules from Edit permission rules too, and a deny is expected to override `allowWrite`.
   Unverified as of 2026-10-15: a first run with that rule failed the download with a curl write error, and the rule was then removed, but the retest has not run yet.
 - `allowUnsandboxedCommands: false` removes the `dangerouslyDisableSandbox` retry, and `failIfUnavailable` stops the session rather than running unsandboxed when bubblewrap is missing.
 - Hosts off the allowlist prompt Ezra instead of connecting;
   add a host to the file by hand after he agrees, never by the session (`.claude` is write-protected in the sandbox).
-- Fetch each item into its own new directory under `inbox/`, with `curl --fail --location --max-filesize` from an official URL.
+- Fetch each item into its own new directory under `inbox/`, from an official URL, with `curl --fail --location --max-filesize 100000000`.
+  That caps a download at 100 MB; raise it for a larger book.
 - Record only the URL and the curl status and byte count (`-w '%{http_code} %{size_download}'`).
   Do not open, unpack, render, hash or run the file, and do not run `file` or `pdfinfo` on it here.
   The cloud thread hashes it after copying it.

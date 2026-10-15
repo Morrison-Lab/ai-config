@@ -35,7 +35,7 @@ This fragment is the agent-facing copy: follow the rules, and link to psw instea
 
 - **State the notation, and name the alternatives** a reader will meet in other sources, in the definition div or a callout beside it.
 - **Name synonyms and near-synonyms** where a term is defined, and say which one the notes use.
-  Put every alias in the `#def-` div title, as in "Risk (expected loss, population risk, true risk, generalization error)", and bold each alias where the definition names it, including the name another source uses, such as a textbook's (Ezra, 2026-10-15).
+  Put every alias in the `#def-` div title, as in "Risk (expected loss, population risk, true risk, generalization error, expected prediction error)", and bold each alias where the definition names it, including the name another source uses, such as a textbook's (Ezra, 2026-10-15).
   The rule holds in every repository, including `mds`, `pds`, `sds`, `lds` and `rme`.
   The wording is canonical in psw's "Defining terms clearly" chapter.
 - **Use real data and compute every number.**

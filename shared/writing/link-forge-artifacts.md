@@ -48,7 +48,7 @@ See [`hyperlink-liberally`](hyperlink-liberally.md) for the general principle co
 When a message names a PR, link both the PR by its full URL and the project thread it belongs to, wherever a thread exists and is relevant.
 In a Claude Projects thread, write the thread link as `[thread title](#cmsg_…)`.
 
-- **Do:** write "[#4516](https://github.com/Morrison-Lab/ai-config/pull/4516) and its [thread title](#cmsg_…)".
+- **Do:** write the PR as `[#4516](https://github.com/Morrison-Lab/ai-config/pull/4516)` followed by its thread link.
 - **Don't:** name a PR with only its number, or link the PR and leave the user to find the thread.
 
 (Directive from the user, 2026-10-14: "when you mention PRs, always link to both the PR and the corresponding thread (if relevant)".)

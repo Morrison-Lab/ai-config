@@ -91,8 +91,8 @@ The settings above are a draft: the download step does not yet work.
 
 - Linux box (cf463-02): the stray write (discarded), the `--noproxy` curl (no DNS) and the Read-tool probe (denied) behaved as required.
   The `known_hosts` read failed only because that file is missing there, so it proved nothing.
-  The arXiv download got HTTP 200 but could not be saved, because `inbox/` was read-only inside the sandbox even with the `~/` path in `allowWrite`.
-  That run's file denied `~/` but not the inbox itself, so the cause is probably the denied home directory.
+  The arXiv download got HTTP 200 but could not be saved, because `inbox/` was read-only inside the sandbox even with the inbox listed in `allowWrite`.
+  That run's file had `denyRead: ["~/"]` and no separate inbox entry, so the cause is probably the denied home directory.
   An absolute `allowWrite` path, and a `chmod 000` right after the download as the Bash-level read block, are untested.
 - Native Windows (XPS8950): the sandbox does not run there.
   Its Ubuntu WSL2 has bubblewrap, and socat was installed as root;

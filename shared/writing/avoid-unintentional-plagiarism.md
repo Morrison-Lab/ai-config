@@ -5,7 +5,7 @@ Credit alone ([`visible-attributions.md`](visible-attributions.md)) does not cur
 
 ## Writing rules
 
-- Write each explanation from the mathematics, the data or the code in front of you, in your own sentence structure.
+- Write each explanation from the mathematics, the data, or the code in front of you, in your own sentence structure.
 - Never reword a source sentence by sentence.
   Swapping synonyms into someone else's sentence is still copying.
 - A passage adapted from a source carries a citation with a locator at the passage, and a Source note when it follows the source's structure for more than a sentence ([`citations.md`](citations.md)).
@@ -21,13 +21,16 @@ Run the overlap checker over what you wrote:
 python3 check_source_overlap.py --corpus <dir of extracted .txt> --git-diff origin/main
 ```
 
-- The tool is `check-source-overlap` in [`Morrison-Lab/gha`](https://github.com/Morrison-Lab/gha) (a composite action, a reusable workflow, and the standalone script).
+- The tool is `check-source-overlap` in [`Morrison-Lab/gha`](https://github.com/Morrison-Lab/gha) (a composite action, a reusable workflow, and the standalone script `check-source-overlap/check_source_overlap.py`, which a notes repository may also carry as `tools/check_source_overlap.py`).
+- `--git-diff` checks only the lines a branch adds.
+  To check content already on `main`, name the files instead: `python3 check_source_overlap.py --corpus <dir> chapters/*.qmd`.
 - The corpus is text extracted with `pdftotext` from the books in `Morrison-Lab/mlr`, kept in a scratch directory and never committed.
 - Web sources (a free online book, a documentation page) go into the corpus as `.txt` files too.
 - Fix every flagged paragraph by rewriting it from scratch, or quote and cite it.
   Mark a hand-checked generic definition or standard formula with `<!-- overlap-ok: reason -->`.
-- A run that reports zero paragraphs examined checked nothing.
+- A run on named files that reports zero paragraphs examined checked nothing.
   Treat it as a failure.
+  A `--git-diff` run that adds no prose may report zero legitimately, so confirm that the diff holds prose.
 
 ## Existing content
 
@@ -35,7 +38,7 @@ Treat bulk-generated commits as the highest risk.
 Find them from commit messages such as "content from multiple sources", from bot authors, and from commits that add whole chapters at once, then run the checker over those files first.
 A flagged paragraph is rewritten from scratch, or turned into a short marked quotation with a citation, in its own PR.
 A citation alone never clears a paragraph that copies the source's wording.
-Never fix a flagged paragraph silently.
+Never fix a flagged paragraph silently: the PR description names the paragraph, the source it overlapped, and the commit that introduced it, so the maintainer can see what was found and how far the problem reaches.
 
 ## Limits
 

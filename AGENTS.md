@@ -175,8 +175,7 @@ See [`grep-is-not-coverage`](shared/workflow/grep-is-not-coverage.md) and [`AGEN
 - **Don't:** assert that a standing grant or rule does not exist based only on searching `skills/` or `memories/`.
 ## Track every useful resource in a repo
 
-Whenever you or a subagent finds a useful resource in any format for any Morrison-Lab repo, course or project, track it in a repo now, from official sources only, to build comprehensive directories of our interests.
-Track it in every notes repo whose topic it covers (sds, mds, pds, rme, lds and the rest), in addition to its primary home, not only the first repo that comes to mind (Ezra, 2026-10-15).
+Whenever you or a subagent finds a useful resource in any format for any Morrison-Lab repo, course or project, track it in every repo it fits now, from official sources only, to build comprehensive directories of our interests.
 Detail: [`track-useful-resources`](shared/workflow/track-useful-resources.md).
 ## Fetch untrusted files in a sandbox
 

@@ -1355,20 +1355,27 @@ The checker now excludes the calling job itself
 after the same loop recurred on
 [rme#1322](https://github.com/Morrison-Lab/rme/pull/1322) on 2026-10-15).
 Run inside GitHub Actions on the PR's own repository,
-it identifies its own job:
-the job in `GITHUB_RUN_ID`'s current attempt whose `runner_name` is `RUNNER_NAME`.
-It reports that job's not-yet-completed check run as a `NOTE` rather than a blocker.
+it looks for its own job:
+the one job in the current attempt of `GITHUB_RUN_ID`
+that is `in_progress` on the runner named `RUNNER_NAME`.
+When exactly one job matches,
+the checker reports that job's unfinished check run as a `NOTE` rather than a blocker.
 Only that one job is excluded.
 A sibling job in the same workflow run still blocks,
-a completed failure of the calling job still blocks,
-and if the job cannot be identified, nothing is excluded.
+and so does a completed failure of the calling job.
+When no single job matches,
+nothing is excluded, and a `NOTE` says why.
 The review-verdict criteria are unchanged, because a merging agent needs them.
 A standing not-clean from an earlier round,
 or no review yet on this head, still exits `1`.
-When the checker has identified its own job,
-it adds a `NOTE` saying that those items describe the PR before the job's own output,
-so a reviewer must not copy them into its verdict.
-Morrison-Lab/gha#978 goes further for the Claude reviewer
+When the calling job's own check run was on the head,
+and one of those two kinds of item is blocking,
+the checker adds a `NOTE`.
+The `NOTE` tells a reviewer whose own earlier round is the standing verdict
+to render a fresh verdict on the diff,
+not to copy those items into it.
+A human's change request and another reviewer's verdict are outside that `NOTE`.
+[Morrison-Lab/gha#978](https://github.com/Morrison-Lab/gha/issues/978) goes further for the Claude reviewer
 and denies it the script outright.
 
 (Measured 2026-08-19 on a remote session driving

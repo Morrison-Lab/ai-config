@@ -136,6 +136,26 @@ Because an incomplete adapter simply returns `{"decision": "allow"}` when it mis
   Do not use tools or acknowledge with a conversational promise.").
   Otherwise, tool-using models may output an initial conversational acknowledgment expecting a subsequent tool-use turn.
 
+### Headless `agy -p` invocation quirks (Windows, agy 1.3.5)
+
+Measured 2026-10-15 running a cross-harness Gemini review from a Windows XPS box.
+
+- With `--mode` following, the prompt attached only as `-p="..."`.
+  A bare `-p "..."` followed by `--mode` took `--mode` as the prompt.
+  [`delegation.md`](delegation.md) documents the space form for `--print` without trailing flags;
+  keep the `=` form when other flags follow.
+- With `-p` present, stdin was **not** read as the prompt.
+  `delegation.md` records piping a brief on stdin with no `-p` at all;
+  that is a different invocation and is not contradicted here.
+- Headless mode auto-denies tool permissions (`read_file` included), so the model cannot fetch the diff itself.
+  Embed the whole diff in the prompt and pass `--mode plan`.
+- The Windows command line caps near 32k characters.
+  Truncate the embedded diff (about 24000 characters, leaving headroom under the cap for the prompt template) or pipe a brief file per `delegation.md`.
+  Say in the posted review that the diff was truncated.
+
+- **Do:** `agy -p="<prompt with diff embedded>" --mode plan`, diff truncated to about 24000 characters with a stated notice.
+- **Don't:** combine `-p` with stdin input, put `-p` and its value as separate arguments, or expect the model to read files in headless mode.
+
 ## The merge gate is client-side only, and client hooks fail open --- server rules are the only enforcement that survives a delivery failure
 
 Measured 2026-08-30 (Morrison-Lab/ai-config#2676): agy merged Lacaedemon/sparta#1427 over a "Needs more work" verdict.

@@ -79,6 +79,19 @@ _Posted by <Agent Name> (AI agent) --- not written by a human._
 This ensures `check-pr-fully-clean.py` admits the review by construction
 and allows a clean verdict to supersede any earlier standing not-clean comments (#4425).
 
+## Verify cross-model findings before presenting them
+
+A reviewer from another model is a source of leads, not verdicts.
+Measured 2026-10-15 (Gemini via `agy`): findings were partly false positives, such as mislabeling which section a reading box sits in, speculative "check whether" items, and mistaking a content-hidden math block for a macro definition.
+
+- **Do:** check each finding against the file at the reviewed SHA (`gh api "repos/<o>/<r>/contents/<path>?ref=<sha>"`, quoted) before presenting it as a finding, and label anything unchecked as an unverified lead.
+- **Do:** check PR state first.
+  A merged PR gets no comment.
+  Head SHAs move while a run is queued, so record the reviewed head and note any drift.
+- **Don't:** relay a speculative "check whether X" item as a defect.
+
+Invocation quirks for the `agy` engine (prompt syntax, no stdin, plan mode, Windows length cap) are in [`memories/antigravity.md`](../../memories/antigravity.md).
+
 ## Related
 
 - `pre-push-review`: The underlying script and skill for pre-push reviews.

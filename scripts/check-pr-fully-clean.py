@@ -683,11 +683,62 @@ def _workflow_path_for_run(run_id: str, repo: str, cache: dict) -> Optional[str]
         return cache[run_id]
     try:
         out = fetch(["gh", "api", f"repos/{repo}/actions/runs/{run_id}"])
-        path = json.loads(out).get("path") or ""
+        run = json.loads(out)
+        path = run.get("path") or ""
+        cache[("event", run_id)] = run.get("event") or ""
     except RuntimeError:
         path = ""
     cache[run_id] = path
     return path or None
+
+
+def _run_id(cr: dict) -> Optional[int]:
+    m = re.search(r"/actions/runs/(\d+)/", cr.get("html_url") or "")
+    return int(m.group(1)) if m else None
+
+
+def _completed_at(cr: dict) -> Optional[datetime]:
+    """Parse a check run's completed_at; None when absent or unparseable."""
+    raw = cr.get("completed_at") or ""
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    # A naive time cannot be compared with an aware one (TypeError).
+    return parsed if parsed.tzinfo is not None else None
+
+
+def _supersedes(success: dict, other: dict) -> bool:
+    """True when `success` is a later run of the job than `other`.
+
+    Runs are ordered by workflow run id, not completion time: re-running an old
+    failed job re-fails it and stamps a fresh completed_at on the OLD run,
+    which must not make it look newer than the run that passed. Within one run
+    id (a re-run of its failed jobs) completed_at decides, and a missing or
+    unparseable one fails closed. Unknown run ids fail closed too.
+    """
+    s_id, o_id = _run_id(success), _run_id(other)
+    if s_id is None or o_id is None:
+        return False
+    if s_id != o_id:
+        return s_id > o_id
+    s_at, o_at = _completed_at(success), _completed_at(other)
+    return s_at is not None and o_at is not None and s_at > o_at
+
+
+def _supersede_key(cr: dict, repo: str, cache: dict) -> Optional[Tuple[str, str, str]]:
+    """(job name, workflow path, event), or None when the workflow is unknown.
+
+    The event is part of the key so a passing push run cannot excuse a failing
+    pull_request run. A run whose event is unknown (a payload that predates
+    the field) gets no key, so it is never excused.
+    """
+    path = _workflow_path_from_check_run(cr, repo, cache)
+    if not path:
+        return None
+    m = re.search(r"/actions/runs/(\d+)/", cr.get("html_url") or "")
+    event = cache.get(("event", m.group(1)) if m else None) or ""
+    return (cr["name"], path, event) if event else None
 
 
 def _workflow_path_from_check_run(cr: dict, repo: str, cache: dict) -> Optional[str]:
@@ -794,7 +845,8 @@ def _is_own_job(cr: dict, own: Optional[Tuple[str, int]]) -> bool:
 def check_ci_runs(pr) -> Tuple[bool, List[str]]:
     sha = pr.head_sha
     repo = pr.repo
-    check_runs = [{"name": cr.name, "status": cr.status, "conclusion": cr.conclusion, "html_url": cr.html_url} for cr in pr.get_check_runs()]
+    check_runs = [{"name": cr.name, "status": cr.status, "conclusion": cr.conclusion, "html_url": cr.html_url,
+                   "completed_at": cr.completed_at} for cr in pr.get_check_runs()]
 
     issues = []
     if not check_runs:
@@ -817,13 +869,16 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
     # Scope by workflow file path, not name alone: two workflows can share a job
     # name (#1869) without one run superseding the other.
     workflow_cache: dict = {}
-    success_keys = set()
+    # Successes per (job name, workflow path, event). A non-passing run is
+    # excused only by a success that _supersedes (a LATER run, never an older
+    # one: a regression after a pass still blocks).
+    successes: Dict[Tuple[str, str, str], List[dict]] = {}
     for cr in check_runs:
         if cr.get("status") != "completed" or cr.get("conclusion") != "success":
             continue
-        wp = _workflow_path_from_check_run(cr, repo, workflow_cache)
-        if wp:
-            success_keys.add((cr["name"], wp))
+        key = _supersede_key(cr, repo, workflow_cache)
+        if key:
+            successes.setdefault(key, []).append(cr)
 
     own_lookup_reported = False
     for cr in check_runs:
@@ -868,10 +923,12 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
             issues.append(
                 f"Check run '{name}'{where} is still in status '{status}'")
         elif conclusion not in ("success", "neutral", "skipped"):
-            if conclusion == "cancelled":
-                wp = _workflow_path_from_check_run(cr, repo, workflow_cache)
-                if wp and (name, wp) in success_keys:
-                    continue
+            # A cancelled or failed run is superseded once a later run of the
+            # same job, workflow and event passes on this same head SHA
+            # (ai-config#2277, #3343).
+            key = _supersede_key(cr, repo, workflow_cache)
+            if key and any(_supersedes(s, cr) for s in successes.get(key, [])):
+                continue
             issues.append(
                 f"Check run '{name}'{where} completed with conclusion "
                 f"'{conclusion}'")

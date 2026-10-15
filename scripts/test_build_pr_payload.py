@@ -291,7 +291,7 @@ def test_fetch_actions_runs_maps_paths_and_skips_404():
         if "/actions/runs/404404" in url:
             raise urllib.error.HTTPError(url, 404, "Not Found", {}, io.BytesIO(b"{}"))
         run_id = url.split("/actions/runs/")[1].split("?")[0]
-        return _Resp(json.dumps({"id": int(run_id), "path": f".github/workflows/{run_id}.yml"}).encode())
+        return _Resp(json.dumps({"id": int(run_id), "path": f".github/workflows/{run_id}.yml", "event": "pull_request"}).encode())
 
     real = urllib.request.urlopen
     urllib.request.urlopen = fake_urlopen
@@ -305,7 +305,8 @@ def test_fetch_actions_runs_maps_paths_and_skips_404():
         sys.stderr = real_err
     check(
         "each reachable run maps to its workflow path",
-        got == {"1": {"path": ".github/workflows/1.yml"}, "2": {"path": ".github/workflows/2.yml"}},
+        got == {"1": {"path": ".github/workflows/1.yml", "event": "pull_request"},
+                "2": {"path": ".github/workflows/2.yml", "event": "pull_request"}},
     )
     check("a 404 run is skipped and named on stderr", "404404" in err.getvalue() and "404404" not in got)
     check("each run id is fetched exactly once", len(calls) == 3)
@@ -335,10 +336,10 @@ def test_cancelled_run_superseded_end_to_end():
          "started_at": "2026-09-01T23:50:00Z", "completed_at": "2026-09-01T23:51:00Z",
          "html_url": "https://github.com/o/r/actions/runs/2/job/2"},
     ]
-    same_workflow = {"1": {"path": ".github/workflows/claude-review.yml"},
-                     "2": {"path": ".github/workflows/claude-review.yml"}}
-    other_workflow = {"1": {"path": ".github/workflows/a.yml"},
-                      "2": {"path": ".github/workflows/b.yml"}}
+    same_workflow = {"1": {"path": ".github/workflows/claude-review.yml", "event": "pull_request"},
+                     "2": {"path": ".github/workflows/claude-review.yml", "event": "pull_request"}}
+    other_workflow = {"1": {"path": ".github/workflows/a.yml", "event": "pull_request"},
+                      "2": {"path": ".github/workflows/b.yml", "event": "pull_request"}}
 
     def score(actions_runs):
         payload = build_pr_payload.build_payload(

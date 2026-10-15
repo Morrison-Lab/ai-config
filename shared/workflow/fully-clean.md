@@ -182,9 +182,22 @@ from a complete one --- so dropping a later standing not-clean yields a
 
 **`actions_runs` is optional but not inert.**
 Omitting it disables the ai-config#2277 suppression of a `cancelled` run
-superseded by a later success, and disables run-based attribution of a verdict
-whose comment cites its run URL rather than a SHA.
-Both omissions push toward a false **not**-clean, which is the safe direction
+superseded by a later success, disables the same suppression of a `failure`
+run superseded by a later run's success (ai-config#3343; same job name,
+workflow file and `event`, ordered by run id, with `completed_at` breaking a
+tie within one run; a missing event, run id or timestamp fails closed), and
+disables run-based attribution of a verdict whose comment cites its run URL
+rather than a SHA.
+Two trade-offs are accepted on purpose.
+An old run that re-fails after a newer run passed stays suppressed, because
+re-running a stale job is how a gate gets stuck red (macros#143); a newer
+not-clean review verdict still blocks through the verdict scan.
+Two same-named jobs in one run attempt cannot be told apart from the check
+run's URL, so one can excuse the other only when its `completed_at` is later.
+The suppression covers every conclusion other than `success`, `neutral` and
+`skipped`: `timed_out`, `action_required`, `startup_failure` and `stale` as
+well as `failure` and `cancelled`.
+Each omission pushes toward a false **not**-clean, which is the safe direction
 --- but if a PR reads not-clean for a reason you cannot see in its checks or
 reviews, gather this key before concluding anything.
 Never add entries until the verdict flips: that is tuning the instrument to

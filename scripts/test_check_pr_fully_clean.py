@@ -4177,6 +4177,7 @@ def main() -> int:
             run_id = cmd[-1].rsplit("/", 1)[-1]
             return json.dumps({
                 "path": ".github/workflows/claude-review.yml",
+                "event": "pull_request",
             })
         return "{}"
 
@@ -4218,6 +4219,76 @@ def main() -> int:
             (not collision_ok)
             and any("cancelled" in i for i in collision_issues),
         )
+
+    # A non-passing run is superseded by a LATER run of the same job, workflow
+    # and event on the same head SHA (#3343), and by nothing else.
+    GATE = "review / require-clean-verdict"
+
+    def gate_run(conclusion, run_id, at="2026-10-15T08:00:00Z"):
+        return {"name": GATE, "status": "completed", "conclusion": conclusion,
+                "completed_at": at,
+                "html_url": f"https://github.com/o/r/actions/runs/{run_id}/job/{run_id}"}
+
+    def gate_router(runs, paths=None, events=None):
+        paths = paths or {}
+        events = events or {}
+
+        def router(cmd):
+            joined = " ".join(cmd)
+            if "check-runs" in joined:
+                return json.dumps({"check_runs": runs})
+            if "/actions/runs/" in joined:
+                run_id = cmd[-1].rsplit("/", 1)[-1]
+                return json.dumps({
+                    "path": paths.get(run_id, ".github/workflows/claude-review.yml"),
+                    "event": events.get(run_id, "pull_request"),
+                })
+            return "{}"
+        return router
+
+    cases = [
+        ("failed run is ignored when a later run of the same job succeeded",
+         [gate_run("failure", 1), gate_run("success", 2)], {}, {}, True),
+        ("failed run still blocks when the success is from an older run",
+         [gate_run("success", 1), gate_run("failure", 2)], {}, {}, False),
+        ("failed run still blocks when the success is from another workflow",
+         [gate_run("failure", 1), gate_run("success", 2)],
+         {"2": ".github/workflows/other.yml"}, {}, False),
+        ("failed old run re-run after a newer run passed is still superseded",
+         [gate_run("failure", 1, "2026-10-15T09:03:57Z"),
+          gate_run("success", 2, "2026-10-15T09:03:30Z")], {}, {}, True),
+        ("failed run with no run id still blocks",
+         [{"name": GATE, "status": "completed", "conclusion": "failure",
+           "html_url": ""}, gate_run("success", 2)], {}, {}, False),
+        ("same run id: a failure then a later success is superseded",
+         [gate_run("failure", 1, "2026-10-15T08:00:00Z"),
+          gate_run("success", 1, "2026-10-15T08:30:00Z")], {}, {}, True),
+        ("same run id: a success then a later failure blocks",
+         [gate_run("success", 1, "2026-10-15T08:00:00Z"),
+          gate_run("failure", 1, "2026-10-15T08:30:00Z")], {}, {}, False),
+        ("same run id: equal timestamps block",
+         [gate_run("failure", 1), gate_run("success", 1)], {}, {}, False),
+        ("same run id: a missing completed_at blocks",
+         [gate_run("failure", 1, ""), gate_run("success", 1)], {}, {}, False),
+        ("same run id: an unparseable completed_at blocks",
+         [gate_run("failure", 1, "soon"), gate_run("success", 1)], {}, {}, False),
+        ("a passing push run does not excuse a failing pull_request run",
+         [gate_run("failure", 1), gate_run("success", 2)], {},
+         {"1": "pull_request", "2": "push"}, False),
+        ("a naive completed_at (no offset) blocks instead of raising",
+         [gate_run("failure", 1, "2026-10-15T08:00:00"),
+          gate_run("success", 1, "2026-10-15T08:30:00Z")], {}, {}, False),
+        ("a run whose event is unknown blocks",
+         [gate_run("failure", 1), gate_run("success", 2)], {},
+         {"1": "", "2": ""}, False),
+        ("a cancelled run after an older success still blocks",
+         [gate_run("success", 1), gate_run("cancelled", 2)], {}, {}, False),
+    ]
+    for label, runs, paths, events, expect_ok in cases:
+        with patch.object(checker, "run_cmd",
+                          side_effect=gate_router(runs, paths, events)):
+            ok_, issues_ = checker.check_ci_runs("sha123", TEST_REPO)
+            check(label, ok_ == expect_ok)
 
     # A job name is not unique across workflows (#1869). The live case:
     # ucdavis/bcs has `ubuntu-latest (release)` in BOTH R-CMD-check.yaml and

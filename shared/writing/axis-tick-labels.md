@@ -13,7 +13,11 @@ Say in the text that the fit uses the transformed values, and why, rather than l
 
 How, by tool:
 
-- ggplot2: set `breaks` in the original units on the scale, or use `scale_x_continuous(transform = ...)` with `labels`.
+- ggplot2, when the plotted column is transformed (scaled, standardized):
+  plot the back-transformed values (`aes(x * sd + mean)`),
+  or give `breaks` at the transformed positions and `labels` with the original-value text.
+  Bare `breaks` in original units against a scaled column draws an empty axis.
+- ggplot2, when the axis uses a `scale_*(transform = ...)` such as `"log10"`: set `breaks` in the original units.
 - Observable Plot: pass `ticks` at the scaled positions and a `tickFormat` that maps back, as the lds Big Ideas helpers `biHpAxis` and `biMpgAxis` do.
 
 A log axis is fine: label it with the original values.

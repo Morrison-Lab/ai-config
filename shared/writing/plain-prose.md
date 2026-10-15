@@ -46,11 +46,12 @@ When PSW and this guidance disagree, PSW wins.
   - **Do:** write "continuity gives us the intermediate value theorem".
   - **Don't:** write "continuity buys us the intermediate value theorem".
 - **Check every prose edit against PSW before the push that carries it**
-  (Ezra and d-morrison, 2026-10-15, psc#39).
+  (Ezra and d-morrison, 2026-10-15,
+  [`Morrison-Lab/psc#39`](https://github.com/Morrison-Lab/psc/pull/39)).
   A concision edit cut a relative pronoun and a citation duplicated a link,
   both against PSW pages the editor had not read.
   Read [Conciseness](https://morrison-lab.github.io/psw/chapters/conciseness.html)
-  and [Relative pronouns](https://morrison-lab.github.io/psw/chapters/grammar/relative-pronouns.html),
+  and [Do not omit relative pronouns](https://morrison-lab.github.io/psw/chapters/grammar.html#do-not-omit-relative-pronouns),
   and give each source one citation, in the same push as the edit.
   - **Do:** keep *that* and *which* where they start a dependent clause,
     and cut sentences that add no information.

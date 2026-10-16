@@ -210,9 +210,9 @@ In a remote session that has the repo attached under its old name,
 the issue tool accepted owner `d-morrison` and GitHub redirected the issue to the migrated repo
 (measured once, 2026-10-05: [Morrison-Lab/macros#103](https://github.com/Morrison-Lab/macros/issues/103)).
 
-- **Do:** file the `Morrison-Lab/macros` issue in the same turn
-  that you add a macro to any repo-local macro file.
-- **Don't:** leave a repo-local macro for a later upstreaming pass;
+- **Do:** add the macro to `Morrison-Lab/macros`,
+  and file the sweep issue in the same turn that you find a repo-local macro file.
+- **Don't:** add a macro to a repo-local file, or leave one for a later upstreaming pass;
   [Morrison-Lab/sds#54](https://github.com/Morrison-Lab/sds/pull/54) accumulated 13 of them before anyone filed the issue.
 
 ### 7. Verify the render and spellcheck, then ship

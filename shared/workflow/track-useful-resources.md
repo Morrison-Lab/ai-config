@@ -1,7 +1,6 @@
 # Track every useful resource in every notes repo whose topic it covers
 
 Ezra, 2026-10-13: any time you or any of your agents comes across a useful resource (textbooks, articles, software packages, websites, videos, or any other format), always make sure it gets tracked in one or more of our repos.
-The 2026-10-15 section below broadens this to every notes repo whose topic the resource covers.
 The rule covers any content relevant to any Morrison-Lab repo, course or project, and the goal is to build comprehensive directories of content relevant to all our interests over time.
 Each tracked resource is a small contribution to a directory, not a one-off link.
 

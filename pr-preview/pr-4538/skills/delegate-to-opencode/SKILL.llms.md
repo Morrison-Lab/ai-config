@@ -100,7 +100,7 @@ A claude.ai cloud session has no `opencode` CLI, but its agent proxy injects the
 - `/messages` (`claude-haiku-5-5`, `minimax-m3`) returned 401 `Missing API key` through the proxy on 2026-10-09, so it is not usable there.
 - `/responses` and `/models` also exist; `/models` lists every id.
 - Send a stable `x-opencode-session` UUID header for each conversation, or the request fails with 400 `MissingSessionID`.
-- Models seen on `/models` on 2026-10-15 include `deepseek-v4.1-flash` (a strong-value choice for review-sized prompts: about 87,000 estimated requests per week on Go, input \$0.15 per million tokens off-peak, though several smaller models list lower prices) and `gemini-4-argon-contributor` (the Argon model, 2x usage for a limited time). Treat `/models` as the authority, since the vendor says the list changes as models are added.
+- Models seen on `/models` on 2026-10-15 include `deepseek-v4.1-flash` (the vendor estimates about 87,000 requests per week on Go at 410 input, 71,300 cached and 310 output tokens per request, with input at \$0.15 per million tokens off-peak; a review that returns a longer answer gets fewer requests, and several smaller models list lower prices) and `gemini-4-argon-contributor` (the Argon model, 2x usage for a limited time). Treat `/models` as the authority, since the vendor says the list changes as models are added.
 - `cat-jam-free` and `longcat-2.5-preview-free` answered through the proxy on 2026-10-15 while the Go quota was exhausted. Both are free for a limited time and reasoning models (a 16-token request returned only reasoning), so give them a generous `max_tokens`. Their review quality is unmeasured, so use them for non-gating checks only.
 - On 2026-10-15 the Argon model was blocked by the same weekly limit as every other Go model. Route the review to `agy` on a device, per `memories/delegation.md`.
 
@@ -109,7 +109,7 @@ A claude.ai cloud session has no `opencode` CLI, but its agent proxy injects the
 OpenCode 2.0 was first seen on 2026-10-15 (<https://opencode.ai/v2/docs>, <https://opencode.ai/v2/docs/migrate-v1/>). Nothing in this skill was measured on it. Every `opencode` measurement above is from 1.18.x.
 
 - V2 reads the same config files as V1, including `~/.config/opencode/opencode.json(c)`, `<project>/opencode.json(c)` and `.opencode/`. Existing agent, command and skill definitions are documented to keep working.
-- V1 plugin implementations do not run in V2. `docs/opencode-hook-mapping.md` depends on the oh-my-openagent plugin, so a V2 session would lose the hook bridge. Stay on V1 until that plugin has a V2 port, or the guards run only under Claude Code.
+- V1 plugin implementations do not run in V2. `docs/opencode-hook-mapping.md` depends on the oh-my-openagent plugin, so a V2 session would lose the hook bridge. Either stay on V1 until that plugin has a V2 port, or move to V2 and accept that the guards then run only under Claude Code.
 - The V2 install commands are `curl -fsSL https://opencode.ai/v2/install | bash` and `npm install -g @opencode/cli`. The docs say `mise use -g opencode` installs V1 on a `mise` older than 2026.10.9. The migration guide says the V2 curl installer replaces the V1 binary, and says to remove a package-managed V1 install first. That is vendor-documented and untested here, so check `opencode --version` after any install. V1 and V2 share the config locations, so keep a copy of the V1 config before converting it.
 
 A non-streaming call works for short prompts (such as a smoke test):

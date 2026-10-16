@@ -1881,6 +1881,17 @@ for _label, _s in [
     _check(f"pr_merge_tail on {_label} stays under 1s",
            time.perf_counter() - _t0 < 1.0)
 
+# The refusal tells a blocked agent how a bare or relayed grant becomes real.
+checks += 1
+_bare_env = {k: v for k, v in os.environ.items()
+             if k not in ('ALLOW_MERGE', 'AI_SESSION_ID', 'CLAUDE_SESSION_ID')}
+_run = subprocess.run([sys.executable, HOOK, '--dry-run', 'gh pr merge 411 --squash'],
+                     capture_output=True, text=True, env=_bare_env)
+_ok_refusal = (_run.returncode == 0
+              and 'enable-mwc' in _run.stdout and 'check-mwc' in _run.stdout)
+wrong += not _ok_refusal
+print(f"  {'ok' if _ok_refusal else 'WRONG':<6} refusal text points at enable-mwc")
+
 total = checks
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
 sys.exit(1 if wrong else 0)

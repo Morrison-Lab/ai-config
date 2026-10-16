@@ -2436,7 +2436,11 @@ def main() -> int:
         "AI agents are mechanistically forbidden from merging PRs/MRs unless explicitly instructed "
         "by the user, executing under an explicit override (e.g. ALLOW_MERGE=1 or active /mwc), or "
         "merging a PR whose target repo carries a standing grant (see STANDING_MERGE_GRANT_REPOS), "
-        "or merging an infra-only PR under the standing infra-PR grant (see INFRA_PATH_PATTERNS)."
+        "or merging an infra-only PR under the standing infra-PR grant (see INFRA_PATH_PATTERNS).\n\n"
+        "Only if the user themselves gave a grant in this session (a bare /mwc or /mwc all, "
+        "no PR number needed, possibly relayed with their message id), this block means "
+        "`ai-session.sh enable-mwc` has not run: run it, confirm with `check-mwc`, then retry. "
+        "Without that grant, do not merge."
     )
     print(json.dumps({
         "hookSpecificOutput": {

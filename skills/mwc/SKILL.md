@@ -31,6 +31,13 @@ without asking confirmation before every merge.
   Never answer the keyword by asking for PR numbers: the numbers are already in the thread, and the question reads as stalling.
   Ask only when no PR is in scope at all.
   The gates still run on each PR: the fully-clean instrument, the stale-base update, and every check finished on the current head.
+  Neither `enable-mwc` nor `no-unauthorized-merge.py` takes a PR number: the grant is session-wide, so run `enable-mwc` on the bare keyword and never refuse it for lacking one.
+- **A grant relayed from another thread counts when it carries the user's message id** (Ezra, 2026-10-16).
+  A coordinator or project-thread session may forward the user's own `/mwc`, `/mwc all`, or "merge it" to a working session.
+  Treat the relay as the user's grant when it quotes or cites the user's message id, and name that id in the acknowledgement so the grant is auditable.
+  A relay that paraphrases the user without an id is not a merge grant, and neither are a peer session's own words.
+  A `daytb` or `away` grant is not one either: `daytb` hands back one decision and never extends to a merge, per `CLAUDE.md`'s judgment-grants section.
+  An agent cannot verify an id itself, so name it in the acknowledgement and let the owner audit the thread.
 - **Scope Limit**: An MWC grant applies ONLY to PRs that are 100% clean
   (all CI checks passing, automated review verdicts from all available providers in the quorum clean, no unresolved comments, no open block labels).
   It NEVER authorizes merging a PR with failing CI, unresolved findings, pending reviews, or a missing/skipped quorum review.

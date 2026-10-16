@@ -112,11 +112,12 @@ NOTE = (
     "of {clis} (or in cloud sessions, curl to opencode.ai with candidate "
     "model fallback per delegate-to-opencode) on the shipping head first. "
     "If no qualifying reviewer can run here (host blocked, backend down, "
-    "CLI or credential absent), probe once, then the gate is waived: merge "
-    "on a clean Claude review plus green CI and say in the PR that the "
-    "cross-model review was waived and why (Ezra, 2026-10-16; "
-    "adversarial-self-review.md 'Waiver when no cross-model reviewer can "
-    "run'). A reviewer that ran and was not clean is not unavailable."
+    "CLI or credential absent), enumerate every route and probe once, then "
+    "the gate is waived (Ezra, 2026-10-16; adversarial-self-review.md "
+    "'Waiver when no cross-model reviewer can run'). The waiver grants no "
+    "merge authority: the merge still needs mwc or an explicit instruction, "
+    "a clean Claude review plus green CI, and a PR note that the review was "
+    "waived. A reviewer that ran and was not clean is not unavailable."
 )
 
 

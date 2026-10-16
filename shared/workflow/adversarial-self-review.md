@@ -112,17 +112,25 @@ While a reviewer that can run has not yet returned a verdict, the merge waits, a
 
 (Directive from the user, 2026-10-16: "when cross-model review is not available, waive it".)
 
-The cross-model, cross-harness verdict is waived, and the merge goes ahead on a clean Claude review plus green CI, when **no qualifying reviewer can run**: the network policy blocks the reviewer's host (`opencode.ai`, `models.opencode.ai`), the reviewer's backend is down or erroring, its CLI is absent and cannot be installed, or no credential for it exists in this environment.
+The cross-model, cross-harness requirement is waived when **no qualifying reviewer can run** in this environment, after the attempt below.
+Every other merge condition still applies, so a waived gate grants no merge authority: the merge itself still needs `mwc` or an explicit merge instruction.
+Unrunnable means one of: the network policy blocks the reviewer's host (`opencode.ai`, `models.opencode.ai`), the reviewer's backend is down or erroring, its CLI is absent and cannot be installed, or no credential for it was found by the enumeration below.
+This section is the exception that the other "required for merging" statements in this file (this section's parent heading, "A merge needs its own ... verdict", and the merge-time Do/Don't list) carry.
 
-- **Try once first.**
-  Make one real dispatch on the shipping head, or one probe that decides it (`opencode run -m <model> "ok"` under `timeout 60`, or a `curl` to the endpoint), and keep the output.
-  Do not retry in a loop or ask again: a retry loop is not a review.
+- **Try the whole ladder once first.**
+  Enumerate every route per [`Availability is a per-route question`](#availability-is-a-per-route-question-and-command--v-answers-one-route) (local CLIs `agy`, `opencode`, `codex`;
+  the OpenCode Go HTTP route;
+  any other configured credential), then make one pass of each route's documented fallback ladder on the shipping head (for OpenCode Go, the candidate-model loop in [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md)).
+  A probe that decides a route is enough for that route (`opencode run -m <model> "ok"` under `timeout 60`, or a `curl` to the endpoint), and keep the output.
+  A quota error reroutes to the next route first and counts as unrunnable only once every route has failed.
+  After that single pass, do not retry in a loop or ask again: a retry loop is not a review.
 - **Unavailable is not "not-clean".**
   A reviewer that ran and returned Needs-more-work, or left an unresolved finding, still blocks until a re-dispatch returns all-clear.
-  The waiver covers only a reviewer that could not produce a verdict at all.
+  The waiver covers only a reviewer that could not produce any verdict.
+  A timeout, a stub, or garbled output counts as no verdict, and only after the single pass above.
+  An earlier not-clean cross-model verdict on this PR is waivable only when the unavailability is newer than that finding and the finding has been addressed, rebutted, or deferred per [`fully-clean`](fully-clean.md).
 - **Everything else still stands.**
-  [`fully-clean`](fully-clean.md) is unchanged: green CI on the exact head, a clean Claude review on that head (the external automated reviewer where a repo has one, plus the adversarial subagent), no standing not-clean finding, and the authorization the merge itself needs (`mwc` or an explicit merge instruction).
-  A waived gate grants no merge authority.
+  [`fully-clean`](fully-clean.md) is unchanged: green CI on the exact head, a clean Claude review on that head (the external automated reviewer where a repo has one, plus the adversarial subagent), and no standing not-clean finding.
 - **Say so.**
   The PR comment or description, and the merge report, state that the cross-model review was waived, name the reviewer attempted and the error that made it unavailable, and give the head sha.
 - **A push resets it.**
@@ -134,17 +142,9 @@ Anyone who wants the cross-model verdict anyway can still ask for it: the waiver
 
 The merge-side rules live with the gate they serve:
 
-- **Do:** for any merge, use a reviewer on a **different model and harness**
-  from your own
-  (agy CLI, opencode, codex,
-  claude only for sessions authored outside Claude,
-  or cursor once its headless dispatch is measured),
-  and report which harness produced each verdict.
-- **Do:** when posting a cross-harness review to a PR under a user login,
-  wrap the verbatim output with a commit header,
-  `Reviewed-Commit: <sha>`,
-  and a `### Verdict` heading so it is admitted by construction (#4425).
-- **Do:** when no qualifying reviewer can run, probe once, then merge on a clean Claude review plus green CI and say in the PR that the cross-model review was waived and why (Ezra, 2026-10-16).
+- **Do:** for any merge, use a reviewer on a **different model and harness** from your own (agy CLI, opencode, codex, claude only for sessions authored outside Claude, or cursor once its headless dispatch is measured), and report which harness produced each verdict.
+- **Do:** when posting a cross-harness review to a PR under a user login, wrap the verbatim output with a commit header, `Reviewed-Commit: <sha>`, and a `### Verdict` heading so it is admitted by construction (#4425).
+- **Do:** when no qualifying reviewer can run after the full-ladder attempt, treat the cross-model gate as waived, say in the PR that it was waived and why, and merge only if the merge itself is authorized and the Claude review and CI are clean (Ezra, 2026-10-16).
 - **Don't:** merge anything --- under any grant, `mwc` included --- without a 100% all-clear adversarial verdict at the shipping head from a reviewer that could run.
   A skip notice, a stub, an older-head verdict, or a same-harness convenience pass clears nothing, and a reviewer that ran and was not clean is not "unavailable".
 - **Don't:** reuse a passing same-harness pre-push verdict

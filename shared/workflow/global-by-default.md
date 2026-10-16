@@ -17,5 +17,5 @@ An instruction from the user applies to every project and repository unless the 
 - **Do:** have project files link to the global copy.
 - **Do:** once the global copy has merged, decide whether to shorten the project copy.
   The default is a one-line pointer to the global copy.
-- **Don't:** record the instruction only in project memory.
+- **Don't:** record the instruction in project memory.
 - **Don't:** wait for the user to say it is global.

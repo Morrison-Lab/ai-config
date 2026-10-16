@@ -93,5 +93,5 @@ When a user uses profanity or displays intense frustration:
 - **Do:** run UMS urgently to persist the lesson and build mechanical enforcement.
 - **Don't:** tone-police, lecture, or argue with the user about their choice of words.
 - **Don't:** emit canned HR apologies or empty verbal assurances.
-- **Don't:** leave the lesson only in project or host memory, where no other project reads it.
+- **Don't:** keep the lesson in a project or host memory store at all, since no other project reads it and it is outside version control.
 - **Don't:** continue with unrelated background work while an active defect is causing user frustration.

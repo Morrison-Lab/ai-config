@@ -53,25 +53,30 @@ missing one".
   M4  the target repository is the `-C` directory, applied on top of the
       session cwd (`tool_input.Cwd`, else the payload's `cwd`, else the
       hook's own) and of any earlier `cd <dir>` in the same command, scoped
-      to its subshell; `cd -P`
-      and `cd -L` are read, and a bare `cd` or `cd -` makes the directory
-      unknown, so a later relative target is skipped (see below)
-  M5  `git status --porcelain=v1 -z --ignore-submodules=dirty` there lists
-      an entry whose worktree column is `M` and whose path has mode 160000
-      in `git ls-files -s`
-  M6  the submodule's own HEAD differs from the commit the index pins -- an
-      ` M` that is only dirty submodule CONTENT leaves the gitlink unchanged
-      and cannot be swept in, so it stays silent (the status flag already
-      drops it; this comparison is defence in depth). A pin bump already staged
-      (`M ` with HEAD still equal to the staged pin) is silent too, while
-      `MM` (staged, then the submodule moved again) warns
+      to its subshell. `cd`, `pushd` and `popd` are resolved by the shared
+      `shellcmd.resolve_cd_target` (`-P`/`-L`, `~` and `$HOME` expanded); one
+      it cannot name (a bare `popd`, `cd -`, `cd $VAR`, a backtick) makes the
+      directory unknown, so a later relative target is skipped (see below)
+  M5  `git status --porcelain=v1 -z -uno` there lists an entry whose worktree
+      column is `M` and whose path has mode 160000 in `git ls-files -s`. The
+      configured ignore settings decide: with `submodule.<name>.ignore=all` or
+      `diff.ignoreSubmodules=all` git leaves the gitlink alone and so does the
+      hook (an `--ignore-submodules=` flag would override them)
+  M6  the submodule's own HEAD differs from the commit the index pins. A
+      submodule with only dirty CONTENT is also reported as ` M` but leaves
+      the gitlink unchanged and cannot be swept in, so it stays silent here.
+      A pin bump already staged (`M ` with HEAD still equal to the staged
+      pin) is silent too, while `MM` (staged, then the submodule moved again)
+      warns
   M7  for `git add -u|-A <pathspec>`, only a submodule at or under a pathspec
-      counts, but a magic (`:/`) or glob pathspec is not evaluated and warns;
-      for a plain `git add <pathspec>`, only a pathspec covering the submodule
-      from above counts (naming it is how a pin is bumped on purpose, and a
-      magic or glob pathspec is not evaluated and stays silent); relative
-      paths are compared through realpath. `commit -a` takes no pathspec
-      (git refuses the combination)
+      counts, but other magic (`:(exclude)...`) or a glob pathspec is not
+      evaluated and warns; for a plain `git add <pathspec>`, only a pathspec
+      covering the submodule from above counts (naming it is how a pin is
+      bumped on purpose, and other magic or a glob pathspec is not evaluated
+      and stays silent). `:/path` and `:(top)path` are read as `path` from
+      the repository root, so `git add :/` covers everything. Relative paths
+      are compared through realpath. `commit -a` takes no pathspec (git
+      refuses the combination)
 
 Fails OPEN on any parse trouble, on git failing or timing out, and outside a
 git repository. Every git call shares an 8 s deadline, inside the 10 s the
@@ -85,16 +90,16 @@ check the wrong one, when:
   - the command carries `--git-dir` or `--work-tree`, which name another
     repository than the cwd, `-C` and `cd` resolve to;
   - the target directory is not a directory at match time, which includes
-    `cd ~` and `cd $VAR` (the text is not expanded) and any `cd` into a
-    directory the command itself creates;
-  - a bare `cd` or `cd -` came earlier, so the directory is unknown (an
-    absolute `git -C /path` after it is still read);
+    any `cd` into a directory the command itself creates;
+  - an earlier `cd $VAR`, `cd -`, backtick target, `popd` or bare `pushd`
+    left the directory unknown, so a later relative `cd ..` or `-C dir` is not
+    guessed at (an absolute `git -C /path` after it is still read);
   - a `GIT_DIR=...` or `GIT_WORK_TREE=...` prefix (also after `env`) names
     another repository, like `--git-dir`; an earlier `export GIT_DIR=...;`
     statement or any other redirecting variable is not read;
   - git is not reached as `git` after the shared parser's normalisation
-    (`/usr/bin/git` and `timeout 60 git` ARE read): an alias, a shell
-    function, or `pushd`/`popd` directory changes are not followed;
+    (`/usr/bin/git` and `timeout 60 git` ARE read): an alias or a shell
+    function is not followed;
   - a `cd` inside a subshell `( ... )` is scoped to it, as in the shell, so a
     git command after the subshell runs where the subshell started; a `cd` in
     a `{ ... }` group moves the caller and is followed;
@@ -105,6 +110,7 @@ check the wrong one, when:
 """
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -138,6 +144,7 @@ if _LIB not in sys.path:
     sys.path.insert(0, _LIB)
 try:
     from shellcmd import simple_commands_with_scope as _simple_commands
+    from shellcmd import resolve_cd_target as _resolve_cd_target
     from shellcmd import strip_env as _strip_env
 except Exception as _exc:  # broken install: fail open, like every guard here
     print("flag-commit-a-sweeps-submodule: cannot load "
@@ -240,17 +247,15 @@ def add_kind(args):
     return ("add", paths) if paths else None
 
 
-def _cd_operand(args):
-    """The directory operand of `cd`, or None when it is not a literal path:
-    a bare `cd` (goes home) and `cd -` (goes to the previous directory)."""
-    i = 0
-    while i < len(args) and args[i].startswith("-") and args[i] != "-":
-        i += 1
-        if args[i - 1] == "--":
-            break  # `cd -P -- dir`; -P, -L, -e and -@ are skipped above
-    if i >= len(args) or args[i] == "-":
+def _move(rest, cur):
+    """The directory a `cd`, `pushd` or `popd` leaves the shell in, by the
+    shared resolver: None when it cannot be named (`cd -`, `popd`, `$VAR`,
+    a backtick), `~` expanded. `cur` is None while the directory is unknown,
+    and an unknown directory plus a relative move stays unknown."""
+    target = _resolve_cd_target(rest, cur)
+    if target is None or (cur is None and not os.path.isabs(target)):
         return None
-    return args[i]
+    return target
 
 
 def _join(base, d):
@@ -284,9 +289,8 @@ def offending(command):
     for scope, argv in cmds:
         env, rest = _strip_env(argv)
         cd = cd_of(scope)
-        if rest and rest[0] == "cd":
-            operand = _cd_operand(rest[1:])
-            cds[scope] = None if operand is None else _join(cd, operand)
+        if rest and rest[0] in ("cd", "pushd", "popd"):
+            cds[scope] = _move(rest, cd)
             continue
         inv = _git_invocation(rest)
         if inv is None or _redirects_git(env):
@@ -356,9 +360,13 @@ def modified_submodules(cwd):
     # edits (slow, and irrelevant: dirty content cannot change a gitlink) but
     # still reports a submodule whose checked-out commit moved.
     # `-uno` skips the untracked scan, which `-a`/`-u` never stage anyway and
-    # which dominates the time in a large tree.
-    status = _git(cwd, "status", "--porcelain=v1", "-z", "-uno",
-                  "--ignore-submodules=dirty")
+    # which dominates the time in a large tree. No `--ignore-submodules`
+    # override: it would also override `submodule.<name>.ignore=all` and
+    # `diff.ignoreSubmodules=all`, which make `commit -a` and `add -u` leave
+    # the gitlink alone (checked with git 2.43), so the configured values must
+    # decide. A submodule with only dirty content is reported as ` M` too;
+    # the HEAD-versus-pin comparison below tells the two apart.
+    status = _git(cwd, "status", "--porcelain=v1", "-z", "-uno")
     top = _git(cwd, "rev-parse", "--show-toplevel")
     # ONE index read for every gitlink, rather than a query per modified path:
     # a large sweep would otherwise spend the whole deadline and fail open
@@ -402,31 +410,41 @@ def modified_submodules(cwd):
     return found, top
 
 
+# `:/path` and `:(top)path`: a path from the repository root, not the cwd.
+_TOP_MAGIC = re.compile(r"^:(?:/|\(top\))(.*)$")
+
+
 def _under_pathspecs(sub_path, pathspecs, cwd, top, sweeping):
     """M7: does a pathspec given from `cwd` stage the submodule at `sub_path`
     (repo-root relative, `top` the repo root)?
 
     `sweeping` is `add -u`/`-A`: no pathspec means the whole repo, a pathspec
-    naming the submodule itself counts, and a magic (`:/`) or glob pathspec,
-    which is not evaluated, warns. A plain `git add <pathspec>` counts only a
-    pathspec that covers the submodule from above (`.`, a parent directory):
-    naming the submodule is how a pin bump is staged on purpose, and a magic
-    or glob pathspec there stays silent. Both sides go through realpath, so a
+    naming the submodule itself counts, and other magic (`:(exclude)...`) or
+    a glob pathspec, which is not evaluated, warns. A plain
+    `git add <pathspec>` counts only a pathspec that covers the submodule
+    from above (`.`, a parent directory, `:/`): naming the submodule is how a
+    pin bump is staged on purpose, and other magic or a glob pathspec there
+    stays silent. The top-level forms `:/path` and `:(top)path` are read as
+    `path` from the repository root. Both sides go through realpath, so a
     symlinked cwd cannot make the relative path miss."""
     if not pathspecs:
         return sweeping
     real_cwd, real_top = os.path.realpath(cwd), os.path.realpath(top)
     for p in pathspecs:
-        if p.startswith(":") or any(ch in p for ch in "*?["):
+        top_form = _TOP_MAGIC.match(p)
+        if top_form and not any(ch in top_form.group(1) for ch in "*?["):
+            rel = os.path.normpath(top_form.group(1) or ".")
+        elif p.startswith(":") or any(ch in p for ch in "*?["):
             if sweeping:
                 return True
             continue
-        if os.name == "nt":
-            p = p.replace("\\", "/")  # Windows separators only
-        rel = os.path.relpath(os.path.normpath(os.path.join(real_cwd, p)),
-                              real_top)
-        if os.name == "nt":
-            rel = rel.replace("\\", "/")
+        else:
+            if os.name == "nt":
+                p = p.replace("\\", "/")  # Windows separators only
+            rel = os.path.relpath(os.path.normpath(os.path.join(real_cwd, p)),
+                                  real_top)
+            if os.name == "nt":
+                rel = rel.replace("\\", "/")
         covers = (rel == "." or sub_path == rel
                   or sub_path.startswith(rel + "/"))
         if covers and (sweeping or rel != sub_path):

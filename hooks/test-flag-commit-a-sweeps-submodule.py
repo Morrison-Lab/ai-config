@@ -150,6 +150,18 @@ def many_files_repo(path):
     _move_submodule_head(path)
 
 
+def ignore_all_repo(path):
+    """submodule.mod.ignore=all: git leaves the moved gitlink alone."""
+    moved_pin_only_repo(path)
+    _run(path, "config", "submodule.mod.ignore", "all")
+
+
+def diff_ignore_all_repo(path):
+    """diff.ignoreSubmodules=all: the same, set repository-wide."""
+    moved_pin_only_repo(path)
+    _run(path, "config", "diff.ignoreSubmodules", "all")
+
+
 def latin1_path_repo(path):
     """A tracked file whose name is not valid UTF-8 (POSIX only), plus a
     moved submodule: `ls-files -z` and `status -z` emit that name raw."""
@@ -196,7 +208,7 @@ SHOULD_WARN = [
      "-S takes an optional ATTACHED value; it must not eat the next token"),
     ("W18", moved_pin_only_repo, f"git commit -u -a -m {MSG}",
      "-u takes an optional attached value, like -S"),
-    ("W20", moved_pin_only_repo, "git add -u :/",
+    ("W20", moved_pin_only_repo, "git add -u ':(exclude)CLAUDE.md'",
      "magic pathspec is not evaluated: warn, not silent"),
     ("W21", moved_pin_only_repo, "git add -u 'mod*'",
      "glob pathspec is not evaluated: warn, not silent"),
@@ -232,6 +244,12 @@ SHOULD_WARN = [
      "tool_input.Cwd beats the payload's `cwd`"),
     ("W37", moved_pin_only_repo, "git add --no-ignore-removal",
      "--no-ignore-removal is an alias of -A"),
+    ("W40", moved_pin_only_repo, "git add :/",
+     "top-level magic covers the whole tree, like `.` at the root"),
+    ("W41", moved_pin_only_repo, "git add ':(top)'",
+     "the long spelling of the same top-level pathspec"),
+    ("W43", moved_pin_only_repo, f"pushd {{repo}} && git commit -am {MSG}",
+     "`pushd dir` moves the directory like `cd`"),
     ("W38", many_files_repo, f"git commit -am {MSG}",
      "5000 modified files and a moved submodule sorting last: the one index "
      "read keeps the warning inside the deadline"),
@@ -272,7 +290,7 @@ SHOULD_STAY_SILENT = [
     ("S16", moved_pin_only_repo, f"git --git-dir .git commit -am {MSG}",
      "separated --git-dir: documented silent case"),
     ("S17", moved_pin_only_repo, f"cd ~ && git commit -am {MSG}",
-     "`cd ~` is not expanded: documented silent case"),
+     "`cd ~` is expanded to the home directory, which is not the repo"),
     ("S18", moved_pin_only_repo, f"cd $SOME_DIR && git commit -am {MSG}",
      "`cd $VAR` is not expanded: documented silent case"),
     ("S19", moved_pin_only_repo, f"@budget0 git commit -am {MSG}",
@@ -289,7 +307,7 @@ SHOULD_STAY_SILENT = [
     ("S26", moved_pin_only_repo, f"cd - && git commit -am {MSG}",
      "`cd -` leaves the directory unknown: documented silent case"),
     ("S27", moved_pin_only_repo, f"cd && git commit -am {MSG}",
-     "a bare `cd` leaves the directory unknown: documented silent case"),
+     "a bare `cd` goes home, which is not the repo"),
     ("S28", moved_pin_only_repo, "git add mod",
      "naming the submodule is how a pin bump is staged on purpose"),
     ("S29", moved_pin_only_repo, "git add 'mod*'",
@@ -302,6 +320,19 @@ SHOULD_STAY_SILENT = [
      "the payload's `cwd` beats the hook's own working directory"),
     ("S33", moved_pin_only_repo, "git add --refresh .",
      "--refresh stages nothing"),
+    ("S37", ignore_all_repo, f"git commit -am {MSG}",
+     "submodule.mod.ignore=all: git does not stage the gitlink"),
+    ("S38", diff_ignore_all_repo, "git add -u",
+     "diff.ignoreSubmodules=all: git does not stage the gitlink"),
+    ("S39", moved_pin_only_repo, "git add :/mod",
+     "a top-level pathspec that names the submodule is a deliberate bump"),
+    ("S40", moved_pin_only_repo, f"pushd mod && git commit -am {MSG}",
+     "`pushd mod` moves into the clean submodule"),
+    ("S41", moved_pin_only_repo, f"popd; git commit -am {MSG}",
+     "`popd` leaves the directory unknown: documented silent case"),
+    ("S42", moved_pin_only_repo,
+     f"cd $X && cd {{reporel}} && git commit -am {MSG}",
+     "after an unexpanded `$VAR` a relative cd is not guessed from the cwd"),
     ("S34", moved_pin_only_repo, f"GIT_DIR=.git git commit -am {MSG}",
      "a GIT_DIR prefix names another repository: documented silent case"),
     ("S35", moved_pin_only_repo, "GIT_WORK_TREE=. git add -u",
@@ -315,7 +346,10 @@ SHOULD_STAY_SILENT = [
 
 
 def verdict(hook_path, repo, command, want_text=False):
-    cwd = ELSEWHERE if "{repo}" in command or "{link}" in command else repo
+    cwd = (ELSEWHERE if any(k in command for k in ("{repo}", "{link}", "{reporel}"))
+           else repo)
+    # The repo as seen from ELSEWHERE: what a cwd-relative guess would reach.
+    command = command.replace("{reporel}", os.path.relpath(repo, ELSEWHERE))
     if "{link}" in command:  # a symlink to the repo, so the cwd is unresolved
         link = os.path.join(ELSEWHERE, "link-" + os.path.basename(repo))
         if not os.path.islink(link):
@@ -463,7 +497,7 @@ MUTATIONS = {
           '                if False:\n                    sweeps = True')],
         {"W1", "W2", "W6", "W8", "W9", "W10", "W11", "W12", "W16", "W17",
          "W18", "W23", "W25", "W26", "W30", "W31", "W32", "W33", "W34",
-         "W35", "W36", "W38"} | ({"W39"} if os.name != "nt" else set()),
+         "W35", "W36", "W38", "W43"} |({"W39"} if os.name != "nt" else set()),
     ),
     "M_value_letter_stops_cluster": (
         "a value-taking letter (-m) ends the cluster, so -ma is not -a",
@@ -501,15 +535,21 @@ MUTATIONS = {
     ),
     "M_magic_pathspec_warns": (
         "a magic pathspec (`:/`) warns instead of going silent",
-        [('        if p.startswith(":") or any(ch in p for ch in "*?["):',
-          '        if any(ch in p for ch in "*?["):')],
+        [('        elif p.startswith(":") or any(ch in p for ch in "*?["):',
+          '        elif any(ch in p for ch in "*?["):')],
         {"W20"},
     ),
     "M_glob_pathspec_warns": (
         "a glob pathspec warns instead of going silent",
-        [('        if p.startswith(":") or any(ch in p for ch in "*?["):',
-          '        if p.startswith(":"):')],
+        [('        elif p.startswith(":") or any(ch in p for ch in "*?["):',
+          '        elif p.startswith(":"):')],
         {"W21"},
+    ),
+    "M_top_magic_read": (
+        "`:/` and `:(top)` are read as the repository root",
+        [('        if top_form and not any(ch in top_form.group(1) for ch in "*?["):',
+          "        if False:")],
+        {"W40", "W41"},
     ),
     "M_plain_add_glob_silent": (
         "a magic/glob pathspec on a plain `git add` is not evaluated: silent",
@@ -519,19 +559,19 @@ MUTATIONS = {
     ),
     "M_windows_separator": (
         "backslash separators are normalised in pathspecs (Windows only)",
-        [('        if os.name == "nt":\n'
-          '            p = p.replace("\\\\", "/")  # Windows separators only',
-          '        if False:\n'
-          '            p = p.replace("\\\\", "/")  # Windows separators only')],
+        [('            if os.name == "nt":\n'
+          '                p = p.replace("\\\\", "/")  # Windows separators only',
+          '            if False:\n'
+          '                p = p.replace("\\\\", "/")  # Windows separators only')],
         # Unobservable on POSIX, where the clause never runs.
         set() if POSIX else {"W22"},
     ),
     "M_backslash_is_separator_everywhere": (
         "backslash is normalised on POSIX too, where it is a name character",
-        [('        if os.name == "nt":\n'
-          '            p = p.replace("\\\\", "/")  # Windows separators only',
-          '        if True:\n'
-          '            p = p.replace("\\\\", "/")  # Windows separators only')],
+        [('            if os.name == "nt":\n'
+          '                p = p.replace("\\\\", "/")  # Windows separators only',
+          '            if True:\n'
+          '                p = p.replace("\\\\", "/")  # Windows separators only')],
         {"S20"} if POSIX else set(),
     ),
     "M_git_dir_work_tree_silent": (
@@ -548,12 +588,26 @@ MUTATIONS = {
           "            timeout=_PER_CALL_S,")],
         {"S19"},
     ),
-    "M_ignore_submodules_dirty": (
-        "status skips dirty-content scans of submodules",
-        [('                  "--ignore-submodules=dirty")', "                  )")],
-        # Declared EMPTY: it is a speed-up. Dirty content cannot change a
-        # gitlink, so the verdict is identical with or without the flag.
-        set(),
+    "M_status_ignore_override": (
+        "status honours the configured submodule ignore settings",
+        [('"--porcelain=v1", "-z", "-uno")',
+          '"--porcelain=v1", "-z", "-uno",\n'
+          '                  "--ignore-submodules=dirty")')],
+        # The override reports a gitlink that git leaves alone when
+        # submodule.<name>.ignore or diff.ignoreSubmodules is `all`.
+        {"S37", "S38"},
+    ),
+    "M_unknown_stays_unknown": (
+        "an unknown directory plus a relative move stays unknown",
+        [("    if target is None or (cur is None and not os.path.isabs(target)):",
+          "    if target is None:")],
+        {"S42"},
+    ),
+    "M_pushd_popd": (
+        "`pushd` and `popd` move the directory like `cd`",
+        [('        if rest and rest[0] in ("cd", "pushd", "popd"):',
+          '        if rest and rest[0] in ("cd",):')],
+        {"W43", "S40", "S41"},
     ),
     "M_optional_locks_off": (
         "git runs with GIT_OPTIONAL_LOCKS=0",
@@ -584,7 +638,7 @@ MUTATIONS = {
     "M_add_plain_pathspec": (
         "a plain `git add <dir>` covering a submodule is read",
         [('    return ("add", paths) if paths else None', "    return None")],
-        {"W29"},
+        {"W29", "W40", "W41"},
     ),
     "M_add_dry_run_long": (
         "`git add --dry-run` stages nothing",
@@ -618,7 +672,7 @@ MUTATIONS = {
     ),
     "M_status_no_untracked": (
         "status skips the untracked scan (-uno)",
-        [('"--porcelain=v1", "-z", "-uno",', '"--porcelain=v1", "-z",')],
+        [('"--porcelain=v1", "-z", "-uno")', '"--porcelain=v1", "-z")')],
         # Declared EMPTY: a speed-up; untracked files never change a verdict.
         set(),
     ),
@@ -632,23 +686,26 @@ MUTATIONS = {
     ),
     "M_cd_tracking": (
         "an earlier `cd <dir>` retargets the repository",
-        [("            cds[scope] = None if operand is None else _join(cd, operand)",
-          "            pass")],
-        # S17/S18 are silent only because the `cd` target is unresolvable;
-        # S26/S27 because the directory is unknown; S30/S31 because the
-        # cd into the (clean) submodule is what makes them silent.
-        {"W9", "W24", "W30", "S17", "S18", "S26", "S27", "S30", "S31"},
+        [("            cds[scope] = _move(rest, cd)", "            pass")],
+        # S17/S18 are silent only because the `cd` goes somewhere that is not
+        # a repository or cannot be named; S26/S27/S41/S42 because the
+        # directory is unknown; S30/S31/S40 because the move into the (clean)
+        # submodule is what makes them silent.
+        {"W9", "W24", "W30", "W43", "S17", "S18", "S26", "S27", "S30", "S31",
+         "S40", "S41"},
     ),
     "M_cd_unknown_directory": (
-        "a bare `cd` or `cd -` makes the directory unknown, not unchanged",
-        [("            cds[scope] = None if operand is None else _join(cd, operand)",
-          "            cds[scope] = cd if operand is None else _join(cd, operand)")],
-        {"S26", "S27"},
+        "a move the resolver cannot name makes the directory unknown, not "
+        "unchanged",
+        [("            cds[scope] = _move(rest, cd)",
+          "            cds[scope] = _move(rest, cd) or cd")],
+        # S27 is not here: a bare `cd` goes home, which the resolver names.
+        {"S18", "S26", "S41", "S42"},
     ),
     "M_subshell_cd_scoped": (
         "a cd inside a subshell stays inside it",
-        [("            cds[scope] = None if operand is None",
-          "            cds[(0,)] = None if operand is None")],
+        [("            cds[scope] = _move(rest, cd)",
+          "            cds[(0,)] = _move(rest, cd)")],
         {"W34"},
     ),
     "M_payload_cwd": (
@@ -660,12 +717,6 @@ MUTATIONS = {
         "tool_input.Cwd takes precedence over the payload's `cwd`",
         [('(inp.get("Cwd"), payload.get("cwd"))', '(payload.get("cwd"), inp.get("Cwd"))')],
         {"W36"},
-    ),
-    "M_cd_flags": (
-        "`cd -P`/`-L` flags are skipped to find the operand",
-        [('    while i < len(args) and args[i].startswith("-") and args[i] != "-":',
-          "    while False:")],
-        {"W30"},
     ),
     "M_lead_words": (
         "env assignments and lead words are skipped",
@@ -694,11 +745,9 @@ MUTATIONS = {
     "M_head_differs_from_pin": (
         "only a submodule whose HEAD differs from the pin counts",
         [("        if head != pinned:", "        if True:")],
-        # Declared EMPTY since status runs with --ignore-submodules=dirty:
-        # a worktree-`M` gitlink entry now always has HEAD != pin, so this
-        # comparison is defence in depth that no case can reach (S3, the
-        # dirty-content case, is dropped by status itself).
-        set(),
+        # Status reports a submodule with only dirty content as ` M` too;
+        # this comparison is what tells it from a moved HEAD (S3).
+        {"S3"},
     ),
     "M_pathspec_scoping": (
         "`git add -u <pathspec>` only counts a submodule under a pathspec",
@@ -706,13 +755,13 @@ MUTATIONS = {
           "            return True\n    return True\n\n\n# What each kind stages")],
         # S2, S28, S29 and S20 are plain `git add` cases: without the final
         # `return False` they too would warn.
-        {"S2", "S6", "S28", "S29"} | ({"S20"} if POSIX else set()),
+        {"S2", "S6", "S28", "S29", "S39"} | ({"S20"} if POSIX else set()),
     ),
     "M_plain_add_names_submodule_silent": (
         "a plain `git add mod` naming the submodule is a deliberate bump",
         [("        if covers and (sweeping or rel != sub_path):",
           "        if covers:")],
-        {"S28"},
+        {"S28", "S39"},
     ),
     "M_realpath": (
         "pathspecs and the repo root are compared through realpath",

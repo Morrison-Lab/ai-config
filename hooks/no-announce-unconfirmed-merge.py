@@ -9,16 +9,20 @@ announcement went out, no merge ever ran, and the PRs sat open.
 
 Modelled on no-offer-to-file.py and reusing its transcript reader, so a
 project-thread reply (`reply` / `post_message` / `update_message` tool call) is
-read the same way. It fires only when BOTH hold:
-  1. the reply announces a future merge ("merges as soon as", "will merge",
-     "each thread merges") in prose, outside code spans, and the same sentence
-     does not make the merge conditional on the user's own say-so; and
-  2. the transcript holds no confirmed merge (a merge tool result reading
-     "successfully merged", "Squashed and merged", `"merged": true`, ...).
+read the same way. It fires only when ALL hold:
+  1. the reply announces a future merge ("merges as soon as", "I'll merge",
+     "will merge", "each thread merges automatically") in prose, outside code
+     spans;
+  2. the same sentence does not make the merge conditional on the user's own
+     say-so, and the merger is not the user; and
+  3. since the last user turn, no result of a MERGE call (the merge tool, or a
+     `gh pr merge` / `glab mr merge` / `.../merge` command) reports a merge.
+     Results of other calls never count: reading a merged PR's state or a
+     file that quotes "successfully merged" is not a merge.
 
 Fires once per distinct message (sentinel keyed by content hash) so a block
 cannot loop. Fails OPEN: a guard that wedges the session costs more than the
-lapse it prevents.
+lapse it prevents, including when the sibling module it reuses cannot load.
 """
 import hashlib
 import importlib.util
@@ -28,42 +32,55 @@ import re
 import sys
 import tempfile
 
-_HERE = os.path.dirname(os.path.realpath(__file__))
-_spec = importlib.util.spec_from_file_location(
-    "no_offer_to_file", os.path.join(_HERE, "no-offer-to-file.py")
-)
-_offer = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(_offer)
-last_assistant_text = _offer.last_assistant_text
-sentence_around = _offer.sentence_around
-strip_code = _offer.strip_code
+try:
+    _spec = importlib.util.spec_from_file_location(
+        "no_offer_to_file",
+        os.path.join(os.path.dirname(os.path.realpath(__file__)), "no-offer-to-file.py"),
+    )
+    _offer = importlib.util.module_from_spec(_spec)
+    _spec.loader.exec_module(_offer)
+    last_assistant_text = _offer.last_assistant_text
+    sentence_around = _offer.sentence_around
+    strip_code = _offer.strip_code
+except Exception:
+    sys.exit(0)
 
 ANNOUNCE_RX = re.compile(
-    r"\b(each|every|all)\b[^.!?\n]{0,40}?\bmerges?\b"
-    r"|\bmerg(es|ing)\b[^.!?\n]{0,30}?\b(as soon as|once|when|after)\b"
+    # first person, any future frame
+    r"\b(i|we)('ll| will| am going to| plan to| intend to)\b[^.!?\n]{0,20}?\bmerg(e|ing)\b"
+    r"|\b(i|we)'ll be merging\b"
+    # a subject followed by a merge verb and an auto/timing frame
+    r"|\b(it|they|each|every|all|both|threads?|prs?|pr \S+|#\d+)\b[^.!?\n]{0,40}?"
+    r"\bmerges?\b[^.!?\n]{0,10}?\b(as soon as|once|when|after|on green|automatically|shortly)\b"
+    r"|\bmerges? (automatically|on green)\b"
+    # passive or modal future
     r"|\bwill (be |auto-?|then )?merged?\b"
-    r"|\b(is|are) (going|set|about) to (be )?merged?\b"
-    r"|\bto be merged (as soon as|once|when|after)\b",
+    r"|\b(is|are|am) (going|set|about) to (be )?merged?\b"
+    r"|\bplans? to merge\b"
+    r"|\b(to be merged|queued for merge)\b[^.!?\n]{0,10}?\b(as soon as|once|when|after)\b",
     re.I,
 )
 
-# The merge waits on the user's own words: that is the correct stance, not an
-# announcement the user can be misled by.
+# The merge waits on the user's own words (a condition on CI or on conflicts
+# is not one), or the user is the one who merges.
+USER_SUBJECT = r"(you|ezra|the user|d-morrison)"
 CONDITIONAL_RX = re.compile(
-    r"\bonly (after|when|if|on)\b"
-    r"|\bunless\b"
-    r"|\buntil (you|ezra|the user|i am told)\b"
-    r"|\bif (you|ezra|the user) (say|confirm|approve|tell|want|ask)"
-    r"|\b(after|once|when) (you|ezra|the user)\b[^.!?\n]{0,30}?"
-    r"\b(say|confirm|approve|tell|give|grant|ask)"
-    r"|\bexplicit(ly)? (merge|go|word|approval|permission|grant)",
+    r"\b(only|unless|until|if|after|once|when)\b[^.!?\n]{0,25}?\b" + USER_SUBJECT + r"\b"
+    r"[^.!?\n]{0,30}?\b(say|says|said|confirm|confirms|approve|approves|tell|tells"
+    r"|give|gives|grant|grants|ask|asks|authori[sz]e|okay|ok)\b"
+    r"|\bexplicit(ly)? (merge|go|word|approval|permission|grant)"
+    r"|\b" + USER_SUBJECT + r"\b[^.!?\n]{0,10}?\bwill (merge|do the merge)",
     re.I,
 )
 
-# A merge that actually happened shows up in a tool result.
+# What a merge call reads as when it ran.
 CONFIRMED_RX = re.compile(
     r"successfully merged|merged pull request|squashed and merged"
-    r"|\"merged\"\s*:\s*true|\"state\"\s*:\s*\"MERGED\"",
+    r"|\"merged\"\s*:\s*true",
+    re.I,
+)
+MERGE_CALL_RX = re.compile(
+    r"(^|__)merge_pull_request$|\b(gh pr|glab mr) merge\b|/pulls/\S+/merge\b|/merge_requests/\S+/merge\b",
     re.I,
 )
 
@@ -76,19 +93,45 @@ def find_announcement(prose):
     return None
 
 
+def _blocks(m):
+    blocks = (m.get("message") or {}).get("content") or m.get("content")
+    return blocks if isinstance(blocks, list) else []
+
+
+def _is_merge_call(block):
+    inp = block.get("input")
+    inp = inp if isinstance(inp, dict) else {}
+    return any(
+        MERGE_CALL_RX.search(str(part or ""))
+        for part in (block.get("name"), inp.get("command"))
+    )
+
+
 def _result_text(block):
     content = block.get("content")
     if isinstance(content, str):
         return content
     if isinstance(content, list):
-        return " ".join(
-            b.get("text", "") for b in content if isinstance(b, dict)
-        )
+        return " ".join(b.get("text", "") for b in content if isinstance(b, dict))
     return ""
 
 
+def _is_user_turn(m):
+    """A genuine user message: user role with at least one non-tool-result block."""
+    if m.get("type") != "user" and m.get("role") != "user":
+        return False
+    content = (m.get("message") or {}).get("content") or m.get("content")
+    if isinstance(content, str):
+        return bool(content.strip())
+    return any(
+        isinstance(b, dict) and b.get("type") != "tool_result" for b in _blocks(m)
+    )
+
+
 def merge_confirmed(path):
-    """True when a non-error tool result in the transcript reports a merge."""
+    """True when, since the last user turn, a non-error MERGE call reported a merge."""
+    merge_ids = set()
+    confirmed = False
     try:
         with open(path, encoding="utf-8", errors="ignore") as fh:
             for line in fh:
@@ -96,20 +139,23 @@ def merge_confirmed(path):
                     m = json.loads(line)
                 except Exception:
                     continue
-                blocks = (m.get("message") or {}).get("content") or m.get("content")
-                if not isinstance(blocks, list):
-                    continue
-                for b in blocks:
-                    if (
-                        isinstance(b, dict)
-                        and b.get("type") == "tool_result"
+                if _is_user_turn(m):
+                    merge_ids, confirmed = set(), False
+                for b in _blocks(m):
+                    if not isinstance(b, dict):
+                        continue
+                    if b.get("type") == "tool_use" and _is_merge_call(b):
+                        merge_ids.add(b.get("id"))
+                    elif (
+                        b.get("type") == "tool_result"
+                        and b.get("tool_use_id") in merge_ids
                         and not b.get("is_error")
                         and CONFIRMED_RX.search(_result_text(b))
                     ):
-                        return True
+                        confirmed = True
     except Exception:
         return False
-    return False
+    return confirmed
 
 
 def main() -> int:
@@ -139,8 +185,8 @@ def main() -> int:
     print(json.dumps({
         "decision": "block",
         "reason": (
-            "Your message announces a future merge that no tool result in this "
-            f"session confirms: \"{hit.group(0).strip()}\".\n\n"
+            "Your message announces a future merge that no merge call since "
+            f"the last user turn confirms: \"{hit.group(0).strip()}\".\n\n"
             "A reader takes \"merges as soon as it is clean\" as a plan that is "
             "running, and stops watching. Either the merge is authorized and "
             "you do it now and report it in the past tense, or it waits on the "

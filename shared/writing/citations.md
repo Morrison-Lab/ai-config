@@ -814,7 +814,7 @@ Three citation rules live canonically in PSW's Citations and evidence chapter:
   (a `::: notes` div only on a site whose stylesheet sets `.notes` apart);
   [`visible-attributions`](visible-attributions.md) covers where the credit goes in included fragments,
   and the one exception PSW does not state:
-  content from the maintainer's own repositories need not be credited to them
+  content from the maintainer's own repositories is not credited to them
   ([psw#119](https://github.com/Morrison-Lab/psw/issues/119) proposes adding it to PSW).
 
 Link those sections rather than restating them here.

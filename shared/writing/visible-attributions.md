@@ -16,14 +16,21 @@ When a source credits its own upstream,
 carry that credit along,
 so the chain reaches the reader rather than stopping one hop short.
 
-## The maintainer's own repositories need not be credited
+## Never formally acknowledge the maintainer's own work
 
 Content taken from the maintainer's own repositories
 (Morrison-Lab and d-morrison, such as rme, lds, pds and sds)
-does not have to be attributed to them
-(user directive, 2026-10-05:
-"you don't have to give attributions for content taken from my other repos").
-The exemption covers only that hop.
+or from other works the maintainer wrote or co-wrote
+(a co-authored lab manual, their papers, their packages)
+is not credited to them
+(user directives, 2026-10-05:
+"you don't have to give attributions for content taken from my other repos";
+2026-10-16: "cross-refs between our repos are fine, but we shouldn't formally acknowledge borrowing content from ourselves like we do when we adapt content from others").
+That covers a Source callout, an "adapted from" sentence,
+and a bibliography entry for the group's own notes cited as the source of a definition or result.
+For a result or definition, cite the original publication and a modern textbook instead,
+and link the group's page as a cross-reference.
+The rule covers only that hop.
 What the repository itself credits is still carried:
 a book or paper it follows,
 and any person other than the maintainer whose lecture or notes it adapted,
@@ -32,15 +39,15 @@ since several of those repositories hold other authors' work
 A link to a sister site that sends the reader to further reading
 is a cross-reference, not an attribution, and is unaffected.
 
-The directive removes a requirement.
-It does not forbid a credit.
-So a sister-repository credit may be left out of new work,
-but do not strip one that already exists unless the maintainer asks.
+Leave such a credit out of new work, and remove an existing one when you find it
+(the maintainer asked for the sweep on 2026-10-16;
+the earlier "do not strip an existing credit unless asked" is superseded).
+Keep the link.
 
 - **Do:** credit the outside book, paper or person an item follows,
   even when it reached you through a sister repository.
-- **Don't:** report a missing sister-repository credit as a review finding,
-  or delete an existing one unasked.
+- **Do:** write `[Math for Data Science](https://morrison-lab.github.io/mds/...)` as a plain link, with no `[@key]` citation after it.
+- **Don't:** report a sister-repository credit as missing in review, or add one.
 
 ## Material written from scratch names no source
 

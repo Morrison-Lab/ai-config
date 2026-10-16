@@ -1200,7 +1200,7 @@ self-review confirms the claim, which was never the defect.
 [`shared/writing/visible-attributions.md`](shared/writing/visible-attributions.md)
 
 Credit every outside source where readers of the rendered document can see it, in PSW's collapsed "Source" callout at the end of the item it credits, never only in an HTML comment.
-Content taken from the maintainer's own repositories need not be credited to them, though what those repositories credit is still carried.
+Content from the maintainer's own work is never credited to them, though what it credits is still carried.
 
 ## Check the renders, not just the source
 

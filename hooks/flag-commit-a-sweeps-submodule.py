@@ -89,7 +89,9 @@ check the wrong one, when:
     directory the command itself creates;
   - a bare `cd` or `cd -` came earlier, so the directory is unknown (an
     absolute `git -C /path` after it is still read);
-  - `GIT_DIR=...` or another environment prefix redirects git (not read);
+  - a `GIT_DIR=...` or `GIT_WORK_TREE=...` prefix (also after `env`) names
+    another repository, like `--git-dir`; an earlier `export GIT_DIR=...;`
+    statement or any other redirecting variable is not read;
   - git is not reached as `git` after the shared parser's normalisation
     (`/usr/bin/git` and `timeout 60 git` ARE read): an alias, a shell
     function, or `pushd`/`popd` directory changes are not followed;
@@ -143,9 +145,14 @@ except Exception as _exc:  # broken install: fail open, like every guard here
     _simple_commands = None
 
 
-def _strip_lead(argv):
-    """argv with leading env assignments, wrappers and keywords removed."""
-    return _strip_env(argv)[1]
+# Environment assignments that name another repository than the cwd does.
+_REDIRECT_ENV = ("GIT_DIR", "GIT_WORK_TREE")
+
+
+def _redirects_git(env_tokens):
+    """True if a leading `NAME=value` (or `env NAME=value`) sends git to
+    another repository, as `--git-dir`/`--work-tree` would."""
+    return any(t.split("=", 1)[0] in _REDIRECT_ENV for t in env_tokens)
 
 
 def _git_invocation(rest):
@@ -275,14 +282,14 @@ def offending(command):
 
     hits = []
     for scope, argv in cmds:
-        rest = _strip_lead(argv)
+        env, rest = _strip_env(argv)
         cd = cd_of(scope)
         if rest and rest[0] == "cd":
             operand = _cd_operand(rest[1:])
             cds[scope] = None if operand is None else _join(cd, operand)
             continue
         inv = _git_invocation(rest)
-        if inv is None:
+        if inv is None or _redirects_git(env):
             continue
         c_dirs, sub, args = inv
         target = cd
@@ -328,12 +335,17 @@ def _git(cwd, *args):
         return None
     try:
         out = subprocess.run(
-            ["git", *args], cwd=cwd, capture_output=True, text=True,
+            ["git", *args], cwd=cwd, capture_output=True,
             timeout=min(_PER_CALL_S, remaining),
             env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"})
     except (OSError, subprocess.SubprocessError):
         return None
-    return out.stdout if out.returncode == 0 else None
+    if out.returncode != 0:
+        return None
+    # A tracked file name need not be UTF-8 (`ls-files -z` and `status -z`
+    # emit it raw): surrogateescape keeps it round-trippable instead of
+    # raising UnicodeDecodeError out of the hook.
+    return out.stdout.decode("utf-8", "surrogateescape")
 
 
 def modified_submodules(cwd):

@@ -150,6 +150,18 @@ def many_files_repo(path):
     _move_submodule_head(path)
 
 
+def latin1_path_repo(path):
+    """A tracked file whose name is not valid UTF-8 (POSIX only), plus a
+    moved submodule: `ls-files -z` and `status -z` emit that name raw."""
+    _base_with_submodule(path)
+    raw = os.path.join(os.fsencode(path), b"caf\xe9.txt")
+    with open(raw, "w", encoding="utf-8") as handle:
+        handle.write("x\n")
+    _run(path, "add", "-A")
+    _run(path, "commit", "-qm", "latin-1 name")
+    _move_submodule_head(path)
+
+
 MSG = '"fix"'
 # (id, builder, command, description). A command may use {repo}.
 SHOULD_WARN = [
@@ -224,7 +236,10 @@ SHOULD_WARN = [
      "5000 modified files and a moved submodule sorting last: the one index "
      "read keeps the warning inside the deadline"),
 ] + ([("W22", moved_pin_only_repo, "git add -u '.\\mod'",
-       "Windows path separator is normalised")] if os.name == "nt" else [])
+       "Windows path separator is normalised")] if os.name == "nt" else []
+     ) + ([("W39", latin1_path_repo, f"git commit -am {MSG}",
+            "a tracked name that is not UTF-8 must not crash the hook")]
+          if os.name != "nt" else [])
 SHOULD_STAY_SILENT = [
     ("S1", moved_pin_repo, f"git commit -m {MSG}", "no -a: nothing swept"),
     ("S2", moved_pin_repo, "git add CLAUDE.md", "explicit path add"),
@@ -287,6 +302,12 @@ SHOULD_STAY_SILENT = [
      "the payload's `cwd` beats the hook's own working directory"),
     ("S33", moved_pin_only_repo, "git add --refresh .",
      "--refresh stages nothing"),
+    ("S34", moved_pin_only_repo, f"GIT_DIR=.git git commit -am {MSG}",
+     "a GIT_DIR prefix names another repository: documented silent case"),
+    ("S35", moved_pin_only_repo, "GIT_WORK_TREE=. git add -u",
+     "a GIT_WORK_TREE prefix names another repository"),
+    ("S36", moved_pin_only_repo, f"env GIT_DIR=.git git commit -am {MSG}",
+     "GIT_DIR after `env` redirects git too"),
 ] + ([] if os.name == "nt" else [
     ("S20", moved_pin_only_repo, "git add -u '.\\mod'",
      "on POSIX a backslash is a name character, not a separator"),
@@ -326,6 +347,8 @@ def verdict(hook_path, repo, command, want_text=False):
         # `scripts/lib` lookup (relative to its file) finds nothing.
         env=env,
     )
+    if proc.returncode != 0 and hook_path != HOOK:
+        return "crash"  # a mutant that raises is a flip, not a harness error
     if proc.returncode != 0:
         sys.exit(f"FATAL: hook exited {proc.returncode} on {command!r}\n"
                  f"{proc.stderr.strip()}")
@@ -440,7 +463,7 @@ MUTATIONS = {
           '                if False:\n                    sweeps = True')],
         {"W1", "W2", "W6", "W8", "W9", "W10", "W11", "W12", "W16", "W17",
          "W18", "W23", "W25", "W26", "W30", "W31", "W32", "W33", "W34",
-         "W35", "W36", "W38"},
+         "W35", "W36", "W38"} | ({"W39"} if os.name != "nt" else set()),
     ),
     "M_value_letter_stops_cluster": (
         "a value-taking letter (-m) ends the cluster, so -ma is not -a",
@@ -646,8 +669,21 @@ MUTATIONS = {
     ),
     "M_lead_words": (
         "env assignments and lead words are skipped",
-        [("    return _strip_env(argv)[1]", "    return argv")],
+        [("        env, rest = _strip_env(argv)", "        env, rest = [], argv")],
         {"W11", "W32", "W33", "S31"},  # S31: `{ cd mod; }` needs `{` stripped
+    ),
+    "M_env_redirect_silent": (
+        "a GIT_DIR/GIT_WORK_TREE prefix names another repository: silent",
+        [("        if inv is None or _redirects_git(env):",
+          "        if inv is None:")],
+        {"S34", "S35", "S36"},
+    ),
+    "M_non_utf8_names": (
+        "git output with a non-UTF-8 file name is decoded, not fatal",
+        [('out.stdout.decode("utf-8", "surrogateescape")',
+          'out.stdout.decode("utf-8", "strict")')],
+        # Skipped (empty) on Windows, which has no such file names.
+        {"W39"} if os.name != "nt" else set(),
     ),
     "M_global_value_options": (
         "a global `-c k=v`, `--namespace`, `--config-env` consume their value",

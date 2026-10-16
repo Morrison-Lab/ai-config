@@ -431,7 +431,7 @@ cookieconsent.run({
 <li><strong>Local sessions</strong>: dispatch to <code>opencode</code>, <code>agy</code> CLI, or <code>codex</code> (via <code>dto</code>, <code>dtc</code>, or <code>adv</code>).</li>
 <li><strong>Cloud sessions</strong>: dispatch via <code>curl</code> to OpenCode Go (<code>https://opencode.ai/zen/go/v1/chat/completions</code>) streaming into <code>skills/delegate-to-opencode/scripts/parse-sse.py</code> per <a href="../../skills/delegate-to-opencode/SKILL.html"><code>delegate-to-opencode</code></a>, with model fallback (<code>deepseek-v4-pro</code>, <code>kimi-k3</code>, <code>qwen3.8-max</code>, <code>glm-5.3</code>) on 502 upstream errors. Do not use Python <code>urllib</code> (which returns 403 Forbidden through the cloud agent proxy).</li>
 </ul>
-<p>Never proceed to the merge call without a clean cross-harness review on the shipping head.</p>
+<p>Never proceed to the merge call without a clean cross-harness review on the shipping head, except under <a href="../../shared/workflow/adversarial-self-review.md#waiver-when-no-cross-model-reviewer-can-run">the waiver</a>: when no qualifying reviewer can run (host blocked, backend down, CLI or credential absent, after enumerating every route and trying each once), treat the gate as waived. The merge itself is authorized by the user’s merge instruction, and it still needs a clean Claude review plus green CI and a PR note that the cross-model review was waived and why. A reviewer that ran and returned not-clean is not unavailable.</p>
 </section>
 <section id="merge" class="level3">
 <h3 class="anchored" data-anchor-id="merge">2. Merge</h3>

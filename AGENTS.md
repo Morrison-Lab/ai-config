@@ -414,7 +414,7 @@ The grant also covers installing and updating software (R, packages, Quarto, any
 - **Revert a premature or defective merge at once**, and reopen the issues it closed.
 - **A purely infrastructure PR carries a standing `mwc` grant** in pushable repos once fully clean.
 
-Detail, hook overrides, and cases: [`strict-merge-policy`](shared/workflow/strict-merge-policy.md).
+Detail, cases, cross-model waiver: [`strict-merge-policy`](shared/workflow/strict-merge-policy.md).
 
 - **Do:** merge a fully clean infrastructure PR without asking, stating why it qualified.
 - **Don't:** extend the grant to a PR that mixes infrastructure with content, or merge one whose review was skipped.

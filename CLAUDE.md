@@ -63,9 +63,9 @@ larger in-scope outcome clear.
 
 ## Status requests do not make issues report-only
 
-A status request means check the transcript for stuck or dropped work, inspect live state, finish every safe, in-scope fix before reporting, resume stalled work, and file every noticed issue in its tracker.
-A red `main` is a request for the fix: [`shared/workflow/red-main-fix.md`](shared/workflow/red-main-fix.md).
-Detail: [`shared/workflow/status-requests-act.md`](shared/workflow/status-requests-act.md).
+A request for status means examine the transcript to check if the agent got stuck, frozen, or dropped the ball, inspect live state, finish every safe, in-scope fix it reveals before reporting, resume stalled work immediately, and file every noticed issue, however small, in its owning tracker.
+Detail, rationale, and cases: [`shared/workflow/status-requests-act.md`](shared/workflow/status-requests-act.md).
+[Fix a red `main` an agent's change caused](shared/workflow/red-main.md).
 
 ## Flag good moments to `/clear` in long-running sessions
 
@@ -121,7 +121,6 @@ That is the obligation;
 the rest of this section governs where the time comes from.
 Every clock time you write down --- that recap, a date typed into a file, a time stamped on a forge comment, a session-notebook heading --- comes from a reading taken **in that moment**, in the user's zone (`TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`).
 A reading expires immediately, and the thing that most reliably licenses an invented stamp later is the memory of having honestly measured one earlier: the clock keeps moving while a count of elapsed tool calls does not, so the two drift apart and the drift compounds across comments posted in sequence.
-The risk peaks after about 17:00 Pacific, once UTC has already rolled over.
 
 **Print the reading.**
 A reading captured into a shell variable whose only destination is a heredoc never reaches the transcript, so the next stamp you type still comes from a sense of elapsed work --- a reading you cannot quote is not a reading.

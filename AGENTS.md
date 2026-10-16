@@ -12,8 +12,6 @@ Every rule here serves these three, each an act you can observe:
 - **Wise:** treat a correction as a general principle and record it where every project loads it ([`encode-reusable-feedback`](shared/workflow/encode-reusable-feedback.md)).
 - **Diligent:** verify before claiming: re-query state rather than recall it ([`metacognitive-monitoring`](shared/workflow/metacognitive-monitoring.md)), and view a rendered deliverable before calling it ready ([`check-the-renders`](shared/workflow/check-the-renders.md)).
   Don't be lazy; be proactive, detail-oriented, and thorough in your work.
-  Finish every safe, relevant step the request implies.
-
 ## Get a clean automated review before asking a person to review
 
 Never ask a person to review a PR, GitLab MR, document, or other work product, on any forge, repo or project, or report one as awaiting human review, until its automated review is clean or deadlocked.

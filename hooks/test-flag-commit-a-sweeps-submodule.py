@@ -16,6 +16,7 @@ case can observe declares an EMPTY set rather than faking coverage.
 Run:  python3 hooks/test-flag-commit-a-sweeps-submodule.py \\
           hooks/flag-commit-a-sweeps-submodule.py
 """
+import atexit
 import json
 import os
 import shutil
@@ -25,6 +26,11 @@ import tempfile
 
 HOOK = os.path.realpath(sys.argv[1])
 ELSEWHERE = tempfile.mkdtemp()  # a cwd that is not the repo under test
+_SCRATCH = [ELSEWHERE]  # every temp dir this run made, removed at exit
+# atexit also runs on the sys.exit(FATAL) paths below, which would otherwise
+# leave the scratch repos behind.
+atexit.register(lambda: [shutil.rmtree(p, ignore_errors=True)
+                         for p in _SCRATCH])
 SHELLCMD_LIB = os.path.join(
     os.path.dirname(os.path.dirname(HOOK)), "scripts", "lib")
 
@@ -49,6 +55,7 @@ def _write(path, *parts, content="x\n"):
 
 def _repo(build):
     path = tempfile.mkdtemp()
+    _SCRATCH.append(path)
     _run(path, "init", "-q")
     _identity(path)
     build(path)
@@ -118,6 +125,18 @@ def staged_bump_repo(path):
     _run(path, "add", "mod")
 
 
+def symlink_to_dir_repo(path):
+    """A tracked symlink to a directory, repointed at the (clean) submodule:
+    status says ` M lnk`, but `lnk` is mode 120000, not a gitlink."""
+    _base_with_submodule(path)
+    _write(path, "docs", "f.txt")
+    os.symlink("docs", os.path.join(path, "lnk"))
+    _run(path, "add", "docs", "lnk")
+    _run(path, "commit", "-qm", "link")
+    os.remove(os.path.join(path, "lnk"))
+    os.symlink("mod", os.path.join(path, "lnk"))
+
+
 MSG = '"fix"'
 # (id, builder, command, description). A command may use {repo}.
 SHOULD_WARN = [
@@ -156,11 +175,29 @@ SHOULD_WARN = [
      "magic pathspec is not evaluated: warn, not silent"),
     ("W21", moved_pin_only_repo, "git add -u 'mod*'",
      "glob pathspec is not evaluated: warn, not silent"),
-    ("W22", moved_pin_only_repo, "git add -u '.\\mod'",
-     "Windows path separator is normalised"),
     ("W23", staged_then_moved_repo, f"git commit -am {MSG}",
      "MM: staged bump, then the submodule moved again"),
-]
+    ("W24", moved_pin_only_repo, "cd {link} && git add -u mod",
+     "cwd reached through a symlink: paths compared through realpath"),
+    ("W25", moved_pin_only_repo,
+     f"git add -u CLAUDE.md && git commit -am {MSG}",
+     "first match is filtered out by its pathspec; a later one still warns"),
+    ("W26", moved_pin_only_repo,
+     f"git -C /nonexistent-dir-xyz commit -am {MSG}; git commit -am {MSG}",
+     "first match has a missing directory; a later one still warns"),
+    ("W27", moved_pin_only_repo, "git add -A", "git add -A stages the gitlink"),
+    ("W28", moved_pin_only_repo, "git add --all", "git add --all"),
+    ("W29", moved_pin_only_repo, "git add .",
+     "git add . stages the gitlink (checked with git 2.x)"),
+    ("W30", moved_pin_only_repo, f"cd -P {{repo}} && git commit -am {MSG}",
+     "`cd -P dir` is read as a cd to dir"),
+    ("W31", moved_pin_only_repo, f"cd - ; git -C {{repo}} commit -am {MSG}",
+     "an absolute -C is still read after a `cd -`"),
+    ("W32", moved_pin_only_repo,
+     f"ENVV=1 git --config-env a.b=ENVV --namespace ns commit -am {MSG}",
+     "global --config-env and --namespace consume a separated value"),
+] + ([("W22", moved_pin_only_repo, "git add -u '.\\mod'",
+       "Windows path separator is normalised")] if os.name == "nt" else [])
 SHOULD_STAY_SILENT = [
     ("S1", moved_pin_repo, f"git commit -m {MSG}", "no -a: nothing swept"),
     ("S2", moved_pin_repo, "git add CLAUDE.md", "explicit path add"),
@@ -198,11 +235,36 @@ SHOULD_STAY_SILENT = [
      "`cd $VAR` is not expanded: documented silent case"),
     ("S19", moved_pin_only_repo, f"@budget0 git commit -am {MSG}",
      "git deadline already spent: fail open, not a late kill"),
-]
+    ("S21", symlink_to_dir_repo, f"git commit -am {MSG}",
+     "a modified tracked symlink to a directory is mode 120000, not a gitlink"),
+    ("S22", moved_pin_only_repo, f"git commit -a --dry-run -m {MSG}",
+     "--dry-run commits nothing"),
+    ("S23", moved_pin_only_repo, f"git commit -a --short -m {MSG}",
+     "--short implies a dry run"),
+    ("S24", moved_pin_only_repo, "git add -n -u", "add -n stages nothing"),
+    ("S25", moved_pin_only_repo, "git add --dry-run .",
+     "add --dry-run stages nothing"),
+    ("S26", moved_pin_only_repo, f"cd - && git commit -am {MSG}",
+     "`cd -` leaves the directory unknown: documented silent case"),
+    ("S27", moved_pin_only_repo, f"cd && git commit -am {MSG}",
+     "a bare `cd` leaves the directory unknown: documented silent case"),
+    ("S28", moved_pin_only_repo, "git add mod",
+     "naming the submodule is how a pin bump is staged on purpose"),
+    ("S29", moved_pin_only_repo, "git add 'mod*'",
+     "a glob pathspec on a plain add is not evaluated: documented silent case"),
+] + ([] if os.name == "nt" else [
+    ("S20", moved_pin_only_repo, "git add -u '.\\mod'",
+     "on POSIX a backslash is a name character, not a separator"),
+])
 
 
 def verdict(hook_path, repo, command, want_text=False):
-    cwd = ELSEWHERE if "{repo}" in command else repo
+    cwd = ELSEWHERE if "{repo}" in command or "{link}" in command else repo
+    if "{link}" in command:  # a symlink to the repo, so the cwd is unresolved
+        link = os.path.join(ELSEWHERE, "link-" + os.path.basename(repo))
+        if not os.path.islink(link):
+            os.symlink(repo, link)
+        command = command.replace("{link}", link)
     command = command.replace("{repo}", repo)
     env = {**os.environ, "PYTHONPATH": SHELLCMD_LIB}
     if command.startswith("@budget0 "):  # an already-spent git deadline
@@ -273,47 +335,69 @@ try:
     head = _run(os.path.join(repo, "mod"), "rev-parse", "HEAD").stdout.strip()
     res = verdict(HOOK, repo, f"git commit -am {MSG}", want_text=True)
     text = json.dumps(res[1]) if isinstance(res, tuple) else ""
+    msg_checks = []  # (label, ok); counted apart from the verdict cases
+
+    def check(label, needle, text, present=True):
+        msg_checks.append((label, (needle in text) == present))
+
     for label, needle in (("submodule path", "mod:"), ("pinned sha", pinned[:7]),
                           ("checked-out sha", head[:7]),
-                          ("suggestion", "git commit -- <paths>")):
-        ok = needle in text
-        wrong += not ok
-        print(f"  {'ok  ' if ok else 'WRONG'} message names {label}")
-    # `add -u` only stages: the message must say the NEXT commit moves it.
+                          ("suggestion", "git commit -- <paths>"),
+                          ("push-first caution", "pushed or on a branch")):
+        check(f"commit -a message names {label}", needle, text)
+    check("commit -a message says this commit", "this commit would MOVE", text)
+    check("commit -a message names no pathspec scope", " under ", text, False)
+    # `add -u` only stages: the message must say the NEXT commit moves it,
+    # and `add -u <pathspec>` must not claim to stage every modified path.
     res = verdict(HOOK, repo, "git add -u", want_text=True)
     text = json.dumps(res[1]) if isinstance(res, tuple) else ""
-    for label, needle in (("next commit (additionalContext)", "the next commit"),
-                          ("next commit (systemMessage)", "next commit would")):
-        ok = needle in text
-        wrong += not ok
-        print(f"  {'ok  ' if ok else 'WRONG'} add -u message says {label}")
+    check("add -u message says the next commit (additionalContext)",
+          "the next commit", text)
+    check("add -u message says the next commit (systemMessage)",
+          "next commit would", text)
+    res = verdict(HOOK, repo, "git add -u mod", want_text=True)
+    text = json.dumps(res[1]) if isinstance(res, tuple) else ""
+    check("add -u <pathspec> message scopes the staging to the pathspec",
+          "every modified tracked path under mod", text)
+    res = verdict(HOOK, repo, "git add -A", want_text=True)
+    text = json.dumps(res[1]) if isinstance(res, tuple) else ""
+    check("add -A message says it stages every change", "stages every change",
+          text)
+    for label, ok in msg_checks:
+        print(f"  {'ok  ' if ok else 'WRONG'} {label}")
 finally:
     shutil.rmtree(repo, ignore_errors=True)
 
+msg_wrong = sum(not ok for _, ok in msg_checks)
 total = len(CASES)
-print(f"\n{total - wrong}/{total} cases (+6 message checks) correct"
+print(f"\n{total - wrong}/{total} cases correct"
       + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
+print(f"{len(msg_checks) - msg_wrong}/{len(msg_checks)} message checks correct"
+      + ("" if msg_wrong == 0 else f"  ({msg_wrong} WRONG)"))
+wrong += msg_wrong
 
 # ------------------------------------------------------------ mutation harness
 
+POSIX = os.name != "nt"
 MUTATIONS = {
     "M_long_all": (
         "`--all` is read as -a",
-        [('            if a == "--all":\n                return True',
-          '            if False:\n                return True')],
+        [('            if a == "--all":\n                sweeps = True',
+          '            if False:\n                sweeps = True')],
         {"W3"},
     ),
     "M_cluster_a": (
         "an `a` inside a short-flag cluster is read as -a",
-        [('                if ch == "a":\n                    return True',
-          '                if False:\n                    return True')],
-        {"W1", "W2", "W6", "W8", "W9", "W10", "W11", "W12", "W16", "W17", "W18", "W23"},
+        [('                if ch == "a":\n                    sweeps = True',
+          '                if False:\n                    sweeps = True')],
+        {"W1", "W2", "W6", "W8", "W9", "W10", "W11", "W12", "W16", "W17",
+         "W18", "W23", "W25", "W26", "W30", "W31", "W32"},
     ),
     "M_value_letter_stops_cluster": (
         "a value-taking letter (-m) ends the cluster, so -ma is not -a",
-        [("                if ch in _COMMIT_VALUE_SHORT:\n"
+        [("                elif ch in _COMMIT_VALUE_SHORT:\n"
           "                    if pos == len(a) - 1:",
-          "                if False:\n                    if pos == len(a) - 1:")],
+          "                elif False:\n                    if pos == len(a) - 1:")],
         {"S5", "S10"},  # S10's `-m -a`: `-m` alone then reads `-a` as flags
     ),
     "M_value_token_skipped": (
@@ -332,10 +416,16 @@ MUTATIONS = {
     ),
     "M_optional_attached_value_ends_cluster": (
         "the rest of a -S/-u cluster is its attached value (-uall)",
-        [('                if ch in "Su":\n'
+        [('                elif ch in "Su":\n'
           "                    break  # optional attached value (-uall): rest of cluster",
-          "                if False:\n                    break")],
+          "                elif False:\n                    break")],
         {"S14"},
+    ),
+    "M_commit_dry_run": (
+        "`commit --dry-run/--short/--porcelain/--long` commit nothing",
+        [("            elif a in _COMMIT_DRY_RUN:\n                dry = True",
+          "            elif False:\n                dry = True")],
+        {"S22", "S23"},
     ),
     "M_magic_pathspec_warns": (
         "a magic pathspec (`:/`) warns instead of going silent",
@@ -349,11 +439,28 @@ MUTATIONS = {
           '        if p.startswith(":"):')],
         {"W21"},
     ),
+    "M_plain_add_glob_silent": (
+        "a magic/glob pathspec on a plain `git add` is not evaluated: silent",
+        [("            if sweeping:\n                return True\n            continue",
+          "            return True")],
+        {"S29"},
+    ),
     "M_windows_separator": (
-        "backslash separators are normalised in pathspecs",
-        [('        p = p.replace("\\\\", "/")  # Windows separators',
-          "        pass")],
-        {"W22"},
+        "backslash separators are normalised in pathspecs (Windows only)",
+        [('        if os.name == "nt":\n'
+          '            p = p.replace("\\\\", "/")  # Windows separators only',
+          '        if False:\n'
+          '            p = p.replace("\\\\", "/")  # Windows separators only')],
+        # Unobservable on POSIX, where the clause never runs.
+        set() if POSIX else {"W22"},
+    ),
+    "M_backslash_is_separator_everywhere": (
+        "backslash is normalised on POSIX too, where it is a name character",
+        [('        if os.name == "nt":\n'
+          '            p = p.replace("\\\\", "/")  # Windows separators only',
+          '        if True:\n'
+          '            p = p.replace("\\\\", "/")  # Windows separators only')],
+        {"S20"} if POSIX else set(),
     ),
     "M_git_dir_work_tree_silent": (
         "--git-dir/--work-tree go silent instead of checking the wrong repo",
@@ -386,40 +493,71 @@ MUTATIONS = {
     ),
     "M_add_update_long": (
         "`--update` is read as -u",
-        [('        if f == "--update":\n            return True, paths',
-          '        if False:\n            return True, paths')],
+        [('    if "--update" in flags or "u" in letters:',
+          '    if "u" in letters:')],
         {"W5"},
     ),
     "M_add_update_short": (
         "`-u` is read as update",
-        [('        if not f.startswith("--") and "u" in f[1:]:\n'
-          "            return True, paths",
-          "        if False:\n            return True, paths")],
-        {"W4", "W7", "W13", "W14", "W15", "W20", "W21", "W22"},
+        [('    if "--update" in flags or "u" in letters:',
+          '    if "--update" in flags:')],
+        {"W4", "W7", "W14", "W15", "W20", "W21", "W24"},
+    ),
+    "M_add_all": (
+        "`-A`/`--all` is read as a sweeping add",
+        [('    if "--all" in flags or "A" in letters:',
+          "    if False:")],
+        {"W27", "W28"},
+    ),
+    "M_add_plain_pathspec": (
+        "a plain `git add <dir>` covering a submodule is read",
+        [('    return ("add", paths) if paths else None', "    return None")],
+        {"W29"},
+    ),
+    "M_add_dry_run": (
+        "`git add -n/--dry-run` stages nothing",
+        [('    if "--dry-run" in flags or "n" in letters:\n        return None',
+          "    if False:\n        return None")],
+        {"S24", "S25"},
     ),
     "M_dash_c_dir": (
         "`git -C <dir>` retargets the repository",
-        [("        for d in c_dirs:\n            target = os.path.join(target, d)",
+        [("        for d in c_dirs:\n            target = _join(target, d)",
           "        for d in c_dirs:\n            pass")],
-        {"W6", "S9"},
+        # W26 is not here: with -C ignored the first command runs in the
+        # cwd and warns too, so the verdict is the same.
+        {"W6", "S9", "W31"},
     ),
     "M_cd_tracking": (
         "an earlier `cd <dir>` retargets the repository",
-        [('            cd = os.path.join(cd, rest[1]) if rest[1] not in ("-",) else cd',
+        [("            cd = None if operand is None else _join(cd, operand)",
           "            pass")],
-        # S17/S18 are silent only because the `cd` target is unresolvable.
-        {"W9", "S17", "S18"},
+        # S17/S18 are silent only because the `cd` target is unresolvable;
+        # S26/S27 because the directory is unknown.
+        {"W9", "W24", "W30", "S17", "S18", "S26", "S27"},
+    ),
+    "M_cd_unknown_directory": (
+        "a bare `cd` or `cd -` makes the directory unknown, not unchanged",
+        [("            cd = None if operand is None else _join(cd, operand)",
+          "            cd = cd if operand is None else _join(cd, operand)")],
+        {"S26", "S27"},
+    ),
+    "M_cd_flags": (
+        "`cd -P`/`-L` flags are skipped to find the operand",
+        [('    while i < len(args) and args[i].startswith("-") and args[i] != "-":',
+          "    while False:")],
+        {"W30"},
     ),
     "M_lead_words": (
         "env assignments and lead words are skipped",
         [("    return _strip_env(argv)[1]", "    return argv")],
-        {"W11"},
+        {"W11", "W32"},
     ),
     "M_global_value_options": (
-        "a global `-c k=v` consumes its value",
+        "a global `-c k=v`, `--namespace`, `--config-env` consume their value",
         [("        elif a in _GIT_VALUE_GLOBAL:\n            i += 2",
           "        elif a in _GIT_VALUE_GLOBAL:\n            i += 1")],
-        {"W12"},
+        {"W12", "W32"},
     ),
     "M_head_differs_from_pin": (
         "only a submodule whose HEAD differs from the pin counts",
@@ -432,19 +570,37 @@ MUTATIONS = {
     ),
     "M_pathspec_scoping": (
         "`git add -u <pathspec>` only counts a submodule under a pathspec",
-        [("            return True\n    return False\n\n\nNOTE",
-          "            return True\n    return True\n\n\nNOTE")],
-        {"S6"},
+        [("            return True\n    return False\n\n\n# What each kind stages",
+          "            return True\n    return True\n\n\n# What each kind stages")],
+        # S2, S28, S29 and S20 are plain `git add` cases: without the final
+        # `return False` they too would warn.
+        {"S2", "S6", "S28", "S29"} | ({"S20"} if POSIX else set()),
+    ),
+    "M_plain_add_names_submodule_silent": (
+        "a plain `git add mod` naming the submodule is a deliberate bump",
+        [("        if covers and (sweeping or rel != sub_path):",
+          "        if covers:")],
+        {"S28"},
+    ),
+    "M_realpath": (
+        "pathspecs and the repo root are compared through realpath",
+        [("    real_cwd, real_top = os.path.realpath(cwd), os.path.realpath(top)",
+          "    real_cwd, real_top = cwd, top")],
+        {"W24"},
+    ),
+    "M_every_match_checked": (
+        "every matching invocation is checked, not only the first",
+        [("    for segment, kind, target, pathspecs in hits:",
+          "    for segment, kind, target, pathspecs in hits[:1]:")],
+        {"W25", "W26"},
     ),
     "M_mode_160000": (
         "only a gitlink (mode 160000) counts",
         [('        if len(fields) < 3 or fields[0] != "160000":',
           "        if len(fields) < 3:")],
-        # Declared EMPTY: a modified regular file reaches the next guard
-        # (rev-parse in a path that is not a directory fails and is skipped),
-        # so removing the mode test changes no verdict here. It stays as the
-        # explicit statement of the condition, not as separately tested code.
-        set(),
+        # A tracked symlink to a directory is ` M` with mode 120000; without
+        # the test it is read as a submodule whose HEAD differs from a blob.
+        {"S21"},
     ),
     "M_worktree_column_modified": (
         "only a worktree-column `M` entry counts",

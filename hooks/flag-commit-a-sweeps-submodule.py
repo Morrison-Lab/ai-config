@@ -14,7 +14,9 @@ older `85c285b`. The PR bot flagged it as blocking.
 `flag-add-a-outside-pathspec.py` covers `git add -A` and untracked files. It
 does not read `git commit -a`, does not read `git add -u` (its M4 clause
 exempts `-u` because `-u` never stages an UNTRACKED file), and does not look
-at submodules at all.
+at submodules at all. Checked with git 2.x: `git add -u`, `git add -A`,
+`git add .` and `git add <dir>` all stage a moved gitlink, as does
+`git commit -a`.
 
 ## Why a hook rather than a rule
 
@@ -40,9 +42,15 @@ missing one".
       right and stops at a letter that takes a value, so `-ma` -- message
       "a" -- is NOT `-a`, and also at `S` and `u`, whose values are optional
       and attached, so `-uall` is NOT `-a` while `-S -a` and `-u -a` ARE),
-      or `add` with `-u`/`--update`
+      or `add` with `-u`/`--update`, `-A`/`--all`, or a pathspec that covers
+      a submodule from above (`git add .`, `git add <dir>`); a dry run
+      (`commit --dry-run`/`--short`/`--porcelain`/`--long`, `add -n`/
+      `--dry-run`) stages and commits nothing and is silent. Every match in
+      the command is checked, not only the first
   M4  the target repository is the `-C` directory, applied on top of the
-      session cwd and of any earlier `cd <dir>` in the same command
+      session cwd and of any earlier `cd <dir>` in the same command; `cd -P`
+      and `cd -L` are read, and a bare `cd` or `cd -` makes the directory
+      unknown, so a later relative target is skipped (see below)
   M5  `git status --porcelain=v1 -z --ignore-submodules=dirty` there lists
       an entry whose worktree column is `M` and whose path has mode 160000
       in `git ls-files -s`
@@ -52,9 +60,13 @@ missing one".
       drops it; this comparison is defence in depth). A pin bump already staged
       (`M ` with HEAD still equal to the staged pin) is silent too, while
       `MM` (staged, then the submodule moved again) warns
-  M7  for `git add -u <pathspec>`, only a submodule at or under a pathspec
+  M7  for `git add -u|-A <pathspec>`, only a submodule at or under a pathspec
       counts, but a magic (`:/`) or glob pathspec is not evaluated and warns;
-      `commit -a` takes no pathspec (git refuses the combination)
+      for a plain `git add <pathspec>`, only a pathspec covering the submodule
+      from above counts (naming it is how a pin is bumped on purpose, and a
+      magic or glob pathspec is not evaluated and stays silent); relative
+      paths are compared through realpath. `commit -a` takes no pathspec
+      (git refuses the combination)
 
 Fails OPEN on any parse trouble, on git failing or timing out, and outside a
 git repository. Every git call shares an 8 s deadline, inside the 10 s the
@@ -70,7 +82,15 @@ check the wrong one, when:
   - the target directory is not a directory at match time, which includes
     `cd ~` and `cd $VAR` (the text is not expanded) and any `cd` into a
     directory the command itself creates;
-  - `GIT_DIR=...` or another environment prefix redirects git (not read).
+  - a bare `cd` or `cd -` came earlier, so the directory is unknown (an
+    absolute `git -C /path` after it is still read);
+  - `GIT_DIR=...` or another environment prefix redirects git (not read);
+  - git is not spelled `git`: `/usr/bin/git`, an alias, a shell function or
+    `pushd`/`popd` directory changes are not followed;
+  - the commit names its paths: `git commit <pathspec>` and `git commit -i
+    <pathspec>` also commit a moved gitlink covered by a directory pathspec
+    (checked: `git commit -m x .` committed `mod`), but they say which paths
+    they take, so the hook does not parse commit's positional arguments.
 """
 import json
 import os
@@ -88,10 +108,14 @@ _COMMIT_VALUE_LONG = {
     "--reuse-message", "--reedit-message", "--fixup", "--squash",
     "--template", "--trailer", "--pathspec-from-file",
 }
-# global options of `git` that consume the next token
-# (--git-dir and --work-tree are handled before this set is consulted)
-_GIT_VALUE_GLOBAL = {"-C", "-c", "--namespace", "--exec-path",
-                      "--super-prefix", "--config-env"}
+# global options of `git` that consume the next token (checked with git 2.x:
+# `--namespace ns` and `--config-env k=ENV` take a separated value;
+# `--exec-path[=<path>]` takes an optional ATTACHED one and so must not be
+# here, and `--super-prefix` is not a user option at all).
+# --git-dir and --work-tree are handled before this set is consulted.
+_GIT_VALUE_GLOBAL = {"-C", "-c", "--namespace", "--config-env"}
+# `git commit` options that make it a dry run: nothing is committed.
+_COMMIT_DRY_RUN = {"--dry-run", "--short", "--porcelain", "--long"}
 
 
 # The shared parser blanks heredoc bodies correctly (a command after
@@ -135,44 +159,52 @@ def _git_invocation(rest):
         elif a in _GIT_VALUE_GLOBAL:
             i += 2
         elif a.startswith("-"):
-            i += 1  # --git-dir=x, --no-pager, -p, ...
+            i += 1  # --no-pager, -p, --exec-path[=x], ...
         else:
             return c_dirs, a, rest[i + 1:]
     return None
 
 
 def commit_sweeps_all(args):
-    """M3 for `git commit`: true if `-a`/`--all` is among the options."""
+    """M3 for `git commit`: true if `-a`/`--all` is among the options and
+    the commit is not a dry run (`--dry-run`, `--short`, `--porcelain` and
+    `--long` all commit nothing; checked with git 2.x)."""
+    sweeps = dry = False
     i = 0
     while i < len(args):
         a = args[i]
         if a == "--":
-            return False
+            break
         if a.startswith("--"):
             if a == "--all":
-                return True
-            if a in _COMMIT_VALUE_LONG:
+                sweeps = True
+            elif a in _COMMIT_DRY_RUN:
+                dry = True
+            elif a in _COMMIT_VALUE_LONG:
                 i += 1  # value is the next token
             i += 1
             continue
         if a.startswith("-") and a != "-":
             for pos, ch in enumerate(a[1:], start=1):
                 if ch == "a":
-                    return True
-                if ch in _COMMIT_VALUE_SHORT:
+                    sweeps = True
+                elif ch in _COMMIT_VALUE_SHORT:
                     if pos == len(a) - 1:
                         i += 1  # value is the next token
                     break
-                if ch in "Su":
+                elif ch in "Su":
                     break  # optional attached value (-uall): rest of cluster
             i += 1
             continue
         i += 1
-    return False
+    return sweeps and not dry
 
 
-def add_update(args):
-    """M3 for `git add`: (True, pathspecs) if `-u`/`--update` is present."""
+def add_kind(args):
+    """M3 for `git add`: (kind, pathspecs), or None when nothing is staged
+    beyond named paths. kind is "add -u" (`-u`/`--update`), "add -A"
+    (`-A`/`--all`) or "add" (only pathspecs, which can still cover a
+    submodule: `git add .`); `-n`/`--dry-run` stages nothing."""
     flags, paths, dashdash = [], [], False
     for a in args:
         if not dashdash and a == "--":
@@ -181,28 +213,53 @@ def add_update(args):
             flags.append(a)
         else:
             paths.append(a)
-    for f in flags:
-        if f == "--update":
-            return True, paths
-        if not f.startswith("--") and "u" in f[1:]:
-            return True, paths
-    return False, paths
+    letters = "".join(f[1:] for f in flags if not f.startswith("--"))
+    if "--dry-run" in flags or "n" in letters:
+        return None
+    if "--update" in flags or "u" in letters:
+        return "add -u", paths
+    if "--all" in flags or "A" in letters:
+        return "add -A", paths
+    return ("add", paths) if paths else None
+
+
+def _cd_operand(args):
+    """The directory operand of `cd`, or None when it is not a literal path:
+    a bare `cd` (goes home) and `cd -` (goes to the previous directory)."""
+    i = 0
+    while i < len(args) and args[i].startswith("-") and args[i] != "-":
+        i += 1
+        if args[i - 1] == "--":
+            break  # `cd -P -- dir`; -P, -L, -e and -@ are skipped above
+    if i >= len(args) or args[i] == "-":
+        return None
+    return args[i]
+
+
+def _join(base, d):
+    """`d` applied on `base`; None while `base` is unknown and `d` relative."""
+    if os.path.isabs(d):
+        return d
+    return None if base is None else os.path.join(base, d)
 
 
 def offending(command):
-    """(segment, kind, target_dir, pathspecs) for the first matching
-    invocation in `command`, or None. `target_dir` is the directory git
-    would run in, relative to the session cwd unless absolute."""
+    """[(segment, kind, target_dir, pathspecs), ...] for every matching
+    invocation in `command`, in order. `target_dir` is the directory git
+    would run in, relative to the session cwd unless absolute; an invocation
+    whose directory is unknown (after a bare `cd` or `cd -`) is left out."""
     if _simple_commands is None:
-        return None
+        return []
     cmds = _simple_commands(command)
     if cmds is None:
-        return None
-    cd = ""
+        return []
+    cd = ""  # None once a `cd` goes somewhere the text does not name
+    hits = []
     for argv in cmds:
         rest = _strip_lead(argv)
-        if len(rest) >= 2 and rest[0] == "cd":
-            cd = os.path.join(cd, rest[1]) if rest[1] not in ("-",) else cd
+        if rest and rest[0] == "cd":
+            operand = _cd_operand(rest[1:])
+            cd = None if operand is None else _join(cd, operand)
             continue
         inv = _git_invocation(rest)
         if inv is None:
@@ -210,14 +267,17 @@ def offending(command):
         c_dirs, sub, args = inv
         target = cd
         for d in c_dirs:
-            target = os.path.join(target, d)
+            target = _join(target, d)
+        if target is None:
+            continue
+        segment = " ".join(argv)
         if sub == "commit" and commit_sweeps_all(args):
-            return " ".join(argv), "commit -a", target, None
-        if sub == "add":
-            hit, paths = add_update(args)
-            if hit:
-                return " ".join(argv), "add -u", target, paths
-    return None
+            hits.append((segment, "commit -a", target, None))
+        elif sub == "add":
+            found = add_kind(args)
+            if found:
+                hits.append((segment, found[0], target, found[1]))
+    return hits
 
 
 # hooks.json gives this hook 10 s. Every git call shares one deadline inside
@@ -257,9 +317,9 @@ def _git(cwd, *args):
 
 
 def modified_submodules(cwd):
-    """List of (path, pinned_sha, head_sha) for each submodule whose gitlink
-    would change if every modified tracked path were staged; None if git
-    cannot be run here."""
+    """(found, toplevel) where found lists (path, pinned_sha, head_sha) for
+    each submodule whose gitlink would change if every modified tracked path
+    were staged; None if git cannot be run here."""
     # `--ignore-submodules=dirty` skips scanning every submodule worktree for
     # edits (slow, and irrelevant: dirty content cannot change a gitlink) but
     # still reports a submodule whose checked-out commit moved.
@@ -295,33 +355,51 @@ def modified_submodules(cwd):
         head = head.strip()
         if head != pinned:
             found.append((path, pinned, head))
-    return found
+    return found, top
 
 
-def _under_pathspecs(sub_path, pathspecs, cwd):
-    """M7: is `sub_path` (repo-root relative) covered by `git add -u`
-    pathspecs given from `cwd`? No pathspec means the whole repo."""
+def _under_pathspecs(sub_path, pathspecs, cwd, top, sweeping):
+    """M7: does a pathspec given from `cwd` stage the submodule at `sub_path`
+    (repo-root relative, `top` the repo root)?
+
+    `sweeping` is `add -u`/`-A`: no pathspec means the whole repo, a pathspec
+    naming the submodule itself counts, and a magic (`:/`) or glob pathspec,
+    which is not evaluated, warns. A plain `git add <pathspec>` counts only a
+    pathspec that covers the submodule from above (`.`, a parent directory):
+    naming the submodule is how a pin bump is staged on purpose, and a magic
+    or glob pathspec there stays silent. Both sides go through realpath, so a
+    symlinked cwd cannot make the relative path miss."""
     if not pathspecs:
-        return True
-    top = _git(cwd, "rev-parse", "--show-toplevel")
-    if top is None:
-        return True  # cannot scope; the safe direction is to warn
-    top = top.strip()
+        return sweeping
+    real_cwd, real_top = os.path.realpath(cwd), os.path.realpath(top)
     for p in pathspecs:
         if p.startswith(":") or any(ch in p for ch in "*?["):
-            # Magic (`:/`, `:(exclude)`) and glob pathspecs are not
-            # evaluated; the safe direction is to warn, never to go silent.
-            return True
-        p = p.replace("\\", "/")  # Windows separators
-        rel = os.path.relpath(os.path.normpath(os.path.join(cwd, p)), top)
-        rel = rel.replace("\\", "/")
-        if rel == "." or sub_path == rel or sub_path.startswith(rel + "/"):
+            if sweeping:
+                return True
+            continue
+        if os.name == "nt":
+            p = p.replace("\\", "/")  # Windows separators only
+        rel = os.path.relpath(os.path.normpath(os.path.join(real_cwd, p)),
+                              real_top)
+        if os.name == "nt":
+            rel = rel.replace("\\", "/")
+        covers = (rel == "." or sub_path == rel
+                  or sub_path.startswith(rel + "/"))
+        if covers and (sweeping or rel != sub_path):
             return True
     return False
 
 
+# What each kind stages, for the message.
+_STAGES = {
+    "commit -a": "every modified tracked path",
+    "add -u": "every modified tracked path",
+    "add -A": "every change",
+    "add": "every change",
+}
+
 NOTE = (
-    "This `git {kind}` stages every modified tracked path, and {count} "
+    "This `git {kind}` stages {stages}{scope}, and {count} "
     "submodule(s) here sit at a different commit than the index pins, so "
     "{which} commit would MOVE the pin(s):\n\n"
     "  command:  {segment}\n"
@@ -332,7 +410,9 @@ NOTE = (
     "If the pin bump is intended, carry on. Otherwise stage only what you "
     "mean (`git add <paths>`), commit with paths (`git commit -- <paths>`), "
     "or check the submodule out at the pinned commit first "
-    "(`git submodule update <path>`)."
+    "(`git submodule update <path>`, after checking that the submodule's "
+    "own commits are pushed or on a branch: the update detaches HEAD and "
+    "can leave unpushed commits reachable only through the reflog)."
 )
 
 
@@ -381,40 +461,51 @@ def main() -> int:
         return quiet()
 
     try:
-        hit = offending(command)
+        hits = offending(command)
     except Exception as exc:  # fail open on any parse trouble
         print(f"flag-commit-a-sweeps-submodule: could not parse command ({exc})",
               file=sys.stderr)
         return 0
-    if hit is None:
-        return quiet()
 
-    segment, kind, target, pathspecs = hit
-    cwd = os.path.normpath(os.path.join(os.getcwd(), target))
-    if not os.path.isdir(cwd):
-        return quiet()
-    subs = modified_submodules(cwd)
-    if not subs:
-        return quiet()
-    if pathspecs is not None:
-        subs = [s for s in subs if _under_pathspecs(s[0], pathspecs, cwd)]
-        if not subs:
-            return quiet()
+    # Every match is checked: one that is filtered out (a pathspec that
+    # excludes the submodule, a missing directory) must not hide a later one.
+    state = {}  # cwd -> modified_submodules(cwd), one status per repository
+    for segment, kind, target, pathspecs in hits:
+        cwd = os.path.normpath(os.path.join(os.getcwd(), target))
+        if not os.path.isdir(cwd):
+            continue
+        if cwd not in state:
+            state[cwd] = modified_submodules(cwd)
+        if not state[cwd]:
+            continue
+        subs, top = state[cwd]
+        if pathspecs is not None:
+            subs = [s for s in subs
+                    if _under_pathspecs(s[0], pathspecs, cwd, top,
+                                        kind != "add")]
+        if subs:
+            return warn(segment, kind, pathspecs, subs)
+    return quiet()
 
+
+def warn(segment, kind, pathspecs, subs):
+    """Print the warning for `subs` and return the exit status."""
     lines = "\n".join(f"    {p}: {a[:7]} -> {b[:7]}" for p, a, b in subs)
-    # `add -u` only stages; the pin moves in the NEXT commit.
-    which = "the next" if kind == "add -u" else "this"
+    # Only `commit -a` commits what it stages; the `add` forms leave the pin
+    # moved for the NEXT commit.
+    which = "this" if kind == "commit -a" else "the next"
+    scope = f" under {', '.join(pathspecs)}" if pathspecs else ""
     print(json.dumps({
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "additionalContext": NOTE.format(
-                kind=kind, count=len(subs), segment=segment, lines=lines,
+                kind=kind, stages=_STAGES[kind], scope=scope,
+                count=len(subs), segment=segment, lines=lines,
                 which=which),
         },
         "systemMessage": (
-            f"`git {kind}` would stage a moved pin"
-            + (", so the next commit would move it" if which == "the next"
-               else ", so this commit would move it")
+            f"`git {kind}` would stage a moved pin, so {which} commit "
+            f"would move it"
             + f" ({len(subs)} submodule(s)): "
             + ", ".join(p for p, _, _ in subs) + "."
         ),

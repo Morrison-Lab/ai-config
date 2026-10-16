@@ -63,8 +63,8 @@ is not a source line, and stays.
 
 ## Where the credit goes
 
-Follow PSW's [Adapting another course's material](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#adapting-another-courses-material): the credit goes in a div, never in running prose.
-For adapted text or licensed material, such as an adapted course page, that div is a collapsed `.callout-note` titled "Source", which frames the credit and keeps it out of the way on the page.
+Follow PSW's [Adapting another course's material](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#adapting-another-courses-material): the credit is set apart from running prose, never woven into it.
+For a credit that holds more than a citation, such as the link, licence and changes for an adapted course page, the credit goes in a div, and in Quarto that div is a collapsed `.callout-note` titled "Source", which frames the credit and keeps it out of the way on the page.
 Do not invent a separate attribution class or style it ad hoc (`.small .text-muted`);
 the callout is the lab's one pattern for such credits.
 Commentary about a source's history or notation is not a credit of this kind, and goes in a remark.
@@ -87,7 +87,7 @@ Source: @james2021islr2e [sec. 5.1].
 ```
 
 A collapsed callout goes at the end of the item's div.
-It differs from a `#rem-source-` remark in what it holds: the callout credits adapted text or licensed material, and the remark comments on the source's history or notation.
+It differs from a `#rem-source-` remark in what it holds: the callout holds the credit's link, licence and changes, and the remark comments on the source's history or notation.
 
 Cite books and papers through the bibliography (`@key [locator]`),
 and link an outside site's rendered page at the item's anchor,
@@ -101,7 +101,7 @@ what was checked in a PDF,
 a page number not yet verified,
 or a wording edit made while porting.
 
-- **Do:** end each item that adapts text or licensed material with PSW's collapsed "Source" callout.
+- **Do:** end each item whose credit holds more than a citation (a link, a licence, a note of changes) with PSW's collapsed "Source" callout.
 - **Do:** end an item whose credit is only a citation with a plain "Source:" line.
 - **Don't:** leave an attribution only in an HTML comment.
 

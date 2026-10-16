@@ -30,7 +30,8 @@ That covers a Source callout, an "adapted from" sentence,
 and a bibliography entry for the group's own notes cited as the source of a definition or result.
 For a result or definition, cite the original publication and a modern textbook instead,
 and link the group's page as a cross-reference.
-The rule covers only that hop.
+The rule covers only that hop, and never the maintainer's co-authors outside the group:
+credit a person such as Kameron Decker Harris or Brian Hutchinson by name when reusing their words or lectures.
 What the repository itself credits is still carried:
 a book or paper it follows,
 and any person other than the maintainer whose lecture or notes it adapted,

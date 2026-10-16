@@ -813,8 +813,7 @@ Three citation rules live canonically in PSW's Citations and evidence chapter:
   write our own version and credit it in a collapsed `.callout-note` titled "Source"
   (a `::: notes` div only on a site whose stylesheet sets `.notes` apart);
   [`visible-attributions`](visible-attributions.md) covers where the credit goes in included fragments,
-  and the one exception PSW does not state:
-  content from the maintainer's own repositories is not credited to them
-  ([psw#119](https://github.com/Morrison-Lab/psw/issues/119) proposes adding it to PSW).
+  and [Material from your own work](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#material-from-your-own-work):
+  content from the maintainer's own repositories or co-authored works is not credited to them.
 
 Link those sections rather than restating them here.

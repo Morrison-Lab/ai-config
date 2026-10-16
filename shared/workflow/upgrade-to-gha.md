@@ -161,6 +161,9 @@ Every new repo gets these gha-backed callers, whatever the repo's purpose, becau
   together with a `.github/zizmor.yml` accepting tag pins and a `.github/dependabot.yml` keeping those tags current
   (`Morrison-Lab/lds`'s copies of both are the pattern to start from;
   callers naming secrets explicitly satisfy zizmor's default `secrets-inherit` rule and require no ignore block).
+  Add it as a blocking check, with no `fail: false`, and fix the repo's existing findings in the same PR instead of going warn-only (mds#329 is the pattern):
+  `persist-credentials: false` on checkouts, an inline `# zizmor: ignore[rule] reason` for each justified case, and a `.github/actionlint.yaml` entry for any false positive.
+  Verify locally with `zizmor --offline` and actionlint before pushing.
 
 ### Add whatever fits the repo type on top of that
 

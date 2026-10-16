@@ -20,16 +20,22 @@ so the chain reaches the reader rather than stopping one hop short.
 
 "The group" means the maintainer (Ezra Morrison) and the members of the lab that maintains these repositories and manuals.
 The group's own work is never credited.
-That is the work in the group's repositories
+That is work the group wrote, wherever it is stored:
+the notes in the group's repositories
 (Morrison-Lab and d-morrison, such as rme, lds, mds, pds and sds),
-and in the other works the group wrote alone or with others
-(the UCD-SERG lab manual, the maintainer's papers and packages).
-Two exceptions keep an ordinary credit or citation:
+and the other works the group wrote alone or with others
+(the UCD-SERG lab manual, the group's papers and packages).
+Material that someone outside the group wrote is not the group's own work, even in those repositories.
+The rule's full statement is PSW's
+[Material from your own work](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#material-from-your-own-work).
+Two kinds of credit and citation stay:
 
-- A person outside the group keeps their credit by name, including a co-author of a co-written work.
-  Credit a person such as Kameron Decker Harris or Brian Hutchinson by name when reusing their words or lectures.
-- Citing the group's published paper or released software as the original publication of a result, or as a tool used, is ordinary citation and stays.
-  So does a citation that a publisher's reuse terms require.
+- A person outside the group keeps their credit by name.
+  For a reused co-written work, the work itself gets no credit, but each outside co-author is credited by name.
+  Credit a person such as Kameron Decker Harris, Brian Hutchinson or Logan Sizemore by name when reusing their words or lectures.
+- Ordinary citation stays:
+  the group's published paper or released software cited as the original publication of a result or as a tool used,
+  and a citation that a publisher's reuse terms require.
 
 The maintainer gave two directives:
 
@@ -46,15 +52,14 @@ What a repository or work itself credits is still carried:
 a book or paper it follows,
 and any person outside the group whose lecture or notes it adapted,
 since several of those repositories hold other authors' work
-(lds credits its notes to Kameron Decker Harris and Brian Hutchinson, who are outside the group and did not co-write with the maintainer).
+(lds credits its notes to Kameron Decker Harris, Brian Hutchinson and Logan Sizemore).
 A link to a sister site that sends the reader to further reading
 is a cross-reference, not an attribution, and is unaffected.
 
 Leave a credit to the group's own work out of new work, and remove an existing one when you find it
-(the 2026-10-16 directive to stop self-citing covers existing credits;
+(read as covering existing credits, since the 2026-10-16 directive says to stop self-citing;
 the earlier rule, "do not strip one that already exists unless the maintainer asks", is superseded).
 Keep the cross-reference link to the group's page.
-When the credit was to a co-written work, keep the outside co-author's credit by name.
 
 - **Do:** credit the outside book, paper or person an item follows,
   even when it reached you through a sister repository.

@@ -814,9 +814,9 @@ Four citation rules live canonically in PSW's Citations and evidence chapter:
   (a `::: notes` div only on a site whose stylesheet sets `.notes` apart);
   [`visible-attributions`](visible-attributions.md) covers where the credit goes in included fragments;
 - [Material from your own work](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#material-from-your-own-work):
-  never credit the group's own work, with two exceptions that stay ordinary credit and citation
-  (see [`visible-attributions`](visible-attributions.md));
-  (the section goes live when [psw#213](https://github.com/Morrison-Lab/psw/pull/213) merges,
-  which replaces the earlier proposal in [psw#119](https://github.com/Morrison-Lab/psw/issues/119)).
+  never credit the group's own work; outside people's credit and ordinary citation stay
+  (see [`visible-attributions`](visible-attributions.md)).
+  The section goes live when [psw#213](https://github.com/Morrison-Lab/psw/pull/213) merges,
+  which replaces the earlier proposal in [psw#119](https://github.com/Morrison-Lab/psw/issues/119).
 
 Link those sections rather than restating them here.

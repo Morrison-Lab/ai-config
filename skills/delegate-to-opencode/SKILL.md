@@ -49,7 +49,8 @@ There is no per-agent hook for a third-party endpoint, so the only route to open
   `opencode run` has no schema flag, so conformance is asked for in the prompt and checked on the way back rather than enforced at the boundary.
 - **The destination tier is unavailable or exhausted.**
   OpenCode Go operates on **dollar** caps rather than request counts.
-  As of 2026-10-15 each model has its own monthly dollar limit, and its 5-hour limit is 20% of that and its weekly limit 50% (vendor docs, <https://opencode.ai/docs/go>, fetched 2026-10-15).
+  As of 2026-10-15 each model has its own monthly dollar limit.
+  Its 5-hour limit is 20% of that and its weekly limit 50% (vendor docs, <https://opencode.ai/docs/go>, fetched 2026-10-15).
   DeepSeek V4.1 Flash is $80 per month on Go and $160 on Go Plus;
   DeepSeek V4 Pro and Kimi K3 are $15 on Go.
   Exhaustion shows as HTTP 429 `GoUsageLimitError` with `limitName` `weekly`, `5-hour` or `monthly`.
@@ -180,17 +181,17 @@ Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402.
 - `/messages` (`claude-haiku-5-5`, `minimax-m3`) returned 401 `Missing API key` through the proxy on 2026-10-09, so it is not usable there.
 - `/responses` and `/models` also exist; `/models` lists every id.
 - Send a stable `x-opencode-session` UUID header for each conversation, or the request fails with 400 `MissingSessionID`.
-- Models seen on `/models` on 2026-10-15 include `deepseek-v4.1-flash` (cheapest reviewer by price and request estimate: about 87,000 estimated requests per week on Go, input $0.15 per million tokens off-peak) and `gemini-4-argon-contributor` (the Argon model, 2x usage for a limited time).
+- Models seen on `/models` on 2026-10-15 include `deepseek-v4.1-flash` (a strong-value choice for review-sized prompts: about 87,000 estimated requests per week on Go, input $0.15 per million tokens off-peak, though several smaller models list lower prices) and `gemini-4-argon-contributor` (the Argon model, 2x usage for a limited time).
   Treat `/models` as the authority, since the vendor says the list changes as models are added.
 - `cat-jam-free` and `longcat-2.5-preview-free` answered through the proxy on 2026-10-15 while the Go quota was exhausted.
   Both are free for a limited time and reasoning models (a 16-token request returned only reasoning), so give them a generous `max_tokens`.
   Their review quality is unmeasured, so use them for non-gating checks only.
-- When the Go weekly limit is hit, the Argon model on OpenCode is out too.
+- On 2026-10-15 the Argon model was blocked by the same weekly limit as every other Go model.
   Route the review to `agy` on a device, per `memories/delegation.md`.
 
 ## OpenCode 2.0
 
-OpenCode 2.0 was announced 2026-10-15 (<https://opencode.ai/v2/docs>, <https://opencode.ai/v2/docs/migrate-v1/>).
+OpenCode 2.0 was first seen on 2026-10-15 (<https://opencode.ai/v2/docs>, <https://opencode.ai/v2/docs/migrate-v1/>).
 Nothing in this skill was measured on it.
 Every `opencode` measurement above is from 1.18.x.
 
@@ -201,7 +202,8 @@ Every `opencode` measurement above is from 1.18.x.
   Stay on V1 until that plugin has a V2 port, or the guards run only under Claude Code.
 - The V2 install commands are `curl -fsSL https://opencode.ai/v2/install | bash` and `npm install -g @opencode/cli`.
   The docs say `mise use -g opencode` installs V1 on a `mise` older than 2026.10.9.
-  Whether a V2 install replaces a V1 binary is unmeasured, so check `opencode --version` after any install.
+  The migration guide says the V2 curl installer replaces the V1 binary, and says to remove a package-managed V1 install first.
+  That is vendor-documented and untested here, so check `opencode --version` after any install.
   V1 and V2 share the config locations, so keep a copy of the V1 config before converting it.
 
 A non-streaming call works for short prompts (such as a smoke test):

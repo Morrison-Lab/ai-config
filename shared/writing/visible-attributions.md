@@ -86,7 +86,16 @@ Source: @james2021islr2e [sec. 5.1].
 :::
 ```
 
-A collapsed callout goes at the end of the item's div.
+A collapsed callout goes inside the item's div, as its last block before the closing `:::`:
+
+```markdown
+::: {.callout-note collapse="true"}
+#### Source
+
+Adapted from [the course page](https://example.org/notes) under its licence, with the examples replaced.
+:::
+```
+
 It differs from a `#rem-source-` remark in what it holds: the callout holds the credit's link, licence and changes, and the remark comments on the source's history or notation.
 
 Cite books and papers through the bibliography (`@key [locator]`),

@@ -101,6 +101,16 @@ def clean_submodule_repo(path):
     _write(path, "CLAUDE.md", content="v2\n")
 
 
+def staged_then_moved_repo(path):
+    """`MM`: a pin bump staged, then the submodule moved on again."""
+    _base_with_submodule(path)
+    _move_submodule_head(path)
+    _run(path, "add", "mod")
+    mod = os.path.join(path, "mod")
+    _write(mod, "lib.txt", content="v3\n")
+    _run(mod, "commit", "-qam", "sub v3")
+
+
 def staged_bump_repo(path):
     """Pin move already staged on purpose: nothing left for -a to sweep."""
     _base_with_submodule(path)
@@ -148,6 +158,8 @@ SHOULD_WARN = [
      "glob pathspec is not evaluated: warn, not silent"),
     ("W22", moved_pin_only_repo, "git add -u '.\\mod'",
      "Windows path separator is normalised"),
+    ("W23", staged_then_moved_repo, f"git commit -am {MSG}",
+     "MM: staged bump, then the submodule moved again"),
 ]
 SHOULD_STAY_SILENT = [
     ("S1", moved_pin_repo, f"git commit -m {MSG}", "no -a: nothing swept"),
@@ -175,19 +187,34 @@ SHOULD_STAY_SILENT = [
      "commit with paths and no -a"),
     ("S14", moved_pin_only_repo, f"git commit -uall -m {MSG}",
      "-uall is -u with value `all`, not a -a flag"),
+    ("S15", moved_pin_only_repo,
+     f"git --git-dir=.git --work-tree=. commit -am {MSG}",
+     "--git-dir/--work-tree name another repo: documented silent case"),
+    ("S16", moved_pin_only_repo, f"git --git-dir .git commit -am {MSG}",
+     "separated --git-dir: documented silent case"),
+    ("S17", moved_pin_only_repo, f"cd ~ && git commit -am {MSG}",
+     "`cd ~` is not expanded: documented silent case"),
+    ("S18", moved_pin_only_repo, f"cd $SOME_DIR && git commit -am {MSG}",
+     "`cd $VAR` is not expanded: documented silent case"),
+    ("S19", moved_pin_only_repo, f"@budget0 git commit -am {MSG}",
+     "git deadline already spent: fail open, not a late kill"),
 ]
 
 
 def verdict(hook_path, repo, command, want_text=False):
     cwd = ELSEWHERE if "{repo}" in command else repo
     command = command.replace("{repo}", repo)
+    env = {**os.environ, "PYTHONPATH": SHELLCMD_LIB}
+    if command.startswith("@budget0 "):  # an already-spent git deadline
+        command = command[len("@budget0 "):]
+        env["FLAG_COMMIT_A_BUDGET_S"] = "0"
     proc = subprocess.run(
         [sys.executable, hook_path],
         input=json.dumps({"tool_name": "Bash", "tool_input": {"command": command}}),
         capture_output=True, text=True, cwd=cwd,
         # Mutants are written to a temp dir, where the hook's own
         # `scripts/lib` lookup (relative to its file) finds nothing.
-        env={**os.environ, "PYTHONPATH": SHELLCMD_LIB},
+        env=env,
     )
     if proc.returncode != 0:
         sys.exit(f"FATAL: hook exited {proc.returncode} on {command!r}\n"
@@ -252,11 +279,19 @@ try:
         ok = needle in text
         wrong += not ok
         print(f"  {'ok  ' if ok else 'WRONG'} message names {label}")
+    # `add -u` only stages: the message must say the NEXT commit moves it.
+    res = verdict(HOOK, repo, "git add -u", want_text=True)
+    text = json.dumps(res[1]) if isinstance(res, tuple) else ""
+    for label, needle in (("next commit (additionalContext)", "the next commit"),
+                          ("next commit (systemMessage)", "next commit would")):
+        ok = needle in text
+        wrong += not ok
+        print(f"  {'ok  ' if ok else 'WRONG'} add -u message says {label}")
 finally:
     shutil.rmtree(repo, ignore_errors=True)
 
 total = len(CASES)
-print(f"\n{total - wrong}/{total} cases (+4 message checks) correct"
+print(f"\n{total - wrong}/{total} cases (+6 message checks) correct"
       + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
 
 # ------------------------------------------------------------ mutation harness
@@ -272,7 +307,7 @@ MUTATIONS = {
         "an `a` inside a short-flag cluster is read as -a",
         [('                if ch == "a":\n                    return True',
           '                if False:\n                    return True')],
-        {"W1", "W2", "W6", "W8", "W9", "W10", "W11", "W12", "W16", "W17", "W18"},
+        {"W1", "W2", "W6", "W8", "W9", "W10", "W11", "W12", "W16", "W17", "W18", "W23"},
     ),
     "M_value_letter_stops_cluster": (
         "a value-taking letter (-m) ends the cluster, so -ma is not -a",
@@ -320,6 +355,35 @@ MUTATIONS = {
           "        pass")],
         {"W22"},
     ),
+    "M_git_dir_work_tree_silent": (
+        "--git-dir/--work-tree go silent instead of checking the wrong repo",
+        [("            return None  # names another repository; go silent (docstring)",
+          "            i += 1  # mutated: keep scanning")],
+        {"S15"},
+    ),
+    "M_shared_deadline": (
+        "git calls share one deadline, so a spent budget fails open",
+        [("    if remaining <= 0:\n        return None",
+          "    if False:\n        return None"),
+         ("            timeout=min(_PER_CALL_S, remaining),",
+          "            timeout=_PER_CALL_S,")],
+        {"S19"},
+    ),
+    "M_ignore_submodules_dirty": (
+        "status skips dirty-content scans of submodules",
+        [('                  "--ignore-submodules=dirty")', "                  )")],
+        # Declared EMPTY: it is a speed-up. Dirty content cannot change a
+        # gitlink, so the verdict is identical with or without the flag.
+        set(),
+    ),
+    "M_optional_locks_off": (
+        "git runs with GIT_OPTIONAL_LOCKS=0",
+        [('env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"})',
+          "env=os.environ)")],
+        # Declared EMPTY: it only stops a read-only status from refreshing
+        # the index under a concurrent git, which no verdict shows.
+        set(),
+    ),
     "M_add_update_long": (
         "`--update` is read as -u",
         [('        if f == "--update":\n            return True, paths',
@@ -343,7 +407,8 @@ MUTATIONS = {
         "an earlier `cd <dir>` retargets the repository",
         [('            cd = os.path.join(cd, rest[1]) if rest[1] not in ("-",) else cd',
           "            pass")],
-        {"W9"},
+        # S17/S18 are silent only because the `cd` target is unresolvable.
+        {"W9", "S17", "S18"},
     ),
     "M_lead_words": (
         "env assignments and lead words are skipped",
@@ -359,9 +424,11 @@ MUTATIONS = {
     "M_head_differs_from_pin": (
         "only a submodule whose HEAD differs from the pin counts",
         [("        if head != pinned:", "        if True:")],
-        # S4 and S11 never reach this test: git status lists no worktree-
-        # modified entry for them, so only the dirty-content case S3 does.
-        {"S3"},
+        # Declared EMPTY since status runs with --ignore-submodules=dirty:
+        # a worktree-`M` gitlink entry now always has HEAD != pin, so this
+        # comparison is defence in depth that no case can reach (S3, the
+        # dirty-content case, is dropped by status itself).
+        set(),
     ),
     "M_pathspec_scoping": (
         "`git add -u <pathspec>` only counts a submodule under a pathspec",

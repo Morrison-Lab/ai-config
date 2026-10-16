@@ -12,8 +12,6 @@ this file holds the cloud-specific quirks that stalled merges.
   [`skills/mwc/SKILL.md`](../skills/mwc/SKILL.md)).
 - "daytb" means go with the recommendation on an open question, and a decision-card tap answers only that card.
   Neither is a merge grant.
-- On 2026-10-10 the project's coordinator session ruled that a bare "mwc" after a message listing several clean PRs did not cover them all;
-  Ezra's 2026-10-16 ruling above replaces that.
 - A PR that goes clean with no named grant gets a reply asking for "mwc N".
 - `ai-config`, `macros` and `gha` carry a standing mwc (Ezra, 2026-10-16: "standing mwc on macro stands", "also on ai-config and gha").
   It covers PRs in those repos only, not a downstream `latex-macros` pin bump in another repo.
@@ -85,20 +83,22 @@ Do not retry or work around a denial.
 - The checker admits a comment as a counted reviewer only through a first or last line marker in `REVIEW_AGENT_MARKERS`.
   A clean read posted by `dem-extra1` with no marker never counts toward `--quorum` (lds#938, 2026-10-16), and the "_Posted by Claude Code (AI agent)_" footer is excluded on purpose.
   The XPS router therefore posts Argon reads with the Antigravity agent header as the first line.
-  Keep `--quorum 2` whenever a cross-harness reviewer is available;
-  the Claude-only mode below, which Ezra chose for the period the reviewers are out, uses quorum 1.
+  Keep `--quorum 2` whenever a cross-harness reviewer is available.
+  The Claude-only exception below uses quorum 1 and applies only while no cross-harness reviewer is reachable.
 - While Argon is out of quota, Ezra's decision (card, 2026-10-16 05:01 UTC;
   the coordinator made it project-wide at 05:11): an independent adversarial Claude subagent, separate from the author and the CI reviewer, stands in for the cross-harness review.
   Run a general-purpose subagent on the final head with the diff as a file and no `mcp__hearthbot__` tools.
   Post a comment with "### Verdict", "VERDICT: CLEAN", "Reviewed-Commit: <full sha>" and a line saying it is the Argon stand-in per Ezra's decision.
   Then run the checker and merge only on that PR's mwc.
   The hook's cross-harness warning is expected while Argon is out (its quota was expected back about 2026-10-21, so reread this bullet after that date).
-- Update (Ezra card, 2026-10-16 07:31 UTC, "Claude-only"): all agy models were out until their quota reset, so a PR with his mwc merges on the Claude CI review plus a CLEAN independent subagent review on the current head, checked at the default quorum 1.
+- Dated exception to `skills/mwc/SKILL.md`, which says a Claude subagent and the CI review do not satisfy the cross-harness requirement.
+  Ezra's card of 2026-10-16 07:31 UTC ("Claude-only") overrides that for as long as no cross-harness reviewer (agy, codex, opencode) is reachable.
+  A PR with his mwc then merges on the Claude CI review plus a CLEAN independent subagent review on the current head, checked at `--quorum 1`.
+  The exception ends when a cross-harness reviewer is reachable again, and the skill's rule then applies in full.
   Wording nits still block.
   The subagent keeps finding header-wording nits each round: shorten archive headers to claim nothing that can go stale (lds#1052).
-- On macros the gate said "No valid clean review" until a `/review` comment dispatched the Claude CI review;
-  the stand-in alone did not satisfy it.
-  Post the stand-in verdict, then `/review`.
+- On macros the gate said "No valid clean review" until a `/review` comment dispatched the Claude CI review, so the stand-in comment alone did not satisfy it.
+  Whichever quorum applies, post the stand-in verdict, then `/review`, then run the checker.
 
 ## `/review` must begin the comment
 

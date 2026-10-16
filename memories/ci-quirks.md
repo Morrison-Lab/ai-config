@@ -62,7 +62,8 @@ When the gha `Claude Code Review` run hits a 429 quota, the `claude-review` job 
 - Resolving a review thread from a cloud session is recorded in [`github-remote-sessions`](github-remote-sessions.md) (CCR route).
 - MathJax lacks `\providecommand`, so a macro-equivalence harness must map it to `\newcommand` and convert definitions line by line.
 - Slide decks: a theorem subfile included right under a section heading must not start with a slide break, or the heading gets an empty slide (pds#154).
-- A shared macro added to `Morrison-Lab/macros` does not move a consumer's `latex-macros` gitlink, and PR previews skip the PDF. lds main went red on the PDF publish ("Undefined control sequence \dataset", 2026-10-15) until lds#999 bumped the pin.
+- A shared macro added to `Morrison-Lab/macros` does not move a consumer's `latex-macros` gitlink, and PR previews skip the PDF.
+  lds main went red on the PDF publish ("Undefined control sequence \dataset", 2026-10-15) until lds#999 bumped the pin.
   When a PR uses a recent macro, check the pin contains it (`git -C latex-macros merge-base --is-ancestor <macro-commit> HEAD`), and read the publish run on every merge commit.
 - The fully-clean gate stays red until the `Build / build` job ends, which took 25 to 40 minutes on lds (2026-10-12 to 2026-10-15), so wait for the check-suite notification rather than polling.
 - A new header partial in a repo whose `.gitignore` lists `*.html` needs a `!name.html` line, or it silently never commits (sds#217).

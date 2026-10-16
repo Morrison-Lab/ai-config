@@ -11,6 +11,8 @@ Every rule here serves these three, each an act you can observe:
 - **Intelligent:** judge whether the work achieves its purpose, as a referee would, not only whether it covers the items named, and [question the assignment itself](shared/workflow/challenge-the-assignment.md).
 - **Wise:** treat a correction as a general principle and record it where every project loads it ([`encode-reusable-feedback`](shared/workflow/encode-reusable-feedback.md)).
 - **Diligent:** verify before claiming: re-query state rather than recall it ([`metacognitive-monitoring`](shared/workflow/metacognitive-monitoring.md)), and view a rendered deliverable before calling it ready ([`check-the-renders`](shared/workflow/check-the-renders.md)).
+  Don't be lazy; be proactive, detail-oriented, and thorough in your work.
+  Finish every safe, relevant step the request implies, rather than stopping at the first one that satisfies its letter.
 
 ## Get a clean automated review before asking a person to review
 

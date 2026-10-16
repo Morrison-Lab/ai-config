@@ -171,7 +171,7 @@ Two routing consequences:
 
 ## Cloud sessions: OpenCode Go over HTTP, no key needed
 
-A claude.ai cloud session has no `opencode` CLI, but its agent proxy injects the OpenCode credential for `opencode.ai`, so `curl` to the chat endpoint works without a key (verified 2026-10-09).
+A claude.ai cloud session has no `opencode` CLI preinstalled (`npm i -g opencode-ai` installs one), but its agent proxy injects the OpenCode credential for `opencode.ai`, so `curl` to the chat endpoint works without a key (verified 2026-10-09).
 A GitHub Actions review job reported 401 `Missing API key` on the same call and no proxy variable (PR review run 37907648792, 2026-10-09), so do not assume it holds there.
 Use the Go endpoint `https://opencode.ai/zen/go/v1`, which both Go and Go Plus plans serve.
 Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402.
@@ -187,7 +187,18 @@ Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402.
   Treat `/models` as the authority, since the vendor says the list changes as models are added.
 - `cat-jam-free` and `longcat-2.5-preview-free` answered through the proxy on 2026-10-15 while the Go quota was exhausted.
   Both are free for a limited time and reasoning models (a 16-token request returned only reasoning), so give them a generous `max_tokens`.
-  Their review quality is unmeasured, so use them for non-gating checks only.
+- **A review through these two ids worked on 2026-10-16, while every Go model returned the weekly `GoUsageLimitError`** ([ai-config#4581](https://github.com/Morrison-Lab/ai-config/issues/4581)).
+  Stream with `"stream": true` and `max_tokens` 30000, and assemble `delta.content`;
+  the text comes only after 40,000 to 70,000 characters of `reasoning_content`, about five minutes.
+  On [ai-config#4572](https://github.com/Morrison-Lab/ai-config/pull/4572), `longcat-2.5-preview-free` found three real defects in the first push and then returned no text on the fix commit in two attempts, while `cat-jam-free` returned a clean verdict on both heads.
+  Run both, treat an empty answer as no verdict rather than clean, and address, rebut or defer every defect in a list as for any review.
+  The user accepted a clean verdict from one of these free models as the non-Claude gate while Go is exhausted (relayed by the coordinator session, 2026-10-16), with the other model's empty answer counted as no verdict.
+- **In a cloud session on 2026-10-16 these other routes did not work, so use the streamed Go-endpoint recipe above instead.**
+  The free ids on the pay-as-you-go path `https://opencode.ai/zen/v1` (not the Go path) return `FreeTierError` with the message that the free tier can only be used from within OpenCode, whereas the paid ids on that path return the 402 above.
+  With the CLI installed by `npm i -g opencode-ai` and the opencode API-key environment variable set to any non-empty value (the proxy supplies the real key), `opencode run -m opencode/<free id>` printed only its banner and hit a 280 to 420 second timeout.
+  That held for `deepseek-v4.1-flash-free` and `nemotron-3-ultra-free`, each with the brief passed as the argument and with the brief attached by `-f`.
+  A message placed after `-f` is read as a file name, because `-f` takes several files, so put the message before `-f`.
+  `codex` and `agy` are not installed in a cloud session, no OpenRouter, Databricks or Gemini key is set, and `openrouter.ai` and `api.openai.com` are refused by the network policy.
 - On 2026-10-15 the Argon model was blocked by the same weekly limit as every other Go model.
   Route the review to `agy` on a device, per `memories/delegation.md`.
 

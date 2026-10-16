@@ -89,8 +89,9 @@ _COMMIT_VALUE_LONG = {
     "--template", "--trailer", "--pathspec-from-file",
 }
 # global options of `git` that consume the next token
-_GIT_VALUE_GLOBAL = {"-C", "-c", "--git-dir", "--work-tree", "--namespace",
-                      "--exec-path", "--super-prefix", "--config-env"}
+# (--git-dir and --work-tree are handled before this set is consulted)
+_GIT_VALUE_GLOBAL = {"-C", "-c", "--namespace", "--exec-path",
+                      "--super-prefix", "--config-env"}
 
 
 # The shared parser blanks heredoc bodies correctly (a command after
@@ -241,7 +242,7 @@ def _git(cwd, *args):
     shared deadline is spent. Optional locks are off so a read-only status
     never rewrites the index under a concurrent git."""
     if _deadline is None:
-        _start_budget()
+        return None  # main() starts the budget; no budget, no git call
     remaining = _deadline - time.monotonic()
     if remaining <= 0:
         return None

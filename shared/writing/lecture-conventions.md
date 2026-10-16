@@ -96,5 +96,6 @@ The detailed rules are in [`plain-prose`](plain-prose.md), [`ai-tells`](ai-tells
 ## Related
 
 - [`definition-crossrefs`](definition-crossrefs.md), [`informal-definitions`](informal-definitions.md), [`forward-references`](forward-references.md), [`semantic-line-breaks`](semantic-line-breaks.md)
+- [`notes-content-rules`](notes-content-rules.md): state the estimand, link prerequisite definitions, talk about ideas not the notes.
 - [`quarto-divs-for-typed-content`](quarto-divs-for-typed-content.md): which div type holds which content.
 - [`quarto-revealjs-div-styling`](quarto-revealjs-div-styling.md): style div boxes on slides as on the web page.

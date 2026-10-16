@@ -1,7 +1,8 @@
 # Content rules for lecture notes
 
 Three rules from Ezra, 2026-10-16.
-Each has a canonical prose rule in [`psw`](https://github.com/Morrison-Lab/psw/); this fragment only points agents to it.
+Each has a canonical prose rule in [`psw`](https://github.com/Morrison-Lab/psw/), possibly still in review.
+This fragment only points agents to it.
 
 ## State the estimand
 

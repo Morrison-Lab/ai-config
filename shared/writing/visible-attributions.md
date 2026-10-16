@@ -32,10 +32,11 @@ The maintainer, Ezra Morrison, gave two directives:
 No credit goes to the group's own work.
 That covers a Source callout, an "adapted from" sentence,
 and a bibliography entry for the group's own notes cited as the source of a definition or result.
-For a result or definition, cite the original publication and a modern textbook instead,
+For a result or definition, cite the original publication and, where one exists, a modern textbook instead,
 and link the group's page as a cross-reference.
+Citing the maintainer's published paper or released software as the original publication of a result, or as a tool used, is ordinary citation and stays.
 
-The rule covers only the group's own work.
+The rule covers only the hop from the group's own work.
 It never covers a person outside the group, including a co-author of a co-written work:
 credit a person such as Kameron Decker Harris or Brian Hutchinson by name when reusing their words or lectures.
 What a repository or work itself credits is still carried:
@@ -54,7 +55,8 @@ Keep the cross-reference link to the sister page.
 - **Do:** credit the outside book, paper or person an item follows,
   even when it reached you through a sister repository.
 - **Do:** write `[Math for Data Science](https://morrison-lab.github.io/mds/...)` as a plain link, with no `[@key]` citation after it.
-- **Don't:** report a sister-repository credit as missing in review, or add one.
+- **Do:** flag an existing credit to the maintainer's own work for removal in review.
+- **Don't:** report a credit to the maintainer's own work as missing in review, or add one.
 
 ## Material written from scratch names no source
 

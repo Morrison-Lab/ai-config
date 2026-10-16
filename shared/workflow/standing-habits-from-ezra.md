@@ -25,13 +25,16 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`, exce
 - **Do:** run the command, apply the patch, and fix the file yourself.
 - **Don't:** ask Ezra to run commands or hand-apply patches.
 - **Reason:** that moves your work onto the person you work for.
-- **Do:** when your own session is blocked (a permission denial, a guard, a missing tool), find another route that does not bypass the block, or make the unavoidable step one command (Ezra, 2026-10-16: "don't make me do anything manually unless absolutely necessary, and then make it as simple as possible, for example by writing scripts I can call in a single shell command").
-- **Do:** for that command, write an idempotent script on a pushed branch that does the whole job (edit, test, commit, push, open or update the PR) and give Ezra one copy-paste line, such as `cd ~/Documents/GitHub/ai-config && git fetch origin && bash <(git show origin/<branch>:scripts/<name>.sh)`.
-  Test it on a scratch copy first, including a second run that changes nothing.
-- **Do:** ask for a manual step only for a secret or credential that must not pass through an agent.
-- **Don't:** list the steps for Ezra to perform, or ask him to add a permission rule or hand-edit a file.
-- **Don't:** write a script whose purpose is to apply, outside the session, an edit the session's permission classifier denied, unless Ezra has said in the thread that the script is sanctioned.
-  A denial is a question for Ezra, and his answer is what licenses the script.
+- **Do:** when a step is blocked and you cannot do it, make Ezra's part as small as possible (Ezra, 2026-10-16: "don't make me do anything manually unless absolutely necessary, and then make it as simple as possible, for example by writing scripts I can call in a single shell command").
+- **Do:** for a classifier denial of an action he authorized, follow [`ask-for-manual-approval`](ask-for-manual-approval.md): name the refused command and ask him to leave auto mode, which is one click.
+- **Do:** for any other unavoidable step (a missing tool, a machine only he can reach), write an idempotent script on a pushed branch that does the whole job and give him one copy-paste line, such as `cd <your ai-config checkout> && git fetch origin && bash <(git show origin/<branch>:scripts/<name>.sh)`.
+  Test it on a scratch copy first, including a second run that changes nothing, and get an adversarial review of the script before you hand it over.
+  Limit the script to the blocked step: it never merges, force-pushes, or touches another repository.
+- **Do:** ask Ezra for a manual step only when another rule reserves it to him: a secret or credential, a hard-prohibited category, or merge words.
+- **Don't:** list the steps for him to perform, or ask him to hand-edit a file.
+- **Don't:** write a script whose purpose is to perform, outside the session, an action that a classifier, hook, or guard denied inside it, unless Ezra has sanctioned that script.
+  Ask first, wait for his answer, then write it.
+  The denial is a question for him, and his answer licenses the script.
 
 ## Report an unreachable source
 

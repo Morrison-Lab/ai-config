@@ -1200,7 +1200,10 @@ self-review confirms the claim, which was never the defect.
 [`shared/writing/visible-attributions.md`](shared/writing/visible-attributions.md)
 
 Credit every outside source where readers of the rendered document can see it, in PSW's collapsed "Source" callout at the end of the item it credits, never only in an HTML comment.
-The group's own work (the maintainer's repositories, lab manual, papers and packages) is never credited to the maintainer or to that work, though what it credits is still carried, a person outside the group keeps their credit by name, and citing the maintainer's published paper or software as the original source stays.
+Never credit the group's own work (the maintainer's repositories, lab manual, papers and packages).
+What that work itself credits is still carried.
+A person outside the group keeps their credit by name.
+Citing the group's published paper or software as the original source stays.
 
 ## Check the renders, not just the source
 

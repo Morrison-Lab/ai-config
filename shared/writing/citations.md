@@ -801,7 +801,7 @@ The same commit fixed two locators the branch had never touched --- `(p. 22-23)`
 Re-deriving one range from the source puts its neighbours within reach of the same check for the first time, and a page citation nobody has ever opened the PDF for is likelier to be wrong than one that survived a reading.
 Sweep the locators around a split, not only the ones the split created.)
 
-## Quote the original; put the content first; adapt, don't summarize; don't credit the maintainer's own work
+## Quote the original; put the content first; adapt, don't summarize; don't credit the group's own work
 
 Four citation rules live canonically in PSW's Citations and evidence chapter:
 
@@ -814,9 +814,8 @@ Four citation rules live canonically in PSW's Citations and evidence chapter:
   (a `::: notes` div only on a site whose stylesheet sets `.notes` apart);
   [`visible-attributions`](visible-attributions.md) covers where the credit goes in included fragments;
 - [Material from your own work](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#material-from-your-own-work):
-  the group's own work (the maintainer's repositories, lab manual, papers and packages) is never credited to the maintainer or to that work,
-  but a person outside the group keeps their credit by name,
-  and citing the maintainer's published paper or software as the original source stays
+  never credit the group's own work, with two exceptions that stay ordinary credit and citation
+  (see [`visible-attributions`](visible-attributions.md));
   (the section goes live when [psw#213](https://github.com/Morrison-Lab/psw/pull/213) merges,
   which replaces the earlier proposal in [psw#119](https://github.com/Morrison-Lab/psw/issues/119)).
 

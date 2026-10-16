@@ -16,9 +16,9 @@ When a source credits its own upstream,
 carry that credit along,
 so the chain reaches the reader rather than stopping one hop short.
 
-## Never formally acknowledge the maintainer's own work
+## Never formally acknowledge the group's own work
 
-"The group" means the maintainer, Ezra Morrison, and the members of the lab that maintains these repositories and manuals.
+"The group" means the maintainer (Ezra Morrison) and the members of the lab that maintains these repositories and manuals.
 The group's own work is never credited.
 That is the work in the group's repositories
 (Morrison-Lab and d-morrison, such as rme, lds, mds, pds and sds),
@@ -28,12 +28,13 @@ Two exceptions keep an ordinary credit or citation:
 
 - A person outside the group keeps their credit by name, including a co-author of a co-written work.
   Credit a person such as Kameron Decker Harris or Brian Hutchinson by name when reusing their words or lectures.
-- Citing the maintainer's published paper or released software as the original publication of a result, or as a tool used, is ordinary citation and stays.
+- Citing the group's published paper or released software as the original publication of a result, or as a tool used, is ordinary citation and stays.
+  So does a citation that a publisher's reuse terms require.
 
 The maintainer gave two directives:
 
 - 2026-10-05: "you don't have to give attributions for content taken from my other repos".
-- 2026-10-16: "cross-refs between our repos are fine, but we shouldn't formally acknowledge borrowing content from ourselves like we do when we adapt content from others".
+- 2026-10-16: "we need to stop self-citing", then "cross-refs between our repos are fine, but we shouldn't formally acknowledge borrowing content from ourselves like we do when we adapt content from others".
 
 The rule covers a Source callout, an "adapted from" sentence,
 and a bibliography entry for the group's own notes cited as the source of a definition or result.
@@ -50,15 +51,16 @@ A link to a sister site that sends the reader to further reading
 is a cross-reference, not an attribution, and is unaffected.
 
 Leave a credit to the group's own work out of new work, and remove an existing one when you find it
-(the maintainer asked for the sweep on 2026-10-16;
+(the 2026-10-16 directive to stop self-citing covers existing credits;
 the earlier rule, "do not strip one that already exists unless the maintainer asks", is superseded).
-Keep the cross-reference link to the sister page.
+Keep the cross-reference link to the group's page.
+When the credit was to a co-written work, keep the outside co-author's credit by name.
 
 - **Do:** credit the outside book, paper or person an item follows,
   even when it reached you through a sister repository.
-- **Do:** write `[Math for Data Science](https://morrison-lab.github.io/mds/...)` as a plain link, with no `[@key]` citation after it.
-- **Do:** flag an existing credit to the maintainer's own work for removal in review.
-- **Don't:** report a credit to the maintainer's own work as missing in review, or add one.
+- **Do:** write `[Mathematics for Data Science](https://morrison-lab.github.io/mds/...)` as a plain link, with no `[@key]` citation after it.
+- **Do:** flag an existing credit to the group's own work for removal in review.
+- **Don't:** report a credit to the group's own work as missing in review, or add one.
 
 ## Material written from scratch names no source
 

@@ -5,7 +5,8 @@ Track every useful resource (textbooks, articles, software packages, websites, v
 The primary home is the first of these that applies:
 
 - the lds catalog that matches the resource's type (for example `courses.csv` or `channels.csv` under `chapters/data`);
-- the Further reading section of the matching page in the notes repo whose topic is the resource's main subject (the first such repo in the `send-notes` registry, when several teach it);
+- the Further reading section of the matching page in the notes repo whose topic is the resource's main subject (the earliest such repo in `course-sequence`, when several teach it;
+  any one of them when the sequence does not order them, because the resource is tracked in all of them);
 - the Further reading section of the closest lds page, when no notes repo covers the subject, because lds is where the lab's resource directories live.
 
 Wherever this rule places a resource in the Further reading section of a page that has none, add one headed `## Further reading`.

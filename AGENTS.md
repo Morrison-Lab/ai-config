@@ -139,10 +139,6 @@ See [`AGENTS.cases.md`](AGENTS.cases.md) and [`challenge-the-assignment.cases.md
 
 Read every word, infer what a request plainly implies, and treat a correction as a general principle whenever plausible: [`read-instructions-fully`](shared/workflow/read-instructions-fully.md).
 
-- **Do:** apply a grant or rule at the breadth stated, naming limits only when stated or forced by a harder rule.
-- **Don't:** add unstated conditions to permissions, or narrow scope unnecessarily.
-- **Don't:** confine a correction to its case, drop a qualifier, or wait to be told what a request implies.
-
 ## "Or" always means "and/or", not xor, unless xor is explicitly specified
 
 In instructions, prompts, specifications, issue descriptions, and checklists, treat "or" as inclusive ("and/or") unless exclusive choice is explicitly stated (e.g., "either A or B, but not both", "mutually exclusive", or "xor").
@@ -180,10 +176,16 @@ See [`grep-is-not-coverage`](shared/workflow/grep-is-not-coverage.md) and [`AGEN
 Track each useful resource you or a subagent finds in its primary home (catalog or Further reading) and in each notes repo whose topic it covers, from official sources only.
 Detail: [`track-useful-resources`](shared/workflow/track-useful-resources.md).
 
+## No vague attribution
+
+Cite a claim's real source or own it as judgment;
+never invent a vague attribution ([details](shared/writing/no-vague-attribution.md)).
+
 ## Fetch untrusted files in a sandbox
 
 A sandboxed local session only downloads; the cloud thread reads.
 Detail: [`fetch-untrusted-files`](shared/workflow/fetch-untrusted-files.md).
+
 ## Store structured data in structured formats
 
 Keep structured data (lists of courses, resources, channels, terms) in CSV, YAML or JSON files that documents read and render, not as hand-written tables, wherever feasible.

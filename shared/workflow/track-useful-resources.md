@@ -43,7 +43,8 @@ A catalog entry in lds (a course list, a channels table) does not substitute for
 ## Gaps
 
 When a topic or a spinoff of an existing topic has no notes repo, track the resource in its primary home now, and create a notes repo for the topic, adding it to `course-sequence` once it exists, rather than starting a link-only catalog repo.
-If you cannot create the repo now, file an issue in ai-config, where `course-sequence` lives, that proposes the new notes repo.
+The repo's name, owner and visibility are the user's call, as [`commit-reusable-work`](commit-reusable-work.md) says for any new repository, so ask the user for them first.
+If the user is not available to answer, file an issue in ai-config, where `course-sequence` lives, that proposes the new notes repo.
 
 ## Official sources
 

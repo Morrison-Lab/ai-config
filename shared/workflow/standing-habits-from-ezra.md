@@ -91,3 +91,11 @@ Claude quota is scarce, so Claude plans and verifies, and other models do bulk w
 - **Don't:** run every task on the same model.
 
 See also [`when-to-orchestrate`](when-to-orchestrate.md) and the `select-model` skill.
+
+## Do not overexplain
+
+- **Do:** answer in the fewest words that settle the question, and write the shortest text that says the thing (a macro interpretation, a comment, a reply).
+- **Don't:** add qualifiers, restatements or reasons nobody asked for.
+  Ezra said on 2026-10-16: "general rule: do not overexplain", after a macro interpretation that added a clause its name already implied.
+  This applies to replies, code comments, documentation and definitions in every repo.
+  Prose rule: [psw conciseness](https://morrison-lab.github.io/psw/chapters/conciseness.html#do-not-overexplain).

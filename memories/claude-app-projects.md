@@ -59,3 +59,19 @@ The user chatting from their Mac also does not mean Remote Control is serving th
 - **Do:** say plainly when a claude.ai setting or UI path is not visible, rather than guessing a menu path;
   on 2026-10-01 there was no visible way to remove a Library context folder, and a guessed path would have sent the user looking for a control that did not exist.
 - **Don't:** infer a thread's state from a notice that names no session.
+
+## Claude Projects: practices the coordinator and threads follow
+
+Recorded from the Machine Learning course project (2026-10-12 to 2026-10-16), where the user asked for each.
+
+- **Link both the PR and its thread** whenever a message names a PR: the full PR URL, and the thread as `[title](#cmsg_...)`.
+- **Broadcast to every open thread, not a remembered subset.**
+  When asked to tell "all relevant threads" something, list every non-resolved thread, read each one's latest status (including threads bucketed "completed", which can be stalled on a blocked merge), and then choose recipients.
+- **A thread starts its own Remote Control sessions.**
+  Where the user has granted a device, call `start_rc_session` yourself and never ask the user to start a session or run a terminal command.
+- **Check a PR preview yourself.**
+  Open the deployed preview in Playwright Chromium and confirm the change, rather than handing the check to the user.
+  A local `file://` render can differ from the `https` preview.
+- **Never merge over a gate that looks wrong.**
+  When `check-pr-fully-clean.py` fails on what looks like a false positive, get the input corrected or fix the checker, rerun, and merge only on a pass.
+  Run the checker before the merge call, since the merge hook only warns.

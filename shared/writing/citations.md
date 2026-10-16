@@ -803,7 +803,7 @@ Sweep the locators around a split, not only the ones the split created.)
 
 ## Quote the original; put the content first; adapt, don't summarize
 
-Three citation rules live canonically in PSW's Citations and evidence chapter:
+Four citation rules live canonically in PSW's Citations and evidence chapter:
 
 - [Quote the original](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#quote-the-original),
   not a secondary source quoting it;
@@ -812,8 +812,9 @@ Three citation rules live canonically in PSW's Citations and evidence chapter:
 - [Adapting another course's material](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#adapting-another-courses-material):
   write our own version and credit it in a collapsed `.callout-note` titled "Source"
   (a `::: notes` div only on a site whose stylesheet sets `.notes` apart);
-  [`visible-attributions`](visible-attributions.md) covers where the credit goes in included fragments,
-  and [Material from your own work](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#material-from-your-own-work):
-  content from the maintainer's own repositories or co-authored works is not credited to them.
+  [`visible-attributions`](visible-attributions.md) covers where the credit goes in included fragments;
+- [Material from your own work](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#material-from-your-own-work):
+  content from the maintainer's own repositories, papers, packages and co-authored works is not credited to them
+  (the section goes live when [psw#213](https://github.com/Morrison-Lab/psw/pull/213) merges).
 
 Link those sections rather than restating them here.

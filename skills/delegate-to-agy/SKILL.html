@@ -387,6 +387,7 @@ cookieconsent.run({
   <li><a href="#dispatch-headless-in-the-background" id="toc-dispatch-headless-in-the-background" class="nav-link" data-scroll-target="#dispatch-headless-in-the-background">3. Dispatch headless, in the background</a></li>
   <li><a href="#verify-what-came-back" id="toc-verify-what-came-back" class="nav-link" data-scroll-target="#verify-what-came-back">4. Verify what came back</a></li>
   <li><a href="#posting-a-cross-harness-review-to-a-pr" id="toc-posting-a-cross-harness-review-to-a-pr" class="nav-link" data-scroll-target="#posting-a-cross-harness-review-to-a-pr">5. Posting a cross-harness review to a PR</a></li>
+  <li><a href="#default-cross-harness-reviewer-argon" id="toc-default-cross-harness-reviewer-argon" class="nav-link" data-scroll-target="#default-cross-harness-reviewer-argon">Default cross-harness reviewer: Argon</a></li>
   <li><a href="#fall-back-for-failures-only" id="toc-fall-back-for-failures-only" class="nav-link" data-scroll-target="#fall-back-for-failures-only">6. Fall back for failures only</a></li>
   </ul></li>
   <li><a href="#relationship-to-other-skills" id="toc-relationship-to-other-skills" class="nav-link" data-scroll-target="#relationship-to-other-skills">Relationship to other skills</a></li>
@@ -502,6 +503,10 @@ cookieconsent.run({
 <span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>_Posted by Antigravity (AI agent) --- not written by a human._</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>This ensures <code>check-pr-fully-clean.py</code> admits the review by construction and allows a clean verdict to supersede any earlier standing not-clean verdicts (#4425).</p>
+</section>
+<section id="default-cross-harness-reviewer-argon" class="level3">
+<h3 class="anchored" data-anchor-id="default-cross-harness-reviewer-argon">Default cross-harness reviewer: Argon</h3>
+<p>Ezra approved Argon, meaning Gemini through the <code>agy</code> CLI, as the default non-Claude reviewer (2026-10-14). Use it whenever a Claude-authored PR needs a reviewer that differs in model and harness, on a machine where <code>agy</code> is signed in. Dispatch it read-only: pass <code>--mode plan</code>, embed the PR diff in the brief, and tell it to use no tools. Run it from a scratch checkout of the PR head, never one that can push. Afterward run <code>git status</code> and <code>git diff</code> in that checkout, since its summaries can claim edits that never happened. Post the review as a PR comment whose body says an agent (Argon via <code>agy</code>) wrote it, and end it with the standard disclosure footer naming the agent that posted it (the footer line above, or “Claude Code” when Claude posts on Argon’s behalf). Ask Argon to list what it checked even when it finds nothing, so a clean verdict is not a single line. See <a href="../../memories/delegation.md"><code>memories/delegation.md</code></a> (“Argon is the default cross-harness reviewer”) for the first eight-PR run.</p>
 </section>
 <section id="fall-back-for-failures-only" class="level3">
 <h3 class="anchored" data-anchor-id="fall-back-for-failures-only">6. Fall back for failures only</h3>

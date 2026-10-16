@@ -589,6 +589,22 @@ only these specific commands, on this one session and date, were denied.
   it is Claude Code's permission system reacting
   to the shape of the command, not a corpus hook a grant can waive.
 
+## Argon is the default cross-harness reviewer
+
+Ezra approved Argon, Gemini through the `agy` CLI, as the default non-Claude reviewer on 2026-10-14.
+First use, same day: eight read-only reviews of [Morrison-Lab/lds](https://github.com/Morrison-Lab/lds) PRs, one `agy --mode plan --print="<brief with the diff inline>"` per PR, run in parallel from scratch checkouts of each PR head.
+
+- A first attempt that told `agy` to run `git diff` itself returned nothing on all eight, with `jetski: no output produced --- a tool required the "command" permission`.
+  Embedding the diff in the brief and forbidding tools fixed it.
+- `git status` and `git diff` in every checkout showed no edits after the second attempt.
+  Check anyway, because earlier summaries claimed edits that never happened.
+- Seven of the eight reviews listed concrete findings (forward references, a raw `#` anchor instead of an `@` cross-reference, half-applied macros, a prose claim that contradicted the figure caption).
+  The review of the 324-line vc PR was one sentence saying clean, which is thin for that size, so do not count a one-line clean verdict as a pass without a second look.
+- No OpenCode Go comparison has been run, so "default" rests on Ezra's approval rather than a measured win.
+
+- **Do:** dispatch Argon with `--mode plan`, the diff inline and no tools, from a checkout that cannot push.
+- **Don't:** let `agy` push, or trust its edit claims without `git diff`.
+
 ## A measured lane comparison: codex, opencode, agy, and Sonnet reviewers, one real task each
 
 Measured 2026-08-27/28 PT across a 13-merge GIA sweep on Morrison-Lab/ai-config, comparing four lanes on real work rather than a benchmark.

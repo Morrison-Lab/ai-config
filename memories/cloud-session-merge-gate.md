@@ -16,7 +16,7 @@ this file holds the cloud-specific quirks that stalled merges.
 - `ai-config`, `macros` and `gha` carry a standing mwc (Ezra, 2026-10-16: "standing mwc on macro stands", "also on ai-config and gha").
   It covers PRs in those repos only, not a downstream `latex-macros` pin bump in another repo.
 - The merge hook's own list (`STANDING_MERGE_GRANT_REPOS`) names only `ai-config` and the macros repo, so a `gha` merge still needs `enable-mwc`;
-  [ai-config#3490](https://github.com/Morrison-Lab/ai-config/issues/3490) tracks the mismatch.
+  [ai-config#3490](https://github.com/Morrison-Lab/ai-config/issues/3490) describes the mismatch and is closed, although the mismatch persists (checked 2026-10-16).
   Infra-only PRs in any Morrison-Lab repo have a separate standing grant, described in `skills/mwc/SKILL.md`.
 - The merge words are unchanged while the cross-harness reviewer is out;
   only the review changes (see "Cross-harness review" below).

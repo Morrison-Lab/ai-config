@@ -21,7 +21,8 @@ A directory entry in lds (a course list, a channels table) does not substitute f
 - Put a topical resource in the Further reading section of the page it matches, and a general one (a whole course, a channel) in the repo's directory, or in its Further reading section where the repo has no directory.
 - Respect each resource's license in each repo.
   When the resource is not adaptable (no license, or a license that forbids derivatives), link to it and do not copy it.
-  When its license allows adaptation, adapt it with attribution, following its other terms (NonCommercial, ShareAlike) and each repo's own license; where those conflict, link only.
+  When its license allows adaptation, adapt it with attribution, following its other terms (NonCommercial, ShareAlike) and each repo's own license;
+  where those conflict, link only.
 - When an existing tracked resource sits in only one repo, add it to each other notes repo whose topic it covers.
   Open one PR per repo, and link each PR to the PRs in the other repos.
   A PR also links its tracking issue when one exists.

@@ -26,6 +26,11 @@ without asking confirmation before every merge.
   The Scope Limit binds both.
 - **MWC Override Scope**: When the user explicitly issues `/mwc`, the bare word `mwc`, "merge when confident", "merge at will", or "maw", that baseline prohibition is suspended for the current session only.
   The bare word is listed here, not only in `CLAUDE.md`'s general "Bare keyword directives" convention, so this file is self-contained: a slash command is routed to this skill by the harness itself, while a bare word in prose is a convention the model must recognize on its own, and it recognizes it most reliably when the file governing the mechanics (`enable-mwc`, `check-mwc`, the Scope Limit) names the exact form it will see rather than only implying it maps here.
+- **A bare `/mwc` means `/mwc all`** (Ezra, 2026-10-16).
+  The grant covers every in-scope PR of the session or thread --- every PR the assistant has just named, opened, or been driving --- that becomes fully clean.
+  Never answer the keyword by asking for PR numbers: the numbers are already in the thread, and the question reads as stalling.
+  Ask only when no PR is in scope at all.
+  The gates still run on each PR: the fully-clean instrument, the stale-base update, and every check finished on the current head.
 - **Scope Limit**: An MWC grant applies ONLY to PRs that are 100% clean
   (all CI checks passing, automated review verdicts from all available providers in the quorum clean, no unresolved comments, no open block labels).
   It NEVER authorizes merging a PR with failing CI, unresolved findings, pending reviews, or a missing/skipped quorum review.

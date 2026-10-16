@@ -1200,7 +1200,7 @@ self-review confirms the claim, which was never the defect.
 [`shared/writing/visible-attributions.md`](shared/writing/visible-attributions.md)
 
 Credit every outside source where readers of the rendered document can see it, in PSW's collapsed "Source" callout at the end of the item it credits, never only in an HTML comment.
-Never credit the group's own work, but carry what it credits, and keep an outside person's credit and citation of its papers or software.
+Never credit the group's own work, but carry what it credits, and keep an outside person's credit and ordinary citation.
 
 ## Check the renders, not just the source
 

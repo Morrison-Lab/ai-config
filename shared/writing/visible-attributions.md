@@ -44,7 +44,7 @@ The maintainer gave two directives:
 
 The rule covers a Source callout, an "adapted from" sentence,
 and a bibliography entry for the group's own notes cited as the source of a definition or result.
-For a result or definition, cite the original publication and, where one exists, a modern textbook instead,
+For a result or definition, cite the original publication where you can identify one, and a modern textbook, instead,
 and link the group's page as a cross-reference.
 
 The rule covers only the hop from the group's own work to the page you write.
@@ -63,7 +63,7 @@ Keep the cross-reference link to the group's page.
 
 - **Do:** credit the outside book, paper or person an item follows,
   even when it reached you through a sister repository.
-- **Do:** write `[Mathematics for Data Science](https://morrison-lab.github.io/mds/...)` as a plain link, with no `[@key]` citation after it.
+- **Do:** write `[Math for Data Science](https://morrison-lab.github.io/mds/...)` as a plain link, with no `[@key]` citation after it.
 - **Do:** flag an existing credit to the group's own work for removal in review.
 - **Don't:** report a credit to the group's own work as missing in review, or add one.
 

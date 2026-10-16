@@ -69,8 +69,9 @@ When a user uses profanity or displays intense frustration:
    anti-pattern,
    and resolution there,
    in [`memories/preferences.md`](../../memories/preferences.md) or the governing fragment.
-   Project or host memory may hold a copy but never the only one,
-   since no other project reads it.
+   Do not keep the lesson in a project or host memory store at all,
+   since no other project reads it and it is outside version control
+   ([`encode-reusable-feedback`](encode-reusable-feedback.md)).
    `hooks/remind-encode-user-correction.py` fires on a correction or repeat request as a reminder.
    It reads the same signal in a project thread message, in a chat prompt, and in the body of a GitHub review comment event, and in a question ("why didn't you update reticulate?", "why aren't we using a semantic macro?") as well as a statement.
    `hooks/remind-record-standing-guidance.py` covers statements of a rule ("never", "from now on").

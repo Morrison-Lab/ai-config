@@ -1437,7 +1437,7 @@ When *I* iterate a PR, the ARDI loop above is the mechanism — it already addre
 ## Encoding reusable feedback into ai-config
 
 Commit feedback that outlives the session to the repo that owns it in the same stride, choosing the form yourself;
-never park it in session-local auto-memory or offer to upstream it instead.
+never park it in session-local or project memory or offer to upstream it instead.
 Detail, rationale, and cases: [`shared/workflow/encode-reusable-feedback.md`](shared/workflow/encode-reusable-feedback.md).
 
 ## PowerShell CLI Command Safety

@@ -230,8 +230,10 @@ Four instances (he named the first three the same day):
   [modular programming](https://en.wikipedia.org/wiki/Modular_programming)
   applied to the notes (Ezra Morrison, 2026-10-16: agents "seem not to
   understand the overall philosophy of our notes").
-  The canonical prose rule is PSW's
-  [Build every unit from smaller atomic units](https://morrison-lab.github.io/psw/chapters/teaching.html#build-every-unit-from-smaller-atomic-units).
+  The canonical prose rule is proposed in
+  [`Morrison-Lab/psw#217`](https://github.com/Morrison-Lab/psw/pull/217)
+  as "Build every unit from smaller atomic units"; once merged, it lives at
+  `chapters/teaching.qmd#build-every-unit-from-smaller-atomic-units` in PSW.
   Before writing a long display or div, name the pieces, give each its own
   macro or div, and link them.
 

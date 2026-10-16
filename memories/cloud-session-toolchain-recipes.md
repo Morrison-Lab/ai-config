@@ -21,6 +21,8 @@ Check `Rscript -e 'requireNamespace("knitr")'` and install by hand rather than w
 ## TinyTeX by hand
 
 `quarto install tinytex` fails (GitHub API 403) and `mirror.ctan.org` is denied by the proxy.
+The base recipe is in [`r-cloud-sessions`](r-cloud-sessions.md);
+the second route below adds the TeX Live version-mismatch case.
 Two routes worked:
 
 - `Rscript -e 'install.packages("tinytex"); tinytex::install_tinytex(force=TRUE)'`, then `tlmgr option repository https://ctan.math.illinois.edu/systems/texlive/tlnet`, `tlmgr update --self` (2026-10-12).

@@ -68,7 +68,7 @@ If the change has no rendered section, such as an infrastructure change, the PR 
 
 ## Link every session you mention
 
-Whenever a message names a session, such as a Claude Code session, a project thread or a Remote Control session, link it in the sentence that names it.
+Whenever a message names a session, either a Claude Code session or a project thread, link it in the sentence that names it.
 Write `[session](https://claude.ai/code/session_…)` for a Claude Code session, or the thread link above for a project thread.
 
 - **Do:** write the session as a link the user can open.

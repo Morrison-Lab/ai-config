@@ -174,9 +174,9 @@ See [`grep-is-not-coverage`](shared/workflow/grep-is-not-coverage.md) and [`AGEN
 - **Do:** run an all-state tracker search before implementing a capability request.
 - **Don't:** assert that a standing grant or rule does not exist based only on searching `skills/` or `memories/`.
 
-## Track every useful resource in the notes repos
+## Track each useful resource in the notes repos it fits
 
-When you or a subagent finds a useful resource (any format) for any Morrison-Lab repo, course or project, track the resource in its primary home and in every notes repo (course site) whose topic it covers, from official sources only.
+When you or a subagent finds a useful resource for any Morrison-Lab repo, course or project, track the resource now in its primary home and in every notes repo (course site) whose topic it covers, from official sources only.
 Definitions: [`track-useful-resources`](shared/workflow/track-useful-resources.md).
 
 ## Fetch untrusted files in a sandbox

@@ -83,3 +83,4 @@ See also [`when-to-orchestrate`](when-to-orchestrate.md) and the `select-model` 
 - **Don't:** add qualifiers, restatements or reasons nobody asked for.
   Ezra said on 2026-10-16: "general rule: do not overexplain", after a macro interpretation that added a clause its name already implied.
   This applies to replies, code comments, documentation and definitions in every repo.
+  Prose rule: [psw conciseness](https://morrison-lab.github.io/psw/conciseness.html#do-not-overexplain).

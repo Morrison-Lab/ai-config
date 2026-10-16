@@ -50,14 +50,14 @@ When PSW and this guidance disagree, PSW wins.
   [`Morrison-Lab/psc#39`](https://github.com/Morrison-Lab/psc/pull/39)).
   A concision edit cut a relative pronoun and a citation duplicated a link,
   both against PSW pages that the editor had not read.
-  Before the push, read [Conciseness](https://morrison-lab.github.io/psw/chapters/conciseness.html)
+  Before the push, read the PSW pages that cover the edit,
+  such as [Conciseness](https://morrison-lab.github.io/psw/chapters/conciseness.html)
   and [Do not omit relative pronouns](https://morrison-lab.github.io/psw/chapters/grammar.html#do-not-omit-relative-pronouns),
   then check the edit against them.
   Give each source one citation.
-  - **Do:** keep *that* and *which* where they start a dependent clause,
-    and cut sentences that add no information.
-  - **Don't:** drop *that* or *which* to shorten a sentence,
-    or leave in a sentence that adds no information.
+  - **Do:** write "the add-on packages that R Markdown needed".
+  - **Don't:** write "the add-on packages R Markdown needed"
+    to save a word.
 - **Follow an abstract or general statement with a concrete example.**
   A general claim is fine when an instance follows it;
   a vague one with no instance is not.

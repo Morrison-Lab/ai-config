@@ -171,7 +171,7 @@ Two routing consequences:
 
 ## Cloud sessions: OpenCode Go over HTTP, no key needed
 
-A claude.ai cloud session has no `opencode` CLI, but its agent proxy injects the OpenCode credential for `opencode.ai`, so `curl` to the chat endpoint works without a key (verified 2026-10-09).
+A claude.ai cloud session has no `opencode` CLI preinstalled (`npm i -g opencode-ai` installs one), but its agent proxy injects the OpenCode credential for `opencode.ai`, so `curl` to the chat endpoint works without a key (verified 2026-10-09).
 A GitHub Actions review job reported 401 `Missing API key` on the same call and no proxy variable (PR review run 37907648792, 2026-10-09), so do not assume it holds there.
 Use the Go endpoint `https://opencode.ai/zen/go/v1`, which both Go and Go Plus plans serve.
 Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402.
@@ -195,7 +195,7 @@ Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402.
   The user accepted a clean free-model verdict as the non-Claude gate while Go is exhausted (relayed by the coordinator session, 2026-10-16).
 - **Skip these routes while Go is exhausted; each failed on 2026-10-16.**
   The free ids on `https://opencode.ai/zen/v1` return `FreeTierError` (usable only from within OpenCode).
-  `opencode run -m opencode/<free id>` printed only its banner and hit a 280 to 420 second timeout on four models, with the brief as the argument and with `-f` (put the message before `-f`, which takes several files).
+  With the CLI installed by `npm i -g opencode-ai` and `OPENCODE_API_KEY=proxy-injected` set, `opencode run -m opencode/<free id>` printed only its banner and hit a 280 to 420 second timeout on four models, with the brief as the argument and with `-f` (put the message before `-f`, which takes several files).
   `codex` and `agy` are not installed in a cloud session, no OpenRouter, Databricks or Gemini key is set, and `openrouter.ai` and `api.openai.com` are refused by the network policy.
 - On 2026-10-15 the Argon model was blocked by the same weekly limit as every other Go model.
   Route the review to `agy` on a device, per `memories/delegation.md`.

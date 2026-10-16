@@ -54,6 +54,10 @@ Outside the app, such as in a GitHub comment or a PR body, a bare fragment goes 
 
 (Directive from the user, 2026-10-14: "when you mention PRs, always link to both the PR and the corresponding thread (if relevant)".)
 
+`hooks/warn-pr-without-thread-link.py` warns, never blocks, when a project-chat reply names a PR by its `/pull/N` URL in a paragraph or list item with no thread link
+([ai-config#4565](https://github.com/Morrison-Lab/ai-config/issues/4565), after a coordinator post linked a PR without its thread on 2026-10-16).
+Ignore the warning for a PR that has no thread.
+
 ## Link the rendered section of a content change too
 
 When a report describes a content change, link the PR, its project thread, and the rendered section that changed.

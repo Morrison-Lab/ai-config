@@ -23,8 +23,23 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`, exce
 ## Do the work yourself
 
 - **Do:** run the command, apply the patch, and fix the file yourself.
-- **Don't:** ask Ezra to run commands or hand-apply patches.
+- **Don't:** ask Ezra to run commands or hand-apply patches, except the single scripted line described below.
 - **Reason:** that moves your work onto the person you work for.
+- **Do:** when a step is blocked and you cannot do it, make Ezra's part as small as possible.
+  Ezra, 2026-10-16: "don't make me do anything manually unless absolutely necessary, and then make it as simple as possible, for example by writing scripts I can call in a single shell command".
+- **Do:** for a classifier denial of an action he authorized, follow [`ask-for-manual-approval`](ask-for-manual-approval.md).
+  Name the refused command and ask him to leave auto mode, which is one click.
+  When he is away, record the denial as a pending decision, as that fragment says.
+- **Do:** for any other unavoidable step (a missing tool, a machine only he can reach), write an idempotent script on a pushed branch that does the whole job.
+  Give him one copy-paste line with the placeholders filled in and the absolute checkout path: `cd <checkout> && git fetch origin && bash <(git show origin/<branch>:scripts/<name>.sh)`.
+  Test the script on a scratch copy, including a second run that changes nothing, and get an adversarial review of it before you hand it over.
+  Limit it to the blocked step: it never merges, force-pushes, or touches another repository.
+- **Do:** ask Ezra for a manual step only when another rule reserves it to him: a secret or credential, a hard-prohibited category, or merge words.
+- **Don't:** list the steps for him to perform, or ask him to hand-edit a file.
+- **Don't:** write a script whose purpose is to perform, outside the session, an action that a classifier, hook, or guard denied inside it, unless Ezra has sanctioned that script after the denial and named the action.
+  A general wish for scripts, including the quotation above, is not that sanction.
+  Ask first, wait for his answer, then write it.
+  This is the one exception to the `ask-for-manual-approval` Don't on handing the user a script in place of the approval.
 
 ## Report an unreachable source
 
@@ -76,3 +91,11 @@ Claude quota is scarce, so Claude plans and verifies, and other models do bulk w
 - **Don't:** run every task on the same model.
 
 See also [`when-to-orchestrate`](when-to-orchestrate.md) and the `select-model` skill.
+
+## Do not overexplain
+
+- **Do:** answer in the fewest words that settle the question, and write the shortest text that says the thing (a macro interpretation, a comment, a reply).
+- **Don't:** add qualifiers, restatements or reasons nobody asked for.
+  Ezra said on 2026-10-16: "general rule: do not overexplain", after a macro interpretation that added a clause its name already implied.
+  This applies to replies, code comments, documentation and definitions in every repo.
+  Prose rule: [psw conciseness](https://morrison-lab.github.io/psw/chapters/conciseness.html#do-not-overexplain).

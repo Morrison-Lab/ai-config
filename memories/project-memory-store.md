@@ -3,7 +3,8 @@
 A Claude Code **project** gives every session in it one shared, file-backed memory directory, surfaced through a memory-service index.
 In the hosted harness it lives under `/tmp/claude/memory/team/<project>/`, one fact per Markdown file, with a `MEMORY.md` index beside them.
 
-It is not this repository's `memories/` directory, and nothing in it is version-controlled --- which is why `CLAUDE.md`'s "Encoding reusable feedback into ai-config" section requires a reusable learning to land in a repo as well.
+It is not this repository's `memories/` directory, and nothing in it is version-controlled.
+**Do not store memories there** (owner directive, 2026-10-16): every memory goes in a version-controlled file, and the store holds at most pointers to those files, per [`encode-reusable-feedback`](../shared/workflow/encode-reusable-feedback.md).
 This file records how that store fails, because every one of its failure modes is silent.
 
 ## A write can report success and then not persist

@@ -1592,8 +1592,18 @@ def mask_payloads(text: str) -> str:
 # 2026-10-02: "the macros repo should have a standing mwc grant"). It answers
 # to both owner spellings: d-morrison/macros and Morrison-Lab/macros both
 # resolved, with the same HEAD (fb15659c), to `git ls-remote` on 2026-10-02.
+#
+# The gha repo (reusable workflows and actions) carries it too (user
+# directive, 2026-10-16: "gha should have a standing merge grant"). Its own
+# CLAUDE.md already claimed the grant (ai-config#3490); this makes the hook
+# agree. The Scope Limit binds it like the others.
 STANDING_MERGE_GRANT_REPOS = frozenset(
-    {"morrison-lab/ai-config", "d-morrison/macros", "morrison-lab/macros"}
+    {
+        "morrison-lab/ai-config",
+        "d-morrison/macros",
+        "morrison-lab/macros",
+        "morrison-lab/gha",
+    }
 )
 
 # Only the GitHub PR-merge forms carry the grant, which is what the user

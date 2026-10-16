@@ -176,7 +176,7 @@ See [`grep-is-not-coverage`](shared/workflow/grep-is-not-coverage.md) and [`AGEN
 
 ## Track each useful resource in each notes repo whose topic it covers
 
-When you or a subagent finds a useful resource for any Morrison-Lab project, track it in its primary home (catalog or Further reading) and in each notes repo whose topic it covers, from official sources only.
+Track each useful resource you or a subagent finds in its primary home (catalog or Further reading) and in each notes repo whose topic it covers, from official sources only.
 Detail: [`track-useful-resources`](shared/workflow/track-useful-resources.md).
 
 ## Fetch untrusted files in a sandbox

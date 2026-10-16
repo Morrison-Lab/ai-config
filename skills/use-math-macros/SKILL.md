@@ -401,6 +401,13 @@ The pair uses prediction errors (predicted minus observed);
 ... why not use the prediction error macro instead of `\vy - \design \vcoef`?"
 Also tracked as [`Morrison-Lab/psw#140`](https://github.com/Morrison-Lab/psw/issues/140).)
 
+### Name a repeated or coherent chunk with a new macro
+
+Before finishing any definition, theorem or proof, scan for a sub-expression written out two or more times, or a conceptually coherent chunk (the prediction error, the loss of one observation), and give it a macro instead of writing it out.
+Add the macro to `Morrison-Lab/macros` first, with an `interpretations.tsv` row, never as a local macro.
+The full rule is in [`math-derivation-steps`](../../shared/writing/math-derivation-steps.md) ("Keep each equation simple", Do and don't).
+(Directive from Ezra, 2026-10-16.)
+
 ## Prefer command operator macros that take arguments over manual delimiter wrappers
 
 There should be very few instances where it is necessary to write `\cb` (curly braces), `\sb` (square brackets), or `\paren` directly with a bare operator.

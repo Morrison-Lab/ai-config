@@ -1482,6 +1482,13 @@
             "timeout": 10,
             "script": "warn-pr-without-thread-link.py",
             "why": "ai-config#4565. The user's rule (shared/writing/link-forge-artifacts.md, 'Link a PR's project thread too', 2026-10-14) is that a message naming a PR links the PR and the project thread that owns it. A coordinator post named a PR with no thread link and the user asked why (2026-10-16); the miss happens at composition time, so the rule alone did not fire. Warns, never blocks, when a user-visible reply tool call (mcp__hearthbot__reply, post_message, update_message) names a github.com/.../pull/N URL in a paragraph or list item that holds no thread link, `(#cmsg_...)` in the app or a URL with `thread=cmsg_...` outside it. Fenced code and inline code are ignored. A bare `#N` is out of scope because text cannot tell a PR from an issue or an ordinal (warn-bare-forge-reference.py covers the unlinked number). Cannot know whether a thread exists for the PR, so the note says to ignore it for one with none."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-unlinked-thread-pointer.py\"'",
+            "timeout": 10,
+            "script": "no-unlinked-thread-pointer.py",
+            "why": "ai-config#4590. On 2026-10-16 the coordinator listed merge words with 'each in its thread' and no thread links, and the user asked 'what threads are those? you're supposed to give them to me'. warn-pr-without-thread-link.py covers a PR URL with no thread link, not the phrase alone. Blocks (deny) when a user-visible reply tool call (mcp__hearthbot__reply, post_message, update_message) says 'in its thread', 'in that thread', 'in their threads', 'in each thread', 'in the relevant thread' and the like in a paragraph or list item that holds no thread link, `(#cmsg_...)` in the app or a URL with `thread=cmsg_...` outside it. 'In this thread' is not a pointer. Fenced code and inline code are ignored. Fails open on any parse trouble."
           }
         ]
       },

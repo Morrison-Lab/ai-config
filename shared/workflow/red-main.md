@@ -2,7 +2,7 @@
 
 When a check on `main` fails after a change an agent merged or enabled, fixing it is already requested.
 Find the root cause and open the fix, without waiting for the user to say so.
-Ezra set this rule on 2026-10-16, during the incident in sds#249.
+Ezra set this rule on 2026-10-16, during the incident in [sds#249](https://github.com/Morrison-Lab/sds/issues/249).
 
 This holds even when the failure is a pre-existing defect that a new check exposed.
 The check exists to be green, so the defect it found is the work.

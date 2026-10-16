@@ -65,7 +65,7 @@ larger in-scope outcome clear.
 
 A request for status means examine the transcript to check if the agent got stuck, frozen, or dropped the ball, inspect live state, finish every safe, in-scope fix it reveals before reporting, resume stalled work immediately, and file every noticed issue, however small, in its owning tracker.
 Detail, rationale, and cases: [`shared/workflow/status-requests-act.md`](shared/workflow/status-requests-act.md).
-[Fix a red `main` an agent's change caused](shared/workflow/red-main.md).
+Fix red `main`: [`shared/workflow/red-main.md`](shared/workflow/red-main.md).
 
 ## Flag good moments to `/clear` in long-running sessions
 

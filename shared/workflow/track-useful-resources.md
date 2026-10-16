@@ -1,8 +1,13 @@
-# Track every useful resource in every notes repo whose topic it covers
+# Track each useful resource in each notes repo whose topic it covers
 
 A notes repo is a course site listed in [`course-sequence`](../writing/course-sequence.md).
 Track every useful resource (textbooks, articles, software packages, websites, videos, or any other format) in its primary home and in every notes repo whose topic it covers.
-The primary home is the lds catalog that matches the resource's type (for example `courses.csv` or `channels.csv` under `chapters/data`), or, for a resource that no catalog fits, the Further reading section of the page in the notes repo whose topic is the resource's main subject, or of the closest lds page when no notes repo covers that subject.
+The primary home is the first of these that applies:
+
+- the lds catalog that matches the resource's type (for example `courses.csv` or `channels.csv` under `chapters/data`);
+- the Further reading section of the page in the notes repo whose topic is the resource's main subject;
+- the Further reading section of the closest lds page, when no notes repo covers the subject.
+
 The rule covers any content relevant to any Morrison-Lab repo, course or project, and the goal is to build comprehensive directories of content relevant to all our interests over time.
 Each tracked resource is a small contribution to a directory, not a one-off link.
 
@@ -22,7 +27,6 @@ On 2026-10-15, in the project chat, he directed that the answer be a permanent p
 Decide at tracking time, for each notes repo, whether the resource covers a topic that repo teaches, and track it in every repo where it does.
 A catalog entry in lds (a course list, a channels table) does not substitute for an entry in any other notes repo that covers the same topic.
 
-- Use the course sequence to find the candidate repos for a topic.
 - The primary home entry is always made.
   In every other notes repo, put a resource with a topical scope (a course on multiple testing, a book chapter) in the Further reading section of the page it matches.
   Put a resource that spans topics (a channel) in that repo's catalog if it has one, and otherwise in the Further reading section of the page closest to the resource's scope.
@@ -36,8 +40,8 @@ A catalog entry in lds (a course list, a channels table) does not substitute for
 
 ## Gaps
 
-When a topic or a spinoff of an existing topic has no notes repo, create one for it, and add it to `course-sequence`, rather than starting a link-only catalog repo.
-If creating the repo does not fit the current PR, file an issue in lds that proposes it.
+When a topic or a spinoff of an existing topic has no notes repo, track the resource on the closest lds page now, and create a notes repo for the topic, adding it to `course-sequence`, rather than starting a link-only catalog repo.
+If creating the repo does not fit the current PR, file an issue in ai-config, where `course-sequence` lives, that proposes it.
 If adding the resource to an existing repo does not fit the current PR, open a small separate PR or an issue in that existing repo.
 
 ## Official sources

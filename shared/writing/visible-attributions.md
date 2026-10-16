@@ -18,32 +18,34 @@ so the chain reaches the reader rather than stopping one hop short.
 
 ## Never formally acknowledge the maintainer's own work
 
-Content taken from the maintainer's own repositories
-(Morrison-Lab and d-morrison, such as rme, lds, mds, pds and sds)
-or from other works the maintainer wrote or co-wrote
-(a lab manual the maintainer's lab maintains, the maintainer's papers, the maintainer's packages)
-is never credited to the maintainer or to those repositories and works.
-The maintainer, Ezra Morrison, gave two directives:
+"The group" means the maintainer, Ezra Morrison, and the members of the lab that maintains these repositories and manuals.
+The group's own work is never credited.
+That is the work in the group's repositories
+(Morrison-Lab and d-morrison, such as rme, lds, mds, pds and sds),
+and in the other works the group wrote alone or with others
+(the UCD-SERG lab manual, the maintainer's papers and packages).
+Two exceptions keep an ordinary credit or citation:
+
+- A person outside the group keeps their credit by name, including a co-author of a co-written work.
+  Credit a person such as Kameron Decker Harris or Brian Hutchinson by name when reusing their words or lectures.
+- Citing the maintainer's published paper or released software as the original publication of a result, or as a tool used, is ordinary citation and stays.
+
+The maintainer gave two directives:
 
 - 2026-10-05: "you don't have to give attributions for content taken from my other repos".
 - 2026-10-16: "cross-refs between our repos are fine, but we shouldn't formally acknowledge borrowing content from ourselves like we do when we adapt content from others".
 
-"The group" means the maintainer and the lab that maintains these repositories and manuals.
-No credit goes to the group's own work.
-That covers a Source callout, an "adapted from" sentence,
+The rule covers a Source callout, an "adapted from" sentence,
 and a bibliography entry for the group's own notes cited as the source of a definition or result.
 For a result or definition, cite the original publication and, where one exists, a modern textbook instead,
 and link the group's page as a cross-reference.
-Citing the maintainer's published paper or released software as the original publication of a result, or as a tool used, is ordinary citation and stays.
 
-The rule covers only the hop from the group's own work.
-It never covers a person outside the group, including a co-author of a co-written work:
-credit a person such as Kameron Decker Harris or Brian Hutchinson by name when reusing their words or lectures.
+The rule covers only the hop from the group's own work to the page you write.
 What a repository or work itself credits is still carried:
 a book or paper it follows,
-and any person other than the maintainer whose lecture or notes it adapted,
+and any person outside the group whose lecture or notes it adapted,
 since several of those repositories hold other authors' work
-(lds, for one, credits its notes to Kameron Decker Harris and Brian Hutchinson).
+(lds credits its notes to Kameron Decker Harris and Brian Hutchinson, who are outside the group and did not co-write with the maintainer).
 A link to a sister site that sends the reader to further reading
 is a cross-reference, not an attribution, and is unaffected.
 

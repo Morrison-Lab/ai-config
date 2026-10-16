@@ -356,9 +356,6 @@ def modified_submodules(cwd):
     """(found, toplevel) where found lists (path, pinned_sha, head_sha) for
     each submodule whose gitlink would change if every modified tracked path
     were staged; None if git cannot be run here."""
-    # `--ignore-submodules=dirty` skips scanning every submodule worktree for
-    # edits (slow, and irrelevant: dirty content cannot change a gitlink) but
-    # still reports a submodule whose checked-out commit moved.
     # `-uno` skips the untracked scan, which `-a`/`-u` never stage anyway and
     # which dominates the time in a large tree. No `--ignore-submodules`
     # override: it would also override `submodule.<name>.ignore=all` and

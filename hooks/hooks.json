@@ -1555,6 +1555,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-announce-unconfirmed-merge.py\"",
+            "timeout": 10,
+            "script": "no-announce-unconfirmed-merge.py",
+            "why": "Strict Merge Control Policy -- a coordinator reply announcing a future merge ('each thread merges as soon as it is clean') reads as a running plan, so the reader stops watching, but the merge needs the user's explicit words and no merge ran (project thread, 2026-10-16). Blocks once per message unless a merge call since the last user turn reported a merge, the sentence makes the merge conditional on the user's words, or it states a refusal or deferral."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-redundant-push-pr-authorization.py\"",
             "timeout": 10,
             "script": "no-redundant-push-pr-authorization.py",

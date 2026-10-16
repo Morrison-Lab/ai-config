@@ -16,31 +16,56 @@ When a source credits its own upstream,
 carry that credit along,
 so the chain reaches the reader rather than stopping one hop short.
 
-## The maintainer's own repositories need not be credited
+## Never formally acknowledge the group's own work
 
-Content taken from the maintainer's own repositories
-(Morrison-Lab and d-morrison, such as rme, lds, pds and sds)
-does not have to be attributed to them
-(user directive, 2026-10-05:
-"you don't have to give attributions for content taken from my other repos").
-The exemption covers only that hop.
-What the repository itself credits is still carried:
+"The group" means the maintainer (Ezra Morrison) and the members of the lab that maintains these repositories and manuals.
+The group's own work is never credited.
+That is work the group wrote, wherever it is stored:
+the notes in the group's repositories
+(Morrison-Lab and d-morrison, such as rme, lds, mds, pds and sds),
+and the other works the group wrote alone or with others
+(the UCD-SERG lab manual, the group's papers and packages).
+Material that someone outside the group wrote is not the group's own work, even in those repositories.
+The rule's full statement is PSW's
+[Material from your own work](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#material-from-your-own-work).
+Two kinds of credit and citation stay:
+
+- A person outside the group keeps their credit by name.
+  For a reused co-written work, the work itself gets no credit, but each outside co-author is credited by name.
+  Credit a person such as Kameron Decker Harris, Brian Hutchinson or Logan Sizemore by name when reusing their words or lectures.
+- Ordinary citation stays:
+  the group's published paper or released software cited as the original publication of a result or as a tool used,
+  and a citation that a publisher's reuse terms require.
+
+The maintainer gave two directives:
+
+- 2026-10-05: "you don't have to give attributions for content taken from my other repos".
+- 2026-10-16: "we need to stop self-citing", then "cross-refs between our repos are fine, but we shouldn't formally acknowledge borrowing content from ourselves like we do when we adapt content from others".
+
+The rule covers a Source callout, an "adapted from" sentence,
+and a bibliography entry for the group's own notes cited as the source of a definition or result.
+For a result or definition, cite the original publication where you can identify one, and a modern textbook, instead,
+and link the group's page as a cross-reference.
+
+The rule covers only the hop from the group's own work to the page you write.
+What a repository or work itself credits is still carried:
 a book or paper it follows,
-and any person other than the maintainer whose lecture or notes it adapted,
+and any person outside the group whose lecture or notes it adapted,
 since several of those repositories hold other authors' work
-(lds, for one, credits its notes to Kameron Decker Harris and Brian Hutchinson).
+(lds credits its notes to Kameron Decker Harris, Brian Hutchinson and Logan Sizemore).
 A link to a sister site that sends the reader to further reading
 is a cross-reference, not an attribution, and is unaffected.
 
-The directive removes a requirement.
-It does not forbid a credit.
-So a sister-repository credit may be left out of new work,
-but do not strip one that already exists unless the maintainer asks.
+Leave a credit to the group's own work out of new work, and remove an existing one when you find it
+(read as covering existing credits, since the 2026-10-16 directive says to stop self-citing;
+the earlier rule, "do not strip one that already exists unless the maintainer asks", is superseded).
+Keep the cross-reference link to the group's page.
 
 - **Do:** credit the outside book, paper or person an item follows,
   even when it reached you through a sister repository.
-- **Don't:** report a missing sister-repository credit as a review finding,
-  or delete an existing one unasked.
+- **Do:** write `[Math for Data Science](https://morrison-lab.github.io/mds/...)` as a plain link, with no `[@key]` citation after it.
+- **Do:** flag an existing credit to the group's own work for removal in review.
+- **Don't:** report a credit to the group's own work as missing in review, or add one.
 
 ## Material written from scratch names no source
 

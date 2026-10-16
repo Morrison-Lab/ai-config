@@ -130,6 +130,17 @@ _Posted by Antigravity (AI agent) --- not written by a human._
 This ensures `check-pr-fully-clean.py` admits the review by construction
 and allows a clean verdict to supersede any earlier standing not-clean verdicts (#4425).
 
+### Default cross-harness reviewer: Argon
+
+Ezra approved Argon, meaning Gemini through the `agy` CLI, as the default non-Claude reviewer (2026-10-14).
+Use it whenever a Claude-authored PR needs a reviewer that differs in model and harness, on a machine where `agy` is signed in.
+Dispatch it read-only: pass `--mode plan`, embed the PR diff in the brief, and tell it to use no tools.
+Run it from a scratch checkout of the PR head, never one that can push.
+Afterward run `git status` and `git diff` in that checkout, since its summaries can claim edits that never happened.
+Post the review as a PR comment whose body says an agent (Argon via `agy`) wrote it, and end it with the standard disclosure footer naming the agent that posted it (the footer line above, or "Claude Code" when Claude posts on Argon's behalf).
+Ask Argon to list what it checked even when it finds nothing, so a clean verdict is not a single line.
+See [`memories/delegation.md`](../../memories/delegation.md) ("Argon is the default cross-harness reviewer") for the first eight-PR run.
+
 ### 6. Fall back for failures only
 
 If a run fails, times out or returns nothing, redo only those items on OpenCode Go.

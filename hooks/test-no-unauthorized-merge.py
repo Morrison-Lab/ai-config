@@ -17,7 +17,7 @@ if not os.path.isfile(HOOK):
 
 # The standing infra-PR grant reads a PR's file list from GitHub. Every
 # subprocess case below inherits this, so none depends on a live PR's files
-# (`gh pr merge 1352 -R Morrison-Lab/gha` must BLOCK whatever gha#1352
+# (`gh pr merge 1352 -R Morrison-Lab/pds` must BLOCK whatever pds#1352
 # changes). The variable can only turn that grant off. The grant's own logic
 # is tested in-process at the end of this file, with the fetch stubbed.
 os.environ["NO_UNAUTHORIZED_MERGE_DISABLE_INFRA_GRANT"] = "1"
@@ -26,7 +26,7 @@ BLOCK = [
     # The macros entries in STANDING_MERGE_GRANT_REPOS are exact names.
     ("gh pr merge 12 -R d-morrison/macros-fork", "a repo whose name merely starts with macros"),
     ("gh pr merge 12 -R Other-Owner/macros", "the macros name under an ungranted owner"),
-    ("gh pr merge 12 -R d-morrison/macros -R Morrison-Lab/gha", "a granted macros target beside an ungranted one"),
+    ("gh pr merge 12 -R d-morrison/macros -R Morrison-Lab/pds", "a granted macros target beside an ungranted one"),
     ("gh pr merge 411 --squash", "bare gh pr merge"),
     ('bash -c "gh pr merge 411 --squash"', "subshell bash -c gh pr merge inside double quotes"),
     ("sh -c 'gh pr merge 411 --squash'", "subshell sh -c gh pr merge inside single quotes"),
@@ -236,9 +236,9 @@ BLOCK = [
     # the grant has stopped meaning "PRs targeting ai-config".
     ("gh pr merge 1352 --squash",
      "a bare merge names no repo, so no target is determined"),
-    ("gh pr merge 1352 -R Morrison-Lab/gha --squash",
+    ("gh pr merge 1352 -R Morrison-Lab/pds --squash",
      "an explicit target outside the grant list"),
-    ("gh api -X PUT repos/Morrison-Lab/gha/pulls/1/merge",
+    ("gh api -X PUT repos/Morrison-Lab/pds/pulls/1/merge",
      "a REST PR merge against a repo outside the grant list"),
     ("gh api -X POST repos/Morrison-Lab/ai-config/merges -f base=main -f head=x",
      "a repository BRANCH merge is not a PR merge, granted repo or not"),
@@ -246,9 +246,9 @@ BLOCK = [
      "two different targets in one segment is not a determination"),
     ("gh api -X PUT repos/Morrison-Lab/gha/pulls/1/merge -R morrison-lab/ai-config",
      "a granted -R must not authorize a merge whose path names another repo"),
-    ('gh pr merge 1352 -R Morrison-Lab/gha --body "morrison-lab/ai-config"',
+    ('gh pr merge 1352 -R Morrison-Lab/pds --body "morrison-lab/ai-config"',
      "a granted repo named inside a masked payload supplies no target"),
-    ("gh pr merge 1352 -R Morrison-Lab/gha # morrison-lab/ai-config",
+    ("gh pr merge 1352 -R Morrison-Lab/pds # morrison-lab/ai-config",
      "a granted repo named inside a trailing comment supplies no target"),
     # The two above are caught by the AMBIGUITY clause -- each names a second,
     # ungranted repo -- so neither tests the payload masking at all. Nor does a

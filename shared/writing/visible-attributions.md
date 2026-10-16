@@ -64,15 +64,16 @@ is not a source line, and stays.
 ## Where the credit goes
 
 Follow PSW's [Adapting another course's material](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#adapting-another-courses-material): the credit goes in a div, never in running prose.
-For a credit that is more than a citation, such as an adapted course page, that div is a collapsed `.callout-note` titled "Source", which frames the credit and keeps it out of the way on the page.
+For adapted text or licensed material, such as an adapted course page, that div is a collapsed `.callout-note` titled "Source", which frames the credit and keeps it out of the way on the page.
 Do not invent a separate attribution class or style it ad hoc (`.small .text-muted`);
 the callout is the lab's one pattern for such credits.
+Commentary about a source's history or notation is not a credit of this kind, and goes in a remark.
 
 On a definition or result div whose credit is only a citation, the credit is the final line "Source: @key [locator]." inside the div.
 Substantial source or history prose goes in a `#rem-source-` remark div (Ezra, 2026-10-15;
 see [`quarto-remarks-vs-callouts`](quarto-remarks-vs-callouts.md)).
 
-Where content lives in small included fragments, put each credit inside its item's own div, not only at the top of the page, so the credit travels with the fragment when another site includes it:
+Where content lives in small included fragments, keep each credit in the same subfile as its item, not only at the top of the page, so the credit travels with the fragment when another site includes it:
 
 ```markdown
 ::: {#def-overfitting}
@@ -85,7 +86,7 @@ Source: @james2021islr2e [sec. 5.1].
 :::
 ```
 
-A collapsed callout also goes at the end of the item's div.
+A collapsed callout goes at the end of the item's div.
 It differs from a `#rem-source-` remark in what it holds: the callout credits adapted text or licensed material, and the remark comments on the source's history or notation.
 
 Cite books and papers through the bibliography (`@key [locator]`),
@@ -100,7 +101,7 @@ what was checked in a PDF,
 a page number not yet verified,
 or a wording edit made while porting.
 
-- **Do:** end each item whose credit is more than a citation with PSW's collapsed "Source" callout.
+- **Do:** end each item that adapts text or licensed material with PSW's collapsed "Source" callout.
 - **Do:** end an item whose credit is only a citation with a plain "Source:" line.
 - **Don't:** leave an attribution only in an HTML comment.
 

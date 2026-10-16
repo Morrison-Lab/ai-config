@@ -801,9 +801,9 @@ The same commit fixed two locators the branch had never touched --- `(p. 22-23)`
 Re-deriving one range from the source puts its neighbours within reach of the same check for the first time, and a page citation nobody has ever opened the PDF for is likelier to be wrong than one that survived a reading.
 Sweep the locators around a split, not only the ones the split created.)
 
-## Quote the original; put the content first; adapt, don't summarize
+## Quote the original; put the content first; adapt, don't summarize; don't credit the group's own work
 
-Three citation rules live canonically in PSW's Citations and evidence chapter:
+Four citation rules live canonically in PSW's Citations and evidence chapter:
 
 - [Quote the original](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#quote-the-original),
   not a secondary source quoting it;
@@ -812,9 +812,12 @@ Three citation rules live canonically in PSW's Citations and evidence chapter:
 - [Adapting another course's material](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#adapting-another-courses-material):
   write our own version and credit it in a collapsed `.callout-note` titled "Source"
   (a `::: notes` div only on a site whose stylesheet sets `.notes` apart);
-  [`visible-attributions`](visible-attributions.md) covers where the credit goes in included fragments,
-  and the one exception PSW does not state:
-  content from the maintainer's own repositories need not be credited to them
-  ([psw#119](https://github.com/Morrison-Lab/psw/issues/119) proposes adding it to PSW).
+  [`visible-attributions`](visible-attributions.md) covers where the credit goes in included fragments;
+- [Material from your own work](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#material-from-your-own-work):
+  never credit the group's own work;
+  outside people's credit and ordinary citation stay
+  (see [`visible-attributions`](visible-attributions.md)).
+  The section goes live when [psw#213](https://github.com/Morrison-Lab/psw/pull/213) merges,
+  which replaces the earlier proposal in [psw#119](https://github.com/Morrison-Lab/psw/issues/119).
 
 Link those sections rather than restating them here.

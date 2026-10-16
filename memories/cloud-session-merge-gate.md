@@ -71,7 +71,7 @@ Do not retry or work around a denial.
 
 - Rule from the project's coordinator session (2026-10-15, after pds#170 merged on "mwc 170" with Argon still queued): wait for the cross-harness verdict on the current head even after Ezra says mwc.
   The gate needs a reviewer whose model and harness both differ from the author's;
-  Claude's CI review does not count.
+  Claude's CI review does not count, unless the dated exception below applies.
   An mwc removes the asking, not the gate.
 - Carry-over of an Argon CLEAN applies only to a fix matching Argon's own suggestion.
   A nit from the Claude CI reviewer needs a new Argon pass on the new head, so batch such nits into the push that answers Argon.
@@ -85,16 +85,15 @@ Do not retry or work around a denial.
   The XPS router therefore posts Argon reads with the Antigravity agent header as the first line.
   Keep `--quorum 2` whenever a cross-harness reviewer is available.
   The Claude-only exception below uses quorum 1 and applies only while no cross-harness reviewer is reachable.
-- While Argon is out of quota, Ezra's decision (card, 2026-10-16 05:01 UTC;
-  the coordinator made it project-wide at 05:11): an independent adversarial Claude subagent, separate from the author and the CI reviewer, stands in for the cross-harness review.
-  Run a general-purpose subagent on the final head with the diff as a file and no `mcp__hearthbot__` tools.
-  Post a comment with "### Verdict", "VERDICT: CLEAN", "Reviewed-Commit: <full sha>" and a line saying it is the Argon stand-in per Ezra's decision.
-  Then run the checker and merge only on that PR's mwc.
-  The hook's cross-harness warning is expected while Argon is out (its quota was expected back about 2026-10-21, so reread this bullet after that date).
 - Dated exception to `skills/mwc/SKILL.md`, which says a Claude subagent and the CI review do not satisfy the cross-harness requirement.
-  Ezra's card of 2026-10-16 07:31 UTC ("Claude-only") overrides that for as long as no cross-harness reviewer (agy, codex, opencode) is reachable.
-  A PR with his mwc then merges on the Claude CI review plus a CLEAN independent subagent review on the current head, checked at `--quorum 1`.
-  The exception ends when a cross-harness reviewer is reachable again, and the skill's rule then applies in full.
+  It ends when a cross-harness reviewer (Argon, agy, codex, opencode) is reachable again, and the skill's rule then applies in full.
+  Ezra's cards of 2026-10-16 05:01 UTC (the coordinator made it project-wide at 05:11) and 07:31 UTC ("Claude-only") override the skill until then.
+  An independent adversarial Claude subagent, separate from the author and the CI reviewer, stands in for the cross-harness review.
+  Run a general-purpose subagent on the final head with the diff as a file and no `mcp__hearthbot__` tools.
+  Post a comment with "### Verdict", "VERDICT: CLEAN", "Reviewed-Commit: <full sha>" and a line saying it is the stand-in per Ezra's decision.
+  A PR with his mwc then merges on the Claude CI review plus that CLEAN subagent review on the current head, checked at `--quorum 1`.
+  The hook's cross-harness warning is expected while the exception holds.
+  Argon's quota was expected back about 2026-10-21, so reread this bullet after that date.
   Wording nits still block.
   The subagent keeps finding header-wording nits each round: shorten archive headers to claim nothing that can go stale (lds#1052).
 - On macros the gate said "No valid clean review" until a `/review` comment dispatched the Claude CI review, so the stand-in comment alone did not satisfy it.

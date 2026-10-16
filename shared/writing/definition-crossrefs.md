@@ -5,10 +5,15 @@ formal cross-reference divs --- Quarto's theorem-like div syntax
 glossary/definition-list convention --- check each of the following for
 every mention:
 
-- **Hyperlinked on first mention.** The first place a technical term or
-  named result appears in running prose should link to the div that
-  defines or states it --- a Quarto crossref (`@def-token-budget`,
-  `@thm-cauchy-schwarz`) or an explicit markdown link to the div's anchor.
+- **Hyperlinked on first use in each div.**
+  A technical term or named
+  result links to the div that defines or states it --- a Quarto crossref
+  (`@def-token-budget`, `@thm-cauchy-schwarz`) or an explicit markdown
+  link to the div's anchor --- the first time it appears in each div.
+  Outside divs, link it the first time it appears in each prose passage.
+  A link in an earlier div or passage does not carry over, because
+  readers jump into the middle of a page.
+  Link once per div or passage, not at every mention.
   A bare mention of a term the reader hasn't been given a definition for
   forces them to search instead of click.
   One exception: you may leave out the pointer when the passage motivates

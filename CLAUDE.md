@@ -63,13 +63,9 @@ larger in-scope outcome clear.
 
 ## Status requests do not make issues report-only
 
-A request for status means examine the transcript to check if the agent got stuck, frozen, or dropped the ball, inspect live state, finish every safe, in-scope fix it reveals before reporting, resume stalled work immediately, and file every noticed issue, however small, in its owning tracker.
-Detail, rationale, and cases: [`shared/workflow/status-requests-act.md`](shared/workflow/status-requests-act.md).
-
-## A red main is a request for the fix
-
-A failing check on `main` is already a request: find the root cause, open the fix, and report the links, without waiting for the user to ask or to choose between fixes.
-Detail, rationale, and cases: [`shared/workflow/red-main-is-a-request-for-the-fix.md`](shared/workflow/red-main-is-a-request-for-the-fix.md).
+A status request means check the transcript for stuck or dropped work, inspect live state, finish every safe, in-scope fix before reporting, resume stalled work, and file every noticed issue in its owning tracker.
+A red `main` is a request for the fix ([rule](shared/workflow/red-main-is-a-request-for-the-fix.md)).
+Detail: [`shared/workflow/status-requests-act.md`](shared/workflow/status-requests-act.md).
 
 ## Flag good moments to `/clear` in long-running sessions
 

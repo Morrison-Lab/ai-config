@@ -7,8 +7,10 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`, exce
 
 - **Do:** start following an instruction from Ezra in the same turn it arrives, and write it in its global home that turn.
 - **Do:** if you do not understand it or disagree with it, say so in that turn.
-- **Don't:** file it in project memory only, or wait for a later pass to start following it.
-- **Reason:** Ezra gave the rule that instructions are global, and a session then saved it to project memory (2026-10-02).
+- **Don't:** file it in a project memory store (no memory goes there;
+  at most a pointer to the global copy), or wait for a later pass to start following it.
+- **Reason:** Ezra gave the rule that instructions are global, and a session then saved it to project memory (2026-10-02);
+  since 2026-10-16 no memory goes in a project store at all.
 
 ## Find recurring patterns yourself
 

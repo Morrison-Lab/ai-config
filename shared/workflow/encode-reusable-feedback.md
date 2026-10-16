@@ -20,5 +20,17 @@ Open the PR.
   the specific repo's own docs for a repo-specific one.
 - **Don't:** leave a reusable learning in session-local auto-memory as a substitute for committing it.
 - **Don't:** file a general lesson in one project's memory (a Claude Project's memory, a repo's notes) because that is where it came up;
-  project memory keeps only facts that are true of that project alone, and every lesson defaults to the most general home that fits (owner directive, 2026-10-02).
+  every lesson defaults to the most general home that fits (owner directive, 2026-10-02).
+- **Don't:** keep any memory in a project memory store (a Claude Project's shared memory directory and its `MEMORY.md`) or in session-local auto-memory.
+  Every memory lives in a version-controlled file.
+  A store outside version control cannot be reviewed, is invisible to other tools, and silently loses concurrent writes.
+  See [`project-memory-store`](../../memories/project-memory-store.md) (owner directive, 2026-10-16).
+- **Do:** put each memory where it fits best, usually in one home:
+  the project's primary repository for a fact or decision true of that project alone
+  (a dev-facing file such as `.claude/project-memory.md`, kept out of any rendered site),
+  `ai-config` for a global rule or lesson,
+  and a repository's own `CLAUDE.md` or instructions for a repo-specific rule.
+  Use several homes only when the memory applies in each.
+- **Do:** leave a project memory store, where one still exists, holding no more than pointers to those files.
+- **Don't:** write anything sensitive into a repository that is or may become public: student information, private third-party materials, permission requests.
 - **Don't:** offer to upstream it, or ask which repo --- decide and do it, surfacing the choice only when it is genuinely ambiguous or architecturally significant.

@@ -295,7 +295,7 @@ Two mechanisms now do, both in `hooks/require-ums-before-resolve.py` (ai-config#
 
 The triggers above fire on an admission, a read review, a questioned claim or a pause.
 Six more moments owe the same pass (ai-config#4480).
-Each is recorded in its global home, never only in project memory, and the reply names what was recorded.
+Each is recorded in its global home, never in project memory, and the reply names what was recorded.
 
 1. **A coordinator note corrects a thread.**
    A correction given to one thread is a rule for every thread the coordinator will start.

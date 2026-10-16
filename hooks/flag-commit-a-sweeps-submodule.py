@@ -69,18 +69,27 @@ missing one".
       in an unknown one
   M5  `git status --porcelain=v1 -z -uno` there lists an entry whose worktree
       column is `M` and whose path has mode 160000 in `git ls-files -s`. The
-      configured ignore settings decide: with `submodule.<name>.ignore=all` or
-      `diff.ignoreSubmodules=all` git leaves the gitlink alone and so does the
-      hook (an `--ignore-submodules=` flag would override them). Settings
-      given as `git -c key=value` on the command are NOT passed on (measured:
-      only `-c diff.ignoreSubmodules=all commit -a` makes git skip the
-      gitlink, so the hook warns there although nothing is staged). Every git
+      ignore settings do not decide: with `submodule.<name>.ignore=all` or
+      `diff.ignoreSubmodules=all`, set in the config or with `-c`, status
+      and `git diff` hide the moved gitlink but `git add -u` and `git commit
+      -a` still stage it (the test's ground-truth pass compares `ls-files -s`
+      and `ls-tree HEAD` before and after; a `git diff --cached` check is
+      blind to it under that very setting). So status runs with
+      `--ignore-submodules=dirty`, which overrides them. Every git
       call the hook makes runs with `-c core.fsmonitor=false`, because a
       repository's `core.fsmonitor` program would otherwise run during
-      `git status`, before the user approves the command
-  M6  the submodule's own HEAD differs from the commit the index pins. A
-      submodule with only dirty CONTENT is also reported as ` M` but leaves
-      the gitlink unchanged and cannot be swept in, so it stays silent here.
+      `git status`, before the user approves the command; status reads
+      attributes from the empty tree (`--attr-source`), so no
+      `filter.<name>.clean` program runs on a stat-dirty file; and
+      GIT_OPTIONAL_LOCKS=0 keeps status from writing the index, which would
+      run the repository's `post-index-change` hook. The ground-truth pass in
+      the test runs the real commands in throwaway copies of the fixtures and
+      compares the index and HEAD before and after, case by case
+  M6  the submodule's own HEAD differs from the commit the index pins: that
+      is what an ` M` entry means once status runs with
+      `--ignore-submodules=dirty`, so a submodule with only dirty CONTENT,
+      which leaves the gitlink unchanged and cannot be swept in, is not
+      listed and stays silent. The hook reads the HEAD only to name it.
       A pin bump already staged (`M ` with HEAD still equal to the staged
       pin) is silent too, while `MM` (staged, then the submodule moved again)
       warns
@@ -88,11 +97,14 @@ missing one".
       counts; an exclude pathspec (`:!x`, `:^x`, `:(exclude)x`) that matches
       the submodule keeps it out whatever else is given, and pathspecs that
       are all excludes mean everything else (checked with git 2.43). Glob
-      excludes are matched with fnmatch, which approximates git's. Other
-      magic (`:(glob)`, `:(attr:...)`) or a glob include is not evaluated and
-      warns; for a plain `git add <pathspec>`, only a pathspec covering the
-      submodule from above counts (naming it is how a pin is bumped on
-      purpose, and unevaluated magic or a glob include stays silent).
+      excludes and includes are matched with fnmatch, which approximates
+      git's, so `git add '*'` and `git add 'mod*'` warn. Other magic
+      (`:(glob)`, `:(attr:...)`) is not evaluated and warns; for a plain
+      `git add <pathspec>`, only a pathspec covering the submodule from above
+      or a glob matching it counts (naming it is how a pin is bumped on
+      purpose, and unevaluated magic stays silent). With `-u`/`-A` a glob
+      include that matches nothing still warns (fnmatch is only an
+      approximation).
       `:/path` and `:(top)path` are read as `path` from the repository root,
       so `git add :/` covers everything, and `icase` and `literal` are read.
       Relative paths are compared through realpath. `commit -a` takes no
@@ -131,6 +143,8 @@ check the wrong one, when:
     `bash -c`), so only an absolute `git -C /path` or `cd /path` inside it is
     read;
   - `eval '...'` and a command built from variables are not read;
+  - a negated option such as `git commit -a --no-all` is read as `-a`, so it
+    warns although git then sweeps nothing (a harmless false positive);
   - `env -C dir git ...` and `env --chdir=dir git ...` run elsewhere: the
     hook goes silent on them; other wrappers that change directory are not
     recognised;
@@ -344,9 +358,20 @@ def _move(rest, cur):
     return target
 
 
-_CD_WORD = re.compile(
-    r"\s*(?:(?:then|do|else|elif|if|while|until|time|!)\s+)*"
-    r"(?:cd|pushd|popd)(?![\w./-])")
+_LEAD_KEYWORDS = {"then", "do", "else", "elif", "if", "while", "until",
+                  "time", "!"}
+
+
+def _starts_with_cd(piece):
+    """True if the pipeline stage `piece` is a cd, pushd or popd, after any
+    leading shell keywords (`then cd x`)."""
+    words = piece.split()
+    while words and words[0] in _LEAD_KEYWORDS:
+        words.pop(0)
+    return bool(words) and words[0] in ("cd", "pushd", "popd")
+
+
+
 _QUOTED = re.compile(r"'[^']*'|\"(?:\\.|[^\"\\])*\"")
 _SEGMENTS = re.compile(r"&&|\|\||[;\n(){}]")
 _PIPE_OR_JOB = re.compile(r"([|&])")
@@ -366,7 +391,7 @@ def _unreachable_cd(command):
         stages = parts[0::2]
         ops = parts[1::2]
         for pos, piece in enumerate(stages):
-            if not _CD_WORD.match(piece):
+            if not _starts_with_cd(piece):
                 continue
             if "|" in ops:
                 return True
@@ -480,8 +505,13 @@ def _start_budget():
 
 def _git(cwd, *args):
     """stdout of `git args` in cwd, or None on any failure or when the
-    shared deadline is spent. Optional locks are off so a read-only status
-    never rewrites the index under a concurrent git."""
+    shared deadline is spent. Two things would otherwise run a repository's
+    own program before the user approves the command: `core.fsmonitor`
+    (switched off here) and, because `git status` refreshes a stat-dirty
+    index and writes it back, the `post-index-change` hook. With
+    GIT_OPTIONAL_LOCKS=0 status does not write the index, so that hook does
+    not run, and a read-only status never rewrites the index under a
+    concurrent git either."""
     if _deadline is None:
         return None  # main() starts the budget; no budget, no git call
     remaining = _deadline - time.monotonic()
@@ -508,13 +538,21 @@ def modified_submodules(cwd):
     each submodule whose gitlink would change if every modified tracked path
     were staged; None if git cannot be run here."""
     # `-uno` skips the untracked scan, which `-a`/`-u` never stage anyway and
-    # which dominates the time in a large tree. No `--ignore-submodules`
-    # override: it would also override `submodule.<name>.ignore=all` and
-    # `diff.ignoreSubmodules=all`, which make `commit -a` and `add -u` leave
-    # the gitlink alone (checked with git 2.43), so the configured values must
-    # decide. A submodule with only dirty content is reported as ` M` too;
-    # the HEAD-versus-pin comparison below tells the two apart.
-    status = _git(cwd, "status", "--porcelain=v1", "-z", "-uno")
+    # which dominates the time in a large tree. `--ignore-submodules=dirty`
+    # overrides `submodule.<name>.ignore` and `diff.ignoreSubmodules`: with
+    # `all` set, status hides a moved gitlink that `commit -a` and `add -u`
+    # still stage (ground truth, git 2.43). A submodule with only dirty
+    # content is left out too, so every entry is a moved HEAD.
+    # Status runs a `filter.<name>.clean` program on a stat-dirty file that
+    # .gitattributes routes to it. Attributes are read from the empty tree
+    # instead of the worktree, so no filter is selected (git 2.40 and later;
+    # an older git rejects the option and the hook fails open).
+    empty = _git(cwd, "hash-object", "-t", "tree", "/dev/null")
+    if empty is None:
+        return None
+    status = _git(cwd, "--attr-source=" + empty.strip(), "status",
+                  "--porcelain=v1", "-z", "-uno",
+                  "--ignore-submodules=dirty")
     top = _git(cwd, "rev-parse", "--show-toplevel")
     # ONE index read for every gitlink, rather than a query per modified path:
     # a large sweep would otherwise spend the whole deadline and fail open
@@ -552,9 +590,7 @@ def modified_submodules(cwd):
         head = _git(os.path.join(top, path), "rev-parse", "HEAD")
         if head is None:
             continue
-        head = head.strip()
-        if head != pinned:
-            found.append((path, pinned, head))
+        found.append((path, pinned, head.strip()))
     return found, top
 
 
@@ -628,11 +664,11 @@ def _under_pathspecs(sub_path, pathspecs, cwd, top, sweeping):
 
     `sweeping` is `add -u`/`-A`: no pathspec means the whole repo, a pathspec
     naming the submodule itself counts, and magic the hook does not evaluate,
-    a glob include, or `--pathspec-from-file` warns. A plain `git add
+    an unmatched glob include, or `--pathspec-from-file` warns. A plain `git add
     <pathspec>` counts only a pathspec that covers the submodule from above
     (`.`, a parent directory, `:/`): naming the submodule is how a pin bump is
-    staged on purpose, and unevaluated magic or a glob include there stays
-    silent. Both sides go through realpath, so a symlinked cwd cannot make
+    staged on purpose, and unevaluated magic there stays silent; a glob that
+    matches the submodule counts. Both sides go through realpath, so a symlinked cwd cannot make
     the relative path miss."""
     if not pathspecs:
         return sweeping
@@ -646,9 +682,13 @@ def _under_pathspecs(sub_path, pathspecs, cwd, top, sweeping):
     if not includes:
         return True  # only excludes: git takes `.` as the include
     for spec in includes:
-        rel = None if spec is None else _rel(spec, real_cwd, real_top)
-        if spec is None or _has_glob(spec, rel):
+        if spec is None:
             if sweeping:
+                return True
+            continue
+        rel = _rel(spec, real_cwd, real_top)
+        if _has_glob(spec, rel):
+            if sweeping or _matches(spec, rel, sub_path):
                 return True
             continue
         if _matches(spec, rel, sub_path) and (sweeping or rel != sub_path):

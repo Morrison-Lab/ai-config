@@ -23,6 +23,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 HOOK = os.path.realpath(sys.argv[1])
 ELSEWHERE = tempfile.mkdtemp()  # a cwd that is not the repo under test
@@ -182,17 +183,15 @@ def subdir_repo(path):
     _run(path, "commit", "-qm", "docs")
 
 
-def rename_ignored_repo(path):
+def rename_odd_repo(path):
     """A staged rename whose OLD name looks like a status record for `mod`
-    (`xM mod`: two status letters, a space, a path), next to a moved submodule
-    that git leaves alone (ignore=all). Reading the old name as a record would
-    invent a modified `mod`."""
+    (`xM mod`: two status letters, a space, a path), next to a submodule that
+    has not moved. Reading the old name as a record would invent a modified
+    `mod`."""
     _base_with_submodule(path)
     _write(path, "xM mod", content="rename me\n")
     _run(path, "add", "xM mod")
     _run(path, "commit", "-qm", "odd name")
-    _move_submodule_head(path)
-    _run(path, "config", "submodule.mod.ignore", "all")
     _run(path, "mv", "xM mod", "renamed.txt")
 
 
@@ -204,16 +203,31 @@ def fsmonitor_repo(path):
     _run(path, "config", "core.fsmonitor", f'sh -c "touch {marker}"')
 
 
-def typechange_repo(path):
-    """The gitlink `mod` replaced by a symlink to another repository whose
-    HEAD differs from the pin: status says ` T mod`, and `-a` stages a
-    symlink, not a moved pin."""
-    _base_with_submodule(path)
-    src = os.path.join(path, ".subsrc")
-    _write(src, "lib.txt", content="v2\n")
-    _run(src, "commit", "-qam", "sub v2")
-    shutil.rmtree(os.path.join(path, "mod"))
-    os.symlink(src, os.path.join(path, "mod"))
+def filter_repo(path):
+    """A stat-dirty file that .gitattributes routes to a clean filter named
+    in the repository config: status would run that program."""
+    moved_pin_only_repo(path)
+    marker = os.path.join(ELSEWHERE, "executed-marker")
+    _write(path, ".gitattributes", content="*.txt filter=evil\n")
+    _write(path, "a.txt", content="one\n")
+    _run(path, "add", ".gitattributes", "a.txt")
+    _run(path, "commit", "-qm", "attrs")
+    _run(path, "config", "filter.evil.clean", f"sh -c 'touch {marker}; cat'")
+    _run(path, "config", "filter.evil.smudge", "cat")
+    later = time.time() + 100
+    os.utime(os.path.join(path, "a.txt"), (later, later))
+
+
+def index_hook_repo(path):
+    """A stat-dirty file and a post-index-change hook: a status that writes
+    the refreshed index would run the hook."""
+    moved_pin_only_repo(path)
+    marker = os.path.join(ELSEWHERE, "executed-marker")
+    hook = os.path.join(path, ".git", "hooks", "post-index-change")
+    _write(hook, content=f"#!/bin/sh\ntouch {marker}\n")
+    os.chmod(hook, 0o755)
+    later = time.time() + 100
+    os.utime(os.path.join(path, "CLAUDE.md"), (later, later))
 
 
 MSG = '"fix"'
@@ -301,6 +315,18 @@ SHOULD_WARN = [
      "an ambiguous prefix (--s) is not guessed at, so -a still sweeps"),
     ("W48", moved_pin_only_repo, "git add -u --pathspec-from-file list.txt",
      "the value of --pathspec-from-file is not a pathspec"),
+    ("W70", ignore_all_repo, f"git commit -am {MSG}",
+     "submodule.mod.ignore=all hides the pin from status, not from -a"),
+    ("W71", diff_ignore_all_repo, "git add -u",
+     "diff.ignoreSubmodules=all hides the pin from status, not from add -u"),
+    ("W66",moved_pin_only_repo, "git add 'mod*'",
+     "a glob that matches the submodule stages it"),
+    ("W67", moved_pin_only_repo, "git add '*'",
+     "a glob that sweeps in the submodule from above"),
+    ("W68", filter_repo, "git commit -am fix",
+     "a clean filter named in the repository config must not run during status"),
+    ("W69", index_hook_repo, "git commit -am fix",
+     "status must not write the index, or post-index-change would run"),
     ("W62", fsmonitor_repo, "git commit -am fix",
      "a repository's core.fsmonitor program must not run during the hook's status"),
     ("W63", moved_pin_only_repo,
@@ -398,8 +424,8 @@ SHOULD_STAY_SILENT = [
      "a bare `cd` goes home, which is not the repo"),
     ("S28", moved_pin_only_repo, "git add mod",
      "naming the submodule is how a pin bump is staged on purpose"),
-    ("S29", moved_pin_only_repo, "git add 'mod*'",
-     "a glob pathspec on a plain add is not evaluated: documented silent case"),
+    ("S29", moved_pin_only_repo, "git add ':(glob)CLAUDE.md'",
+     "unevaluated magic on a plain add is not guessed at: documented silent case"),
     ("S30", moved_pin_only_repo, f"(cd mod && git commit -am {MSG})",
      "a cd inside a subshell applies to the commands inside it"),
     ("S31", moved_pin_only_repo, f"{{ cd mod; }}; git commit -am {MSG}",
@@ -408,10 +434,6 @@ SHOULD_STAY_SILENT = [
      "the payload's `cwd` beats the hook's own working directory"),
     ("S33", moved_pin_only_repo, "git add --refresh .",
      "--refresh stages nothing"),
-    ("S37", ignore_all_repo, f"git commit -am {MSG}",
-     "submodule.mod.ignore=all: git does not stage the gitlink"),
-    ("S38", diff_ignore_all_repo, "git add -u",
-     "diff.ignoreSubmodules=all: git does not stage the gitlink"),
     ("S39", subdir_repo, "cd docs && git add :/mod",
      "a top-level pathspec that names the submodule is a deliberate bump"),
     ("S43", moved_pin_only_repo, "git commit --message -a",
@@ -450,8 +472,6 @@ SHOULD_STAY_SILENT = [
      "env -C runs git in another directory: documented silent case"),
     ("S63", moved_pin_only_repo, "env --chdir=mod git commit -am fix",
      "env --chdir runs git in another directory: documented silent case"),
-    ("S64", typechange_repo, "git commit -am fix",
-     "a gitlink replaced by a symlink is ` T`, not a moved pin"),
     ("S65", moved_pin_only_repo, "git add -N .", "add -N stages no gitlink"),
     ("S66", moved_pin_only_repo, "git add --renormalize .",
      "add --renormalize stages no gitlink"),
@@ -465,7 +485,7 @@ SHOULD_STAY_SILENT = [
      "after a cd a nested line is unknown: documented silent case"),
     ("S70", moved_pin_only_repo, "git add --intent-to-add .",
      "the long spelling of add -N"),
-    ("S61", rename_ignored_repo, "git add -u",
+    ("S61", rename_odd_repo, "git add -u",
      "a staged rename's old name is not a status record of its own"),
     ("S40", moved_pin_only_repo, f"pushd mod && git commit -am {MSG}",
      "`pushd mod` moves into the clean submodule"),
@@ -632,6 +652,89 @@ print(f"{len(msg_checks) - msg_wrong}/{len(msg_checks)} message checks correct"
       + ("" if msg_wrong == 0 else f"  ({msg_wrong} WRONG)"))
 wrong += msg_wrong
 
+# ------------------------------------------------------------ ground truth
+# The cases above say what the HOOK should do. This pass runs each real
+# command in a throwaway copy of its fixture and asks git itself whether the
+# pin of `mod` ended up different in the index or in HEAD. A case where the
+# hook and git disagree must be listed here with the reason: a documented
+# silent case (the hook cannot see the target), a documented over-warn, or a
+# command that does not run as written.
+GT_EXEMPT = {
+    "W20": "unevaluated magic warns by design: git treats :(glob)CLAUDE.md as "
+           "a path the submodule is not under",
+    "W21": "an unmatched glob include warns by design (the hook does not "
+           "expand it for -u)",
+    "W47": "git rejects the ambiguous option --s, so nothing runs; the hook "
+           "does not guess at it",
+    "W48": "the pathspec file does not exist, so git stops; the hook does "
+           "not read it",
+    "S11": "a staged pin bump is committed by -a, but it was staged on "
+           "purpose, so the hook stays silent",
+    "S15": "documented silent case: --git-dir/--work-tree name another repo",
+    "S16": "documented silent case: separated --git-dir",
+    "S34": "documented silent case: GIT_DIR in the environment",
+    "S35": "documented silent case: GIT_WORK_TREE in the environment",
+    "S36": "documented silent case: GIT_DIR through env",
+    "S28": "naming the submodule on a plain add is a deliberate bump",
+    "S39": "a top-level pathspec naming the submodule is a deliberate bump",
+    "S41": "documented silent case: the directory after popd is unknown",
+    "S69": "documented silent case: a nested line after a cd has an unknown "
+           "directory",
+}
+GT_SKIP_PREFIX = "@"  # payload-shaped cases (cwd, HOME) are not shell commands
+
+
+def _pin_state(repo):
+    return [subprocess.run(["git", *args], cwd=repo, capture_output=True,
+                           text=True).stdout
+            for args in (("ls-files", "-s", "mod"), ("ls-tree", "HEAD", "mod"))]
+
+
+def _ground_truth(case_id, builder, command):
+    """True if running `command` for real moves the pin of `mod`."""
+    if builder not in _REPOS:
+        _REPOS[builder] = _repo(builder)
+    copy = tempfile.mkdtemp()
+    _SCRATCH.append(copy)
+    dst = os.path.join(copy, "r")
+    shutil.copytree(_REPOS[builder], dst, symlinks=True)
+    cwd = ELSEWHERE if any(k in command for k in ("{repo}", "{link}",
+                                                 "{reporel}")) else dst
+    command = (command.replace("{reporel}", os.path.relpath(dst, ELSEWHERE))
+               .replace("{link}", dst).replace("{repo}", dst))
+    before = _pin_state(dst)
+    subprocess.run(["bash", "-c", command], cwd=cwd, capture_output=True,
+                   text=True, timeout=120,
+                   env={**os.environ, "GIT_TERMINAL_PROMPT": "0"})
+    after = _pin_state(dst)
+    shutil.rmtree(copy, ignore_errors=True)
+    return before != after
+
+
+gt_wrong = gt_checked = 0
+print("\nground truth (does the real command move the pin?):")
+for case_id, (builder, command) in CASES.items():
+    if command.startswith(GT_SKIP_PREFIX):
+        continue
+    gt_checked += 1
+    moved = _ground_truth(case_id, builder, command)
+    agrees = moved == (EXPECTED[case_id] == "WARN")
+    if case_id in GT_EXEMPT:
+        if agrees:
+            print(f"  WRONG {case_id}  exempt but git agrees with the hook; "
+                  "drop the exemption")
+            gt_wrong += 1
+        continue
+    if not agrees:
+        print(f"  WRONG {case_id}  hook says {EXPECTED[case_id]}, git "
+              f"{'moves' if moved else 'does not move'} the pin: {command}")
+        gt_wrong += 1
+print(f"{gt_checked - gt_wrong - len([c for c in GT_EXEMPT if c in CASES])}"
+      f"/{gt_checked} cases agree with git "
+      f"({len(GT_EXEMPT)} exempt, each documented)"
+      + ("" if gt_wrong == 0 else f"  ({gt_wrong} WRONG)"))
+wrong += gt_wrong
+
 # ------------------------------------------------------------ mutation harness
 
 POSIX = os.name != "nt"
@@ -649,7 +752,8 @@ MUTATIONS = {
         {"W1", "W2", "W6", "W8", "W9", "W10", "W11", "W12", "W16", "W17",
          "W18", "W23", "W25", "W26", "W30", "W31", "W32", "W33", "W34",
          "W35", "W36", "W38", "W43", "W44", "W45", "W47", "W50",
-         "W51", "W56", "W57", "W58", "W59", "W60", "W61", "W62", "W63", "W65"}
+         "W51", "W56", "W57", "W58", "W59", "W60", "W61", "W62", "W63", "W65",
+         "W68", "W69", "W70"}
         | ({"W39"} if os.name != "nt" else set()),
     ),
     "M_value_letter_stops_cluster": (
@@ -693,12 +797,6 @@ MUTATIONS = {
           '    return False, False, False, False, p')],
         {"W20"},
     ),
-    "M_glob_pathspec_warns": (
-        "a glob include warns (sweeping) or stays silent (plain), unevaluated",
-        [("        if spec is None or _has_glob(spec, rel):",
-          "        if spec is None:")],
-        {"W21", "S29"},
-    ),
     "M_top_magic_read": (
         "`:/` and `:(top)` are read as the repository root",
         [('    if top:\n        rel = os.path.normpath(body or ".")',
@@ -724,17 +822,47 @@ MUTATIONS = {
           "    sub = sub_path")],
         {"W55", "S56"},
     ),
+    "M_glob_include_unmatched_warns": (
+        "with -u/-A a glob include warns even when it matches nothing",
+        [("            if sweeping or _matches(spec, rel, sub_path):",
+          "            if _matches(spec, rel, sub_path):")],
+        {"W21"},
+    ),
+    "M_glob_include_matched_warns": (
+        "a glob include that matches the submodule warns, even on a plain add",
+        [("            if sweeping or _matches(spec, rel, sub_path):",
+          "            if sweeping:")],
+        {"W66", "W67"},
+    ),
+    "M_plain_add_unevaluated_silent": (
+        "unevaluated magic on a plain `git add` is not guessed at: silent",
+        [("        if spec is None:\n            if sweeping:\n                return True\n            continue",
+          "        if spec is None:\n            return True")],
+        {"S29"},
+    ),
+    "M_optional_locks_off": (
+        "git runs with GIT_OPTIONAL_LOCKS=0, so status writes no index",
+        [('env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"})',
+          "env=os.environ)")],
+        {"W69"},
+    ),
+    "M_attr_source_empty": (
+        "status reads attributes from the empty tree, so no filter runs",
+        [('"--attr-source=" + empty.strip(), "status",',
+          '"status",')],
+        {"W68"},
+    ),
+    "M_long_exact_match_first": (
+        "an exact long-option name wins over longer names it prefixes",
+        [("    if name in known:\n        return name\n", "")],
+        {"W3"},
+    ),
     "M_glob_exclude_matched": (
         "a glob in an exclude is matched with fnmatch",
         [("    if _has_glob(spec, rel):\n        prefixes",
           "    if False:\n        prefixes")],
-        {"S55"},
-    ),
-    "M_plain_add_glob_silent": (
-        "a magic/glob pathspec on a plain `git add` is not evaluated: silent",
-        [("            if sweeping:\n                return True\n            continue",
-          "            return True")],
-        {"S29"},
+        # The same glob test reads a glob INCLUDE (W66, W67).
+        {"S55", "W66", "W67"},
     ),
     "M_windows_separator": (
         "backslash separators are normalised in pathspecs (Windows only)",
@@ -768,13 +896,14 @@ MUTATIONS = {
         {"S19"},
     ),
     "M_status_ignore_override": (
-        "status honours the configured submodule ignore settings",
-        [('"--porcelain=v1", "-z", "-uno")',
-          '"--porcelain=v1", "-z", "-uno",\n'
-          '                  "--ignore-submodules=dirty")')],
-        # The override reports a gitlink that git leaves alone when
-        # submodule.<name>.ignore or diff.ignoreSubmodules is `all`.
-        {"S37", "S38", "S61"},
+        "status overrides the configured submodule ignore settings",
+        [('"-uno",\n                  "--ignore-submodules=dirty")',
+          '"-uno")')],
+        # Without the override, status hides a gitlink that -a and add -u
+        # still stage when submodule.<name>.ignore or
+        # diff.ignoreSubmodules is `all` (W70, W71).
+        # S3 (dirty content only) is reported once the override is gone.
+        {"W70", "W71", "S3"},
     ),
     "M_unknown_stays_unknown": (
         "an unknown directory plus a relative move stays unknown",
@@ -788,14 +917,6 @@ MUTATIONS = {
           '        if rest and rest[0] in ("cd",):')],
         {"W43", "S40", "S41"},
     ),
-    "M_optional_locks_off": (
-        "git runs with GIT_OPTIONAL_LOCKS=0",
-        [('env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"})',
-          "env=os.environ)")],
-        # Declared EMPTY: it only stops a read-only status from refreshing
-        # the index under a concurrent git, which no verdict shows.
-        set(),
-    ),
     "M_add_update_long": (
         "`--update` is read as -u",
         [('    if "--update" in names or "u" in letters:',
@@ -806,7 +927,8 @@ MUTATIONS = {
         "`-u` is read as update",
         [('    if "--update" in names or "u" in letters:',
           '    if "--update" in names:')],
-        {"W4", "W7", "W14", "W15", "W20", "W21", "W24", "W48", "W55", "W64"},
+        {"W4", "W7", "W14", "W15", "W20", "W21", "W24", "W48", "W55", "W64",
+         "W71"},
     ),
     "M_add_all": (
         "`-A`/`--all` is read as a sweeping add",
@@ -817,7 +939,7 @@ MUTATIONS = {
     "M_add_plain_pathspec": (
         "a plain `git add <dir>` covering a submodule is read",
         [('    return ("add", paths) if paths else None', "    return None")],
-        {"W29", "W40", "W41", "W52", "W54"},
+        {"W29", "W40", "W41", "W52", "W54", "W66", "W67"},
     ),
     "M_add_dry_run_long": (
         "`git add --dry-run` stages nothing",
@@ -865,8 +987,8 @@ MUTATIONS = {
     ),
     "M_cd_keyword": (
         "a pipeline cd after `then`/`do`/... is still a pipeline cd",
-        [('r"\\s*(?:(?:then|do|else|elif|if|while|until|time|!)\\s+)*"',
-          'r"\\s*"')],
+        [("    while words and words[0] in _LEAD_KEYWORDS:",
+          "    while False:")],
         {"W65"},
     ),
     "M_short_magic_colon": (
@@ -890,7 +1012,7 @@ MUTATIONS = {
     ),
     "M_status_no_untracked": (
         "status skips the untracked scan (-uno)",
-        [('"--porcelain=v1", "-z", "-uno")', '"--porcelain=v1", "-z")')],
+        [('"-z", "-uno",', '"-z",')],
         # Declared EMPTY: a speed-up; untracked files never change a verdict.
         set(),
     ),
@@ -1032,13 +1154,6 @@ MUTATIONS = {
           "        hits += scans[i][0]")],
         {"S59", "S68"},
     ),
-    "M_head_differs_from_pin": (
-        "only a submodule whose HEAD differs from the pin counts",
-        [("        if head != pinned:", "        if True:")],
-        # Status reports a submodule with only dirty content as ` M` too;
-        # this comparison is what tells it from a moved HEAD (S3).
-        {"S3"},
-    ),
     "M_pathspec_scoping": (
         "`git add -u <pathspec>` only counts a submodule under a pathspec",
         [("            return True\n    return False\n\n\n# What each kind stages",
@@ -1077,9 +1192,9 @@ MUTATIONS = {
         "only a worktree-column `M` entry counts",
         [('        if xy[1] != "M":\n            continue',
           "        if False:\n            continue")],
-        # A gitlink replaced by a symlink is ` T`, with another repository's
-        # HEAD, which differs from the pin (S64).
-        {"S64"},
+        # A pin bump already staged is `M ` (index column only): the commit
+        # would carry it, but it is deliberate (S11).
+        {"S11"},
     ),
 }
 
@@ -1100,6 +1215,11 @@ with tempfile.TemporaryDirectory() as tmp:
             handle.write(mutated)
         flipped = {cid for cid, (builder, command) in CASES.items()
                    if build_and_verdict(path, builder, command) != EXPECTED[cid]}
+        # A mutant that lets status write the index refreshes the stat data
+        # of a shared fixture, which would hide its stat-dirty file from
+        # every later clause: rebuild those two.
+        for stat_dirty in (filter_repo, index_hook_repo):
+            _REPOS.pop(stat_dirty, None)
         ok = flipped == expected_flips
         mutation_wrong += not ok
         if not flipped and expected_flips:

@@ -64,18 +64,17 @@ is not a source line, and stays.
 
 ## Where the credit goes
 
-Follow PSW's
-[Adapting another course's material](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#adapting-another-courses-material):
-the credit goes in a div, never in running prose,
-and in Quarto that div is a collapsed `.callout-note` titled "Source",
-which frames the credit and keeps it out of the way on the page.
-Do not invent a separate attribution class or style it ad hoc
-(`.small .text-muted`); the callout is the lab's one pattern.
+Follow PSW's [Adapting another course's material](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#adapting-another-courses-material): the credit is set apart from running prose, never woven into it.
+For a credit that holds more than a citation, such as the link, licence and changes for an adapted course page, the credit goes in a div, and in Quarto that div is a collapsed `.callout-note` titled "Source", which frames the credit and keeps it out of the way on the page.
+Do not invent a separate attribution class or style it ad hoc (`.small .text-muted`);
+the callout is the lab's one pattern for such credits.
+Commentary about a source's history or notation is not a credit of this kind, and goes in a remark.
 
-Where content lives in small included fragments,
-put the callout at the end of each item's own div,
-not only at the top of the page,
-so the credit travels with the fragment when another site includes it:
+On a definition or result div whose credit is only a citation, the credit is the final line "Source: @key [locator]." inside the div.
+Substantial source or history prose goes in a `#rem-source-` remark div (Ezra, 2026-10-15;
+see [`quarto-remarks-vs-callouts`](quarto-remarks-vs-callouts.md)).
+
+Where content lives in small included fragments, keep each credit in the same subfile as its item, not only at the top of the page, so the credit travels with the fragment when another site includes it:
 
 ```markdown
 ::: {#def-overfitting}
@@ -83,14 +82,22 @@ so the credit travels with the fragment when another site includes it:
 
 ...
 
-::: {.callout-note collapse="true"}
-#### Source
-
-@james2021islr2e [sec. 5.1].
-:::
+Source: @james2021islr2e [sec. 5.1].
 
 :::
 ```
+
+A collapsed callout goes inside the item's div, as its last block before the closing `:::`:
+
+```markdown
+::: {.callout-note collapse="true"}
+#### Source
+
+Adapted from [the course page](https://example.org/notes) under its licence, with the examples replaced.
+:::
+```
+
+It differs from a `#rem-source-` remark in what it holds: the callout holds the credit's link, licence and changes, and the remark comments on the source's history or notation.
 
 Cite books and papers through the bibliography (`@key [locator]`),
 and link an outside site's rendered page at the item's anchor,
@@ -104,7 +111,8 @@ what was checked in a PDF,
 a page number not yet verified,
 or a wording edit made while porting.
 
-- **Do:** end each item adapted from an outside source with PSW's collapsed "Source" callout.
+- **Do:** end each item whose credit holds more than a citation (a link, a licence, a note of changes) with PSW's collapsed "Source" callout.
+- **Do:** end an item whose credit is only a citation with a plain "Source:" line.
 - **Don't:** leave an attribution only in an HTML comment.
 
 (Morrison-Lab/sds, 2026-10-05:

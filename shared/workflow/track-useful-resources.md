@@ -5,10 +5,10 @@ Track every useful resource (textbooks, articles, software packages, websites, v
 The primary home is the first of these that applies:
 
 - the lds catalog that matches the resource's type (for example `courses.csv` or `channels.csv` under `chapters/data`);
-- the Further reading section of the page in the notes repo whose topic is the resource's main subject;
-- the Further reading section of the closest lds page, when no notes repo covers the subject.
+- the Further reading section of the matching page in the notes repo whose topic is the resource's main subject (the earliest such repo in `course-sequence`, when several teach it);
+- the Further reading section of the closest lds page, when no notes repo covers the subject, because lds is where the lab's resource directories live.
 
-Where a page named above has no Further reading section, add one headed `## Further reading`.
+Wherever this rule places a resource in the Further reading section of a page that has none, add one headed `## Further reading`.
 The rule covers any content relevant to any Morrison-Lab repo, course or project, and the goal is to build comprehensive directories of content relevant to all our interests over time.
 Each tracked resource is a small contribution to a directory, not a one-off link.
 
@@ -41,8 +41,8 @@ A catalog entry in lds (a course list, a channels table) does not substitute for
 
 ## Gaps
 
-When a topic or a spinoff of an existing topic has no notes repo, track the resource in its primary home now, and propose a notes repo for the topic, adding it to `course-sequence`, rather than starting a link-only catalog repo.
-A PR cannot create a repository, so file an issue in ai-config, where `course-sequence` lives, that proposes it, and add the repo to `course-sequence` once it exists.
+When a topic or a spinoff of an existing topic has no notes repo, track the resource in its primary home now, and propose a notes repo for the topic, rather than starting a link-only catalog repo.
+A PR cannot create a repository, so file an issue in ai-config, where `course-sequence` lives, that proposes the new notes repo, and add the repo to `course-sequence` once it exists.
 If adding the resource to an existing repo does not fit the current PR, open a small separate PR or an issue in that existing repo.
 
 ## Official sources
@@ -54,7 +54,7 @@ Never link an unauthorized copy, and never commit paywalled text.
 
 - **Do:** check that a resource you cite or find is tracked in its primary home and in every notes repo whose topic it covers, and add it (or file an issue) where it is not.
 - **Do:** pass this rule to subagents that research or read course material.
-- **Don't:** treat an entry in an lds catalog as covering the other notes repos whose topics the resource covers.
+- **Don't:** treat an entry in an lds catalog as covering the other notes repos whose topic the resource covers.
 - **Don't:** leave a useful resource only in a chat reply or session transcript.
 - **Don't:** link an unauthorized copy, or commit paywalled text.
 

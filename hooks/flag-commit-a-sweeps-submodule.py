@@ -65,15 +65,19 @@ missing one".
       (`cd x &`) runs in a subshell of its own in bash and moves nothing; when
       the command has one, EVERY directory change in it is ignored and the
       session directory is checked. A nested `bash -c` line starts in the
-      session directory when no `cd` precedes it, else in an unknown one
+      session directory when no other line of the command has a `cd`, else
+      in an unknown one
   M5  `git status --porcelain=v1 -z -uno` there lists an entry whose worktree
       column is `M` and whose path has mode 160000 in `git ls-files -s`. The
       configured ignore settings decide: with `submodule.<name>.ignore=all` or
       `diff.ignoreSubmodules=all` git leaves the gitlink alone and so does the
-      hook (an `--ignore-submodules=` flag would override them). The same two
-      settings given as `git -c key=value` on the command are passed on to
-      the hook's status; no other `-c` is, because one such as
-      `core.fsmonitor` runs a program, here before the user approves
+      hook (an `--ignore-submodules=` flag would override them). Settings
+      given as `git -c key=value` on the command are NOT passed on (measured:
+      only `-c diff.ignoreSubmodules=all commit -a` makes git skip the
+      gitlink, so the hook warns there although nothing is staged). Every git
+      call the hook makes runs with `-c core.fsmonitor=false`, because a
+      repository's `core.fsmonitor` program would otherwise run during
+      `git status`, before the user approves the command
   M6  the submodule's own HEAD differs from the commit the index pins. A
       submodule with only dirty CONTENT is also reported as ` M` but leaves
       the gitlink unchanged and cannot be swept in, so it stays silent here.
@@ -122,8 +126,16 @@ check the wrong one, when:
   - a pipeline or background `cd` is detected from the command text, with
     quoted strings blanked; the approximation ignores every `cd` in the
     command, so a `cd` that does take effect beside it is not followed either;
-  - after a `cd`, a nested `bash -c` line has an unknown directory, so only
-    an absolute `git -C /path` or `cd /path` inside it is read;
+  - a nested `bash -c` line has an unknown directory when any other line of
+    the command has a `cd` (before it, after it, or in an intermediate
+    `bash -c`), so only an absolute `git -C /path` or `cd /path` inside it is
+    read;
+  - `eval '...'` and a command built from variables are not read;
+  - `env -C dir git ...` and `env --chdir=dir git ...` run elsewhere: the
+    hook goes silent on them; other wrappers that change directory are not
+    recognised;
+  - `git add -N`/`--intent-to-add` and `--renormalize` stage no gitlink and
+    are silent (measured, git 2.43);
   - a `cd` inside a subshell `( ... )` is scoped to it, as in the shell, so a
     git command after the subshell runs where the subshell started; a `cd` in
     a `{ ... }` group moves the caller and is followed;
@@ -169,6 +181,11 @@ _COMMIT_LONG = _COMMIT_VALUE_LONG | _COMMIT_DRY_RUN | {
     "--post-rewrite", "--untracked-files", "--pathspec-file-nul",
     "--allow-empty", "--allow-empty-message",
 }
+# `git add` options after which nothing is staged that matters here: a dry
+# run, a refresh, `-N` (an empty placeholder for new files) and
+# `--renormalize` (tracked files only, never a gitlink; measured, git 2.43).
+_STAGES_NOTHING = {"--dry-run", "--refresh", "--intent-to-add",
+                   "--renormalize"}
 _ADD_VALUE_LONG = {"--chmod", "--pathspec-from-file"}
 _ADD_LONG = _ADD_VALUE_LONG | {
     "--dry-run", "--verbose", "--interactive", "--patch", "--edit", "--force",
@@ -176,13 +193,6 @@ _ADD_LONG = _ADD_VALUE_LONG | {
     "--ignore-removal", "--no-ignore-removal", "--refresh", "--ignore-errors",
     "--ignore-missing", "--sparse", "--pathspec-file-nul",
 }
-# A command-line `-c key=value` that decides whether git leaves a submodule's
-# gitlink alone. Only these are passed on to the hook's own `git status`:
-# anything else (`core.fsmonitor`, `core.sshCommand`, ...) can run a program
-# at hook time, before the user has approved the command.
-_IGNORE_CONF = re.compile(
-    r"^(?:diff\.ignoresubmodules|submodule\.[^=]+\.ignore)="
-    r"(?:all|dirty|untracked|none)$", re.I)
 
 
 # The shared parser blanks heredoc bodies correctly (a command after
@@ -214,24 +224,18 @@ def _redirects_git(env_tokens):
 
 
 def _git_invocation(rest):
-    """(c_dirs, confs, subcommand, args) for a `git ...` argv, or None.
+    """(c_dirs, subcommand, args) for a `git ...` argv, or None.
 
-    `c_dirs` is every `-C <dir>` in order (git applies them cumulatively);
-    `confs` is every `-c <key=value>` that decides whether a gitlink is
-    ignored (`_IGNORE_CONF`), which the hook's own `git status` must share.
+    `c_dirs` is every `-C <dir>` in order (git applies them cumulatively).
     """
     if not rest or rest[0] != "git":
         return None
-    c_dirs, confs = [], []
+    c_dirs = []
     i = 1
     while i < len(rest):
         a = rest[i]
         if a == "-C" and i + 1 < len(rest):
             c_dirs.append(rest[i + 1])
-            i += 2
-        elif a == "-c" and i + 1 < len(rest):
-            if _IGNORE_CONF.match(rest[i + 1]):
-                confs.append(rest[i + 1])
             i += 2
         elif a in ("--git-dir", "--work-tree") or a.startswith(
                 ("--git-dir=", "--work-tree=")):
@@ -241,7 +245,7 @@ def _git_invocation(rest):
         elif a.startswith("-"):
             i += 1  # --no-pager, -p, --exec-path[=x], ...
         else:
-            return c_dirs, confs, a, rest[i + 1:]
+            return c_dirs, a, rest[i + 1:]
     return None
 
 
@@ -320,7 +324,7 @@ def add_kind(args):
         else:
             paths.append(a)
         i += 1
-    if "--dry-run" in names or "--refresh" in names or "n" in letters:
+    if (names & _STAGES_NOTHING) or "n" in letters or "N" in letters:
         return None
     if "--update" in names or "u" in letters:
         return "add -u", paths
@@ -340,7 +344,9 @@ def _move(rest, cur):
     return target
 
 
-_CD_WORD = re.compile(r"\s*(?:cd|pushd|popd)(?![\w./-])")
+_CD_WORD = re.compile(
+    r"\s*(?:(?:then|do|else|elif|if|while|until|time|!)\s+)*"
+    r"(?:cd|pushd|popd)(?![\w./-])")
 _QUOTED = re.compile(r"'[^']*'|\"(?:\\.|[^\"\\])*\"")
 _SEGMENTS = re.compile(r"&&|\|\||[;\n(){}]")
 _PIPE_OR_JOB = re.compile(r"([|&])")
@@ -369,8 +375,21 @@ def _unreachable_cd(command):
     return False
 
 
+def _env_chdir(argv):
+    """True for `env -C dir ...` / `env --chdir=dir ...`, which the shared
+    parser peels like any lead word although it changes the directory."""
+    if os.path.basename(argv[0]) != "env":
+        return False
+    for a in argv[1:]:
+        if a.startswith("--chdir") or a.startswith("-C"):
+            return True
+        if not a.startswith("-") and "=" not in a:
+            break
+    return False
+
+
 def _scan(command, start):
-    """[(segment, kind, target_dir, pathspecs, confs), ...] for every
+    """[(segment, kind, target_dir, pathspecs), ...] for every
     matching invocation in the one command line `command`, in order, and
     whether it changes directory at all. `start` is the directory the line
     starts in (relative to the session cwd; "" is the session cwd itself, None
@@ -392,6 +411,8 @@ def _scan(command, start):
 
     hits, moved = [], False
     for scope, argv in cmds:
+        if _env_chdir(argv):
+            continue  # `env -C dir git ...` runs elsewhere; go silent
         env, rest = _strip_env(argv)
         cd = cd_of(scope)
         if rest and rest[0] in ("cd", "pushd", "popd"):
@@ -402,7 +423,7 @@ def _scan(command, start):
         inv = _git_invocation(rest)
         if inv is None or _redirects_git(env):
             continue
-        c_dirs, confs, sub, args = inv
+        c_dirs, sub, args = inv
         target = cd
         for d in c_dirs:  # `-C` moves like `cd`, `~` and `$HOME` included
             target = _move(["cd", "--", d], target)
@@ -410,32 +431,33 @@ def _scan(command, start):
             continue
         segment = " ".join(argv)
         if sub == "commit" and commit_sweeps_all(args):
-            hits.append((segment, "commit -a", target, None, confs))
+            hits.append((segment, "commit -a", target, None))
         elif sub == "add":
             found = add_kind(args)
             if found:
-                hits.append((segment, found[0], target, found[1], confs))
+                hits.append((segment, found[0], target, found[1]))
     return hits, moved
 
 
 def offending(command):
-    """[(segment, kind, target_dir, pathspecs, confs), ...] for every
+    """[(segment, kind, target_dir, pathspecs), ...] for every
     matching invocation in `command`, including the command lines of nested
     `bash -c '...'` shells, in order.
 
-    A nested line starts where the outer shell is: the session directory when
-    no line of the command changes directory, else unknown (the shell it runs
-    in may have been moved by a `cd` the text does not tie to it), and then
-    only an absolute `git -C /path` or `cd /path` is read."""
+    A nested line starts in the session directory when no OTHER line of the
+    command (the outer text, or another nested line) changes directory, else
+    in an unknown one, because the text does not tie that `cd` to this shell
+    (`bash -c "cd r && bash -c 'git commit -am x'"`, or a `cd` after the
+    `bash -c`). Only an absolute `git -C /path` or `cd /path` is read there."""
     if _simple_commands is None:
         return []
     pieces = _shell_c_expansions(command)
     scans = [_scan(piece, "") for piece in pieces]
-    if not scans[0][1]:
-        return [h for hits, _ in scans for h in hits]
-    hits = scans[0][0]
-    for piece in pieces[1:]:
-        hits = hits + _scan(piece, None)[0]
+    hits = list(scans[0][0])
+    for i, piece in enumerate(pieces[1:], start=1):
+        # Another line's `cd` may have moved the shell this one runs in.
+        others_move = any(m for j, (_, m) in enumerate(scans) if j != i)
+        hits += _scan(piece, None)[0] if others_move else scans[i][0]
     return hits
 
 
@@ -467,7 +489,8 @@ def _git(cwd, *args):
         return None
     try:
         out = subprocess.run(
-            ["git", *args], cwd=cwd, capture_output=True,
+            ["git", "-c", "core.fsmonitor=false", *args], cwd=cwd,
+            capture_output=True,
             timeout=min(_PER_CALL_S, remaining),
             env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"})
     except (OSError, subprocess.SubprocessError):
@@ -480,7 +503,7 @@ def _git(cwd, *args):
     return out.stdout.decode("utf-8", "surrogateescape")
 
 
-def modified_submodules(cwd, confs=()):
+def modified_submodules(cwd):
     """(found, toplevel) where found lists (path, pinned_sha, head_sha) for
     each submodule whose gitlink would change if every modified tracked path
     were staged; None if git cannot be run here."""
@@ -491,8 +514,7 @@ def modified_submodules(cwd, confs=()):
     # the gitlink alone (checked with git 2.43), so the configured values must
     # decide. A submodule with only dirty content is reported as ` M` too;
     # the HEAD-versus-pin comparison below tells the two apart.
-    conf_args = [x for c in confs for x in ("-c", c)]
-    status = _git(cwd, *conf_args, "status", "--porcelain=v1", "-z", "-uno")
+    status = _git(cwd, "status", "--porcelain=v1", "-z", "-uno")
     top = _git(cwd, "rev-parse", "--show-toplevel")
     # ONE index read for every gitlink, rather than a query per modified path:
     # a large sweep would otherwise spend the whole deadline and fail open
@@ -539,7 +561,7 @@ def modified_submodules(cwd, confs=()):
 # Pathspec magic the hook evaluates: `:!x` and `:^x` (exclude), `:/x` (from
 # the repository root) and `:(exclude,top,icase,literal)x`. Any other magic
 # (`attr`, `glob`, `from-file`, ...) is not evaluated.
-_SHORT_MAGIC = re.compile(r"^:([!^/]+)(.*)$", re.S)
+_SHORT_MAGIC = re.compile(r"^:([!^/]+):?(.*)$", re.S)
 _LONG_MAGIC = re.compile(r"^:\(([^)]*)\)(.*)$", re.S)
 _EVALUATED = {"exclude", "top", "icase", "literal"}
 _GLOB = "*?["
@@ -718,16 +740,15 @@ def main() -> int:
     base = next((c for c in (inp.get("Cwd"), payload.get("cwd"))
                  if isinstance(c, str) and c), None) or os.getcwd()
     state = {}  # cwd -> modified_submodules(cwd), one status per repository
-    for segment, kind, target, pathspecs, confs in hits:
+    for segment, kind, target, pathspecs in hits:
         cwd = os.path.normpath(os.path.join(base, target))
         if not os.path.isdir(cwd):
             continue
-        key = (cwd, tuple(confs))
-        if key not in state:
-            state[key] = modified_submodules(cwd, confs)
-        if not state[key]:
+        if cwd not in state:
+            state[cwd] = modified_submodules(cwd)
+        if not state[cwd]:
             continue
-        subs, top = state[key]
+        subs, top = state[cwd]
         if pathspecs is not None:
             subs = [s for s in subs
                     if _under_pathspecs(s[0], pathspecs, cwd, top,

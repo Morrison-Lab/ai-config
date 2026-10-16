@@ -196,6 +196,26 @@ def rename_ignored_repo(path):
     _run(path, "mv", "xM mod", "renamed.txt")
 
 
+def fsmonitor_repo(path):
+    """The repository's own config names a core.fsmonitor program: git runs
+    it during `status`, so the hook's status must switch it off."""
+    moved_pin_only_repo(path)
+    marker = os.path.join(ELSEWHERE, "executed-marker")
+    _run(path, "config", "core.fsmonitor", f'sh -c "touch {marker}"')
+
+
+def typechange_repo(path):
+    """The gitlink `mod` replaced by a symlink to another repository whose
+    HEAD differs from the pin: status says ` T mod`, and `-a` stages a
+    symlink, not a moved pin."""
+    _base_with_submodule(path)
+    src = os.path.join(path, ".subsrc")
+    _write(src, "lib.txt", content="v2\n")
+    _run(src, "commit", "-qam", "sub v2")
+    shutil.rmtree(os.path.join(path, "mod"))
+    os.symlink(src, os.path.join(path, "mod"))
+
+
 MSG = '"fix"'
 # (id, builder, command, description). A command may use {repo}.
 SHOULD_WARN = [
@@ -281,9 +301,16 @@ SHOULD_WARN = [
      "an ambiguous prefix (--s) is not guessed at, so -a still sweeps"),
     ("W48", moved_pin_only_repo, "git add -u --pathspec-from-file list.txt",
      "the value of --pathspec-from-file is not a pathspec"),
-    ("W49", moved_pin_only_repo,
-     "git -c 'core.fsmonitor=sh -c \"touch {marker}\"' commit -am fix",
-     "a -c that can run a program is not forwarded to the hook's status"),
+    ("W62", fsmonitor_repo, "git commit -am fix",
+     "a repository's core.fsmonitor program must not run during the hook's status"),
+    ("W63", moved_pin_only_repo,
+     "git -c submodule.mod.ignore=all commit -am fix",
+     "a command-line submodule.<n>.ignore=all does not stop git staging it"),
+    ("W64", moved_pin_only_repo, "git -c diff.ignoreSubmodules=all add -u",
+     "a command-line diff.ignoreSubmodules=all does not stop add staging it"),
+    ("W65", moved_pin_only_repo,
+     "if true; then cd mod | cat; fi; git commit -am fix",
+     "a pipeline cd after a shell keyword runs in a subshell"),
     ("W50", moved_pin_only_repo, "@home git -C ~ commit -am fix",
      "-C ~ is expanded like cd ~"),
     ("W51", moved_pin_only_repo, "@home git -C $HOME commit -am fix",
@@ -399,11 +426,6 @@ SHOULD_STAY_SILENT = [
      "--dr is an unambiguous prefix of --dry-run"),
     ("S48", moved_pin_only_repo, "git commit --mess -a",
      "--mess is --message, and -a is its value"),
-    ("S49", moved_pin_only_repo,
-     "git -c submodule.mod.ignore=all commit -am fix",
-     "a command-line submodule.<name>.ignore=all: git leaves the gitlink alone"),
-    ("S50", moved_pin_only_repo, "git -c diff.ignoreSubmodules=all add -u",
-     "a command-line diff.ignoreSubmodules=all: the same"),
     ("S51", moved_pin_only_repo, "git add . ':!mod'",
      "an exclude of the submodule keeps it out"),
     ("S52", moved_pin_only_repo, "git add -u ':(exclude)mod'",
@@ -424,6 +446,25 @@ SHOULD_STAY_SILENT = [
      "after a cd a nested shell's directory is unknown: documented silent case"),
     ("S60", moved_pin_only_repo, "bash -c 'cd mod && git commit -am fix'",
      "a cd inside bash -c moves into the clean submodule"),
+    ("S62", moved_pin_only_repo, "env -C mod git commit -am fix",
+     "env -C runs git in another directory: documented silent case"),
+    ("S63", moved_pin_only_repo, "env --chdir=mod git commit -am fix",
+     "env --chdir runs git in another directory: documented silent case"),
+    ("S64", typechange_repo, "git commit -am fix",
+     "a gitlink replaced by a symlink is ` T`, not a moved pin"),
+    ("S65", moved_pin_only_repo, "git add -N .", "add -N stages no gitlink"),
+    ("S66", moved_pin_only_repo, "git add --renormalize .",
+     "add --renormalize stages no gitlink"),
+    ("S67", moved_pin_only_repo, "git add -u ':!:mod'",
+     "the optional `:` ending short magic: this excludes mod"),
+    ("S68", moved_pin_only_repo,
+     "bash -c \"cd mod && bash -c 'git commit -am fix'\"",
+     "a cd in an intermediate bash -c makes the inner directory unknown"),
+    ("S69", moved_pin_only_repo,
+     "cd {repo} && bash -c 'git commit -am fix'",
+     "after a cd a nested line is unknown: documented silent case"),
+    ("S70", moved_pin_only_repo, "git add --intent-to-add .",
+     "the long spelling of add -N"),
     ("S61", rename_ignored_repo, "git add -u",
      "a staged rename's old name is not a status record of its own"),
     ("S40", moved_pin_only_repo, f"pushd mod && git commit -am {MSG}",
@@ -474,13 +515,11 @@ def verdict(hook_path, repo, command, want_text=False):
             env["HOME"], cwd = repo, ELSEWHERE
         else:
             sys.exit(f"FATAL: unknown payload prefix @{name}")
-    # `{marker}` is a file a `-c` program would create: if it exists after the
-    # run, the hook let a command-line config execute something at hook time.
+    # The file a repository's core.fsmonitor program would create: if it
+    # exists after the run, the hook let that config execute at hook time.
     marker = os.path.join(ELSEWHERE, "executed-marker")
-    if "{marker}" in command:
-        command = command.replace("{marker}", marker)
-        if os.path.exists(marker):
-            os.remove(marker)
+    if os.path.exists(marker):
+        os.remove(marker)
     tool_input["command"] = command
     proc = subprocess.run(
         [sys.executable, hook_path],
@@ -492,7 +531,7 @@ def verdict(hook_path, repo, command, want_text=False):
     )
     if os.path.exists(marker):
         os.remove(marker)
-        return "EXECUTED"  # the hook ran a program named on the command line
+        return "EXECUTED"  # the hook ran the repository's fsmonitor program
     if proc.returncode != 0 and hook_path != HOOK:
         return "crash"  # a mutant that raises is a flip, not a harness error
     if proc.returncode != 0:
@@ -609,8 +648,8 @@ MUTATIONS = {
           '                if False:\n                    sweeps = True')],
         {"W1", "W2", "W6", "W8", "W9", "W10", "W11", "W12", "W16", "W17",
          "W18", "W23", "W25", "W26", "W30", "W31", "W32", "W33", "W34",
-         "W35", "W36", "W38", "W43", "W44", "W45", "W47", "W49", "W50",
-         "W51", "W56", "W57", "W58", "W59", "W60", "W61"}
+         "W35", "W36", "W38", "W43", "W44", "W45", "W47", "W50",
+         "W51", "W56", "W57", "W58", "W59", "W60", "W61", "W62", "W63", "W65"}
         | ({"W39"} if os.name != "nt" else set()),
     ),
     "M_value_letter_stops_cluster": (
@@ -670,7 +709,7 @@ MUTATIONS = {
         "an exclude pathspec that matches the submodule keeps it out",
         [("        if spec and spec[0] and _matches(",
           "        if False and _matches(")],
-        {"S51", "S52", "S53", "S54", "S55", "S56", "S57"},
+        {"S51", "S52", "S53", "S54", "S55", "S56", "S57", "S67"},
     ),
     "M_exclude_only_means_all": (
         "pathspecs that are all excludes mean everything else",
@@ -735,7 +774,7 @@ MUTATIONS = {
           '                  "--ignore-submodules=dirty")')],
         # The override reports a gitlink that git leaves alone when
         # submodule.<name>.ignore or diff.ignoreSubmodules is `all`.
-        {"S37", "S38", "S49", "S50", "S61"},
+        {"S37", "S38", "S61"},
     ),
     "M_unknown_stays_unknown": (
         "an unknown directory plus a relative move stays unknown",
@@ -767,7 +806,7 @@ MUTATIONS = {
         "`-u` is read as update",
         [('    if "--update" in names or "u" in letters:',
           '    if "--update" in names:')],
-        {"W4", "W7", "W14", "W15", "W20", "W21", "W24", "W48", "W55"},
+        {"W4", "W7", "W14", "W15", "W20", "W21", "W24", "W48", "W55", "W64"},
     ),
     "M_add_all": (
         "`-A`/`--all` is read as a sweeping add",
@@ -782,19 +821,58 @@ MUTATIONS = {
     ),
     "M_add_dry_run_long": (
         "`git add --dry-run` stages nothing",
-        [('"--dry-run" in names or "--refresh"', '"--refresh"')],
+        [('_STAGES_NOTHING = {"--dry-run", "--refresh",',
+          '_STAGES_NOTHING = {"--refresh",')],
         {"S25", "S47"},
-    ),
-    "M_add_dry_run_short": (
-        "`git add -n` stages nothing",
-        [(' or "n" in letters:\n        return None', ':\n        return None')],
-        {"S24"},
     ),
     "M_add_refresh": (
         "`git add --refresh` stages nothing",
-        [('"--dry-run" in names or "--refresh" in names or "n"',
-          '"--dry-run" in names or "n"')],
+        [('{"--dry-run", "--refresh", "--intent-to-add",',
+          '{"--dry-run", "--intent-to-add",')],
         {"S33"},
+    ),
+    "M_add_intent_to_add_long": (
+        "`git add --intent-to-add` stages no gitlink",
+        [('"--refresh", "--intent-to-add",', '"--refresh",')],
+        {"S70"},
+    ),
+    "M_add_renormalize": (
+        "`git add --renormalize` stages no gitlink",
+        [('"--intent-to-add",\n                   "--renormalize"}',
+          '"--intent-to-add"}')],
+        {"S66"},
+    ),
+    "M_add_dry_run_short": (
+        "`git add -n` stages nothing",
+        [('or "n" in letters or "N" in letters:', 'or "N" in letters:')],
+        {"S24"},
+    ),
+    "M_add_intent_to_add_short": (
+        "`git add -N` stages no gitlink",
+        [('or "n" in letters or "N" in letters:', 'or "n" in letters:')],
+        {"S65"},
+    ),
+    "M_fsmonitor_off": (
+        "every git call runs with core.fsmonitor switched off",
+        [('["git", "-c", "core.fsmonitor=false", *args], cwd=cwd,',
+          '["git", *args], cwd=cwd,')],
+        {"W62"},
+    ),
+    "M_env_chdir_silent": (
+        "`env -C dir` / `env --chdir=dir` go silent",
+        [("        if _env_chdir(argv):", "        if False:")],
+        {"S62", "S63"},
+    ),
+    "M_cd_keyword": (
+        "a pipeline cd after `then`/`do`/... is still a pipeline cd",
+        [('r"\\s*(?:(?:then|do|else|elif|if|while|until|time|!)\\s+)*"',
+          'r"\\s*"')],
+        {"W65"},
+    ),
+    "M_short_magic_colon": (
+        "the optional `:` ending short magic is dropped",
+        [('r"^:([!^/]+):?(.*)$"', 'r"^:([!^/]+)(.*)$"')],
+        {"S67"},
     ),
     "M_add_no_ignore_removal": (
         "`--no-ignore-removal` is an alias of -A",
@@ -880,28 +958,7 @@ MUTATIONS = {
         "a global `-c k=v`, `--namespace`, `--config-env` consume their value",
         [("        elif a in _GIT_VALUE_GLOBAL:\n            i += 2",
           "        elif a in _GIT_VALUE_GLOBAL:\n            i += 1")],
-        {"W32"},
-    ),
-    "M_dash_c_value_skipped": (
-        "a global `-c k=v` consumes its value",
-        [("                confs.append(rest[i + 1])\n            i += 2",
-          "                confs.append(rest[i + 1])\n            i += 1")],
-        # S49/S50 stay silent: the unconsumed value then reads as the
-        # subcommand, which is not commit or add.
-        {"W12", "W49"},
-    ),
-    "M_conf_forwarded": (
-        "the command's ignore settings reach the hook's own status",
-        [('    conf_args = [x for c in confs for x in ("-c", c)]',
-          "    conf_args = []")],
-        {"S49", "S50"},
-    ),
-    "M_conf_whitelist": (
-        "only ignore settings are forwarded; a -c that runs a program is not",
-        [("            if _IGNORE_CONF.match(rest[i + 1]):\n"
-          "                confs.append(rest[i + 1])",
-          "            if True:\n                confs.append(rest[i + 1])")],
-        {"W49"},
+        {"W12", "W32", "W63", "W64"},
     ),
     "M_long_prefix": (
         "a long option may be abbreviated to an unambiguous prefix",
@@ -955,7 +1012,7 @@ MUTATIONS = {
     "M_pipeline_cd_unreachable": (
         "a cd in a pipeline stage or background job never moves the shell",
         [("    ignore_cd = _unreachable_cd(command)", "    ignore_cd = False")],
-        {"W56", "W57"},
+        {"W56", "W57", "W65"},
     ),
     "M_redirect_is_not_a_job": (
         "`2>&1` and `&>` are redirections, not background jobs",
@@ -970,9 +1027,10 @@ MUTATIONS = {
         {"W58", "W59", "W60", "W61"},
     ),
     "M_nested_start_unknown": (
-        "after a cd the directory of a nested shell is unknown",
-        [("    if not scans[0][1]:", "    if True:")],
-        {"S59"},
+        "when another line has a cd, a nested line's directory is unknown",
+        [("        hits += _scan(piece, None)[0] if others_move else scans[i][0]",
+          "        hits += scans[i][0]")],
+        {"S59", "S68"},
     ),
     "M_head_differs_from_pin": (
         "only a submodule whose HEAD differs from the pin counts",
@@ -1003,8 +1061,8 @@ MUTATIONS = {
     ),
     "M_every_match_checked": (
         "every matching invocation is checked, not only the first",
-        [("    for segment, kind, target, pathspecs, confs in hits:",
-          "    for segment, kind, target, pathspecs, confs in hits[:1]:")],
+        [("    for segment, kind, target, pathspecs in hits:",
+          "    for segment, kind, target, pathspecs in hits[:1]:")],
         {"W25", "W26"},
     ),
     "M_mode_160000": (
@@ -1019,9 +1077,9 @@ MUTATIONS = {
         "only a worktree-column `M` entry counts",
         [('        if xy[1] != "M":\n            continue',
           "        if False:\n            continue")],
-        # Declared EMPTY: a pin bump staged on purpose has HEAD == index, so
-        # M_head_differs_from_pin already silences it (S11).
-        set(),
+        # A gitlink replaced by a symlink is ` T`, with another repository's
+        # HEAD, which differs from the pin (S64).
+        {"S64"},
     ),
 }
 

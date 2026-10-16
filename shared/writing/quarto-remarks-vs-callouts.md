@@ -65,7 +65,7 @@ James et al. write the quantity as $\generr$, without the argument.
 ```
 
 - **Do:** end a definition div with a "Source:" line that holds only the citation.
-- **Do:** put "Hastie et al. write the quantity as $\generr$, without the argument" in a `#rem-source-` remark.
+- **Do:** put "James et al. write the quantity as $\generr$, without the argument" in a `#rem-source-` remark.
 - **Don't:** make a one-line remark div whose only content is a citation.
 - **Don't:** put a paragraph of history inside the definition.
 

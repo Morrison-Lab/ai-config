@@ -2,7 +2,7 @@
 
 Measured in claude.ai cloud sessions, 2026-10-12 to 2026-10-16.
 Earlier TinyTeX and R findings are in [`r-cloud-sessions`](r-cloud-sessions.md); this file adds what was missing.
-A coordinator rule applies: do not skip a check because a tool is missing, and do not leave the PDF check to CI.
+The project's coordinator session set one rule: do not skip a check because a tool is missing, and do not leave the PDF check to CI.
 
 ## When the SessionStart toolchain install dies
 
@@ -39,16 +39,19 @@ Two routes worked:
   Ezra had pushed back on "no LaTeX").
 - Pushing to a second repo needs `add_repo` with `access: "push"` first.
 - The gha `check-new-line-breaks` check flags a bold lead-in followed by text on one line (`**Fitting.** We find ...`), long lines with a mid-line semicolon, and packed sentences.
-  Three lds pushes each failed on one such line (2026-10-14), and the CI log names only the first offender.
+  Three lds pushes each failed on one such line (2026-10-14).
+  The CI log names only the first offender.
+  The local run is also documented in [`gha-reusable-workflows`](gha-reusable-workflows.md).
   Run it locally first: `git clone --depth 1 --branch v3 https://github.com/Morrison-Lab/gha.git`, then from the repo checkout run `NLB_BASE_REF=origin/main NLB_GLOBS='*.md *.qmd' NLB_PATHS_IGNORE='_extensions/**,lectures/**,chapters/outtakes/**' NLB_FAIL=true NLB_CLAUSE_BREAKS=true NLB_CLAUSE_MIN_LENGTH=80 python3 gha/check-new-line-breaks/check-new-line-breaks.py`.
   Put it in the brief of any worker editing prose.
 
 ## R in a cloud session: never declare it unrestorable
 
-On rme#1326 (2026-10-14) "R can't be restored in this container" was my mistake, not a limit, and Ezra rejected it.
+On rme#1326 (2026-10-14) a session declared "R can't be restored in this container", which was a mistake rather than a limit, and Ezra rejected it.
+The `00LOCK` finding below extends [`r-cloud-sessions`](r-cloud-sessions.md).
 Three causes stacked:
 
-- `pkill -f install.packages` killed my own shell and left a stale `/usr/local/lib/R/site-library/00LOCK-*` directory, so later installs died with "failed to lock directory".
+- `pkill -f install.packages` killed the session's own shell and left a stale `/usr/local/lib/R/site-library/00LOCK-*` directory, so later installs died with "failed to lock directory".
 - The repo's `.Rprofile` loads renv, whose sandbox library hides the system site-library, so knitr and rmarkdown looked missing.
 - GitHub tarball URLs (codeload, API tarball, archive) return 403, so `renv::restore` and `remotes::install_github` die on GitHub-only packages.
 
@@ -56,13 +59,14 @@ Three causes stacked:
 - **Do:** for a GitHub-only package, `git clone` it (git works through the proxy), check out the SHA pinned in DESCRIPTION `Remotes`, then `remotes::install_local()`.
 - **Do:** render with `RENV_CONFIG_AUTOLOADER_ENABLED=FALSE` and `R_LD_LIBRARY_PATH="$(R RHOME)/lib"`.
 - **Don't:** `pkill -f` a pattern that can match your own shell.
-- **Don't:** tell Ezra a tool is unavailable before a second, different attempt.
+- **Don't:** tell Ezra a tool is unavailable before a second attempt by a different route (for example a clone in place of a tarball download).
 
 ## Reading a private PR preview
 
 The private Pages URL returns 404 to curl.
 Read the built files from the branch instead (Ezra, 2026-10-12: "remember you can always inspect the gh-pages branch directly"): `git fetch origin gh-pages`, then `git show origin/gh-pages:pr-preview/pr-N/chapters/<page>.html`.
 Check that new ids exist and no `?@` unresolved cross-reference appears.
-The preview is built from the head at build time, so re-check after a push.
+The preview is built from the head at build time.
+Re-check after a push.
 For behaviour a file cannot show (an embed), open the deployed preview in Playwright Chromium;
 a local `file://` render can fail where the https preview works.

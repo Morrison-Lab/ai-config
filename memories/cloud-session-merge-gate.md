@@ -6,15 +6,21 @@ this file holds the cloud-specific quirks that stalled merges.
 
 ## Grants
 
-- A merge grant is per PR.
-  "mwc 548", "merge macros 122 when ready", or a bare "mwc" sent right after an ask naming one PR covers that PR once it passes `check-pr-fully-clean.py`.
+- A merge grant covers the PRs it names.
+  "mwc 548" or "merge macros 122 when ready" covers that PR once it passes `check-pr-fully-clean.py`.
+  A bare "mwc" means "mwc all", the PRs in that thread at that time (Ezra, 2026-10-16;
+  [`skills/mwc/SKILL.md`](../skills/mwc/SKILL.md)).
 - "daytb" means go with the recommendation on an open question, and a decision-card tap answers only that card.
   Neither is a merge grant.
-- A bare "mwc" after a message listing several clean PRs does not cover them all (coordinator, 2026-10-10): ask for "mwc" on each.
+- On 2026-10-10 the project's coordinator session ruled that a bare "mwc" after a message listing several clean PRs did not cover them all;
+  Ezra's 2026-10-16 ruling above replaces that.
 - A PR that goes clean with no named grant gets a reply asking for "mwc N".
 - `ai-config`, `macros` and `gha` carry a standing mwc (Ezra, 2026-10-16: "standing mwc on macro stands", "also on ai-config and gha").
   It covers PRs in those repos only, not a downstream `latex-macros` pin bump in another repo.
-- The merge words stay per PR even while the cross-harness reviewer is out;
+- The merge hook's own list (`STANDING_MERGE_GRANT_REPOS`) names only `ai-config` and the macros repo, so a `gha` merge still needs `enable-mwc`;
+  [ai-config#3490](https://github.com/Morrison-Lab/ai-config/issues/3490) tracks the mismatch.
+  Infra-only PRs in any Morrison-Lab repo have a separate standing grant, described in `skills/mwc/SKILL.md`.
+- The merge words are unchanged while the cross-harness reviewer is out;
   only the review changes (see "Cross-harness review" below).
 
 ## The merge hook marker
@@ -44,7 +50,7 @@ Do not retry or work around a denial.
 ## The checker comes before the merge call
 
 - The hook only warns afterwards; it does not gate.
-  On ai-config#4538 (2026-10-15) a merge went through on hand-read verdicts without `check-pr-fully-clean.py`, which is procedural miss even though a later run found the PR clean.
+  On ai-config#4538 (2026-10-15) a merge went through on hand-read verdicts without `check-pr-fully-clean.py`, which is a procedural miss even though a later run found the PR clean.
 - In a cloud session GraphQL is blocked, so the bare checker exits 1 with a traceback and no finding bullets.
   That is a data failure, not a verdict.
   Run `python3 scripts/build-pr-payload.py OWNER/REPO N OUT.json`, then `python3 scripts/check-pr-fully-clean.py -R OWNER/REPO --from-json OUT.json N`, and read the exit status unpiped (0 clean, 1 not clean, other is a data problem).
@@ -54,7 +60,8 @@ Do not retry or work around a denial.
   compare it with the PR's head, since failures on older heads were already fixed.
 - Without the checker, report a REST check-run count (`commits/<sha>/check-runs?per_page=100 --paginate`) and say the checker could not run.
   Do not write "ready for merge" (lds#640, 2026-10-12; the Stop hook flags it).
-- A gate that looks wrong is fixed, or its input corrected, never merged over (coordinator, 2026-10-16, gha#1073).
+- A gate that looks wrong is fixed, or its input corrected, never merged over (project coordinator session, 2026-10-16, gha#1073;
+  the same rule is in [`claude-app-projects`](claude-app-projects.md)).
   Report the failing lines to the coordinator, wait for the corrected input, rebuild the payload, rerun, and merge only on a pass.
 - The checker fails a PR when main gained commits touching `.github/workflows/` since the merge base (ai-config#2982).
   In a batch of workflow PRs (pds#177 to #184, 2026-10-16) each merge forced every remaining PR to merge main, re-review and rebuild the preview, about 10 minutes per round.
@@ -64,7 +71,7 @@ Do not retry or work around a denial.
 
 ## Cross-harness review
 
-- Coordinator rule (2026-10-15, after pds#170 merged on "mwc 170" with Argon still queued): wait for the cross-harness verdict on the current head even after Ezra says mwc.
+- Rule from the project's coordinator session (2026-10-15, after pds#170 merged on "mwc 170" with Argon still queued): wait for the cross-harness verdict on the current head even after Ezra says mwc.
   The gate needs a reviewer whose model and harness both differ from the author's;
   Claude's CI review does not count.
   An mwc removes the asking, not the gate.
@@ -74,17 +81,18 @@ Do not retry or work around a denial.
   a non-overlapping main commit need not move the head.
 - Argon quota failure looks like review output: a comment headed "FINDINGS" holding only `RESOURCE_EXHAUSTED (code 429) ... Resets in 2h0m28s` and an empty `VERDICT:` (lds#1027, 2026-10-15).
   Read the reset time, ask the coordinator to re-queue after it, and merge nothing on it.
+  The CI review's own 429 skip behaviour is in [`claude-review-dispatch`](claude-review-dispatch.md).
 - The checker admits a comment as a counted reviewer only through a first or last line marker in `REVIEW_AGENT_MARKERS`.
   A clean read posted by `dem-extra1` with no marker never counts toward `--quorum` (lds#938, 2026-10-16), and the "_Posted by Claude Code (AI agent)_" footer is excluded on purpose.
   The XPS router therefore posts Argon reads with the Antigravity agent header as the first line.
-  Keep `--quorum 2`; quorum 1 is not a substitute for a cross-harness review.
+  Keep `--quorum 2` whenever a cross-harness reviewer is available;
+  the Claude-only mode below, which Ezra chose for the period the reviewers are out, uses quorum 1.
 - While Argon is out of quota, Ezra's decision (card, 2026-10-16 05:01 UTC;
   the coordinator made it project-wide at 05:11): an independent adversarial Claude subagent, separate from the author and the CI reviewer, stands in for the cross-harness review.
   Run a general-purpose subagent on the final head with the diff as a file and no `mcp__hearthbot__` tools.
   Post a comment with "### Verdict", "VERDICT: CLEAN", "Reviewed-Commit: <full sha>" and a line saying it is the Argon stand-in per Ezra's decision.
   Then run the checker and merge only on that PR's mwc.
-  Argon's quota was expected back about 2026-10-21;
-  the hook's cross-harness warning is expected meanwhile.
+  The hook's cross-harness warning is expected while Argon is out (its quota was expected back about 2026-10-21, so reread this bullet after that date).
 - Update (Ezra card, 2026-10-16 07:31 UTC, "Claude-only"): all agy models were out until their quota reset, so a PR with his mwc merges on the Claude CI review plus a CLEAN independent subagent review on the current head, checked at the default quorum 1.
   Wording nits still block.
   The subagent keeps finding header-wording nits each round: shorten archive headers to claim nothing that can go stale (lds#1052).

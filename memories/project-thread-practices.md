@@ -15,7 +15,7 @@ A line in a reply is not tracked and no other session can find it.
 ## Paywalled or institution-only content goes through a VPN session
 
 Rule (Ezra, 2026-10-12): try the UC Davis VPN or the WWU VPN to get the content.
-His Mac (DEM-MBP-02, folder `mlg`) is on the Davis VPN, and a WWU VPN is available through his work Linux machine.
+One of his registered devices is on the Davis VPN, and a WWU VPN is available through his work Linux machine.
 The AdamW, Adam and He et al. statements in lds#599 to #602 were first written from memory, and the fact-check (lds#628) found three that did not match the papers.
 
 - **Do:** start a Remote Control session with `start_rc_session` on a `list_devices` folder that is on a VPN.
@@ -32,6 +32,7 @@ The AdamW, Adam and He et al. statements in lds#599 to #602 were first written f
 
 Ezra's rule (2026-10-13): track any resource relevant to any of our repos or projects, not only the course in hand (for example later Deep Learning or RL courses).
 Before adding a course or channel link, check the directory CSV for the channel's row and extend it rather than adding a duplicate (lds#775, Pieter Abbeel's Berkeley playlists).
+The general rule is [`track-useful-resources`](../shared/workflow/track-useful-resources.md).
 
 ## Delegation lanes
 
@@ -42,6 +43,7 @@ This is recorded in [`delegation`](delegation.md) and [`manage-quota`](../shared
 ## ai-config's own context gate
 
 CLAUDE.md and AGENTS.md sit at their size caps (100,000 characters total for the CLI gate with margin 5 on 2026-10-16, and the 32,768-byte Codex cap for AGENTS.md).
-A new `## section` failed `validate` by 347 characters on ai-config#4569.
+A new `## section` failed `validate` by 347 characters on the branch for ai-config#4569.
 Put new rules in `shared/workflow/<name>.md` or a `memories/` file, fold at most a one-line pointer into an existing section, and run `python3 scripts/check-context-closure.py` before pushing.
-A red main is a request for the fix, not a reason to wait on Ezra (2026-10-16).
+A red main is a request for the fix, not a reason to wait on Ezra (2026-10-16;
+see [`red-main`](../shared/workflow/red-main.md)).

@@ -2,20 +2,26 @@
 
 Measured in the Machine Learning course project's repos (lds, mlg, macros, pds, sds), 2026-10-12 to 2026-10-16.
 Merge mechanics are in [`cloud-session-merge-gate.md`](cloud-session-merge-gate.md).
+Terms: Argon is the cross-harness reviewer that runs on Ezra's XPS machine through the Antigravity agent (`agy`), the "XPS router" is the thread that relays reviews to it, and `dem-extra1` is the GitHub account the cloud sessions post as.
 
 ## Every Actions job fails in seconds
+
+The general outage record is [`github-actions-outages`](github-actions-outages.md);
+this section adds the zero-step failure seen in the course repos.
 
 - Every workflow failed in 2-3 s with zero steps and a 404 on the log URL, on main and PRs alike (lds, 2026-10-16 about 08:24 UTC;
   lds#1058 at about 01:30 PDT).
   A one-line comment edit failed while the previous head had passed 15 minutes earlier.
-  It is an account or Actions-side limit that Ezra fixes ("try again", 08:38 UTC), not a code defect, so no push fixes it.
+  The cause was an account or Actions-side limit that Ezra fixed ("try again", 08:38 UTC).
+  It was not a code defect, so no push fixes it.
 - `rerun_failed_jobs` failed the same way for about 10 minutes.
   A full `gh api -X POST repos/OWNER/REPO/actions/runs/ID/rerun` on each run succeeded once Actions recovered.
 - **Do:** confirm the jobs have no steps, post one PR comment saying so, re-run each failed run once, then retry promptly when Ezra says "try again".
-- **Don't:** push commits to "kick" CI, or schedule a long wait.
+- **Don't:** push commits to "kick" CI, or schedule a wake further than 10 minutes out.
 
 ## Claude review after a quota failure
 
+The dispatch mechanics are in [`claude-review-dispatch`](claude-review-dispatch.md).
 When the gha `Claude Code Review` run hits a 429 quota, the `claude-review` job "succeeds" with a quota-exhausted result and only `require-clean-verdict` fails.
 `rerun_failed_jobs` then re-runs just the verdict job against that stale result (`QUOTA_EXHAUSTED=true`), which fails again at once.
 
@@ -34,7 +40,7 @@ When the gha `Claude Code Review` run hits a 429 quota, the `claude-review` job 
 
 - OpenCode `kimi-k3` returns empty text for very large diffs (91 KB on mlg#99) and sometimes for 25-40 KB parts.
   Split by file and treat an empty reply as "no review", not "no findings".
-  Where it did answer on mlg it found three real slips in the reports.
+  When it did answer on mlg, it found three real slips in the reports.
 - OpenCode Go via curl needs `--max-time` of at least 1500 s for reasoning models;
   400 s cut off reasoning-only streams (2026-10-15).
 - OpenCode Go has a weekly limit (see [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md)).
@@ -58,5 +64,5 @@ When the gha `Claude Code Review` run hits a 429 quota, the `claude-review` job 
 - Slide decks: a theorem subfile included right under a section heading must not start with a slide break, or the heading gets an empty slide (pds#154).
 - A shared macro added to `Morrison-Lab/macros` does not move a consumer's `latex-macros` gitlink, and PR previews skip the PDF. lds main went red on the PDF publish ("Undefined control sequence \dataset", 2026-10-15) until lds#999 bumped the pin.
   When a PR uses a recent macro, check the pin contains it (`git -C latex-macros merge-base --is-ancestor <macro-commit> HEAD`), and read the publish run on every merge commit.
-- The lds `Build / build` job takes about 40 minutes and the fully-clean gate stays red until it ends, so wait for the check-suite wake rather than polling.
+- The fully-clean gate stays red until the `Build / build` job ends, which took 25 to 40 minutes on lds (2026-10-12 to 2026-10-15), so wait for the check-suite notification rather than polling.
 - A new header partial in a repo whose `.gitignore` lists `*.html` needs a `!name.html` line, or it silently never commits (sds#217).

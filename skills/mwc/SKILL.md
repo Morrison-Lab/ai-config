@@ -44,7 +44,10 @@ without asking confirmation before every merge.
   Nor does it authorize merging a PR that changes a rendered document (Word, PDF, slides, a manuscript) before that document has been viewed page by page at the current head, with the evidence and an independent referee read of that render posted on the PR ([`review-rendered-documents`](../../shared/workflow/review-rendered-documents.md)).
   A clean automated review from every available provider evaluating the current HEAD commit is strictly required for autonomous merge under MWC;
   a reviewer skip notice (e.g. for quota exhaustion or workflow edits) or a fallback self-review does NOT waive this requirement, grant merge authority under MWC, or clear missing external review.
-  **A cross-model, cross-harness adversarial review evaluating the shipping head is strictly required before merge.**
+  **A cross-model, cross-harness adversarial review evaluating the shipping head is required before merge, unless no qualifying reviewer can run.**
+  When none can (host blocked by the network policy, backend down, CLI or credential absent), enumerate every route and try each once, then treat the gate as waived: the `mwc` grant and a clean Claude review plus green CI still apply, and the PR states that the review was waived, which reviewer was attempted, and the error (Ezra, 2026-10-16;
+  [`the waiver`](../../shared/workflow/adversarial-self-review.md#waiver-when-no-cross-model-reviewer-can-run)).
+  A reviewer that ran and returned not-clean is not unavailable and still blocks.
   An author-dispatched review from a reviewer differing in BOTH model and harness from the authoring session must return a 100% all-clear verdict on the shipping head before merging,
   per [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md).
   An `Agent` subagent in Claude Code and the CI `claude-review` workflow are both Claude and do NOT satisfy this requirement.
@@ -631,7 +634,7 @@ When the user gives an MWC grant (e.g. `/mwc` or "merge when confident"):
      Confirm the shipping HEAD commit has received a 100% all-clear verdict from an author-dispatched cross-model, cross-harness reviewer,
      per [Standing Scope & Policy](#standing-scope--policy) above and [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md)
      (local: `dto`/`dtc`/`adv`; cloud: `curl` to OpenCode Go with candidate model fallback per [`delegate-to-opencode`](../delegate-to-opencode/SKILL.md)).
-     Never proceed to the merge command before this verdict is clean.
+     Never proceed to the merge command before this verdict is clean, except under [the waiver](../../shared/workflow/adversarial-self-review.md#waiver-when-no-cross-model-reviewer-can-run) when no qualifying reviewer can run (every route tried once, error recorded in the PR).
    - **Verify base currency and pre-merge pins**:
      Run the base-currency check that [`fully-clean`](../../shared/workflow/fully-clean.md) states in its stale-base rule before the merge command.
    - **Merge**:

@@ -327,7 +327,9 @@ See [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md) 
   see [`hyperlink-liberally`](shared/writing/hyperlink-liberally.md).
 - When referencing files or symbols, use relative markdown links or inline code backticks.
 - When mentioning PRs or issues, format them as clickable hyperlinks to forge URLs, never bare `#NNN` (except `Closes #123`).
-- Preserve semantic line breaks (SemBr) when editing markdown docs.
+- Every Morrison-Lab repository uses semantic line breaks (SemBr): one sentence per source line in markdown and Quarto prose, and CI blocks a PR that adds a packed line.
+  Leave `fail: true` on the `check-new-line-breaks` caller; see [`semantic-line-breaks`](shared/writing/semantic-line-breaks.md).
+  When editing existing prose, preserve its current line breaks.
 
 - **Do:** link every pull request or issue cited as a source.
 - **Do:** hyperlink tools, internal rules, and technical terms on first or key mention.

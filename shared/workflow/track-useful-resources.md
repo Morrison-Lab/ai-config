@@ -42,8 +42,8 @@ A catalog entry in lds (a course list, a channels table) does not substitute for
 
 ## Gaps
 
-When a topic or a spinoff of an existing topic has no notes repo, track the resource in its primary home now, and propose a notes repo for the topic, rather than starting a link-only catalog repo.
-A PR cannot create a repository, so file an issue in ai-config, where `course-sequence` lives, that proposes the new notes repo, and add the repo to `course-sequence` once it exists.
+When a topic or a spinoff of an existing topic has no notes repo, track the resource in its primary home now, and create a notes repo for the topic, adding it to `course-sequence` once it exists, rather than starting a link-only catalog repo.
+If you cannot create the repo now, file an issue in ai-config, where `course-sequence` lives, that proposes the new notes repo.
 
 ## Official sources
 

@@ -176,8 +176,9 @@ See [`grep-is-not-coverage`](shared/workflow/grep-is-not-coverage.md) and [`AGEN
 
 ## Track every useful resource in every notes repo whose topic it covers
 
-When you or a subagent find a useful resource in any format, track it in every notes repo whose topic it covers, in addition to its primary home, from official sources only.
+When you or a subagent finds a useful resource in any format, track it now in every notes repo whose topic it covers, in addition to its primary home, from official sources only.
 Detail: [`track-useful-resources`](shared/workflow/track-useful-resources.md).
+
 ## Fetch untrusted files in a sandbox
 
 A sandboxed local session only downloads; the cloud thread reads.

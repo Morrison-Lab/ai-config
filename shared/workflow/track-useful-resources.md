@@ -1,6 +1,7 @@
 # Track every useful resource in every notes repo whose topic it covers
 
 Ezra, 2026-10-13: any time you or any of your agents comes across a useful resource (textbooks, articles, software packages, websites, videos, or any other format), always make sure it gets tracked in one or more of our repos.
+The 2026-10-15 section below broadens this to every notes repo whose topic the resource covers.
 The rule covers any content relevant to any Morrison-Lab repo, course or project, and the goal is to build comprehensive directories of content relevant to all our interests over time.
 Each tracked resource is a small contribution to a directory, not a one-off link.
 
@@ -15,22 +16,23 @@ Put the resource where readers will find it: a chapter's Further reading or "Rea
 Ezra, 2026-10-15 (review comment on lds#841, "should some of these entries go in one of the other repos (sds, mds, pds, rme, etc) either instead of or in addition to here?"): the answer is a permanent policy, not a one-off.
 Decide at tracking time, for each notes repo, whether the resource covers a topic that repo teaches.
 Track it in every notes repo whose topic it covers, in addition to its primary home.
+The primary home is the repo or directory where the resource would live if only one place tracked it, such as the lds directories for courses, channels and programs.
 A directory entry in lds (a course list, a channels table) does not substitute for a Further reading bullet on the sds, mds, pds or rme page that covers the same topic.
 
 - Use the course sequence ([`course-sequence`](../writing/course-sequence.md)) to find the candidate repos for a topic.
 - Put a topical resource in the Further reading section of the page it matches, and a general one (a whole course, a channel) in the repo's directory.
 - Respect each resource's license in each repo.
-  Link only when the resource is not adaptable (no license, or a license that forbids derivatives).
-  Adapt it with attribution only when its license allows adaptation, and follow its other terms (NonCommercial, ShareAlike) and each repo's own license.
-- When an existing tracked resource sits in only one repo, add it to each of the others.
-  A PR links its tracking issue when one exists, and otherwise stands alone.
+  When the resource is not adaptable (no license, or a license that forbids derivatives), link to it and do not copy it.
+  When its license allows adaptation, adapt it with attribution, following its other terms (NonCommercial, ShareAlike) and each repo's own license.
+- When an existing tracked resource sits in only one repo, add it to each other notes repo whose topic it covers.
   Open one PR per repo, and link each PR to the PRs in the other repos.
+  A PR links its tracking issue when one exists, and otherwise stands alone.
   File an issue in a repo when the addition is too large for a PR now.
 
 ## Official sources and gaps
 
 When a topic or a spinoff of an existing topic has no notes repo, create one for it rather than starting a link-only catalog repo.
-If the resource does not fit the current PR, open a small separate PR or an issue for the resource.
+If adding the resource to a repo does not fit the current PR, open a small separate PR or an issue for it in that repo.
 Link official sources only: the authors', publisher's or institution's own site, or an open-access host.
 Never link an unauthorized copy, and never commit paywalled text.
 

@@ -100,7 +100,8 @@ what was checked in a PDF,
 a page number not yet verified,
 or a wording edit made while porting.
 
-- **Do:** end each item adapted from an outside source with PSW's collapsed "Source" callout.
+- **Do:** end each item whose credit is more than a citation with PSW's collapsed "Source" callout.
+- **Do:** end an item whose credit is only a citation with a plain "Source:" line.
 - **Don't:** leave an attribution only in an HTML comment.
 
 (Morrison-Lab/sds, 2026-10-05:

@@ -100,7 +100,7 @@ CASES = [
     ([USER, call("m1", name="mcp__github__merge_pull_request"),
       result('{"merged": true}', "m1"), reply("Others will merge when clean.")], False,
      "merge tool with merged:true passes"),
-    ([USER, call("m1", MERGE_CMD), result("✓ Squashed and merged pull request #9", "m1"),
+    ([USER, call("m1", MERGE_CMD), result(chr(0x2713) + " Squashed and merged pull request #9", "m1"),
       reply("Next one will merge once clean.")], False,
      "gh squash output passes"),
     ([USER, call("m1", MERGE_CMD), result(MERGED, "m1", is_error=True),
@@ -125,6 +125,23 @@ CASES = [
      "unless the user approves passes"),
     ([TOOL, reply("Ezra will merge when he is back.")], False,
      "the user is the merger passes"),
+
+    ([TOOL, reply("I'm going to merge it now.")], True, "I'm going to merge blocks"),
+    ([TOOL, reply("Once green, each PR gets merged.")], True, "gets merged blocks"),
+
+    # System text in a user-role message is not a user turn
+    ([USER, call("m1", MERGE_CMD), result(MERGED, "m1"),
+      {"type": "user", "message": {"content": [
+          {"type": "text", "text": "<system-reminder>queued wake</system-reminder>"}]}},
+      reply("The rest will merge once green.")], False,
+     "a system-reminder text block does not reset the confirmation"),
+
+    # Negatives: first-person negation and deferral are the policy-correct stance
+    ([TOOL, reply("I will not merge anything without your word.")], False, "will not merge passes"),
+    ([TOOL, reply("I'll never merge without approval.")], False, "never merge passes"),
+    ([TOOL, reply("I will merge nothing; Ezra decides.")], False, "merge nothing passes"),
+    ([TOOL, reply("I'll wait for you to merge.")], False, "wait for you passes"),
+    ([TOOL, reply("I'll ask you before I merge.")], False, "ask you before passes"),
 
     # Negatives: not an announcement
     ([TOOL, reply("Every merge requires your approval.")], False,

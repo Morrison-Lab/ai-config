@@ -5,7 +5,12 @@ formal cross-reference divs --- Quarto's theorem-like div syntax
 glossary/definition-list convention --- check each of the following for
 every mention:
 
-- **Hyperlinked on first use in each div.**
+- **Defined and hyperlinked on first use in each div.**
+  A technical term with no formal definition yet gets one:
+  search the earlier sites in the course sequence first and link to a
+  definition there if one exists,
+  otherwise write it in its own definition div in the earliest site that
+  needs the term, then link to it.
   A technical term or named
   result links to the div that defines or states it --- a Quarto crossref
   (`@def-token-budget`, `@thm-cauchy-schwarz`) or an explicit markdown

@@ -199,13 +199,13 @@ Name the new macro for the concept it denotes, not for its typography, so it sta
 The macros repo carries a standing `mwc` grant, so merge the macro PR yourself once it is fully clean (see `STANDING_MERGE_GRANT_REPOS` in `hooks/no-unauthorized-merge.py`).
 Bump the submodule pointer in the manuscript repo once that macro PR merges.
 
-When the macros PR can't happen in this session,
-a repo-local macro file is an acceptable stopgap
-(such as `_subfiles/_macros-sds.qmd` in sds);
-an inline one-off command in a document still is not.
-Every macro added to a repo-local macro file
-gets an issue in [`Morrison-Lab/macros`](https://github.com/Morrison-Lab/macros) in the same turn,
-listing each new definition, what it means, and any existing macro it overlaps.
+New macros always go in `Morrison-Lab/macros`, never in an applied repo.
+The one exception is a repo that explicitly overrides one specific macro's default meaning, in a dedicated override file.
+(Directive from the user, 2026-10-16: "new macros should always go into our macros repo, never into applied repos (unless you're explicitly overriding the default macros repo for a specific semantic macro)".)
+If the macros PR has to wait, say so and keep the change in a stacked PR on the macros PR;
+do not add a repo-local macro or an inline command.
+A repo-local macro file left over from the old stopgap (such as `_subfiles/_macros-sds.qmd` in sds) is debt: move each definition into `Morrison-Lab/macros` in a sweep PR.
+File an issue in [`Morrison-Lab/macros`](https://github.com/Morrison-Lab/macros) listing each leftover definition, what it means, and any existing macro it overlaps.
 In a remote session that has the repo attached under its old name,
 the issue tool accepted owner `d-morrison` and GitHub redirected the issue to the migrated repo
 (measured once, 2026-10-05: [Morrison-Lab/macros#103](https://github.com/Morrison-Lab/macros/issues/103)).
@@ -374,7 +374,10 @@ Write `\eoutvar` for a predicted outcome.
 Write `\resid`/`\vresid` for a residual (observed minus predicted) and `\prederr` for a prediction error (predicted minus observed), not a bare `e` or `\ve`;
 for an observation used in the fit, the residual is the negative of the prediction error ([sds `#thm-prediction-error-residual`](https://morrison-lab.github.io/sds/estimation.html#thm-prediction-error-residual)).
 For a parameter estimate, write `\erf{\eparam}` (estimate minus truth, [sds `#def-estimation-error`](https://morrison-lab.github.io/sds/estimation.html#def-estimation-error)).
-A letter used generically (a function argument, an integration variable) stays a letter.
+No literal Latin or Greek letter appears in a math expression, outside a passage that discusses the notation itself, except a one-off symbol that corresponds to no semantic category.
+Almost every symbol has a category: the library already names outcome variables (`\outvar`), covariates and predictors (`\predvar`), generic parameters (`\param`, `\vparam`), prediction functions (`\predfn`), and more, so a one-off should almost never be needed.
+A function argument or integration variable is a generic variable of some kind, so look for its category first;
+add a macro to `Morrison-Lab/macros` (step 6) whenever a category has none.
 `\vx` and `\vy` remain defined;
 existing uses are converted in the sweep, [`Morrison-Lab/ai-config#4440`](https://github.com/Morrison-Lab/ai-config/issues/4440), not as a side edit.
 The macros land with `Morrison-Lab/macros#117`;

@@ -967,6 +967,13 @@ the transpose stays for matrix products, outer products and quadratic forms
 A semantic macro is named for meaning, not for the letter it prints: outside a passage about the notation itself, write no Greek letter in math, raw (`\delta`) or inside a letter-named macro (`\vdelta`, `\hb`, `\eps`) (see `skills/use-math-macros/SKILL.md`, "No Greek letters in math source").
 (Directive from the user, 2026-10-08: "I don't want any hardcoded greek letters in latex expression, even in compounds like \vdelta;
 that's still not a semantic macro".)
+The same holds for literal Latin letters: outside a passage about the notation itself, write none in math except a one-off with no semantic category, because the library has macros for outcome variables, covariates and generic parameters, so one-offs should almost never be needed;
+add macros whenever helpful.
+New macros always go in `Morrison-Lab/macros`, never in an applied repo, unless the repo explicitly overrides one specific macro.
+(Directive from the user, 2026-10-16: "all agents must always use semantic macros;
+never use literal latin or greek symbols in math expressions except for one-offs that don't correspond to a semantic category.
+and we even have semantic macros for outcome variables, covariates, and generic parameters, so one-offs should almost never be necessary.
+add more macros whenever helpful", and "new macros should always go into our macros repo, never into applied repos (unless you're explicitly overriding the default macros repo for a specific semantic macro)".)
 `scripts/check-raw-math.py` lints for raw operators, and `hooks/warn-raw-math-notation.py` warns at write time.
 The `use-math-macros` (alias `macroize`) skill is the executable procedure.
 

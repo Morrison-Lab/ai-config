@@ -142,8 +142,6 @@ SHOULD_WARN = [
      "-S takes an optional ATTACHED value; it must not eat the next token"),
     ("W18", moved_pin_only_repo, f"git commit -u -a -m {MSG}",
      "-u takes an optional attached value, like -S"),
-    ("W19", moved_pin_only_repo, "git -C{repo} commit -am 'fix'",
-     "attached -C<dir> form"),
     ("W20", moved_pin_only_repo, "git add -u :/",
      "magic pathspec is not evaluated: warn, not silent"),
     ("W21", moved_pin_only_repo, "git add -u 'mod*'",
@@ -274,7 +272,7 @@ MUTATIONS = {
         "an `a` inside a short-flag cluster is read as -a",
         [('                if ch == "a":\n                    return True',
           '                if False:\n                    return True')],
-        {"W1", "W2", "W6", "W8", "W9", "W10", "W11", "W12", "W16", "W17", "W18", "W19"},
+        {"W1", "W2", "W6", "W8", "W9", "W10", "W11", "W12", "W16", "W17", "W18"},
     ),
     "M_value_letter_stops_cluster": (
         "a value-taking letter (-m) ends the cluster, so -ma is not -a",
@@ -303,12 +301,6 @@ MUTATIONS = {
           "                    break  # optional attached value (-uall): rest of cluster",
           "                if False:\n                    break")],
         {"S14"},
-    ),
-    "M_attached_dash_C": (
-        "attached `-C<dir>` retargets the repository",
-        [('        elif a.startswith("-C") and len(a) > 2:',
-          "        elif False:")],
-        {"W19"},
     ),
     "M_magic_pathspec_warns": (
         "a magic pathspec (`:/`) warns instead of going silent",
@@ -345,7 +337,7 @@ MUTATIONS = {
         "`git -C <dir>` retargets the repository",
         [("        for d in c_dirs:\n            target = os.path.join(target, d)",
           "        for d in c_dirs:\n            pass")],
-        {"W6", "W19", "S9"},
+        {"W6", "S9"},
     ),
     "M_cd_tracking": (
         "an earlier `cd <dir>` retargets the repository",

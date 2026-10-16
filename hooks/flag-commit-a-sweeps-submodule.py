@@ -107,9 +107,6 @@ def _git_invocation(rest):
         if a == "-C" and i + 1 < len(rest):
             c_dirs.append(rest[i + 1])
             i += 2
-        elif a.startswith("-C") and len(a) > 2:
-            c_dirs.append(a[2:])  # attached form: -Cdir
-            i += 1
         elif a in _GIT_VALUE_GLOBAL:
             i += 2
         elif a.startswith("-"):

@@ -1,6 +1,6 @@
 # Content rules for lecture notes
 
-Three rules from Ezra, 2026-10-16.
+Four rules from Ezra, 2026-10-16.
 Each has a canonical prose rule in [`psw`](https://github.com/Morrison-Lab/psw/), possibly still in review.
 This fragment only points agents to it.
 
@@ -28,3 +28,13 @@ Tracked in [ai-config#4563](https://github.com/Morrison-Lab/ai-config/issues/456
 
 Canonical rule: [psw#216](https://github.com/Morrison-Lab/psw/pull/216).
 Tracked in [ai-config#4564](https://github.com/Morrison-Lab/ai-config/issues/4564).
+
+## Qualify "mean" and "average" as population or sample
+
+- **Do:** write "population mean" or "sample mean" (likewise "average"),
+  and pMSE vs sMSE, pRMSE vs sRMSE, pMAE vs sMAE.
+- **Don't:** write a bare "mean", "average", MSE, RMSE or MAE,
+  unless it is completely clear from context.
+
+Canonical rule: [psw#235](https://github.com/Morrison-Lab/psw/pull/235).
+Tracked in [ai-config#4584](https://github.com/Morrison-Lab/ai-config/issues/4584).

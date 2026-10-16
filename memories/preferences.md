@@ -964,7 +964,7 @@ the transpose stays for matrix products, outer products and quadratic forms
 (see `skills/use-math-macros/SKILL.md`, "Prefer dot products").
 (Directive from the user, 2026-10-08, on `Morrison-Lab/lds#488`:
 "let's use dot products over transpose products and inner products where feasible".)
-A semantic macro is named for meaning, not for the letter it prints: outside a passage about the notation itself, write no Greek letter in math, raw (`\delta`) or inside a letter-named macro (`\vdelta`, `\hb`, `\eps`) (see `skills/use-math-macros/SKILL.md`, "No Greek letters in math source").
+A semantic macro is named for meaning, not for the letter it prints: outside a passage about the notation itself, write no Greek letter in math, raw (`\delta`) or inside a letter-named macro (`\vdelta`, `\hb`, `\eps`) , except a one-off with no semantic category (see `skills/use-math-macros/SKILL.md`, "No Greek letters in math source").
 (Directive from the user, 2026-10-08: "I don't want any hardcoded greek letters in latex expression, even in compounds like \vdelta;
 that's still not a semantic macro".)
 The same holds for literal Latin letters: outside a passage about the notation itself, write none in math except a one-off with no semantic category, because the library has macros for outcome variables, covariates and generic parameters, so one-offs should almost never be needed;

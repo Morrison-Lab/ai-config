@@ -210,8 +210,7 @@ In a remote session that has the repo attached under its old name,
 the issue tool accepted owner `d-morrison` and GitHub redirected the issue to the migrated repo
 (measured once, 2026-10-05: [Morrison-Lab/macros#103](https://github.com/Morrison-Lab/macros/issues/103)).
 
-- **Do:** add the macro to `Morrison-Lab/macros`,
-  and file the sweep issue in the same turn that you find a repo-local macro file.
+- **Do:** add the macro to `Morrison-Lab/macros`, and file the sweep issue in the same turn that you find a repo-local macro file.
 - **Don't:** add a macro to a repo-local file, or leave one for a later upstreaming pass;
   [Morrison-Lab/sds#54](https://github.com/Morrison-Lab/sds/pull/54) accumulated 13 of them before anyone filed the issue.
 
@@ -300,7 +299,7 @@ fixed by changing to `\exp{-\frac{x^2}{2}}` and `\exp{x^8}`.
 
 A semantic macro is named for what a symbol means, not for the letter it prints.
 `\vdelta`, `\vbeta`, `\hb`, `\bfbeta`, `\vth`, `\eps` and `\lam` only spell a Greek letter, so they are no more semantic than the raw `\delta`.
-Outside a passage that discusses the notation itself (a symbol table, a note on which letter a field uses), write no Greek letter in a math expression, either raw or inside a letter-named macro.
+Outside a passage that discusses the notation itself (a symbol table, a note on which letter a field uses), write no Greek letter in a math expression, either raw or inside a letter-named macro, except a one-off symbol with no semantic category (see the Latin-letter section below).
 Use the macro that names the concept (`\vcoef`, `\regcoef`, `\mean`, `\lincomp`, `\odds`, `\rate`, `\haz`, `\sigmoid`), and when none exists, add one named for the concept to `Morrison-Lab/macros` first (step 6).
 For example, write the backpropagation error as `\backerr^{(\ell)}`, not `\vdelta^{(\ell)}`, and the step size as `\learnrate`, not `\eta`.
 [`Morrison-Lab/macros#113`](https://github.com/Morrison-Lab/macros/pull/113) added a concept macro for each meaning the course sites use

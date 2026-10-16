@@ -14,6 +14,18 @@ The issue is the durable record of intent, scope, and "done" criteria --- it giv
 Skip only when the task is already tracked by an open issue.
 A closed match is not a skip: surface it and confirm before re-doing the work.
 
+## A task that builds on existing work
+
+When the task naturally builds on an existing issue or PR, file the new issue and then:
+
+1. Mark the new issue **blocked by** the existing one in GitHub's issue relationships field.
+   The REST call is `POST /repos/{owner}/{repo}/issues/<new>/dependencies/blocked_by` with the body `{"issue_id": <id>}`, where `<id>` is the blocking issue's numeric `id` (from `GET /repos/{owner}/{repo}/issues/<n>`), not its number.
+   A PR is also an issue there, so the same call works for a blocking PR.
+2. Either wait for the lower-level issue or PR to finish, or open a PR stacked on it when that is feasible.
+   [`stack-prs`](../../skills/stack-prs/SKILL.md) holds the decision gate and the mechanics.
+
+Independent work stays unlinked and branches from `main`.
+
 ## A capped `--state all` listing can hide most OPEN issues behind closed ones
 
 `gh issue list --state all --limit N` (or `--search` with no `--limit`, whose

@@ -19,8 +19,9 @@ A closed match is not a skip: surface it and confirm before re-doing the work.
 When the task naturally builds on an existing issue or PR, file the new issue and then:
 
 1. Mark the new issue **blocked by** the existing one in GitHub's issue relationships field.
-   The REST call is `POST /repos/{owner}/{repo}/issues/<new>/dependencies/blocked_by` with the body `{"issue_id": <id>}`, where `<id>` is the blocking issue's numeric `id` (from `GET /repos/{owner}/{repo}/issues/<n>`), not its number.
-   A PR is also an issue there, so the same call works for a blocking PR.
+   Prefer the packaged command where `gh` has it (v2.94.0 or later, per the gh changelog of 2026-06-10): `gh issue edit <new> --add-blocked-by <existing number or URL>`.
+   Otherwise use the REST call `POST /repos/{owner}/{repo}/issues/<new>/dependencies/blocked_by` with the body `{"issue_id": <id>}`, where `<id>` is the blocking issue's numeric `id` (from `GET /repos/{owner}/{repo}/issues/<n>`), not its number.
+   A PR is also an issue there, so either form works for a blocking PR.
 2. Either wait for the lower-level issue or PR to finish, or open a PR stacked on it when that is feasible.
    [`stack-prs`](../../skills/stack-prs/SKILL.md) holds the decision gate and the mechanics.
 

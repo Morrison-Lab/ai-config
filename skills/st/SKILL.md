@@ -104,7 +104,7 @@ glab issue create --title "<concise title>" --description "<what & why>
 When the task naturally builds on an open issue or PR (it needs that work's code, or edits the same passages), link the two before branching, per [`issue-first`](../../shared/workflow/issue-first.md#a-task-that-builds-on-existing-work):
 
 1. File the new issue as usual.
-2. Mark it **blocked by** the existing issue (or the existing PR) in GitHub's issue relationships field.
+2. Mark it **blocked by** the existing issue (or the existing PR) in GitHub's issue relationships field: `gh issue edit <new> --add-blocked-by <existing number or URL>` (the REST fallback for older `gh` is in `issue-first`).
 3. Then either wait for the lower-level issue or PR to finish, or, if feasible, stack a new PR on it with [`stack-prs`](../stack-prs/SKILL.md).
    Run `stack-prs`'s decision gate first;
    step 5's branch from `main` applies only when the work is independent of every open PR.

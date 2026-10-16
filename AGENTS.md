@@ -173,9 +173,10 @@ See [`grep-is-not-coverage`](shared/workflow/grep-is-not-coverage.md) and [`AGEN
 - **Do:** search `AGENTS.md`, `CLAUDE.md`, `memories/`, `shared/`, and open issues before answering "no" to whether a policy exists.
 - **Do:** run an all-state tracker search before implementing a capability request.
 - **Don't:** assert that a standing grant or rule does not exist based only on searching `skills/` or `memories/`.
-## Track every useful resource in every repo it fits
 
-Whenever you or a subagent finds a useful resource in any format for any Morrison-Lab repo, course or project, track it in every repo it fits now, from official sources only, to build comprehensive directories of our interests.
+## Track every useful resource in every notes repo whose topic it covers
+
+Whenever you or a subagent finds a useful resource in any format for any Morrison-Lab repo, course or project, track it in every notes repo whose topic it covers, in addition to its primary home, from official sources only, to build comprehensive directories of our interests.
 Detail: [`track-useful-resources`](shared/workflow/track-useful-resources.md).
 ## Fetch untrusted files in a sandbox
 

@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
-"""PreToolUse guard: `git commit -a`/`--all` (or `git add -u`/`--update`)
-while a submodule's checked-out commit differs from the one the index pins.
+"""PreToolUse guard: a `git` command that stages every modified tracked path
+-- `git commit -a`/`--all`, `git add -u`/`--update`, `git add -A`/`--all`
+(`--no-ignore-removal`), or a `git add .`/`git add <dir>` covering a
+submodule -- while that submodule's checked-out commit differs from the one
+the index pins.
 
 ## The incident
 
@@ -48,7 +51,9 @@ missing one".
       `--dry-run`) stages and commits nothing and is silent. Every match in
       the command is checked, not only the first
   M4  the target repository is the `-C` directory, applied on top of the
-      session cwd and of any earlier `cd <dir>` in the same command; `cd -P`
+      session cwd (`tool_input.Cwd`, else the payload's `cwd`, else the
+      hook's own) and of any earlier `cd <dir>` in the same command, scoped
+      to its subshell; `cd -P`
       and `cd -L` are read, and a bare `cd` or `cd -` makes the directory
       unknown, so a later relative target is skipped (see below)
   M5  `git status --porcelain=v1 -z --ignore-submodules=dirty` there lists
@@ -85,8 +90,12 @@ check the wrong one, when:
   - a bare `cd` or `cd -` came earlier, so the directory is unknown (an
     absolute `git -C /path` after it is still read);
   - `GIT_DIR=...` or another environment prefix redirects git (not read);
-  - git is not spelled `git`: `/usr/bin/git`, an alias, a shell function or
-    `pushd`/`popd` directory changes are not followed;
+  - git is not reached as `git` after the shared parser's normalisation
+    (`/usr/bin/git` and `timeout 60 git` ARE read): an alias, a shell
+    function, or `pushd`/`popd` directory changes are not followed;
+  - a `cd` inside a subshell `( ... )` is scoped to it, as in the shell, so a
+    git command after the subshell runs where the subshell started; a `cd` in
+    a `{ ... }` group moves the caller and is followed;
   - the commit names its paths: `git commit <pathspec>` and `git commit -i
     <pathspec>` also commit a moved gitlink covered by a directory pathspec
     (checked: `git commit -m x .` committed `mod`), but they say which paths
@@ -126,7 +135,7 @@ _LIB = os.path.join(
 if _LIB not in sys.path:
     sys.path.insert(0, _LIB)
 try:
-    from shellcmd import simple_commands as _simple_commands
+    from shellcmd import simple_commands_with_scope as _simple_commands
     from shellcmd import strip_env as _strip_env
 except Exception as _exc:  # broken install: fail open, like every guard here
     print("flag-commit-a-sweeps-submodule: cannot load "
@@ -204,7 +213,8 @@ def add_kind(args):
     """M3 for `git add`: (kind, pathspecs), or None when nothing is staged
     beyond named paths. kind is "add -u" (`-u`/`--update`), "add -A"
     (`-A`/`--all`) or "add" (only pathspecs, which can still cover a
-    submodule: `git add .`); `-n`/`--dry-run` stages nothing."""
+    submodule: `git add .`); `-n`/`--dry-run` and `--refresh` stage nothing
+    (checked with git 2.x), and `--no-ignore-removal` is an alias of `-A`."""
     flags, paths, dashdash = [], [], False
     for a in args:
         if not dashdash and a == "--":
@@ -214,11 +224,11 @@ def add_kind(args):
         else:
             paths.append(a)
     letters = "".join(f[1:] for f in flags if not f.startswith("--"))
-    if "--dry-run" in flags or "n" in letters:
+    if "--dry-run" in flags or "--refresh" in flags or "n" in letters:
         return None
     if "--update" in flags or "u" in letters:
         return "add -u", paths
-    if "--all" in flags or "A" in letters:
+    if "--all" in flags or "--no-ignore-removal" in flags or "A" in letters:
         return "add -A", paths
     return ("add", paths) if paths else None
 
@@ -253,13 +263,23 @@ def offending(command):
     cmds = _simple_commands(command)
     if cmds is None:
         return []
-    cd = ""  # None once a `cd` goes somewhere the text does not name
+    # Directory per subshell scope: a subshell starts from its parent's
+    # directory and a `cd` inside it never reaches the parent. A directory is
+    # None once a `cd` goes somewhere the text does not name.
+    cds = {(0,): ""}
+
+    def cd_of(scope):
+        while scope not in cds:
+            scope = scope[:-1]
+        return cds[scope]
+
     hits = []
-    for argv in cmds:
+    for scope, argv in cmds:
         rest = _strip_lead(argv)
+        cd = cd_of(scope)
         if rest and rest[0] == "cd":
             operand = _cd_operand(rest[1:])
-            cd = None if operand is None else _join(cd, operand)
+            cds[scope] = None if operand is None else _join(cd, operand)
             continue
         inv = _git_invocation(rest)
         if inv is None:
@@ -323,12 +343,28 @@ def modified_submodules(cwd):
     # `--ignore-submodules=dirty` skips scanning every submodule worktree for
     # edits (slow, and irrelevant: dirty content cannot change a gitlink) but
     # still reports a submodule whose checked-out commit moved.
-    status = _git(cwd, "status", "--porcelain=v1", "-z",
+    # `-uno` skips the untracked scan, which `-a`/`-u` never stage anyway and
+    # which dominates the time in a large tree.
+    status = _git(cwd, "status", "--porcelain=v1", "-z", "-uno",
                   "--ignore-submodules=dirty")
     top = _git(cwd, "rev-parse", "--show-toplevel")
+    # ONE index read for every gitlink, rather than a query per modified path:
+    # a large sweep would otherwise spend the whole deadline and fail open
+    # exactly when the sweep is big.
+    # Run from the root: from a subdirectory it would list only that subtree,
+    # with paths relative to it, while status paths are root-relative.
     if status is None or top is None:
         return None
     top = top.strip()
+    index = _git(top, "ls-files", "-s", "-z")
+    if index is None:
+        return None
+    gitlinks = {}
+    for entry in index.split("\0"):
+        meta, _, entry_path = entry.partition("\t")
+        fields = meta.split()
+        if len(fields) == 3 and fields[0] == "160000":
+            gitlinks[entry_path] = fields[1]
     records = status.split("\0")
     found = []
     i = 0
@@ -342,13 +378,9 @@ def modified_submodules(cwd):
             i += 1
         if xy[1] != "M":
             continue
-        staged = _git(top, "ls-files", "-s", "--", path)
-        if not staged:
+        pinned = gitlinks.get(path)  # only a gitlink (mode 160000) counts
+        if pinned is None:
             continue
-        fields = staged.split(None, 3)
-        if len(fields) < 3 or fields[0] != "160000":
-            continue
-        pinned = fields[1]
         head = _git(os.path.join(top, path), "rev-parse", "HEAD")
         if head is None:
             continue
@@ -469,9 +501,13 @@ def main() -> int:
 
     # Every match is checked: one that is filtered out (a pathspec that
     # excludes the submodule, a missing directory) must not hide a later one.
+    # The directory the command runs from is the payload's, not this
+    # process's: tool_input.Cwd, then the payload's `cwd`, then ours.
+    base = next((c for c in (inp.get("Cwd"), payload.get("cwd"))
+                 if isinstance(c, str) and c), None) or os.getcwd()
     state = {}  # cwd -> modified_submodules(cwd), one status per repository
     for segment, kind, target, pathspecs in hits:
-        cwd = os.path.normpath(os.path.join(os.getcwd(), target))
+        cwd = os.path.normpath(os.path.join(base, target))
         if not os.path.isdir(cwd):
             continue
         if cwd not in state:

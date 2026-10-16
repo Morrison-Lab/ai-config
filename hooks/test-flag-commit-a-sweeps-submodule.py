@@ -137,6 +137,19 @@ def symlink_to_dir_repo(path):
     os.symlink("mod", os.path.join(path, "lnk"))
 
 
+def many_files_repo(path):
+    """A big sweep: thousands of modified tracked files, and a moved
+    submodule that sorts after all of them."""
+    _base_with_submodule(path)
+    for i in range(5000):
+        _write(path, "a", f"f{i}.txt")
+    _run(path, "add", "a")
+    _run(path, "commit", "-qm", "many")
+    for i in range(5000):
+        _write(path, "a", f"f{i}.txt", content="changed\n")
+    _move_submodule_head(path)
+
+
 MSG = '"fix"'
 # (id, builder, command, description). A command may use {repo}.
 SHOULD_WARN = [
@@ -196,6 +209,20 @@ SHOULD_WARN = [
     ("W32", moved_pin_only_repo,
      f"ENVV=1 git --config-env a.b=ENVV --namespace ns commit -am {MSG}",
      "global --config-env and --namespace consume a separated value"),
+    ("W33", moved_pin_only_repo, f"/usr/bin/git commit -am {MSG}",
+     "the shared parser normalises /usr/bin/git, so it is read"),
+    ("W34", moved_pin_only_repo,
+     f"(cd mod && git log -1); git commit -am {MSG}",
+     "a cd inside a subshell does not reach the command after it"),
+    ("W35", moved_pin_only_repo, f"@payloadcwd git commit -am {MSG}",
+     "the payload's `cwd` is the base directory, not the hook's own"),
+    ("W36", moved_pin_only_repo, f"@inputcwd git commit -am {MSG}",
+     "tool_input.Cwd beats the payload's `cwd`"),
+    ("W37", moved_pin_only_repo, "git add --no-ignore-removal",
+     "--no-ignore-removal is an alias of -A"),
+    ("W38", many_files_repo, f"git commit -am {MSG}",
+     "5000 modified files and a moved submodule sorting last: the one index "
+     "read keeps the warning inside the deadline"),
 ] + ([("W22", moved_pin_only_repo, "git add -u '.\\mod'",
        "Windows path separator is normalised")] if os.name == "nt" else [])
 SHOULD_STAY_SILENT = [
@@ -252,6 +279,14 @@ SHOULD_STAY_SILENT = [
      "naming the submodule is how a pin bump is staged on purpose"),
     ("S29", moved_pin_only_repo, "git add 'mod*'",
      "a glob pathspec on a plain add is not evaluated: documented silent case"),
+    ("S30", moved_pin_only_repo, f"(cd mod && git commit -am {MSG})",
+     "a cd inside a subshell applies to the commands inside it"),
+    ("S31", moved_pin_only_repo, f"{{ cd mod; }}; git commit -am {MSG}",
+     "a cd inside a { } group moves the caller"),
+    ("S32", moved_pin_only_repo, f"@payloadelsewhere git commit -am {MSG}",
+     "the payload's `cwd` beats the hook's own working directory"),
+    ("S33", moved_pin_only_repo, "git add --refresh .",
+     "--refresh stages nothing"),
 ] + ([] if os.name == "nt" else [
     ("S20", moved_pin_only_repo, "git add -u '.\\mod'",
      "on POSIX a backslash is a name character, not a separator"),
@@ -267,12 +302,25 @@ def verdict(hook_path, repo, command, want_text=False):
         command = command.replace("{link}", link)
     command = command.replace("{repo}", repo)
     env = {**os.environ, "PYTHONPATH": SHELLCMD_LIB}
-    if command.startswith("@budget0 "):  # an already-spent git deadline
-        command = command[len("@budget0 "):]
-        env["FLAG_COMMIT_A_BUDGET_S"] = "0"
+    payload = {"tool_name": "Bash"}
+    tool_input = {}
+    # `@name ` prefixes shape the payload rather than the command.
+    while command.startswith("@"):
+        name, _, command = command[1:].partition(" ")
+        if name == "budget0":  # an already-spent git deadline
+            env["FLAG_COMMIT_A_BUDGET_S"] = "0"
+        elif name == "payloadcwd":  # payload `cwd` is the repo; process cwd is not
+            payload["cwd"], cwd = repo, ELSEWHERE
+        elif name == "inputcwd":  # tool_input.Cwd wins over payload `cwd`
+            tool_input["Cwd"], payload["cwd"], cwd = repo, ELSEWHERE, ELSEWHERE
+        elif name == "payloadelsewhere":  # payload `cwd` beats the process cwd
+            payload["cwd"], cwd = ELSEWHERE, repo
+        else:
+            sys.exit(f"FATAL: unknown payload prefix @{name}")
+    tool_input["command"] = command
     proc = subprocess.run(
         [sys.executable, hook_path],
-        input=json.dumps({"tool_name": "Bash", "tool_input": {"command": command}}),
+        input=json.dumps({**payload, "tool_input": tool_input}),
         capture_output=True, text=True, cwd=cwd,
         # Mutants are written to a temp dir, where the hook's own
         # `scripts/lib` lookup (relative to its file) finds nothing.
@@ -391,7 +439,8 @@ MUTATIONS = {
         [('                if ch == "a":\n                    sweeps = True',
           '                if False:\n                    sweeps = True')],
         {"W1", "W2", "W6", "W8", "W9", "W10", "W11", "W12", "W16", "W17",
-         "W18", "W23", "W25", "W26", "W30", "W31", "W32"},
+         "W18", "W23", "W25", "W26", "W30", "W31", "W32", "W33", "W34",
+         "W35", "W36", "W38"},
     ),
     "M_value_letter_stops_cluster": (
         "a value-taking letter (-m) ends the cluster, so -ma is not -a",
@@ -505,20 +554,50 @@ MUTATIONS = {
     ),
     "M_add_all": (
         "`-A`/`--all` is read as a sweeping add",
-        [('    if "--all" in flags or "A" in letters:',
+        [('    if "--all" in flags or "--no-ignore-removal" in flags or "A" in letters:',
           "    if False:")],
-        {"W27", "W28"},
+        {"W27", "W28", "W37"},
     ),
     "M_add_plain_pathspec": (
         "a plain `git add <dir>` covering a submodule is read",
         [('    return ("add", paths) if paths else None', "    return None")],
         {"W29"},
     ),
-    "M_add_dry_run": (
-        "`git add -n/--dry-run` stages nothing",
-        [('    if "--dry-run" in flags or "n" in letters:\n        return None',
-          "    if False:\n        return None")],
-        {"S24", "S25"},
+    "M_add_dry_run_long": (
+        "`git add --dry-run` stages nothing",
+        [('"--dry-run" in flags or "--refresh"', '"--refresh"')],
+        {"S25"},
+    ),
+    "M_add_dry_run_short": (
+        "`git add -n` stages nothing",
+        [(' or "n" in letters:\n        return None', ':\n        return None')],
+        {"S24"},
+    ),
+    "M_add_refresh": (
+        "`git add --refresh` stages nothing",
+        [('"--dry-run" in flags or "--refresh" in flags or "n"',
+          '"--dry-run" in flags or "n"')],
+        {"S33"},
+    ),
+    "M_add_no_ignore_removal": (
+        "`--no-ignore-removal` is an alias of -A",
+        [(' or "--no-ignore-removal" in flags', "")],
+        {"W37"},
+    ),
+    "M_per_path_index_query": (
+        "one index read serves every modified path (no query per path)",
+        [("        pinned = gitlinks.get(path)  # only a gitlink (mode 160000) counts\n",
+          "        one = _git(top, 'ls-files', '-s', '--', path) or ''\n"
+          "        got = one.split(None, 3)\n"
+          "        pinned = got[1] if len(got) > 2 and got[0] == '160000' else None\n")],
+        # 5000 queries spend the 8 s deadline, so the hook fails open.
+        {"W38"},
+    ),
+    "M_status_no_untracked": (
+        "status skips the untracked scan (-uno)",
+        [('"--porcelain=v1", "-z", "-uno",', '"--porcelain=v1", "-z",')],
+        # Declared EMPTY: a speed-up; untracked files never change a verdict.
+        set(),
     ),
     "M_dash_c_dir": (
         "`git -C <dir>` retargets the repository",
@@ -530,17 +609,34 @@ MUTATIONS = {
     ),
     "M_cd_tracking": (
         "an earlier `cd <dir>` retargets the repository",
-        [("            cd = None if operand is None else _join(cd, operand)",
+        [("            cds[scope] = None if operand is None else _join(cd, operand)",
           "            pass")],
         # S17/S18 are silent only because the `cd` target is unresolvable;
-        # S26/S27 because the directory is unknown.
-        {"W9", "W24", "W30", "S17", "S18", "S26", "S27"},
+        # S26/S27 because the directory is unknown; S30/S31 because the
+        # cd into the (clean) submodule is what makes them silent.
+        {"W9", "W24", "W30", "S17", "S18", "S26", "S27", "S30", "S31"},
     ),
     "M_cd_unknown_directory": (
         "a bare `cd` or `cd -` makes the directory unknown, not unchanged",
-        [("            cd = None if operand is None else _join(cd, operand)",
-          "            cd = cd if operand is None else _join(cd, operand)")],
+        [("            cds[scope] = None if operand is None else _join(cd, operand)",
+          "            cds[scope] = cd if operand is None else _join(cd, operand)")],
         {"S26", "S27"},
+    ),
+    "M_subshell_cd_scoped": (
+        "a cd inside a subshell stays inside it",
+        [("            cds[scope] = None if operand is None",
+          "            cds[(0,)] = None if operand is None")],
+        {"W34"},
+    ),
+    "M_payload_cwd": (
+        "the payload's `cwd` is the base directory",
+        [('(inp.get("Cwd"), payload.get("cwd"))', '(inp.get("Cwd"),)')],
+        {"W35", "S32"},
+    ),
+    "M_input_cwd_first": (
+        "tool_input.Cwd takes precedence over the payload's `cwd`",
+        [('(inp.get("Cwd"), payload.get("cwd"))', '(payload.get("cwd"), inp.get("Cwd"))')],
+        {"W36"},
     ),
     "M_cd_flags": (
         "`cd -P`/`-L` flags are skipped to find the operand",
@@ -551,7 +647,7 @@ MUTATIONS = {
     "M_lead_words": (
         "env assignments and lead words are skipped",
         [("    return _strip_env(argv)[1]", "    return argv")],
-        {"W11", "W32"},
+        {"W11", "W32", "W33", "S31"},  # S31: `{ cd mod; }` needs `{` stripped
     ),
     "M_global_value_options": (
         "a global `-c k=v`, `--namespace`, `--config-env` consume their value",
@@ -596,8 +692,8 @@ MUTATIONS = {
     ),
     "M_mode_160000": (
         "only a gitlink (mode 160000) counts",
-        [('        if len(fields) < 3 or fields[0] != "160000":',
-          "        if len(fields) < 3:")],
+        [('        if len(fields) == 3 and fields[0] == "160000":',
+          "        if len(fields) == 3:")],
         # A tracked symlink to a directory is ` M` with mode 120000; without
         # the test it is read as a submodule whose HEAD differs from a blob.
         {"S21"},

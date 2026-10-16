@@ -328,6 +328,20 @@ This is the target state rather than a blocker on current work: write new math t
 (Directive from the user, 2026-10-08: "eventually, we want to remove even non-semantic decorators like \hat in favor of semantic macros like `\est`".
 Prose rule: [psw `chapters/notation/shared-macros.qmd`](https://github.com/Morrison-Lab/psw/blob/main/chapters/notation/shared-macros.qmd); sweep and detection: [`Morrison-Lab/ai-config#4438`](https://github.com/Morrison-Lab/ai-config/issues/4438).)
 
+### Latin letters are symbols too: name the role
+
+Every agent writes a semantic macro for each quantity, never a literal Latin or Greek symbol.
+The macros cover outcome variables (`\outvar`, `\Outvar`), covariates (`\predvar`, `\Predvar`), generic parameters (`\param`), the target function (`\targetfnf{}`) and more, so a bare `x`, `y`, `f(x)` or `\theta` in a math expression is almost never right.
+A literal symbol is allowed only for a one-off that fits no semantic category.
+When no macro fits a recurring quantity, add one to `Morrison-Lab/macros` first, then use it.
+
+- **Do:** write `$\predvar$` for a covariate value and `\targetfnf{\predvar}` for the true function there.
+- **Don't:** write `$x$` or `f(x)` because the neighbouring text already does;
+  fix the neighbour in the same sweep when it is in scope.
+
+(Directive from the user, 2026-10-16: "all agents must always use semantic macros;
+never use literal latin or greek symbols in math expressions except for one-offs that don't correspond to a semantic category ... add more macros whenever helpful".)
+
 ### `\ell` is a letter too
 
 A bare `\ell` spells a letter, so it is no more semantic than a Greek letter.

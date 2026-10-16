@@ -20,7 +20,7 @@ Ezra asked in a review comment on [lds#841](https://github.com/Morrison-Lab/lds/
 On 2026-10-15, in the project chat, he directed that the answer be a permanent policy rather than a one-off: track the resource in addition to its primary home, not instead of it.
 
 Decide at tracking time, for each notes repo, whether the resource covers a topic that repo teaches, and track it in every repo where it does.
-A catalog entry in lds (a course list, a channels table) does not substitute for an entry in any other notes repo that covers the same topic: a Further reading bullet, or that repo's catalog for a resource that spans topics.
+A catalog entry in lds (a course list, a channels table) does not substitute for an entry in any other notes repo that covers the same topic.
 
 - Use the course sequence to find the candidate repos for a topic.
 - The primary home entry is always made.
@@ -31,7 +31,7 @@ A catalog entry in lds (a course list, a channels table) does not substitute for
   When its license allows adaptation, you may adapt it, with attribution, following its other terms (NonCommercial, ShareAlike) and each repo's own license.
   Where the resource's license and the repo's license conflict, link only.
 - When you find that a tracked resource is missing from a notes repo whose topic it covers, add it to that repo.
-  Open one PR per repo, and link each PR to the PRs in the other repos.
+  When a resource is missing from several notes repos, open one PR per repo, and link each PR to the others.
   A PR also links its tracking issue when one exists.
 
 ## Gaps

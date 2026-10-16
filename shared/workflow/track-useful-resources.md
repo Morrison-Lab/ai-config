@@ -38,12 +38,12 @@ A catalog entry in lds (a course list, a channels table) does not substitute for
 - When you find that a tracked resource is missing from a notes repo whose topic it covers, add it to that repo.
   When a resource is missing from several notes repos, open one PR per repo, and link each PR to the others.
   A PR also links its tracking issue when one exists.
+- If adding the resource to an existing repo does not fit the current PR, open a small separate PR or an issue in that existing repo.
 
 ## Gaps
 
 When a topic or a spinoff of an existing topic has no notes repo, track the resource in its primary home now, and propose a notes repo for the topic, rather than starting a link-only catalog repo.
 A PR cannot create a repository, so file an issue in ai-config, where `course-sequence` lives, that proposes the new notes repo, and add the repo to `course-sequence` once it exists.
-If adding the resource to an existing repo does not fit the current PR, open a small separate PR or an issue in that existing repo.
 
 ## Official sources
 

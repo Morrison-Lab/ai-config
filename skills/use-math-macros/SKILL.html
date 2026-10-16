@@ -427,6 +427,7 @@ window.Quarto = {
   <li><a href="#presentation-commands-are-not-notation-sizing-transposes-and-fonts" id="toc-presentation-commands-are-not-notation-sizing-transposes-and-fonts" class="nav-link" data-scroll-target="#presentation-commands-are-not-notation-sizing-transposes-and-fonts">Presentation commands are not notation: sizing, transposes and fonts</a></li>
   <li><a href="#latin-letters-with-a-fixed-role-outvar-predvar-resid" id="toc-latin-letters-with-a-fixed-role-outvar-predvar-resid" class="nav-link" data-scroll-target="#latin-letters-with-a-fixed-role-outvar-predvar-resid">Latin letters with a fixed role: <code>\outvar</code>, <code>\predvar</code>, <code>\resid</code></a></li>
   <li><a href="#write-a-named-quantity-by-its-macro-not-its-definition" id="toc-write-a-named-quantity-by-its-macro-not-its-definition" class="nav-link" data-scroll-target="#write-a-named-quantity-by-its-macro-not-its-definition">Write a named quantity by its macro, not its definition</a></li>
+  <li><a href="#name-a-repeated-or-coherent-chunk-with-a-new-macro" id="toc-name-a-repeated-or-coherent-chunk-with-a-new-macro" class="nav-link" data-scroll-target="#name-a-repeated-or-coherent-chunk-with-a-new-macro">Name a repeated or coherent chunk with a new macro</a></li>
   </ul></li>
   <li><a href="#prefer-command-operator-macros-that-take-arguments-over-manual-delimiter-wrappers" id="toc-prefer-command-operator-macros-that-take-arguments-over-manual-delimiter-wrappers" class="nav-link" data-scroll-target="#prefer-command-operator-macros-that-take-arguments-over-manual-delimiter-wrappers">Prefer command operator macros that take arguments over manual delimiter wrappers</a></li>
   <li><a href="#prefer-dot-products-over-transpose-products-and-inner-products" id="toc-prefer-dot-products-over-transpose-products-and-inner-products" class="nav-link" data-scroll-target="#prefer-dot-products-over-transpose-products-and-inner-products">Prefer dot products over transpose products and inner products</a></li>
@@ -627,6 +628,10 @@ window.Quarto = {
 <li><strong>Don’t:</strong> write <code>\frac{2}{n} \tp{\design} \paren{\design\vcoef - \vy}</code> after the prediction errors already have a name.</li>
 </ul>
 <p>The pair uses prediction errors (predicted minus observed); <code>\vy - \design\vcoef</code> is the vector of residuals, <code>\vresid</code>. (Directive from the user, 2026-10-09: “remember to always decompose expressions to make each one concise; … why not use the prediction error macro instead of <code>\vy - \design \vcoef</code>?” Also tracked as <a href="https://github.com/Morrison-Lab/psw/issues/140"><code>Morrison-Lab/psw#140</code></a>.)</p>
+</section>
+<section id="name-a-repeated-or-coherent-chunk-with-a-new-macro" class="level3">
+<h3 class="anchored" data-anchor-id="name-a-repeated-or-coherent-chunk-with-a-new-macro">Name a repeated or coherent chunk with a new macro</h3>
+<p>Before finishing any definition, theorem or proof, scan for a sub-expression written out two or more times, or a conceptually coherent chunk (the prediction error, the loss of one observation), and give it a macro instead of writing it out. Add the macro to <code>Morrison-Lab/macros</code> first, with an <code>interpretations.tsv</code> row, never as a local macro. The full rule is in <a href="../../shared/writing/math-derivation-steps.md"><code>math-derivation-steps</code></a> (“Keep each equation simple”, Do and don’t). (Directive from Ezra, 2026-10-16.)</p>
 </section>
 </section>
 <section id="prefer-command-operator-macros-that-take-arguments-over-manual-delimiter-wrappers" class="level2">

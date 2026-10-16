@@ -24,8 +24,8 @@ re-verify on a harness bump, the way the Cursor mapping doc does.
 
 **OpenCode 2.0 (first seen 2026-10-15) is a harness bump that breaks this chain.**
 The vendor's migration guide says V1 plugin implementations do not run in V2 (<https://opencode.ai/v2/docs/migrate-v1/>, fetched 2026-10-15).
-The bridge is an OpenCode plugin, so under V2 the catalog would presumably not run, and nothing in the guide says it would warn.
-This is inferred from the guide and unmeasured: no V2 session was run against it.
+The bridge is an OpenCode plugin, so under V2 the catalog would presumably not run, and nothing in the migration guide says V2 would warn about that.
+This is inferred from the guide and unmeasured: no V2 session was run with the bridge installed.
 Stay on V1 until oh-my-openagent ships a V2 plugin, then re-measure every row below.
 
 ## Activation

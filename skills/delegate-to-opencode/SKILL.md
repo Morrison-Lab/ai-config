@@ -53,6 +53,7 @@ There is no per-agent hook for a third-party endpoint, so the only route to open
   Its 5-hour limit is 20% of that and its weekly limit 50% (vendor docs, <https://opencode.ai/docs/go>, fetched 2026-10-15).
   DeepSeek V4.1 Flash is $80 per month on Go and $160 on Go Plus;
   DeepSeek V4 Pro and Kimi K3 are $15 on Go.
+  The vendor's page lists the other models' limits.
   Exhaustion shows as HTTP 429 `GoUsageLimitError` with `limitName` `weekly`, `5-hour` or `monthly`.
   On 2026-10-15 every model returned the weekly error at once, so the documented per-model limits did not isolate one model's exhaustion from another's.
   The response carries no reset time.
@@ -190,23 +191,6 @@ Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402.
 - On 2026-10-15 the Argon model was blocked by the same weekly limit as every other Go model.
   Route the review to `agy` on a device, per `memories/delegation.md`.
 
-## OpenCode 2.0
-
-OpenCode 2.0 was first seen on 2026-10-15 (<https://opencode.ai/v2/docs>, <https://opencode.ai/v2/docs/migrate-v1/>).
-Nothing in this skill was measured on it.
-Every `opencode` measurement above is from 1.18.x.
-
-- V2 reads the same config files as V1, including `~/.config/opencode/opencode.json(c)`, `<project>/opencode.json(c)` and `.opencode/`.
-  Existing agent, command and skill definitions are documented to keep working.
-- V1 plugin implementations do not run in V2.
-  `docs/opencode-hook-mapping.md` depends on the oh-my-openagent plugin, so a V2 session would lose the hook bridge.
-  Either stay on V1 until that plugin has a V2 port, or move to V2 and accept that the guards then run only under Claude Code.
-- The V2 install commands are `curl -fsSL https://opencode.ai/v2/install | bash` and `npm install -g @opencode/cli`.
-  The docs say `mise use -g opencode` installs V1 on a `mise` older than 2026.10.9.
-  The migration guide says the V2 curl installer replaces the V1 binary, and says to remove a package-managed V1 install first.
-  That is vendor-documented and untested here, so check `opencode --version` after any install.
-  V1 and V2 share the config locations, so keep a copy of the V1 config before converting it.
-
 A non-streaming call works for short prompts (such as a smoke test):
 
 ```bash
@@ -217,9 +201,7 @@ curl -s https://opencode.ai/zen/go/v1/chat/completions \
 ```
 
 **Non-streaming requests fail for review-sized or substantial prompts.**
-Measured in a claude.ai cloud session on 2026-10-12, a non-streaming request with a ~22 KB diff failed:
-`glm-5.3` returned HTTP 502 after about 30 seconds,
-and `deepseek-v4-pro` returned an empty body with `upstream request failed` (while a `PONG` smoke test on the same endpoint returned 200 in 1.8 seconds).
+Measured in a claude.ai cloud session on 2026-10-12, a non-streaming request with a ~22 KB diff failed: `glm-5.3` returned HTTP 502 after about 30 seconds, and `deepseek-v4-pro` returned an empty body with `upstream request failed` (while a `PONG` smoke test on the same endpoint returned 200 in 1.8 seconds).
 The roughly 30-second gateway cutoff requires streaming for anything longer than a trivial prompt.
 
 **Always stream review-sized prompts and assemble `delta.content` chunks.**
@@ -325,6 +307,23 @@ _Posted by <Agent Name> (AI agent) --- not written by a human._
 This ensures `check-pr-fully-clean.py` admits the review by construction
 and allows a clean verdict to supersede any earlier standing not-clean comments (#4425).
 Never use Codex for this routing.
+
+## OpenCode 2.0
+
+OpenCode 2.0 was first seen on 2026-10-15 (<https://opencode.ai/v2/docs>, <https://opencode.ai/v2/docs/migrate-v1/>).
+Nothing in this skill was measured on it.
+Every `opencode` measurement above is from 1.18.x.
+
+- V2 reads the same config files as V1, including `~/.config/opencode/opencode.json(c)`, `<project>/opencode.json(c)` and `.opencode/`.
+  Existing agent, command and skill definitions are documented to keep working.
+- V1 plugin implementations do not run in V2.
+  `docs/opencode-hook-mapping.md` depends on the oh-my-openagent plugin, so a V2 session would lose the hook bridge.
+  Either stay on V1 until that plugin has a V2 port, or move to V2 and accept that the guards then run only under Claude Code.
+- The V2 install commands are `curl -fsSL https://opencode.ai/v2/install | bash` and `npm install -g @opencode/cli`.
+  The docs say `mise use -g opencode` installs V1 on a `mise` older than 2026.10.9.
+  The migration guide says the V2 curl installer replaces the V1 binary, and says to remove a package-managed V1 install first.
+  That is vendor-documented and untested here, so check `opencode --version` after any install.
+  V1 and V2 share the config locations, so keep a copy of the V1 config before converting it.
 
 ## Where opencode sits in the budget ladder
 

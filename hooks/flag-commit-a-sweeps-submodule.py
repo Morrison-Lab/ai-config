@@ -59,7 +59,9 @@ import sys
 
 # `git commit` short options that consume a value (attached or next token),
 # so the rest of a cluster after one of them is that value, not more flags.
-_COMMIT_VALUE_SHORT = set("mFCctSu")
+# -S and -u take OPTIONAL, attached-only arguments, so they never consume
+# the next token and are deliberately absent here.
+_COMMIT_VALUE_SHORT = set("mFCct")
 _COMMIT_VALUE_LONG = {
     "--message", "--file", "--author", "--date", "--cleanup",
     "--reuse-message", "--reedit-message", "--fixup", "--squash",
@@ -105,6 +107,9 @@ def _git_invocation(rest):
         if a == "-C" and i + 1 < len(rest):
             c_dirs.append(rest[i + 1])
             i += 2
+        elif a.startswith("-C") and len(a) > 2:
+            c_dirs.append(a[2:])  # attached form: -Cdir
+            i += 1
         elif a in _GIT_VALUE_GLOBAL:
             i += 2
         elif a.startswith("-"):
@@ -136,6 +141,8 @@ def commit_sweeps_all(args):
                     if pos == len(a) - 1:
                         i += 1  # value is the next token
                     break
+                if ch in "Su":
+                    break  # optional attached value (-uall): rest of cluster
             i += 1
             continue
         i += 1
@@ -248,9 +255,13 @@ def _under_pathspecs(sub_path, pathspecs, cwd):
         return True  # cannot scope; the safe direction is to warn
     top = top.strip()
     for p in pathspecs:
-        if p.startswith(":"):
-            continue  # magic pathspec: not evaluated, ignore
+        if p.startswith(":") or any(ch in p for ch in "*?["):
+            # Magic (`:/`, `:(exclude)`) and glob pathspecs are not
+            # evaluated; the safe direction is to warn, never to go silent.
+            return True
+        p = p.replace("\\", "/")  # Windows separators
         rel = os.path.relpath(os.path.normpath(os.path.join(cwd, p)), top)
+        rel = rel.replace("\\", "/")
         if rel == "." or sub_path == rel or sub_path.startswith(rel + "/"):
             return True
     return False

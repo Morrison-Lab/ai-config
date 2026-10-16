@@ -138,6 +138,18 @@ SHOULD_WARN = [
     ("W16", moved_pin_only_repo,
      "cat <<'EOF' > note.txt\ngit add -u\nEOF\ngit commit -am 'fix'",
      "heredoc body mentions the command, then a real one follows"),
+    ("W17", moved_pin_only_repo, f"git commit -S -a -m {MSG}",
+     "-S takes an optional ATTACHED value; it must not eat the next token"),
+    ("W18", moved_pin_only_repo, f"git commit -u -a -m {MSG}",
+     "-u takes an optional attached value, like -S"),
+    ("W19", moved_pin_only_repo, "git -C{repo} commit -am 'fix'",
+     "attached -C<dir> form"),
+    ("W20", moved_pin_only_repo, "git add -u :/",
+     "magic pathspec is not evaluated: warn, not silent"),
+    ("W21", moved_pin_only_repo, "git add -u 'mod*'",
+     "glob pathspec is not evaluated: warn, not silent"),
+    ("W22", moved_pin_only_repo, "git add -u '.\\mod'",
+     "Windows path separator is normalised"),
 ]
 SHOULD_STAY_SILENT = [
     ("S1", moved_pin_repo, f"git commit -m {MSG}", "no -a: nothing swept"),
@@ -163,6 +175,8 @@ SHOULD_STAY_SILENT = [
     ("S12", moved_pin_only_repo, "git status", "different subcommand"),
     ("S13", moved_pin_only_repo, f"git commit -m {MSG} -- CLAUDE.md",
      "commit with paths and no -a"),
+    ("S14", moved_pin_only_repo, f"git commit -uall -m {MSG}",
+     "-uall is -u with value `all`, not a -a flag"),
 ]
 
 
@@ -260,7 +274,7 @@ MUTATIONS = {
         "an `a` inside a short-flag cluster is read as -a",
         [('                if ch == "a":\n                    return True',
           '                if False:\n                    return True')],
-        {"W1", "W2", "W6", "W8", "W9", "W10", "W11", "W12", "W16"},
+        {"W1", "W2", "W6", "W8", "W9", "W10", "W11", "W12", "W16", "W17", "W18", "W19"},
     ),
     "M_value_letter_stops_cluster": (
         "a value-taking letter (-m) ends the cluster, so -ma is not -a",
@@ -277,6 +291,43 @@ MUTATIONS = {
           "                        pass")],
         {"S10"},
     ),
+    "M_optional_value_S_u_not_in_value_set": (
+        "-S and -u do not consume the next token",
+        [('_COMMIT_VALUE_SHORT = set("mFCct")',
+          '_COMMIT_VALUE_SHORT = set("mFCctSu")')],
+        {"W17", "W18"},
+    ),
+    "M_optional_attached_value_ends_cluster": (
+        "the rest of a -S/-u cluster is its attached value (-uall)",
+        [('                if ch in "Su":\n'
+          "                    break  # optional attached value (-uall): rest of cluster",
+          "                if False:\n                    break")],
+        {"S14"},
+    ),
+    "M_attached_dash_C": (
+        "attached `-C<dir>` retargets the repository",
+        [('        elif a.startswith("-C") and len(a) > 2:',
+          "        elif False:")],
+        {"W19"},
+    ),
+    "M_magic_pathspec_warns": (
+        "a magic pathspec (`:/`) warns instead of going silent",
+        [('        if p.startswith(":") or any(ch in p for ch in "*?["):',
+          '        if any(ch in p for ch in "*?["):')],
+        {"W20"},
+    ),
+    "M_glob_pathspec_warns": (
+        "a glob pathspec warns instead of going silent",
+        [('        if p.startswith(":") or any(ch in p for ch in "*?["):',
+          '        if p.startswith(":"):')],
+        {"W21"},
+    ),
+    "M_windows_separator": (
+        "backslash separators are normalised in pathspecs",
+        [('        p = p.replace("\\\\", "/")  # Windows separators',
+          "        pass")],
+        {"W22"},
+    ),
     "M_add_update_long": (
         "`--update` is read as -u",
         [('        if f == "--update":\n            return True, paths',
@@ -288,13 +339,13 @@ MUTATIONS = {
         [('        if not f.startswith("--") and "u" in f[1:]:\n'
           "            return True, paths",
           "        if False:\n            return True, paths")],
-        {"W4", "W7", "W13", "W14", "W15"},
+        {"W4", "W7", "W13", "W14", "W15", "W20", "W21", "W22"},
     ),
     "M_dash_c_dir": (
         "`git -C <dir>` retargets the repository",
         [("        for d in c_dirs:\n            target = os.path.join(target, d)",
           "        for d in c_dirs:\n            pass")],
-        {"W6", "S9"},
+        {"W6", "W19", "S9"},
     ),
     "M_cd_tracking": (
         "an earlier `cd <dir>` retargets the repository",

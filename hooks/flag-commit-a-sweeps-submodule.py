@@ -39,7 +39,8 @@ missing one".
 
   M1  the tool is `Bash` and `tool_input.command` parses into simple commands
   M2  one of them is `git`, after skipping leading env-var assignments and
-      lead words, and `-C <dir>` / `-c <k=v>` global options
+      lead words, and `-C <dir>` / `-c <k=v>` global options; a command line
+      inside `bash -c '...'` (or `sh -c`) is read too
   M3  its subcommand is `commit` with `-a`/`--all` (also inside a combined
       short cluster such as `-am`, `-av`, `-sam`; a cluster is read left to
       right and stops at a letter that takes a value, so `-ma` -- message
@@ -48,20 +49,31 @@ missing one".
       or `add` with `-u`/`--update`, `-A`/`--all`, or a pathspec that covers
       a submodule from above (`git add .`, `git add <dir>`); a dry run
       (`commit --dry-run`/`--short`/`--porcelain`/`--long`, `add -n`/
-      `--dry-run`) stages and commits nothing and is silent. Every match in
-      the command is checked, not only the first
-  M4  the target repository is the `-C` directory, applied on top of the
+      `--dry-run`) stages and commits nothing and is silent. Long options
+      may be abbreviated to an unambiguous prefix, as git allows (`--dry`,
+      `--upd`); an ambiguous prefix names nothing. Every match in the command
+      is checked, not only the first
+  M4  the target repository is the `-C` directory (`~` and `$HOME` expanded
+      like a `cd`), applied on top of the
       session cwd (`tool_input.Cwd`, else the payload's `cwd`, else the
       hook's own) and of any earlier `cd <dir>` in the same command, scoped
       to its subshell. `cd`, `pushd` and `popd` are resolved by the shared
       `shellcmd.resolve_cd_target` (`-P`/`-L`, `~` and `$HOME` expanded); one
       it cannot name (a bare `popd`, `cd -`, `cd $VAR`, a backtick) makes the
-      directory unknown, so a later relative target is skipped (see below)
+      directory unknown, so a later relative target is skipped (see below).
+      A `cd` that is a stage of a pipeline (`cd x | cat`) or a background job
+      (`cd x &`) runs in a subshell of its own in bash and moves nothing; when
+      the command has one, EVERY directory change in it is ignored and the
+      session directory is checked. A nested `bash -c` line starts in the
+      session directory when no `cd` precedes it, else in an unknown one
   M5  `git status --porcelain=v1 -z -uno` there lists an entry whose worktree
       column is `M` and whose path has mode 160000 in `git ls-files -s`. The
       configured ignore settings decide: with `submodule.<name>.ignore=all` or
       `diff.ignoreSubmodules=all` git leaves the gitlink alone and so does the
-      hook (an `--ignore-submodules=` flag would override them)
+      hook (an `--ignore-submodules=` flag would override them). The same two
+      settings given as `git -c key=value` on the command are passed on to
+      the hook's status; no other `-c` is, because one such as
+      `core.fsmonitor` runs a program, here before the user approves
   M6  the submodule's own HEAD differs from the commit the index pins. A
       submodule with only dirty CONTENT is also reported as ` M` but leaves
       the gitlink unchanged and cannot be swept in, so it stays silent here.
@@ -69,14 +81,18 @@ missing one".
       pin) is silent too, while `MM` (staged, then the submodule moved again)
       warns
   M7  for `git add -u|-A <pathspec>`, only a submodule at or under a pathspec
-      counts, but other magic (`:(exclude)...`) or a glob pathspec is not
-      evaluated and warns; for a plain `git add <pathspec>`, only a pathspec
-      covering the submodule from above counts (naming it is how a pin is
-      bumped on purpose, and other magic or a glob pathspec is not evaluated
-      and stays silent). `:/path` and `:(top)path` are read as `path` from
-      the repository root, so `git add :/` covers everything. Relative paths
-      are compared through realpath. `commit -a` takes no pathspec (git
-      refuses the combination)
+      counts; an exclude pathspec (`:!x`, `:^x`, `:(exclude)x`) that matches
+      the submodule keeps it out whatever else is given, and pathspecs that
+      are all excludes mean everything else (checked with git 2.43). Glob
+      excludes are matched with fnmatch, which approximates git's. Other
+      magic (`:(glob)`, `:(attr:...)`) or a glob include is not evaluated and
+      warns; for a plain `git add <pathspec>`, only a pathspec covering the
+      submodule from above counts (naming it is how a pin is bumped on
+      purpose, and unevaluated magic or a glob include stays silent).
+      `:/path` and `:(top)path` are read as `path` from the repository root,
+      so `git add :/` covers everything, and `icase` and `literal` are read.
+      Relative paths are compared through realpath. `commit -a` takes no
+      pathspec (git refuses the combination)
 
 Fails OPEN on any parse trouble, on git failing or timing out, and outside a
 git repository. Every git call shares an 8 s deadline, inside the 10 s the
@@ -100,6 +116,14 @@ check the wrong one, when:
   - git is not reached as `git` after the shared parser's normalisation
     (`/usr/bin/git` and `timeout 60 git` ARE read): an alias or a shell
     function is not followed;
+  - the paths a `--pathspec-from-file` reads are not seen: with `-u`/`-A`
+    that reads as no pathspec (the whole repository), and a plain `add` of
+    them is silent;
+  - a pipeline or background `cd` is detected from the command text, with
+    quoted strings blanked; the approximation ignores every `cd` in the
+    command, so a `cd` that does take effect beside it is not followed either;
+  - after a `cd`, a nested `bash -c` line has an unknown directory, so only
+    an absolute `git -C /path` or `cd /path` inside it is read;
   - a `cd` inside a subshell `( ... )` is scoped to it, as in the shell, so a
     git command after the subshell runs where the subshell started; a `cd` in
     a `{ ... }` group moves the caller and is followed;
@@ -108,6 +132,7 @@ check the wrong one, when:
     (checked: `git commit -m x .` committed `mod`), but they say which paths
     they take, so the hook does not parse commit's positional arguments.
 """
+import fnmatch
 import json
 import os
 import re
@@ -133,6 +158,31 @@ _COMMIT_VALUE_LONG = {
 _GIT_VALUE_GLOBAL = {"-C", "-c", "--namespace", "--config-env"}
 # `git commit` options that make it a dry run: nothing is committed.
 _COMMIT_DRY_RUN = {"--dry-run", "--short", "--porcelain", "--long"}
+# Every long option of `git commit` and `git add` (git 2.43, `-h`). git
+# accepts an unambiguous prefix of one (`--dry` is `--dry-run`, `--upd` is
+# `--update`), so a token is resolved against these lists, not compared whole.
+_COMMIT_LONG = _COMMIT_VALUE_LONG | _COMMIT_DRY_RUN | {
+    "--quiet", "--verbose", "--reset-author", "--signoff", "--edit",
+    "--status", "--gpg-sign", "--all", "--include", "--interactive",
+    "--patch", "--only", "--no-verify", "--verify", "--branch",
+    "--ahead-behind", "--null", "--amend", "--no-post-rewrite",
+    "--post-rewrite", "--untracked-files", "--pathspec-file-nul",
+    "--allow-empty", "--allow-empty-message",
+}
+_ADD_VALUE_LONG = {"--chmod", "--pathspec-from-file"}
+_ADD_LONG = _ADD_VALUE_LONG | {
+    "--dry-run", "--verbose", "--interactive", "--patch", "--edit", "--force",
+    "--update", "--renormalize", "--intent-to-add", "--all",
+    "--ignore-removal", "--no-ignore-removal", "--refresh", "--ignore-errors",
+    "--ignore-missing", "--sparse", "--pathspec-file-nul",
+}
+# A command-line `-c key=value` that decides whether git leaves a submodule's
+# gitlink alone. Only these are passed on to the hook's own `git status`:
+# anything else (`core.fsmonitor`, `core.sshCommand`, ...) can run a program
+# at hook time, before the user has approved the command.
+_IGNORE_CONF = re.compile(
+    r"^(?:diff\.ignoresubmodules|submodule\.[^=]+\.ignore)="
+    r"(?:all|dirty|untracked|none)$", re.I)
 
 
 # The shared parser blanks heredoc bodies correctly (a command after
@@ -146,6 +196,7 @@ try:
     from shellcmd import simple_commands_with_scope as _simple_commands
     from shellcmd import resolve_cd_target as _resolve_cd_target
     from shellcmd import strip_env as _strip_env
+    from shellcmd import shell_c_expansions as _shell_c_expansions
 except Exception as _exc:  # broken install: fail open, like every guard here
     print("flag-commit-a-sweeps-submodule: cannot load "
           f"scripts/lib/shellcmd.py ({_exc}); inert", file=sys.stderr)
@@ -163,18 +214,24 @@ def _redirects_git(env_tokens):
 
 
 def _git_invocation(rest):
-    """(c_dirs, subcommand, args) for a `git ...` argv, or None.
+    """(c_dirs, confs, subcommand, args) for a `git ...` argv, or None.
 
-    `c_dirs` is every `-C <dir>` in order (git applies them cumulatively).
+    `c_dirs` is every `-C <dir>` in order (git applies them cumulatively);
+    `confs` is every `-c <key=value>` that decides whether a gitlink is
+    ignored (`_IGNORE_CONF`), which the hook's own `git status` must share.
     """
     if not rest or rest[0] != "git":
         return None
-    c_dirs = []
+    c_dirs, confs = [], []
     i = 1
     while i < len(rest):
         a = rest[i]
         if a == "-C" and i + 1 < len(rest):
             c_dirs.append(rest[i + 1])
+            i += 2
+        elif a == "-c" and i + 1 < len(rest):
+            if _IGNORE_CONF.match(rest[i + 1]):
+                confs.append(rest[i + 1])
             i += 2
         elif a in ("--git-dir", "--work-tree") or a.startswith(
                 ("--git-dir=", "--work-tree=")):
@@ -184,14 +241,26 @@ def _git_invocation(rest):
         elif a.startswith("-"):
             i += 1  # --no-pager, -p, --exec-path[=x], ...
         else:
-            return c_dirs, a, rest[i + 1:]
+            return c_dirs, confs, a, rest[i + 1:]
     return None
+
+
+def _long_name(token, known):
+    """The option in `known` that the long option `token` (`--dry`,
+    `--author=x`) names: an exact match, else the one option it is a prefix
+    of, as git resolves it. None when it matches none or several."""
+    name = token.split("=", 1)[0]
+    if name in known:
+        return name
+    matches = [k for k in known if k.startswith(name)]
+    return matches[0] if len(matches) == 1 else None
 
 
 def commit_sweeps_all(args):
     """M3 for `git commit`: true if `-a`/`--all` is among the options and
     the commit is not a dry run (`--dry-run`, `--short`, `--porcelain` and
-    `--long` all commit nothing; checked with git 2.x)."""
+    `--long` all commit nothing; checked with git 2.x). Long options may be
+    abbreviated, as git allows."""
     sweeps = dry = False
     i = 0
     while i < len(args):
@@ -199,11 +268,12 @@ def commit_sweeps_all(args):
         if a == "--":
             break
         if a.startswith("--"):
-            if a == "--all":
+            name = _long_name(a, _COMMIT_LONG)
+            if name == "--all":
                 sweeps = True
-            elif a in _COMMIT_DRY_RUN:
+            elif name in _COMMIT_DRY_RUN:
                 dry = True
-            elif a in _COMMIT_VALUE_LONG:
+            elif name in _COMMIT_VALUE_LONG and "=" not in a:
                 i += 1  # value is the next token
             i += 1
             continue
@@ -228,21 +298,33 @@ def add_kind(args):
     beyond named paths. kind is "add -u" (`-u`/`--update`), "add -A"
     (`-A`/`--all`) or "add" (only pathspecs, which can still cover a
     submodule: `git add .`); `-n`/`--dry-run` and `--refresh` stage nothing
-    (checked with git 2.x), and `--no-ignore-removal` is an alias of `-A`."""
-    flags, paths, dashdash = [], [], False
-    for a in args:
-        if not dashdash and a == "--":
+    (checked with git 2.x), and `--no-ignore-removal` is an alias of `-A`.
+    Long options may be abbreviated. The paths `--pathspec-from-file` reads
+    are not seen: with `-u`/`-A` that reads as no pathspec (the whole
+    repository), and a plain `add` of them is silent."""
+    names, letters, paths, dashdash = set(), "", [], False
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if dashdash:
+            paths.append(a)
+        elif a == "--":
             dashdash = True
-        elif not dashdash and a.startswith("-") and a != "-":
-            flags.append(a)
+        elif a.startswith("--"):
+            name = _long_name(a, _ADD_LONG)
+            names.add(name)
+            if name in _ADD_VALUE_LONG and "=" not in a:
+                i += 1  # value is the next token
+        elif a.startswith("-") and a != "-":
+            letters += a[1:]
         else:
             paths.append(a)
-    letters = "".join(f[1:] for f in flags if not f.startswith("--"))
-    if "--dry-run" in flags or "--refresh" in flags or "n" in letters:
+        i += 1
+    if "--dry-run" in names or "--refresh" in names or "n" in letters:
         return None
-    if "--update" in flags or "u" in letters:
+    if "--update" in names or "u" in letters:
         return "add -u", paths
-    if "--all" in flags or "--no-ignore-removal" in flags or "A" in letters:
+    if "--all" in names or "--no-ignore-removal" in names or "A" in letters:
         return "add -A", paths
     return ("add", paths) if paths else None
 
@@ -258,56 +340,102 @@ def _move(rest, cur):
     return target
 
 
-def _join(base, d):
-    """`d` applied on `base`; None while `base` is unknown and `d` relative."""
-    if os.path.isabs(d):
-        return d
-    return None if base is None else os.path.join(base, d)
+_CD_WORD = re.compile(r"\s*(?:cd|pushd|popd)(?![\w./-])")
+_QUOTED = re.compile(r"'[^']*'|\"(?:\\.|[^\"\\])*\"")
+_SEGMENTS = re.compile(r"&&|\|\||[;\n(){}]")
+_PIPE_OR_JOB = re.compile(r"([|&])")
 
 
-def offending(command):
-    """[(segment, kind, target_dir, pathspecs), ...] for every matching
-    invocation in `command`, in order. `target_dir` is the directory git
-    would run in, relative to the session cwd unless absolute; an invocation
-    whose directory is unknown (after a bare `cd` or `cd -`) is left out."""
-    if _simple_commands is None:
-        return []
+def _unreachable_cd(command):
+    """True if a `cd`, `pushd` or `popd` in `command` runs in a subshell of
+    its own, so its directory never reaches the commands after it: a stage of
+    a pipeline (`cd /x | cat`, which bash forks) or a backgrounded one
+    (`cd /x &`). Read from the text with the quoted strings blanked; any such
+    form makes the hook ignore EVERY directory change in the command, which
+    checks the session directory instead (the warn side)."""
+    text = _QUOTED.sub(" ", command)
+    text = re.sub(r"[0-9]*[<>]&[0-9-]*|&>>?", " ", text)  # 2>&1, &>f
+    for segment in _SEGMENTS.split(text):
+        parts = _PIPE_OR_JOB.split(segment)  # piece, op, piece, ...
+        stages = parts[0::2]
+        ops = parts[1::2]
+        for pos, piece in enumerate(stages):
+            if not _CD_WORD.match(piece):
+                continue
+            if "|" in ops:
+                return True
+            if pos < len(ops) and ops[pos] == "&":
+                return True
+    return False
+
+
+def _scan(command, start):
+    """[(segment, kind, target_dir, pathspecs, confs), ...] for every
+    matching invocation in the one command line `command`, in order, and
+    whether it changes directory at all. `start` is the directory the line
+    starts in (relative to the session cwd; "" is the session cwd itself, None
+    is unknown). `target_dir` is the directory git would run in; an
+    invocation whose directory is unknown is left out."""
     cmds = _simple_commands(command)
     if cmds is None:
-        return []
+        return [], False
+    ignore_cd = _unreachable_cd(command)
     # Directory per subshell scope: a subshell starts from its parent's
     # directory and a `cd` inside it never reaches the parent. A directory is
     # None once a `cd` goes somewhere the text does not name.
-    cds = {(0,): ""}
+    cds = {(0,): start}
 
     def cd_of(scope):
         while scope not in cds:
             scope = scope[:-1]
         return cds[scope]
 
-    hits = []
+    hits, moved = [], False
     for scope, argv in cmds:
         env, rest = _strip_env(argv)
         cd = cd_of(scope)
         if rest and rest[0] in ("cd", "pushd", "popd"):
-            cds[scope] = _move(rest, cd)
+            moved = True
+            if not ignore_cd:
+                cds[scope] = _move(rest, cd)
             continue
         inv = _git_invocation(rest)
         if inv is None or _redirects_git(env):
             continue
-        c_dirs, sub, args = inv
+        c_dirs, confs, sub, args = inv
         target = cd
-        for d in c_dirs:
-            target = _join(target, d)
+        for d in c_dirs:  # `-C` moves like `cd`, `~` and `$HOME` included
+            target = _move(["cd", "--", d], target)
         if target is None:
             continue
         segment = " ".join(argv)
         if sub == "commit" and commit_sweeps_all(args):
-            hits.append((segment, "commit -a", target, None))
+            hits.append((segment, "commit -a", target, None, confs))
         elif sub == "add":
             found = add_kind(args)
             if found:
-                hits.append((segment, found[0], target, found[1]))
+                hits.append((segment, found[0], target, found[1], confs))
+    return hits, moved
+
+
+def offending(command):
+    """[(segment, kind, target_dir, pathspecs, confs), ...] for every
+    matching invocation in `command`, including the command lines of nested
+    `bash -c '...'` shells, in order.
+
+    A nested line starts where the outer shell is: the session directory when
+    no line of the command changes directory, else unknown (the shell it runs
+    in may have been moved by a `cd` the text does not tie to it), and then
+    only an absolute `git -C /path` or `cd /path` is read."""
+    if _simple_commands is None:
+        return []
+    pieces = _shell_c_expansions(command)
+    scans = [_scan(piece, "") for piece in pieces]
+    if not scans[0][1]:
+        return [h for hits, _ in scans for h in hits]
+    hits = scans[0][0]
+    for piece in pieces[1:]:
+        hits = hits + _scan(piece, None)[0]
     return hits
 
 
@@ -352,7 +480,7 @@ def _git(cwd, *args):
     return out.stdout.decode("utf-8", "surrogateescape")
 
 
-def modified_submodules(cwd):
+def modified_submodules(cwd, confs=()):
     """(found, toplevel) where found lists (path, pinned_sha, head_sha) for
     each submodule whose gitlink would change if every modified tracked path
     were staged; None if git cannot be run here."""
@@ -363,7 +491,8 @@ def modified_submodules(cwd):
     # the gitlink alone (checked with git 2.43), so the configured values must
     # decide. A submodule with only dirty content is reported as ` M` too;
     # the HEAD-versus-pin comparison below tells the two apart.
-    status = _git(cwd, "status", "--porcelain=v1", "-z", "-uno")
+    conf_args = [x for c in confs for x in ("-c", c)]
+    status = _git(cwd, *conf_args, "status", "--porcelain=v1", "-z", "-uno")
     top = _git(cwd, "rev-parse", "--show-toplevel")
     # ONE index read for every gitlink, rather than a query per modified path:
     # a large sweep would otherwise spend the whole deadline and fail open
@@ -407,44 +536,100 @@ def modified_submodules(cwd):
     return found, top
 
 
-# `:/path` and `:(top)path`: a path from the repository root, not the cwd.
-_TOP_MAGIC = re.compile(r"^:(?:/|\(top\))(.*)$")
+# Pathspec magic the hook evaluates: `:!x` and `:^x` (exclude), `:/x` (from
+# the repository root) and `:(exclude,top,icase,literal)x`. Any other magic
+# (`attr`, `glob`, `from-file`, ...) is not evaluated.
+_SHORT_MAGIC = re.compile(r"^:([!^/]+)(.*)$", re.S)
+_LONG_MAGIC = re.compile(r"^:\(([^)]*)\)(.*)$", re.S)
+_EVALUATED = {"exclude", "top", "icase", "literal"}
+_GLOB = "*?["
+
+
+def _parse_pathspec(p):
+    """(exclude, top, icase, literal, body), or None for a pathspec carrying
+    magic the hook does not evaluate. A plain path is (False, False, False,
+    False, p)."""
+    if not p.startswith(":"):
+        return False, False, False, False, p
+    short = _SHORT_MAGIC.match(p)
+    if short:
+        flags, body = short.groups()
+        return ("!" in flags or "^" in flags), "/" in flags, False, False, body
+    long_form = _LONG_MAGIC.match(p)
+    if long_form:
+        words = {w for w in long_form.group(1).split(",") if w}
+        if words <= _EVALUATED:
+            return ("exclude" in words, "top" in words, "icase" in words,
+                    "literal" in words, long_form.group(2))
+    return None
+
+
+def _rel(spec, real_cwd, real_top):
+    """The pathspec's path relative to the repository root, lowercased for
+    `icase`."""
+    _, top, icase, _, body = spec
+    if top:
+        rel = os.path.normpath(body or ".")
+    else:
+        if os.name == "nt":
+            body = body.replace("\\", "/")  # Windows separators only
+        rel = os.path.relpath(os.path.normpath(os.path.join(real_cwd, body)),
+                              real_top)
+        if os.name == "nt":
+            rel = rel.replace("\\", "/")
+    return rel.lower() if icase else rel
+
+
+def _has_glob(spec, rel):
+    return not spec[3] and any(ch in rel for ch in _GLOB)
+
+
+def _matches(spec, rel, sub_path):
+    """Does the pathspec (path `rel`) match the submodule at `sub_path` as
+    that path or a directory above it? A glob is matched with fnmatch, which
+    approximates git's."""
+    sub = sub_path.lower() if spec[2] else sub_path
+    if _has_glob(spec, rel):
+        prefixes = [sub[:i] for i, ch in enumerate(sub) if ch == "/"] + [sub]
+        return any(fnmatch.fnmatchcase(x, rel) for x in prefixes)
+    return rel == "." or sub == rel or sub.startswith(rel + "/")
 
 
 def _under_pathspecs(sub_path, pathspecs, cwd, top, sweeping):
     """M7: does a pathspec given from `cwd` stage the submodule at `sub_path`
     (repo-root relative, `top` the repo root)?
 
+    An exclude pathspec (`:!x`, `:^x`, `:(exclude)x`) that matches the
+    submodule keeps it out whatever else is given (checked with git 2.43:
+    `git add -u mod ':!mod'` stages nothing). Pathspecs that are all excludes
+    mean everything else.
+
     `sweeping` is `add -u`/`-A`: no pathspec means the whole repo, a pathspec
-    naming the submodule itself counts, and other magic (`:(exclude)...`) or
-    a glob pathspec, which is not evaluated, warns. A plain
-    `git add <pathspec>` counts only a pathspec that covers the submodule
-    from above (`.`, a parent directory, `:/`): naming the submodule is how a
-    pin bump is staged on purpose, and other magic or a glob pathspec there
-    stays silent. The top-level forms `:/path` and `:(top)path` are read as
-    `path` from the repository root. Both sides go through realpath, so a
-    symlinked cwd cannot make the relative path miss."""
+    naming the submodule itself counts, and magic the hook does not evaluate,
+    a glob include, or `--pathspec-from-file` warns. A plain `git add
+    <pathspec>` counts only a pathspec that covers the submodule from above
+    (`.`, a parent directory, `:/`): naming the submodule is how a pin bump is
+    staged on purpose, and unevaluated magic or a glob include there stays
+    silent. Both sides go through realpath, so a symlinked cwd cannot make
+    the relative path miss."""
     if not pathspecs:
         return sweeping
     real_cwd, real_top = os.path.realpath(cwd), os.path.realpath(top)
-    for p in pathspecs:
-        top_form = _TOP_MAGIC.match(p)
-        if top_form and not any(ch in top_form.group(1) for ch in "*?["):
-            rel = os.path.normpath(top_form.group(1) or ".")
-        elif p.startswith(":") or any(ch in p for ch in "*?["):
+    parsed = [_parse_pathspec(p) for p in pathspecs]
+    for spec in parsed:
+        if spec and spec[0] and _matches(
+                spec, _rel(spec, real_cwd, real_top), sub_path):
+            return False
+    includes = [s for s in parsed if not (s and s[0])]
+    if not includes:
+        return True  # only excludes: git takes `.` as the include
+    for spec in includes:
+        rel = None if spec is None else _rel(spec, real_cwd, real_top)
+        if spec is None or _has_glob(spec, rel):
             if sweeping:
                 return True
             continue
-        else:
-            if os.name == "nt":
-                p = p.replace("\\", "/")  # Windows separators only
-            rel = os.path.relpath(os.path.normpath(os.path.join(real_cwd, p)),
-                                  real_top)
-            if os.name == "nt":
-                rel = rel.replace("\\", "/")
-        covers = (rel == "." or sub_path == rel
-                  or sub_path.startswith(rel + "/"))
-        if covers and (sweeping or rel != sub_path):
+        if _matches(spec, rel, sub_path) and (sweeping or rel != sub_path):
             return True
     return False
 
@@ -533,15 +718,16 @@ def main() -> int:
     base = next((c for c in (inp.get("Cwd"), payload.get("cwd"))
                  if isinstance(c, str) and c), None) or os.getcwd()
     state = {}  # cwd -> modified_submodules(cwd), one status per repository
-    for segment, kind, target, pathspecs in hits:
+    for segment, kind, target, pathspecs, confs in hits:
         cwd = os.path.normpath(os.path.join(base, target))
         if not os.path.isdir(cwd):
             continue
-        if cwd not in state:
-            state[cwd] = modified_submodules(cwd)
-        if not state[cwd]:
+        key = (cwd, tuple(confs))
+        if key not in state:
+            state[key] = modified_submodules(cwd, confs)
+        if not state[key]:
             continue
-        subs, top = state[cwd]
+        subs, top = state[key]
         if pathspecs is not None:
             subs = [s for s in subs
                     if _under_pathspecs(s[0], pathspecs, cwd, top,

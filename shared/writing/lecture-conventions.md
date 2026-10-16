@@ -35,6 +35,9 @@ This fragment is the agent-facing copy: follow the rules, and link to psw instea
 
 - **State the notation, and name the alternatives** a reader will meet in other sources, in the definition div or a callout beside it.
 - **Name synonyms and near-synonyms** where a term is defined, and say which one the notes use.
+  Put every alias in the `#def-` div title, as in "Risk (expected loss, population risk, true risk, generalization error, expected prediction error)", and bold each alias where the definition names it, including the name another source uses, such as a textbook's (Ezra, 2026-10-15).
+  The rule holds in every repository, including `mds`, `pds`, `sds`, `lds` and `rme`.
+  The wording is canonical in psw's "Defining terms clearly" chapter.
 - **Use real data and compute every number.**
   Never type or paste output.
   See [`hypothetical-examples`](hypothetical-examples.md).
@@ -93,5 +96,6 @@ The detailed rules are in [`plain-prose`](plain-prose.md), [`ai-tells`](ai-tells
 ## Related
 
 - [`definition-crossrefs`](definition-crossrefs.md), [`informal-definitions`](informal-definitions.md), [`forward-references`](forward-references.md), [`semantic-line-breaks`](semantic-line-breaks.md)
+- [`notes-content-rules`](notes-content-rules.md): state the estimand, link prerequisite definitions, talk about ideas not the notes.
 - [`quarto-divs-for-typed-content`](quarto-divs-for-typed-content.md): which div type holds which content.
 - [`quarto-revealjs-div-styling`](quarto-revealjs-div-styling.md): style div boxes on slides as on the web page.

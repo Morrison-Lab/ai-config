@@ -17,7 +17,7 @@ if not os.path.isfile(HOOK):
 
 # The standing infra-PR grant reads a PR's file list from GitHub. Every
 # subprocess case below inherits this, so none depends on a live PR's files
-# (`gh pr merge 1352 -R Morrison-Lab/gha` must BLOCK whatever gha#1352
+# (`gh pr merge 1352 -R Morrison-Lab/pds` must BLOCK whatever pds#1352
 # changes). The variable can only turn that grant off. The grant's own logic
 # is tested in-process at the end of this file, with the fetch stubbed.
 os.environ["NO_UNAUTHORIZED_MERGE_DISABLE_INFRA_GRANT"] = "1"
@@ -26,7 +26,7 @@ BLOCK = [
     # The macros entries in STANDING_MERGE_GRANT_REPOS are exact names.
     ("gh pr merge 12 -R d-morrison/macros-fork", "a repo whose name merely starts with macros"),
     ("gh pr merge 12 -R Other-Owner/macros", "the macros name under an ungranted owner"),
-    ("gh pr merge 12 -R d-morrison/macros -R Morrison-Lab/gha", "a granted macros target beside an ungranted one"),
+    ("gh pr merge 12 -R d-morrison/macros -R Morrison-Lab/pds", "a granted macros target beside an ungranted one"),
     ("gh pr merge 411 --squash", "bare gh pr merge"),
     ('bash -c "gh pr merge 411 --squash"', "subshell bash -c gh pr merge inside double quotes"),
     ("sh -c 'gh pr merge 411 --squash'", "subshell sh -c gh pr merge inside single quotes"),
@@ -236,9 +236,9 @@ BLOCK = [
     # the grant has stopped meaning "PRs targeting ai-config".
     ("gh pr merge 1352 --squash",
      "a bare merge names no repo, so no target is determined"),
-    ("gh pr merge 1352 -R Morrison-Lab/gha --squash",
+    ("gh pr merge 1352 -R Morrison-Lab/pds --squash",
      "an explicit target outside the grant list"),
-    ("gh api -X PUT repos/Morrison-Lab/gha/pulls/1/merge",
+    ("gh api -X PUT repos/Morrison-Lab/pds/pulls/1/merge",
      "a REST PR merge against a repo outside the grant list"),
     ("gh api -X POST repos/Morrison-Lab/ai-config/merges -f base=main -f head=x",
      "a repository BRANCH merge is not a PR merge, granted repo or not"),
@@ -246,9 +246,9 @@ BLOCK = [
      "two different targets in one segment is not a determination"),
     ("gh api -X PUT repos/Morrison-Lab/gha/pulls/1/merge -R morrison-lab/ai-config",
      "a granted -R must not authorize a merge whose path names another repo"),
-    ('gh pr merge 1352 -R Morrison-Lab/gha --body "morrison-lab/ai-config"',
+    ('gh pr merge 1352 -R Morrison-Lab/pds --body "morrison-lab/ai-config"',
      "a granted repo named inside a masked payload supplies no target"),
-    ("gh pr merge 1352 -R Morrison-Lab/gha # morrison-lab/ai-config",
+    ("gh pr merge 1352 -R Morrison-Lab/pds # morrison-lab/ai-config",
      "a granted repo named inside a trailing comment supplies no target"),
     # The two above are caught by the AMBIGUITY clause -- each names a second,
     # ungranted repo -- so neither tests the payload masking at all. Nor does a
@@ -681,6 +681,10 @@ ALLOW = [
      "the macros repo carries the standing grant too"),
     ("gh pr merge 12 --repo Morrison-Lab/macros",
      "the macros repo under its other owner spelling"),
+    ("gh pr merge 1080 -R Morrison-Lab/gha --squash",
+     "the gha repo carries the standing grant too (user directive, 2026-10-16)"),
+    ("gh api -X PUT repos/Morrison-Lab/gha/pulls/1080/merge",
+     "the REST PR-merge form against the gha repo"),
     ("gh api -X PUT repos/d-morrison/macros/pulls/12/merge",
      "the REST PR-merge form against the macros repo"),
     ("gh api -X PUT repos/Morrison-Lab/ai-config/pulls/1352/merge",
@@ -1876,6 +1880,17 @@ for _label, _s in [
     _guard.pr_merge_tail(_s)
     _check(f"pr_merge_tail on {_label} stays under 1s",
            time.perf_counter() - _t0 < 1.0)
+
+# The refusal tells a blocked agent how a bare or relayed grant becomes real.
+checks += 1
+_bare_env = {k: v for k, v in os.environ.items()
+             if k not in ('ALLOW_MERGE', 'AI_SESSION_ID', 'CLAUDE_SESSION_ID')}
+_run = subprocess.run([sys.executable, HOOK, '--dry-run', 'gh pr merge 411 --squash'],
+                     capture_output=True, text=True, env=_bare_env)
+_ok_refusal = (_run.returncode == 0
+              and 'enable-mwc' in _run.stdout and 'check-mwc' in _run.stdout)
+wrong += not _ok_refusal
+print(f"  {'ok' if _ok_refusal else 'WRONG':<6} refusal text points at enable-mwc")
 
 total = checks
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))

@@ -235,8 +235,17 @@ repo's** `.claude/settings.json`:
 }
 ```
 
-Claude Code installs the plugin at session start (needs network access to reach
-GitHub). Plugin skills are namespaced, e.g. `/ai-config:reprexes`,
+Declaring the plugin does not install it.
+Observed 2026-10-15 in a Claude Code cloud session for `Morrison-Lab/rme`:
+the container started with only the default marketplace registered,
+and `claude plugin install ai-config@Morrison-Lab` failed with
+"not found in marketplace" until the marketplace was added.
+So also commit a `SessionStart` hook that adds the marketplace and installs
+the plugin when `CLAUDE_CODE_REMOTE` is `true`
+(needs network access to reach GitHub);
+[`Morrison-Lab/rme`'s `.claude/hooks/install-ai-config.sh`](https://github.com/Morrison-Lab/rme/blob/main/.claude/hooks/install-ai-config.sh)
+is a working example ([rme#1336](https://github.com/Morrison-Lab/rme/pull/1336)).
+Plugin skills are namespaced, e.g. `/ai-config:reprexes`,
 `/ai-config:grade-work`.
 
 Locally (or to try it), run these as slash commands inside a Claude Code
@@ -454,6 +463,7 @@ The payload gaps that remain and the per-guard status are in
 | `warn-python3-cannot-read-hooks.sh` | `UserPromptSubmit` | names the interpreter when the `python3` on `PATH` cannot read the directory the hooks live in -- a condition that denies `Bash`, `Edit`, `Write` and `Agent` at once (every tool a `PreToolUse` matcher names; `Read` and `Grep` are unaffected), while each denial names a hook rather than the interpreter. Shell, not Python: in the failure this hook reports, no Python hook can run. Silent when the interpreter is fine; see the hook's own header for the mechanism (ai-config#3624) |
 | `require-gh-repo-flag.py` | `PreToolUse` (Bash) | blocks a mutating repo-scoped `gh` command that omits `-R` |
 | `no-offer-to-file.py` | `Stop` | blocks a reply that *offers* to file or record instead of doing it |
+| `no-announce-unconfirmed-merge.py` | `Stop` | blocks a reply that announces a future merge ("merges as soon as", "will merge") when no merge call since the last user turn confirmed one, unless the merge waits on the user's words |
 | `no-redundant-push-pr-authorization.py` | `Stop` | blocks a request for routine push or PR/MR authorization already covered by the standing grant; deliberately leaves merge, force-push, and unverified external-membership questions alone |
 | `no-empty-promise.py` | `Stop` | blocks a reply committing to future behaviour when the same turn shipped no mechanism: a rule ("going forward, I will/won't") needs a durable write, an owed action ("I owe #N the ARDI loop") needs that or an armed timer/watcher |
 | `no-unfiled-finding.py` | `Stop` | blocks the *declarative* "worth its own issue" that leaves no filing behind |
@@ -471,6 +481,7 @@ The payload gaps that remain and the per-guard status are in
 | `remind-record-standing-guidance.py` | `UserPromptSubmit` | reminds, never blocks, when a standing rule has no global record (ai-config, psw) after it |
 | `warn-hedged-checkable-claim.py` | `PreToolUse` (mcp__hearthbot__.*\|mcp__github__add_issue_comment\|mcp__github__update_issue_comment\|mcp__github__add_reply_to_pull_request_comment\|mcp__github__add_comment_to_pending_review\|mcp__github__pull_request_review_write) | warns, never blocks, when a hedge ("likely", "probably", "presumably", "I think", "should be") shares a sentence with a PR or issue reference, a CI or check word, or merged, open or closed: the user's rule is to check it and state the result. |
 | `warn-bare-forge-reference.py` | `PreToolUse` (mcp__hearthbot__.*) | warns, never blocks, when a user-visible reply (`mcp__hearthbot__reply`, `post_message`, `update_message`) names a PR, MR or issue by number (`#N`, `!N`, `owner/repo#N`) outside a link, URL or code span: the user asked for a link on every artifact, repeatedly, after the rule was already in memory (ai-config#4224) |
+| `warn-pr-without-thread-link.py` | `PreToolUse` (mcp__hearthbot__.*) | warns, never blocks, when a user-visible reply (`mcp__hearthbot__reply`, `post_message`, `update_message`) names a PR by its `/pull/N` URL in a paragraph or list item with no project-thread link (`(#cmsg_...)`, or a URL with `thread=cmsg_...`): the user asked why a coordinator post linked a PR without its thread after the rule already existed (ai-config#4565) |
 | `remind-ums-after-error.py` | `UserPromptSubmit` | reminds, never blocks, when an admitted error has no recorded learning after it |
 | `remind-ci-crosscheck-sim-verdict.py` | `UserPromptSubmit` | reminds, never blocks, when a verdict-shaped figure follows a LOCAL sim/transcript run with no CI-side read in between -- the same clip and seed have been measured reading FAIL locally and PASS on CI |
 | `no-mistake-without-a-hook.py` | `UserPromptSubmit, Stop` | blocks after an admitted, mechanizable mistake or recognized redundant prose/content with no mechanism decision, capped once per trigger phrase within a short transcript window |

@@ -381,6 +381,12 @@ the counterpart of the skipped-step rule at the top of this file.
   it instead of rebuilding it.
 - **Do:** pick a name the document's existing notation already implies, so a
   reader needs no introduction to it.
+- **Do:** before finishing any definition, theorem or proof, scan it for a sub-expression written out two or more times, or a conceptually coherent chunk even if it appears once (the prediction error, fitted minus outcome;
+  the loss of a prediction on one observation);
+  name it, give it a macro, and use the macro everywhere.
+  Add the macro to `Morrison-Lab/macros` with an `interpretations.tsv` row, never as a local macro.
+  (Directive from Ezra, 2026-10-16: "always try to make each expression as concise as possible, especially by using additional notation to represent conceptually coherent chunks of an expression ...
+  The more we can reduce clutter in expressions, the easier they are to read.")
 - **Do:** check a proposed name against the first three gains above, and drop it
   when it buys none of them.
 - **Don't:** unfold past that floor into internal construction the reader has

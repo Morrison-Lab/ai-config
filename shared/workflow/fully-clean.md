@@ -182,9 +182,22 @@ from a complete one --- so dropping a later standing not-clean yields a
 
 **`actions_runs` is optional but not inert.**
 Omitting it disables the ai-config#2277 suppression of a `cancelled` run
-superseded by a later success, and disables run-based attribution of a verdict
-whose comment cites its run URL rather than a SHA.
-Both omissions push toward a false **not**-clean, which is the safe direction
+superseded by a later success, disables the same suppression of a `failure`
+run superseded by a later run's success (ai-config#3343; same job name,
+workflow file and `event`, ordered by run id, with `completed_at` breaking a
+tie within one run; a missing event, run id or timestamp fails closed), and
+disables run-based attribution of a verdict whose comment cites its run URL
+rather than a SHA.
+Two trade-offs are accepted on purpose.
+An old run that re-fails after a newer run passed stays suppressed, because
+re-running a stale job is how a gate gets stuck red (macros#143); a newer
+not-clean review verdict still blocks through the verdict scan.
+Two same-named jobs in one run attempt cannot be told apart from the check
+run's URL, so one can excuse the other only when its `completed_at` is later.
+The suppression covers every conclusion other than `success`, `neutral` and
+`skipped`: `timed_out`, `action_required`, `startup_failure` and `stale` as
+well as `failure` and `cancelled`.
+Each omission pushes toward a false **not**-clean, which is the safe direction
 --- but if a PR reads not-clean for a reason you cannot see in its checks or
 reviews, gather this key before concluding anything.
 Never add entries until the verdict flips: that is tuning the instrument to
@@ -1349,6 +1362,35 @@ That round is also the reason to state the split precisely: the first draft of
 this record said all three blocked, and review caught it --- an unverified count
 in prose, inside an entry about an unverified count.
 Tracked as [ai-config#2441](https://github.com/Morrison-Lab/ai-config/issues/2441).)
+
+The checker now excludes the calling job itself
+([ai-config#4521](https://github.com/Morrison-Lab/ai-config/issues/4521),
+after the same loop recurred on
+[rme#1322](https://github.com/Morrison-Lab/rme/pull/1322) on 2026-10-15).
+Run inside GitHub Actions on the PR's own repository,
+it looks for its own job:
+the one job in the current attempt of `GITHUB_RUN_ID`
+that is `in_progress` on the runner named `RUNNER_NAME`.
+When exactly one job matches,
+the checker reports that job's unfinished check run as a `NOTE` rather than a blocker.
+Only that one job is excluded.
+A sibling job in the same workflow run still blocks,
+and so does a completed failure of the calling job.
+When no single job matches,
+nothing is excluded,
+and a `NOTE` says why whenever some check run is still unfinished.
+The review-verdict criteria are unchanged, because a merging agent needs them.
+A standing not-clean from an earlier round,
+or no review yet on this head, still exits `1`.
+When the calling job's own check run was on the head,
+and one of those two kinds of item is blocking,
+the checker adds a `NOTE`.
+The `NOTE` tells a reviewer whose own earlier round is the standing verdict
+to render a fresh verdict on the diff,
+not to copy those items into it.
+A human's change request and another reviewer's verdict are outside that `NOTE`.
+[Morrison-Lab/gha#978](https://github.com/Morrison-Lab/gha/issues/978) goes further for the Claude reviewer
+and denies it the script outright.
 
 (Measured 2026-08-19 on a remote session driving
 [ai-config#1673](https://github.com/Morrison-Lab/ai-config/pull/1673).

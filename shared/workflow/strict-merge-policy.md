@@ -27,6 +27,15 @@ Merging a Pull Request or Merge Request is strictly controlled across all agents
   GitHub does not automatically reopen the issue a reverted PR closed;
   explicitly and immediately reopen the corresponding issue(s) (`gh issue reopen <issue-number>`) per [`revert-merge.md`](revert-merge.md).
 
+## Waiver of the cross-model review
+
+When no non-Claude model and harness can run (the network policy blocks the host, the backend is down, the CLI or credential is absent after enumerating every route), try each route once, then waive the cross-model review.
+The waiver grants no merge authority: the merge still needs `mwc` or an explicit instruction, a clean Claude review plus green CI, and a PR note that the review was waived, which reviewer was attempted, and the error.
+A reviewer that ran and returned not-clean is not unavailable and still vetoes the merge.
+The waiver removes only the cross-model requirement;
+authorization, [`fully-clean`](fully-clean.md), and the clean-on-head rules still bind.
+Full procedure: [`adversarial-self-review`](adversarial-self-review.md#waiver-when-no-cross-model-reviewer-can-run) (Ezra, 2026-10-16).
+
 ## Infrastructure PRs standing `mwc` grant
 
 Infrastructure PRs carry a standing `mwc` grant in every repo the user can push to.

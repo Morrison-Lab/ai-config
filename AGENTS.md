@@ -2,7 +2,7 @@
 
 This file defines standardized, vendor-neutral instructions for AI coding agents operating within Morrison-Lab repositories (OpenAI Codex CLI, Gemini CLI / Antigravity, Claude Code, Cursor, Aider, etc.).
 
-Worked-example case records and authentic incident directives live in [`AGENTS.cases.md`](AGENTS.cases.md), moved out of this auto-loaded context.
+Case records and incident directives live in [`AGENTS.cases.md`](AGENTS.cases.md).
 
 ## Guiding principles: be intelligent, wise, and diligent
 
@@ -12,6 +12,7 @@ Every rule here serves these three, each an act you can observe:
 - **Wise:** treat a correction as a general principle and record it where every project loads it ([`encode-reusable-feedback`](shared/workflow/encode-reusable-feedback.md)).
 - **Diligent:** verify before claiming: re-query state rather than recall it ([`metacognitive-monitoring`](shared/workflow/metacognitive-monitoring.md)), and view a rendered deliverable before calling it ready ([`check-the-renders`](shared/workflow/check-the-renders.md)).
 
+  Don't be lazy; be proactive, detail-oriented, and thorough in your work.
 ## Get a clean automated review before asking a person to review
 
 Never ask a person to review a PR, GitLab MR, document, or other work product, on any forge, repo or project, or report one as awaiting human review, until its automated review is clean or deadlocked.
@@ -173,14 +174,21 @@ See [`grep-is-not-coverage`](shared/workflow/grep-is-not-coverage.md) and [`AGEN
 - **Do:** search `AGENTS.md`, `CLAUDE.md`, `memories/`, `shared/`, and open issues before answering "no" to whether a policy exists.
 - **Do:** run an all-state tracker search before implementing a capability request.
 - **Don't:** assert that a standing grant or rule does not exist based only on searching `skills/` or `memories/`.
-## Track every useful resource in a repo
 
-Whenever you or a subagent finds a useful resource in any format for any Morrison-Lab repo, course or project, track it in a repo now, from official sources only, to build comprehensive directories of our interests.
+## Track each useful resource in each notes repo whose topic it covers
+
+Track each useful resource you or a subagent finds in its primary home (catalog or Further reading) and in each notes repo whose topic it covers, from official sources only.
 Detail: [`track-useful-resources`](shared/workflow/track-useful-resources.md).
+
 ## No vague attribution
 
 Cite a claim's real source or own it as judgment;
 never invent a vague attribution ([details](shared/writing/no-vague-attribution.md)).
+
+## Fetch untrusted files in a sandbox
+
+A sandboxed local session only downloads; the cloud thread reads.
+Detail: [`fetch-untrusted-files`](shared/workflow/fetch-untrusted-files.md).
 
 ## Store structured data in structured formats
 
@@ -223,7 +231,7 @@ See [`improve-your-subagents`](shared/workflow/improve-your-subagents.md).
 
 ## Treat user profanity and frustration as urgent defect signals
 
-Treat profanity, frustration, a correction, or a repeat request as an urgent defect: diagnose, fix it now, and in that turn commit the general rule to the repo that owns it (ai-config if it spans repos), never only to project memory (`hooks/remind-encode-user-correction.py`).
+Treat profanity, frustration, a correction, or a repeat request as an urgent defect: diagnose, fix it now, and in that turn commit the general rule to the repo that owns it (ai-config if it spans repos), never in project memory (`hooks/remind-encode-user-correction.py`).
 See [`user-profanity-signal`](shared/workflow/user-profanity-signal.md).
 
 ## Status and diagnostic requests do not make issues report-only
@@ -328,7 +336,7 @@ See [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md) 
   see [`hyperlink-liberally`](shared/writing/hyperlink-liberally.md).
 - When referencing files or symbols, use relative markdown links or inline code backticks.
 - When mentioning PRs or issues, format them as clickable hyperlinks to forge URLs, never bare `#NNN` (except `Closes #123`).
-- Preserve semantic line breaks (SemBr) when editing markdown docs.
+- Semantic line breaks everywhere, enforced by CI ([rule](shared/writing/semantic-line-breaks.md)).
 
 - **Do:** link every pull request or issue cited as a source.
 - **Do:** hyperlink tools, internal rules, and technical terms on first or key mention.
@@ -413,7 +421,7 @@ The grant also covers installing and updating software (R, packages, Quarto, any
 - **Revert a premature or defective merge at once**, and reopen the issues it closed.
 - **A purely infrastructure PR carries a standing `mwc` grant** in pushable repos once fully clean.
 
-Detail, hook overrides, and cases: [`strict-merge-policy`](shared/workflow/strict-merge-policy.md).
+Detail, cases, cross-model waiver: [`strict-merge-policy`](shared/workflow/strict-merge-policy.md).
 
 - **Do:** merge a fully clean infrastructure PR without asking, stating why it qualified.
 - **Don't:** extend the grant to a PR that mixes infrastructure with content, or merge one whose review was skipped.

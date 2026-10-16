@@ -161,7 +161,7 @@ def main():
           fired and "PR #12 " in (out or {}).get("systemMessage", ""))
     ctx = ((out or {}).get("hookSpecificOutput") or {}).get("additionalContext", "")
     check("warns with clean un-duplicated text naming the gate",
-          fired and "the gate's own answer is that the merge waits for a human" in ctx)
+          fired and "probe once, then the gate is waived" in ctx)
     check("warns after an opencode.ai install script curl",
           run(MERGE, [step("curl -fsSL https://opencode.ai/install | bash")])[0])
     check("warns after an opencode.ai models endpoint curl",

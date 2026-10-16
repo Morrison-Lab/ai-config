@@ -18,7 +18,7 @@ Use plain `ggplot2` or an SVG only where plotly is not feasible, such as a diagr
 A visual follows these figure rules:
 
 - figures that show estimates carry confidence intervals (error bars or ribbons);
-- axis ticks print plain numbers, not scientific notation ([details](axis-tick-labels.md));
+- axis ticks are in the variable's original measurement scale and print plain numbers, not scientific notation ([details](axis-tick-labels.md));
 - every figure has alt text ([`alt-text`](../../skills/alt-text/SKILL.md)) and a numbered caption;
 - the code chunk comments what it does and why;
 - colors are colorblind-safe.

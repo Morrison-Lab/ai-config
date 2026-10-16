@@ -1,11 +1,12 @@
 # Track every useful resource in every notes repo whose topic it covers
 
 Track every useful resource (textbooks, articles, software packages, websites, videos, or any other format) in every notes repo whose topic it covers, in addition to its primary home.
+The primary home is the repo or directory where the resource would live if only one place tracked it, such as the lds directories for courses, channels and programs.
 The rule covers any content relevant to any Morrison-Lab repo, course or project, and the goal is to build comprehensive directories of content relevant to all our interests over time.
 Each tracked resource is a small contribution to a directory, not a one-off link.
 
 Ezra's first form of the rule, 2026-10-13, said to make sure a resource gets tracked in one or more of our repos.
-The 2026-10-15 decision below broadened it.
+On 2026-10-15 he broadened it to every notes repo whose topic the resource covers.
 
 ## How
 
@@ -15,19 +16,18 @@ Put the resource where readers will find it: a chapter's Further reading or "Rea
 
 ## Put it in every notes repo whose topic it covers
 
-Ezra asked in a review comment on [lds#841](https://github.com/Morrison-Lab/lds/pull/841#discussion_r4288705723) whether some entries should go in one of the other repos (sds, mds, pds, rme, etc) "either instead of or in addition to here".
-On 2026-10-15 he made the answer a permanent policy rather than a one-off: track the resource in addition to its primary home, not instead of it.
+Ezra asked in a review comment on [lds#841](https://github.com/Morrison-Lab/lds/pull/841#discussion_r4288705723) whether some entries should go in one of the other repos (sds, mds, pds, rme, or another notes repo) "either instead of or in addition to here".
+On 2026-10-15, in the project chat, he directed that the answer be a permanent policy rather than a one-off: track the resource in addition to its primary home, not instead of it.
 
-The primary home is the repo or directory where the resource would live if only one place tracked it, such as the lds directories for courses, channels and programs.
 Decide at tracking time, for each notes repo, whether the resource covers a topic that repo teaches, and track it in every repo where it does.
 A directory entry in lds (a course list, a channels table) does not substitute for a Further reading bullet on the page of any other notes repo that covers the same topic.
 
 - Use the course sequence ([`course-sequence`](../writing/course-sequence.md)) to find the candidate repos for a topic.
 - Put a resource with a topical scope (a course on multiple testing, a book chapter) in the Further reading section of the page it matches, and a resource that spans topics (a channel, a whole textbook) in the repo's directory.
-  Where a repo has no directory, put it in the Further reading section of the page closest to its scope.
+  Where a repo has no directory, put the resource in the Further reading section of the page closest to the resource's scope.
 - Respect each resource's license in each repo.
   When the resource is not adaptable (no license, or a license that forbids derivatives), link to it and do not copy it.
-  When its license allows adaptation, adapt it with attribution, following its other terms (NonCommercial, ShareAlike) and each repo's own license.
+  When its license allows adaptation, you may adapt it, with attribution, following its other terms (NonCommercial, ShareAlike) and each repo's own license.
   Where the resource's license and the repo's license conflict, link only.
 - When you find that a tracked resource is missing from a notes repo whose topic it covers, add it to that repo.
   Open one PR per repo, and link each PR to the PRs in the other repos.

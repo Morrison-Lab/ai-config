@@ -191,11 +191,13 @@ Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402.
   Stream with `"stream": true` and `max_tokens` 30000, and assemble `delta.content`;
   the text comes only after 40,000 to 70,000 characters of `reasoning_content`, about five minutes.
   On [ai-config#4572](https://github.com/Morrison-Lab/ai-config/pull/4572), `longcat-2.5-preview-free` found three real defects in the first push and then returned no text on the fix commit in two attempts, while `cat-jam-free` returned a clean verdict on both heads.
-  Run both, treat an empty answer as no verdict rather than clean, and give a defect list the same ARD as any review.
+  Run both, treat an empty answer as no verdict rather than clean, and address, rebut or defer every defect in a list as for any review.
   The user accepted a clean free-model verdict as the non-Claude gate while Go is exhausted (relayed by the coordinator session, 2026-10-16).
-- **Skip these routes while Go is exhausted; each failed on 2026-10-16.**
-  The free ids on `https://opencode.ai/zen/v1` return `FreeTierError` (usable only from within OpenCode).
-  With the CLI installed by `npm i -g opencode-ai` and `OPENCODE_API_KEY=proxy-injected` set, `opencode run -m opencode/<free id>` printed only its banner and hit a 280 to 420 second timeout on four models, with the brief as the argument and with `-f` (put the message before `-f`, which takes several files).
+- **Other routes did not work on 2026-10-16, so use the streamed Go-endpoint recipe above instead.**
+  The free ids on the pay-as-you-go path `https://opencode.ai/zen/v1` (not the Go path) return `FreeTierError`, usable only from within OpenCode.
+  With the CLI installed by `npm i -g opencode-ai` and `OPENCODE_API_KEY` set to any non-empty value (the proxy supplies the real key), `opencode run -m opencode/<free id>` printed only its banner and hit a 280 to 420 second timeout.
+  That held for `deepseek-v4.1-flash-free` and `nemotron-3-ultra-free`, with the brief as the argument and attached with `-f`.
+  Put the message before `-f`, because `-f` takes several files and read the message as a file name.
   `codex` and `agy` are not installed in a cloud session, no OpenRouter, Databricks or Gemini key is set, and `openrouter.ai` and `api.openai.com` are refused by the network policy.
 - On 2026-10-15 the Argon model was blocked by the same weekly limit as every other Go model.
   Route the review to `agy` on a device, per `memories/delegation.md`.

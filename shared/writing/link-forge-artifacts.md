@@ -65,3 +65,14 @@ If the change has no rendered section, such as an infrastructure change, the PR 
 - **Don't:** report a content change with only the PR link and leave the user to find the section.
 
 (Directive from the user, 2026-10-16: "always link me to the relevant section as well as the relevant pr", then corrected to include the thread.)
+
+## Link every session you mention
+
+Whenever a message names a session, such as a Claude Code session, a project thread or a Remote Control session, link it in the sentence that names it.
+Write `[session](https://claude.ai/code/session_…)` for a Claude Code session, or the thread link above for a project thread.
+
+- **Do:** write the session as a link the user can open.
+- **Don't:** name a session by title or id alone.
+
+(Directive from the user, 2026-10-16: "anytime you mention a session, you must provide a link".
+Tracked in [ai-config#4570](https://github.com/Morrison-Lab/ai-config/issues/4570).)

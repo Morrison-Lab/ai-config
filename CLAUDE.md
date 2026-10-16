@@ -65,7 +65,7 @@ larger in-scope outcome clear.
 
 A request for status means examine the transcript to check if the agent got stuck, frozen, or dropped the ball, inspect live state, finish every safe, in-scope fix it reveals before reporting, resume stalled work immediately, and file every noticed issue, however small, in its owning tracker.
 Detail, rationale, and cases: [`shared/workflow/status-requests-act.md`](shared/workflow/status-requests-act.md).
-Fix red `main`: [`shared/workflow/red-main.md`](shared/workflow/red-main.md).
+Red `main` after an agent's change: [`shared/workflow/red-main.md`](shared/workflow/red-main.md).
 
 ## Flag good moments to `/clear` in long-running sessions
 
@@ -117,8 +117,7 @@ The fragment above carries the mechanics, the failure modes each check catches, 
 [`shared/workflow/timestamp-local-recaps.md`](shared/workflow/timestamp-local-recaps.md)
 
 A status recap or summary carries a timestamp in the user's local zone, so "as of when" is unambiguous when they read it later.
-That is the obligation;
-the rest of this section governs where the time comes from.
+The rest of this section governs where the time comes from.
 Every clock time you write down --- that recap, a date typed into a file, a time stamped on a forge comment, a session-notebook heading --- comes from a reading taken **in that moment**, in the user's zone (`TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`).
 A reading expires immediately, and the thing that most reliably licenses an invented stamp later is the memory of having honestly measured one earlier: the clock keeps moving while a count of elapsed tool calls does not, so the two drift apart and the drift compounds across comments posted in sequence.
 

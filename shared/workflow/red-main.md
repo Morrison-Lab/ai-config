@@ -13,7 +13,7 @@ The check exists to be green, so the defect it found is the work.
 - **Don't:** post "which fix do you prefer?" and stop.
   Pick the root-cause fix, say which, and keep going.
 - **Don't:** treat the missing merge grant as a reason to wait on the fix.
-  Merging still needs the user's `mwc` where the repository has no standing grant, but the PR does not.
+  Merging still needs the user's permission (`mwc`, or an explicit instruction for that PR) where the repository has no standing grant, but opening the fix PR does not.
 
 Example: the new equation-render check found 80 "Double subscripts" errors on sds `main` ([sds#249](https://github.com/Morrison-Lab/sds/issues/249)).
 The cause was one macro, `\vecf`, whose `\underset` output took the subscript.

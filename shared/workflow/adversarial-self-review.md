@@ -135,7 +135,7 @@ This section is the exception that the other "required for merging" statements i
   The PR comment or description, and the merge report, state that the cross-model review was waived, name the reviewer attempted and the error that made it unavailable, and give the head sha.
 - **A push resets it.**
   The waiver and the Claude review both attach to the shipping head;
-  after any further push, re-probe availability and re-review.
+  after any further push, re-run the full-ladder attempt and re-review.
 
 Anyone who wants the cross-model verdict anyway can still ask for it: the waiver removes a requirement and forbids nothing.
 

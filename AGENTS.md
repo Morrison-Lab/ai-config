@@ -327,7 +327,7 @@ See [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md) 
   see [`hyperlink-liberally`](shared/writing/hyperlink-liberally.md).
 - When referencing files or symbols, use relative markdown links or inline code backticks.
 - When mentioning PRs or issues, format them as clickable hyperlinks to forge URLs, never bare `#NNN` (except `Closes #123`).
-- Preserve semantic line breaks (SemBr) when editing markdown docs.
+- Semantic line breaks everywhere, enforced by CI ([rule](shared/writing/semantic-line-breaks.md)).
 
 - **Do:** link every pull request or issue cited as a source.
 - **Do:** hyperlink tools, internal rules, and technical terms on first or key mention.

@@ -26,13 +26,14 @@ is well under 40 characters — is fine as-is. Don't force an awkward
 mid-clause break just to shorten the raw line; review bots themselves
 classify these as borderline / acceptable.
 
-**When reviewing prose, suggest semantic-line-break fixes — don't insist on
-them.** Flag lines that ignore clause/sentence boundaries as a style
-suggestion, the same weight as a word-choice nit: worth raising, not worth
-blocking approval over, and not worth re-raising if the author declines.
-This is distinct from the rule above: that one governs how thoroughly to
-fix violations once a review has flagged them; this one governs the
-weight to give the finding when you are the reviewer in the first place.
+**Every Morrison-Lab repository uses semantic line breaks, and its CI
+blocks on them** (Ezra, 2026-10-16).
+A packed-sentence line in a PR is a blocking finding, not a style
+suggestion: when reviewing prose, request the fix, and when adding the
+`check-new-line-breaks` caller to a repository, leave `fail` at its
+default of `true`.
+Pre-existing lines stay as they are, since the check reads only the lines
+a PR adds.
 
 **What CI actually enforces is one sentence per line, not a character
 count -- don't reflow to 80 columns thinking the check demands it.**

@@ -6,11 +6,8 @@ glossary/definition-list convention --- check each of the following for
 every mention:
 
 - **Defined and hyperlinked on first use in each div.**
-  A technical term with no formal definition yet gets one:
-  search the earlier sites in the course sequence first and link to a
-  definition there if one exists,
-  otherwise write it in its own definition div in the earliest site that
-  needs the term, then link to it.
+  A technical term with no formal definition yet gets one
+  (see "Undefined term" under "What to report").
   A technical term or named
   result links to the div that defines or states it --- a Quarto crossref
   (`@def-token-budget`, `@thm-cauchy-schwarz`) or an explicit markdown
@@ -96,6 +93,13 @@ one of:
   never delete the link.
 - **Undefined term** --- the term is mentioned but no div defines it
   anywhere in the document; add the missing definition.
+  In a series of related documents, such as course sites, first look for a
+  definition in an earlier document and link to it if one exists;
+  otherwise write the definition in the earliest document that needs the
+  term, then link to it.
+  The checklist bullet's "no formal definition yet" case is this one, and
+  [`informal-definitions.md`](informal-definitions.md) covers a concept
+  defined only in plain prose.
 - **Doubled type word** --- the mention writes the type name in front of a
   crossref that already supplies it; drop the hand-written word.
 

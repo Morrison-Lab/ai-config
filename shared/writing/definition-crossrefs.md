@@ -10,7 +10,8 @@ every mention:
   result links to the div that defines or states it --- a Quarto crossref
   (`@def-token-budget`, `@thm-cauchy-schwarz`) or an explicit markdown
   link to the div's anchor --- the first time it appears in each div.
-  Outside divs, link it the first time it appears in each prose passage.
+  Outside divs, link it the first time it appears in each prose passage,
+  meaning the text between two headings, divs or slide breaks.
   A link in an earlier div or passage does not carry over, because
   readers jump into the middle of a page.
   Link once per div or passage, not at every mention.
@@ -48,8 +49,9 @@ diff.
 ## What to check
 
 - For each technical term or named result mentioned in the prose, find its
-  defining div (if one exists) and confirm the first mention is a working
-  crossref/link to it, not bare text.
+  defining div (if one exists) and confirm the first mention in each div
+  (or in each prose passage outside divs) is a working crossref/link to it,
+  not bare text.
   A bare mention in a passage that motivates the definition that follows
   is not a missing crossref
   ([keep the crossref](forward-references.md#keep-the-crossref)).

@@ -197,7 +197,7 @@ should be extracted and named).
 The principle reaches past code, into prose documents and their structure
 (Ezra Morrison, 2026-09-25: "this falls under the general principle of
 favoring modularity and decomposition").
-Three instances he named the same day:
+Four instances (he named the first three the same day):
 
 - **Documents decompose into subfiles.**
   A Quarto chapter is a spine of `{{< include >}}` calls over one subfile
@@ -220,6 +220,22 @@ Three instances he named the same day:
 - **Functions do not nest** without a specific efficiency or simplicity
   reason, stated beside the nested definition
   ([`avoid-nesting`](../coding/avoid-nesting.md)).
+- **Every unit of analysis is as concise and minimal as it can be.**
+  A mathematical expression, definition, theorem, proof, example or remark
+  holds one idea.
+  Abstract the complexity out into smaller, atomic definitions, results and
+  expressions, each with its own name and identifier,
+  and glue the pieces together with hyperlinks.
+  This is the compositional approach of
+  [modular programming](https://en.wikipedia.org/wiki/Modular_programming)
+  applied to the notes (Ezra Morrison, 2026-10-16: agents "seem not to
+  understand the overall philosophy of our notes").
+  The canonical prose rule is proposed in
+  [`Morrison-Lab/psw#217`](https://github.com/Morrison-Lab/psw/pull/217)
+  as "Build every unit from smaller atomic units"; once merged, it lives at
+  `chapters/teaching.qmd#build-every-unit-from-smaller-atomic-units` in PSW.
+  Before writing a long display or div, name the pieces, give each its own
+  macro or div, and link them.
 
 Whenever one unit sits inside another only because it was written there
 first, split it out.

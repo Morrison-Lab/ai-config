@@ -9,7 +9,7 @@ The check exists to be green, so the defect it found is the work.
 
 - **Do:** file or update the tracking issue first, so another session sees the work is claimed.
 - **Do:** read the failing source lines, find the cause, and fix it at the root: a shared macro, a workflow, or the affected sources.
-- **Do:** open the fix PRs, subscribe to them, drive them to fully clean, and report the links.
+- **Do:** open the fix PRs, subscribe to them, drive them to [fully clean](fully-clean.md), and report the links.
 - **Don't:** post "which fix do you prefer?" and stop.
   Pick the root-cause fix, say which, and keep going.
 - **Don't:** treat the missing merge grant as a reason to wait on the fix.

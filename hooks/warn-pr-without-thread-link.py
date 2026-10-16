@@ -17,7 +17,8 @@ What counts, so the warning stays rare enough to be read:
   - A PR mention is a `github.com/<owner>/<repo>/pull/<N>` URL, in a link or
     bare. A bare `#N` cannot be told from an issue or an ordinal by text
     alone (warn-bare-forge-reference.py covers the unlinked number), so it is
-    out of scope here.
+    out of scope here. A schemeless `github.com/...` is not a mention either:
+    the rule asks for the PR's full URL, which carries the scheme.
   - A thread link is `(#cmsg_...)`, the in-app form, or a URL carrying
     `thread=cmsg_...`, the form used outside the app.
   - The unit is one paragraph or one list item. Each unit that names a PR
@@ -42,8 +43,10 @@ INLINE_CODE = re.compile(r"(?<!`)(`+)(?!`).*?(?<!`)\1(?!`)", re.S)
 PR_URL = re.compile(
     r"https?://github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/pull/(\d+)\b")
 THREAD_LINK = re.compile(r"\(#cmsg_\w+\)|[?&]thread=cmsg_\w+")
-# A blank line ends a paragraph; a list marker starts a new item.
-UNIT_BREAK = re.compile(r"\n[ \t]*\n|\n(?=[ \t]*(?:[-*+]|\d+[.)])[ \t])")
+# A blank line ends a paragraph; a list marker at the start of a line begins a
+# new item. An indented marker is a nested item and stays in its parent's unit,
+# so a thread link on a sub-bullet covers the PR named by the bullet above it.
+UNIT_BREAK = re.compile(r"\n[ \t]*\n|\n(?=(?:[-*+]|\d+[.)])[ \t])")
 
 NOTE = """\
 [hook: warn-pr-without-thread-link] This reply names {prs} without \
@@ -56,13 +59,14 @@ list_thread_sessions, project memory, or the PR's attribution block; do not \
 type an id from memory. If a listed PR has no thread, ignore this note."""
 
 
-def strip_code(text: str) -> str:
-    return INLINE_CODE.sub(" ", FENCE.sub(" ", text))
-
-
 def unlinked_prs(text: str) -> list[str]:
     seen: list[str] = []
-    for unit in UNIT_BREAK.split(strip_code(text)):
+    # Fences first (they span blank lines), then split into units, then strip
+    # inline code per unit: a code span cannot close in another block, so it
+    # must not merge two items into one unit.
+    text = FENCE.sub(" ", text.replace("\r\n", "\n"))
+    for unit in UNIT_BREAK.split(text):
+        unit = INLINE_CODE.sub(" ", unit)
         if THREAD_LINK.search(unit):
             continue
         for match in PR_URL.finditer(unit):

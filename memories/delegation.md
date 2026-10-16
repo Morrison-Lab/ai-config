@@ -178,6 +178,10 @@ or handle it in the authoring session instead.
 [`delegate-to-opencode`](../skills/delegate-to-opencode/SKILL.md) carries the
 mechanics and the hosted-only routing rule.
 The tiers and version above were measured 2026-08-19 on opencode 1.18.15.
+Go's limits are per model, in dollars (5-hour 20%, weekly 50%, monthly 100% of the model's monthly limit), checked 2026-10-15;
+the limits the skill gives for three models and the exhaustion error are in `delegate-to-opencode`'s "The destination tier is unavailable or exhausted".
+Go also serves the Argon model (`gemini-4-argon-contributor`), but it was blocked by the same weekly limit on 2026-10-15, so do not count on it as a fallback when Go is exhausted.
+OpenCode 2.0 drops V1 plugins, so stay on V1 while the hook bridge depends on one.
 `delegate-to-codex` operationalizes the codex mechanics ---
 background runner plus DONE-marker poll, `--output-schema`,
 exhaustion detection, Claude fallback ---

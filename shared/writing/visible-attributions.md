@@ -21,21 +21,24 @@ so the chain reaches the reader rather than stopping one hop short.
 Content taken from the maintainer's own repositories
 (Morrison-Lab and d-morrison, such as rme, lds, mds, pds and sds)
 or from other works the maintainer wrote or co-wrote
-(a lab manual the group maintains, their papers, their packages)
-is not credited to them.
-The maintainer gave two directives:
+(a lab manual the maintainer's lab maintains, the maintainer's papers, the maintainer's packages)
+is never credited to the maintainer or to those repositories and works.
+The maintainer, Ezra Morrison, gave two directives:
 
 - 2026-10-05: "you don't have to give attributions for content taken from my other repos".
 - 2026-10-16: "cross-refs between our repos are fine, but we shouldn't formally acknowledge borrowing content from ourselves like we do when we adapt content from others".
 
-The rule covers a Source callout, an "adapted from" sentence,
+"The group" means the maintainer and the lab that maintains these repositories and manuals.
+No credit goes to the group's own work.
+That covers a Source callout, an "adapted from" sentence,
 and a bibliography entry for the group's own notes cited as the source of a definition or result.
 For a result or definition, cite the original publication and a modern textbook instead,
 and link the group's page as a cross-reference.
-"The group" means the maintainer and the lab that maintains these repositories and manuals.
-The rule covers only that hop, and never a person outside the group:
+
+The rule covers only the group's own work.
+It never covers a person outside the group, including a co-author of a co-written work:
 credit a person such as Kameron Decker Harris or Brian Hutchinson by name when reusing their words or lectures.
-What the repository itself credits is still carried:
+What a repository or work itself credits is still carried:
 a book or paper it follows,
 and any person other than the maintainer whose lecture or notes it adapted,
 since several of those repositories hold other authors' work
@@ -43,9 +46,9 @@ since several of those repositories hold other authors' work
 A link to a sister site that sends the reader to further reading
 is a cross-reference, not an attribution, and is unaffected.
 
-Leave a credit to the maintainer's own work out of new work, and remove an existing one when you find it
+Leave a credit to the group's own work out of new work, and remove an existing one when you find it
 (the maintainer asked for the sweep on 2026-10-16;
-the earlier "do not strip an existing credit unless asked" is superseded).
+the earlier rule, "do not strip one that already exists unless the maintainer asks", is superseded).
 Keep the cross-reference link to the sister page.
 
 - **Do:** credit the outside book, paper or person an item follows,

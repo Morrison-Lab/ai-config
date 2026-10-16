@@ -195,7 +195,7 @@ Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402.
   The user accepted a clean free-model verdict as the non-Claude gate while Go is exhausted (relayed by the coordinator session, 2026-10-16).
 - **Other routes did not work on 2026-10-16, so use the streamed Go-endpoint recipe above instead.**
   The free ids on the pay-as-you-go path `https://opencode.ai/zen/v1` (not the Go path) return `FreeTierError`, usable only from within OpenCode.
-  With the CLI installed by `npm i -g opencode-ai` and `OPENCODE_API_KEY` set to any non-empty value (the proxy supplies the real key), `opencode run -m opencode/<free id>` printed only its banner and hit a 280 to 420 second timeout.
+  With the CLI installed by `npm i -g opencode-ai` and the opencode API-key environment variable set to any non-empty value (the proxy supplies the real key), `opencode run -m opencode/<free id>` printed only its banner and hit a 280 to 420 second timeout.
   That held for `deepseek-v4.1-flash-free` and `nemotron-3-ultra-free`, with the brief as the argument and attached with `-f`.
   Put the message before `-f`, because `-f` takes several files and read the message as a file name.
   `codex` and `agy` are not installed in a cloud session, no OpenRouter, Databricks or Gemini key is set, and `openrouter.ai` and `api.openai.com` are refused by the network policy.

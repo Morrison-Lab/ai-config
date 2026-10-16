@@ -111,9 +111,12 @@ NOTE = (
     "CI claude-review workflow are both Claude and do not qualify. Run one "
     "of {clis} (or in cloud sessions, curl to opencode.ai with candidate "
     "model fallback per delegate-to-opencode) on the shipping head first. "
-    "If no qualifying reviewer is reachable here, the gate's own answer is "
-    "that the merge waits for a human or a differently-provisioned "
-    "session (ai-config#3099)."
+    "If no qualifying reviewer can run here (host blocked, backend down, "
+    "CLI or credential absent), probe once, then the gate is waived: merge "
+    "on a clean Claude review plus green CI and say in the PR that the "
+    "cross-model review was waived and why (Ezra, 2026-10-16; "
+    "adversarial-self-review.md 'Waiver when no cross-model reviewer can "
+    "run'). A reviewer that ran and was not clean is not unavailable."
 )
 
 

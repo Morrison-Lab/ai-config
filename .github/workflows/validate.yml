@@ -368,6 +368,10 @@ jobs:
         # Verdict-parsing and merge-command gating for the Antigravity plugin's
         # enforce-mwc-review-gate.py, incl. the sparta#1427 regression (#2676).
         run: python3 scripts/test_enforce_mwc_review_gate.py
+      - name: Run maintainer-feedback parity tests
+        # The merge hook and check-pr-fully-clean.py each hold the unread
+        # maintainer-feedback rule; this pins them to the same verdicts (#4611).
+        run: python3 scripts/test_maintainer_feedback.py
       - name: Run hook-runner tests
         # Per-suite timeout and interpreter spawn (ai-config#2098). The
         # runner itself had no test, so a missing timeout would only show

@@ -3621,6 +3621,13 @@ class TestMaintainerFeedback(unittest.TestCase):
                 s["comments"].append(comment(body, "d-morrison", self.LATER))
                 self.assertEqual(self.decide(s)["decision"], "allow")
 
+    def test_grant_exemption_is_linear_on_a_long_digit_run(self):
+        import time
+        body = "mwc " + "1" * 5000 + "x"
+        start = time.monotonic()
+        gate.MAINTAINER_FEEDBACK_EXEMPT_RE.fullmatch(body)
+        self.assertLess(time.monotonic() - start, 1.0)
+
     def test_grant_keyword_with_a_trailing_request_is_feedback(self):
         for body in (
             "Approved, but please fix the typo on line 42.",

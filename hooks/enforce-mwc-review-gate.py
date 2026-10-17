@@ -1318,7 +1318,7 @@ def extract_actions_run_id(check):
 # nearly did, because no gate re-listed comments right before the merge call.
 MAINTAINER_FEEDBACK_EXEMPT_RE = re.compile(
     r"/?(?:ai-config:)?(?:mwc|maw|merge(?:[- ]it)?|lgtm|approved?"
-    r"|looks good|ship it)(?: ?#?(?:all|\d+))*[.!]?",
+    r"|looks good|ship it)(?: ?#?(?:all|\d+))?[.!]?",
     re.IGNORECASE,
 )
 

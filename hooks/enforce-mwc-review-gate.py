@@ -1317,8 +1317,8 @@ def extract_actions_run_id(check):
 # 2026-10-17: sds#278 merged with two of his suggestions unread and pds#196
 # nearly did, because no gate re-listed comments right before the merge call.
 MAINTAINER_FEEDBACK_EXEMPT_RE = re.compile(
-    r"\s*/?(?:ai-config:)?(?:mwc|maw|merge(?:[- ]it)?|lgtm|approved?"
-    r"|looks good|ship it)(?:[\s,#]+(?:all|\d+))*\s*[.!]*\s*",
+    r"/?(?:ai-config:)?(?:mwc|maw|merge(?:[- ]it)?|lgtm|approved?"
+    r"|looks good|ship it)(?: ?#?(?:all|\d+))*[.!]?",
     re.IGNORECASE,
 )
 
@@ -1358,7 +1358,7 @@ def unread_maintainer_feedback(pr_data):
         body = body or ""
         if login not in logins or (when or "") <= head_date:
             continue
-        if AGENT_AUTHORSHIP_RE.search(body) or MAINTAINER_FEEDBACK_EXEMPT_RE.fullmatch(body):
+        if AGENT_AUTHORSHIP_RE.search(body) or MAINTAINER_FEEDBACK_EXEMPT_RE.fullmatch(body.strip()):
             continue
         found.append(f"{kind} by {login} at {when}")
     return found

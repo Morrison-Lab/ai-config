@@ -97,6 +97,9 @@ one of:
   definition in an earlier document and link to it if one exists;
   otherwise write the definition in the earliest document that needs the
   term, then link to it.
+  Land the missing definition in the same PR as the link,
+  or in a PR stacked under it (see [`stack-prs`](../../skills/stack-prs/SKILL.md)),
+  so no merged page links to a definition that does not exist yet.
   The checklist bullet's "no formal definition yet" case is this one, and
   [`informal-definitions.md`](informal-definitions.md) covers a concept
   defined only in plain prose.

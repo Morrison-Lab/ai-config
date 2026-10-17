@@ -1335,9 +1335,10 @@ def unread_maintainer_feedback(pr_data):
     Compares each item's timestamp with the head commit's `committedDate`, so a
     push that answers a comment is later than it and clears it. Skips a body
     that carries the agent-disclosure marker (an agent posts under the
-    maintainer's login) and a bare merge grant or approval, which is not
-    feedback. A payload without `commits` cannot name the head date and
-    reports nothing; the real fetch always supplies it.
+    maintainer's login), a blank body (an Approve click with no text) and a
+    bare merge grant or approval, none of which is feedback. A payload
+    without `commits` cannot name the head date and reports nothing; the real
+    fetch always supplies it.
     """
     commits = pr_data.get("commits") or []
     head_date = (commits[-1].get("committedDate") or "") if commits else ""
@@ -1358,7 +1359,8 @@ def unread_maintainer_feedback(pr_data):
         body = body or ""
         if login not in logins or (when or "") <= head_date:
             continue
-        if AGENT_AUTHORSHIP_RE.search(body) or MAINTAINER_FEEDBACK_EXEMPT_RE.fullmatch(body.strip()):
+        text = body.strip()
+        if not text or AGENT_AUTHORSHIP_RE.search(body) or MAINTAINER_FEEDBACK_EXEMPT_RE.fullmatch(text):
             continue
         found.append(f"{kind} by {login} at {when}")
     return found

@@ -3621,6 +3621,25 @@ class TestMaintainerFeedback(unittest.TestCase):
                 s["comments"].append(comment(body, "d-morrison", self.LATER))
                 self.assertEqual(self.decide(s)["decision"], "allow")
 
+    def test_blank_body_is_not_feedback_for_any_kind(self):
+        for body in ("", "   ", " \t "):
+            with self.subTest(body=body, kind="review"):
+                r = review("d-morrison", "APPROVED", body=body, submittedAt=self.LATER)
+                self.assertEqual(self.decide(self.state(reviews=[r]))["decision"], "allow")
+            with self.subTest(body=body, kind="comment"):
+                s = self.state()
+                s["comments"].append(comment(body, "d-morrison", self.LATER))
+                self.assertEqual(self.decide(s)["decision"], "allow")
+            with self.subTest(body=body, kind="inline comment"):
+                rc = inline_comment("d-morrison")
+                rc.update({"createdAt": self.LATER, "body": body})
+                self.assertEqual(self.decide(self.state(review_comments=[rc]))["decision"], "allow")
+
+    def test_approved_review_with_a_request_in_the_body_is_feedback(self):
+        r = review("d-morrison", "APPROVED", body="Approved, but rename the helper.",
+                   submittedAt=self.LATER)
+        self.assertEqual(self.decide(self.state(reviews=[r]))["decision"], "deny")
+
     def test_grant_exemption_is_linear_on_a_long_digit_run(self):
         import time
         body = "mwc " + "1" * 5000 + "x"

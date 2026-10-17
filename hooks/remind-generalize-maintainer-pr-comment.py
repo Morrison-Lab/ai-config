@@ -32,7 +32,11 @@ import tempfile
 
 EVENT = re.compile(r'<event\b[^>]*source="github"[^>]*>', re.I)
 KIND = re.compile(r'kind="([^"]*)"', re.I)
-COMMENTISH = re.compile(r"comment|review", re.I)
+# Only events that carry written feedback: review_requested and review_dismissed
+# are state changes with no comment text, so a substring test on "review" misfires.
+COMMENTISH = re.compile(
+    r"^(?:issue_comment|pull_request_review_comment|review_comment"
+    r"|pull_request_review|commit_comment)(?:\.|$)", re.I)
 
 
 def logins():

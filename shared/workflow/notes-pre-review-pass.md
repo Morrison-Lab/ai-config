@@ -20,7 +20,7 @@ The agent returns pass or fail for each item with `path:line` evidence.
 State in the PR body that the checklist ran.
 
 1. **Types.**
-   Each function or procedure states its domain and codomain, and the type of each input and output, as in psw's [Types of functions and procedures](https://morrison-lab.github.io/psw/notation.html#types-of-functions-and-procedures).
+   Each function or procedure states its domain and codomain, and the type of each input and output, as in psw's [Types of functions and procedures](https://morrison-lab.github.io/psw/chapters/notation.html#types-of-functions-and-procedures).
    A procedure that produces a function says so.
    "Function" replaces "rule" and "map", and links the formal definition.
 2. **Links.**

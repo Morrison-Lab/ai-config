@@ -3572,5 +3572,115 @@ class UnavailableNoticeParityTests(unittest.TestCase):
                     self.assertEqual(is_gate_cleared, is_checker_cleared)
 
 
+class TestMaintainerFeedback(unittest.TestCase):
+    """A maintainer comment newer than the head commit blocks the merge
+    (ai-config#4611: sds#278 merged with two suggestions unread)."""
+
+    PUSHED = "2026-10-17T06:00:00Z"
+    LATER = "2026-10-17T06:30:00Z"
+    EARLIER = "2026-10-17T05:30:00Z"
+
+    def state(self, **kw):
+        s = pr(comments=[CLEAN_VERDICT], **kw)
+        s["commits"] = [{"committedDate": self.PUSHED}]
+        return s
+
+    def decide(self, state):
+        return gate.evaluate(MERGE_CMD, state)
+
+    def test_clean_pr_without_maintainer_comment_allows(self):
+        self.assertEqual(self.decide(self.state())["decision"], "allow")
+
+    def test_maintainer_comment_after_push_denies(self):
+        s = self.state()
+        s["comments"].append(comment("Define this directly.", "d-morrison", self.LATER))
+        d = self.decide(s)
+        self.assertEqual(d["decision"], "deny")
+        self.assertIn("maintainer feedback newer than the last push", d["reason"])
+
+    def test_maintainer_comment_before_push_allows(self):
+        s = self.state()
+        s["comments"].append(comment("Define this directly.", "d-morrison", self.EARLIER))
+        self.assertEqual(self.decide(s)["decision"], "allow")
+
+    def test_maintainer_inline_comment_after_push_denies(self):
+        rc = inline_comment("d-morrison")
+        rc.update({"createdAt": self.LATER, "body": "Name the codomain."})
+        d = self.decide(self.state(review_comments=[rc]))
+        self.assertEqual(d["decision"], "deny")
+        self.assertIn("inline comment", d["reason"])
+
+    def test_maintainer_review_after_push_denies(self):
+        r = review("d-morrison", "COMMENTED", body="One suggestion.", submittedAt=self.LATER)
+        self.assertEqual(self.decide(self.state(reviews=[r]))["decision"], "deny")
+
+    def test_merge_grant_is_not_feedback(self):
+        for body in ("/mwc 4609", "/mwc all", "merge it", "LGTM", "Approved."):
+            with self.subTest(body=body):
+                s = self.state()
+                s["comments"].append(comment(body, "d-morrison", self.LATER))
+                self.assertEqual(self.decide(s)["decision"], "allow")
+
+    def test_blank_body_is_not_feedback_for_any_kind(self):
+        for body in ("", "   ", " \t "):
+            with self.subTest(body=body, kind="review"):
+                r = review("d-morrison", "APPROVED", body=body, submittedAt=self.LATER)
+                self.assertEqual(self.decide(self.state(reviews=[r]))["decision"], "allow")
+            with self.subTest(body=body, kind="comment"):
+                s = self.state()
+                s["comments"].append(comment(body, "d-morrison", self.LATER))
+                self.assertEqual(self.decide(s)["decision"], "allow")
+            with self.subTest(body=body, kind="inline comment"):
+                rc = inline_comment("d-morrison")
+                rc.update({"createdAt": self.LATER, "body": body})
+                self.assertEqual(self.decide(self.state(review_comments=[rc]))["decision"], "allow")
+
+    def test_approved_review_with_a_request_in_the_body_is_feedback(self):
+        r = review("d-morrison", "APPROVED", body="Approved, but rename the helper.",
+                   submittedAt=self.LATER)
+        self.assertEqual(self.decide(self.state(reviews=[r]))["decision"], "deny")
+
+    def test_grant_exemption_is_linear_on_a_long_digit_run(self):
+        import time
+        body = "mwc " + "1" * 5000 + "x"
+        start = time.monotonic()
+        gate.MAINTAINER_FEEDBACK_EXEMPT_RE.fullmatch(body)
+        self.assertLess(time.monotonic() - start, 1.0)
+
+    def test_grant_keyword_with_a_trailing_request_is_feedback(self):
+        for body in (
+            "Approved, but please fix the typo on line 42.",
+            "Merge conflicts need resolving before this can land.",
+            "Ship it only after you add the missing test.",
+        ):
+            with self.subTest(body=body):
+                s = self.state()
+                s["comments"].append(comment(body, "d-morrison", self.LATER))
+                self.assertEqual(self.decide(s)["decision"], "deny")
+
+    def test_agent_marked_comment_under_maintainer_login_is_not_feedback(self):
+        s = self.state()
+        s["comments"].append(comment(
+            "Pushed the fix.\n\n_Posted by Claude Code (AI agent) --- not written by a human._",
+            "d-morrison", self.LATER))
+        self.assertEqual(self.decide(s)["decision"], "allow")
+
+    def test_other_author_after_push_is_not_blocked(self):
+        s = self.state()
+        s["comments"].append(comment("Nit.", "someone-else", self.LATER))
+        self.assertEqual(self.decide(s)["decision"], "allow")
+
+    def test_maintainer_logins_override(self):
+        s = self.state()
+        s["comments"].append(comment("Nit.", "ezra-m", self.LATER))
+        with patch.dict(os.environ, {"MAINTAINER_LOGINS": "ezra-m"}):
+            self.assertEqual(self.decide(s)["decision"], "deny")
+
+    def test_payload_without_commits_reports_nothing(self):
+        s = pr(comments=[CLEAN_VERDICT,
+                         comment("Nit.", "d-morrison", self.LATER)])
+        self.assertEqual(gate.unread_maintainer_feedback(s), [])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

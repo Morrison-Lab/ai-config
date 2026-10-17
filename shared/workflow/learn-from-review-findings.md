@@ -579,5 +579,9 @@ Everything else does, and "it only applied here" is a claim to state in the repl
 It reminds and never blocks.
 Tracked in [#3465](https://github.com/Morrison-Lab/ai-config/issues/3465).
 
+A reminder does not stop a merge, so the merge gate backs it: `hooks/enforce-mwc-review-gate.py` re-lists the PR's comments, reviews and inline comments at the merge call and denies when any one by a `MAINTAINER_LOGINS` author is newer than the head commit, which closes the gap that let sds#278 merge with two suggestions unread.
+A bare merge grant or approval and a body carrying the agent-disclosure marker are not feedback.
+Tracked in [#4611](https://github.com/Morrison-Lab/ai-config/issues/4611).
+
 - **Do:** treat each maintainer comment as a class to sweep and record, in the turn it arrives.
 - **Don't:** wait for a comment that sounds like a rule, or for a second comment on the same class.

@@ -55,6 +55,7 @@ merged over a "Needs more work" verdict (reverted in sparta#1429):
 `git merge origin/main` is deliberately NOT gated: it merges main *into*
 the branch (the corpus-mandated sync direction) and cannot merge into main.
 """
+import os
 import sys
 import json
 import subprocess
@@ -1312,6 +1313,59 @@ def extract_actions_run_id(check):
     return None
 
 
+# A maintainer's comment on a PR is feedback until a push answers it. Ezra,
+# 2026-10-17: sds#278 merged with two of his suggestions unread and pds#196
+# nearly did, because no gate re-listed comments right before the merge call.
+MAINTAINER_FEEDBACK_EXEMPT_RE = re.compile(
+    r"/?(?:ai-config:)?(?:mwc|maw|merge(?:[- ]it)?|lgtm|approved?"
+    r"|looks good|ship it)(?: ?#?(?:all|\d+))?[.!]?",
+    re.IGNORECASE,
+)
+
+
+def maintainer_logins():
+    raw = os.environ.get("MAINTAINER_LOGINS", "d-morrison")
+    return {x.strip().lower() for x in raw.split(",") if x.strip()}
+
+
+def unread_maintainer_feedback(pr_data):
+    """Maintainer comments, reviews and inline comments posted after the head
+    commit, as short descriptions.
+
+    Compares each item's timestamp with the head commit's `committedDate`, so a
+    push that answers a comment is later than it and clears it. Skips a body
+    that carries the agent-disclosure marker (an agent posts under the
+    maintainer's login), a blank body (an Approve click with no text) and a
+    bare merge grant or approval, none of which is feedback. A payload
+    without `commits` cannot name the head date and reports nothing; the real
+    fetch always supplies it.
+    """
+    commits = pr_data.get("commits") or []
+    head_date = (commits[-1].get("committedDate") or "") if commits else ""
+    if not head_date:
+        return []
+    logins = maintainer_logins()
+    items = (
+        [("comment", c.get("author"), c.get("createdAt"), c.get("body"))
+         for c in pr_data.get("comments") or []]
+        + [("review", r.get("author"), r.get("submittedAt"), r.get("body"))
+           for r in pr_data.get("reviews") or []]
+        + [("inline comment", c.get("author"), c.get("createdAt"), c.get("body"))
+           for c in pr_data.get("reviewComments") or []]
+    )
+    found = []
+    for kind, author, when, body in items:
+        login = ((author or {}).get("login") or "").lower().removesuffix("[bot]")
+        body = body or ""
+        if login not in logins or (when or "") <= head_date:
+            continue
+        text = body.strip()
+        if not text or AGENT_AUTHORSHIP_RE.search(body) or MAINTAINER_FEEDBACK_EXEMPT_RE.fullmatch(text):
+            continue
+        found.append(f"{kind} by {login} at {when}")
+    return found
+
+
 def evaluate(cmd, pr_data):
     """Pure decision function: merge command + PR state -> hook decision."""
     if GRAPHQL_MERGE_RE.search(cmd):
@@ -1331,6 +1385,15 @@ def evaluate(cmd, pr_data):
     comments = pr_data.get("comments", []) or []
     head_oid = pr_data.get("headRefOid", "") or ""
     pr_author = (pr_data.get("author") or {}).get("login", "") or ""
+
+    unread = unread_maintainer_feedback(pr_data)
+    if unread:
+        return deny(
+            "Strict Merge Control Policy: maintainer feedback newer than the "
+            f"last push is unanswered ({'; '.join(unread[:5])}). Read it, "
+            "fix its whole class, push, and let the checks re-run before "
+            "merging."
+        )
 
     # CI first: never merge red or incomplete checks.
     status_rollup = pr_data.get("statusCheckRollup") or []
@@ -1715,7 +1778,7 @@ def fetch_pr_data(cmd, cwd, target_repo=None, target_number=None):
 
     result = run_gh(
         view_args
-        + ["--json", "url,author,reviews,statusCheckRollup,headRefOid,reviewRequests"],
+        + ["--json", "url,author,reviews,statusCheckRollup,headRefOid,reviewRequests,commits"],
         cwd,
     )
     if result.returncode != 0:
@@ -1759,7 +1822,8 @@ def fetch_pr_data(cmd, cwd, target_repo=None, target_number=None):
          "--paginate", "--jq",
          "[.[] | {author: {login: (.user.login // \"\")}, "
          "commit_id: (.commit_id // \"\"), "
-         "original_commit_id: (.original_commit_id // \"\")}]"],
+         "original_commit_id: (.original_commit_id // \"\"), "
+         "createdAt: (.created_at // \"\"), body: (.body // \"\")}]"],
         cwd,
     )
     if review_comments_result.returncode != 0:

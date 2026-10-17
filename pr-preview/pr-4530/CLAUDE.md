@@ -65,6 +65,7 @@ larger in-scope outcome clear.
 
 A request for status means examine the transcript to check if the agent got stuck, frozen, or dropped the ball, inspect live state, finish every safe, in-scope fix it reveals before reporting, resume stalled work immediately, and file every noticed issue, however small, in its owning tracker.
 Detail, rationale, and cases: [`shared/workflow/status-requests-act.md`](shared/workflow/status-requests-act.md).
+Red `main` after an agent's change: [`shared/workflow/red-main.md`](shared/workflow/red-main.md).
 
 ## Flag good moments to `/clear` in long-running sessions
 
@@ -116,11 +117,9 @@ The fragment above carries the mechanics, the failure modes each check catches, 
 [`shared/workflow/timestamp-local-recaps.md`](shared/workflow/timestamp-local-recaps.md)
 
 A status recap or summary carries a timestamp in the user's local zone, so "as of when" is unambiguous when they read it later.
-That is the obligation;
-the rest of this section governs where the time comes from.
+The rest of this section governs where the time comes from.
 Every clock time you write down --- that recap, a date typed into a file, a time stamped on a forge comment, a session-notebook heading --- comes from a reading taken **in that moment**, in the user's zone (`TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`).
 A reading expires immediately, and the thing that most reliably licenses an invented stamp later is the memory of having honestly measured one earlier: the clock keeps moving while a count of elapsed tool calls does not, so the two drift apart and the drift compounds across comments posted in sequence.
-The risk peaks after about 17:00 Pacific, once UTC has already rolled over.
 
 **Print the reading.**
 A reading captured into a shell variable whose only destination is a heredoc never reaches the transcript, so the next stamp you type still comes from a sense of elapsed work --- a reading you cannot quote is not a reading.
@@ -1200,7 +1199,7 @@ self-review confirms the claim, which was never the defect.
 [`shared/writing/visible-attributions.md`](shared/writing/visible-attributions.md)
 
 Credit every outside source where readers of the rendered document can see it, in PSW's collapsed "Source" callout at the end of the item it credits, never only in an HTML comment.
-Content taken from the maintainer's own repositories need not be credited to them, though what those repositories credit is still carried.
+Never credit the group's own work, but carry what it credits, and keep an outside person's credit and ordinary citation.
 
 ## Check the renders, not just the source
 
@@ -1437,7 +1436,7 @@ When *I* iterate a PR, the ARDI loop above is the mechanism — it already addre
 ## Encoding reusable feedback into ai-config
 
 Commit feedback that outlives the session to the repo that owns it in the same stride, choosing the form yourself;
-never park it in session-local auto-memory or offer to upstream it instead.
+never park it in local or project memory or offer to upstream it instead.
 Detail, rationale, and cases: [`shared/workflow/encode-reusable-feedback.md`](shared/workflow/encode-reusable-feedback.md).
 
 ## PowerShell CLI Command Safety
@@ -1492,7 +1491,7 @@ The Write tool passes bytes unchanged, and it cannot be silently skipped the way
   Another lab member's PR that fails the test gets neither the comment nor the merge.
   [`mwc`](skills/mwc/SKILL.md)'s "Another session's PR" section carries the derivation and the pattern/anti-pattern pair (ai-config#2460).
 
-**One standing exception: PRs targeting `Morrison-Lab/ai-config` or the shared math-macros repo (`d-morrison/macros`) carry a standing `mwc` grant**, with no per-session re-issue and no `enable-mwc` step --- `hooks/no-unauthorized-merge.py` reads the merge's target repo off the command.
+**One standing exception: PRs targeting `Morrison-Lab/ai-config`, `Morrison-Lab/gha` or the macros repo `d-morrison/macros` carry a standing `mwc` grant**, with no per-session re-issue and no `enable-mwc` step --- `hooks/no-unauthorized-merge.py` reads the merge's target repo off the command.
 [`mwc`](skills/mwc/SKILL.md)'s Scope Limit binds in full, so it covers a **fully clean** PR (see [`fully-clean`](shared/workflow/fully-clean.md)) and nothing else.
 It is scoped to the **target**, so a merge from an ai-config checkout into another repo is unaffected.
 

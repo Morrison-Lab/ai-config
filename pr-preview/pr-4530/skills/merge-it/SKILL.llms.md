@@ -28,7 +28,7 @@ Before executing the merge, confirm the shipping HEAD commit has received a 100%
 - **Local sessions**: dispatch to `opencode`, `agy` CLI, or `codex` (via `dto`, `dtc`, or `adv`).
 - **Cloud sessions**: dispatch via `curl` to OpenCode Go (`https://opencode.ai/zen/go/v1/chat/completions`) streaming into `skills/delegate-to-opencode/scripts/parse-sse.py` per [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.llms.md), with model fallback (`deepseek-v4-pro`, `kimi-k3`, `qwen3.8-max`, `glm-5.3`) on 502 upstream errors. Do not use Python `urllib` (which returns 403 Forbidden through the cloud agent proxy).
 
-Never proceed to the merge call without a clean cross-harness review on the shipping head.
+Never proceed to the merge call without a clean cross-harness review on the shipping head, except under [the waiver](../../shared/workflow/adversarial-self-review.md#waiver-when-no-cross-model-reviewer-can-run): when no qualifying reviewer can run (host blocked, backend down, CLI or credential absent, after enumerating every route and trying each once), treat the gate as waived. The merge itself is authorized by the user’s merge instruction, and it still needs a clean Claude review plus green CI and a PR note that the cross-model review was waived and why. A reviewer that ran and returned not-clean is not unavailable.
 
 ### 2. Merge
 

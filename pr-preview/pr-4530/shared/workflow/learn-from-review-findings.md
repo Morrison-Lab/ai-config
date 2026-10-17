@@ -556,4 +556,5 @@ A comment that only asks about the content ("when?") is a one-off, and saying so
 - **Do:** after an owner's review comment, sweep the PR for the class, run `ums`, and name the recorded rule and its link in the reply.
 - **Do:** treat a repeated correction as evidence that the first fix was too narrow.
 - **Don't:** reply "Fixed" to a comment phrased as a standing rule and stop there.
-- **Don't:** record the rule only in the project's memory, because a lesson filed where it came up is invisible to every other repository.
+- **Don't:** record the rule in a project memory store (no memory goes there;
+  at most a pointer to the global copy), because a lesson filed where it came up is invisible to every other repository.

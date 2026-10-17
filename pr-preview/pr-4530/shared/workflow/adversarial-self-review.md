@@ -53,8 +53,7 @@ A multi-backend harness qualifies only when both its harness
 and its configured model differ from the authoring session.
 `cursor` stays out of the active ladder until its headless dispatch
 is probed here.
-If no qualifying entry remains, autonomous merging waits ---
-it never falls through to a same-model or same-harness reviewer.
+If no qualifying entry can run, the gate is waived under [the waiver below](#waiver-when-no-cross-model-reviewer-can-run) --- it never falls through to a same-model or same-harness reviewer standing in as the cross-model verdict.
 A quota outage reroutes the dispatch --- it does not license skipping it.
 Waiting does not overrule a human:
 escalation to the repository owner per [`fully-clean`](fully-clean.md)'s
@@ -106,31 +105,48 @@ A split --- one all-clear and another not-clean, nits included --- is not
 100% all-clear, and `mwc` does not authorize merging it
 (ai-config#2274).
 ARD every item from every review, then request fresh reviews.
-If no qualifying reviewer is reachable, the merge waits ---
-"blocked on reviewer availability" is the honest status
-only once it carries the per-provider enumeration
-[`Availability is a per-route question`](#availability-is-a-per-route-question-and-command--v-answers-one-route)
-requires ---
-and arming an auto-merge while waiting is
-[Pattern 12](../../memories/mistake-patterns.md).
+If no qualifying reviewer can run, the waiver below applies, but only once the attempt and the per-provider enumeration [`Availability is a per-route question`](#availability-is-a-per-route-question-and-command--v-answers-one-route) requires are on record.
+While a reviewer that can run has not yet returned a verdict, the merge waits, and arming an auto-merge during that wait is [Pattern 12](../../memories/mistake-patterns.md).
+
+## Waiver when no cross-model reviewer can run
+
+(Directive from the user, 2026-10-16: "when cross-model review is not available, waive it".)
+
+The cross-model, cross-harness requirement is waived when **no qualifying reviewer can run** in this environment, after the attempt below.
+Every other merge condition still applies, so a waived gate grants no merge authority: the merge itself still needs `mwc` or an explicit merge instruction.
+Unrunnable means one of: the network policy blocks the reviewer's host (`opencode.ai`, `models.opencode.ai`), the reviewer's backend is down or erroring, its CLI is absent and cannot be installed, or no credential for it was found by the enumeration below.
+This section is the exception that the other "required for merging" statements in this file (this section's parent heading, "A merge needs its own ... verdict", and the merge-time Do/Don't list) carry.
+
+- **Try the whole ladder once first.**
+  Enumerate every route per [`Availability is a per-route question`](#availability-is-a-per-route-question-and-command--v-answers-one-route) (local CLIs `agy`, `opencode`, `codex`;
+  the OpenCode Go HTTP route;
+  any other configured credential), then make one pass of each route's documented fallback ladder on the shipping head (for OpenCode Go, the candidate-model loop in [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md)).
+  A probe that decides a route is enough for that route (`opencode run -m <model> "ok"` under `timeout 60`, or a `curl` to the endpoint), and keep the output.
+  A quota error reroutes to the next route first and counts as unrunnable only once every route has failed.
+  After that single pass, do not retry in a loop or ask again: a retry loop is not a review.
+- **Unavailable is not "not-clean".**
+  A reviewer that ran and returned Needs-more-work, or left an unresolved finding, still blocks until a re-dispatch returns all-clear.
+  The waiver covers only a reviewer that could not produce any verdict.
+  A timeout, a stub, or garbled output counts as no verdict, and only after the single pass above.
+  An earlier not-clean cross-model verdict on this PR is waivable only when the unavailability is newer than that finding and the finding has been addressed, rebutted, or deferred per [`fully-clean`](fully-clean.md).
+- **Everything else still stands.**
+  [`fully-clean`](fully-clean.md) is unchanged: green CI on the exact head, a clean Claude review on that head (the external automated reviewer where a repo has one, plus the adversarial subagent), and no standing not-clean finding.
+- **Say so.**
+  The PR comment or description, and the merge report, state that the cross-model review was waived, name the reviewer attempted and the error that made it unavailable, and give the head sha.
+- **A push resets it.**
+  The waiver and the Claude review both attach to the shipping head;
+  after any further push, re-run the full-ladder attempt and re-review.
+
+Anyone who wants the cross-model verdict anyway can still ask for it: the waiver removes a requirement and forbids nothing.
 
 
 The merge-side rules live with the gate they serve:
 
-- **Do:** for any merge, use a reviewer on a **different model and harness**
-  from your own
-  (agy CLI, opencode, codex,
-  claude only for sessions authored outside Claude,
-  or cursor once its headless dispatch is measured),
-  and report which harness produced each verdict.
-- **Do:** when posting a cross-harness review to a PR under a user login,
-  wrap the verbatim output with a commit header,
-  `Reviewed-Commit: <sha>`,
-  and a `### Verdict` heading so it is admitted by construction (#4425).
-- **Don't:** merge anything --- under any grant, `mwc` included ---
-  without a 100% all-clear adversarial verdict at the shipping head.
-  A skip notice, a stub, an older-head verdict,
-  or a same-harness convenience pass clears nothing.
+- **Do:** for any merge, use a reviewer on a **different model and harness** from your own (agy CLI, opencode, codex, claude only for sessions authored outside Claude, or cursor once its headless dispatch is measured), and report which harness produced each verdict.
+- **Do:** when posting a cross-harness review to a PR under a user login, wrap the verbatim output with a commit header, `Reviewed-Commit: <sha>`, and a `### Verdict` heading so it is admitted by construction (#4425).
+- **Do:** when no qualifying reviewer can run after the full-ladder attempt, treat the cross-model gate as waived, say in the PR that it was waived and why, and merge only if the merge itself is authorized and the Claude review and CI are clean (Ezra, 2026-10-16).
+- **Don't:** merge anything --- under any grant, `mwc` included --- without a 100% all-clear adversarial verdict at the shipping head from a reviewer that could run.
+  A skip notice, a stub, an older-head verdict, or a same-harness convenience pass clears nothing, and a reviewer that ran and was not clean is not "unavailable".
 - **Don't:** reuse a passing same-harness pre-push verdict
   to satisfy the merge gate.
   A merge needs its own cross-model, cross-harness verdict

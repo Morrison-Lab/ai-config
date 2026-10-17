@@ -2,6 +2,10 @@
 
 When the user decides to push something out of the current scope, file a new issue in the appropriate forge that captures the deferred work cleanly enough for them (or a future Claude) to pick it up cold.
 
+## Files the issue and stops
+
+`/defer-issue` (alias `/di`) means **file the issue and stop**. Do not branch, edit, or start the work after filing, even when the work looks small. Its counterpart is [`st`](../../skills/st/SKILL.llms.md): `/st` files the issue (or finds the existing one) and **starts the work**. When the user names neither shorthand, the default is to start the work, per [`issue-first`](../../shared/workflow/issue-first.md#defer-issue-files-and-stops-st-files-and-starts).
+
 ## When this fires
 
 User says something like:
@@ -118,6 +122,8 @@ Print the new issue’s number and URL as a **bare URL** (so it’s clickable in
     Filed followup: https://github.com/owner/repo/issues/123
 
 If the deferral originated in an open PR or issue, **offer** to add a `Followup: #<new-issue>` reference to that source thread — don’t do it unprompted. The user may want different wording or may not want a cross-reference at all.
+
+After reporting, end the turn on that issue. Resume the deferred work only when the user later asks for it.
 
 ## Edge cases
 

@@ -5,10 +5,18 @@ formal cross-reference divs --- Quarto's theorem-like div syntax
 glossary/definition-list convention --- check each of the following for
 every mention:
 
-- **Hyperlinked on first mention.** The first place a technical term or
-  named result appears in running prose should link to the div that
-  defines or states it --- a Quarto crossref (`@def-token-budget`,
-  `@thm-cauchy-schwarz`) or an explicit markdown link to the div's anchor.
+- **Defined and hyperlinked on first use in each div.**
+  A technical term with no formal definition yet gets one
+  (see "Undefined term" under "What to report").
+  A technical term or named
+  result links to the div that defines or states it --- a Quarto crossref
+  (`@def-token-budget`, `@thm-cauchy-schwarz`) or an explicit markdown
+  link to the div's anchor --- the first time it appears in each div.
+  Outside divs, link it the first time it appears in each prose passage,
+  meaning the text between two headings, divs or slide breaks.
+  A link in an earlier div or passage does not carry over, because
+  readers jump into the middle of a page.
+  Link once per div or passage, not at every mention.
   A bare mention of a term the reader hasn't been given a definition for
   forces them to search instead of click.
   One exception: you may leave out the pointer when the passage motivates
@@ -43,8 +51,9 @@ diff.
 ## What to check
 
 - For each technical term or named result mentioned in the prose, find its
-  defining div (if one exists) and confirm the first mention is a working
-  crossref/link to it, not bare text.
+  defining div (if one exists) and confirm the first mention in each div
+  (or in each prose passage outside divs) is a working crossref/link to it,
+  not bare text.
   A bare mention in a passage that motivates the definition that follows
   is not a missing crossref
   ([keep the crossref](forward-references.md#keep-the-crossref)).
@@ -84,6 +93,16 @@ one of:
   never delete the link.
 - **Undefined term** --- the term is mentioned but no div defines it
   anywhere in the document; add the missing definition.
+  In a series of related documents, such as course sites, first look for a
+  definition in an earlier document and link to it if one exists;
+  otherwise write the definition in the earliest document that needs the
+  term, then link to it.
+  Land the missing definition in the same PR as the link,
+  or in a PR stacked under it (see [`stack-prs`](../../skills/stack-prs/SKILL.md)),
+  so no merged page links to a definition that does not exist yet.
+  The checklist bullet's "no formal definition yet" case is this one, and
+  [`informal-definitions.md`](informal-definitions.md) covers a concept
+  defined only in plain prose.
 - **Doubled type word** --- the mention writes the type name in front of a
   crossref that already supplies it; drop the hand-written word.
 

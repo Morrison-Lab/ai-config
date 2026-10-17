@@ -377,6 +377,7 @@ cookieconsent.run({
   <ul>
   <li><a href="#defer-issue" id="toc-defer-issue" class="nav-link active" data-scroll-target="#defer-issue">defer-issue</a>
   <ul class="collapse">
+  <li><a href="#files-the-issue-and-stops" id="toc-files-the-issue-and-stops" class="nav-link" data-scroll-target="#files-the-issue-and-stops">Files the issue and stops</a></li>
   <li><a href="#when-this-fires" id="toc-when-this-fires" class="nav-link" data-scroll-target="#when-this-fires">When this fires</a></li>
   <li><a href="#procedure" id="toc-procedure" class="nav-link" data-scroll-target="#procedure">Procedure</a>
   <ul class="collapse">
@@ -402,6 +403,10 @@ cookieconsent.run({
 <section id="defer-issue" class="level1">
 <h1>defer-issue</h1>
 <p>When the user decides to push something out of the current scope, file a new issue in the appropriate forge that captures the deferred work cleanly enough for them (or a future Claude) to pick it up cold.</p>
+<section id="files-the-issue-and-stops" class="level2">
+<h2 class="anchored" data-anchor-id="files-the-issue-and-stops">Files the issue and stops</h2>
+<p><code>/defer-issue</code> (alias <code>/di</code>) means <strong>file the issue and stop</strong>. Do not branch, edit, or start the work after filing, even when the work looks small. Its counterpart is <a href="../../skills/st/SKILL.html"><code>st</code></a>: <code>/st</code> files the issue (or finds the existing one) and <strong>starts the work</strong>. When the user names neither shorthand, the default is to start the work, per <a href="../../shared/workflow/issue-first.md#defer-issue-files-and-stops-st-files-and-starts"><code>issue-first</code></a>.</p>
+</section>
 <section id="when-this-fires" class="level2">
 <h2 class="anchored" data-anchor-id="when-this-fires">When this fires</h2>
 <p>User says something like:</p>
@@ -514,6 +519,7 @@ cookieconsent.run({
 <p>Print the new issue’s number and URL as a <strong>bare URL</strong> (so it’s clickable in the user’s terminal — markdown links render as label-only and lose the URL). Example:</p>
 <pre><code>Filed followup: https://github.com/owner/repo/issues/123</code></pre>
 <p>If the deferral originated in an open PR or issue, <strong>offer</strong> to add a <code>Followup: #&lt;new-issue&gt;</code> reference to that source thread — don’t do it unprompted. The user may want different wording or may not want a cross-reference at all.</p>
+<p>After reporting, end the turn on that issue. Resume the deferred work only when the user later asks for it.</p>
 </section>
 </section>
 <section id="edge-cases" class="level2">

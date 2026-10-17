@@ -420,6 +420,10 @@ Instead, use the functional command version of the operator macro that takes its
 - **Probability / Quantile**: write `\Prf{A}` or `\Qf{p}`, not `\Pr\paren{A}` or `\Q\paren{p}`.
 - **Exponential**: write `\expf{x}` or `\exp{x}` (or `e^{x}`), not `\expt\paren{x}`.
 - **Indicator**: write `\indicp{P}` or `\indic{A}(x)`.
+- **Any function-like macro, not only operators**: when a symbol macro such as `\fitproc` or `\predfn` is applied to arguments, write its `f` form (`\fitprocf{\predvar; \trainset}`, `\predfnf{\predvar}`), not the symbol followed by `\paren{...}`.
+  Before typing a macro followed by `\paren`, grep `macros.qmd` for `<name>f`.
+  If no `f` form exists, propose one in `Morrison-Lab/macros` first; notes never define it locally.
+  (Directive from the user, 2026-10-16, review of `Morrison-Lab/sds#261`; tracked in #4597.)
 
 Reserve direct `\sb{...}`, `\cb{...}`, and `\paren{...}` for mathematical grouping, sets ($\cb{1, \dots, n}$), evaluation limits, or raw algebra that does not denote an operator with a dedicated macro.
 (Directive from the user, 2026-10-07.)

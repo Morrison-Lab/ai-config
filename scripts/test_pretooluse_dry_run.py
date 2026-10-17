@@ -201,6 +201,7 @@ class TestPreToolUseDryRun(unittest.TestCase):
             ("flag-add-a-outside-pathspec.py", "Bash"),
             ("flag-cd-into-main-checkout.py", "Bash"),
             ("flag-chained-push.py", "Bash"),
+            ("flag-commit-a-sweeps-submodule.py", "Bash"),
             ("flag-indirect-gnu-grep-flag.py", "Bash"),
             ("flag-reset-hard-uncommitted-work.py", "Bash"),
             ("flag-stale-adjacent-comment.py", "Bash"),

@@ -23,6 +23,7 @@ State in the PR body that the checklist ran.
    Each function or procedure states its domain and codomain, and the type of each input and output, as in psw's [Types of functions and procedures](https://morrison-lab.github.io/psw/chapters/notation.html#types-of-functions-and-procedures).
    A procedure that produces a function says so.
    "Function" replaces "rule" and "map", and links the formal definition.
+   The argument of a function is its domain, not one of the inputs that specify it.
 2. **Links.**
    Every technical term is hyperlinked at first use in each div.
    A term with no definition gets its own definition div, filed as an issue if it widens the PR, never left unlinked.
@@ -32,9 +33,13 @@ State in the PR body that the checklist ran.
    Each expression is as short as the macros allow, with no manual delimiter around a function's arguments, and any repeated chunk is named.
 5. **Definitions.**
    No term appears in its own definition, none is defined as a modification of another, and each preposition states a relation you can name.
+   A definition div holds its one term and links to everything else.
+   A clause that defines another term or notation ("we write ... for ...", "a function that maps ...") gets its own definition div and example instead.
 6. **No overexplaining.**
    Delete a clause that restates what the term and its symbol already say.
+   Replace a pronoun such as "It" with its referent.
 7. **Population or sample.**
    Every "mean", "average" and error shorthand says which.
 
 An item that fails on one div is checked on every div of the PR, per the sweep above.
+Recurrence: sds#268 (2026-10-17) drew an inline definition at least five times after the first correction, which is why item 5 now names the pattern.

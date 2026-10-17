@@ -31,6 +31,10 @@ This is not the surface axis in [`challenge-the-assignment.cases.md`](shared/wor
 which is about carrying an instruction to a different context;
 this is about shrinking an instruction inside the context it was given for.)
 
+- **Do:** apply a grant or rule at the breadth stated, naming limits only when stated or forced by a harder rule.
+- **Don't:** add unstated conditions to permissions, or narrow scope unnecessarily.
+- **Don't:** confine a correction to its case, drop a qualifier, or wait to be told what a request implies.
+
 ## Always give recommendations with questions --- Decision points in status lists
 
 (User correction, 2026-09-28, on Morrison-Lab/mln#186:

@@ -44,6 +44,33 @@ no theorem-type div goes inside it
 A claim that needs a proof is a result div, not a remark;
 a concrete instance is an example div.
 
+## Source credits: a bare citation goes in the div, prose goes in a remark
+
+A credit that is only a citation goes inside the definition or result div.
+It is the div's final line, starting "Source:" and followed by the citation.
+One reference adds no commentary to the statement (Ezra, 2026-10-15).
+
+Substantial prose about the source or history of the content is commentary.
+Examples are a comparison of notation, an account of who proved what, and a note that a proof is omitted.
+That prose goes in a `#rem-source-` remark div titled "Source:" followed by the source's short name.
+Place the remark right after the item's div and its proof, in the same subfile.
+A def or thm div never carries that prose.
+
+```markdown
+::: {#rem-source-overfitting}
+#### Source: James et al.
+
+James et al. write the quantity as $\generr$, without the argument.
+:::
+```
+
+- **Do:** end a definition div with a "Source:" line that holds only the citation.
+- **Do:** put "James et al. write the quantity as $\generr$, without the argument" in a `#rem-source-` remark.
+- **Don't:** make a one-line remark div whose only content is a citation.
+- **Don't:** put a paragraph of history inside the definition.
+
+## Examples
+
 - **Do:** put "Other sources write $A^c$ for $\neg A$" in a remark after the definition.
 - **Do:** put "R's `var()` divides by $n - 1$, not $n$" in a `.callout-tip`.
 - **Don't:** put a synonym or a historical note in a `.callout-note`.

@@ -124,8 +124,11 @@ Watch for:
 - **Structural/typographic:** em-dash overuse as a default connector,
   bold-leading `**Term:**` bullets applied mechanically, emoji section headers,
   conspicuously uniform paragraph rhythm.
-- **Tonal:** promotional register, reflexive both-sidesing, vague universals
-  with no concrete names or numbers.
+- **Tonal:**
+  - promotional register
+  - reflexive both-sidesing
+  - vague universals with no concrete names or numbers
+  - vague attributions ("instructors often observe", "studies show") that name no source ([`no-vague-attribution`](no-vague-attribution.md))
 
 De-slop --- cut the filler and the reflexes --- but **don't** ban words outright
 or sand the text into a flat, voiceless register. Any single tell is innocent;

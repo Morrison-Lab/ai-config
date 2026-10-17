@@ -581,6 +581,8 @@ Tracked in [#3465](https://github.com/Morrison-Lab/ai-config/issues/3465).
 
 A reminder does not stop a merge, so the merge gate backs it: `hooks/enforce-mwc-review-gate.py` re-lists the PR's comments, reviews and inline comments at the merge call and denies when any one by a `MAINTAINER_LOGINS` author is newer than the head commit, which closes the gap that let sds#278 merge with two suggestions unread.
 A bare merge grant or approval and a body carrying the agent-disclosure marker are not feedback.
+The same hook denies a merge while any inline review thread is unresolved and not outdated, whoever opened it, and denies when it cannot read the threads.
+`scripts/check-pr-fully-clean.py` fails on the same unread-feedback state, through the shared `scripts/lib/maintainer_feedback.py`, so the instrument and the hook agree.
 Tracked in [#4611](https://github.com/Morrison-Lab/ai-config/issues/4611).
 
 - **Do:** treat each maintainer comment as a class to sweep and record, in the turn it arrives.

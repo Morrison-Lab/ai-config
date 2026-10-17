@@ -151,7 +151,7 @@ class PullRequest:
             cmd = [
                 "gh", "api", f"repos/{self.repo}/pulls/{self.pr_num}/comments",
                 "--paginate", "--jq",
-                "[.[] | {author: {login: (.user.login // \"\")}, commit_id: (.commit_id // \"\"), original_commit_id: (.original_commit_id // \"\")}]"
+                "[.[] | {author: {login: (.user.login // \"\")}, commit_id: (.commit_id // \"\"), original_commit_id: (.original_commit_id // \"\"), createdAt: (.created_at // \"\"), body: (.body // \"\")}]"
             ]
             stdout = self._fetcher(cmd)
             data = []

@@ -277,6 +277,8 @@ def build_payload(
                 "author": {"login": (c.get("user") or {}).get("login", "")},
                 "commit_id": c.get("commit_id") or "",
                 "original_commit_id": c.get("original_commit_id") or "",
+                "createdAt": c.get("created_at") or "",
+                "body": c.get("body") or "",
             }
             for c in review_comments_raw
         ]

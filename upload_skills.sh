@@ -84,6 +84,11 @@ for dir in "$STAGE"/*/; do
   [ -d "$dir" ] || continue
   name="$(basename "$dir")"
   [ -f "$dir/SKILL.md" ] || { echo "WARN no SKILL.md: $name"; continue; }
+  # The Skills API rejects any skill name containing the reserved word
+  # 'claude' (ai-config#4397), so such a skill is skipped, not counted as failed.
+  case "${name,,}" in
+    *claude*) echo "skipped (name contains reserved word 'claude'): $name"; continue ;;
+  esac
 
   staged_names+=("$name")
   cur_hash="$(hash_dir "$dir")"

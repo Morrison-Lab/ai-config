@@ -251,6 +251,7 @@ Claude checks every result.
 A reviewer must differ from the author in model and harness.
 Never send student or PHI data.
 Elsewhere follow `memories/delegation.md`.
+Never use a pay-per-use API anywhere (Ezra, 2026-10-17); see that file.
 
 ## Keep ai-config and repo checkouts fresh
 

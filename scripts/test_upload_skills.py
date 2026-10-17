@@ -350,6 +350,26 @@ sys.exit(response.get("exit_code", 0))
         self.assertIn("filename=quarto-authoring/SKILL.md", args_str)
         self.assertIn("filename=quarto-authoring/references/figures.md", args_str)
 
+    def test_reserved_word_name_skipped(self):
+        (self.stage / "skill-alpha").mkdir()
+        (self.stage / "skill-alpha" / "SKILL.md").write_text("# Alpha", encoding="utf-8")
+        (self.stage / "refresh-Claude-token").mkdir()
+        (self.stage / "refresh-Claude-token" / "SKILL.md").write_text("# Token", encoding="utf-8")
+
+        mock_config = {
+            "POST https://api.anthropic.com/v1/skills": {
+                "code": 200,
+                "body": json.dumps({"id": "skill_alpha_123", "latest_version_id": "ver_1"}),
+            },
+        }
+
+        res = self.run_upload(mock_config=mock_config)
+        self.assertEqual(res.returncode, 0, f"stderr: {res.stderr}")
+        self.assertIn("skipped (name contains reserved word 'claude'): refresh-Claude-token", res.stdout)
+        self.assertIn("created=1 versioned=0 unchanged=0 deleted=0 failed=0", res.stdout)
+        posts = [c for c in self.get_curl_calls() if "POST" in c["args"]]
+        self.assertEqual(len(posts), 1)
+
     def test_auth_error_bails_out(self):
         (self.stage / "skill-alpha").mkdir()
         (self.stage / "skill-alpha" / "SKILL.md").write_text("# Alpha", encoding="utf-8")

@@ -40,6 +40,12 @@ State in the PR body that the checklist ran.
    Replace a pronoun such as "It" with its referent.
 7. **Population or sample.**
    Every "mean", "average" and error shorthand says which.
+8. **Estimands.**
+   Every "estimate", "smallest" or "best" names its target, as in psw's [estimand rule](https://morrison-lab.github.io/psw/chapters/defining-terms.html).
+   A vague verb such as "generalizes" or "captures" gives way to the relation it stands for, stated in the definition.
+9. **Relevance.**
+   Each remark, source credit and citation supports the claim in the div it sits in, per psw's [What makes a citation relevant](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#what-makes-a-citation-relevant).
+   Remove one the div does not need.
 
 An item that fails on one div is checked on every div of the PR, per the sweep above.
 Recurrence: sds#268 (2026-10-17) drew an inline definition at least five times after the first correction, which is why item 5 now names the pattern.

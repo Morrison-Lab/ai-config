@@ -48,9 +48,15 @@ There is no per-agent hook for a third-party endpoint, so the only route to open
 - **The result must conform to a schema and you have no cheap validator.**
   `opencode run` has no schema flag, so conformance is asked for in the prompt and checked on the way back rather than enforced at the boundary.
 - **The destination tier is unavailable or exhausted.**
-  OpenCode Go operates on windowed **dollar** caps rather than request counts:
-  $12 per 5 hours, $30 per week, $60 per month
-  (vendor docs, <https://opencode.ai/docs/go>, fetched 2026-08-25).
+  OpenCode Go operates on **dollar** caps rather than request counts.
+  As of 2026-10-15 each model has its own monthly dollar limit.
+  Its 5-hour limit is 20% of that and its weekly limit 50% (vendor docs, <https://opencode.ai/docs/go>, fetched 2026-10-15).
+  DeepSeek V4.1 Flash is $80 per month on Go and $160 on Go Plus;
+  DeepSeek V4 Pro and Kimi K3 are $15 on Go.
+  The vendor's page lists the other models' limits.
+  Exhaustion shows as HTTP 429 `GoUsageLimitError` with `limitName` `weekly`, `5-hour` or `monthly`.
+  On 2026-10-15 every model returned the weekly error at once, so the documented per-model limits did not isolate one model's exhaustion from another's.
+  The response carries no reset time.
   When exhausted, fall back to Codex or OpenRouter per the ladder.
   Zen free tier rate-limiting is an availability state rather than window exhaustion.
 
@@ -165,7 +171,7 @@ Two routing consequences:
 
 ## Cloud sessions: OpenCode Go over HTTP, no key needed
 
-A claude.ai cloud session has no `opencode` CLI, but its agent proxy injects the OpenCode credential for `opencode.ai`, so `curl` to the chat endpoint works without a key (verified 2026-10-09).
+A claude.ai cloud session has no `opencode` CLI preinstalled (`npm i -g opencode-ai` installs one), but its agent proxy injects the OpenCode credential for `opencode.ai`, so `curl` to the chat endpoint works without a key (verified 2026-10-09).
 A GitHub Actions review job reported 401 `Missing API key` on the same call and no proxy variable (PR review run 37907648792, 2026-10-09), so do not assume it holds there.
 Use the Go endpoint `https://opencode.ai/zen/go/v1`, which both Go and Go Plus plans serve.
 Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402.
@@ -176,6 +182,25 @@ Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402.
 - `/messages` (`claude-haiku-5-5`, `minimax-m3`) returned 401 `Missing API key` through the proxy on 2026-10-09, so it is not usable there.
 - `/responses` and `/models` also exist; `/models` lists every id.
 - Send a stable `x-opencode-session` UUID header for each conversation, or the request fails with 400 `MissingSessionID`.
+- Models seen on `/models` on 2026-10-15 include `deepseek-v4.1-flash` (the vendor estimates about 87,000 requests per week on Go at 410 input, 71,300 cached and 310 output tokens per request, with input at $0.15 per million tokens off-peak;
+  a review that returns a longer answer gets fewer requests, and several smaller models list lower prices) and `gemini-4-argon-contributor` (the Argon model, 2x usage for a limited time).
+  Treat `/models` as the authority, since the vendor says the list changes as models are added.
+- `cat-jam-free` and `longcat-2.5-preview-free` answered through the proxy on 2026-10-15 while the Go quota was exhausted.
+  Both are free for a limited time and reasoning models (a 16-token request returned only reasoning), so give them a generous `max_tokens`.
+- **A review through these two ids worked on 2026-10-16, while every Go model returned the weekly `GoUsageLimitError`** ([ai-config#4581](https://github.com/Morrison-Lab/ai-config/issues/4581)).
+  Stream with `"stream": true` and `max_tokens` 30000, and assemble `delta.content`;
+  the text comes only after 40,000 to 70,000 characters of `reasoning_content`, about five minutes.
+  On [ai-config#4572](https://github.com/Morrison-Lab/ai-config/pull/4572), `longcat-2.5-preview-free` found three real defects in the first push and then returned no text on the fix commit in two attempts, while `cat-jam-free` returned a clean verdict on both heads.
+  Run both, treat an empty answer as no verdict rather than clean, and address, rebut or defer every defect in a list as for any review.
+  The user accepted a clean verdict from one of these free models as the non-Claude gate while Go is exhausted (relayed by the coordinator session, 2026-10-16), with the other model's empty answer counted as no verdict.
+- **In a cloud session on 2026-10-16 these other routes did not work, so use the streamed Go-endpoint recipe above instead.**
+  The free ids on the pay-as-you-go path `https://opencode.ai/zen/v1` (not the Go path) return `FreeTierError` with the message that the free tier can only be used from within OpenCode, whereas the paid ids on that path return the 402 above.
+  With the CLI installed by `npm i -g opencode-ai` and the opencode API-key environment variable set to any non-empty value (the proxy supplies the real key), `opencode run -m opencode/<free id>` printed only its banner and hit a 280 to 420 second timeout.
+  That held for `deepseek-v4.1-flash-free` and `nemotron-3-ultra-free`, each with the brief passed as the argument and with the brief attached by `-f`.
+  A message placed after `-f` is read as a file name, because `-f` takes several files, so put the message before `-f`.
+  `codex` and `agy` are not installed in a cloud session, no OpenRouter, Databricks or Gemini key is set, and `openrouter.ai` and `api.openai.com` are refused by the network policy.
+- On 2026-10-15 the Argon model was blocked by the same weekly limit as every other Go model.
+  Route the review to `agy` on a device, per `memories/delegation.md`.
 
 A non-streaming call works for short prompts (such as a smoke test):
 
@@ -187,9 +212,7 @@ curl -s https://opencode.ai/zen/go/v1/chat/completions \
 ```
 
 **Non-streaming requests fail for review-sized or substantial prompts.**
-Measured in a claude.ai cloud session on 2026-10-12, a non-streaming request with a ~22 KB diff failed:
-`glm-5.3` returned HTTP 502 after about 30 seconds,
-and `deepseek-v4-pro` returned an empty body with `upstream request failed` (while a `PONG` smoke test on the same endpoint returned 200 in 1.8 seconds).
+Measured in a claude.ai cloud session on 2026-10-12, a non-streaming request with a ~22 KB diff failed: `glm-5.3` returned HTTP 502 after about 30 seconds, and `deepseek-v4-pro` returned an empty body with `upstream request failed` (while a `PONG` smoke test on the same endpoint returned 200 in 1.8 seconds).
 The roughly 30-second gateway cutoff requires streaming for anything longer than a trivial prompt.
 
 **Always stream review-sized prompts and assemble `delta.content` chunks.**
@@ -295,6 +318,23 @@ _Posted by <Agent Name> (AI agent) --- not written by a human._
 This ensures `check-pr-fully-clean.py` admits the review by construction
 and allows a clean verdict to supersede any earlier standing not-clean comments (#4425).
 Never use Codex for this routing.
+
+## OpenCode 2.0
+
+OpenCode 2.0 was first seen on 2026-10-15 (<https://opencode.ai/v2/docs>, <https://opencode.ai/v2/docs/migrate-v1/>).
+Nothing in this skill was measured on it.
+Every `opencode` measurement above is from 1.18.x.
+
+- V2 reads the same config files as V1, including `~/.config/opencode/opencode.json(c)`, `<project>/opencode.json(c)` and `.opencode/`.
+  Existing agent, command and skill definitions are documented to keep working.
+- V1 plugin implementations do not run in V2.
+  `docs/opencode-hook-mapping.md` depends on the oh-my-openagent plugin, so a V2 session would lose the hook bridge.
+  Either stay on V1 until that plugin has a V2 port, or move to V2 and accept that the guards then run only under Claude Code.
+- The V2 install commands are `curl -fsSL https://opencode.ai/v2/install | bash` and `npm install -g @opencode/cli`.
+  The docs say `mise use -g opencode` installs V1 on a `mise` older than 2026.10.9.
+  The migration guide says the V2 curl installer replaces the V1 binary, and says to remove a package-managed V1 install first.
+  That is vendor-documented and untested here, so check `opencode --version` after any install.
+  V1 and V2 share the config locations, so keep a copy of the V1 config before converting it.
 
 ## Where opencode sits in the budget ladder
 

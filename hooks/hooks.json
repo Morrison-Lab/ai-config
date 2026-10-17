@@ -1500,6 +1500,20 @@
             "timeout": 10,
             "script": "warn-bare-forge-reference.py",
             "why": "ai-config#4224. The user asked for a link on every artifact a reply names ('always give me hyperlinks!', then 'how many times do I have to tell you that?', 2026-10-02) after the rule was already in memory and repo instructions; the miss happens at composition time, so the rule alone did not fire. Warns, never blocks, when a user-visible reply tool call carries a bare forge reference (#N, !N, owner/repo#N) outside Markdown links, URLs and code. Descriptions without a number ('the referee note') have no lexical marker and are out of scope. Fails open."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-pr-without-thread-link.py\"",
+            "timeout": 10,
+            "script": "warn-pr-without-thread-link.py",
+            "why": "ai-config#4565. The user's rule (shared/writing/link-forge-artifacts.md, 'Link a PR's project thread too', 2026-10-14) is that a message naming a PR links the PR and the project thread that owns it. A coordinator post named a PR with no thread link and the user asked why (2026-10-16); the miss happens at composition time, so the rule alone did not fire. Warns, never blocks, when a user-visible reply tool call (mcp__hearthbot__reply, post_message, update_message) names a github.com/.../pull/N URL in a paragraph or list item that holds no thread link, `(#cmsg_...)` in the app or a URL with `thread=cmsg_...` outside it. Fenced code and inline code are ignored. A bare `#N` is out of scope because text cannot tell a PR from an issue or an ordinal (warn-bare-forge-reference.py covers the unlinked number). Cannot know whether a thread exists for the PR, so the note says to ignore it for one with none."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unlinked-thread-pointer.py\"",
+            "timeout": 10,
+            "script": "no-unlinked-thread-pointer.py",
+            "why": "ai-config#4590. On 2026-10-16 the coordinator listed merge words with 'each in its thread' and no thread links, and the user asked 'what threads are those? you're supposed to give them to me'. warn-pr-without-thread-link.py covers a PR URL with no thread link, not the phrase alone. Blocks (deny) when a user-visible reply tool call (mcp__hearthbot__reply, post_message, update_message) says 'in its thread', 'in that thread', 'in their threads', 'in each thread', 'in the relevant thread' and the like in a paragraph or list item that holds no thread link, `(#cmsg_...)` in the app or a URL with `thread=cmsg_...` outside it. 'In this thread' is not a pointer. Fenced code and inline code are ignored. Fails open on any parse trouble."
           }
         ]
       },
@@ -1563,6 +1577,13 @@
             "timeout": 10,
             "script": "no-offer-to-file.py",
             "why": "report-mistakes-proactively 'Filing is not gated on approval' -- blocks a reply that offers to file or record instead of doing it."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-announce-unconfirmed-merge.py\"",
+            "timeout": 10,
+            "script": "no-announce-unconfirmed-merge.py",
+            "why": "Strict Merge Control Policy -- a coordinator reply announcing a future merge ('each thread merges as soon as it is clean') reads as a running plan, so the reader stops watching, but the merge needs the user's explicit words and no merge ran (project thread, 2026-10-16). Blocks once per message unless a merge call since the last user turn reported a merge, the sentence makes the merge conditional on the user's words, or it states a refusal or deferral."
           },
           {
             "type": "command",

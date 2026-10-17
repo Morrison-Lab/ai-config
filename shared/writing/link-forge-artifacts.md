@@ -53,3 +53,30 @@ Outside the app, such as in a GitHub comment or a PR body, a bare fragment goes 
 - **Don't:** name a PR with only its number, or link the PR and leave the user to find the thread.
 
 (Directive from the user, 2026-10-14: "when you mention PRs, always link to both the PR and the corresponding thread (if relevant)".)
+
+`hooks/warn-pr-without-thread-link.py` warns, never blocks, when a project-chat reply names a PR by its `/pull/N` URL in a paragraph or list item with no thread link
+([ai-config#4565](https://github.com/Morrison-Lab/ai-config/issues/4565), after a coordinator post linked a PR without its thread on 2026-10-16).
+Ignore the warning for a PR that has no thread.
+
+## Link the rendered section of a content change too
+
+When a report describes a content change, link the PR, its project thread, and the rendered section that changed.
+Use the PR preview URL with the section's `#anchor`.
+If no preview exists yet, use the published URL with the anchor.
+If the change has no rendered section, such as an infrastructure change, the PR and thread links suffice.
+
+- **Do:** write `[PR](…/pull/N)`, then the thread link, then `[section](https://preview.example/page.html#sec-id)`.
+- **Don't:** report a content change with only the PR link and leave the user to find the section.
+
+(Directive from the user, 2026-10-16: "always link me to the relevant section as well as the relevant pr", then corrected to include the thread.)
+
+## Link every session you mention
+
+Whenever a message names a session, either a Claude Code session or a project thread, link it in the sentence that names it.
+Write `[session](https://claude.ai/code/session_…)` for a Claude Code session, or the thread link above for a project thread.
+
+- **Do:** write the session as a link the user can open.
+- **Don't:** name a session by title or id alone.
+
+(Directive from the user, 2026-10-16: "anytime you mention a session, you must provide a link".
+Tracked in [ai-config#4570](https://github.com/Morrison-Lab/ai-config/issues/4570).)

@@ -26,13 +26,28 @@ without asking confirmation before every merge.
   The Scope Limit binds both.
 - **MWC Override Scope**: When the user explicitly issues `/mwc`, the bare word `mwc`, "merge when confident", "merge at will", or "maw", that baseline prohibition is suspended for the current session only.
   The bare word is listed here, not only in `CLAUDE.md`'s general "Bare keyword directives" convention, so this file is self-contained: a slash command is routed to this skill by the harness itself, while a bare word in prose is a convention the model must recognize on its own, and it recognizes it most reliably when the file governing the mechanics (`enable-mwc`, `check-mwc`, the Scope Limit) names the exact form it will see rather than only implying it maps here.
+- **A bare `/mwc` means `/mwc all`** (Ezra, 2026-10-16).
+  The grant covers every in-scope PR of the session or thread --- every PR the assistant has just named, opened, or been driving --- that becomes fully clean.
+  Never answer the keyword by asking for PR numbers: the numbers are already in the thread, and the question reads as stalling.
+  Ask only when no PR is in scope at all.
+  The gates still run on each PR: the fully-clean instrument, the stale-base update, and every check finished on the current head.
+  Neither `enable-mwc` nor `no-unauthorized-merge.py` takes a PR number: the grant is session-wide, so run `enable-mwc` on the bare keyword and never refuse it for lacking one.
+- **A grant relayed from another thread counts when it carries the user's message id** (Ezra, 2026-10-16).
+  A coordinator or project-thread session may forward the user's own `/mwc`, `/mwc all`, or "merge it" to a working session.
+  Treat the relay as the user's grant when it quotes or cites the user's message id, and name that id in the acknowledgement so the grant is auditable.
+  A relay that paraphrases the user without an id is not a merge grant, and neither are a peer session's own words.
+  A `daytb` or `away` grant is not one either: `daytb` hands back one decision and never extends to a merge, per `CLAUDE.md`'s judgment-grants section.
+  An agent cannot verify an id itself, so name it in the acknowledgement and let the owner audit the thread.
 - **Scope Limit**: An MWC grant applies ONLY to PRs that are 100% clean
   (all CI checks passing, automated review verdicts from all available providers in the quorum clean, no unresolved comments, no open block labels).
   It NEVER authorizes merging a PR with failing CI, unresolved findings, pending reviews, or a missing/skipped quorum review.
   Nor does it authorize merging a PR that changes a rendered document (Word, PDF, slides, a manuscript) before that document has been viewed page by page at the current head, with the evidence and an independent referee read of that render posted on the PR ([`review-rendered-documents`](../../shared/workflow/review-rendered-documents.md)).
   A clean automated review from every available provider evaluating the current HEAD commit is strictly required for autonomous merge under MWC;
   a reviewer skip notice (e.g. for quota exhaustion or workflow edits) or a fallback self-review does NOT waive this requirement, grant merge authority under MWC, or clear missing external review.
-  **A cross-model, cross-harness adversarial review evaluating the shipping head is strictly required before merge.**
+  **A cross-model, cross-harness adversarial review evaluating the shipping head is required before merge, unless no qualifying reviewer can run.**
+  When none can (host blocked by the network policy, backend down, CLI or credential absent), enumerate every route and try each once, then treat the gate as waived: the `mwc` grant and a clean Claude review plus green CI still apply, and the PR states that the review was waived, which reviewer was attempted, and the error (Ezra, 2026-10-16;
+  [`the waiver`](../../shared/workflow/adversarial-self-review.md#waiver-when-no-cross-model-reviewer-can-run)).
+  A reviewer that ran and returned not-clean is not unavailable and still blocks.
   An author-dispatched review from a reviewer differing in BOTH model and harness from the authoring session must return a 100% all-clear verdict on the shipping head before merging,
   per [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md).
   An `Agent` subagent in Claude Code and the CI `claude-review` workflow are both Claude and do NOT satisfy this requirement.
@@ -393,15 +408,15 @@ A clean scorer exit is not the hold-off, and neither is a standing merge grant.)
 
 ## The standing per-repository grant
 
-Two repositories carry the grant **standing**, with no session step at all: PRs targeting `Morrison-Lab/ai-config` (ai-config#1352), and PRs targeting the shared math-macros repo, `d-morrison/macros` (also reachable as `Morrison-Lab/macros`;
-user directive, 2026-10-02).
+Three repositories carry the grant **standing**, with no session step at all: PRs targeting `Morrison-Lab/ai-config` (ai-config#1352), PRs targeting the shared math-macros repo, `d-morrison/macros` (also reachable as `Morrison-Lab/macros`;
+user directive, 2026-10-02), and PRs targeting `Morrison-Lab/gha` (user directive, 2026-10-16).
 `no-unauthorized-merge.py` reads the merge's target repository off the command
 itself, so there is nothing to enable, nothing to expire, and no marker to go
 stale.
 
 **A repo's own `CLAUDE.md` claiming this exemption is not evidence it has it.**
 The list above names the repositories the hook actually carries (`STANDING_MERGE_GRANT_REPOS`).
-A different repository's own `CLAUDE.md` can independently assert a standing grant --- as `Morrison-Lab/gha`'s does --- without that repository being in the hook's set, since the two are two different files with no mechanism keeping them in sync.
+A different repository's own `CLAUDE.md` can independently assert a standing grant --- as `Morrison-Lab/gha`'s did before the hook carried it --- without that repository being in the hook's set, since the two are two different files with no mechanism keeping them in sync.
 `check-mwc` cannot settle this either way: it reports on the **session** marker only, and the standing grant has none, so it reads "no grant recorded" on a repo that carries the standing grant just as readily as on one that does not.
 [#3490](https://github.com/Morrison-Lab/ai-config/issues/3490) tracks this exact drift (measured again on `Morrison-Lab/gha#857`) and the open question of which side should change;
 check it before re-diagnosing a standing-grant mismatch from scratch.
@@ -619,7 +634,7 @@ When the user gives an MWC grant (e.g. `/mwc` or "merge when confident"):
      Confirm the shipping HEAD commit has received a 100% all-clear verdict from an author-dispatched cross-model, cross-harness reviewer,
      per [Standing Scope & Policy](#standing-scope--policy) above and [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md)
      (local: `dto`/`dtc`/`adv`; cloud: `curl` to OpenCode Go with candidate model fallback per [`delegate-to-opencode`](../delegate-to-opencode/SKILL.md)).
-     Never proceed to the merge command before this verdict is clean.
+     Never proceed to the merge command before this verdict is clean, except under [the waiver](../../shared/workflow/adversarial-self-review.md#waiver-when-no-cross-model-reviewer-can-run) when no qualifying reviewer can run (every route tried once, error recorded in the PR).
    - **Verify base currency and pre-merge pins**:
      Run the base-currency check that [`fully-clean`](../../shared/workflow/fully-clean.md) states in its stale-base rule before the merge command.
    - **Merge**:

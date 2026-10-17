@@ -1366,6 +1366,31 @@ def unread_maintainer_feedback(pr_data):
     return found
 
 
+REVIEW_THREADS_QUERY = (
+    "query($owner:String!,$name:String!,$n:Int!,$endCursor:String){"
+    "repository(owner:$owner,name:$name){pullRequest(number:$n){"
+    "reviewThreads(first:100,after:$endCursor){"
+    "pageInfo{hasNextPage endCursor}"
+    "nodes{isResolved isOutdated path line}}}}}"
+)
+REVIEW_THREADS_JQ = (
+    "[.data.repository.pullRequest.reviewThreads.nodes[]? | "
+    "{isResolved, isOutdated, path, line}]"
+)
+
+
+def unresolved_review_threads(pr_data):
+    """`path:line` of each inline review thread that is neither resolved nor
+    outdated (`?` when GitHub reports no line). Matches what
+    `check-pr-fully-clean.py` counts as open; a payload without
+    `reviewThreads` reports nothing, and the real fetch always supplies it."""
+    return [
+        f"{t.get('path') or '?'}:{t.get('line') if t.get('line') is not None else '?'}"
+        for t in pr_data.get("reviewThreads") or []
+        if not t.get("isResolved") and not t.get("isOutdated")
+    ]
+
+
 def evaluate(cmd, pr_data):
     """Pure decision function: merge command + PR state -> hook decision."""
     if GRAPHQL_MERGE_RE.search(cmd):
@@ -1393,6 +1418,14 @@ def evaluate(cmd, pr_data):
             f"last push is unanswered ({'; '.join(unread[:5])}). Read it, "
             "fix its whole class, push, and let the checks re-run before "
             "merging."
+        )
+
+    open_threads = unresolved_review_threads(pr_data)
+    if open_threads:
+        return deny(
+            "Strict Merge Control Policy: unresolved review thread(s) at "
+            f"{', '.join(open_threads[:5])}. Fix each, reply, and resolve "
+            "the thread before merging."
         )
 
     # CI first: never merge red or incomplete checks.
@@ -1873,6 +1906,24 @@ def fetch_pr_data(cmd, cwd, target_repo=None, target_number=None):
                 "detailsUrl": details,
             })
         pr_data["statusCheckRollup"] = existing_rollup
+
+    # Resolution is reported only by GraphQL, so a failed fetch denies rather
+    # than reading as "no open threads".
+    owner, _, name = url_match.group(1).partition("/")
+    threads_result = run_gh(
+        ["api", "graphql", "--paginate", "-f", f"query={REVIEW_THREADS_QUERY}",
+         "-F", f"owner={owner}", "-F", f"name={name}",
+         "-F", f"n={url_match.group(2)}", "--jq", REVIEW_THREADS_JQ],
+        cwd,
+    )
+    if threads_result.returncode != 0:
+        return None, (
+            "Hook failed to fetch the PR's review threads (gh api graphql "
+            "returned non-zero). Output: " + threads_result.stderr
+        )
+    pr_data["reviewThreads"] = _merge_paginated_json(
+        threads_result.stdout.strip(), decoder
+    )
     return pr_data, None
 
 

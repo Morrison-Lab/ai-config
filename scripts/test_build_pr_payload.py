@@ -495,7 +495,8 @@ def test_review_comments_handling():
         review_comments_raw=sample_comments,
     )
     expected_mapped = [
-        {"author": {"login": "Copilot"}, "commit_id": "c1", "original_commit_id": "c0"}
+        {"author": {"login": "Copilot"}, "commit_id": "c1", "original_commit_id": "c0",
+         "createdAt": "", "body": "inline feedback"}
     ]
     check("review_comments carried through when provided", payload.get("review_comments") == expected_mapped)
     check("pr.reviewComments carried through when provided", payload["pr"].get("reviewComments") == expected_mapped)

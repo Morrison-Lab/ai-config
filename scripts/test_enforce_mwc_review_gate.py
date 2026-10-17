@@ -2229,7 +2229,7 @@ class TestMain(unittest.TestCase):
     def run_main(self, payload, view=None, comments=None, side_effect=None):
         """Run main() with `gh` mocked: first call is `gh pr view`, second is
         the paginated comments fetch, third is the paginated inline review
-        comments fetch, fourth is the paginated check-runs fetch."""
+        comments fetch, fourth is the paginated check-runs fetch, fifth is the review threads."""
         stdout = io.StringIO()
         if side_effect is None:
             state = view if view is not None else pr()
@@ -2242,7 +2242,12 @@ class TestMain(unittest.TestCase):
                                             else state["comments"])),
                 gh_result(stdout=json.dumps(state.get("reviewComments", []))),
                 gh_result(stdout=json.dumps([])),
+                gh_result(stdout=json.dumps(state.get("reviewThreads", []))),
             ]
+        else:
+            # The review-threads fetch is the last call; an explicit list
+            # describes the earlier ones, so it gets an empty thread list.
+            side_effect = list(side_effect) + [gh_result(stdout=json.dumps([]))]
         with patch.object(sys, "stdin", io.StringIO(json.dumps(payload))), \
              patch.object(sys, "stdout", stdout), \
              patch.object(gate.subprocess, "run", side_effect=side_effect) as run_mock:
@@ -3680,6 +3685,75 @@ class TestMaintainerFeedback(unittest.TestCase):
         s = pr(comments=[CLEAN_VERDICT,
                          comment("Nit.", "d-morrison", self.LATER)])
         self.assertEqual(gate.unread_maintainer_feedback(s), [])
+
+
+class TestUnresolvedReviewThreads(unittest.TestCase):
+    """An unresolved inline thread on a current line blocks the merge whoever
+    opened it (ai-config#4611); the fetch asks GraphQL, the only surface that
+    reports resolution."""
+
+    run_main = TestMain.run_main
+    payload = TestMain.payload
+
+    def thread(self, resolved=False, outdated=False, path="a.py", line=3):
+        return {"isResolved": resolved, "isOutdated": outdated,
+                "path": path, "line": line}
+
+    def decide(self, threads):
+        s = pr(comments=[CLEAN_VERDICT])
+        s["reviewThreads"] = threads
+        return gate.evaluate(MERGE_CMD, s)
+
+    def test_no_threads_allows(self):
+        self.assertEqual(self.decide([])["decision"], "allow")
+
+    def test_unresolved_current_thread_denies_and_names_the_line(self):
+        d = self.decide([self.thread(path="hooks/x.py", line=12)])
+        self.assertEqual(d["decision"], "deny")
+        self.assertIn("hooks/x.py:12", d["reason"])
+
+    def test_resolved_thread_allows(self):
+        self.assertEqual(self.decide([self.thread(resolved=True)])["decision"], "allow")
+
+    def test_outdated_unresolved_thread_allows(self):
+        self.assertEqual(self.decide([self.thread(outdated=True)])["decision"], "allow")
+
+    def test_one_open_thread_among_resolved_ones_denies(self):
+        d = self.decide([self.thread(resolved=True), self.thread(path="b.py", line=None)])
+        self.assertEqual(d["decision"], "deny")
+        self.assertIn("b.py:?", d["reason"])
+
+    def test_payload_without_thread_key_reports_nothing(self):
+        self.assertEqual(gate.unresolved_review_threads(pr()), [])
+
+    def test_fetch_reads_threads_through_graphql_after_check_runs(self):
+        state = pr(comments=[CLEAN_VERDICT])
+        threads = [self.thread(path="c.py", line=7)]
+        decision, run_mock = self.run_main(
+            self.payload(MERGE_CMD),
+            view=dict(state, reviewThreads=threads))
+        graphql_cmd = run_mock.call_args_list[4][0][0]
+        self.assertEqual(graphql_cmd[:3], ["gh", "api", "graphql"])
+        self.assertIn("--paginate", graphql_cmd)
+        self.assertIn("n=1427", graphql_cmd)
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("c.py:7", decision["reason"])
+
+    def test_threads_fetch_failure_denies(self):
+        state = pr(comments=[CLEAN_VERDICT])
+        view_payload = {k: state[k] for k in
+                        ("url", "author", "reviews", "statusCheckRollup",
+                         "headRefOid", "reviewRequests") if k in state}
+        decision, _ = self.run_main(
+            self.payload(MERGE_CMD),
+            side_effect=[gh_result(stdout=json.dumps(view_payload)),
+                         gh_result(stdout=json.dumps(state["comments"])),
+                         gh_result(stdout=json.dumps([])),
+                         gh_result(stdout=json.dumps([])),
+                         gh_result(rc=1, stderr="graphql unreachable")],
+        )
+        self.assertEqual(decision["decision"], "deny")
+        self.assertIn("review threads", decision["reason"])
 
 
 if __name__ == "__main__":

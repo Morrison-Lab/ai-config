@@ -702,6 +702,9 @@ def _ground_truth(case_id, builder, command):
                                                  "{reporel}")) else dst
     command = (command.replace("{reporel}", os.path.relpath(dst, ELSEWHERE))
                .replace("{link}", dst).replace("{repo}", dst))
+    # -S only signs; a runner with no GPG key would fail the commit for that
+    # reason alone, so the real run drops it (the pin moves the same way).
+    command = command.replace("commit -S ", "commit ")
     before = _pin_state(dst)
     subprocess.run(["bash", "-c", command], cwd=cwd, capture_output=True,
                    text=True, timeout=120,

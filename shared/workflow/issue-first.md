@@ -14,6 +14,14 @@ The issue is the durable record of intent, scope, and "done" criteria --- it giv
 Skip only when the task is already tracked by an open issue.
 A closed match is not a skip: surface it and confirm before re-doing the work.
 
+## `/defer-issue` files and stops; `/st` files and starts
+
+Ezra approved this mapping (2026-10-17):
+
+- [`/defer-issue`](../../skills/defer-issue/SKILL.md) (alias `/di`) files the issue and **stops**.
+- [`/st`](../../skills/st/SKILL.md) files the issue, or finds the existing one, and **starts the work**.
+- With no shorthand, the default is to **start the work**, matching the bias to action.
+
 ## A task that builds on existing work
 
 When the task naturally builds on an existing issue or PR, file the new issue and then:

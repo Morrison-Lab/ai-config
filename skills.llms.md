@@ -39,7 +39,7 @@ Most skills also respond to plain-English triggers listed in their `description`
 | [`start-task`](skills/start-task/SKILL.llms.md) | `st` | File a tracking issue (if none exists), branch, implement, open PR, ARDI to clean |
 | [`grab-issue`](skills/grab-issue/SKILL.llms.md) | `gi` | Pick the highest-priority open issue and work it end-to-end |
 | [`grab-issues-in-parallel`](skills/grab-issues-in-parallel/SKILL.llms.md) | `gip` | Grab multiple issues and work them in parallel worktrees |
-| [`defer-issue`](skills/defer-issue/SKILL.llms.md) |  | File a follow-up issue for something out of scope in the current PR |
+| [`defer-issue`](skills/defer-issue/SKILL.llms.md) | `di` | File a follow-up issue for something out of scope in the current PR |
 | [`cancel-superseded`](skills/cancel-superseded/SKILL.llms.md) | `cb` | Close issues/PRs that a merged PR made redundant |
 | [`discussions`](skills/discussions/SKILL.llms.md) |  | Read and respond to GitHub Discussions topics; mark Q&A answers |
 | [`migrate-discussion`](skills/migrate-discussion/SKILL.llms.md) |  | Move an item between Discussions and Issues when it fits the other tracker better |

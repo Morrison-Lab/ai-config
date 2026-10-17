@@ -421,7 +421,7 @@ Instead, use the functional command version of the operator macro that takes its
 - **Exponential**: write `\expf{x}` or `\exp{x}` (or `e^{x}`), not `\expt\paren{x}`.
 - **Indicator**: write `\indicp{P}` or `\indic{A}(x)`.
 - **Any function-like macro, not only operators**: when a symbol macro such as `\predfn` is applied to arguments, write its `f` form (`\predfnf{\predvar}`), not the symbol followed by `\paren{...}` (`\predfn\paren{\predvar}`).
-  The same holds for `\sb{...}`, `\cb{...}` and every other delimiter macro, as in `\E{X}` rather than `\Ep\sb{X}`.
+  The same holds for `\cb{...}` and every other delimiter macro, as in `\expitf{x}` rather than `\expit\cb{x}`.
   Before typing a macro followed by `\paren`, `\sb` or `\cb`, grep `macros.qmd` for `<name>f`.
   If no `f` form exists, propose one in `Morrison-Lab/macros` first; notes never define it locally.
   (Directive from the user, 2026-10-16, review of `Morrison-Lab/sds#261`; tracked in #4597.)

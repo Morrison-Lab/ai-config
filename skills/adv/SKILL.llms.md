@@ -68,6 +68,25 @@ _Posted by <Agent Name> (AI agent) --- not written by a human._
 
 This ensures `check-pr-fully-clean.py` admits the review by construction and allows a clean verdict to supersede any earlier standing not-clean comments (#4425).
 
+## Verify cross-model findings before presenting them
+
+A reviewer from another model is a source of leads, not verdicts. Measured 2026-10-15 (Gemini via `agy`): findings were partly false positives, such as mislabeling which section a reading box sits in, speculative “check whether” items, and mistaking a content-hidden math block for a macro definition.
+
+- **Do:** check each finding against the file at the reviewed SHA (`gh api "repos/<o>/<r>/contents/<path>?ref=<sha>"`, quoted) before presenting it as a finding, and label anything unchecked as an unverified lead.
+- **Do:** check PR state first. A merged PR gets no comment. Head SHAs move while a run is queued, and a queued review reads the head when it starts, so record in each comment the SHA actually read and note any drift.
+- **Don’t:** relay a speculative “check whether X” item as a defect.
+
+## Name the PR’s particular risk in the prompt
+
+Put a `SPECIAL CHECK` paragraph in the cross-model prompt for the PR’s own risk (paraphrase distance, link anchors, references to deleted files), not only the generic prompt.
+
+- **Do:** add the `SPECIAL CHECK` paragraph to the generic prompt for any PR with a distinctive risk.
+- **Don’t:** send only the generic prompt for a PR with a distinctive risk.
+
+When a merge gate names this reviewer, a deterministic check does not replace the named read: see [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md#a-gate-that-names-a-reviewer-is-met-by-that-reviewer).
+
+Invocation quirks for the `agy` engine (prompt syntax, no stdin, plan mode, Windows length cap) are in [`memories/antigravity.md`](../../memories/antigravity.md).
+
 ## Related
 
 - `pre-push-review`: The underlying script and skill for pre-push reviews.

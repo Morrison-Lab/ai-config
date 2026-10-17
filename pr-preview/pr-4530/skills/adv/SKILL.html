@@ -469,6 +469,7 @@ cookieconsent.run({
 <h2 class="anchored" data-anchor-id="name-the-prs-particular-risk-in-the-prompt">Name the PR’s particular risk in the prompt</h2>
 <p>Put a <code>SPECIAL CHECK</code> paragraph in the cross-model prompt for the PR’s own risk (paraphrase distance, link anchors, references to deleted files), not only the generic prompt.</p>
 <ul>
+<li><strong>Do:</strong> add the <code>SPECIAL CHECK</code> paragraph to the generic prompt for any PR with a distinctive risk.</li>
 <li><strong>Don’t:</strong> send only the generic prompt for a PR with a distinctive risk.</li>
 </ul>
 <p>When a merge gate names this reviewer, a deterministic check does not replace the named read: see <a href="../../shared/workflow/adversarial-self-review.md#a-gate-that-names-a-reviewer-is-met-by-that-reviewer"><code>adversarial-self-review</code></a>.</p>

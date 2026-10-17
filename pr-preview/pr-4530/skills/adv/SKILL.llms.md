@@ -80,6 +80,7 @@ A reviewer from another model is a source of leads, not verdicts. Measured 2026-
 
 Put a `SPECIAL CHECK` paragraph in the cross-model prompt for the PR’s own risk (paraphrase distance, link anchors, references to deleted files), not only the generic prompt.
 
+- **Do:** add the `SPECIAL CHECK` paragraph to the generic prompt for any PR with a distinctive risk.
 - **Don’t:** send only the generic prompt for a PR with a distinctive risk.
 
 When a merge gate names this reviewer, a deterministic check does not replace the named read: see [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md#a-gate-that-names-a-reviewer-is-met-by-that-reviewer).

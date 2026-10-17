@@ -3615,11 +3615,22 @@ class TestMaintainerFeedback(unittest.TestCase):
         self.assertEqual(self.decide(self.state(reviews=[r]))["decision"], "deny")
 
     def test_merge_grant_is_not_feedback(self):
-        for body in ("/mwc 4609", "merge it", "LGTM", "Approved."):
+        for body in ("/mwc 4609", "/mwc all", "merge it", "LGTM", "Approved."):
             with self.subTest(body=body):
                 s = self.state()
                 s["comments"].append(comment(body, "d-morrison", self.LATER))
                 self.assertEqual(self.decide(s)["decision"], "allow")
+
+    def test_grant_keyword_with_a_trailing_request_is_feedback(self):
+        for body in (
+            "Approved, but please fix the typo on line 42.",
+            "Merge conflicts need resolving before this can land.",
+            "Ship it only after you add the missing test.",
+        ):
+            with self.subTest(body=body):
+                s = self.state()
+                s["comments"].append(comment(body, "d-morrison", self.LATER))
+                self.assertEqual(self.decide(s)["decision"], "deny")
 
     def test_agent_marked_comment_under_maintainer_login_is_not_feedback(self):
         s = self.state()

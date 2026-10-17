@@ -252,6 +252,12 @@ A reviewer must differ from the author in model and harness.
 Never send student or PHI data.
 Elsewhere follow `memories/delegation.md`.
 
+**Never use a pay-per-use API (Ezra, 2026-10-17).**
+This covers every per-token or prepaid-credit API (Anthropic, OpenAI, Gemini, OpenCode Zen `/zen/v1`), however it authenticates (static key or identity federation), in delegation, CI workflows, scripts and tools alike.
+Use subscriptions and free tiers only.
+Do not add a workflow or script that needs such an API, and remove one that does (ai-config#4397 removed Upload Skills).
+The delegation detail is in `memories/delegation.md`.
+
 ## Keep ai-config and repo checkouts fresh
 
 Before starting work, update the current checkout and relevant submodules (`git pull --ff-only`, `git submodule update --init --recursive`).

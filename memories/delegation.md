@@ -84,7 +84,7 @@ Institution-provisioned budgets (`delegate-to-databricks`) are not Ezra's own pa
 **The rule is global, not only for delegation (Ezra, 2026-10-17): we do not use pay-per-use APIs anywhere.**
 It covers CI workflows, scripts and tools too, and holds however the API authenticates, whether by static key or identity federation.
 Do not add a workflow or script that needs one, and remove one that does.
-The Upload Skills workflow was removed for this reason (ai-config#4397): its Anthropic key "won't work until you add credits".
+A free Anthropic "Evaluation access" workspace key does work for the Skills API (the Upload Skills run on 2026-10-17 created 220 skills), so the Upload Skills workflow stays (ai-config#4397).
 
 **Three of these are metered plans, and the rule is to try all three before
 Claude's: `codex`, `agy`, and OpenCode's `opencode-go/*` tier.

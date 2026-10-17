@@ -39,7 +39,7 @@ Examine the target repository structure to locate where the content fits: - Chec
 
 ### 3. Draft Content in Target Conventions
 
-Follow the shared Morrison-Lab writing and technical standards: - **Semantic Line Breaks (SemBr)**: One thought / sentence per line. Never reflow text into arbitrary line wraps. - **LaTeX Math Macros**: When writing mathematical notation, use the shared semantic macros from `Morrison-Lab/macros` (e.g. `\E`, `\Prob`, `\Var`, `\Cov`, `\indic`, `\R`, etc., per `use-math-macros`). - **Callout Enclosures**: Use GitHub or Quarto callouts (`> [!NOTE]`, `> [!TIP]`, `> [!IMPORTANT]`, theorem/lemma environments) where appropriate. - **Tone & Style**: Clear, pedagogical, direct, concise, avoiding passive voice and avoiding AI prose tells (per `find-ai-tells` and `psw`).
+Follow the shared Morrison-Lab writing and technical standards: - **Semantic Line Breaks (SemBr)**: One thought / sentence per line. Never reflow text into arbitrary line wraps. - **LaTeX Math Macros**: When writing mathematical notation, use the shared semantic macros from `Morrison-Lab/macros` (e.g. `\E`, `\Prob`, `\Var`, `\Cov`, `\indic`, `\R`, etc., per `use-math-macros`). - **Callout Enclosures**: Use GitHub or Quarto callouts (`> [!NOTE]`, `> [!TIP]`, `> [!IMPORTANT]`, theorem/lemma environments) where appropriate. - **Tone & Style**: Clear, pedagogical, direct, concise, avoiding passive voice and avoiding AI prose tells (per `find-ai-tells` and `psw`). - **Pre-review pass**: Before the PR goes to a person, run the checklist in [`notes-pre-review-pass`](../../shared/workflow/notes-pre-review-pass.md) with a separate subagent, and answer every review comment by sweeping its whole class, not the commented line.
 
 ### 4. Deliver on a Dedicated Branch and PR
 

@@ -558,3 +558,26 @@ A comment that only asks about the content ("when?") is a one-off, and saying so
 - **Don't:** reply "Fixed" to a comment phrased as a standing rule and stop there.
 - **Don't:** record the rule in a project memory store (no memory goes there;
   at most a pointer to the global copy), because a lesson filed where it came up is invisible to every other repository.
+
+## Every maintainer comment is generalized the turn it arrives
+
+The section above says what to do with a comment that implies a rule.
+Ezra's instruction (2026-10-17: "you should be learning from every comment I make on every PR, as soon as I make it") removes the condition: every comment from the maintainer on any PR counts, with no wording test, because the sds#268 review needed 25 corrections that fell into a handful of classes (types, inline definitions, links, estimands, notation, relevance) and each was fixed on its own line.
+
+So the first action on a maintainer's PR comment is not the line fix.
+In the turn the comment arrives:
+
+1. Name the class of the comment in a few words.
+2. Sweep the whole PR, and the sibling files it touches, for that class, and fix every instance in one push.
+3. Check the global home for a rule or check on that class (psw for prose and notation, ai-config for agent behaviour, gha for a decidable check), extend it if one exists, and open a small PR for it if none does.
+4. Say in the reply which rule or check you recorded, with its link, or that the comment was a one-off and why.
+
+A question or thanks needs no rule.
+Everything else does, and "it only applied here" is a claim to state in the reply, not to assume.
+
+`hooks/remind-generalize-maintainer-pr-comment.py` is the mechanism: it fires on a GitHub comment or review event authored by a login in `MAINTAINER_LOGINS` (default `d-morrison`) and injects these four steps, once per event.
+It reminds and never blocks.
+Tracked in [#3465](https://github.com/Morrison-Lab/ai-config/issues/3465).
+
+- **Do:** treat each maintainer comment as a class to sweep and record, in the turn it arrives.
+- **Don't:** wait for a comment that sounds like a rule, or for a second comment on the same class.

@@ -80,6 +80,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-generalize-maintainer-pr-comment.py\"",
+            "timeout": 10,
+            "script": "remind-generalize-maintainer-pr-comment.py",
+            "why": "Ezra 2026-10-17 'learn from every comment I make on every PR, as soon as I make it'. A maintainer's PR comment arrives as a GitHub event, which no chat-prose hook reads. Injects, never blocks, on a GitHub comment or review event authored by the maintainer: sweep the class across the PR and record the rule or check in its global home in the same turn."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-record-standing-guidance.py\"",
             "timeout": 10,
             "script": "remind-record-standing-guidance.py",

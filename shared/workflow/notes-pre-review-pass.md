@@ -40,6 +40,9 @@ State in the PR body that the checklist ran.
    Replace a pronoun such as "It" with its referent.
 7. **Population or sample.**
    Every "mean", "average" and error shorthand says which.
+8. **Deferred items.**
+   Every item left out of the PR on purpose has an issue filed and linked in the PR body at the moment it is deferred, not after the maintainer asks.
 
 An item that fails on one div is checked on every div of the PR, per the sweep above.
 Recurrence: sds#268 (2026-10-17) drew an inline definition at least five times after the first correction, which is why item 5 now names the pattern.
+Recurrence: sds#268 (2026-10-17) also deferred six items with only a note in a reply, and the maintainer asked "did you file an issue for followup?", which is why item 8 exists.

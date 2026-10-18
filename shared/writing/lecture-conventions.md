@@ -25,8 +25,13 @@ This fragment is the agent-facing copy: follow the rules, and link to psw instea
   [`quarto-remarks-vs-callouts`](quarto-remarks-vs-callouts.md) says what belongs in a remark.
 - **Subfiles hold one unit each and start with no heading.**
   The chapter file is a spine of headings, slide breaks and `{{< include >}}` calls.
-  Name each unit's file for its div type (`_def-`, `_exr-`, `_sol-`, `_thm-`, `_exm-`, `_fig-`), and decompose further when it is a judgment call.
-  New and revised content gets one div per subfile, a solution in its own `_sol-` file included (Ezra, 2026-10-18).
+  Name each unit's file `_<stem>_<type>.qmd`, with the div type last (`_def`, `_exr`, `_sol`, `_thm`, `_exm`, `_fig`, `_rem`).
+  The files of one idea then share a stem and sort together:
+  `_backfitting-update_def.qmd`, `_backfitting-update_exr.qmd` and `_backfitting-update_sol.qmd` (Ezra, 2026-10-18).
+  The type follows an underscore because stems are kebab-case, so an underscore never occurs inside a stem.
+  Decompose further when it is a judgment call.
+  New and revised content gets one div per subfile, a solution in its own `_sol` file included (Ezra, 2026-10-18).
+  Existing files keep their `_def-` style prefix names until a separate rename sweep.
   A subfile that is not otherwise touched keeps its present layout.
 - **Never nest one theorem-type div inside another.**
   A special case gets its own div after the general one and links to it.

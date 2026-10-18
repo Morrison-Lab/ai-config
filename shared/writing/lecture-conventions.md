@@ -26,6 +26,8 @@ This fragment is the agent-facing copy: follow the rules, and link to psw instea
 - **Subfiles hold one unit each and start with no heading.**
   The chapter file is a spine of headings, slide breaks and `{{< include >}}` calls.
   Name each unit's file for its div type (`_def-`, `_exr-`, `_sol-`, `_thm-`, `_exm-`, `_fig-`), and decompose further when it is a judgment call.
+  New and revised content gets one div per subfile, a solution in its own `_sol-` file included (Ezra, 2026-10-18).
+  A subfile that is not otherwise touched keeps its present layout.
 - **Never nest one theorem-type div inside another.**
   A special case gets its own div after the general one and links to it.
 - **Keep body text off section and title slides.**

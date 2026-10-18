@@ -108,6 +108,7 @@ from fences import (  # noqa: E402
     strip_code_spans,
 )
 from payload_fetcher import PayloadError, PayloadFetcher  # noqa: E402
+from maintainer_feedback import unread_maintainer_feedback  # noqa: E402
 from pull_request import extract_request_names  # noqa: E402
 from review_payload import (  # noqa: E402
     extract_structured_review,
@@ -997,6 +998,24 @@ def check_base_drift(pr) -> Tuple[bool, List[str]]:
         f"including changes to {shown}. A check added there never ran on this "
         f"head, so green CI here does not show it passes. Merge {base} into "
         f"the branch and let CI re-run (ai-config#2982)"]
+
+
+def check_maintainer_feedback(pr) -> Tuple[bool, List[str]]:
+    """Fail when a maintainer comment, review or inline comment is newer than
+    the head commit: the merge hook denies the same state (ai-config#4611)."""
+    pr_data = dict(getattr(pr, "_data", {}) or {})
+    inline_note = ""
+    try:
+        pr_data["reviewComments"] = pr.review_comments
+    except PayloadError:
+        # A --from-json payload may omit inline comments; the surface that
+        # needs them (check_review_comments) still fails fast on its own.
+        inline_note = " (inline comments not in the payload, so not checked)"
+    unread = unread_maintainer_feedback(pr_data)
+    if not unread:
+        print(f"✓ No maintainer feedback is newer than the head commit{inline_note}.")
+        return True, []
+    return False, [f"Maintainer feedback newer than the last push: {item}" for item in unread]
 
 
 def check_review_threads(pr) -> Tuple[bool, List[str]]:
@@ -4214,10 +4233,11 @@ def main():
 
     ci_ok, ci_issues = check_ci_runs(pr)
     threads_ok, thread_issues = check_review_threads(pr)
+    feedback_ok, feedback_issues = check_maintainer_feedback(pr)
     review_ok, review_issues = check_review_comments(pr, args.quorum)
     drift_ok, drift_issues = check_base_drift(pr)
 
-    all_issues = ci_issues + thread_issues + review_issues + drift_issues
+    all_issues = ci_issues + thread_issues + feedback_issues + review_issues + drift_issues
 
     # Inside a CI job whose own check run is on this head, some review items
     # describe the PR BEFORE that job posts anything: no review on this head

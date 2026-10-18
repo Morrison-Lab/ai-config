@@ -270,6 +270,14 @@ pre-empt these when authoring shell, especially under `set -euo pipefail`:
   **associative arrays do NOT** (4.0+).
   Parse key=value records with `while IFS='=' read -r k v; do case "$k" in ...`.
 
+## Git Bash on Windows: empty `python3 - <<EOF` and long chained `gh` loops hang
+
+Measured 2026-10-15 on a Windows XPS box.
+A `python3 - <<EOF` with an empty body and a long chained `for ... gh ...` loop each hung the Bash tool.
+
+- **Do:** write the script to a file in the scratchpad (Write tool) and run it with `run_in_background`, then read its output.
+- **Don't:** feed `python3 -` an inline heredoc, or chain many `gh` calls in one foreground loop.
+
 ## A `while read` loop's own stdin can be silently stolen by a command in its body
 
 `while read -r x; do <cmd using $x>; done < <(source)` (or `< file`) hands

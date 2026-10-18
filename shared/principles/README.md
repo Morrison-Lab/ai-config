@@ -204,7 +204,7 @@ Four instances (he named the first three the same day):
   per unit of content, roughly one div per file, so a reorder moves an
   include line instead of a block of prose.
   [`lecture-conventions`](../writing/lecture-conventions.md) sets the current rule:
-  one div per subfile, with a solution kept in its exercise's subfile.
+  one div per subfile for new and revised content, solutions included.
   `d-morrison/rme` stated it first: its `CLAUDE.md` caps a `.qmd` source
   at about 100 lines, and its `.github/copilot-instructions.md`
   ("Decomposing content into subfiles") asks for one subtopic per subfile.

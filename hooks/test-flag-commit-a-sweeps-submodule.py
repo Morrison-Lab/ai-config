@@ -1007,10 +1007,14 @@ MUTATIONS = {
     "M_per_path_index_query": (
         "one index read serves every modified path (no query per path)",
         [("        pinned = gitlinks.get(path)  # only a gitlink (mode 160000) counts\n",
-          "        one = _git(top, 'ls-files', '-s', '--', path) or ''\n"
+          "        one = _git(top, 'ls-files', '-s', '--', path)\n"
+          "        if one is not None:\n"
+          "            time.sleep(0.01)  # fixed cost per query, not machine speed\n"
+          "        one = one or ''\n"
           "        got = one.split(None, 3)\n"
           "        pinned = got[1] if len(got) > 2 and got[0] == '160000' else None\n")],
-        # 5000 queries spend the 8 s deadline, so the hook fails open.
+        # 5000 queries at a fixed 10 ms each spend the 8 s deadline on any
+        # machine, so the hook fails open.
         {"W38"},
     ),
     "M_status_no_untracked": (

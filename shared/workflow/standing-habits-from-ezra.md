@@ -49,11 +49,16 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`, exce
 - **Don't:** cite the source from memory.
 - **Reason:** a citation from memory can be wrong, and nobody can tell.
 
-## Annotation errors fail CI
+## Annotations fail CI
 
-- **Do:** treat a CI annotation of level error as a failure in every repository.
+- **Do:** treat a CI annotation of any level (error, warning or notice) as a failure in every repository.
+- **Do:** make the workflow itself fail on one: a repository's CI calls the `annotation-gate.yml` job from `Morrison-Lab/gha`, which fails the run on any annotation not on its allowlist.
+- **Do:** allow only a tracked exception, with a link to its issue, in the caller's `allow-patterns`.
+  The gate already allows the runner-image migration notice and the forced-Node deprecation warning.
 - **Do:** check that each repository has a ruleset that blocks direct pushes to `main`.
-- **Don't:** merge over an error annotation.
+- **Don't:** merge over an annotation, or lower a check's annotation level to get past the gate.
+- **Reason:** agents skip annotations that leave the job green (Ezra, 2026-10-18;
+  [gha#1097](https://github.com/Morrison-Lab/gha/issues/1097), [ai-config#1068](https://github.com/Morrison-Lab/ai-config/issues/1068)).
 
 ## Keep removed content
 

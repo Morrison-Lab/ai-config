@@ -203,6 +203,8 @@ Four instances (he named the first three the same day):
   A Quarto chapter is a spine of `{{< include >}}` calls over one subfile
   per unit of content, roughly one div per file, so a reorder moves an
   include line instead of a block of prose.
+  [`lecture-conventions`](../writing/lecture-conventions.md) sets the current rule:
+  one div per subfile, with a solution kept in its exercise's subfile.
   `d-morrison/rme` stated it first: its `CLAUDE.md` caps a `.qmd` source
   at about 100 lines, and its `.github/copilot-instructions.md`
   ("Decomposing content into subfiles") asks for one subtopic per subfile.

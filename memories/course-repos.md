@@ -51,6 +51,25 @@ until someone makes that decision and retires the graded item.
 "and not just from mlg; from any evaluation-material repo (e.g. epi204)";
 "we just need to be intentional about what we migrate, and not do it accidentally".)
 
+## An overlap is fixed in the notes, and standard results stay
+
+When a graded item in an evaluation repo overlaps a notes repo, the notes repo changes and the graded item does not.
+Overlaps are fixed on the notes side: change the numbers, data or setup of the worked example or solution that matches the graded item.
+Never reword, replace or retire a graded item to get around an overlap, and never propose that in an overlap sweep.
+
+A **standard result** is the exception on the notes side: a theorem or derivation that the notes have to teach, such as the normal equations, the stationarity condition of logistic regression, or the construction of a Boolean function by a one-hidden-layer network.
+A standard result stays in the notes as it is, even when the evaluation repo uses it as an exercise.
+Only the choice of numbers, data or setup is changed, never the result.
+
+- **Do:** in a sweep, classify each overlap as a choice of numbers, data or setup (change the notes) or a standard result (leave both alone).
+- **Don't:** rewrite a graded item because the notes teach the result it asks for.
+- **Don't:** remove or hide a worked proof from the notes to avoid an overlap with a graded item.
+
+(Ezra, 2026-10-19, in the thread preparing `Morrison-Lab/lds` for release:
+"when mlg overlaps with any notes repo (including lds), we want the notes repo to change, not mlg";
+"standard results can stay in the notes repos as-is, even if they are also used as exercises in mlg".
+It reversed three graded-item rewrites made in `Morrison-Lab/mlg` on the first reading of the sweep, which were closed unmerged.)
+
 ## The leak check covers what we grade, not what another class assigned
 
 What goes in the notes and what is held back for assessment is our decision.

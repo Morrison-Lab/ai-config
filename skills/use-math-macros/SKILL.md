@@ -415,7 +415,8 @@ The full rule is in [`math-derivation-steps`](../../shared/writing/math-derivati
 Whenever you add, rename, remove or change what a macro prints in `Morrison-Lab/macros`, update `notation-choices.qmd` in the same PR.
 Each entry states our convention, the reasons for it, and the other conventions readers will meet in other sources.
 If the page is already accurate after your change, say why in the PR description and apply the `no-notation-change` label.
-CI in `Morrison-Lab/macros` fails a PR that changes `macros.qmd` without changing `notation-choices.qmd`.
+Once [Morrison-Lab/macros#248](https://github.com/Morrison-Lab/macros/issues/248) lands (as of 2026-10-19 it has not), CI in `Morrison-Lab/macros` will fail a PR that changes `macros.qmd` without changing `notation-choices.qmd`.
+Until then nothing catches the omission, so check it yourself.
 Applied notes repos link to the entry instead of keeping their own copy.
 (Directive from Ezra, 2026-10-19: "make sure every time we change or add macros, we update the notation-choices page accordingly".
 Tracked in [Morrison-Lab/macros#248](https://github.com/Morrison-Lab/macros/issues/248).)

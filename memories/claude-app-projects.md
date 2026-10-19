@@ -84,6 +84,6 @@ Recorded from the Machine Learning course project (2026-10-12 to 2026-10-16), wh
 - **A thread flags a tangential ask to the coordinator instead of starting it.**
   If the coordinator has not already redirected it, the thread sends the ask to the coordinator and keeps working on its own task.
   A thread questions an instruction that seems too tangential or irrelevant to its current work, whether it comes from the user or the coordinator:
-  it asks whether the instruction belongs in this thread and suggests a separate one, and does not quietly do it (Ezra, 2026-10-19).
+  it asks whether the instruction belongs in this thread and suggests a separate one, and does not quietly do the instruction (Ezra, 2026-10-19).
   Questioning is not refusing: the user decides where the task goes.
   An explicit "switch to this" from the user is the exception, as in [`dont-get-sidetracked`](../shared/workflow/dont-get-sidetracked.md).

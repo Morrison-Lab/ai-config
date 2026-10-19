@@ -75,3 +75,10 @@ Recorded from the Machine Learning course project (2026-10-12 to 2026-10-16), wh
 - **Never merge over a gate that looks wrong.**
   When `check-pr-fully-clean.py` fails on what looks like a false positive, get the input corrected or fix the checker, rerun, and merge only on a pass.
   Run the checker before the merge call, since the merge hook only warns.
+- **The coordinator redirects a tangential task away from an in-progress thread** (Ezra, 2026-10-19, ai-config#4629).
+  When the user gives a thread that is mid-task an irrelevant or tangential ask, the coordinator intervenes:
+  it sends the ask to a more appropriate existing thread, or starts a new one, and tells the user where it went.
+  The busy thread does not take the ask on.
+- **A thread flags a tangential ask to the coordinator instead of starting it.**
+  If the coordinator has not already redirected it, the thread sends the ask to the coordinator and keeps working on its own task.
+  An explicit "switch to this" from the user is the exception, as in [`dont-get-sidetracked`](../shared/workflow/dont-get-sidetracked.md).

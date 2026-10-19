@@ -57,6 +57,12 @@ Examine the target repository structure to locate where the content fits:
   - Fits inside an **existing chapter** (e.g., adding a new section or callout to `chapters/defining-terms.qmd` in `psw`).
   - Merits a **new chapter or standalone note** (e.g., `chapters/<new-topic>.qmd`), which also requires updating the navbar/sidebar in the Quarto configuration.
 
+### 2b. Port existing content by script
+
+If the content already exists in another notes repository, do not retype it.
+Follow [`port-by-script`](../../shared/workflow/port-by-script.md): copy the source files with a script, keep ids, wording and citations, and edit only what the target's style rules require.
+Step 3 applies only to content with nothing to port.
+
 ### 3. Draft Content in Target Conventions
 
 Follow the shared Morrison-Lab writing and technical standards:

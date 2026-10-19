@@ -398,6 +398,8 @@ Before opening a browser, look for a CLI, MCP, or API that can do the task, and 
 Use a browser only if none can (or could be set up), or the task is visual.
 See [`browser-last-resort`](shared/workflow/browser-last-resort.md).
 
+To check a notes repo's rendered HTML, anchors or MathJax source, read the published files, including `pr-preview/pr-<N>/`, straight from its `gh-pages` branch with git or the contents API: [`read-published-html-from-gh-pages`](shared/workflow/read-published-html-from-gh-pages.md).
+
 ## Default to action without asking
 
 The owner grants standing permission for non-destructive steps (branch commits, pushes, opening/updating PRs, read commands, editing memory).

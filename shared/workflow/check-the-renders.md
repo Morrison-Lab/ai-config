@@ -5,6 +5,8 @@ A `.qmd` or `.md` diff can be entirely correct while the published page is broke
 
 This is [`verify-the-right-artifact`](verify-the-right-artifact.md) applied to rendered output: the diff in hand cannot show the claim false, because the claim is about a page the diff does not contain.
 
+To read a deployed or PR-preview page without a browser, use the `gh-pages` branch: [`read-published-html-from-gh-pages`](read-published-html-from-gh-pages.md).
+
 ## What only the render shows
 
 - A macro that never expanded, because it was never defined.

@@ -37,6 +37,10 @@ Match the content to the appropriate notes repository using the registry above. 
 
 Examine the target repository structure to locate where the content fits: - Check `_quarto.yml`, `_quarto-website.yml`, or `_quarto-book.yml` to understand the table of contents and chapter organization. - Inspect the `chapters/` directory or root `.qmd` files. - Determine whether the content: - Fits inside an **existing chapter** (e.g., adding a new section or callout to `chapters/defining-terms.qmd` in `psw`). - Merits a **new chapter or standalone note** (e.g., `chapters/<new-topic>.qmd`), which also requires updating the navbar/sidebar in the Quarto configuration.
 
+### 2b. Port existing content by script
+
+If the content already exists in another notes repository, do not retype it. Follow [`port-by-script`](../../shared/workflow/port-by-script.md): copy the source files with a script, keep ids, wording and citations, and edit only what the target’s style rules require. Step 3 applies only to content with nothing to port.
+
 ### 3. Draft Content in Target Conventions
 
 Follow the shared Morrison-Lab writing and technical standards: - **Semantic Line Breaks (SemBr)**: One thought / sentence per line. Never reflow text into arbitrary line wraps. - **LaTeX Math Macros**: When writing mathematical notation, use the shared semantic macros from `Morrison-Lab/macros` (e.g. `\E`, `\Prob`, `\Var`, `\Cov`, `\indic`, `\R`, etc., per `use-math-macros`). - **Callout Enclosures**: Use GitHub or Quarto callouts (`> [!NOTE]`, `> [!TIP]`, `> [!IMPORTANT]`, theorem/lemma environments) where appropriate. - **Tone & Style**: Clear, pedagogical, direct, concise, avoiding passive voice and avoiding AI prose tells (per `find-ai-tells` and `psw`). - **Pre-review pass**: Before the PR goes to a person, run the checklist in [`notes-pre-review-pass`](../../shared/workflow/notes-pre-review-pass.md) with a separate subagent, and answer every review comment by sweeping its whole class, not the commented line.

@@ -354,6 +354,7 @@ See [`commit-reusable-work`](shared/workflow/commit-reusable-work.md) and [`AGEN
 
 - **Do:** commit and PR reusable incidental work in the owning repository in the same session.
 - **Do:** re-check the committed form against published claims, stating so in the commit message.
+- **Do:** [port content by script](shared/workflow/port-by-script.md).
 - **Don't:** leave incidental math, code, or derivations in scratchpads or chat logs.
 ## Never dispatch a worker on Fable without explicit, specific permission
 

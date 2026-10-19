@@ -383,6 +383,7 @@ cookieconsent.run({
   <ul class="collapse">
   <li><a href="#identify-target-repository-and-topic" id="toc-identify-target-repository-and-topic" class="nav-link" data-scroll-target="#identify-target-repository-and-topic">1. Identify Target Repository and Topic</a></li>
   <li><a href="#locate-target-chapter-or-file" id="toc-locate-target-chapter-or-file" class="nav-link" data-scroll-target="#locate-target-chapter-or-file">2. Locate Target Chapter or File</a></li>
+  <li><a href="#b.-port-existing-content-by-script" id="toc-b.-port-existing-content-by-script" class="nav-link" data-scroll-target="#b.-port-existing-content-by-script">2b. Port existing content by script</a></li>
   <li><a href="#draft-content-in-target-conventions" id="toc-draft-content-in-target-conventions" class="nav-link" data-scroll-target="#draft-content-in-target-conventions">3. Draft Content in Target Conventions</a></li>
   <li><a href="#deliver-on-a-dedicated-branch-and-pr" id="toc-deliver-on-a-dedicated-branch-and-pr" class="nav-link" data-scroll-target="#deliver-on-a-dedicated-branch-and-pr">4. Deliver on a Dedicated Branch and PR</a></li>
   <li><a href="#drive-pr-to-clean-ardi" id="toc-drive-pr-to-clean-ardi" class="nav-link" data-scroll-target="#drive-pr-to-clean-ardi">5. Drive PR to Clean (ARDI)</a></li>
@@ -499,6 +500,10 @@ cookieconsent.run({
 <section id="locate-target-chapter-or-file" class="level3">
 <h3 class="anchored" data-anchor-id="locate-target-chapter-or-file">2. Locate Target Chapter or File</h3>
 <p>Examine the target repository structure to locate where the content fits: - Check <code>_quarto.yml</code>, <code>_quarto-website.yml</code>, or <code>_quarto-book.yml</code> to understand the table of contents and chapter organization. - Inspect the <code>chapters/</code> directory or root <code>.qmd</code> files. - Determine whether the content: - Fits inside an <strong>existing chapter</strong> (e.g., adding a new section or callout to <code>chapters/defining-terms.qmd</code> in <code>psw</code>). - Merits a <strong>new chapter or standalone note</strong> (e.g., <code>chapters/&lt;new-topic&gt;.qmd</code>), which also requires updating the navbar/sidebar in the Quarto configuration.</p>
+</section>
+<section id="b.-port-existing-content-by-script" class="level3">
+<h3 class="anchored" data-anchor-id="b.-port-existing-content-by-script">2b. Port existing content by script</h3>
+<p>If the content already exists in another notes repository, do not retype it. Follow <a href="../../shared/workflow/port-by-script.md"><code>port-by-script</code></a>: copy the source files with a script, keep ids, wording and citations, and edit only what the target’s style rules require. Step 3 applies only to content with nothing to port.</p>
 </section>
 <section id="draft-content-in-target-conventions" class="level3">
 <h3 class="anchored" data-anchor-id="draft-content-in-target-conventions">3. Draft Content in Target Conventions</h3>

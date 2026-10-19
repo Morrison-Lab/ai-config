@@ -228,6 +228,10 @@ The pair uses prediction errors (predicted minus observed); `\vy - \design\vcoef
 
 Before finishing any definition, theorem or proof, scan for a sub-expression written out two or more times, or a conceptually coherent chunk (the prediction error, the loss of one observation), and give it a macro instead of writing it out. Add the macro to `Morrison-Lab/macros` first, with an `interpretations.tsv` row, never as a local macro. The full rule is in [`math-derivation-steps`](../../shared/writing/math-derivation-steps.md) (“Keep each equation simple”, Do and don’t). (Directive from Ezra, 2026-10-16.)
 
+### Update the notation-choices page with every macro change
+
+Whenever you add, rename, remove or change what a macro prints in `Morrison-Lab/macros`, update `notation-choices.qmd` in the same PR. Each entry states our convention, the reasons for it, and the other conventions readers will meet in other sources. If the page is already accurate after your change, say why in the PR description and apply the `no-notation-change` label. Once [Morrison-Lab/macros#248](https://github.com/Morrison-Lab/macros/issues/248) lands (as of 2026-10-19 it has not), CI in `Morrison-Lab/macros` will fail a PR that changes `macros.qmd` without changing `notation-choices.qmd`. Until then nothing catches the omission, so check it yourself. Applied notes repos link to the entry instead of keeping their own copy. (Directive from Ezra, 2026-10-19: “make sure every time we change or add macros, we update the notation-choices page accordingly”. Tracked in [Morrison-Lab/macros#248](https://github.com/Morrison-Lab/macros/issues/248).)
+
 ## Prefer command operator macros that take arguments over manual delimiter wrappers
 
 There should be very few instances where it is necessary to write `\cb` (curly braces), `\sb` (square brackets), or `\paren` directly with a bare operator. Instead, use the functional command version of the operator macro that takes its operand as an argument and wraps it in delimiters automatically:

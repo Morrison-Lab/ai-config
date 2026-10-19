@@ -340,16 +340,6 @@ See [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md) 
 - **Don't:** link a `#NNN` a passage is displaying rather than citing.
 - **Don't:** leave referenced external tools, forge items, or internal policies as plain unlinked text.
 
-## Port content between repos with a script
-
-When content moves between repositories, copy the source files with a script, keeping ids, wording and citations.
-Edit only what the target's style rules require, and list those edits in the PR.
-Write generatively only for content with nothing to port.
-See [`port-by-script`](shared/workflow/port-by-script.md).
-
-- **Do:** script the copy, then apply each required edit as its own named step.
-- **Don't:** retype, summarize or regenerate content that exists in a source repository.
-
 ## Deliver completed implementation work
 
 When asked to implement or write up changes on a feature branch, complete the full delivery cycle: tracking issue, scoped commits, adversarial self-review to clean verdict, push, open/update PR, request AI review, and drive to clean.
@@ -364,6 +354,7 @@ See [`commit-reusable-work`](shared/workflow/commit-reusable-work.md) and [`AGEN
 
 - **Do:** commit and PR reusable incidental work in the owning repository in the same session.
 - **Do:** re-check the committed form against published claims, stating so in the commit message.
+- **Do:** [port content by script](shared/workflow/port-by-script.md).
 - **Don't:** leave incidental math, code, or derivations in scratchpads or chat logs.
 ## Never dispatch a worker on Fable without explicit, specific permission
 

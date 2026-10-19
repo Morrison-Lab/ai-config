@@ -5,6 +5,7 @@ when you have a primary task, don't get sidetracked, including by the user's inp
 if a tangential or irrelevant task or information gets added, do something to both stay on your main task and not lose track of the other topic;
 delegate it to a subagent, fork your session, defer it for later through a tracking issue, add it to your to-do list, and/or use any other means available to you to keep independent lines of thought separate without losing track of any of them.
 If the user explicitly tells you to change focus, that's a different case.
+In a Claude Project, the coordinator redirects such a task to a better thread, and a thread flags it to the coordinator ([`claude-app-projects`](../../memories/claude-app-projects.md)).
 
 ## Why
 

@@ -55,6 +55,9 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`, exce
 - **Do:** make the workflow itself fail on one: a repository's CI calls the `annotation-gate.yml` job from `Morrison-Lab/gha`, which fails the run on any annotation not on its allowlist.
 - **Do:** allow only a tracked exception, with a link to its issue, in the caller's `allow-patterns`.
   The gate already allows the runner-image migration notice and the forced-Node deprecation warning.
+- **Do:** when a shared gha action emits an annotation by design (the `skip-docx` notice from the `preview` action, for example), fix the cause in the caller's config, or allow the message once in gha's `default-allow`.
+  Coordinator correction, 2026-10-19 ([ai-config#4622](https://github.com/Morrison-Lab/ai-config/issues/4622)).
+- **Don't:** copy the same by-design annotation into each repository's `allow-patterns`.
 - **Do:** check that each repository has a ruleset that blocks direct pushes to `main`.
 - **Don't:** merge over an annotation, or lower a check's annotation level to get past the gate.
 - **Reason:** agents skip annotations that leave the job green (Ezra, 2026-10-18;

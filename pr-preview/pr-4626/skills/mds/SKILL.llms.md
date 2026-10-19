@@ -1,0 +1,7 @@
+# mds (alias for `send-notes` -\> `Morrison-Lab/mds`)
+
+This is a short alias to send mathematics and linear algebra content to the **Mathematics for Data Science** repo (`Morrison-Lab/mds`). Read and follow the canonical skill:
+
+→ **[send-notes](../../skills/send-notes/SKILL.llms.md)**
+
+Back to top

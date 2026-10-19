@@ -410,6 +410,16 @@ Add the macro to `Morrison-Lab/macros` first, with an `interpretations.tsv` row,
 The full rule is in [`math-derivation-steps`](../../shared/writing/math-derivation-steps.md) ("Keep each equation simple", Do and don't).
 (Directive from Ezra, 2026-10-16.)
 
+### Update the notation-choices page with every macro change
+
+Whenever you add, rename, remove or change what a macro prints in `Morrison-Lab/macros`, update `notation-choices.qmd` in the same PR.
+Each entry states our convention, the reasons for it, and the other conventions readers will meet in other sources.
+If the page is already accurate after your change, say why in the PR description and apply the `no-notation-change` label.
+CI in `Morrison-Lab/macros` fails a PR that changes `macros.qmd` without changing `notation-choices.qmd`.
+Applied notes repos link to the entry instead of keeping their own copy.
+(Directive from Ezra, 2026-10-19: "make sure every time we change or add macros, we update the notation-choices page accordingly".
+Tracked in [Morrison-Lab/macros#248](https://github.com/Morrison-Lab/macros/issues/248).)
+
 ## Prefer command operator macros that take arguments over manual delimiter wrappers
 
 There should be very few instances where it is necessary to write `\cb` (curly braces), `\sb` (square brackets), or `\paren` directly with a bare operator.

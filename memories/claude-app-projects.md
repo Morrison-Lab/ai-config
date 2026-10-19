@@ -83,6 +83,7 @@ Recorded from the Machine Learning course project (2026-10-12 to 2026-10-16), wh
   before it routes a task to an active thread, it checks that the task falls within that thread's PR scope, and otherwise uses a separate or new thread (Ezra, 2026-10-19).
 - **A thread flags a tangential ask to the coordinator instead of starting it.**
   If the coordinator has not already redirected it, the thread sends the ask to the coordinator and keeps working on its own task.
-  A thread protests an instruction that seems too tangential or irrelevant to its current work, whether it comes from the user or the coordinator:
-  it says why and suggests a separate thread, and does not quietly do it (Ezra, 2026-10-19).
+  A thread questions an instruction that seems too tangential or irrelevant to its current work, whether it comes from the user or the coordinator:
+  it asks whether the instruction belongs in this thread and suggests a separate one, and does not quietly do it (Ezra, 2026-10-19).
+  Questioning is not refusing: the user decides where the task goes.
   An explicit "switch to this" from the user is the exception, as in [`dont-get-sidetracked`](../shared/workflow/dont-get-sidetracked.md).

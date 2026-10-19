@@ -33,10 +33,11 @@ and requiring consensus clean verdicts at the current HEAD.
 - **Don't:** assume an empty `reviewRequests` list means a bot review has completed ---
   inspect check runs and review bodies instead.
 
-**A check-run listing is complete only when the runs listed equal its `total_count`.**
-The GitHub MCP `get_check_runs` returns 30 runs per page even when `total_count` is larger.
+**The GitHub MCP `get_check_runs` returns 30 runs per page even when `total_count` is larger.**
 A merge or an "all checks green" claim based on page 1 covers 30 of however many runs exist
 (Morrison-Lab/ai-config#4619, from Morrison-Lab/gha#1102, where page 1 held 30 of 101).
+The count rule under "A paginated sweep with an inconsistent page size" below applies in full;
+this adds the tool's page size.
 `scripts/check-pr-fully-clean.py` and `scripts/build-pr-payload.py` already page the REST endpoint, so this binds reads made by hand through MCP.
 
 - **Do:** call `get_check_runs` with `perPage: 30` and `page: 2, 3, ...` until the number listed equals `total_count`, confirm none is pending or failed, and state the counted total in the report.

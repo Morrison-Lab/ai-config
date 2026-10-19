@@ -425,6 +425,12 @@ Instead, use the functional command version of the operator macro that takes its
   Before typing a macro followed by `\paren`, `\sb` or `\cb`, grep `macros.qmd` for `<name>f`.
   If no `f` form exists, propose one in `Morrison-Lab/macros` first; notes never define it locally.
   (Directive from the user, 2026-10-16, review of `Morrison-Lab/sds#261`; tracked in #4597.)
+- **Operator plus any delimiter is one macro** (psw's [apply a function to its argument with the macro's f form](https://github.com/Morrison-Lab/psw/blob/main/chapters/defining-terms.qmd) rule):
+  the delimiters covered are `\paren`, `\sb`, `\cb`, `\set`, `\abs`, `\norm` and `\angb`, and an alias of the operator counts as the operator (`\Ep\sb{X}` is `\E{X}`).
+  A missing combined macro is created in `Morrison-Lab/macros` in the same session, never worked around.
+  Then bump the pin and use it.
+  (Directive from the user, 2026-10-18, review of `Morrison-Lab/lds#1157`.
+  Tracked in psw#286; checked by gha `check-fform-paren`, gha#1106.)
 
 Reserve direct `\sb{...}`, `\cb{...}`, and `\paren{...}` for mathematical grouping, sets ($\cb{1, \dots, n}$), evaluation limits, or raw algebra that does not denote an operator with a dedicated macro.
 (Directive from the user, 2026-10-07.)

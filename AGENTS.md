@@ -396,9 +396,7 @@ See [`GEMINI.md`](GEMINI.md) and [`memories/antigravity.md`](memories/antigravit
 
 Before opening a browser, look for a CLI, MCP, or API that can do the task, and say what you found.
 Use a browser only if none can (or could be set up), or the task is visual.
-See [`browser-last-resort`](shared/workflow/browser-last-resort.md).
-
-To check a notes repo's rendered HTML, anchors or MathJax source, read the published files, including `pr-preview/pr-<N>/`, straight from its `gh-pages` branch with git or the contents API: [`read-published-html-from-gh-pages`](shared/workflow/read-published-html-from-gh-pages.md).
+See [`browser-last-resort`](shared/workflow/browser-last-resort.md) and [`gh-pages`](shared/workflow/read-published-html-from-gh-pages.md).
 
 ## Default to action without asking
 

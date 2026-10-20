@@ -93,8 +93,8 @@ _BLANK_RE = re.compile(r'^\s*$')
 _BQ_ALERT_RE = re.compile(r'^\[![A-Z]+\]\s*$')
 _HTML_COMMENT_RE = re.compile(r'^\s*<!--')
 _AT_DIRECTIVE_RE = re.compile(r'^\s*@[\w./-]+\.md\s*$')
-_QUARTO_DIV_RE = re.compile(r'^\s*:{3,}(\s*\{.*\}|\s*)$')
-_MATH_FENCE_RE = re.compile(r'^\s*\$\$\s*$')
+_QUARTO_DIV_RE = re.compile(r'^\s*:{3,}(?:\s*\{[^}]*\})?\s*$')
+_MATH_FENCE_RE = re.compile(r'^\s*\$\$(?:\s*\{[^}]*\})?\s*$')
 
 
 def _is_new_block(line: str) -> bool:

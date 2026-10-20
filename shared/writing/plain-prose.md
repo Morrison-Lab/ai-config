@@ -79,11 +79,14 @@ When PSW and this guidance disagree, PSW wins.
   Use literal words, not idioms or slang,
   and spell out abbreviations and hidden steps.
   This includes postural verbs used for numbers, sets, or distributions
-  ("lies in", "lies between", "sits at", "stands at" --- use "is in", "is between", "equals", or "has [quantity]")
+  ("lies in", "lies between", "sits at" --- use "is in", "is between", or "has [quantity]")
   and imperative mathematical idioms
   ("Write $X$ as", "Fix $X$", "Take $X$", "Call $X$" --- use "Express $X$ as", "Let $X$", "Consider $X$", "Denote $X$ by").
   PSW's rules and table of literal alternatives live at
-  [Writing for every reader](https://morrison-lab.github.io/psw/chapters/inclusive-writing.html#use-literal-language).
+  [Writing for every reader](https://morrison-lab.github.io/psw/chapters/inclusive-writing.html#use-literal-language),
+  with the postural-verb and `Take`/`Call` rows proposed in
+  [`Morrison-Lab/psw#308`](https://github.com/Morrison-Lab/psw/pull/308)
+  (open as of 2026-10-20).
   - **Do:** write "the estimates become very large" and "the residual is in $(-1, 1)$".
   - **Don't:** write "the estimates blow up" or "the residual lies in $(-1, 1)$".
 

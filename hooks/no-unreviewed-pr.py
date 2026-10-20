@@ -377,7 +377,7 @@ RX_OPEN = re.compile(r"gh\s+pr\s+(?:create|ready)\b", re.I)
 # ready PR BACK to draft, so it counts as a draft action even though it also
 # matches RX_OPEN -- the draft branch is checked first below.
 RX_DRAFT = re.compile(
-    r"\"?draft\"?\s*[:=]\s*true|--draft\b|gh\s+pr\s+ready[^|;&]*--undo",
+    r"\"?draft\"?\s*[:=]\s*true|--draft\b|\bgh\s+pr\s+create\b[^|;&]*\s-d\b|gh\s+pr\s+ready[^|;&]*--undo",
     re.I,
 )
 
@@ -764,7 +764,7 @@ def _argv_draft(argv):
     # `gh pr create --draft` opens a NEW draft PR (a draft action for ordering);
     # like any create, its number is in the result, not the command.
     if len(argv) >= 3 and argv[1] == "pr" and argv[2] == "create" \
-            and _has_flag(argv[3:], "--draft"):
+            and _has_flag(argv[3:], "--draft", "-d"):
         return True, None, None
     return False, None, None
 
@@ -1702,16 +1702,58 @@ def _argv_open(argv):
     if _has_flag(argv[2:], "--help", "-h"):
         return False, None, None
     if argv[2] == "create":
+        if _has_flag(argv[3:], "--draft", "-d"):
+            return False, None, None
         _, repo = _verb_ident(argv)
         return True, None, repo          # a create's number is in its result
     if argv[2] == "ready":
+        if _has_flag(argv[3:], "--undo"):
+            return False, None, None
         num, repo = _verb_ident(argv)
         return True, num, repo
     return False, None, None
 
 
-def open_ident(cmd):
-    """(is_open, num, repo) from the actual `gh pr create`/`gh pr ready` simple command.
+def _opens_in(cmd):
+    """([(index, num, repo, create_idx)], split) for every open (create/ready) in `cmd`.
+
+    Structural and gh-scoped: returns each simple command that is a non-draft
+    `gh pr create` or `gh pr ready`. For `create`, `create_idx` is its 0-based
+    index among all `gh pr create` calls (both draft and non-draft) in `cmd`,
+    allowing result URLs to be paired accurately even when draft creates precede
+    non-draft ones. If `_split_commands` returns None on a parse failure, falls
+    back to `_scrub_all` + `RX_OPEN` with no identity.
+    """
+    split = _split_commands(cmd)
+    if split is None:
+        cmd_open = _scrub_all(cmd)
+        draft = bool(RX_DRAFT.search(cmd_open))
+        if not draft and RX_OPEN.search(cmd_open):
+            return [(0, None, None, 0)], []
+        return [], []
+    found = []
+    create_count = 0
+    for i, (_ops, argv) in enumerate(split):
+        if not argv or argv[0] != "gh" or len(argv) < 3 or argv[1] != "pr":
+            continue
+        if _has_flag(argv[2:], "--help", "-h"):
+            continue
+        sub = argv[2]
+        if sub == "create":
+            c_idx = create_count
+            create_count += 1
+            if not _has_flag(argv[3:], "--draft", "-d"):
+                _, repo = _verb_ident(argv)
+                found.append((i, None, repo, c_idx))
+        elif sub == "ready":
+            if not _has_flag(argv[3:], "--undo"):
+                num, repo = _verb_ident(argv)
+                found.append((i, num, repo, None))
+    return found, split
+
+
+def open_ident(cmd, _opens=None):
+    """(is_open, num, repo) from the FIRST `gh pr create`/`gh pr ready` simple command.
 
     Mirrors draft_ident/request_ident: the OPEN identity is located
     structurally from the create/ready command, never from the whole raw string.
@@ -1723,15 +1765,11 @@ def open_ident(cmd):
     (False, None, None) when no open command matches. On a parse error, falls back
     to RX_OPEN string search with no identity (is_open, None, None).
     """
-    cmds = _simple_commands(cmd)
-    if cmds is None:
-        cmd_open = _scrub_all(cmd)
-        return bool(RX_OPEN.search(cmd_open)), None, None
-    for argv in cmds:
-        ok, num, repo = _argv_open(argv)
-        if ok:
-            return True, num, repo
-    return False, None, None
+    found, _split = _opens_in(cmd) if _opens is None else _opens
+    if not found:
+        return False, None, None
+    _i, num, repo, _cidx = found[0]
+    return True, num, repo
 
 
 # Tools whose input is a SHELL COMMAND. Matching CLI patterns against any
@@ -1906,22 +1944,51 @@ def input_ident(inp):
     return num, repo
 
 
+def result_idents(body):
+    """List of (num, repo) parsed from a tool_result body string, in order."""
+    matches = []
+    for rx in (RX_RES_URL, RX_RES_API, RX_RES_HASH):
+        for m in rx.finditer(body):
+            matches.append((m.start(), m.group(3), f"{m.group(1)}/{m.group(2)}"))
+    for m in RX_RES_NUM.finditer(body):
+        matches.append((m.start(), m.group(1), None))
+    if not matches:
+        return []
+    matches.sort(key=lambda x: x[0])
+    results = []
+    seen = set()
+    for _pos, num, repo in matches:
+        key = (num, repo)
+        if key in seen:
+            continue
+        seen.add(key)
+        if repo is None and any(n == num for n, r in results):
+            continue
+        if repo is not None:
+            upgraded = False
+            for idx, (n, r) in enumerate(results):
+                if n == num and r is None:
+                    results[idx] = (num, repo)
+                    upgraded = True
+                    break
+            if upgraded:
+                continue
+        results.append((num, repo))
+    return results
+
+
 def result_ident(body):
     """(num, repo) parsed from a tool_result body string."""
-    m = RX_RES_URL.search(body) or RX_RES_API.search(body) \
-        or RX_RES_HASH.search(body)
-    if m:
-        return m.group(3), f"{m.group(1)}/{m.group(2)}"
-    m = RX_RES_NUM.search(body)
-    if m:
-        return m.group(1), None
+    idents = result_idents(body)
+    if idents:
+        return idents[0]
     return None, None
 
 
 _OBL_SEQ = 0
 
 
-def _new_obl(num, repo, tid, self_, slast, srnum, srrepo, push=False):
+def _new_obl(num, repo, tid, self_, slast, srnum, srrepo, push=False, cidx=None):
     """One outstanding-open record.
 
     `self_` marks an open whose SAME action also requested a reviewer, so the
@@ -1939,12 +2006,15 @@ def _new_obl(num, repo, tid, self_, slast, srnum, srrepo, push=False):
     superseded by a credited standalone one would mark an obligation created
     afterwards, and the block would blame chaining for a head that simply moved
     (adversarial review on ai-config#3024).
+
+    `cidx` records which `gh pr create` invocation in the command this open
+    corresponds to when multiple creates exist in one command.
     """
     global _OBL_SEQ
     _OBL_SEQ += 1
     return {"num": num, "repo": repo, "tid": tid, "self": self_,
             "slast": slast, "srnum": srnum, "srrepo": srrepo, "push": push,
-            "seq": _OBL_SEQ}
+            "seq": _OBL_SEQ, "cidx": cidx, "res": False}
 
 
 # A PR number seen in two DIFFERENT repositories. `live` is keyed by number
@@ -2381,78 +2451,84 @@ def scan(path):
                     body = json.dumps(b.get("content") or "")
                     err = bool(b.get("is_error"))
                     failed = err or bool(RX_FAILED.search(body))
-                    rnum, rrepo = result_ident(body)
-                    # Resolve the open that produced this result.
+                    r_idents = result_idents(body)
+                    rnum, rrepo = r_idents[0] if r_idents else (None, None)
+                    # Resolve the opens that produced this result.
+                    matched = [ob for ob in obligations if ob["tid"] == rid and not ob.get("res")]
+                    paired = [None] * len(matched)
+                    used_idents = set()
+
+                    # Pass 1: exact PR number match (e.g. from `gh pr ready <N>`)
+                    for i, ob in enumerate(matched):
+                        if ob.get("num") is not None:
+                            for j, (num_j, repo_j) in enumerate(r_idents):
+                                if j not in used_idents and num_j == ob["num"] \
+                                        and _repo_ok(ob.get("repo"), repo_j):
+                                    paired[i] = (num_j, repo_j)
+                                    used_idents.add(j)
+                                    break
+
+                    # Pass 2: exact repo match with create-index preference
+                    for i, ob in enumerate(matched):
+                        if paired[i] is None and ob.get("repo"):
+                            cidx = ob.get("cidx")
+                            if cidx is not None and cidx < len(r_idents) \
+                                    and cidx not in used_idents \
+                                    and r_idents[cidx][1] == ob["repo"]:
+                                paired[i] = r_idents[cidx]
+                                used_idents.add(cidx)
+                                continue
+                            for j, (num_j, repo_j) in enumerate(r_idents):
+                                if j not in used_idents and repo_j and ob["repo"] == repo_j:
+                                    paired[i] = (num_j, repo_j)
+                                    used_idents.add(j)
+                                    break
+
+                    # Pass 3: by create-index (`cidx`)
+                    for i, ob in enumerate(matched):
+                        if paired[i] is None and ob.get("cidx") is not None:
+                            cidx = ob["cidx"]
+                            if cidx < len(r_idents) and cidx not in used_idents:
+                                paired[i] = r_idents[cidx]
+                                used_idents.add(cidx)
+
+                    # Pass 4: remaining in-order fallback
+                    j = 0
+                    for i, ob in enumerate(matched):
+                        if paired[i] is None:
+                            while j < len(r_idents) and j in used_idents:
+                                j += 1
+                            if j < len(r_idents):
+                                paired[i] = r_idents[j]
+                                used_idents.add(j)
+                                j += 1
+
                     keep = []
+                    resolved_any = False
                     for ob in obligations:
-                        if ob["tid"] != rid:
+                        if ob["tid"] != rid or ob.get("res"):
                             keep.append(ob)
                             continue
-                        # `failed` is one flag over the WHOLE result body, but a
-                        # single call can pair opening a PR with requesting a
-                        # reviewer (`gh pr create --reviewer` whose reviewer step
-                        # 422s, or `update_pull_request(draft=False,
-                        # reviewers=[...])` whose reviewer-add fails). A failure
-                        # there must not be read as the PR never existing:
-                        #   * failed, NOT a self create+reviewers obligation, AND
-                        #     the PR's identity is STILL unknown (never in the
-                        #     input, not in this result) -> the open itself is what
-                        #     failed, no PR exists to track, so drop it. This is a
-                        #     plain `create_pull_request`/`gh pr create`, whose
-                        #     number is only ever learned from the result -- a
-                        #     create that failed without yielding a number yielded
-                        #     no PR.
-                        #   * failed BUT the PR's identity is known -- resolved
-                        #     here (a URL/number in the result) OR already known
-                        #     from the input (`update_pull_request`'s
-                        #     `pull_number`, populated at append time) -> the PR
-                        #     is real and its reviewer step is what failed, so
-                        #     keep tracking it and let the `self` check below hold
-                        #     it outstanding. Dropping a known-identity obligation
-                        #     on a bare `{"status":422}` body (no number echoed --
-                        #     the ordinary error shape) would silently clear a PR
-                        #     that was genuinely marked ready with no reviewer.
-                        #   * failed AND self (a create+reviewers: `gh pr create
-                        #     --reviewer`, `create_pull_request(reviewers=[...])`)
-                        #     -> its number is NEVER known at append time, so a
-                        #     numberless failure body cannot distinguish "the
-                        #     create failed, no PR" from "the PR was created and
-                        #     only the reviewer step failed". Dropping would
-                        #     silently discharge a genuinely-created, unreviewed
-                        #     PR (the dangerous direction), so it is NOT dropped
-                        #     here: it falls through to the `self` check below and
-                        #     stays outstanding. The cost is a rare unclearable
-                        #     (num-None) obligation when the create truly failed --
-                        #     a safe over-warn, per shared/principles/fail-fast.md,
-                        #     chosen over a silent discharge.
-                        if rnum is None and ob["num"] is None \
+                        ob["res"] = True
+                        idx = matched.index(ob)
+                        res_pair = paired[idx]
+                        onum_i, orepo_i = res_pair if res_pair else (None, None)
+                        # Failure handling:
+                        # * failed, NOT a self create+reviewers obligation, AND
+                        #   the PR's identity is STILL unknown (never in the
+                        #   input, not in this result) -> the open itself is what
+                        #   failed, no PR exists to track, so drop it.
+                        # * failed AND self (a create+reviewers) -> keep outstanding
+                        #   as safe over-warn.
+                        if onum_i is None and ob["num"] is None \
                                 and (not failed or not ob["self"]):
                             continue
-                        if ob["num"] is None and rnum:
-                            ob["num"] = rnum
-                        if ob["repo"] is None and rrepo:
-                            ob["repo"] = rrepo
-                        # A create's number is knowable only here, so this is
-                        # where most PRs enter the live set.
+                        if ob["num"] is None and onum_i:
+                            ob["num"] = onum_i
+                            resolved_any = True
+                        if ob["repo"] is None and orepo_i:
+                            ob["repo"] = orepo_i
                         _note_live(live, ob["num"], ob["repo"])
-                        # A `self` obligation (an open whose SAME action also
-                        # requested a reviewer -- `gh pr create --reviewer`,
-                        # `create_pull_request(reviewers=[...])`, or a create
-                        # chained with a request in one Bash call) discharges only
-                        # on POSITIVE evidence the reviewer request itself
-                        # succeeded, the same fail-safe rule the pending[tid] path
-                        # below uses. For the shell path `self` comes from
-                        # request_ident scanning the WHOLE command, so the matched
-                        # request may be a NON-LAST simple command (its own failure
-                        # masked by a trailing success) or target a DIFFERENT PR
-                        # than the one opened. So discharge only when that request
-                        # was the LAST/atomic simple command (`slast`, so the
-                        # coarse `failed` reflects IT rather than a trailing
-                        # command) AND names THIS PR (`srnum` None -- the create's
-                        # own reviewer or a current-branch edit -- or equal to the
-                        # resolved number). Otherwise keep it tracked (the safe
-                        # over-warn direction). A structured create/edit is atomic
-                        # (slast=True) and targets its own PR, so it is unaffected.
                         if ob["self"]:
                             same_pr = (ob["srnum"] is None
                                        or ob["srnum"] == ob["num"])
@@ -2461,9 +2537,10 @@ def scan(path):
                             keep.append(ob)
                             continue
                         keep.append(ob)
-                    opened_tid = any(ob["tid"] == rid for ob in obligations)
-                    if opened_tid and rnum:
-                        keep[:] = [o for o in keep if o["num"] is not None]
+
+                    opened_tid = any(ob["tid"] == rid for ob in matched)
+                    if opened_tid and (resolved_any or not failed):
+                        keep[:] = [o for o in keep if o["num"] is not None or (failed and o.get("self"))]
                     obligations[:] = keep
                     # Discharge the reviewer request that produced this result.
                     # A discharge is the DANGEROUS action -- it asserts the PR
@@ -2715,67 +2792,55 @@ def scan(path):
                 # (`gh pr view 42 && gh pr ready`) and mislabeled the obligation.
                 cmd_open = _scrub_all(cmd_raw)
                 draft = bool(RX_DRAFT.search(cmd_open))
-                is_open, onum, orepo = open_ident(cmd_raw)
-                opened = is_open and not draft
-                reqs_parsed = _requests_in(cmd_raw)
-                requested, rnum, rrepo, rlast = request_ident(cmd_raw, _reqs=reqs_parsed)
                 _dok, dnum, drepo, dlast = draft_ident(cmd_raw)
+                opens_found, split_open = _opens_in(cmd_raw)
+                reqs_parsed = _requests_in(cmd_raw)
+                reqs_found, _split_reqs = reqs_parsed
+                requested, rnum, rrepo, rlast = request_ident(cmd_raw, _reqs=reqs_parsed)
                 pushed = push_ident(cmd_raw)
                 uok, unum, urepo = update_branch_ident(cmd_raw)
-                # Draft is checked first: `gh pr ready --undo` matches RX_OPEN
-                # too, and it is the draft action that decides. The clear is
-                # deferred to the command's own non-failed result: a `gh pr
-                # ready --undo` that fails leaves the PR ready, so clearing at
-                # tool_use time would silently forget it.
-                if draft:
-                    # Identity and `last` come from the draft command ITSELF
-                    # (draft_ident): a decoy PR verb earlier in the line cannot
-                    # misdirect the clear onto the wrong PR, and a draft chained
-                    # AHEAD of another command is seen as not-last (dlast=False),
-                    # so the clear is withheld (is_error ambiguous). A draft form
-                    # draft_ident does not resolve leaves dnum=None/dlast=False,
-                    # which never clears -- the safe over-warn direction.
+                # Draft is checked: `gh pr ready --undo` matches RX_OPEN too,
+                # and it is the draft action that decides for that PR. The clear is
+                # deferred to the command's own non-failed result.
+                if _dok:
                     pending_clear[tid] = (dnum, drepo, dlast)
-                elif opened:
-                    # `self` carries the matched request's ordering (rlast) and
-                    # target PR (rnum/rrepo) so the discharge can require the
-                    # request to be last/atomic and same-PR -- a request from a
-                    # non-last or different-PR command in a chained create combo
-                    # must not silently discharge this open.
+                elif draft:
+                    pending_clear[tid] = (dnum, drepo, dlast)
+                if len(opens_found) == 1:
+                    _i, onum, orepo, cidx = opens_found[0]
                     obligations.append(_new_obl(
-                        onum, orepo, tid, requested, rlast, rnum, rrepo))
-                    # A number-less request chained ahead of another command
-                    # resolves no number on EITHER side, so the number-matched
-                    # loop below cannot reach it and it needs marking here.
-                    # BOTH sides must be number-less for the attribution to
-                    # hold. `rnum is None` covers the create's own `--reviewer`
-                    # and a current-branch `gh pr edit --add-reviewer`, neither
-                    # of which names a PR. `onum is None` is the other half:
-                    # it admits `gh pr create` and a bare `gh pr ready`, which
-                    # are this branch's own PR, and excludes `gh pr ready <N>`,
-                    # which names a PR that need not be this branch's -- there
-                    # a current-branch add-reviewer targets a DIFFERENT PR than
-                    # the one being readied, and marking it would claim a
-                    # request that does not exist for it (Copilot on
-                    # ai-config#3024).
-                    # The two exclusions differ, and only one is covered
-                    # elsewhere. A request resolving its own number is not
-                    # lost: the number-matched loop below reaches it. A
-                    # number-less request chained ahead of `gh pr ready <N>`
-                    # is reached by neither path, and that is deliberate --
-                    # attribution does not hold there, so the block falls back
-                    # to naming only failure as the cause. The `ready_named`
-                    # test asserts that absence rather than leaving it to be
-                    # rediscovered as a gap.
-                    # `_repo_ok` for the same reason the loop applies it:
-                    # two explicit `-R` flags naming different repositories,
-                    # both number-less, would otherwise mark the opened PR for
-                    # a request that targeted another repo entirely
-                    # (claude-review on ai-config#3024).
+                        onum, orepo, tid, requested, rlast, rnum, rrepo, cidx=cidx))
                     if requested and not rlast and rnum is None and onum is None \
                             and _repo_ok(orepo, rrepo):
                         obligations[-1]["nonlast"] = True
                     _note_live(live, onum, orepo)
+                elif len(opens_found) > 1:
+                    for idx_cmd, onum, orepo, cidx in opens_found:
+                        self_k, rnum_k, rrepo_k = False, None, None
+                        slast_k = False
+                        if split_open and idx_cmd < len(split_open):
+                            is_req, _rn, _rr = _argv_request(split_open[idx_cmd][1])
+                            if is_req:
+                                self_k = True
+                                slast_k = _status_owned(split_open, idx_cmd)
+                                rnum_k = onum
+                                rrepo_k = orepo
+                        if not self_k:
+                            for j, req_num, req_repo in reqs_found:
+                                if j != idx_cmd and req_num is not None:
+                                    if onum and onum == req_num:
+                                        self_k = True
+                                        slast_k = _status_owned(split_open, j)
+                                        rnum_k = req_num
+                                        rrepo_k = req_repo
+                                        break
+                        obligations.append(_new_obl(
+                            onum, orepo, tid, self_k, slast_k, rnum_k, rrepo_k, cidx=cidx))
+                        if self_k and not slast_k and rnum_k is None and onum is None \
+                                and _repo_ok(orepo, rrepo_k):
+                            obligations[-1]["nonlast"] = True
+                        _note_live(live, onum, orepo)
+                opened = bool(opens_found)
                 # A create --reviewer both opens and requests; its `self` flag
                 # discharges it on the create's own result, so it is not also a
                 # separate pending request here.

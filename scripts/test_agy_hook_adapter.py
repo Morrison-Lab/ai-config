@@ -2976,5 +2976,78 @@ class TestWarnOnlyPreToolUseSurfacing(unittest.TestCase):
         expected_ids = {f"item_{i}" for i in range(total_items)}
         self.assertEqual(set(hook_ids), expected_ids)
 
+    def test_cleanup_stale_warning_files_preserves_lock_files(self):
+        warn_dir = Path(self.test_dir)
+        json_file = warn_dir / "warnings-stale.json"
+        lock_file = warn_dir / "warnings-stale.json.lock"
+        tmp_file = warn_dir / "warnings-stale.json.1234.tmp"
+
+        json_file.write_text("[]", encoding="utf-8")
+        lock_file.write_text("", encoding="utf-8")
+        tmp_file.write_text("[]", encoding="utf-8")
+
+        past = time.time() - 90000  # 25 hours ago
+        os.utime(str(json_file), (past, past))
+        os.utime(str(lock_file), (past, past))
+        os.utime(str(tmp_file), (past, past))
+
+        self.adapter._cleanup_stale_warning_files(warn_dir, max_age_seconds=86400)
+
+        self.assertFalse(json_file.exists(), "Stale json file should be cleaned up")
+        self.assertFalse(tmp_file.exists(), "Stale tmp file should be cleaned up")
+        self.assertTrue(lock_file.exists(), "Lock file must NEVER be unlinked by stale cleanup")
+
+    def test_aged_lock_file_preserves_mutual_exclusion_during_cleanup(self):
+        import threading
+        sid = "aged-lock-session"
+        warn_file = self.adapter._get_pending_warnings_file(sid)
+        lock_file = warn_file.with_name(f"{warn_file.name}.lock")
+
+        events = []
+        holder_holding = threading.Event()
+        cleanup_done = threading.Event()
+
+        def holder():
+            with self.adapter._advisory_warnings_lock(warn_file):
+                events.append("holder:acquired")
+                holder_holding.set()
+                cleanup_done.wait(timeout=2.0)
+                events.append("holder:releasing")
+            events.append("holder:released")
+
+        t_holder = threading.Thread(target=holder)
+        t_holder.start()
+        self.assertTrue(holder_holding.wait(timeout=2.0))
+
+        # Age the lock file past 24h
+        past = time.time() - 90000
+        os.utime(str(lock_file), (past, past))
+
+        # Run cleanup while holder is still holding lock
+        self.adapter._cleanup_stale_warning_files(Path(self.test_dir), max_age_seconds=86400)
+        self.assertTrue(lock_file.exists(), "Lock file must remain on disk")
+
+        # Second thread attempts to acquire lock -- must block until holder releases!
+        acquired_while_held = False
+        def contender():
+            nonlocal acquired_while_held
+            with self.adapter._advisory_warnings_lock(warn_file):
+                if "holder:released" not in events:
+                    acquired_while_held = True
+                events.append("contender:acquired")
+
+        t_contender = threading.Thread(target=contender)
+        t_contender.start()
+        time.sleep(0.05)
+
+        cleanup_done.set()
+        t_holder.join(timeout=2.0)
+        t_contender.join(timeout=2.0)
+
+        self.assertFalse(acquired_while_held, "Contender must not acquire lock while holder holds it")
+        self.assertIn("holder:released", events)
+        self.assertIn("contender:acquired", events)
+        self.assertLess(events.index("holder:releasing"), events.index("contender:acquired"))
+
 if __name__ == "__main__":
     unittest.main()

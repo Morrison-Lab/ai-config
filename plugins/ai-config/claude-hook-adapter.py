@@ -344,11 +344,18 @@ def refresh_session_heartbeat(session_id: str | None, repo_root: str | None = No
         print(f"claude-hook-adapter: heartbeat refresh failed: {exc}", file=sys.stderr)
 
 def _cleanup_stale_warning_files(warn_dir: Path, max_age_seconds: int = 86400):
-    """Remove orphaned warning or lock files older than max_age_seconds (default 24h)."""
+    """Remove orphaned warning queue files older than max_age_seconds (default 24h).
+
+    Excludes .lock files: lock files must persist indefinitely because unlinking
+    an active flock file creates a new inode on subsequent opens, breaking mutual exclusion
+    against concurrent holders.
+    """
     try:
         now = time.time()
         for p in warn_dir.glob("warnings-*"):
             try:
+                if p.name.endswith(".lock"):
+                    continue
                 if now - p.stat().st_mtime > max_age_seconds:
                     p.unlink(missing_ok=True)
             except Exception:

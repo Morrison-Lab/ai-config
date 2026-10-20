@@ -88,6 +88,7 @@ rather than through `.cmd` or `.bat` batch wrappers.
     A bridge adapter evaluates all subagents in the list against `Agent` PreToolUse hooks.
     If any subagent triggers `deny`, the whole tool execution is denied.
     Subagent isolation requires passing `Workspace: "branch"` in `invoke_subagent`, which `claude-hook-adapter` maps to Claude Code's `isolation: "worktree"` enum (`hooks/flag-unassigned-worktree.py`).
+    Passing `Workspace: "share"` is denied when unpushed commits or tracked changes exist off the default branch, because `normalize_isolation()` in `plugins/ai-config/claude-hook-adapter.py` returns `None` for `"share"` (tested in `scripts/test_agy_hook_adapter.py`) and rewrites `tool_name` to `"Agent"`, bypassing `flag-unassigned-worktree.py`'s direct `tool_name == "invoke_subagent"` branch.
     On Windows, ensure `~/.gemini/config/plugins/ai-config/claude-hook-adapter.py` is kept synced with `plugins/ai-config/claude-hook-adapter.py`.
   - `send_message` maps to `SendMessage`.
   - `define_subagent` maps to `Task`.
@@ -307,4 +308,7 @@ Antigravity provides built-in system tools for managing asynchronous background 
 - Otherwise, `last_assistant_text()` returns `""` on Antigravity transcripts, making stop guards completely inert.
 - When evaluating announced work, guards must also inspect candidates from the raw message tail, not just the text preceding `**Stopping Point**:`, so that unstarted continuation promises placed inside or alongside the stopping point detail text are caught and blocked.
   (Observed in live Antigravity sessions 2026-10-06.)
+- Tool execution results (`view_file`, `run_command`, `invoke_subagent`) are logged with `m.get("source") == "MODEL"` and `m.get("type") == "GENERIC"`, not `m.get("type") == "PLANNER_RESPONSE"`.
+  Transcript hooks that treat `m.get("source") == "MODEL"` or `m.get("type") == "GENERIC"` as assistant prose (such as `hooks/no-mistake-without-a-hook.py`, `hooks/remind-ums-after-error.py`, and `hooks/remind-learn-from-review.py`) match trigger phrases inside file or command outputs read by the session ([ai-config#4635](https://github.com/Morrison-Lab/ai-config/issues/4635)).
+- In `PLANNER_RESPONSE` `tool_calls`, `invoke_subagent` places its subagent prompts inside `args.Subagents` (a JSON string or list of objects carrying `Prompt`, `Role`, and `TypeName`) alongside `args.toolAction` and `args.toolSummary`, rather than top-level `prompt` or `Prompt` keys ([ai-config#4635](https://github.com/Morrison-Lab/ai-config/issues/4635)).
 

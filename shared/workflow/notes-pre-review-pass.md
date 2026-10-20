@@ -55,7 +55,9 @@ State in the PR body that the checklist ran.
     cognitive or speech verbs on models or equations ("knows nothing", "decides", "says"),
     and imperative or exercise-prompt idioms ("Write $X$ as", "Fix $X$", "Take $X$", "Call $X$", "Say which/what/why")
     with literal wording,
-    per psw's [Use literal language](https://morrison-lab.github.io/psw/chapters/inclusive-writing.html#use-literal-language) ([`Morrison-Lab/psw#308`](https://github.com/Morrison-Lab/psw/pull/308)).
+    per psw's [Use literal language](https://morrison-lab.github.io/psw/chapters/inclusive-writing.html#use-literal-language)
+    ([`Morrison-Lab/psw#308`](https://github.com/Morrison-Lab/psw/pull/308),
+    [`Morrison-Lab/psw#309`](https://github.com/Morrison-Lab/psw/pull/309)).
 
 An item that fails on one div is checked on every div of the PR, per the sweep above.
 Recurrence: sds#268 (2026-10-17) drew an inline definition at least five times after the first correction, which is why item 5 now names the pattern.

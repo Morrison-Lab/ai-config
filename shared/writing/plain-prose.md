@@ -90,7 +90,8 @@ When PSW and this guidance disagree, PSW wins.
   ("Write $X$ as", "Fix $X$", "Take $X$", "Call $X$", "Say which/why" --- use "Express $X$ as", "Let $X$", "Consider $X$", "Denote $X$ by", "State which", or "Explain why").
   PSW's rules and table of literal alternatives live at
   [Writing for every reader](https://morrison-lab.github.io/psw/chapters/inclusive-writing.html#use-literal-language)
-  ([`Morrison-Lab/psw#308`](https://github.com/Morrison-Lab/psw/pull/308)).
+  ([`Morrison-Lab/psw#308`](https://github.com/Morrison-Lab/psw/pull/308),
+  [`Morrison-Lab/psw#309`](https://github.com/Morrison-Lab/psw/pull/309)).
   - **Do:** write "the estimates become very large" and "the residual is in $(-1, 1)$".
   - **Don't:** write "the estimates blow up" or "the residual lies in $(-1, 1)$".
 

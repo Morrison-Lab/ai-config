@@ -764,8 +764,8 @@ and checks `isEqual(index.projectFormats, Object.keys(_quarto.yml.format))`.
 When `_quarto.yml` omits `format:` and leaves format declarations to `_quarto-website.yml`,
 `Object.keys(_quarto.yml.format)` is `[]`,
 so `isEqual(["html", "revealjs"], [])` returns `false` (`missingReason: "formats"`).
-Every cross-chapter `.qmd` link then misses the `.quarto/idx/` cache and calls `resolveInputTargetForFile()`,
-which runs a full markdown parse and Pandoc title/crossref render of the target chapter on every link reference.
+Every cross-chapter `.qmd` link in `resolveProjectInputLinks()` (`src/project/types/website/website-utils.ts`) then misses the `.quarto/idx/` cache in `resolveInputTarget()` and re-runs `inputTargetIndex()`,
+which executes a full markdown parse and Pandoc title/crossref render of the target chapter on every link reference.
 On a book-scale website with dozens of cross-chapter links (`Morrison-Lab/lds`, 12 chapters and ~800 subfiles),
 this multiplies into hundreds of repeated full-chapter parses per build,
 exhausting the 12 GB V8 heap or hitting the 45-minute CI job timeout

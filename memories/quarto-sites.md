@@ -751,3 +751,38 @@ Rewording the heading changes the id, and the link still loads the page, just no
 - **Don't:** link to an automatically generated heading id and rely on the link checker to notice when a rewording breaks it.
 
 ([`Morrison-Lab/psc#6`](https://github.com/Morrison-Lab/psc/issues/6), 2026-10-10: tracks adding the ids to the headings the lab-manual stubs link to.)
+
+## Omitting `format:` from `_quarto.yml` in a profiled project invalidates every `.quarto/idx/` entry during link resolution
+
+In Quarto 1.10.18 (`src/project/project-index.ts`),
+`inputTargetIndex()` writes `.quarto/idx/<file>.qmd.json` with `projectFormats` set to the merged `context.config.format` keys
+(for example `["html", "revealjs"]` when rendering under `--profile website` with `_quarto-website.yml`).
+When `resolveProjectInputLinks()` resolves cross-chapter `.qmd` links during HTML rendering,
+`readInputTargetIndex()` reads bare `_quarto.yml` via `projectConfigFile()` without merging the active `--profile` configuration,
+and checks `isEqual(index.projectFormats, Object.keys(_quarto.yml.format))`.
+
+When `_quarto.yml` omits `format:` and leaves format declarations to `_quarto-website.yml`,
+`Object.keys(_quarto.yml.format)` is `[]`,
+so `isEqual(["html", "revealjs"], [])` returns `false` (`missingReason: "formats"`).
+Every cross-chapter `.qmd` link then misses the `.quarto/idx/` cache and calls `resolveInputTargetForFile()`,
+which runs a full markdown parse and Pandoc title/crossref render of the target chapter on every link reference.
+On a book-scale website with dozens of cross-chapter links (`Morrison-Lab/lds`, 12 chapters and ~800 subfiles),
+this multiplies into hundreds of repeated full-chapter parses per build,
+exhausting the 12 GB V8 heap or hitting the 45-minute CI job timeout
+([`Morrison-Lab/lds#1227`](https://github.com/Morrison-Lab/lds/pull/1227), [`Morrison-Lab/lds#1229`](https://github.com/Morrison-Lab/lds/issues/1229), 2026-10-20;
+reducing full-site HTML + RevealJS render time from >45 minutes to 55 seconds once fixed).
+
+A second defect in the same function compounds the miss when a pre-render script (such as `tools/skip-pdf-in-previews.py`) strips `pdf:` between passes:
+`readInputTargetIndexIfStillCurrent()` caches the on-disk `.quarto/idx/<file>.qmd.json` object in the in-memory `inputTargetIndexCache` map *before* checking `isEqual(formats2, projFormats)`,
+and `inputTargetIndex()` overwrites `.quarto/idx/<file>.qmd.json` on disk *without* updating `inputTargetIndexCache`.
+If `.quarto/idx/` on disk still holds entries written before `pdf:` was stripped (`projectFormats: ["html", "revealjs", "pdf"]`),
+the first `readInputTargetIndex()` call caches the 3-format entry in `inputTargetIndexCache`,
+rejects it because `_quarto.yml` now has 2 formats,
+re-indexes the file on disk with 2 formats,
+and leaves the stale 3-format object in `inputTargetIndexCache` for every subsequent lookup in the same process.
+
+- **Do:** declare matching top-level `format:` keys (`html: default`, `revealjs: default`, `pdf: default`) in `_quarto.yml` even when `_quarto-website.yml` supplies the per-format options,
+  so `readInputTargetIndex()` sees the same format keys as `inputTargetIndex()`.
+- **Do:** when a preview helper script (`skip-pdf-in-previews.py`) strips `pdf:` from `_quarto-website.yml`,
+  strip `pdf:` from `_quarto.yml` too and delete `.quarto/idx/` so stale `projectFormats` entries do not poison `inputTargetIndexCache`.
+- **Don't:** put `format:` keys only in a `--profile` file (`_quarto-website.yml`) while leaving `_quarto.yml` without a `format:` map.

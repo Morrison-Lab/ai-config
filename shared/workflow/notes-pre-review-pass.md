@@ -49,7 +49,13 @@ State in the PR body that the checklist ran.
    Each remark, source credit and citation supports the claim in the div that contains it, per psw's [What makes a citation relevant](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#what-makes-a-citation-relevant).
    Remove one the div does not need.
 10. **Literal wording (no idioms).**
-    Replace postural verbs for mathematical objects ("lies in", "lies between", "sits at"), money-word trade-off idioms ("costs", "buys", "at the price of"), and imperative mathematical idioms ("Write $X$ as", "Fix $X$", "Take $X$", "Call $X$") with literal wording, per psw's [Use literal language](https://morrison-lab.github.io/psw/chapters/inclusive-writing.html#use-literal-language) and [`Morrison-Lab/psw#308`](https://github.com/Morrison-Lab/psw/pull/308) (open as of 2026-10-20).
+    Replace postural or residency verbs for mathematical objects ("lies in", "lies between", "sits at", "lives in"),
+    money-word trade-off idioms ("costs", "buys", "at the price of"),
+    idioms for equality, zero, or special cases ("agree", "vanish", "recover"),
+    cognitive or speech verbs on models or equations ("knows nothing", "decides", "says"),
+    and imperative or exercise-prompt idioms ("Write $X$ as", "Fix $X$", "Take $X$", "Call $X$", "Say which/what/why")
+    with literal wording,
+    per psw's [Use literal language](https://morrison-lab.github.io/psw/chapters/inclusive-writing.html#use-literal-language) ([`Morrison-Lab/psw#308`](https://github.com/Morrison-Lab/psw/pull/308)).
 
 An item that fails on one div is checked on every div of the PR, per the sweep above.
 Recurrence: sds#268 (2026-10-17) drew an inline definition at least five times after the first correction, which is why item 5 now names the pattern.

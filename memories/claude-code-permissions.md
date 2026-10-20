@@ -134,6 +134,7 @@ blocks all `Read` and `Glob` access inside the agent's own workspace
 - **Do:** stage an isolated agent workspace under a root directory disjoint from every denied prefix (such as `/srv/...`),
   and assert in tests that the workspace path matches none of the configured `Read(//...)` deny prefixes.
 - **Do:** run every invocation of an untrusted or agent CLI (including `--version` smoke checks) under the same `env -i` and non-root `setpriv` UID/GID isolation as the main agent run, never in `before_script` as root with CI secrets in its environment (`HACtions !69`, 2026-10-19).
+- **Do:** invoke `node .../node_modules/@anthropic-ai/claude-code/cli-wrapper.cjs` rather than `.bin/claude` when installing `@anthropic-ai/claude-code` (`v2.1.267`) with `npm install --ignore-scripts`, because `--ignore-scripts` skips the `postinstall` (`install.cjs`) step that replaces the `bin/claude.exe` stub with the platform-native binary (`HACtions !69`, caught by pre-push adversarial review 2026-10-19).
 - **Don't:** pair `Read(./**)` with `Read(//tmp/**)` when the agent's current working directory is itself created inside `/tmp`.
 
 ## Parameter-scoped rules (`Tool(param:value)`) are valid only in deny/ask, never allow -- and an omitted parameter is never matched

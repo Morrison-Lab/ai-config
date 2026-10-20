@@ -99,13 +99,21 @@ def ensure_python_shim():
 
     shim_dir = Path(tempfile.mkdtemp(prefix="shellforms-python-shim-"))
     shim_path = shim_dir / "python"
+
+    # On Windows, always provide python.bat so native Windows callers and
+    # PATHEXT-based lookups find python regardless of symlink privileges.
+    if sys.platform == "win32":
+        bat_path = shim_dir / "python.bat"
+        bat_path.write_text(f'@echo off\r\n"{sys.executable}" %*\r\n', encoding="utf-8")
+
     try:
         shim_path.symlink_to(sys.executable)
     except (OSError, NotImplementedError):
-        if sys.platform == "win32":
-            bat_path = shim_dir / "python.bat"
-            bat_path.write_text(f'@echo off\r\n"{sys.executable}" %*\r\n', encoding="utf-8")
-        shim_path.write_text(f'#!/bin/sh\nexec "{sys.executable}" "$@"\n', encoding="utf-8")
+        # Fallback when symlink creation fails: write a POSIX shell script.
+        # Single-quote the path and escape internal single quotes to prevent
+        # backslash mangling or parameter expansion on paths with special chars.
+        posix_exe = Path(sys.executable).as_posix().replace("'", "'\\''")
+        shim_path.write_text(f"#!/bin/sh\nexec '{posix_exe}' \"$@\"\n", encoding="utf-8")
         try:
             shim_path.chmod(0o755)
         except OSError:
@@ -123,13 +131,14 @@ def interpreter_env(base_env=None):
     containing `python`, so a form that invokes `python` would fail as a harness
     failure for a reason that has nothing to do with the forms being compared.
     Resolving it from `sys.executable` fixes the common case; if `python` is
-    still missing (e.g. on Debian/Ubuntu systems with only python3), a transient
-    shim is created so forms invoking `python` run under `sys.executable`.
+    missing from this interpreter's directory (e.g. stock Debian/Ubuntu where
+    only python3 is in exe_dir), a transient shim is prepended to ensure child
+    shells execute under sys.executable rather than an unrelated host python.
     """
     env = dict(base_env if base_env is not None else os.environ)
     exe_dir = str(Path(sys.executable).parent)
     path = exe_dir + os.pathsep + env.get("PATH", "")
-    if shutil.which("python", path=path) is None:
+    if shutil.which("python", path=exe_dir) is None:
         shim_dir = ensure_python_shim()
         path = shim_dir + os.pathsep + path
     env["PATH"] = path

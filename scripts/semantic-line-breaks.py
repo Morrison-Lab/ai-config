@@ -93,6 +93,8 @@ _BLANK_RE = re.compile(r'^\s*$')
 _BQ_ALERT_RE = re.compile(r'^\[![A-Z]+\]\s*$')
 _HTML_COMMENT_RE = re.compile(r'^\s*<!--')
 _AT_DIRECTIVE_RE = re.compile(r'^\s*@[\w./-]+\.md\s*$')
+_QUARTO_DIV_RE = re.compile(r'^\s*:{3,}(\s*\{.*\}|\s*)$')
+_MATH_FENCE_RE = re.compile(r'^\s*\$\$\s*$')
 
 
 def _is_new_block(line: str) -> bool:
@@ -106,7 +108,9 @@ def _is_new_block(line: str) -> bool:
         _BQ_RE.match(line) or
         _BULLET_RE.match(line) or
         _HTML_COMMENT_RE.match(line) or
-        _AT_DIRECTIVE_RE.match(line)
+        _AT_DIRECTIVE_RE.match(line) or
+        _QUARTO_DIV_RE.match(line) or
+        _MATH_FENCE_RE.match(line)
     )
 
 
@@ -423,13 +427,27 @@ def reformat(original: str, changed: set[int] | None = None) -> str:
             i = j
             continue
 
+        # Multi-line display math blocks ($$ ... $$) --- pass through verbatim
+        if _MATH_FENCE_RE.match(line):
+            output.append(line)
+            j = i + 1
+            while j < len(lines) and not _MATH_FENCE_RE.match(lines[j]):
+                output.append(lines[j])
+                j += 1
+            if j < len(lines):
+                output.append(lines[j])
+                j += 1
+            i = j
+            continue
+
         # Pass-through: blank, heading, table row, horizontal rule,
-        # and @-import directives.
+        # @-import directives, and Quarto fenced div markers.
         if (not stripped or
                 _HEADING_RE.match(line) or
                 _TABLE_RE.match(line) or
                 _HR_RE.match(stripped) or
-                _AT_DIRECTIVE_RE.match(line)):
+                _AT_DIRECTIVE_RE.match(line) or
+                _QUARTO_DIV_RE.match(line)):
             output.append(line)
             i += 1
             continue

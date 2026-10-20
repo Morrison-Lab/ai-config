@@ -44,8 +44,10 @@ State in the PR body that the checklist ran.
    Every "estimate", "smallest" or "best" names its target, as in psw's [estimand rule](https://morrison-lab.github.io/psw/chapters/defining-terms.html).
    A vague verb such as "generalizes" or "captures" gives way to the relation it stands for, stated in the definition.
 9. **Relevance.**
-   Each remark, source credit and citation supports the claim in the div it sits in, per psw's [What makes a citation relevant](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#what-makes-a-citation-relevant).
+   Each remark, source credit and citation supports the claim in the div that contains it, per psw's [What makes a citation relevant](https://morrison-lab.github.io/psw/chapters/citations-evidence.html#what-makes-a-citation-relevant).
    Remove one the div does not need.
+10. **Literal wording (no idioms).**
+    Replace postural verbs for mathematical objects ("lies in", "lies between", "sits at"), money-word trade-off idioms ("costs", "buys", "at the price of"), and imperative mathematical idioms ("Write $X$ as", "Fix $X$", "Take $X$", "Call $X$") with literal wording, per psw's [Use literal language](https://morrison-lab.github.io/psw/chapters/inclusive-writing.html#use-literal-language).
 
 An item that fails on one div is checked on every div of the PR, per the sweep above.
 Recurrence: sds#268 (2026-10-17) drew an inline definition at least five times after the first correction, which is why item 5 now names the pattern.

@@ -668,7 +668,7 @@ case([bash("gh pr create -R o1/r --title a", tid="a"),
 # CURRENT branch's own PR (#1038, learned from the ready result). A whole-string
 # identity scan matched the decoy `pr view 42` and mislabeled the obligation as
 # #42 -- so a later, entirely unrelated request for #42 discharged the (real,
-# unreviewed) #1038. open_ident scopes identity to the `gh pr ready` command
+# unreviewed) #1038. _opens_in scopes identity to the `gh pr ready` command
 # itself, so the obligation is #1038 (backfilled from its result) and the #42
 # request cannot clear it.
 case([bash("gh pr view 42 && gh pr ready", tid="c"),
@@ -924,7 +924,7 @@ case(create("c") + [
 # usage. RX_CMD_VERB needs a digit, so the command yields no number and the
 # obligation is appended with num=None. gh's success line is `Pull request
 # owner/repo#N is marked as "ready for review"` -- an owner/repo#N shape
-# result_ident must recognize, or the number never backfills and _clear() (which
+# result_idents must recognize, or the number never backfills and _clear() (which
 # will not touch a num=None obligation) can NEVER discharge it: the guard would
 # then block every message for the rest of the session (a wedge).
 READY_OUT = 'Pull request o/r#1038 is marked as "ready for review"'

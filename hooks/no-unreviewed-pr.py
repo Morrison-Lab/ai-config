@@ -1686,34 +1686,6 @@ def _exempt(obligations, live, num, repo):
     live.pop(num, None)
 
 
-def _argv_open(argv):
-    """(is_open, num, repo) for one simple command's argv: a create/ready open.
-
-    Structural and gh-SCOPED, exactly like _argv_draft/_argv_request. Identity
-    comes from the open command ITSELF, so a decoy PR verb earlier in a chained
-    command (`gh pr view 42 && gh pr ready`) cannot misattribute the obligation's
-    number. A `gh pr create`'s number is never in the command -- it comes from
-    the result -- so num is None for create; a `gh pr ready [<N>]` carries a
-    number only when one is given explicitly (a bare `gh pr ready` yields None,
-    backfilled from the ready command's own `owner/repo#N` result).
-    """
-    if not argv or argv[0] != "gh" or len(argv) < 3 or argv[1] != "pr":
-        return False, None, None
-    if _has_flag(argv[2:], "--help", "-h"):
-        return False, None, None
-    if argv[2] == "create":
-        if _has_flag(argv[3:], "--draft", "-d"):
-            return False, None, None
-        _, repo = _verb_ident(argv)
-        return True, None, repo          # a create's number is in its result
-    if argv[2] == "ready":
-        if _has_flag(argv[3:], "--undo"):
-            return False, None, None
-        num, repo = _verb_ident(argv)
-        return True, num, repo
-    return False, None, None
-
-
 def _opens_in(cmd):
     """([(index, num, repo, create_idx)], split) for every open (create/ready) in `cmd`.
 
@@ -1750,26 +1722,6 @@ def _opens_in(cmd):
                 num, repo = _verb_ident(argv)
                 found.append((i, num, repo, None))
     return found, split
-
-
-def open_ident(cmd, _opens=None):
-    """(is_open, num, repo) from the FIRST `gh pr create`/`gh pr ready` simple command.
-
-    Mirrors draft_ident/request_ident: the OPEN identity is located
-    structurally from the create/ready command, never from the whole raw string.
-    A whole-string search (the old cmd_ident) matched a decoy PR number chained ahead
-    (`gh pr checks 1029 && gh pr ready`), mislabeled the obligation, and let a later
-    unrelated request for that decoy PR silently discharge the real one. Returns
-    (True, None, repo) when no open command carries a number -- the bare `gh pr ready`
-    case -- so the number backfills from the open's own result instead. Returns
-    (False, None, None) when no open command matches. On a parse error, falls back
-    to RX_OPEN string search with no identity (is_open, None, None).
-    """
-    found, _split = _opens_in(cmd) if _opens is None else _opens
-    if not found:
-        return False, None, None
-    _i, num, repo, _cidx = found[0]
-    return True, num, repo
 
 
 # Tools whose input is a SHELL COMMAND. Matching CLI patterns against any
@@ -1844,9 +1796,8 @@ RX_TERMINAL_STATE = re.compile(
 # request paths use instead precisely so a pull path quoted in a payload cannot
 # supply identity (ai-config#3086 review). Open, draft, and request identity are
 # all resolved STRUCTURALLY from the specific simple command
-# (open_ident/draft_ident/request_ident), never from a whole-string scan -- a
-# decoy PR number chained ahead would otherwise mislabel the obligation (see
-# open_ident).
+# (_opens_in/draft_ident/request_ident), never from a whole-string scan -- a
+# decoy PR number chained ahead would otherwise mislabel the obligation.
 RX_CMD_API = re.compile(r"repos/([\w.-]+)/([\w.-]+)/pulls?/(\d+)", re.I)
 
 # The same path with NOTHING after the number, used by _argv_probe to spot an
@@ -1896,7 +1847,7 @@ RX_RES_API = re.compile(r"repos/([\w.-]+)/([\w.-]+)/pulls?/(\d+)", re.I)
 # `gh pr ready`/`gh pr create` print `... Pull request owner/repo#N ...` (e.g.
 # `Pull request o/r#42 is marked as "ready for review"`). A BARE `gh pr ready`
 # (no number -- the ordinary way to ready the current branch's PR) carries no
-# number in the command, so open_ident yields None and the obligation is
+# number in the command, so _opens_in yields num=None and the obligation is
 # appended with num=None. Without recognizing this result shape the number never
 # backfills, and _clear() (which refuses to touch a num=None obligation) can
 # never discharge it -- a bare `gh pr ready` would then block every message for
@@ -1975,14 +1926,6 @@ def result_idents(body):
                 continue
         results.append((num, repo))
     return results
-
-
-def result_ident(body):
-    """(num, repo) parsed from a tool_result body string."""
-    idents = result_idents(body)
-    if idents:
-        return idents[0]
-    return None, None
 
 
 _OBL_SEQ = 0
@@ -2787,7 +2730,7 @@ def scan(path):
                 # `gh pr create`/`ready` is always a leading command word and a
                 # quoted example must not forge an obligation. IDENTITY (which
                 # PR) is resolved STRUCTURALLY from the specific simple command
-                # by open_ident/draft_ident/request_ident -- never a whole-string
+                # by _opens_in/draft_ident/request_ident -- never a whole-string
                 # scan, which matched a decoy PR number chained ahead
                 # (`gh pr view 42 && gh pr ready`) and mislabeled the obligation.
                 cmd_open = _scrub_all(cmd_raw)

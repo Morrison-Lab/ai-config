@@ -541,6 +541,19 @@ try:
 finally:
     os.unlink(_tp3)
 
+# Test Antigravity GENERIC tool result vs PLANNER_RESPONSE (ai-config#4635)
+_tp_generic = transcript([
+    {"source": "MODEL", "type": "GENERIC", "content": "git log output"},
+])
+try:
+    _d = hook.transcript_derivations(_tp_generic)
+    ok = len(_d[0]) == 0 and len(_d[1]) == 0
+    wrong += not ok
+    print(f"  {'ok    ' if ok else 'WRONG '} Antigravity GENERIC tool result is not assistant message")
+    CONTRACT_EXTRA += 1
+finally:
+    os.unlink(_tp_generic)
+
 # ------------------------------------------------------------- own-item scope
 #
 # AGG_FOREIGN subtracts a count about somebody else's forge item. This corpus

@@ -1383,5 +1383,25 @@ if subject.asserts_session_done("**Stopping Point**: Not a clean stopping point 
 else:
     print("PASS: asserts_session_done correctly rejects session not done")
 
+# Antigravity transcript format: GENERIC tool result vs PLANNER_RESPONSE (ai-config#4635)
+raw_ag_with_generic = [
+    json.dumps({"source": "MODEL", "type": "PLANNER_RESPONSE", "content": "**Stopping Point**: Clean stopping point reached --- session done; UMS executed; no follow-up items pending."}),
+    json.dumps({"source": "MODEL", "type": "GENERIC", "content": "tool stdout without stopping point"}),
+]
+if run("", raw_lines=raw_ag_with_generic):
+    print("FAIL: Antigravity GENERIC tool result overwrote last_text and warned")
+    failed += 1
+else:
+    print("PASS: Antigravity GENERIC tool result does not overwrite assistant prose")
+
+raw_ag_missing = [
+    json.dumps({"source": "MODEL", "type": "PLANNER_RESPONSE", "content": "Assistant finished work without stopping point."}),
+]
+if not run("", raw_lines=raw_ag_missing):
+    print("FAIL: Antigravity PLANNER_RESPONSE without stopping point did not warn")
+    failed += 1
+else:
+    print("PASS: Antigravity PLANNER_RESPONSE without stopping point warns")
+
 raise SystemExit(bool(failed))
 

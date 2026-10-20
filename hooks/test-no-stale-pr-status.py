@@ -1238,6 +1238,14 @@ CASES = [
           }}]}},
       say("All checks green at this head.")], True,
      "edit tool mentioning query vocabulary must not count as fresh status query"),
+
+    # Antigravity transcript format: GENERIC tool result vs PLANNER_RESPONSE (ai-config#4635)
+    ([QUERY, PUSH,
+      {"source": "MODEL", "type": "GENERIC", "content": "All checks green at this head."}], False,
+     "Antigravity GENERIC tool result containing stale status claim is not assistant prose"),
+    ([QUERY, PUSH,
+      {"source": "MODEL", "type": "PLANNER_RESPONSE", "content": "All checks green at this head."}], True,
+     "Antigravity PLANNER_RESPONSE containing stale status claim blocks"),
 ]
 
 

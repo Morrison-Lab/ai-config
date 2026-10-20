@@ -483,6 +483,11 @@ CASES = [
     (HAZARD_42_CONTENT_KEY + [say("Reported to the user: Ready for merge.")],
      True, "a nested block keyed `content` is still scanned for the hazard"),
 
+    # Antigravity transcript format: GENERIC tool result vs PLANNER_RESPONSE (ai-config#4635)
+    (HAZARD_42 + [{"source": "MODEL", "type": "GENERIC", "content": "Ready for merge."}],
+     False, "Antigravity GENERIC tool result containing clean claim is not assistant prose"),
+    (HAZARD_42 + [{"source": "MODEL", "type": "PLANNER_RESPONSE", "content": "Ready for merge."}],
+     True, "Antigravity PLANNER_RESPONSE containing clean claim over hazard warns"),
 ]
 
 

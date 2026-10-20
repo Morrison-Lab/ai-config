@@ -565,8 +565,6 @@ def scan(path):
             rec_type = "user"
         elif rec_type == "PLANNER_RESPONSE" or rec_type == "assistant" or m.get("role") == "assistant":
             rec_type = "assistant"
-        elif rec_type == "GENERIC" or m.get("type") == "tool_result":
-            rec_type = "tool_result"
 
         for b in blocks:
             if not isinstance(b, dict):

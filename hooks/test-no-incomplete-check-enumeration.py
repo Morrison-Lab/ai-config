@@ -547,6 +547,16 @@ CASES = [
       say("Waiting for the verdict on #651 -- ready to merge.")],
      "block",
      "#4468 negative control: general text mentioning 'verdict' before 'ready to merge' still blocks"),
+
+    # Antigravity transcript format: GENERIC tool result vs PLANNER_RESPONSE (ai-config#4635)
+    ([PARTIAL,
+      {"source": "MODEL", "type": "GENERIC", "content": "#651 is fully clean."}],
+     "allow",
+     "Antigravity GENERIC tool result containing clean claim is not assistant prose"),
+    ([PARTIAL,
+      {"source": "MODEL", "type": "PLANNER_RESPONSE", "content": "#651 is fully clean."}],
+     "block",
+     "Antigravity PLANNER_RESPONSE containing unverified clean claim blocks"),
 ]
 
 # ai-config#4468: CI environment cases (events, extra_env, want, label)

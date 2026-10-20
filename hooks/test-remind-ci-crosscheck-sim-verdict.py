@@ -112,6 +112,10 @@ REMIND = [
     # `gh pr checks` reports state, never a verdict figure.
     ([LOCAL, bash("gh pr checks 1374 -R Lacaedemon/sparta"), CLAIM],
      "gh pr checks is check STATE, not a CI-side figure"),
+
+    # Antigravity transcript format: GENERIC tool result vs PLANNER_RESPONSE (ai-config#4635)
+    ([LOCAL, {"source": "MODEL", "type": "PLANNER_RESPONSE", "content": "Locally this still reports `uid0 overlap worst=1.611`."}],
+     "Antigravity PLANNER_RESPONSE containing sim figure reminds"),
 ]
 
 SILENT = [
@@ -163,6 +167,10 @@ SILENT = [
      "a SUBAGENT's message is not my outgoing message"),
     ([bash("tools/demo/dump-state.sh x.json 8 /tmp/tx", sidechain=True), CLAIM],
      "a SUBAGENT's local run does not arm the guard"),
+
+    # Antigravity transcript format: GENERIC tool result vs PLANNER_RESPONSE (ai-config#4635)
+    ([LOCAL, {"source": "MODEL", "type": "GENERIC", "content": "uid0 overlap worst=1.611"}],
+     "Antigravity GENERIC tool result is not assistant prose"),
 ]
 
 

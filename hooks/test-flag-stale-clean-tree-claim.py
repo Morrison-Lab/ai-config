@@ -177,6 +177,24 @@ CASES = [
         False,
         "Backtick-quoted phrase in prose does not trigger clean assertion",
     ),
+
+    # Antigravity transcript format: GENERIC tool result vs PLANNER_RESPONSE (ai-config#4635)
+    (
+        [
+            bash_tool("git checkout -q origin/main -- website/"),
+            {"source": "MODEL", "type": "GENERIC", "content": "Working tree clean, ready to wrap up."},
+        ],
+        False,
+        "Antigravity GENERIC tool result containing clean claim is not assistant prose",
+    ),
+    (
+        [
+            bash_tool("git checkout -q origin/main -- website/"),
+            say_ag("Working tree clean, ready to wrap up."),
+        ],
+        True,
+        "Antigravity PLANNER_RESPONSE containing clean claim warns",
+    ),
 ]
 
 

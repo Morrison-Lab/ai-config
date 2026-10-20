@@ -145,6 +145,9 @@ CASES = [
 
     # Antigravity format cases
     ([
+        {"source": "MODEL", "type": "GENERIC", "content": "FLAG -- a mechanism bug worth its own issue. Moving on."}
+    ], False, "Antigravity GENERIC tool result containing unfiled finding is not assistant prose"),
+    ([
         {"source": "MODEL", "type": "PLANNER_RESPONSE", "content": "FLAG -- a mechanism bug worth its own issue. Moving on."}
     ], True, "antigravity declarative unfiled finding blocks"),
     ([

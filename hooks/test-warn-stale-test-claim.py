@@ -327,6 +327,11 @@ CASES = [
       say("All tests pass.")], False,
      "'perl -Ilib' (an unrelated include-path flag) is not an in-place edit"),
 
+    # Antigravity transcript format: GENERIC tool result vs PLANNER_RESPONSE (ai-config#4635)
+    ([edit(), {"source": "MODEL", "type": "GENERIC", "content": "All 25 probe cases pass."}], False,
+     "Antigravity GENERIC tool result containing test pass claim is not assistant prose"),
+    ([edit(), {"source": "MODEL", "type": "PLANNER_RESPONSE", "content": "All 25 probe cases pass."}], True,
+     "Antigravity PLANNER_RESPONSE containing stale test claim warns"),
 ]
 
 

@@ -78,15 +78,20 @@ When PSW and this guidance disagree, PSW wins.
   and neurodiverse readers.**
   Use literal words, not idioms or slang,
   and spell out abbreviations and hidden steps.
-  This includes postural verbs used for numbers, sets, or distributions
-  ("lies in", "lies between", "sits at" --- use "is in", "is between", or "has [quantity]")
-  and imperative mathematical idioms
-  ("Write $X$ as", "Fix $X$", "Take $X$", "Call $X$" --- use "Express $X$ as", "Let $X$", "Consider $X$", "Denote $X$ by").
+  This includes postural or residency verbs used for numbers, sets, or distributions
+  ("lies in", "lies between", "sits at", "lives in" --- use "is in", "is between", or "has [quantity]"),
+  verbs that stand in for equality, zero, or special cases
+  ("agree" --- use "are equal" or "give the same result";
+  "vanish" --- use "equal $0$", "converge to $0$", or "cancel";
+  "recover" --- use "give", "equal", or "reduce to"),
+  cognitive or speech verbs applied to models or equations
+  ("the model knows nothing about $[0, 1]$", "the boundary decides" --- state the constraint or condition),
+  and imperative or exercise-prompt idioms
+  ("Write $X$ as", "Fix $X$", "Take $X$", "Call $X$", "Say which/why" --- use "Express $X$ as", "Let $X$", "Consider $X$", "Denote $X$ by", "State which", or "Explain why").
   PSW's rules and table of literal alternatives live at
-  [Writing for every reader](https://morrison-lab.github.io/psw/chapters/inclusive-writing.html#use-literal-language),
-  with the postural-verb and `Take`/`Call` rows proposed in
-  [`Morrison-Lab/psw#308`](https://github.com/Morrison-Lab/psw/pull/308)
-  (open as of 2026-10-20).
+  [Writing for every reader](https://morrison-lab.github.io/psw/chapters/inclusive-writing.html#use-literal-language)
+  ([`Morrison-Lab/psw#308`](https://github.com/Morrison-Lab/psw/pull/308),
+  [`Morrison-Lab/psw#309`](https://github.com/Morrison-Lab/psw/pull/309)).
   - **Do:** write "the estimates become very large" and "the residual is in $(-1, 1)$".
   - **Don't:** write "the estimates blow up" or "the residual lies in $(-1, 1)$".
 

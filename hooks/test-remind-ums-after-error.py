@@ -61,6 +61,8 @@ REMIND = [
     # match (SILENT below) or losing a real admission (these). A suite carrying
     # only one side cannot tell a correct anchor from an over-tightened one.
     ([txt("I was wrong about this.")], "first person: was wrong"),
+    ([{"source": "MODEL", "type": "PLANNER_RESPONSE", "content": "I was wrong about this."}],
+     "Antigravity PLANNER_RESPONSE with admission reminds"),
     ([txt("I got that wrong.")], "first person: got that wrong"),
     ([txt("I mischaracterized it.")], "first person: mischaracterized"),
     ([txt("I incorrectly claimed success.")], "first person: adverb form"),
@@ -341,6 +343,22 @@ SILENT = [
      "`/memorize` at the start of a prompt still discharges"),
     ([ADMIT, tool("Bash", {"command": "echo /record-learnings"})],
      "`/record-learnings` still discharges"),
+
+    # Antigravity transcript format: GENERIC tool result vs invoke_subagent dispatches (ai-config#4635)
+    ([{"source": "MODEL", "type": "GENERIC", "content": "Checking that again -- I was wrong about that."}],
+     "Antigravity GENERIC tool result with admission is not assistant prose"),
+    ([ADMIT, {"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "name": "invoke_subagent", "input": {"Subagents": [{"Prompt": "Run UMS pass"}]}}]}}],
+     "invoke_subagent with Subagents list discharges UMS"),
+    ([ADMIT, {"source": "MODEL", "type": "PLANNER_RESPONSE", "tool_calls": [
+        {"name": "invoke_subagent", "args": {"Subagents": [{"Prompt": "Run UMS pass"}]}}]}],
+     "Antigravity PLANNER_RESPONSE invoke_subagent discharges UMS"),
+    ([ADMIT, {"source": "MODEL", "type": "PLANNER_RESPONSE", "tool_calls": [
+        {"name": "invoke_subagent", "args": {"Subagents": "[{\"Prompt\": \"Run UMS pass\"}]"}}]}],
+     "Antigravity invoke_subagent with JSON string Subagents discharges UMS"),
+    ([ADMIT, {"source": "MODEL", "type": "PLANNER_RESPONSE", "tool_calls": [
+        {"name": "invoke_subagent", "args": {"toolAction": "Running UMS pass", "Subagents": []}}]}],
+     "Antigravity invoke_subagent with toolAction discharges UMS"),
 ]
 
 # ai-config#1965, the FALSE-positive half. `\b` treats `-`, `/`, and `.` as

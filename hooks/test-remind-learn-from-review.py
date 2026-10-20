@@ -163,6 +163,18 @@ CASES = [
      False, "the slash-command spelling `/ums` still discharges"),
     ([REVIEW, ACCEPT, tool("Bash", {"command": "ls skills/ums"})],
      True, "a path ending in `ums` does not discharge"),
+
+    # Antigravity transcript format: GENERIC tool result vs invoke_subagent dispatches (ai-config#4635)
+    ([REVIEW, {"source": "MODEL", "type": "GENERIC", "content": "Good catch, I will fix that."}],
+     False, "Antigravity GENERIC tool result containing acceptance is not assistant prose"),
+    ([REVIEW, {"source": "MODEL", "type": "PLANNER_RESPONSE", "content": "Good catch from the reviewer, I will fix that."}],
+     True, "Antigravity PLANNER_RESPONSE containing acceptance reminds"),
+    ([REVIEW, ACCEPT, {"source": "MODEL", "type": "PLANNER_RESPONSE", "tool_calls": [
+        {"name": "invoke_subagent", "args": {"Subagents": [{"Prompt": "Run UMS pass"}]}}]}],
+     False, "Antigravity invoke_subagent discharges review acceptance"),
+    ([REVIEW, ACCEPT, {"source": "MODEL", "type": "PLANNER_RESPONSE", "tool_calls": [
+        {"name": "invoke_subagent", "args": {"toolAction": "Running UMS pass", "Subagents": []}}]}],
+     False, "Antigravity invoke_subagent with toolAction discharges review acceptance"),
 ]
 
 

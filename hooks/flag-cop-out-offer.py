@@ -132,7 +132,7 @@ def last_visible_texts(path):
                         raw = (m.get("message") or {}).get("content") or m.get("content")
                         if isinstance(raw, str) and raw.strip():
                             last_text = raw
-                elif m.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or m.get("source") == "MODEL":
+                elif m.get("type") == "PLANNER_RESPONSE":
                     content = m.get("content")
                     if isinstance(content, str) and content.strip():
                         last_text = content

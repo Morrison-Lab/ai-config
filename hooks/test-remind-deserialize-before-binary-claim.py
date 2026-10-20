@@ -241,9 +241,15 @@ REMIND = [
     ([ESCALATE_ABSOLUTE, OTHER_ABSOLUTE_CHECK],
      "PATH-SCOPED for absolute paths: a different /scratch path must not "
      "discharge"),
+    # Antigravity transcript format: GENERIC tool result vs PLANNER_RESPONSE (ai-config#4635)
+    ([NAME_ONLY, {"source": "MODEL", "type": "PLANNER_RESPONSE", "content": "🛑 **BLOCKER** `inst/extdata/ett-validation-true-effects.rds` changed. Your call: regenerate?"}],
+     "Antigravity PLANNER_RESPONSE containing binary artifact blocker reminds"),
 ]
 
 SILENT = [
+    # Antigravity transcript format: GENERIC tool result vs PLANNER_RESPONSE (ai-config#4635)
+    ([NAME_ONLY, {"source": "MODEL", "type": "GENERIC", "content": "🛑 **BLOCKER** `inst/extdata/ett-validation-true-effects.rds` changed. Your call: regenerate?"}],
+     "Antigravity GENERIC tool result is not assistant prose"),
     ([MENTION_ONLY],
      "mentions an .rds path with no escalation signal"),
     ([ESCALATE_TEXT_FILE],

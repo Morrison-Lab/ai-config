@@ -85,6 +85,9 @@ multiline_pushed = transcript(["git commit -m hook", "git add .\ngit push origin
 antigravity_unshipped = antigravity_transcript(["git commit -m hook"])
 antigravity_pushed = antigravity_transcript(["git commit -m hook", "git push origin branch"])
 antigravity_text = antigravity_transcript(["git commit -m x"], assistant_text="Antigravity done.")
+handle, antigravity_generic = tempfile.mkstemp()
+with os.fdopen(handle, "w") as stream:
+    stream.write(json.dumps({"source": "MODEL", "type": "GENERIC", "content": "tool stdout content"}) + "\n")
 
 openai_unshipped = openai_transcript(["git commit -m hook"])
 openai_pushed = openai_transcript(["git commit -m hook", "git push origin branch"])
@@ -329,6 +332,7 @@ try:
     assert subject.pending_commit(antigravity_unshipped) == "git commit -m hook", "antigravity unshipped commit must arm"
     assert subject.pending_commit(antigravity_pushed) is None, "antigravity push must discharge"
     assert subject.last_assistant_text(antigravity_text) == "Antigravity done."
+    assert subject.last_assistant_text(antigravity_generic) == "", "Antigravity GENERIC tool result is not assistant prose"
     assert subject.pending_commit(openai_unshipped) == "git commit -m hook", "openai unshipped commit must arm"
     assert subject.pending_commit(openai_pushed) is None, "openai push must discharge"
 finally:
@@ -340,6 +344,7 @@ finally:
     os.unlink(antigravity_unshipped)
     os.unlink(antigravity_pushed)
     os.unlink(antigravity_text)
+    os.unlink(antigravity_generic)
     os.unlink(openai_unshipped)
     os.unlink(openai_pushed)
     os.unlink(malformed_path)

@@ -806,6 +806,16 @@ CASES = [
     ([say("Going forward I'll always check this before replying."),
       bash("git add--interactive shared/workflow/fully-clean.md")],
      True, "`git add--interactive` is excluded with the rest of the group"),
+
+    # Antigravity transcript format: GENERIC tool result vs invoke_subagent dispatches (ai-config#4635)
+    ([{"source": "MODEL", "type": "GENERIC", "content": "Going forward I will always check this before replying."}],
+     False, "Antigravity GENERIC tool result containing promise is not assistant prose"),
+    ([{"source": "MODEL", "type": "PLANNER_RESPONSE", "content": "Going forward I will always check this before replying."}],
+     True, "Antigravity PLANNER_RESPONSE containing promise blocks"),
+    ([{"source": "MODEL", "type": "PLANNER_RESPONSE", "content": "Going forward I will always check this before replying."},
+      {"source": "MODEL", "type": "PLANNER_RESPONSE", "tool_calls": [
+          {"name": "invoke_subagent", "args": {"Subagents": [{"Prompt": "run ums to record this"}]}}]}],
+     False, "Antigravity invoke_subagent with Subagents discharges promise"),
 ]
 
 

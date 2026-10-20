@@ -163,7 +163,7 @@ def last_assistant_text(path):
                                 last_reply = payload
                     elif isinstance(blocks, str) and blocks.strip():
                         last_text = blocks
-                elif m.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or m.get("source") == "MODEL":
+                elif m.get("type") == "PLANNER_RESPONSE":
                     content = m.get("content")
                     if isinstance(content, str) and content.strip():
                         last_text = content

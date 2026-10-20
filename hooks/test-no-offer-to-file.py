@@ -349,6 +349,12 @@ CASES = [
         True,
         "reply-tool offer wins over clean narration",
     ),
+
+    # Antigravity transcript format: GENERIC tool result vs PLANNER_RESPONSE (ai-config#4635)
+    ([TOOL, {"source": "MODEL", "type": "GENERIC", "content": "Want me to file an issue for this?"}], False,
+     "Antigravity GENERIC tool result containing offer is not assistant prose"),
+    ([TOOL, {"source": "MODEL", "type": "PLANNER_RESPONSE", "content": "Want me to file an issue for this?"}], True,
+     "Antigravity PLANNER_RESPONSE containing offer blocks"),
 ]
 
 

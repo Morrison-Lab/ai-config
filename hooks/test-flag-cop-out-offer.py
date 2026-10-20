@@ -148,6 +148,12 @@ CASES = [
         "Internal note: the merge landed cleanly.",
         "Done. Say the word and I'll open the follow-up PR.")], True,
      "an offer in the reply wins over clean narration"),
+
+    # Antigravity transcript format: GENERIC tool result vs PLANNER_RESPONSE (ai-config#4635)
+    ([{"source": "MODEL", "type": "GENERIC", "content": "Say the word and I'll push."}], False,
+     "Antigravity GENERIC tool result containing offer is not assistant prose"),
+    ([{"source": "MODEL", "type": "PLANNER_RESPONSE", "content": "Say the word and I'll push."}], True,
+     "Antigravity PLANNER_RESPONSE containing offer warns"),
 ]
 
 

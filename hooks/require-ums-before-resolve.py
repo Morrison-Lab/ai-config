@@ -78,30 +78,71 @@ def ums_since_last_user_message(path, ums_word):
             if not isinstance(rec, dict) or rec.get("isSidechain"):
                 continue
             role = rec.get("type") or rec.get("role")
+            if rec.get("source") == "USER_EXPLICIT" or role == "USER_INPUT" or role == "user":
+                role = "user"
+            elif role == "PLANNER_RESPONSE" or role == "assistant" or rec.get("role") == "assistant":
+                role = "assistant"
+
             if role == "user":
                 if (text_of(rec) or "").strip():
                     last_user = i
                 continue
             if role != "assistant":
                 continue
+            tool_calls = []
             blocks = (rec.get("message") or {}).get("content") or rec.get("content") or []
             for b in blocks if isinstance(blocks, list) else []:
-                if not isinstance(b, dict) or b.get("type") != "tool_use":
-                    continue
-                name = (b.get("name") or "").lower()
-                inp = b.get("input") if isinstance(b.get("input"), dict) else {}
-                blob = ""
-                if name in WRITE_TOOLS:
+                if isinstance(b, dict) and b.get("type") == "tool_use":
+                    tool_calls.append((b.get("name") or "", b.get("input") or {}))
+            if rec.get("type") == "PLANNER_RESPONSE" or "tool_calls" in rec:
+                for tc in rec.get("tool_calls") or []:
+                    if isinstance(tc, dict):
+                        tname = tc.get("name") or (tc.get("function") or {}).get("name") or ""
+                        targs = tc.get("args") or tc.get("input") or (tc.get("function") or {}).get("arguments") or {}
+                        if isinstance(targs, str):
+                            try:
+                                targs = json.loads(targs)
+                            except Exception:
+                                targs = {"command": targs}
+                        tool_calls.append((tname, targs if isinstance(targs, dict) else {}))
+
+            for name, inp in tool_calls:
+                name_low = (name or "").lower()
+                if not isinstance(inp, dict):
+                    inp = {}
+                if name_low in WRITE_TOOLS:
                     target = str(inp.get("file_path") or inp.get("path") or inp.get("TargetFile") or "")
                     if UMS_PATH.search(target):
                         evidence = i
                     continue
-                if name in AGENT_TOOLS:
-                    blob = str(inp.get("prompt") or "") + str(inp.get("description") or "")
-                elif name in BASH_TOOLS:
-                    blob = str(inp.get("command") or "")
-                elif name == "skill":
-                    blob = str(inp.get("skill") or "")
+                blob = ""
+                if name_low in AGENT_TOOLS:
+                    ums_parts = [
+                        str(inp.get("prompt") or inp.get("Prompt") or ""),
+                        str(inp.get("description") or ""),
+                        str(inp.get("toolAction") or ""),
+                        str(inp.get("toolSummary") or ""),
+                    ]
+                    subagents = inp.get("Subagents") or inp.get("subagents")
+                    if isinstance(subagents, str):
+                        try:
+                            subagents = json.loads(subagents)
+                        except Exception:
+                            ums_parts.append(subagents)
+                            subagents = None
+                    if isinstance(subagents, list):
+                        for sa in subagents:
+                            if isinstance(sa, dict):
+                                ums_parts.append(str(sa.get("Prompt") or sa.get("prompt") or ""))
+                                ums_parts.append(str(sa.get("Role") or sa.get("role") or ""))
+                                ums_parts.append(str(sa.get("TypeName") or sa.get("typeName") or ""))
+                            elif isinstance(sa, str):
+                                ums_parts.append(sa)
+                    blob = " ".join(ums_parts)
+                elif name_low in BASH_TOOLS:
+                    blob = str(inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or "")
+                elif name_low == "skill":
+                    blob = str(inp.get("skill") or "") + " " + str(inp.get("args") or "")
                 if blob and ums_word.search(blob):
                     evidence = i
     return evidence > last_user

@@ -1035,7 +1035,7 @@ def transcript_derivations(path):
                             "input": targs if isinstance(targs, dict) else {},
                         })
 
-            is_assistant = m.get("type") == "assistant" or m.get("role") == "assistant" or m.get("source") == "MODEL" or m.get("type") in {"PLANNER_RESPONSE", "GENERIC"}
+            is_assistant = m.get("type") == "assistant" or m.get("role") == "assistant" or m.get("type") == "PLANNER_RESPONSE"
             if is_assistant:
                 if m.get("isSidechain"):
                     continue

@@ -433,6 +433,34 @@ def main() -> int:
         else:
             print("reply-tool: reply-tool quote wins over safe narration")
 
+        # Antigravity transcript format: GENERIC tool result vs PLANNER_RESPONSE (ai-config#4635)
+        def run_ag(ev):
+            tdir = Path(tempfile.mkdtemp())
+            tpath = tdir / "t.jsonl"
+            tpath.write_text(json.dumps(ev) + "\n", encoding="utf-8")
+            env = dict(os.environ)
+            env["CLAUDE_PLUGIN_ROOT"] = str(root)
+            env["TMPDIR"] = str(tdir / ".tmp")
+            env["TEMP"] = env["TMP"] = env["TMPDIR"]
+            Path(env["TMPDIR"]).mkdir(parents=True, exist_ok=True)
+            proc = subprocess.run(
+                [sys.executable, str(hook)],
+                input=json.dumps({"transcript_path": str(tpath)}),
+                capture_output=True, text=True, cwd=str(root), env=env)
+            shutil.rmtree(tdir, ignore_errors=True)
+            out = proc.stdout.strip()
+            return json.loads(out).get("reason") if out else None
+
+        if run_ag({"source": "MODEL", "type": "GENERIC", "content": incident_text}):
+            failures.append("Antigravity GENERIC tool result containing quote blocked")
+        else:
+            print("antigravity: GENERIC tool result containing quote passes (not assistant prose)")
+
+        if not run_ag({"source": "MODEL", "type": "PLANNER_RESPONSE", "content": incident_text}):
+            failures.append("Antigravity PLANNER_RESPONSE containing misattributed quote did not block")
+        else:
+            print("antigravity: PLANNER_RESPONSE containing misattributed quote blocks")
+
     if failures:
         for f in failures:
             print(f"FAIL: {f}")

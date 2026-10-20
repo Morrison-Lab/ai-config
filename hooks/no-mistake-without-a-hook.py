@@ -168,7 +168,7 @@ def scan(path):
                             done_at = i
 
             # Antigravity text content
-            if m.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or m.get("source") == "MODEL":
+            if m.get("type") == "PLANNER_RESPONSE":
                 raw_content = m.get("content")
                 if isinstance(raw_content, str) and raw_content.strip():
                     prose = visible_prose(raw_content)

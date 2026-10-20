@@ -136,6 +136,12 @@ CASES = [
      "undelivered narration placeholder does not block when reply spoke"),
     ([TOOL, narrate_and_reply("Completed task successfully.", "No response requested.")], True,
      "reply-tool placeholder wins over clean narration"),
+
+    # Antigravity transcript format: GENERIC tool result vs PLANNER_RESPONSE (ai-config#4635)
+    ([TOOL, {"source": "MODEL", "type": "GENERIC", "content": "No response requested."}], False,
+     "Antigravity GENERIC tool result containing placeholder is not assistant prose"),
+    ([TOOL, {"source": "MODEL", "type": "PLANNER_RESPONSE", "content": "No response requested."}], True,
+     "Antigravity PLANNER_RESPONSE containing placeholder blocks"),
 ]
 
 

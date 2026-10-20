@@ -4298,6 +4298,18 @@ def main() -> int:
         ("a passing workflow_dispatch run does not excuse a failing push run (#4647)",
          [gate_run("failure", 1), gate_run("success", 2)], {},
          {"1": "push", "2": "workflow_dispatch"}, False),
+        ("a passing pull_request_target run excuses a failed pull_request run (#4647)",
+         [gate_run("failure", 1), gate_run("success", 2)], {},
+         {"1": "pull_request", "2": "pull_request_target"}, True),
+        ("a passing workflow_dispatch run excuses a failed pull_request_target run (#4647)",
+         [gate_run("failure", 1), gate_run("success", 2)], {},
+         {"1": "pull_request_target", "2": "workflow_dispatch"}, True),
+        ("a passing push run does not excuse a failing pull_request_target run (#4647)",
+         [gate_run("failure", 1), gate_run("success", 2)], {},
+         {"1": "pull_request_target", "2": "push"}, False),
+        ("a passing pull_request_target run does not excuse a failing push run (#4647)",
+         [gate_run("failure", 1), gate_run("success", 2)], {},
+         {"1": "push", "2": "pull_request_target"}, False),
     ]
     for label, runs, paths, events, expect_ok in cases:
         with patch.object(checker, "run_cmd",

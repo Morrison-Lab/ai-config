@@ -256,11 +256,11 @@ pre-empt these when authoring shell, especially under `set -euo pipefail`:
   Don't generalize either finding to the other command: always pass `--` before a variable operand to `grep`, and separately verify the target of `<dir>` itself for `find`, per the bullet above.
 
   (Self-hit during a `clean-git` session, 2026-09-10: a safety filter meant to skip live sessions' worktrees under-matched silently because of this, reading a genuinely live session's registration as absent.)
-- **`printf '%s' "$text" | grep -Fq -- "$needle"` can fail open under `set -o pipefail` when `$text` exceeds the pipe buffer.**
-  When `$needle` matches near the beginning of a large multiline string (above the 64 KiB pipe buffer) and `grep -q` exits `0` immediately on the first match, `printf` receives `SIGPIPE` (`141`) while writing the remaining bytes, making the pipeline return `141` under `pipefail` and inverting an `if printf ... | grep -Fq` secret-detection check (`HACtions!69`, caught by pre-push adversarial review 2026-10-19).
-  Write large outputs to a file and run `grep -Fq -- "$needle" "$file"` directly (and serialize large JSON bodies with `jq -Rs '{body: .}' < "$file"` rather than `jq --arg`, which hits Linux's 128 KiB `MAX_ARG_STRLEN` limit).
+- **`printf '%s' "$text" | grep -Fq -- "$needle"` can fail open under `set -o pipefail` when `grep -q` exits before `printf` finishes writing.**
+  When `$needle` matches an early line of a multiline `$text` and `grep -q` exits `0` immediately on the first match, `printf` can receive `SIGPIPE` (`141`) on subsequent writes after the read end closes, making the pipeline return `141` under `pipefail` and inverting an `if printf ... | grep -Fq` secret-detection check (`HACtions !69`, caught by pre-push adversarial review 2026-10-19).
+  Write outputs to a file and run `grep -Fq -- "$needle" "$file"` directly (and serialize large JSON bodies with `jq -Rs '{body: .}' < "$file"` rather than `jq --arg`, which hits Linux's 128 KiB `MAX_ARG_STRLEN` limit).
 - **`git archive "$sha"` honors `.gitattributes` `export-ignore` and `export-subst`, so it is not an exact tracked-tree snapshot.**
-  When staging a clean, `.git`-free checkout of a commit for an isolated reviewer or tool, `git archive` omits `export-ignore` paths and expands `export-subst` placeholders (`HACtions!69`, 2026-10-19).
+  When staging a clean, `.git`-free checkout of a commit for an isolated reviewer or tool, `git archive` omits `export-ignore` paths and expands `export-subst` placeholders (`HACtions !69`, 2026-10-19).
   Use a throwaway index file (`GIT_DIR="$repo/.git" GIT_INDEX_FILE="$tmp_idx" git read-tree "$sha"` followed by `GIT_DIR="$repo/.git" GIT_WORK_TREE="$dest" GIT_INDEX_FILE="$tmp_idx" git checkout-index -a -f`) to materialize the exact tracked blobs without archive attribute transformations.
 - **Bounds-check value-taking flags before `shift 2`.**
   In a `set -e` arg parser, `--flag` as the last arg makes `${2:-}` expand to "" but the following `shift 2` fail (count out of range) -> script aborts with a cryptic error.

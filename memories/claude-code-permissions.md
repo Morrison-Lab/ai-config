@@ -129,7 +129,7 @@ Because `deny` rules take precedence over `allow` rules and hook approvals,
 staging a sandboxed checkout under `/tmp/...` (e.g. `mktemp -d /tmp/agent-workspace.XXXXXX`)
 while `Read(//tmp/**)` is in `permissions.deny` or `--disallowedTools`
 blocks all `Read` and `Glob` access inside the agent's own workspace
-(`HACtions!69`, caught by pre-push adversarial review 2026-10-19).
+(`HACtions !69`, caught by pre-push adversarial review 2026-10-19).
 
 - **Do:** stage an isolated agent workspace under a root directory disjoint from every denied prefix (such as `/srv/...`),
   and assert in tests that the workspace path matches none of the configured `Read(//...)` deny prefixes.

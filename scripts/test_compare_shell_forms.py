@@ -253,5 +253,29 @@ check(
     "NOT a result about the forms" in csf.render([OK, BROKEN], csf.HARNESS_FAILURE),
 )
 
+# --- ensure_python_shim and interpreter_env fallback tests (ai-config#4646) ---
+shim_dir = csf.ensure_python_shim()
+check("ensure_python_shim returns an existing directory", Path(shim_dir).is_dir())
+shim_bin = Path(shim_dir) / "python"
+check(
+    "ensure_python_shim creates python binary or symlink",
+    shim_bin.exists() or (Path(shim_dir) / "python.bat").exists(),
+)
+proc = csf.subprocess.run(
+    [str(shim_bin), "-c", "import sys; print(sys.version_info[0])"],
+    capture_output=True,
+    text=True,
+)
+check(
+    "python shim executes and reports python major version",
+    proc.returncode == 0 and proc.stdout.strip() == str(sys.version_info[0]),
+)
+isolated_env = csf.interpreter_env(base_env={"PATH": "/usr/bin:/bin"})
+found_python = csf.shutil.which("python", path=isolated_env["PATH"])
+check(
+    "interpreter_env guarantees python is findable on PATH",
+    found_python is not None,
+)
+
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

@@ -123,6 +123,18 @@ the second easy to miss.
 - **Do:** write `//path` (double leading slash) for a genuinely filesystem-root-absolute rule, e.g. `Edit(//tmp/**)` to grant scratch writes anywhere under `/tmp` regardless of which settings file defines the rule or where the session started.
 - **Don't:** write a single leading `/` and expect it to mean "absolute" --- it means "relative to wherever this settings file's own anchor is," which varies by settings source (project root, starting directory, `~/.claude/`, etc.).
 
+### A deny prefix like `Read(//tmp/**)` overrides `Read(./**)` when the working directory sits under `/tmp`
+
+Because `deny` rules take precedence over `allow` rules and hook approvals,
+staging a sandboxed checkout under `/tmp/...` (e.g. `mktemp -d /tmp/agent-workspace.XXXXXX`)
+while `Read(//tmp/**)` is in `permissions.deny` or `--disallowedTools`
+blocks all `Read` and `Glob` access inside the agent's own workspace
+(`HACtions!69`, caught by pre-push adversarial review 2026-10-19).
+
+- **Do:** stage an isolated agent workspace under a root directory disjoint from every denied prefix (such as `/srv/...`),
+  and assert in tests that the workspace path matches none of the configured `Read(//...)` deny prefixes.
+- **Don't:** pair `Read(./**)` with `Read(//tmp/**)` when the agent's current working directory is itself created inside `/tmp`.
+
 ## Parameter-scoped rules (`Tool(param:value)`) are valid only in deny/ask, never allow -- and an omitted parameter is never matched
 
 `Tool(param:value)` matches a top-level input field on any tool (e.g. `Agent(model:opus)`, `Bash(run_in_background:true)`) and is restricted to **deny and ask** rules only:

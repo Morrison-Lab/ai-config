@@ -386,9 +386,6 @@ and draft-gated dependent PRs held until prerequisites merge.
 Marking a PR ready grants no merge authority.
 See [`put-prs-in-ready-mode`](shared/workflow/put-prs-in-ready-mode.md).
 
-- **Do:** open completed work ready for review, or mark draft ready once checks pass.
-- **Don't:** leave a PR ready for review in draft, except a deliberately draft-gated dependent PR.
-
 ## Antigravity Workspace Rules & Activation Scopes
 
 See [`GEMINI.md`](GEMINI.md) and [`memories/antigravity.md`](memories/antigravity.md) for Antigravity-specific workspace rules, activation scopes, manifests, and hook integration.

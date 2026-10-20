@@ -311,4 +311,7 @@ Antigravity provides built-in system tools for managing asynchronous background 
 - Tool execution results (`view_file`, `run_command`, `invoke_subagent`) are logged with `m.get("source") == "MODEL"` and `m.get("type") == "GENERIC"`, not `m.get("type") == "PLANNER_RESPONSE"`.
   Transcript hooks that treat `m.get("source") == "MODEL"` or `m.get("type") == "GENERIC"` as assistant prose (such as `hooks/no-mistake-without-a-hook.py`, `hooks/remind-ums-after-error.py`, and `hooks/remind-learn-from-review.py`) match trigger phrases inside file or command outputs read by the session ([ai-config#4635](https://github.com/Morrison-Lab/ai-config/issues/4635)).
 - In `PLANNER_RESPONSE` `tool_calls`, `invoke_subagent` places its subagent prompts inside `args.Subagents` (a JSON string or list of objects carrying `Prompt`, `Role`, and `TypeName`) alongside `args.toolAction` and `args.toolSummary`, rather than top-level `prompt` or `Prompt` keys ([ai-config#4635](https://github.com/Morrison-Lab/ai-config/issues/4635)).
+- **Companion test coverage for transcript hooks:** When updating transcript hooks across the corpus to account for schema distinctions (`GENERIC` tool result vs `PLANNER_RESPONSE` assistant prose),
+  add companion regression tests across ALL touched hook test suites, not just a subset.
+  Avoid inert/dead branches (such as setting an unused `rec_type = "tool_result"`) that downstream logic never evaluates.
 

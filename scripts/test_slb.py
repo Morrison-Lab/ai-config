@@ -1127,5 +1127,51 @@ with tempfile.TemporaryDirectory() as _shim_dir:
         _multi_out[-400:],
     )
 
+# Quarto fenced divs (::: {.reading} ... :::) without interior blank lines
+# must keep their opening/closing fences on their own lines while sentence-splitting
+# interior prose.
+check(
+    "Quarto fenced div without blank lines preserves fences and splits interior prose",
+    "::: {.reading}\n"
+    "First sentence. Second sentence.\n"
+    ":::\n",
+    "::: {.reading}\n"
+    "First sentence.\n"
+    "Second sentence.\n"
+    ":::\n",
+)
+
+# Multi-line display math blocks ($$ ... $$) must be preserved verbatim, not
+# collapsed onto a single line, including when the closing fence carries a
+# Quarto equation label ($$ {#eq-label}) followed by prose that should split.
+check(
+    "multi-line display math block preserved verbatim",
+    "$$\n"
+    "\\begin{aligned}\n"
+    "a &= b \\\\\n"
+    "c &= d.\n"
+    "\\end{aligned}\n"
+    "$$\n",
+    "$$\n"
+    "\\begin{aligned}\n"
+    "a &= b \\\\\n"
+    "c &= d.\n"
+    "\\end{aligned}\n"
+    "$$\n",
+)
+
+check(
+    "labeled multi-line display math block ($$ {#eq-line}) closes and splits following prose",
+    "$$\n"
+    "y = mx + b\n"
+    "$$ {#eq-line}\n\n"
+    "First sentence after equation. Second sentence after equation.\n",
+    "$$\n"
+    "y = mx + b\n"
+    "$$ {#eq-line}\n\n"
+    "First sentence after equation.\n"
+    "Second sentence after equation.\n",
+)
+
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

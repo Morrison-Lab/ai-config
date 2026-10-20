@@ -5,6 +5,7 @@ Before opening one for a task, look for a non-browser route:
 a CLI (`gh`, `glab`, `gcloud`, a vendor CLI),
 an MCP server that is installed or could be installed (see [`use-mcp-servers`](use-mcp-servers.md)),
 or the service's REST API.
+For a notes repo's rendered HTML, the route is its `gh-pages` branch: [`read-published-html-from-gh-pages`](read-published-html-from-gh-pages.md).
 Use the browser only when that search finds no route that can do the task,
 or when the task itself is visual (checking a rendered page, say).
 

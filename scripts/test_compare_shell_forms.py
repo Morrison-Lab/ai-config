@@ -253,5 +253,46 @@ check(
     "NOT a result about the forms" in csf.render([OK, BROKEN], csf.HARNESS_FAILURE),
 )
 
+# --- ensure_python_shim and interpreter_env fallback tests (ai-config#4646) ---
+shim_dir = csf.ensure_python_shim()
+check("ensure_python_shim returns an existing directory", Path(shim_dir).is_dir())
+shim_bin = Path(shim_dir) / "python"
+shim_bat = Path(shim_dir) / "python.bat"
+check(
+    "ensure_python_shim creates python binary, symlink, or batch file",
+    shim_bin.exists() or shim_bat.exists(),
+)
+if sys.platform == "win32":
+    exec_cmd = ["cmd.exe", "/c", str(shim_bat if shim_bat.exists() else shim_bin)]
+else:
+    exec_cmd = [str(shim_bin)]
+proc = csf.subprocess.run(
+    exec_cmd + ["-c", "import sys; print(sys.version_info[0])"],
+    capture_output=True,
+    text=True,
+)
+check(
+    "python shim executes and reports python major version",
+    proc.returncode == 0 and proc.stdout.strip() == str(sys.version_info[0]),
+)
+isolated_env = csf.interpreter_env(base_env={"PATH": "/usr/bin:/bin"})
+found_python = csf.shutil.which("python", path=isolated_env["PATH"])
+check(
+    "interpreter_env guarantees python is findable on PATH",
+    found_python is not None,
+)
+bash = csf.find_bash()
+if bash is not None:
+    bash_proc = csf.subprocess.run(
+        [bash, "-c", "python -c 'import sys; print(sys.version_info[0])'"],
+        capture_output=True,
+        text=True,
+        env=isolated_env,
+    )
+    check(
+        "python shim executes under bash with isolated_env",
+        bash_proc.returncode == 0 and bash_proc.stdout.strip() == str(sys.version_info[0]),
+    )
+
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

@@ -46,6 +46,7 @@ Usage
     python3 scripts/compare-shell-forms.py --file forms.txt   # one per line
 """
 import argparse
+import atexit
 import os
 import shutil
 import subprocess
@@ -82,18 +83,65 @@ def find_bash():
     return None
 
 
-def interpreter_env():
-    """PATH with this Python's own directory prepended.
+_SHIM_DIR = None
+
+
+def ensure_python_shim():
+    """Return a directory containing a python executable pointing to sys.executable.
+
+    On platforms where python3 is installed without a python symlink or alias
+    (e.g. stock Debian/Ubuntu), child shell forms that call python fail with
+    exit code 127 unless a python shim is provided.
+    """
+    global _SHIM_DIR
+    if _SHIM_DIR is not None and Path(_SHIM_DIR).is_dir():
+        return _SHIM_DIR
+
+    shim_dir = Path(tempfile.mkdtemp(prefix="shellforms-python-shim-"))
+    shim_path = shim_dir / "python"
+
+    # On Windows, always provide python.bat so native Windows callers and
+    # PATHEXT-based lookups find python regardless of symlink privileges.
+    if sys.platform == "win32":
+        bat_path = shim_dir / "python.bat"
+        bat_path.write_text(f'@echo off\r\n"{sys.executable}" %*\r\n', encoding="utf-8")
+
+    try:
+        shim_path.symlink_to(sys.executable)
+    except (OSError, NotImplementedError):
+        # Fallback when symlink creation fails: write a POSIX shell script.
+        # Single-quote the path and escape internal single quotes to prevent
+        # backslash mangling or parameter expansion on paths with special chars.
+        posix_exe = Path(sys.executable).as_posix().replace("'", "'\\''")
+        shim_path.write_text(f"#!/bin/sh\nexec '{posix_exe}' \"$@\"\n", encoding="utf-8")
+        try:
+            shim_path.chmod(0o755)
+        except OSError:
+            pass
+
+    atexit.register(shutil.rmtree, str(shim_dir), ignore_errors=True)
+    _SHIM_DIR = str(shim_dir)
+    return _SHIM_DIR
+
+
+def interpreter_env(base_env=None):
+    """PATH with this Python's own directory and a python shim prepended.
 
     A bash started from a Python subprocess does not reliably inherit a PATH
     containing `python`, so a form that invokes `python` would fail as a harness
     failure for a reason that has nothing to do with the forms being compared.
-    Resolving it from `sys.executable` fixes the common case; anything still
-    missing is reported rather than swallowed.
+    Resolving it from `sys.executable` fixes the common case; if `python` is
+    missing from this interpreter's directory (e.g. stock Debian/Ubuntu where
+    only python3 is in exe_dir), a transient shim is prepended to ensure child
+    shells execute under sys.executable rather than an unrelated host python.
     """
-    env = dict(os.environ)
+    env = dict(base_env if base_env is not None else os.environ)
     exe_dir = str(Path(sys.executable).parent)
-    env["PATH"] = exe_dir + os.pathsep + env.get("PATH", "")
+    path = exe_dir + os.pathsep + env.get("PATH", "")
+    if shutil.which("python", path=exe_dir) is None:
+        shim_dir = ensure_python_shim()
+        path = shim_dir + os.pathsep + path
+    env["PATH"] = path
     return env
 
 

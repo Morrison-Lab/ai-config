@@ -87,10 +87,11 @@ one of:
 - **Forward reference** --- the div is at `<location>`, after the mention
   at `<location>`; move the div earlier, or restructure so the definition
   precedes its use.
+  When a general definition and its special cases appear to form a cycle because the general definition lists the special cases, define the general concept directly from prerequisite terms defined before it and state the special cases after it, rather than moving the general definition after its special cases.
   When the div has to stay where it is, keep the crossref and signpost it
   ("defined later in this section (@def-x)"), per
   [keep the crossref](forward-references.md#keep-the-crossref);
-  never delete the link.
+  never delete the link or add `<!-- check-term-links: allow -->` to hide the forward reference from a dependency-graph check.
 - **Undefined term** --- the term is mentioned but no div defines it
   anywhere in the document; add the missing definition.
   In a series of related documents, such as course sites, first look for a

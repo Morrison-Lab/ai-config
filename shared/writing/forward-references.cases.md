@@ -77,10 +77,9 @@ entry is on [#1874](https://github.com/Morrison-Lab/ai-config/pull/1874).)
 
 ## "Keep the crossref"
 
-([Morrison-Lab/lds#392](https://github.com/Morrison-Lab/lds/pull/392),
-2026-10-05: a forward-reference fix in an SVM lecture solution on multiclass
-classification removed the `@def-one-versus-one` link and left the bare term
-name.
+(2nd occurrence, [Morrison-Lab/mds#422](https://github.com/Morrison-Lab/mds/pull/422), 2026-10-19: to clear `build_dependency_graph.py` forward-reference findings in `_subfiles/linear-algebra/_thm-gram-properties.qmd`, the PR removed the `(@def-symmetric-matrix)` and `[positive semidefinite](linear-algebra.qmd#def-positive-semidefinite)` links, leaving the bare terms in place with `<!-- check-term-links: allow -->` comments to silence the term-link check, and in `_subfiles/sets/_def-interval.qmd` moved `#def-interval` after `#def-closed-interval` through `#def-unbounded-interval` with `<!-- check-term-links: allow -->` rather than defining bounds first and defining an interval from its bounds before the special cases.
+The maintainer flagged both: "the solution to a forward reference is to reorder the content, not to remove the hyperlink" and "define an interval as the subset of the real numbers that are between two bounds (define bounds first), possibly including one or both bounds."
+1st occurrence, [Morrison-Lab/lds#392](https://github.com/Morrison-Lab/lds/pull/392), 2026-10-05: a forward-reference fix in an SVM lecture solution on multiclass classification removed the `@def-one-versus-one` link and left the bare term name.
 The maintainer said that was worse than the forward reference, and gave the
 rule: "if it's motivation for a coming definition, it's ok not to point",
 "but otherwise we want to preserve crossrefs".

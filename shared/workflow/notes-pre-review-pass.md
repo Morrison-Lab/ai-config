@@ -25,8 +25,9 @@ State in the PR body that the checklist ran.
    "Function" replaces "rule" and "map", and links the formal definition.
    The argument of a function is typed by its domain, and is not one of the inputs that specify the function.
 2. **Links.**
-   Every technical term is hyperlinked at first use in each div.
+   Every technical term is hyperlinked at first use in each div, and each target div precedes its first mention in reading order.
    A term with no definition gets its own definition div, filed as an issue if it widens the PR, never left unlinked.
+   Fix a forward reference or dependency-graph cycle by reordering the content or defining the prerequisite concept first, never by removing the hyperlink and adding `<!-- check-term-links: allow -->`.
 3. **Symbols.**
    Every technical term is paired with its semantic macro, and the macro is the existing one: search `Morrison-Lab/macros` for the concept before writing any expression.
 4. **Minimal expressions.**
@@ -35,6 +36,7 @@ State in the PR body that the checklist ran.
    No term appears in its own definition, none is defined as a modification of another, and each preposition states a relation you can name.
    A definition div holds its one term and links to everything else.
    A clause that defines another term or notation ("we write ... for ...", "a function that maps ...") gets its own definition div and example instead.
+   Define a general concept from prerequisite terms defined before it (for example, define bounds first, then define an interval from its bounds), then state its special cases after it, rather than defining the general concept by listing later special-case divs or moving the general definition after its special cases.
 6. **No overexplaining.**
    Delete a clause that restates what the term and its symbol already say.
    Replace a pronoun such as "It" with its referent.
@@ -49,3 +51,4 @@ State in the PR body that the checklist ran.
 
 An item that fails on one div is checked on every div of the PR, per the sweep above.
 Recurrence: sds#268 (2026-10-17) drew an inline definition at least five times after the first correction, which is why item 5 now names the pattern.
+mds#422 (2026-10-19) stripped `@def-` links and added `<!-- check-term-links: allow -->` to silence `build_dependency_graph.py` forward-reference findings and moved `@def-interval` after its special-case interval definitions instead of reordering the content and defining bounds first.

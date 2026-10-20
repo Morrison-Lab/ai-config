@@ -134,13 +134,17 @@ with tempfile.TemporaryDirectory() as d:
     status_file = os.path.join(d, "status.txt")
     with open(status_file, "w", encoding="utf-8") as stream:
         stream.write(GLAB_STATUS)
+    refuse_all_file = os.path.join(d, "refuse_all")
     stub = os.path.join(d, "glab")
     with open(stub, "w", encoding="utf-8") as stream:
         stream.write(
             "#!/usr/bin/env python3\n"
-            "import sys\n"
+            "import os, sys\n"
             f"open({argv_log!r}, 'a').write(' '.join(sys.argv[1:]) + chr(10))\n"
             "if sys.argv[1:3] == ['auth', 'status']:\n"
+            f"    if '--all' in sys.argv and os.path.exists({refuse_all_file!r}):\n"
+            "        sys.stderr.write('unknown flag: --all\\n')\n"
+            "        sys.exit(1)\n"
             f"    text = open({status_file!r}, encoding='utf-8').read()\n"
             "    sys.stderr.write(text)\n"
             "    sys.exit(1 if ('Error:' in text or 'failed' in text) else 0)\n"
@@ -242,9 +246,33 @@ with tempfile.TemporaryDirectory() as d:
             state = subject.poll_once({})
             assert state["data"] == {}
             assert list(json.loads(state["error"])) == ["gitlab_merge_requests"]
-            # An invocation glab REFUSES (a glab older than v1.79.0 has no
-            # `--all`) is not an authentication state: the error carries
-            # glab's exit status and its own message.
+            # When glab rejects `--all` with 'unknown flag: --all' (e.g. glab
+            # older than v1.79.0), glab_hosts falls back to bare `glab auth status`.
+            # If the fallback succeeds with authenticated hosts, they are returned:
+            with open(refuse_all_file, "w", encoding="utf-8") as stream:
+                stream.write("1")
+            with open(status_file, "w", encoding="utf-8") as stream:
+                stream.write(GLAB_STATUS)
+            with open(argv_log, "w", encoding="utf-8") as stream:
+                stream.write("")
+            assert subject.glab_hosts() == (["gitlab.com", "gitlab.example.com:8443"], None)
+            with open(argv_log, encoding="utf-8") as stream:
+                fallback_calls = stream.read().splitlines()
+            assert fallback_calls == ["auth status --all", "auth status"], fallback_calls
+
+            # If the fallback also lists no authenticated hosts, the error
+            # names the fallback command and keeps its output:
+            with open(status_file, "w", encoding="utf-8") as stream:
+                stream.write("gitlab.com\n  x gitlab.com: API call failed: 401\n")
+            try:
+                subject.glab_hosts()
+                raise AssertionError("no authenticated hosts should raise")
+            except OSError as error:
+                assert "glab auth status listed no authenticated host (exit 1)" in str(error), error
+                assert "API call failed: 401" in str(error), error
+
+            # If bare `glab auth status` itself failed with unknown flag or error,
+            # it also raises and reports the error:
             with open(status_file, "w", encoding="utf-8") as stream:
                 stream.write("Error: unknown flag: --all\n")
             try:

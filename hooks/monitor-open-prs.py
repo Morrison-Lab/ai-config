@@ -217,7 +217,7 @@ GLAB_LOGGED_IN_RE = re.compile(
 
 
 def authenticated_hosts(auth_status_output):
-    """Hosts `glab auth status --all` reports a working login for, in order."""
+    """Hosts `glab auth status` reports a working login for, in order."""
     return GLAB_LOGGED_IN_RE.findall(auth_status_output)
 
 
@@ -245,16 +245,18 @@ def glab_hosts():
 
     An error when the status lists no logged-in host, carrying glab's exit
     status and its own message. The message is what names the cause -- no
-    login at all, or an invocation glab refused (a glab older than v1.79.0
-    has no `--all`, an unreadable config) -- since glab exits 1 for either,
-    and also for a working instance listed beside a failed one, which is
-    why the status is never consulted when parsing. `--all` covers every
-    authenticated instance. Without it glab checks only the instance implied
-    by the cwd's git remote or GITLAB_HOST when that is not gitlab.com -- and
-    this daemon inherits the cwd of whichever session spawned it, so the
-    polled host set would depend on where the session happened to start.
+    login at all, or an invocation glab refused (an unreadable config, etc.)
+    -- since glab exits 1 for either, and also for a working instance listed
+    beside a failed one, which is why the status is never consulted when parsing.
+    `--all` covers every authenticated instance (supported in glab v1.79.0+).
+    When glab rejects `--all` with 'unknown flag: --all', fall back to bare
+    `glab auth status`. Without it glab checks configured instances, or the
+    instance implied by the cwd's git remote or GITLAB_HOST when that is not
+    gitlab.com -- and this daemon inherits the cwd of whichever session spawned
+    it, so the polled host set would depend on where the session happened to start.
     """
     cut_short = None
+    cmd_name = "glab auth status --all"
     try:
         result = subprocess.run(
             [GLAB_PATH, "auth", "status", "--all"],
@@ -271,10 +273,25 @@ def glab_hosts():
         output = _captured_text(error.stdout) + _captured_text(error.stderr)
         none_listed = f"({error}; nothing listed before the timeout)"
         cut_short = f"{error}; hosts listed before the timeout were polled"
+
+    if "unknown flag: --all" in output:
+        cmd_name = "glab auth status"
+        try:
+            result = subprocess.run(
+                [GLAB_PATH, "auth", "status"],
+                capture_output=True, text=True, timeout=POLL_SECONDS, **NO_WINDOW)
+            output = (result.stdout or "") + (result.stderr or "")
+            none_listed = f"(exit {result.returncode})"
+            cut_short = None
+        except subprocess.TimeoutExpired as error:
+            output = _captured_text(error.stdout) + _captured_text(error.stderr)
+            none_listed = f"({error}; nothing listed before the timeout)"
+            cut_short = f"{error}; hosts listed before the timeout were polled"
+
     hosts = authenticated_hosts(output)
     if not hosts:
         raise OSError(
-            f"glab auth status --all listed no authenticated host "
+            f"{cmd_name} listed no authenticated host "
             f"{none_listed}: {output.strip()[-ERROR_TAIL:]}")
     return hosts, cut_short
 

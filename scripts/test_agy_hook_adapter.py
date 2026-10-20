@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch, MagicMock, mock_open
@@ -2869,6 +2870,111 @@ class TestWarnOnlyPreToolUseSurfacing(unittest.TestCase):
             stop_res = json.loads(mock_stdout.getvalue())
             sys_msg = stop_res.get("systemMessage", "")
             self.assertIn("Specific warning reason.\n\nActionable user remediation note.", sys_msg)
+
+    def test_format_warning_entry_helper(self):
+        # Both distinct
+        entry_both = {"hook_id": "hookA", "additionalContext": "ctx", "systemMessage": "sys"}
+        self.assertEqual(
+            self.adapter._format_warning_entry(entry_both, prefix_style="bracket"),
+            "[hookA] ctx\n\nsys",
+        )
+        self.assertEqual(
+            self.adapter._format_warning_entry(entry_both, prefix_style="label"),
+            "Warning from hookA: ctx\n\nsys",
+        )
+
+        # Only ctx
+        entry_ctx = {"hook_id": "hookB", "additionalContext": "only ctx"}
+        self.assertEqual(
+            self.adapter._format_warning_entry(entry_ctx, prefix_style="bracket"),
+            "[hookB] only ctx",
+        )
+        self.assertEqual(
+            self.adapter._format_warning_entry(entry_ctx, prefix_style="label"),
+            "Warning from hookB: only ctx",
+        )
+
+        # Only sys_msg
+        entry_sys = {"hook_id": "hookC", "systemMessage": "only sys"}
+        self.assertEqual(
+            self.adapter._format_warning_entry(entry_sys, prefix_style="bracket"),
+            "[hookC] only sys",
+        )
+        self.assertEqual(
+            self.adapter._format_warning_entry(entry_sys, prefix_style="label"),
+            "Warning from hookC: only sys",
+        )
+
+        # Both identical
+        entry_same = {"hook_id": "hookD", "additionalContext": "same", "systemMessage": "same"}
+        self.assertEqual(
+            self.adapter._format_warning_entry(entry_same, prefix_style="bracket"),
+            "[hookD] same",
+        )
+
+        # Empty
+        entry_empty = {"hook_id": "hookE"}
+        self.assertEqual(self.adapter._format_warning_entry(entry_empty), "")
+
+    def test_drain_acquires_advisory_lock(self):
+        sid = "lock-check-session"
+        warn_file = self.adapter._get_pending_warnings_file(sid)
+        warn_file.write_text(json.dumps([{"hook_id": "h1", "additionalContext": "m1"}]), encoding="utf-8")
+        
+        lock_called = []
+        orig_lock = self.adapter._advisory_warnings_lock
+
+        import contextlib
+        @contextlib.contextmanager
+        def tracked_lock(f):
+            lock_called.append(f)
+            with orig_lock(f):
+                yield
+
+        with patch.object(self.adapter, "_advisory_warnings_lock", side_effect=tracked_lock):
+            drained = self.adapter._drain_pending_warnings(sid)
+
+        self.assertEqual(len(lock_called), 1)
+        self.assertEqual(lock_called[0], warn_file)
+        self.assertEqual(len(drained), 1)
+        self.assertEqual(drained[0]["hook_id"], "h1")
+
+    def test_concurrent_record_and_drain_no_duplicates_or_losses(self):
+        import threading
+        sid = "concurrent-race-session"
+        total_items = 40
+        all_drained = []
+        drained_lock = threading.Lock()
+
+        def recorder():
+            for i in range(total_items):
+                self.adapter._record_pending_warnings(sid, [{"hook_id": f"item_{i}", "additionalContext": f"val_{i}"}])
+                time.sleep(0.002)
+
+        def drainer():
+            for _ in range(total_items * 2):
+                items = self.adapter._drain_pending_warnings(sid)
+                if items:
+                    with drained_lock:
+                        all_drained.extend(items)
+                time.sleep(0.001)
+
+        t_rec = threading.Thread(target=recorder)
+        t_drain = threading.Thread(target=drainer)
+        t_rec.start()
+        t_drain.start()
+        t_rec.join()
+        t_drain.join()
+
+        # Any final remaining
+        final_items = self.adapter._drain_pending_warnings(sid)
+        all_drained.extend(final_items)
+
+        hook_ids = [item["hook_id"] for item in all_drained]
+        self.assertEqual(len(hook_ids), total_items, f"Expected {total_items} items, got {len(hook_ids)}: {hook_ids}")
+        self.assertEqual(len(set(hook_ids)), total_items, f"Duplicate items detected: {hook_ids}")
+        expected_ids = {f"item_{i}" for i in range(total_items)}
+        self.assertEqual(set(hook_ids), expected_ids)
 
 if __name__ == "__main__":
     unittest.main()

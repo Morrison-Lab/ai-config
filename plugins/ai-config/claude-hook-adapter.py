@@ -7,6 +7,7 @@ import tempfile
 import time
 import traceback
 import urllib.parse
+import contextlib
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
@@ -390,6 +391,54 @@ def _get_pending_warnings_file(session_id: str | None) -> Path:
     clean_sid = re.sub(r"[^A-Za-z0-9._-]", "_", str(session_id or "global"))[:64]
     return _get_pending_warnings_dir() / f"warnings-{clean_sid}.json"
 
+@contextlib.contextmanager
+def _advisory_warnings_lock(warn_file: Path):
+    """Exclusive flock context manager protecting both record and drain operations."""
+    lock_file = warn_file.with_name(f"{warn_file.name}.lock")
+    lock_fd = None
+    try:
+        try:
+            lock_fd = os.open(str(lock_file), os.O_CREAT | os.O_RDWR, 0o600)
+            try:
+                import fcntl
+                fcntl.flock(lock_fd, fcntl.LOCK_EX)
+            except Exception:
+                pass
+        except Exception:
+            lock_fd = None
+        yield
+    finally:
+        if lock_fd is not None:
+            try:
+                import fcntl
+                fcntl.flock(lock_fd, fcntl.LOCK_UN)
+            except Exception:
+                pass
+            try:
+                os.close(lock_fd)
+            except Exception:
+                pass
+
+def _format_warning_entry(entry: dict, prefix_style: str = "bracket") -> str:
+    """Combine additionalContext and systemMessage from an advisory warning entry.
+
+    prefix_style:
+      - 'bracket': '[hook_id] msg' (used in Stop systemMessage)
+      - 'label': 'Warning from hook_id: msg' (used in PreInvocation ephemeral messages)
+    """
+    hook_id = entry.get("hook_id", "PreToolUse hook")
+    ctx = entry.get("additionalContext", "").strip()
+    sys_msg = entry.get("systemMessage", "").strip()
+    if ctx and sys_msg and ctx != sys_msg:
+        body = f"{ctx}\n\n{sys_msg}"
+    else:
+        body = ctx or sys_msg
+    if not body:
+        return ""
+    if prefix_style == "label":
+        return f"Warning from {hook_id}: {body}"
+    return f"[{hook_id}] {body}"
+
 def _record_pending_warnings(session_id: str | None, warnings: list[dict]):
     """Persist advisory PreToolUse warnings so they reach the model on the next turn.
 
@@ -400,16 +449,7 @@ def _record_pending_warnings(session_id: str | None, warnings: list[dict]):
         return
     try:
         warn_file = _get_pending_warnings_file(session_id)
-        lock_file = warn_file.with_name(f"{warn_file.name}.lock")
-        lock_fd = None
-        try:
-            lock_fd = os.open(str(lock_file), os.O_CREAT | os.O_RDWR, 0o600)
-            try:
-                import fcntl
-                fcntl.flock(lock_fd, fcntl.LOCK_EX)
-            except Exception:
-                pass
-
+        with _advisory_warnings_lock(warn_file):
             existing = []
             if warn_file.is_file():
                 try:
@@ -426,34 +466,28 @@ def _record_pending_warnings(session_id: str | None, warnings: list[dict]):
             tmp_file = warn_file.with_name(f"{warn_file.name}.{os.getpid()}.tmp")
             tmp_file.write_text(json.dumps(existing), encoding="utf-8")
             os.replace(tmp_file, warn_file)
-        finally:
-            if lock_fd is not None:
-                try:
-                    import fcntl
-                    fcntl.flock(lock_fd, fcntl.LOCK_UN)
-                except Exception:
-                    pass
-                try:
-                    os.close(lock_fd)
-                except Exception:
-                    pass
     except Exception as exc:
         print(f"claude-hook-adapter: failed to record pending warnings: {exc}", file=sys.stderr)
 
 def _drain_pending_warnings(session_id: str | None) -> list[dict]:
-    """Retrieve and clear all pending advisory warnings for the session atomically."""
+    """Retrieve and clear all pending advisory warnings for the session atomically.
+
+    Acquires the exclusive flock before renaming to prevent races where a concurrent
+    record operation might read existing warnings and resurrect them after drain.
+    """
     if not session_id:
         return []
     try:
         warn_file = _get_pending_warnings_file(session_id)
-        if not warn_file.is_file():
-            return []
-        # Atomically rename to process-unique file so parallel writes create a fresh warn_file
-        drain_file = warn_file.with_name(f"{warn_file.name}.drain.{os.getpid()}")
-        try:
-            os.replace(warn_file, drain_file)
-        except (FileNotFoundError, OSError):
-            return []
+        with _advisory_warnings_lock(warn_file):
+            if not warn_file.is_file():
+                return []
+            # Atomically rename to process-unique file while holding lock so parallel writes create a fresh warn_file
+            drain_file = warn_file.with_name(f"{warn_file.name}.drain.{os.getpid()}")
+            try:
+                os.replace(warn_file, drain_file)
+            except (FileNotFoundError, OSError):
+                return []
 
         try:
             data = json.loads(drain_file.read_text(encoding="utf-8"))
@@ -873,15 +907,9 @@ def main():
         # were not yet consumed by a PreInvocation step.
         pending = _drain_pending_warnings(session_id)
         for w in pending:
-            hook_id = w.get("hook_id", "PreToolUse hook")
-            ctx = w.get("additionalContext", "").strip()
-            sys_msg = w.get("systemMessage", "").strip()
-            if ctx and sys_msg and ctx != sys_msg:
-                msg = f"{ctx}\n\n{sys_msg}"
-            else:
-                msg = ctx or sys_msg
-            if msg and msg not in warn_messages:
-                warn_messages.append(f"[{hook_id}] {msg}")
+            formatted = _format_warning_entry(w, prefix_style="bracket")
+            if formatted and formatted not in warn_messages:
+                warn_messages.append(formatted)
 
         # A warn-only Stop hook (no block/deny decision) still allows the
         # agent to stop, but its message is forwarded via the top-level
@@ -944,17 +972,7 @@ def main():
         # sees advisory warnings (e.g. require-agent-disclosure.py) on its next turn.
         pending = _drain_pending_warnings(session_id)
         for w in pending:
-            hook_id = w.get("hook_id", "PreToolUse hook")
-            ctx = w.get("additionalContext", "").strip()
-            sys_msg = w.get("systemMessage", "").strip()
-            if ctx and sys_msg and ctx != sys_msg:
-                formatted = f"Warning from {hook_id}: {ctx}\n\n{sys_msg}"
-            elif ctx:
-                formatted = f"Warning from {hook_id}: {ctx}"
-            elif sys_msg:
-                formatted = f"Warning from {hook_id}: {sys_msg}"
-            else:
-                formatted = ""
+            formatted = _format_warning_entry(w, prefix_style="label")
             if formatted:
                 raw_bytes = formatted.encode("utf-8")[:PRE_INVOCATION_MSG_BYTE_CAP]
                 chunk = raw_bytes.decode("utf-8", errors="ignore")

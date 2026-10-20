@@ -3,8 +3,11 @@ import json
 import subprocess
 import os
 import re
+import tempfile
+import time
 import traceback
 import urllib.parse
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
 def _int_env(name, default):
@@ -339,6 +342,133 @@ def refresh_session_heartbeat(session_id: str | None, repo_root: str | None = No
     except Exception as exc:
         print(f"claude-hook-adapter: heartbeat refresh failed: {exc}", file=sys.stderr)
 
+def _cleanup_stale_warning_files(warn_dir: Path, max_age_seconds: int = 86400):
+    """Remove orphaned warning or lock files older than max_age_seconds (default 24h)."""
+    try:
+        now = time.time()
+        for p in warn_dir.glob("warnings-*"):
+            try:
+                if now - p.stat().st_mtime > max_age_seconds:
+                    p.unlink(missing_ok=True)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+def _get_pending_warnings_dir() -> Path:
+    """Return directory for cross-event pending warnings, scoped per user.
+
+    Ensures the directory is not a symlink, is owned by the current user,
+    and has restrictive (0700) permissions to prevent multi-user eavesdropping.
+    """
+    uid = os.getuid() if hasattr(os, "getuid") else None
+    uid_suffix = f"-{uid}" if uid is not None else ""
+    base = Path(tempfile.gettempdir()) / f"agy-pending-warnings{uid_suffix}"
+    try:
+        if base.exists():
+            # If the directory is a symlink or owned by another user, refuse it
+            # and fall back to an isolated mkdtemp directory.
+            if base.is_symlink() or (uid is not None and base.stat().st_uid != uid):
+                base = Path(tempfile.mkdtemp(prefix=f"agy-pending-warnings{uid_suffix}-"))
+            else:
+                try:
+                    os.chmod(base, 0o700)
+                except Exception:
+                    pass
+        else:
+            base.mkdir(parents=True, exist_ok=True, mode=0o700)
+            try:
+                os.chmod(base, 0o700)
+            except Exception:
+                pass
+        _cleanup_stale_warning_files(base)
+    except Exception:
+        pass
+    return base
+
+def _get_pending_warnings_file(session_id: str | None) -> Path:
+    clean_sid = re.sub(r"[^A-Za-z0-9._-]", "_", str(session_id or "global"))[:64]
+    return _get_pending_warnings_dir() / f"warnings-{clean_sid}.json"
+
+def _record_pending_warnings(session_id: str | None, warnings: list[dict]):
+    """Persist advisory PreToolUse warnings so they reach the model on the next turn.
+
+    Uses an exclusive lock file and a process-unique temporary file to prevent
+    races and collisions when multiple tool calls execute concurrently.
+    """
+    if not session_id or not warnings:
+        return
+    try:
+        warn_file = _get_pending_warnings_file(session_id)
+        lock_file = warn_file.with_name(f"{warn_file.name}.lock")
+        lock_fd = None
+        try:
+            lock_fd = os.open(str(lock_file), os.O_CREAT | os.O_RDWR, 0o600)
+            try:
+                import fcntl
+                fcntl.flock(lock_fd, fcntl.LOCK_EX)
+            except Exception:
+                pass
+
+            existing = []
+            if warn_file.is_file():
+                try:
+                    data = json.loads(warn_file.read_text(encoding="utf-8"))
+                    if isinstance(data, list):
+                        existing = data
+                except Exception:
+                    existing = []
+            existing.extend(warnings)
+            if len(existing) > 50:
+                existing = existing[-50:]
+
+            # Process-unique temporary file in the same directory for atomic replace
+            tmp_file = warn_file.with_name(f"{warn_file.name}.{os.getpid()}.tmp")
+            tmp_file.write_text(json.dumps(existing), encoding="utf-8")
+            os.replace(tmp_file, warn_file)
+        finally:
+            if lock_fd is not None:
+                try:
+                    import fcntl
+                    fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                except Exception:
+                    pass
+                try:
+                    os.close(lock_fd)
+                except Exception:
+                    pass
+    except Exception as exc:
+        print(f"claude-hook-adapter: failed to record pending warnings: {exc}", file=sys.stderr)
+
+def _drain_pending_warnings(session_id: str | None) -> list[dict]:
+    """Retrieve and clear all pending advisory warnings for the session atomically."""
+    if not session_id:
+        return []
+    try:
+        warn_file = _get_pending_warnings_file(session_id)
+        if not warn_file.is_file():
+            return []
+        # Atomically rename to process-unique file so parallel writes create a fresh warn_file
+        drain_file = warn_file.with_name(f"{warn_file.name}.drain.{os.getpid()}")
+        try:
+            os.replace(warn_file, drain_file)
+        except (FileNotFoundError, OSError):
+            return []
+
+        try:
+            data = json.loads(drain_file.read_text(encoding="utf-8"))
+        except Exception:
+            data = []
+        finally:
+            try:
+                drain_file.unlink(missing_ok=True)
+            except Exception:
+                pass
+        return data if isinstance(data, list) else []
+    except Exception as exc:
+        print(f"claude-hook-adapter: failed to drain pending warnings: {exc}", file=sys.stderr)
+        return []
+
 def main():
     try:
         payload = json.load(sys.stdin)
@@ -643,6 +773,7 @@ def main():
                 for idx, desc, hook_id, res in executor.map(_run_single_pre_tool, enumerate(flattened_hooks)):
                     results[idx] = (idx, desc, hook_id, res)
 
+        pending_warnings = []
         for item in results:
             if item is None:
                 continue
@@ -661,8 +792,17 @@ def main():
                         base_reason = hso.get("permissionDecisionReason", "Denied by Claude Code hook")
                         reason = f"[{desc}] {base_reason}" if desc != "run_command" else base_reason
                         deny_response = {"decision": "deny", "reason": reason}
-                    if hso.get("additionalContext"):
-                        print(f"Warning from {hook_id}: {hso.get('additionalContext')}", file=sys.stderr)
+                    ctx = hso.get("additionalContext") or hook_out.get("additionalContext")
+                    sys_msg = hook_out.get("systemMessage")
+                    if ctx:
+                        print(f"Warning from {hook_id}: {ctx}", file=sys.stderr)
+                    if ctx or sys_msg:
+                        pending_warnings.append({
+                            "hook_id": hook_id,
+                            "desc": desc,
+                            "additionalContext": str(ctx) if ctx else "",
+                            "systemMessage": str(sys_msg) if sys_msg else "",
+                        })
                 except Exception as exc:
                     print(f"claude-hook-adapter: failed to parse output: {exc}", file=sys.stderr)
 
@@ -672,6 +812,9 @@ def main():
                 deny_response["reason"] = f"{deny_response['reason']}\n\n{combined_msgs}"
             print(json.dumps(deny_response))
             return
+
+        if pending_warnings:
+            _record_pending_warnings(session_id, pending_warnings)
 
         allow_response = {"decision": "allow"}
         if system_messages:
@@ -726,6 +869,20 @@ def main():
                 except Exception as exc:
                     print(f"claude-hook-adapter: failed to parse output: {exc}", file=sys.stderr)
 
+        # Collect any pending warnings from allowed PreToolUse hooks that
+        # were not yet consumed by a PreInvocation step.
+        pending = _drain_pending_warnings(session_id)
+        for w in pending:
+            hook_id = w.get("hook_id", "PreToolUse hook")
+            ctx = w.get("additionalContext", "").strip()
+            sys_msg = w.get("systemMessage", "").strip()
+            if ctx and sys_msg and ctx != sys_msg:
+                msg = f"{ctx}\n\n{sys_msg}"
+            else:
+                msg = ctx or sys_msg
+            if msg and msg not in warn_messages:
+                warn_messages.append(f"[{hook_id}] {msg}")
+
         # A warn-only Stop hook (no block/deny decision) still allows the
         # agent to stop, but its message is forwarded via the top-level
         # systemMessage field -- shown to the user in Antigravity's
@@ -733,7 +890,11 @@ def main():
         # than dropped after only reaching stderr. No warning still allows
         # stopping via the standard empty JSON object.
         if warn_messages:
-            print(json.dumps({"systemMessage": "\n\n".join(warn_messages)}))
+            combined = "\n\n".join(warn_messages)
+            if len(combined.encode("utf-8")) > PRE_INVOCATION_TOTAL_BYTE_CAP:
+                raw_bytes = combined.encode("utf-8")[:PRE_INVOCATION_TOTAL_BYTE_CAP]
+                combined = raw_bytes.decode("utf-8", errors="ignore")
+            print(json.dumps({"systemMessage": combined}))
         else:
             print(json.dumps({}))
         return
@@ -778,6 +939,30 @@ def main():
 
         injected_messages = []
         total_injected_bytes = 0
+
+        # Inject pending warnings from allowed PreToolUse hooks so the model
+        # sees advisory warnings (e.g. require-agent-disclosure.py) on its next turn.
+        pending = _drain_pending_warnings(session_id)
+        for w in pending:
+            hook_id = w.get("hook_id", "PreToolUse hook")
+            ctx = w.get("additionalContext", "").strip()
+            sys_msg = w.get("systemMessage", "").strip()
+            if ctx and sys_msg and ctx != sys_msg:
+                formatted = f"Warning from {hook_id}: {ctx}\n\n{sys_msg}"
+            elif ctx:
+                formatted = f"Warning from {hook_id}: {ctx}"
+            elif sys_msg:
+                formatted = f"Warning from {hook_id}: {sys_msg}"
+            else:
+                formatted = ""
+            if formatted:
+                raw_bytes = formatted.encode("utf-8")[:PRE_INVOCATION_MSG_BYTE_CAP]
+                chunk = raw_bytes.decode("utf-8", errors="ignore")
+                chunk_bytes = len(chunk.encode("utf-8"))
+                if total_injected_bytes + chunk_bytes <= PRE_INVOCATION_TOTAL_BYTE_CAP:
+                    injected_messages.append(chunk)
+                    total_injected_bytes += chunk_bytes
+
         hooks_to_run = extract_hook_list(ups_groups)
         flattened_ups = []
         for hook in hooks_to_run:

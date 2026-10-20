@@ -15,6 +15,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch, MagicMock, mock_open
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -2611,6 +2612,263 @@ class TestAgyHookAdapter(unittest.TestCase):
             self.assertTrue(mock_run.called)
             called_payload = mock_run.call_args[0][1]
             self.assertEqual(called_payload.get("tool_input", {}).get("model"), "flash")
+
+class TestWarnOnlyPreToolUseSurfacing(unittest.TestCase):
+    def setUp(self):
+        self.adapter = load_adapter()
+        self.test_dir = tempfile.mkdtemp(prefix="test-agy-warn-")
+        self.patcher = patch.object(self.adapter, "_get_pending_warnings_dir", return_value=Path(self.test_dir))
+        self.patcher.start()
+        self.stderr_patcher = patch("sys.stderr", new_callable=io.StringIO)
+        self.stderr_patcher.start()
+
+    def tearDown(self):
+        self.stderr_patcher.stop()
+        self.patcher.stop()
+        shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    def test_pre_tool_use_warn_persists_and_pre_invocation_injects(self):
+        sid = "test-session-warn-1"
+        pre_tool_payload = {
+            "conversationId": sid,
+            "toolCall": {"name": "run_command", "args": {"CommandLine": "gh pr comment 12 --body 'test'"}},
+        }
+        warn_output = {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "additionalContext": "Forge comment lacks agent disclosure.",
+            },
+            "systemMessage": "Please append agent disclosure footer.",
+        }
+        with patch.object(self.adapter, "find_repo_root", return_value=ROOT), \
+             patch("builtins.open", mock_open(read_data=json.dumps(MOCK_HOOKS_DEF))), \
+             patch("os.path.exists", return_value=True), \
+             patch.object(self.adapter, "run_hook_command") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout=json.dumps(warn_output), stderr="")
+            with patch("sys.stdin", io.StringIO(json.dumps(pre_tool_payload))), \
+                 patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
+                self.adapter.main()
+            res = json.loads(mock_stdout.getvalue())
+            self.assertEqual(res.get("decision"), "allow")
+
+        # Now trigger PreInvocation for the same session
+        pre_inv_payload = {
+            "conversationId": sid,
+            "invocationNum": 2,
+        }
+        with patch.object(self.adapter, "find_repo_root", return_value=ROOT), \
+             patch("builtins.open", mock_open(read_data=json.dumps(MOCK_HOOKS_DEF))), \
+             patch("os.path.exists", return_value=True), \
+             patch.object(self.adapter, "run_hook_command") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+            with patch("sys.stdin", io.StringIO(json.dumps(pre_inv_payload))), \
+                 patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
+                self.adapter.main()
+            inv_res = json.loads(mock_stdout.getvalue())
+            steps = inv_res.get("injectSteps", [])
+            self.assertTrue(len(steps) > 0, "PreInvocation should have injected warning step")
+            msg = steps[0].get("ephemeralMessage", "")
+            self.assertIn("Forge comment lacks agent disclosure.", msg)
+            self.assertIn("Please append agent disclosure footer.", msg)
+
+        # Subsequent PreInvocation should have drained the warning
+        with patch.object(self.adapter, "find_repo_root", return_value=ROOT), \
+             patch("builtins.open", mock_open(read_data=json.dumps(MOCK_HOOKS_DEF))), \
+             patch("os.path.exists", return_value=True), \
+             patch.object(self.adapter, "run_hook_command") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+            with patch("sys.stdin", io.StringIO(json.dumps(pre_inv_payload))), \
+                 patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
+                self.adapter.main()
+            inv_res2 = json.loads(mock_stdout.getvalue())
+            self.assertEqual(inv_res2.get("injectSteps", []), [])
+
+    def test_pre_tool_use_warn_surfaces_in_stop(self):
+        sid = "test-session-warn-stop"
+        pre_tool_payload = {
+            "conversationId": sid,
+            "toolCall": {"name": "run_command", "args": {"CommandLine": "gh pr comment 12"}},
+        }
+        warn_output = {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "additionalContext": "Notice: comment missing disclosure footer.",
+            }
+        }
+        with patch.object(self.adapter, "find_repo_root", return_value=ROOT), \
+             patch("builtins.open", mock_open(read_data=json.dumps(MOCK_HOOKS_DEF))), \
+             patch("os.path.exists", return_value=True), \
+             patch.object(self.adapter, "run_hook_command") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout=json.dumps(warn_output), stderr="")
+            with patch("sys.stdin", io.StringIO(json.dumps(pre_tool_payload))), \
+                 patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
+                self.adapter.main()
+
+        # Trigger Stop for the session
+        stop_payload = {
+            "conversationId": sid,
+            "terminationReason": "model_stop",
+        }
+        with patch.object(self.adapter, "find_repo_root", return_value=ROOT), \
+             patch("builtins.open", mock_open(read_data=json.dumps(MOCK_HOOKS_DEF))), \
+             patch("os.path.exists", return_value=True), \
+             patch.object(self.adapter, "run_hook_command") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+            with patch("sys.stdin", io.StringIO(json.dumps(stop_payload))), \
+                 patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
+                self.adapter.main()
+            stop_res = json.loads(mock_stdout.getvalue())
+            sys_msg = stop_res.get("systemMessage", "")
+            self.assertIn("Notice: comment missing disclosure footer.", sys_msg)
+
+    def test_session_isolation_for_pending_warnings(self):
+        sid_a = "session-AAA"
+        sid_b = "session-BBB"
+        pre_tool_payload = {
+            "conversationId": sid_a,
+            "toolCall": {"name": "run_command", "args": {"CommandLine": "ls"}},
+        }
+        warn_output = {
+            "hookSpecificOutput": {
+                "additionalContext": "Specific warning for A",
+            }
+        }
+        with patch.object(self.adapter, "find_repo_root", return_value=ROOT), \
+             patch("builtins.open", mock_open(read_data=json.dumps(MOCK_HOOKS_DEF))), \
+             patch("os.path.exists", return_value=True), \
+             patch.object(self.adapter, "run_hook_command") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout=json.dumps(warn_output), stderr="")
+            with patch("sys.stdin", io.StringIO(json.dumps(pre_tool_payload))), \
+                 patch("sys.stdout", new_callable=io.StringIO):
+                self.adapter.main()
+
+        # Session B checks PreInvocation
+        pre_inv_b = {"conversationId": sid_b, "invocationNum": 1}
+        with patch.object(self.adapter, "find_repo_root", return_value=ROOT), \
+             patch("builtins.open", mock_open(read_data=json.dumps(MOCK_HOOKS_DEF))), \
+             patch("os.path.exists", return_value=True), \
+             patch.object(self.adapter, "run_hook_command") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+            with patch("sys.stdin", io.StringIO(json.dumps(pre_inv_b))), \
+                 patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
+                self.adapter.main()
+            b_res = json.loads(mock_stdout.getvalue())
+            self.assertEqual(b_res.get("injectSteps", []), [])
+
+        # Session A checks PreInvocation
+        pre_inv_a = {"conversationId": sid_a, "invocationNum": 1}
+        with patch.object(self.adapter, "find_repo_root", return_value=ROOT), \
+             patch("builtins.open", mock_open(read_data=json.dumps(MOCK_HOOKS_DEF))), \
+             patch("os.path.exists", return_value=True), \
+             patch.object(self.adapter, "run_hook_command") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+            with patch("sys.stdin", io.StringIO(json.dumps(pre_inv_a))), \
+                 patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
+                self.adapter.main()
+            a_res = json.loads(mock_stdout.getvalue())
+            self.assertGreaterEqual(len(a_res.get("injectSteps", [])), 1)
+            self.assertIn("Specific warning for A", a_res["injectSteps"][0]["ephemeralMessage"])
+
+    def test_get_pending_warnings_dir_unpatched(self):
+        # Stop patcher to test real directory resolution and security permissions
+        self.patcher.stop()
+        try:
+            real_dir = self.adapter._get_pending_warnings_dir()
+            self.assertTrue(real_dir.is_dir())
+            self.assertFalse(real_dir.is_symlink())
+            if os.name != "nt":
+                mode = real_dir.stat().st_mode & 0o777
+                self.assertEqual(mode, 0o700)
+        finally:
+            self.patcher.start()
+
+    def test_session_id_none_or_empty_does_not_persist(self):
+        warns = [{"hook_id": "h1", "additionalContext": "test"}]
+        self.adapter._record_pending_warnings(None, warns)
+        self.adapter._record_pending_warnings("", warns)
+        self.assertEqual(self.adapter._drain_pending_warnings(None), [])
+        self.assertEqual(self.adapter._drain_pending_warnings(""), [])
+
+    def test_warning_list_capping(self):
+        sid = "capped-session"
+        warns = [{"hook_id": f"h_{i}", "additionalContext": f"msg_{i}"} for i in range(60)]
+        self.adapter._record_pending_warnings(sid, warns)
+        drained = self.adapter._drain_pending_warnings(sid)
+        self.assertEqual(len(drained), 50)
+        self.assertEqual(drained[-1]["hook_id"], "h_59")
+
+    def test_corrupted_json_handled_cleanly(self):
+        sid = "corrupted-session"
+        warn_file = self.adapter._get_pending_warnings_file(sid)
+        warn_file.write_text("NOT_VALID_JSON{{{", encoding="utf-8")
+        drained = self.adapter._drain_pending_warnings(sid)
+        self.assertEqual(drained, [])
+        self.assertFalse(warn_file.exists())
+
+    def test_pre_tool_use_deny_does_not_persist_warnings(self):
+        sid = "deny-session"
+        pre_tool_payload = {
+            "conversationId": sid,
+            "toolCall": {"name": "run_command", "args": {"CommandLine": "rm -rf /"}},
+        }
+        deny_output = {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "deny",
+                "permissionDecisionReason": "Blocked destructive command.",
+                "additionalContext": "Advisory context that should not persist on deny.",
+            }
+        }
+        with patch.object(self.adapter, "find_repo_root", return_value=ROOT), \
+             patch("builtins.open", mock_open(read_data=json.dumps(MOCK_HOOKS_DEF))), \
+             patch("os.path.exists", return_value=True), \
+             patch.object(self.adapter, "run_hook_command") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout=json.dumps(deny_output), stderr="")
+            with patch("sys.stdin", io.StringIO(json.dumps(pre_tool_payload))), \
+                 patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
+                self.adapter.main()
+            res = json.loads(mock_stdout.getvalue())
+            self.assertEqual(res.get("decision"), "deny")
+
+        self.assertEqual(self.adapter._drain_pending_warnings(sid), [])
+
+    def test_stop_retains_both_ctx_and_sys_msg_when_distinct(self):
+        sid = "dual-msg-stop-session"
+        pre_tool_payload = {
+            "conversationId": sid,
+            "toolCall": {"name": "run_command", "args": {"CommandLine": "gh pr comment 12"}},
+        }
+        warn_output = {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "additionalContext": "Specific warning reason.",
+            },
+            "systemMessage": "Actionable user remediation note.",
+        }
+        with patch.object(self.adapter, "find_repo_root", return_value=ROOT), \
+             patch("builtins.open", mock_open(read_data=json.dumps(MOCK_HOOKS_DEF))), \
+             patch("os.path.exists", return_value=True), \
+             patch.object(self.adapter, "run_hook_command") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout=json.dumps(warn_output), stderr="")
+            with patch("sys.stdin", io.StringIO(json.dumps(pre_tool_payload))), \
+                 patch("sys.stdout", new_callable=io.StringIO):
+                self.adapter.main()
+
+        stop_payload = {
+            "conversationId": sid,
+            "terminationReason": "model_stop",
+        }
+        with patch.object(self.adapter, "find_repo_root", return_value=ROOT), \
+             patch("builtins.open", mock_open(read_data=json.dumps(MOCK_HOOKS_DEF))), \
+             patch("os.path.exists", return_value=True), \
+             patch.object(self.adapter, "run_hook_command") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+            with patch("sys.stdin", io.StringIO(json.dumps(stop_payload))), \
+                 patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
+                self.adapter.main()
+            stop_res = json.loads(mock_stdout.getvalue())
+            sys_msg = stop_res.get("systemMessage", "")
+            self.assertIn("Specific warning reason.\n\nActionable user remediation note.", sys_msg)
 
 if __name__ == "__main__":
     unittest.main()

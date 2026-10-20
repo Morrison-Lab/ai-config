@@ -727,19 +727,42 @@ def _supersedes(success: dict, other: dict) -> bool:
     return s_at is not None and o_at is not None and s_at > o_at
 
 
-def _supersede_key(cr: dict, repo: str, cache: dict) -> Optional[Tuple[str, str, str]]:
-    """(job name, workflow path, event), or None when the workflow is unknown.
+PR_COMPATIBLE_EVENTS = frozenset({
+    "pull_request",
+    "pull_request_target",
+    "workflow_dispatch",
+})
 
-    The event is part of the key so a passing push run cannot excuse a failing
-    pull_request run. A run whose event is unknown (a payload that predates
-    the field) gets no key, so it is never excused.
+
+def _event_group(event: str) -> str:
+    """Group events that share PR evaluation context.
+
+    `pull_request`, `pull_request_target`, and `workflow_dispatch` (such as
+    an on-demand review dispatch triggered by `@claude review` that cancels
+    an in-flight PR run) all evaluate the PR on the same head SHA.
+    `push` runs independently on the branch head and must not excuse a PR run.
+    """
+    if event in PR_COMPATIBLE_EVENTS:
+        return "pr_dispatch"
+    return event
+
+
+def _supersede_key(cr: dict, repo: str, cache: dict) -> Optional[Tuple[str, str, str]]:
+    """(job name, workflow path, event group), or None when the workflow is unknown.
+
+    The event group is part of the key so a passing push run cannot excuse a failing
+    pull_request run. Runs sharing PR evaluation context (pull_request,
+    pull_request_target, workflow_dispatch) group together so on-demand review
+    dispatches can supersede concurrency-cancelled pull_request runs. A run
+    whose event is unknown (a payload that predates the field) gets no key, so
+    it is never excused.
     """
     path = _workflow_path_from_check_run(cr, repo, cache)
     if not path:
         return None
     m = re.search(r"/actions/runs/(\d+)/", cr.get("html_url") or "")
     event = cache.get(("event", m.group(1)) if m else None) or ""
-    return (cr["name"], path, event) if event else None
+    return (cr["name"], path, _event_group(event)) if event else None
 
 
 def _workflow_path_from_check_run(cr: dict, repo: str, cache: dict) -> Optional[str]:

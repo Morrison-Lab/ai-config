@@ -132,7 +132,7 @@ def scan(path):
                             last_file = i
 
             # Antigravity text content
-            if m.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or m.get("source") == "MODEL":
+            if m.get("type") == "PLANNER_RESPONSE":
                 raw_content = m.get("content")
                 if isinstance(raw_content, str) and raw_content.strip():
                     text = raw_content

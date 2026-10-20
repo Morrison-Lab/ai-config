@@ -322,10 +322,7 @@ def last_text(path: str) -> str:
                             last_text_val = text
                             consecutive_assistant = True
                             curr_msg_id = msg_id
-                elif (
-                    event.get("type") in {"PLANNER_RESPONSE", "GENERIC"}
-                    or event.get("source") == "MODEL"
-                ):
+                elif event.get("type") == "PLANNER_RESPONSE":
                     msg_id = (
                         (event.get("message") or {}).get("id")
                         or event.get("id")

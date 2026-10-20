@@ -475,7 +475,7 @@ def scan(path):
                             partial_events.append((i, _partial_refs(blob)))
 
             # Antigravity text content
-            if m.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or m.get("source") == "MODEL":
+            if m.get("type") == "PLANNER_RESPONSE":
                 raw_content = m.get("content")
                 if isinstance(raw_content, str) and raw_content.strip():
                     text = raw_content

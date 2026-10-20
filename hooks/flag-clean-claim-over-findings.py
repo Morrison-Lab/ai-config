@@ -563,8 +563,10 @@ def scan(path):
         rec_type = m.get("type") or m.get("role")
         if m.get("source") == "USER_EXPLICIT" or rec_type == "USER_INPUT":
             rec_type = "user"
-        elif m.get("source") == "MODEL" or rec_type in {"PLANNER_RESPONSE", "GENERIC"}:
+        elif rec_type == "PLANNER_RESPONSE" or rec_type == "assistant" or m.get("role") == "assistant":
             rec_type = "assistant"
+        elif rec_type == "GENERIC" or m.get("type") == "tool_result":
+            rec_type = "tool_result"
 
         for b in blocks:
             if not isinstance(b, dict):
@@ -632,9 +634,7 @@ def scan(path):
                 if txt.strip():
                     last_text = txt
 
-        if rec_type == "assistant" and (
-            m.get("source") == "MODEL" or (m.get("type") or "") in {"PLANNER_RESPONSE", "GENERIC"}
-        ):
+        if rec_type == "assistant" and (m.get("type") == "PLANNER_RESPONSE"):
             raw_content = m.get("content")
             if isinstance(raw_content, str) and raw_content.strip():
                 last_text = raw_content

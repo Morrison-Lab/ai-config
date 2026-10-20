@@ -84,10 +84,18 @@ for desc, rec in [
     ("Agent prompt naming UMS", tool("Agent", {"prompt": "Run UMS on this thread"})),
     ("Bash invoking update-memories-and-skills", tool("Bash", {"command": "echo update memories"})),
     ("Write under ai-config", tool("Write", {"file_path": "/h/ai-config/shared/x.md"})),
+    ("invoke_subagent with Subagents list", tool("invoke_subagent", {"Subagents": [{"Prompt": "Run UMS"}]})),
+    ("Antigravity PLANNER_RESPONSE invoke_subagent",
+     {"source": "MODEL", "type": "PLANNER_RESPONSE", "tool_calls": [
+         {"name": "invoke_subagent", "args": {"Subagents": [{"Prompt": "Run UMS"}]}}]}),
 ]:
     check(f"allowed after {desc}", run(work + [rec], resolve(), fresh()) == "")
 check("UMS before the last user message does not count",
       '"deny"' in run([tool("Skill", {"skill": "ums"}), user("more work")], resolve(), fresh()))
+check("Antigravity USER_INPUT user message invalidates earlier UMS",
+      '"deny"' in run([tool("Skill", {"skill": "ums"}),
+                       {"source": "USER_EXPLICIT", "type": "USER_INPUT", "content": "more work"}],
+                      resolve(), fresh()))
 check("a tool_result record is not a user message",
       run([user("go"), tool("Skill", {"skill": "ums"}), result()], resolve(), fresh()) == "")
 check("resolved:false (reopen) is not gated", run(work, resolve(resolved=False), fresh()) == "")

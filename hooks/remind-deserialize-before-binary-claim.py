@@ -382,7 +382,7 @@ def scan(path):
         elif isinstance(blocks, str) and is_assistant:
             text_blocks.append(blocks)
 
-        if m.get("type") in {"PLANNER_RESPONSE", "GENERIC"} or m.get("source") == "MODEL":
+        if m.get("type") == "PLANNER_RESPONSE":
             content = m.get("content")
             if isinstance(content, str):
                 text_blocks.append(content)
@@ -392,6 +392,8 @@ def scan(path):
                         text_blocks.append(b.get("text") or "")
                     elif isinstance(b, str):
                         text_blocks.append(b)
+
+        if m.get("type") == "PLANNER_RESPONSE" or "tool_calls" in m:
             for tc in m.get("tool_calls") or []:
                 if isinstance(tc, dict):
                     tname = tc.get("name") or (tc.get("function") or {}).get("name") or ""

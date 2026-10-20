@@ -244,8 +244,10 @@ def scan(path):
         rec_type = m.get("type") or m.get("role")
         if m.get("source") == "USER_EXPLICIT" or rec_type == "USER_INPUT":
             rec_type = "user"
-        elif m.get("source") == "MODEL" or rec_type in {"PLANNER_RESPONSE", "GENERIC"}:
+        elif rec_type == "PLANNER_RESPONSE" or rec_type == "assistant" or m.get("role") == "assistant":
             rec_type = "assistant"
+        elif rec_type == "GENERIC" or m.get("type") == "tool_result":
+            rec_type = "tool_result"
 
         if rec_type == "user":
             raw = _text_of(blocks)
@@ -294,10 +296,28 @@ def scan(path):
                     if REVIEW_FETCH.search(blob):
                         last_review_at = i
                 if name in ("Task", "Agent", "invoke_subagent"):
-                    ums_blob = (
-                        str(inp.get("prompt") or inp.get("Prompt") or "")
-                        + str(inp.get("description") or "")
-                    )
+                    ums_parts = [
+                        str(inp.get("prompt") or inp.get("Prompt") or ""),
+                        str(inp.get("description") or ""),
+                        str(inp.get("toolAction") or ""),
+                        str(inp.get("toolSummary") or ""),
+                    ]
+                    subagents = inp.get("Subagents") or inp.get("subagents")
+                    if isinstance(subagents, str):
+                        try:
+                            subagents = json.loads(subagents)
+                        except Exception:
+                            ums_parts.append(subagents)
+                            subagents = None
+                    if isinstance(subagents, list):
+                        for sa in subagents:
+                            if isinstance(sa, dict):
+                                ums_parts.append(str(sa.get("Prompt") or sa.get("prompt") or ""))
+                                ums_parts.append(str(sa.get("Role") or sa.get("role") or ""))
+                                ums_parts.append(str(sa.get("TypeName") or sa.get("typeName") or ""))
+                            elif isinstance(sa, str):
+                                ums_parts.append(sa)
+                    ums_blob = " ".join(ums_parts)
                 elif name in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
                     ums_blob = str(inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or "")
                 elif name == "Skill":

@@ -134,6 +134,19 @@ CASES = [
     # Ordering: hook work BEFORE the admission does not discharge it.
     ([WROTE_HOOK, say("Separately, I was wrong about the count.")], True,
      "hook work preceding the admission does not count"),
+
+    # Antigravity transcript format: GENERIC tool result vs PLANNER_RESPONSE (ai-config#4635)
+    ([{"source": "MODEL", "type": "GENERIC", "content": "I was wrong about that."}], False,
+     "Antigravity GENERIC tool result containing admission is not assistant prose"),
+    ([{"source": "MODEL", "type": "GENERIC", "content": "Found duplicated content in file."}], False,
+     "Antigravity GENERIC tool result containing redundant prose trigger is not assistant prose"),
+    ([{"source": "MODEL", "type": "PLANNER_RESPONSE", "content": "I was wrong about that."}], True,
+     "Antigravity PLANNER_RESPONSE containing admission reminds"),
+    ([{"source": "MODEL", "type": "PLANNER_RESPONSE", "content": "I was wrong about that."},
+      {"source": "MODEL", "type": "PLANNER_RESPONSE", "tool_calls": [
+          {"name": "write_to_file", "args": {"TargetFile": "hooks/my-guard.py"}},
+      ]}], False,
+     "Antigravity PLANNER_RESPONSE tool call writing hook discharges admission"),
 ]
 
 

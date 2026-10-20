@@ -635,7 +635,7 @@ def scan(path):
             elif isinstance(blocks, str):
                 text_blocks.append(blocks)
 
-        if kind in {"PLANNER_RESPONSE", "GENERIC"} or m.get("source") == "MODEL":
+        if kind == "PLANNER_RESPONSE":
             content = m.get("content")
             if isinstance(content, str):
                 text_blocks.append(content)
@@ -645,6 +645,8 @@ def scan(path):
                         text_blocks.append(b.get("text") or "")
                     elif isinstance(b, str):
                         text_blocks.append(b)
+
+        if kind == "PLANNER_RESPONSE" or "tool_calls" in m:
             for tc in m.get("tool_calls") or []:
                 if isinstance(tc, dict):
                     tname = tc.get("name") or (tc.get("function") or {}).get("name") or ""
@@ -836,8 +838,22 @@ def discharges(name, inp):
         skill = str(inp.get("skill", "")).strip().lower().split(":")[-1]
         if skill in SCHEDULER_SKILLS:
             return "scheduled"
-        blob = " ".join(str(inp.get(k, "")) for k in
-                        ("prompt", "description", "skill", "args"))
+        parts = [str(inp.get(k, "")) for k in ("prompt", "description", "skill", "args", "toolAction", "toolSummary")]
+        subagents = inp.get("Subagents") or inp.get("subagents")
+        if isinstance(subagents, str):
+            try:
+                subagents = json.loads(subagents)
+            except Exception:
+                parts.append(subagents)
+                subagents = None
+        if isinstance(subagents, list):
+            for sa in subagents:
+                if isinstance(sa, dict):
+                    parts.append(str(sa.get("Prompt") or sa.get("prompt") or ""))
+                    parts.append(str(sa.get("Role") or sa.get("role") or ""))
+                elif isinstance(sa, str):
+                    parts.append(sa)
+        blob = " ".join(parts)
         if FILING_CMD.search(blob) or SKILL_WORD.search(blob):
             return "durable"
         return None

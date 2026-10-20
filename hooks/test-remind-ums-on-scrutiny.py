@@ -200,6 +200,14 @@ SILENT = [
     ([meta("**Claude finished** reviewing HEAD. ### Verdict")],
      "a loaded skill body quoting review-shaped text is not a review-read "
      "(ai-config#3860)"),
+    ([Q, {"source": "MODEL", "type": "GENERIC", "content": "I was wrong about that."}],
+     "Antigravity GENERIC tool result after questioning is not assistant correction"),
+    ([Q, WRONG, {"source": "MODEL", "type": "PLANNER_RESPONSE", "tool_calls": [
+        {"name": "invoke_subagent", "args": {"Subagents": [{"Prompt": "Run UMS pass"}]}}]}],
+     "Antigravity invoke_subagent discharges scrutiny"),
+    ([REVIEW, {"source": "MODEL", "type": "PLANNER_RESPONSE", "tool_calls": [
+        {"name": "invoke_subagent", "args": {"toolAction": "Running UMS pass", "Subagents": []}}]}],
+     "Antigravity invoke_subagent with toolAction discharges review-read"),
     ([REVIEW], "placeholder -- replaced below for sidechain"),
 ]
 

@@ -668,7 +668,7 @@ case([bash("gh pr create -R o1/r --title a", tid="a"),
 # CURRENT branch's own PR (#1038, learned from the ready result). A whole-string
 # identity scan matched the decoy `pr view 42` and mislabeled the obligation as
 # #42 -- so a later, entirely unrelated request for #42 discharged the (real,
-# unreviewed) #1038. open_ident scopes identity to the `gh pr ready` command
+# unreviewed) #1038. _opens_in scopes identity to the `gh pr ready` command
 # itself, so the obligation is #1038 (backfilled from its result) and the #42
 # request cannot clear it.
 case([bash("gh pr view 42 && gh pr ready", tid="c"),
@@ -693,6 +693,85 @@ case([bash("gh pr checks 1029 && gh pr ready 1038", tid="c"), res("c", "{}"),
       res("q", OK),
       say("Checked #1029, readied #1038, requested on #1029.")], True,
      "a decoy verb does not override an explicit `gh pr ready <N>` identity")
+
+# --- chained `gh pr create` calls in one shell command (ai-config#4393) ---
+# One command creates PRs in two repos; result contains both URLs.
+# Both must be tracked, and requesting review for only one keeps the other outstanding.
+case([bash("gh pr create --repo Morrison-Lab/mln --head x --base main --title t1\n"
+          "gh pr create --repo Morrison-Lab/mlg --head x --base main --title t2", tid="c"),
+      res("c", "https://github.com/Morrison-Lab/mln/pull/23\n"
+               "https://github.com/Morrison-Lab/mlg/pull/5\n"),
+      bash("gh api repos/Morrison-Lab/mln/pulls/23/requested_reviewers -X POST", tid="q"),
+      res("q", OK),
+      say("Requested review on mln only.")], True,
+     "chained creates: requesting review on one leaves the other outstanding")
+case([bash("gh pr create --repo Morrison-Lab/mln --head x --base main --title t1\n"
+          "gh pr create --repo Morrison-Lab/mlg --head x --base main --title t2", tid="c"),
+      res("c", "https://github.com/Morrison-Lab/mln/pull/23\n"
+               "https://github.com/Morrison-Lab/mlg/pull/5\n"),
+      bash("gh api repos/Morrison-Lab/mln/pulls/23/requested_reviewers -X POST", tid="q1"),
+      res("q1", OK),
+      bash("gh api repos/Morrison-Lab/mlg/pulls/5/requested_reviewers -X POST", tid="q2"),
+      res("q2", OK),
+      say("Requested review on both.")], False,
+     "chained creates: requesting review on both discharges both obligations")
+case([bash("gh pr create --repo Morrison-Lab/mln --draft --title t1 && "
+          "gh pr create --repo Morrison-Lab/mlg --title t2", tid="c"),
+      res("c", "https://github.com/Morrison-Lab/mln/pull/23\n"
+               "https://github.com/Morrison-Lab/mlg/pull/5\n"),
+      bash("gh api repos/Morrison-Lab/mlg/pulls/5/requested_reviewers -X POST", tid="q"),
+      res("q", OK),
+      say("Drafted mln, readied mlg, and requested on mlg.")], False,
+     "chained draft and non-draft create tracks only the non-draft PR")
+case([bash("gh pr create --repo Morrison-Lab/mln --title t1 && "
+          "gh pr create --repo Morrison-Lab/mlg --title t2", tid="c"),
+      res("c", "https://github.com/Morrison-Lab/mln/pull/23\nerror: branch missing", err=True),
+      bash("gh api repos/Morrison-Lab/mln/pulls/23/requested_reviewers -X POST", tid="q"),
+      res("q", OK),
+      say("First create succeeded, second failed; requested review on the first.")], False,
+     "chained creates where one fails tracks only the succeeded PR")
+case([bash("gh pr create --repo Morrison-Lab/mln --draft --title t1 && "
+          "gh pr create --repo Morrison-Lab/mln --title t2", tid="c"),
+      res("c", "https://github.com/Morrison-Lab/mln/pull/23\n"
+               "https://github.com/Morrison-Lab/mln/pull/24\n"),
+      bash("gh api repos/Morrison-Lab/mln/pulls/24/requested_reviewers -X POST", tid="q"),
+      res("q", OK),
+      say("Drafted 23, readied 24, requested on 24.")], False,
+     "chained draft and non-draft in same repo correctly attributes non-draft obligation")
+case([bash("gh pr create --draft --title t1 && "
+          "gh pr create --title t2 && "
+          "gh pr create --title t3", tid="c"),
+      res("c", "https://github.com/Morrison-Lab/mln/pull/23\n"
+               "https://github.com/Morrison-Lab/mln/pull/24\n"
+               "https://github.com/Morrison-Lab/mln/pull/25\n"),
+      bash("gh api repos/Morrison-Lab/mln/pulls/24/requested_reviewers -X POST", tid="q1"),
+      res("q1", OK),
+      bash("gh api repos/Morrison-Lab/mln/pulls/25/requested_reviewers -X POST", tid="q2"),
+      res("q2", OK),
+      say("Drafted 23, created 24 and 25, requested on both.")], False,
+     "chained draft and multiple non-draft creates pair correctly and discharge")
+case([bash("gh pr create --repo Morrison-Lab/mln --title t1 && "
+          "gh pr create --repo Morrison-Lab/mlg --title t2", tid="c"),
+      res("c", "https://github.com/Morrison-Lab/mln/pull/23\n"),
+      bash("gh api repos/Morrison-Lab/mln/pulls/23/requested_reviewers -X POST", tid="q"),
+      res("q", OK),
+      say("First succeeded, second produced no URL; requested on first.")], False,
+     "chained creates where one yields no URL exits without wedging unnumbered obligation")
+case([bash("gh pr create --repo Morrison-Lab/mln --title t1 && "
+          "gh pr create --repo Morrison-Lab/mln --title t2 && "
+          "gh pr edit -R Morrison-Lab/mln --add-reviewer alice", tid="c"),
+      res("c", "https://github.com/Morrison-Lab/mln/pull/23\n"
+               "https://github.com/Morrison-Lab/mln/pull/24\n"),
+      say("Created both, bare edit added reviewer to one.")], True,
+     "chained creates with bare edit does not silently discharge multiple obligations")
+case([bash("gh pr create -d --title t1 && "
+          "gh pr create --title t2", tid="c"),
+      res("c", "https://github.com/Morrison-Lab/mln/pull/23\n"
+               "https://github.com/Morrison-Lab/mln/pull/24\n"),
+      bash("gh api repos/Morrison-Lab/mln/pulls/24/requested_reviewers -X POST", tid="q"),
+      res("q", OK),
+      say("Created draft with -d, non-draft with create, requested review on non-draft.")], False,
+     "short flag -d opens a draft PR and does not create an outstanding obligation")
 
 # --- id-correlated results: an unrelated batched result must not mislead ---
 case(create("c") + [
@@ -845,7 +924,7 @@ case(create("c") + [
 # usage. RX_CMD_VERB needs a digit, so the command yields no number and the
 # obligation is appended with num=None. gh's success line is `Pull request
 # owner/repo#N is marked as "ready for review"` -- an owner/repo#N shape
-# result_ident must recognize, or the number never backfills and _clear() (which
+# result_idents must recognize, or the number never backfills and _clear() (which
 # will not touch a num=None obligation) can NEVER discharge it: the guard would
 # then block every message for the rest of the session (a wedge).
 READY_OUT = 'Pull request o/r#1038 is marked as "ready for review"'

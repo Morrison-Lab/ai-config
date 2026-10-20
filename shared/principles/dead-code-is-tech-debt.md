@@ -39,6 +39,9 @@ When auditing or reviewing a codebase, identify and prune these five categories:
 ### 1. Obsolete and uncalled functions, modules, and exports
 
 - Functions, classes, methods, or helper utilities with zero live callers across the repository.
+- Superseded single-item internal helpers left behind when generalized multi-item functions are introduced
+  (e.g. leaving `open_ident`, `_argv_open`, and `result_ident` orphaned after `_opens_in` and `result_idents` took over their call sites;
+  ai-config#4639).
 - Dead branches guarded by conditions that are statically false or obsolete feature flags.
 - Exported package symbols that have been superseded and are no longer part of the public interface.
 
@@ -128,6 +131,7 @@ This principle complements rather than contradicts [`prefer-optionality-over-rem
 - **Do:** delete dead code, orphaned configs, unreferenced memories, and commented-out code completely.
 - **Do:** rely on git history as the permanent archive instead of preserving dead code in source files.
 - **Do:** remove associated tests, documentation, and manifest registrations when removing dead symbols.
+- **Do:** when generalizing an internal helper to handle multiple items or batch pipelines, eliminate the superseded single-item function in the same turn instead of preserving an unused wrapper.
 - **Do:** use deterministic static analysis tools to verify zero callers before deletion.
 - **Do:** when a comment proves one conjunct redundant, grep the same file for the identical operand and check whether a nearby condition carries it too --- the removal you just made can be exactly the fact that makes a sibling conjunct provably dead as well.
 - **Do:** treat every match that grep turns up as a question, not an answer --- re-run the same control-flow proof against it, and if the proof doesn't go through, ask what failure mode the operand might be the sole guard against before removing it.

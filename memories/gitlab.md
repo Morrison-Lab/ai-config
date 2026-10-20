@@ -230,6 +230,7 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
     or the corresponding group endpoint before ruling out a maintainer-only repair.
     (Measured 2026-09-23 while diagnosing HACR
     (`health-analytics-core/hacr`) job-token access.)
+  - Escape line-initial `/command` tokens in model-generated Markdown before posting GitLab issue or MR notes (`sed -E 's|^([[:space:]]*)/([[:alpha:]][[:alnum:]_-]*)|\1\\/\2|'`), because GitLab executes standalone quick actions (such as `/close`, `/approve`, or `/label`) using the posting token's permissions (`HACtions !69`, caught by pre-push adversarial review 2026-10-19).
 
 ## GitLab returns 404, not 403, for a project the token cannot SEE
 

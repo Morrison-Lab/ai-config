@@ -2,6 +2,12 @@ Whenever `main` has moved ahead of a PR branch you're working on, **merge
 `main` into the PR branch** before the next push or review trigger. Don't wait
 for a conflict to surface or for someone to ask.
 
+Merging `main` into any PR branch is standing-authorized and never needs
+asking (Ezra, 2026-10-22: asked "confirm I may merge main into that branch",
+the answer was "yes, always").
+A repo's own "merge main only when it conflicts" guidance does not make the
+merge a question for the user: do it when `main` has moved, and say so after.
+
 Worked-example case records for the rules below live in
 [`sync-with-main.cases.md`](sync-with-main.cases.md), moved out of the auto-loaded context.
 

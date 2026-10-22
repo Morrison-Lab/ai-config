@@ -6,7 +6,8 @@ The rule is in [`shared/workflow/repo-templates.md`](../../shared/workflow/repo-
 ## 2026-10-22: every repo gets a ruleset that follows its template's example
 
 Ezra's rule: when configuring a repo, always set a ruleset, following the example of the template repo it came from, and create the example when the template has none.
-Issue: [ai-config#4671](https://github.com/Morrison-Lab/ai-config/issues/4671); rule PR: [ai-config#4672](https://github.com/Morrison-Lab/ai-config/pull/4672).
+The tracking issue is [ai-config#4671](https://github.com/Morrison-Lab/ai-config/issues/4671).
+The rule was merged in [ai-config#4672](https://github.com/Morrison-Lab/ai-config/pull/4672).
 
 - **Template examples.**
   `qwt`, `qbt` and `rpt` already had `.github/rulesets/main.json`.
@@ -25,7 +26,11 @@ Issue: [ai-config#4671](https://github.com/Morrison-Lab/ai-config/issues/4671); 
   - A fresh dry run then showed no repo without a ruleset.
     Before, 39 had one and 20 were missing.
 - **Why `qmt`, `qet` and `grt` carry `base.json` rather than their own example.**
-  They had no example when the script ran, so the fallback applied.
+  The three are templates themselves, so GitHub records no template for them and `apply-all.sh` used the fallback.
+  Their own examples were already merged by then, so the live rulesets differ from the examples in their `.github/rulesets/` until a template's `apply-rulesets.sh` is run in that repo.
+  `mcsg` is the exception: it was applied with the `mcsg=grt` override, so it got `grt`'s example.
 - **Name aliasing.**
   `base.json` is named `protect-default-branch` and the template examples are named `main`.
-  Each template's `apply-rulesets.sh` treats `protect-default-branch` as the same ruleset as its own, so a later run updates the live ruleset in place and cannot add a second one.
+  The `apply-rulesets.sh` of `qwt`, `qbt`, `rpt`, `qmt`, `qet` and `grt` treats `protect-default-branch` as the same ruleset as `main`.
+  A later run therefore updates the live ruleset in place and cannot add a second one.
+  When a repo has both names, the script prefers the ruleset named `main`.

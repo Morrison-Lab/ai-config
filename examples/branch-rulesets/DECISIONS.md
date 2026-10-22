@@ -1,7 +1,8 @@
 # Branch-ruleset decisions
 
 A dated record of the decisions behind the rulesets in the Morrison-Lab organization.
-The rule is in [`shared/workflow/repo-templates.md`](../../shared/workflow/repo-templates.md); the scripts are described in [`README.md`](README.md).
+The rule is in [`shared/workflow/repo-templates.md`](../../shared/workflow/repo-templates.md).
+The scripts are described in [`README.md`](README.md).
 
 ## 2026-10-22: every repo gets a ruleset that follows its template's example
 
@@ -26,7 +27,7 @@ The rule was merged in [ai-config#4672](https://github.com/Morrison-Lab/ai-confi
   - A fresh dry run then showed no repo without a ruleset.
     Before, 39 had one and 20 were missing.
 - **Why `qmt`, `qet` and `grt` carry `base.json` rather than their own example.**
-  The three are templates themselves, so GitHub records no template for them and `apply-all.sh` used the fallback.
+  The three are templates themselves, so none of them had a template with an example to follow (GitHub records `slidebreak` for `qet`, which has none) and `apply-all.sh` used the fallback.
   Their own examples were already merged by then, so the live rulesets differ from the examples in their `.github/rulesets/` until a template's `apply-rulesets.sh` is run in that repo.
   `mcsg` is the exception: it was applied with the `mcsg=grt` override, so it got `grt`'s example.
 - **Name aliasing.**
@@ -34,3 +35,4 @@ The rule was merged in [ai-config#4672](https://github.com/Morrison-Lab/ai-confi
   The `apply-rulesets.sh` of `qwt`, `qbt`, `rpt`, `qmt`, `qet` and `grt` treats `protect-default-branch` as the same ruleset as `main`.
   A later run therefore updates the live ruleset in place and cannot add a second one.
   When a repo has both names, the script prefers the ruleset named `main`.
+  Updating a `protect-default-branch` ruleset replaces its settings with the example's and renames it to `main`, so check that the live ruleset is not stricter than the example before running a template's script on a repo that has one.

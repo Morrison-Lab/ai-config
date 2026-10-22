@@ -107,7 +107,7 @@ something else.
 
 ## Template examples and the org-wide audit
 
-Each template repository (`qwt`, `qbt`, `rpt`, and `qmt`, `qet` and `grt` once their example PRs merge) carries its own example in `.github/rulesets/main.json`;
+Each template repository (`qwt`, `qbt`, `rpt`, `qmt`, `qet` and `grt`) carries its own example in `.github/rulesets/main.json`;
 a repo follows the example of the template it was made from (rule in [`shared/workflow/repo-templates.md`](../../shared/workflow/repo-templates.md)).
 `apply-all.sh` reports which org repos have no ruleset and applies the matching example with `--apply`.
 [`DECISIONS.md`](DECISIONS.md) records which repo got which example, and why.

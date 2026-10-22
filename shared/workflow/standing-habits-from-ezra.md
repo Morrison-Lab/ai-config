@@ -32,8 +32,10 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`, exce
 - **Do:** for a classifier denial of an action he authorized, follow [`ask-for-manual-approval`](ask-for-manual-approval.md).
   Name the refused command and ask him to leave auto mode, which is one click.
   When he is away, record the denial as a pending decision, as that fragment says.
-- **Do:** for any other unavoidable step (a missing tool, a machine only he can reach), write an idempotent script on a pushed branch that does the whole job.
-  Give him one copy-paste line with the placeholders filled in and the absolute checkout path: `cd <checkout> && git fetch origin && bash <(git show origin/<branch>:scripts/<name>.sh)`.
+- **Do:** for any other unavoidable step (a missing tool, a machine only he can reach), write an idempotent script that does the whole job.
+  Give him one single command with the absolute path filled in, such as `bash <absolute-path>/scripts/<name>.sh`, after getting the script onto his disk (a merged PR in a checkout he keeps current, or a file the session on his machine writes).
+  Chaining does not count as a single command (Ezra, 2026-10-22): no `&&`, `;`, pipe, `cd <dir> &&`, or `bash <(...)`.
+  If the step takes more than one command, those commands go inside the script, never in his paste.
   Test the script on a scratch copy, including a second run that changes nothing, and get an adversarial review of it before you hand it over.
   Limit it to the blocked step: it never merges, force-pushes, or touches another repository.
 - **Do:** ask Ezra for a manual step only when another rule reserves it to him: a secret or credential, a hard-prohibited category, or merge words.

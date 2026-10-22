@@ -15,7 +15,7 @@ Yields are a dated measurement and decay as communities shift;
 re-measure on each pass rather than trusting this table's ranking as current.
 
 Access mechanics (Reddit is blocked to WebFetch/WebSearch/curl in local sessions;
-the working Claude-in-Chrome route): [`reddit-access.md`](reddit-access.md).
+the Claude-in-Chrome route is retired): [`reddit-access.md`](reddit-access.md).
 
 | Subreddit | Yield (2026-08) | What it carried |
 |---|---|---|

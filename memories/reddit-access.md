@@ -124,7 +124,11 @@ Record whichever happens, because the two outcomes say different things.
 The same "unable to fetch" refusal surviving the override would rule the
 preflight out, whereas a Reddit 403 would confirm it.
 
-## The working route: Claude in Chrome, in-page fetch
+## Retired route: Claude in Chrome, in-page fetch
+
+Retired 2026-10-22: Ezra's rule is "no chrome ever" ([`browser-last-resort`](../shared/workflow/browser-last-resort.md)).
+Do not use it; the measurements below stay as history.
+When Reddit matters, report the surface as blocked and ask the user for a non-Chrome route.
 
 The `mcp__claude-in-chrome__*` tools drive the user's real Chrome, which has
 a real TLS fingerprint and a logged-in Reddit session.
@@ -156,9 +160,8 @@ Five mechanics, each measured working:
 
 ## Do and Don't
 
-- **Do:** route Reddit reads through Claude in Chrome's in-page fetch
-  (origin first, `credentials:'include'`), and check the `window` state
-  after a `javascript_tool` timeout before re-running the loop.
+- **Do:** report Reddit as blocked and ask the user for a non-Chrome route.
+  The Chrome in-page fetch is retired.
 - **Do:** describe route 1's block as a client-side gate, probably the
   WebFetch domain safety preflight, and say which part is measured and
   which is inferred.

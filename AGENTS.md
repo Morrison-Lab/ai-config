@@ -406,7 +406,7 @@ This grants no merge authority.
 See [`AGENTS.cases.md`](AGENTS.cases.md).
 
 The grant also covers software installs and updates, and `add_repo` (even to read a repo), without asking.
-Never hand the owner a step you could do yourself: [`default-to-action-grants`](shared/workflow/default-to-action-grants.md).
+Never ask the owner to perform a step you could do: [`default-to-action-grants`](shared/workflow/default-to-action-grants.md).
 Create new repos with `gh repo create --template`: [`templates`](shared/workflow/repo-templates.md).
 
 ## Strict Merge Control Policy

@@ -81,8 +81,8 @@ A notes site documents the topic and links to the package that supplies the code
 The answer was no.
 See [ai-config#4674](https://github.com/Morrison-Lab/ai-config/issues/4674).)
 
-- Sites install the package in CI, for example `any::Morrison-Lab/qnp` in a site's `r-packages`.
-  A merged repository would make every site clone the other site's chapters, data and Quarto configuration to get one function.
+- A site that uses the package installs it in CI, with an `owner/repo` line in its `r-packages` list.
+  For example, [lds#1280](https://github.com/Morrison-Lab/lds/pull/1280) adds `Morrison-Lab/qnp` there.
+  A merged repository would make every such site clone the other site's chapters, data and Quarto configuration to get one function.
 - A package has checks and a release cycle that prose does not: a dev version bump, a `NEWS.md` bullet, and `R CMD check` on three operating systems.
   A merged repository would put both sets of checks on every change.
-- A notes site may declare the package in its `DESCRIPTION` or `r-packages` and call it from its pages.

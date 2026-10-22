@@ -24,7 +24,7 @@ import sys
 from pathlib import Path
 
 BUILTIN = [
-    r"ucdavis/", r"ucdmc", r"\bUCDH\b", r"UC Davis Health", r"\bVPN\b", r"\bBAA\b",
+    r"\bucdavis\b",r"ucdmc", r"\bUCDH\b", r"UC Davis Health", r"\bVPN\b", r"\bBAA\b",
     r"hc2-gitlab", r"databricks\.com", r"\bdbc-",r"hac\.it", r"health-analytics-core",
     r"private (?:github )?mirror", r"runbook", r"project id\W{0,3}[0-9]{3,}",
     r"glpat-", r"glptt-", r"ghp_", r"gho_", r"AKIA[0-9A-Z]{16}",
@@ -69,10 +69,12 @@ def main() -> int:
                 patterns.append(line.strip())
     rx = re.compile("|".join(f"(?:{p})" for p in patterns), re.I)
     hits = 0
+    unscanned = []
     for rel in sorted(b):
         try:
             text = (exp / rel).read_text(encoding="utf-8", errors="strict")
         except (UnicodeDecodeError, OSError):
+            unscanned.append(rel)
             continue
         for n, line in enumerate(text.splitlines(), 1):
             if rx.search(line):
@@ -82,6 +84,12 @@ def main() -> int:
         failed = True
         print(f"FAIL {hits} line(s) match an internal-name or secret pattern; "
               "each must be removed or justified in the review.")
+    if unscanned:
+        failed = True
+        print(f"FAIL {len(unscanned)} file(s) are not UTF-8 text and were NOT "
+              "scanned; open each by hand and justify it in the review:")
+        for rel in unscanned:
+            print(f"  {rel}")
     print("FAIL" if failed else "ok")
     return 1 if failed else 0
 

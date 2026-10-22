@@ -397,15 +397,6 @@ Use a browser only if none can (or could be set up), or the task is visual.
 Never use Chrome or Claude in Chrome (Ezra, 2026-10-22).
 See [`browser-last-resort`](shared/workflow/browser-last-resort.md) and [`gh-pages`](shared/workflow/read-published-html-from-gh-pages.md).
 
-## Create every new Morrison-Lab repository from its template
-
-Before creating a repository in the Morrison-Lab organization, list the template repositories and create the new one from the matching template (`qwt` for a Quarto notes website, `qbt` for a book, `qmt` for a manuscript, `qet` for an extension, `rpt` for an R package).
-Never run a plain `gh repo create` for a repository a template covers, and never fall back to an empty repository when none matches: say so and ask which repository to model it on (Ezra, 2026-10-22, "always use templates").
-Detail: [`create-repos-from-templates`](shared/workflow/create-repos-from-templates.md).
-
-- **Do:** use `gh repo create Morrison-Lab/<name> --template Morrison-Lab/<template>`, and name the template in any Remote Control brief.
-- **Don't:** create an empty repository and add the template's files afterwards.
-
 ## Default to action without asking
 
 The owner grants standing permission for non-destructive steps (branch commits, pushes, opening/updating PRs, read commands, editing memory).
@@ -414,7 +405,8 @@ ask only for destructive, high-impact, or blocking decisions.
 This grants no merge authority.
 See [`AGENTS.cases.md`](AGENTS.cases.md).
 
-The grant also covers installing and updating software (R, packages, Quarto, any tool, directly or through a manager) and attaching any repository with `add_repo`, even only to read it, without asking: [`default-to-action-grants`](shared/workflow/default-to-action-grants.md).
+The grant also covers installing and updating software (R, packages, Quarto, any tool) and attaching any repository with `add_repo`, even to read it, without asking: [`default-to-action-grants`](shared/workflow/default-to-action-grants.md).
+Create new repos with `gh repo create --template`: [`templates`](shared/workflow/repo-templates.md).
 
 ## Strict Merge Control Policy
 

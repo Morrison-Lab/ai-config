@@ -138,7 +138,8 @@ Measured 2026-10-22: a new rule restated [`ask-for-manual-approval`](ask-for-man
 That fragment's trigger is a classifier denial, and it says to retry the identical command once at most, never rephrased, then ask.
 
 - **Do:** when a new directive overlaps an existing fragment, name the situation in a clause and link the fragment for the trigger and the steps.
-- **Don't:** restate the existing fragment's trigger or remedy in your own words.
+- **Do:** as a reviewer, flag a restated trigger or remedy and ask for a link.
+- **Don't:** paraphrase the existing fragment's trigger or remedy as a rule of your own, where the paraphrase can disagree with it.
 
 ## Applies at the scale of what's in front of you
 

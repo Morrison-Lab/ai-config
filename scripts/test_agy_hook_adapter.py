@@ -3032,7 +3032,7 @@ class TestWarnOnlyPreToolUseSurfacing(unittest.TestCase):
         def contender():
             nonlocal acquired_while_held
             with self.adapter._advisory_warnings_lock(warn_file):
-                if "holder:released" not in events:
+                if "holder:releasing" not in events:
                     acquired_while_held = True
                 events.append("contender:acquired")
 

@@ -134,8 +134,10 @@ delimited list, and the caveat was free prose outside the markers.)
 ## A new directive that overlaps an existing fragment: link it, do not paraphrase its trigger
 
 A paraphrase of a rule's trigger is a second copy that can disagree with the first.
-Measured 2026-10-22: a new rule restated [`ask-for-manual-approval`](ask-for-manual-approval.md) loosely ("same goal twice", "take another route"), and so contradicted it.
-That fragment's trigger is a classifier denial, and it says to retry the identical command once at most, never rephrased, then ask.
+Measured 2026-10-22: the first draft of [ai-config#4686](https://github.com/Morrison-Lab/ai-config/pull/4686) restated [`ask-for-manual-approval`](ask-for-manual-approval.md) loosely, and so contradicted it.
+The draft said "when a path is blocked, take another route to the same goal" with no exception for denials, and escalated "when an auto-mode classifier denies the same goal twice".
+The fragment's trigger is a classifier or approval-mode denial of an authorized action, and it says to retry the identical command once at most, never rephrased, then ask.
+The merged wording links the fragment and limits rerouting to technical blocks.
 
 - **Do:** when a new directive overlaps an existing fragment, name the situation in a clause and link the fragment for the trigger and the steps.
 - **Do:** as a reviewer, flag a restated trigger or remedy and ask for a link.

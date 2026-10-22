@@ -9,5 +9,6 @@ Nothing warns at edit time ([ai-config#4684](https://github.com/Morrison-Lab/ai-
 Measured 2026-10-22: `main` sat 1 byte under the cap, so an agent's appended paragraph left the file 619 bytes over.
 Only the adversarial reviewer caught it (the `main` figure is reproducible: `wc -c AGENTS.md` gave 32,767 at `427219fe`).
 
-- **Do:** run `python3 scripts/check-context-closure.py` before committing an `AGENTS.md` addition, and move the detail into a `shared/` fragment, leaving a one-line pointer.
+- **Do:** run `python3 scripts/check-context-closure.py` before committing an `AGENTS.md` addition.
+  When it reports the file over or near the cap, move the detail into a `shared/` fragment and leave a one-line pointer.
 - **Don't:** append a paragraph to `AGENTS.md` without measuring the cap, least of all when the last run reported tight headroom ([ai-config#4214](https://github.com/Morrison-Lab/ai-config/issues/4214)).

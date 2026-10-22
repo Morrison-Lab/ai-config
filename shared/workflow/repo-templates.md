@@ -14,6 +14,7 @@ A plain `gh repo create` produces an empty repository that lacks the lab's workf
   - `qmt` for a Quarto manuscript.
   - `qet` for a Quarto extension.
   - `rpt` for an R package.
+  - `grt` for a grading repository (private, so a reviewer without access to it will not see it in a listing).
 - Before creating from it, check the template for improvements:
   read its README, workflows, instructions and placeholder text, compare it with the newest repository made from it,
   and list the open issues and pull requests on the template.
@@ -55,3 +56,19 @@ Do not delete and recreate it unless the owner asks.
 (Owner rule, 2026-10-22: "always use templates", after two empty repositories were created in place of `qwt` copies.)
 Owner rule, 2026-10-22: "and before using a template, first check for opportunities to improve the template".
 Owner rule, 2026-10-22: "create a template first when none exists" (said about a grading repository, which had no template).
+
+## Set a branch ruleset that follows the template's example
+
+When you configure a repository, always give it a branch ruleset, and follow the example ruleset of the template it came from.
+(Owner rule, 2026-10-22: "when configuring a repo, always set a ruleset, following the examples from the corresponding template repos (create such examples if missing)".)
+
+- Each template carries its example as `.github/rulesets/main.json` with `.github/scripts/apply-rulesets.sh`.
+  Templates with an example: `qwt`, `qbt` and `rpt`;
+  `qmt`, `qet` and `grt` get theirs from [qmt#14](https://github.com/Morrison-Lab/qmt/pull/14), [qet#3](https://github.com/Morrison-Lab/qet/pull/3) and [grt#3](https://github.com/Morrison-Lab/grt/pull/3) (2026-10-22), and carry one once those merge.
+- A template without an example gets one by its own pull request, modelled on the closest template that has one, before any repo is made from it.
+  A repo with no template uses `examples/branch-rulesets/base.json`.
+- Apply it with the template's `apply-rulesets.sh` (idempotent by ruleset name), or audit and apply across the org with
+  `examples/branch-rulesets/apply-all.sh` (a dry run unless `--apply`).
+- Applying needs repo admin, which a cloud session lacks (403).
+  Run it in a Remote Control session with the owner's typed go, and prepare the exact command in the brief.
+- Never replace a live ruleset that is stricter than the example, and never add `required_status_checks` without reading the check-run names from a merged PR.

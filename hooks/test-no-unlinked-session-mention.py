@@ -24,6 +24,7 @@ CASES = [
     ("coordinator session", POST, "The coordinator session suggested it.", "coordinator session"),
     ("update_message", "mcp__hearthbot__update_message", "Ask the cloud session.", "cloud session"),
     ("capitalised", POST, "REMOTE CONTROL SESSIONS stopped.", "REMOTE CONTROL SESSIONS"),
+    ("two words between", POST, "Your remote desktop session is idle.", "Your remote desktop session"),
     ("linked in same paragraph", POST, f"The Mac session ({S}) is waiting.", None),
     ("thread link covers it", POST, f"The coordinator thread, {T}.", None),
     ("link in a different paragraph", POST, f"The Mac session is idle.\n\n{S}", "Mac session"),

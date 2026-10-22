@@ -32,7 +32,7 @@ FENCE = re.compile(
 INLINE_CODE = re.compile(r"(?<!`)(`+)(?!`).*?(?<!`)\1(?!`)", re.S)
 MENTION = re.compile(
     r"\b(?:(?:Remote Control|RC|Mac|Linux|cloud|local|device|coordinator|your)"
-    r"(?: \w+)? sessions?|coordinator)\b", re.I)
+    r"(?: \w+){0,2} sessions?|coordinator)\b", re.I)
 LINK = re.compile(
     r"claude\.ai/code/session_\w+|\(#cmsg_\w+\)|[?&]thread=cmsg_\w+")
 UNIT_BREAK = re.compile(r"\n[ \t]*\n|\n(?=(?:[-*+]|\d+[.)])[ \t])")

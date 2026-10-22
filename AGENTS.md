@@ -407,7 +407,6 @@ See [`AGENTS.cases.md`](AGENTS.cases.md).
 
 The grant also covers installing and updating software (R, packages, Quarto, any tool) and attaching any repository with `add_repo`, even to read it, without asking: [`default-to-action-grants`](shared/workflow/default-to-action-grants.md).
 Create new repos with `gh repo create --template`: [`templates`](shared/workflow/repo-templates.md).
-Always give a configured repo a branch ruleset that follows its template's example ruleset (create the example when missing): [`templates`](shared/workflow/repo-templates.md#set-a-branch-ruleset-that-follows-the-templates-example).
 
 ## Strict Merge Control Policy
 

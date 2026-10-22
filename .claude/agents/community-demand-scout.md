@@ -15,9 +15,9 @@ Prefer official read-only APIs over scraping: the GitHub issues API sorted
 by reactions, Reddit's `.json` endpoints, the Stack Exchange API. Skip
 gated Discord/Slack content that requires an invite or login to read.
 In a local session reddit.com is blocked for WebFetch/WebSearch/curl, and
-your toolset cannot reach it at all --- report the surface as blocked and let
-the caller run it via [`memories/reddit-access.md`](../../memories/reddit-access.md)'s
-Claude-in-Chrome route.
+your toolset cannot reach it at all --- report the surface as blocked and tell
+the caller to ask the user for a non-Chrome route
+(the Claude-in-Chrome route in [`memories/reddit-access.md`](../../memories/reddit-access.md) is retired).
 
 Report, for your surface only:
 

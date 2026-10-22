@@ -104,7 +104,7 @@ Split out of [`claude-code.md`](claude-code.md) (ai-config#694 pattern) at the
   refuses all three reddit.com hosts before Reddit answers, probably at its
   domain safety preflight rather than under any permission rule.
   [`reddit-access.md`](reddit-access.md) carries the five failed routes and
-  the working Claude-in-Chrome route (measured 2026-08-23/24).
+  the Claude-in-Chrome route, retired 2026-10-22 (measured 2026-08-23/24).
 - **`docs.github.com` itself can be blocked outright by a remote session's
   network policy** (proxy 403 on every page, and `api.github.com` too —
   both at the curl/WebFetch level; the GitHub MCP tools route through

@@ -394,6 +394,7 @@ See [`GEMINI.md`](GEMINI.md) and [`memories/antigravity.md`](memories/antigravit
 
 Before opening a browser, look for a CLI, MCP, or API that can do the task, and say what you found.
 Use a browser only if none can (or could be set up), or the task is visual.
+Never use Chrome or Claude in Chrome (Ezra, 2026-10-22).
 See [`browser-last-resort`](shared/workflow/browser-last-resort.md) and [`gh-pages`](shared/workflow/read-published-html-from-gh-pages.md).
 
 ## Default to action without asking

@@ -3,7 +3,8 @@
 
 Usage: python3 scripts/check_public_export.py SOURCE_CHECKOUT EXPORT_DIR [--deny-file FILE]
 
-Two checks, both of which must pass before any visibility change:
+SOURCE_CHECKOUT must be a full clone: a shallow one fails the run, because it cannot
+see the old history. These checks must all pass before any visibility change:
 
 1. Dropped files. Every file tracked in SOURCE_CHECKOUT (git ls-files) must be in
    EXPORT_DIR, and no file may appear only in EXPORT_DIR. A `git archive` plus the
@@ -13,7 +14,6 @@ Two checks, both of which must pass before any visibility change:
    case-insensitively for the built-in patterns below plus any extra regular
    expressions, one per line, in --deny-file (blank lines and lines starting with
    `#` are skipped). A match prints `path:line: text` and fails the check.
-
 3. Pinned commits. Any 40-hex SHA in EXPORT_DIR that is a commit of SOURCE_CHECKOUT
    fails the check: the history-free export does not contain that commit, so a
    consumer fetching at that ref gets a 404 (gla#3, 2026-10-22). Commits of other

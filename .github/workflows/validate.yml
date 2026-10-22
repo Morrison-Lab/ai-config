@@ -33,6 +33,9 @@ jobs:
         run: python3 scripts/check-md056-table-columns.py
       - name: Run check-md056-table-columns tests
         run: python3 scripts/test_check_md056_table_columns.py
+      - name: Run check-public-export tests
+        # Morrison-Lab/gla#3: the export check must fail on pins to commits of the old history.
+        run: python3 scripts/test_check_public_export.py
       - name: Run split-qmd tests
         # The splitter rewrites a Quarto chapter into a spine plus subfiles,
         # so these pin that expanding the includes restores every line.

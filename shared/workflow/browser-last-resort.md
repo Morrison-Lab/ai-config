@@ -16,6 +16,10 @@ Opening the browser because it was the first tool to hand is the failure this ru
 A missing route can also be a missing setup step: an API that needs an OAuth login, or a CLI that is not installed yet.
 That is a reason to set the route up, or to ask the user for the one step only they can do (an OAuth consent screen, say), rather than a reason to fall back to the browser.
 
+Chrome is the exception to the last resort: never drive Chrome or Claude in Chrome, for any task, including Canvas and other sites that have an API behind a login.
+Set up the route (a CLI, a script that reads its token from the keychain) or ask the user for the one step only they can do.
+(Directive from Ezra Morrison, 2026-10-22: "no chrome ever", when an agent proposed Chrome to reach Canvas.)
+
 A task that still needs the browser gets logged per [`deterministic-tools`](../principles/deterministic-tools.md#browser-work-leaves-no-artifact-so-keep-a-log-of-it).
 
 - **Do:** search for a CLI, MCP, or API route before opening a browser, and name what you found in the reply.

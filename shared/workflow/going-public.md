@@ -10,7 +10,7 @@ Follow this order, and change visibility last.
    Run `python3 scripts/check_public_export.py SOURCE EXPORT` (`scripts/check_public_export.py`).
    It fails if any tracked file was dropped from the export, such as a folder the source `.gitignore` excluded, or if the export holds a file the source does not.
 3. **Scan for internal names, not only hosts and tokens.**
-   The same script searches for `ucdavis/`, UCDH, VPN, BAA, project IDs, runbooks, private mirrors and private repository names, as well as tokens and SSN-like strings.
+   The same script searches for `ucdavis`, UCDH, VPN, BAA, project IDs, runbooks, private mirrors and private repository names, as well as tokens and SSN-like strings.
    Add the project's own names with `--deny-file`.
    Read every hit: a hit is removed or justified in the review, never ignored.
 4. **Read the whole export.**

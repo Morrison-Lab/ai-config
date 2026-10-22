@@ -24,8 +24,8 @@ import sys
 from pathlib import Path
 
 BUILTIN = [
-    r"\bucdavis\b",r"ucdmc", r"\bUCDH\b", r"UC Davis Health", r"\bVPN\b", r"\bBAA\b",
-    r"hc2-gitlab", r"databricks\.com", r"\bdbc-",r"hac\.it", r"health-analytics-core",
+    r"\bucdavis\b", r"ucdmc", r"\bUCDH\b", r"UC Davis Health", r"\bVPN\b", r"\bBAA\b",
+    r"hc2-gitlab", r"databricks\.com", r"\bdbc-", r"hac\.it", r"health-analytics-core",
     r"private (?:github )?mirror", r"runbook", r"project id\W{0,3}[0-9]{3,}",
     r"glpat-", r"glptt-", r"ghp_", r"gho_", r"AKIA[0-9A-Z]{16}",
     r"BEGIN [A-Z ]*PRIVATE KEY", r"\b[0-9]{3}-[0-9]{2}-[0-9]{4}\b",

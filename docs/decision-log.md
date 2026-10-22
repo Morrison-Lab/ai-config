@@ -1,7 +1,7 @@
 # Decision log
 
 Decisions about the lab's repositories and tooling that otherwise exist only in a chat thread.
-Format and rules: [`record-every-decision`](../shared/workflow/record-every-decision.md).
+Format and rules: [`record-every-decision`](https://github.com/Morrison-Lab/ai-config/blob/main/shared/workflow/record-every-decision.md).
 Newest first.
 Each entry gives the decision, who decided and when, and the thread.
 

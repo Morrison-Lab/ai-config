@@ -14,6 +14,12 @@ A plain `gh repo create` produces an empty repository that lacks the lab's workf
   - `qmt` for a Quarto manuscript.
   - `qet` for a Quarto extension.
   - `rpt` for an R package.
+- Before creating from it, check the template for improvements:
+  read its README, workflows, instructions and placeholder text, compare it with the newest repository made from it,
+  and list the open issues and pull requests on the template.
+  Fix what you find in the template through its own pull request, merge it, and only then create from it,
+  so every later repository gets the fix and not only this one.
+  If a fix cannot merge first, create from the template anyway and open the template pull request alongside.
 - Create from it:
   `gh repo create Morrison-Lab/<name> --template Morrison-Lab/<template> --private` (or `--public`).
 - Name the template in the brief when a Remote Control session does the creating, because a cloud session cannot create organization repositories (it gets a 403).
@@ -46,4 +52,5 @@ If the repository is still empty, copy the template's files into it through a pu
 Do not delete and recreate it unless the owner asks.
 
 (Owner rule, 2026-10-22: "always use templates", after two empty repositories were created in place of `qwt` copies.)
+Owner rule, 2026-10-22: "and before using a template, first check for opportunities to improve the template".
 Owner rule, 2026-10-22: "create a template first when none exists" (said about a grading repository, which had no template).

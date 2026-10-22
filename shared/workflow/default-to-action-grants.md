@@ -22,8 +22,9 @@ When a path is blocked for a technical reason (a missing CLI, a tool that cannot
 A failing check or gate is not such a block: fix what it reports rather than going around it.
 
 A policy denial is not a technical block, and you never route around one.
-For a permission-classifier or approval-mode denial, follow [`ask-for-manual-approval`](ask-for-manual-approval.md).
-For a proxy `403` or other forge policy rejection, follow [`use-existing-pr-branch`](use-existing-pr-branch.md) and report it to the owner.
+For a permission-classifier or approval-mode denial of an authorized action, follow [`ask-for-manual-approval`](ask-for-manual-approval.md).
+For a denial of an action nothing authorizes, ask the owner whether to do it at all, as that fragment says.
+For a proxy `403` on a push, follow [`use-existing-pr-branch`](use-existing-pr-branch.md): report it to the owner and do not retry it.
 
 Owner directive, 2026-10-22, given while moving mlg CI to the WWU GitLab.
 Tracked in [ai-config#4683](https://github.com/Morrison-Lab/ai-config/issues/4683).

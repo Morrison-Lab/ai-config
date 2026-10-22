@@ -9,7 +9,7 @@ A decision is any choice between options, by any route:
 - Ezra's own call, typed or picked on a decision card.
 - A [`daytb`](../../skills/daytb/SKILL.md) best guess.
 - A judgment call under [`away`](../../skills/away/SKILL.md) or [`dmmhyh`](../../skills/dmmhyh/SKILL.md).
-- A default taken because nobody answered in time.
+- A default taken after 10 minutes of silence, per the silence default in [`standing-habits-from-ezra`](standing-habits-from-ezra.md).
 - A choice made by a subagent or another thread.
 
 ## What a record holds

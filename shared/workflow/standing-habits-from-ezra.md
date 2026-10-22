@@ -70,6 +70,10 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`, exce
 - **Do:** record each decision (Ezra's call, `daytb`, a silence default, any other route) in a repo file, following [`record-every-decision`](record-every-decision.md).
 - **Don't:** leave a decision only in a thread or in project memory.
 - **Reason:** Ezra, 2026-10-22 ([ai-config#4676](https://github.com/Morrison-Lab/ai-config/issues/4676)).
+- **Silence default:** Ezra's standing DAYTB rule is to decide, and after 10 minutes of silence to take the best guess.
+  It never covers merges.
+  Its only prior copy was in the DATA 571 project memory, so this is its repo record.
+  The date Ezra set it is not recorded there.
 
 ## Keep removed content
 

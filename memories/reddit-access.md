@@ -6,7 +6,7 @@ Claude Code session, and the corpus's own research briefs
 [`community-demand-scout`](../.claude/agents/community-demand-scout.md)
 agent) named "the Reddit `.json` endpoints" as a preferred data source ---
 so a workflow brief written from those files sends every scout into a wall.
-The one route that works is Claude in Chrome driving the user's real Chrome.
+The one route that worked was Claude in Chrome driving the user's real Chrome, and it is retired (see "Retired route" below).
 Measured 2026-08-23/24 on a Windows 11 local session; tracked as
 [ai-config#2046](https://github.com/Morrison-Lab/ai-config/issues/2046).
 

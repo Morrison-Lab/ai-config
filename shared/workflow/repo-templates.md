@@ -69,6 +69,7 @@ When you configure a repository, always give it a branch ruleset, and follow the
   A repo with no template uses `examples/branch-rulesets/base.json`.
 - Apply it with the template's `apply-rulesets.sh` (idempotent by ruleset name), or audit and apply across the org with
   `examples/branch-rulesets/apply-all.sh` (a dry run unless `--apply`).
+- Naming repos on the command line restricts the run to those repos, so after an override run such as `mcs=qwt mcsg=grt --apply`, rerun `--apply` with no names, then a final dry run must show 0 `MISSING` (2026-10-22: 20 repos applied in two runs).
 - Applying needs repo admin, which a cloud session lacks (403).
   Run it in a Remote Control session with the owner's typed go, and prepare the exact command in the brief.
 - Never replace a live ruleset that is stricter than the example, and never add `required_status_checks` without reading the check-run names from a merged PR.

@@ -75,8 +75,9 @@ If the change has no rendered section, such as an infrastructure change, the PR 
 Whenever a message names a session, either a Claude Code session or a project thread, link it in the sentence that names it.
 Write `[session](https://claude.ai/code/session_…)` for a Claude Code session, or the thread link above for a project thread.
 
-- **Do:** write the session as a link the user can open.
-- **Don't:** name a session by title or id alone.
+- **Do:** write the session as a link the user can open, including a Remote Control session on the user's device, the coordinator, and every other thread or session.
+- **Don't:** name a session by title or id alone, or by a phrase such as "your Mac session".
 
 (Directive from the user, 2026-10-16: "anytime you mention a session, you must provide a link".
+Reaffirmed 2026-10-22: "always hyperlink when you mention other sessions".
 Tracked in [ai-config#4570](https://github.com/Morrison-Lab/ai-config/issues/4570).)

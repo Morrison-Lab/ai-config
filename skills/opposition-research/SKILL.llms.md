@@ -41,7 +41,7 @@ Spawn subagents (the `Agent` tool) — one per surface or small bucket of surfac
 2.  **Top demanded items** — the highest-signal feature requests found. For each: *what users want* (in your own words), *demand evidence* (upvotes / reactions / vote count / how many independent threads), and the *source link*.
 3.  **On-scope?** — does this fall inside our repo’s scope (§1), or is it adjacent noise?
 
-Prefer official read-only APIs over scraping (see Anti-patterns): the GitHub issues API sorted by reactions, the Reddit `.json` endpoints, the Stack Exchange API. Note reddit.com specifically is blocked for WebFetch, WebSearch, and curl in local sessions — cover Reddit surfaces from the main session via the Claude-in-Chrome route in [`memories/reddit-access.md`](../../memories/reddit-access.md).
+Prefer official read-only APIs over scraping (see Anti-patterns): the GitHub issues API sorted by reactions, the Reddit `.json` endpoints, the Stack Exchange API. Note reddit.com specifically is blocked for WebFetch, WebSearch, and curl in local sessions — report Reddit surfaces as blocked and ask the user for a non-Chrome route (the Claude-in-Chrome route in [`memories/reddit-access.md`](../../memories/reddit-access.md) is retired).
 
 ### 4. Keep only the community-valued, on-scope ideas
 

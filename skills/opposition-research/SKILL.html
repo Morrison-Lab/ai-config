@@ -50,9 +50,9 @@ ul.task-list li input[type="checkbox"] {
 <link href="../../site_libs/quarto-html/quarto-syntax-highlighting-bf27225e3a48a9273f3daa8f8e829971.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
 <script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="../../site_libs/bootstrap/bootstrap-55617497126496852ff9f5a59253c640.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="../../site_libs/bootstrap/bootstrap-dark-90b0ccabdf50233fb893b00cd6e33405.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
-<link href="../../site_libs/bootstrap/bootstrap-55617497126496852ff9f5a59253c640.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-d3c09cf01b9717715406c5b992d80823.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark-6933666674d213de44649b54dd39797a.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<link href="../../site_libs/bootstrap/bootstrap-d3c09cf01b9717715406c5b992d80823.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -415,7 +415,7 @@ cookieconsent.run({
 <li><strong>Top demanded items</strong> — the highest-signal feature requests found. For each: <em>what users want</em> (in your own words), <em>demand evidence</em> (upvotes / reactions / vote count / how many independent threads), and the <em>source link</em>.</li>
 <li><strong>On-scope?</strong> — does this fall inside our repo’s scope (§1), or is it adjacent noise?</li>
 </ol>
-<p>Prefer official read-only APIs over scraping (see Anti-patterns): the GitHub issues API sorted by reactions, the Reddit <code>.json</code> endpoints, the Stack Exchange API. Note reddit.com specifically is blocked for WebFetch, WebSearch, and curl in local sessions — cover Reddit surfaces from the main session via the Claude-in-Chrome route in <a href="../../memories/reddit-access.md"><code>memories/reddit-access.md</code></a>.</p>
+<p>Prefer official read-only APIs over scraping (see Anti-patterns): the GitHub issues API sorted by reactions, the Reddit <code>.json</code> endpoints, the Stack Exchange API. Note reddit.com specifically is blocked for WebFetch, WebSearch, and curl in local sessions — report Reddit surfaces as blocked and ask the user for a non-Chrome route (the Claude-in-Chrome route in <a href="../../memories/reddit-access.md"><code>memories/reddit-access.md</code></a> is retired).</p>
 </section>
 <section id="keep-only-the-community-valued-on-scope-ideas" class="level3">
 <h3 class="anchored" data-anchor-id="keep-only-the-community-valued-on-scope-ideas">4. Keep only the community-valued, on-scope ideas</h3>

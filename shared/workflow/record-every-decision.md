@@ -9,7 +9,7 @@ A decision is any choice between options, by any route:
 - Ezra's own call, typed or picked on a decision card.
 - A [`daytb`](../../skills/daytb/SKILL.md) best guess.
 - A judgment call under [`away`](../../skills/away/SKILL.md) or [`dmmhyh`](../../skills/dmmhyh/SKILL.md).
-- A default taken after 10 minutes of silence.
+- A default taken because nobody answered in time.
 - A choice made by a subagent or another thread.
 
 ## What a record holds
@@ -20,11 +20,13 @@ A decision is any choice between options, by any route:
 
 ## Where it goes
 
-- **Do:** put it in the governing repo's decision log or `docs/` page, or in the canonical home of the rule it changes (`ai-config` for agent rules, `psw` for prose rules, `gha` for checks, the notes repo for content and notation choices).
-- **Do:** if the repo has an ADR or decision-log file, add an entry there;
-  otherwise, add a short section to the page the decision governs.
-- **Don't:** leave it only in a thread, a chat message, a PR description, or project memory.
-  Project memory is a pointer to the record, never the record.
+- **Do:** pick the first of these that exists:
+  1. the canonical home of the rule the decision changes (`ai-config` for agent rules, `psw` for prose rules, `gha` for checks, `macros` for notation);
+  2. the governing repo's ADR directory or decision-log file;
+  3. a short section on the page the decision governs, or in the repo's committed notes file (for example lds's `.claude/project-memory.md`).
+- **Don't:** leave it only in a thread, a chat message, a PR description, or an agent memory store.
+  A memory store is a pointer to the record, never the record.
+  A notes file committed in the repo is a repo file, so it counts.
 
 ## When
 

@@ -4,7 +4,7 @@ for a conflict to surface or for someone to ask.
 
 Merging `main` into any PR branch is standing-authorized and never needs
 asking (Ezra, 2026-10-22: asked "confirm I may merge main into that branch",
-he answered "yes, always").
+the answer was "yes, always").
 A repo's own "merge main only when it conflicts" guidance does not make the
 merge a question for the user: do it when `main` has moved, and say so after.
 

@@ -64,14 +64,14 @@ def main() -> int:
 
     patterns = list(BUILTIN)
     if args.deny_file:
-        for line in Path(args.deny_file).read_text().splitlines():
+        for line in Path(args.deny_file).read_text(encoding="utf-8").splitlines():
             if line.strip() and not line.lstrip().startswith("#"):
                 patterns.append(line.strip())
     rx = re.compile("|".join(f"(?:{p})" for p in patterns), re.I)
     hits = 0
     for rel in sorted(b):
         try:
-            text = (exp / rel).read_text(errors="strict")
+            text = (exp / rel).read_text(encoding="utf-8", errors="strict")
         except (UnicodeDecodeError, OSError):
             continue
         for n, line in enumerate(text.splitlines(), 1):

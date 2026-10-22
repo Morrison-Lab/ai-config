@@ -131,6 +131,15 @@ meant to close it.
 The guard the PR added could not have caught it: it compares a
 delimited list, and the caveat was free prose outside the markers.)
 
+## A new directive that overlaps an existing fragment: link it, do not paraphrase its trigger
+
+A paraphrase of a rule's trigger is a second copy that can disagree with the first.
+Measured 2026-10-22: a new rule restated [`ask-for-manual-approval`](ask-for-manual-approval.md) loosely ("same goal twice", "take another route"), and so contradicted it.
+That fragment's trigger is a classifier denial, and it says to retry the identical command once at most, never rephrased, then ask.
+
+- **Do:** when a new directive overlaps an existing fragment, name the situation in a clause and link the fragment for the trigger and the steps.
+- **Don't:** restate the existing fragment's trigger or remedy in your own words.
+
 ## Applies at the scale of what's in front of you
 
 This is a review-time check on the document or diff already being read, not a

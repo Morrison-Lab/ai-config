@@ -115,6 +115,8 @@ Distinguish from [`daytb`](../daytb/SKILL.md), or a one-off "just proceed" on a 
    one line (what the question was, what you decided, why) so the
    eventual recap is a genuine decision log the user can scan and
    countermand any of, not just a "done, trust me" report.
+   Each call also gets a record in a repo file, per [`record-every-decision`](../../shared/workflow/record-every-decision.md);
+   the running log is not that record.
 5. **The grant doesn't relax anything else** — still follow `ardi`,
    `fully-clean`, the git safety protocol, and every other standing
    procedure exactly as if the user were watching. `away` only changes

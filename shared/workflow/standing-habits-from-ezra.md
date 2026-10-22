@@ -65,6 +65,12 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`, exce
 - **Reason:** agents skip annotations that leave the job green (Ezra, 2026-10-18;
   [gha#1097](https://github.com/Morrison-Lab/gha/issues/1097), [ai-config#1068](https://github.com/Morrison-Lab/ai-config/issues/1068)).
 
+## Record every decision outside the thread
+
+- **Do:** record each decision (Ezra's call, `daytb`, a silence default, any other route) in a repo file, following [`record-every-decision`](record-every-decision.md).
+- **Don't:** leave a decision only in a thread or in project memory.
+- **Reason:** Ezra, 2026-10-22 ([ai-config#4676](https://github.com/Morrison-Lab/ai-config/issues/4676)).
+
 ## Keep removed content
 
 - **Do:** move good content you remove into an outtakes file.

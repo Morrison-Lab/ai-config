@@ -1521,6 +1521,13 @@
             "timeout": 10,
             "script": "no-unlinked-thread-pointer.py",
             "why": "ai-config#4590. On 2026-10-16 the coordinator listed merge words with 'each in its thread' and no thread links, and the user asked 'what threads are those? you're supposed to give them to me'. warn-pr-without-thread-link.py covers a PR URL with no thread link, not the phrase alone. Blocks (deny) when a user-visible reply tool call (mcp__hearthbot__reply, post_message, update_message) says 'in its thread', 'in that thread', 'in their threads', 'in each thread', 'in the relevant thread' and the like in a paragraph or list item that holds no thread link, `(#cmsg_...)` in the app or a URL with `thread=cmsg_...` outside it. 'In this thread' is not a pointer. Fenced code and inline code are ignored. Fails open on any parse trouble."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unlinked-session-mention.py\"",
+            "timeout": 10,
+            "script": "no-unlinked-session-mention.py",
+            "why": "The user's standing rule (2026-10-16, reaffirmed 2026-10-22): anytime you mention a session, you must provide a link. warn-pr-without-thread-link.py and no-unlinked-thread-pointer.py cover PRs and 'in its thread'; neither covers a named session, so 'your Mac session' and 'the coordinator' went out unlinked. Blocks (deny) when a user-visible reply tool call (mcp__hearthbot__reply, post_message, update_message) names a Remote Control, RC, Mac, Linux, cloud, local, device or coordinator session, or the coordinator, in a paragraph or list item with no claude.ai/code/session_ link, (#cmsg_...) or thread=cmsg_ URL. 'This session' is not a mention. Fenced and inline code are ignored. Fails open on any parse trouble."
           }
         ]
       },

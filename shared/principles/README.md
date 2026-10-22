@@ -236,6 +236,20 @@ Four instances (he named the first three the same day):
   [Build every unit from smaller atomic units](https://morrison-lab.github.io/psw/chapters/teaching.html#build-every-unit-from-smaller-atomic-units).
   Before writing a long display or div, name the pieces, give each its own
   macro or div, and link them.
+  Every expression is maximally condensed and decomposed: one compact form,
+  built from separately defined named pieces (expected squared error is the
+  squared bias plus the variance plus the irreducible error), never the pieces
+  expanded inline.
+  In a note sheet or any reference table, each concept gets its own row:
+  never two definitions in a row, never merge rows to save space (find the room
+  another way), and never notation or assumptions inside a label (each
+  assumption gets its own row).
+  Ezra Morrison, 2026-10-22, reviewing lds#1267; canonical prose rules are in
+  PSW's
+  [Give each concept in a note sheet its own row](https://morrison-lab.github.io/psw/chapters/teaching.html#give-each-concept-in-a-note-sheet-its-own-row)
+  and [Making expressions concise](https://morrison-lab.github.io/psw/chapters/notation.html#making-expressions-concise).
+  Apply the rule when you write a sheet, and sweep the diff for merged rows
+  before requesting review.
 
 Whenever one unit sits inside another only because it was written there
 first, split it out.

@@ -72,3 +72,17 @@ When you configure a repository, always give it a branch ruleset, and follow the
 - Applying needs repo admin, which a cloud session lacks (403).
   Run it in a Remote Control session with the owner's typed go, and prepare the exact command in the brief.
 - Never replace a live ruleset that is stricter than the example, and never add `required_status_checks` without reading the check-run names from a merged PR.
+
+## Keep an R package and a notes site in separate repositories
+
+Do not merge an R package (`rpt`) into a notes site (`qwt`), or the reverse, even when they cover one topic.
+A notes site documents the topic and links to the package that supplies the code.
+(Owner decision, 2026-10-22, on whether `Morrison-Lab/vds` and `Morrison-Lab/qnp` should be one repository, with "document this decision" as the instruction.
+The answer was no.
+See [ai-config#4674](https://github.com/Morrison-Lab/ai-config/issues/4674).)
+
+- A site that uses the package installs it in CI, with an `owner/repo` line in its `r-packages` list.
+  For example, [lds#1280](https://github.com/Morrison-Lab/lds/pull/1280) adds `Morrison-Lab/qnp` there.
+  A merged repository would make every such site clone the other site's chapters, data and Quarto configuration to get one function.
+- A package has checks and a release cycle that prose does not: a dev version bump, a `NEWS.md` bullet, and `R CMD check` on three operating systems.
+  A merged repository would put both sets of checks on every change.

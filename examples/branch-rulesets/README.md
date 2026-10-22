@@ -104,3 +104,9 @@ same body.
 ruleset special value -- it resolves to whatever the repo's actual default
 branch is, so the same JSON works whether that branch is named `main` or
 something else.
+
+## Template examples and the org-wide audit
+
+Each template repository (`qwt`, `qbt`, `rpt`, `qmt`, `qet`, `grt`) carries its own example in `.github/rulesets/main.json`;
+a repo follows the example of the template it was made from (rule in `shared/workflow/repo-templates.md`).
+`apply-all.sh` reports which org repos have no ruleset and applies the matching example with `--apply`.

@@ -14,8 +14,10 @@
 # Applying needs repo admin, so run it from a Remote Control session on a
 # machine with an authenticated `gh` (a cloud session gets 403 on repo settings).
 #
-# Usage: examples/branch-rulesets/apply-all.sh [--apply] [--org ORG] [repo ...]
+# Usage: examples/branch-rulesets/apply-all.sh [--apply] [--org ORG] [repo[=template] ...]
 #   With repo names given, only those repos are checked.
+#   `repo=template` names the template for a repo GitHub records none for
+#   (for example `mcs=qwt`).
 # Requires: gh, jq.
 
 set -euo pipefail
@@ -23,10 +25,12 @@ set -euo pipefail
 org="Morrison-Lab"
 apply=0
 repos=()
+declare -A over   # repo=template overrides, for repos GitHub records no template for
 while [ $# -gt 0 ]; do
   case "$1" in
     --apply) apply=1 ;;
     --org) shift; org="$1" ;;
+    *=*) over["${1%%=*}"]="${1#*=}"; repos+=("${1%%=*}") ;;
     *) repos+=("$1") ;;
   esac
   shift
@@ -43,6 +47,8 @@ printf '%-28s %-10s %-8s %s\n' repo template status action
 for name in "${repos[@]}"; do
   full="$org/$name"
   tmpl=$(gh api "repos/$full" --jq '.template_repository.name // ""' 2>/dev/null || true)
+  [[ "$tmpl" =~ ^[A-Za-z0-9._-]+$ ]] || tmpl=""
+  tmpl="${over[$name]:-$tmpl}"
   live=$(gh api "repos/$full/rulesets" --jq '[.[].name] | join(",")' 2>/dev/null || echo "?")
   if [ "$live" = "?" ]; then
     printf '%-28s %-10s %-8s %s\n' "$name" "${tmpl:--}" "unreadable" "need admin"
@@ -60,7 +66,7 @@ for name in "${repos[@]}"; do
   if [ -n "$tmpl" ]; then
     f=$(gh api "repos/$org/$tmpl/contents/.github/rulesets" \
       --jq '[.[] | select(.name | endswith(".json")) | .name][0] // ""' 2>/dev/null || true)
-    if [ -n "$f" ]; then
+    if [[ "$f" =~ ^[A-Za-z0-9._-]+[.]json$ ]]; then
       gh api "repos/$org/$tmpl/contents/.github/rulesets/$f" \
         -H 'Accept: application/vnd.github.raw' > "$work/ruleset.json"
       src="$work/ruleset.json"

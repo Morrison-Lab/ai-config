@@ -14,6 +14,7 @@ A plain `gh repo create` produces an empty repository that lacks the lab's workf
   - `qmt` for a Quarto manuscript.
   - `qet` for a Quarto extension.
   - `rpt` for an R package.
+  - `grt` for a grading repository (private, so a reviewer without access to it will not see it in a listing).
 - Before creating from it, check the template for improvements:
   read its README, workflows, instructions and placeholder text, compare it with the newest repository made from it,
   and list the open issues and pull requests on the template.
@@ -62,7 +63,8 @@ When you configure a repository, always give it a branch ruleset, and follow the
 (Owner rule, 2026-10-22: "when configuring a repo, always set a ruleset, following the examples from the corresponding template repos (create such examples if missing)".)
 
 - Each template carries its example as `.github/rulesets/main.json` with `.github/scripts/apply-rulesets.sh`.
-  Templates with an example: `qwt`, `qbt`, `rpt`, `qmt`, `qet`, `grt`.
+  Templates with an example: `qwt`, `qbt` and `rpt`;
+  `qmt`, `qet` and `grt` get theirs from [qmt#14](https://github.com/Morrison-Lab/qmt/pull/14), [qet#3](https://github.com/Morrison-Lab/qet/pull/3) and [grt#3](https://github.com/Morrison-Lab/grt/pull/3) (2026-10-22), and carry one once those merge.
 - A template without an example gets one by its own pull request, modelled on the closest template that has one, before any repo is made from it.
   A repo with no template uses `examples/branch-rulesets/base.json`.
 - Apply it with the template's `apply-rulesets.sh` (idempotent by ruleset name), or audit and apply across the org with

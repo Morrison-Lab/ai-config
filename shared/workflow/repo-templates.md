@@ -6,7 +6,7 @@ A plain `gh repo create` produces an empty repository that lacks the lab's workf
 ## Do
 
 - List the templates first:
-  `gh repo list Morrison-Lab --json name,isTemplate --jq '.[] | select(.isTemplate) | .name'`
+  `gh repo list Morrison-Lab -L 500 --json name,isTemplate --jq '.[] | select(.isTemplate) | .name'`
   (in a cloud session, the repository search `org:Morrison-Lab template:true`).
 - Pick the template that matches the kind of repository:
   - `qwt` for a Quarto notes website.
@@ -17,7 +17,10 @@ A plain `gh repo create` produces an empty repository that lacks the lab's workf
 - Create from it:
   `gh repo create Morrison-Lab/<name> --template Morrison-Lab/<template> --private` (or `--public`).
 - Name the template in the brief when a Remote Control session does the creating, because a cloud session cannot create organization repositories (it gets a 403).
-- After creating, rename the site title, package name and URLs inside the copied files, and pin the `latex-macros` submodule at the current `Morrison-Lab/macros` main.
+- After creating, rename the site title, package name and URLs inside the copied files.
+  Then pin any macros submodule the template carries at the current `Morrison-Lab/macros` main.
+  The path differs by template:
+  `latex-macros` in `qwt`, `macros` in `qbt`, `vignettes/macros` in `rpt`, and none in `qmt` or `qet`.
 
 ## Do not
 

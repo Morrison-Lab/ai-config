@@ -47,6 +47,16 @@ class StalePinTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertIn(self.old_sha, result.stdout)
 
+    def test_shallow_source_fails(self) -> None:
+        self.run_check(OTHER_REPO_SHA)
+        shallow = self.src.parent / "shallow"
+        subprocess.run(["git", "clone", "-q", "--depth", "1", f"file://{self.src}", str(shallow)],
+                       capture_output=True, check=True)
+        result = subprocess.run([sys.executable, str(SCRIPT), str(shallow), str(self.exp)],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("shallow", result.stdout)
+
     def test_commit_of_another_repository_passes(self) -> None:
         result = self.run_check(OTHER_REPO_SHA)
         self.assertEqual(result.returncode, 0, result.stdout)

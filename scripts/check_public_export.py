@@ -66,6 +66,13 @@ def main() -> int:
     src, exp = Path(args.source), Path(args.export)
     failed = False
 
+    shallow = subprocess.run(["git", "-C", str(src), "rev-parse", "--is-shallow-repository"],
+                             capture_output=True, check=True, text=True).stdout.strip()
+    if shallow == "true":
+        failed = True
+        print("FAIL SOURCE_CHECKOUT is a shallow clone, so the pinned-commit check cannot "
+              "see the old history; re-run against a full clone (git fetch --unshallow).")
+
     a, b = tracked(src), exported(exp)
     for label, paths in (("dropped from export", sorted(a - b)),
                          ("only in export", sorted(b - a))):

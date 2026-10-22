@@ -14,7 +14,12 @@ Two checks, both of which must pass before any visibility change:
    expressions, one per line, in --deny-file (blank lines and lines starting with
    `#` are skipped). A match prints `path:line: text` and fails the check.
 
-Exit 0 means both checks passed. It does not replace the separate-agent review of
+3. Pinned commits. Any 40-hex SHA in EXPORT_DIR that is a commit of SOURCE_CHECKOUT
+   fails the check: the history-free export does not contain that commit, so a
+   consumer fetching at that ref gets a 404 (gla#3, 2026-10-22). Commits of other
+   repositories are not in SOURCE_CHECKOUT and are ignored.
+
+Exit 0 means all checks passed. It does not replace the separate-agent review of
 the exported tree (shared/workflow/going-public.md).
 """
 import argparse
@@ -36,6 +41,15 @@ def tracked(root: Path) -> set[str]:
     out = subprocess.run(["git", "-C", str(root), "ls-files", "-z"],
                          capture_output=True, check=True).stdout.decode()
     return {p for p in out.split("\0") if p}
+
+
+SHA40 = re.compile(r"\b[0-9a-f]{40}\b")
+
+
+def in_history(root: Path, sha: str) -> bool:
+    """True if SHA is a commit of the checkout at ROOT (git cat-file -e)."""
+    return subprocess.run(["git", "-C", str(root), "cat-file", "-e", f"{sha}^{{commit}}"],
+                          capture_output=True).returncode == 0
 
 
 def exported(root: Path) -> set[str]:
@@ -70,6 +84,7 @@ def main() -> int:
     rx = re.compile("|".join(f"(?:{p})" for p in patterns), re.I)
     hits = 0
     unscanned = []
+    stale_pins = []
     for rel in sorted(b):
         try:
             text = (exp / rel).read_text(encoding="utf-8", errors="strict")
@@ -80,10 +95,20 @@ def main() -> int:
             if rx.search(line):
                 hits += 1
                 print(f"{rel}:{n}: {line.strip()[:140]}")
+            for sha in SHA40.findall(line):
+                if in_history(src, sha):
+                    stale_pins.append(f"{rel}:{n}: {sha}")
     if hits:
         failed = True
         print(f"FAIL {hits} line(s) match an internal-name or secret pattern; "
               "each must be removed or justified in the review.")
+    if stale_pins:
+        failed = True
+        print(f"FAIL {len(stale_pins)} commit SHA(s) in the export name a commit of the "
+              "source history; the history-free repository will not contain it, so a "
+              "fetch at that ref returns 404. Re-pin each to a commit of the new repository:")
+        for pin in stale_pins:
+            print(f"  {pin}")
     if unscanned:
         failed = True
         print(f"FAIL {len(unscanned)} file(s) are not UTF-8 text and were NOT "

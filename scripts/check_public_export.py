@@ -3,7 +3,8 @@
 
 Usage: python3 scripts/check_public_export.py SOURCE_CHECKOUT EXPORT_DIR [--deny-file FILE]
 
-Two checks, both of which must pass before any visibility change:
+SOURCE_CHECKOUT must be a full clone: a shallow one fails the run, because it cannot
+see the old history. These checks must all pass before any visibility change:
 
 1. Dropped files. Every file tracked in SOURCE_CHECKOUT (git ls-files) must be in
    EXPORT_DIR, and no file may appear only in EXPORT_DIR. A `git archive` plus the
@@ -13,8 +14,12 @@ Two checks, both of which must pass before any visibility change:
    case-insensitively for the built-in patterns below plus any extra regular
    expressions, one per line, in --deny-file (blank lines and lines starting with
    `#` are skipped). A match prints `path:line: text` and fails the check.
+3. Pinned commits. Any 40-hex SHA in EXPORT_DIR that is a commit of SOURCE_CHECKOUT
+   fails the check: the history-free export does not contain that commit, so a
+   consumer fetching at that ref gets a 404 (gla#3, 2026-10-22). Commits of other
+   repositories are not in SOURCE_CHECKOUT and are ignored.
 
-Exit 0 means both checks passed. It does not replace the separate-agent review of
+Exit 0 means all checks passed. It does not replace the separate-agent review of
 the exported tree (shared/workflow/going-public.md).
 """
 import argparse
@@ -38,6 +43,15 @@ def tracked(root: Path) -> set[str]:
     return {p for p in out.split("\0") if p}
 
 
+SHA40 = re.compile(r"\b[0-9a-f]{40}\b")
+
+
+def in_history(root: Path, sha: str) -> bool:
+    """True if SHA is a commit of the checkout at ROOT (git cat-file -e)."""
+    return subprocess.run(["git", "-C", str(root), "cat-file", "-e", f"{sha}^{{commit}}"],
+                          capture_output=True).returncode == 0
+
+
 def exported(root: Path) -> set[str]:
     return {str(p.relative_to(root)) for p in root.rglob("*")
             if p.is_file() and ".git" not in p.relative_to(root).parts}
@@ -51,6 +65,13 @@ def main() -> int:
     args = ap.parse_args()
     src, exp = Path(args.source), Path(args.export)
     failed = False
+
+    shallow = subprocess.run(["git", "-C", str(src), "rev-parse", "--is-shallow-repository"],
+                             capture_output=True, check=True, text=True).stdout.strip()
+    if shallow == "true":
+        failed = True
+        print("FAIL SOURCE_CHECKOUT is a shallow clone, so the pinned-commit check cannot "
+              "see the old history; re-run against a full clone (git fetch --unshallow).")
 
     a, b = tracked(src), exported(exp)
     for label, paths in (("dropped from export", sorted(a - b)),
@@ -70,6 +91,7 @@ def main() -> int:
     rx = re.compile("|".join(f"(?:{p})" for p in patterns), re.I)
     hits = 0
     unscanned = []
+    stale_pins = []
     for rel in sorted(b):
         try:
             text = (exp / rel).read_text(encoding="utf-8", errors="strict")
@@ -80,10 +102,20 @@ def main() -> int:
             if rx.search(line):
                 hits += 1
                 print(f"{rel}:{n}: {line.strip()[:140]}")
+            for sha in SHA40.findall(line):
+                if in_history(src, sha):
+                    stale_pins.append(f"{rel}:{n}: {sha}")
     if hits:
         failed = True
         print(f"FAIL {hits} line(s) match an internal-name or secret pattern; "
               "each must be removed or justified in the review.")
+    if stale_pins:
+        failed = True
+        print(f"FAIL {len(stale_pins)} commit SHA(s) in the export name a commit of the "
+              "source history; the history-free repository will not contain it, so a "
+              "fetch at that ref returns 404. Re-pin each to a commit of the new repository:")
+        for pin in stale_pins:
+            print(f"  {pin}")
     if unscanned:
         failed = True
         print(f"FAIL {len(unscanned)} file(s) are not UTF-8 text and were NOT "

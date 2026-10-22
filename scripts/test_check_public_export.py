@@ -26,7 +26,7 @@ class StalePinTest(unittest.TestCase):
         self.exp = Path(tmp.name) / "exp"
         self.src.mkdir()
         self.exp.mkdir()
-        git(self.src, "init", "-q")
+        git(self.src, "init", "-q", "-b", "main")
         (self.src / "a.txt").write_text("hello\n", encoding="utf-8")
         git(self.src, "add", "a.txt")
         git(self.src, "commit", "-q", "-m", "init")
@@ -50,7 +50,8 @@ class StalePinTest(unittest.TestCase):
     def test_shallow_source_fails(self) -> None:
         self.run_check(OTHER_REPO_SHA)
         shallow = self.src.parent / "shallow"
-        subprocess.run(["git", "clone", "-q", "--depth", "1", f"file://{self.src}", str(shallow)],
+        subprocess.run(["git", "clone", "-q", "--branch", "main", "--depth", "1",
+                        f"file://{self.src}", str(shallow)],
                        capture_output=True, check=True)
         result = subprocess.run([sys.executable, str(SCRIPT), str(shallow), str(self.exp)],
                                 capture_output=True, text=True)

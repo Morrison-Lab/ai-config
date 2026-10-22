@@ -10,11 +10,12 @@ A reason or an option list that the thread summary did not carry is left out rat
 
 - **`gla` and `glr` are public, as new history-free repositories.**
   Decided by Ezra, in the thread "Taking gla and glr public".
-  The old private repositories were renamed `gla-history` and `glr-history`.
+  Checked over the GitHub REST API on 2026-10-22: `gla` and `glr` are public, and `gla-history` and `glr-history` exist and are private.
   The process fix is [ai-config#4662](https://github.com/Morrison-Lab/ai-config/pull/4662), and the process is in [`going-public`](../shared/workflow/going-public.md).
-- **`grt` becomes public, as a history-free export.**
-  Decided by Ezra.
-  The old repository becomes `grt-history`.
+- **`grt` is to become public, as a history-free export.**
+  Decided by Ezra on 2026-10-22.
+  Not done yet: on 2026-10-22 `grt` is still private and `grt-history` does not exist.
+  The old repository is to be renamed `grt-history`.
 
 ## 2026-10-21
 

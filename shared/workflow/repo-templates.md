@@ -17,9 +17,10 @@ A plain `gh repo create` produces an empty repository that lacks the lab's workf
 - Before creating from it, check the template for improvements:
   read its README, workflows, instructions and placeholder text, compare it with the newest repository made from it,
   and list the open issues and pull requests on the template.
-  Fix what you find in the template through its own pull request, merge it, and only then create from it,
-  so every later repository gets the fix and not only this one.
-  If a fix cannot merge first, create from the template anyway and open the template pull request alongside.
+  Fix what you find in the template through its own pull request, and drive it to fully clean.
+  Create from the template once that pull request has merged, so every later repository gets the fix and not only this one.
+  Merging it follows the usual merge policy: it needs the owner's merge words (or a standing grant that covers that repository), never an assumption.
+  If it has not merged, create from the template anyway and keep the template pull request open alongside.
 - Create from it:
   `gh repo create Morrison-Lab/<name> --template Morrison-Lab/<template> --private` (or `--public`).
 - Name the template in the brief when a Remote Control session does the creating, because a cloud session cannot create organization repositories (it gets a 403).

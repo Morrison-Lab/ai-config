@@ -77,8 +77,7 @@ When you configure a repository, always give it a branch ruleset, and follow the
 
 Do not merge an R package (`rpt`) into a notes site (`qwt`), or the reverse, even when they cover one topic.
 A notes site documents the topic and links to the package that supplies the code.
-(Owner decision, 2026-10-22, on whether `Morrison-Lab/vds` and `Morrison-Lab/qnp` should be one repository: "daytb;
-document this decision".
+(Owner decision, 2026-10-22, on whether `Morrison-Lab/vds` and `Morrison-Lab/qnp` should be one repository, with "document this decision" as the instruction.
 The answer was no.
 See [ai-config#4674](https://github.com/Morrison-Lab/ai-config/issues/4674).)
 

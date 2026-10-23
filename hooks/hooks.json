@@ -511,6 +511,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-oversized-pr-push.py\"",
+            "timeout": 20,
+            "script": "no-oversized-pr-push.py",
+            "why": "ai-config#4698. Ezra, 2026-10-23: \"don't allow massive sweep PRs like pds#244 anymore; do them in minimal batches\" and \"every PR should be as small and focused as it can be while completely solving its stated task\". DENIES a `git push` of a branch that changes more than 10 files or 300 lines against the merge base with the remote default branch (generated, lock, image and data paths not counted), before CI is spent; gha's check-pr-size (gha#1188) fails the same PR in CI. Clearable with an ALLOW_LARGE_PR=1 prefix for a stacked branch or a maintainer-requested mechanical PR. See shared/workflow/small-prs.md. Fails open on any parse or git trouble."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-nonglobal-substitution.py\"",
             "timeout": 20,
             "script": "warn-nonglobal-substitution.py",

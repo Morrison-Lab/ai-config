@@ -424,7 +424,7 @@ The measurements above are what this section asserts, over the version where `--
 A long review prompt (~6.7 KB) passed as one positional argument to `opencode run -m opencode/<id>` hit a 600 s `timeout` with 0 bytes of output, not even the `> build ·` banner.
 That happened four times, on `deepseek-v4.1-flash-free`, `nemotron-3-ultra-free` and `glm-5.3-flash-free`, from the repo root and from a scratchpad directory, with and without file paths in the prompt.
 A trivial prompt (`cd /tmp && opencode run -m opencode/glm-5.3-flash-free "Reply with exactly the word: PONG"`) returned in about 3 s.
-Putting the prompt in a file, passing a short positional message before `-f <file>`, and running from `/tmp` completed with a full, usable review four times in a row (7.6 KB files, each finishing within a few minutes):
+Putting the prompt in a file (7.6 KB), passing a short positional message before `-f <file>`, and running from `/tmp` completed with a full, usable review four times in a row, each within a few minutes, all on `glm-5.3-flash-free`:
 
 ```bash
 cd /tmp && opencode run -m opencode/glm-5.3-flash-free \
@@ -432,13 +432,15 @@ cd /tmp && opencode run -m opencode/glm-5.3-flash-free \
   -f <prompt-file>
 ```
 
-Two things changed between the failing and working runs (short positional message plus `-f`, and cwd `/tmp`), so which one fixed it is unknown.
+Several things changed between the failing and working runs: the prompt moved from the positional argument into an attached file, the positional message became short, the cwd became `/tmp`, the prompt size differed (about 6.7 KB against 7.6 KB), and the working runs used one of the three models.
+A scratchpad cwd had already stalled, so a neutral directory alone did not prevent it.
+Which change fixed it is unknown.
 
-- **Do:** put a long prompt in a file, pass a short positional message before `-f <file>`, and run from a neutral directory such as `/tmp`.
-- **Don't:** pass a multi-kilobyte prompt as one positional argument, or claim that the attachment or the directory alone is the fix.
+- **Do:** put a long prompt in a file, pass a short positional message before `-f <file>`, and run it from `/tmp`, as the working runs did.
+- **Don't:** report the mechanism as known, or pass a multi-kilobyte prompt as one positional argument, which stalled in all four measured runs.
 
-On the same machine `opencode models` listed no `opencode-go/*` ids, so `opencode-go/deepseek-v4-pro` returned "Model not found".
-The other fallbacks were also down: agy returned HTTP 429 "Individual quota reached", and gemini and cursor-agent were unauthenticated ([ai-config#4688](https://github.com/Morrison-Lab/ai-config/issues/4688)).
+On that machine and date, `opencode models` listed no `opencode-go/*` ids, so `opencode-go/deepseek-v4-pro` returned "Model not found" (step 1's "confirmed-working" claim for `opencode-go/*` therefore depends on the account and machine).
+The alternative delegation CLIs were also unusable there: agy returned HTTP 429 "Individual quota reached", and gemini and cursor-agent were unauthenticated ([ai-config#4688](https://github.com/Morrison-Lab/ai-config/issues/4688)).
 
 There is no sandbox flag either.
 `opencode run --help` on 2026-08-19 listed none, and permissions come from the `permission` block in the opencode config.

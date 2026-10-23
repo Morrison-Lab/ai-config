@@ -8,6 +8,15 @@ A reason or an option list that the thread summary did not carry is left out rat
 
 ## 2026-10-23
 
+- **The ai-config backlog is processed by cluster, and a daily scheduled run keeps it down.**
+  Decided by Ezra ("daytb", following the coordinator's recommendation), in the thread "ai-config backlog processing".
+  Measured 2026-10-23: 758 open issues, median age 49 days, 581 older than 30 days, 554 with no comment, about 6 closed per day over the previous week.
+  Triage closes duplicates, stale items and fixed items with a note, and a cluster of issues about one hook or script gets one fix PR.
+  A correction becomes a hook or a failing check, not a new issue, and a new symptom of a tracked script is a comment on its tracking issue, as [`triage-backlog`](../shared/workflow/triage-backlog.md) says.
+  The daily run is scheduled at 02:47 America/Los_Angeles.
+  It works clusters first, then the oldest issues, at most 10 per run, and never merges.
+  It is a scheduled task in the harness (id `trig_013zD2wkY2XsVHYQ3seY3LDy`), not a file in this repository.
+  Tracked by [ai-config#4700](https://github.com/Morrison-Lab/ai-config/issues/4700).
 - **No merge on a standing grant in Ezra's project threads.**
   A merge there needs Ezra's own typed word, in the thread that owns the PR, for a PR that existed when he typed it.
   Decided by Ezra (the project rule in the DATA 571 project memory);

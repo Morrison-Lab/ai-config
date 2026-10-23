@@ -23,7 +23,7 @@ def make_repo(files):
     """A repo with origin/main at a base commit and a branch adding `files` ({path: lines})."""
     d = tempfile.mkdtemp()
     git(d, "init", "-q", "-b", "main")
-    with open(os.path.join(d, "base.txt"), "w") as f:
+    with open(os.path.join(d, "base.txt"), "w", encoding="utf-8") as f:
         f.write("base\n")
     git(d, "add", "-A")
     git(d, "commit", "-q", "-m", "base")
@@ -32,7 +32,7 @@ def make_repo(files):
     for path, n in files.items():
         p = os.path.join(d, path)
         os.makedirs(os.path.dirname(p), exist_ok=True)
-        with open(p, "w") as f:
+        with open(p, "w", encoding="utf-8") as f:
             f.write("".join(f"l{i}\n" for i in range(n)))
     git(d, "add", "-A")
     git(d, "commit", "-q", "-m", "change")

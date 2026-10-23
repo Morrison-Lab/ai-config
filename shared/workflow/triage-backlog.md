@@ -57,3 +57,15 @@ It is filed as an issue only when it names a concrete change.
 - **Don't:** close an actionable-but-unlikely item as not-planned.
   Label it P3 and leave the call to the maintainer.
 - **Don't:** file an aphorism as an issue; record it in memory.
+
+## Fix what an agent can fix
+
+Closing is only one outcome of a pass.
+A live issue that an agent can fix gets a small PR, up to the run's cap, rather than a skip.
+"Still live" is the reason the issue is open, not a reason to leave it, and a drive that closes duplicates but opens no PR leaves the backlog's real work untouched (measured 2026-10-23: the first daily drive closed 3 issues and opened no PRs, skipping a mechanical file split).
+An issue is skipped only when it needs the maintainer's hands: a credential, his own machine, or a decision only he can make.
+The skip carries a comment that names which of the three it is.
+
+- **Do:** open a small PR for a live issue an agent can fix, and cite the issue with a closing keyword.
+- **Do:** comment on a skipped issue with what it needs from the maintainer.
+- **Don't:** skip a live issue as "still live" or "needs design" when the change is mechanical or its design is stated in the issue.

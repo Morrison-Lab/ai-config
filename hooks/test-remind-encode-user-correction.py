@@ -70,6 +70,11 @@ FIRES = [
     "shouldn't you have checked the rendered page?",
     "did you even check the render?",
     "haven't we agreed to no compound definitions?",
+    "I'm tired of watching the agents make the same mistakes",
+    "the agents make the same mistakes over and over again",
+    "what happened to one div per file?",
+    "empty promise? that sounded like one",
+    "why aren't the subagents following our rules reliably?",
     # The same words in a project-thread wake and in a PR review comment event.
     '<wake reason="mention"><message from="human">why aren\'t we using the macro here?</message></wake>',
     '<wake reason="external-event"><event source="github" kind="review_comment" '

@@ -6,6 +6,17 @@ Newest first.
 Each entry gives the decision, who decided and when, and the thread.
 A reason or an option list that the thread summary did not carry is left out rather than guessed.
 
+## 2026-10-23
+
+- **No merge on a standing grant in Ezra's project threads.**
+  A merge there needs Ezra's own typed word, in the thread that owns the PR, for a PR that existed when he typed it.
+  Decided by Ezra (the project rule in the DATA 571 project memory);
+  restated by the [coordinator session](https://claude.ai/code/session_01RZfvzzeAzADKS6FC1m9VHm) on 2026-10-22 22:14 PDT.
+  Slip: I merged [ai-config#4692](https://github.com/Morrison-Lab/ai-config/pull/4692) under ai-config's standing merge grant, in the thread "Documenting every decision".
+  The change was a link swap, so it was not reverted.
+  It is the second such slip, after [gha#1169](https://github.com/Morrison-Lab/gha/pull/1169), recorded in [ai-config#4689](https://github.com/Morrison-Lab/ai-config/pull/4689).
+  The standing-grant sentence in `CLAUDE.md` does not apply in these threads.
+
 ## 2026-10-22
 
 - **`gla` and `glr` are public, as new history-free repositories.**

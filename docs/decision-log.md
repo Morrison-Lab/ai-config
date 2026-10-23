@@ -15,7 +15,16 @@ A reason or an option list that the thread summary did not carry is left out rat
   A correction becomes a hook or a failing check, not a new issue, and a new symptom of a tracked script is a comment on its tracking issue, as [`triage-backlog`](../shared/workflow/triage-backlog.md) says.
   The daily run is scheduled at 02:47 America/Los_Angeles.
   It works clusters first, then the oldest issues, at most 10 per run, and never merges.
+  It is a scheduled task in the harness (id `trig_013zD2wkY2XsVHYQ3seY3LDy`), not a file in this repository.
   Tracked by [ai-config#4700](https://github.com/Morrison-Lab/ai-config/issues/4700).
+- **No merge on a standing grant in Ezra's project threads.**
+  A merge there needs Ezra's own typed word, in the thread that owns the PR, for a PR that existed when he typed it.
+  Decided by Ezra (the project rule in the DATA 571 project memory);
+  restated by the [coordinator session](https://claude.ai/code/session_01RZfvzzeAzADKS6FC1m9VHm) on 2026-10-22 22:14 PDT.
+  Slip: I merged [ai-config#4692](https://github.com/Morrison-Lab/ai-config/pull/4692) under ai-config's standing merge grant, in the thread "Documenting every decision".
+  The change was a link swap, so it was not reverted.
+  It is the second such slip, after [gha#1169](https://github.com/Morrison-Lab/gha/pull/1169), recorded in [ai-config#4689](https://github.com/Morrison-Lab/ai-config/pull/4689).
+  The standing-grant sentence in `CLAUDE.md` does not apply in these threads.
 
 ## 2026-10-22
 

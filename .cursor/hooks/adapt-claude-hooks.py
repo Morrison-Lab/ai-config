@@ -106,6 +106,9 @@ EVENT_MAPPING: dict[str, list[str]] = {
     # and Cursor's postToolUse payload has no translated equivalent. See
     # docs/cursor-hook-mapping.md.
     "PostToolUse": [],
+    # Cursor has no subagent-start event that can inject context
+    # (ai-config#4698); inject-subagent-rules.py is Claude-only.
+    "SubagentStart": [],
     "SessionStart": ["sessionStart"],
     "Stop": ["stop"],
     "UserPromptSubmit": ["sessionStart", "postToolUse"],

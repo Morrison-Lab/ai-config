@@ -245,10 +245,12 @@ def main() -> int:
         print(
             f'Standing-guidance reminder: {which} reads as a standing rule '
             f'("{phrase}").\n'
-            "Record it in its global home in this same turn (ai-config for "
-            "agent rules, psw for prose rules, gha for checks), and start "
-            "following it now, without waiting to be told it is global. "
-            "Project memory is allowed too, but is not enough alone.\n"
+            "Record it as a MECHANISM in this same turn: a hook in ai-config "
+            "for agent behaviour, or a failing check in gha for content. "
+            "Prose alone (psw, AGENTS.md, a fragment, memory) is allowed only "
+            "where no mechanism can work, and the prose must say why. "
+            "Start following the rule now, without waiting to be told it is "
+            "global. Project memory is allowed too, but is not enough alone.\n"
             "If it is only a one-off task instruction, disregard this."
         )
     return 0

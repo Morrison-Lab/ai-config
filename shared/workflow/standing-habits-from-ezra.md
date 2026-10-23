@@ -75,6 +75,12 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`, exce
   Its only prior copy was in the DATA 571 project memory, so this is its repo record.
   The date Ezra set it is not recorded there.
 
+## Merge only on Ezra's word in his project threads
+
+- **Do:** in a project thread for Ezra, merge only on his own typed word in the owning thread, for a PR that existed when he typed it.
+- **Don't:** invoke a repo's standing merge grant (the ai-config, gha and macros exceptions) there, or relay a grant for him.
+- **Reason:** slips on gha#1169 and ai-config#4692 (2026-10-22), recorded in the [decision log](../../docs/decision-log.md).
+
 ## Keep removed content
 
 - **Do:** move good content you remove into an outtakes file.

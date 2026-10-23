@@ -170,7 +170,7 @@ Links that are content stay, such as a link to the prerequisite course's notes s
 
 - **Do:** rewrite `CLAUDE.md`, `AUTHORING.md`, the README and the CI notes to stand alone in the scaffolding PR,
   and drop the sibling's issue numbers, "ported from" notes and examples that apply only to the sibling's course.
-- **Do:** when a deleted provenance sentence also carried an instruction, such as "add a `gitsubmodule` entry if the submodule lands",
+- **Do:** when a deleted provenance sentence also carried an instruction, such as "add a Dependabot `gitsubmodule` entry if the submodule lands",
   keep the instruction or state the decision that replaces it.
 - **Do:** trim copied allowlists, such as `_typos.toml` words and a DOI check's `exclude-keys`, to the entries the new repository uses.
 - **Do:** finish with `git grep -n -i -w -E "<every sibling repo name>"` over the tree, minus vendored directories,

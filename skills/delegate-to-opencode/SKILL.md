@@ -383,7 +383,7 @@ and its output was not observed in this session.
 **That gap is closed as of 2026-09-04.**
 `opencode run -m opencode-go/gpt-5.6-luna "Reply with exactly the word: PONG"` returned `PONG`, and a subsequent real dispatch (an adversarial prose review of a small diff) to the same id completed and returned a usable verdict.
 So `opencode-go/*` is a confirmed-working route for judgment-bearing sidecar work, not only an active-subscription claim --- prefer it there over a bare `opencode/*` id, per the reachability caveat in the section above.
-That result did not reproduce on another machine on 2026-10-22, where `opencode models` listed no `opencode-go/*` ids (see the end of step 3), so run `opencode models` before choosing the tier.
+That result did not reproduce on another machine on 2026-10-22, where `opencode models` listed no `opencode-go/*` ids, so run `opencode models` before choosing the tier.
 
 ### 2. Prepare the prompt
 
@@ -418,7 +418,7 @@ A candidate explanation is the prompt's file paths inducing tool use that goes n
 The measurements above are what this section asserts, over the version where `--agent plan` still worked.
 
 - **Do:** treat a silent, multi-minute `opencode run` as a stall to kill and retry --- `--agent plan` no longer selects an agent as of 2026-09-04, so it is not an escape from the stall.
-  When the stalled run passed a long prompt as a positional argument, try the 2026-10-22 recipe below, since a change of model alone did not help in those runs.
+  When the stalled run passed a long prompt as a positional argument, try the 2026-10-22 prompt-in-file recipe, since a change of model alone did not help in those runs.
 - **Don't:** rely on `--agent plan` to avoid the default-agent stall.
   It now falls back to the default agent it was meant to replace.
 

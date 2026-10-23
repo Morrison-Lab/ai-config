@@ -153,12 +153,13 @@ That is what keeps countermanding cheap.
    **both** the choice and the change, since a silent switch away from a
    stated recommendation reads as having reopened it.
 3. **Act.**
-4. **Report in the past tense**: what you chose, and the single reason that
-   decided it.
+4. **Record the decision in a repo file**, per [`record-every-decision`](../../shared/workflow/record-every-decision.md): the decision, the options, the reason, `daytb` as the decider, the date, and a link to the thread.
+   The past-tense report below is not the record, because it lives in the thread.
+5. **Report in the past tense**: what you chose, and the single reason that decided it.
    One or two sentences.
    Name anything you deliberately did *not* do, so a silent omission does
    not read as an oversight.
-5. **Do not re-ask.**
+6. **Do not re-ask.**
    A follow-up question about the same decision spends the round trip the
    grant existed to save.
 
@@ -189,6 +190,7 @@ That is what keeps countermanding cheap.
 - Reading it as authorization to merge, delete, or publish.
 - Choosing silently, so the user learns what was decided only by noticing the
   result later.
+- Reporting the decision in the thread and writing it nowhere else.
 - Asking a confirming question anyway -- "I'll do X, unless you'd rather Y?"
   is the grant declined, not honoured.
 - Reopening a recommendation you had already made, instead of simply taking

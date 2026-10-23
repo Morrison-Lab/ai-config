@@ -174,6 +174,6 @@ My first commit message said F1 was "a regression of this PR's own opener-line f
 `7b54d28` reproduces the same defect by a different route, so it predated the fix.
 `git commit --amend` after merging `main` in then retargeted the merge rather than the fix commit, and the recovery was a reset, amend and re-merge whose resulting tree hash matched the pre-reset one.
 
-The generalizable halves live in [`metacognitive-monitoring`](../shared/workflow/metacognitive-monitoring.md), "Your own most recent change is a cause claim too" with its case record, and in [`git`](git.md), "`git commit --amend` after a merge amends the MERGE".
+The generalizable halves live in [`metacognitive-monitoring`](../shared/workflow/metacognitive-monitoring.md), "Your own most recent change is a cause claim too" with its case record, and in [`git-commit-push`](git-commit-push.md), "`git commit --amend` after a merge amends the MERGE".
 Read those rather than this;
 the paragraphs that used to restate them here were pruned during the same UMS pass that wrote them, per [`run-ums-proactively`](../shared/workflow/run-ums-proactively.md)'s fold-or-prune step.

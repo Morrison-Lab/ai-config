@@ -25,6 +25,8 @@ without asking confirmation before every merge.
   Two repositories are exempted standing --- see "The standing per-repository grant" below --- and so are infra-only PRs in any Morrison-Lab repository --- see "The standing infra-PR grant".
   The Scope Limit binds both.
 - **MWC Override Scope**: When the user explicitly issues `/mwc`, the bare word `mwc`, "merge when confident", "merge at will", or "maw", that baseline prohibition is suspended for the current session only.
+  So are their plain-English equivalents from the user (Ezra, 2026-10-23): "merge when ready", "merge them all", "merge it", "go ahead and merge", a bare "merge", and "mwc them all".
+  `hooks/remind-plain-english-merge-word.py` recognizes these mechanically and injects the reminder, so a user never has to retype `mwc`.
   The bare word is listed here, not only in `CLAUDE.md`'s general "Bare keyword directives" convention, so this file is self-contained: a slash command is routed to this skill by the harness itself, while a bare word in prose is a convention the model must recognize on its own, and it recognizes it most reliably when the file governing the mechanics (`enable-mwc`, `check-mwc`, the Scope Limit) names the exact form it will see rather than only implying it maps here.
 - **A bare `/mwc` means `/mwc all`** (Ezra, 2026-10-16).
   The grant covers every in-scope PR of the session or thread --- every PR the assistant has just named, opened, or been driving --- that becomes fully clean.

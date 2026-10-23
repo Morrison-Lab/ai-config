@@ -409,13 +409,6 @@ The grant also covers software installs and updates, and `add_repo` (even to rea
 Never ask the owner to perform a step you could do: [`default-to-action-grants`](shared/workflow/default-to-action-grants.md).
 Create new repos with `gh repo create --template`: [`templates`](shared/workflow/repo-templates.md).
 
-When a coordinator or the user says "don't wait" or "decide it yourself", act in the same turn;
-hold a step for a person only when it is irreversible or needs their own word, such as a merge.
-A rule learned from such a correction is global ([`global-by-default`](shared/workflow/global-by-default.md)):
-record it the same turn, never as a later to-do.
-A sandbox denial of the step is a reason to report the denial, not to skip recording the rule
-([ai-config#4696](https://github.com/Morrison-Lab/ai-config/issues/4696)).
-
 ## Strict Merge Control Policy
 
 - **NEVER merge a PR or MR without explicit user permission**: a session grant (`/mwc`, `/maw`) or a merge instruction for that PR.

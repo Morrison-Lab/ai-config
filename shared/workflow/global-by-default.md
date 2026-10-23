@@ -10,6 +10,19 @@ An instruction from the user applies to every project and repository unless the 
 - Checks go in [`gha`](https://github.com/Morrison-Lab/gha).
 - Project memory holds no rule, at most a pointer to one of these homes.
 
+## Record it as a mechanism, not as prose
+
+Ezra, 2026-10-23: "no more prose-only rules if we can help it;
+all new rules go straight into hooks."
+A prose rule is read by the agents that load it, and a subagent loads almost none of them ([ai-config#4698](https://github.com/Morrison-Lab/ai-config/issues/4698)).
+
+- **Do:** write the hook (agent behaviour, in `hooks/`) or the failing check (content, in `gha`) in the same turn as the rule, with its test.
+- **Do:** make the check blocking from its first PR.
+  A warn-only check is how sds#444 shipped four divs in one subfile.
+- **Do:** add the prose only as the explanation the hook's message links to.
+- **Do:** where no mechanism can work, say why in the prose and file the issue that would make one possible.
+- **Don't:** record a rule as a paragraph in `AGENTS.md`, a fragment or memory and call it done.
+
 ## What to do
 
 - **Do:** record a new instruction in its global home in the same turn it arrives.

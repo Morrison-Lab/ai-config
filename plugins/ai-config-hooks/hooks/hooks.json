@@ -1811,6 +1811,19 @@
           }
         ]
       }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/inject-subagent-rules.py\"'",
+            "timeout": 10,
+            "script": "inject-subagent-rules.py",
+            "why": "ai-config#4698 -- SessionStart and UserPromptSubmit injection never reaches a dispatched subagent, which began with only its brief; Ezra asked 2026-10-23 why subagents do not follow the rules reliably. Injects shared/workflow/subagent-core-rules.md at SubagentStart. Adds context, never blocks."
+          }
+        ]
+      }
     ]
   }
 }

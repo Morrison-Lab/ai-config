@@ -15,7 +15,11 @@ A reason or an option list that the thread summary did not carry is left out rat
   A correction becomes a hook or a failing check and a corresponding new issue, and a new symptom of a tracked script is a comment on its tracking issue, as [`triage-backlog`](../shared/workflow/triage-backlog.md) says.
   The daily run is scheduled at 02:47 America/Los_Angeles.
   It works clusters first, then the oldest issues, at most 10 per run, and never merges.
-  It is a scheduled task in the harness (id `trig_01TbyPBLXVFaeRvSH7a39uHA`, recreated twice on 2026-10-23: after Ezra changed the correction wording in an inline review comment on [ai-config#4701](https://github.com/Morrison-Lab/ai-config/pull/4701#discussion_r4357843556) as it merged, and so a live issue an agent can fix gets a small PR, up to the cap, instead of being skipped as "still live"), not a file in this repository.
+  It is a scheduled task in the harness (id `trig_01TbyPBLXVFaeRvSH7a39uHA`), not a file in this repository.
+  The scheduled task was recreated twice on 2026-10-23, because its prompt cannot be edited in place.
+  The first time, Ezra changed the correction wording in an inline review comment on [ai-config#4701](https://github.com/Morrison-Lab/ai-config/pull/4701#discussion_r4357843556) as it merged.
+  The second time, the [coordinator session](https://claude.ai/code/session_01RZfvzzeAzADKS6FC1m9VHm) relayed Ezra's correction at 02:49 PDT that the first daily run had skipped a fixable issue as "still live".
+  A live issue that an agent can fix now gets a small PR, up to the cap, and is skipped only when it needs Ezra's hands.
   Tracked by [ai-config#4700](https://github.com/Morrison-Lab/ai-config/issues/4700).
 - **No merge on a standing grant in Ezra's project threads.**
   A merge there needs Ezra's own typed word, in the thread that owns the PR, for a PR that existed when he typed it.

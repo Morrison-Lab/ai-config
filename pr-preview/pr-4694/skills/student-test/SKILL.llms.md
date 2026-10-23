@@ -55,6 +55,6 @@ Run the students and graders on Sonnet-tier models; one pair per item cost rough
 - **Don’t** include solutions, student records, `Student_Work` folders or a course instructor’s final exam anywhere in a student’s context or in a report.
 - **Don’t** put reports or keys in a student-facing repository: `mlg` reports quote answers and stay in `mlg`.
 - **Don’t** trust a full score as proof of clarity: a lucky guess or a recited answer also scores full marks, so read the grader’s guessable-question list.
-- **Don’t** post-process the student render.
+- **Don’t** post-process the student render beyond deleting its leading block of raw TeX macro definitions.
 
 Back to top

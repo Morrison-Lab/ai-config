@@ -1528,6 +1528,13 @@
             "timeout": 10,
             "script": "no-unlinked-session-mention.py",
             "why": "The user's standing rule (2026-10-16, reaffirmed 2026-10-22): anytime you mention a session, you must provide a link. warn-pr-without-thread-link.py and no-unlinked-thread-pointer.py cover PRs and 'in its thread'; neither covers a named session, so 'your Mac session' and 'the coordinator' went out unlinked. Blocks (deny) when a user-visible reply tool call (mcp__hearthbot__reply, post_message, update_message) names a Remote Control, RC, Mac, Linux, cloud, local, device or coordinator session, or the coordinator, in a paragraph or list item with no claude.ai/code/session_ link, (#cmsg_...) or thread=cmsg_ URL. 'This session' is not a mention. Fenced and inline code are ignored. Fails open on any parse trouble."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-numbered-merge-word-ask.py\"",
+            "timeout": 10,
+            "script": "no-numbered-merge-word-ask.py",
+            "why": "ai-config#4698. Ezra, 2026-10-23: \"don't make me name each one; mwc them all!\" A bare mwc already covers every ready PR in the thread's scope, yet agents asked him to type 'mwc 4699'. Blocks (deny) a user-visible reply tool call (mcp__hearthbot__reply, post_message, update_message, edit_message) whose text asks for mwc followed by a number or a reference, and points at plain mwc. Inline code is not ignored: the ask sits in a code span. Fails open on any parse trouble."
           }
         ]
       },

@@ -238,7 +238,7 @@ opencode run -m opencode-go/deepseek-v4-pro "Reply with exactly the word: PONG"
 
 Measured 2026-08-19 on opencode 1.18.15, the hosted-free smoke test returned `PONG` in 7.9s. The OpenCode Go **subscription’s activation** was verified 2026-08-25; that check confirmed the subscription is active, not that the smoke test above ran — the `opencode-go/*` line is the recipe for that test, and its output was not observed in this session.
 
-**That gap is closed as of 2026-09-04.** `opencode run -m opencode-go/gpt-5.6-luna "Reply with exactly the word: PONG"` returned `PONG`, and a subsequent real dispatch (an adversarial prose review of a small diff) to the same id completed and returned a usable verdict. So `opencode-go/*` is a confirmed-working route for judgment-bearing sidecar work, not only an active-subscription claim — prefer it there over a bare `opencode/*` id, per the reachability caveat in the section above.
+**That gap is closed as of 2026-09-04.** `opencode run -m opencode-go/gpt-5.6-luna "Reply with exactly the word: PONG"` returned `PONG`, and a subsequent real dispatch (an adversarial prose review of a small diff) to the same id completed and returned a usable verdict. So `opencode-go/*` is a confirmed-working route for judgment-bearing sidecar work, not only an active-subscription claim — prefer it there over a bare `opencode/*` id, per the reachability caveat in the section above. That result did not reproduce on another machine on 2026-10-22, where `opencode models` listed no `opencode-go/*` ids, so run `opencode models` before choosing the tier.
 
 ### 2. Prepare the prompt
 
@@ -258,10 +258,33 @@ As of 2026-08-19, `opencode run` takes the message as positional arguments, and 
 
 `opencode run` defaults to the `build` agent, which runs with tools enabled. Measured 2026-08-23 on 1.18.21 with `openrouter/stealth/ox-alpha`: a ~350-word diagnosis prompt (a Python traceback plus a function body, JSON-only output requested) produced zero streamed output across two default-agent runs — one killed at a 5-minute timeout, the other left running in the background and never observed to finish — while `--agent plan` completed the identical prompt in 36 seconds, and the default agent answered trivial and medium prompts in 13-15 seconds throughout. A candidate explanation is the prompt’s file paths inducing tool use that goes nowhere headless, but that mechanism is unconfirmed. The measurements above are what this section asserts, over the version where `--agent plan` still worked.
 
-- **Do:** treat a silent, multi-minute `opencode run` as a stall to kill and retry, on a different model or a shorter prompt — `--agent plan` no longer selects an agent as of 2026-09-04, so it is not an escape from the stall.
+- **Do:** treat a silent, multi-minute `opencode run` as a stall to kill and retry — `--agent plan` no longer selects an agent as of 2026-09-04, so it is not an escape from the stall. When the stalled run passed a long prompt as a positional argument, try the 2026-10-22 prompt-in-file recipe, since a change of model alone did not help in those runs.
 - **Don’t:** rely on `--agent plan` to avoid the default-agent stall. It now falls back to the default agent it was meant to replace.
 
-There is no sandbox flag either. `opencode run --help` on 2026-08-19 listed none, and permissions come from the `permission` block in the opencode config. `--auto` auto-approves everything not explicitly denied, and its own help calls it dangerous, so scope the config rather than reaching for that flag. The root `opencode.json` in this repo is intentionally unscoped (`permission: allow` for all tools, `opencode.json:23-37`) to avoid interactive prompts for routine `gh`/`sh` pipelines. This is the config-scoped equivalent of `--auto` and is documented as deliberate here. Prefer this repo-level allow over per-invocation `--auto`.
+**A recipe that returned output where long positional prompts did not, measured 2026-10-22 (Linux desktop, opencode 1.18.34).** Whether this is the same default-agent stall described above is not established. A long review prompt (~6.7 KB) passed as one positional argument to `opencode run -m opencode/<id>` hit a 600 s `timeout` with 0 bytes of output, not even the `> build ·` banner. That happened four times, on `deepseek-v4.1-flash-free`, `nemotron-3-ultra-free` and `glm-5.3-flash-free`, from the repo root and from a scratchpad directory, with and without file paths in the prompt. A trivial prompt (`cd /tmp && opencode run -m opencode/glm-5.3-flash-free "Reply with exactly the word: PONG"`) returned in about 3 s. Putting the prompt in a file (7.6 KB), passing a short positional message before `-f <file>`, and running from `/tmp` completed with a full, usable review four times in a row, each within a few minutes, all on `glm-5.3-flash-free`:
+
+``` bash
+cd /tmp && opencode run -m opencode/glm-5.3-flash-free \
+  "Follow the instructions at the top of the attached file and review the two diffs it contains. Do not use any tools." \
+  -f <prompt-file>
+```
+
+Several things changed at once between the failing and working runs:
+
+- the prompt moved from the positional argument into an attached file;
+- the positional message became short;
+- the cwd became `/tmp`;
+- the prompt size differed (about 6.7 KB against 7.6 KB);
+- every working run used `glm-5.3-flash-free`, which had also stalled with a long positional prompt.
+
+No run varied one of these alone, so which change mattered is unknown.
+
+- **Do:** when a long positional prompt stalls, retry with the full recipe above (prompt in a file, short positional message before `-f <file>`, cwd `/tmp`), since that combination is the one measured to work.
+- **Don’t:** credit any single part of the recipe with the fix, or treat the recipe as proven on models other than `glm-5.3-flash-free`.
+
+On that machine and date, `opencode models` listed no `opencode-go/*` ids, so `opencode-go/deepseek-v4-pro` returned “Model not found”. Step 1’s “confirmed-working” result for `opencode-go/*` (2026-09-04) did not reproduce there; the cause (account, configuration, or version) was not determined. The alternative delegation CLIs were also unusable there: agy returned HTTP 429 “Individual quota reached”, and gemini and cursor-agent were unauthenticated ([ai-config#4688](https://github.com/Morrison-Lab/ai-config/issues/4688)).
+
+`opencode run` has no sandbox flag. `opencode run --help` on 2026-08-19 listed none, and permissions come from the `permission` block in the opencode config. `--auto` auto-approves everything not explicitly denied, and its own help calls it dangerous, so scope the config rather than reaching for that flag. The root `opencode.json` in this repo is intentionally unscoped (`permission: allow` for all tools, `opencode.json:23-37`) to avoid interactive prompts for routine `gh`/`sh` pipelines. This is the config-scoped equivalent of `--auto` and is documented as deliberate here. Prefer this repo-level allow over per-invocation `--auto`.
 
 For a long or multi-item run, borrow the background-runner-plus-DONE-marker *shape* from [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.llms.md) step 3 rather than making a foreground call that the tool timeout will kill. Borrow the shape and not the body. **Four things in that skill’s `run_one()` do not transfer**, and the fourth fails silently rather than erroring:
 

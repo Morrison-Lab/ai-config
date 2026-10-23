@@ -1131,6 +1131,11 @@ Tracked as [#1794](https://github.com/Morrison-Lab/ai-config/issues/1794), and c
 This section's own first draft then committed the same error: it opened by describing "the two sections above", carrying that framing over from its neighbour, when the section directly above it argues the opposite of what the sentence attributed to it.
 The reviewer on [#1795](https://github.com/Morrison-Lab/ai-config/pull/1795) caught it, which is worth recording as evidence about the remedy rather than about the author --- naming a target beats counting to it, exactly as [`forward-references`](forward-references.md) says, and the count was wrong here because an unrelated section had been inserted between the two being counted.)
 
+(Second case, 2026-10-22, [#4690](https://github.com/Morrison-Lab/ai-config/pull/4690).
+A dated measurement paragraph appended to the end of step 3 of `skills/delegate-to-opencode/SKILL.md` qualified two older sentences the diff never touched: step 1's "confirmed-working route" claim and an earlier step-3 bullet recommending a retry on a different model or a shorter prompt.
+Two review rounds found them one at a time, each costing a full cycle.
+The new data was evidence rather than a hedge, so the same read applies: search the file for older advice the new measurement qualifies or contradicts, and update it in the same edit.)
+
 ## A number in a commit message is an assertion nobody re-derives
 
 The section on your own PR descriptions above names the commit message as a

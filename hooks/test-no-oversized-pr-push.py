@@ -49,6 +49,19 @@ def run(command, cwd, raw=None):
     return p.returncode, denied
 
 
+def new_path_cases():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("hook", HOOK)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return [
+        ("rename: plain arrow", mod.new_path("a.qmd => _freeze/b.json"), "_freeze/b.json"),
+        ("rename: brace form", mod.new_path("chapters/{old => _freeze}/x.json"), "chapters/_freeze/x.json"),
+        ("rename: brace with empty new side", mod.new_path("a/{old => }/x.qmd"), "a/x.qmd"),
+        ("rename: no rename", mod.new_path("a/b.qmd"), "a/b.qmd"),
+    ]
+
+
 def check(label, ok):
     print(("  ok      " if ok else "  FAIL    ") + label)
     return 0 if ok else 1
@@ -82,11 +95,13 @@ def main():
     ]
     for label, (rc, denied), want in cases:
         fails += check(label, rc == 0 and denied == want)
+    for label, got, want in new_path_cases():
+        fails += check(label, got == want)
     # On the default branch itself there is no PR to measure.
     git(sweep, "switch", "-q", "main")
     rc, denied = run("git push", sweep)
     fails += check("push from the default branch passes", rc == 0 and not denied)
-    total = len(cases) + 1
+    total = len(cases) + 1 + len(new_path_cases())
     print(f"\n{total - fails}/{total} correct")
     return 1 if fails else 0
 

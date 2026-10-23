@@ -49,6 +49,12 @@ def default_base(cwd):
     return None
 
 
+def new_path(name):
+    """The post-rename path in a numstat name: `a => b` or `pre/{a => b}/post`."""
+    name = re.sub(r"\{[^{}]* => ([^{}]*)\}", r"\1", name)
+    return re.sub(r"/{2,}", "/", name.split(" => ")[-1])
+
+
 def measure(cwd, base):
     mb = git(cwd, "merge-base", base, "HEAD")
     if not mb:
@@ -61,7 +67,7 @@ def measure(cwd, base):
         parts = row.split("\t", 2)
         if len(parts) != 3:
             continue
-        path = parts[2].split(" => ")[-1]
+        path = new_path(parts[2])
         if any(re.fullmatch(p, path) for p in IGNORE):
             continue
         files += 1

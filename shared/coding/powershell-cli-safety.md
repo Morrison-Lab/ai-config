@@ -9,7 +9,7 @@ link here.
 - **The hazard is not PowerShell-specific, and not limited to PR descriptions**:
   bash and zsh double-quoted strings run backtick spans as command substitution,
   so `gh pr comment`, `gh issue comment`, `gh api .../comments -f body="..."` / `.../replies -f body="..."`, and `git commit -m "..."` corrupt a backtick-carrying body exactly as `gh pr create --body "..."` does
-  (a `` `ms.` `` code span runs `ms.` as a command and vanishes).
+  (a `ms` code span runs `ms` as a command and vanishes).
   Use `--body-file` / `-F body=@<file>` for comment and review-reply bodies too, in any shell, and `git commit -F <file>` for a commit message.
   See `memories/git-commit-push.md`'s "`gh pr comment` / `gh api ... -f body=` run backtick spans too" and "`git commit -m "..."` runs backtick spans as shell commands" sections.
 - **`git commit -m` is the surface that enumeration hides**, because every other entry posts to GitHub, so a commit message reads as a different kind of thing while the shell treats it identically.

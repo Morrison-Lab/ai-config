@@ -18,6 +18,13 @@ this file holds the cloud-specific quirks that stalled merges.
 - The merge hook's own list (`STANDING_MERGE_GRANT_REPOS`) names only `ai-config` and the macros repo, so a `gha` merge still needs `enable-mwc`;
   [ai-config#3490](https://github.com/Morrison-Lab/ai-config/issues/3490) describes the mismatch and is closed, although the mismatch persists (checked 2026-10-16).
   Infra-only PRs in any Morrison-Lab repo have a separate standing grant, described in `skills/mwc/SKILL.md`.
+- In a Hearth project thread of the Machine Learning course project, the project rule is stricter: a merge needs Ezra's own word, typed in the owning thread, for PRs that existed when he typed it.
+  A thread does not invoke the standing grants above there, and does not relay them.
+  Slip, 2026-10-22: a thread squash-merged [gha#1169](https://github.com/Morrison-Lab/gha/pull/1169) under `gha`'s `CLAUDE.md` standing rule, without Ezra's typed word.
+  Nothing was lost (CI green, Claude review clean), but the project rule was broken.
+  **Do:** when a PR in such a thread is ready, report it to the coordinator and wait for Ezra's word.
+  **Don't:** read a repo's standing grant as covering a Hearth thread, or merge before `check-pr-fully-clean.py` has run.
+  The scorer cannot run in these sessions (it calls `gh pr view`, which needs GraphQL, blocked here), so verify readiness by REST and say so.
 - The merge words are unchanged while the cross-harness reviewer is out;
   only the review changes (see "Cross-harness review" below).
 

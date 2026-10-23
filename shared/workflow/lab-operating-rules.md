@@ -51,3 +51,9 @@ The rest are prose because no condition in the transcript can decide them.
   Enforced by `hooks/no-memory-only-learning.py`.
 - Every correction Ezra makes becomes a hook or failing check.
   Enforced by `hooks/no-user-correction-without-mechanism.py`.
+
+## Asking for a merge word
+
+- Ask for `mwc` only once the whole stack is ready: green on every head (all checks, paged) with a clean review of each head.
+  Post that as one line when it is true, not before.
+  Not hookable: readiness depends on live GitHub state.

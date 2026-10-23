@@ -22,12 +22,12 @@ REPLY_TOOL = re.compile(r"^mcp__hearthbot__(?:reply|post_message|update_message|
 
 ASKS = (
     ("a manual 'go' in a Remote Control session", re.compile(
-        r"\b(?:type|say|send|reply|enter|answer)\b[^.\n]{0,60}[`'\"*]*\bgo\b[`'\"*]*[^.\n]{0,60}"
+        r"\b(?:type|say|send|reply|enter|answer)\s+(?:with\s+)?[`'\"*]*go\b[`'\"*]*[^.\n]{0,60}"
         r"\b(?:remote control|RC|session|device)\b"
         r"|\b(?:remote control|RC)\b[^.\n]{0,80}\b(?:type|say|send|reply|enter)\b[^.\n]{0,40}[`'\"*]\bgo\b",
         re.I)),
     ("a merge button or manual merge", re.compile(
-        r"\b(?:click|press|hit|tap|use)\b[^.\n]{0,30}\bmerge\b[^.\n]{0,20}\bbutton\b"
+        r"\b(?:click|press|hit|tap)\b[^.\n]{0,30}\bmerge\b[^.\n]{0,20}\bbutton\b"
         r"|\bmerge (?:it|them|the PRs?) (?:yourself|manually|by hand)\b",
         re.I)),
 )

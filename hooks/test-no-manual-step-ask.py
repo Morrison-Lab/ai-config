@@ -23,7 +23,10 @@ CASES = [
     ("plain mwc ask", POST, "Both are ready. Type `mwc` to merge them.", False),
     ("fresh session sentence", POST, "I started a fresh Remote Control session with the brief as its opening task.", False),
     ("go as an ordinary word", POST, "Let's go ahead and type the results into the table.", False),
-    ("unrelated tool", "Bash", "Click the Merge button", False),
+    ("reply then go ahead, session later", POST, "Reply if you disagree; otherwise we can go ahead and the session will start.", False),
+    ("say we go, RC mentioned", POST, "You said we should go with the RC plan, so I started a session.", False),
+    ("use the merge queue", POST, "Use the merge queue; the button is disabled by policy.", False),
+    ("unrelated tool","Bash", "Click the Merge button", False),
     ("no text", POST, None, False),
 ]
 

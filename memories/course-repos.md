@@ -161,3 +161,19 @@ Automated code review checks resolve external links against the live published s
 
 
 
+
+## A repository scaffolded from a sibling describes itself
+
+When a new course repository is built by copying a sibling's files (dds from lds, dlg from mlg),
+the copy's documentation, agent instructions and comments must state the new repository's own rules and reasons.
+Links that are content stay, such as a link to the prerequisite course's notes site.
+
+- **Do:** rewrite `CLAUDE.md`, `AUTHORING.md`, the README and the CI notes to stand alone in the scaffolding PR,
+  and drop the sibling's issue numbers, "ported from" notes and examples that apply only to the sibling's course.
+- **Do:** trim copied allowlists, such as `_typos.toml` words and a DOI check's `exclude-keys`, to the entries the new repository uses.
+- **Do:** finish with `git grep -n -i -w -E "<every sibling repo name>"` over the tree, minus vendored directories,
+  and account for each hit as content or as a functional name (a shared storage key) before calling the rewrite done.
+  A file-by-file rewrite of dds missed six `AUTHORING.md` lines that only the grep found.
+- **Don't:** leave "follows lds's `CLAUDE.md` as its baseline", "copied from mlg", "(lds#370)" or a pointer to the sibling's docs for the details.
+
+(Ezra, 2026-10-23, on dds#1 and dlg#2: "clear out all the template content and references".)

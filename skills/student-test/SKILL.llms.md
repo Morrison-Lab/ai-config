@@ -2,7 +2,7 @@
 
 Give each assessment to a “student” agent that has no access to the solutions, then have a separate grader compare its answers with the key. Every wrong or hedged answer is either a student error, a wording problem (ambiguous, or missing information), or a key error. The deliverable is a per-item report with a suggested rewording for each wording problem.
 
-**Origin:** Ezra, 2026-10-12, for the DATA 571 repositories (`Morrison-Lab/mlg` assessments, `Morrison-Lab/lds` notes). Ezra made it standing practice the same day: re-run it on every changed homework or exam.
+**Origin:** Ezra, 2026-10-12, for the DATA 571 repositories (`Morrison-Lab/mlg` assessments, `Morrison-Lab/lds` notes). Ezra made it standing practice the same day: re-run it on every changed homework or exam. It applies equally to the CSCI 481 assessments in `Morrison-Lab/dlg`, which copy `mlg`’s layout.
 
 ## When this fires
 
@@ -12,7 +12,7 @@ Give each assessment to a “student” agent that has no access to the solution
 
 ## Procedure
 
-1.  **Render the student copy, unmodified.** In `mlg` or `dlg`: `quarto render <item>.qmd --to markdown` with the default `assign` profile, then `--profile solution` for the key (grader only). Not `--to gfm`: GitHub-flavoured Markdown has no lettered lists, so it numbers parts a to e as 1 to 5, and a question that refers to “part c” then reads as broken to the student (dlg#2, 2026-10-23).
+1.  **Render the student copy, and change nothing a student sees.** In `mlg` or `dlg`: `quarto render <item>.qmd --to markdown` with the default `assign` profile, then `--profile solution` for the key (grader only). Not `--to gfm`: GitHub-flavoured Markdown has no lettered lists, so it numbers parts a to e as 1 to 5, and a question that refers to “part c” then reads as broken to the student (dlg#2, 2026-10-23).
 
     - **Do:** render to `markdown`, and delete only the leading block of raw TeX macro definitions, which no student sees.
     - **Don’t:** hand the student a `gfm` render of an item with lettered parts.
@@ -36,7 +36,7 @@ Give each assessment to a “student” agent that has no access to the solution
 
 6.  **Verify each finding before acting.** A grader can report an artifact of the test itself. Check the real student render against anything about formatting, and re-derive anything called a key error.
 
-7.  **Write the report** to the repository’s report folder (`reports/student-test/<date>-<topic>/` in `mlg`): a README table of item, score and tools allowed, plus the grader reports and the student answers. Open it as a PR. Fixing the assessment wording is a separate PR per item.
+7.  **Write the report** to the repository’s report folder (`reports/student-test/<date>-<topic>/` in the assessment repository, `mlg` or `dlg`): a README table of item, score and tools allowed, plus the grader reports and the student answers. Open it as a PR. Fixing the assessment wording is a separate PR per item.
 
 8.  **Pilot first when new.** Run one homework and one exam, report the method, and then run the rest unless the pilot shows the method is broken.
 
@@ -53,7 +53,7 @@ Run the students and graders on Sonnet-tier models; one pair per item cost rough
 ## Anti-patterns
 
 - **Don’t** include solutions, student records, `Student_Work` folders or a course instructor’s final exam anywhere in a student’s context or in a report.
-- **Don’t** put reports or keys in a student-facing repository: `mlg` reports quote answers and stay in `mlg`.
+- **Don’t** put reports or keys in a student-facing repository: reports quote answers, so `mlg` reports stay in `mlg` (never `lds`) and `dlg` reports stay in `dlg` (never `dds`).
 - **Don’t** trust a full score as proof of clarity: a lucky guess or a recited answer also scores full marks, so read the grader’s guessable-question list.
 - **Don’t** post-process the student render beyond deleting its leading block of raw TeX macro definitions.
 

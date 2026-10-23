@@ -361,7 +361,7 @@ cookieconsent.run({
 <section id="student-test-can-a-student-answer-it-from-the-wording-alone" class="level1">
 <h1>student-test — can a student answer it from the wording alone?</h1>
 <p>Give each assessment to a “student” agent that has no access to the solutions, then have a separate grader compare its answers with the key. Every wrong or hedged answer is either a student error, a wording problem (ambiguous, or missing information), or a key error. The deliverable is a per-item report with a suggested rewording for each wording problem.</p>
-<p><strong>Origin:</strong> Ezra, 2026-10-12, for the DATA 571 repositories (<code>Morrison-Lab/mlg</code> assessments, <code>Morrison-Lab/lds</code> notes). Ezra made it standing practice the same day: re-run it on every changed homework or exam.</p>
+<p><strong>Origin:</strong> Ezra, 2026-10-12, for the DATA 571 repositories (<code>Morrison-Lab/mlg</code> assessments, <code>Morrison-Lab/lds</code> notes). Ezra made it standing practice the same day: re-run it on every changed homework or exam. It applies equally to the CSCI 481 assessments in <code>Morrison-Lab/dlg</code>, which copy <code>mlg</code>’s layout.</p>
 <section id="when-this-fires" class="level2">
 <h2 class="anchored" data-anchor-id="when-this-fires">When this fires</h2>
 <ul>
@@ -373,7 +373,7 @@ cookieconsent.run({
 <section id="procedure" class="level2">
 <h2 class="anchored" data-anchor-id="procedure">Procedure</h2>
 <ol type="1">
-<li><p><strong>Render the student copy, unmodified.</strong> In <code>mlg</code> or <code>dlg</code>: <code>quarto render &lt;item&gt;.qmd --to markdown</code> with the default <code>assign</code> profile, then <code>--profile solution</code> for the key (grader only). Not <code>--to gfm</code>: GitHub-flavoured Markdown has no lettered lists, so it numbers parts a to e as 1 to 5, and a question that refers to “part c” then reads as broken to the student (dlg#2, 2026-10-23).</p>
+<li><p><strong>Render the student copy, and change nothing a student sees.</strong> In <code>mlg</code> or <code>dlg</code>: <code>quarto render &lt;item&gt;.qmd --to markdown</code> with the default <code>assign</code> profile, then <code>--profile solution</code> for the key (grader only). Not <code>--to gfm</code>: GitHub-flavoured Markdown has no lettered lists, so it numbers parts a to e as 1 to 5, and a question that refers to “part c” then reads as broken to the student (dlg#2, 2026-10-23).</p>
 <ul>
 <li><strong>Do:</strong> render to <code>markdown</code>, and delete only the leading block of raw TeX macro definitions, which no student sees.</li>
 <li><strong>Don’t:</strong> hand the student a <code>gfm</code> render of an item with lettered parts.</li>
@@ -407,7 +407,7 @@ cookieconsent.run({
 <li><p><strong>The student flags every doubt.</strong> Where a question is ambiguous or seems to lack information it states the reading it chose, carries on, and ends with a “Confusions” list. It asks nobody.</p></li>
 <li><p><strong>A separate grader agent grades.</strong> It reads the student copy, the student’s answers and the key. It scores each part, re-runs any computation it relies on, and classifies every discrepancy and confusion as exactly one of: <strong>STUDENT_ERROR</strong> (the wording was clear), <strong>AMBIGUOUS_WORDING</strong>, <strong>MISSING_INFORMATION</strong>, <strong>SOLUTION_ERROR</strong>, <strong>ACCEPTABLE_ALTERNATIVE</strong>. Each non-student item carries a concrete suggested rewording or key fix. It also flags guessable questions, over-hinted ones, heavy arithmetic, time fit, and duplicated or mislabeled key text.</p></li>
 <li><p><strong>Verify each finding before acting.</strong> A grader can report an artifact of the test itself. Check the real student render against anything about formatting, and re-derive anything called a key error.</p></li>
-<li><p><strong>Write the report</strong> to the repository’s report folder (<code>reports/student-test/&lt;date&gt;-&lt;topic&gt;/</code> in <code>mlg</code>): a README table of item, score and tools allowed, plus the grader reports and the student answers. Open it as a PR. Fixing the assessment wording is a separate PR per item.</p></li>
+<li><p><strong>Write the report</strong> to the repository’s report folder (<code>reports/student-test/&lt;date&gt;-&lt;topic&gt;/</code> in the assessment repository, <code>mlg</code> or <code>dlg</code>): a README table of item, score and tools allowed, plus the grader reports and the student answers. Open it as a PR. Fixing the assessment wording is a separate PR per item.</p></li>
 <li><p><strong>Pilot first when new.</strong> Run one homework and one exam, report the method, and then run the rest unless the pilot shows the method is broken.</p></li>
 </ol>
 </section>
@@ -427,7 +427,7 @@ cookieconsent.run({
 <h2 class="anchored" data-anchor-id="anti-patterns">Anti-patterns</h2>
 <ul>
 <li><strong>Don’t</strong> include solutions, student records, <code>Student_Work</code> folders or a course instructor’s final exam anywhere in a student’s context or in a report.</li>
-<li><strong>Don’t</strong> put reports or keys in a student-facing repository: <code>mlg</code> reports quote answers and stay in <code>mlg</code>.</li>
+<li><strong>Don’t</strong> put reports or keys in a student-facing repository: reports quote answers, so <code>mlg</code> reports stay in <code>mlg</code> (never <code>lds</code>) and <code>dlg</code> reports stay in <code>dlg</code> (never <code>dds</code>).</li>
 <li><strong>Don’t</strong> trust a full score as proof of clarity: a lucky guess or a recited answer also scores full marks, so read the grader’s guessable-question list.</li>
 <li><strong>Don’t</strong> post-process the student render beyond deleting its leading block of raw TeX macro definitions.</li>
 </ul>

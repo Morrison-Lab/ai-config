@@ -36,7 +36,7 @@ Give each assessment to a “student” agent that has no access to the solution
 
 6.  **Verify each finding before acting.** A grader can report an artifact of the test itself. Check the real student render against anything about formatting, and re-derive anything called a key error.
 
-7.  **Write the report** to the repository’s report folder (`reports/student-test/<date>-<topic>/` in `mlg`): a README table of item, score and tools allowed, plus the grader reports and the student answers. Open it as a PR. Fixing the assessment wording is a separate PR per item.
+7.  **Write the report** to the repository’s report folder (`reports/student-test/<date>-<topic>/` in the assessment repository, `mlg` or `dlg`): a README table of item, score and tools allowed, plus the grader reports and the student answers. Open it as a PR. Fixing the assessment wording is a separate PR per item.
 
 8.  **Pilot first when new.** Run one homework and one exam, report the method, and then run the rest unless the pilot shows the method is broken.
 
@@ -53,7 +53,7 @@ Run the students and graders on Sonnet-tier models; one pair per item cost rough
 ## Anti-patterns
 
 - **Don’t** include solutions, student records, `Student_Work` folders or a course instructor’s final exam anywhere in a student’s context or in a report.
-- **Don’t** put reports or keys in a student-facing repository: `mlg` reports quote answers and stay in `mlg`.
+- **Don’t** put reports or keys in a student-facing repository: reports quote answers, so `mlg` reports stay in `mlg` (never `lds`) and `dlg` reports stay in `dlg` (never `dds`).
 - **Don’t** trust a full score as proof of clarity: a lucky guess or a recited answer also scores full marks, so read the grader’s guessable-question list.
 - **Don’t** post-process the student render beyond deleting its leading block of raw TeX macro definitions.
 

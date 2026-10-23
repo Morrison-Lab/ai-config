@@ -407,7 +407,7 @@ cookieconsent.run({
 <li><p><strong>The student flags every doubt.</strong> Where a question is ambiguous or seems to lack information it states the reading it chose, carries on, and ends with a “Confusions” list. It asks nobody.</p></li>
 <li><p><strong>A separate grader agent grades.</strong> It reads the student copy, the student’s answers and the key. It scores each part, re-runs any computation it relies on, and classifies every discrepancy and confusion as exactly one of: <strong>STUDENT_ERROR</strong> (the wording was clear), <strong>AMBIGUOUS_WORDING</strong>, <strong>MISSING_INFORMATION</strong>, <strong>SOLUTION_ERROR</strong>, <strong>ACCEPTABLE_ALTERNATIVE</strong>. Each non-student item carries a concrete suggested rewording or key fix. It also flags guessable questions, over-hinted ones, heavy arithmetic, time fit, and duplicated or mislabeled key text.</p></li>
 <li><p><strong>Verify each finding before acting.</strong> A grader can report an artifact of the test itself. Check the real student render against anything about formatting, and re-derive anything called a key error.</p></li>
-<li><p><strong>Write the report</strong> to the repository’s report folder (<code>reports/student-test/&lt;date&gt;-&lt;topic&gt;/</code> in <code>mlg</code>): a README table of item, score and tools allowed, plus the grader reports and the student answers. Open it as a PR. Fixing the assessment wording is a separate PR per item.</p></li>
+<li><p><strong>Write the report</strong> to the repository’s report folder (<code>reports/student-test/&lt;date&gt;-&lt;topic&gt;/</code> in the assessment repository, <code>mlg</code> or <code>dlg</code>): a README table of item, score and tools allowed, plus the grader reports and the student answers. Open it as a PR. Fixing the assessment wording is a separate PR per item.</p></li>
 <li><p><strong>Pilot first when new.</strong> Run one homework and one exam, report the method, and then run the rest unless the pilot shows the method is broken.</p></li>
 </ol>
 </section>
@@ -427,7 +427,7 @@ cookieconsent.run({
 <h2 class="anchored" data-anchor-id="anti-patterns">Anti-patterns</h2>
 <ul>
 <li><strong>Don’t</strong> include solutions, student records, <code>Student_Work</code> folders or a course instructor’s final exam anywhere in a student’s context or in a report.</li>
-<li><strong>Don’t</strong> put reports or keys in a student-facing repository: <code>mlg</code> reports quote answers and stay in <code>mlg</code>.</li>
+<li><strong>Don’t</strong> put reports or keys in a student-facing repository: reports quote answers, so <code>mlg</code> reports stay in <code>mlg</code> (never <code>lds</code>) and <code>dlg</code> reports stay in <code>dlg</code> (never <code>dds</code>).</li>
 <li><strong>Don’t</strong> trust a full score as proof of clarity: a lucky guess or a recited answer also scores full marks, so read the grader’s guessable-question list.</li>
 <li><strong>Don’t</strong> post-process the student render beyond deleting its leading block of raw TeX macro definitions.</li>
 </ul>

@@ -18,6 +18,7 @@ The deliverable is a per-item report with a suggested rewording for each wording
 
 **Origin:** Ezra, 2026-10-12, for the DATA 571 repositories (`Morrison-Lab/mlg` assessments, `Morrison-Lab/lds` notes).
 Ezra made it standing practice the same day: re-run it on every changed homework or exam.
+It applies equally to the CSCI 481 assessments in `Morrison-Lab/dlg`, which copy `mlg`'s layout.
 
 ## When this fires
 
@@ -28,7 +29,7 @@ Ezra made it standing practice the same day: re-run it on every changed homework
 
 ## Procedure
 
-1. **Render the student copy, unmodified.**
+1. **Render the student copy, and change nothing a student sees.**
    In `mlg` or `dlg`: `quarto render <item>.qmd --to markdown` with the default `assign` profile, then `--profile solution` for the key (grader only).
    Not `--to gfm`: GitHub-flavoured Markdown has no lettered lists, so it numbers parts a to e as 1 to 5,
    and a question that refers to "part c" then reads as broken to the student (dlg#2, 2026-10-23).

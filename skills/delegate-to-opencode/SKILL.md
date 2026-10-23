@@ -420,6 +420,26 @@ The measurements above are what this section asserts, over the version where `--
 - **Don't:** rely on `--agent plan` to avoid the default-agent stall.
   It now falls back to the default agent it was meant to replace.
 
+**A recipe that avoided the stall, measured 2026-10-22 (Linux desktop, opencode 1.18.34).**
+A long review prompt (~6.7 KB) passed as one positional argument to `opencode run -m opencode/<id>` hit a 600 s `timeout` with 0 bytes of output, not even the `> build ·` banner.
+That happened four times, on `deepseek-v4.1-flash-free`, `nemotron-3-ultra-free` and `glm-5.3-flash-free`, from the repo root and from a scratchpad directory, with and without file paths in the prompt.
+A trivial prompt (`cd /tmp && opencode run -m opencode/glm-5.3-flash-free "Reply with exactly the word: PONG"`) returned in about 3 s.
+Putting the prompt in a file, passing a short positional message before `-f <file>`, and running from `/tmp` completed with a full, usable review four times in a row (7.6 KB files, each finishing within a few minutes):
+
+```bash
+cd /tmp && opencode run -m opencode/glm-5.3-flash-free \
+  "Follow the instructions at the top of the attached file and review the two diffs it contains. Do not use any tools." \
+  -f <prompt-file>
+```
+
+Two things changed between the failing and working runs (short positional message plus `-f`, and cwd `/tmp`), so which one fixed it is unknown.
+
+- **Do:** put a long prompt in a file, pass a short positional message before `-f <file>`, and run from a neutral directory such as `/tmp`.
+- **Don't:** pass a multi-kilobyte prompt as one positional argument, or claim that the attachment or the directory alone is the fix.
+
+On the same machine `opencode models` listed no `opencode-go/*` ids, so `opencode-go/deepseek-v4-pro` returned "Model not found".
+The other fallbacks were also down: agy returned HTTP 429 "Individual quota reached", and gemini and cursor-agent were unauthenticated ([ai-config#4688](https://github.com/Morrison-Lab/ai-config/issues/4688)).
+
 There is no sandbox flag either.
 `opencode run --help` on 2026-08-19 listed none, and permissions come from the `permission` block in the opencode config.
 `--auto` auto-approves everything not explicitly denied, and its own help calls it dangerous, so scope the config rather than reaching for that flag.

@@ -56,9 +56,11 @@ It does not silence you. The user is present, so the point is to stop *asking* r
 
 3.  **Act.**
 
-4.  **Report in the past tense**: what you chose, and the single reason that decided it. One or two sentences. Name anything you deliberately did *not* do, so a silent omission does not read as an oversight.
+4.  **Record the decision in a repo file**, per [`record-every-decision`](../../shared/workflow/record-every-decision.md): the decision, the options, the reason, `daytb` as the decider, the date, and a link to the thread. The past-tense report below is not the record, because it lives in the thread.
 
-5.  **Do not re-ask.** A follow-up question about the same decision spends the round trip the grant existed to save.
+5.  **Report in the past tense**: what you chose, and the single reason that decided it. One or two sentences. Name anything you deliberately did *not* do, so a silent omission does not read as an oversight.
+
+6.  **Do not re-ask.** A follow-up question about the same decision spends the round trip the grant existed to save.
 
 ## Relationship to other skills
 
@@ -73,6 +75,7 @@ It does not silence you. The user is present, so the point is to stop *asking* r
 - Treating it as session-wide, and quietly dropping clarifying questions for unrelated later work – that is `away`, and the user did not ask for it.
 - Reading it as authorization to merge, delete, or publish.
 - Choosing silently, so the user learns what was decided only by noticing the result later.
+- Reporting the decision in the thread and writing it nowhere else.
 - Asking a confirming question anyway – “I’ll do X, unless you’d rather Y?” is the grant declined, not honoured.
 - Reopening a recommendation you had already made, instead of simply taking it – though re-reading the artifacts its options name is not reopening it, per step 2.
 - Filing a stale worktree or a merged local branch back as a question, or as an issue for the user to action, when the grant already covers clearing it.

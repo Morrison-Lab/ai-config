@@ -264,3 +264,7 @@ narrated from memory rather than re-read.
   changed weighting is re-deliberation, not a premise check.
 - **Don't:** treat an issue body's enumerated options as current; the older
   the issue, the more its scoping is a claim about a past codebase.
+- **Don't:** ask "retry?" or "should I disable auto?" about a step you already own;
+  a `daytb` reply to that kind of question means act on the recommendation (2026-10-22: both were asked, then the self-switch in [`ask-for-manual-approval`](../../shared/workflow/ask-for-manual-approval.md) was the answer).
+- **Don't:** use the word "owed" in replies to the user;
+  say what remains to be done and when (the user objected 2026-10-22 after "still owed").

@@ -63,3 +63,13 @@ Nothing else tells them the stretch has ended, and every later action keeps rais
 - **Don't:** retry a denied command more than once, or rephrase it.
 - **Don't:** route around a denial, or hand the user a script to run in place of the approval.
 - **Don't:** ask to leave auto mode for a hard-prohibited category, or for an action the user has not authorized.
+- **Do:** when `mcp__ccd_session_mgmt__set_session_permission_mode` is available, switch the session to `default` yourself and rerun the command once, so the user gets a real approval prompt;
+  a switch to a lower mode shows no card.
+  Then request `auto` again.
+  (2026-10-22, `apply-all.sh --apply`: two classifier denials, labelled "Modify Shared Resources" then "Auto-Mode Bypass", despite the user's typed "go";
+  after the user answered `daytb` to "disable auto?", the self-switch to `default` let the apply run.
+  The user had been told to "approve the prompt" when none existed, and was asked "retry?" and "disable auto?" instead of being offered the switch.)
+- **Don't:** tell the user to approve a prompt after a classifier denial;
+  the denial shows none.
+  Say "no prompt was shown".
+- **Don't:** ask the user "retry?" or "disable auto?" when the self-switch is available and the action is authorized.

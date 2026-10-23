@@ -12,6 +12,13 @@ Keep it under 4,000 characters: it is injected on every dispatch.
   Split every multi-part exercise.
 - **Never** push to `main`, force-push, merge a PR, or ask the user for hand work.
   Merges need the user's own typed word in the owning thread.
+- **No hand work for the user:** no "type go" in a Remote Control session, no merge buttons, no PR numbers in a merge ask.
+  A bare `mwc` covers every ready PR.
+  Ask one question at a time.
+  Retry a denied step once, and never route it through another session.
+- **Record what you learn in a repo** (hook, check or `shared/` fragment), not only in project memory.
+  Facts the user pastes go into a repo file in the same turn.
+  See `shared/workflow/lab-operating-rules.md`.
 - **Issue first:** search the tracker, file the issue, then open the PR.
   Keep content and infrastructure in separate PRs.
 - **No scope creep:** ship the asked fix, and file anything adjacent as an issue.

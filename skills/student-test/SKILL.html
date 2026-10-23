@@ -373,7 +373,12 @@ cookieconsent.run({
 <section id="procedure" class="level2">
 <h2 class="anchored" data-anchor-id="procedure">Procedure</h2>
 <ol type="1">
-<li><p><strong>Render the student copy, unmodified.</strong> In <code>mlg</code>: <code>quarto render &lt;item&gt;.qmd --to gfm</code> with the default <code>assign</code> profile, then <code>--profile solution</code> for the key (grader only). Do not post-process the render. A link-stripping regex run on the pilot also deleted <code>[...]</code> inside inline math, which made the exam look defective and produced a false finding.</p></li>
+<li><p><strong>Render the student copy, unmodified.</strong> In <code>mlg</code> or <code>dlg</code>: <code>quarto render &lt;item&gt;.qmd --to markdown</code> with the default <code>assign</code> profile, then <code>--profile solution</code> for the key (grader only). Not <code>--to gfm</code>: GitHub-flavoured Markdown has no lettered lists, so it numbers parts a to e as 1 to 5, and a question that refers to “part c” then reads as broken to the student (dlg#2, 2026-10-23).</p>
+<ul>
+<li><strong>Do:</strong> render to <code>markdown</code>, and delete only the leading block of raw TeX macro definitions, which no student sees.</li>
+<li><strong>Don’t:</strong> hand the student a <code>gfm</code> render of an item with lettered parts.</li>
+</ul>
+<p>Do not post-process the render beyond that. A link-stripping regex run on the pilot also deleted <code>[...]</code> inside inline math, which made the exam look defective and produced a false finding.</p></li>
 <li><p><strong>Isolate the student.</strong> Put the student text, any data file the item gives students, and for an exam its permitted note sheet, in a fresh scratch directory. The student’s prompt holds only that and the rules. It gets no repository clone, no project files, no memory, and is told not to search for or read this course’s solutions, other repositories or other files. Subagent tools cannot be technically blocked, so ask the student to report its tool use and check the transcript’s tool-use count.</p></li>
 <li><p><strong>Give the tools the item allows, no more.</strong></p>
 <table class="caption-top table">
@@ -424,7 +429,7 @@ cookieconsent.run({
 <li><strong>Don’t</strong> include solutions, student records, <code>Student_Work</code> folders or a course instructor’s final exam anywhere in a student’s context or in a report.</li>
 <li><strong>Don’t</strong> put reports or keys in a student-facing repository: <code>mlg</code> reports quote answers and stay in <code>mlg</code>.</li>
 <li><strong>Don’t</strong> trust a full score as proof of clarity: a lucky guess or a recited answer also scores full marks, so read the grader’s guessable-question list.</li>
-<li><strong>Don’t</strong> post-process the student render.</li>
+<li><strong>Don’t</strong> post-process the student render beyond deleting its leading block of raw TeX macro definitions.</li>
 </ul>
 
 

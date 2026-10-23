@@ -1559,6 +1559,18 @@
             "why": "A git revert or hard reset means work was undone or redone: ask what would have prevented the first attempt and record it (ai-config#4480)."
           }
         ]
+      },
+      {
+        "matcher": "Skill|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/grant-personal-permissions.py\"'",
+            "timeout": 10,
+            "script": "grant-personal-permissions.py",
+            "why": "The owner's personal grants (Skill(mwc), gh pr merge, glab mr merge) lived in one machine's unsynced settings.json, and a plugin settings.json cannot ship permission rules. Emits permissionDecision allow, unlike every other hook here, for Skill mwc / ai-config:mwc and for a Bash command that is exactly one gh pr merge or glab mr merge with no shell operator, substitution, escape or newline and no prefix but ALLOW_MERGE=. Hook precedence is deny > defer > ask > allow and settings deny/ask rules still apply, so no-unauthorized-merge.py keeps denying what it denies today; only the trailing prompt goes (ai-config#4374). Anything else: no output."
+          }
+        ]
       }
     ],
     "PostToolUse": [

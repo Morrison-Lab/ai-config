@@ -29,8 +29,13 @@ Ezra made it standing practice the same day: re-run it on every changed homework
 ## Procedure
 
 1. **Render the student copy, unmodified.**
-   In `mlg`: `quarto render <item>.qmd --to gfm` with the default `assign` profile, then `--profile solution` for the key (grader only).
-   Do not post-process the render.
+   In `mlg` or `dlg`: `quarto render <item>.qmd --to markdown` with the default `assign` profile, then `--profile solution` for the key (grader only).
+   Not `--to gfm`: GitHub-flavoured Markdown has no lettered lists, so it numbers parts a to e as 1 to 5,
+   and a question that refers to "part c" then reads as broken to the student (dlg#2, 2026-10-23).
+   - **Do:** render to `markdown`, and delete only the leading block of raw TeX macro definitions, which no student sees.
+   - **Don't:** hand the student a `gfm` render of an item with lettered parts.
+
+   Do not post-process the render beyond that.
    A link-stripping regex run on the pilot also deleted `[...]` inside inline math, which made the exam look defective and produced a false finding.
 2. **Isolate the student.**
    Put the student text, any data file the item gives students, and for an exam its permitted note sheet, in a fresh scratch directory.

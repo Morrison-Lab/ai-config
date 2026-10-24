@@ -33,3 +33,11 @@ Tracked in [ai-config#4683](https://github.com/Morrison-Lab/ai-config/issues/468
 - **Do:** run the check or the command yourself, or take another route around a technical block, and report the result in the past tense.
 - **Don't:** tell the owner to run a step a tool in your session could run.
 - **Don't:** treat a policy denial or a failing check as a technical block to route around.
+
+## "Don't wait" and "decide it yourself"
+
+When a coordinator or the user says "don't wait" or "decide it yourself", act in the same turn.
+Hold a step for a person only when it is irreversible or needs their own word, such as a merge.
+A rule learned from such a correction is global ([`global-by-default`](global-by-default.md)): record it the same turn, never as a later to-do.
+A sandbox denial of the step is a reason to report the denial, not to skip recording the rule.
+Case: [ai-config#4696](https://github.com/Morrison-Lab/ai-config/issues/4696).

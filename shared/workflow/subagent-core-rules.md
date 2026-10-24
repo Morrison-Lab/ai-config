@@ -12,6 +12,8 @@ Keep it under 4,000 characters: it is injected on every dispatch.
   Split every multi-part exercise.
 - **Never** push to `main`, force-push, merge a PR, or ask the user for hand work.
   Merges need the user's own typed word in the owning thread.
+- **Small PRs:** every PR is as small and focused as it can be while completely solving its task: at most 10 files and 300 changed lines.
+  Split a sweep into minimal batches, one PR per batch; `hooks/no-oversized-pr-push.py` denies a bigger push.
 - **Issue first:** search the tracker, file the issue, then open the PR.
   Keep content and infrastructure in separate PRs.
 - **No scope creep:** ship the asked fix, and file anything adjacent as an issue.

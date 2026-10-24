@@ -62,6 +62,42 @@ def parse_string_constants(source_code: str) -> tuple[set[str], str | None]:
     return strings, None
 
 
+PERMISSION_DECISIONS = frozenset({"allow", "ask"})
+
+
+def _is_str(node, values) -> bool:
+    return (isinstance(node, ast.Constant) and isinstance(node.value, str)
+            and node.value in values)
+
+
+def decides_permission(source_code: str) -> bool:
+    """True when the source assigns `permissionDecision` an `allow` or `ask`
+    value and also sets a `permissionDecisionReason`.
+
+    Both are read structurally -- a dict entry `"permissionDecision": "allow"`
+    or a subscript assignment `x["permissionDecision"] = "allow"` -- so the
+    word "allow" elsewhere in the file (a docstring, a message) does not count.
+    """
+    try:
+        tree = ast.parse(source_code)
+    except SyntaxError:
+        return False
+    decision = reason = False
+    for node in ast.walk(tree):
+        pairs = []
+        if isinstance(node, ast.Dict):
+            pairs = list(zip(node.keys, node.values))
+        elif isinstance(node, ast.Assign):
+            pairs = [(t.slice, node.value) for t in node.targets
+                     if isinstance(t, ast.Subscript)]
+        for key, value in pairs:
+            if _is_str(key, {"permissionDecision"}) and _is_str(value, PERMISSION_DECISIONS):
+                decision = True
+            if _is_str(key, {"permissionDecisionReason"}):
+                reason = True
+    return decision and reason
+
+
 def blocks_by_exit_2(source_code: str) -> bool:
     """True when the source can exit with status 2 outside an error handler.
 
@@ -179,12 +215,10 @@ def check_hook_sources(
         # skips or shows the permission prompt) and shows that reason to the
         # user, so it needs no additionalContext channel (ai-config#4374,
         # hooks/grant-personal-permissions.py). A bare `allow` with no reason
-        # still does not exempt (#3068's "non-blocking 'allow'" case).
-        decides_permission = (
-            "permissionDecision" in constants
-            and "permissionDecisionReason" in constants
-            and ("allow" in constants or "ask" in constants)
-        )
+        # still does not exempt (#3068's "non-blocking 'allow'" case). The
+        # test is structural; it cannot see whether OTHER branches of the
+        # same hook warn silently, which stays a review question.
+        decides = decides_permission(source)
         has_reason = "reason" in constants
         has_system_message = "systemMessage" in constants
         has_additional_context = "additionalContext" in constants
@@ -227,7 +261,8 @@ def check_hook_sources(
         # block, so it does not exempt -- see blocks_by_exit_2 for why a
         # laxer scan would exempt nearly every hook that has an
         # unreadable-payload branch.
-        if "PreToolUse" in events and not (blocks_by_decision or blocks_by_exit or decides_permission):
+        exempt = blocks_by_decision or blocks_by_exit or decides
+        if "PreToolUse" in events and not exempt:
             if not (has_additional_context or has_system_message):
                 errors.append(
                     f"FAIL: {script} is registered as a PreToolUse hook that "

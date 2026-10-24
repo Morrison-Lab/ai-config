@@ -263,6 +263,13 @@
             "timeout": 10,
             "script": "remind-ums-on-trigger-events.py",
             "why": "A coordinator note that steers a thread, or a user reply that is only a grant ('daytb', 'yes, do it'), owes a UMS pass. Injects, never blocks (ai-config#4480)."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-plain-english-merge-word.py\"",
+            "timeout": 10,
+            "script": "remind-plain-english-merge-word.py",
+            "why": "ai-config#4698. Ezra, 2026-10-23: a typed 'merge when ready' was not recognized as a merge word and he had to retype 'mwc'. skills/mwc/SKILL.md listed fixed phrases and a model does not generalize a list. Injects, never grants: when the user's typed message is a merge instruction in plain English ('merge when ready', 'merge them all', 'merge', 'go ahead and merge', 'mwc them all'), tells the agent to treat it as a bare mwc (mwc all), run enable-mwc and check-mwc, and not ask for a retype or PR numbers. A question, quoted or code text, or a system reminder is ignored. The merge guards still decide."
           }
         ]
       }

@@ -23,8 +23,10 @@ def say(text):
     return {"type": "assistant", "message": {"content": [{"type": "text", "text": text}]}}
 
 
-def github(author, body):
-    event = json.dumps({"author": author, "comment": body, "pr": "Morrison-Lab/x#1"})
+def github(author, body, shape="flat"):
+    who = {"flat": author, "nested": {"login": author}}[shape]
+    key = "user" if shape == "nested" else "author"
+    event = json.dumps({key: who, "comment": body, "pr": "Morrison-Lab/x#1"})
     return user('<wake reason="external-event"><event source="github" kind="issue_comment.created" '
                 'trust="relay">' + event + "</event></wake>")
 
@@ -51,6 +53,10 @@ CASES = [
      "PR review comment from the user is a correction"),
     ([github("github-actions[bot]", "you keep forgetting to link the term, same mistake again"), say("Fixed.")], False,
      "a bot's review comment is not"),
+    ([github("github-actions[bot]", "you keep forgetting to link the term, same mistake again", "nested"), say("Fixed.")],
+     False, "a bot's comment in the nested user.login shape is not"),
+    ([github("d-morrison", "you keep forgetting to link the term, same mistake again", "nested"), say("Fixed.")],
+     True, "the owner's comment in the nested user.login shape is"),
     ([user(TIRED), say("ok"), user("[SYSTEM NOTIFICATION] CI finished"), say("fine")], True,
      "a later notification does not clear the correction"),
     ([user("please run the tests"), say("done")], False, "ordinary request"),

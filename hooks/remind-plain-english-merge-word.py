@@ -22,8 +22,7 @@ import sys
 
 # A whole short message that is only a merge instruction.
 WHOLE = re.compile(
-    r"^\W*(?:/?mwc|/?maw|merge(?:\s+(?:it|them|these|those|all|everything|them\s+all|it\s+all"
-    r"|all\s+(?:of\s+)?(?:them|these|the\s+ready\s+prs?)))?"
+    r"^\W*(?:/?mwc|/?maw|merge(?:\s+(?:it|them\s+all|all))?"
     r"|go\s+ahead\s+(?:and\s+)?merge(?:\s+(?:it|them|them\s+all))?"
     r"|(?:please\s+)?merge\s+(?:when|once|as\s+soon\s+as)\s+(?:ready|clean|green|confident|they(?:'re| are) ready)"
     r"|merge\s+when\s+ready|mwc\s+(?:them\s+)?all|mwc\s+them)\W*$",
@@ -31,11 +30,11 @@ WHOLE = re.compile(
 )
 # A merge instruction inside a longer message.
 INLINE = re.compile(
-    r"\b(?:merge\s+when\s+(?:ready|clean|green)|merge\s+them\s+all|merge\s+it\s+all"
-    r"|merge\s+all\s+(?:of\s+)?(?:them|the\s+ready)|mwc\s+(?:them\s+)?all)\b",
+    r"\b(?:merge\s+when\s+(?:ready|clean|green)|merge\s+them\s+all|mwc\s+(?:them\s+)?all)\b",
     re.I,
 )
 QUESTION = re.compile(r"\?\s*$")
+QUESTION_SENTENCE = re.compile(r"[^.!?\n]*\?")
 
 NOT_TYPED = [
     re.compile(r"^ {0,3}(```|~~~).*?^ {0,3}\1[^\n]*$", re.MULTILINE | re.DOTALL),
@@ -74,6 +73,9 @@ def main() -> int:
         return 0
     match = WHOLE.match(text) or INLINE.search(text)
     if not match:
+        return 0
+    # An inline match inside a sentence that ends in a question mark is not an instruction.
+    if QUESTION_SENTENCE.match(text, match.end()):
         return 0
     print(REMINDER.format(quote=" ".join(match.group(0).split())[:60]))
     return 0

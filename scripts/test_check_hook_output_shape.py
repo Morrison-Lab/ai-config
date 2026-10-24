@@ -262,6 +262,45 @@ case(
     want_exit=0,
 )
 
+# A PreToolUse hook that ALLOWS is a permission decision the harness acts on
+# (it skips the prompt), not a warning, so it is out of scope too.
+ALLOWING_PRETOOL_FILES = dict(CLEAN_FILES)
+ALLOWING_PRETOOL_FILES["hooks/warn-pretool.py"] = (
+    'import json\nprint(json.dumps({"hookSpecificOutput": '
+    '{"permissionDecision": "allow", "permissionDecisionReason": "ok"}}))\n'
+)
+ALLOWING_PRETOOL_FILES["hooks/test-warn-pretool.py"] = (
+    'import json\nout = \'{"hookSpecificOutput": {"permissionDecision": "allow"}}\'\n'
+    'assert "permissionDecision" in out\n'
+)
+
+case(
+    "allowing PreToolUse hook needs no advisory channel (#4374)",
+    CLEAN_HOOKS_JSON,
+    ALLOWING_PRETOOL_FILES,
+    want_exit=0,
+)
+
+# Naming the key without a decision value is not a decision, so it does not
+# exempt the hook from Rule 3.
+VALUELESS_PRETOOL_FILES = dict(CLEAN_FILES)
+VALUELESS_PRETOOL_FILES["hooks/warn-pretool.py"] = (
+    'import json\nprint(json.dumps({"hookSpecificOutput": '
+    '{"permissionDecision": None}}))\n'
+)
+VALUELESS_PRETOOL_FILES["hooks/test-warn-pretool.py"] = (
+    'import json\nout = \'{"hookSpecificOutput": {"permissionDecision": null}}\'\n'
+    'assert "permissionDecision" in out\n'
+)
+
+case(
+    "permissionDecision with no decision value does not exempt (#4374)",
+    CLEAN_HOOKS_JSON,
+    VALUELESS_PRETOOL_FILES,
+    want_exit=1,
+    needle="neither blocks (no blocking 'decision' emit and no exit 2)",
+)
+
 # A PreToolUse hook that blocks by EXIT CODE is equally out of scope: exit 2
 # denies the tool call and its stderr is fed back to Claude, so the advisory
 # channel Rule 3 demands would be redundant. #3068's own derivation excluded

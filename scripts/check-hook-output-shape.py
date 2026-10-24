@@ -174,6 +174,17 @@ def check_hook_sources(
 
         has_decision = "decision" in constants or "permissionDecision" in constants
         blocks_by_decision = has_decision and ("deny" in constants or "block" in constants)
+        # A PreToolUse `permissionDecision` of `allow` or `ask` that carries a
+        # `permissionDecisionReason` is a decision the harness acts on (it
+        # skips or shows the permission prompt) and shows that reason to the
+        # user, so it needs no additionalContext channel (ai-config#4374,
+        # hooks/grant-personal-permissions.py). A bare `allow` with no reason
+        # still does not exempt (#3068's "non-blocking 'allow'" case).
+        decides_permission = (
+            "permissionDecision" in constants
+            and "permissionDecisionReason" in constants
+            and ("allow" in constants or "ask" in constants)
+        )
         has_reason = "reason" in constants
         has_system_message = "systemMessage" in constants
         has_additional_context = "additionalContext" in constants
@@ -216,7 +227,7 @@ def check_hook_sources(
         # block, so it does not exempt -- see blocks_by_exit_2 for why a
         # laxer scan would exempt nearly every hook that has an
         # unreadable-payload branch.
-        if "PreToolUse" in events and not (blocks_by_decision or blocks_by_exit):
+        if "PreToolUse" in events and not (blocks_by_decision or blocks_by_exit or decides_permission):
             if not (has_additional_context or has_system_message):
                 errors.append(
                     f"FAIL: {script} is registered as a PreToolUse hook that "

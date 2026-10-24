@@ -511,6 +511,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-oversized-pr-push.py\"",
+            "timeout": 20,
+            "script": "no-oversized-pr-push.py",
+            "why": "ai-config#4698. Ezra, 2026-10-23: \"don't allow massive sweep PRs like pds#244 anymore; do them in minimal batches\" and \"every PR should be as small and focused as it can be while completely solving its stated task\". DENIES a `git push` of a branch that changes more than 10 files or 300 lines against the merge base with the remote default branch (generated, lock, image and data paths not counted), before CI is spent; gha's check-pr-size (gha#1188) fails the same PR in CI. Clearable with an ALLOW_LARGE_PR=1 prefix for a stacked branch or a maintainer-requested mechanical PR. See shared/workflow/small-prs.md. Fails open on any parse or git trouble."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-nonglobal-substitution.py\"",
             "timeout": 20,
             "script": "warn-nonglobal-substitution.py",
@@ -1827,6 +1834,26 @@
             "timeout": 10,
             "script": "require-stopping-point.py",
             "why": "A stopping-point declaration is an explicit standing preference, not a best-effort recap (shared/workflow/flag-session-boundaries.md). Warns via systemMessage on any final reply that omits stating whether the session is done or not, including conversational question-answering replies (#4308); handles streamed chunk concatenation (#2500)."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-user-correction-without-mechanism.py\"",
+            "timeout": 10,
+            "script": "no-user-correction-without-mechanism.py",
+            "why": "ai-config#4698 -- Ezra, 2026-10-23: 'I'm tired of watching the agents make the same mistakes over and over again'. remind-encode-user-correction.py only injects, and no-mistake-without-a-hook.py keys on the agent's own admission, so a user's correction (chat or a GitHub review comment from a non-bot author) could end a turn with a note and no mechanism. Blocks once per message until the turn writes a hook or gha check, cites 'Mechanism: <url>', or states why none is possible."
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/inject-subagent-rules.py\"",
+            "timeout": 10,
+            "script": "inject-subagent-rules.py",
+            "why": "ai-config#4698 -- SessionStart and UserPromptSubmit injection never reaches a dispatched subagent, which began with only its brief; Ezra asked 2026-10-23 why subagents do not follow the rules reliably. Injects shared/workflow/subagent-core-rules.md at SubagentStart. Adds context, never blocks."
           }
         ]
       }

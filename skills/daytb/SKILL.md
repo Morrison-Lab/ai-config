@@ -153,12 +153,13 @@ That is what keeps countermanding cheap.
    **both** the choice and the change, since a silent switch away from a
    stated recommendation reads as having reopened it.
 3. **Act.**
-4. **Report in the past tense**: what you chose, and the single reason that
-   decided it.
+4. **Record the decision in a repo file**, per [`record-every-decision`](../../shared/workflow/record-every-decision.md): the decision, the options, the reason, `daytb` as the decider, the date, and a link to the thread.
+   The past-tense report below is not the record, because it lives in the thread.
+5. **Report in the past tense**: what you chose, and the single reason that decided it.
    One or two sentences.
    Name anything you deliberately did *not* do, so a silent omission does
    not read as an oversight.
-5. **Do not re-ask.**
+6. **Do not re-ask.**
    A follow-up question about the same decision spends the round trip the
    grant existed to save.
 
@@ -189,6 +190,7 @@ That is what keeps countermanding cheap.
 - Reading it as authorization to merge, delete, or publish.
 - Choosing silently, so the user learns what was decided only by noticing the
   result later.
+- Reporting the decision in the thread and writing it nowhere else.
 - Asking a confirming question anyway -- "I'll do X, unless you'd rather Y?"
   is the grant declined, not honoured.
 - Reopening a recommendation you had already made, instead of simply taking
@@ -262,3 +264,7 @@ narrated from memory rather than re-read.
   changed weighting is re-deliberation, not a premise check.
 - **Don't:** treat an issue body's enumerated options as current; the older
   the issue, the more its scoping is a claim about a past codebase.
+- **Don't:** ask "retry?" or "should I disable auto?" about a step you already own;
+  a `daytb` reply to that kind of question means act on the recommendation (2026-10-22: both were asked, then the self-switch in [`ask-for-manual-approval`](../../shared/workflow/ask-for-manual-approval.md) was the answer).
+- **Don't:** use the word "owed" in replies to the user;
+  say what remains to be done and when (the user objected 2026-10-22 after "still owed").

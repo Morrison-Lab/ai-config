@@ -328,3 +328,23 @@ which a completed commit-and-push also leaves behind.
   whose "NOT written" clause is an example about file edits and says nothing about Bash,
   or from `git status` alone.
 
+## Personal permission grants travel as a PreToolUse allow hook
+
+A rule in `~/.claude/settings.json` reaches one machine only.
+The two synced surfaces cannot carry it:
+a plugin's `settings.json` applies only `agent` and `subagentStatusLine`
+([plugins reference](https://code.claude.com/docs/en/plugins-reference)),
+and a project's `.claude/settings.json` grants every collaborator the same permission.
+A plugin `PreToolUse` hook that returns `permissionDecision: "allow"` reaches every machine with the plugin enabled,
+and stays bounded because hook precedence is "deny > defer > ask > allow"
+and settings deny and ask rules are still evaluated
+([hooks reference](https://code.claude.com/docs/en/hooks)).
+`hooks/grant-personal-permissions.py` is the instance (ai-config#4374):
+it allows `Skill(mwc)` and a single unchained `gh pr merge` / `glab mr merge`.
+
+- **Do:** carry a personal grant cross-machine as a narrow PreToolUse allow hook,
+  matching the whole command string and rejecting every shell operator,
+  since a hook allow covers the whole command rather than one segment.
+- **Don't:** ship the grant in a plugin `settings.json`, where it is ignored,
+  or in a project `.claude/settings.json`, where it reaches every collaborator.
+

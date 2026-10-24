@@ -1549,6 +1549,13 @@
             "timeout": 10,
             "script": "no-numbered-merge-word-ask.py",
             "why": "ai-config#4698. Ezra, 2026-10-23: \"don't make me name each one; mwc them all!\" A bare mwc already covers every ready PR in the thread's scope, yet agents asked him to type 'mwc 4699'. Blocks (deny) a user-visible reply tool call (mcp__hearthbot__reply, post_message, update_message, edit_message) whose text asks for mwc followed by a number or a reference, and points at plain mwc. Inline code is not ignored: the ask sits in a code span. Fails open on any parse trouble."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-manual-step-ask.py\"",
+            "timeout": 10,
+            "script": "no-manual-step-ask.py",
+            "why": "ai-config#4698. Ezra, 2026-10-23: \"don't make me intervene manually to prompt threads to 'go' if there's any other way\"; no merge buttons or manual steps. Blocks (deny) a user-visible reply tool call that asks the user to type go into a Remote Control session or to click a Merge button, and points at the substitutes (fresh session on an approved environment; plain mwc). See shared/workflow/lab-operating-rules.md. Fails open on any parse trouble."
           }
         ]
       },
@@ -1855,6 +1862,13 @@
             "timeout": 10,
             "script": "no-user-correction-without-mechanism.py",
             "why": "ai-config#4698 -- Ezra, 2026-10-23: 'I'm tired of watching the agents make the same mistakes over and over again'. remind-encode-user-correction.py only injects, and no-mistake-without-a-hook.py keys on the agent's own admission, so a user's correction (chat or a GitHub review comment from a non-bot author) could end a turn with a note and no mechanism. Blocks once per message until the turn writes a hook or gha check, cites 'Mechanism: <url>', or states why none is possible."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-memory-only-learning.py\"",
+            "timeout": 10,
+            "script": "no-memory-only-learning.py",
+            "why": "ai-config#4698. Ezra, 2026-10-23: 'I hope you're recording everything we learn in one of our repos'. Project memory is unversioned and no hook reads it. Blocks once per turn when the turn wrote a memory file and reached no repo (hook, check, shared fragment, issue, PR, a Mechanism: URL line, or 'memory only: <reason>'). See shared/workflow/lab-operating-rules.md. Fails open on any parse trouble."
           }
         ]
       }

@@ -49,6 +49,9 @@ ALLOW = [
     ("ALLOW_MERGE=1 prefix", bash("ALLOW_MERGE=1 gh pr merge 123 --squash")),
     ("-R repo flag", bash("gh pr merge 123 -R Morrison-Lab/ai-config --squash")),
     ("quoted subject", bash('gh pr merge 123 --squash --subject "Fix the thing"')),
+    # Flags and targets are left to no-unauthorized-merge.py and settings rules.
+    ("cross-repo --repo", bash("gh pr merge 5 --repo other/repo --squash")),
+    ("--admin", bash("gh pr merge 5 --admin")),
 ]
 for name, payload in ALLOW:
     rc, out, _ = run(payload)
@@ -71,6 +74,7 @@ SILENT = [
     ("second line", bash("gh pr merge 123\nrm -rf x")),
     ("trailing &", bash("gh pr merge 123 &")),
     ("quoted 'a; b'", bash("gh pr merge 123 --subject 'a; b'")),
+    ("quoted ( in subject", bash('gh pr merge 123 --subject "Fix (x)"')),
     ("PATH= prefix", bash("PATH=/tmp gh pr merge 123")),
     ("GH_HOST= prefix", bash("GH_HOST=evil.example gh pr merge 123")),
     ("env wrapper", bash("env gh pr merge 123")),
@@ -103,6 +107,10 @@ res = subprocess.run([sys.executable, HOOK, "--dry-run", json.dumps(skill("ardi"
                      capture_output=True, encoding="utf-8")
 check("--dry-run prints the empty PreToolUse shape when silent",
       json.loads(res.stdout) == {"hookSpecificOutput": {"hookEventName": "PreToolUse"}})
+
+res = subprocess.run([sys.executable, HOOK, "--simulate", "gh pr merge 1"],
+                     input="", capture_output=True, encoding="utf-8")
+check("--simulate is not a dry-run flag", res.returncode == 0 and res.stdout == "")
 
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(1 if failures else 0)

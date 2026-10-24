@@ -18,8 +18,9 @@ prompt as an allow rule does.
 
 ## Why this does not loosen the merge guard
 
-Other hooks in this repo never emit `allow`; this one exists to. Its safety
-rests on two documented rules (https://code.claude.com/docs/en/hooks):
+No other hook in this repo sets `permissionDecision: "allow"`;
+this one exists to.
+Its safety rests on two documented rules (https://code.claude.com/docs/en/hooks):
 
   - when several hooks decide, the precedence is "deny > defer > ask > allow",
     so `no-unauthorized-merge.py` still denies every merge it denies today;
@@ -28,6 +29,9 @@ rests on two documented rules (https://code.claude.com/docs/en/hooks):
 
 The grant removes only the prompt that would follow once every guard has let
 the call through.
+It does not judge the merge's flags or target: `--repo other/repo` and
+`--admin` get the allow too, and deciding whether that merge may run is left
+to `no-unauthorized-merge.py` and the settings rules, as before.
 
 ## What it decides
 
@@ -45,6 +49,9 @@ built-in matcher checks each `&&`/`;`/`|` segment separately, but a hook
 its other segments through on the merge's grant. Rejecting every operator,
 substitution, and escape character -- quoted or not -- keeps the allowed set
 to exactly one merge invocation.
+The cost is that a merge whose quoted subject or body contains one of those
+characters, such as `--subject "Fix (x)"`, gets no decision and prompts as
+before.
 
 Run with `--dry-run '<payload json or bare command>'` to see the verdict.
 """
@@ -61,7 +68,7 @@ ALLOWED_ASSIGNMENT = re.compile(r"ALLOW_MERGE=[A-Za-z0-9_.-]*")
 
 def _read_payload():
     args = sys.argv[1:]
-    dry = "--dry-run" in args or "--simulate" in args
+    dry = "--dry-run" in args
     if dry:
         positional = [a for a in args if not a.startswith("-")]
         if positional:

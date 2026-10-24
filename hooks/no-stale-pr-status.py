@@ -636,6 +636,14 @@ ASSERT = [
     r"\bfully clean\b",
     r"\bno failures\b",
     r"\bconflict-free\b",
+    # Imperative forms (ai-config#1072): a recommendation to act on the
+    # artifact asserts its state by presupposition, so "merge #1058 whenever
+    # you like" must be read as the status claim it is.
+    r"\bmerge\s+(?:#|!)\d+",
+    r"\bsafe to merge\b",
+    r"\byou can (?:now )?merge\b",
+    r"\bgo ahead and merge\b",
+    r"\bmerge (?:these|them|both)\b",
 ]
 RX_ASSERT = re.compile("|".join(ASSERT), re.I)
 

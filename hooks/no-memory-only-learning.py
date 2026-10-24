@@ -12,8 +12,10 @@ wrote or edited a file under a memory directory (a path containing `/memory/`,
 or named MEMORY.md) and nothing in the same turn reached a repo, block once
 per message. "Reached a repo" means any of:
 
-  * a tool call that names `hooks/<script>.py`, `hooks.json`, a `shared/`
-    markdown fragment, AGENTS.md, CLAUDE.md, `check-*/`, or `.github/`;
+  * a Write, Edit or NotebookEdit on `hooks/<script>.py`, `hooks.json`, a
+    `shared/` markdown fragment, AGENTS.md, CLAUDE.md, `check-*/` or `.github/`,
+    or a Bash `git add|commit|push` naming one (a mention in an echo, a todo
+    item or a search pattern does not count);
   * a GitHub tool call that files an issue, opens a PR or pushes files;
   * a line of its own starting "Mechanism: <issue or PR URL>"; or
   * a plain statement that the fact is not repo-worthy, with the reason
@@ -31,9 +33,11 @@ import tempfile
 MEMORY_PATH = re.compile(r"(?:/memory/|(?:^|/)MEMORY\.md$)", re.I)
 REPO_WORK = re.compile(
     r"hooks/[\w-]+\.py|hooks\.json|shared/[\w/.-]+\.md|AGENTS\.md|CLAUDE\.md"
-    r"|check-[\w-]+/|\.github/|mcp__github__(?:issue_write|create_pull_request|push_files|create_or_update_file)",
+    r"|check-[\w-]+/|\.github/",
     re.I,
 )
+GITHUB_WRITE = re.compile(r"^mcp__github__(?:issue_write|create_pull_request|push_files|create_or_update_file)$")
+GIT_WRITE = re.compile(r"\bgit\s+(?:add|commit|push)\b")
 MECHANISM_LINE = re.compile(r"^\s*Mechanism:\s*https?://\S+", re.M)
 MEMORY_ONLY_REASON = re.compile(r"\bmemory only:\s*\S", re.I)
 FILE_TOOLS = {"Write", "Edit", "NotebookEdit"}
@@ -53,6 +57,22 @@ def human_text(record):
         return None
     parts = [b.get("text") or "" for b in blocks if isinstance(b, dict) and b.get("type") == "text"]
     return "\n".join(parts) if parts else None
+
+
+def reached(name, inp, target):
+    """True when a tool call actually changes or files something in a repo.
+
+    A path-shaped string inside free text (an echo, a todo item, a search
+    pattern) does not count: the check keys on the work done, not on a mention.
+    """
+    if name in FILE_TOOLS:
+        return bool(REPO_WORK.search(target)) and not MEMORY_PATH.search(target)
+    if name.startswith("mcp__github__"):
+        return bool(GITHUB_WRITE.search(name))
+    if name == "Bash":
+        command = str(inp.get("command") or "")
+        return bool(GIT_WRITE.search(command) and REPO_WORK.search(command))
+    return False
 
 
 def owed(path):
@@ -87,7 +107,7 @@ def owed(path):
                 target = str(inp.get("file_path") or inp.get("path") or "")
                 if name in FILE_TOOLS and MEMORY_PATH.search(target):
                     wrote_memory = True
-                elif REPO_WORK.search(name + " " + json.dumps(inp)):
+                elif reached(name, inp, target):
                     reached_repo = True
             elif b.get("type") == "text":
                 text = b.get("text") or ""

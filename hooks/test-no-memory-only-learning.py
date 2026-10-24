@@ -44,6 +44,17 @@ CASES = [
     ([user("old"), tool("Write", file_path=MEM), say("ok"), user("next"), say("hi")], False,
      "an earlier turn's memory write is not this turn's"),
     ([user("hi"), say("hello")], False, "no memory write"),
+    ([user("learn this"), tool("Write", file_path=MEM),
+      tool("Bash", command="echo 'remember to note this in AGENTS.md sometime'")],
+     True, "a path mentioned in an echo is not repo work"),
+    ([user("learn this"), tool("Write", file_path=MEM),
+      tool("TodoWrite", todos=[{"content": "add note to shared/workflow/foo.md"}])],
+     True, "a path in a todo item is not repo work"),
+    ([user("learn this"), tool("Write", file_path=MEM), tool("Grep", pattern="hooks/x.py")],
+     True, "a path in a search pattern is not repo work"),
+    ([user("learn this"), tool("Write", file_path=MEM),
+      tool("Bash", command="git add hooks/x.py && git commit -m x")],
+     False, "a git commit naming a hook is repo work"),
 ]
 
 

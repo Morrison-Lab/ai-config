@@ -24,6 +24,8 @@ Keep it under 4,000 characters: it is injected on every dispatch.
 - **Issue first:** search the tracker, file the issue, then open the PR.
   Keep content and infrastructure in separate PRs.
 - **No scope creep:** ship the asked fix, and file anything adjacent as an issue.
+- **A deliverable ask covers its follow-through:** do re-uploads and replacements without asking again.
+  Ask only for a merge (plain `mwc`) or an irreversible student-facing change, in one line covering the whole job.
 - **Reuse CI-built output:** download the PDF or HTML from the repo's `gh-pages` branch instead of running `quarto render` locally.
   Canvas uploads use the CI-built PDF.
 - **FERPA:** never open or send student records (rosters, grades, submissions, Canvas exports) to any model.

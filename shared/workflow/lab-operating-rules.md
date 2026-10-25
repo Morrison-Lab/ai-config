@@ -13,6 +13,15 @@ The rest are prose because no condition in the transcript can decide them.
 - Never offer him a merge button or a manual step.
   Enforced by `hooks/no-manual-step-ask.py`.
 
+## Built output
+
+- Reuse the CI-built PDF or HTML instead of rendering locally.
+  Download it from the repo's `gh-pages` branch or the published site (for example an mlg exam under `solution/Exams/`).
+  Canvas uploads always use the CI-built PDF.
+  Render locally only when the source changed and CI has not built it yet.
+  Enforced by `hooks/warn-local-render-when-ci-built.py` (a warning, ai-config#4724).
+  Ezra, 2026-10-25: "isn't it already rendered in mlg ... remember that going forward".
+
 ## Remote Control
 
 - Never ask Ezra to type "go" in a Remote Control session.

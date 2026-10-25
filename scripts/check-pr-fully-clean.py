@@ -140,6 +140,21 @@ def die(message: str) -> None:
     raise SystemExit(USAGE_EXIT)
 
 
+def _payload_remedy() -> str:
+    """The `--from-json` recipe for a session with no usable `gh` GraphQL."""
+    here = Path(__file__).resolve()
+    return (
+        "\n`-R` alone cannot substitute for it, but the GitHub CLI is"
+        " not required: score a JSON payload instead."
+        " `build-pr-payload.py` assembles one from plain REST, and"
+        " needs GITHUB_TOKEN or GH_TOKEN set:\n"
+        f"  python3 {shlex.quote(str(here.parent / 'build-pr-payload.py'))}"
+        " OWNER/REPO N /tmp/pr.json\n"
+        f"  python3 {shlex.quote(str(here))}"
+        " N -R OWNER/REPO --from-json /tmp/pr.json"
+    )
+
+
 def run_cmd(cmd: List[str]) -> str:
     try:
         # `encoding` is load-bearing on Windows, not tidiness. Without it the
@@ -203,17 +218,7 @@ def run_cmd(cmd: List[str]) -> str:
             # Gated on `gh` because this `die` serves every command run_cmd is
             # handed, and neither `--from-json` nor anything about the GitHub
             # CLI answers a missing `git`.
-            here = Path(__file__).resolve()
-            message += (
-                "\n`-R` alone cannot substitute for it, but the GitHub CLI is"
-                " not required: score a JSON payload instead."
-                " `build-pr-payload.py` assembles one from plain REST, and"
-                " needs GITHUB_TOKEN or GH_TOKEN set:\n"
-                f"  python3 {shlex.quote(str(here.parent / 'build-pr-payload.py'))}"
-                " OWNER/REPO N /tmp/pr.json\n"
-                f"  python3 {shlex.quote(str(here))}"
-                " N -R OWNER/REPO --from-json /tmp/pr.json"
-            )
+            message += _payload_remedy()
         else:
             message += "\nInstall it, or put it on PATH, and re-run."
         die(message)
@@ -238,6 +243,11 @@ def run_cmd(cmd: List[str]) -> str:
                 "read or decoded, so the reason is unavailable. This is an "
                 "environment failure, not a verdict about the PR."
             )
+        if cmd[0] == "gh" and "GraphQL is not available" in res.stderr:
+            # A cloud session's proxy refuses GraphQL, which `gh pr view --json`
+            # uses. That is an environment failure, not a verdict (ai-config#4220,
+            # #4722): exit 2 with the REST recipe, not exit 1.
+            die(f"`{' '.join(cmd[:3])}` was refused: {res.stderr.strip()}" + _payload_remedy())
         raise RuntimeError(f"Command failed ({' '.join(cmd)}): {res.stderr.strip()}")
     if res.stdout is None:
         # Defence in depth for the reader-thread failure described above, and

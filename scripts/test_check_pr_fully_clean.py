@@ -16,6 +16,7 @@ import os
 import re
 import shlex
 import time
+import types
 from unittest.mock import patch
 import sys
 from pathlib import Path
@@ -4508,6 +4509,24 @@ def main() -> int:
           "--from-json" in gh_message)
     check("a missing gh names the token build-pr-payload.py requires",
           "GITHUB_TOKEN" in gh_message)
+
+    # A GraphQL 403 (cloud session proxy) is an environment failure too: exit 2
+    # with the same recipe, never exit 1 "not clean" (ai-config#4220, #4722).
+    def stderr_of_graphql_refusal():
+        buf = io.StringIO()
+        with patch.object(checker, "subprocess") as refused:
+            refused.run.return_value = types.SimpleNamespace(
+                returncode=1, stdout="",
+                stderr="HTTP 403: GitHub GraphQL is not available from Claude Code sessions",
+            )
+            with contextlib.redirect_stderr(buf):
+                code = exit_code_of(lambda: checker.run_cmd(["gh", "pr", "view", "445", "--json", "x"]))
+        return code, buf.getvalue()
+
+    graphql_code, graphql_message = stderr_of_graphql_refusal()
+    check("a GraphQL 403 from gh exits 2, not 1 ('not clean')", graphql_code == 2)
+    check("a GraphQL 403 names build-pr-payload.py and --from-json as the remedy",
+          "build-pr-payload.py" in graphql_message and "--from-json" in graphql_message)
 
     # The two substring checks above establish only that the message was
     # reached and carries the strings. They cannot see a rename of the sibling

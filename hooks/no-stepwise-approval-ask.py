@@ -26,7 +26,11 @@ import sys
 REPLY_TOOL = re.compile(r"^mcp__hearthbot__(?:reply|post_message|update_message|edit_message)$")
 
 APPROVAL = r"(?:yes|approve[ds]?|approval|confirm(?:ed)?|proceed|continue|ok(?:ay)?|allow(?:ed)?)"
-FOLLOW = r"(?:re-?upload|re-?post|re-?send|replac(?:e|ing)|overwrit(?:e|ing)|re-?publish|re-?run)"
+DELIVERABLE = r"(?:pdf|key|sheet|upload(?:ed)?|posted|answers?|canvas|attachment)"
+FOLLOW = (
+    r"(?:re-?upload|re-?post|re-?send|"
+    r"replac(?:e|ing)\s+(?:the\s+|that\s+|this\s+)?(?:\w+\s+){0,2}" + DELIVERABLE + r")"
+)
 
 ASKS = (
     ("a typed approval word to continue a step", re.compile(

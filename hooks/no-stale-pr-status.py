@@ -1194,8 +1194,7 @@ def _is_negated(text, hit, starts=None, index=None):
     vocabulary reads in both directions, and only when it attaches.
     """
     start = _sentence_start(text, hit, starts)
-    if _first_match_after(RX_NEGATION, text, start, hit.start(), index) if index is not None \
-            else RX_NEGATION.search(text[start:hit.start()]):
+    if _first_match_after(RX_NEGATION, text, start, hit.start(), index):
         return True
     if _is_neither_nor_negated(text, hit, starts, index):
         return True

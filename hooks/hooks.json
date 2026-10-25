@@ -280,6 +280,13 @@
         "hooks": [
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-local-render-when-ci-built.py\"",
+            "timeout": 10,
+            "script": "warn-local-render-when-ci-built.py",
+            "why": "ai-config#4724. Ezra, 2026-10-25: \"isn't it already rendered in mlg ... remember that going forward\". Warns (never blocks) when a Bash command runs quarto render in a repo with a gh-pages ref, because CI has probably built the output already; download the PDF or HTML from gh-pages or the published site instead. Canvas uploads always use the CI-built PDF. Fails open on any parse or git trouble."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/require-gh-repo-flag.py\"",
             "timeout": 10,
             "script": "require-gh-repo-flag.py",

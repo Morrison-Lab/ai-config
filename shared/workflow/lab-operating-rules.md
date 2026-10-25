@@ -13,6 +13,18 @@ The rest are prose because no condition in the transcript can decide them.
 - Never offer him a merge button or a manual step.
   Enforced by `hooks/no-manual-step-ask.py`.
 
+## Deliverables and approvals
+
+- An ask for a deliverable (for example "post the key") authorizes its whole follow-through, including re-uploads and replacements of the same item.
+  Never ask again for each step.
+  Enforced by `hooks/no-stepwise-approval-ask.py` (ai-config#4726).
+- Decide reversible choices yourself, as `daytb` does.
+  Ask only for a merge (plain `mwc`) and for an irreversible student-facing change.
+- Any approval ask is one line that covers the entire remaining job.
+- Routine pushed scripts (Canvas upload and replace, CI_RUNNER and variable scripts) are allow-listed in the user-level settings on the Mac and cf463-02, so the classifier does not demand typed phrases.
+  Merge commands are never allow-listed.
+  Ezra, 2026-10-25: "stop making me give so many manual orders".
+
 ## Built output
 
 - Reuse the CI-built PDF or HTML instead of rendering locally.

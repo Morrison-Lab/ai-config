@@ -150,6 +150,18 @@ CASES = [
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT, say("PR #1167 is fully clean.")], True,
      "claiming fully clean when check-pr-fully-clean.py returned NOT fully clean"),
 
+    # ai-config#1903: a phrase inside a code span, fence or blockquote is
+    # quoted, not asserted, so a retraction that names it is not blocked.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("I wrote `PR #1167 is fully clean` earlier; that was premature.")], False,
+     "a code span quoting the retracted phrase is not an assertion"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("Earlier reply:\n> PR #1167 is fully clean\nThat claim was premature.")],
+     False, "a blockquote quoting the retracted phrase is not an assertion"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("Stripping quoted text hides `x`. PR #1167 is fully clean.")], True,
+     "a bare assertion beside a code span still blocks"),
+
     # `no-incomplete-check-enumeration.py` PRESCRIBES the bare-count form as
     # the safe progress report -- its blocking message says verbatim that
     # "13 pass, 5 pending" trips nothing, and its source repeats the claim as

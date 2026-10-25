@@ -1344,6 +1344,20 @@ def scan(path):
     return last_push, last_query, last_failing_query, text, last_push_cmd
 
 
+# Code regions are quotation, not assertion (ai-config#1903): a retraction that
+# names the phrase it retracts, or a recap quoting this guard's own triggers,
+# must not be blocked by that phrase. Same two regexes as
+# `no-unfiled-finding.py`, which substitutes a sentence terminator because a
+# bare space would let a match bridge the gap.
+RX_CODE_BLOCK = re.compile(r"```.*?```|^[ \t]*>[^\n]*$", re.S | re.M)
+RX_CODE_SPAN = re.compile(r"`[^`\n]*`")
+
+
+def visible_prose(text):
+    """`text` with fences, blockquotes and code spans replaced by ' . '."""
+    return RX_CODE_SPAN.sub(" . ", RX_CODE_BLOCK.sub(" . ", text))
+
+
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
@@ -1352,6 +1366,7 @@ def main() -> int:
     except Exception:
         return 0  # fail open
 
+    text = visible_prose(text or "")
     if not text:
         return 0
     hit = find_unnegated_assert(text)

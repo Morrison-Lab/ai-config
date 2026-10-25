@@ -1435,6 +1435,11 @@ def check_cost():
         ([PUSH, PUSH_OK, say(LAZY)],
          "many asserts in one sentence, all but the first unread"),
         (NEVER_RAN_COST, "long whitespace runs in a push result"),
+        # ai-config#3984: with no sentence break, every per-hit negation,
+        # retraction and neither/nor scan covered the whole prefix, so the
+        # cost was quadratic in the length of one sentence.
+        ([PUSH, PUSH_OK, say("3 errors remain " + "14 pass " * 6000)],
+         "many asserts in one sentence with no break, per-hit scans"),
     ]
     for events, label in shapes:
         started = time.time()
@@ -1447,7 +1452,7 @@ def check_cost():
     return failures
 
 
-COST_CHECKS = 6
+COST_CHECKS = 7
 
 
 def run(events):

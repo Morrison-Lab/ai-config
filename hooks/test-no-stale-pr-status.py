@@ -161,8 +161,8 @@ CASES = [
     # A four-backtick fence wrapping a three-backtick block: a whole-text
     # ```.*?``` regex pairs the wrong runs and leaves the quoted phrase visible.
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
-      say("How the guard reads it:\n````\nExample:\n```\nsome code\n```\n"
-          "PR #1167 is fully clean\n````\nThat claim was premature.")], False,
+      say("x:\n````\nEx:\n```\nPR #1167 is fully clean\n```\nend\n````\n"
+          "Premature.")], False,
      "a nested fence quoting the phrase is not an assertion"),
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
       say("Stripping quoted text hides `x`. PR #1167 is fully clean.")], True,

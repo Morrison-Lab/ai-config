@@ -35,6 +35,10 @@ try:
     from shellcmd import git_subcommand, simple_commands
 except Exception as _exc:  # broken install; fail open and say so
     git_subcommand = simple_commands = None
+try:
+    from fences import strip_code
+except Exception:  # broken install: visible_prose falls back to the raw text
+    strip_code = None
 
 # A bare pass/fail count says nothing about WHERE it came from: a local test
 # suite and a check-run query both read "<n> pass". The trigger stays broad,
@@ -1385,6 +1389,23 @@ def scan(path):
     return last_push, last_query, last_failing_query, text, last_push_cmd
 
 
+# Code regions are quotation, not assertion (ai-config#1903): a retraction that
+# names the phrase it retracts, or a recap quoting this guard's own triggers,
+# must not be blocked by that phrase. Fences and code spans come from
+# `scripts/lib/fences.py`, which pairs nested fences correctly; only the
+# blockquote lines are matched here. Each region becomes a sentence terminator,
+# because a bare space would let a match bridge the gap.
+RX_BLOCKQUOTE = re.compile(r"^[ \t]*>[^\n]*$", re.M)
+
+
+def visible_prose(text):
+    """`text` with fences, blockquotes and code spans replaced by '.'."""
+    if strip_code is None:
+        return text  # broken install: scan the raw text, as before
+    return RX_BLOCKQUOTE.sub(".", strip_code(
+        text, fence_replacement=".", span_replacement=" . "))
+
+
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
@@ -1393,6 +1414,8 @@ def main() -> int:
     except Exception:
         return 0  # fail open
 
+    raw_text = text or ""
+    text = visible_prose(raw_text)
     if not text:
         return 0
     hit = find_unnegated_assert(text)
@@ -1469,7 +1492,9 @@ def main() -> int:
     if last_query > last_push:
         return 0
 
-    key = hashlib.sha256(text.encode()).hexdigest()[:16]
+    # Keyed on the message as sent, so two messages differing only in their
+    # quoted content do not share a sentinel.
+    key = hashlib.sha256(raw_text.encode()).hexdigest()[:16]
     sentinel = os.path.join(tempfile.gettempdir(), f".claude-stale-status-{key}")
     if os.path.exists(sentinel):
         return 0

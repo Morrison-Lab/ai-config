@@ -144,6 +144,25 @@ git(same, "reset", "-q", "--hard", "origin/main")
 verdict, _ = run("git push origin feat", same, 1)
 expect("T17 nothing ahead of origin/main is silent", verdict, "silent")
 
+verdict, _ = run("git push origin :feat", repo, 1)
+expect("T18 colon-refspec delete is silent", verdict, "silent")
+verdict, _ = run("AI_CONFIG_SKIP_PUSH_CHECKS=\"'   '\" git push origin feat", repo, 1)
+expect("T19 whitespace-only bypass is refused", verdict, "DENY")
+verdict, _ = run("AI_CONFIG_SKIP_PUSH_CHECKS=false git push origin feat", repo, 1)
+expect("T20 boolean-false bypass is refused", verdict, "DENY")
+
+import importlib.util
+spec = importlib.util.spec_from_file_location("hook", HOOK)
+hook = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(hook)
+parsed = hook.parse_workflow(
+    "jobs:\n  c:\n    uses: Morrison-Lab/gha/.github/workflows/check-term-links.yml@v3\n"
+    "    with:\n      globs: '*.qmd # not a comment'\n      allow-file: # nothing here\n"
+    "      terms-file: terms.txt # real comment\n"
+)
+expect("T21 quoted # kept, comment-only value skipped, trailing comment cut",
+       parsed[0]["inputs"], {"globs": "*.qmd # not a comment", "terms-file": "terms.txt"})
+
 real = os.environ.get("GHA_REAL_DIR")
 if real:
     r = make_repo({"check-new-line-breaks.yml": NLB})

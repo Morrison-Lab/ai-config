@@ -138,9 +138,13 @@ def parse_workflow(text: str) -> list[dict]:
             value = kv.group("value")
             if "${{" in value or not value:
                 continue
-            value = re.sub(r"\s+#.*$", "", value).strip()
-            if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
-                value = value[1:-1]
+            quoted = re.match(r"""^(['"])(.*?)\1(?:\s+#.*)?$""", value)
+            if quoted:
+                value = quoted.group(2)
+            else:
+                value = re.sub(r"(?:^|\s+)#.*$", "", value).strip()
+            if not value:
+                continue
             inputs[kv.group("key")] = value
         calls.append({"name": m.group("name"), "ref": m.group("ref"), "inputs": inputs})
     return calls
@@ -168,15 +172,19 @@ def ensure_gha(ref: str) -> str | None:
     if override:
         return override if os.path.isdir(override) else None
     dest = os.path.join(CACHE_ROOT, "gha", re.sub(r"[^\w.\-]", "_", ref))
-    stamp = os.path.join(dest, ".git", "FETCH_HEAD")
+    stamp = os.path.join(dest, ".git", "refreshed")
     try:
         if os.path.isdir(os.path.join(dest, ".git")):
-            if time.time() - os.path.getmtime(stamp if os.path.exists(stamp) else dest) > REFRESH_SECONDS:
-                subprocess.run(["git", "-C", dest, "fetch", "--depth", "1", "origin", ref],
-                               capture_output=True, timeout=30)
-                subprocess.run(["git", "-C", dest, "reset", "--hard", "FETCH_HEAD"],
-                               capture_output=True, timeout=30)
-                os.utime(dest)
+            last = os.path.getmtime(stamp) if os.path.exists(stamp) else 0
+            if time.time() - last > REFRESH_SECONDS:
+                # Stamp first, so an offline machine retries once a day, not on every push.
+                with open(stamp, "w", encoding="utf-8") as fh:
+                    fh.write(str(time.time()))
+                fetched = subprocess.run(["git", "-C", dest, "fetch", "--depth", "1", "origin", ref],
+                                         capture_output=True, timeout=30)
+                if fetched.returncode == 0:
+                    subprocess.run(["git", "-C", dest, "reset", "--hard", "FETCH_HEAD"],
+                                   capture_output=True, timeout=30)
             return dest
         os.makedirs(os.path.dirname(dest), exist_ok=True)
         res = subprocess.run(["git", "clone", "--depth", "1", "--branch", ref, GHA_URL, dest],
@@ -239,8 +247,8 @@ def bypass_reason(env_assignments, command: str) -> str | None:
         value = os.environ.get(BYPASS_VAR)
     if value is None:
         return None
-    value = value.strip().strip("'\"")
-    return value if value and value.lower() not in {"1", "true", "yes", "y"} else ""
+    value = value.strip("'\" \t")
+    return value if value and value.lower() not in {"1", "0", "true", "false", "yes", "no", "y", "n", "on", "off"} else ""
 
 
 def log_bypass(git_root: str, reason: str) -> None:
@@ -272,7 +280,7 @@ def evaluate(command: str):
     for env_assign, argv, directory in pushes:
         if directory is redirected:
             continue
-        if any(a in ("--delete", "-d") for a in (argv or [])):
+        if any(a in ("--delete", "-d") or a.startswith(":") for a in (argv or [])):
             continue
         git_root = _git(["rev-parse", "--show-toplevel"], cwd=directory or os.getcwd())
         if not git_root:

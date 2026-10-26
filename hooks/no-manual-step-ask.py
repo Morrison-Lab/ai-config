@@ -30,9 +30,12 @@ FILE_ASK = "a paste or hand-edit of a file"
 # rule asks for. It exempts a paste-like clause in the same sentence, or in the
 # sentence just before a "Run/Use/Execute ..." one; a script named elsewhere in the
 # message does not.
-SCRIPT_COMMAND = re.compile(r"\b(?:python3?|bash|sh|Rscript)\s+[~/.\w-]+\.(?:py|sh|R)\b", re.I)
+SCRIPT_COMMAND = re.compile(
+    r"\b(?:run(?:s|ning)?|use|execute)\b[^.,;\n]{0,40}"
+    r"\b(?:python3?|bash|sh|Rscript)\s+[~/.\w-]+\.(?:py|sh|R)\b",
+    re.I)
 SENTENCE_BREAK = re.compile(r"(?<=[.!?])\s+|\n+")
-RUN_SENTENCE = re.compile(r"^\W*(?:run|use|execute)\b", re.I)
+RUN_SENTENCE = re.compile(r"^\W*(?:run(?:ning)?|use|execute)\b", re.I)
 
 # A file cue unambiguous enough that add, put and copy, which are ordinary code
 # verbs, can rely on it, and that "config dict" or "settings object" do not trip.

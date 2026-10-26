@@ -67,6 +67,19 @@ Keep the cross-reference link to the group's page.
 - **Do:** flag an existing credit to the group's own work for removal in review.
 - **Don't:** report a credit to the group's own work as missing in review, or add one.
 
+## The group's tools and templates are its own work too
+
+The rule covers the group's tooling, not only its content.
+A page never acknowledges the lab, its CI and build tooling, its macros, or its templates (qwt, qbt, qmt, qet, rpt, grt),
+whether as an Acknowledgments section, "built from qwt", "CI tooling by Ezra", "template by Morrison-Lab" or "thanks to the lab".
+Ezra, 2026-10-26, on [psw#362](https://github.com/Morrison-Lab/psw/pull/362): "we don't self-acknowledge" and "same with qwt - that's ours".
+Credit still goes to outsiders by name, and a plain link for further reading stays.
+The mechanism is gha's `check-self-credits` ([gha#1249](https://github.com/Morrison-Lab/gha/pull/1249)),
+which needs each repository's own tools and templates listed under `names` in `.github/own-works.yml`.
+
+- **Do:** list the group's templates and tools under `names` in `.github/own-works.yml`.
+- **Don't:** end a lab site with an Acknowledgments section that names the lab, its tooling or its templates.
+
 ## Material written from scratch names no source
 
 Material the maintainer's group wrote from scratch,

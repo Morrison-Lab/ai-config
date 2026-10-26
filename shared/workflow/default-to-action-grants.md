@@ -1,4 +1,4 @@
-# Default to action without asking: installs, `add_repo`, and your own steps
+# Default to action without asking: installs, `add_repo`, posting reviews, and your own steps
 
 Detail for [`AGENTS.md`'s "Default to action without asking"](../../AGENTS.md), moved here to keep `AGENTS.md` under Codex's byte cap.
 
@@ -37,20 +37,28 @@ Tracked in [ai-config#4683](https://github.com/Morrison-Lab/ai-config/issues/468
 ## Posting reviews
 
 The grant covers posting reviews, always, without asking (owner directive, 2026-10-26: "you can always post reviews").
-That means a review comment or verdict on a PR or MR: an adversarial or cross-model verdict, review findings, a self-review, or a reply on a review thread.
-It covers posting from any session, including a Remote Control session on the owner's machine.
-It grants no approval or merge authority, and every posted comment still carries the disclosure footer from [`disclose-agent-authorship`](disclose-agent-authorship.md).
-It does not widen which PRs you act on: for a PR that is not yours under `memories/reviewing-prs.md`, post a review only when asked to review it.
+A review here means a review comment on a PR or MR: an adversarial or cross-model verdict, review findings, a self-review, or a reply on a review thread.
+Post it as a comment (`gh pr comment`, `gh pr review --comment`, or a GitLab MR note), never as `gh pr review --approve` or `--request-changes`, since a formal review state under the owner's login is a decision the owner has not made.
+The grant covers posting from any session, including a Remote Control session on the owner's machine.
+The posted comment follows the posting contract in [`adversarial-self-review`](adversarial-self-review.md#post-every-independent-review-on-the-pr-or-mr-it-reviewed): the reviewer's report verbatim, a `Reviewed-Commit:` line and a `### Verdict` heading, the structured review data, a branch with no PR yet waiting until the PR exists, and the posted comment's link in your reply.
+Every posted comment carries the disclosure footer from [`disclose-agent-authorship`](disclose-agent-authorship.md).
+The grant gives no approval or merge authority.
 
-A standing grant does not clear a permission-classifier denial (see [`ask-for-manual-approval`](ask-for-manual-approval.md)).
-When the classifier blocks `gh pr comment` or `gh pr review`, ask once as that fragment says.
-The durable fix is an `autoMode` `allow` entry that permits posting PR comments.
-It goes in `~/.claude/settings.json` or in managed settings, never in a repository's settings, as [`use-existing-pr-branch`](use-existing-pr-branch.md) explains for `autoMode` in general.
+The grant does not widen which PRs you act on.
+Scope stays as [`memories/reviewing-prs.md`](../../memories/reviewing-prs.md) and [`pr-scope`](pr-scope.md) set it: a PR you opened, are assigned to, or were asked to work by name, or one the `github-actions` app authored, and an explicit exclusion such as "do not touch #N" vetoes every one of those arms.
+On any other PR, post a review only when asked to review it.
+Posting in a repository outside the owner's control still passes the membership gate in `AGENTS.md` and [`gate-external-communication`](gate-external-communication.md), as the `add_repo` grant above does.
+
+A standing grant does not clear a permission-classifier denial.
+When the classifier blocks the post, follow [`ask-for-manual-approval`](ask-for-manual-approval.md): retry the identical command once, then switch the session to `default` mode yourself when `mcp__ccd_session_mgmt__set_session_permission_mode` is available, and otherwise ask the owner to leave auto mode.
+Never ask whether to post; the grant has answered that.
+The durable fix is an `autoMode` `allow` entry that covers `gh pr comment`, `gh pr review --comment`, and MR notes.
+It goes in `~/.claude/settings.json` or in managed settings, never in a repository's settings, and a cloud session reads no `~/.claude/settings.json`, so managed settings are its only durable route (see [`use-existing-pr-branch`](use-existing-pr-branch.md)).
 Tracked in [ai-config#4756](https://github.com/Morrison-Lab/ai-config/issues/4756).
-The case: on Morrison-Lab/ids#26, a finished all-clear cross-model verdict sat unposted until the owner wrote "post it".
+The case: on [Morrison-Lab/ids#26](https://github.com/Morrison-Lab/ids/pull/26), a finished all-clear cross-model verdict sat unposted until the owner wrote "post it".
 
-- **Do:** post the review as soon as it exists, and report it in the past tense.
-- **Don't:** hold a finished review and ask whether to post it.
+- **Do:** post the review as a comment as soon as it exists, and report it in the past tense with its link.
+- **Don't:** hold a finished review and ask whether to post it, or post it as an approve or request-changes review.
 
 ## "Don't wait" and "decide it yourself"
 

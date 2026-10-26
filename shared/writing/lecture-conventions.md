@@ -15,6 +15,11 @@ This fragment is the agent-facing copy: follow the rules, and link to psw instea
   Precede a `#def-` or `#thm-` div with an exercise that asks the question it answers.
   The solution answers informally, and the formal div follows the solution div, never inside it.
   [`informal-definitions`](informal-definitions.md) states the underlying rule.
+- **Cite result divs, never solutions, in a derivation** (Ezra, 2026-10-26).
+  Follow each solution that a later argument relies on with a result div (`#thm-`, `#lem-`, `#cor-` or `#prp-`), and cite that div.
+  The one exception is an exercise that asks students to prove a result before the result is stated: that result's proof may cite the preceding solution, marked with `<!-- check-solution-citations: allow -->`.
+  Add an exercise and solution just before every result div you add or edit.
+  The `check-solution-citations` workflow in `Morrison-Lab/gha` enforces the citation rule, and psw's "Cite results, not solutions" section is canonical.
 - **One bottom-level prompt per exercise.**
   Do not write one exercise with parts (a) through (e).
 - **Put on a slide only what the audience should look at.**

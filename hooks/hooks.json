@@ -532,6 +532,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-push-with-failing-notes-checks.py\"",
+            "timeout": 90,
+            "script": "no-push-with-failing-notes-checks.py",
+            "why": "Coordinator, 2026-10-26: lds#1409, lds#1422 and lds#1424 each failed CI's check-term-links or check-new-line-breaks within an hour because the thread skipped the local run that lds .claude/project-memory.md already prescribes. DENIES a `git push` when the repo's own doc checks fail locally. It reads the repo's caller workflows for Morrison-Lab/gha check-term-links and check-new-line-breaks jobs and their literal `with:` inputs (so every notes repo is covered with no per-repo list), runs gha's own scripts at the pinned ref from a daily-refreshed cache in ~/.cache/ai-config/gha against origin/main, and names the findings. Clearable with an AI_CONFIG_SKIP_PUSH_CHECKS='<reason>' prefix (a bare 1 is refused; each bypass is appended to ~/.cache/ai-config/push-check-bypass.log). Fails open with a visible note when gha cannot be fetched, a check times out or origin/main is missing. Covers repos that only call the reusable workflow, the gap warn-new-line-breaks-on-push.py leaves (ai-config#3747)."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-nonglobal-substitution.py\"",
             "timeout": 20,
             "script": "warn-nonglobal-substitution.py",

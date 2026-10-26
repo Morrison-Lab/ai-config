@@ -11,7 +11,7 @@ A reader should never see "`geom_smooth()` using formula = 'y ~ x'", "`stat_bin(
 - Fix the code that raises a warning.
 - Silence a message only when it cannot be avoided and carries no information a reader needs.
   Wrap only the one offending call, never a whole chunk: `suppressPackageStartupMessages(library(pkg))` for a package that prints a banner.
-- Never hide a real warning with `warning: false` or `message: false` to make a page look clean: that hides a defect from the author as well.
+- Never hide a warning or message with the chunk options `warning: false` or `message: false` to make a page look clean: that hides a defect from the author as well.
 
 ## Mechanism
 

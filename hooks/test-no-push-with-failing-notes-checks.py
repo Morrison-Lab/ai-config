@@ -179,6 +179,20 @@ expect("T25 options before push do not read as a refspec", verdict, "DENY")
 other = hook.pushed_other_than_head(["git", "-C", repo, "push", "origin", "HEAD"], repo, git(repo, "rev-parse", "HEAD"))
 expect("T26 -C dir and remote are not treated as sources", other, None)
 
+verdict, _ = run("git push origin :old-branch HEAD:new-branch", repo, 1)
+expect("T27 a mixed delete-and-ship push is still checked", verdict, "DENY")
+verdict, _ = run("git push origin :old-branch", repo, 1)
+expect("T28 a delete-only push is silent", verdict, "silent")
+verdict, _ = run("git push origin feat", repo, 1, extra={"PUSH_CHECK_BASE_REF": "origin/nonexistent"})
+expect("T29 an explicit base that does not resolve is a missing base", verdict, "NOTE")
+parsed = hook.parse_workflow(
+    "jobs:\n  c:\n    with:\n      globs: '*.md'\n    uses: Morrison-Lab/gha/.github/workflows/check-new-line-breaks.yml@v3\n"
+    "  d:\n    uses: Morrison-Lab/gha/.github/workflows/check-term-links.yml@v3\n"
+)
+expect("T30 with: before uses: is read, and not shared with the next job",
+       [(c["name"], c["inputs"]) for c in parsed],
+       [("check-new-line-breaks", {"globs": "*.md"}), ("check-term-links", {})])
+
 real = os.environ.get("GHA_REAL_DIR")
 if real:
     r = make_repo({"check-new-line-breaks.yml": NLB})

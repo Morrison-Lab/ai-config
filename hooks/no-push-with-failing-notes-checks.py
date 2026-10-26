@@ -120,9 +120,15 @@ def parse_workflow(text: str) -> list[dict]:
             continue
         uses_indent = len(line) - len(line.lstrip())
         inputs: dict[str, str] = {}
+        # The job mapping is every contiguous line indented at least as far as `uses:`,
+        # on either side of it, since YAML puts `with:` before or after `uses:`.
+        start = i
+        while start > 0 and (not lines[start - 1].strip()
+                             or len(lines[start - 1]) - len(lines[start - 1].lstrip()) >= uses_indent):
+            start -= 1
         in_with = False
         with_indent = -1
-        for nxt in lines[i + 1:]:
+        for nxt in lines[start:]:
             if not nxt.strip() or nxt.lstrip().startswith("#"):
                 continue
             indent = len(nxt) - len(nxt.lstrip())
@@ -131,12 +137,12 @@ def parse_workflow(text: str) -> list[dict]:
             kv = KEY_VALUE.match(nxt)
             if not kv:
                 continue
+            if in_with and indent <= with_indent:
+                in_with = False
             if not in_with:
                 if indent == uses_indent and kv.group("key") == "with":
                     in_with, with_indent = True, indent
                 continue
-            if indent <= with_indent:
-                break
             value = kv.group("value")
             if "${{" in value or not value or value[0] in "|>":
                 continue
@@ -192,7 +198,8 @@ def ensure_gha(ref: str) -> str | None:
         if re.fullmatch(r"[0-9a-f]{40}", ref):
             # A commit pin cannot be a `--branch`: fetch that one commit instead.
             steps = [["git", "init", "-q", dest],
-                     ["git", "-C", dest, "fetch", "-q", "--depth", "1", GHA_URL, ref],
+                     ["git", "-C", dest, "remote", "add", "origin", GHA_URL],
+                     ["git", "-C", dest, "fetch", "-q", "--depth", "1", "origin", ref],
                      ["git", "-C", dest, "checkout", "-q", "FETCH_HEAD"]]
         else:
             steps = [["git", "clone", "-q", "--depth", "1", "--branch", ref, GHA_URL, dest]]
@@ -212,7 +219,10 @@ def ensure_gha(ref: str) -> str | None:
 
 def resolve_base(git_root: str) -> str | None:
     base = os.environ.get("PUSH_CHECK_BASE_REF", "").strip()
-    for cand in ([base] if base else []) + ["origin/main", "origin/master"]:
+    if base:  # An explicit base that does not resolve is a missing base, not a cue to guess.
+        found = _git(["rev-parse", "--verify", "--quiet", base + "^{commit}"], cwd=git_root)
+        return base if found else None
+    for cand in ("origin/main", "origin/master"):
         if _git(["rev-parse", "--verify", "--quiet", cand + "^{commit}"], cwd=git_root):
             return cand
     return None
@@ -282,8 +292,8 @@ def log_bypass(git_root: str, reason: str) -> None:
         pass
 
 
-def pushed_other_than_head(argv, git_root: str, head: str | None) -> str | None:
-    """Return the first pushed refspec source that resolves to a commit other than HEAD."""
+def refspecs(argv) -> list[str]:
+    """Return the refspec words of a push: the arguments after the remote."""
     args = list(argv or [])
     # Everything before the `push` token is git's own options (`-C dir`, `-c k=v`).
     args = args[args.index("push") + 1:] if "push" in args else args
@@ -296,7 +306,20 @@ def pushed_other_than_head(argv, git_root: str, head: str | None) -> str | None:
             skip = True
         elif not a.startswith("-"):
             words.append(a)
-    for spec in words[1:]:  # words[0] is the remote
+    return words[1:]  # words[0] is the remote
+
+
+def deletes_only(argv) -> bool:
+    """True when the push deletes refs and ships nothing: `--delete`, or only `:ref` specs."""
+    if any(a in ("--delete", "-d") for a in (argv or [])):
+        return True
+    specs = refspecs(argv)
+    return bool(specs) and all(s.lstrip("+").startswith(":") for s in specs)
+
+
+def pushed_other_than_head(argv, git_root: str, head: str | None) -> str | None:
+    """Return the first pushed refspec source that resolves to a commit other than HEAD."""
+    for spec in refspecs(argv):
         src = spec.lstrip("+").split(":", 1)[0]
         if src in ("", "HEAD"):
             continue
@@ -319,7 +342,7 @@ def evaluate(command: str):
     for env_assign, argv, directory in pushes:
         if directory is redirected:
             continue
-        if any(a in ("--delete", "-d") or a.startswith(":") for a in (argv or [])):
+        if deletes_only(argv):
             continue
         git_root = _git(["rev-parse", "--show-toplevel"], cwd=directory or os.getcwd())
         if not git_root:

@@ -246,8 +246,10 @@ Four instances (he named the first three the same day):
   assumption gets its own row).
   Ezra Morrison, 2026-10-22, reviewing lds#1267; canonical prose rules are in
   PSW's
-  [Give each concept in a note sheet its own row](https://morrison-lab.github.io/psw/chapters/teaching.html#give-each-concept-in-a-note-sheet-its-own-row)
-  and [Making expressions concise](https://morrison-lab.github.io/psw/chapters/notation.html#making-expressions-concise).
+  [Making expressions concise](https://morrison-lab.github.io/psw/chapters/notation.html#making-expressions-concise)
+  and, once [psw#328](https://github.com/Morrison-Lab/psw/pull/328) merges,
+  its "Give each concept in a note sheet its own row" section in
+  [the teaching chapter](https://morrison-lab.github.io/psw/chapters/teaching.html).
   Apply the rule when you write a sheet, and sweep the diff for merged rows
   before requesting review.
 

@@ -10,8 +10,9 @@ A reader should never see "`geom_smooth()` using formula = 'y ~ x'", "`stat_bin(
   `geom_histogram()` and `stat_bin()` need one of `bins`, `binwidth` or `breaks`: `geom_histogram(binwidth = 1)`.
 - Fix the code that raises a warning.
 - Silence a message only when it cannot be avoided and carries no information a reader needs.
-  Wrap only the one offending call, never a whole chunk: `suppressPackageStartupMessages(library(pkg))` for a package that prints a banner.
-- Never hide a warning or message with the chunk options `warning: false` or `message: false` to make a page look clean: that hides a defect from the author as well.
+  Keep the code readers see plain: set the chunk option `#| message: false` on a chunk that loads a package, rather than wrapping `library(pkg)` in `suppressPackageStartupMessages()` (cross-harness review, 2026-10-26).
+  Use `#| warning: false` only for a warning that is expected and understood, and check the fact it relies on in the chunk, such as `stopifnot(fit$converged)`.
+- Never use a chunk option to hide a message or warning that has not been read and understood: that hides a defect from the author as well.
 
 ## Mechanism
 

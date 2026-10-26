@@ -30,6 +30,8 @@ CASES = [
     ("paste into file", POST, "Please paste this into the file and save it.", True),
     ("you can add to config", POST, "You can add the entry to your config.json by hand.", True),
     ("script command form", POST, "Run `python3 ~/Documents/claude-fetch/add-automode-allow.py`; it adds the entry to settings.json and keeps a backup.", False),
+    ("script handed over beside a could-add clause", POST, "You could add an entry to the allowlist in settings.json, but run `python3 ~/scripts/add-entry.py` instead; it does it.", False),
+    ("copy as a code instruction", POST, "Copy the array into a new variable before mutating it, to avoid aliasing in the config.", False),
     ("agent did the edit", POST, "I added the entry to the file myself and the probe passes.", False),
     ("agent will add", POST, "I'll add the rule to the file in the next commit.", False),
     ("unrelated tool","Bash", "Click the Merge button", False),

@@ -24,6 +24,12 @@ import sys
 
 REPLY_TOOL = re.compile(r"^mcp__hearthbot__(?:reply|post_message|update_message|edit_message)$")
 
+FILE_ASK = "a paste or hand-edit of a file"
+
+# A message that hands over one command running a script is the substitute the
+# rule asks for, so a paste-like clause beside it is not an ask.
+SCRIPT_COMMAND = re.compile(r"\b(?:python3?|bash|sh|Rscript)\s+[~/.\w-]+\.(?:py|sh|R)\b", re.I)
+
 ASKS = (
     ("a manual 'go' in a Remote Control session", re.compile(
         r"\b(?:type|say|send|reply|enter|answer)\s+(?:with\s+)?[`'\"*]*go\b[`'\"*]*[^.\n]{0,60}"
@@ -34,9 +40,10 @@ ASKS = (
         r"\b(?:click|press|hit|tap)\b[^.\n]{0,30}\bmerge\b[^.\n]{0,20}\bbutton\b"
         r"|\bmerge (?:it|them|the PRs?) (?:yourself|manually|by hand)\b",
         re.I)),
-    ("a paste or hand-edit of a file", re.compile(
-        r"(?:^|[.!?\n:]\s*|\b(?:please|you can|you could|can you|could you|just)\s+)"
-        r"(?:paste|append|insert|add|put|copy)\b(?:[^.\n]|\.(?=\S)){0,80}\b(?:into|to|in|onto)\b"
+    (FILE_ASK, re.compile(
+        r"(?:(?:^|[.!?\n:]\s*)(?:paste|append|insert)"
+        r"|\b(?:please|you can|you could|can you|could you|just)\s+(?:paste|append|insert|add|put|copy))"
+        r"\b(?:[^.\n]|\.(?=\S)){0,80}\b(?:into|to|in|onto)\b"
         r"(?:[^.\n]|\.(?=\S)){0,60}(?:\bfile\b|settings|config|\.json\b|\.ya?ml\b|\.toml\b|~/)",
         re.I)),
 )
@@ -65,6 +72,8 @@ def main() -> int:
         return 0
     for what, pattern in ASKS:
         if pattern.search(text):
+            if what == FILE_ASK and SCRIPT_COMMAND.search(text):
+                continue
             print(json.dumps({
                 "hookSpecificOutput": {
                     "hookEventName": "PreToolUse",

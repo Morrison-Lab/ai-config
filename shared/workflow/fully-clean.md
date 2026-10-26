@@ -142,6 +142,10 @@ python3 scripts/build-pr-payload.py OWNER/REPO N out.json
 python3 scripts/check-pr-fully-clean.py N -R OWNER/REPO --from-json out.json
 ```
 
+In a cloud container (`CLAUDE_CODE_REMOTE=true` with `GITHUB_TOKEN` or `GH_TOKEN` set) the checker does both steps itself when given `-R`:
+`python3 scripts/check-pr-fully-clean.py N -R OWNER/REPO` is the whole command.
+Any thread can run it, so a checker run needs no Remote Control hop to another machine.
+
 `scripts/build-pr-payload.py` (ai-config#2908) assembles the whole payload
 from plain REST, which a remote session's proxy does reach even where its
 GraphQL surface is pinned.

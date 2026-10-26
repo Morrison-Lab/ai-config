@@ -361,6 +361,9 @@ def _test_own_actions_job():
         pr._check_runs = None
         out = io.StringIO()
         args = SimpleNamespace(from_json="", pr_number="1322", repo=TEST_REPO, quorum=1)
+        # Cloud containers set CLAUDE_CODE_REMOTE, which makes main() build its
+        # own REST payload; this test drives the `gh` path.
+        env = {k: v for k, v in env.items() if k != "CLAUDE_CODE_REMOTE"}
         with patch.dict(os.environ, env, clear=True), \
                 patch.object(checker, "run_cmd", side_effect=routed), \
                 patch.object(checker, "parse_args", return_value=args), \
@@ -4354,8 +4357,12 @@ def main() -> int:
         ("a run whose event is unknown blocks",
          [gate_run("failure", 1), gate_run("success", 2)], {},
          {"1": "", "2": ""}, False),
-        ("a cancelled run after an older success still blocks",
-         [gate_run("success", 1), gate_run("cancelled", 2)], {}, {}, False),
+        ("a cancelled run after an older success is excused (preempted dispatch)",
+         [gate_run("success", 1), gate_run("cancelled", 2)], {}, {}, True),
+        ("a failed run after an older success still blocks",
+         [gate_run("success", 1), gate_run("failure", 2)], {}, {}, False),
+        ("a cancelled run with no success of the job still blocks",
+         [gate_run("cancelled", 2)], {}, {}, False),
         ("a passing workflow_dispatch run excuses a cancelled pull_request run (#4647)",
          [gate_run("cancelled", 1), gate_run("success", 2)], {},
          {"1": "pull_request", "2": "workflow_dispatch"}, True),

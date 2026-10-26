@@ -3,7 +3,7 @@
 
 Subscription-only: `agy` uses the Antigravity login stored on the machine,
 never an API key. Run it only on a machine where Antigravity is signed in
-(cf463-02, Ezra's Linux box, or the XPS).
+(cf463-02 or the XPS; cf463-02 is Ezra's Linux box).
 
 Modes:
   brief   Send the text of --brief-file; print the reply on stdout.

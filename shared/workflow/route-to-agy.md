@@ -19,7 +19,7 @@ A cloud session has no `agy`; use `delegate-to-opencode` there.
 | Mechanical content edits (rename, reformat, table fill) | `agy` drafts the replacement text; Claude applies it with Edit and runs the checkers | `brief`, then Claude edits |
 | Focused authoring, the critical-path edit, merges, anything with restricted data | Claude | none |
 
-Why not let `agy` write files: this box's `settings.json` has no allow-rule for edits, and headless `agy` otherwise exits 0 having written nothing.
+Why not let `agy` write files: `cf463-02`'s `~/.gemini/antigravity-cli/settings.json` has no allow-rule for edits, and headless `agy` otherwise exits 0 having written nothing.
 Claude applies the edits.
 
 ## Capacity: two Argon reviewers

@@ -35,6 +35,7 @@ import importlib.util
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -195,9 +196,14 @@ def ensure_gha(ref: str) -> str | None:
                      ["git", "-C", dest, "checkout", "-q", "FETCH_HEAD"]]
         else:
             steps = [["git", "clone", "-q", "--depth", "1", "--branch", ref, GHA_URL, dest]]
-        for step in steps:
-            if subprocess.run(step, capture_output=True, timeout=CLONE_TIMEOUT).returncode != 0:
-                return None
+        try:
+            for step in steps:
+                if subprocess.run(step, capture_output=True, timeout=CLONE_TIMEOUT).returncode != 0:
+                    raise OSError(f"{step[:3]} failed")
+        except (OSError, subprocess.SubprocessError):
+            # Never leave a half-built checkout behind: the next run would treat it as a cache.
+            shutil.rmtree(dest, ignore_errors=True)
+            return None
         return dest
     except (OSError, subprocess.SubprocessError):
         # A failed refresh keeps the stale cache usable.
@@ -278,7 +284,18 @@ def log_bypass(git_root: str, reason: str) -> None:
 
 def pushed_other_than_head(argv, git_root: str, head: str | None) -> str | None:
     """Return the first pushed refspec source that resolves to a commit other than HEAD."""
-    words = [a for a in (argv or []) if not a.startswith("-") and a not in ("git", "push")]
+    args = list(argv or [])
+    # Everything before the `push` token is git's own options (`-C dir`, `-c k=v`).
+    args = args[args.index("push") + 1:] if "push" in args else args
+    words = []
+    skip = False
+    for a in args:
+        if skip:
+            skip = False
+        elif a in ("--repo", "-o", "--push-option", "--receive-pack", "--exec"):
+            skip = True
+        elif not a.startswith("-"):
+            words.append(a)
     for spec in words[1:]:  # words[0] is the remote
         src = spec.lstrip("+").split(":", 1)[0]
         if src in ("", "HEAD"):

@@ -174,6 +174,11 @@ parsed = hook.parse_workflow(
 expect("T24 block scalar skipped, 40-hex pin parsed",
        (parsed[0]["ref"], parsed[0]["inputs"]), ("a" * 40, {"terms-file": "terms.txt"}))
 
+verdict, _ = run(f"git -C {repo} push -o ci.skip origin HEAD", repo, 1)
+expect("T25 options before push do not read as a refspec", verdict, "DENY")
+other = hook.pushed_other_than_head(["git", "-C", repo, "push", "origin", "HEAD"], repo, git(repo, "rev-parse", "HEAD"))
+expect("T26 -C dir and remote are not treated as sources", other, None)
+
 real = os.environ.get("GHA_REAL_DIR")
 if real:
     r = make_repo({"check-new-line-breaks.yml": NLB})

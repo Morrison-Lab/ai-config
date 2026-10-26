@@ -46,4 +46,9 @@ These come from Ezra's reviews of the lab's notes repositories (2026-10-14 to 20
   Make one ggplot2 figure per subfile and let `plotly::ggplotly()` supply the interactive HTML version.
   Use plotly directly only for 3D.
   Add a package to the render workflows' `r-packages` in its own PR before a page relies on it.
+- **A caption states what the float shows.**
+  Open it with a sentence that says what the figure or table displays, so it stands alone.
+  A cross-reference to the example it illustrates may follow, and never replaces that sentence
+  ("The symmetry of @exm-x." is a pointer, not a caption).
+  Rule: psw `chapters/slides-posters-figures.qmd`; mechanism: gha `check-self-contained-captions`.
 - **Show confidence intervals on estimates**, and put axis ticks in the original scale ([`axis-tick-labels`](axis-tick-labels.md)).

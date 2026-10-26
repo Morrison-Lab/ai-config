@@ -240,7 +240,8 @@ def run_check(git_root: str, gha_dir: str, call: dict, base: str):
         if suffix:
             env[spec["prefix"] + suffix] = v
     env[spec["prefix"] + spec["base"]] = base
-    env[spec["prefix"] + spec["fail"]] = "true"
+    # CI's default is blocking; a repo that sets `fail: false` is not predicted to fail, so honor it.
+    env[spec["prefix"] + spec["fail"]] = call["inputs"].get("fail", "true")
     env.update(spec.get("extra", {}))
     try:
         proc = subprocess.run([sys.executable, script], capture_output=True, text=True,

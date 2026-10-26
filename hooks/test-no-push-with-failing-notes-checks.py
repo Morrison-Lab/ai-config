@@ -193,6 +193,11 @@ expect("T30 with: before uses: is read, and not shared with the next job",
        [(c["name"], c["inputs"]) for c in parsed],
        [("check-new-line-breaks", {"globs": "*.md"}), ("check-term-links", {})])
 
+nonblocking = make_repo({"check-term-links.yml": WORKFLOW.replace("whole-tree:", "fail: false\n      whole-tree:")})
+run("git push origin feat", nonblocking, 0)
+env_tl = json.load(open(os.path.join(LOG, "check-term-links.py.env"), encoding="utf-8"))
+expect("T31 a repo's fail: false is passed through", env_tl.get("TERM_LINKS_FAIL"), "false")
+
 real = os.environ.get("GHA_REAL_DIR")
 if real:
     r = make_repo({"check-new-line-breaks.yml": NLB})

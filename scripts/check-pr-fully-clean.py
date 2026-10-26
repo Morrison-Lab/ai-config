@@ -370,6 +370,14 @@ def _is_bot_author(login: Optional[str]) -> bool:
 REVIEW_AGENT_MARKERS: Dict[str, str] = {
     "**claude finished": "Claude",
     "### \U0001f916 antigravity agent report": "Antigravity",
+    # The router's own header for an Argon (agy) review it relays under the
+    # owner's login: "## Independent adversarial review at `<sha>` (Argon /
+    # `agy`, ...)". Without it that review's identity fell back to the login,
+    # so a later "### 🤖 Antigravity agent report" CLEAN from the same reviewer
+    # never superseded its FINDINGS (Morrison-Lab/gha#1255). Matched on the
+    # parenthesised "(argon /" because code spans are blanked before the first
+    # line is scanned and the sha before it varies.
+    "(argon /": "Antigravity",
     "verdict: block": "Jules",
     "_posted by codex (ai agent)": "Codex",
     "_posted by opencode (ai agent)": "OpenCode",
@@ -497,6 +505,9 @@ REVIEW_BODY_MARKERS = (
     "_posted by opencode (ai agent)",
     "verdict:",
     "review-data:",
+    # Argon's relayed header (see REVIEW_AGENT_MARKERS); every agent marker
+    # must contain a body marker, so this is the superset entry for it.
+    "(argon /",
 )
 
 

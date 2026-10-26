@@ -1069,6 +1069,78 @@ def main() -> int:
         "line does not collapse the two reviewers (#2274)",
         (not fl_ok) and any("Claude" in i and "different reviewer" in i for i in fl_issues),
     )
+    # Morrison-Lab/gha#1255, 2026-10-26: the router posted an Argon FINDINGS
+    # review under the owner's login with the header below, which carried no
+    # known agent marker, so its identity fell back to the login. The later
+    # CLEAN reports open with the Antigravity header, a different identity, and
+    # so never superseded it: the checker kept reading a stale FINDINGS as the
+    # latest verdict although the same reviewer had since passed the head.
+    argon_findings = (
+        "## Independent adversarial review at `73866348` (Argon / `agy`, "
+        "verified by Claude Code)\n\n"
+        "Reviewer: Antigravity CLI (`agy --mode plan`, no tools).\n\n"
+        "### Findings\n\n**1. False positive on ordinary code.**\n\n"
+        "### Verdict\n\nVERDICT: FINDINGS (not clean): items 1 and 2.\n\n"
+        "Reviewed-Commit: 73866348e01e18666d82ec4b888186c76fc574d3\n\n"
+        "_Posted by Claude Code (AI agent) --- not written by a human._\n"
+    )
+    argon_clean = (
+        "### \U0001f916 Antigravity agent report\n\n"
+        "### Cross-harness review (Argon: Gemini 4 Argon (Medium) via "
+        "Antigravity `agy` 1.3.5) at 91bb0f0\n\n"
+        "### Verdict\n\nVERDICT: CLEAN\n\n"
+        "Reviewed-Commit: 91bb0f0b21766a825ee315a3ad38c3e73e573846\n\n"
+        "_Posted by Claude Code (AI agent) --- not written by a human._\n"
+    )
+    check(
+        "_reviewer_identity: an Argon `Independent adversarial review` header "
+        "is Antigravity, not the posting login",
+        checker._reviewer_identity(argon_findings, "dem-extra1") == "Antigravity",
+    )
+    check(
+        "classify_verdict: the Argon FINDINGS body still reads as not-clean",
+        checker.classify_verdict(argon_findings, "", "dem-extra1") == "not-clean",
+    )
+    items_argon = [
+        ("comment", "2026-10-26T10:03:27Z", argon_findings, "", "", "dem-extra1"),
+        ("comment", "2026-10-26T10:06:00Z", argon_clean, "", "", "dem-extra1"),
+    ]
+    with contextlib.redirect_stdout(io.StringIO()):
+        ar_ok, ar_issues = checker.check_latest_verdict(items_argon)
+    check(
+        "check_latest_verdict: a later Argon CLEAN at a newer head supersedes "
+        "the same reviewer's earlier FINDINGS (gha#1255)",
+        ar_ok and not any(not i.startswith("NOTE:") for i in ar_issues),
+    )
+    items_argon_reversed = [
+        ("comment", "2026-10-26T10:03:27Z", argon_clean, "", "", "dem-extra1"),
+        ("comment", "2026-10-26T10:06:00Z", argon_findings, "", "", "dem-extra1"),
+    ]
+    with contextlib.redirect_stdout(io.StringIO()):
+        ar2_ok, _ar2_issues = checker.check_latest_verdict(items_argon_reversed)
+    check(
+        "check_latest_verdict: an Argon FINDINGS posted AFTER the CLEAN still blocks",
+        not ar2_ok,
+    )
+    items_argon_vs_claude = [
+        ("comment", "2026-10-26T10:03:27Z", argon_findings, "", "", "dem-extra1"),
+        (
+            "comment",
+            "2026-10-26T10:06:37Z",
+            "**Claude finished review** --- [View run](x)\n\n### Verdict\n\n"
+            "**Ready for merge**",
+            "",
+            "",
+            "github-actions[bot]",
+        ),
+    ]
+    with contextlib.redirect_stdout(io.StringIO()):
+        avc_ok, _avc_issues = checker.check_latest_verdict(items_argon_vs_claude)
+    check(
+        "check_latest_verdict: a Claude CLEAN does not supersede an Argon FINDINGS "
+        "(different reviewers, #2274)",
+        not avc_ok,
+    )
     unmarked_ga = (
         "**Round-2 verification** --- adversarial re-check.\n\n"
         "### Verdict\n\n**Ready for merge**"

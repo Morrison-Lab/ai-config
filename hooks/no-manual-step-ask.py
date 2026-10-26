@@ -51,11 +51,19 @@ ASKS = (
         r"\b(?:click|press|hit|tap)\b[^.\n]{0,30}\bmerge\b[^.\n]{0,20}\bbutton\b"
         r"|\bmerge (?:it|them|the PRs?) (?:yourself|manually|by hand)\b",
         re.I)),
+    # paste, append and insert are rarely anything but a hand-edit, so a bare
+    # settings or config is cue enough after them.
     (FILE_ASK, re.compile(
-        r"(?:(?:^|[.!?\n:]\s*)(?:paste|append|insert)"
-        r"|\b(?:please|you can|you could|can you|could you|just)\s+(?:paste|append|insert|add|put|copy))"
+        r"(?:(?:^|[.!?\n:]\s*)|\b(?:please|you can|you could|can you|could you|just)\s+)(?:paste|append|insert)"
         r"\b(?:[^.\n]|\.(?=\S)){0,80}\b(?:into|to|in|onto)\b"
-        r"(?:[^.\n]|\.(?=\S)){0,60}" + FILE_CUE,
+        r"(?:[^.\n]|\.(?=\S)){0,60}(?:" + FILE_CUE + r"|\b(?:settings|config)\b)",
+        re.I)),
+    # add, put and copy are ordinary code verbs, so after a polite lead-in they
+    # need the strong file cue.
+    (FILE_ASK, re.compile(
+        r"\b(?:please|you can|you could|can you|could you|just)\s+(?:add|put|copy)"
+        r"\b(?:[^.,\n]|\.(?=\S)){0,60}?\b(?:into|to|onto)\b"
+        r"(?:[^.,\n]|\.(?=\S)){0,40}?" + FILE_CUE,
         re.I)),
     # A bare "Add ... to settings.json" is the plainest hand-add ask. add, put and
     # copy are also ordinary code verbs, so this form needs a strong file cue.

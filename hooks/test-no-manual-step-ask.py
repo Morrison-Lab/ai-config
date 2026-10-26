@@ -62,6 +62,8 @@ CASES = [
     ("exempt ask whose match ends at a newline", POST, "You can run python3 ~/scripts/add-entry.py or just add this to the settings\nThat is all.", False),
     ("put in settings.json", POST, "Please put this entry in settings.json.", True),
     ("e.g. does not split the sentence", POST, "You could add the entry to settings.json, e.g. by hand, but run python3 ~/scripts/add-entry.py instead.", False),
+    ("envs. is not an abbreviation break", POST, "You could add the entry to settings.json for the envs. Run python3 ~/scripts/add-entry.py to do the rest.", True),
+    ("ask spanning a question mark", POST, "Could you add the key? Run python3 ~/scripts/add-entry.py; it writes to settings.json.", True),
     ("add to config dict", POST, "Add the result to the config dict before returning it.", False),
     ("add to settings object", POST, "Add the handler to the settings object in the test fixture.", False),
     ("put into settings dataclass", POST, "Put a default value into the settings dataclass.", False),

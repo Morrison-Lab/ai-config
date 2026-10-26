@@ -36,7 +36,7 @@ SCRIPT_COMMAND = re.compile(
     re.I)
 # A sentence ends at ., ! or ? plus whitespace, but not after e.g., i.e., vs. or etc.
 SENTENCE_BREAK = re.compile(
-    r"(?<!e\.g\.)(?<!i\.e\.)(?<!vs\.)(?<!etc\.)(?<=[.!?])\s+|\n+",
+    r"(?<!\be\.g\.)(?<!\bi\.e\.)(?<!\bvs\.)(?<!\betc\.)(?<=[.!?])\s+|\n+",
     re.I)
 
 # A file cue unambiguous enough that add, put and copy, which are ordinary code
@@ -89,6 +89,8 @@ REASON = (
 
 def scripted(text: str, match: re.Match) -> bool:
     """True when the sentence holding the ask's last visible character tells the user to run a script command."""
+    if SENTENCE_BREAK.search(match.group(0).rstrip()):
+        return False
     ask_end = len(text[:match.end()].rstrip()) - 1
     position = 0
     for piece in SENTENCE_BREAK.split(text):

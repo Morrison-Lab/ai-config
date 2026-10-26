@@ -50,10 +50,10 @@ These come from Ezra's reviews of the lab's notes repositories (2026-10-14 to 20
   Open the caption with a sentence that says what the figure or table displays, so the float stands alone.
   A cross-reference to the example that the float illustrates may follow that sentence, but must never replace it
   ("The symmetry of @exm-x." is a pointer, not a caption).
-  Describe what the reader sees (lines, points, panels), not a property of the objects drawn ("linear functions are linear in $x$" shows nothing).
+  Describe what the reader sees (lines, points, panels), not a property of the objects drawn ("linear functions are linear in $x$" describes nothing visible).
   Word the panels of a multi-panel float in parallel
   ("On the left, ...; on the right, ...").
-  Link each target once per caption.
+  Link each cross-reference or hyperlink target once per caption.
   Rule: psw `chapters/slides-posters-figures.qmd`
   ([psw#357](https://github.com/Morrison-Lab/psw/pull/357));
   mechanism: gha `check-self-contained-captions`

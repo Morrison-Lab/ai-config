@@ -15,8 +15,9 @@ A reader should never see "`geom_smooth()` using formula = 'y ~ x'", "`stat_bin(
 - Use `#| warning: false` only for a warning that is expected and understood.
   Check the invariant the result relies on, such as `stopifnot(fit$converged)`, in a hidden chunk (`#| echo: false`), unless the check is what the page teaches.
   Where the page quotes the warning, repeat the call in that hidden chunk under `withCallingHandlers()`.
-  In the handler, keep the warning text, then muffle the warning with `invokeRestart("muffleWarning")`, which ends the handler, so the chunk prints none.
-  After the call, assert the kept text with `stopifnot()`, so a different warning fails the render.
+  The repeated call must be deterministic: for a random call, reset the seed to the value the visible chunk used before the repeat.
+  In the handler, append each warning text to a character vector, then muffle the warning with `invokeRestart("muffleWarning")`, which ends the handler, so the chunk prints none.
+  After the call, assert the vector's exact length and content with `stopifnot()`, so an extra or different warning fails the render.
 - Never hide a message or warning that has not been read and understood, by a chunk option or by a wrapper such as `suppressWarnings()`, `suppressMessages()` or `warnings.filterwarnings("ignore")`: that hides a defect from the author as well.
 
 ## Mechanism

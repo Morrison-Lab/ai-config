@@ -8,10 +8,17 @@ A reader should never see "`geom_smooth()` using formula = 'y ~ x'", "`stat_bin(
 - Name every argument whose default makes ggplot2 print a message.
   `geom_smooth()` and `stat_smooth()` need both `method` and `formula`: `geom_smooth(method = "lm", formula = y ~ x)`.
   `geom_histogram()` and `stat_bin()` need one of `bins`, `binwidth` or `breaks`: `geom_histogram(binwidth = 1)`.
-- Fix the code that raises a warning.
+- Fix the code that raises a warning, unless the warning is the expected result of what the page shows, as in the `#| warning: false` bullet below.
 - Silence a message only when it cannot be avoided and carries no information a reader needs.
-  Wrap only the one offending call, never a whole chunk: `suppressPackageStartupMessages(library(pkg))` for a package that prints a banner.
-- Never hide a warning or message with the chunk options `warning: false` or `message: false` to make a page look clean: that hides a defect from the author as well.
+  Keep the code readers see plain: set the chunk option `#| message: false` on a chunk that loads a package, rather than wrapping `library(pkg)` in `suppressPackageStartupMessages()` (cross-harness review, 2026-10-26).
+  A chunk option silences every message in its chunk, so keep such a chunk to the package load or to the one call whose message is expected.
+- Use `#| warning: false` only for a warning that is expected and understood.
+  Check the invariant the result relies on, such as `stopifnot(fit$converged)`, in a hidden chunk (`#| echo: false`), unless the check is what the page teaches.
+  Where the page quotes the warning, repeat the call in that hidden chunk under `withCallingHandlers()`.
+  The repeated call must be deterministic: for a random call, reset the seed to the value the visible chunk used before the repeat.
+  In the handler, append each warning text to a character vector, then muffle the warning with `invokeRestart("muffleWarning")`, which ends the handler, so the chunk prints none.
+  After the call, assert the vector's exact length and content with `stopifnot()`, so an extra or different warning fails the render.
+- Never hide a message or warning that has not been read and understood, by a chunk option or by a wrapper such as `suppressWarnings()`, `suppressMessages()` or `warnings.filterwarnings("ignore")`: that hides a defect from the author as well.
 
 ## Mechanism
 

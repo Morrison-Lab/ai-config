@@ -463,16 +463,20 @@ with tempfile.TemporaryDirectory(prefix="hook-runner-") as tmp:
     # An invalid value must fail before any suite output is printed.
     (hooks / "test-orphan.py").write_text(OK, encoding="utf-8")
     th.HOOKS = str(hooks)
-    printed = []
+    def run_expecting_exit():
+        try:
+            th.run_suites(timeout=10)
+        except SystemExit as exc:
+            return exc.code
+        return None
+
     try:
         with patch.dict(os.environ, {"HOOK_TEST_JOBS": "0"}):
-            (_, stdout, _) = _capture(lambda: th.run_suites(timeout=10))
-    except SystemExit as exc:
-        printed.append(exc.code)
+            (code, stdout, _) = _capture(run_expecting_exit)
     finally:
         th.HOOKS = old_hooks
     check("invalid HOOK_TEST_JOBS fails before any suite runs",
-          printed == [2], repr(printed))
+          code == 2 and stdout == "", repr((code, stdout)))
 
 
 print(f"\n{passes}/{passes + failures} checks passed")

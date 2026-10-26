@@ -27,17 +27,14 @@ REPLY_TOOL = re.compile(r"^mcp__hearthbot__(?:reply|post_message|update_message|
 FILE_ASK = "a paste or hand-edit of a file"
 
 # A sentence that hands over one command running a script is the substitute the
-# rule asks for. It exempts a paste-like clause in the same sentence, or in the
-# sentence just before a "Run/Use/Execute ..." one; a script named elsewhere in the
-# message does not.
+# rule asks for. It exempts a paste-like clause only in the same sentence; a script
+# named in another sentence does not. A reply that pairs an ask with a script in
+# separate sentences is denied and rewritten as the script alone, which is the point.
 SCRIPT_COMMAND = re.compile(
     r"\b(?:run(?:s|ning)?|use|execute)\b[^.,;\n]{0,40}"
     r"\b(?:python3?|bash|sh|Rscript)\s+[~/.\w-]+\.(?:py|sh|R)\b",
     re.I)
-# Where a sentence already opens with Run/Use/Execute, any script command in it counts.
-BARE_SCRIPT_COMMAND = re.compile(r"\b(?:python3?|bash|sh|Rscript)\s+[~/.\w-]+\.(?:py|sh|R)\b", re.I)
 SENTENCE_BREAK = re.compile(r"(?<=[.!?])\s+|\n+")
-RUN_SENTENCE = re.compile(r"^\W*(?:run(?:ning)?|use|execute)\b", re.I)
 
 # A file cue unambiguous enough that add, put and copy, which are ordinary code
 # verbs, can rely on it, and that "config dict" or "settings object" do not trip.
@@ -97,10 +94,7 @@ def scripted(text: str, ask_start: int) -> bool:
         position = start + len(piece)
     for index, (start, piece) in enumerate(sentences):
         if start <= ask_start < start + len(piece):
-            if SCRIPT_COMMAND.search(piece):
-                return True
-            following = sentences[index + 1][1] if index + 1 < len(sentences) else ""
-            return bool(RUN_SENTENCE.search(following) and BARE_SCRIPT_COMMAND.search(following))
+            return bool(SCRIPT_COMMAND.search(piece))
     return False
 
 

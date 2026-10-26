@@ -14,8 +14,8 @@ What it does, for each `git push` in the command:
      `check-new-line-breaks.yml`, and takes their literal `with:` inputs (globs,
      paths-ignore, terms-file, allow-file, clause settings). The repo's CI
      configuration stays the single source; nothing is hard-coded per repo, so
-     every notes repo that calls those workflows (lds, sds, pds, mds, rme, psw,
-     ids, ...) is covered.
+     every repo that calls those workflows is covered (as of 2026-10-26: lds,
+     sds, pds, mds and rme; psw and ids once they adopt the two checks).
   2. Runs gha's own scripts at the ref the workflow pins (`@v3`) from a cached
      shallow clone in `~/.cache/ai-config/gha/` (refreshed daily; override with
      `GHA_CHECKS_DIR` for a checkout), against `origin/main`.
@@ -184,7 +184,8 @@ def ensure_gha(ref: str) -> str | None:
     try:
         if os.path.isdir(os.path.join(dest, ".git")):
             last = os.path.getmtime(stamp) if os.path.exists(stamp) else 0
-            if time.time() - last > REFRESH_SECONDS:
+            # A commit pin is immutable, so only a tag or branch pin is ever refreshed.
+            if not re.fullmatch(r"[0-9a-f]{40}", ref) and time.time() - last > REFRESH_SECONDS:
                 # Stamp first, so an offline machine retries once a day, not on every push.
                 with open(stamp, "w", encoding="utf-8") as fh:
                     fh.write(str(time.time()))
@@ -234,7 +235,8 @@ def run_check(git_root: str, gha_dir: str, call: dict, base: str):
     script = os.path.join(gha_dir, spec["script"])
     if not os.path.isfile(script):
         return call["name"], "error", f"{spec['script']} not found in gha checkout"
-    env = dict(os.environ)
+    # Start from a clean slate: a stray TERM_LINKS_* or NLB_* in the caller's shell is not CI.
+    env = {k: v for k, v in os.environ.items() if not k.startswith(("TERM_LINKS_", "NLB_"))}
     for k, v in call["inputs"].items():
         suffix = spec["inputs"].get(k)
         if suffix:
@@ -293,11 +295,22 @@ def log_bypass(git_root: str, reason: str) -> None:
         pass
 
 
+def push_args(argv) -> list[str]:
+    """Return the arguments after the `push` subcommand, skipping git's own options.
+
+    `-C dir` and `-c k=v` take a value, so a directory literally named `push` is
+    not mistaken for the subcommand.
+    """
+    args = list(argv or [])
+    i = 1 if args[:1] == ["git"] else 0
+    while i < len(args) and args[i] != "push":
+        i += 2 if args[i] in ("-C", "-c", "--git-dir", "--work-tree", "--namespace") else 1
+    return args[i + 1:]
+
+
 def refspecs(argv) -> list[str]:
     """Return the refspec words of a push: the arguments after the remote."""
-    args = list(argv or [])
-    # Everything before the `push` token is git's own options (`-C dir`, `-c k=v`).
-    args = args[args.index("push") + 1:] if "push" in args else args
+    args = push_args(argv)
     words = []
     skip = False
     for a in args:
@@ -312,9 +325,12 @@ def refspecs(argv) -> list[str]:
 
 def deletes_only(argv) -> bool:
     """True when the push deletes refs and ships nothing: `--delete`, or only `:ref` specs."""
-    if any(a in ("--delete", "-d") for a in (argv or [])):
+    args = push_args(argv)
+    if any(a in ("--delete", "-d") for a in args):
         return True
     specs = refspecs(argv)
+    if not specs and "--tags" in args:  # tags only: nothing from HEAD's history is pushed
+        return True
     return bool(specs) and all(s.lstrip("+").startswith(":") for s in specs)
 
 

@@ -198,6 +198,15 @@ run("git push origin feat", nonblocking, 0)
 env_tl = json.load(open(os.path.join(LOG, "check-term-links.py.env"), encoding="utf-8"))
 expect("T31 a repo's fail: false is passed through", env_tl.get("TERM_LINKS_FAIL"), "false")
 
+verdict, _ = run("git push --tags origin", repo, 1)
+expect("T32 a tags-only push is silent", verdict, "silent")
+expect("T33 a directory named push does not hide the refspecs",
+       hook.refspecs(["git", "-C", "push", "push", "origin", "HEAD:x"]), ["HEAD:x"])
+verdict, _ = run("git push origin feat", repo, 1, extra={"NLB_GLOBS": "*.nothing", "TERM_LINKS_GLOBS": "*.nothing"})
+env_tl = json.load(open(os.path.join(LOG, "check-term-links.py.env"), encoding="utf-8"))
+expect("T34 caller NLB_/TERM_LINKS_ variables do not leak into a check",
+       env_tl.get("TERM_LINKS_GLOBS"), None)
+
 real = os.environ.get("GHA_REAL_DIR")
 if real:
     r = make_repo({"check-new-line-breaks.yml": NLB})

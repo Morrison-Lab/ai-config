@@ -974,6 +974,15 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
             key = _supersede_key(cr, repo, workflow_cache)
             if key and any(_supersedes(s, cr) for s in successes.get(key, [])):
                 continue
+            # A `cancelled` job says nothing about the code: it is a concurrency
+            # or preempt cancellation. When the same job in the same workflow
+            # and event group already passed on this head SHA, a cancelled run
+            # (earlier or later, whatever its timestamps) is no regression:
+            # measured on Morrison-Lab/lds#1422, where a comment-dispatched
+            # review was preempted by a newer one. A `failure` is never
+            # excused this way.
+            if conclusion == "cancelled" and key and successes.get(key):
+                continue
             issues.append(
                 f"Check run '{name}'{where} completed with conclusion "
                 f"'{conclusion}'")
@@ -4251,9 +4260,45 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def _auto_build_payload(repo: str, pr_number: str) -> str:
+    """Write a REST payload for *repo*#*pr_number* with build-pr-payload.py.
+
+    The file is removed at interpreter exit. Returns its path.
+    """
+    import atexit
+    import importlib.util
+    import tempfile
+    if not str(pr_number).isdigit():
+        die(f"cannot build a REST payload: PR number {pr_number!r} is not an integer")
+    spec = importlib.util.spec_from_file_location(
+        "build_pr_payload", Path(__file__).resolve().parent / "build-pr-payload.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    try:
+        payload = module.fetch_payload(repo, int(pr_number), module._token())
+    except module.PayloadBuildError as exc:
+        die(f"build-pr-payload.py could not gather the payload: {exc}")
+    fd, path = tempfile.mkstemp(prefix="pr-payload-", suffix=".json")
+    atexit.register(lambda: Path(path).unlink(missing_ok=True))
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh)
+    print(f"cloud container: built a REST payload ({path}) instead of using `gh` GraphQL",
+          file=sys.stderr)
+    return path
+
+
 def main():
     global _FETCHER
     args = parse_args()
+
+    # A cloud container's proxy refuses GraphQL, so `gh pr view --json` always
+    # fails there (ai-config#4220, #4722). Build the REST payload here instead
+    # of exiting 2 with a recipe the agent must run by hand, so a thread can run
+    # this checker with one command and no Remote Control hop.
+    if (not args.from_json and args.repo
+            and os.environ.get("CLAUDE_CODE_REMOTE") == "true"
+            and (os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN"))):
+        args.from_json = _auto_build_payload(args.repo, args.pr_number)
 
     # Installed before resolve_repo, because repo resolution is itself one of
     # the `gh` reads the payload replaces.

@@ -22,8 +22,9 @@ AGENTS.md, and both sessions knew it. It had happened before (ai-config#4399,
   can read past. It also ties a run to the PR NUMBER, never to the HEAD SHA,
   so a run from before the last push, or one made while a check was pending,
   can pass; it credits only a Bash run in this transcript, which a cloud
-  session cannot produce (the checker needs GraphQL, so it runs through a
-  Remote Control session and the result comes back as a relayed message); and
+  session can in fact produce (the checker builds a REST payload in a cloud
+  container; before ai-config#4746 this was believed to need a Remote Control
+  session, with the result relayed back as a message); and
   it lets a merge naming no PR number through.
 
 ## The condition (all must hold, or the merge is DENIED)
@@ -122,10 +123,12 @@ DENY_TEXT = (
     "1. Get the head SHA: the PR's `head.sha` (40 hex).\n"
     "2. Run `python3 scripts/{inst} {num} -R {repo}` (local or Bash), and see "
     "exit 0 with the line `{repo}#{num} is FULLY CLEAN on HEAD <sha8>`.\n"
-    "   In a cloud session the checker cannot run (it needs GraphQL): build "
-    "the payload with `scripts/build-pr-payload.py`, or run the checker "
-    "through a Remote Control session on the XPS, and get its output line "
-    "relayed back into this session.\n"
+    "   The same command works in a cloud session: with CLAUDE_CODE_REMOTE=true "
+    "and a GITHUB_TOKEN or GH_TOKEN set, `-R` makes the checker build its own REST "
+    "payload (older checkouts: run `scripts/build-pr-payload.py` first and "
+    "pass `--from-json`). Run it in THIS session so its line is in this "
+    "transcript; a Remote Control run is a fallback, and its output line "
+    "must be relayed back into this session.\n"
     "3. Retry the merge with the full head SHA pinned "
     "(`expectedHeadSha` / `--match-head-commit`). A run made while a check "
     "was pending, or before the last push, names the wrong state and does "

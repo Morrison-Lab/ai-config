@@ -50,12 +50,13 @@ These come from Ezra's reviews of the lab's notes repositories (2026-10-14 to 20
   Open the caption with a sentence that says what the figure or table displays, so the float stands alone.
   A cross-reference to the example that the float illustrates may follow that sentence, but must never replace it
   ("The symmetry of @exm-x." is a pointer, not a caption).
+  That opening-sentence rule is in psw `chapters/slides-posters-figures.qmd`
+  ([psw#357](https://github.com/Morrison-Lab/psw/pull/357)),
+  and gha `check-self-contained-captions` checks it
+  ([gha#1241](https://github.com/Morrison-Lab/gha/pull/1241), open as of 2026-10-26, not yet merged).
+  The three rules below are ai-config guidance only, with no psw rule or gha check behind them as of 2026-10-26.
   Describe what the reader sees (lines, points, panels), not a property of the objects drawn ("linear functions are linear in $x$" describes nothing visible).
   Word the panels of a multi-panel float in parallel
   ("On the left, ...; on the right, ...").
   Link each cross-reference or hyperlink target once per caption.
-  Rule: psw `chapters/slides-posters-figures.qmd`
-  ([psw#357](https://github.com/Morrison-Lab/psw/pull/357));
-  mechanism: gha `check-self-contained-captions`
-  ([gha#1241](https://github.com/Morrison-Lab/gha/pull/1241), open as of 2026-10-26, not yet merged).
 - **Show confidence intervals on estimates**, and put axis ticks in the original scale ([`axis-tick-labels`](axis-tick-labels.md)).

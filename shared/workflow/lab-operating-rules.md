@@ -10,7 +10,8 @@ The rest are prose because no condition in the transcript can decide them.
 - A bare `mwc`, or plain words such as "merge when ready", is the merge grant for every ready PR in the thread's scope.
   Never ask Ezra to name PR numbers ("don't make me name each one").
   Enforced by `hooks/no-numbered-merge-word-ask.py` and `hooks/remind-plain-english-merge-word.py`.
-- Never offer him a merge button or a manual step.
+- Never offer him a merge button or a manual step, and never ask him to paste, append, or hand-add text into a file.
+  Write an idempotent script, test it, and give him one command that runs it (Ezra, 2026-10-26).
   Enforced by `hooks/no-manual-step-ask.py`.
 
 ## Deliverables and approvals

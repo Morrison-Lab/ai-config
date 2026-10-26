@@ -8,17 +8,40 @@ reply tool call (mcp__hearthbot__reply, post_message, update_message,
 edit_message) whose text asks the user to
 
   * type "go" (or similar) into a Remote Control / RC session;
-  * click or press a Merge button, or merge a PR themselves.
+  * click or press a Merge button, or merge a PR themselves;
+  * paste, append, or hand-add text into a file or settings (Ezra, 2026-10-26:
+    "never ask me to paste anything into a file; always give me a script-based
+    command to run that does it for me").
 
 The denial points at the substitute: start a fresh session on an already
 approved environment with the brief as its opening task, retry a denied step
-once, and for merges ask for the plain `mwc` word. Fails open on parse trouble.
+once, for merges ask for the plain `mwc` word, and for a file edit write an
+idempotent script and give one command that runs it. Fails open on parse trouble.
 """
 import json
 import re
 import sys
 
 REPLY_TOOL = re.compile(r"^mcp__hearthbot__(?:reply|post_message|update_message|edit_message)$")
+
+FILE_ASK = "a paste or hand-edit of a file"
+
+# A sentence that hands over one command running a script is the substitute the
+# rule asks for. It exempts a paste-like clause only in the same sentence; a script
+# named in another sentence does not. A reply that pairs an ask with a script in
+# separate sentences is denied and rewritten as the script alone, which is the point.
+SCRIPT_COMMAND = re.compile(
+    r"\b(?:run(?:s|ning)?|use|execute)\b[^.,;\n]{0,40}"
+    r"\b(?:python3?|bash|sh|Rscript)\s+[~/.\w-]+\.(?:py|sh|R)\b",
+    re.I)
+SENTENCE_BREAK = re.compile(r"(?<=[.!?])\s+|\n+")
+
+# A file cue unambiguous enough that add, put and copy, which are ordinary code
+# verbs, can rely on it, and that "config dict" or "settings object" do not trip.
+FILE_CUE = (
+    r"(?:\bfile\b|\.json\b|\.ya?ml\b|\.toml\b|~/"
+    r"|\b(?:the|your) (?:settings|config)\s*(?:[.!?]|\n|$))"
+)
 
 ASKS = (
     ("a manual 'go' in a Remote Control session", re.compile(
@@ -30,15 +53,49 @@ ASKS = (
         r"\b(?:click|press|hit|tap)\b[^.\n]{0,30}\bmerge\b[^.\n]{0,20}\bbutton\b"
         r"|\bmerge (?:it|them|the PRs?) (?:yourself|manually|by hand)\b",
         re.I)),
+    # paste, append and insert are rarely anything but a hand-edit, so a bare
+    # settings or config is cue enough after them.
+    (FILE_ASK, re.compile(
+        r"(?:(?:^|[.!?\n:]\s*)|\b(?:please|you can|you could|can you|could you|just)\s+)(?:paste|append|insert)"
+        r"\b(?:[^.\n]|\.(?=\S)){0,80}\b(?:into|to|in|onto)\b"
+        r"(?:[^.\n]|\.(?=\S)){0,60}(?:" + FILE_CUE + r"|\b(?:settings|config)\s*(?:[.!?]|\n|$))",
+        re.I)),
+    # add, put and copy are ordinary code verbs, so after a polite lead-in they
+    # need the strong file cue.
+    (FILE_ASK, re.compile(
+        r"\b(?:please|you can|you could|can you|could you|just)\s+(?:add|put|copy)"
+        r"\b(?:[^.,\n]|\.(?=\S)){0,60}?\b(?:into|to|onto)\b"
+        r"(?:[^.,\n]|\.(?=\S)){0,40}?" + FILE_CUE,
+        re.I)),
+    # A bare "Add ... to settings.json" is the plainest hand-add ask. add, put and
+    # copy are also ordinary code verbs, so this form needs a strong file cue.
+    (FILE_ASK, re.compile(
+        r"(?:^|[.!?\n:]\s*)(?:add|put|copy)\b(?:[^.,\n]|\.(?=\S)){0,60}?\b(?:into|to|onto)\b"
+        r"(?:[^.,\n]|\.(?=\S)){0,40}?" + FILE_CUE,
+        re.I)),
 )
 
 REASON = (
     "[hook: no-manual-step-ask] This message asks the user for hand work: {what}. "
     "Do it another way. For a Remote Control session, start a fresh one on an "
     "already approved environment with the brief as its opening task (no 'go' to type). "
-    "For a merge, ask for plain `mwc`. For a denied step, retry once unchanged. "
+    "For a merge, ask for plain `mwc`. For a file edit, write an idempotent script, test it, and give one command that runs it (no pasting). For a denied step, retry once unchanged. "
     "shared/workflow/lab-operating-rules.md; ai-config#4698."
 )
+
+
+def scripted(text: str, ask_start: int) -> bool:
+    """True when the ask's own sentence tells the user to run a script command."""
+    position = 0
+    sentences = []
+    for piece in SENTENCE_BREAK.split(text):
+        start = text.find(piece, position)
+        sentences.append((start, piece))
+        position = start + len(piece)
+    for start, piece in sentences:
+        if start <= ask_start < start + len(piece):
+            return bool(SCRIPT_COMMAND.search(piece))
+    return False
 
 
 def main() -> int:
@@ -55,7 +112,10 @@ def main() -> int:
     if not isinstance(text, str):
         return 0
     for what, pattern in ASKS:
-        if pattern.search(text):
+        match = pattern.search(text)
+        if match:
+            if what == FILE_ASK and scripted(text, match.end() - 1):
+                continue
             print(json.dumps({
                 "hookSpecificOutput": {
                     "hookEventName": "PreToolUse",

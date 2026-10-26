@@ -57,5 +57,5 @@ These come from Ezra's reviews of the lab's notes repositories (2026-10-14 to 20
   Rule: psw `chapters/slides-posters-figures.qmd`
   ([psw#357](https://github.com/Morrison-Lab/psw/pull/357));
   mechanism: gha `check-self-contained-captions`
-  ([gha#1241](https://github.com/Morrison-Lab/gha/pull/1241)).
+  ([gha#1241](https://github.com/Morrison-Lab/gha/pull/1241), open as of 2026-10-26, not yet merged).
 - **Show confidence intervals on estimates**, and put axis ticks in the original scale ([`axis-tick-labels`](axis-tick-labels.md)).

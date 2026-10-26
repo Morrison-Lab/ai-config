@@ -8,7 +8,7 @@ A reader should never see "`geom_smooth()` using formula = 'y ~ x'", "`stat_bin(
 - Name every argument whose default makes ggplot2 print a message.
   `geom_smooth()` and `stat_smooth()` need both `method` and `formula`: `geom_smooth(method = "lm", formula = y ~ x)`.
   `geom_histogram()` and `stat_bin()` need one of `bins`, `binwidth` or `breaks`: `geom_histogram(binwidth = 1)`.
-- Fix the code that raises a warning, unless the warning is the expected result of what the page shows, as in the `warning: false` bullet below.
+- Fix the code that raises a warning, unless the warning is the expected result of what the page shows, as in the `#| warning: false` bullet below.
 - Silence a message only when it cannot be avoided and carries no information a reader needs.
   Keep the code readers see plain: set the chunk option `#| message: false` on a chunk that loads a package, rather than wrapping `library(pkg)` in `suppressPackageStartupMessages()` (cross-harness review, 2026-10-26).
   A chunk option silences every message in its chunk, so keep such a chunk to the package load or to the one call whose message is expected.

@@ -37,11 +37,13 @@ does its own bounded drain instead (see DRAIN_TIMEOUT_S).
 
 Run: python3 scripts/test_hooks.py
 """
+import concurrent.futures
 import glob
 import math
 import os
 import subprocess
 import sys
+import threading
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HOOKS = os.path.join(ROOT, "hooks")
@@ -171,6 +173,29 @@ def subjects():
 # waiting forever, is what keeps the per-suite deadline a real deadline.
 DRAIN_TIMEOUT_S = 5
 
+# Suites are independent subprocesses, so run_suites runs several at once; the
+# serial sweep took about 21 minutes of the 24-minute `validate` job
+# (2026-10-26), long enough that every newer push cancelled the older run and
+# the cancelled run blocked check-pr-fully-clean.py. This lock keeps one
+# suite's multi-line output together.
+_PRINT_LOCK = threading.Lock()
+
+
+def jobs():
+    """Parallel suite count: HOOK_TEST_JOBS, else min(4, CPUs). Always >= 1."""
+    raw = os.environ.get("HOOK_TEST_JOBS")
+    if raw is not None:
+        try:
+            value = int(raw)
+        except ValueError:
+            value = 0
+        if value < 1:
+            print(f"FATAL: HOOK_TEST_JOBS={raw!r} must be a positive integer",
+                  file=sys.stderr)
+            raise SystemExit(2)
+        return value
+    return max(1, min(4, os.cpu_count() or 1))
+
 
 def run_one_suite(test_path, subject, timeout):
     """Run one suite against its subject. Returns 0 on pass, 1 on fail."""
@@ -211,25 +236,31 @@ def run_one_suite(test_path, subject, timeout):
             stdout = stderr = None
             proc.stdout.close()
             proc.stderr.close()
-        print(f"FAIL: {rel_test} (timed out after {_timeout_label(timeout)}s)")
-        sys.stdout.write(_decode_captured(stdout))
-        sys.stderr.write(_decode_captured(stderr))
-        if stdout is None and stderr is None:
-            # Known trade-off: only the direct child was killed above, so
-            # a descendant that inherited the pipe survives as an orphan
-            # until it exits on its own. Killing the whole process group
-            # (start_new_session=True) would close that, at the cost of
-            # changing signal semantics for every well-behaved suite.
-            print("(output unavailable: a descendant process still held the "
-                  "pipe after the suite was killed)")
+        with _PRINT_LOCK:
+            print(f"FAIL: {rel_test} (timed out after {_timeout_label(timeout)}s)")
+            sys.stdout.write(_decode_captured(stdout))
+            sys.stderr.write(_decode_captured(stderr))
+            if stdout is None and stderr is None:
+                # Known trade-off: only the direct child was killed above, so
+                # a descendant that inherited the pipe survives as an orphan
+                # until it exits on its own. Killing the whole process group
+                # (start_new_session=True) would close that, at the cost of
+                # changing signal semantics for every well-behaved suite.
+                print("(output unavailable: a descendant process still held the "
+                      "pipe after the suite was killed)")
+            sys.stdout.flush()
+            sys.stderr.flush()
         return 1
     tail = (stdout.strip().splitlines() or ["(no output)"])[-1]
-    if proc.returncode == 0:
-        print(f"PASS: {rel_test} -- {tail}")
-        return 0
-    print(f"FAIL: {rel_test} (exit {proc.returncode})")
-    sys.stdout.write(stdout)
-    sys.stderr.write(stderr)
+    with _PRINT_LOCK:
+        if proc.returncode == 0:
+            print(f"PASS: {rel_test} -- {tail}", flush=True)
+            return 0
+        print(f"FAIL: {rel_test} (exit {proc.returncode})")
+        sys.stdout.write(stdout)
+        sys.stderr.write(stderr)
+        sys.stdout.flush()
+        sys.stderr.flush()
     return 1
 
 
@@ -237,8 +268,10 @@ def run_suites(timeout=None):
     """Run each hooks/test-*.py against its subject. Returns failure count."""
     if timeout is None:
         timeout = suite_timeout_s()
+    workers = jobs()
     failures = 0
     tests = sorted(glob.glob(os.path.join(HOOKS, "test-*.py")))
+    runnable = []
     for test_path in tests:
         # A subject may be a .py or a .sh hook (inject-local-time.sh, #1080);
         # try the test's own extension first, then the shell spelling.
@@ -257,8 +290,10 @@ def run_suites(timeout=None):
                   + " or ".join(os.path.relpath(c, ROOT) for c in candidates))
             failures += 1
             continue
-        subject = present[0]
-        failures += run_one_suite(test_path, subject, timeout)
+        runnable.append((test_path, present[0]))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = [pool.submit(run_one_suite, t, subj, timeout) for t, subj in runnable]
+        failures += sum(f.result() for f in futures)
     return failures, len(tests)
 
 

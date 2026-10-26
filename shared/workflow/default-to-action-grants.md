@@ -34,6 +34,24 @@ Tracked in [ai-config#4683](https://github.com/Morrison-Lab/ai-config/issues/468
 - **Don't:** tell the owner to run a step a tool in your session could run.
 - **Don't:** treat a policy denial or a failing check as a technical block to route around.
 
+## Posting reviews
+
+The grant covers posting reviews, always, without asking (owner directive, 2026-10-26: "you can always post reviews").
+That means a review comment or verdict on a PR or MR: an adversarial or cross-model verdict, review findings, a self-review, or a reply on a review thread.
+It covers posting from any session, including a Remote Control session on the owner's machine.
+It grants no approval or merge authority, and every posted comment still carries the disclosure footer from [`disclose-agent-authorship`](disclose-agent-authorship.md).
+It does not widen which PRs you act on: for a PR that is not yours under `memories/reviewing-prs.md`, post a review only when asked to review it.
+
+A standing grant does not clear a permission-classifier denial (see [`ask-for-manual-approval`](ask-for-manual-approval.md)).
+When the classifier blocks `gh pr comment` or `gh pr review`, ask once as that fragment says.
+The durable fix is an `autoMode` `allow` entry that permits posting PR comments.
+It goes in `~/.claude/settings.json` or in managed settings, never in a repository's settings, as [`use-existing-pr-branch`](use-existing-pr-branch.md) explains for `autoMode` in general.
+Tracked in [ai-config#4756](https://github.com/Morrison-Lab/ai-config/issues/4756).
+The case: on Morrison-Lab/ids#26, a finished all-clear cross-model verdict sat unposted until the owner wrote "post it".
+
+- **Do:** post the review as soon as it exists, and report it in the past tense.
+- **Don't:** hold a finished review and ask whether to post it.
+
 ## "Don't wait" and "decide it yourself"
 
 When a coordinator or the user says "don't wait" or "decide it yourself", act in the same turn.

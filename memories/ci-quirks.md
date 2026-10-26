@@ -67,3 +67,7 @@ When the gha `Claude Code Review` run hits a 429 quota, the `claude-review` job 
   When a PR uses a recent macro, check the pin contains it (`git -C latex-macros merge-base --is-ancestor <macro-commit> HEAD`), and read the publish run on every merge commit.
 - The fully-clean gate stays red until the `Build / build` job ends, which took 25 to 40 minutes on lds (2026-10-12 to 2026-10-15), so wait for the check-suite notification rather than polling.
 - A new header partial in a repo whose `.gitignore` lists `*.html` needs a `!name.html` line, or it silently never commits (sds#217).
+- Before recording a fact about how a CI job behaves (its duration, a step that looks hung), search open PRs that change that job.
+  A fix in flight makes the note stale on merge (ai-config#4748 was closed for this reason, 2026-10-26).
+  **Do:** search open PRs and issues for the job name first, and link the fix instead of writing a timing.
+  **Don't:** record a measured duration for a job someone is already reworking.

@@ -440,6 +440,40 @@ with tempfile.TemporaryDirectory(prefix="hook-runner-") as tmp:
           counts == (2, 4) and stdout.count("PASS:") == 2
           and stdout.count("FAIL:") == 2, repr((counts, stdout)))
 
+    # A serial run_suites would pass the check above, so spy on the pool to
+    # prove jobs() reaches max_workers.
+    seen = []
+    real_pool = th.concurrent.futures.ThreadPoolExecutor
+
+    def spy_pool(max_workers=None, **kwargs):
+        seen.append(max_workers)
+        return real_pool(max_workers=max_workers, **kwargs)
+
+    th.HOOKS = str(hooks)
+    try:
+        with patch.dict(os.environ, {"HOOK_TEST_JOBS": "3"}), \
+                patch.object(th.concurrent.futures, "ThreadPoolExecutor",
+                             spy_pool):
+            _capture(lambda: th.run_suites(timeout=10))
+    finally:
+        th.HOOKS = old_hooks
+    check("HOOK_TEST_JOBS reaches the pool's max_workers", seen == [3],
+          repr(seen))
+
+    # An invalid value must fail before any suite output is printed.
+    (hooks / "test-orphan.py").write_text(OK, encoding="utf-8")
+    th.HOOKS = str(hooks)
+    printed = []
+    try:
+        with patch.dict(os.environ, {"HOOK_TEST_JOBS": "0"}):
+            (_, stdout, _) = _capture(lambda: th.run_suites(timeout=10))
+    except SystemExit as exc:
+        printed.append(exc.code)
+    finally:
+        th.HOOKS = old_hooks
+    check("invalid HOOK_TEST_JOBS fails before any suite runs",
+          printed == [2], repr(printed))
+
 
 print(f"\n{passes}/{passes + failures} checks passed")
 sys.exit(1 if failures else 0)

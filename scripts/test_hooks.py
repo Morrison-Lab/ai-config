@@ -268,6 +268,7 @@ def run_suites(timeout=None):
     """Run each hooks/test-*.py against its subject. Returns failure count."""
     if timeout is None:
         timeout = suite_timeout_s()
+    workers = jobs()
     failures = 0
     tests = sorted(glob.glob(os.path.join(HOOKS, "test-*.py")))
     runnable = []
@@ -290,7 +291,7 @@ def run_suites(timeout=None):
             failures += 1
             continue
         runnable.append((test_path, present[0]))
-    with concurrent.futures.ThreadPoolExecutor(max_workers=jobs()) as pool:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
         futures = [pool.submit(run_one_suite, t, subj, timeout) for t, subj in runnable]
         failures += sum(f.result() for f in futures)
     return failures, len(tests)

@@ -46,13 +46,14 @@ A review here is any of these on a PR or MR:
 
 Post a review report with `gh pr comment` (an MR note on GitLab).
 Never post it with `gh pr review --approve` or `--request-changes`, which set GitHub's formal `APPROVED` or `CHANGES_REQUESTED` review state, a decision that the owner has not made.
-Do not post a report with `gh pr review --comment` either, because `scripts/check-pr-fully-clean.py` admits a structured report under a user login only from an issue comment, so a report posted as a review would not count, clean or not.
+Do not post a report with `gh pr review --comment` either, because `scripts/check-pr-fully-clean.py` ignores a `COMMENTED` review from a user login unless its body names another agent, so a self-review or a marker-free report posted that way would not count, clean or not.
 The grant gives no approval or merge authority.
 
 Every review report follows [`adversarial-self-review`](adversarial-self-review.md#post-every-independent-review-on-the-pr-or-mr-it-reviewed), which also covers the separate dispositions comment:
 
 - post the reviewer's report verbatim, or page-numbered findings for a referee read of a rendered document
-- include a `Reviewed-Commit:` line, a `### Verdict` heading, and the `review-data` JSON payload on every code or PR review, as [`AGENTS.md`](../../AGENTS.md) requires
+- include a `Reviewed-Commit:` line and a `### Verdict` heading on every code or PR review, as that fragment requires
+- include the `review-data` JSON payload on every review, as [`AGENTS.md`](../../AGENTS.md) requires
 - for a branch that has no PR yet, wait until the PR exists before posting
 
 A reply on a review thread is an ordinary comment, so it needs no `Reviewed-Commit:` line, verdict, or `review-data` payload.

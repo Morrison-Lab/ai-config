@@ -11,15 +11,16 @@ This fragment is the agent-facing copy: follow the rules, and link to psw instea
   Pose each data manipulation, analysis, calculation, derivation or proof in an `#exr-` div, and put the worked answer in the repository's solution div (`::: solution` or the `.sol` class), with a `#sol-` id sharing the exercise's slug.
   [`quarto-divs-for-typed-content`](quarto-divs-for-typed-content.md) defines the solution div, and a repository uses the syntax its own `student-qmd` setup expects.
 - **Put a slide break between an exercise and its solution** (`{{< slidebreak >}}`, never `---`), so the prompt is on screen alone while students work.
-- **Ask before defining.**
-  Precede every `#def-` div and every result div (`#thm-`, `#lem-`, `#cor-`, or `#prp-`) that you add or edit with an exercise that asks the question it answers.
+- **Ask before defining and before stating a result.**
+  Precede every `#def-` div, and every result div (`#thm-`, `#lem-`, `#cor-`, or `#prp-`) that you add or edit, with an exercise that asks the question the div answers.
   The solution answers informally, and the formal div follows the solution div, never inside it.
   [`informal-definitions`](informal-definitions.md) states the underlying rule.
 - **Cite result divs, never solutions** (Ezra, 2026-10-26).
-  A proof or any later argument cites a result div (`#thm-`, `#lem-`, `#cor-`, or `#prp-`) and never a `@sol-` solution.
-  Follow each solution that a later argument relies on with such a div, as the previous rule requires of every result div.
-  The one exception is an exercise that asks students to prove a result before the result is stated: that result's proof may cite the preceding solution, marked with `<!-- check-solution-citations: allow -->`.
-  The [`check-solution-citations`](https://github.com/Morrison-Lab/gha/blob/main/website/reference/check-solution-citations.qmd) workflow in `Morrison-Lab/gha` enforces the citation rule, and [psw's "Cite results, not solutions"](https://github.com/Morrison-Lab/psw/blob/main/chapters/mathematical-writing.qmd) section is canonical.
+  A proof or any later argument cross-references a result div (`@thm-`, `@lem-`, `@cor-`, or `@prp-`) and never a solution (`@sol-`).
+  When a later argument relies on a solution, add a result div that states the claim after that solution, and cite the result div.
+  The one exception is an exercise that asks students to prove a result before the result is stated: the result's proof may cite the solution that precedes the result.
+  Put `<!-- check-solution-citations: allow -->` on the same line as the `@sol-` cross-reference.
+  The [`check-solution-citations`](https://github.com/Morrison-Lab/gha/blob/main/website/reference/check-solution-citations.qmd) workflow in `Morrison-Lab/gha` enforces the citation rule, and the section [Cite results, not solutions](https://github.com/Morrison-Lab/psw/blob/main/chapters/mathematical-writing.qmd#cite-results-not-solutions) in psw is canonical.
 - **One bottom-level prompt per exercise.**
   Do not write one exercise with parts (a) through (e).
 - **Put on a slide only what the audience should look at.**

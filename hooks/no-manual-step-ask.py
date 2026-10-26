@@ -46,6 +46,12 @@ FILE_CUE = (
     r"|\b(?:the|your) (?:settings|config)\s*(?:[.!?]|\n|$))"
 )
 
+# Filler inside one ask: stays within a sentence, so it never crosses ? or !, and
+# passes a period only inside a name (settings.json) or after e.g., i.e., vs., etc.
+ABBREV = r"\b(?:e\.g|i\.e|vs|etc)\."
+FILL = r"(?:[^.,\n!?]|\.(?=\S)|" + ABBREV + r")"
+PASTE_FILL = r"(?:[^.\n!?]|\.(?=\S)|" + ABBREV + r")"
+
 ASKS = (
     ("a manual 'go' in a Remote Control session", re.compile(
         r"\b(?:type|say|send|reply|enter|answer)\s+(?:with\s+)?[`'\"*]*go\b[`'\"*]*[^.\n]{0,60}"
@@ -60,21 +66,21 @@ ASKS = (
     # settings or config is cue enough after them.
     (FILE_ASK, re.compile(
         r"(?:(?:^|[.!?\n:]\s*)|\b(?:please|you can|you could|can you|could you|just)\s+)(?:paste|append|insert)"
-        r"\b(?:[^.\n]|\.(?=\S)){0,80}\b(?:into|to|in|onto)\b"
-        r"(?:[^.\n]|\.(?=\S)){0,60}(?:" + FILE_CUE + r"|\b(?:settings|config)\s*(?:[.!?]|\n|$))",
+        r"\b" + PASTE_FILL + r"{0,80}\b(?:into|to|in|onto)\b"
+        + PASTE_FILL + r"{0,60}(?:" + FILE_CUE + r"|\b(?:settings|config)\s*(?:[.!?]|\n|$))",
         re.I)),
     # add, put and copy are ordinary code verbs, so after a polite lead-in they
     # need the strong file cue.
     (FILE_ASK, re.compile(
         r"\b(?:please|you can|you could|can you|could you|just)\s+(?:add|put|copy)"
-        r"\b(?:[^.,\n]|\.(?=\S)){0,60}?\b(?:into|to|in|onto)\b"
-        r"(?:[^.,\n]|\.(?=\S)){0,40}?" + FILE_CUE,
+        r"\b" + FILL + r"{0,60}?\b(?:into|to|in|onto)\b"
+        + FILL + r"{0,40}?" + FILE_CUE,
         re.I)),
     # A bare "Add ... to settings.json" is the plainest hand-add ask. add, put and
     # copy are also ordinary code verbs, so this form needs a strong file cue.
     (FILE_ASK, re.compile(
-        r"(?:^|[.!?\n:]\s*)(?:add|put|copy)\b(?:[^.,\n]|\.(?=\S)){0,60}?\b(?:into|to|in|onto)\b"
-        r"(?:[^.,\n]|\.(?=\S)){0,40}?" + FILE_CUE,
+        r"(?:^|[.!?\n:]\s*)(?:add|put|copy)\b" + FILL + r"{0,60}?\b(?:into|to|in|onto)\b"
+        + FILL + r"{0,40}?" + FILE_CUE,
         re.I)),
 )
 
@@ -89,8 +95,6 @@ REASON = (
 
 def scripted(text: str, match: re.Match) -> bool:
     """True when the sentence holding the ask's last visible character tells the user to run a script command."""
-    if SENTENCE_BREAK.search(match.group(0).rstrip()):
-        return False
     ask_end = len(text[:match.end()].rstrip()) - 1
     position = 0
     for piece in SENTENCE_BREAK.split(text):

@@ -1,4 +1,15 @@
-# Axis tick labels: original units, no scientific notation
+# Axis titles and tick labels: plain words, original units, no scientific notation
+
+## Axis titles name the quantity in plain words
+
+Name the quantity on each axis in plain words, and add its symbol only as an option (Ezra, 2026-10-26).
+Write "Probability, π" and "Log-odds, η", not a bare symbol or expression such as "π", "z", "x1" or "f(x)".
+A reader should not have to look up a symbol to know what an axis shows.
+The gha check `check-axis-titles` flags a title with no plain word in it,
+in ggplot2 `labs()`, `xlab()` and `ylab()`, and in matplotlib `set_xlabel()` and `set_ylabel()`.
+
+- **Do:** label the axes of a logistic curve "Log-odds, η" and "Probability, p".
+- **Don't:** label them "z" and "f(z)".
 
 ## Ticks are in the variable's original measurement scale
 

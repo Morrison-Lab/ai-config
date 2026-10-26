@@ -53,7 +53,7 @@ See [`gate-external-communication`](shared/workflow/gate-external-communication.
 
 When authoring analysis figures, prefer `ggplot2` over base graphics wherever the dependency is available or appropriate to add.
 For each plot, consider whether an axis should be extended to show important reference values such as zero.
-Print axis ticks as plain numbers, not scientific notation ([details](shared/writing/axis-tick-labels.md)).
+Name each axis's quantity in plain words, with the symbol optional ("Probability, π", not "π" or "f(x)"), and print axis ticks as plain numbers, not scientific notation ([details](shared/writing/axis-tick-labels.md)).
 One equation per display line unless a reason favors more;
 one `=` per math line ([details](shared/writing/math-derivation-steps.md)).
 Include a visual (graph, diagram, figure) wherever one helps a reader, in new work and in existing content you touch, as a plotly graph (3D where a third dimension helps) wherever feasible, with a static fallback for PDF and Word ([details](shared/writing/visuals-everywhere.md)).

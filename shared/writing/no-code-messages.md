@@ -15,7 +15,8 @@ A reader should never see "`geom_smooth()` using formula = 'y ~ x'", "`stat_bin(
 
 ## Mechanism
 
-The gha check `check-code-messages` ([Morrison-Lab/gha#1261](https://github.com/Morrison-Lab/gha/pull/1261); `check-code-messages/check-code-messages.py` in Morrison-Lab/gha) enforces the rule two ways:
+The gha check `check-code-messages` enforces the rule two ways ([Morrison-Lab/gha#1261](https://github.com/Morrison-Lab/gha/pull/1261);
+the script is `check-code-messages/check-code-messages.py` in Morrison-Lab/gha):
 
 - a source lint flags `geom_smooth()` or `stat_smooth()` missing `method` or `formula`, and `geom_histogram()` or `stat_bin()` with none of `bins`, `binwidth` or `breaks`, on lines a PR adds;
 - a scan of the rendered site flags every Quarto `cell-output-stderr` block, where knitr, reticulate and Jupyter put every warning and message.

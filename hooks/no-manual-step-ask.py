@@ -50,7 +50,7 @@ ASKS = (
     # copy are also ordinary code verbs, so this form needs a strong file cue.
     (FILE_ASK, re.compile(
         r"(?:^|[.!?\n:]\s*)(?:add|put|copy)\b(?:[^.,\n]|\.(?=\S)){0,60}?\b(?:into|to|onto)\b"
-        r"(?:[^.,\n]|\.(?=\S)){0,40}?(?:\bfile\b|\.json\b|\.ya?ml\b|\.toml\b|~/)",
+        r"(?:[^.,\n]|\.(?=\S)){0,40}?(?:\bfile\b|\.json\b|\.ya?ml\b|\.toml\b|~/|\byour (?:settings|config)\s*(?:[.!?]|$))",
         re.I)),
 )
 

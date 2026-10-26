@@ -46,6 +46,12 @@ ASKS = (
         r"\b(?:[^.\n]|\.(?=\S)){0,80}\b(?:into|to|in|onto)\b"
         r"(?:[^.\n]|\.(?=\S)){0,60}(?:\bfile\b|settings|config|\.json\b|\.ya?ml\b|\.toml\b|~/)",
         re.I)),
+    # A bare "Add ... to settings.json" is the plainest hand-add ask. add, put and
+    # copy are also ordinary code verbs, so this form needs a strong file cue.
+    (FILE_ASK, re.compile(
+        r"(?:^|[.!?\n:]\s*)(?:add|put|copy)\b(?:[^.,\n]|\.(?=\S)){0,60}?\b(?:into|to|onto)\b"
+        r"(?:[^.,\n]|\.(?=\S)){0,40}?(?:\bfile\b|\.json\b|\.ya?ml\b|\.toml\b|~/|\b(?:your|the) (?:settings|config)\b)",
+        re.I)),
 )
 
 REASON = (

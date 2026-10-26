@@ -35,6 +35,10 @@ try:
     from shellcmd import git_subcommand, simple_commands
 except Exception as _exc:  # broken install; fail open and say so
     git_subcommand = simple_commands = None
+try:
+    from fences import strip_code
+except Exception:  # broken install: visible_prose falls back to the raw text
+    strip_code = None
 
 # A bare pass/fail count says nothing about WHERE it came from: a local test
 # suite and a check-run query both read "<n> pass". The trigger stays broad,
@@ -636,6 +640,14 @@ ASSERT = [
     r"\bfully clean\b",
     r"\bno failures\b",
     r"\bconflict-free\b",
+    # Imperative forms (ai-config#1072): a recommendation to act on the
+    # artifact asserts its state by presupposition, so "merge #1058 whenever
+    # you like" must be read as the status claim it is.
+    r"\bmerge\s+(?:#|!)\d+",
+    r"\bsafe to merge\b",
+    r"\byou can (?:now )?merge\b",
+    r"\bgo ahead and merge\b",
+    r"\bmerge (?:these|them|both)\b",
 ]
 RX_ASSERT = re.compile("|".join(ASSERT), re.I)
 
@@ -1098,8 +1110,12 @@ def _sentence_start(text, hit, starts=None):
     return starts[bisect.bisect_right(starts, pos) - 1]
 
 
-def _trailing_end(text, hit):
+def _trailing_end(text, hit, index=None):
     """End of the clause following `hit`, for the retraction scan."""
+    if index is not None:
+        breaks = index["trailing"]
+        i = bisect.bisect_left(breaks, hit.end())
+        return breaks[i] if i < len(breaks) else len(text)
     end = RX_TRAILING_BREAK.search(text, hit.end())
     return end.start() if end else len(text)
 
@@ -1109,7 +1125,7 @@ def _attaches(connector, separators=RX_CLAUSE_SEPARATOR):
     return not separators.search(connector)
 
 
-def _is_retracted(text, hit, starts=None):
+def _is_retracted(text, hit, starts=None, index=None):
     """True if a retraction attaches to the ASSERT match, either side of it.
 
     The trailing scan falls THROUGH when its match does not attach, rather than
@@ -1120,22 +1136,59 @@ def _is_retracted(text, hit, starts=None):
     the count was overstated too." blocked, which is the very class this guard
     was widened to stop blocking.
     """
-    for after in RX_RETRACTION.finditer(text, hit.end(), _trailing_end(text, hit)):
+    after = _first_match_after(RX_RETRACTION, text, hit.end(), _trailing_end(text, hit, index), index)
+    if after is not None:
         connector = RX_METALINGUISTIC_HEAD.sub(
             "", RX_MARKDOWN_SPAN.sub("", text[hit.end():after.start()]), count=1)
         if _attaches(connector):
             return True
-        break
     start = _sentence_start(text, hit, starts)
-    before = None
-    for before in RX_RETRACTION.finditer(text, start, hit.start()):
-        pass
+    before = _last_match_before(RX_RETRACTION, text, start, hit.start(), index)
     return before is not None and _attaches(
         RX_MARKDOWN_SPAN.sub("", text[before.end():hit.start()]),
         RX_LEADING_SEPARATOR)
 
 
-def _is_negated(text, hit, starts=None):
+def match_index(text):
+    """Every per-hit scan's matches, in ONE pass each, for the bisect forms (ai-config#3984)."""
+    index = {"trailing": [m.start() for m in RX_TRAILING_BREAK.finditer(text)]}
+    for rx in (RX_RETRACTION, RX_NEITHER_NOR, RX_NEGATION):
+        found = list(rx.finditer(text))
+        index[rx] = (found, [m.start() for m in found], [m.end() for m in found])
+    return index
+
+
+def _first_match_after(rx, text, pos, end, index=None):
+    """The first `rx` match inside [pos, end), or None."""
+    if index is None:
+        return next(rx.finditer(text, pos, end), None)
+    found, begins, ends = index[rx]
+    i = bisect.bisect_left(begins, pos)
+    if i < len(found) and ends[i] <= end:
+        return found[i]
+    return None
+
+
+def _last_match_before(rx, text, start, pos, index=None):
+    """The last `rx` match inside [start, pos), or None.
+
+    Without `index` this rescans the sentence prefix for every hit, which is
+    quadratic on a long single-sentence recap (ai-config#3984). With `index`
+    from `match_index` it bisects the precomputed matches instead.
+    """
+    if index is None:
+        before = None
+        for before in rx.finditer(text, start, pos):
+            pass
+        return before
+    found, _, ends = index[rx]
+    i = bisect.bisect_right(ends, pos) - 1
+    if i >= 0 and found[i].start() >= start:
+        return found[i]
+    return None
+
+
+def _is_negated(text, hit, starts=None, index=None):
     """True if the ASSERT match is negated or retracted within its sentence.
 
     Plain negation stays scoped to the text BEFORE the phrase, which is the
@@ -1144,14 +1197,15 @@ def _is_negated(text, hit, starts=None):
     trailing negation is about something else entirely. Only the retraction
     vocabulary reads in both directions, and only when it attaches.
     """
-    if RX_NEGATION.search(text[_sentence_start(text, hit, starts):hit.start()]):
+    start = _sentence_start(text, hit, starts)
+    if _first_match_after(RX_NEGATION, text, start, hit.start(), index):
         return True
-    if _is_neither_nor_negated(text, hit, starts):
+    if _is_neither_nor_negated(text, hit, starts, index):
         return True
-    return _is_retracted(text, hit, starts)
+    return _is_retracted(text, hit, starts, index)
 
 
-def _is_neither_nor_negated(text, hit, starts=None):
+def _is_neither_nor_negated(text, hit, starts=None, index=None):
     """True if the nearest `neither`/`nor` before `hit` attaches to it.
 
     Same shape as `_is_retracted`'s leading scan: take the LAST
@@ -1162,9 +1216,7 @@ def _is_neither_nor_negated(text, hit, starts=None):
     merge."), not a denial of this claim.
     """
     start = _sentence_start(text, hit, starts)
-    before = None
-    for before in RX_NEITHER_NOR.finditer(text, start, hit.start()):
-        pass
+    before = _last_match_before(RX_NEITHER_NOR, text, start, hit.start(), index)
     return before is not None and _attaches(
         RX_MARKDOWN_SPAN.sub("", text[before.end():hit.start()]),
         RX_LEADING_SEPARATOR)
@@ -1185,8 +1237,9 @@ def all_unnegated_asserts(text):
     candidate 0 at offset 60 and the eager form still computed 5999 more.
     """
     starts = sentence_starts(text)
+    index = match_index(text)
     for hit in RX_ASSERT.finditer(text):
-        if not _is_negated(text, hit, starts):
+        if not _is_negated(text, hit, starts, index):
             yield hit
 
 
@@ -1336,6 +1389,23 @@ def scan(path):
     return last_push, last_query, last_failing_query, text, last_push_cmd
 
 
+# Code regions are quotation, not assertion (ai-config#1903): a retraction that
+# names the phrase it retracts, or a recap quoting this guard's own triggers,
+# must not be blocked by that phrase. Fences and code spans come from
+# `scripts/lib/fences.py`, which pairs nested fences correctly; only the
+# blockquote lines are matched here. Each region becomes a sentence terminator,
+# because a bare space would let a match bridge the gap.
+RX_BLOCKQUOTE = re.compile(r"^[ \t]*>[^\n]*$", re.M)
+
+
+def visible_prose(text):
+    """`text` with fences, blockquotes and code spans replaced by '.'."""
+    if strip_code is None:
+        return text  # broken install: scan the raw text, as before
+    return RX_BLOCKQUOTE.sub(".", strip_code(
+        text, fence_replacement=".", span_replacement=" . "))
+
+
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
@@ -1344,6 +1414,8 @@ def main() -> int:
     except Exception:
         return 0  # fail open
 
+    raw_text = text or ""
+    text = visible_prose(raw_text)
     if not text:
         return 0
     hit = find_unnegated_assert(text)
@@ -1420,7 +1492,9 @@ def main() -> int:
     if last_query > last_push:
         return 0
 
-    key = hashlib.sha256(text.encode()).hexdigest()[:16]
+    # Keyed on the message as sent, so two messages differing only in their
+    # quoted content do not share a sentinel.
+    key = hashlib.sha256(raw_text.encode()).hexdigest()[:16]
     sentinel = os.path.join(tempfile.gettempdir(), f".claude-stale-status-{key}")
     if os.path.exists(sentinel):
         return 0

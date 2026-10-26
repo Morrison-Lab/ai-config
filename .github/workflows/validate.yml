@@ -768,6 +768,24 @@ jobs:
           # skip-with-a-warning path (no base ref) is no longer reachable
           # from here.
           base-ref: ${{ github.event.pull_request.base.sha }}
+      - name: Check lines the PR adds for non-ASCII punctuation
+        # ai-config#735. The tree-mode step in the validate job covers only
+        # .py and .R, and 2.7K em-dashes already sit in .md, so a whole-tree
+        # scan would fail on the backlog. Diff mode flags only what a PR adds,
+        # across .md, .qmd, .sh, .yml and .yaml too. Only exit 2 is tolerated
+        # (nothing in scope changed, or the diff could not be computed), with
+        # a warning; any other nonzero code fails the job, as in the
+        # context-closure step above.
+        run: |
+          STATUS=0
+          python3 scripts/check-ascii-punctuation.py --diff \
+            --base "${{ github.event.pull_request.base.sha }}" || STATUS=$?
+          if [ "$STATUS" -eq 2 ]; then
+            echo "::warning::ascii-punctuation diff check examined nothing" \
+              "or could not run (exit 2); it did not check this PR."
+            exit 0
+          fi
+          exit "$STATUS"
       - name: Check added prose for unverifiable citations (advisory)
         # ai-config#3660. Rides this job for its full-history checkout and its
         # pull_request gate. Non-blocking: main() returns 0 whatever it finds,

@@ -405,7 +405,8 @@ ask only for destructive, high-impact, or blocking decisions.
 This grants no merge authority.
 See [`AGENTS.cases.md`](AGENTS.cases.md).
 
-The grant also covers installing and updating software (R, packages, Quarto, any tool) and attaching any repository with `add_repo`, even to read it, without asking: [`default-to-action-grants`](shared/workflow/default-to-action-grants.md).
+The grant also covers software installs and updates, and `add_repo` (even to read a repo), without asking.
+Never ask the owner to perform a step you could do: [`default-to-action-grants`](shared/workflow/default-to-action-grants.md).
 Create new repos with `gh repo create --template`: [`templates`](shared/workflow/repo-templates.md).
 
 ## Strict Merge Control Policy

@@ -263,6 +263,13 @@
             "timeout": 10,
             "script": "remind-ums-on-trigger-events.py",
             "why": "A coordinator note that steers a thread, or a user reply that is only a grant ('daytb', 'yes, do it'), owes a UMS pass. Injects, never blocks (ai-config#4480)."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-plain-english-merge-word.py\"",
+            "timeout": 10,
+            "script": "remind-plain-english-merge-word.py",
+            "why": "ai-config#4698. Ezra, 2026-10-23: a typed 'merge when ready' was not recognized as a merge word and he had to retype 'mwc'. skills/mwc/SKILL.md listed fixed phrases and a model does not generalize a list. Injects, never grants: when the user's typed message is a merge instruction in plain English ('merge when ready', 'merge them all', 'merge', 'go ahead and merge', 'mwc them all'), tells the agent to treat it as a bare mwc (mwc all), run enable-mwc and check-mwc, and not ask for a retype or PR numbers. A question, quoted or code text, or a system reminder is ignored. The merge guards still decide."
           }
         ]
       }
@@ -271,6 +278,13 @@
       {
         "matcher": "Bash",
         "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-local-render-when-ci-built.py\"",
+            "timeout": 10,
+            "script": "warn-local-render-when-ci-built.py",
+            "why": "ai-config#4724. Ezra, 2026-10-25: \"isn't it already rendered in mlg ... remember that going forward\". Warns (never blocks) when a Bash command runs quarto render in a repo with a gh-pages ref, because CI has probably built the output already; download the PDF or HTML from gh-pages or the published site instead. Canvas uploads always use the CI-built PDF. Fails open on any parse or git trouble."
+          },
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/require-gh-repo-flag.py\"",
@@ -508,6 +522,13 @@
             "timeout": 20,
             "script": "no-clobbering-push.py",
             "why": "shared/workflow/check-before-pushing.md. A branch you cut and whose PR you opened is the one you are least likely to check before pushing to, and claim-pr.md records three ways it gains another agent's commits anyway (the @claude agent's main-sync, a second CLI session, a human). Every recovery procedure in claim-pr.md runs AFTER the collision. DENIES a bare `git push --force`/`-f`, whose remedy (`--force-with-lease --force-if-includes`) costs one word and is never the worse command, clearable with an `ALLOW_FORCE_PUSH=1` prefix for the unsatisfiable-lease case memories/git.md records. WARNS on everything else from a live read-only `git ls-remote` reading taken at push time, and stays silent on a fast-forward. Fails open on parse trouble, outside a repo, and on any network timeout. Tracked as #1883."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-oversized-pr-push.py\"",
+            "timeout": 20,
+            "script": "no-oversized-pr-push.py",
+            "why": "ai-config#4698. Ezra, 2026-10-23: \"don't allow massive sweep PRs like pds#244 anymore; do them in minimal batches\" and \"every PR should be as small and focused as it can be while completely solving its stated task\". DENIES a `git push` of a branch that changes more than 10 files or 300 lines against the merge base with the remote default branch (generated, lock, image and data paths not counted), before CI is spent; gha's check-pr-size (gha#1188) fails the same PR in CI. Clearable with an ALLOW_LARGE_PR=1 prefix for a stacked branch or a maintainer-requested mechanical PR. See shared/workflow/small-prs.md. Fails open on any parse or git trouble."
           },
           {
             "type": "command",
@@ -1528,6 +1549,27 @@
             "timeout": 10,
             "script": "no-unlinked-session-mention.py",
             "why": "The user's standing rule (2026-10-16, reaffirmed 2026-10-22): anytime you mention a session, you must provide a link. warn-pr-without-thread-link.py and no-unlinked-thread-pointer.py cover PRs and 'in its thread'; neither covers a named session, so 'your Mac session' and 'the coordinator' went out unlinked. Blocks (deny) when a user-visible reply tool call (mcp__hearthbot__reply, post_message, update_message) names a Remote Control, RC, Mac, Linux, cloud, local, device or coordinator session, or the coordinator, in a paragraph or list item with no claude.ai/code/session_ link, (#cmsg_...) or thread=cmsg_ URL. 'This session' is not a mention. Fenced and inline code are ignored. Fails open on any parse trouble."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-numbered-merge-word-ask.py\"",
+            "timeout": 10,
+            "script": "no-numbered-merge-word-ask.py",
+            "why": "ai-config#4698. Ezra, 2026-10-23: \"don't make me name each one; mwc them all!\" A bare mwc already covers every ready PR in the thread's scope, yet agents asked him to type 'mwc 4699'. Blocks (deny) a user-visible reply tool call (mcp__hearthbot__reply, post_message, update_message, edit_message) whose text asks for mwc followed by a number or a reference, and points at plain mwc. Inline code is not ignored: the ask sits in a code span. Fails open on any parse trouble."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-stepwise-approval-ask.py\"",
+            "timeout": 10,
+            "script": "no-stepwise-approval-ask.py",
+            "why": "ai-config#4726. Ezra, 2026-10-25: \"stop making me give so many manual orders\". An ask for a deliverable authorizes its whole follow-through, including re-uploads and replacements. Blocks (deny) a user-visible reply tool call (mcp__hearthbot__reply, post_message, update_message, edit_message) that asks the user to type an approval word (yes, approve, confirm, proceed, okay, allow) to continue a step, or asks whether to re-upload, replace, repost or resend; points at doing the step and, for a real approval, one line covering the whole remaining job (plain mwc for merges). Fails open on any parse trouble."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-manual-step-ask.py\"",
+            "timeout": 10,
+            "script": "no-manual-step-ask.py",
+            "why": "ai-config#4698. Ezra, 2026-10-23: \"don't make me intervene manually to prompt threads to 'go' if there's any other way\"; no merge buttons or manual steps. Blocks (deny) a user-visible reply tool call that asks the user to type go into a Remote Control session or to click a Merge button, and points at the substitutes (fresh session on an approved environment; plain mwc). See shared/workflow/lab-operating-rules.md. Fails open on any parse trouble."
           }
         ]
       },
@@ -1564,6 +1606,18 @@
             "timeout": 10,
             "script": "remind-ums-on-trigger-events.py",
             "why": "A git revert or hard reset means work was undone or redone: ask what would have prevented the first attempt and record it (ai-config#4480)."
+          }
+        ]
+      },
+      {
+        "matcher": "Skill|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/grant-personal-permissions.py\"",
+            "timeout": 10,
+            "script": "grant-personal-permissions.py",
+            "why": "The owner's personal grants (Skill(mwc), gh pr merge, glab mr merge) lived in one machine's unsynced settings.json, and a plugin settings.json cannot ship permission rules. Emits permissionDecision allow, unlike every other hook here, for Skill mwc / ai-config:mwc and for a Bash command that is exactly one gh pr merge or glab mr merge with no shell operator, substitution, escape or newline and no prefix but ALLOW_MERGE=. Hook precedence is deny > defer > ask > allow and settings deny/ask rules still apply, so no-unauthorized-merge.py keeps denying what it denies today; only the trailing prompt goes (ai-config#4374). Anything else: no output."
           }
         ]
       }
@@ -1815,6 +1869,33 @@
             "timeout": 10,
             "script": "require-stopping-point.py",
             "why": "A stopping-point declaration is an explicit standing preference, not a best-effort recap (shared/workflow/flag-session-boundaries.md). Warns via systemMessage on any final reply that omits stating whether the session is done or not, including conversational question-answering replies (#4308); handles streamed chunk concatenation (#2500)."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-user-correction-without-mechanism.py\"",
+            "timeout": 10,
+            "script": "no-user-correction-without-mechanism.py",
+            "why": "ai-config#4698 -- Ezra, 2026-10-23: 'I'm tired of watching the agents make the same mistakes over and over again'. remind-encode-user-correction.py only injects, and no-mistake-without-a-hook.py keys on the agent's own admission, so a user's correction (chat or a GitHub review comment from a non-bot author) could end a turn with a note and no mechanism. Blocks once per message until the turn writes a hook or gha check, cites 'Mechanism: <url>', or states why none is possible."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-memory-only-learning.py\"",
+            "timeout": 10,
+            "script": "no-memory-only-learning.py",
+            "why": "ai-config#4698. Ezra, 2026-10-23: 'I hope you're recording everything we learn in one of our repos'. Project memory is unversioned and no hook reads it. Blocks once per turn when the turn wrote a memory file and reached no repo (hook, check, shared fragment, issue, PR, a Mechanism: URL line, or 'memory only: <reason>'). See shared/workflow/lab-operating-rules.md. Fails open on any parse trouble."
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/inject-subagent-rules.py\"",
+            "timeout": 10,
+            "script": "inject-subagent-rules.py",
+            "why": "ai-config#4698 -- SessionStart and UserPromptSubmit injection never reaches a dispatched subagent, which began with only its brief; Ezra asked 2026-10-23 why subagents do not follow the rules reliably. Injects shared/workflow/subagent-core-rules.md at SubagentStart. Adds context, never blocks."
           }
         ]
       }

@@ -67,3 +67,7 @@ When the gha `Claude Code Review` run hits a 429 quota, the `claude-review` job 
   When a PR uses a recent macro, check the pin contains it (`git -C latex-macros merge-base --is-ancestor <macro-commit> HEAD`), and read the publish run on every merge commit.
 - The fully-clean gate stays red until the `Build / build` job ends, which took 25 to 40 minutes on lds (2026-10-12 to 2026-10-15), so wait for the check-suite notification rather than polling.
 - A new header partial in a repo whose `.gitignore` lists `*.html` needs a `!name.html` line, or it silently never commits (sds#217).
+- ai-config's `validate` job spends about 21 of its 24 minutes in "Run enforcement-hook tests" (measured 2026-10-26, ai-config#4745).
+  A run in progress at that step is not hung, so do not cancel or rerun it, and do not push to the branch mid-run, since a push cancels it.
+  Wait about 25 minutes before calling it hung.
+  **Don't:** cancel at 15 minutes and rerun; the rerun then needs another 25.

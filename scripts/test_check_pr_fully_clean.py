@@ -9683,6 +9683,53 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     check("check_base_drift: the base name is percent-encoded",
           calls and calls[0][-1].endswith("/compare/sha123...feat%231%3Fx"))
 
+    # A cloud container (CLAUDE_CODE_REMOTE=true plus a token, and -R) builds
+    # its own REST payload; anywhere else main() leaves `gh` in charge.
+    from types import SimpleNamespace as NS
+
+    def drive_main(env, from_json=""):
+        built = []
+
+        def fake_build(repo, num):
+            built.append((repo, num))
+            return "/tmp/fake-payload.json"
+
+        args = NS(from_json=from_json, pr_number="7", repo="o/r", quorum=1)
+        with patch.dict(os.environ, env, clear=True), \
+                patch.object(checker, "parse_args", return_value=args), \
+                patch.object(checker, "_auto_build_payload", fake_build), \
+                patch.object(checker.PayloadFetcher, "from_file",
+                             side_effect=checker.PayloadError("stop here")), \
+                patch.object(checker, "resolve_repo", side_effect=SystemExit(7)):
+            try:
+                checker.main()
+            except SystemExit as exc:
+                return built, exc.code
+        return built, None
+
+    remote = {"CLAUDE_CODE_REMOTE": "true", "GITHUB_TOKEN": "t"}
+    built, _ = drive_main(remote)
+    check("main: a cloud container with a token and -R builds the REST payload",
+          built == [("o/r", "7")])
+    built, _ = drive_main({"CLAUDE_CODE_REMOTE": "true", "GH_TOKEN": "t"})
+    check("main: GH_TOKEN alone is enough to build the REST payload",
+          built == [("o/r", "7")])
+    built, _ = drive_main({"CLAUDE_CODE_REMOTE": "true"})
+    check("main: no token means no auto-built payload", built == [])
+    built, _ = drive_main({"GITHUB_TOKEN": "t"})
+    check("main: outside a cloud container no payload is auto-built", built == [])
+    built, _ = drive_main(remote, from_json="given.json")
+    check("main: an explicit --from-json is never replaced", built == [])
+
+    with patch.dict(os.environ, remote, clear=True):
+        try:
+            checker._auto_build_payload("o/r", "12abc")
+            code = None
+        except SystemExit as exc:
+            code = exc.code
+    check("_auto_build_payload: a non-integer PR number exits 2, not a traceback",
+          code == 2)
+
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

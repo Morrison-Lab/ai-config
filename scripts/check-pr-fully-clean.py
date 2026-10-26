@@ -976,9 +976,10 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
                 continue
             # A `cancelled` job says nothing about the code: it is a concurrency
             # or preempt cancellation. When the same job in the same workflow
-            # already passed on this head SHA, a LATER cancelled run (a
-            # comment-dispatched review that a newer one preempted, measured on
-            # Morrison-Lab/lds#1422) is no regression. A `failure` is never
+            # and event group already passed on this head SHA, a cancelled run
+            # (earlier or later, whatever its timestamps) is no regression:
+            # measured on Morrison-Lab/lds#1422, where a comment-dispatched
+            # review was preempted by a newer one. A `failure` is never
             # excused this way.
             if conclusion == "cancelled" and key and successes.get(key):
                 continue
@@ -4260,9 +4261,15 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
 
 
 def _auto_build_payload(repo: str, pr_number: str) -> str:
-    """Write a REST payload for *repo*#*pr_number* with build-pr-payload.py."""
+    """Write a REST payload for *repo*#*pr_number* with build-pr-payload.py.
+
+    The file is removed at interpreter exit. Returns its path.
+    """
+    import atexit
     import importlib.util
     import tempfile
+    if not str(pr_number).isdigit():
+        die(f"cannot build a REST payload: PR number {pr_number!r} is not an integer")
     spec = importlib.util.spec_from_file_location(
         "build_pr_payload", Path(__file__).resolve().parent / "build-pr-payload.py")
     module = importlib.util.module_from_spec(spec)
@@ -4272,9 +4279,10 @@ def _auto_build_payload(repo: str, pr_number: str) -> str:
     except module.PayloadBuildError as exc:
         die(f"build-pr-payload.py could not gather the payload: {exc}")
     fd, path = tempfile.mkstemp(prefix="pr-payload-", suffix=".json")
+    atexit.register(lambda: Path(path).unlink(missing_ok=True))
     with os.fdopen(fd, "w", encoding="utf-8") as fh:
         json.dump(payload, fh)
-    print(f"cloud container: scored a REST payload ({path}) instead of `gh` GraphQL",
+    print(f"cloud container: built a REST payload ({path}) instead of using `gh` GraphQL",
           file=sys.stderr)
     return path
 

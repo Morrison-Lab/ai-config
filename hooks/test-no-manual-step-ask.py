@@ -55,6 +55,7 @@ CASES = [
     ("ask with a comma script aside", POST, "Could you add the key to settings.json, the way python3 old-script.py used to?", True),
     ("ask with a since-script aside", POST, "Please paste this into ~/.claude/settings.json since python3 check.py already confirmed the format.", True),
     ("running the script hand-over", POST, "You could add the entry to settings.json, but running python3 ~/scripts/add-entry.py does it for you.", False),
+    ("run sentence with a long lead-in", POST, "Please add the key to settings.json. Run the helper script that lives in the scripts directory of this repo, specifically python3 ~/scripts/add-entry.py, to do it.", False),
     ("add to config dict", POST, "Add the result to the config dict before returning it.", False),
     ("add to settings object", POST, "Add the handler to the settings object in the test fixture.", False),
     ("put into settings dataclass", POST, "Put a default value into the settings dataclass.", False),

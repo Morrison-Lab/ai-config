@@ -34,6 +34,8 @@ SCRIPT_COMMAND = re.compile(
     r"\b(?:run(?:s|ning)?|use|execute)\b[^.,;\n]{0,40}"
     r"\b(?:python3?|bash|sh|Rscript)\s+[~/.\w-]+\.(?:py|sh|R)\b",
     re.I)
+# Where a sentence already opens with Run/Use/Execute, any script command in it counts.
+BARE_SCRIPT_COMMAND = re.compile(r"\b(?:python3?|bash|sh|Rscript)\s+[~/.\w-]+\.(?:py|sh|R)\b", re.I)
 SENTENCE_BREAK = re.compile(r"(?<=[.!?])\s+|\n+")
 RUN_SENTENCE = re.compile(r"^\W*(?:run(?:ning)?|use|execute)\b", re.I)
 
@@ -98,7 +100,7 @@ def scripted(text: str, ask_start: int) -> bool:
             if SCRIPT_COMMAND.search(piece):
                 return True
             following = sentences[index + 1][1] if index + 1 < len(sentences) else ""
-            return bool(RUN_SENTENCE.search(following) and SCRIPT_COMMAND.search(following))
+            return bool(RUN_SENTENCE.search(following) and BARE_SCRIPT_COMMAND.search(following))
     return False
 
 

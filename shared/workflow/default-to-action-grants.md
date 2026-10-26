@@ -38,19 +38,22 @@ Tracked in [ai-config#4683](https://github.com/Morrison-Lab/ai-config/issues/468
 
 The grant covers posting reviews, always, without asking (owner directive, 2026-10-26: "you can always post reviews").
 A review here means a review comment on a PR or MR: an adversarial or cross-model verdict, review findings, a self-review, or a reply on a review thread.
-Post it as a comment (`gh pr comment`, `gh pr review --comment`, or a GitLab MR note), never as `gh pr review --approve` or `--request-changes`, since a formal review state under the owner's login is a decision the owner has not made.
+Post it as a comment (`gh pr comment`, `gh pr review --comment`, or a GitLab MR note), never as `gh pr review --approve` or `--request-changes`.
+An approve or request-changes review sets a state that gates the merge, a decision the owner has not made, while a `COMMENTED` review gates nothing.
 The grant covers posting from any session, including a Remote Control session on the owner's machine.
-The posted comment follows the posting contract in [`adversarial-self-review`](adversarial-self-review.md#post-every-independent-review-on-the-pr-or-mr-it-reviewed): the reviewer's report verbatim, a `Reviewed-Commit:` line and a `### Verdict` heading, the structured review data, a branch with no PR yet waiting until the PR exists, and the posted comment's link in your reply.
-Every posted comment carries the disclosure footer from [`disclose-agent-authorship`](disclose-agent-authorship.md).
+An independent review's report follows the posting contract in [`adversarial-self-review`](adversarial-self-review.md#post-every-independent-review-on-the-pr-or-mr-it-reviewed), which also covers dispositions; among its terms are the reviewer's report verbatim, a `Reviewed-Commit:` line and a `### Verdict` heading, the structured review data, a branch with no PR yet waiting until the PR exists, and the posted comment's link in your reply.
+A reply on a review thread is an ordinary comment and needs none of those.
+A comment posted under the owner's login carries the disclosure footer from [`disclose-agent-authorship`](disclose-agent-authorship.md), which also names the bot-identity exemption.
 The grant gives no approval or merge authority.
 
 The grant does not widen which PRs you act on.
-Scope stays as [`memories/reviewing-prs.md`](../../memories/reviewing-prs.md) and [`pr-scope`](pr-scope.md) set it: a PR you opened, are assigned to, or were asked to work by name, or one the `github-actions` app authored, and an explicit exclusion such as "do not touch #N" vetoes every one of those arms.
+Scope stays as [`memories/reviewing-prs.md`](../../memories/reviewing-prs.md) and [`pr-scope`](pr-scope.md) set it: a PR the owner opened or is assigned to, one the owner asked for by name, or one the `github-actions` app authored, and an explicit exclusion such as "do not touch #N" vetoes every one of those arms.
 On any other PR, post a review only when asked to review it.
-Posting in a repository outside the owner's control still passes the membership gate in `AGENTS.md` and [`gate-external-communication`](gate-external-communication.md), as the `add_repo` grant above does.
+Posting in a repository where the owner's membership is not positively verified still passes the membership gate in `AGENTS.md` and [`gate-external-communication`](gate-external-communication.md), as the `add_repo` grant above does.
 
 A standing grant does not clear a permission-classifier denial.
-When the classifier blocks the post, follow [`ask-for-manual-approval`](ask-for-manual-approval.md): retry the identical command once, then switch the session to `default` mode yourself when `mcp__ccd_session_mgmt__set_session_permission_mode` is available, and otherwise ask the owner to leave auto mode.
+When the classifier or approval mode blocks the post, follow [`ask-for-manual-approval`](ask-for-manual-approval.md): retry the identical command once, then switch the session to `default` mode yourself when `mcp__ccd_session_mgmt__set_session_permission_mode` is available, and otherwise ask the owner to leave auto mode.
+A managed-settings `permissions.deny` denial applies in every mode, so report it as a denial and do not ask to switch.
 Never ask whether to post; the grant has answered that.
 The durable fix is an `autoMode` `allow` entry that covers `gh pr comment`, `gh pr review --comment`, and MR notes.
 It goes in `~/.claude/settings.json` or in managed settings, never in a repository's settings, and a cloud session reads no `~/.claude/settings.json`, so managed settings are its only durable route (see [`use-existing-pr-branch`](use-existing-pr-branch.md)).

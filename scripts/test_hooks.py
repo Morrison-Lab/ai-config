@@ -42,8 +42,8 @@ import glob
 import math
 import os
 import subprocess
-import threading
 import sys
+import threading
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HOOKS = os.path.join(ROOT, "hooks")
@@ -240,15 +240,16 @@ def run_one_suite(test_path, subject, timeout):
             print(f"FAIL: {rel_test} (timed out after {_timeout_label(timeout)}s)")
             sys.stdout.write(_decode_captured(stdout))
             sys.stderr.write(_decode_captured(stderr))
-        if stdout is None and stderr is None:
-            # Known trade-off: only the direct child was killed above, so
-            # a descendant that inherited the pipe survives as an orphan
-            # until it exits on its own. Killing the whole process group
-            # (start_new_session=True) would close that, at the cost of
-            # changing signal semantics for every well-behaved suite.
-            with _PRINT_LOCK:
+            if stdout is None and stderr is None:
+                # Known trade-off: only the direct child was killed above, so
+                # a descendant that inherited the pipe survives as an orphan
+                # until it exits on its own. Killing the whole process group
+                # (start_new_session=True) would close that, at the cost of
+                # changing signal semantics for every well-behaved suite.
                 print("(output unavailable: a descendant process still held the "
                       "pipe after the suite was killed)")
+            sys.stdout.flush()
+            sys.stderr.flush()
         return 1
     tail = (stdout.strip().splitlines() or ["(no output)"])[-1]
     with _PRINT_LOCK:
@@ -258,6 +259,8 @@ def run_one_suite(test_path, subject, timeout):
         print(f"FAIL: {rel_test} (exit {proc.returncode})")
         sys.stdout.write(stdout)
         sys.stderr.write(stderr)
+        sys.stdout.flush()
+        sys.stderr.flush()
     return 1
 
 

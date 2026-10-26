@@ -41,7 +41,8 @@ A review here means a review comment on a PR or MR: an adversarial or cross-mode
 Post it as a comment (`gh pr comment`, `gh pr review --comment`, or a GitLab MR note), never as `gh pr review --approve` or `--request-changes`.
 An approve or request-changes review sets a state that gates the merge, a decision the owner has not made, while a `COMMENTED` review gates nothing.
 The grant covers posting from any session, including a Remote Control session on the owner's machine.
-An independent review's report follows the posting contract in [`adversarial-self-review`](adversarial-self-review.md#post-every-independent-review-on-the-pr-or-mr-it-reviewed), which also covers dispositions; among its terms are the reviewer's report verbatim, a `Reviewed-Commit:` line and a `### Verdict` heading, the structured review data, a branch with no PR yet waiting until the PR exists, and the posted comment's link in your reply.
+An independent review's report follows the posting contract in [`adversarial-self-review`](adversarial-self-review.md#post-every-independent-review-on-the-pr-or-mr-it-reviewed), which also covers dispositions.
+Among its terms are the reviewer's report verbatim, a `Reviewed-Commit:` line and a `### Verdict` heading, the structured review data, a branch with no PR yet waiting until the PR exists, and the posted comment's link in your reply.
 A reply on a review thread is an ordinary comment and needs none of those.
 A comment posted under the owner's login carries the disclosure footer from [`disclose-agent-authorship`](disclose-agent-authorship.md), which also names the bot-identity exemption.
 The grant gives no approval or merge authority.

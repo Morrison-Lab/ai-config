@@ -60,3 +60,4 @@ These come from Ezra's reviews of the lab's notes repositories (2026-10-14 to 20
   ("On the left, ...; on the right, ...").
   Link each cross-reference or hyperlink target once per caption.
 - **Show confidence intervals on estimates**, and put axis ticks in the original scale ([`axis-tick-labels`](axis-tick-labels.md)).
+- **Print no warning or message under a figure chunk** (Ezra, 2026-10-26): name `method` and `formula` in `geom_smooth()` and `bins`, `binwidth` or `breaks` in `geom_histogram()` ([`no-code-messages`](no-code-messages.md)).

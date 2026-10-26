@@ -46,6 +46,7 @@ BYPASS_VAR = "AI_CONFIG_SKIP_PUSH_CHECKS"
 BYPASS_LOG = os.path.join(CACHE_ROOT, "push-check-bypass.log")
 REFRESH_SECONDS = 24 * 3600
 CHECK_TIMEOUT = 60
+CLONE_TIMEOUT = 40
 SHELL_TOOLS = ("Bash", "bash", "run_command", "execute_command", "terminal", "shell")
 
 # workflow file name -> (script path within gha, env prefix, input -> env suffix)
@@ -136,7 +137,7 @@ def parse_workflow(text: str) -> list[dict]:
             if indent <= with_indent:
                 break
             value = kv.group("value")
-            if "${{" in value or not value:
+            if "${{" in value or not value or value[0] in "|>":
                 continue
             quoted = re.match(r"""^(['"])(.*?)\1(?:\s+#.*)?$""", value)
             if quoted:
@@ -187,9 +188,17 @@ def ensure_gha(ref: str) -> str | None:
                                    capture_output=True, timeout=30)
             return dest
         os.makedirs(os.path.dirname(dest), exist_ok=True)
-        res = subprocess.run(["git", "clone", "--depth", "1", "--branch", ref, GHA_URL, dest],
-                             capture_output=True, timeout=90)
-        return dest if res.returncode == 0 else None
+        if re.fullmatch(r"[0-9a-f]{40}", ref):
+            # A commit pin cannot be a `--branch`: fetch that one commit instead.
+            steps = [["git", "init", "-q", dest],
+                     ["git", "-C", dest, "fetch", "-q", "--depth", "1", GHA_URL, ref],
+                     ["git", "-C", dest, "checkout", "-q", "FETCH_HEAD"]]
+        else:
+            steps = [["git", "clone", "-q", "--depth", "1", "--branch", ref, GHA_URL, dest]]
+        for step in steps:
+            if subprocess.run(step, capture_output=True, timeout=CLONE_TIMEOUT).returncode != 0:
+                return None
+        return dest
     except (OSError, subprocess.SubprocessError):
         # A failed refresh keeps the stale cache usable.
         return dest if os.path.isdir(os.path.join(dest, ".git")) else None
@@ -267,6 +276,19 @@ def log_bypass(git_root: str, reason: str) -> None:
         pass
 
 
+def pushed_other_than_head(argv, git_root: str, head: str | None) -> str | None:
+    """Return the first pushed refspec source that resolves to a commit other than HEAD."""
+    words = [a for a in (argv or []) if not a.startswith("-") and a not in ("git", "push")]
+    for spec in words[1:]:  # words[0] is the remote
+        src = spec.lstrip("+").split(":", 1)[0]
+        if src in ("", "HEAD"):
+            continue
+        sha = _git(["rev-parse", "--verify", "--quiet", src + "^{commit}"], cwd=git_root)
+        if sha and sha != head:
+            return src
+    return None
+
+
 def evaluate(command: str):
     """Return ("deny", reason) | ("note", message) | None."""
     if _SIBLING is None:
@@ -303,6 +325,10 @@ def evaluate(command: str):
             notes.append("Doc checks skipped: no origin/main to diff against (fetch it, then push).")
             continue
         head = _git(["rev-parse", "HEAD"], cwd=git_root)
+        other = pushed_other_than_head(argv, git_root, head)
+        if other:
+            notes.append(f"Doc checks skipped: this push ships `{other}`, not HEAD, and the checks read HEAD.")
+            continue
         if head and head == _git(["rev-parse", base + "^{commit}"], cwd=git_root):
             continue
         by_ref: dict[str, str | None] = {}

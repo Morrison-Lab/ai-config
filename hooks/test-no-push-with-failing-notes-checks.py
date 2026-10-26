@@ -163,6 +163,17 @@ parsed = hook.parse_workflow(
 expect("T21 quoted # kept, comment-only value skipped, trailing comment cut",
        parsed[0]["inputs"], {"globs": "*.qmd # not a comment", "terms-file": "terms.txt"})
 
+verdict, out = run("git push origin main:feat2", repo, 1)
+expect("T22 pushing a non-HEAD source skips with a note", verdict, "NOTE")
+verdict, _ = run("git push origin HEAD:refs/heads/other", repo, 1)
+expect("T23 HEAD:other is still checked", verdict, "DENY")
+parsed = hook.parse_workflow(
+    "jobs:\n  c:\n    uses: Morrison-Lab/gha/.github/workflows/check-term-links.yml@" + "a" * 40 + "\n"
+    "    with:\n      globs: |\n        *.qmd\n      terms-file: terms.txt\n"
+)
+expect("T24 block scalar skipped, 40-hex pin parsed",
+       (parsed[0]["ref"], parsed[0]["inputs"]), ("a" * 40, {"terms-file": "terms.txt"}))
+
 real = os.environ.get("GHA_REAL_DIR")
 if real:
     r = make_repo({"check-new-line-breaks.yml": NLB})

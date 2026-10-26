@@ -38,7 +38,7 @@ RUN_SENTENCE = re.compile(r"^\W*(?:run|use|execute)\b", re.I)
 # verbs, can rely on it, and that "config dict" or "settings object" do not trip.
 FILE_CUE = (
     r"(?:\bfile\b|\.json\b|\.ya?ml\b|\.toml\b|~/"
-    r"|\byour (?:settings|config)\s*(?:[.!?]|$))"
+    r"|\b(?:the|your) (?:settings|config)\s*(?:[.!?]|\n|$))"
 )
 
 ASKS = (
@@ -56,7 +56,7 @@ ASKS = (
     (FILE_ASK, re.compile(
         r"(?:(?:^|[.!?\n:]\s*)|\b(?:please|you can|you could|can you|could you|just)\s+)(?:paste|append|insert)"
         r"\b(?:[^.\n]|\.(?=\S)){0,80}\b(?:into|to|in|onto)\b"
-        r"(?:[^.\n]|\.(?=\S)){0,60}(?:" + FILE_CUE + r"|\b(?:settings|config)\b)",
+        r"(?:[^.\n]|\.(?=\S)){0,60}(?:" + FILE_CUE + r"|\b(?:settings|config)\s*(?:[.!?]|\n|$))",
         re.I)),
     # add, put and copy are ordinary code verbs, so after a polite lead-in they
     # need the strong file cue.

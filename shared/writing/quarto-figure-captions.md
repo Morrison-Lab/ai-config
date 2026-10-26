@@ -47,15 +47,15 @@ These come from Ezra's reviews of the lab's notes repositories (2026-10-14 to 20
   Use plotly directly only for 3D.
   Add a package to the render workflows' `r-packages` in its own PR before a page relies on it.
 - **A caption states what the float shows.**
-  Open it with a sentence that says what the figure or table displays, so it stands alone.
-  A cross-reference to the example it illustrates may follow, and never replaces that sentence
+  Open the caption with a sentence that says what the figure or table displays, so the float stands alone.
+  A cross-reference to the example that the float illustrates may follow that sentence, but must never replace it
   ("The symmetry of @exm-x." is a pointer, not a caption).
-  Describe what the reader sees (lines, points, panels), not a property of the objects drawn ("linear functions are linear in $x$" shows nothing),
-  and word the panels of a multi-panel float in parallel
+  Describe what the reader sees (lines, points, panels), not a property of the objects drawn ("linear functions are linear in $x$" shows nothing).
+  Word the panels of a multi-panel float in parallel
   ("On the left, ...; on the right, ...").
   Link each target once per caption.
   Rule: psw `chapters/slides-posters-figures.qmd`
-  ([psw#357](https://github.com/Morrison-Lab/psw/pull/357), merged 2026-10-26);
+  ([psw#357](https://github.com/Morrison-Lab/psw/pull/357));
   mechanism: gha `check-self-contained-captions`
-  ([gha#1241](https://github.com/Morrison-Lab/gha/pull/1241), open as of 2026-10-26).
+  ([gha#1241](https://github.com/Morrison-Lab/gha/pull/1241)).
 - **Show confidence intervals on estimates**, and put axis ticks in the original scale ([`axis-tick-labels`](axis-tick-labels.md)).

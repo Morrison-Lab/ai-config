@@ -402,5 +402,44 @@ with tempfile.TemporaryDirectory(prefix="hook-runner-") as tmp:
           counts == (1, 1) and "orphan.py or " in stdout and "orphan.sh" in stdout, repr((counts, stdout)))
 
 
+# --- 5. HOOK_TEST_JOBS parsing and the parallel pool ---------------------
+
+with patch.dict(os.environ):
+    os.environ.pop("HOOK_TEST_JOBS", None)
+    with patch.object(th.os, "cpu_count", return_value=16):
+        check("default jobs is capped at 4", th.jobs() == 4)
+    with patch.object(th.os, "cpu_count", return_value=2):
+        check("default jobs follows a smaller CPU count", th.jobs() == 2)
+    with patch.object(th.os, "cpu_count", return_value=None):
+        check("default jobs is 1 when the CPU count is unknown",
+              th.jobs() == 1)
+
+with patch.dict(os.environ, {"HOOK_TEST_JOBS": "7"}):
+    check("HOOK_TEST_JOBS override is honored", th.jobs() == 7)
+
+for raw in ("0", "-3", "abc", ""):
+    try:
+        with patch.dict(os.environ, {"HOOK_TEST_JOBS": raw}):
+            _capture(th.jobs)
+        check(f"HOOK_TEST_JOBS={raw!r} is fatal", False)
+    except SystemExit as exc:
+        check(f"HOOK_TEST_JOBS={raw!r} is fatal", exc.code == 2, repr(exc.code))
+
+with tempfile.TemporaryDirectory(prefix="hook-runner-") as tmp:
+    hooks = Path(tmp)
+    for name, body in (("a", OK), ("b", BOOM), ("c", OK), ("d", BOOM)):
+        _write_pair(hooks, name, body)
+    old_hooks = th.HOOKS
+    th.HOOKS = str(hooks)
+    try:
+        with patch.dict(os.environ, {"HOOK_TEST_JOBS": "3"}):
+            (counts, stdout, _) = _capture(lambda: th.run_suites(timeout=10))
+    finally:
+        th.HOOKS = old_hooks
+    check("parallel run sums failures across suites",
+          counts == (2, 4) and stdout.count("PASS:") == 2
+          and stdout.count("FAIL:") == 2, repr((counts, stdout)))
+
+
 print(f"\n{passes}/{passes + failures} checks passed")
 sys.exit(1 if failures else 0)

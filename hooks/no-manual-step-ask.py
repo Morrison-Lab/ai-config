@@ -26,9 +26,20 @@ REPLY_TOOL = re.compile(r"^mcp__hearthbot__(?:reply|post_message|update_message|
 
 FILE_ASK = "a paste or hand-edit of a file"
 
-# A message that hands over one command running a script is the substitute the
-# rule asks for, so a paste-like clause beside it is not an ask.
+# A sentence that hands over one command running a script is the substitute the
+# rule asks for. It exempts a paste-like clause in the same sentence, or in the
+# sentence just before a "Run/Use/Execute ..." one; a script named elsewhere in the
+# message does not.
 SCRIPT_COMMAND = re.compile(r"\b(?:python3?|bash|sh|Rscript)\s+[~/.\w-]+\.(?:py|sh|R)\b", re.I)
+SENTENCE_BREAK = re.compile(r"(?<=[.!?])\s+|\n+")
+RUN_SENTENCE = re.compile(r"^\W*(?:run|use|execute)\b", re.I)
+
+# A file cue unambiguous enough that add, put and copy, which are ordinary code
+# verbs, can rely on it, and that "config dict" or "settings object" do not trip.
+FILE_CUE = (
+    r"(?:\bfile\b|\.json\b|\.ya?ml\b|\.toml\b|~/"
+    r"|\byour (?:settings|config)\s*(?:[.!?]|$))"
+)
 
 ASKS = (
     ("a manual 'go' in a Remote Control session", re.compile(
@@ -44,13 +55,13 @@ ASKS = (
         r"(?:(?:^|[.!?\n:]\s*)(?:paste|append|insert)"
         r"|\b(?:please|you can|you could|can you|could you|just)\s+(?:paste|append|insert|add|put|copy))"
         r"\b(?:[^.\n]|\.(?=\S)){0,80}\b(?:into|to|in|onto)\b"
-        r"(?:[^.\n]|\.(?=\S)){0,60}(?:\bfile\b|settings|config|\.json\b|\.ya?ml\b|\.toml\b|~/)",
+        r"(?:[^.\n]|\.(?=\S)){0,60}" + FILE_CUE,
         re.I)),
     # A bare "Add ... to settings.json" is the plainest hand-add ask. add, put and
     # copy are also ordinary code verbs, so this form needs a strong file cue.
     (FILE_ASK, re.compile(
         r"(?:^|[.!?\n:]\s*)(?:add|put|copy)\b(?:[^.,\n]|\.(?=\S)){0,60}?\b(?:into|to|onto)\b"
-        r"(?:[^.,\n]|\.(?=\S)){0,40}?(?:\bfile\b|\.json\b|\.ya?ml\b|\.toml\b|~/|\byour (?:settings|config)\s*(?:[.!?]|$))",
+        r"(?:[^.,\n]|\.(?=\S)){0,40}?" + FILE_CUE,
         re.I)),
 )
 
@@ -61,6 +72,23 @@ REASON = (
     "For a merge, ask for plain `mwc`. For a file edit, write an idempotent script, test it, and give one command that runs it (no pasting). For a denied step, retry once unchanged. "
     "shared/workflow/lab-operating-rules.md; ai-config#4698."
 )
+
+
+def scripted(text: str, ask_start: int) -> bool:
+    """True when the ask's sentence, or the next sentence if it opens with run/use/execute, names a script command."""
+    position = 0
+    sentences = []
+    for piece in SENTENCE_BREAK.split(text):
+        start = text.find(piece, position)
+        sentences.append((start, piece))
+        position = start + len(piece)
+    for index, (start, piece) in enumerate(sentences):
+        if start <= ask_start < start + len(piece):
+            if SCRIPT_COMMAND.search(piece):
+                return True
+            following = sentences[index + 1][1] if index + 1 < len(sentences) else ""
+            return bool(RUN_SENTENCE.search(following) and SCRIPT_COMMAND.search(following))
+    return False
 
 
 def main() -> int:
@@ -77,8 +105,9 @@ def main() -> int:
     if not isinstance(text, str):
         return 0
     for what, pattern in ASKS:
-        if pattern.search(text):
-            if what == FILE_ASK and SCRIPT_COMMAND.search(text):
+        match = pattern.search(text)
+        if match:
+            if what == FILE_ASK and scripted(text, match.end() - 1):
                 continue
             print(json.dumps({
                 "hookSpecificOutput": {

@@ -350,6 +350,11 @@ jobs:
         # applies exactly ONE shell layer, and only a real run can show that.
         run: python3 scripts/test_compare_shell_forms.py
       - name: Run enforcement-hook tests
+        # Measured 2026-10-26: this serial step took ~21 of the job's 24
+        # minutes, so each push cancelled its predecessor and the cancelled
+        # run blocked check-pr-fully-clean.py. test_hooks.py now runs suites
+        # in parallel (HOOK_TEST_JOBS); the timeout makes a real hang fail fast.
+        timeout-minutes: 30
         # The hooks/ guards enforce corpus rules but their test-<name>.py files
         # ran nowhere until now (ai-config#1065). This runner pairs each test
         # with its subject AND flags any hook missing a test (ai-config#1080),

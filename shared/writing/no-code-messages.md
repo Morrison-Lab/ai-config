@@ -14,7 +14,7 @@ A reader should never see "`geom_smooth()` using formula = 'y ~ x'", "`stat_bin(
   A chunk option silences every message in its chunk, so keep such a chunk to the package load or to the one call whose message is expected.
 - Use `#| warning: false` only for a warning that is expected and understood.
   Check the invariant the result relies on, such as `stopifnot(fit$converged)`, in a hidden chunk (`#| echo: false`), unless the check is what the page teaches.
-  Where the page quotes the warning, repeat the call in that hidden chunk under `withCallingHandlers()`, keep the warning text, and assert it with `stopifnot()`, so a different warning fails the render.
+  Where the page quotes the warning, repeat the call in that hidden chunk under `withCallingHandlers()`, muffle each warning with `invokeRestart("muffleWarning")` so the chunk prints none, keep the warning text, and assert it with `stopifnot()`, so a different warning fails the render.
 - Never hide a message or warning that has not been read and understood, by a chunk option or by a wrapper such as `suppressWarnings()`, `suppressMessages()` or `warnings.filterwarnings("ignore")`: that hides a defect from the author as well.
 
 ## Mechanism

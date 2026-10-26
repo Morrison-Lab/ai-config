@@ -51,6 +51,15 @@ class DispatchTest(unittest.TestCase):
         with self.assertRaises(SystemExit):
             self.dispatch(done("ok"), status=" M file.py\n")
 
+    def test_git_status_failure_fails(self):
+        def run(cmd, **kw):
+            if cmd[0] == "agy":
+                return done("ok")
+            return done("", "not a repo", 128)
+
+        with mock.patch.object(agy, "run", run), self.assertRaises(SystemExit):
+            agy.dispatch("brief", "m", "1m", ".")
+
     def test_oversized_brief_fails(self):
         with self.assertRaises(SystemExit):
             agy.dispatch("x" * (agy.MAX_BRIEF_BYTES + 1), "m", "1m", ".")
@@ -75,6 +84,10 @@ class ReviewTest(unittest.TestCase):
         self.assertEqual(text.count("Verdict:"), 1)
         self.assertIn("Verdict: Clean", text)
         self.assertTrue(text.endswith(agy.FOOTER))
+
+    def test_one_line_clean_verdict_is_not_clean(self):
+        text = self.review("Verdict: Clean")
+        self.assertIn("Verdict: Needs more work", text)
 
     def test_missing_verdict_is_not_clean(self):
         text = self.review("Checked: a\nsome finding")

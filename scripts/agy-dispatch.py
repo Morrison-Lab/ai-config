@@ -3,7 +3,7 @@
 
 Subscription-only: `agy` uses the Antigravity login stored on the machine,
 never an API key. Run it only on a machine where Antigravity is signed in
-(Ezra's Linux box, cf463-02, or the XPS).
+(cf463-02, Ezra's Linux box, or the XPS).
 
 Modes:
   brief   Send the text of --brief-file; print the reply on stdout.
@@ -19,6 +19,7 @@ See memories/delegation.md and skills/delegate-to-agy/SKILL.md.
 import argparse
 import subprocess
 import sys
+from pathlib import Path
 
 DEFAULT_MODEL = "gemini-4-argon-high"
 FOOTER = "_Posted by Antigravity (AI agent) --- not written by a human._"
@@ -40,7 +41,9 @@ Title: {title}
 
 
 def run(cmd, **kw):
-    return subprocess.run(cmd, capture_output=True, text=True, **kw)
+    return subprocess.run(
+        cmd, capture_output=True, text=True, encoding="utf-8", **kw
+    )
 
 
 def dispatch(brief: str, model: str, timeout: str, cwd: str) -> str:
@@ -56,9 +59,11 @@ def dispatch(brief: str, model: str, timeout: str, cwd: str) -> str:
         sys.exit(f"agy failed (exit {p.returncode}): {(out + p.stderr)[:500]}")
     if not out:
         sys.exit("agy returned empty output; treat as failure, not clean")
-    dirty = run(["git", "status", "--porcelain"], cwd=cwd).stdout
-    if dirty.strip():
-        sys.exit(f"agy edited the checkout despite --mode plan:\n{dirty}")
+    status = run(["git", "status", "--porcelain"], cwd=cwd)
+    if status.returncode != 0:
+        sys.exit(f"git status failed in {cwd}: {status.stderr.strip()}")
+    if status.stdout.strip():
+        sys.exit(f"agy edited the checkout despite --mode plan:\n{status.stdout}")
     return out
 
 
@@ -76,7 +81,8 @@ def main():
     a = ap.parse_args()
 
     if a.cmd == "brief":
-        print(dispatch(open(a.brief_file).read(), a.model, a.timeout, a.cwd))
+        brief = Path(a.brief_file).read_text(encoding="utf-8")
+        print(dispatch(brief, a.model, a.timeout, a.cwd))
         return
 
     meta = run(["gh", "pr", "view", str(a.pr), "-R", a.repo, "--json",
@@ -93,9 +99,12 @@ def main():
     out = dispatch(brief, a.model, a.timeout, a.cwd)
     sha = m["headRefOid"]
     lines = out.splitlines()
-    verdict = "Clean" if "Verdict: Clean" in lines[-1] else "Needs more work"
-    if lines[-1].lstrip("`* ").startswith("Verdict:"):
+    last = lines[-1].strip("`* ")
+    if last.startswith("Verdict:"):
         out = chr(10).join(lines[:-1]).rstrip()
+    # A one-line clean verdict is not a review.
+    clean = last == "Verdict: Clean" and bool(out.strip())
+    verdict = "Clean" if clean else "Needs more work"
     print(f"## Cross-harness review (Antigravity agy CLI) of {sha}\n\n"
           f"Reviewed-Commit: {sha}\n\n{out}\n\n### Verdict\n\n"
           f"Verdict: {verdict}\n\n{FOOTER}")

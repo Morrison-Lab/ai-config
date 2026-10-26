@@ -225,6 +225,7 @@ REVIEW_BODY_MARKERS = (
     "_posted by opencode (ai agent)",
     "verdict:",
     "review-data:",
+    "(argon /",
 )
 
 

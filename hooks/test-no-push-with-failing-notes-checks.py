@@ -41,9 +41,9 @@ jobs:
       fail: true
 """
 STUB = """import json, os, sys
-open(os.path.join(os.environ["STUB_LOG"], os.path.basename(__file__) + ".env"), "w").write(
+open(os.path.join(os.environ["STUB_LOG"], os.path.basename(__file__) + ".env"), "w", encoding="utf-8").write(
     json.dumps({k: v for k, v in os.environ.items() if k.startswith(("TERM_LINKS_", "NLB_"))}))
-code = int(open(".stub-exit").read().strip()) if os.path.exists(".stub-exit") else 0
+code = int(open(".stub-exit", encoding="utf-8").read().strip()) if os.path.exists(".stub-exit") else 0
 if code:
     print("::error file=chapters/a.qmd,line=3::unlinked-first-use: model")
 sys.exit(code)
@@ -59,12 +59,12 @@ def make_repo(workflows):
     git(d, "init", "-q", "-b", "main")
     os.makedirs(os.path.join(d, ".github", "workflows"))
     for name, text in workflows.items():
-        open(os.path.join(d, ".github", "workflows", name), "w").write(text)
-    open(os.path.join(d, "a.qmd"), "w").write("x\n")
+        open(os.path.join(d, ".github", "workflows", name), "w", encoding="utf-8").write(text)
+    open(os.path.join(d, "a.qmd"), "w", encoding="utf-8").write("x\n")
     git(d, "add", "-A"); git(d, "commit", "-qm", "init")
     git(d, "update-ref", "refs/remotes/origin/main", "HEAD")
     git(d, "checkout", "-q", "-b", "feat")
-    open(os.path.join(d, "a.qmd"), "w").write("y\n")
+    open(os.path.join(d, "a.qmd"), "w", encoding="utf-8").write("y\n")
     git(d, "commit", "-qam", "change")
     return d
 
@@ -73,7 +73,7 @@ def stub_dir():
     g = tempfile.mkdtemp(prefix="npc-gha-")
     for sub, name in (("check-term-links", "check-term-links.py"), ("check-new-line-breaks", "check-new-line-breaks.py")):
         os.makedirs(os.path.join(g, sub))
-        open(os.path.join(g, sub, name), "w").write(STUB)
+        open(os.path.join(g, sub, name), "w", encoding="utf-8").write(STUB)
     return g
 
 
@@ -83,7 +83,7 @@ fails = []
 
 
 def run(command, cwd, exit_code=0, gha=GHA, extra=None):
-    open(os.path.join(cwd, ".stub-exit"), "w").write(str(exit_code))
+    open(os.path.join(cwd, ".stub-exit"), "w", encoding="utf-8").write(str(exit_code))
     env = {**os.environ, "HOME": HOME, "STUB_LOG": LOG, **({"GHA_CHECKS_DIR": gha} if gha else {}), **(extra or {})}
     p = subprocess.run([sys.executable, HOOK], input=json.dumps({"tool_name": "Bash", "tool_input": {"command": command}}),
                        capture_output=True, text=True, cwd=cwd, env=env)
@@ -105,12 +105,12 @@ def expect(label, got, want):
 repo = make_repo({"check-term-links.yml": WORKFLOW, "check-new-line-breaks.yml": NLB})
 verdict, out = run("git push -u origin feat", repo, 0)
 expect("T1 passing checks stay silent", verdict, "silent")
-env_tl = json.load(open(os.path.join(LOG, "check-term-links.py.env")))
+env_tl = json.load(open(os.path.join(LOG, "check-term-links.py.env"), encoding="utf-8"))
 expect("T2 term-links gets repo paths-ignore", env_tl.get("TERM_LINKS_PATHS_IGNORE"), "_extensions/**,chapters/outtakes/**")
 expect("T3 expression inputs are skipped", "TERM_LINKS_WHOLE_TREE" in env_tl, False)
 expect("T4 base ref is origin/main", env_tl.get("TERM_LINKS_BASE_REF"), "origin/main")
 expect("T5 fail forced true", env_tl.get("TERM_LINKS_FAIL"), "true")
-env_nlb = json.load(open(os.path.join(LOG, "check-new-line-breaks.py.env")))
+env_nlb = json.load(open(os.path.join(LOG, "check-new-line-breaks.py.env"), encoding="utf-8"))
 expect("T6 nlb globs from repo", env_nlb.get("NLB_GLOBS"), "*.md *.qmd")
 expect("T7 nlb scope committed", env_nlb.get("NLB_SCOPE"), "committed")
 
@@ -129,7 +129,7 @@ expect("T12 bare flag bypass is refused", verdict, "DENY")
 verdict, out = run("AI_CONFIG_SKIP_PUSH_CHECKS='CI runner outage' git push origin feat", repo, 1)
 expect("T13 reasoned bypass allows with a note", verdict, "NOTE")
 logf = os.path.join(HOME, ".cache", "ai-config", "push-check-bypass.log")
-entry = json.loads(open(logf).read().splitlines()[-1])
+entry = json.loads(open(logf, encoding="utf-8").read().splitlines()[-1])
 expect("T14 bypass is logged with its reason", entry["reason"], "CI runner outage")
 
 verdict, _ = run("git push origin feat", repo, 1, gha="/nonexistent-gha")
@@ -147,7 +147,7 @@ expect("T17 nothing ahead of origin/main is silent", verdict, "silent")
 real = os.environ.get("GHA_REAL_DIR")
 if real:
     r = make_repo({"check-new-line-breaks.yml": NLB})
-    open(os.path.join(r, "bad.md"), "w").write("# T\n\nFirst sentence. Second sentence on the same line.\n")
+    open(os.path.join(r, "bad.md"), "w", encoding="utf-8").write("# T\n\nFirst sentence. Second sentence on the same line.\n")
     git(r, "add", "-A"); git(r, "commit", "-qm", "bad")
     verdict, _ = run("git push origin feat", r, 0, gha=real)
     expect("R1 real nlb script denies a packed line", verdict, "DENY")

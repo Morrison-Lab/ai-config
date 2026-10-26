@@ -50,5 +50,8 @@ These come from Ezra's reviews of the lab's notes repositories (2026-10-14 to 20
   Open it with a sentence that says what the figure or table displays, so it stands alone.
   A cross-reference to the example it illustrates may follow, and never replaces that sentence
   ("The symmetry of @exm-x." is a pointer, not a caption).
-  Rule: psw `chapters/slides-posters-figures.qmd`; mechanism: gha `check-self-contained-captions`.
+  Rule: psw `chapters/slides-posters-figures.qmd`
+  ([psw#357](https://github.com/Morrison-Lab/psw/pull/357), open as of 2026-10-26);
+  mechanism: gha `check-self-contained-captions`
+  ([gha#1241](https://github.com/Morrison-Lab/gha/pull/1241), open as of 2026-10-26).
 - **Show confidence intervals on estimates**, and put axis ticks in the original scale ([`axis-tick-labels`](axis-tick-labels.md)).

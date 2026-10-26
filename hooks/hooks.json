@@ -896,6 +896,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/block-merge-without-clean-checker.py\"",
+            "timeout": 20,
+            "script": "block-merge-without-clean-checker.py",
+            "why": "Morrison-Lab/ai-config, 2026-10-26: psw#354 (6ebf005) and gha#1239 (f450d6f) were merged under a standing mwc without a check-pr-fully-clean.py exit 0 on the merged head, although the rule was in memory and AGENTS.md. warn-merge-without-fully-clean.py only warned, tied a run to the PR number rather than the head sha, and credited only a Bash run, which a cloud session cannot produce. DENIES a merge (MCP merge tool, gh pr merge, gh api PUT, curl PUT, GraphQL mergePullRequest) unless it pins the full head sha and the transcript holds the checker's own '<repo>#<N> is FULLY CLEAN on HEAD <sha8>' line for that repo, PR and sha, from a checker run or a relayed Remote Control result. No escape variable."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-merge-without-cross-harness-review.py\"",
             "timeout": 20,
             "script": "warn-merge-without-cross-harness-review.py",
@@ -1063,6 +1070,13 @@
             "timeout": 20,
             "script": "warn-merge-without-fully-clean.py",
             "why": "ai-config#4399: on 2026-10-08 two ai-config PRs were merged on gh pr checks, mergeStateStatus and a hand-parsed review verdict, and scripts/check-pr-fully-clean.py ran only afterwards when a Stop hook objected to the wording. no-unauthorized-merge.py gates permission to merge, not cleanliness. Warns, never denies, unless the transcript holds a Bash run of check-pr-fully-clean.py for that PR number (and -R repo when both name one) whose result shows the 'is FULLY CLEAN' line for that PR, after the last push (git push or an MCP push tool); a NOT-fully-clean line vetoes. Warn rather than deny because the transcript is a lossy witness (a peer session, a resumed session, or an unseen push by another session) and a deny on an inference teaches an escape-variable reflex. Command position via shellcmd, so a quoted or echoed merge is inert."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/block-merge-without-clean-checker.py\"",
+            "timeout": 20,
+            "script": "block-merge-without-clean-checker.py",
+            "why": "Morrison-Lab/ai-config, 2026-10-26: psw#354 (6ebf005) and gha#1239 (f450d6f) were merged under a standing mwc without a check-pr-fully-clean.py exit 0 on the merged head, although the rule was in memory and AGENTS.md. warn-merge-without-fully-clean.py only warned, tied a run to the PR number rather than the head sha, and credited only a Bash run, which a cloud session cannot produce. DENIES a merge (MCP merge tool, gh pr merge, gh api PUT, curl PUT, GraphQL mergePullRequest) unless it pins the full head sha and the transcript holds the checker's own '<repo>#<N> is FULLY CLEAN on HEAD <sha8>' line for that repo, PR and sha, from a checker run or a relayed Remote Control result. No escape variable."
           },
           {
             "type": "command",

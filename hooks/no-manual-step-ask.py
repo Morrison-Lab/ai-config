@@ -85,14 +85,14 @@ REASON = (
 
 
 def scripted(text: str, ask_start: int) -> bool:
-    """True when the ask's sentence, or the next sentence if it opens with run/use/execute, names a script command."""
+    """True when the ask's own sentence tells the user to run a script command."""
     position = 0
     sentences = []
     for piece in SENTENCE_BREAK.split(text):
         start = text.find(piece, position)
         sentences.append((start, piece))
         position = start + len(piece)
-    for index, (start, piece) in enumerate(sentences):
+    for start, piece in sentences:
         if start <= ask_start < start + len(piece):
             return bool(SCRIPT_COMMAND.search(piece))
     return False

@@ -250,7 +250,6 @@ In a cloud session (no `agy` or Codex), send bulk, mechanical, and review work t
 Claude checks every result.
 A reviewer must differ from the author in model and harness.
 Never send student or PHI data.
-Where `agy` is signed in (`cf463-02`, the XPS), route reviews, sweeps, and mechanical drafts to it first: [`route-to-agy`](shared/workflow/route-to-agy.md).
 Elsewhere follow `memories/delegation.md`.
 Never use a pay-per-use API anywhere (Ezra, 2026-10-17); see that file.
 

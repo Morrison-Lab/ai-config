@@ -26,6 +26,12 @@ CASES = [
     ("reply then go ahead, session later", POST, "Reply if you disagree; otherwise we can go ahead and the session will start.", False),
     ("say we go, RC mentioned", POST, "You said we should go with the RC plan, so I started a session.", False),
     ("use the merge queue", POST, "Use the merge queue; the button is disabled by policy.", False),
+    ("append to settings", POST, "Append this string to the autoMode.allow list in ~/.claude/settings.json.", True),
+    ("paste into file", POST, "Please paste this into the file and save it.", True),
+    ("you can add to config", POST, "You can add the entry to your config.json by hand.", True),
+    ("script command form", POST, "Run `python3 ~/Documents/claude-fetch/add-automode-allow.py`; it adds the entry to settings.json and keeps a backup.", False),
+    ("agent did the edit", POST, "I added the entry to the file myself and the probe passes.", False),
+    ("agent will add", POST, "I'll add the rule to the file in the next commit.", False),
     ("unrelated tool","Bash", "Click the Merge button", False),
     ("no text", POST, None, False),
 ]

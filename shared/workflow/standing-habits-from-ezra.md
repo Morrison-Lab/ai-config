@@ -40,6 +40,9 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`, exce
   Limit it to the blocked step: it never merges, force-pushes, or touches another repository.
 - **Do:** ask Ezra for a manual step only when another rule reserves it to him: a secret or credential, a hard-prohibited category, or merge words.
 - **Don't:** list the steps for him to perform, or ask him to hand-edit a file.
+  Ezra, 2026-10-26, after a reply asked him to paste an `autoMode.allow` entry into `~/.claude/settings.json`: "never ask me to paste anything into a file;
+  always give me a script-based command to run that does it for me".
+  `hooks/no-manual-step-ask.py` denies a reply that asks for a paste or hand-add into a file.
 - **Don't:** write a script whose purpose is to perform, outside the session, an action that a classifier, hook, or guard denied inside it, unless Ezra has sanctioned that script after the denial and named the action.
   A general wish for scripts, including the quotation above, is not that sanction.
   Ask first, wait for his answer, then write it.

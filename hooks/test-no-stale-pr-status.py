@@ -150,6 +150,24 @@ CASES = [
     ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT, say("PR #1167 is fully clean.")], True,
      "claiming fully clean when check-pr-fully-clean.py returned NOT fully clean"),
 
+    # ai-config#1903: a phrase inside a code span, fence or blockquote is
+    # quoted, not asserted, so a retraction that names it is not blocked.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("I wrote `PR #1167 is fully clean` earlier; that was premature.")], False,
+     "a code span quoting the retracted phrase is not an assertion"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("Earlier reply:\n> PR #1167 is fully clean\nThat claim was premature.")],
+     False, "a blockquote quoting the retracted phrase is not an assertion"),
+    # A four-backtick fence wrapping a three-backtick block: a whole-text
+    # ```.*?``` regex pairs the wrong runs and leaves the quoted phrase visible.
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("x:\n````\nEx:\n```\nPR #1167 is fully clean\n```\nend\n````\n"
+          "Premature.")], False,
+     "a nested fence quoting the phrase is not an assertion"),
+    ([CHECK_CLEAN_QUERY, CHECK_CLEAN_FAIL_RESULT,
+      say("Stripping quoted text hides `x`. PR #1167 is fully clean.")], True,
+     "a bare assertion beside a code span still blocks"),
+
     # `no-incomplete-check-enumeration.py` PRESCRIBES the bare-count form as
     # the safe progress report -- its blocking message says verbatim that
     # "13 pass, 5 pending" trips nothing, and its source repeats the claim as
@@ -1435,6 +1453,11 @@ def check_cost():
         ([PUSH, PUSH_OK, say(LAZY)],
          "many asserts in one sentence, all but the first unread"),
         (NEVER_RAN_COST, "long whitespace runs in a push result"),
+        # ai-config#3984: with no sentence break, every per-hit negation,
+        # retraction and neither/nor scan covered the whole prefix, so the
+        # cost was quadratic in the length of one sentence.
+        ([PUSH, PUSH_OK, say("3 errors remain " + "14 pass " * 6000)],
+         "many asserts in one sentence with no break, per-hit scans"),
     ]
     for events, label in shapes:
         started = time.time()
@@ -1447,7 +1470,7 @@ def check_cost():
     return failures
 
 
-COST_CHECKS = 6
+COST_CHECKS = 7
 
 
 def run(events):

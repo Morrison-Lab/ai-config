@@ -218,19 +218,19 @@ operations:
     github_mcp: mcp__github__get_discussion / mcp__github__get_discussion_comments
   - id: COMMENT_DISCUSSION
     description: Post a reply on a discussion (top-level or threaded). **The body ends with the agent-disclosure marker** --- see [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md).
-    cli: gh api graphql (addDiscussionComment)
+    cli: gh api graphql -f query='mutation { addDiscussionComment(input:{discussionId:"<discussion_node_id>",body:"<text>"}) { comment { id url } } }'
     github_mcp: mcp__github__discussion_comment_write (method=add|reply)
   - id: ANSWER_DISCUSSION
     description: Mark a comment as the accepted answer on a Q&A discussion.
-    cli: gh api graphql (markDiscussionCommentAsAnswer)
+    cli: gh api graphql -f query='mutation { markDiscussionCommentAsAnswer(input:{id:"<comment_node_id>"}) { discussion { url answerChosenAt } } }'
     github_mcp: mcp__github__discussion_comment_write (method=mark_answer)
   - id: CREATE_DISCUSSION
     description: Open a new discussion in a category.
-    cli: gh api graphql (createDiscussion)
+    cli: gh api graphql -f query='mutation { createDiscussion(input:{repositoryId:"<repo_node_id>",categoryId:"<category_node_id>",title:"<title>",body:"<text>"}) { discussion { id url } } }'
     github_mcp: (no GitHub MCP tool; use gh api graphql)
   - id: CLOSE_DISCUSSION
     description: Close a discussion with a reason (RESOLVED, OUTDATED, DUPLICATE).
-    cli: gh api graphql (closeDiscussion)
+    cli: gh api graphql -f query='mutation { closeDiscussion(input:{discussionId:"<discussion_node_id>",reason:RESOLVED}) { discussion { url closed } } }'
     github_mcp: (no GitHub MCP tool; use gh api graphql)
   - id: PUSH
     description: Push commits to a branch.

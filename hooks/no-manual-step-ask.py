@@ -34,7 +34,10 @@ SCRIPT_COMMAND = re.compile(
     r"\b(?:run(?:s|ning)?|use|execute)\b[^.,;\n]{0,40}"
     r"\b(?:python3?|bash|sh|Rscript)\s+[~/.\w-]+\.(?:py|sh|R)\b",
     re.I)
-SENTENCE_BREAK = re.compile(r"(?<=[.!?])\s+|\n+")
+# A sentence ends at ., ! or ? plus whitespace, but not after e.g., i.e., vs. or etc.
+SENTENCE_BREAK = re.compile(
+    r"(?<!\be\.g\.)(?<!\bi\.e\.)(?<!\bvs\.)(?<!\betc\.)(?<=[.!?])\s+|\n+",
+    re.I)
 
 # A file cue unambiguous enough that add, put and copy, which are ordinary code
 # verbs, can rely on it, and that "config dict" or "settings object" do not trip.
@@ -42,6 +45,12 @@ FILE_CUE = (
     r"(?:\bfile\b|\.json\b|\.ya?ml\b|\.toml\b|~/"
     r"|\b(?:the|your) (?:settings|config)\s*(?:[.!?]|\n|$))"
 )
+
+# Filler inside one ask: stays within a sentence, so it never crosses ? or !, and
+# passes a period only inside a name (settings.json) or after e.g., i.e., vs., etc.
+ABBREV = r"\b(?:e\.g|i\.e|vs|etc)\."
+FILL = r"(?:[^.,\n!?]|\.(?=\S)|" + ABBREV + r")"
+PASTE_FILL = r"(?:[^.\n!?]|\.(?=\S)|" + ABBREV + r")"
 
 ASKS = (
     ("a manual 'go' in a Remote Control session", re.compile(
@@ -57,21 +66,21 @@ ASKS = (
     # settings or config is cue enough after them.
     (FILE_ASK, re.compile(
         r"(?:(?:^|[.!?\n:]\s*)|\b(?:please|you can|you could|can you|could you|just)\s+)(?:paste|append|insert)"
-        r"\b(?:[^.\n]|\.(?=\S)){0,80}\b(?:into|to|in|onto)\b"
-        r"(?:[^.\n]|\.(?=\S)){0,60}(?:" + FILE_CUE + r"|\b(?:settings|config)\s*(?:[.!?]|\n|$))",
+        r"\b" + PASTE_FILL + r"{0,80}\b(?:into|to|in|onto)\b"
+        + PASTE_FILL + r"{0,60}(?:" + FILE_CUE + r"|\b(?:settings|config)\s*(?:[.!?]|\n|$))",
         re.I)),
     # add, put and copy are ordinary code verbs, so after a polite lead-in they
     # need the strong file cue.
     (FILE_ASK, re.compile(
         r"\b(?:please|you can|you could|can you|could you|just)\s+(?:add|put|copy)"
-        r"\b(?:[^.,\n]|\.(?=\S)){0,60}?\b(?:into|to|onto)\b"
-        r"(?:[^.,\n]|\.(?=\S)){0,40}?" + FILE_CUE,
+        r"\b" + FILL + r"{0,60}?\b(?:into|to|in|onto)\b"
+        + FILL + r"{0,40}?" + FILE_CUE,
         re.I)),
     # A bare "Add ... to settings.json" is the plainest hand-add ask. add, put and
     # copy are also ordinary code verbs, so this form needs a strong file cue.
     (FILE_ASK, re.compile(
-        r"(?:^|[.!?\n:]\s*)(?:add|put|copy)\b(?:[^.,\n]|\.(?=\S)){0,60}?\b(?:into|to|onto)\b"
-        r"(?:[^.,\n]|\.(?=\S)){0,40}?" + FILE_CUE,
+        r"(?:^|[.!?\n:]\s*)(?:add|put|copy)\b" + FILL + r"{0,60}?\b(?:into|to|in|onto)\b"
+        + FILL + r"{0,40}?" + FILE_CUE,
         re.I)),
 )
 
@@ -84,16 +93,14 @@ REASON = (
 )
 
 
-def scripted(text: str, ask_start: int) -> bool:
-    """True when the ask's own sentence tells the user to run a script command."""
+def scripted(text: str, match: re.Match) -> bool:
+    """True when the sentence holding the ask's last visible character tells the user to run a script command."""
+    ask_end = len(text[:match.end()].rstrip()) - 1
     position = 0
-    sentences = []
     for piece in SENTENCE_BREAK.split(text):
         start = text.find(piece, position)
-        sentences.append((start, piece))
         position = start + len(piece)
-    for start, piece in sentences:
-        if start <= ask_start < start + len(piece):
+        if start <= ask_end < position:
             return bool(SCRIPT_COMMAND.search(piece))
     return False
 
@@ -112,9 +119,8 @@ def main() -> int:
     if not isinstance(text, str):
         return 0
     for what, pattern in ASKS:
-        match = pattern.search(text)
-        if match:
-            if what == FILE_ASK and scripted(text, match.end() - 1):
+        for match in pattern.finditer(text):
+            if what == FILE_ASK and scripted(text, match):
                 continue
             print(json.dumps({
                 "hookSpecificOutput": {

@@ -28,7 +28,8 @@ the maintainer's review asked "why not a formal citation?".)
 
 - **Do:** check for a bibliography before adding a source, and add a bib entry plus a citation for anything you summarize or rely on.
 - **Don't:** treat an inline link as the citation for a summarized source in a project that keeps a bibliography.
-- **Don't:** add a bibliography entry for the group's own notes or tools; link them instead.
+- **Don't:** add a bibliography entry for the group's own notes or tools;
+  link them instead.
 
 A citation that resolves but doesn't actually back the claim it's attached
 to is still a defect --- the `check-info-quality` (`ciq`) skill's

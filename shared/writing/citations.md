@@ -22,14 +22,14 @@ that a link would look padded.
 In a document project with a `references.bib` (or a `bibliography:` key in its Quarto, R Markdown, or LaTeX configuration), a source you summarize or rely on gets a bibliography entry and a citation (`[@key]`, `\cite{key}`).
 A hyperlink may accompany the citation, but it does not replace it.
 Inline links alone stay right for passing mentions, for link and resource lists, and in projects with no bibliography.
-The group's own notes, tools and templates are the exception: they are cross-linked, not cited.
+The group's own notes, build tooling and templates are the exception: they are cross-linked, not cited.
 The group's published papers and released software still get an ordinary citation when cited as the original publication of a result or as a tool used ([`visible-attributions`](visible-attributions.md)).
 ([Morrison-Lab/psc#58](https://github.com/Morrison-Lab/psc/pull/58#discussion_r4394745717), 2026-10-27: a section summarizing an essay only linked it, in a chapter that already cited through `references.bib`;
 the maintainer's review asked "why not a formal citation?".)
 
 - **Do:** check for a bibliography before adding a source, and add a bib entry plus a citation for anything you summarize or rely on.
 - **Don't:** treat an inline link as the citation for a summarized source in a project that keeps a bibliography.
-- **Don't:** add a bibliography entry for the group's own notes, tools or templates;
+- **Don't:** add a bibliography entry for the group's own notes, build tooling or templates;
   link them instead.
 
 A citation that resolves but doesn't actually back the claim it's attached

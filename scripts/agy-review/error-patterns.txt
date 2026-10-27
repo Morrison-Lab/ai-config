@@ -1,0 +1,5 @@
+AGY_ERROR
+RESOURCE_EXHAUSTED
+"short_error"[[:space:]]*:
+^(Error|FATAL):
+^[[:space:]]*(Rate[ _-]?limit exceeded|Quota[ _-]?(exceeded|exhausted)|HTTP/[0-9.]+ 429\b|status[ =:]+429\b)

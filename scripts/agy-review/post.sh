@@ -22,7 +22,7 @@ if [ "$verdict_count" -ge 2 ] && [ "${#body_tail}" -gt "${#body_head}" ]; then b
 verdict=$(grep -o '^VERDICT: [A-Z]*' "$f" | tail -1); verdict=${verdict#VERDICT: }
 case "$verdict" in CLEAN|FINDINGS) ;; *) echo "NO VERDICT in $f; not posting"; exit 3;; esac
 [ "$(grep -o '^VERDICT: [A-Z]*' "$f" | sort -u | wc -l)" -eq 1 ] || { echo "conflicting VERDICT lines in $f; not posting"; exit 3; }
-if grep -q -E 'AGY_ERROR|RESOURCE_EXHAUSTED|short_error|^Error:|^FATAL:' "$f" || grep -q -i -E 'rate[ _-]?limit exceeded|quota[ _-]?(exceeded|exhausted)|HTTP[ /0-9.]* 429\b|status[ =:]+429\b' "$f"; then echo "AGY ERROR in $f; not posting"; exit 3; fi
+if awk 'NR>2' "$f" | grep -v -E '^[[:space:]]*([0-9]+\.|[-*>])' | grep -q -i -E -f "$d/error-patterns.txt"; then echo "AGY ERROR in $f; not posting"; exit 3; fi
 if [ "$verdict" = FINDINGS ] && [ "${#body}" -lt 100 ]; then echo "FINDINGS with no findings text in $f; not posting"; exit 3; fi
 # same 80-character rule as CLEAN_NOTE_CHARS in bigread.py
 if [ "$verdict" = CLEAN ] && { printf '%s\n%s\n' "$body_head" "$body_tail" | grep -q -i 'non-blocking' || [ "${#body}" -gt 80 ]; }; then echo "CLEAN with listed notes in $f; not posting"; exit 4; fi

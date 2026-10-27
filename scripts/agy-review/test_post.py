@@ -10,8 +10,9 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 
 
 def _setup_post_env(tmp_path, out_text, pr_state="OPEN", head_sha="a" * 40):
-    """Copy post.sh into tmp_path and stub `gh` on PATH."""
+    """Copy post.sh and error-patterns.txt into tmp_path and stub `gh` on PATH."""
     shutil.copy(os.path.join(_HERE, "post.sh"), tmp_path / "post.sh")
+    shutil.copy(os.path.join(_HERE, "error-patterns.txt"), tmp_path / "error-patterns.txt")
     (tmp_path / "out-o_r-7.txt").write_text(out_text, encoding="utf-8")
 
     bin_dir = tmp_path / "bin"
@@ -55,6 +56,7 @@ def test_post_rejects_early_verdict_followed_by_cli_error_dump(tmp_path):
         env=env,
     )
     assert res.returncode == 3
+    assert "last line is not VERDICT" in res.stdout
     assert not (tmp_path / "comment-o_r-7.md").exists()
 
 
@@ -115,3 +117,28 @@ def test_post_accepts_repeated_findings_when_closed_by_second_verdict(tmp_path):
     comment = (tmp_path / "comment-o_r-7.md").read_text(encoding="utf-8")
     assert finding in comment
     assert "VERDICT: FINDINGS" in comment
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="bash not installed")
+def test_post_allows_finding_quoting_error_keywords(tmp_path):
+    """A numbered finding that quotes short_error or rate-limit/429 strings is not rejected as an AGY ERROR."""
+    finding = (
+        "1. `scripts/agy-review/rf.sh:34` --- The fallback log greps for `short_error` and "
+        "`Rate limit exceeded` or `HTTP/1.1 429` without checking the exit code."
+    )
+    out_text = (
+        "HEAD: " + ("a" * 40) + "\n"
+        "STATE: OPEN\n"
+        f"{finding}\n"
+        "VERDICT: FINDINGS\n"
+    )
+    env = _setup_post_env(tmp_path, out_text)
+    res = subprocess.run(
+        ["bash", str(tmp_path / "post.sh"), "o/r", "7"],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert res.returncode == 0, res.stdout + res.stderr
+    comment = (tmp_path / "comment-o_r-7.md").read_text(encoding="utf-8")
+    assert finding in comment

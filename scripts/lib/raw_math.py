@@ -3,7 +3,7 @@
 Shared by `scripts/check-raw-math.py` (the lint) and
 `hooks/warn-raw-math-notation.py` (the write-time warning).
 Both extend BUILTIN_RULES from the macros library itself (`load_rules`),
-found for a file by `find_macros_library`: the macros submodule that the
+found for a file by `read_macros_library`: the macros submodule that the
 file's git repository declares in `.gitmodules`.
 
 The rule they enforce is in `skills/use-math-macros/SKILL.md`: any LaTeX
@@ -194,28 +194,11 @@ def _macros_submodules(start, deadline: float):
             yield root, name, path
 
 
-def find_macros_library(start, budget: float = DEFAULT_BUDGET) -> Path | None:
-    """Return the checked-out `macros.qmd` a file under `start` loads, or None.
-
-    None when there is no git root, no macros submodule, or the submodule
-    is not checked out (see `read_macros_library` for that case).
-    """
-    for root, _name, path in _macros_submodules(start, time.monotonic() + budget):
-        lib = root / path / LIBRARY_BASENAME
-        if lib.is_file():
-            return lib
-    return None
-
-
 def _git_show(git_dir: str, spec: str, deadline: float) -> str | None:
+    """The blob at `spec`, or None if absent; a non-UTF-8 blob raises."""
     p = subprocess.run(["git", "--git-dir", git_dir, "show", spec],
                        capture_output=True, timeout=_left(deadline))
-    if p.returncode != 0:
-        return None
-    try:
-        return p.stdout.decode("utf-8")
-    except UnicodeDecodeError:
-        return None  # a rule derived from a mis-decoded library would be wrong
+    return p.stdout.decode("utf-8") if p.returncode == 0 else None
 
 
 def read_macros_library(start, budget: float = DEFAULT_BUDGET) -> tuple[str, str] | None:
@@ -228,7 +211,8 @@ def read_macros_library(start, budget: float = DEFAULT_BUDGET) -> tuple[str, str
     HEAD when the pinned commit was never fetched. Every git call shares one
     `budget` of seconds, so a hung git costs the write-time hook at most
     that; past it the lookup gives up (None). Raises OSError or
-    UnicodeDecodeError when a checked-out file cannot be read.
+    UnicodeDecodeError when the library it finds, checked out or in the
+    clone, cannot be read or is not UTF-8.
     """
     deadline = time.monotonic() + budget
     subs = list(_macros_submodules(start, deadline))

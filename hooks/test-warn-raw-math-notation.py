@@ -186,9 +186,8 @@ def make_repo(d, url="https://github.com/Morrison-Lab/macros.git",
         f.write(f'[submodule "{sub}"]\n\tpath = {sub}\n\turl = {url}\n')
     if lib is not None:
         os.makedirs(os.path.join(d, sub))
-        mode = "wb" if isinstance(lib, bytes) else "w"
-        with open(os.path.join(d, sub, "macros.qmd"), mode) as f:
-            f.write(lib)
+        with open(os.path.join(d, sub, "macros.qmd"), "wb") as f:
+            f.write(lib if isinstance(lib, bytes) else lib.encode("utf-8"))
     return d
 
 

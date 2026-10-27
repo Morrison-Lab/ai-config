@@ -326,6 +326,29 @@ def _is_digest_shaped(body, match):
     return False, None
 
 
+def _resolve_transcript_path(transcript_path):
+    """Prefer sibling `transcript_full.jsonl` when `transcript_path` is `transcript.jsonl`."""
+    if transcript_path and os.path.basename(transcript_path) == "transcript.jsonl":
+        full = os.path.join(os.path.dirname(transcript_path), "transcript_full.jsonl")
+        if os.path.isfile(full):
+            return full
+    return transcript_path
+
+
+def _iter_strings(obj):
+    """Yield every string leaf inside a JSON-decoded transcript field."""
+    if isinstance(obj, str):
+        yield obj
+        if "\\n" in obj or "\\t" in obj or "\\r" in obj:
+            yield re.sub(r"\\[nrt\"'\\]", " ", obj)
+    elif isinstance(obj, dict):
+        for v in obj.values():
+            yield from _iter_strings(v)
+    elif isinstance(obj, list):
+        for item in obj:
+            yield from _iter_strings(item)
+
+
 def _transcript_hex(transcript_path):
     """Every hex run appearing in a prior tool result or user message.
 
@@ -338,8 +361,9 @@ def _transcript_hex(transcript_path):
     seen = set()
     if not transcript_path or not os.path.exists(transcript_path):
         return None
+    resolved = _resolve_transcript_path(transcript_path)
     try:
-        with open(transcript_path, "r", encoding="utf-8", errors="replace") as fh:
+        with open(resolved, "r", encoding="utf-8", errors="replace") as fh:
             for line in fh:
                 line = line.strip()
                 if not line:
@@ -349,17 +373,23 @@ def _transcript_hex(transcript_path):
                 except Exception:
                     continue
                 role = (rec.get("type") or rec.get("role") or "")
-                # A tool result arrives as a `user` record whose message.content
-                # holds a block of type "tool_result"; no record carries a
-                # top-level type of "tool_result". `user` is therefore the whole
-                # of it, and it covers the user's own turns too -- the two places
-                # a value can enter the session from outside the model.
-                if role != "user":
-                    continue
-                # `toolUseResult` sits beside `message` and can hold the whole
-                # stdout where `message.content` was truncated, so read both.
-                seen |= hex_tokens_in(json.dumps(rec.get("message", "")))
-                seen |= hex_tokens_in(json.dumps(rec.get("toolUseResult", "")))
+                # In Claude Code transcripts, a tool result arrives as a `user`
+                # record whose message.content holds a block of type
+                # "tool_result", alongside `toolUseResult`. In Antigravity
+                # transcripts, user messages have type `USER_INPUT` and tool
+                # outputs / background task completions arrive in `GENERIC`,
+                # `TOOL_RESPONSE`, or `EPHEMERAL_MESSAGE` records (`content`),
+                # while model turns have type `PLANNER_RESPONSE` (excluded so
+                # the model's own prior output cannot launder an unmeasured SHA).
+                if role == "user":
+                    for s in _iter_strings(rec.get("message", "")):
+                        seen |= hex_tokens_in(s)
+                    for s in _iter_strings(rec.get("toolUseResult", "")):
+                        seen |= hex_tokens_in(s)
+                elif role in ("USER_INPUT", "GENERIC", "TOOL_RESPONSE",
+                              "EPHEMERAL_MESSAGE"):
+                    for s in _iter_strings(rec.get("content", "")):
+                        seen |= hex_tokens_in(s)
     except Exception:
         return None
     return seen
@@ -663,9 +693,10 @@ def _pins_in(words):
 
 def _pin_command(tool_name, tool_input):
     """The shell command for a Bash tool call, or the serialized MCP pin args."""
-    bash_names = getattr(_stamp, "BASH_TOOL_NAMES", {"Bash"})
+    bash_names = getattr(_stamp, "BASH_TOOL_NAMES", {"Bash", "run_command"})
     if tool_name in bash_names:
-        cmd = tool_input.get("command")
+        cmd = (tool_input.get("command") or tool_input.get("CommandLine")
+               or tool_input.get("cmd") or tool_input.get("script"))
         return cmd if isinstance(cmd, str) else None
     # The MCP merge/update tools carry the pin as a named parameter rather than
     # in a command string; serializing the input lets one regex cover both.

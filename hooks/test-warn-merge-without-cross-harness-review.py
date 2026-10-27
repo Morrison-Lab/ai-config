@@ -221,6 +221,79 @@ def main():
     check("silent on an unrelated MCP tool",
           not run("", [], tool_name="mcp__github__get_me", tool_input={})[0])
 
+    # --- Antigravity transcript schema & harness detection (#4653) -------
+    def run_agy(records_list, command=MERGE, env_extra=None,
+                subdir="brain/conv-1/.system_generated/logs"):
+        import shutil
+        tdir = tempfile.mkdtemp()
+        try:
+            ldir = os.path.join(tdir, subdir)
+            os.makedirs(ldir, exist_ok=True)
+            path = os.path.join(ldir, "transcript.jsonl")
+            with open(path, "w", encoding="utf-8") as fh:
+                for rec in records_list:
+                    fh.write(json.dumps(rec) + "\n")
+            payload = {
+                "tool_name": "run_command",
+                "tool_input": {"CommandLine": command},
+                "transcript_path": path,
+            }
+            env = dict(os.environ)
+            env.pop("ANTIGRAVITY_AGENT", None)
+            env.update(env_extra or {})
+            proc = subprocess.run([sys.executable, HOOK],
+                                  input=json.dumps(payload),
+                                  capture_output=True, text=True, env=env)
+            if proc.returncode != 0:
+                raise AssertionError(
+                    "FATAL: hook exited %s on %r\nstderr: %s"
+                    % (proc.returncode, command, proc.stderr))
+            out = proc.stdout.strip()
+            return (True, json.loads(out)) if out else (False, None)
+        finally:
+            shutil.rmtree(tdir, ignore_errors=True)
+
+    agy_claude_call = {
+        "type": "PLANNER_RESPONSE",
+        "tool_calls": [{
+            "name": "run_command",
+            "args": {"CommandLine": json.dumps("claude -p --permission-mode plan 'review'")},
+        }],
+    }
+    agy_ok_out = {
+        "type": "GENERIC",
+        "status": "DONE",
+        "content": "Command exited with code 0.\n\nCommand output:\nVerdict: Ready to merge",
+    }
+    check("silent after a claude -p run in an Antigravity transcript (even without ANTIGRAVITY_AGENT env)",
+          not run_agy([agy_claude_call, agy_ok_out])[0])
+    check("silent after a backgrounded claude -p run finishing via EPHEMERAL_MESSAGE in Antigravity",
+          not run_agy([
+              agy_claude_call,
+              {"type": "GENERIC", "status": "DONE",
+               "content": "Tool is running as a background task with task id: conv/task-9"},
+              {"type": "EPHEMERAL_MESSAGE", "status": "DONE",
+               "content": ('Task id "conv/task-9" finished with result:\n'
+                           'Command exited with code 0.\n\nCommand output:\nok')},
+          ])[0])
+    fired_agy, out_agy = run_agy([
+        {"type": "PLANNER_RESPONSE",
+         "tool_calls": [{"name": "run_command",
+                         "args": {"CommandLine": json.dumps("gemini -p 'review'")}}]},
+        agy_ok_out,
+    ])
+    ctx_agy = ((out_agy or {}).get("hookSpecificOutput") or {}).get(
+        "additionalContext", "")
+    check("warns when an Antigravity session only ran gemini (same model family) and lists claude among qualifying CLIs",
+          fired_agy and "claude" in ctx_agy and "agy," not in ctx_agy
+          and "gemini" not in ctx_agy)
+    check("warns when an Antigravity claude -p run exited non-zero",
+          run_agy([
+              agy_claude_call,
+              {"type": "GENERIC", "status": "DONE",
+               "content": "Command exited with code 1.\n\nCommand output:\nerror"},
+          ])[0])
+
     # --- robustness -------------------------------------------------------
     proc = subprocess.run([sys.executable, HOOK], input="not json",
                           capture_output=True, text=True)

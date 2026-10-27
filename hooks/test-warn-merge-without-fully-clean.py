@@ -442,6 +442,98 @@ def main():
     check("silent when a heredoc body names the merge",
           not run("cat <<'EOF'\ngh pr merge 12\nEOF", [])[0])
 
+    # --- Antigravity transcript schema (ai-config#4653) ------------------
+    def run_agy(records_list, command=MERGE, tool_name="run_command",
+                tool_input=None, full_records=None):
+        tdir = tempfile.mkdtemp()
+        try:
+            path = os.path.join(tdir, "transcript.jsonl")
+            with open(path, "w", encoding="utf-8") as fh:
+                for rec in records_list:
+                    fh.write(json.dumps(rec) + "\n")
+            if full_records is not None:
+                fpath = os.path.join(tdir, "transcript_full.jsonl")
+                with open(fpath, "w", encoding="utf-8") as fh:
+                    for rec in full_records:
+                        fh.write(json.dumps(rec) + "\n")
+            payload = {
+                "tool_name": tool_name,
+                "tool_input": tool_input or {"CommandLine": command},
+                "transcript_path": path,
+            }
+            env = dict(os.environ)
+            env.pop("ANTIGRAVITY_AGENT", None)
+            proc = subprocess.run([sys.executable, HOOK],
+                                  input=json.dumps(payload),
+                                  capture_output=True, text=True, env=env)
+            if proc.returncode != 0:
+                raise AssertionError(
+                    "FATAL: hook exited %s on %r\nstderr: %s"
+                    % (proc.returncode, command, proc.stderr))
+            out = proc.stdout.strip()
+            return (True, json.loads(out)) if out else (False, None)
+        finally:
+            import shutil
+            shutil.rmtree(tdir, ignore_errors=True)
+
+    agy_clean_call = {
+        "type": "PLANNER_RESPONSE",
+        "tool_calls": [{
+            "name": "run_command",
+            "args": {"CommandLine": json.dumps(INSTR)},
+        }],
+    }
+    agy_clean_out = {
+        "type": "GENERIC",
+        "status": "DONE",
+        "content": "Command exited with code 0.\n\nCommand output:\n" + CLEAN_OUT,
+    }
+    agy_push_call = {
+        "type": "PLANNER_RESPONSE",
+        "tool_calls": [{
+            "name": "run_command",
+            "args": {"CommandLine": json.dumps("git push origin my-branch")},
+        }],
+    }
+    agy_push_out = {
+        "type": "GENERIC",
+        "status": "DONE",
+        "content": "Command exited with code 0.\n\nCommand output:\nEverything up-to-date",
+    }
+    check("silent after an Antigravity PLANNER_RESPONSE + GENERIC clean run",
+          not run_agy([agy_clean_call, agy_clean_out])[0])
+    check("warns when an Antigravity git push follows the clean run",
+          run_agy([agy_clean_call, agy_clean_out, agy_push_call, agy_push_out])[0])
+    check("silent when an Antigravity backgrounded clean run finishes via EPHEMERAL_MESSAGE",
+          not run_agy([
+              agy_clean_call,
+              {"type": "GENERIC", "status": "DONE",
+               "content": "Tool is running as a background task with task id: conv/task-7"},
+              {"type": "EPHEMERAL_MESSAGE", "status": "DONE",
+               "content": ('[Message] sender=conv/task-7 content=Task id "conv/task-7" '
+                           'finished with result:\nCommand exited with code 0.\n\n'
+                           'Command output:\n' + CLEAN_OUT)},
+          ])[0])
+    check("warns when an Antigravity backgrounded clean run has not finished yet",
+          run_agy([
+              agy_clean_call,
+              {"type": "GENERIC", "status": "DONE",
+               "content": "Tool is running as a background task with task id: conv/task-7"},
+          ])[0])
+    check("silent when transcript.jsonl is truncated but sibling transcript_full.jsonl has the clean output",
+          not run_agy(
+              [agy_clean_call,
+               {"type": "GENERIC", "status": "DONE",
+                "content": "Command exited with code 0.\n\n... [truncated]",
+                "truncated_fields": ["content"]}],
+              full_records=[
+                  {"type": "PLANNER_RESPONSE",
+                   "tool_calls": [{"name": "run_command",
+                                   "args": {"CommandLine": INSTR}}]},
+                  agy_clean_out,
+              ],
+          )[0])
+
     # --- robustness ------------------------------------------------------
     proc = subprocess.run([sys.executable, HOOK], input="not json",
                           capture_output=True, text=True)

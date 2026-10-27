@@ -52,3 +52,24 @@ It missed UC Davis, Kristen Aiemjoy, two cited books, Quarto, GitHub Actions, an
 - **Do:** after adding the requested link, reread the whole page and link every other unlinked name it carries.
 - **Do:** open each new target URL and confirm it names the entity before linking it.
 - **Don't:** search only for other mentions of the term the user named and report the page done.
+
+## Link a term where the sentence names it, not in a trailing parenthetical
+
+A list of definition links after the sentence --- "(definitions: bias, variance, irreducible error)" --- makes the reader find each term twice, once in the sentence and once in the list.
+Put each link on the word the sentence already uses, once per passage as in [`definition-crossrefs`](definition-crossrefs.md).
+A single crossref attached to the term it defines, such as "(@def-hessian)", is a different construction and stays;
+a parenthetical list of them does not.
+
+The test is observable: does a sentence in the passage use the term as a word?
+If so, link it there, rewriting the sentence in prose when the term sat only in a formula.
+If the term occurs only as a math label (for example an underbrace in a displayed equation), keep a "Hint: see the definitions of ..." line.
+
+Observed on a private `Morrison-Lab/mlg` exercise (issue 203, pull request 205, 2026-10-26;
+no link is given because the repository is private).
+Midterm 1 practice question 3(c) (`exercises/generalization/_exr-kfold-cv-feature-count.qmd`) wrote the decomposition as a formula and listed the three terms in a parenthetical after it, and Ezra asked for the links in the sentence itself:
+
+- **Before:** `Each model's expected squared error on a new point decomposes into $\text{bias}^2 + \text{variance} + \text{irreducible error}$ (definitions: [bias](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-bias), [variance](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-variance), [irreducible error](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-irreducible-error)).`
+- **After:** `Each model's expected squared error on a new point decomposes into the squared [bias](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-bias), the [variance](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-variance) and the [irreducible error](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-irreducible-error).`
+
+- **Do:** link each term at its mention, and find other instances with `grep -n -E '\((definitions?|see)[: ]' <files>` over the document you are editing.
+- **Don't:** append a parenthetical list of links after a sentence whose words could carry them.

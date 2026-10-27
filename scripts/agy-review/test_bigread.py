@@ -112,3 +112,31 @@ def test_main_writes_clean_only_when_every_part_is_a_short_clean(monkeypatch, tm
 def test_clean_part_drops_the_repeated_answer_and_status_lines():
     out = "1. problem\n\nVERDICT: FINDINGS\n1. problem\n\n**Stopping Point**: done\n\nVERDICT: FINDINGS"
     assert bigread.clean_part(out) == "1. problem"
+
+
+@pytest.mark.parametrize(
+    "error_line",
+    [
+        "AGY_ERROR timeout",
+        "RESOURCE_EXHAUSTED: model quota",
+        '{"short_error": "model overloaded"}',
+        "Error: upstream request failed",
+        "FATAL: connection reset",
+        "Rate limit exceeded for model gemini-4-argon-medium",
+        "  Quota exhausted on endpoint (HTTP/1.1 429 Too Many Requests)",
+        "HTTP/2 429 rate limited",
+        "status=429 from backend",
+    ],
+)
+def test_has_agy_error_matches_all_shared_error_patterns(error_line):
+    assert bigread.has_agy_error(error_line + "\nVERDICT: FINDINGS")
+
+
+def test_has_agy_error_ignores_numbered_and_bulleted_finding_lines():
+    review = (
+        "1. `rf.sh:34` --- quotes `\"short_error\": \"x\"` and `Rate limit exceeded` or `HTTP/1.1 429`.\n"
+        "- Also mentions `Error: boom` and `AGY_ERROR` in a bullet.\n"
+        "> Quoted `RESOURCE_EXHAUSTED` line.\n"
+        "VERDICT: FINDINGS"
+    )
+    assert not bigread.has_agy_error(review)

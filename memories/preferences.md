@@ -412,7 +412,7 @@
 - When an MR/PR addresses multiple independent concerns, proactively offer to split it into separate MRs/PRs (one per concern).
   Simpler diffs = easier review, independent merge timelines, and less risk of one concern blocking another.
 - When resolving a git merge/rebase/cherry-pick conflict, consolidate the best of BOTH branches --- read why each side changed the hunk and preserve both intents; never blind-pick `--ours`/`--theirs`, which silently discards the other side's work.
-  Remove every marker (verify with `git diff --check`), run the repo's pre-commit checks (a merge clean on each side separately can break combined), then stage and finish the operation --- don't `--abort`/`--skip` a conflict you were asked to resolve.
+  Remove every marker (verify with `git diff HEAD --check`, which also reads unstaged and unmerged files; a lone `=======` it flags in Markdown can be a setext underline, see [`git-diffing.md`](git-diffing.md)), run the repo's pre-commit checks (a merge clean on each side separately can break combined), then stage and finish the operation --- don't `--abort`/`--skip` a conflict you were asked to resolve.
   Note: "ours"/"theirs" are reversed in a rebase vs a merge.
   The `resolve-conflicts` skill (alias `rc`) operationalizes this.
   `sync-pr-branch`/`clean-branches`/`gii` delegate to it. (Distinct from `session-lock`, which deconflicts AI *sessions*, not git content.)

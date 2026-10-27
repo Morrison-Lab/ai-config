@@ -10,11 +10,16 @@ head=$(sed -n 's/^HEAD: //p' "$f" | head -1)
 state=$(gh pr view "$pr" -R "$repo" --json state,headRefOid --jq '.state+" "+.headRefOid') || { echo "gh pr view failed for $repo#$pr; not posting"; exit 3; }
 cur=${state#* }; st=${state%% *}
 if [ "$st" != OPEN ]; then echo "SKIP $repo#$pr state=$st"; exit 0; fi
-body=$(awk 'NR>2' "$f" | awk '/^VERDICT: /{exit} {print}' | grep -v -E '^\*\*(Stopping Point|Status)')
+# agy prints its answer, a VERDICT line, then usually a repeat of the answer; take the longer of the two
+# texts so nothing printed after the first VERDICT line is dropped, and blank lines do not count.
+body_head=$(awk 'NR>2' "$f" | awk '/^VERDICT: /{exit} {print}' | grep -v -E '^\*\*(Stopping Point|Status)' | sed '/^[[:space:]]*$/d')
+body_tail=$(awk 'NR>2' "$f" | awk 'p{print} /^VERDICT: /{p=1}' | grep -v -E '^(VERDICT: |\*\*(Stopping Point|Status))' | sed '/^[[:space:]]*$/d')
+if [ "${#body_tail}" -gt "${#body_head}" ]; then body=$body_tail; else body=$body_head; fi
 verdict=$(grep -o '^VERDICT: [A-Z]*' "$f" | tail -1); verdict=${verdict#VERDICT: }
 case "$verdict" in CLEAN|FINDINGS) ;; *) echo "NO VERDICT in $f; not posting"; exit 3;; esac
 [ "$(grep -o '^VERDICT: [A-Z]*' "$f" | sort -u | wc -l)" -eq 1 ] || { echo "conflicting VERDICT lines in $f; not posting"; exit 3; }
 if grep -q -E 'AGY_ERROR|RESOURCE_EXHAUSTED' "$f"; then echo "AGY ERROR in $f; not posting"; exit 3; fi
+if [ "$verdict" = FINDINGS ] && [ "${#body}" -lt 100 ]; then echo "FINDINGS with no findings text in $f; not posting"; exit 3; fi
 # same 80-character rule as CLEAN_NOTE_CHARS in bigread.py
 if [ "$verdict" = CLEAN ] && { echo "$body" | grep -q -i 'non-blocking' || [ "${#body}" -gt 80 ]; }; then echo "CLEAN with listed notes in $f; not posting"; exit 4; fi
 if [ "$verdict" = CLEAN ] && [ -e "$f.truncated" ]; then echo "CLEAN from a truncated diff ($(cat "$f.truncated") chars) in $f; not posting (use bigread.py)"; exit 5; fi

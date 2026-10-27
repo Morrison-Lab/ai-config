@@ -14,7 +14,7 @@ A cloud session has no `agy`; use `delegate-to-opencode` there.
 
 | Work | Route | Mechanism |
 |---|---|---|
-| Cross-harness PR review (a Claude-authored PR) | `agy`, Argon, `--mode plan`, diff inline | `scripts/agy-dispatch.py review <owner/repo> <pr> --cwd <scratch clone>` |
+| Cross-harness PR review (a Claude-authored PR) | `agy`, Argon, `--mode plan`, diff inline | `scripts/agy-review/rf.sh <owner/repo> <pr>` (model chain, posts the comment, `bigread.py` for large PRs); `scripts/agy-dispatch.py review <owner/repo> <pr> --cwd <scratch clone>` prints the comment body without posting |
 | Orphan-PR sweeps, checker re-runs, read-and-report audits | `agy` with the data embedded in the brief | `scripts/agy-dispatch.py brief --brief-file <f>` |
 | Mechanical content edits (rename, reformat, table fill) | `agy` drafts the replacement text; Claude applies it with Edit and runs the checkers | `brief`, then Claude edits |
 | Focused authoring, the critical-path edit, merges, anything with restricted data | Claude | none |

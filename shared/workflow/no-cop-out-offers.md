@@ -95,13 +95,16 @@ you'd rather", which stalled work for 2.5 hours against a hard deadline, and
 
 ## A follow-up inside the same feature
 
-The third authorization arm above, "a step toward" an outcome the user asked for, also covers a follow-up the user never named.
-The test is whether the change serves the same feature or a different concern.
-A follow-up qualifies when it is small and reversible, changes only the behaviour the request was about, and settles no tradeoff the user hasn't decided.
+This section extends the third authorization arm above to a follow-up the user never named.
+The test is whether the follow-up carries the same behaviour the request introduced, or introduces a different one.
+A follow-up qualifies when it applies the requested behaviour to the rest of what that behaviour obviously covers, is small and reversible, and settles no tradeoff the user hasn't decided.
+That is [`lab-operating-rules`](lab-operating-rules.md)'s "Decide reversible choices yourself", applied before the question is asked.
 Make such a follow-up in the same PR and report it.
-Anything else is "adjacent" in the sense of [`subagent-core-rules`](subagent-core-rules.md)'s "No scope creep" rule: file it as an issue, and don't ask about it in the reply.
+A different behaviour, or a change to a component the request didn't touch for that behaviour, is "adjacent" in the sense of [`subagent-core-rules`](subagent-core-rules.md)'s "No scope creep" rule.
+File it as an issue, as `AGENTS.md` requires for noticed follow-ups, and don't ask about it in the reply.
 
-- **Do:** asked to give one page a dark mode, also set the sibling pages to follow the browser's color scheme when that is a one-line setting, and say so.
+- **Do:** asked to give a site's landing page a dark mode that follows the browser, make the site's other pages follow the browser's color scheme too when that is a one-line setting, and say so: it is the same behaviour on the same site.
+- **Do:** file a different behaviour noticed on the way, such as a broken link on another page, as an issue.
 - **Don't:** finish the literal request and close the reply with "should I also make the other pages follow it?"
 
 (Incident, 2026-10-27, [Morrison-Lab/mlg#225](https://github.com/Morrison-Lab/mlg/pull/225):

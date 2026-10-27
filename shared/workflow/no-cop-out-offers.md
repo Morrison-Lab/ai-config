@@ -93,6 +93,22 @@ The same session had earlier closed a turn with "I'll keep digging unless
 you'd rather", which stalled work for 2.5 hours against a hard deadline, and
 "want me to kick off the re-run" for a run the user had already asked for.)
 
+## A follow-up inside the same feature
+
+The third authorization arm above, "a step toward" an outcome the user asked for, also covers a follow-up the user never named.
+The test is whether the change serves the same feature or a different concern.
+A follow-up qualifies when it is small and reversible, changes only the behaviour the request was about, and settles no tradeoff the user hasn't decided.
+Make such a follow-up in the same PR and report it.
+Anything else is "adjacent" in the sense of [`subagent-core-rules`](subagent-core-rules.md)'s "No scope creep" rule: file it as an issue, and don't ask about it in the reply.
+
+- **Do:** asked to give one page a dark mode, also set the sibling pages to follow the browser's color scheme when that is a one-line setting, and say so.
+- **Don't:** finish the literal request and close the reply with "should I also make the other pages follow it?"
+
+(Incident, 2026-10-27, [Morrison-Lab/mlg#225](https://github.com/Morrison-Lab/mlg/pull/225):
+after adding dark mode to the Pages landing page, a session ended its report by asking whether the Quarto pages beside it should also follow the browser's color scheme.
+The user replied `daytb`, handing the decision back.
+Calling that follow-up the same feature is the session's inference from that reply, not the user's words.)
+
 ## Relationship to `report-mistakes-proactively`
 
 [`report-mistakes-proactively`](report-mistakes-proactively.md)'s "Offering to

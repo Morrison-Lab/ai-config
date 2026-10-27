@@ -76,8 +76,9 @@ def pack(items):
             die("no patch text for %s (binary or too large); cannot review it" % f["filename"])
         text = "FILE: %s (%s)\n%s\n" % (f["filename"], f["status"], patch)
         while len(text) > CHUNK_CHARS:  # split one huge patch on line boundaries
-            cut = text.rfind("\n", 0, CHUNK_CHARS)
-            cut = cut if cut > 0 else CHUNK_CHARS
+            header_end = text.find("\n") + 1
+            cut = text.rfind("\n", header_end + 1, CHUNK_CHARS)
+            cut = cut if cut > header_end else CHUNK_CHARS  # a single very long line is cut mid-line
             pieces.append((f["filename"], text[:cut]))
             text = "FILE: %s (continued)\n%s" % (f["filename"], text[cut:])
         pieces.append((f["filename"], text))
@@ -116,6 +117,8 @@ def read_chunk(idx, total, names, text, repo, pr, meta, focus):
         ok = (lines and lines[-1].strip() in ("VERDICT: CLEAN", "VERDICT: FINDINGS")
               and not re.search(r"AGY_ERROR|RESOURCE_EXHAUSTED", out)
               and not re.search(r"awaiting (your )?(approval|confirmation)|implementation plan", out, re.I))
+        if ok and lines[-1].strip() == "VERDICT: FINDINGS" and len(clean_part(out)) < 60:
+            ok = False  # FINDINGS with no findings text is not a usable part
         if ok:
             return idx, lines[-1].strip()[9:], out.strip()
     return idx, "ERROR", last[-500:]
@@ -126,11 +129,17 @@ def main():
         die("usage: bigread.py owner/repo PR [focus]")
     repo, pr = sys.argv[1], sys.argv[2]
     focus = sys.argv[3] if len(sys.argv) > 3 else ""
-    info = json.loads(run(["gh", "pr", "view", pr, "-R", repo, "--json", "headRefOid,title,state,body"]))
+    path = os.path.join(HERE, "out-%s-%s.txt" % (repo.replace("/", "_"), pr))
+    if os.path.exists(path):
+        os.remove(path)  # a failed run must not leave an earlier verdict for post.sh to post
+    info = json.loads(run(["gh", "pr", "view", pr, "-R", repo, "--json", "headRefOid,title,state,body,changedFiles"]))
     head = info["headRefOid"]
     if info["state"] != "OPEN":
         die("PR is %s" % info["state"])
     items = list_files(repo, pr)
+    if len(items) < info["changedFiles"]:
+        die("the files API returned %d of %d changed files (it caps at 3000); not a full read"
+            % (len(items), info["changedFiles"]))
     chunks = pack(items)
     meta = "HEAD: %s\nTITLE: %s\nBODY:\n%s" % (head, info["title"], (info["body"] or "")[:3000])
     sys.stderr.write("%d files, %d chunks at %s\n" % (len(items), len(chunks), head[:8]))
@@ -149,14 +158,13 @@ def main():
         sys.stderr.write("WARNING: head moved from %s to %s during the read\n" % (head[:8], now[:8]))
     findings = []
     for idx, verdict, out in results:
-        if verdict == "FINDINGS":
-            body = clean_part(out)
+        body = clean_part(out)
+        if verdict == "FINDINGS" or len(body) >= 300:  # a CLEAN part that lists notes is not clean
             findings.append("**Part %d of %d (%s ... %s)**\n\n%s" % (
                 idx + 1, len(chunks), chunks[idx][0][0], chunks[idx][0][-1], body))
     verdict = "FINDINGS" if findings else "CLEAN"
     body = ("\n\n".join(findings) if findings else
             "Read in %d parts covering all %d files; nothing found in any part." % (len(chunks), len(items)))
-    path = os.path.join(HERE, "out-%s-%s.txt" % (repo.replace("/", "_"), pr))
     with open(path, "w", encoding="utf-8") as fh:
         fh.write("HEAD: %s\nSTATE: OPEN\n%s\nVERDICT: %s\n" % (head, body, verdict))
     print("wrote %s verdict=%s parts=%d files=%d head=%s" % (path, verdict, len(chunks), len(items), head))

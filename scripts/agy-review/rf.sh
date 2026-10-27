@@ -4,7 +4,6 @@
 # posts the first read that is a real review: a verdict as last line, no agy error, not a plan.
 d=$(cd "$(dirname "$0")" && pwd); cd "$d"
 slug=$1; pr=$2; extra=$3
-repo=${slug#*/}
 tail_note=" Do not write a plan, do not create artifacts, do not ask questions or request approval: answer in one pass with the review itself. List every finding, wording and style nits included, each in at most 3 lines with the quoted passage. Keep the answer under 3000 characters. The last line must be exactly VERDICT: FINDINGS if you list any finding at all, or exactly VERDICT: CLEAN if there is none (then say only that nothing was found)."
 f="out-${slug//\//_}-$pr.txt"
 real_read() {
@@ -21,7 +20,7 @@ for spec in "gemini-4-argon-medium|Argon: Gemini 4 Argon (Medium) via Antigravit
   model=${spec%%|*}; name=${spec#*|}
   MODEL=$model bash argon.sh "$slug" "$pr" "$extra$tail_note" >/dev/null 2>&1
   if real_read; then
-    MODEL_LABEL="$name" bash post.sh "$slug" "$pr"
+    MODEL_LABEL="$name" bash post.sh "$slug" "$pr" || { echo "post.sh failed (exit $?) for $slug#$pr; read not posted"; exit 1; }
     echo "model=$model head=$(sed -n 1p $f | cut -c7-13) verdict=$(grep -o '^VERDICT: [A-Z]*' $f | tail -1)"
     exit 0
   fi

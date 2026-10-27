@@ -1592,9 +1592,7 @@ def mask_payloads(text: str) -> str:
 # 2026-10-02: "the macros repo should have a standing mwc grant") until
 # macros#309 / ai-config#4767: a session merged macros#293 on that grant with no
 # typed mwc, and the project rule is that only the user's own typed mwc counts.
-# It is removed from the set below. It answered
-# to both owner spellings: d-morrison/macros and Morrison-Lab/macros both
-# resolved, with the same HEAD (fb15659c), to `git ls-remote` on 2026-10-02.
+# It is removed from the set below.
 #
 # The gha repo (reusable workflows and actions) carries it too (user
 # directive, 2026-10-16: "gha should have a standing merge grant"). Its own

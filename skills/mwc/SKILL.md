@@ -410,8 +410,8 @@ A clean scorer exit is not the hold-off, and neither is a standing merge grant.)
 
 ## The standing per-repository grant
 
-Three repositories carry the grant **standing**, with no session step at all: PRs targeting `Morrison-Lab/ai-config` (ai-config#1352), PRs targeting the shared math-macros repo, `d-morrison/macros` (also reachable as `Morrison-Lab/macros`;
-user directive, 2026-10-02), and PRs targeting `Morrison-Lab/gha` (user directive, 2026-10-16).
+Two repositories carry the grant **standing**, with no session step at all: PRs targeting `Morrison-Lab/ai-config` (ai-config#1352), and PRs targeting `Morrison-Lab/gha` (user directive, 2026-10-16).
+The shared math-macros repo, `d-morrison/macros`, carried it too until macros#309 / ai-config#4767; a session merged macros#293 on it with no typed `mwc`, so it was removed.
 `no-unauthorized-merge.py` reads the merge's target repository off the command
 itself, so there is nothing to enable, nothing to expire, and no marker to go
 stale.
@@ -432,7 +432,7 @@ The two grants differ on every axis except the Scope Limit, which binds both:
 
 | | session grant (`/mwc`) | standing grant |
 | :--- | :--- | :--- |
-| scope | this session, every repo | `Morrison-Lab/ai-config` and the macros repo, forever |
+| scope | this session, every repo | `Morrison-Lab/ai-config` and `Morrison-Lab/gha`, forever |
 | keyed on | a `.mwc` marker in the **current** repo's git dir | the **target** repo named in the command |
 | enabling step | `enable-mwc`, then `check-mwc` | none |
 | covers | any merge command run from that checkout | `gh pr merge` / `gh api .../pulls/N/merge` only |

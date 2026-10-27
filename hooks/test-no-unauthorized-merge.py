@@ -23,7 +23,7 @@ if not os.path.isfile(HOOK):
 os.environ["NO_UNAUTHORIZED_MERGE_DISABLE_INFRA_GRANT"] = "1"
 
 BLOCK = [
-    # The macros entries in STANDING_MERGE_GRANT_REPOS are exact names.
+    # Near-misses of a repo name never inherit a grant.
     ("gh pr merge 12 -R d-morrison/macros-fork", "a repo whose name merely starts with macros"),
     ("gh pr merge 12 -R Other-Owner/macros", "the macros name under an ungranted owner"),
     ("gh pr merge 12 -R d-morrison/macros -R Morrison-Lab/pds", "a granted macros target beside an ungranted one"),

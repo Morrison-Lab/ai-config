@@ -1146,3 +1146,24 @@ Each wrong scope looked plausible to a same-model reviewer, and only a trace aga
 - **Do:** read the refusal condition of the guard a hook defers to, and copy its scope into the hold.
 - **Do:** where the session has an action available, change only the message to name that action, and keep the hold.
 - **Don't:** scope a hold by intuition, such as "only the reviewed branch", without checking what the guard refuses.
+
+## A `PreToolUse` guard on `git commit` must read each path from where the commit takes it (#4770)
+
+`hooks/no-commit-with-conflict-markers.py` ([ai-config#4770](https://github.com/Morrison-Lab/ai-config/pull/4770)) judges what a `git commit` will record before it runs.
+Its first version read every path from the index, and an adversarial review found false denies on exactly the commands that repair a bad state:
+`git commit -am` and `git add -A && git commit --amend` were refused for markers the working tree had already removed.
+
+The hook runs before the whole Bash command, so an earlier `git add` in the same command has not happened yet and the index still reads as it was.
+Where the commit takes each path from:
+
+- **The working tree:** paths `-a` stages, paths named on the command line, and paths an earlier `git add` in the same command stages.
+- **The index:** everything else.
+- **Under `--only`** (named paths without `-i`, git's default for named paths), the commit records the named paths and `HEAD` for the rest, so the earlier `git add`s in that command are **not** part of the commit.
+
+Count a line only when it is added relative to every parent the commit will have:
+`MERGE_HEAD` as well as `HEAD` during a merge, `HEAD`'s own parents under `--amend`, and the empty tree for a root commit.
+
+- **Do:** resolve each path to the working tree or the index by the rules above, and diff against every parent of the commit to be made.
+- **Do:** keep the repair commands (`git commit -am`, `git add -A && git commit --amend`) as must-allow cases in the hook's suite.
+- **Don't:** read the index alone for a path the working tree will overwrite before the commit is written.
+- **Don't:** count the earlier `git add`s of a compound command as committed under `--only`.

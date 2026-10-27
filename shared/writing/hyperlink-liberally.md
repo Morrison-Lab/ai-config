@@ -56,12 +56,17 @@ It missed UC Davis, Kristen Aiemjoy, two cited books, Quarto, GitHub Actions, an
 ## Link a term where the sentence names it, not in a trailing parenthetical
 
 A list of definition links after the sentence --- "(definitions: bias, variance, irreducible error)" --- makes the reader find each term twice, once in the sentence and once in the list.
-Put each link on the word the sentence already uses, rewriting the sentence in prose when the terms sit inside a formula where a link cannot go.
+When the sentence can name the terms in prose, put each link on the word the sentence uses, once per passage as in [`definition-crossrefs`](definition-crossrefs.md).
+A compact crossref such as "(@def-hessian)" is a different construction and stays.
 
-Observed on [Morrison-Lab/mlg#203](https://github.com/Morrison-Lab/mlg/issues/203) (2026-10-26).
-Midterm 1 practice question 3(c) wrote the decomposition as a formula and listed the three terms in a parenthetical after it, and the reviewer asked for the links in the sentence itself.
+The test is whether the sentence can name the terms in prose.
+Rewrite when the terms sit in a formula only because the sentence chose to write them there, and the prose can carry them instead.
+Leave a "Hint: see the definitions of ..." line alone when the terms occur only as math labels (for example underbraces in a displayed equation) and no sentence names them.
+
+Observed on a private Morrison-Lab/mlg exercise (issue 203, fixed in pull request 205, 2026-10-26).
+Midterm 1 practice question 3(c) wrote the decomposition as a formula and listed the three terms in a parenthetical after it, and Ezra asked for the links in the sentence itself.
 The fix reads "decomposes into the squared [bias](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-bias), the [variance](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-variance) and the [irreducible error](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-irreducible-error)".
 
-- **Do:** link each term at its mention, and sweep the repository for other "(definitions: ...)" or "(see ...)" lists in the same change.
-- **Do:** leave a "Hint: see the definitions of ..." line alone when the terms occur only inside math, where a link cannot go.
+- **Do:** link each term at its mention, and sweep the repository for other "(definitions: ...)" lists of links in the same change.
+- **Do:** leave a "Hint: see the definitions of ..." line alone when the terms occur only inside math.
 - **Don't:** append a parenthetical list of links after a sentence whose words could carry them.

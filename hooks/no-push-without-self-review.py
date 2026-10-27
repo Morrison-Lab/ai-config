@@ -2607,16 +2607,16 @@ def _handback_candidates(record: dict) -> list[tuple[list[str], str]]:
     return out
 
 
-UNPARSED_VERDICT_CUE = re.compile(
-    r"^[ \t]{0,3}(?:#{1,6}[ \t]*)?(?:\d+[.)][ \t]+)?(?:\*{1,2})?(?:(?:Final|Review|Summary)[ \t]+)?Verdict\b",
-    re.I | re.M,
+ACCEPTED_VERDICT_PHRASES = (
+    "`Ready for merge`, `Ready to merge`, `Clean`, `Needs more work`, "
+    "`Needs work`, or `NOT_CLEAN`"
 )
 
 
 def _unparsed_report_shas(text: str) -> list[str] | None:
-    """Return `Reviewed-Commit:` SHAs when `text` looks like a reviewer report
-    whose verdict line failed to parse (`Reviewed-Commit:` or `Verdict` cue
-    outside quoted regions), or `None` when `text` is not a report candidate.
+    """Return `Reviewed-Commit:` SHAs when `text` is a reviewer report
+    whose verdict line failed to parse (`Reviewed-Commit:` outside quoted
+    regions), or `None` when `text` carries no report fingerprint.
     """
     blanked, unresolved = _blank_quoted_regions(text)
     if unresolved:
@@ -2628,7 +2628,7 @@ def _unparsed_report_shas(text: str) -> list[str] | None:
         if sha not in seen:
             seen.add(sha)
             shas.append(sha)
-    if shas or UNPARSED_VERDICT_CUE.search(blanked):
+    if shas:
         return shas
     return None
 
@@ -2997,8 +2997,7 @@ def verify_review(transcript_path: str, directory: str | None,
         )
         unparsed_hint = (
             f"\nNote: a later reviewer report{sha_clause} was seen in the transcript, "
-            "but its verdict line could not be parsed (expected `Ready for merge`, "
-            "`Ready to merge`, `Clean`, `Needs more work`, `Needs work`, or `NOT_CLEAN`)."
+            f"but its verdict line could not be parsed (expected {ACCEPTED_VERDICT_PHRASES})."
         )
 
     # Neither this condition nor the one below carries `and not
@@ -3042,7 +3041,7 @@ def verify_review(transcript_path: str, directory: str | None,
             "The report must state a verdict in one of two formats:\n"
             "  1. Inline: `### Verdict: <phrase>` or `Verdict: <phrase>`\n"
             "  2. Under a heading: `### Verdict` followed on the next line by `<phrase>`\n"
-            "where <phrase> is `Ready for merge`, `Ready to merge`, `Clean`, `Needs more work`, `Needs work`, or `NOT_CLEAN`.\n"
+            f"where <phrase> is {ACCEPTED_VERDICT_PHRASES}.\n"
             "Dispatch it in the foreground (`run_in_background: false`) so its report "
             "returns as the tool result -- a background dispatch returns an agent id, "
             f"which carries no verdict, and an errored result carries none either.{unparsed_hint}"

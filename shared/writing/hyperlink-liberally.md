@@ -64,8 +64,9 @@ The test is observable: does a sentence in the passage use the term as a word?
 If so, link it there, rewriting the sentence in prose when the term sat only in a formula.
 If the term occurs only as a math label (for example an underbrace in a displayed equation), keep a "Hint: see the definitions of ..." line.
 
-Observed on [`Morrison-Lab/mlg#203`](https://github.com/Morrison-Lab/mlg/issues/203) and [`Morrison-Lab/mlg#204`](https://github.com/Morrison-Lab/mlg/pull/204) (2026-10-26).
-Midterm 1 question 3(c) (`Exams/2026-fall-morrison/midterm1.qmd` and `Exams/2026-fall-morrison/midterm1-practice.qmd`) wrote the decomposition as a formula and listed the three terms in a parenthetical after it, and Ezra asked for the links in the sentence itself:
+Observed on a private `Morrison-Lab/mlg` exercise and exam question (issue 203, merged in pull request 204 for `Exams/2026-fall-morrison/midterm1.qmd` and `midterm1-practice.qmd` and drafted in pull request 205 for `exercises/generalization/_exr-kfold-cv-feature-count.qmd`, 2026-10-26;
+no link is given because the repository is private, per [`media-links-beside-content`](media-links-beside-content.md)).
+Midterm 1 question 3(c) wrote the decomposition as a formula and listed the three terms in a parenthetical after it, and Ezra asked for the links in the sentence itself:
 
 - **Before:** `Each model's expected squared error on a new point decomposes into $\text{bias}^2 + \text{variance} + \text{irreducible error}$ (definitions: [bias](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-bias), [variance](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-variance), [irreducible error](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-irreducible-error)).`
 - **After:** `Each model's expected squared error on a new point is the sum of three terms: its squared [bias](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-bias), its [variance](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-variance), and the [irreducible error](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-irreducible-error).`

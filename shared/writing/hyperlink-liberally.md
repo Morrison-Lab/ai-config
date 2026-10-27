@@ -64,12 +64,13 @@ The test is observable: does a sentence in the passage use the term as a word?
 If so, link it there, rewriting the sentence in prose when the term sat only in a formula.
 If the term occurs only as a math label (for example an underbrace in a displayed equation), keep a "Hint: see the definitions of ..." line.
 
-Observed on a private `Morrison-Lab/mlg` exercise (issue 203, pull request 205, 2026-10-26;
-no link is given because the repository is private).
-Midterm 1 practice question 3(c) (`exercises/generalization/_exr-kfold-cv-feature-count.qmd`) wrote the decomposition as a formula and listed the three terms in a parenthetical after it, and Ezra asked for the links in the sentence itself:
+Observed on [`Morrison-Lab/mlg#203`](https://github.com/Morrison-Lab/mlg/issues/203) and [`Morrison-Lab/mlg#204`](https://github.com/Morrison-Lab/mlg/pull/204) (2026-10-26).
+Midterm 1 question 3(c) (`Exams/2026-fall-morrison/midterm1.qmd` and `Exams/2026-fall-morrison/midterm1-practice.qmd`) wrote the decomposition as a formula and listed the three terms in a parenthetical after it, and Ezra asked for the links in the sentence itself:
 
 - **Before:** `Each model's expected squared error on a new point decomposes into $\text{bias}^2 + \text{variance} + \text{irreducible error}$ (definitions: [bias](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-bias), [variance](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-variance), [irreducible error](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-irreducible-error)).`
-- **After:** `Each model's expected squared error on a new point decomposes into the squared [bias](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-bias), the [variance](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-variance) and the [irreducible error](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-irreducible-error).`
+- **After:** `Each model's expected squared error on a new point is the sum of three terms: its squared [bias](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-bias), its [variance](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-variance), and the [irreducible error](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-irreducible-error).`
+
+In general practice, place the link on the term where the sentence uses it and sweep the document for remaining parenthetical link lists:
 
 - **Do:** link each term at its mention, and find other instances with `grep -n -E '\((definitions?|see)[: ]' <files>` over the document you are editing.
 - **Don't:** append a parenthetical list of links after a sentence whose words could carry them.

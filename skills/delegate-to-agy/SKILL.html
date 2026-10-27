@@ -407,6 +407,7 @@ cookieconsent.run({
 <h1>delegate-to-agy — run sidecar work on the Antigravity subscription, not Claude</h1>
 <p>Standing rule: for bounded read-and-answer work, spend the Antigravity subscription through the <strong><code>agy</code> CLI</strong> before Claude budget. Claude stays the orchestrator: it writes the briefs, checks the outputs and integrates them, and it is the fallback for anything <code>agy</code> cannot finish. This skill is the mechanism. The flag traps, the permission findings and the install notes live in <code>memories/delegation.md</code>.</p>
 <p>The subscription-only rule applies (Ezra, 2026-10-13): <code>agy</code> here means the CLI signed in with the Antigravity app’s login. Never route work through a Gemini, OpenAI or Anthropic API key.</p>
+<p>For reviews and plain briefs, <code>scripts/agy-dispatch.py</code> runs steps 3 and 4 below with the checks built in; the routing table is in <a href="../../shared/workflow/route-to-agy.md"><code>route-to-agy</code></a>.</p>
 <section id="where-it-runs" class="level2">
 <h2 class="anchored" data-anchor-id="where-it-runs">Where it runs</h2>
 <p><code>agy</code> authenticates with the login the Antigravity app stored on the machine, and it has no documented headless token (none found as of 2026-10-13). So it works only on a machine where Antigravity is signed in.</p>

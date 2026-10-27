@@ -551,17 +551,19 @@ A feature branch made locally and pushed with `git push -u origin <branch>` then
 - `git status -sb` shows the branch without `...origin/<branch>`.
 - The `~/.claude/stop-hook-git-check.sh` Stop hook reports "N unpushed commit(s) and no remote branch", although `git ls-remote --heads origin <branch>` shows the commits on the remote.
 - `git fetch origin <branch>` creates no remote-tracking ref, so `git branch -u origin/<branch>` fails with "does not exist".
-- Even after `git fetch origin +refs/heads/<b>:refs/remotes/origin/<b>`, it fails with "starting point ... is not a branch", because the fetch refspec does not cover that ref.
+- An explicit `git fetch origin +refs/heads/<branch>:refs/remotes/origin/<branch>` succeeds and creates `origin/<branch>`, but `git branch -u origin/<branch>` still fails with "starting point ... is not a branch", because the fetch refspec does not cover that ref.
 
-The fix is to widen the refspec and set the tracking config by hand:
+The fix is to widen the refspec, fetch, and set the tracking config by hand:
 
 ```
-git config --add remote.origin.fetch '+refs/heads/<b>:refs/remotes/origin/<b>'
-git config branch.<b>.remote origin
-git config branch.<b>.merge refs/heads/<b>
+git config --add remote.origin.fetch '+refs/heads/<branch>:refs/remotes/origin/<branch>'
+git fetch origin <branch>
+git config branch.<branch>.remote origin
+git config branch.<branch>.merge refs/heads/<branch>
 ```
 
-Widening the clone before the push avoids the problem: `git remote set-branches --add origin '<b>'`.
+Without the `git fetch`, `git status -sb` shows the upstream as `[gone]` until the next fetch.
+Widening the clone before the push avoids the problem: `git remote set-branches --add origin '<branch>'`.
 
-- **Do:** run `git remote set-branches --add origin '<b>'` before the first `git push -u` of a branch in an `add_repo` clone, or apply the three `git config` lines afterwards.
+- **Do:** run `git remote set-branches --add origin '<branch>'` before the first `git push -u` of a branch in an `add_repo` clone, or apply the four lines above afterwards.
 - **Don't:** retry `git fetch origin <branch>` or `git branch -u origin/<branch>`, or treat the hook's "no remote branch" as proof the push failed, before checking `git ls-remote --heads origin <branch>`.

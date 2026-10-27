@@ -56,17 +56,16 @@ It missed UC Davis, Kristen Aiemjoy, two cited books, Quarto, GitHub Actions, an
 ## Link a term where the sentence names it, not in a trailing parenthetical
 
 A list of definition links after the sentence --- "(definitions: bias, variance, irreducible error)" --- makes the reader find each term twice, once in the sentence and once in the list.
-When the sentence can name the terms in prose, put each link on the word the sentence uses, once per passage as in [`definition-crossrefs`](definition-crossrefs.md).
-A compact crossref such as "(@def-hessian)" is a different construction and stays.
+Put each link on the word the sentence already uses, once per passage as in [`definition-crossrefs`](definition-crossrefs.md).
+A single crossref attached to the term it defines, such as "(@def-hessian)", is a different construction and stays; a parenthetical list of them does not.
 
-The test is whether the sentence can name the terms in prose.
-Rewrite when the terms sit in a formula only because the sentence chose to write them there, and the prose can carry them instead.
-Leave a "Hint: see the definitions of ..." line alone when the terms occur only as math labels (for example underbraces in a displayed equation) and no sentence names them.
+The test is observable: does a sentence in the passage use the term as a word?
+If so, link it there, rewriting the sentence in prose when the term sat only in a formula.
+If the term occurs only as a math label (for example an underbrace in a displayed equation), keep a "Hint: see the definitions of ..." line.
 
-Observed on a private Morrison-Lab/mlg exercise (issue 203, fixed in pull request 205, 2026-10-26).
+Observed on a private Morrison-Lab/mlg exercise (issue 203, proposed in pull request 205, 2026-10-26; no link is given because the repository is private).
 Midterm 1 practice question 3(c) wrote the decomposition as a formula and listed the three terms in a parenthetical after it, and Ezra asked for the links in the sentence itself.
-The fix reads "decomposes into the squared [bias](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-bias), the [variance](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-variance) and the [irreducible error](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-irreducible-error)".
+The proposed text reads "decomposes into the squared [bias](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-bias), the [variance](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-variance) and the [irreducible error](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-irreducible-error)".
 
-- **Do:** link each term at its mention, and sweep the repository for other "(definitions: ...)" lists of links in the same change.
-- **Do:** leave a "Hint: see the definitions of ..." line alone when the terms occur only inside math.
+- **Do:** link each term at its mention, and find other instances with `grep -n -E '\((definitions?|see)[: ]' <files>` over the document you are editing.
 - **Don't:** append a parenthetical list of links after a sentence whose words could carry them.

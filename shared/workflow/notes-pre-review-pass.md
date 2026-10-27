@@ -28,7 +28,7 @@ State in the PR body that the checklist ran.
    Every technical term is hyperlinked at first use in each div, and each target div precedes its first mention in reading order.
    A term with no definition gets its own definition div, filed as an issue if it widens the PR, never left unlinked.
    Fix a forward reference or dependency-graph cycle by reordering the content or defining the prerequisite concept first, never by removing the hyperlink and adding `<!-- check-term-links: allow -->`.
-   Run [`Morrison-Lab/gha`](https://github.com/Morrison-Lab/gha)'s [`check-term-links.py`](https://github.com/Morrison-Lab/gha/blob/main/check-term-links/check-term-links.py) with `--diff <(git diff origin/main...HEAD)` (or `--base-ref origin/main`) locally before pushing so every `unlinked-first-use` finding in the PR diff is caught pre-push.
+   Run [`Morrison-Lab/gha`](https://github.com/Morrison-Lab/gha)'s [`check-term-links.py`](https://github.com/Morrison-Lab/gha/blob/main/check-term-links/check-term-links.py) with `--base-ref origin/main` (or `git diff origin/main...HEAD > /tmp/pr.diff` followed by `--diff /tmp/pr.diff`) from the notes repository root locally before pushing so every `unlinked-first-use` finding in the PR diff is caught pre-push.
 3. **Symbols.**
    Every technical term is paired with its semantic macro, and the macro is the existing one: search `Morrison-Lab/macros` for the concept before writing any expression.
 4. **Minimal expressions.**
@@ -65,4 +65,4 @@ State in the PR body that the checklist ran.
 An item that fails on one div is checked on every div of the PR, per the sweep above.
 Recurrence: sds#268 (2026-10-17) drew an inline definition at least five times after the first correction, which is why item 5 now names the pattern.
 mds#422 (2026-10-19) stripped `@def-` links and added `<!-- check-term-links: allow -->` to silence `build_dependency_graph.py` forward-reference findings and moved `@def-interval` after its special-case interval definitions instead of reordering the content and defining bounds first.
-[`Morrison-Lab/lds#1237`](https://github.com/Morrison-Lab/lds/pull/1237) (2026-10-27, recorded in [`Morrison-Lab/ai-config#4769`](https://github.com/Morrison-Lab/ai-config/issues/4769)) bundled `#def-noise-model`, `#rem-noise-draws`, and `#rem-noise-model` into a single `_def-noise-model.qmd` subfile and pushed with `unlinked-first-use` findings in the diff before a local `check-term-links.py --diff` pass ran.
+[`Morrison-Lab/lds#1237`](https://github.com/Morrison-Lab/lds/pull/1237) (2026-10-20, recorded 2026-10-27 in [`Morrison-Lab/ai-config#4769`](https://github.com/Morrison-Lab/ai-config/issues/4769)) bundled `#def-noise-model`, `#rem-noise-draws`, and `#rem-noise-model` into a single `_def-noise-model.qmd` subfile and pushed with `unlinked-first-use` findings in the diff before a local `check-term-links.py --diff` pass ran.

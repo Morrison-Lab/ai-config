@@ -186,6 +186,7 @@ LOCAL_EQUIVALENTS = {
     "claude.yml": lambda j, b: None,
     "claude-code-review": lambda j, b: None,
     "detect-review-request": lambda j, b: None,
+    "check-caller-permissions": lambda j, b: None,
     "cleanup-pr-previews": lambda j, b: None,
     "preview-deploy": lambda j, b: None,
     "preview.yml": lambda j, b: None,

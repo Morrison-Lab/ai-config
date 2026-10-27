@@ -723,3 +723,21 @@ First in `scripts/vendor/gha-check-new-line-breaks.py`, whose `_added_line_numbe
 Then, hours later, in my own non-ASCII sweep on [#2539](https://github.com/Morrison-Lab/ai-config/pull/2539), which reported clean over a literal em-dash a reviewer found immediately;
 filed as [#2550](https://github.com/Morrison-Lab/ai-config/issues/2550), which also carries the reason CI missed it --- the non-ASCII gate scans `.qmd` and `.R`, and this repo is written in Python.
 Having filed the first did not prevent the second, which is the argument for the rule rather than the incident.)
+
+## `git diff --check` reports a Markdown setext underline as a "leftover conflict marker"
+
+`git diff --check` flags an added line of exactly seven `=` as `leftover conflict marker`, whether or not a `<<<<<<<` opens a block around it.
+A Markdown setext heading underlined with seven `=` is such a line, so the check misfires on ordinary prose with no conflict anywhere in the file.
+(Measured 2026-10-27 on git 2.43.0: a file holding `Title` over `=======` gave `t.md:2: leftover conflict marker` and exit 2.)
+
+A tool that reads every `--check` marker hit as a real conflict therefore refuses clean Markdown commits.
+This came up building `hooks/no-commit-with-conflict-markers.py` on [ai-config#4770](https://github.com/Morrison-Lab/ai-config/pull/4770).
+
+Git's own escape for a file that legitimately carries marker-like lines is the `conflict-marker-size` attribute.
+With `*.md conflict-marker-size=32` in `.gitattributes`, the same `git diff --check` exits 0 (measured the same day), because git then looks for 32-character markers in those files.
+It also changes the markers `git merge` writes into those files, which is the point: the two can no longer be confused.
+
+- **Do:** count a flagged `=======` as a conflict only when an open `<<<<<<<` block surrounds it.
+- **Do:** honour `conflict-marker-size` (`git check-attr conflict-marker-size -- <path>`) in a marker-detecting guard, and point a file that legitimately holds such lines at that attribute.
+- **Don't:** trust `git diff --check` alone as a conflict detector in a Markdown-heavy repo.
+- **Don't:** add an environment-variable escape hatch to a marker guard when git already has a per-path attribute for the same job.

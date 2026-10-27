@@ -159,7 +159,8 @@ RX_AGY_BG_DONE = re.compile(
     r'(?=\r?\n(?:Task id "|</SYSTEM_MESSAGE>)|\Z)',
     re.S,
 )
-RX_AGY_NONZERO_EXIT = re.compile(r"\bcommand exited with code [1-9]\d*\b", re.I)
+RX_AGY_NONZERO_EXIT = re.compile(
+    r"^\s*(?:the\s+)?command exited with code [1-9]\d*\b", re.I)
 AGY_SYS_MSG_SEP = "\n\nThe following is a <SYSTEM_MESSAGE>"
 
 NOTE = (
@@ -335,68 +336,86 @@ def _agy_is_error(rec, text):
 
 def records(path):
     resolved = _resolve_transcript_path(path)
-    agy_pending_ids = []
-    agy_bg_tasks = {}
+    raw_recs = []
     with open(resolved, encoding="utf-8", errors="ignore") as fh:
         for line_no, line in enumerate(fh):
             try:
                 rec = json.loads(line)
             except Exception:
                 continue
-            if not isinstance(rec, dict):
-                continue
-            rtype = rec.get("type")
-            content = rec.get("content")
-            blocks = []
-            if rtype == "PLANNER_RESPONSE" and isinstance(rec.get("tool_calls"), list):
-                agy_pending_ids.clear()
-                for idx, tc in enumerate(rec["tool_calls"]):
-                    if not isinstance(tc, dict):
-                        continue
-                    tid = tc.get("id") or f"agy_tc_{line_no}_{idx}"
-                    raw_args = (tc.get("args") or tc.get("arguments")
-                                or tc.get("input") or {})
-                    blocks.append({
-                        "type": "tool_use",
-                        "id": tid,
-                        "name": tc.get("name") or "",
-                        "input": _agy_unwrap_args(raw_args),
-                    })
+            if isinstance(rec, dict):
+                raw_recs.append((line_no, rec))
+    if any(isinstance(r.get("step_index"), int) for _, r in raw_recs):
+        raw_recs.sort(key=lambda item: (
+            item[1]["step_index"] if isinstance(item[1].get("step_index"), int)
+            else item[0],
+            item[0],
+        ))
+    agy_pending_ids = []
+    agy_step_to_tid = {}
+    agy_bg_tasks = {}
+    for line_no, rec in raw_recs:
+        rtype = rec.get("type")
+        content = rec.get("content")
+        step_idx = rec.get("step_index")
+        blocks = []
+        if rtype == "PLANNER_RESPONSE" and isinstance(rec.get("tool_calls"), list):
+            agy_pending_ids.clear()
+            agy_step_to_tid.clear()
+            for idx, tc in enumerate(rec["tool_calls"]):
+                if not isinstance(tc, dict):
+                    continue
+                tid = tc.get("id") or f"agy_tc_{line_no}_{idx}"
+                raw_args = (tc.get("args") or tc.get("arguments")
+                            or tc.get("input") or {})
+                blocks.append({
+                    "type": "tool_use",
+                    "id": tid,
+                    "name": tc.get("name") or "",
+                    "input": _agy_unwrap_args(raw_args),
+                })
+                if isinstance(step_idx, int):
+                    agy_step_to_tid[step_idx + 1 + idx] = tid
+                else:
                     agy_pending_ids.append(tid)
-            elif rtype in ("GENERIC", "TOOL_RESPONSE"):
-                primary = content if isinstance(content, str) else ""
-                if AGY_SYS_MSG_SEP in primary:
-                    primary = primary.split(AGY_SYS_MSG_SEP, 1)[0]
-                tid = (rec.get("tool_call_id") or rec.get("tool_use_id")
-                       or (agy_pending_ids.pop(0) if agy_pending_ids else None))
+        elif rtype in ("GENERIC", "TOOL_RESPONSE"):
+            primary = content if isinstance(content, str) else ""
+            if AGY_SYS_MSG_SEP in primary:
+                primary = primary.split(AGY_SYS_MSG_SEP, 1)[0]
+            tid = rec.get("tool_call_id") or rec.get("tool_use_id")
+            if not tid:
+                if isinstance(step_idx, int):
+                    tid = agy_step_to_tid.pop(step_idx, None)
+                elif agy_pending_ids:
+                    tid = agy_pending_ids.pop(0)
+            if tid:
+                m_bg = RX_AGY_BG_START.search(primary)
+                if m_bg:
+                    agy_bg_tasks[m_bg.group(1).strip()] = tid
+                else:
+                    blocks.append({
+                        "type": "tool_result",
+                        "tool_use_id": tid,
+                        "is_error": _agy_is_error(rec, primary),
+                        "content": primary,
+                    })
+        if isinstance(content, str) and 'Task id "' in content:
+            for m_done in RX_AGY_BG_DONE.finditer(content):
+                task_id, outcome, body = (
+                    m_done.group(1), m_done.group(2), m_done.group(3))
+                tid = agy_bg_tasks.pop(task_id, None)
                 if tid:
-                    m_bg = RX_AGY_BG_START.search(primary)
-                    if m_bg:
-                        agy_bg_tasks[m_bg.group(1).strip()] = tid
-                    else:
-                        blocks.append({
-                            "type": "tool_result",
-                            "tool_use_id": tid,
-                            "is_error": _agy_is_error(rec, primary),
-                            "content": primary,
-                        })
-            if isinstance(content, str) and "Task id \"" in content:
-                for m_done in RX_AGY_BG_DONE.finditer(content):
-                    task_id, outcome, body = (
-                        m_done.group(1), m_done.group(2), m_done.group(3))
-                    tid = agy_bg_tasks.pop(task_id, None)
-                    if tid:
-                        is_err = (outcome != "finished"
-                                  or _agy_is_error(rec, body))
-                        blocks.append({
-                            "type": "tool_result",
-                            "tool_use_id": tid,
-                            "is_error": is_err,
-                            "content": body,
-                        })
-            if blocks:
-                rec = dict(rec, _agy_blocks=blocks)
-            yield rec
+                    is_err = (outcome != "finished"
+                              or _agy_is_error(rec, body))
+                    blocks.append({
+                        "type": "tool_result",
+                        "tool_use_id": tid,
+                        "is_error": is_err,
+                        "content": body,
+                    })
+        if blocks:
+            rec = dict(rec, _agy_blocks=blocks)
+        yield rec
 
 
 def _blocks(record):
@@ -426,8 +445,6 @@ def _credited(runs, block):
     no named PR), but only when no NOT-clean line is present. A lone run is also vetoed by a
     NOT-clean line beside a clean one. Silence is never success.
     """
-    if block.get("is_error"):
-        return []
     text = _result_text(block)
     if not RX_CLEAN_LINE.search(text):
         return []

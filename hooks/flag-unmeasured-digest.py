@@ -406,13 +406,15 @@ def _transcript_hex(transcript_path):
                 content = rec.get("content")
                 if not isinstance(content, str):
                     continue
+                if role in ("GENERIC", "TOOL_RESPONSE") and rec.get("status") == "ERROR":
+                    continue
                 primary = (content.split(AGY_SYS_MSG_SEP, 1)[0]
                            if AGY_SYS_MSG_SEP in content else content)
                 if role == "USER_INPUT" and not primary.lstrip().startswith(
                         "<SYSTEM_MESSAGE>"):
                     for s in _iter_strings(primary):
                         seen |= hex_tokens_in(s)
-                elif role in ("GENERIC", "TOOL_RESPONSE") and rec.get("status") != "ERROR":
+                elif role in ("GENERIC", "TOOL_RESPONSE"):
                     for s in _iter_strings(primary):
                         seen |= hex_tokens_in(s)
                 if role in ("SYSTEM_MESSAGE", "EPHEMERAL_MESSAGE", "GENERIC",

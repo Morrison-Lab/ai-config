@@ -283,6 +283,36 @@ def main():
               {"type": "GENERIC", "status": "DONE",
                "content": "The command exited with code 1.\nOutput:\nerror"},
           ])[0])
+    check("silent when a zero-exit claude -p review mentions 'command exited with code 1' in its output body",
+          not run_agy([
+              agy_claude_call,
+              {"type": "GENERIC", "status": "DONE",
+               "content": "Command exited with code 0.\n\nCommand output:\nChecked why the command exited with code 1."},
+          ])[0])
+    check("warns when out-of-order step_index has view_file succeed (step 8) and claude -p fail (step 9)",
+          run_agy([
+              {"step_index": 8, "type": "GENERIC", "status": "DONE",
+               "content": "Showing lines 1-10 of foo.py"},
+              {"step_index": 7, "type": "PLANNER_RESPONSE",
+               "tool_calls": [
+                   {"name": "view_file", "args": {"Path": "/tmp/foo.py"}},
+                   {"name": "run_command", "args": {"CommandLine": "claude -p 'review'"}},
+               ]},
+              {"step_index": 9, "type": "GENERIC", "status": "DONE",
+               "content": "Command exited with code 1.\n\nCommand output:\nfailed"},
+          ])[0])
+    check("silent when out-of-order step_index has view_file (step 8) before planner (step 7) and claude -p succeed (step 9)",
+          not run_agy([
+              {"step_index": 8, "type": "GENERIC", "status": "DONE",
+               "content": "Showing lines 1-10 of foo.py"},
+              {"step_index": 7, "type": "PLANNER_RESPONSE",
+               "tool_calls": [
+                   {"name": "view_file", "args": {"Path": "/tmp/foo.py"}},
+                   {"name": "run_command", "args": {"CommandLine": "claude -p 'review'"}},
+               ]},
+              {"step_index": 9, "type": "GENERIC", "status": "DONE",
+               "content": "Command exited with code 0.\n\nCommand output:\nVerdict: Ready to merge"},
+          ])[0])
     fired_agy, out_agy = run_agy([
         {"type": "PLANNER_RESPONSE",
          "tool_calls": [{"name": "run_command",

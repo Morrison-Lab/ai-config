@@ -289,6 +289,10 @@ def main():
     check("silent: failing #6 does not veto the attributed clean #5",
           not run(M5, [step(IC + "5" + R + " && " + IC + "6" + R,
                             OUT5 + chr(10) + "PR is NOT fully clean")])[0])
+    check("silent: failing #6 (is_error=True) still does not veto the attributed clean #5",
+          not run(M5, [step(IC + "5" + R + " && " + IC + "6" + R,
+                            OUT5 + chr(10) + "PR is NOT fully clean",
+                            is_error=True)])[0])
     # item 3: shell-variable or missing run number
     check("warns: run number is a shell variable and output names nothing",
           run(M5, [step(IC + "$PR" + R, "is FULLY CLEAN")])[0])

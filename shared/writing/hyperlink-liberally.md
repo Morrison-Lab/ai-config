@@ -52,3 +52,16 @@ It missed UC Davis, Kristen Aiemjoy, two cited books, Quarto, GitHub Actions, an
 - **Do:** after adding the requested link, reread the whole page and link every other unlinked name it carries.
 - **Do:** open each new target URL and confirm it names the entity before linking it.
 - **Don't:** search only for other mentions of the term the user named and report the page done.
+
+## Link a term where the sentence names it, not in a trailing parenthetical
+
+A list of definition links after the sentence --- "(definitions: bias, variance, irreducible error)" --- makes the reader find each term twice, once in the sentence and once in the list.
+Put each link on the word the sentence already uses, rewriting the sentence in prose when the terms sit inside a formula where a link cannot go.
+
+Observed on [Morrison-Lab/mlg#203](https://github.com/Morrison-Lab/mlg/issues/203) (2026-10-26).
+Midterm 1 practice question 3(c) wrote the decomposition as a formula and listed the three terms in a parenthetical after it, and the reviewer asked for the links in the sentence itself.
+The fix reads "decomposes into the squared [bias](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-bias), the [variance](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-variance) and the [irreducible error](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-irreducible-error)".
+
+- **Do:** link each term at its mention, and sweep the repository for other "(definitions: ...)" or "(see ...)" lists in the same change.
+- **Do:** leave a "Hint: see the definitions of ..." line alone when the terms occur only inside math, where a link cannot go.
+- **Don't:** append a parenthetical list of links after a sentence whose words could carry them.

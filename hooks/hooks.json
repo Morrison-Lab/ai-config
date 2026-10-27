@@ -444,6 +444,22 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-commit-with-conflict-markers.py\"",
+            "timeout": 10,
+            "script": "no-commit-with-conflict-markers.py",
+            "why": "2026-10-27, Morrison-Lab/lds#1364, during an `ardia` sweep: a `main` merge left six files conflicted, a helper script that read only its first argument resolved one, and `git add -A && git commit --no-edit` committed the other five with their `<<<<<<< HEAD` / `=======` / `>>>>>>> origin/main` blocks. The Quarto render passed because Markdown prints the markers as text, and the push-time check-term-links caught it only incidentally. DENIES a `git commit` (incl. `-a`, `--amend`, paths, `-C <dir>`, `cd <dir> &&`) or `git merge|rebase|cherry-pick|revert|am --continue` when `git diff --check` reports `leftover conflict marker` on what the commit would carry: the working tree of the `-a` paths, named paths, and paths an earlier `git add` in the same command stages, and the index for every other path, each against every parent the commit will have (HEAD plus MERGE_HEAD, HEAD's parents under --amend, the empty tree for a root commit). A flagged `=======` counts only inside an open `<<<<<<<` block, since git 2.43 flags a Markdown setext underline; aider's `<<<<<<< SEARCH`/`>>>>>>> REPLACE` blocks are exempt, and a file with real marker lines raises `conflict-marker-size` in .gitattributes. No escape variable.",
+            "_note_reads_live_git_state": [
+              "Runs `git diff --check`, `git show :<path>` and",
+              "`git rev-parse` at match time, with fsmonitor and optional",
+              "locks off. Fails open on any git failure or timeout, a",
+              "directory the text does not name, --git-dir/GIT_DIR, a",
+              "dry run, an interactive commit or add, and when the sibling",
+              "flag-commit-a-sweeps-submodule.py or scripts/lib/shellcmd.py",
+              "cannot be loaded."
+            ]
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-reset-hard-uncommitted-work.py\"",
             "timeout": 10,
             "script": "flag-reset-hard-uncommitted-work.py",

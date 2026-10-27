@@ -210,6 +210,7 @@ class TestPreToolUseDryRun(unittest.TestCase):
             ("flag-unmeasured-digest.py", "Bash"),
             ("guard-slide-major-tag.py", "Bash"),
             ("no-clobbering-push.py", "Bash"),
+            ("no-commit-with-conflict-markers.py", "Bash"),
             ("no-delete-branch-under-stacked-pr.py", "Bash"),
             ("no-fable-subagent.py", "Agent"),
             ("no-handrolled-verdict-parse.py", "Bash"),

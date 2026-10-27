@@ -13,8 +13,9 @@ if [ "$st" != OPEN ]; then echo "SKIP $repo#$pr state=$st"; exit 0; fi
 body=$(awk 'NR>2' "$f" | awk '/^VERDICT: /{exit} {print}' | grep -v -E '^\*\*(Stopping Point|Status)')
 verdict=$(grep -o '^VERDICT: [A-Z]*' "$f" | tail -1); verdict=${verdict#VERDICT: }
 case "$verdict" in CLEAN|FINDINGS) ;; *) echo "NO VERDICT in $f; not posting"; exit 3;; esac
+[ "$(grep -o '^VERDICT: [A-Z]*' "$f" | sort -u | wc -l)" -eq 1 ] || { echo "conflicting VERDICT lines in $f; not posting"; exit 3; }
 if grep -q -E 'AGY_ERROR|RESOURCE_EXHAUSTED' "$f"; then echo "AGY ERROR in $f; not posting"; exit 3; fi
-if [ "$verdict" = CLEAN ] && { echo "$body" | grep -q -i 'non-blocking' || [ "${#body}" -ge 500 ]; }; then echo "CLEAN with listed notes in $f; not posting"; exit 4; fi
+if [ "$verdict" = CLEAN ] && { echo "$body" | grep -q -i 'non-blocking' || [ "${#body}" -gt 80 ]; }  # same 80-character rule as CLEAN_NOTE_CHARS in bigread.py; then echo "CLEAN with listed notes in $f; not posting"; exit 4; fi
 if [ "$verdict" = CLEAN ] && [ -e "$f.truncated" ]; then echo "CLEAN from a truncated diff ($(cat "$f.truncated") chars) in $f; not posting (use bigread.py)"; exit 4; fi
 note=""
 [ "$cur" != "$head" ] && note="

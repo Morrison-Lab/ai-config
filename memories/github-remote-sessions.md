@@ -539,6 +539,29 @@ Measured in a claude.ai cloud session ([session](https://claude.ai/code/session_
   The denial is a harness decision that the `mwc` grant cannot clear.
   - **Do:** report a classifier-denied merge to the user and leave the merge to them.
   - **Don't:** retry the merge in another call shape, or treat the `mwc` grant as having failed.
-- A repo attached with `add_repo` is cloned `--depth 1` with a main-only fetch refspec, so a pushed feature branch has no upstream tracking ref, and `git branch --set-upstream-to` fails.
-  Add `+refs/heads/<b>:refs/remotes/origin/<b>` to `remote.origin.fetch`, fetch, then set `branch.<b>.remote` and `branch.<b>.merge`.
+- The upstream-tracking failure of an `add_repo` clone has its own section at the end of this file, with the measured symptom and the fix.
 - Already recorded above, and re-measured the same day: branch deletion through `gh api -X DELETE .../git/refs/heads/<b>` is refused by the proxy, and `build-pr-payload.py` gets review threads from `gh api repos/<o>/<r>/pulls/<n>/ccr/review_threads`.
+
+## A repo attached with `add_repo` has a main-only fetch refspec, so a pushed branch gets no upstream
+
+Measured 2026-10-27 in a Claude Code cloud session, extending the one-line note from 2026-10-05.
+`add_repo` says to clone with `git clone --depth 1 <url>`, and that clone's `remote.origin.fetch` covers only `main`.
+A feature branch made locally and pushed with `git push -u origin <branch>` then has no usable upstream:
+
+- `git status -sb` shows the branch without `...origin/<branch>`.
+- The `~/.claude/stop-hook-git-check.sh` Stop hook reports "N unpushed commit(s) and no remote branch", although `git ls-remote --heads origin <branch>` shows the commits on the remote.
+- `git fetch origin <branch>` creates no remote-tracking ref, so `git branch -u origin/<branch>` fails with "does not exist".
+- Even after `git fetch origin +refs/heads/<b>:refs/remotes/origin/<b>`, it fails with "starting point ... is not a branch", because the fetch refspec does not cover that ref.
+
+The fix is to widen the refspec and set the tracking config by hand:
+
+```
+git config --add remote.origin.fetch '+refs/heads/<b>:refs/remotes/origin/<b>'
+git config branch.<b>.remote origin
+git config branch.<b>.merge refs/heads/<b>
+```
+
+Widening the clone before the push avoids the problem: `git remote set-branches --add origin '<b>'`.
+
+- **Do:** run `git remote set-branches --add origin '<b>'` before the first `git push -u` of a branch in an `add_repo` clone, or apply the three `git config` lines afterwards.
+- **Don't:** retry `git fetch origin <branch>` or `git branch -u origin/<branch>`, or treat the hook's "no remote branch" as proof the push failed, before checking `git ls-remote --heads origin <branch>`.

@@ -98,17 +98,18 @@ you'd rather", which stalled work for 2.5 hours against a hard deadline, and
 This section extends the third authorization arm above to a follow-up the user never named.
 The test is whether the follow-up carries the same behaviour the request introduced, or introduces a different one.
 A follow-up qualifies when it applies the requested behaviour to the rest of what that behaviour obviously covers, is small and reversible, and settles no tradeoff the user hasn't decided.
+Other parts of the same site or document count as covered when the behaviour is meant to hold across it, as a light/dark scheme is.
 That is [`lab-operating-rules`](lab-operating-rules.md)'s "Decide reversible choices yourself", applied before the question is asked.
 Make such a follow-up in the same PR and report it.
 A different behaviour, or a change to a component the request didn't touch for that behaviour, is "adjacent" in the sense of [`subagent-core-rules`](subagent-core-rules.md)'s "No scope creep" rule.
 File it as an issue, as `AGENTS.md` requires for noticed follow-ups, and don't ask about it in the reply.
 
-- **Do:** asked to give a site's landing page a dark mode that follows the browser, make the site's other pages follow the browser's color scheme too when that is a one-line setting, and say so: it is the same behaviour on the same site.
+- **Do:** asked to give a site's landing page a dark mode, and having made it follow the browser's color scheme, make the site's other pages follow that scheme too when that is a one-line setting, and say so: it keeps one light/dark behaviour across the site.
 - **Do:** file a different behaviour noticed on the way, such as a broken link on another page, as an issue.
 - **Don't:** finish the literal request and close the reply with "should I also make the other pages follow it?"
 
 (Incident, 2026-10-27, [Morrison-Lab/mlg#225](https://github.com/Morrison-Lab/mlg/pull/225):
-after adding dark mode to the Pages landing page, a session ended its report by asking whether the Quarto pages beside it should also follow the browser's color scheme.
+asked only to "give the landing page ... a dark mode", a session made the Pages landing page follow the browser's color scheme by its own choice, then ended its report by asking whether the Quarto pages beside it should also follow the browser's color scheme.
 The user replied `daytb`, handing the decision back.
 Calling that follow-up the same feature is the session's inference from that reply, not the user's words.)
 

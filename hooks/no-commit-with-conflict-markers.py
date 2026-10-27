@@ -22,19 +22,24 @@ cwd, moved by `cd <dir> &&`, `pushd` and `git -C <dir>`), it runs git's own
 detector, `git diff --check`, which reports `leftover conflict marker` on
 added lines:
 
-- the index against the base (`git diff --cached --check <base>`), unless
-  the commit names paths without `-i` (`--only`, git's default for paths),
-  which commits those paths and nothing else that is staged;
 - the working tree against the base for the paths the commit takes from the
   working tree: every tracked path under `-a`, the named paths, and the paths
   a `git add` EARLIER IN THE SAME COMMAND will stage. That last one is the
   incident's own shape: `git add -A && git commit` is checked before the add
   runs, so the index alone would read clean. `git diff HEAD` also reads an
   unmerged (`UU`) path's working-tree file, which `--cached` skips.
+- the index against the base (`git diff --cached --check <base>`) for every
+  other path, so a stale staged copy that the working tree is about to
+  replace does not count (`git commit -am x` is how markers get repaired).
+  Under `--only` (paths named without `-i`, git's default for paths) the
+  commit takes the named paths and nothing else, staged or added earlier.
 
-`<base>` is `HEAD`, or `HEAD^` under `--amend` (the amended commit replaces
-HEAD, so markers already in HEAD are part of what it commits); with no HEAD
-(the first commit) the index is compared with the empty tree.
+The base is every parent the commit will have, and a line counts only when
+it is added against all of them: `HEAD`, plus `MERGE_HEAD` during a merge
+(so marker-like lines the other side already holds do not count), HEAD's own
+parents under `--amend` (the amended commit replaces HEAD, so markers
+already in HEAD are part of what it commits), and the empty tree for a root
+commit, amended or not.
 
 ## Why it does not trust `--check` alone
 
@@ -43,7 +48,8 @@ underline, as a leftover marker (measured 2026-10-27). So a flagged line
 counts only when it is
 
 - an opening `<<<<<<<` or closing `>>>>>>>` line, or a diff3 `|||||||` base
-  line, none of which is legitimate text; or
+  line, which outside a conflict appear almost only in documentation of
+  conflicts (a fenced example in a git guide); or
 - an `=======` line that follows an opening `<<<<<<<` line with no closing
   line between them, read from the content the commit would carry (the
   staged blob, or the working-tree file).
@@ -57,7 +63,9 @@ escape variable.
 
 ## Why it DENIES
 
-A conflict marker in a commit is never intended, and the deny names every
+A conflict marker in a commit is almost never intended, a file that
+documents one has git's own escape (`conflict-marker-size`), and the deny
+names every
 offending file and line, so the fix is mechanical. Unlike the warn-only
 staging guards (`flag-commit-a-sweeps-submodule.py`), nothing here is a
 judgement call the author could legitimately make the other way.
@@ -275,8 +283,8 @@ def commits(command):
 
 
 # hooks.json gives this hook 10 s; every git call shares one deadline inside
-# it, so a slow repository fails open rather than being killed. The tests
-# override it with NO_COMMIT_MARKERS_BUDGET_S.
+# it, so a slow repository fails open rather than being killed.
+# NO_COMMIT_MARKERS_BUDGET_S overrides the total.
 _DEFAULT_BUDGET_S = 8.0
 _PER_CALL_S = 5.0
 _deadline = None
@@ -291,11 +299,12 @@ def _start_budget():
     _deadline = time.monotonic() + budget
 
 
-def _git(cwd, *args, ok=(0,)):
+def _git(cwd, *args, ok=(0,), stdin=None):
     """stdout of `git args` in cwd, or None on any failure, an exit status
-    outside `ok`, or a spent deadline. fsmonitor is off and optional locks
-    are off, so no repository program runs and the index is never
-    rewritten before the user approves the command."""
+    outside `ok`, or a spent deadline. fsmonitor and optional locks are off,
+    so the index is never rewritten before the user approves the command;
+    a diff against the working tree still runs any `filter.*.clean` the
+    repository configures, as `git status` would."""
     if _deadline is None:
         return None
     remaining = _deadline - time.monotonic()
@@ -305,7 +314,8 @@ def _git(cwd, *args, ok=(0,)):
         out = subprocess.run(
             ["git", "-c", "core.fsmonitor=false", "-c", "core.quotePath=false",
              "-c", "diff.relative=false", *args],
-            cwd=cwd, capture_output=True,
+            cwd=cwd, capture_output=True, input=stdin,
+            stdin=None if stdin is not None else subprocess.DEVNULL,
             timeout=min(_PER_CALL_S, remaining),
             env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"})
     except (OSError, subprocess.SubprocessError):
@@ -337,6 +347,45 @@ def _flagged(cwd, cached, base, paths):
         if m:
             found.setdefault(m.group(1), set()).add(int(m.group(2)))
     return found
+
+
+def _flagged_all(cwd, cached, bases, paths):
+    """The lines `_flagged` reports against EVERY base: a line already in
+    any parent (the other side of a merge) is not added by this commit."""
+    result = None
+    for base in bases:
+        found = _flagged(cwd, cached, base, paths)
+        if found is None:
+            return None
+        if result is None:
+            result = found
+        else:
+            result = {p: result[p] & found[p] for p in result if p in found}
+            result = {p: n for p, n in result.items() if n}
+    return result
+
+
+def _bases(cwd, amend):
+    """The parents the commit will have: HEAD plus MERGE_HEAD during a
+    merge, HEAD's own parents under --amend, and the empty tree for a root
+    commit. Empty when git cannot say."""
+    def commit(rev):
+        out = _git(cwd, "rev-parse", "-q", "--verify", rev + "^{commit}")
+        return out.strip() if out else None
+
+    if amend:
+        parents = _git(cwd, "rev-parse", "HEAD^@")
+        bases = parents.split() if parents is not None else None
+    elif commit("HEAD"):
+        bases = ["HEAD"] + ([m] if (m := commit("MERGE_HEAD")) else [])
+    else:
+        bases = []
+    if bases is None:
+        return []
+    if not bases:
+        empty = _git(cwd, "hash-object", "-t", "tree", "--stdin", stdin=b"")
+        return [empty.strip()] if empty else []
+    return bases
 
 
 _MARKER = re.compile(r"^(<{7,}|>{7,}|\|{7,}|={7,})(?:[ \t]+(.*?))?[ \t]*$")
@@ -394,29 +443,38 @@ def check(cwd, spec, worktree):
     if top is None:
         return []
     top = top.strip()
-    base = None
-    if spec.amend and _git(cwd, "rev-parse", "-q", "--verify",
-                           "HEAD~1^{commit}") is not None:
-        base = "HEAD^"
-    elif _git(cwd, "rev-parse", "-q", "--verify", "HEAD^{commit}") is not None:
-        base = "HEAD"
+    bases = _bases(cwd, spec.amend)
+    if not bases:
+        return []
 
-    # Each source is (staged?, flagged-map).
-    sources = []
-    if spec.staged_counts():
-        found = _flagged(cwd, True, base, None)
-        if found:
-            sources.append((True, found))
+    # What the commit takes from the working tree, overriding the index.
     whole, add_paths = worktree
     if spec.all:
         whole = True
-    paths = list(add_paths) + list(spec.paths)
-    if whole or paths:
-        # With no HEAD, plain `git diff --check` reads the working tree
-        # against the index, which is the closest available base.
-        found = _flagged(cwd, False, base, None if whole else paths)
+    if spec.staged_counts():
+        wt_paths = list(add_paths) + list(spec.paths)
+    else:
+        # `--only`: git commits the named paths and nothing else, so what an
+        # earlier `git add` staged stays staged and out of this commit.
+        whole, wt_paths = False, list(spec.paths)
+
+    # Each source is (staged?, flagged-map).
+    sources = []
+    covered = set()  # top-level paths the working tree supplies
+    if whole or wt_paths:
+        found = _flagged_all(cwd, False, bases, None if whole else wt_paths)
         if found:
             sources.append((False, found))
+        if not whole:
+            listed = _git(cwd, "ls-files", "--full-name", "-z", "--",
+                          *wt_paths)
+            covered = None if listed is None else set(
+                p for p in listed.split("\0") if p)
+    if spec.staged_counts() and not whole and covered is not None:
+        found = _flagged_all(cwd, True, bases, None)
+        if found:
+            found = {p: n for p, n in found.items() if p not in covered}
+            sources.append((True, found))
 
     hits = set()
     for staged, found in sources:

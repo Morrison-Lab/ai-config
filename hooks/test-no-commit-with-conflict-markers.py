@@ -165,6 +165,53 @@ def subdir_marker(p):
     _run(p, "add", "sub/c.md")
 
 
+def diff_relative_subdir(p):
+    subdir_marker(p)
+    _run(p, "config", "diff.relative", "true")
+
+
+def staged_marker_worktree_fixed(p):
+    """Markers staged; the working tree is already resolved."""
+    staged_marker(p)
+    _write(p, "a.md", "start\nresolved\n")
+
+
+def head_markers_worktree_fixed(p):
+    """Markers committed in HEAD, fixed in the working tree, nothing staged:
+    the repair is `git commit -a --amend`."""
+    markers_in_head_nothing_staged(p)
+    _write(p, "a.md", "start\nresolved\n")
+
+
+def root_commit_markers(p):
+    first_commit(p)
+    _run(p, "commit", "-qm", "root")
+
+
+def merge_staged(p):
+    """A real merge, conflicted, then staged unresolved: MERGE_HEAD set."""
+    conflicted_merge(p)
+    _run(p, "add", "-A")
+
+
+def merge_brings_markers(p):
+    """`main` already holds a guide with a fenced conflict example; a side
+    branch merges it, resolving an unrelated conflict cleanly."""
+    _init(p)
+    _run(p, "checkout", "-qb", "side")
+    _write(p, "a.md", "side\n")
+    _run(p, "commit", "-qam", "side")
+    _run(p, "checkout", "-q", "main")
+    _write(p, "a.md", "main\n")
+    _write(p, "guide.md", "Example:\n\n```\n" + BLOCK + "```\n")
+    _run(p, "add", ".")
+    _run(p, "commit", "-qm", "main")
+    _run(p, "checkout", "-q", "side")
+    _run(p, "merge", "main", check=False)
+    _write(p, "a.md", "both\n")
+    _run(p, "add", "a.md")
+
+
 # command templates: {repo} is the fixture path; the hook runs from ELSEWHERE
 # when the command names the repo, else from the repo itself.
 CASES = {
@@ -186,9 +233,15 @@ CASES = {
                             "git commit -i -m x -- b.md", True),
     "lone-open":           (lone_open, "git commit -m x", True),
     "diff3-base":          (diff3_base, "git commit -m x", True),
-    "merge-continue":      (staged_marker, "git merge --continue", True),
+    "merge-continue":      (merge_staged, "git merge --continue", True),
+    "merge-commit":        (merge_staged, "git commit --no-edit", True),
     "first-commit":        (first_commit, "git commit -m init", True),
-    "subdir":              (subdir_marker, "git commit -m x", True),
+    "root-amend":          (root_commit_markers,
+                            "git commit --amend --no-edit", True),
+    "subdir":              (subdir_marker, "%git commit -m x", True),
+    "diff-relative-subdir": (diff_relative_subdir, "%git commit -m x", True),
+    "staged-marker-worktree-fixed": (staged_marker_worktree_fixed,
+                                     "git commit -m x", True),
     # must pass
     "clean-stage":         (clean_stage, "git commit -m x", False),
     "setext-underline":    (setext, "git commit -m x", False),
@@ -202,6 +255,25 @@ CASES = {
     "heredoc-message":     (clean_stage,
                             "git commit -F - <<'EOF'\nmsg\nEOF", False),
     "marker-size-attr":    (big_marker_size, "git commit -m x", False),
+    # the repair commands, after the working tree is fixed
+    "stale-staged-commit-a": (staged_marker_worktree_fixed,
+                              "git commit -am x", False),
+    "stale-staged-add-A":  (staged_marker_worktree_fixed,
+                            "git add -A && git commit -m x", False),
+    "stale-staged-add-path": (staged_marker_worktree_fixed,
+                              "git add a.md && git commit -m x", False),
+    "stale-head-amend-a":  (head_markers_worktree_fixed,
+                            "git commit -a --amend --no-edit", False),
+    # `--only` commits the named path, not what an earlier add staged
+    "add-A-then-only":     (unstaged_marker,
+                            "git add -A && git commit -m x -- b.md", False),
+    "add-then-only":       (unstaged_marker,
+                            "git add a.md && git commit -m x b.md", False),
+    # lines the merged side already holds are not added by the merge
+    "merge-brings-existing-markers": (merge_brings_markers,
+                                      "git commit --no-edit", False),
+    "merge-continue-existing-markers": (merge_brings_markers,
+                                        "git merge --continue", False),
     "not-a-commit":        (staged_marker, "git status", False),
 }
 
@@ -222,6 +294,8 @@ def run_hook(hook_path, builder, command):
     repo = _repo(builder)
     if command.startswith("@"):
         cwd, command = ELSEWHERE, command[1:].format(repo=repo)
+    elif command.startswith("%"):  # run from the repo's `sub/` directory
+        cwd, command = os.path.join(repo, "sub"), command[1:]
     else:
         cwd = repo
     payload = json.dumps({"tool_name": "Bash", "cwd": cwd,
@@ -260,7 +334,7 @@ reason = out.get("hookSpecificOutput", {}).get("permissionDecisionReason", "")
 expect("reason names a.md:1", "a.md:1: " + OPEN in reason, True)
 expect("reason names the separator line", f"a.md:3: {SEP}" in reason, True)
 expect("systemMessage present", "systemMessage" in out, True)
-out = run_hook(HOOK, subdir_marker, "git commit -m x")
+out = run_hook(HOOK, subdir_marker, "%git commit -m x")
 reason = out.get("hookSpecificOutput", {}).get("permissionDecisionReason", "")
 expect("subdir path is top-level relative", "sub/c.md:1:" in reason, True)
 # Silence is silence: no stdout at all on a pass outside --dry-run.
@@ -275,11 +349,16 @@ for payload in ({"tool_name": "Read", "tool_input": {"command": "git commit"}},
     expect(f"ignored {payload['tool_name']}", (proc.returncode, proc.stdout),
            (0, ""))
 
-# The repo under test is never modified (the hook only reads).
-before = _run(_repo(staged_marker), "status", "--porcelain").stdout
-run_hook(HOOK, staged_marker, "git commit -m x")
-expect("repo untouched", _run(_repo(staged_marker), "status",
-                              "--porcelain").stdout, before)
+# The repo under test is never modified (the hook only reads): neither the
+# status nor the index file's bytes change.
+def _state(repo):
+    with open(os.path.join(repo, ".git", "index"), "rb") as fh:
+        return _run(repo, "status", "--porcelain").stdout, fh.read()
+
+
+before = _state(_repo(staged_marker_worktree_fixed))
+run_hook(HOOK, staged_marker_worktree_fixed, "git add -A && git commit -am x")
+expect("repo untouched", _state(_repo(staged_marker_worktree_fixed)), before)
 
 
 # ---------------------------------------------------------- mutation harness
@@ -297,22 +376,56 @@ MUTATIONS = [
      "bad = mk[1] != \"SEARCH\"",
      "bad = True",
      {"aider-search-replace"}),
+    ("open-marker-counts",
+     "bad = mk[1] != \"SEARCH\"",
+     "bad = False",
+     {"lone-open"}),
+    ("diff3-line-counts",
+     "elif kind == \"|\":\n            bad = True",
+     "elif kind == \"|\":\n            bad = False",
+     {"diff3-base"}),
     ("preceding-add",
      "whole, add_paths = worktree",
      "whole, add_paths = False, []",
-     {"incident", "add-path-then-commit"}),
+     # unseen adds: the worktree is not read, and the stale index counts
+     {"incident", "add-path-then-commit", "stale-staged-add-A",
+      "stale-staged-add-path"}),
     ("commit-a",
      "    if spec.all:\n        whole = True\n",
      "",
-     {"commit-a"}),
-    ("amend-base",
-     "base = \"HEAD^\"",
-     "base = \"HEAD\"",
-     {"amend"}),
+     {"commit-a", "stale-staged-commit-a", "stale-head-amend-a"}),
+    ("amend-parents",
+     "    if amend:\n",
+     "    if False:\n",
+     {"amend", "root-amend"}),
+    ("merge-head-parent",
+     "([m] if (m := commit(\"MERGE_HEAD\")) else [])",
+     "[]",
+     {"merge-brings-existing-markers", "merge-continue-existing-markers"}),
+    ("whole-tree-skips-index",
+     "if spec.staged_counts() and not whole and covered is not None:",
+     "if spec.staged_counts() and covered is not None:",
+     {"stale-staged-commit-a", "stale-staged-add-A", "stale-head-amend-a"}),
+    ("covered-paths-skip-index",
+     "if p not in covered}",
+     "if True}",
+     {"stale-staged-add-path"}),
+    ("only-drops-earlier-adds",
+     "whole, wt_paths = False, list(spec.paths)",
+     "wt_paths = list(add_paths) + list(spec.paths)",
+     {"add-A-then-only", "add-then-only"}),
+    ("staged-blob-read",
+     "    if staged:\n        return _git(cwd, \"show\"",
+     "    if False:\n        return _git(cwd, \"show\"",
+     {"staged-marker-worktree-fixed"}),
+    ("diff-relative-off",
+     "\"-c\", \"diff.relative=false\", ",
+     "",
+     {"diff-relative-subdir"}),
     ("only-excludes-index",
      "return self.include or not self.paths",
      "return True",
-     {"only-paths"}),
+     {"only-paths", "add-A-then-only", "add-then-only"}),
     ("include-keeps-index",
      "return self.include or not self.paths",
      "return not self.paths",

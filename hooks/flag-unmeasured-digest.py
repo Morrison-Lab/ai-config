@@ -326,6 +326,14 @@ def _is_digest_shaped(body, match):
     return False, None
 
 
+RX_AGY_BG_FINISHED = re.compile(
+    r'Task id "[^"]+" finished with result:\r?\n(.*?)'
+    r'(?=\r?\n(?:Task id "|</SYSTEM_MESSAGE>)|\Z)',
+    re.S,
+)
+AGY_SYS_MSG_SEP = "\n\nThe following is a <SYSTEM_MESSAGE>"
+
+
 def _resolve_transcript_path(transcript_path):
     """Prefer sibling `transcript_full.jsonl` when `transcript_path` is `transcript.jsonl`."""
     if transcript_path and os.path.basename(transcript_path) == "transcript.jsonl":
@@ -376,20 +384,42 @@ def _transcript_hex(transcript_path):
                 # In Claude Code transcripts, a tool result arrives as a `user`
                 # record whose message.content holds a block of type
                 # "tool_result", alongside `toolUseResult`. In Antigravity
-                # transcripts, user messages have type `USER_INPUT` and tool
-                # outputs / background task completions arrive in `GENERIC`,
-                # `TOOL_RESPONSE`, or `EPHEMERAL_MESSAGE` records (`content`),
-                # while model turns have type `PLANNER_RESPONSE` (excluded so
-                # the model's own prior output cannot launder an unmeasured SHA).
+                # transcripts:
+                # - `USER_INPUT` holds user messages (strip any appended
+                #   `<SYSTEM_MESSAGE>` block before scanning user text).
+                # - `GENERIC` / `TOOL_RESPONSE` with status != "ERROR" holds
+                #   synchronous tool output (`status == "ERROR"` is skipped so
+                #   a pre-tool hook denial quoting an unmeasured SHA does not
+                #   launder it on retry).
+                # - Background task completions (`Task id "..." finished with
+                #   result:`) arrive inside `SYSTEM_MESSAGE`, `EPHEMERAL_MESSAGE`,
+                #   `GENERIC`, or `USER_INPUT`; only the task's result body is
+                #   scanned so `EPHEMERAL_MESSAGE` hook warnings (`Warning from
+                #   flag-unmeasured-digest.py: ...`) never launder the SHA they
+                #   just warned about.
                 if role == "user":
                     for s in _iter_strings(rec.get("message", "")):
                         seen |= hex_tokens_in(s)
                     for s in _iter_strings(rec.get("toolUseResult", "")):
                         seen |= hex_tokens_in(s)
-                elif role in ("USER_INPUT", "GENERIC", "TOOL_RESPONSE",
-                              "EPHEMERAL_MESSAGE"):
-                    for s in _iter_strings(rec.get("content", "")):
+                    continue
+                content = rec.get("content")
+                if not isinstance(content, str):
+                    continue
+                primary = (content.split(AGY_SYS_MSG_SEP, 1)[0]
+                           if AGY_SYS_MSG_SEP in content else content)
+                if role == "USER_INPUT" and not primary.lstrip().startswith(
+                        "<SYSTEM_MESSAGE>"):
+                    for s in _iter_strings(primary):
                         seen |= hex_tokens_in(s)
+                elif role in ("GENERIC", "TOOL_RESPONSE") and rec.get("status") != "ERROR":
+                    for s in _iter_strings(primary):
+                        seen |= hex_tokens_in(s)
+                if role in ("SYSTEM_MESSAGE", "EPHEMERAL_MESSAGE", "GENERIC",
+                            "TOOL_RESPONSE", "USER_INPUT") and 'Task id "' in content:
+                    for m_bg in RX_AGY_BG_FINISHED.finditer(content):
+                        for s in _iter_strings(m_bg.group(1)):
+                            seen |= hex_tokens_in(s)
     except Exception:
         return None
     return seen

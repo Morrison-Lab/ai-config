@@ -159,7 +159,7 @@ RX_AGY_BG_DONE = re.compile(
     r'(?=\r?\n(?:Task id "|</SYSTEM_MESSAGE>)|\Z)',
     re.S,
 )
-RX_AGY_NONZERO_EXIT = re.compile(r"\bCommand exited with code [1-9]\d*\b")
+RX_AGY_NONZERO_EXIT = re.compile(r"\bcommand exited with code [1-9]\d*\b", re.I)
 AGY_SYS_MSG_SEP = "\n\nThe following is a <SYSTEM_MESSAGE>"
 
 NOTE = (
@@ -295,7 +295,10 @@ def _resolve_transcript_path(path):
 
     Antigravity writes both `transcript.jsonl` (which truncates long `content`
     fields and double-encodes `tool_calls[].args` strings) and
-    `transcript_full.jsonl` (untruncated, raw args) in the same logs directory.
+    `transcript_full.jsonl` (untruncated JSON fields, raw args) in the same
+    logs directory. Note that very long single tool outputs spilled to
+    `steps/<N>/output.txt` by the platform remain truncated in both files,
+    failing safely toward warning unless read back.
     """
     if path and os.path.basename(path) == "transcript.jsonl":
         full = os.path.join(os.path.dirname(path), "transcript_full.jsonl")

@@ -267,14 +267,21 @@ def main():
     }
     check("silent after a claude -p run in an Antigravity transcript (even without ANTIGRAVITY_AGENT env)",
           not run_agy([agy_claude_call, agy_ok_out])[0])
-    check("silent after a backgrounded claude -p run finishing via EPHEMERAL_MESSAGE in Antigravity",
+    check("silent after a backgrounded claude -p run finishing via SYSTEM_MESSAGE in Antigravity",
           not run_agy([
               agy_claude_call,
               {"type": "GENERIC", "status": "DONE",
                "content": "Tool is running as a background task with task id: conv/task-9"},
-              {"type": "EPHEMERAL_MESSAGE", "status": "DONE",
-               "content": ('Task id "conv/task-9" finished with result:\n'
-                           'Command exited with code 0.\n\nCommand output:\nok')},
+              {"type": "SYSTEM_MESSAGE", "status": "DONE",
+               "content": ('The following is a <SYSTEM_MESSAGE> not actually sent by the user.\n'
+                           '<SYSTEM_MESSAGE>\nTask id "conv/task-9" finished with result:\n'
+                           'Command exited with code 0.\n\nCommand output:\nok\n</SYSTEM_MESSAGE>')},
+          ])[0])
+    check("warns when an older-format Antigravity claude -p run exited non-zero ('The command exited with code 1.')",
+          run_agy([
+              agy_claude_call,
+              {"type": "GENERIC", "status": "DONE",
+               "content": "The command exited with code 1.\nOutput:\nerror"},
           ])[0])
     fired_agy, out_agy = run_agy([
         {"type": "PLANNER_RESPONSE",

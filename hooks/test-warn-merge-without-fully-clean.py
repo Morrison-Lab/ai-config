@@ -504,15 +504,16 @@ def main():
           not run_agy([agy_clean_call, agy_clean_out])[0])
     check("warns when an Antigravity git push follows the clean run",
           run_agy([agy_clean_call, agy_clean_out, agy_push_call, agy_push_out])[0])
-    check("silent when an Antigravity backgrounded clean run finishes via EPHEMERAL_MESSAGE",
+    check("silent when an Antigravity backgrounded clean run finishes via SYSTEM_MESSAGE",
           not run_agy([
               agy_clean_call,
               {"type": "GENERIC", "status": "DONE",
                "content": "Tool is running as a background task with task id: conv/task-7"},
-              {"type": "EPHEMERAL_MESSAGE", "status": "DONE",
-               "content": ('[Message] sender=conv/task-7 content=Task id "conv/task-7" '
+              {"type": "SYSTEM_MESSAGE", "status": "DONE",
+               "content": ('The following is a <SYSTEM_MESSAGE> not actually sent by the user.\n'
+                           '<SYSTEM_MESSAGE>\n[Message] sender=conv/task-7 content=Task id "conv/task-7" '
                            'finished with result:\nCommand exited with code 0.\n\n'
-                           'Command output:\n' + CLEAN_OUT)},
+                           'Command output:\n' + CLEAN_OUT + '\n</SYSTEM_MESSAGE>')},
           ])[0])
     check("warns when an Antigravity backgrounded clean run has not finished yet",
           run_agy([

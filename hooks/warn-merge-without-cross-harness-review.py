@@ -53,10 +53,11 @@ nothing about who reviewed.
 * A multi-backend harness (`opencode`, `cursor-agent`) qualifies only when
   its configured model also differs. The model is a config file away, not on
   the command line, so the hook takes the harness as the signal.
-* The session's own harness is read from the environment: Antigravity when
-  `ANTIGRAVITY_AGENT` is set, Claude Code otherwise. Under another harness
-  (Codex, OpenCode, Gemini CLI) that default is wrong: its own CLI would be
-  credited and `claude` excluded.
+* The session's own harness is read from `ANTIGRAVITY_AGENT`, the Antigravity
+  transcript path (`brain/<id>/.system_generated/logs/transcript.jsonl`), or
+  Antigravity record types (`PLANNER_RESPONSE`, `SYSTEM_MESSAGE`), defaulting
+  to Claude Code otherwise. In an Antigravity session, both `agy` and `gemini`
+  are excluded as same-harness/same-model family while `claude` qualifies.
 * A review run in another session or by a human is invisible here.
 * `nohup` and `timeout` are looked through, but a reviewer launched from a
   script (`dtc`'s background `nohup bash "$WORK/run.sh" &`) is not: the
@@ -103,7 +104,8 @@ RX_AUTO_MERGE_TOOL = re.compile(
 RX_AGY_TRANSCRIPT_PATH = re.compile(
     r"(?:^|/)(?:\.gemini/antigravity/|brain/[^/]+/\.system_generated/logs/transcript)")
 AGY_RECORD_TYPES = frozenset({
-    "PLANNER_RESPONSE", "USER_INPUT", "EPHEMERAL_MESSAGE", "TOOL_RESPONSE",
+    "PLANNER_RESPONSE", "USER_INPUT", "SYSTEM_MESSAGE", "EPHEMERAL_MESSAGE",
+    "TOOL_RESPONSE",
 })
 GATE = "shared/workflow/adversarial-self-review.md"
 

@@ -1588,8 +1588,11 @@ def mask_payloads(text: str) -> str:
 # the command text. Adding a repository here is a one-line diff, and code
 # review is the right gate for an allowlist.
 #
-# The shared math-macros repo carries the same standing grant (user directive,
-# 2026-10-02: "the macros repo should have a standing mwc grant"). It answers
+# The shared math-macros repo carried the same standing grant (user directive,
+# 2026-10-02: "the macros repo should have a standing mwc grant") until
+# macros#309 / ai-config#4767: a session merged macros#293 on that grant with no
+# typed mwc, and the project rule is that only the user's own typed mwc counts.
+# It is removed from the set below. It answered
 # to both owner spellings: d-morrison/macros and Morrison-Lab/macros both
 # resolved, with the same HEAD (fb15659c), to `git ls-remote` on 2026-10-02.
 #
@@ -1600,8 +1603,6 @@ def mask_payloads(text: str) -> str:
 STANDING_MERGE_GRANT_REPOS = frozenset(
     {
         "morrison-lab/ai-config",
-        "d-morrison/macros",
-        "morrison-lab/macros",
         "morrison-lab/gha",
     }
 )

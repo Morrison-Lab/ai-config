@@ -411,7 +411,8 @@ A clean scorer exit is not the hold-off, and neither is a standing merge grant.)
 ## The standing per-repository grant
 
 Two repositories carry the grant **standing**, with no session step at all: PRs targeting `Morrison-Lab/ai-config` (ai-config#1352), and PRs targeting `Morrison-Lab/gha` (user directive, 2026-10-16).
-The shared math-macros repo, `d-morrison/macros`, carried it too until macros#309 / ai-config#4767; a session merged macros#293 on it with no typed `mwc`, so it was removed.
+The shared math-macros repo, `d-morrison/macros`, carried it too until macros#309 / ai-config#4767;
+a session merged macros#293 on it with no typed `mwc`, so it was removed.
 `no-unauthorized-merge.py` reads the merge's target repository off the command
 itself, so there is nothing to enable, nothing to expire, and no marker to go
 stale.

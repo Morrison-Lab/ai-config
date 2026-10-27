@@ -160,7 +160,7 @@ RX_AGY_BG_DONE = re.compile(
     re.S,
 )
 RX_AGY_NONZERO_EXIT = re.compile(
-    r"^\s*(?:the\s+)?command exited with code [1-9]\d*\b", re.I)
+    r"^[ \t]*(?:the[ \t]+)?command exited with code [1-9]\d*\b", re.I | re.M)
 AGY_SYS_MSG_SEP = "\n\nThe following is a <SYSTEM_MESSAGE>"
 
 NOTE = (
@@ -331,7 +331,12 @@ def _agy_is_error(rec, text):
         return False
     if "Encountered error in tool execution:" in text:
         return True
-    return bool(RX_AGY_NONZERO_EXIT.search(text))
+    # Match exit status only in the wrapper header before the command's own
+    # stdout/stderr body (`\n\nCommand output:` in current Antigravity or
+    # `\nOutput:` in pre-2026-10-20 transcripts), accounting for any leading
+    # `Created At:` / `Completed At:` lines.
+    header = text.split("\n\nCommand output:", 1)[0].split("\nOutput:", 1)[0]
+    return bool(RX_AGY_NONZERO_EXIT.search(header))
 
 
 def records(path):
@@ -360,6 +365,8 @@ def records(path):
         step_idx = rec.get("step_index")
         blocks = []
         if rtype == "PLANNER_RESPONSE" and isinstance(rec.get("tool_calls"), list):
+            # Safe to clear on each PLANNER_RESPONSE because raw_recs is sorted
+            # by step_index above before iteration.
             agy_pending_ids.clear()
             agy_step_to_tid.clear()
             for idx, tc in enumerate(rec["tool_calls"]):

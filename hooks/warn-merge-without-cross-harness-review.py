@@ -150,7 +150,12 @@ def own_harness(path="", recs=None):
 
 
 def own_harnesses(path="", recs=None):
-    """CLI names that share the authoring session's harness/model family."""
+    """CLI names that share the authoring session's harness/model family.
+
+    Note: assumes an Antigravity session runs a Gemini-family model (the
+    platform default) so `claude` counts as cross-harness and `agy`/`gemini`
+    are excluded as same-family.
+    """
     if own_harness(path, recs) == "agy":
         return frozenset({"agy", "gemini"})
     return frozenset({"claude"})

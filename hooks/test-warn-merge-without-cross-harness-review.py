@@ -263,7 +263,11 @@ def main():
     agy_ok_out = {
         "type": "GENERIC",
         "status": "DONE",
-        "content": "Command exited with code 0.\n\nCommand output:\nVerdict: Ready to merge",
+        "content": (
+            "Created At: 2026-10-27T16:29:10-07:00\n"
+            "Completed At: 2026-10-27T16:29:22-07:00\n"
+            "Command exited with code 0.\n\nCommand output:\nVerdict: Ready to merge"
+        ),
     }
     check("silent after a claude -p run in an Antigravity transcript (even without ANTIGRAVITY_AGENT env)",
           not run_agy([agy_claude_call, agy_ok_out])[0])
@@ -281,13 +285,22 @@ def main():
           run_agy([
               agy_claude_call,
               {"type": "GENERIC", "status": "DONE",
-               "content": "The command exited with code 1.\nOutput:\nerror"},
+               "content": (
+                   "Created At: 2026-10-19T12:00:00Z\n"
+                   "Completed At: 2026-10-19T12:00:02Z\n"
+                   "The command exited with code 1.\nOutput:\nerror"
+               )},
           ])[0])
     check("silent when a zero-exit claude -p review mentions 'command exited with code 1' in its output body",
           not run_agy([
               agy_claude_call,
               {"type": "GENERIC", "status": "DONE",
-               "content": "Command exited with code 0.\n\nCommand output:\nChecked why the command exited with code 1."},
+               "content": (
+                   "Created At: 2026-10-27T16:29:10-07:00\n"
+                   "Completed At: 2026-10-27T16:29:22-07:00\n"
+                   "Command exited with code 0.\n\nCommand output:\n"
+                   "command exited with code 1 in earlier test"
+               )},
           ])[0])
     check("warns when out-of-order step_index has view_file succeed (step 8) and claude -p fail (step 9)",
           run_agy([
@@ -299,7 +312,11 @@ def main():
                    {"name": "run_command", "args": {"CommandLine": "claude -p 'review'"}},
                ]},
               {"step_index": 9, "type": "GENERIC", "status": "DONE",
-               "content": "Command exited with code 1.\n\nCommand output:\nfailed"},
+               "content": (
+                   "Created At: 2026-10-27T16:29:10-07:00\n"
+                   "Completed At: 2026-10-27T16:29:22-07:00\n"
+                   "Command exited with code 1.\n\nCommand output:\nfailed"
+               )},
           ])[0])
     check("silent when out-of-order step_index has view_file (step 8) before planner (step 7) and claude -p succeed (step 9)",
           not run_agy([
@@ -311,7 +328,11 @@ def main():
                    {"name": "run_command", "args": {"CommandLine": "claude -p 'review'"}},
                ]},
               {"step_index": 9, "type": "GENERIC", "status": "DONE",
-               "content": "Command exited with code 0.\n\nCommand output:\nVerdict: Ready to merge"},
+               "content": (
+                   "Created At: 2026-10-27T16:29:10-07:00\n"
+                   "Completed At: 2026-10-27T16:29:22-07:00\n"
+                   "Command exited with code 0.\n\nCommand output:\nVerdict: Ready to merge"
+               )},
           ])[0])
     fired_agy, out_agy = run_agy([
         {"type": "PLANNER_RESPONSE",
@@ -328,7 +349,11 @@ def main():
           run_agy([
               agy_claude_call,
               {"type": "GENERIC", "status": "DONE",
-               "content": "Command exited with code 1.\n\nCommand output:\nerror"},
+               "content": (
+                   "Created At: 2026-10-27T16:29:10-07:00\n"
+                   "Completed At: 2026-10-27T16:29:22-07:00\n"
+                   "Command exited with code 1.\n\nCommand output:\nerror"
+               )},
           ])[0])
 
     # --- robustness -------------------------------------------------------

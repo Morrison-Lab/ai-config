@@ -109,7 +109,7 @@ File it as an issue, as `AGENTS.md` requires for noticed follow-ups, and don't a
 - **Don't:** finish the literal request and close the reply with "should I also make the other pages follow it?"
 
 (Incident, 2026-10-27, [Morrison-Lab/mlg#225](https://github.com/Morrison-Lab/mlg/pull/225):
-asked only to "give the landing page ... a dark mode", a session made the Pages landing page follow the browser's color scheme by its own choice, then ended its report by asking whether the Quarto pages beside it should also follow the browser's color scheme.
+asked only to "give the landing page ... a dark mode", a session made the Pages landing page follow the browser's color scheme by its own choice, then ended its report by asking whether the Quarto pages beside the landing page should also follow the browser's color scheme.
 The user replied `daytb`, handing the decision back.
 Calling that follow-up the same feature is the session's inference from that reply, not the user's words.)
 

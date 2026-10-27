@@ -19,6 +19,9 @@ The flag traps, the permission findings and the install notes live in `memories/
 The subscription-only rule applies (Ezra, 2026-10-13): `agy` here means the CLI signed in with the Antigravity app's login.
 Never route work through a Gemini, OpenAI or Anthropic API key.
 
+For reviews and plain briefs, `scripts/agy-dispatch.py` runs steps 3 and 4 below with the checks built in;
+the routing table is in [`route-to-agy`](../../shared/workflow/route-to-agy.md).
+
 ## Where it runs
 
 `agy` authenticates with the login the Antigravity app stored on the machine, and it has no documented headless token (none found as of 2026-10-13).

@@ -9,7 +9,8 @@ f="out-${slug//\//_}-$pr.txt"
 real_read() {
   grep -q '^VERDICT: ' "$f" || return 1
   [ "$(grep -o '^VERDICT: [A-Z]*' "$f" | sort -u | wc -l)" -eq 1 ] || return 1
-  grep -q -E 'AGY_ERROR|RESOURCE_EXHAUSTED' "$f" && return 1
+  grep -q -E 'AGY_ERROR|RESOURCE_EXHAUSTED|short_error|^Error:|^FATAL:' "$f" && return 1
+  grep -q -i -E 'rate[ _-]?limit exceeded|quota[ _-]?(exceeded|exhausted)|HTTP[ /0-9.]* 429\b|status[ =:]+429\b' "$f" && return 1
   body=$(awk 'NR>2' "$f")
   if grep -q '^VERDICT: FINDINGS' "$f"; then [ "${#body}" -ge 200 ] || return 1; else [ "${#body}" -ge 30 ] || return 1; fi
   echo "$body" | grep -q -i -E 'awaiting (your )?(approval|confirmation)|please (approve|confirm)|implementation plan|should I proceed|do you want me to|let me know (if|whether)' && return 1

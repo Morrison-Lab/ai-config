@@ -17,6 +17,7 @@ import sys
 import concurrent.futures as cf
 
 CHUNK_CHARS = 22000
+CLEAN_NOTE_CHARS = 80  # a CLEAN part longer than "nothing found" is listing something
 WORKERS = 5
 MODEL = os.environ.get("MODEL", "gemini-4-argon-medium")
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -112,8 +113,11 @@ def read_chunk(idx, total, names, text, repo, pr, meta, focus):
             out = p.stdout + p.stderr
         except subprocess.TimeoutExpired:
             out = "AGY_ERROR timeout"
+        except OSError as exc:  # agy missing from PATH, or a command line over the OS limit
+            out = "AGY_ERROR could not start agy: %s" % exc
         last = out
-        lines = [l for l in out.splitlines() if l.strip()]
+        lines = [l for l in out.splitlines()
+                 if l.strip() and not l.startswith(("**Stopping Point", "**Status"))]
         ok = (lines and lines[-1].strip() in ("VERDICT: CLEAN", "VERDICT: FINDINGS")
               and not re.search(r"AGY_ERROR|RESOURCE_EXHAUSTED", out)
               and not re.search(r"awaiting (your )?(approval|confirmation)|implementation plan", out, re.I))
@@ -130,8 +134,9 @@ def main():
     repo, pr = sys.argv[1], sys.argv[2]
     focus = sys.argv[3] if len(sys.argv) > 3 else ""
     path = os.path.join(HERE, "out-%s-%s.txt" % (repo.replace("/", "_"), pr))
-    if os.path.exists(path):
-        os.remove(path)  # a failed run must not leave an earlier verdict for post.sh to post
+    for stale in (path, path + ".truncated"):
+        if os.path.exists(stale):
+            os.remove(stale)  # a failed run must not leave an earlier verdict or marker for post.sh
     info = json.loads(run(["gh", "pr", "view", pr, "-R", repo, "--json", "headRefOid,title,state,body,changedFiles"]))
     head = info["headRefOid"]
     if info["state"] != "OPEN":
@@ -159,7 +164,8 @@ def main():
     findings = []
     for idx, verdict, out in results:
         body = clean_part(out)
-        if verdict == "FINDINGS" or len(body) >= 300:  # a CLEAN part that lists notes is not clean
+        if verdict == "FINDINGS" or len(body) > CLEAN_NOTE_CHARS or re.search("non-blocking", body, re.I):
+            # a CLEAN part that lists notes is not clean
             findings.append("**Part %d of %d (%s ... %s)**\n\n%s" % (
                 idx + 1, len(chunks), chunks[idx][0][0], chunks[idx][0][-1], body))
     verdict = "FINDINGS" if findings else "CLEAN"

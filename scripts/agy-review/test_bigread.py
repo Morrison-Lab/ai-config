@@ -61,6 +61,54 @@ def test_list_files_joins_several_pages(monkeypatch):
     assert len(bigread.list_files("o/r", "1")) == 2
 
 
+def _setup_main(monkeypatch, tmp_path, changed, parts):
+    """Run main() against stubbed gh calls and stubbed agy parts; return the out-file path."""
+    monkeypatch.setattr(bigread, "HERE", str(tmp_path))
+    monkeypatch.setattr(sys, "argv", ["bigread.py", "o/r", "7", "focus"])
+    info = {"headRefOid": "a" * 40, "title": "t", "state": "OPEN", "body": "b", "changedFiles": changed}
+
+    def fake_run(cmd):
+        if "--paginate" in cmd:
+            return json.dumps([_file("a.qmd", "+x"), _file("b.qmd", "+y")])
+        return json.dumps(info)
+
+    monkeypatch.setattr(bigread, "run", fake_run)
+    monkeypatch.setattr(bigread, "read_chunk", lambda idx, *a: (idx,) + parts[idx])
+    return tmp_path / "out-o_r-7.txt"
+
+
+def test_main_dies_when_the_files_api_returns_fewer_files_than_changed(monkeypatch, tmp_path):
+    _setup_main(monkeypatch, tmp_path, 3, [("CLEAN", "nothing")])
+    with pytest.raises(SystemExit) as exc:
+        bigread.main()
+    assert exc.value.code == 5
+
+
+def test_main_removes_a_stale_out_file_and_marker_before_failing(monkeypatch, tmp_path):
+    out = _setup_main(monkeypatch, tmp_path, 3, [("CLEAN", "nothing")])
+    out.write_text("HEAD: old\nSTATE: OPEN\nVERDICT: CLEAN\n")
+    (tmp_path / "out-o_r-7.txt.truncated").write_text("99999")
+    with pytest.raises(SystemExit):
+        bigread.main()
+    assert not out.exists()
+    assert not (tmp_path / "out-o_r-7.txt.truncated").exists()
+
+
+def test_main_turns_a_clean_part_that_lists_notes_into_findings(monkeypatch, tmp_path):
+    notes = "Non-blocking: a typo in the second paragraph of the exercise text that should be fixed."
+    out = _setup_main(monkeypatch, tmp_path, 2, [("CLEAN", notes + "\nVERDICT: CLEAN")])
+    bigread.main()
+    text = out.read_text()
+    assert text.rstrip().endswith("VERDICT: FINDINGS")
+    assert "typo in the second paragraph" in text
+
+
+def test_main_writes_clean_only_when_every_part_is_a_short_clean(monkeypatch, tmp_path):
+    out = _setup_main(monkeypatch, tmp_path, 2, [("CLEAN", "Nothing found.\nVERDICT: CLEAN")])
+    bigread.main()
+    assert out.read_text().rstrip().endswith("VERDICT: CLEAN")
+
+
 def test_clean_part_drops_the_repeated_answer_and_status_lines():
     out = "1. problem\n\nVERDICT: FINDINGS\n1. problem\n\n**Stopping Point**: done\n\nVERDICT: FINDINGS"
     assert bigread.clean_part(out) == "1. problem"

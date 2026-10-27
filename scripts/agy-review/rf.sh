@@ -20,7 +20,9 @@ for spec in "gemini-4-argon-medium|Argon: Gemini 4 Argon (Medium) via Antigravit
   model=${spec%%|*}; name=${spec#*|}
   MODEL=$model bash argon.sh "$slug" "$pr" "$extra$tail_note" >/dev/null 2>&1
   if real_read; then
-    MODEL_LABEL="$name" bash post.sh "$slug" "$pr" || { echo "post.sh failed (exit $?) for $slug#$pr; read not posted"; exit 1; }
+    post_out=$(MODEL_LABEL="$name" bash post.sh "$slug" "$pr") || { echo "$post_out"; echo "post.sh failed for $slug#$pr; read not posted"; exit 1; }
+    echo "$post_out"
+    case "$post_out" in SKIP*) echo "read not posted for $slug#$pr"; exit 2;; esac
     echo "model=$model head=$(sed -n 1p $f | cut -c7-13) verdict=$(grep -o '^VERDICT: [A-Z]*' $f | tail -1)"
     exit 0
   fi

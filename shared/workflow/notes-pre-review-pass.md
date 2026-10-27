@@ -28,7 +28,7 @@ State in the PR body that the checklist ran.
    Every technical term is hyperlinked at first use in each div, and each target div precedes its first mention in reading order.
    A term with no definition gets its own definition div, filed as an issue if it widens the PR, never left unlinked.
    Fix a forward reference or dependency-graph cycle by reordering the content or defining the prerequisite concept first, never by removing the hyperlink and adding `<!-- check-term-links: allow -->`.
-   Run [`Morrison-Lab/gha`](https://github.com/Morrison-Lab/gha)'s [`check-term-links.py`](https://github.com/Morrison-Lab/gha/blob/main/check-term-links/check-term-links.py) with `--diff <pr.diff>` locally before pushing so every `unlinked-first-use` finding in the PR diff is caught pre-push.
+   Run [`Morrison-Lab/gha`](https://github.com/Morrison-Lab/gha)'s [`check-term-links.py`](https://github.com/Morrison-Lab/gha/blob/main/check-term-links/check-term-links.py) with `--diff <(git diff origin/main...HEAD)` (or `--base-ref origin/main`) locally before pushing so every `unlinked-first-use` finding in the PR diff is caught pre-push.
 3. **Symbols.**
    Every technical term is paired with its semantic macro, and the macro is the existing one: search `Morrison-Lab/macros` for the concept before writing any expression.
 4. **Minimal expressions.**
@@ -38,7 +38,7 @@ State in the PR body that the checklist ran.
    A definition div holds its one term and links to everything else.
    A clause that defines another term or notation ("we write ... for ...", "a function that maps ...") gets its own definition div and example instead.
    Define a general concept from prerequisite terms defined before it (for example, define bounds first, then define an interval from its bounds), then state its special cases after it, rather than defining the general concept by listing later special-case divs or moving the general definition after its special cases.
-   Each new or revised subfile holds a single div, per [`lecture-conventions`](../writing/lecture-conventions.md) (with `{{< slidebreak >}}` between includes in the parent chapter spine);
+   Each new or revised subfile holds a single div, per [`lecture-conventions`](../writing/lecture-conventions.md);
    never bundle a definition and its remarks or additional definitions into the same subfile.
 6. **No overexplaining.**
    Delete a clause that restates what the term and its symbol already say.

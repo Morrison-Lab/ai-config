@@ -86,8 +86,8 @@ def test_main_dies_when_the_files_api_returns_fewer_files_than_changed(monkeypat
 
 def test_main_removes_a_stale_out_file_and_marker_before_failing(monkeypatch, tmp_path):
     out = _setup_main(monkeypatch, tmp_path, 3, [("CLEAN", "nothing")])
-    out.write_text("HEAD: old\nSTATE: OPEN\nVERDICT: CLEAN\n")
-    (tmp_path / "out-o_r-7.txt.truncated").write_text("99999")
+    out.write_text("HEAD: old\nSTATE: OPEN\nVERDICT: CLEAN\n", encoding="utf-8")
+    (tmp_path / "out-o_r-7.txt.truncated").write_text("99999", encoding="utf-8")
     with pytest.raises(SystemExit):
         bigread.main()
     assert not out.exists()
@@ -98,7 +98,7 @@ def test_main_turns_a_clean_part_that_lists_notes_into_findings(monkeypatch, tmp
     notes = "Non-blocking: a typo in the second paragraph of the exercise text that should be fixed."
     out = _setup_main(monkeypatch, tmp_path, 2, [("CLEAN", notes + "\nVERDICT: CLEAN")])
     bigread.main()
-    text = out.read_text()
+    text = out.read_text(encoding="utf-8")
     assert text.rstrip().endswith("VERDICT: FINDINGS")
     assert "typo in the second paragraph" in text
 
@@ -106,7 +106,7 @@ def test_main_turns_a_clean_part_that_lists_notes_into_findings(monkeypatch, tmp
 def test_main_writes_clean_only_when_every_part_is_a_short_clean(monkeypatch, tmp_path):
     out = _setup_main(monkeypatch, tmp_path, 2, [("CLEAN", "Nothing found.\nVERDICT: CLEAN")])
     bigread.main()
-    assert out.read_text().rstrip().endswith("VERDICT: CLEAN")
+    assert out.read_text(encoding="utf-8").rstrip().endswith("VERDICT: CLEAN")
 
 
 def test_clean_part_drops_the_repeated_answer_and_status_lines():

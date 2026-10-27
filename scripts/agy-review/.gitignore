@@ -1,0 +1,4 @@
+out-*.txt
+out-*.txt.truncated
+comment-*.md
+skip-*

@@ -57,13 +57,15 @@ It missed UC Davis, Kristen Aiemjoy, two cited books, Quarto, GitHub Actions, an
 
 A list of definition links after the sentence --- "(definitions: bias, variance, irreducible error)" --- makes the reader find each term twice, once in the sentence and once in the list.
 Put each link on the word the sentence already uses, once per passage as in [`definition-crossrefs`](definition-crossrefs.md).
-A single crossref attached to the term it defines, such as "(@def-hessian)", is a different construction and stays; a parenthetical list of them does not.
+A single crossref attached to the term it defines, such as "(@def-hessian)", is a different construction and stays;
+a parenthetical list of them does not.
 
 The test is observable: does a sentence in the passage use the term as a word?
 If so, link it there, rewriting the sentence in prose when the term sat only in a formula.
 If the term occurs only as a math label (for example an underbrace in a displayed equation), keep a "Hint: see the definitions of ..." line.
 
-Observed on a private Morrison-Lab/mlg exercise (issue 203, proposed in pull request 205, 2026-10-26; no link is given because the repository is private).
+Observed on a private Morrison-Lab/mlg exercise (issue 203, proposed in pull request 205, 2026-10-26;
+no link is given because the repository is private).
 Midterm 1 practice question 3(c) wrote the decomposition as a formula and listed the three terms in a parenthetical after it, and Ezra asked for the links in the sentence itself.
 The proposed text reads "decomposes into the squared [bias](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-bias), the [variance](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-variance) and the [irreducible error](https://morrison-lab.github.io/lds/chapters/big-ideas.html#def-irreducible-error)".
 

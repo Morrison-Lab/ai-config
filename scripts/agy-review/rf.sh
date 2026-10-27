@@ -8,6 +8,7 @@ tail_note=" Do not write a plan, do not create artifacts, do not ask questions o
 f="out-${slug//\//_}-$pr.txt"
 real_read() {
   grep -q '^VERDICT: ' "$f" || return 1
+  [ "$(grep -o '^VERDICT: [A-Z]*' "$f" | sort -u | wc -l)" -eq 1 ] || return 1
   grep -q -E 'AGY_ERROR|RESOURCE_EXHAUSTED' "$f" && return 1
   body=$(awk 'NR>2' "$f")
   if grep -q '^VERDICT: FINDINGS' "$f"; then [ "${#body}" -ge 200 ] || return 1; else [ "${#body}" -ge 30 ] || return 1; fi
@@ -22,7 +23,8 @@ for spec in "gemini-4-argon-medium|Argon: Gemini 4 Argon (Medium) via Antigravit
   if real_read; then
     post_out=$(MODEL_LABEL="$name" bash post.sh "$slug" "$pr"); post_rc=$?
     echo "$post_out"
-    if [ "$post_rc" -eq 4 ]; then echo "model $model read refused by post.sh (notes or truncated diff); trying the next model"; continue; fi
+    if [ "$post_rc" -eq 4 ]; then echo "model $model read refused by post.sh (CLEAN that lists notes); trying the next model"; continue; fi
+    if [ "$post_rc" -eq 5 ]; then echo "diff was truncated, so no model can post a CLEAN here; use bigread.py"; exit 1; fi
     [ "$post_rc" -eq 0 ] || { echo "post.sh failed (exit $post_rc) for $slug#$pr; read not posted"; exit 1; }
     case "$post_out" in SKIP*) echo "read not posted for $slug#$pr"; exit 2;; esac
     echo "model=$model head=$(sed -n 1p $f | cut -c7-13) verdict=$(grep -o '^VERDICT: [A-Z]*' $f | tail -1)"

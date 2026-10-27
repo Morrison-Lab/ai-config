@@ -17,7 +17,7 @@ case "$verdict" in CLEAN|FINDINGS) ;; *) echo "NO VERDICT in $f; not posting"; e
 if grep -q -E 'AGY_ERROR|RESOURCE_EXHAUSTED' "$f"; then echo "AGY ERROR in $f; not posting"; exit 3; fi
 # same 80-character rule as CLEAN_NOTE_CHARS in bigread.py
 if [ "$verdict" = CLEAN ] && { echo "$body" | grep -q -i 'non-blocking' || [ "${#body}" -gt 80 ]; }; then echo "CLEAN with listed notes in $f; not posting"; exit 4; fi
-if [ "$verdict" = CLEAN ] && [ -e "$f.truncated" ]; then echo "CLEAN from a truncated diff ($(cat "$f.truncated") chars) in $f; not posting (use bigread.py)"; exit 4; fi
+if [ "$verdict" = CLEAN ] && [ -e "$f.truncated" ]; then echo "CLEAN from a truncated diff ($(cat "$f.truncated") chars) in $f; not posting (use bigread.py)"; exit 5; fi
 note=""
 [ "$cur" != "$head" ] && note="
 The PR head has moved since this review (reviewed ${head:0:7}); a later read of the current head supersedes this one."

@@ -653,12 +653,14 @@ See
   GitHub scope, no network path), file in the current working repo, state
   plainly which repo it really belongs to, and ask the user to transfer it
   — the same fallback the `config-ai` skill's step 3 uses.
-- **Out of scope is not unreachable when the session can attach repos.**
-  A cloud session with an `add_repo` tool reaches any repo the account can, so attach the home repo and file there.
-  Never end a reply listing findings as "unfiled because the repo isn't in this session's scope", or ask whether to file them:
-  on 2026-10-27 a session did both for three ai-config hook defects,
-  and the user had to attach ai-config and answer `daytb` before they were filed
-  (ai-config#4785, and comments on #4712 and #3544).
+  A repo outside the session's scope is not yet unreachable when the session has an `add_repo` tool:
+  attach it first, without asking, per [`default-to-action-grants`](default-to-action-grants.md),
+  and fall back here only when `add_repo` refuses.
+  A reply that lists findings as unfiled because their repo was out of scope skipped that step
+  (2026-10-27: three ai-config tooling defects waited on the user to attach ai-config;
+  they became [ai-config#4785](https://github.com/Morrison-Lab/ai-config/issues/4785)
+  and comments on [ai-config#4712](https://github.com/Morrison-Lab/ai-config/issues/4712#issuecomment-6458214277)
+  and [ai-config#3544](https://github.com/Morrison-Lab/ai-config/issues/3544#issuecomment-6458214464)).
 
 ## A defect that resolved itself on a retry is still a defect
 

@@ -644,7 +644,8 @@ The second trap was this README's own advice until ai-config#4796.
 It said to "emit `systemMessage`", and 19 registered hooks did, every one of them addressed to the agent ("your message says ...").
 On 2026-10-27 `require-stopping-point.py` fired on every closing reply of a lds session that never said whether it was done.
 The agent saw none of those warnings, so the user had to ask "session done?" and then "why didn't you say so before?", exactly as in #4308.
-#4322 had turned that hook from blocking to warn-only on the premise that `systemMessage` alerts the agent; it does not.
+PR #4322 had turned that hook from blocking to warn-only on the premise that `systemMessage` alerts the agent.
+It does not.
 
 The channels that do reach the agent:
 

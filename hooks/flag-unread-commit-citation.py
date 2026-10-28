@@ -574,7 +574,13 @@ def _collect_tool_uses(path):
                     if tname == "call_mcp_tool" and isinstance(inp, dict):
                         srv = str(inp.get("ServerName") or inp.get("serverName") or inp.get("server") or "").strip()
                         sub = str(inp.get("ToolName") or inp.get("toolName") or inp.get("tool") or "").strip()
-                        mcp_args = _agy_unwrap_args(inp.get("Arguments") or inp.get("arguments") or {}) if _agy_unwrap_args else (inp.get("Arguments") or inp.get("arguments") or {})
+                        raw_mcp = inp.get("Arguments") or inp.get("arguments") or {}
+                        if isinstance(raw_mcp, str) and not _agy_unwrap_args:
+                            try:
+                                raw_mcp = json.loads(raw_mcp)
+                            except Exception:
+                                raw_mcp = {}
+                        mcp_args = _agy_unwrap_args(raw_mcp) if _agy_unwrap_args else raw_mcp
                         if srv and sub and isinstance(mcp_args, dict):
                             tname, inp = f"mcp__{srv}__{sub}", mcp_args
                     out.append((i, tname, inp))

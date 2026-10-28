@@ -39,8 +39,11 @@ incident, and truncating test output is ordinary, legitimate practice; a hook
 keyed on it would misfire constantly and get switched off, taking the real
 cases with it.
 
-WHY THIS WARNS RATHER THAN BLOCKS
-----------------------------------
+WHY THIS NEVER DECIDES FOR THE AGENT
+-----------------------------------
+It interrupts the stop at most once per turn (agent_notice.stop_notice), so
+the agent reads the warning, which a bare systemMessage never reached
+(ai-config#4796), and the next stop always passes.
 Same shape as `remind-ums-after-error.py`'s reasoning, restated for a `Stop`
 hook rather than a `UserPromptSubmit` one: a false positive here (a genuine
 probe correctly disclosed as a probe, or a claim about a file this hook's
@@ -64,7 +67,7 @@ matching -- `remind-ums-after-error.py`'s `visible_prose()` -- on the
 assumption that a reply discussing this rule quotes its example phrases in
 backticks or a fence, as this docstring and its PR body do. A bare-prose
 discussion that never quotes the phrases can still misfire; that residual
-gap is why this warns rather than blocks.
+gap is why this interrupts once rather than refusing the stop.
 
 TEST-SUITE RECOGNITION IS DELIBERATELY A SMALL, EXPLICIT LIST
 ----------------------------------------------------------------

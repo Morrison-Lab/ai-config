@@ -45,8 +45,11 @@ the actual incident shape: a handoff whose STATED REASON is a permission
 refusal, not any blocker whatsoever. See `ESCALATION_RX` / `ATTRIBUTION_RX`
 and `find_denial_escalation` below.
 
-WHY THIS WARNS RATHER THAN BLOCKS
+WHY THIS NEVER DECIDES FOR THE AGENT
 -----------------------------------
+It interrupts the stop at most once per turn (agent_notice.stop_notice), so
+the agent reads the warning, which a bare systemMessage never reached
+(ai-config#4796), and the next stop always passes.
 The obvious shape is a `Stop` guard that blocks the escalating message
 outright, copying `no-offer-to-file.py`. That shape is wrong here, for the
 same reason `flag-cop-out-offer.py` and `remind-deserialize-before-binary-claim.py`

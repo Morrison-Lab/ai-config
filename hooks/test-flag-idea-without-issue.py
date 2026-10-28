@@ -220,22 +220,41 @@ def main():
             print(f"FAIL: {label} (expected warn={expected}, got {got})")
             failures += 1
 
-    # This hook must never emit "decision": "block" -- it is warn-only.
+    # The first warning in a turn must block, with the warning as its
+    # `reason`, the only part the agent reads (ai-config#4796).
     fd, path = tempfile.mkstemp(suffix=".jsonl")
     with os.fdopen(fd, "w") as fh:
         fh.write(json.dumps(say(
             "\U0001F4A1 **OFFER** --- I can build that mechanism."
         )) + "\n")
+    # A fresh sentinel dir, so an earlier run cannot have spent this turn's block.
     out = subprocess.run(
         [sys.executable, HOOK], input=json.dumps({"transcript_path": path}),
         capture_output=True, text=True,
+        env=dict(os.environ, TMPDIR=tempfile.mkdtemp()),
     ).stdout
-    os.unlink(path)
-    if '"decision"' not in out and '"block"' not in out:
-        print("PASS: never emits a block decision")
+    payload = json.loads(out) if out.strip() else {}
+    if (payload.get("decision") == "block" and payload.get("reason")
+            and payload.get("reason") == payload.get("systemMessage")):
+        print("PASS: blocks once, with the warning as the reason the agent reads")
         passes += 1
     else:
-        print("FAIL: emitted a block decision -- this hook must warn only")
+        print(f"FAIL: expected a block whose reason carries the warning, got {out!r}")
+        failures += 1
+    # ...and never blocks a stop that continues an earlier block, so it cannot
+    # wedge a session.
+    again = subprocess.run(
+        [sys.executable, HOOK],
+        input=json.dumps({"transcript_path": path, "stop_hook_active": True}),
+        capture_output=True, text=True,
+        env=dict(os.environ, TMPDIR=tempfile.mkdtemp()),
+    ).stdout
+    os.unlink(path)
+    if '"decision"' not in again:
+        print("PASS: never blocks a stop that continues an earlier block")
+        passes += 1
+    else:
+        print(f"FAIL: blocked while stop_hook_active was set: {again!r}")
         failures += 1
 
     # Fires at most once per distinct message.

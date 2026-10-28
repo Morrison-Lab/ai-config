@@ -47,8 +47,11 @@ per-message sentinel has seen (the two hooks keep separate sentinel
 namespaces), and dropping the overlapping phrases would leave this hook
 silent on wording the incident used almost verbatim.
 
-WHY THIS WARNS RATHER THAN BLOCKS
+WHY THIS NEVER DECIDES FOR THE AGENT
 -----------------------------------
+It interrupts the stop at most once per turn (agent_notice.stop_notice), so
+the agent reads the warning, which a bare systemMessage never reached
+(ai-config#4796), and the next stop always passes.--
 Whether an item SHOULD have been filed is not lexically decidable from the
 phrase alone. The reply may be narrating an item that is already filed and
 merely restating its status ("still unfiled" describing last week, before
@@ -58,8 +61,7 @@ with no defect behind it at all. Blocking a truthful status report would be
 worse than the report itself, so this hook can only surface the phrase and
 make the author answer the filing question -- deciding it for them would
 refuse a legitimate "this is out of scope; it is not mine to file" answer.
-This matches the warn-not-block precedent already set by
-`no-unmeasured-clock-claim.py` and `flag-cop-out-offer.py`.
+`no-unmeasured-clock-claim.py` and `flag-cop-out-offer.py` work the same way.
 
 REUSE RATHER THAN RE-IMPLEMENTATION
 --------------------------------------

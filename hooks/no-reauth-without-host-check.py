@@ -46,7 +46,11 @@ of its sentence ("Your token is invalid."), "log in again" only with a
 forge or token word in its sentence; and a login command followed by
 "in the README / docs / CI / example" is read as describing, not asking.
 
-## Why this warns rather than blocks
+## Why this never decides for the agent
+
+It interrupts the stop at most once per turn (agent_notice.stop_notice), so
+the agent reads the warning, which a bare systemMessage never reached
+(ai-config#4796), and the next stop always passes.
 
 Sometimes re-authentication really is needed and the check was made some
 other way (a browser, a different tool). The hook cannot tell, so it only adds

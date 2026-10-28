@@ -621,7 +621,7 @@ consuming repos.
 [machine_learning_lecture_materials#2](https://github.com/Morrison-Lab/machine_learning_lecture_materials/pull/2);
 tracked as [ai-config#3717](https://github.com/Morrison-Lab/ai-config/issues/3717).)
 
-## A green HTML build does not show that the PDF and Word outputs are right
+## A green build does not show that the PDF and Word outputs are right
 
 On a site whose pages also render PDF and DOCX, the CI build check can pass
 while those outputs are wrong in ways nothing reports.
@@ -629,14 +629,18 @@ Measured on `Morrison-Lab/psw` (2026-10-27):
 
 - **PDF:** LuaLaTeX printed a blank for each character Latin Modern lacks,
   such as the ❌/✅ markers on example lines, and the build still succeeded
-  ([psw#387](https://github.com/Morrison-Lab/psw/issues/387); fixed in psw#389
+  ([psw#387](https://github.com/Morrison-Lab/psw/issues/387); fixed in [psw#389](https://github.com/Morrison-Lab/psw/pull/389)
   with `\tracinglostchars=3` and a `newunicodechar` map).
 - **DOCX:** the shared math macros came through unexpanded,
   because Word output has no MathJax or LaTeX preamble to define them
-  (fixed in psw#390 with a Lua filter).
+  (fixed in [psw#390](https://github.com/Morrison-Lab/psw/pull/390) with a Lua filter).
 
-- **Do:** before merging a content change on such a site, render the changed page
-  with `quarto render <page>.qmd --to pdf` and `--to docx`, and open the output.
+So check those outputs yourself:
+
+- **Do:** before merging a content change on such a site, download the changed page's PDF and DOCX
+  from the PR preview on `gh-pages`
+  (see [`read-published-html-from-gh-pages`](../shared/workflow/read-published-html-from-gh-pages.md))
+  and open them.
 - **Do:** make a lost glyph fail the PDF build (`\tracinglostchars=3`)
   so the next one turns CI red.
 - **Don't:** read a green `build` check as evidence the non-HTML outputs are correct.

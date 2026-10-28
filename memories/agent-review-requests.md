@@ -5,7 +5,7 @@ For what the reusable review workflow does once dispatched --- including how it
 triggers, stashes and restores requested reviewers, and posts its reply ---
 see [`claude-review-dispatch.md`](claude-review-dispatch.md).
 
-## How an agent session requests a review: a `/review` comment, never a dispatch
+## How a bot-identity agent session requests a review: a `/review` comment, never a dispatch
 
 An agent session -- a Claude Code remote/web session, a thread session, or one
 of their subagents -- cannot reach the Claude reviewer the way a person does,
@@ -80,8 +80,10 @@ itself.
   read the acknowledgement's link to find the dispatch run.
 - **Do:** check a dispatched run's `triggering_actor` before diagnosing a
   zero-cost short-circuit as a flake.
-- **Don't:** dispatch `claude-review.yml` directly from an agent session ---
-  the run starts, costs nothing, and fails.
+- **Don't:** dispatch `claude-review.yml` directly from an agent session acting as `claude[bot]` ---
+  the run starts, costs nothing, and fails
+  (a session acting as a person is the case
+  [below](#where-the-comment-route-does-not-exist-read-the-actor-before-following-this-page)).
 - **Don't:** reach for an `@claude review` comment instead; the mention filter
   skips a bot sender before any agent starts, and if it ever stopped doing so
   it would start an agent rather than a review.
@@ -166,8 +168,12 @@ and its `workflow_dispatch` through the GitHub MCP `actions_run_trigger` tool st
 (`triggering_actor: d-morrison`, `success`, a real review).
 The two gates this page opens with key on the sender being a bot,
 so they do not apply when the session acts as a person.
+A dispatch is what re-runs a review on an unchanged head,
+such as after the PR body changes, since only a push starts one otherwise.
 
-- **Do:** read the repo's review-workflow `on:` block for an `issue_comment` trigger before posting `/review`.
-- **Do:** read `triggering_actor` on the session's last review run; when it is a person,
-  dispatch the review workflow with its `pr_number` input.
+- **Do:** grep `.github/workflows/` for a job that answers `/review` before posting one.
+- **Do:** confirm the identity of the tool that will dispatch (`get_me` for the GitHub MCP, `gh api user` for `gh`);
+  when it is a person, dispatch the review workflow with its `pr_number` input.
+- **Do:** read the new run's `triggering_actor` after dispatching,
+  and stop if it reads `claude[bot]`.
 - **Don't:** post `/review` where no job answers it and then wait for a verdict.

@@ -247,13 +247,13 @@ Detaching the commit SHA leaves those verdicts pointing to an unreachable histor
 Once a commit is pushed, add a new commit instead of amending.
 The extra commit is squashed cleanly at PR merge, so history tidiness is preserved without breaking the review audit trail.
 
-## Never amend right after a reset
+## Never amend right after resetting to the base branch
 
 `git reset --hard origin/main` leaves `HEAD` on the base branch's own last commit,
 so a `git commit --amend` straight after it folds your change into that commit
 rather than into one of yours.
 Measured 2026-10-27 in a `Morrison-Lab/psw` cloud session:
-an amend meant for a fresh lessons commit rewrote the squash commit of psw#390,
+an amend meant for a fresh lessons commit rewrote the squash commit of [psw#390](https://github.com/Morrison-Lab/psw/pull/390),
 and was caught before any push.
 Before amending, read `git log -1 --format=%s` and confirm the subject is your own commit;
 after a reset, make a new commit instead.
@@ -285,6 +285,7 @@ An agent must never route around a push block by publishing through an alternati
 - **Do:** push with `--force-with-lease --force-if-includes` whenever a force is genuinely wanted, and state a reason whenever you reach for `ALLOW_FORCE_PUSH=1`.
 - **Do:** add a new commit rather than amending once a commit has been pushed to the remote.
 - **Do:** immediately start or re-arm active CI and review polling after pushing to a PR/MR, driving the round until it reaches a terminal state.
+- **Do:** read `git log -1 --format=%s` before `git commit --amend`, and after a reset make a new commit.
 - **Do:** stop and report when a push is refused and no override is authorized, leaving unpushed commits in the local worktree for the orchestrator.
 - **Do:** use the sanctioned override (`ALLOW_UNREVIEWED_PUSH=1`) only when authorized, stating the exact reason on the record so the bypass is auditable.
 - **Do:** reconcile a divergence by fetching and reading it, and treat an object you cannot resolve locally as the stronger signal rather than the weaker.

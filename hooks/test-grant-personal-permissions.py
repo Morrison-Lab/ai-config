@@ -58,6 +58,36 @@ for name, payload in ALLOW:
     check(f"allows: {name}", rc == 0 and decision(out) == "allow"
           and "ai-config#4374" in out["hookSpecificOutput"]["permissionDecisionReason"])
 
+
+def add_repo(owner, repo="x", access="read", tool="mcp__claude-code-remote__add_repo"):
+    return {"tool_name": tool,
+            "tool_input": {"owner": owner, "repo": repo, "access": access}}
+
+
+for name, payload in [
+    ("add_repo Morrison-Lab", add_repo("Morrison-Lab", "gha")),
+    ("add_repo push access", add_repo("Morrison-Lab", "gha", "push")),
+    ("add_repo lowercase owner", add_repo("morrison-lab")),
+    ("add_repo d-morrison", add_repo("d-morrison", "qwt")),
+    ("add_repo UCD-SERG", add_repo("UCD-SERG", "serodynamics")),
+    ("add_repo other spelling", add_repo("Morrison-Lab", tool="mcp__Claude_Code_Remote__add_repo")),
+]:
+    rc, out, _ = run(payload)
+    check(f"allows: {name}", rc == 0 and decision(out) == "allow"
+          and "member owner" in out["hookSpecificOutput"]["permissionDecisionReason"])
+
+for name, payload in [
+    ("add_repo non-member owner", add_repo("someone-else", "repo")),
+    ("add_repo owner as prefix", add_repo("Morrison-Lab-fork")),
+    ("add_repo missing owner", {"tool_name": "mcp__claude-code-remote__add_repo",
+                                "tool_input": {"repo": "gha"}}),
+    ("add_repo non-string owner", add_repo(["Morrison-Lab"])),
+    ("other remote tool", {"tool_name": "mcp__claude-code-remote__create_session",
+                           "tool_input": {"owner": "Morrison-Lab"}}),
+]:
+    rc, out, _ = run(payload)
+    check(f"no decision: {name}", rc == 0 and decision(out) is None)
+
 SILENT = [
     ("other skill", skill("ardi")),
     ("mwc-extra", skill("mwc-extra")),

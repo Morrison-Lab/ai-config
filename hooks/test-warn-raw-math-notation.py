@@ -260,6 +260,42 @@ with tempfile.TemporaryDirectory() as d:
     check(r.returncode == 1 and "\\ESEt" in r.stdout,
           "lint finds a latex-macros/ submodule through .gitmodules without --macros")
 
+    # The library must stay inside the repo: no `..` path, no symlink out.
+    outside = os.path.join(d, "outside")
+    os.makedirs(outside)
+    with open(os.path.join(outside, "macros.qmd"), "w", encoding="utf-8") as f:
+        f.write(ESE_DEF)
+    escape = make_repo(os.path.join(d, "escape"), sub="../outside", lib=None)
+    out = hook("Write", {"file_path": os.path.join(escape, "a.qmd"), "content": ESE_RAW})
+    check("\\ESEt" not in out and "\\Ep" in out,
+          "a submodule path with `..` leading out of the repo is not read")
+    linked = make_repo(os.path.join(d, "linked"), lib=None)
+    os.makedirs(os.path.join(linked, "latex-macros"))
+    os.symlink(os.path.join(outside, "macros.qmd"),
+               os.path.join(linked, "latex-macros", "macros.qmd"))
+    out = hook("Write", {"file_path": os.path.join(linked, "a.qmd"), "content": ESE_RAW})
+    check("\\ESEt" not in out and "\\Ep" in out,
+          "a macros.qmd symlinked out of the repo is not read")
+
+    # A path reached through a symlinked directory finds the real repo.
+    alias = os.path.join(d, "alias")
+    os.symlink(os.path.join(repo, "chapters"), alias)
+    out = hook("Write", {"file_path": os.path.join(alias, "x.qmd"), "content": ESE_RAW})
+    check("\\ESEt" in out, "a symlinked directory is resolved before the walk up")
+
+    # A deleted working directory fails open instead of crashing.
+    gone = os.path.join(d, "gone")
+    os.makedirs(gone)
+    script = ("import os, subprocess, sys; os.chdir(sys.argv[1]); os.rmdir(sys.argv[1]); "
+              "p = subprocess.run([sys.executable, sys.argv[2]], input=sys.argv[3], "
+              "capture_output=True, text=True); "
+              "print(p.returncode, 'Traceback' in p.stderr, '\\\\Ep' in p.stdout)")
+    p = subprocess.run([sys.executable, "-c", script, gone, HOOK, json.dumps(
+        {"tool_name": "Write", "tool_input": {"file_path": "a.qmd", "content": ESE_RAW}})],
+        capture_output=True, text=True)
+    check(p.stdout.split() == ["0", "False", "True"],
+          "a deleted working directory fails open to the built-in rules")
+
     # A worktree leaves the submodule uninitialised: read it from the clone.
     lib_src = os.path.join(d, "macros-src")
     os.makedirs(lib_src)

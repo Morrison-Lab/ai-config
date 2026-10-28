@@ -176,7 +176,7 @@ def _macros_submodules(start, deadline: float):
     directory name, identifies it. Raises OSError or UnicodeDecodeError
     when `.gitmodules` exists but cannot be read.
     """
-    start = Path(start).absolute()
+    start = Path(start).resolve()
     root = _git_root(start if start.is_dir() else start.parent)
     if root is None:
         return
@@ -217,8 +217,9 @@ def read_macros_library(start, budget: float = DEFAULT_BUDGET) -> tuple[str, str
     deadline = time.monotonic() + budget
     subs = list(_macros_submodules(start, deadline))
     for root, _name, path in subs:
-        lib = root / path / LIBRARY_BASENAME
-        if lib.is_file():
+        lib = (root / path / LIBRARY_BASENAME).resolve()
+        # A path with `..`, an absolute path or a symlink must not lead out of the repo.
+        if lib.is_relative_to(root) and lib.is_file():
             return str(lib), lib.read_text(encoding="utf-8")
     for root, name, path in subs:
         try:
@@ -228,9 +229,11 @@ def read_macros_library(start, budget: float = DEFAULT_BUDGET) -> tuple[str, str
                 timeout=_left(deadline))
             if common.returncode != 0:
                 continue
-            git_dir = os.path.join(common.stdout.strip(), "modules", name)
-            if not os.path.isdir(git_dir):
+            modules = (Path(common.stdout.strip()) / "modules").resolve()
+            git_dir = (modules / name).resolve()
+            if not (git_dir.is_relative_to(modules) and git_dir.is_dir()):
                 continue
+            git_dir = str(git_dir)
             pin = subprocess.run(["git", "-C", str(root), "ls-tree", "HEAD", "--", path],
                                  capture_output=True, text=True, timeout=_left(deadline))
             fields = pin.stdout.split()  # "<mode> commit <sha>\t<path>"

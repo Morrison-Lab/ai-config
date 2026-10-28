@@ -56,13 +56,14 @@ def _content(tool_input):
     return text
 
 
-def _rules(target: str, cwd: str):
+def _rules(target: str, cwd: str | None):
     """The rules for `target`: built-ins extended from its macros library.
 
-    Fails open to the built-ins (None) on any trouble finding or reading it.
+    Fails open to the built-ins (None) on any trouble finding or reading it,
+    including a working directory that no longer exists.
     """
     try:
-        found = read_macros_library(os.path.join(cwd, target))
+        found = read_macros_library(os.path.join(cwd or os.getcwd(), target))
         return load_rules(macros_text=found[1]) if found else None
     except Exception as exc:
         print(f"warn-raw-math-notation: macros library unreadable ({exc}); "
@@ -88,7 +89,7 @@ def main() -> int:
     text = _content(ti)
     if not text:
         return 0
-    rules = _rules(target, payload.get("cwd") or os.getcwd())
+    rules = _rules(target, payload.get("cwd"))
     hits = list(find_raw(text, rules, markdown=is_markdown(target)))
     if not hits:
         return 0

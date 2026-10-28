@@ -622,9 +622,18 @@ def main():
             if raw_subagents is None:
                 raw_subagents = args.get("subagents")
             if raw_subagents is None:
-                reason = "invoke_subagent missing required 'Subagents' argument"
-                print(json.dumps({"decision": "deny", "reason": reason}))
-                return
+                # Antigravity's native invoke_subagent tool passes single-subagent
+                # arguments flat in args ({TypeName, Role, Prompt, Model, Workspace})
+                # rather than wrapped under a Subagents list (ai-config#4795).
+                if any(
+                    args.get(k) is not None
+                    for k in ("TypeName", "typeName", "Prompt", "prompt", "Role", "role")
+                ):
+                    raw_subagents = [args]
+                else:
+                    reason = "invoke_subagent missing required 'Subagents' argument"
+                    print(json.dumps({"decision": "deny", "reason": reason}))
+                    return
             if isinstance(raw_subagents, dict):
                 raw_subagents = [raw_subagents]
             elif isinstance(raw_subagents, str):

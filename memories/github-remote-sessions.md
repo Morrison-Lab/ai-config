@@ -567,3 +567,23 @@ Widening the clone before the push avoids the problem: `git remote set-branches 
 
 - **Do:** run `git remote set-branches --add origin '<branch>'` before the first `git push -u` of a branch in an `add_repo` clone, or apply the four lines above afterwards.
 - **Don't:** retry `git fetch origin <branch>` or `git branch -u origin/<branch>`, or treat the hook's "no remote branch" as proof the push failed, before checking `git ls-remote --heads origin <branch>`.
+
+## A command handed to the user must run where the user is, not in the container
+
+A cloud session's files live in its container:
+the clones under `/home/user/`, the scratchpad under `/tmp/claude-0/`.
+The user follows the session from the Claude app or a browser and cannot run anything there.
+Measured 2026-10-28 in a `Morrison-Lab/psw` session:
+after the classifier refused an ai-config hook edit,
+the session handed the user `cd /home/user/ai-config && python3 -I /tmp/claude-0/.../grant_edit.py ...` to run,
+and on the user's Mac it failed at once with `cd: no such file or directory: /home/user/ai-config`.
+
+- **Do:** before giving the user a command, ask where it will run.
+  For their own machine, write it against their own checkout
+  (clone or `cd` into it, check out the pushed branch),
+  and send any script it needs as a file the user can download
+  (`SendUserFile`) or push it to a branch first.
+- **Do:** say plainly when a step can only run in the container,
+  and name the setting or permission rule that would let the session run it.
+- **Don't:** paste a command containing `/home/user/`, `/tmp/claude-0/`
+  or another container path as something for the user to run.

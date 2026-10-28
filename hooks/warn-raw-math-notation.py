@@ -12,8 +12,17 @@ so a rule in prose alone does not reach it.
 Scans the text being written to a `.qmd`, `.Rmd`, `.tex`, `.md`, `.R`,
 `.Rd`, `.Rnw` or `.ipynb` file with the patterns in
 `scripts/lib/raw_math.py` (shared with the `scripts/check-raw-math.py`
-lint, which can also extend them from the macros library; this hook uses
-the built-in rules only), and names each raw operator and the macro to use.
+lint), and names each raw operator and the macro to use.
+
+The built-in rules are extended from the macros library of the repository
+being edited: `read_macros_library` walks up from the edited file to its git
+root and finds the submodule whose `.gitmodules` URL is the macros
+repository, whatever its directory is called (`latex-macros/` in lds,
+`macros/` elsewhere), reading it from the submodule's git clone when a
+worktree has not checked it out. So a raw `\\mathrm{ESE}` in lds is flagged
+because the library defines `\\ESEt`, as it was not before (lds#1495).
+With no library found, or one that cannot be read, the built-in rules
+alone apply.
 
 WARNS, never blocks: a raw spelling can be deliberate (a macro definition,
 prose quoting the raw form, a document that cannot load the library), and
@@ -30,7 +39,8 @@ try:
         "scripts", "lib")
     if _LIB not in sys.path:
         sys.path.insert(0, _LIB)
-    from raw_math import MATH_SUFFIXES, find_raw, is_library, is_markdown
+    from raw_math import (MATH_SUFFIXES, find_raw, is_library, is_markdown,
+                          load_rules, read_macros_library)
 except Exception as _exc:  # broken install; fail open and say so
     print(f"warn-raw-math-notation: cannot load scripts/lib/raw_math.py "
           f"({_exc}); not evaluating", file=sys.stderr)
@@ -44,6 +54,21 @@ def _content(tool_input):
     if not text:
         text = tool_input.get("new_source") or ""
     return text
+
+
+def _rules(target: str, cwd: str | None):
+    """The rules for `target`: built-ins extended from its macros library.
+
+    Fails open to the built-ins (None) on any trouble finding or reading it,
+    including a working directory that no longer exists.
+    """
+    try:
+        found = read_macros_library(os.path.join(cwd or os.getcwd(), target))
+        return load_rules(macros_text=found[1]) if found else None
+    except Exception as exc:
+        print(f"warn-raw-math-notation: macros library unreadable ({exc}); "
+              "using built-in rules", file=sys.stderr)
+        return None
 
 
 def main() -> int:
@@ -61,7 +86,11 @@ def main() -> int:
         return 0
     if is_library(target):
         return 0  # the library itself defines the raw forms
-    hits = list(find_raw(_content(ti), markdown=is_markdown(target)))
+    text = _content(ti)
+    if not text:
+        return 0
+    rules = _rules(target, payload.get("cwd"))
+    hits = list(find_raw(text, rules, markdown=is_markdown(target)))
     if not hits:
         return 0
     listed = "\n".join(f"    line {n} of the new text: {raw} -> use {macro}"

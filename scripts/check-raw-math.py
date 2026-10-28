@@ -13,8 +13,12 @@ skipped, so prose can quote a raw form.
 
 `--macros` points at the library's `macros.qmd`, whose zero-argument
 `\\operatorname` macros then extend the built-in rules. Without it, the lint
-looks for exactly one `macros/macros.qmd` under the current directory and
-uses it; when it finds several, it stops and asks for `--macros`.
+uses the macros submodule that the current directory's git repository
+declares in `.gitmodules` (found by its URL, so `latex-macros/` and
+`macros/` both work, and read from the submodule's git clone when it is not
+checked out), as the write-time hook does. Failing that, it looks for
+exactly one `macros/macros.qmd` under the current directory; when it finds
+several, it stops and asks for `--macros`.
 
 Exit status: 0 when nothing is found, 1 when raw notation is found, 2 on a
 usage or read error. The rule is in `skills/use-math-macros/SKILL.md`
@@ -29,7 +33,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
 from raw_math import (  # noqa: E402
-    MATH_SUFFIXES, find_raw, is_library, is_markdown, load_rules)
+    MATH_SUFFIXES, find_raw, is_library, is_markdown, load_rules,
+    read_macros_library)
 
 SKIP_DIRS = {".git", "_site", "_freeze", ".quarto", "node_modules", "renv"}
 
@@ -90,8 +95,15 @@ def main(argv=None) -> int:
     # definition would be wrong, so a bad library is a read error (exit 2).
     # Scanned files use errors="replace", since a stray byte cannot fake a hit.
     try:
-        macros = args.macros or default_macros(Path.cwd())
-        rules = load_rules(macros)
+        if args.macros is not None:
+            macros = args.macros
+            rules = load_rules(macros)
+        elif (found := read_macros_library(Path.cwd(), budget=30)) is not None:
+            macros, text = found
+            rules = load_rules(macros_text=text)
+        else:
+            macros = default_macros(Path.cwd())
+            rules = load_rules(macros)
         files = list(iter_files(args.paths))
     except AmbiguousMacros as exc:
         print(f"check-raw-math: several macros libraries found ({exc}); "

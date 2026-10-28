@@ -2,9 +2,9 @@
 
 Shared by `scripts/check-raw-math.py` (the lint) and
 `hooks/warn-raw-math-notation.py` (the write-time warning).
-Both use BUILTIN_RULES; the lint can also extend them from the macros
-library itself (`load_rules`), which the hook does not, since a write-time
-hook has no reliable way to find the library a document will load.
+Both extend BUILTIN_RULES from the macros library itself (`load_rules`),
+found for a file by `read_macros_library`: the macros submodule that the
+file's git repository declares in `.gitmodules`.
 
 The rule they enforce is in `skills/use-math-macros/SKILL.md`: any LaTeX
 math, in any repo or format, uses the shared macros library
@@ -28,7 +28,10 @@ transpose (`^\\top`) and a font command used as a symbol (`\\mathbb{R}`,
 from __future__ import annotations
 
 import os
+import posixpath
 import re
+import subprocess
+import time
 from pathlib import Path
 
 BUILTIN_RULES: dict[str, str] = {
@@ -92,6 +95,158 @@ def is_markdown(path) -> bool:
     return str(path).lower().endswith(_MARKDOWN_SUFFIXES)
 
 
+# The macros library's repository, as a submodule URL names it.
+MACROS_REPOS = ("morrison-lab/macros", "d-morrison/macros")
+DEFAULT_BUDGET = 2.0  # seconds, for all the git calls of one lookup
+_URL_TAIL = re.compile(r"(?:^|[/:])([^/:]+/[^/:]+?)(?:\.git)?/*$")
+
+
+def _git_root(start: Path) -> Path | None:
+    """Return the nearest directory at or above `start` holding `.git`.
+
+    `.git` may be a directory or, in a submodule or worktree, a file. The
+    start need not exist (a Write may create the file and its directory).
+    """
+    for d in (start, *start.parents):
+        if (d / ".git").exists():
+            return d
+    return None
+
+
+_SUBMODULE = re.compile(r'\[\s*submodule\s+"([^"]*)"\s*\]')
+
+
+def _gitmodules_entries(text: str):
+    """Yield (name, path, url) for each submodule in a `.gitmodules` text."""
+    sections: list[dict[str, str]] = []
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith("["):
+            m = _SUBMODULE.match(line)
+            sections.append({"name": m.group(1)} if m else {})
+        elif "=" in line and sections:
+            key, _, value = line.partition("=")
+            value = value.strip()
+            if value.startswith('"'):
+                value = value[1:].partition('"')[0]
+            else:  # git drops an unquoted value's trailing comment
+                value = re.sub(r"\s+[#;].*$", "", value)
+            sections[-1][key.strip().lower()] = value
+    for sec in sections:
+        if "name" in sec and "path" in sec and "url" in sec:
+            yield sec["name"], sec["path"], sec["url"]
+
+
+def is_macros_url(url: str, base: str | None = None) -> bool:
+    """True when a submodule URL names the macros library's repository.
+
+    A relative URL (`../macros.git`) is resolved against `base`, the
+    superproject's own remote URL; without one it never matches.
+    """
+    url = url.strip()
+    if url.startswith(("./", "../")):
+        m = _URL_TAIL.search(base or "")
+        if not m:
+            return False
+        url = posixpath.normpath(posixpath.join(m.group(1), url))
+    m = _URL_TAIL.search(url)
+    return bool(m) and m.group(1).lower() in MACROS_REPOS
+
+
+def _origin_url(root: Path, deadline: float) -> str | None:
+    p = subprocess.run(["git", "-C", str(root), "config", "--get", "remote.origin.url"],
+                       capture_output=True, text=True, timeout=_left(deadline))
+    return p.stdout.strip() if p.returncode == 0 else None
+
+
+def _left(deadline: float) -> float:
+    """Seconds left before `deadline`; raises TimeoutExpired once it passes."""
+    left = deadline - time.monotonic()
+    if left <= 0:
+        raise subprocess.TimeoutExpired("git", 0)
+    return left
+
+
+def _macros_submodules(start, deadline: float):
+    """Yield (git_root, name, path) for each macros submodule `start` sees.
+
+    Walks up from `start` (a file or a directory, which need not exist) to
+    its git root and reads `.gitmodules` there. Lab repos name the macros
+    submodule differently (`latex-macros/`, `macros/`), so its URL, not its
+    directory name, identifies it. Raises OSError or UnicodeDecodeError
+    when `.gitmodules` exists but cannot be read.
+    """
+    start = Path(start).resolve()
+    root = _git_root(start if start.is_dir() else start.parent)
+    if root is None:
+        return
+    gm = root / ".gitmodules"
+    if not gm.is_file():
+        return
+    origin: list[str | None] = []  # looked up once, and only for a relative URL
+    for name, path, url in _gitmodules_entries(gm.read_text(encoding="utf-8")):
+        if url.startswith(("./", "../")) and not origin:
+            try:
+                origin.append(_origin_url(root, deadline))
+            except (OSError, subprocess.SubprocessError):
+                origin.append(None)
+        if is_macros_url(url, origin[0] if origin else None):
+            yield root, name, path
+
+
+def _git_show(git_dir: str, spec: str, deadline: float) -> str | None:
+    """The blob at `spec`, or None if absent; a non-UTF-8 blob raises."""
+    p = subprocess.run(["git", "--git-dir", git_dir, "show", spec],
+                       capture_output=True, timeout=_left(deadline))
+    return p.stdout.decode("utf-8") if p.returncode == 0 else None
+
+
+def read_macros_library(start, budget: float = DEFAULT_BUDGET) -> tuple[str, str] | None:
+    """Return (source, text) of the macros library for `start`, or None.
+
+    Reads the checked-out `macros.qmd` when there is one. A worktree often
+    leaves the submodule uninitialised, so otherwise the library is read
+    from the submodule's clone in the superproject's git directory
+    (`modules/<name>`): the commit the superproject pins, or that clone's
+    HEAD when the pinned commit was never fetched. Every git call shares one
+    `budget` of seconds, so a hung git costs the write-time hook at most
+    that; past it the lookup gives up (None). Raises OSError or
+    UnicodeDecodeError when the library it finds, checked out or in the
+    clone, cannot be read or is not UTF-8.
+    """
+    deadline = time.monotonic() + budget
+    subs = list(_macros_submodules(start, deadline))
+    for root, _name, path in subs:
+        lib = (root / path / LIBRARY_BASENAME).resolve()
+        # A path with `..`, an absolute path or a symlink must not lead out of the repo.
+        if lib.is_relative_to(root) and lib.is_file():
+            return str(lib), lib.read_text(encoding="utf-8")
+    for root, name, path in subs:
+        try:
+            common = subprocess.run(
+                ["git", "-C", str(root), "rev-parse", "--path-format=absolute",
+                 "--git-common-dir"], capture_output=True, text=True,
+                timeout=_left(deadline))
+            if common.returncode != 0:
+                continue
+            modules = (Path(common.stdout.strip()) / "modules").resolve()
+            git_dir = (modules / name).resolve()
+            if not (git_dir.is_relative_to(modules) and git_dir.is_dir()):
+                continue
+            git_dir = str(git_dir)
+            pin = subprocess.run(["git", "-C", str(root), "ls-tree", "HEAD", "--", path],
+                                 capture_output=True, text=True, timeout=_left(deadline))
+            fields = pin.stdout.split()  # "<mode> commit <sha>\t<path>"
+            revs = ([fields[2]] if len(fields) > 2 and fields[1] == "commit" else []) + ["HEAD"]
+            for rev in revs:
+                text = _git_show(git_dir, f"{rev}:{LIBRARY_BASENAME}", deadline)
+                if text is not None:
+                    return f"{git_dir} at {rev[:12]}", text
+        except (OSError, subprocess.SubprocessError):
+            continue
+    return None
+
+
 def derive_rules(macros_text: str) -> dict[str, str]:
     """Map each raw operator name to the zero-arg macro that defines it."""
     rules: dict[str, str] = {}
@@ -100,10 +255,14 @@ def derive_rules(macros_text: str) -> dict[str, str]:
     return rules
 
 
-def load_rules(macros_file: Path | None) -> dict[str, str]:
+def load_rules(macros_file: Path | None = None,
+               macros_text: str | None = None) -> dict[str, str]:
+    """BUILTIN_RULES extended from a macros library, given as a file or its text."""
     rules = dict(BUILTIN_RULES)
     if macros_file is not None:
-        for op, macro in derive_rules(macros_file.read_text(encoding="utf-8")).items():
+        macros_text = macros_file.read_text(encoding="utf-8")
+    if macros_text is not None:
+        for op, macro in derive_rules(macros_text).items():
             rules.setdefault(op, macro)
     return rules
 

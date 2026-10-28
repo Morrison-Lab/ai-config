@@ -1743,6 +1743,23 @@ class TestPrePushReview(unittest.TestCase):
         self.assertTrue(is_valid)
         self.assertTrue(is_clean)
 
+    def test_ready_to_merge_accepted_as_clean_verdict(self):
+        commit = "12345678abcdef00"
+        report = (
+            "### Summary Verdict\n"
+            "Verdict: Ready to merge\n\n"
+            "### Critical Findings\n"
+            "None.\n\n"
+            "### Observations & Non-Blocking Suggestions\n"
+            "None.\n\n"
+            "### Verification Steps\n"
+            "- Tests pass.\n\n"
+            f"Reviewed-Commit: {commit}"
+        )
+        is_valid, is_clean, reason = reviewer.parse_review_verdict(report, expected_commit_sha=commit)
+        self.assertTrue(is_valid, f"Expected valid report, got: {reason}")
+        self.assertTrue(is_clean, f"Expected clean report, got: {reason}")
+
     @patch("sys.exit", side_effect=lambda code=0: (_ for _ in ()).throw(SystemExit(code)))
     @patch("os.chdir")
     @patch.object(reviewer, "verify_working_state", return_value=(False, "dirty state"))

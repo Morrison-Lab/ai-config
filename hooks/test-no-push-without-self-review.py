@@ -4328,6 +4328,47 @@ def deny_resilience_cases() -> tuple[int, int]:
     check("main() fails open (exit 0) when an exception occurs before any denial decision",
           p4.returncode == 0 and not p4.stdout.strip())
 
+    # 5. Ready to merge (inline and heading block) is accepted (#4765).
+    rc_rtm_inline, out_rtm_inline = run_hook(
+        "git push origin main",
+        reviewed(text=body(verdict="Ready to merge", commit=HEAD)),
+    )
+    check("inline 'Verdict: Ready to merge' authorizes push (#4765)",
+          rc_rtm_inline == 0 and not out_rtm_inline)
+
+    rc_rtm_heading, out_rtm_heading = run_hook(
+        "git push origin main",
+        reviewed(text=f"### Verdict\n\n**Ready to merge**\n\nReviewed-Commit: {HEAD}"),
+    )
+    check("heading-block '**Ready to merge**' authorizes push (#4765)",
+          rc_rtm_heading == 0 and not out_rtm_heading)
+
+    # 6. Unparsed later report after an earlier clean verdict surfaces diagnostic hint (#4765).
+    events_unparsed_later = (
+        reviewed(text=body(verdict="Ready for merge", commit=PREV))
+        + reviewed(text=f"### Summary\nLooks good.\n\n### Verdict\n\nShip it!\n\nReviewed-Commit: {HEAD}")
+    )
+    rc_unp, out_unp = run_hook("git push origin main", events_unparsed_later)
+    reason_unp = (out_unp.get("hookSpecificOutput") or {}).get("permissionDecisionReason", "")
+    check("unparsed later report after earlier clean verdict surfaces diagnostic hint naming Reviewed-Commit (#4765)",
+          rc_unp == 0
+          and (out_unp.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+          and f"Reviewed-Commit: {HEAD}" in reason_unp
+          and "Ready to merge" in reason_unp)
+
+    # 7. Mid-investigation prose mentioning `### Verdict` or mid-sentence
+    #    `Reviewed-Commit:` does NOT trigger a false-positive unparsed hint (#4765).
+    events_mid_prose = (
+        reviewed(text=body(verdict="Ready for merge", commit=PREV))
+        + reviewed(text=f"Checking `### Verdict` headings; I will end with Reviewed-Commit: {HEAD} once done.")
+    )
+    rc_mid, out_mid = run_hook("git push origin main", events_mid_prose)
+    reason_mid = (out_mid.get("hookSpecificOutput") or {}).get("permissionDecisionReason", "")
+    check("mid-investigation prose without line-anchored Reviewed-Commit does not trigger unparsed hint (#4765)",
+          rc_mid == 0
+          and (out_mid.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+          and "verdict line could not be parsed" not in reason_mid)
+
     return failures, ran
 
 

@@ -49,7 +49,7 @@ BOT = re.compile(r"bot|copilot|claude", re.I)
 # A clean review result: a verdict line or payload AND the commit it covers.
 # Quoted instruction text names the verdict but carries no 40-hex commit.
 VERDICT = re.compile(
-    r"^[ \t#>*]*Verdict:[ \t*]*Ready for merge|\"verdict\":\s*\"CLEAN\"",
+    r"^[ \t#>*]*Verdict:[ \t*]*Ready (?:for|to) merge|\"verdict\":\s*\"CLEAN\"",
     re.I | re.M)
 COMMIT = re.compile(r"(Reviewed-Commit:|\"commit_sha\":)\s*\"?[0-9a-f]{40}", re.I)
 # `git`, then options (`-C DIR`, `-c k=v`, `--flag`), then `push` as the

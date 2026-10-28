@@ -87,6 +87,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-treat-wording-as-draft.py\"",
+            "timeout": 10,
+            "script": "remind-treat-wording-as-draft.py",
+            "why": "Ezra 2026-10-28 (ai-config#4813): 'something like' and similar hedges mean he is open to suggestions, and no instruction of his is to be followed blindly. AGENTS.md 'Don't take anyone's word for it' and 'Proactively suggest better alternatives' are the rules; this injects, never blocks, a reminder that hedged or example wording is a draft to improve on, not text to copy or relay verbatim."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-record-standing-guidance.py\"",
             "timeout": 10,
             "script": "remind-record-standing-guidance.py",

@@ -79,12 +79,15 @@ its own test file, so a check that scanned assistant PROSE for the command
 string would warn on itself being described. Every match here comes from a
 `tool_use` block's `input`, never from a `text` block.
 
-WARN ONLY
----------
+NEVER DECIDES FOR THE AGENT
+---------------------------
 A title-only edit is often exactly right -- fixing a typo, narrowing scope
 in a way the body already covers, correcting a misspelled issue number in
 the title. The hook cannot tell those apart from the incident shape, so it
-names the risk and asks for a re-read rather than blocking anything.
+names the risk and asks for a re-read, never refusing the edit. It
+interrupts the stop at most once per turn (agent_notice.stop_notice) so the
+agent reads the warning, which a bare systemMessage never reached
+(ai-config#4796), and the next stop always passes.
 
 FAILS OPEN
 ----------

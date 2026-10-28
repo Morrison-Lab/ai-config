@@ -66,9 +66,9 @@ not just the fields being set:
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
-import os
 
 _AGENT_NOTICE_LIB = os.path.join(
     os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"

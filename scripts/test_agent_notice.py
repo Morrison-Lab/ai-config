@@ -16,7 +16,7 @@ import os
 import sys
 import tempfile
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "lib"))
 os.environ["TMPDIR"] = tempfile.mkdtemp()
 tempfile.tempdir = None  # re-read TMPDIR so sentinels land in the fresh dir
 

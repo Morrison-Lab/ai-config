@@ -472,7 +472,7 @@ def mutation_checks():
         # Beside the subject, so its `scripts/lib` import still resolves.
         tmp = tempfile.NamedTemporaryFile("w", suffix=".py", delete=False,
                                           encoding="utf-8",
-                                          dir=os.path.dirname(os.path.abspath(SUBJECT)))
+                                          dir=os.path.dirname(os.path.realpath(SUBJECT)))
         tmp.write(source.replace(anchor, replacement))
         tmp.close()
         try:
@@ -490,7 +490,7 @@ def mutation_checks():
         return
     tmp = tempfile.NamedTemporaryFile("w", suffix=".py", delete=False,
                                       encoding="utf-8",
-                                      dir=os.path.dirname(os.path.abspath(SUBJECT)))
+                                      dir=os.path.dirname(os.path.realpath(SUBJECT)))
     tmp.write(source.replace(
         anchor, '(lambda _p, _m, _h: json.dumps({"systemMessage": _m}))(payload,'))
     tmp.close()

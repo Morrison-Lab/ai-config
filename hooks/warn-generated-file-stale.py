@@ -31,11 +31,10 @@ push can be legitimate mid-stack. Blocking would buy little and cost a refused
 turn, so this only ever adds context.
 """
 import json
-import os.path
+import os
 import re
 import subprocess
 import sys
-import os
 
 _AGENT_NOTICE_LIB = os.path.join(
     os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"

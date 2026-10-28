@@ -65,7 +65,7 @@ def warned(d, command):
     # The copy runs outside the repo, so point it at scripts/lib for the
     # agent_notice import (ai-config#4796).
     env = dict(os.environ, PYTHONPATH=os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(HOOK))), "scripts", "lib"))
+        os.path.dirname(os.path.dirname(os.path.realpath(HOOK))), "scripts", "lib"))
     patched = open(HOOK, encoding="utf-8").read().replace(
         '("hooks/hooks.json", [sys.executable, "scripts/gen-hooks-plugin.py", "--check"]),',
         '("src.json", [sys.executable, "scripts/gen.py", "--check"]),',

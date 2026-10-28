@@ -36,6 +36,15 @@ to `no-unauthorized-merge.py` and the settings rules, as before.
 ## What it decides
 
   - `Skill` whose `skill` is exactly `mwc` or `ai-config:mwc` -> allow.
+  - the cloud session's `add_repo` tool (`mcp__claude-code-remote__add_repo`,
+    or the `Claude_Code_Remote` spelling) whose `owner` is one of
+    `MEMBER_OWNERS` -> allow. The owner's standing rule (2026-10-28): any
+    repo d-morrison is a member of may always be cloned into a session.
+    A hook cannot test membership in one repository from a cloud session,
+    whose GitHub API is scoped to the repos already attached, so the grant
+    is by owner. The backend's own authorization check still refuses a
+    repository the account cannot reach, and an owner outside the set gets
+    no decision and goes to the classifier or prompt as before.
   - `Bash` whose command is one `gh pr merge ...` or `glab mr merge ...`
     invocation -> allow. The command must contain none of
     ``; & | < > ( ) $ \\ ` `` or a newline or carriage return, must parse with
@@ -61,6 +70,13 @@ import shlex
 import sys
 
 GRANTED_SKILLS = frozenset({"mwc", "ai-config:mwc"})
+ADD_REPO_TOOLS = frozenset({
+    "mcp__claude-code-remote__add_repo",
+    "mcp__Claude_Code_Remote__add_repo",
+})
+# GitHub owners whose repositories d-morrison is a member of, compared
+# case-insensitively. Extend this set to widen the clone grant.
+MEMBER_OWNERS = frozenset({"d-morrison", "morrison-lab", "ucd-serg"})
 GRANTED_COMMANDS = (["gh", "pr", "merge"], ["glab", "mr", "merge"])
 FORBIDDEN_CHARS = frozenset(";&|<>()$\\`\n\r")
 ALLOWED_ASSIGNMENT = re.compile(r"ALLOW_MERGE=[A-Za-z0-9_.-]*")
@@ -111,6 +127,12 @@ def decide(payload):
         skill = inp.get("skill")
         if isinstance(skill, str) and skill in GRANTED_SKILLS:
             return f"ai-config#4374 personal grant: Skill({skill})"
+        return None
+    if tool in ADD_REPO_TOOLS:
+        owner = inp.get("owner")
+        if isinstance(owner, str) and owner.strip().lower() in MEMBER_OWNERS:
+            return (f"personal grant: add_repo for {owner.strip()}/..., "
+                    "a member owner (repos d-morrison is a member of may always be cloned)")
         return None
     if tool == "Bash":
         name = granted_command(inp.get("command"))

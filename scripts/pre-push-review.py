@@ -447,7 +447,7 @@ def _parse_persona_verdict(report: str, expected_commit_sha: str = "") -> Tuple[
         last_clean = None
         for m in re.finditer(
             r"(?im)^[ \t]{0,3}(?:#{1,6}[ \t]*)?Verdict[ \t]*:[ \t]*(?:\*\*)?"
-            r"(?:Ready for merge)\b(?P<rest>.*)$",
+            r"(?:Ready (?:for|to) merge)\b(?P<rest>.*)$",
             stripped,
         ):
             last_clean = m
@@ -598,7 +598,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
     verdict_matches = re.findall(r"(?im)^(?:###\s*)?(?:Summary\s+)?Verdict:\s*(.+)$", summary_text)
     if not verdict_matches:
         bold_matches = re.findall(
-            r"(?im)^\s*\*\*(APPROVE|NEEDS WORK|Ready for merge|Not ready for merge|Ready after addressing findings|Changes requested|UNAPPROVED|Blocked)\.?\*\*",
+            r"(?im)^\s*\*\*(APPROVE|NEEDS WORK|Ready (?:for|to) merge|Not ready (?:for|to) merge|Ready after addressing findings|Changes requested|UNAPPROVED|Blocked)\.?\*\*",
             summary_text,
         )
         if bold_matches:
@@ -609,7 +609,7 @@ def parse_review_verdict(report: Optional[str], expected_commit_sha: str = "") -
 
     verdict_matches = list(verdict_matches) + trailing_verdicts
 
-    clean_allowlist = {"ready for merge", "approve", "approved", "clean"}
+    clean_allowlist = {"ready for merge", "ready to merge", "approve", "approved", "clean"}
     needs_work_allowlist = {
         "needs work", "needs more work", "changes requested", "unapproved", "not approved",
         "disapproved", "blocked", "ready after addressing findings", "unable to review",

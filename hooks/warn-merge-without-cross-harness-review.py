@@ -53,10 +53,11 @@ nothing about who reviewed.
 * A multi-backend harness (`opencode`, `cursor-agent`) qualifies only when
   its configured model also differs. The model is a config file away, not on
   the command line, so the hook takes the harness as the signal.
-* The session's own harness is read from the environment: Antigravity when
-  `ANTIGRAVITY_AGENT` is set, Claude Code otherwise. Under another harness
-  (Codex, OpenCode, Gemini CLI) that default is wrong: its own CLI would be
-  credited and `claude` excluded.
+* The session's own harness is read from `ANTIGRAVITY_AGENT`, the Antigravity
+  transcript path (`brain/<id>/.system_generated/logs/transcript.jsonl`), or
+  Antigravity record types (`PLANNER_RESPONSE`, `SYSTEM_MESSAGE`), defaulting
+  to Claude Code otherwise. In an Antigravity session, both `agy` and `gemini`
+  are excluded as same-harness/same-model family while `claude` qualifies.
 * A review run in another session or by a human is invisible here.
 * `nohup` and `timeout` are looked through, but a reviewer launched from a
   script (`dtc`'s background `nohup bash "$WORK/run.sh" &`) is not: the
@@ -100,6 +101,12 @@ ENV_ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 # `enable_pull_request_auto_merge`. Match both, as no-unauthorized-merge.py does.
 RX_AUTO_MERGE_TOOL = re.compile(
     r"^mcp__github__enable_?(?:pull_?request_?|pr_)?auto_?merge$", re.I)
+RX_AGY_TRANSCRIPT_PATH = re.compile(
+    r"(?:^|/)(?:\.gemini/antigravity/|brain/[^/]+/\.system_generated/logs/transcript)")
+AGY_RECORD_TYPES = frozenset({
+    "PLANNER_RESPONSE", "USER_INPUT", "SYSTEM_MESSAGE", "EPHEMERAL_MESSAGE",
+    "TOOL_RESPONSE",
+})
 GATE = "shared/workflow/adversarial-self-review.md"
 
 NOTE = (
@@ -129,11 +136,29 @@ def _sibling():
     return mod
 
 
-def own_harness():
+def own_harness(path="", recs=None):
     """The CLI name of the harness running this hook (see the docstring)."""
     if os.environ.get("ANTIGRAVITY_AGENT"):
         return "agy"
+    norm = (path or "").replace("\\", "/")
+    if RX_AGY_TRANSCRIPT_PATH.search(norm):
+        return "agy"
+    if recs and any(isinstance(r, dict) and r.get("type") in AGY_RECORD_TYPES
+                    for r in recs):
+        return "agy"
     return "claude"
+
+
+def own_harnesses(path="", recs=None):
+    """CLI names that share the authoring session's harness/model family.
+
+    Note: assumes an Antigravity session runs a Gemini-family model (the
+    platform default) so `claude` counts as cross-harness and `agy`/`gemini`
+    are excluded as same-family.
+    """
+    if own_harness(path, recs) == "agy":
+        return frozenset({"agy", "gemini"})
+    return frozenset({"claude"})
 
 
 def _argvs(sib, command):
@@ -239,7 +264,7 @@ def _fresh(events):
     return all(p == last_piece and i < last_i for i, p in pushes)
 
 
-def scan(sib, path, clis):
+def scan(sib, path, clis, recs=None):
     """Return (last_push_seq, [seq of successful reviewer calls]).
 
     A push and a review in one command count the push at seq - 0.5, a review
@@ -248,7 +273,8 @@ def scan(sib, path, clis):
     last_push = -1
     pending = {}
     reviews = []
-    for seq, rec in enumerate(sib.records(path)):
+    stream = recs if recs is not None else sib.records(path)
+    for seq, rec in enumerate(stream):
         for b in sib._blocks(rec):
             kind = b.get("type")
             if kind == "tool_use":
@@ -316,8 +342,9 @@ def main() -> int:
         targets = _targets(sib, tool, tool_input)
         if not targets or not path or not os.path.isfile(path):
             return 0
-        clis = CROSS_HARNESS_CLIS - {own_harness()}
-        last_push, reviews = scan(sib, path, clis)
+        recs = list(sib.records(path))
+        clis = CROSS_HARNESS_CLIS - own_harnesses(path, recs)
+        last_push, reviews = scan(sib, path, clis, recs=recs)
         if tool in sib.SHELL_TOOLS and sib._push_before_merge(
                 _shell_command(tool_input) or ""):
             reviews = []

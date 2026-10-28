@@ -304,6 +304,21 @@ with tempfile.TemporaryDirectory() as d:
     git("init", "-q", "-b", "main", cwd=lib_src)
     git("add", ".", cwd=lib_src)
     git("commit", "-qm", "lib", cwd=lib_src)
+
+    # A submodule name that climbs out of <git-common-dir>/modules is not read,
+    # even when a clone holding the library sits where it points.
+    hostile = os.path.join(d, "hostile")
+    os.makedirs(hostile)
+    git("init", "-q", "-b", "main", cwd=hostile)
+    with open(os.path.join(hostile, ".gitmodules"), "w", encoding="utf-8") as f:
+        f.write('[submodule "../../escaped"]\n\tpath = latex-macros\n'
+                "\turl = https://github.com/Morrison-Lab/macros.git\n")
+    git("clone", "-q", "--bare", "--branch", "main", lib_src,
+        os.path.join(hostile, "escaped"), cwd=d)
+    out = hook("Write", {"file_path": os.path.join(hostile, "a.qmd"), "content": ESE_RAW})
+    check("\\ESEt" not in out and "\\Ep" in out,
+          "a submodule name leading out of .git/modules is not read")
+
     sup = os.path.join(d, "sup")
     os.makedirs(sup)
     git("init", "-q", "-b", "main", cwd=sup)

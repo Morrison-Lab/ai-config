@@ -46,6 +46,13 @@ import os
 import re
 import sys
 
+_AGENT_NOTICE_LIB = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"
+)
+if _AGENT_NOTICE_LIB not in sys.path:
+    sys.path.insert(0, _AGENT_NOTICE_LIB)
+from agent_notice import context_notice  # noqa: E402 -- reaches the agent (ai-config#4796)
+
 HERE = os.path.dirname(os.path.realpath(__file__))
 _LIB = os.path.join(os.path.dirname(HERE), "scripts", "lib")
 if _LIB not in sys.path:
@@ -251,7 +258,7 @@ def main():
         searched, prior_browser_call = state
         if searched or prior_browser_call:
             return 0
-        print(json.dumps({"systemMessage": MESSAGE}))
+        print(context_notice(MESSAGE))
         return 0
     except Exception as exc:  # fail open on any parse trouble
         print(f"warn-browser-without-route-check: could not evaluate ({exc})",

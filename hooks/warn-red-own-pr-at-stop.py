@@ -4,8 +4,9 @@
 The rule "fix red CI on your own PRs unprompted" lives in the PR-driving rules,
 and nothing fired at turn end, so a turn could end over a red PR and the person
 had to ask "fix failing CI?" (twice in one day). This hook checks the one thing
-that is decidable from the transcript. It is a warning: a Stop hook that emits
-only `systemMessage` cannot block the stop.
+that is decidable from the transcript. It emits through agent_notice.stop_notice,
+which blocks the stop once per turn so the agent reads the warning; a bare
+`systemMessage` would reach only the user (ai-config#4796).
 
 Own PRs: numbers returned by a successful `create_pull_request` call, or by a
 successful Bash command with a `gh pr create` segment (at the start of the line
@@ -56,14 +57,22 @@ Deliberate limits:
   - A record that cannot be processed is skipped and counted on stderr; the rest
     of the transcript is still read. At most 64 unparseable braces are tried per
     string, to stay linear.
-  - Warns, never blocks. A missing transcript is silent; any other error prints
-    one line to stderr and exits 0.
+  - Interrupts the stop at most once per turn and never wedges it
+    (agent_notice.stop_notice, ai-config#4796). A missing transcript is
+    silent; any other error prints one line to stderr and exits 0.
 """
 import json
 import os
 import re
 import shlex
 import sys
+
+_AGENT_NOTICE_LIB = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"
+)
+if _AGENT_NOTICE_LIB not in sys.path:
+    sys.path.insert(0, _AGENT_NOTICE_LIB)
+from agent_notice import stop_notice  # noqa: E402 -- reaches the agent (ai-config#4796)
 
 FAILING = {"failure", "timed_out", "startup_failure"}
 BOT_REVIEW = re.compile(r"claude-review|require-review|require-clean-verdict", re.I)
@@ -91,8 +100,9 @@ TEXT_RUN = re.compile(
 
 NOTE = (
     "[hook: warn-red-own-pr-at-stop] PR {prs} opened in this session still "
-    "shows failing checks that nothing since has acted on: {detail}. This note "
-    "does not block the stop; fix it, or comment once why it is not this PR's."
+    "shows failing checks that nothing since has acted on: {detail}. Before "
+    "ending the turn, fix it, or comment once on the PR why the failure is not "
+    "this PR's. This note interrupts the stop only once per turn."
 )
 
 
@@ -494,7 +504,7 @@ def main():
         return 0
     prs = ", ".join(f"#{pr}" for pr in found)
     detail = "; ".join(f"#{pr}: {', '.join(names)}" for pr, names in found.items())
-    print(json.dumps({"systemMessage": NOTE.format(prs=prs, detail=detail)}))
+    print(stop_notice(payload, NOTE.format(prs=prs, detail=detail), "warn-red-own-pr-at-stop"))
     return 0
 
 

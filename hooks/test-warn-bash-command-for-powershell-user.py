@@ -309,7 +309,8 @@ def verdict(script, case_payload):
     out = subprocess.run(
         [sys.executable, script], input=json.dumps(case_payload),
         capture_output=True, text=True, timeout=60, env=env)
-    return "systemMessage" in (out.stdout or "")
+    data = json.loads(out.stdout) if (out.stdout or "").strip() else {}
+    return data.get("decision") == "block" and bool(data.get("reason"))  # reaches the agent (ai-config#4796)
 
 
 print("case tests (full payload through the hook):")
@@ -366,7 +367,8 @@ for var in ("TMPDIR", "TEMP", "TMP"):
 def _run(p):
     out = subprocess.run([sys.executable, HOOK], input=json.dumps(p),
                          capture_output=True, text=True, timeout=60, env=env)
-    return "systemMessage" in (out.stdout or "")
+    data = json.loads(out.stdout) if (out.stdout or "").strip() else {}
+    return data.get("decision") == "block" and bool(data.get("reason"))  # reaches the agent (ai-config#4796)
 
 
 once = CASES["W1"]
@@ -568,7 +570,8 @@ for clause, (statement, edits, expected_flips) in MUTATIONS.items():
                      "---")
         mutated = mutated.replace(find, replace)
 
-    fd, path = tempfile.mkstemp(suffix=".py")
+    # Beside the subject, so its `scripts/lib` import still resolves.
+    fd, path = tempfile.mkstemp(suffix=".py", dir=HERE)
     with os.fdopen(fd, "w", encoding="utf-8") as handle:
         handle.write(mutated)
     try:

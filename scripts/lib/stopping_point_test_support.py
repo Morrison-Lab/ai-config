@@ -28,15 +28,37 @@ def make_test_env(tmpdir: str, extra_env: dict | None = None) -> dict:
 
 
 def has_warning(stdout: str) -> bool:
-    """Verify stdout JSON has no blocking decision/reason and check for systemMessage."""
+    """True when the hook warned, after checking the warning reaches the agent.
+
+    The hook emits through agent_notice.stop_notice (ai-config#4796): the first
+    warning in a turn is `decision: block` with the text as `reason` (the part
+    the agent reads) and the same text as `systemMessage` (the user's copy).
+    A repeat in the same turn, or a stop that continues an earlier block, is
+    the `systemMessage` alone, so the hook can never wedge a session.
+    """
     if not stdout.strip():
         return False
     data = json.loads(stdout)
     decision = str(data.get("decision") or "").strip().lower()
-    assert decision not in {"block", "deny"} and "reason" not in data, (
-        f"Hook emitted blocking decision or reason: {stdout}"
-    )
-    return "systemMessage" in data and bool(data.get("systemMessage"))
+    message = data.get("systemMessage")
+    assert decision != "deny", f"Stop hook emitted a deny decision: {stdout}"
+    if decision == "block":
+        assert data.get("reason") and data.get("reason") == message, (
+            f"A block must carry the warning as its reason and as systemMessage: {stdout}"
+        )
+    else:
+        assert "reason" not in data, (
+            f"A 'reason' without 'decision: block' is discarded by the harness: {stdout}"
+        )
+    return bool(message)
+
+
+def blocked(stdout: str) -> bool:
+    """True when the hook blocked, so its warning reached the agent."""
+    if not stdout.strip():
+        return False
+    data = json.loads(stdout)
+    return data.get("decision") == "block" and bool(data.get("reason"))
 
 
 _DEFAULT_HOOK = os.path.realpath(

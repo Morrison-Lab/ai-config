@@ -254,9 +254,12 @@ def verdict(hook_path, entries):
         parsed = json.loads(out)
     except json.JSONDecodeError as exc:
         sys.exit(f"FATAL: non-JSON stdout ({exc}): {out!r}")
-    if parsed.get("decision") == "block":
-        sys.exit("FATAL: warn-only guard emitted decision=block")
-    return "WARN" if parsed.get("systemMessage") else "silent"
+    # A warning must block with its text as the reason, the only part the
+    # agent reads; a bare systemMessage reaches the user alone (ai-config#4796).
+    if parsed.get("systemMessage") and not (
+            parsed.get("decision") == "block" and parsed.get("reason") == parsed["systemMessage"]):
+        sys.exit(f"FATAL: warning does not reach the agent: {out!r}")
+    return "WARN" if parsed.get("reason") else "silent"
 
 
 wrong = 0

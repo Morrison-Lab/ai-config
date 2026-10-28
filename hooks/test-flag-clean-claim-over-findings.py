@@ -520,8 +520,10 @@ def main():
             print(f"FAIL: {label} (expected warn={expected}, got {got})")
             failures += 1
 
-    # This hook must never emit "decision": "block" -- it is warn-only by
-    # design (see the docstring's "WARN, NEVER BLOCK").
+    # The first warning in a turn must block, with the warning as its
+    # `reason`, because that is the only part the agent reads; a bare
+    # systemMessage reaches the user alone (ai-config#4796, the docstring's
+    # "BLOCK ONCE, NEVER WEDGE").
     fd, path = tempfile.mkstemp(suffix=".jsonl")
     with os.fdopen(fd, "w") as fh:
         for e in HAZARD_42 + [say("Reported to the user: Ready for merge.")]:
@@ -531,17 +533,45 @@ def main():
     # reply text and never reach the print this case inspects. Reproduced in
     # round 8 -- a mutation emitting a block decision left the suite fully
     # green.
-    out = subprocess.run(
-        [sys.executable, HOOK], input=json.dumps({"transcript_path": path}),
-        capture_output=True, text=True,
-        env=dict(os.environ, TMPDIR=tempfile.mkdtemp()),
-    ).stdout
+    with tempfile.TemporaryDirectory() as fresh:
+        out = subprocess.run(
+            [sys.executable, HOOK], input=json.dumps({"transcript_path": path}),
+            capture_output=True, text=True,
+            env=dict(os.environ, TMPDIR=fresh),
+        ).stdout
     os.unlink(path)
-    if '"decision"' not in out and '"block"' not in out:
-        print("PASS: never emits a block decision")
+    payload = json.loads(out) if out.strip() else {}
+    if (payload.get("decision") == "block" and payload.get("reason")
+            and payload.get("reason") == payload.get("systemMessage")):
+        print("PASS: blocks once, with the warning as the reason the agent reads")
         passes += 1
     else:
-        print("FAIL: emitted a block decision -- this hook must warn only")
+        print(f"FAIL: expected a block whose reason carries the warning, got {out!r}")
+        failures += 1
+    # And it must never block twice: a stop that is itself the continuation
+    # of a block (stop_hook_active) passes, so the hook cannot wedge a session.
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w") as fh:
+        for e in HAZARD_42 + [say("Reported to the user: Ready for merge.")]:
+            fh.write(json.dumps(e) + "\n")
+    with tempfile.TemporaryDirectory() as fresh:
+        again = subprocess.run(
+            [sys.executable, HOOK],
+            input=json.dumps({"transcript_path": path, "stop_hook_active": True}),
+            capture_output=True, text=True,
+            env=dict(os.environ, TMPDIR=fresh),
+        )
+    os.unlink(path)
+    # Not vacuous: the hook must run cleanly and still show the user the
+    # warning, just without a block, so a crash cannot pass as "no block".
+    again_payload = json.loads(again.stdout) if again.stdout.strip() else {}
+    if (again.returncode == 0 and again_payload.get("systemMessage")
+            and "decision" not in again_payload):
+        print("PASS: never blocks a stop that continues an earlier block")
+        passes += 1
+    else:
+        print(f"FAIL: expected a bare systemMessage while stop_hook_active was set: "
+              f"rc={again.returncode} {again.stdout!r}")
         failures += 1
 
     # A valid-JSON payload that is not an object must fail OPEN, not raise.

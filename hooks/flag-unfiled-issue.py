@@ -47,8 +47,12 @@ per-message sentinel has seen (the two hooks keep separate sentinel
 namespaces), and dropping the overlapping phrases would leave this hook
 silent on wording the incident used almost verbatim.
 
-WHY THIS WARNS RATHER THAN BLOCKS
+WHY THIS NEVER DECIDES FOR THE AGENT
 -----------------------------------
+It interrupts the stop at most once per turn (agent_notice.stop_notice), so
+the agent reads the warning, which a bare systemMessage never reached
+(ai-config#4796), and the next stop always passes.
+
 Whether an item SHOULD have been filed is not lexically decidable from the
 phrase alone. The reply may be narrating an item that is already filed and
 merely restating its status ("still unfiled" describing last week, before
@@ -58,8 +62,7 @@ with no defect behind it at all. Blocking a truthful status report would be
 worse than the report itself, so this hook can only surface the phrase and
 make the author answer the filing question -- deciding it for them would
 refuse a legitimate "this is out of scope; it is not mine to file" answer.
-This matches the warn-not-block precedent already set by
-`no-unmeasured-clock-claim.py` and `flag-cop-out-offer.py`.
+`no-unmeasured-clock-claim.py` and `flag-cop-out-offer.py` work the same way.
 
 REUSE RATHER THAN RE-IMPLEMENTATION
 --------------------------------------
@@ -96,6 +99,13 @@ import os
 import re
 import sys
 import tempfile
+
+_AGENT_NOTICE_LIB = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"
+)
+if _AGENT_NOTICE_LIB not in sys.path:
+    sys.path.insert(0, _AGENT_NOTICE_LIB)
+from agent_notice import stop_notice  # noqa: E402 -- reaches the agent (ai-config#4796)
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 
@@ -190,13 +200,10 @@ def main() -> int:
 
     phrase = hit.group(0).strip()
 
-    # `systemMessage`, not `reason` -- a `Stop` hook's `reason` is read only
-    # alongside `"decision": "block"`, so a warn-only hook printing `reason`
-    # alone reaches nobody. Every warn-only hook in this repo emits
-    # `systemMessage` for exactly that reason; see
-    # `no-unmeasured-clock-claim.py` and `flag-cop-out-offer.py`.
-    print(json.dumps({"systemMessage": (
-        f"Your reply reports a known gap as \"{phrase}\" and no issue-create "
+    # A `Stop` hook's `reason` is read only alongside `"decision": "block"`,
+    # and a `systemMessage` reaches only the user, so stop_notice blocks once
+    # per turn with the warning as the reason the agent reads (ai-config#4796).
+    print(stop_notice(payload, f"Your reply reports a known gap as \"{phrase}\" and no issue-create "
         "or issue-comment call follows it in this transcript. Reporting the "
         "gap is not tracking it, however many times it gets said -- file it "
         "now (dupe-check with `gh issue list --state all --search`, then "
@@ -205,8 +212,7 @@ def main() -> int:
         "shared/workflow/label-agent-filed-issues.md), or comment the new "
         "evidence onto the issue that already covers it. If it is genuinely "
         "not yours to file -- out of scope for this repo -- say so instead "
-        "of restating that it is unfiled."
-    )}))
+        "of restating that it is unfiled.", "flag-unfiled-issue"))
     return 0
 
 

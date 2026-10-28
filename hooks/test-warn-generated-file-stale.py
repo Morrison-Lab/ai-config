@@ -62,7 +62,10 @@ def build_repo(source_edited, regenerated, only_output_edited=False, no_generato
 
 
 def warned(d, command):
-    env = dict(os.environ)
+    # The copy runs outside the repo, so point it at scripts/lib for the
+    # agent_notice import (ai-config#4796).
+    env = dict(os.environ, PYTHONPATH=os.path.join(
+        os.path.dirname(os.path.dirname(os.path.realpath(HOOK))), "scripts", "lib"))
     patched = open(HOOK, encoding="utf-8").read().replace(
         '("hooks/hooks.json", [sys.executable, "scripts/gen-hooks-plugin.py", "--check"]),',
         '("src.json", [sys.executable, "scripts/gen.py", "--check"]),',
@@ -76,7 +79,11 @@ def warned(d, command):
         input=json.dumps({"tool_input": {"command": command}}),
         capture_output=True, text=True, cwd=d, env=env,
     ).stdout
-    return "systemMessage" in out
+    if not out.strip():
+        return False
+    # The warning reaches the agent through additionalContext (ai-config#4796).
+    data = json.loads(out)
+    return bool((data.get("hookSpecificOutput") or {}).get("additionalContext"))
 
 
 CASES = [

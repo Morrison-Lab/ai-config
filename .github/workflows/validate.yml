@@ -385,6 +385,11 @@ jobs:
         # runner itself had no test, so a missing timeout would only show
         # up as a Windows hang.
         run: python3 scripts/test_test_hooks.py
+      - name: Run agent-notice helper tests
+        # scripts/lib/agent_notice.py is how a warning hook reaches the agent
+        # rather than only the user; these pin its block-once-per-turn and
+        # never-while-stop_hook_active guarantees (ai-config#4796).
+        run: python3 scripts/test_agent_notice.py
       - name: Check the hook catalog against hooks.json
         # test_hooks.py above compares hooks against their TESTS. Nothing
         # compared them against their BINDINGS or against the README table a

@@ -55,8 +55,12 @@ def run(tool_name, tool_input, entries=None, path=None):
 
 def warns(label, *a, **kw):
     out = run(*a, **kw)
-    ok = bool(out) and "browser-last-resort.md" in out.get("systemMessage", "") \
-        and set(out) == {"systemMessage"}
+    # The agent reads additionalContext; systemMessage is the user's copy
+    # (ai-config#4796). The tool call must stay allowed: no decision at all.
+    context = ((out or {}).get("hookSpecificOutput") or {}).get("additionalContext", "")
+    ok = bool(out) and "browser-last-resort.md" in context \
+        and out.get("systemMessage") == context \
+        and set(out) == {"hookSpecificOutput", "systemMessage"}
     check(label, ok, True)
 
 

@@ -2,8 +2,11 @@
 """Stop-hook guard: warn when a stopping-point declaration is missing from a final reply.
 
 Treats the last reply of a turn as a stopping point, including conversational
-question-answering replies (#4308). Warns via systemMessage rather than blocking
-when that reply omits an explicit statement of whether the session is done or not.
+question-answering replies (#4308). When that reply omits an explicit statement
+of whether the session is done or not, blocks once per turn through
+scripts/lib/agent_notice.py's stop_notice, so the agent reads the warning and
+adds the statement. #4322 had made it warn through systemMessage only, which the
+user sees and the agent never does, so the miss recurred unchanged (#4796).
 Handles streamed assistant chunk concatenation (#2500).
 """
 from __future__ import annotations
@@ -15,6 +18,13 @@ import re
 import subprocess
 import sys
 import tempfile
+
+_AGENT_NOTICE_LIB = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"
+)
+if _AGENT_NOTICE_LIB not in sys.path:
+    sys.path.insert(0, _AGENT_NOTICE_LIB)
+from agent_notice import stop_notice  # noqa: E402 -- reaches the agent (ai-config#4796)
 
 _LIB = os.path.join(
     os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"
@@ -440,8 +450,9 @@ def main() -> int:
     # Note: shared/workflow/flag-session-boundaries.md:45-50 permits omitting the
     # declaration in non-interactive runs whose output is posted somewhere by a harness,
     # but the Stop hook event payload does not currently carry an interactivity discriminator.
-    # The hook is registered as warn-only (systemMessage, non-blocking), so warning in
-    # automated runs does not abort execution or block the session.
+    # stop_notice blocks at most once per turn and never while stop_hook_active is
+    # set, so in an automated run the cost is one extra continuation, never an
+    # aborted or wedged session (#4796).
     text = extract_text_from_payload(payload)
     if not text:
         return 0
@@ -489,7 +500,7 @@ def main() -> int:
             "Never say a session is done when there are uncommitted, unpushed, or un-PRed changes, or open PRs authored by that session (#4328)."
         )
 
-    print(json.dumps({"systemMessage": msg}))
+    print(stop_notice(payload, msg, "require-stopping-point"))
     return 0
 
 

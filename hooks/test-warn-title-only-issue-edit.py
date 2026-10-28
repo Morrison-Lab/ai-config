@@ -433,13 +433,20 @@ check(
 
 # ---------------------------------------------------------------------------
 # Payload-shape assertion (scripts/check-hook-output-shape.py's own bar):
-# a warn must surface through `systemMessage`, never `reason` alone.
+# a warn must reach the agent as a block's `reason`, never `reason` alone,
+# with `systemMessage` as the user's copy (ai-config#4796).
 # ---------------------------------------------------------------------------
 
 clear_sentinels()
 shape_payload = run_hook([assistant_bash('gh issue edit 839 --title "t"')])
 check("shape: systemMessage present on a fire", bool(shape_payload.get("systemMessage")), True)
-check("shape: no bare 'reason'-only payload", "reason" in shape_payload, False)
+# The reason is what the agent reads, so it must come with the block that makes
+# the harness read it (ai-config#4796), never on its own.
+check("shape: a reason only ever rides on a block",
+      "reason" not in shape_payload or shape_payload.get("decision") == "block", True)
+check("shape: the first fire blocks, so the agent reads the warning",
+      shape_payload.get("decision") == "block"
+      and shape_payload.get("reason") == shape_payload.get("systemMessage"), True)
 
 
 # ---------------------------------------------------------------------------

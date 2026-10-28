@@ -31,10 +31,17 @@ push can be legitimate mid-stack. Blocking would buy little and cost a refused
 turn, so this only ever adds context.
 """
 import json
-import os.path
+import os
 import re
 import subprocess
 import sys
+
+_AGENT_NOTICE_LIB = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"
+)
+if _AGENT_NOTICE_LIB not in sys.path:
+    sys.path.insert(0, _AGENT_NOTICE_LIB)
+from agent_notice import context_notice  # noqa: E402 -- reaches the agent (ai-config#4796)
 
 # (source path, generator argv) -- the generator must support a --check mode
 # that exits non-zero when its output is stale.
@@ -133,7 +140,7 @@ def main() -> int:
         "output, and push again.",
         "Warning only -- the push is not blocked.",
     ]
-    print(json.dumps({"systemMessage": "\n".join(lines)}))
+    print(context_notice("\n".join(lines)))
     return 0
 
 

@@ -95,10 +95,11 @@ WHAT IT DOES NOT KEY ON
   * A block in a session whose shell is unknown. Absent positive evidence that
     the user's shell is PowerShell, this stays silent -- the safe direction.
 
-It warns and never blocks. A `Stop` guard sits between the model and the user,
-which README names as the worst place for a wrong one, so this only ever adds a
-`systemMessage`; there is no path here that suppresses, delays, or alters the
-reply.
+It never suppresses or alters the reply. A `Stop` guard sits between the model
+and the user, which README names as the worst place for a wrong one. It emits
+through agent_notice.stop_notice, which blocks at most once per turn so the
+agent reads the warning and can follow up, and never while `stop_hook_active`
+is set; a bare `systemMessage` would reach only the user (ai-config#4796).
 """
 import hashlib
 import json
@@ -106,6 +107,13 @@ import os
 import re
 import sys
 import tempfile
+
+_AGENT_NOTICE_LIB = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"
+)
+if _AGENT_NOTICE_LIB not in sys.path:
+    sys.path.insert(0, _AGENT_NOTICE_LIB)
+from agent_notice import stop_notice  # noqa: E402 -- reaches the agent (ai-config#4796)
 
 _HERE = os.path.dirname(os.path.realpath(__file__))
 _LIB = os.path.join(os.path.dirname(_HERE), "scripts", "lib")
@@ -509,15 +517,13 @@ def main() -> int:
     name, fix, line = hits[0]
     extra = ("" if len(hits) == 1
              else f" ({len(hits) - 1} more construct(s) in the same reply.)")
-    print(json.dumps({"systemMessage": (
-        f"Your reply hands the user a command containing {name}, and this "
+    print(stop_notice(payload, f"Your reply hands the user a command containing {name}, and this "
         "session's environment brief says their shell is Windows PowerShell "
         f"5.1, where that is a parser error.\n  {line}\nUse {fix} instead.\n"
         "A command in a fenced block is addressed to the USER'S shell, which "
         "is a different program from the one your Bash tool runs -- the "
         "target is decided by where the command goes, not by which shell you "
-        "last used." + extra
-    )}))
+        "last used." + extra, "warn-bash-command-for-powershell-user"))
     return 0
 
 

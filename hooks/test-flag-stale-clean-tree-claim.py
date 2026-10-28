@@ -219,7 +219,8 @@ def run_case(events, should_warn):
         warned = False
         if out:
             data = json.loads(out)
-            warned = bool(data.get("systemMessage"))
+            # Warned = blocked with a reason, the part the agent reads (ai-config#4796).
+            warned = data.get("decision") == "block" and bool(data.get("reason"))
         return warned == should_warn, warned
 
 

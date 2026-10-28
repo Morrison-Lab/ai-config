@@ -75,6 +75,8 @@ def run(reply, prior_commands=()):
             return "silent"
         payload = json.loads(out)
         assert "hookSpecificOutput" in payload, "missing hookSpecificOutput"
+        # additionalContext is the part the agent reads (ai-config#4796).
+        assert payload["hookSpecificOutput"].get("additionalContext"), "missing additionalContext"
         assert "systemMessage" in payload, "missing systemMessage"
         return "WARN"
     finally:

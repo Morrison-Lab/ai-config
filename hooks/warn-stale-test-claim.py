@@ -39,8 +39,11 @@ incident, and truncating test output is ordinary, legitimate practice; a hook
 keyed on it would misfire constantly and get switched off, taking the real
 cases with it.
 
-WHY THIS WARNS RATHER THAN BLOCKS
-----------------------------------
+WHY THIS NEVER DECIDES FOR THE AGENT
+-----------------------------------
+It interrupts the stop at most once per turn (agent_notice.stop_notice), so
+the agent reads the warning, which a bare systemMessage never reached
+(ai-config#4796), and the next stop always passes.
 Same shape as `remind-ums-after-error.py`'s reasoning, restated for a `Stop`
 hook rather than a `UserPromptSubmit` one: a false positive here (a genuine
 probe correctly disclosed as a probe, or a claim about a file this hook's
@@ -64,7 +67,7 @@ matching -- `remind-ums-after-error.py`'s `visible_prose()` -- on the
 assumption that a reply discussing this rule quotes its example phrases in
 backticks or a fence, as this docstring and its PR body do. A bare-prose
 discussion that never quotes the phrases can still misfire; that residual
-gap is why this warns rather than blocks.
+gap is why this interrupts once rather than refusing the stop.
 
 TEST-SUITE RECOGNITION IS DELIBERATELY A SMALL, EXPLICIT LIST
 ----------------------------------------------------------------
@@ -85,6 +88,13 @@ import os
 import re
 import sys
 import tempfile
+
+_AGENT_NOTICE_LIB = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"
+)
+if _AGENT_NOTICE_LIB not in sys.path:
+    sys.path.insert(0, _AGENT_NOTICE_LIB)
+from agent_notice import stop_notice  # noqa: E402 -- reaches the agent (ai-config#4796)
 
 EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
 BASH_TOOLS = {"Bash", "bash", "run_command", "execute_command", "terminal", "shell"}
@@ -514,13 +524,11 @@ def main() -> int:
 
     claim = hit.group(0).strip()
     suite_ran = "never" if last_test_at < 0 else "before the most recent edit"
-    print(json.dumps({"systemMessage": (
-        f'Your reply claims tests pass ("{claim}"), but a source-file edit '
+    print(stop_notice(payload, f'Your reply claims tests pass ("{claim}"), but a source-file edit '
         f"happened after the last recognized test-suite invocation "
         f"(the project's own suite ran {suite_ran} in this transcript). "
         "Run the real suite over the current state of the file before "
-        "reporting it verified, or say plainly that only a probe ran."
-    )}))
+        "reporting it verified, or say plainly that only a probe ran.", "warn-stale-test-claim"))
 
     sys.stderr.write(
         f'[hook: warn-stale-test-claim] Your reply claims tests pass '

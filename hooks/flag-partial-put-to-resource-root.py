@@ -66,8 +66,16 @@ not just the fields being set:
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
+
+_AGENT_NOTICE_LIB = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"
+)
+if _AGENT_NOTICE_LIB not in sys.path:
+    sys.path.insert(0, _AGENT_NOTICE_LIB)
+from agent_notice import context_notice  # noqa: E402 -- reaches the agent (ai-config#4796)
 
 # `/api/v1/<collection>/<id>` and nothing after it. The id may be numeric or a
 # sis-style string. A trailing slash still counts as the root; any further
@@ -124,8 +132,7 @@ def main() -> int:
         return 0  # the author is already diffing the whole resource
 
     target = m.group(0).strip("\"'`")
-    print(json.dumps({"systemMessage": (
-        f"This PUTs to a REST resource ROOT ({target}) with a partial body, and "
+    print(context_notice(f"This PUTs to a REST resource ROOT ({target}) with a partial body, and "
         "the call does not snapshot and diff the whole resource around it.\n\n"
         "An API may treat the fields you omit as 'leave alone' or as 'clear' --- "
         "that is the remote's choice, not the request's, and both return 200.\n\n"
@@ -141,8 +148,7 @@ def main() -> int:
         "  const lost = Object.keys(before).filter(k => "
         "before[k] !== null && after[k] === null);\n\n"
         "If this endpoint is known to preserve omitted fields, carry on --- "
-        "this is a reminder, not a refusal."
-    )}))
+        "this is a reminder, not a refusal."))
     return 0
 
 

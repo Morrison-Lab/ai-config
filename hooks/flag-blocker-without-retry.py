@@ -45,8 +45,11 @@ the actual incident shape: a handoff whose STATED REASON is a permission
 refusal, not any blocker whatsoever. See `ESCALATION_RX` / `ATTRIBUTION_RX`
 and `find_denial_escalation` below.
 
-WHY THIS WARNS RATHER THAN BLOCKS
+WHY THIS NEVER DECIDES FOR THE AGENT
 -----------------------------------
+It interrupts the stop at most once per turn (agent_notice.stop_notice), so
+the agent reads the warning, which a bare systemMessage never reached
+(ai-config#4796), and the next stop always passes.
 The obvious shape is a `Stop` guard that blocks the escalating message
 outright, copying `no-offer-to-file.py`. That shape is wrong here, for the
 same reason `flag-cop-out-offer.py` and `remind-deserialize-before-binary-claim.py`
@@ -113,6 +116,13 @@ import os
 import re
 import sys
 import tempfile
+
+_AGENT_NOTICE_LIB = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"
+)
+if _AGENT_NOTICE_LIB not in sys.path:
+    sys.path.insert(0, _AGENT_NOTICE_LIB)
+from agent_notice import stop_notice  # noqa: E402 -- reaches the agent (ai-config#4796)
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 
@@ -497,7 +507,7 @@ def main() -> int:
         "correct as written -- this is a reminder, not a refusal."
     )
 
-    print(json.dumps({"systemMessage": message}))
+    print(stop_notice(payload, message, "flag-blocker-without-retry"))
     sys.stderr.write(f"[hook: flag-blocker-without-retry] {message}\n")
     return 0
 

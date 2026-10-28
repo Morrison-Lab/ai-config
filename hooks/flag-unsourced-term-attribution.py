@@ -80,6 +80,13 @@ import os
 import re
 import sys
 
+_AGENT_NOTICE_LIB = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"
+)
+if _AGENT_NOTICE_LIB not in sys.path:
+    sys.path.insert(0, _AGENT_NOTICE_LIB)
+from agent_notice import context_notice  # noqa: E402 -- reaches the agent (ai-config#4796)
+
 # A term word bound to a year. `\s+` rather than `[ ]` so a line-wrapped
 # "Autumn\n2008" still matches; semantic line breaks put one there often.
 RX_TERM_YEAR = re.compile(
@@ -185,8 +192,7 @@ def main() -> int:
 
     phrase = hit.group(0).strip()
     named = doc.group(0)
-    print(json.dumps({"systemMessage": (
-        f'This writes "{phrase}" alongside `{named}`, and no command in this '
+    print(context_notice(f'This writes "{phrase}" alongside `{named}`, and no command in this '
         "transcript has extracted text from any document (pdftotext, "
         "pdfinfo, unzip -p, strings). A term and year say which offering a "
         "document belongs to -- a fact that lives inside the document or on "
@@ -200,8 +206,7 @@ def main() -> int:
         f"Run `pdftotext -f 1 -l 1 {named} -` (or the equivalent) and quote "
         "what it returns. If you sourced the term from the publisher's page "
         "rather than the file, or you know the offering first-hand, say so "
-        "and carry on -- this is a reminder, not a refusal."
-    )}))
+        "and carry on -- this is a reminder, not a refusal."))
     return 0
 
 

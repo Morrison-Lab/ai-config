@@ -55,9 +55,12 @@ a batch close because one of its PRs was checked.
 of any kind. Counting the mergeability query is what silenced the first draft;
 scoping alone would also have fixed it, and so would this exclusion alone.
 
-Warns, never blocks: "abandoned" is partly a judgment, and a blocking guard on
-a judgment gets switched off, taking the real cases with it. Fails OPEN on any
-parse trouble, and fires at most once per distinct message.
+Interrupts the stop at most once per turn and never wedges it: "abandoned" is
+partly a judgment, and a guard that blocked on a judgment every time would get
+switched off, taking the real cases with it. agent_notice.stop_notice blocks
+once so the agent reads the warning, which a bare systemMessage never reached
+(ai-config#4796), and the next stop always passes. Fails OPEN on any parse
+trouble, and fires at most once per distinct message.
 
 Two known limits, both accepted rather than unnoticed.
 
@@ -80,6 +83,13 @@ import os
 import re
 import sys
 import tempfile
+
+_AGENT_NOTICE_LIB = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"
+)
+if _AGENT_NOTICE_LIB not in sys.path:
+    sys.path.insert(0, _AGENT_NOTICE_LIB)
+from agent_notice import stop_notice  # noqa: E402 -- reaches the agent (ai-config#4796)
 
 # How far a PR number may sit from the phrase for the phrase to be a claim
 # about that PR.
@@ -455,9 +465,7 @@ def main() -> int:
         pass
 
     named = ", ".join("#" + n for n in missing)
-    print(json.dumps({
-        "systemMessage": (
-            f"Empty-PR check: your message characterizes {named} as abandoned "
+    print(stop_notice(payload, f"Empty-PR check: your message characterizes {named} as abandoned "
             f"or as empty and disposable (\"{hit.group(0).strip()}\"), and no "
             "commit-list query naming it was issued this session. pr-on-claim "
             "opens PRs against an empty commit on purpose, so changed_files: "
@@ -465,9 +473,7 @@ def main() -> int:
             "commits cannot be pushed. The mergeability query that returns "
             "that field cannot tell those apart -- read the commit list (a "
             "claim PR has 1, not 0) and the PR body before reporting it as "
-            "abandoned (ai-config#3755)."
-        ),
-    }))
+            "abandoned (ai-config#3755).", "no-unchecked-empty-pr-claim"))
     return 0
 
 

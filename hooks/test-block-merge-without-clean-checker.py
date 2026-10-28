@@ -206,6 +206,21 @@ def main():
           gh(GH_OK, [agy_checker(status="ERROR")])[0])
     check("allows a RELAYED line in an Antigravity USER_INPUT record",
           not gh(GH_OK, [agy_user_text("RC result:\n" + line())])[0])
+    # Fallback reader when sibling is unavailable:
+    import importlib.util as _ilu
+    _spec = _ilu.spec_from_file_location("_bm_test", HOOK)
+    _mod = _ilu.module_from_spec(_spec)
+    _spec.loader.exec_module(_mod)
+    _orig_here = _mod._HERE
+    _mod._HERE = "/nonexistent"
+    _fb = _mod._load_records()
+    _mod._HERE = _orig_here
+    _tpath = transcript([checker()])
+    try:
+        check("_load_records falls back to raw JSONL reader when sibling is missing",
+              len(list(_fb(_tpath))) == 2)
+    finally:
+        os.unlink(_tpath)
 
     # --- allows: relayed evidence (cloud) ---------------------------------
     check("allows a RELAYED line in a user-role message (RC session output)",

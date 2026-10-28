@@ -87,13 +87,21 @@ _HERE = os.path.dirname(os.path.realpath(__file__))
 
 
 def _load_records():
+    """Reuse `records` from sibling `warn-merge-without-fully-clean.py` so
+    Antigravity `PLANNER_RESPONSE` / `GENERIC` / `SYSTEM_MESSAGE` records are
+    normalized into `_agy_blocks` (`tool_use` and `tool_result`). Falls back to
+    raw JSONL iteration if the sibling cannot be loaded.
+    """
     try:
         path = os.path.join(_HERE, "warn-merge-without-fully-clean.py")
         spec = importlib.util.spec_from_file_location("_sib_wmwfc", path)
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         return mod.records
-    except Exception:
+    except Exception as exc:
+        print(f"block-merge-without-clean-checker: cannot load "
+              f"warn-merge-without-fully-clean.py ({exc}); using raw JSONL "
+              f"reader", file=sys.stderr)
         def _fallback(path):
             with open(path, encoding="utf-8", errors="ignore") as fh:
                 for line in fh:
@@ -386,6 +394,11 @@ def evidence(path):
                     relay_ids.add(b.get("id"))
             elif kind == "tool_result":
                 tid = b.get("tool_use_id")
+                # `take()` only adds positive evidence to `found`; skipping
+                # `is_error` tool results ensures a failed or nonzero-exit
+                # command (e.g., Antigravity `status="ERROR"` or nonzero exit
+                # header) is never credited even if its output quotes a clean
+                # line.
                 if tid in bash_ids and not b.get("is_error"):
                     take(_result_text(b), veto=True)
                 elif tid in relay_ids:

@@ -1154,3 +1154,14 @@ It has two concrete consequences worth keeping straight:
   - **Don't:** reach for an empty commit or a close-and-reopen to kick CI, and don't read "all required contexts green" without confirming each one actually reported on the current head.
   ([Morrison-Lab/qbt#80](https://github.com/Morrison-Lab/qbt/pull/80), 2026-09-27: `check-spelling.yaml` and `check-non-standard-chars.yml` both declare `branches: [main]`.
   While the PR was stacked neither reported, and the base-sync merge push took `check / check-chars` from *not reported* to green.)
+
+## A `workflow_run` run is listed under the default branch's head, not under the commit it checks
+
+A run triggered by `workflow_run`, such as the `Annotation gate` caller, carries the default branch's latest commit as its `head_sha`, whatever run triggered it.
+So `actions/runs?head_sha=<main merge commit>` lists gate runs that were gating other PRs' runs, and a failure among them can belong to a different commit entirely.
+
+- **Do:** before blaming a merge for a failed gate run, read the commit it actually checked: the `GATE_HEAD_SHA` and `GATE_RUN_ID` lines in its job log, then `gh api repos/<o>/<r>/actions/runs/<GATE_RUN_ID>` for that run's branch.
+- **Do:** fetch job logs with `mcp__github__get_job_logs` (`return_content: true`) in a cloud session: `gh api .../actions/jobs/<id>/logs` redirects to a `*.blob.core.windows.net` URL that the agent proxy answers with `Forbidden`.
+- **Don't:** report a merge commit's CI as red on a gate run whose `GATE_HEAD_SHA` differs from it.
+
+([Morrison-Lab/lds#1516](https://github.com/Morrison-Lab/lds/pull/1516), 2026-10-28: gate run 40783835248, listed under merge commit `812c98c2` on `main`, failed with `Cache save failed`, but its log read `GATE_HEAD_SHA: 0083336c` and `GATE_RUN_ID: 40783479780`, a `pull_request` run on `claude/split-def-log-loss-1533`.)

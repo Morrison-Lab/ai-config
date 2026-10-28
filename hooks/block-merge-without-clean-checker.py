@@ -77,12 +77,36 @@ LIMITS
 * Fails OPEN when the payload or transcript is unreadable (some harnesses
   supply no transcript); a broken `shellcmd` import writes one STDERR line.
 """
+import importlib.util
 import json
 import os
 import re
 import sys
 
 _HERE = os.path.dirname(os.path.realpath(__file__))
+
+
+def _load_records():
+    try:
+        path = os.path.join(_HERE, "warn-merge-without-fully-clean.py")
+        spec = importlib.util.spec_from_file_location("_sib_wmwfc", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod.records
+    except Exception:
+        def _fallback(path):
+            with open(path, encoding="utf-8", errors="ignore") as fh:
+                for line in fh:
+                    try:
+                        rec = json.loads(line)
+                    except Exception:
+                        continue
+                    if isinstance(rec, dict):
+                        yield rec
+        return _fallback
+
+
+_records = _load_records()
 try:
     _LIB = os.path.join(os.path.dirname(_HERE), "scripts", "lib")
     if _LIB not in sys.path:
@@ -311,6 +335,8 @@ def _runs_instrument(command):
 
 
 def _blocks(rec):
+    if isinstance(rec.get("_agy_blocks"), list):
+        return rec["_agy_blocks"]
     content = (rec.get("message") or {}).get("content") or rec.get("content")
     if isinstance(content, str):
         return [{"type": "text", "text": content}]
@@ -341,36 +367,31 @@ def evidence(path):
         for repo, num, sha in RX_EVIDENCE.findall(text):
             found.add((repo.lower(), int(num), sha.lower()))
 
-    with open(path, encoding="utf-8", errors="ignore") as fh:
-        for line in fh:
-            try:
-                rec = json.loads(line)
-            except Exception:
-                continue
-            if rec.get("isSidechain"):
-                continue
-            role = rec.get("type") or (rec.get("message") or {}).get("role")
-            for b in _blocks(rec):
-                kind = b.get("type")
-                if kind == "tool_use":
-                    name = b.get("name")
-                    if name in SHELL_TOOLS:
-                        cmd = _shell_command(b.get("input") or {})
-                        try:
-                            if cmd and _runs_instrument(cmd):
-                                bash_ids.add(b.get("id"))
-                        except Exception:
-                            pass
-                    elif _is_relay_tool(name):
-                        relay_ids.add(b.get("id"))
-                elif kind == "tool_result":
-                    tid = b.get("tool_use_id")
-                    if tid in bash_ids:
-                        take(_result_text(b), veto=True)
-                    elif tid in relay_ids:
-                        take(_result_text(b), veto=False)
-                elif kind == "text" and role == "user":
-                    take(b.get("text") or "", veto=False)
+    for rec in _records(path):
+        if rec.get("isSidechain"):
+            continue
+        role = rec.get("type") or (rec.get("message") or {}).get("role")
+        for b in _blocks(rec):
+            kind = b.get("type")
+            if kind == "tool_use":
+                name = b.get("name")
+                if name in SHELL_TOOLS:
+                    cmd = _shell_command(b.get("input") or {})
+                    try:
+                        if cmd and _runs_instrument(cmd):
+                            bash_ids.add(b.get("id"))
+                    except Exception:
+                        pass
+                elif _is_relay_tool(name):
+                    relay_ids.add(b.get("id"))
+            elif kind == "tool_result":
+                tid = b.get("tool_use_id")
+                if tid in bash_ids and not b.get("is_error"):
+                    take(_result_text(b), veto=True)
+                elif tid in relay_ids:
+                    take(_result_text(b), veto=False)
+            elif kind == "text" and role in ("user", "USER_INPUT"):
+                take(b.get("text") or "", veto=False)
     return found
 
 

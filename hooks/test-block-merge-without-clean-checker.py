@@ -50,6 +50,15 @@ def assistant_text(text):
     return {"kind": "assistant", "text": text}
 
 
+def agy_checker(n=354, repo=REPO, out=None, status="DONE"):
+    return {"kind": "agy", "cmd": f"python3 scripts/check-pr-fully-clean.py {n} -R {repo}",
+            "out": line() if out is None else out, "status": status}
+
+
+def agy_user_text(text):
+    return {"kind": "agy_user", "text": text}
+
+
 def transcript(steps):
     fd, path = tempfile.mkstemp(suffix=".jsonl")
     with os.fdopen(fd, "w") as fh:
@@ -57,6 +66,29 @@ def transcript(steps):
             if s["kind"] == "user":
                 fh.write(json.dumps({"type": "user", "message": {
                     "role": "user", "content": s["text"]}}) + "\n")
+            elif s["kind"] == "agy_user":
+                fh.write(json.dumps({"type": "USER_INPUT", "content": s["text"]}) + "\n")
+            elif s["kind"] == "agy":
+                fh.write(json.dumps({
+                    "step_index": i * 2,
+                    "type": "PLANNER_RESPONSE",
+                    "tool_calls": [{
+                        "id": f"agy_{i}",
+                        "name": "run_command",
+                        "args": {"CommandLine": json.dumps(s["cmd"])},
+                    }],
+                }) + "\n")
+                fh.write(json.dumps({
+                    "step_index": i * 2 + 1,
+                    "type": "GENERIC",
+                    "status": s["status"],
+                    "content": (
+                        "Created At: 2026-10-27T23:39:27-07:00\n"
+                        "Completed At: 2026-10-27T23:39:29-07:00\n"
+                        "Command exited with code 0.\n\n"
+                        "Command output:\n" + s["out"]
+                    ),
+                }) + "\n")
             elif s["kind"] == "assistant":
                 fh.write(json.dumps({"type": "assistant", "message": {
                     "content": [{"type": "text", "text": s["text"]}]}}) + "\n")
@@ -168,6 +200,12 @@ def main():
           not mcp([bash(f"python3 scripts/check-pr-fully-clean.py "
                         f"--from-json /tmp/p.json -R {REPO} 354",
                         line())])[0])
+    check("allows an Antigravity PLANNER_RESPONSE + GENERIC checker run",
+          not gh(GH_OK, [agy_checker()])[0])
+    check("denies an Antigravity checker run with status=ERROR",
+          gh(GH_OK, [agy_checker(status="ERROR")])[0])
+    check("allows a RELAYED line in an Antigravity USER_INPUT record",
+          not gh(GH_OK, [agy_user_text("RC result:\n" + line())])[0])
 
     # --- allows: relayed evidence (cloud) ---------------------------------
     check("allows a RELAYED line in a user-role message (RC session output)",

@@ -55,9 +55,12 @@ a batch close because one of its PRs was checked.
 of any kind. Counting the mergeability query is what silenced the first draft;
 scoping alone would also have fixed it, and so would this exclusion alone.
 
-Warns, never blocks: "abandoned" is partly a judgment, and a blocking guard on
-a judgment gets switched off, taking the real cases with it. Fails OPEN on any
-parse trouble, and fires at most once per distinct message.
+Interrupts the stop at most once per turn and never wedges it: "abandoned" is
+partly a judgment, and a guard that blocked on a judgment every time would get
+switched off, taking the real cases with it. agent_notice.stop_notice blocks
+once so the agent reads the warning, which a bare systemMessage never reached
+(ai-config#4796), and the next stop always passes. Fails OPEN on any parse
+trouble, and fires at most once per distinct message.
 
 Two known limits, both accepted rather than unnoticed.
 

@@ -213,7 +213,6 @@ CONTEXT_STOP_FILES["hooks/test-warn-stop.py"] = (
     'import json\nout = \'{"hookSpecificOutput": {"additionalContext": "warning"}}\'\n'
     'payload = json.loads(out)\n'
     'assert payload["hookSpecificOutput"]["additionalContext"]\n'
-    'assert "systemMessage" not in payload\n'
 )
 
 case(
@@ -221,6 +220,38 @@ case(
     CLEAN_HOOKS_JSON,
     CONTEXT_STOP_FILES,
     want_exit=0,
+)
+
+# --- 3c'. ...but its test must inspect additionalContext, not systemMessage ---
+# The test-side rule is decided by what the hook emits, not by whether it uses
+# agent_notice, so a direct additionalContext hook is held to the same bar.
+CONTEXT_STOP_BLIND = dict(CONTEXT_STOP_FILES)
+CONTEXT_STOP_BLIND["hooks/test-warn-stop.py"] = (
+    'import json\nout = \'{"systemMessage": "warning"}\'\n'
+    'assert json.loads(out).get("systemMessage")\n'
+)
+
+case(
+    "test of a direct additionalContext Stop hook checking only systemMessage fails",
+    CLEAN_HOOKS_JSON,
+    CONTEXT_STOP_BLIND,
+    want_exit=1,
+    needle="never inspects 'additionalContext'",
+)
+
+# --- 3c''. Same for a direct additionalContext PreToolUse hook ---
+PRETOOL_BLIND = dict(CLEAN_FILES)
+PRETOOL_BLIND["hooks/test-warn-pretool.py"] = (
+    'import json\nout = \'{"systemMessage": "warn"}\'\n'
+    'assert json.loads(out).get("systemMessage")\n'
+)
+
+case(
+    "test of a direct additionalContext PreToolUse hook checking only systemMessage fails",
+    CLEAN_HOOKS_JSON,
+    PRETOOL_BLIND,
+    want_exit=1,
+    needle="never inspects 'additionalContext'",
 )
 
 # --- 3d. PreToolUse hook emitting only systemMessage fails (#4796) ---
@@ -262,7 +293,7 @@ case(
     CLEAN_HOOKS_JSON,
     BLIND_PRETOOL_TEST_FILES,
     want_exit=1,
-    needle="never inspects 'additionalContext' or 'systemMessage'",
+    needle="never inspects 'additionalContext'",
 )
 
 # --- 4b. Test-side payload inspection via imported helper module (ai-config#4308) ---

@@ -426,6 +426,10 @@ def test_end_to_end():
                 "transcript_path": p})
     check("exits 0 even when it fires", out.returncode == 0)
     check("warns on an unswept move", "inbound-link sweep" in out.stdout)
+    # additionalContext is the part the agent reads (ai-config#4796).
+    check("the warning is in additionalContext",
+          "inbound-link sweep" in json.loads(out.stdout)
+          .get("hookSpecificOutput", {}).get("additionalContext", ""))
     check("names the source file", "src.md" in out.stdout)
     check("prints the deriving command", "grep -rn 'src.md'" in out.stdout)
     # It must never take the permission decision away from the user.

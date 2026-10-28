@@ -15,8 +15,11 @@ uncommitted", or a "clean stopping point" without an intervening `git status`
 or `git diff` reading, the claim is stale and risks leaving uncommitted or
 staged files behind (ai-config#3821).
 
-WARNS, never blocks: a clean-tree assertion may be accurate (e.g. if the checkout
-restored identical bytes), and the corrective action is a single `git status`.
+Interrupts the stop at most once per turn and never wedges it: a clean-tree
+assertion may be accurate (e.g. if the checkout restored identical bytes), and
+the corrective action is a single `git status`. agent_notice.stop_notice blocks
+once so the agent reads the warning, which a bare systemMessage never reached
+(ai-config#4796).
 
 Fails OPEN on any parse or import trouble, and fires at most once per distinct
 reply message (sentinel keyed by content hash).

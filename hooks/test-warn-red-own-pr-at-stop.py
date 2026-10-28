@@ -390,7 +390,8 @@ def main():
                 # The block's reason is the part the agent reads (ai-config#4796).
                 message = json.loads(out).get("reason", "")
             ok = ok and all(f"#{n}" in message for n in prs) and check in message \
-                and "does not block the stop" in message
+                and "interrupts the stop only once per turn" in message \
+                and json.loads(out).get("decision") == "block"
         else:
             ok = ok and out == ""
         if not ok:

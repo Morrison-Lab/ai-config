@@ -69,7 +69,9 @@ false negative here (a citation that turns out to be unrelated) is the same
 shape of miss `RX_ALREADY` already accepts everywhere else in this file's
 sibling.
 
-WARNS, never blocks. Whether a given FLAG/OFFER is genuinely idea-shaped is
+Interrupts the stop at most once per turn (agent_notice.stop_notice) and never
+wedges it, so the agent reads the warning (ai-config#4796); it never decides
+for the agent. Whether a given FLAG/OFFER is genuinely idea-shaped is
 not fully decidable from vocabulary alone -- IDEA_CUE will both miss a
 proposal phrased unusually and catch a risk note that happens to share a
 word ("consider", "worth") with a real proposal. A block on a guess this

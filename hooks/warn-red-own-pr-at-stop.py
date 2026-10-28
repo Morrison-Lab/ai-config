@@ -57,8 +57,9 @@ Deliberate limits:
   - A record that cannot be processed is skipped and counted on stderr; the rest
     of the transcript is still read. At most 64 unparseable braces are tried per
     string, to stay linear.
-  - Warns, never blocks. A missing transcript is silent; any other error prints
-    one line to stderr and exits 0.
+  - Interrupts the stop at most once per turn and never wedges it
+    (agent_notice.stop_notice, ai-config#4796). A missing transcript is
+    silent; any other error prints one line to stderr and exits 0.
 """
 import json
 import os
@@ -99,8 +100,9 @@ TEXT_RUN = re.compile(
 
 NOTE = (
     "[hook: warn-red-own-pr-at-stop] PR {prs} opened in this session still "
-    "shows failing checks that nothing since has acted on: {detail}. This note "
-    "does not block the stop; fix it, or comment once why it is not this PR's."
+    "shows failing checks that nothing since has acted on: {detail}. Before "
+    "ending the turn, fix it, or comment once on the PR why the failure is not "
+    "this PR's. This note interrupts the stop only once per turn."
 )
 
 

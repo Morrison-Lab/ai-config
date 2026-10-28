@@ -12,7 +12,9 @@ Per `shared/principles/deterministic-tools.md`, a rule is consulted at read
 time and broken at composition time, so the prose alone does not reach the
 moment it breaks. This is the instrument.
 
-WARNS, never blocks. Whether the underlying action was already authorized is
+Interrupts the stop at most once per turn (agent_notice.stop_notice), and
+never wedges it, so the agent reads the warning (ai-config#4796); it never
+decides for the agent. Whether the underlying action was already authorized is
 NOT lexically decidable -- asking before a merge or a force-push is correct,
 and those sentences look identical. So the hook can only surface the phrase
 and make the author answer the authorization question; deciding it for them

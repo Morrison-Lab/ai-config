@@ -421,11 +421,15 @@ def check_hook_tests(
                     "'decision' or 'reason' in its payload. Assert the block, "
                     "since the 'reason' is the only part the agent reads."
                 )
-        elif "PreToolUse" in events and "additionalContext" in helper_keys:
+        elif (("Stop" in events or "PreToolUse" in events)
+              and has_additional_context and not has_decision):
+            # Decided by what the hook emits, not by whether it uses the
+            # helper: a hook that writes additionalContext directly is held to
+            # the same bar as one that goes through context_notice.
             if "additionalContext" not in test_constants:
                 errors.append(
-                    f"FAIL: {test_path.name} tests PreToolUse hook {subject_name}, "
-                    "which warns through agent_notice.context_notice, but never "
+                    f"FAIL: {test_path.name} tests warn-only hook {subject_name}, "
+                    "which warns through 'additionalContext', but never "
                     "inspects 'additionalContext', the part the agent reads."
                 )
         elif is_warn_only_stop:

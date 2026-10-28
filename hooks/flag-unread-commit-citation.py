@@ -279,6 +279,7 @@ _clock = _sibling("no-unmeasured-clock-claim.py", "_sib_unread_commit_clock")
 scan = getattr(_clock, "scan", None)
 _iter_records = getattr(_clock, "_iter_records", None)
 _agy_unwrap_args = getattr(_clock, "_agy_unwrap_args", None)
+_resolve_transcript_path = getattr(_clock, "_resolve_transcript_path", None)
 
 RX_COMMENT_POST = getattr(_ts, "RX_COMMENT_POST", None)
 strip_heredocs = getattr(_ts, "strip_heredocs", None)
@@ -560,33 +561,22 @@ def _collect_tool_uses(path):
             records_iter = _iter_records(path)
         else:
             with open(path, encoding="utf-8", errors="ignore") as fh:
-                records_iter = [
-                    (idx, json.loads(line))
-                    for idx, line in enumerate(fh, 1)
-                    if line.strip()
-                ]
+                records_iter = [(idx, json.loads(line)) for idx, line in enumerate(fh, 1) if line.strip()]
         for i, m in records_iter:
             if m.get("type") == "PLANNER_RESPONSE" and isinstance(m.get("tool_calls"), list):
                 for tc in m["tool_calls"]:
                     if not isinstance(tc, dict):
                         continue
                     tname = tc.get("name") or ""
-                    raw_args = (tc.get("args") or tc.get("arguments")
-                                or tc.get("input") or {})
+                    raw_args = tc.get("args") or tc.get("arguments") or tc.get("input") or {}
                     inp = _agy_unwrap_args(raw_args) if _agy_unwrap_args else (
                         raw_args if isinstance(raw_args, dict) else {})
                     if tname == "call_mcp_tool" and isinstance(inp, dict):
                         srv = str(inp.get("ServerName") or inp.get("serverName") or inp.get("server") or "").strip()
                         sub = str(inp.get("ToolName") or inp.get("toolName") or inp.get("tool") or "").strip()
-                        mcp_args = inp.get("Arguments") or inp.get("arguments") or {}
-                        if isinstance(mcp_args, str):
-                            try:
-                                mcp_args = json.loads(mcp_args)
-                            except Exception:
-                                mcp_args = {}
+                        mcp_args = _agy_unwrap_args(inp.get("Arguments") or inp.get("arguments") or {}) if _agy_unwrap_args else (inp.get("Arguments") or inp.get("arguments") or {})
                         if srv and sub and isinstance(mcp_args, dict):
-                            tname = f"mcp__{srv}__{sub}"
-                            inp = mcp_args
+                            tname, inp = f"mcp__{srv}__{sub}", mcp_args
                     out.append((i, tname, inp))
                 continue
             blocks = (m.get("message") or {}).get("content")
@@ -841,7 +831,8 @@ def main() -> int:
     if not isinstance(tool_input, dict):
         return 0
     cwd = payload.get("cwd") or os.getcwd()
-    tpath = payload.get("transcript_path") or ""
+    raw_tpath = payload.get("transcript_path") or ""
+    tpath = _resolve_transcript_path(raw_tpath) if _resolve_transcript_path else raw_tpath
 
     try:
         kind, body, surface = _post_from_payload(tool_name, tool_input, cwd)

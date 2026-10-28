@@ -608,6 +608,14 @@ RX_AGY_BG_DONE = re.compile(
 AGY_SYS_MSG_SEP = "\n\nThe following is a <" + "SYSTEM_MESSAGE>"
 
 
+def _resolve_transcript_path(path):
+    if path and os.path.basename(path) == "transcript.jsonl":
+        full = os.path.join(os.path.dirname(path), "transcript_full.jsonl")
+        if os.path.isfile(full):
+            return full
+    return path
+
+
 def _agy_unwrap_args(raw_args):
     if isinstance(raw_args, str):
         try:
@@ -616,22 +624,29 @@ def _agy_unwrap_args(raw_args):
             return {}
     if not isinstance(raw_args, dict):
         return {}
+    out = dict(raw_args)
     for wrapper_key in ("args", "arguments", "input", "parameters", "params"):
-        nested = raw_args.get(wrapper_key)
+        nested = out.get(wrapper_key)
         if isinstance(nested, str):
             try:
                 nested = json.loads(nested)
             except Exception:
                 nested = None
         if isinstance(nested, dict):
-            merged = dict(raw_args)
-            merged.update(nested)
-            return merged
-    return raw_args
+            out.update(nested)
+            break
+    for k, v in list(out.items()):
+        if isinstance(v, str) and len(v) >= 2 and v[0] == '"' and v[-1] == '"':
+            try:
+                out[k] = json.loads(v)
+            except Exception:
+                pass
+    return out
 
 
 def _iter_records(path):
     """Yield (index, record) from JSONL `path`, sorted by `step_index` when present."""
+    path = _resolve_transcript_path(path)
     raw_recs = []
     with open(path, encoding="utf-8", errors="ignore") as fh:
         for line_no, line in enumerate(fh, 1):
@@ -642,11 +657,7 @@ def _iter_records(path):
             if isinstance(m, dict):
                 raw_recs.append((line_no, m))
     if any(isinstance(r.get("step_index"), int) for _, r in raw_recs):
-        raw_recs.sort(key=lambda item: (
-            item[1]["step_index"] if isinstance(item[1].get("step_index"), int)
-            else item[0],
-            item[0],
-        ))
+        raw_recs.sort(key=lambda it: (it[1]["step_index"] if isinstance(it[1].get("step_index"), int) else it[0], it[0]))
     for idx, (_line_no, m) in enumerate(raw_recs, 1):
         yield idx, m
 

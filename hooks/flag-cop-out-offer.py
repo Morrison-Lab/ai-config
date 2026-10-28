@@ -36,6 +36,13 @@ import re
 import sys
 import tempfile
 
+_AGENT_NOTICE_LIB = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"
+)
+if _AGENT_NOTICE_LIB not in sys.path:
+    sys.path.insert(0, _AGENT_NOTICE_LIB)
+from agent_notice import stop_notice  # noqa: E402 -- reaches the agent (ai-config#4796)
+
 # Matched against the LAST few lines of the reply only.
 OFFERS = [
     r"say the word",
@@ -230,15 +237,15 @@ def main() -> int:
     except Exception:
         pass
 
-    # A warn-only Stop hook must emit `systemMessage` on stdout: stderr alone
-    # can be discarded, so a guard that writes only there is indistinguishable
-    # from one that never fired. That is the failure this hook is about --
-    # something that looks like it is working and delivers nothing.
-    print(json.dumps({"systemMessage": (
-        f"Your reply closes on an offer to do work: \"{phrase}\". "
+    # The warning must reach the agent: stderr alone is discarded, and a
+    # `systemMessage` reaches only the user, so either makes a guard
+    # indistinguishable from one that never fired (ai-config#4796). That is
+    # the failure this hook is about -- something that looks like it is
+    # working and delivers nothing. stop_notice blocks once per turn, with
+    # the warning as the reason the agent reads.
+    print(stop_notice(payload, f"Your reply closes on an offer to do work: \"{phrase}\". "
         "Was that action already authorized? If so, do it and report in the "
-        "past tense -- an unanswered offer leaves no branch, no PR, no issue."
-    )}))
+        "past tense -- an unanswered offer leaves no branch, no PR, no issue.", "flag-cop-out-offer"))
 
     sys.stderr.write(
         f"[hook: flag-cop-out-offer] Your reply closes on an offer: "

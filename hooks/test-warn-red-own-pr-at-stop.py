@@ -387,7 +387,8 @@ def main():
         if prs:
             message = ""
             if out:
-                message = json.loads(out).get("systemMessage", "")
+                # The block's reason is the part the agent reads (ai-config#4796).
+                message = json.loads(out).get("reason", "")
             ok = ok and all(f"#{n}" in message for n in prs) and check in message \
                 and "does not block the stop" in message
         else:

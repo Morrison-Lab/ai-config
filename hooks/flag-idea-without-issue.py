@@ -119,6 +119,13 @@ import re
 import sys
 import tempfile
 
+_AGENT_NOTICE_LIB = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"
+)
+if _AGENT_NOTICE_LIB not in sys.path:
+    sys.path.insert(0, _AGENT_NOTICE_LIB)
+from agent_notice import stop_notice  # noqa: E402 -- reaches the agent (ai-config#4796)
+
 HERE = os.path.dirname(os.path.realpath(__file__))
 
 
@@ -306,15 +313,13 @@ def main() -> int:
         pass
 
     article = "an" if label == "OFFER" else "a"
-    print(json.dumps({"systemMessage": (
-        f"Your reply raises an idea in {article} {label} block with no "
+    print(stop_notice(payload, f"Your reply raises an idea in {article} {label} block with no "
         "issue or PR filed for it in this transcript. Per "
         "shared/workflow/report-mistakes-proactively.md's 'An idea is filed "
         "the same way a mistake is', a chat-only FLAG or OFFER is a "
         "heads-up, not a filing -- file it now (dupe-check, then "
         "`gh issue create` / `mcp__github__issue_write`), or say why this "
-        "one is passing speculation rather than a concrete, actionable idea."
-    )}))
+        "one is passing speculation rather than a concrete, actionable idea.", "flag-idea-without-issue"))
     return 0
 
 

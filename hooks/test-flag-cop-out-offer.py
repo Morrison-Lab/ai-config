@@ -185,11 +185,13 @@ def run(events):
         # Must never block, and must SURFACE the warning. Asserting on stderr
         # alone cannot tell a surfaced warning from discarded output, so the
         # positive signal is `systemMessage` on stdout.
-        assert '"decision": "block"' not in r.stdout, "guard must never block"
         if not r.stdout.strip():
             return False
         payload = json.loads(r.stdout)
-        assert "systemMessage" in payload, "warn-only Stop hook must emit systemMessage"
+        assert payload.get("decision") == "block" and payload.get("reason"), (
+            "Stop hook must block with its warning as the reason, the only part "
+            "the agent reads (ai-config#4796)")
+        assert payload.get("systemMessage") == payload["reason"], "user copy must match"
         return "offer" in payload["systemMessage"].lower()
     finally:
         os.unlink(path)

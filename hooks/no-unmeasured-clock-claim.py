@@ -80,6 +80,13 @@ import re
 import sys
 import tempfile
 
+_AGENT_NOTICE_LIB = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"
+)
+if _AGENT_NOTICE_LIB not in sys.path:
+    sys.path.insert(0, _AGENT_NOTICE_LIB)
+from agent_notice import stop_notice  # noqa: E402 -- reaches the agent (ai-config#4796)
+
 _LIB = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib")
 if _LIB not in sys.path:
     sys.path.insert(0, _LIB)
@@ -840,21 +847,15 @@ def main() -> int:
     except Exception:
         pass
 
-    # `systemMessage`, not `reason`. A `Stop` hook's `reason` is read only
-    # alongside `"decision": "block"`, so a warn-only hook emitting `reason`
-    # alone prints valid JSON that reaches nobody -- a detector that fires
-    # silently, which is indistinguishable from one that never fires at all.
-    # Every warn-only hook in this repo emits `systemMessage` for exactly that
-    # reason; see `flag-unassigned-worktree.py` and
-    # `flag-unchained-branch-switch.py`.
+    # A `Stop` hook's `reason` is read only alongside `"decision": "block"`,
+    # and a `systemMessage` reaches only the user; either alone makes a
+    # detector that fires where nobody can act on it, indistinguishable from
+    # one that never fires. stop_notice blocks once per turn with the warning
+    # as the reason the agent reads (ai-config#4796).
     # Single-line message avoids emitting multi-line "Stop says:" blocks in Claude Code.
-    print(json.dumps({
-        "systemMessage": (
-            f"Timestamp reminder: Your message states Pacific time \"{unmeasured_hit.group(0).strip()}\" "
+    print(stop_notice(payload, f"Timestamp reminder: Your message states Pacific time \"{unmeasured_hit.group(0).strip()}\" "
             f"and {detail}. Run 'TZ=America/Los_Angeles date \"+%Y-%m-%d %H:%M %Z\"' "
-            "fresh for recaps; cite artifacts for past times."
-        ),
-    }))
+            "fresh for recaps; cite artifacts for past times.", "no-unmeasured-clock-claim"))
     return 0
 
 

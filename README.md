@@ -628,47 +628,45 @@ on, so sleep and logout pause polling --- acceptable for a secondary backstop
 host ([#2082](https://github.com/Morrison-Lab/ai-config/issues/2082)), not
 for a primary one.
 
-### Writing a warn-only hook: emit `systemMessage`, not `reason`
+### Writing a warn-only hook: make the warning reach the agent
 
-A `Stop` hook's `reason` is read **only** alongside `"decision": "block"`.
-So a hook meant to *warn* rather than block, emitting `reason` by itself,
-prints valid JSON that reaches nobody --- a detector that fires silently, which
-is indistinguishable from one that never fires.
-That is the worst possible defect for a guard, and nothing catches it: the
-hook runs, exits 0, and its tests pass if they only assert that *something* was
-printed.
+A warning only works if the agent reads it, and two of the obvious channels do not reach the agent.
 
-Most warn-only hooks here emit `systemMessage`, and the `PreToolUse` ones pair
-it with `hookSpecificOutput.additionalContext`;
-the blocking `Stop` hooks pair `reason` with `decision`.
-The trap is that a blocking hook is the natural model to copy, and it uses
-`reason` correctly.
-"Most" rather than all, derived over `hooks/hooks.json` rather than recalled:
-every registered warn-only `Stop` hook emits `systemMessage`, and so does
-every registered warn-only `PreToolUse` hook but one (measured 2026-09-04).
-The exception is `warn-pr-create-without-dupe-check.py`, which emits
-`additionalContext` alone --- accepted by the `PreToolUse` rule below, since
-that channel is surfaced on its own.
-Stated as a property rather than as a tally, because a tally goes stale on
-any unrelated hook addition: `no-underived-required-check.py` and
-`flag-config-deletion-without-ref-check.py` landed on the same day and moved
-the counts from 19 warn-only `PreToolUse` hooks to 20 and from two warn-only
-`Stop` hooks to three.
+- A `Stop` hook's `reason` is read **only** alongside `"decision": "block"`.
+  Emitted by itself it prints valid JSON that reaches nobody.
+- A `systemMessage` is shown to the **user** and never to the model.
+  A hook whose only output is `systemMessage` warns the person watching, and cannot change what the agent does next.
+
+Either way the hook runs, exits 0, and its tests pass if they only assert that *something* was printed.
+A detector that fires where nobody can act on it is indistinguishable from one that never fires, which is the worst possible defect for a guard.
+
+The second trap was this README's own advice until ai-config#4796.
+It said to "emit `systemMessage`", and 19 registered hooks did, every one of them addressed to the agent ("your message says ...").
+On 2026-10-27 `require-stopping-point.py` fired on every closing reply of a lds session that never said whether it was done.
+The agent saw none of those warnings, so the user had to ask "session done?" and then "why didn't you say so before?", exactly as in #4308.
+#4322 had turned that hook from blocking to warn-only on the premise that `systemMessage` alerts the agent; it does not.
+
+The channels that do reach the agent:
+
+- **`Stop` / `SubagentStop`:** `{"decision": "block", "reason": ...}`, or `hookSpecificOutput.additionalContext` (as `no-unread-issue-claim.py` does).
+  Use `scripts/lib/agent_notice.py`'s `stop_notice(payload, message, hook)`.
+  It blocks at most once per hook per turn, and never while `stop_hook_active` is set, so a warning can never hold a session in a loop.
+  When it does not block it falls back to `systemMessage`, so the user still sees the note.
+- **`PreToolUse` and the other tool and prompt events:** `hookSpecificOutput.additionalContext`, which the model reads without the tool call being denied.
+  Use `agent_notice.context_notice(message)`, which also keeps a `systemMessage` for the user.
 
 So when adding a warn-only hook:
 
-- emit `systemMessage`, and confirm by reading the printed payload rather than
-  by checking that output is non-empty
-- have its test assert the payload **shape** --- `bool(out)` cannot tell a
-  surfaced warning from a discarded one
-- mutation-check it: revert `systemMessage` to `reason` and require the suite to
-  fail
+- emit through `agent_notice`, and confirm by reading the printed payload rather than by checking that output is non-empty
+- have its test assert the payload **shape**: the `decision`/`reason` of a `Stop` hook, the `additionalContext` of a `PreToolUse` hook.
+  `bool(out)` cannot tell a surfaced warning from a discarded one
+- mutation-check it: replace the `agent_notice` call with a bare `systemMessage` and require the suite to fail
 
-`scripts/check-hook-output-shape.py` is a hard gate enforcing this on every run: it verifies that
-warn-only hooks never emit `reason` alone, that warn-only `Stop` hooks emit
-`systemMessage`, that warn-only `PreToolUse` hooks emit `additionalContext` or
-`systemMessage`, and that their test suites inspect the payload shape rather than
-checking non-empty output.
+`scripts/check-hook-output-shape.py` is a hard gate enforcing this on every run.
+It verifies that no warn-only hook emits `reason` alone, that every `Stop` hook can emit `decision: block` or `additionalContext`, and that every warn-only `PreToolUse` hook emits `additionalContext`.
+A `systemMessage` alone satisfies neither rule.
+It also checks that the test suites inspect the payload shape rather than non-empty output.
+It reads an `agent_notice` import as emitting what that helper emits.
 
 The `PreToolUse` half was added after `flag-cd-into-main-checkout.py` shipped
 printing its warning to stderr and exiting 0

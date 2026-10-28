@@ -262,7 +262,9 @@ def run(events):
     payload = invoke(events)
     if not payload:
         return False
-    if not payload.get("systemMessage"):
+    # The warning must reach the agent: a block whose reason is the warning
+    # (ai-config#4796), with the same text as the user's systemMessage copy.
+    if payload.get("decision") != "block" or payload.get("reason") != payload.get("systemMessage"):
         SHAPE_ERRORS.append(sorted(payload))
     return True
 
@@ -467,8 +469,10 @@ def mutation_checks():
             check(f"mutation anchor {anchor!r} is unique",
                   source.count(anchor), 1)
             continue
+        # Beside the subject, so its `scripts/lib` import still resolves.
         tmp = tempfile.NamedTemporaryFile("w", suffix=".py", delete=False,
-                                          encoding="utf-8")
+                                          encoding="utf-8",
+                                          dir=os.path.dirname(os.path.abspath(SUBJECT)))
         tmp.write(source.replace(anchor, replacement))
         tmp.close()
         try:
@@ -478,21 +482,24 @@ def mutation_checks():
         check(f"mutation {anchor!r}: {label}", fired, want_fire)
 
     # The output-shape mutation README's "Writing a warn-only hook" names: the
-    # guard still fires, but its warning stops reaching anyone.
-    anchor = '"systemMessage"'
+    # guard still fires, but emits a bare systemMessage, which the user sees
+    # and the agent never does (ai-config#4796). The block must disappear.
+    anchor = "stop_notice(payload,"
     if source.count(anchor) != 1:
         check(f"mutation anchor {anchor!r} is unique", source.count(anchor), 1)
         return
     tmp = tempfile.NamedTemporaryFile("w", suffix=".py", delete=False,
-                                      encoding="utf-8")
-    tmp.write(source.replace(anchor, '"reason"'))
+                                      encoding="utf-8",
+                                      dir=os.path.dirname(os.path.abspath(SUBJECT)))
+    tmp.write(source.replace(
+        anchor, '(lambda _p, _m, _h: json.dumps({"systemMessage": _m}))(payload,'))
     tmp.close()
     try:
         payload = invoke([INCIDENT], hook=tmp.name)
     finally:
         os.unlink(tmp.name)
-    check("mutation systemMessage->reason drops the surfaced field",
-          "systemMessage" in payload, False)
+    check("mutation stop_notice->bare systemMessage loses the agent's copy",
+          payload.get("decision") == "block", False)
 
 
 def main():

@@ -160,14 +160,14 @@ def run(events):
         if not out:
             return False
         payload = json.loads(out)
-        # A Stop hook's output is surfaced only via systemMessage (or a block
-        # decision); anything else reaches nobody.
-        if not payload.get("systemMessage"):
+        # A Stop hook reaches the agent only through a block's `reason`; a
+        # systemMessage is shown to the user alone (ai-config#4796).
+        if payload.get("decision") != "block" or not payload.get("reason"):
             SHAPE_ERRORS.append(sorted(payload))
-        if "mergeStateStatus" not in (payload.get("systemMessage") or ""):
+        if "mergeStateStatus" not in (payload.get("reason") or ""):
             SHAPE_ERRORS.append(["message-lacks-remedy"])
-        if payload.get("decision") == "block":
-            SHAPE_ERRORS.append(["must-not-block"])
+        if payload.get("systemMessage") != payload.get("reason"):
+            SHAPE_ERRORS.append(["user-copy-differs"])
         return True
     finally:
         shutil.rmtree(td, ignore_errors=True)

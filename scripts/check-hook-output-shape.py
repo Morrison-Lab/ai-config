@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Assert warn-only hooks emit systemMessage rather than reason, and tests assert shape.
+"""Assert every hook warning reaches the agent, and that tests assert its shape.
 
 A `Stop` hook's `reason` is read ONLY alongside `"decision": "block"`.
 A warn-only `Stop` hook that emits `reason` by itself prints valid JSON that the
@@ -11,9 +11,13 @@ This checks two things:
   1. Hook source output shape:
      - For every hook in `hooks/hooks.json` (and `hooks/*.py`): if its source
        never emits `"decision"` (or `permissionDecision: deny`), it must not
-       emit `"reason"` alone, warn-only Stop hooks must emit `"systemMessage"`,
-       and warn-only PreToolUse hooks must emit `"additionalContext"` or
-       `"systemMessage"` (ai-config#3068). "Warn-only" there means neither a
+       emit `"reason"` alone; every Stop hook must be able to emit
+       `"decision": "block"` or `"additionalContext"`, and warn-only PreToolUse hooks must emit
+       `"additionalContext"` (ai-config#3068, #4796). A `"systemMessage"` alone
+       satisfies neither, because the user sees it and the agent never does.
+       Importing `stop_notice` or `context_notice` from
+       `scripts/lib/agent_notice.py` counts as emitting what that helper
+       emits. "Warn-only" there means neither a
        blocking JSON decision nor an exit with status 2, which denies the tool
        call and has its stderr fed back to Claude.
   2. Test-side payload inspection:
@@ -63,6 +67,28 @@ def parse_string_constants(source_code: str) -> tuple[set[str], str | None]:
 
 
 PERMISSION_DECISIONS = frozenset({"allow", "ask"})
+
+
+# The keys each scripts/lib/agent_notice.py helper emits on a hook's behalf,
+# so a hook that delegates its output is checked as if it wrote them itself.
+NOTICE_HELPER_KEYS = {
+    "stop_notice": {"decision", "block", "reason", "systemMessage"},
+    "context_notice": {"hookSpecificOutput", "additionalContext", "systemMessage"},
+}
+
+
+def notice_helper_keys(source_code: str) -> set[str]:
+    """The output keys implied by `from agent_notice import ...` in a hook."""
+    try:
+        tree = ast.parse(source_code)
+    except SyntaxError:
+        return set()
+    keys: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module == "agent_notice":
+            for alias in node.names:
+                keys |= NOTICE_HELPER_KEYS.get(alias.name, set())
+    return keys
 
 
 def _is_str(node, values) -> bool:
@@ -207,6 +233,7 @@ def check_hook_sources(
         if parse_err:
             errors.append(f"FAIL: {script} {parse_err}")
             continue
+        constants |= notice_helper_keys(source)
 
         has_decision = "decision" in constants or "permissionDecision" in constants
         blocks_by_decision = has_decision and ("deny" in constants or "block" in constants)
@@ -234,14 +261,26 @@ def check_hook_sources(
                 "paired with 'decision: block'. Emit 'systemMessage' instead."
             )
 
-        # Rule 2: A Stop hook with no block decision is warn-only, so it must emit systemMessage
-        if "Stop" in events and not has_decision:
-            if not has_system_message:
-                errors.append(
-                    f"FAIL: {script} is registered as a Stop hook without a 'decision' "
-                    "block emit, but does not emit 'systemMessage'. "
-                    "Warn-only Stop hooks must emit 'systemMessage'."
-                )
+        # Rule 2: A Stop hook must reach the agent. Two channels do:
+        # `decision: block` with a `reason`, and
+        # `hookSpecificOutput.additionalContext` (no-unread-issue-claim.py
+        # uses it, and its reminders reached the agent in the session that
+        # found #4796). A `systemMessage` is shown to the user and never to
+        # the model, so a Stop hook that only emits one cannot change what the
+        # agent does next (ai-config#4796: require-stopping-point.py warned on
+        # every closing reply of a lds session and the agent saw none of it).
+        # Use scripts/lib/agent_notice.py's stop_notice, which blocks at most
+        # once per turn and never while stop_hook_active is set.
+        if "Stop" in events and not (has_decision or has_additional_context):
+            channel = (
+                "emits only 'systemMessage', which the user sees and the agent never does"
+                if has_system_message else "emits nothing the harness surfaces"
+            )
+            errors.append(
+                f"FAIL: {script} is registered as a Stop hook without a 'decision' "
+                f"block emit, and {channel}. Emit through "
+                "scripts/lib/agent_notice.py's stop_notice (ai-config#4796)."
+            )
 
         # Rule 3: A PreToolUse hook that does not block is warn-only, so it
         # must emit additionalContext or systemMessage. On exit 0 stderr goes
@@ -261,17 +300,19 @@ def check_hook_sources(
         # block, so it does not exempt -- see blocks_by_exit_2 for why a
         # laxer scan would exempt nearly every hook that has an
         # unreadable-payload branch.
+        # A 'systemMessage' alone no longer satisfies this rule: the user sees
+        # it and the agent never does (ai-config#4796).
         exempt = blocks_by_decision or blocks_by_exit or decides
         if "PreToolUse" in events and not exempt:
-            if not (has_additional_context or has_system_message):
+            if not has_additional_context:
                 errors.append(
                     f"FAIL: {script} is registered as a PreToolUse hook that "
                     "neither blocks (no blocking 'decision' emit and no exit 2) "
-                    "nor emits 'additionalContext' or 'systemMessage'. A "
-                    "warn-only PreToolUse hook must emit "
-                    "'hookSpecificOutput.additionalContext' on stdout (a "
-                    "'systemMessage' alongside it is fine); stderr on exit 0 "
-                    "reaches the debug log only."
+                    "nor emits 'additionalContext'. A warn-only PreToolUse hook "
+                    "must emit 'hookSpecificOutput.additionalContext' on stdout, "
+                    "for example through scripts/lib/agent_notice.py's "
+                    "context_notice; a 'systemMessage' alone reaches the user "
+                    "only, and stderr on exit 0 reaches the debug log only."
                 )
 
     return errors
@@ -355,6 +396,8 @@ def check_hook_tests(
         if subj_err:
             errors.append(f"FAIL: {subject_name} {subj_err}")
             continue
+        helper_keys = notice_helper_keys(subject_source)
+        subject_constants |= helper_keys
 
         has_decision = "decision" in subject_constants or "permissionDecision" in subject_constants
         has_system_message = "systemMessage" in subject_constants
@@ -370,7 +413,22 @@ def check_hook_tests(
             errors.append(f"FAIL: {test_err}")
             continue
 
-        if is_warn_only_stop:
+        if "Stop" in events and "decision" in helper_keys:
+            if "decision" not in test_constants and "reason" not in test_constants:
+                errors.append(
+                    f"FAIL: {test_path.name} tests Stop hook {subject_name}, which "
+                    "blocks through agent_notice.stop_notice, but never inspects "
+                    "'decision' or 'reason' in its payload. Assert the block, "
+                    "since the 'reason' is the only part the agent reads."
+                )
+        elif "PreToolUse" in events and "additionalContext" in helper_keys:
+            if "additionalContext" not in test_constants:
+                errors.append(
+                    f"FAIL: {test_path.name} tests PreToolUse hook {subject_name}, "
+                    "which warns through agent_notice.context_notice, but never "
+                    "inspects 'additionalContext', the part the agent reads."
+                )
+        elif is_warn_only_stop:
             if "systemMessage" not in test_constants:
                 errors.append(
                     f"FAIL: {test_path.name} tests warn-only Stop hook {subject_name}, "
@@ -407,9 +465,9 @@ def main() -> int:
 
     print(
         f"OK: Checked {len(registered)} registered hook(s) and their test suites: "
-        "warn-only Stop hooks emit 'systemMessage', warn-only PreToolUse hooks "
-        "emit 'additionalContext' or 'systemMessage', no warn-only hook emits "
-        "'reason' alone, and tests inspect payload shape."
+        "every Stop hook can block or add context, warn-only PreToolUse hooks emit "
+        "'additionalContext', no warn-only hook emits 'reason' alone, and "
+        "tests inspect payload shape."
     )
     return SUCCESS_EXIT
 

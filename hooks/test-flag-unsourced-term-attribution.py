@@ -60,8 +60,9 @@ def check(name: str, got: str, want_fire: bool) -> None:
     if fired:
         try:
             data = json.loads(got)
-            if "systemMessage" not in data:
-                FAILURES.append(f"{name}: missing 'systemMessage' in payload ({data})")
+            # The agent reads additionalContext; systemMessage is the user's copy (ai-config#4796).
+            if not (data.get("hookSpecificOutput") or {}).get("additionalContext"):
+                FAILURES.append(f"{name}: missing 'additionalContext' in payload ({data})")
         except Exception as exc:
             FAILURES.append(f"{name}: stdout is not valid JSON ({exc})")
 

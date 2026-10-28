@@ -125,7 +125,9 @@ def run(events):
             [sys.executable, HOOK], input=json.dumps({"transcript_path": path}),
             capture_output=True, text=True, env=env,
         ).stdout
-        return '"systemMessage"' in out
+        # Fired = blocked with a reason, the part the agent reads (ai-config#4796).
+        data = json.loads(out) if out.strip() else {}
+        return data.get("decision") == "block" and bool(data.get("reason"))
     finally:
         os.unlink(path)
 

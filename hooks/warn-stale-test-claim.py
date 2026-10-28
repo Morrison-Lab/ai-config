@@ -86,6 +86,13 @@ import re
 import sys
 import tempfile
 
+_AGENT_NOTICE_LIB = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"
+)
+if _AGENT_NOTICE_LIB not in sys.path:
+    sys.path.insert(0, _AGENT_NOTICE_LIB)
+from agent_notice import stop_notice  # noqa: E402 -- reaches the agent (ai-config#4796)
+
 EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
 BASH_TOOLS = {"Bash", "bash", "run_command", "execute_command", "terminal", "shell"}
 
@@ -514,13 +521,11 @@ def main() -> int:
 
     claim = hit.group(0).strip()
     suite_ran = "never" if last_test_at < 0 else "before the most recent edit"
-    print(json.dumps({"systemMessage": (
-        f'Your reply claims tests pass ("{claim}"), but a source-file edit '
+    print(stop_notice(payload, f'Your reply claims tests pass ("{claim}"), but a source-file edit '
         f"happened after the last recognized test-suite invocation "
         f"(the project's own suite ran {suite_ran} in this transcript). "
         "Run the real suite over the current state of the file before "
-        "reporting it verified, or say plainly that only a probe ran."
-    )}))
+        "reporting it verified, or say plainly that only a probe ran.", "warn-stale-test-claim"))
 
     sys.stderr.write(
         f'[hook: warn-stale-test-claim] Your reply claims tests pass '

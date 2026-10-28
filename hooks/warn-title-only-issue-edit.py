@@ -104,6 +104,13 @@ import shlex
 import sys
 import tempfile
 
+_AGENT_NOTICE_LIB = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"
+)
+if _AGENT_NOTICE_LIB not in sys.path:
+    sys.path.insert(0, _AGENT_NOTICE_LIB)
+from agent_notice import stop_notice  # noqa: E402 -- reaches the agent (ai-config#4796)
+
 HERE = os.path.dirname(os.path.realpath(__file__))
 
 
@@ -490,7 +497,7 @@ def main() -> int:
             NOTE.format(label=call.label(), cmd_desc=_cmd_desc(call))
             for call in to_report
         ]
-        print(json.dumps({"systemMessage": "\n\n---\n\n".join(blocks)}))
+        print(stop_notice(payload, "\n\n---\n\n".join(blocks), "warn-title-only-issue-edit"))
     except Exception:
         return 0
     return 0

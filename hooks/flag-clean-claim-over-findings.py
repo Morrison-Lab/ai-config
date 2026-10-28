@@ -90,16 +90,19 @@ earlier one from deeper in a long session (which the findings-heading
 exemption or a manual fix may have already resolved through some other
 channel this hook cannot see).
 
-WARN, NEVER BLOCK
------------------
+BLOCK ONCE, NEVER WEDGE
+----------------------
 Authorization and intent are not lexically decidable here (the reply may be
-citing the review for a human to read, not asserting it is done), and a
-false block on a correct summary is worse than a missed warning. Emits
-`systemMessage` only, exactly like `flag-unfiled-issue.py` and
-`flag-cop-out-offer.py` -- a `Stop` hook's `reason` is read only alongside
-`"decision": "block"`, so a warn-only hook printing `reason` alone reaches
-nobody (README, "Writing a warn-only hook: emit `systemMessage`, not
-`reason`").
+citing the review for a human to read, not asserting it is done), so a
+warning here can be wrong. It used to emit `systemMessage` only, on the
+reasoning that a false block on a correct summary is worse than a missed
+warning; but a `systemMessage` is shown to the user and never to the agent,
+so every warning was a missed one (ai-config#4796). It now emits through
+`scripts/lib/agent_notice.py`'s `stop_notice`, which blocks at most once per
+turn and never while `stop_hook_active` is set: a false block costs one
+continuation in which the agent can say why its summary stands, and the
+next stop always passes (README, "Writing a warn-only hook: make the warning
+reach the agent").
 
 Fails OPEN on any parse or import trouble, and fires at most once per
 distinct final message (sentinel keyed by content hash), so it cannot wedge
@@ -173,6 +176,13 @@ import os
 import re
 import sys
 import tempfile
+
+_AGENT_NOTICE_LIB = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"
+)
+if _AGENT_NOTICE_LIB not in sys.path:
+    sys.path.insert(0, _AGENT_NOTICE_LIB)
+from agent_notice import stop_notice  # noqa: E402 -- reaches the agent (ai-config#4796)
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 REPO_ROOT = os.path.dirname(HERE)
@@ -913,8 +923,7 @@ def main() -> int:
 
     phrase = clean_hit.group(0).strip()
     which = f" (PR #{', #'.join(sorted(hazard['pr_refs']))})" if hazard["pr_refs"] else ""
-    print(json.dumps({"systemMessage": (
-        f"Your reply states \"{phrase}\"{which}, but a review body read earlier "
+    print(stop_notice(payload, f"Your reply states \"{phrase}\"{which}, but a review body read earlier "
         "in this session states a clean verdict while still carrying an "
         "unresolved finding (per check-pr-fully-clean.py's own "
         "classify_verdict()/_unresolved_finding_pattern()). "
@@ -923,8 +932,7 @@ def main() -> int:
         "presence of a positive verdict line.\n\n"
         "Read the findings section itself before reporting the round clean, "
         "and run `python3 scripts/check-pr-fully-clean.py <PR>` -- the real "
-        "instrument -- rather than the verdict line alone."
-    )}))
+        "instrument -- rather than the verdict line alone.", "flag-clean-claim-over-findings"))
     return 0
 
 

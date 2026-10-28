@@ -59,6 +59,13 @@ import re
 import sys
 import tempfile
 
+_AGENT_NOTICE_LIB = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"
+)
+if _AGENT_NOTICE_LIB not in sys.path:
+    sys.path.insert(0, _AGENT_NOTICE_LIB)
+from agent_notice import stop_notice  # noqa: E402 -- reaches the agent (ai-config#4796)
+
 _LIB = os.path.join(
     os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
     "scripts", "lib")
@@ -303,18 +310,14 @@ def main() -> int:
         pass
 
     shown = hit.group(0).replace(MARKER, "glab/gh auth login").strip()
-    print(json.dumps({
-        "systemMessage": (
-            f"Re-authentication claim without a host check: your message says "
+    print(stop_notice(payload, f"Re-authentication claim without a host check: your message says "
             f"\"{shown}\", and nothing since the user's last prompt verified "
             "the token against the intended host. A CLI's \"Unauthenticated\" "
             "describes the host it contacted: glab outside a checkout falls "
             "back to gitlab.com, gh to github.com (ai-config#4387). Verify "
             "first: `curl -H \"PRIVATE-TOKEN: $T\" https://<host>/api/v4/user`, "
             "`glab api --hostname <host> user`, or `gh api --hostname <host> "
-            "user`, then retract or restate the claim."
-        ),
-    }))
+            "user`, then retract or restate the claim.", "no-reauth-without-host-check"))
     return 0
 
 

@@ -5,10 +5,13 @@ Every case runs the real script as a subprocess against a synthetic scratch repo
 verifying that:
   1. A clean suite passes (both synthetic and live repo).
   2. A warn-only hook emitting `reason` without `decision` fails (the defect from #1566).
-  3. A warn-only Stop hook that fails to emit `systemMessage` fails.
-  4. A test for a warn-only hook that does not assert payload shape fails (test-side blindness).
-  5. A warn-only PreToolUse hook emitting neither additionalContext nor
-     systemMessage fails, while one that blocks -- by a `deny` decision or by
+  3. A Stop hook that emits only `systemMessage`, or nothing surfaced, fails:
+     the user sees a systemMessage and the agent never does (ai-config#4796).
+     One that adds `additionalContext` passes, and one that emits through
+     agent_notice.stop_notice is read as blocking.
+  4. A test for a warning hook that does not assert payload shape fails (test-side blindness).
+  5. A warn-only PreToolUse hook emitting no additionalContext fails, including
+     one that emits only systemMessage, while one that blocks -- by a `deny` decision or by
      exiting 2 -- does not; an error-path `return 1` does not exempt, an
      exit 2 inside an `except` handler does not exempt, and an `if`-guarded
      error-path `return 2` DOES exempt, which is the narrowing's edge and is
@@ -132,12 +135,15 @@ CLEAN_FILES = {
     "hooks/test-blocking-stop.py": (
         'import json\nout = \'{"decision": "block"}\'\nassert "decision" in out\n'
     ),
+    # A warning Stop hook emits through agent_notice.stop_notice, which the
+    # checker reads as a block with a reason (ai-config#4796).
     "hooks/warn-stop.py": (
-        'import json\nprint(json.dumps({"systemMessage": "warning"}))\n'
+        'from agent_notice import stop_notice\n'
+        'print(stop_notice({}, "warning", "warn-stop"))\n'
     ),
     "hooks/test-warn-stop.py": (
-        'import json\nout = \'{"systemMessage": "warning"}\'\n'
-        'payload = json.loads(out)\nassert payload.get("systemMessage")\n'
+        'import json\nout = \'{"decision": "block", "reason": "warning"}\'\n'
+        'payload = json.loads(out)\nassert payload.get("reason")\n'
     ),
     "hooks/warn-pretool.py": (
         'import json\nprint(json.dumps({"systemMessage": "warn", "hookSpecificOutput": {"additionalContext": "ctx"}}))\n'
@@ -171,11 +177,64 @@ NO_SYSMSG_FILES["hooks/warn-stop.py"] = (
 )
 
 case(
-    "warn-only Stop hook without systemMessage fails",
+    "Stop hook with no surfaced output fails",
     CLEAN_HOOKS_JSON,
     NO_SYSMSG_FILES,
     want_exit=1,
-    needle="does not emit 'systemMessage'",
+    needle="emits nothing the harness surfaces",
+)
+
+# --- 3b. Stop hook emitting only systemMessage (ai-config#4796) ---
+# The user sees a systemMessage and the agent never does, so this shape is the
+# defect, not the fix: require-stopping-point.py warned on every closing reply
+# of a session and the agent saw none of it.
+SYSMSG_ONLY_FILES = dict(CLEAN_FILES)
+SYSMSG_ONLY_FILES["hooks/warn-stop.py"] = (
+    'import json\nprint(json.dumps({"systemMessage": "warning"}))\n'
+)
+
+case(
+    "Stop hook emitting only systemMessage fails (#4796)",
+    CLEAN_HOOKS_JSON,
+    SYSMSG_ONLY_FILES,
+    want_exit=1,
+    needle="which the user sees and the agent never does",
+)
+
+# --- 3c. Stop hook adding context instead of blocking passes ---
+# hookSpecificOutput.additionalContext on Stop reaches the agent too
+# (no-unread-issue-claim.py), so it satisfies the rule on its own.
+CONTEXT_STOP_FILES = dict(CLEAN_FILES)
+CONTEXT_STOP_FILES["hooks/warn-stop.py"] = (
+    'import json\nprint(json.dumps({"hookSpecificOutput": '
+    '{"hookEventName": "Stop", "additionalContext": "warning"}}))\n'
+)
+CONTEXT_STOP_FILES["hooks/test-warn-stop.py"] = (
+    'import json\nout = \'{"hookSpecificOutput": {"additionalContext": "warning"}}\'\n'
+    'payload = json.loads(out)\n'
+    'assert payload["hookSpecificOutput"]["additionalContext"]\n'
+    'assert "systemMessage" not in payload\n'
+)
+
+case(
+    "Stop hook adding additionalContext passes (#4796)",
+    CLEAN_HOOKS_JSON,
+    CONTEXT_STOP_FILES,
+    want_exit=0,
+)
+
+# --- 3d. PreToolUse hook emitting only systemMessage fails (#4796) ---
+PRETOOL_SYSMSG_ONLY_FILES = dict(CLEAN_FILES)
+PRETOOL_SYSMSG_ONLY_FILES["hooks/warn-pretool.py"] = (
+    'import json\nprint(json.dumps({"systemMessage": "warn"}))\n'
+)
+
+case(
+    "PreToolUse hook emitting only systemMessage fails (#4796)",
+    CLEAN_HOOKS_JSON,
+    PRETOOL_SYSMSG_ONLY_FILES,
+    want_exit=1,
+    needle="nor emits 'additionalContext'",
 )
 
 # --- 4. Test-side blindness: warn-only Stop test checking only bool(out) ---
@@ -185,11 +244,11 @@ BLIND_TEST_FILES["hooks/test-warn-stop.py"] = (
 )
 
 case(
-    "test-side blindness on warn-only Stop hook fails",
+    "test-side blindness on a stop_notice Stop hook fails",
     CLEAN_HOOKS_JSON,
     BLIND_TEST_FILES,
     want_exit=1,
-    needle="never inspects 'systemMessage'",
+    needle="never inspects 'decision' or 'reason'",
 )
 
 # --- 5. Test-side blindness: warn-only PreToolUse test checking only bool(out) ---
@@ -210,12 +269,12 @@ case(
 IMPORTED_HELPER_FILES = dict(CLEAN_FILES)
 IMPORTED_HELPER_FILES["hooks/test-warn-stop.py"] = (
     'from stopping_point_test_support import check_warn\n'
-    'check_warn(\'{"systemMessage": "warning"}\')\n'
+    'check_warn(\'{"decision": "block", "reason": "warning"}\')\n'
 )
 IMPORTED_HELPER_FILES["scripts/lib/stopping_point_test_support.py"] = (
     'import json\n'
     'def check_warn(out):\n'
-    '    assert json.loads(out).get("systemMessage")\n'
+    '    assert json.loads(out).get("reason")\n'
 )
 
 case(

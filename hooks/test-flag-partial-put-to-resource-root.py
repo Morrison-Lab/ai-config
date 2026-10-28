@@ -35,8 +35,11 @@ def check(name, got, want_fire):
     if fired:
         try:
             payload = json.loads(got)
-            if not isinstance(payload, dict) or "systemMessage" not in payload:
-                FAILURES.append(f"{name}: expected 'systemMessage' in payload, got {payload!r}")
+            # The agent reads additionalContext; systemMessage is the user's copy (ai-config#4796).
+            context = (payload.get("hookSpecificOutput") or {}).get("additionalContext") \
+                if isinstance(payload, dict) else None
+            if not context:
+                FAILURES.append(f"{name}: expected 'additionalContext' in payload, got {payload!r}")
         except Exception as exc:
             FAILURES.append(f"{name}: stdout not valid JSON ({exc})")
 

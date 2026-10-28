@@ -19,10 +19,11 @@ The condition is exactly decidable from the transcript:
     state wording)  AND  no tool call since the last real user prompt queried
     mergeability
 
-Warns rather than blocks. The status report is RIGHT to send; only the missing
-reading is owed, and a guard that suppressed the report would hide the very
-signal it exists to complete. It emits a `systemMessage`, which is the field a
-`Stop` hook's output surfaces without `decision: block`.
+Never suppresses the report. The status report is RIGHT to send; only the
+missing reading is owed, and a guard that suppressed the report would hide the
+very signal it exists to complete. It emits through agent_notice.stop_notice,
+which blocks once per turn so the agent reads the reminder and adds the
+reading; a bare `systemMessage` would reach only the user (ai-config#4796).
 
 Fenced code, blockquotes and inline code are stripped first, so a reply quoting
 the trigger wording is not asserting it. Fails OPEN on any parse trouble, and
@@ -34,6 +35,13 @@ import os
 import re
 import sys
 import tempfile
+
+_AGENT_NOTICE_LIB = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"
+)
+if _AGENT_NOTICE_LIB not in sys.path:
+    sys.path.insert(0, _AGENT_NOTICE_LIB)
+from agent_notice import stop_notice  # noqa: E402 -- reaches the agent (ai-config#4796)
 
 _LIB = os.path.join(
     os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib")
@@ -192,9 +200,7 @@ def main() -> int:
     except Exception:
         pass
 
-    print(json.dumps({
-        "systemMessage": (
-            "Mergeability reminder (ai-config#4380): this reply reports a PR/MR's "
+    print(stop_notice(payload, "Mergeability reminder (ai-config#4380): this reply reports a PR/MR's "
             "status (pipeline/CI/checks), but no command this turn read its "
             "mergeability. A green pipeline says nothing about whether it merges.\n"
             "Query mergeability against the PR's ACTUAL target branch -- for a "
@@ -205,9 +211,7 @@ def main() -> int:
             "If it has conflicts and the PR is yours, resolve them now; do not "
             "assume whichever thread holds the merge grant owns them.\n"
             "If this is a false positive (the PR is not yours to merge, or you "
-            "read mergeability another way), disregard it."
-        ),
-    }))
+            "read mergeability another way), disregard it.", "remind-mergeability-on-status"))
     return 0
 
 

@@ -1779,7 +1779,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-reauth-without-host-check.py\"",
             "timeout": 10,
             "script": "no-reauth-without-host-check.py",
-            "why": "ai-config#4387, the other half of warn-glab-without-host.py. An \"Unauthenticated\" from a CLI describes the host it contacted, not the credential. WARN-ONLY (systemMessage, once per distinct message) when the final message asks the user to run `glab auth login` / `gh auth login`, to re-authenticate or log in again, or says a token or credential expired or was revoked, and no tool call since the user's last prompt verified the token against a named host (curl to <host>/api/v4/user or /user, `glab api --hostname H user`, `gh api --hostname H user`, or a GITLAB_HOST=/GH_HOST= prefix on the same call). Fenced blocks and code spans are ignored, except that a span or fence that is just an auth-login command is kept so the usual \"run `glab auth login`\" phrasing is still seen. Fails open."
+            "why": "ai-config#4387, the other half of warn-glab-without-host.py. An \"Unauthenticated\" from a CLI describes the host it contacted, not the credential. Blocks once per turn through agent_notice.stop_notice (a systemMessage alone never reaches the agent, ai-config#4796) when the final message asks the user to run `glab auth login` / `gh auth login`, to re-authenticate or log in again, or says a token or credential expired or was revoked, and no tool call since the user's last prompt verified the token against a named host (curl to <host>/api/v4/user or /user, `glab api --hostname H user`, `gh api --hostname H user`, or a GITLAB_HOST=/GH_HOST= prefix on the same call). Fenced blocks and code spans are ignored, except that a span or fence that is just an auth-login command is kept so the usual \"run `glab auth login`\" phrasing is still seen. Fails open."
           },
           {
             "type": "command",
@@ -1905,7 +1905,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/require-stopping-point.py\"",
             "timeout": 10,
             "script": "require-stopping-point.py",
-            "why": "A stopping-point declaration is an explicit standing preference, not a best-effort recap (shared/workflow/flag-session-boundaries.md). Warns via systemMessage on any final reply that omits stating whether the session is done or not, including conversational question-answering replies (#4308); handles streamed chunk concatenation (#2500)."
+            "why": "A stopping-point declaration is an explicit standing preference, not a best-effort recap (shared/workflow/flag-session-boundaries.md). Blocks once per turn (scripts/lib/agent_notice.py stop_notice, so the agent reads it; a systemMessage alone never reaches the agent, ai-config#4796) on any final reply that omits stating whether the session is done or not, including conversational question-answering replies (#4308); handles streamed chunk concatenation (#2500)."
           },
           {
             "type": "command",

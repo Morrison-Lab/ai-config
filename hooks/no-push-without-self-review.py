@@ -188,7 +188,7 @@ _DENIAL_ISSUED: list[bool] = [False]
 # only an exact `clean` (or `ready...`) as clean.
 VERDICT_LINE = re.compile(
     r"^[ \t]{0,3}(?:#{1,6}[ \t]*)?Verdict[ \t]*:[ \t]*(?:\*\*)?"
-    r"(Ready for merge|Needs (?:more )?work|NOT[ _-]?CLEAN|CLEAN)\b",
+    r"(Ready (?:for|to) merge|Needs (?:more )?work|NOT[ _-]?CLEAN|CLEAN)\b",
     re.I | re.M,
 )
 
@@ -202,7 +202,7 @@ VERDICT_LINE = re.compile(
 VERDICT_HEADING_BLOCK = re.compile(
     r"^[ \t]{0,3}#{1,6}[ \t]*(?:\d+[.)][ \t]+)?(?:\*\*)?(?:(?:Final|Review|Summary)[ \t]+)?Verdict(?:\*\*)?:?(?:\*\*)?[ \t]*\r?\n"
     r"(?:[ \t]*\r?\n){0,2}"
-    r"[ \t]{0,3}(?:\*{1,2}|_{1,2})?(Ready for merge|Needs (?:more )?work|NOT[ _-]?CLEAN|CLEAN)(?:\*{1,2}|_{1,2})?[.!]?[ \t]*\r?$",
+    r"[ \t]{0,3}(?:\*{1,2}|_{1,2})?(Ready (?:for|to) merge|Needs (?:more )?work|NOT[ _-]?CLEAN|CLEAN)(?:\*{1,2}|_{1,2})?[.!]?[ \t]*\r?$",
     re.I | re.M,
 )
 
@@ -2607,10 +2607,42 @@ def _handback_candidates(record: dict) -> list[tuple[list[str], str]]:
     return out
 
 
-def read_latest_review(
+ACCEPTED_VERDICT_PHRASES = (
+    "`Ready for merge`, `Ready to merge`, `Clean`, `Needs more work`, "
+    "`Needs work`, or `NOT_CLEAN`"
+)
+
+REVIEWED_COMMIT_LINE = re.compile(
+    r"^[ \t]{0,3}\*{0,2}Reviewed-Commit\*{0,2}[ \t]*:[ \t]*\*{0,2}[ \t]*`?([0-9a-fA-F]{7,40})`?",
+    re.I | re.M,
+)
+
+
+def _unparsed_report_shas(text: str) -> list[str] | None:
+    """Return `Reviewed-Commit:` SHAs when `text` is a reviewer report
+    whose verdict line failed to parse (line-anchored `Reviewed-Commit:`
+    outside quoted regions), or `None` when `text` carries no fingerprint.
+    """
+    blanked, unresolved = _blank_quoted_regions(text)
+    if unresolved:
+        return None
+    shas: list[str] = []
+    seen: set[str] = set()
+    for m in REVIEWED_COMMIT_LINE.finditer(blanked):
+        sha = m.group(1).lower()
+        if sha not in seen:
+            seen.add(sha)
+            shas.append(sha)
+    if shas:
+        return shas
+    return None
+
+
+def read_latest_review_with_unparsed(
     transcript_path: str, _known_task_ids: frozenset[str] | None = None,
-) -> tuple[str | None, list[str], bool]:
-    """(verdict, reviewed_commits, saw_reviewer_call) from the transcript.
+) -> tuple[str | None, list[str], bool, bool, list[str]]:
+    """Return `(verdict, reviewed_commits, saw_reviewer_call,
+    saw_unparsed_later, unparsed_later_shas)` from the transcript.
 
     `reviewed_commits` is every `Reviewed-Commit:` line the winning report
     named (see `parse_report_all`), not just one -- empty when no report
@@ -2645,8 +2677,24 @@ def read_latest_review(
     saw_reviewer_call = False
     verdict: str | None = None
     reviewed_commits: list[str] = []
+    saw_unparsed_later = False
+    unparsed_later_shas: list[str] = []
     pending_omo_uses: dict[str, list[str]] = {}
     ambiguous_omo_names: set[str] = set()
+
+    def _record_candidate(text: str) -> bool:
+        nonlocal verdict, reviewed_commits, saw_unparsed_later, unparsed_later_shas
+        found, shas = parse_report_all(text)
+        if found:
+            verdict, reviewed_commits = found, shas
+            saw_unparsed_later = False
+            unparsed_later_shas = []
+            return True
+        cand_shas = _unparsed_report_shas(text)
+        if cand_shas is not None:
+            saw_unparsed_later = True
+            unparsed_later_shas = cand_shas
+        return False
 
     with open(transcript_path, "r", encoding="utf-8", errors="ignore") as f:
         for line in f:
@@ -2736,11 +2784,9 @@ def read_latest_review(
                         # complete, correctly-fingerprinted report WILL
                         # authorize. No signal available here distinguishes it.
                         if not record.get("is_error"):
-                            found, shas = parse_report_all(
+                            _record_candidate(
                                 _result_text({"content": record.get("tool_output")})
                             )
-                            if found:
-                                verdict, reviewed_commits = found, shas
                 continue
 
             is_assistant = _is_assistant_record(record)
@@ -2752,9 +2798,7 @@ def read_latest_review(
                     record.get("message") if isinstance(record.get("message"), dict) else record
                 )
                 if content_text:
-                    found, shas = parse_report_all(content_text)
-                    if found:
-                        verdict, reviewed_commits = found, shas
+                    _record_candidate(content_text)
 
             # Handback delivery as direct transcript messages from subagent
             # A hand-back counts only when a HARNESS-WRITTEN field names its
@@ -2772,9 +2816,7 @@ def read_latest_review(
                     if not text:
                         continue
                     if any(_id_is_tracked(s, tracked_ids) for s in sender_ids):
-                        found, shas = parse_report_all(text)
-                        if found:
-                            verdict, reviewed_commits = found, shas
+                        _record_candidate(text)
                     elif _known_task_ids is None:
                         unresolved_handback = True
 
@@ -2823,9 +2865,7 @@ def read_latest_review(
                     elif tool_name == "send_message" and record_is_reviewer:
                         msg_text = str(inp.get("Message") or inp.get("message") or "")
                         if msg_text:
-                            found, shas = parse_report_all(msg_text)
-                            if found:
-                                verdict, reviewed_commits = found, shas
+                            _record_candidate(msg_text)
 
                 elif b_type == "tool_result":
                     call_id = b.get("tool_use_id")
@@ -2845,8 +2885,9 @@ def read_latest_review(
                             reviewer_task_ids.add(f"agent-{tid_match.group(1)}")
 
                         if not b.get("is_error"):
-                            found, shas = parse_report_all(res_text)
-                            if not found:
+                            if _record_candidate(res_text):
+                                saw_reviewer_call = True
+                            else:
                                 # The result itself carries no report -- the
                                 # hand-back shape this dispatch's OWN result
                                 # points at, if any (ai-config#3945). Tried
@@ -2856,11 +2897,8 @@ def read_latest_review(
                                 # as before.
                                 handback_text = _handback_report_text(
                                     transcript_path, call_id, res_text)
-                                if handback_text:
-                                    found, shas = parse_report_all(handback_text)
-                            if found:
-                                saw_reviewer_call = True
-                                verdict, reviewed_commits = found, shas
+                                if handback_text and _record_candidate(handback_text):
+                                    saw_reviewer_call = True
 
                 # Genuine task notifications from tracked background reviewer dispatches
                 origin = record.get("origin")
@@ -2876,13 +2914,21 @@ def read_latest_review(
                         or (sender_id and sender_id in reviewer_task_ids)
                     ):
                         text = str(b.get("text") or b.get("content") or "")
-                        found, shas = parse_report_all(text)
-                        if found:
+                        if _record_candidate(text):
                             saw_reviewer_call = True
-                            verdict, reviewed_commits = found, shas
 
     if unresolved_handback:
-        return read_latest_review(transcript_path, frozenset(reviewer_task_ids))
+        return read_latest_review_with_unparsed(transcript_path, frozenset(reviewer_task_ids))
+    return verdict, reviewed_commits, saw_reviewer_call, saw_unparsed_later, unparsed_later_shas
+
+
+def read_latest_review(
+    transcript_path: str, _known_task_ids: frozenset[str] | None = None,
+) -> tuple[str | None, list[str], bool]:
+    """(verdict, reviewed_commits, saw_reviewer_call) from the transcript."""
+    verdict, reviewed_commits, saw_reviewer_call, _, _ = read_latest_review_with_unparsed(
+        transcript_path, _known_task_ids
+    )
     return verdict, reviewed_commits, saw_reviewer_call
 
 
@@ -2915,6 +2961,8 @@ def verify_review(transcript_path: str, directory: str | None,
     saw_reviewer_call = False
     verdict: str | None = None
     reviewed_commits: list[str] = []
+    saw_unparsed_later = False
+    unparsed_later_shas: list[str] = []
 
     # `transcript_path and` stays here, unlike the two conjuncts removed below,
     # and the difference is not cosmetic. Those two restated a fact a preceding
@@ -2936,9 +2984,26 @@ def verify_review(transcript_path: str, directory: str | None,
     # future caller need not.
     if transcript_path and os.path.exists(transcript_path):
         try:
-            verdict, reviewed_commits, saw_reviewer_call = read_latest_review(transcript_path)
+            (
+                verdict,
+                reviewed_commits,
+                saw_reviewer_call,
+                saw_unparsed_later,
+                unparsed_later_shas,
+            ) = read_latest_review_with_unparsed(transcript_path)
         except Exception as e:
             return False, f"Failed reading transcript: {e}"
+
+    unparsed_hint = ""
+    if saw_unparsed_later:
+        sha_clause = (
+            f" naming `Reviewed-Commit: {', '.join(unparsed_later_shas)}`"
+            if unparsed_later_shas else ""
+        )
+        unparsed_hint = (
+            f"\nNote: a later reviewer report{sha_clause} was seen in the transcript, "
+            f"but its verdict line could not be parsed (expected {ACCEPTED_VERDICT_PHRASES})."
+        )
 
     # Neither this condition nor the one below carries `and not
     # saw_reviewer_call`. That conjunct cannot be False on either path:
@@ -2981,16 +3046,16 @@ def verify_review(transcript_path: str, directory: str | None,
             "The report must state a verdict in one of two formats:\n"
             "  1. Inline: `### Verdict: <phrase>` or `Verdict: <phrase>`\n"
             "  2. Under a heading: `### Verdict` followed on the next line by `<phrase>`\n"
-            "where <phrase> is `Ready for merge`, `Clean`, `Needs more work`, `Needs work`, or `NOT_CLEAN`.\n"
+            f"where <phrase> is {ACCEPTED_VERDICT_PHRASES}.\n"
             "Dispatch it in the foreground (`run_in_background: false`) so its report "
             "returns as the tool result -- a background dispatch returns an agent id, "
-            "which carries no verdict, and an errored result carries none either."
+            f"which carries no verdict, and an errored result carries none either.{unparsed_hint}"
         )
 
     if verdict == "needs_work":
         return False, (
             "The latest adversarial self-review returned a blocking verdict.\n"
-            "Address, rebut, or defer every finding, commit, and re-dispatch the reviewer."
+            f"Address, rebut, or defer every finding, commit, and re-dispatch the reviewer.{unparsed_hint}"
         )
 
     if not reviewed_commits:
@@ -3056,7 +3121,7 @@ def verify_review(transcript_path: str, directory: str | None,
             f"would ship {', '.join(c[:12] for c in unreviewed)}.\n"
             "A push ships commits, so whatever differs -- a later commit, a `main` merge, "
             "a rebase, or a branch other than the reviewed one -- is unreviewed. "
-            "Re-dispatch the reviewer against what you are actually pushing."
+            f"Re-dispatch the reviewer against what you are actually pushing.{unparsed_hint}"
         )
 
     return True, f"Clean adversarial self-review verified at {', '.join(resolved_commits)}."

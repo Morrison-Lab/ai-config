@@ -2612,18 +2612,23 @@ ACCEPTED_VERDICT_PHRASES = (
     "`Needs work`, or `NOT_CLEAN`"
 )
 
+REVIEWED_COMMIT_LINE = re.compile(
+    r"^[ \t]{0,3}\*{0,2}Reviewed-Commit\*{0,2}[ \t]*:[ \t]*\*{0,2}[ \t]*`?([0-9a-fA-F]{7,40})`?",
+    re.I | re.M,
+)
+
 
 def _unparsed_report_shas(text: str) -> list[str] | None:
     """Return `Reviewed-Commit:` SHAs when `text` is a reviewer report
-    whose verdict line failed to parse (`Reviewed-Commit:` outside quoted
-    regions), or `None` when `text` carries no report fingerprint.
+    whose verdict line failed to parse (line-anchored `Reviewed-Commit:`
+    outside quoted regions), or `None` when `text` carries no fingerprint.
     """
     blanked, unresolved = _blank_quoted_regions(text)
     if unresolved:
         return None
     shas: list[str] = []
     seen: set[str] = set()
-    for m in REVIEWED_COMMIT.finditer(blanked):
+    for m in REVIEWED_COMMIT_LINE.finditer(blanked):
         sha = m.group(1).lower()
         if sha not in seen:
             seen.add(sha)
@@ -2636,8 +2641,8 @@ def _unparsed_report_shas(text: str) -> list[str] | None:
 def read_latest_review_with_unparsed(
     transcript_path: str, _known_task_ids: frozenset[str] | None = None,
 ) -> tuple[str | None, list[str], bool, bool, list[str]]:
-    """(verdict, reviewed_commits, saw_reviewer_call, saw_unparsed_later, unparsed_later_shas)
-    from the transcript.
+    """Return `(verdict, reviewed_commits, saw_reviewer_call,
+    saw_unparsed_later, unparsed_later_shas)` from the transcript.
 
     `reviewed_commits` is every `Reviewed-Commit:` line the winning report
     named (see `parse_report_all`), not just one -- empty when no report

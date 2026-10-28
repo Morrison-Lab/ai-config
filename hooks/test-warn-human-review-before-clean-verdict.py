@@ -49,6 +49,8 @@ CASES = [
      {"reviewers": ["d-morrison"]}, PUSHED, True, "d-morrison"),
     ("not-clean verdict", "Bash", {"command": ADD}, PUSHED + OTHER, True, "d-morrison"),
     ("clean verdict after push", "Bash", {"command": ADD}, PUSHED + CLEAN, False, None),
+    ("Ready to merge verdict after push (#4765)", "Bash", {"command": ADD},
+     PUSHED + text("### Verdict: Ready to merge\n\nReviewed-Commit: " + SHA + "\n"), False, None),
     ("clean verdict before the last push", "Bash", {"command": ADD},
      CLEAN + PUSHED, True, "d-morrison"),
     ("escaped review-data payload counts", "Bash", {"command": ADD},

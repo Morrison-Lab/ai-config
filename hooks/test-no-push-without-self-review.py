@@ -4356,18 +4356,18 @@ def deny_resilience_cases() -> tuple[int, int]:
           and f"Reviewed-Commit: {HEAD}" in reason_unp
           and "Ready to merge" in reason_unp)
 
-    # 7. Mid-investigation prose mentioning `### Verdict` without `Reviewed-Commit:`
-    #    does NOT trigger a false-positive unparsed-verdict hint (#4765).
+    # 7. Mid-investigation prose mentioning `### Verdict` or mid-sentence
+    #    `Reviewed-Commit:` does NOT trigger a false-positive unparsed hint (#4765).
     events_mid_prose = (
         reviewed(text=body(verdict="Ready for merge", commit=PREV))
-        + reviewed(text="Checking how `### Verdict` headings are parsed before emitting report.")
+        + reviewed(text=f"Checking `### Verdict` headings; I will end with Reviewed-Commit: {HEAD} once done.")
     )
     rc_mid, out_mid = run_hook("git push origin main", events_mid_prose)
     reason_mid = (out_mid.get("hookSpecificOutput") or {}).get("permissionDecisionReason", "")
-    check("mid-investigation prose with '### Verdict' and no Reviewed-Commit does not trigger unparsed hint (#4765)",
+    check("mid-investigation prose without line-anchored Reviewed-Commit does not trigger unparsed hint (#4765)",
           rc_mid == 0
           and (out_mid.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
-          and "could not be parsed as a clean verdict" not in reason_mid)
+          and "verdict line could not be parsed" not in reason_mid)
 
     return failures, ran
 

@@ -174,6 +174,189 @@ with tempfile.TemporaryDirectory() as d:
     check(r.returncode == 2 and "no such file" in r.stderr,
           "lint exits 2 on a missing path and says why")
 
+# --- the macros library is found through .gitmodules ------------------------
+ESE_DEF = "\\def\\ESEt{\\operatorname{ESE}}\n"
+ESE_RAW = "$\\mathrm{ESE}(x)$ and $\\mathbb{E}[Y]$"
+
+
+def make_repo(d, url="https://github.com/Morrison-Lab/macros.git",
+              sub="latex-macros", lib=ESE_DEF):
+    os.makedirs(os.path.join(d, ".git"))
+    with open(os.path.join(d, ".gitmodules"), "w", encoding="utf-8") as f:
+        f.write(f'[submodule "{sub}"]\n\tpath = {sub}\n\turl = {url}\n')
+    if lib is not None:
+        os.makedirs(os.path.join(d, sub))
+        with open(os.path.join(d, sub, "macros.qmd"), "wb") as f:
+            f.write(lib if isinstance(lib, bytes) else lib.encode("utf-8"))
+    return d
+
+
+def git(*args, cwd):
+    subprocess.run(["git", "-c", "protocol.file.allow=always", *args], cwd=cwd,
+                   check=True, capture_output=True,
+                   env={**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+                        "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"})
+
+
+with tempfile.TemporaryDirectory() as d:
+    repo = make_repo(os.path.join(d, "lds"))
+    target = os.path.join(repo, "chapters", "new.qmd")  # not yet on disk
+    out = hook("Write", {"file_path": target, "content": ESE_RAW})
+    check("\\ESEt" in out and "\\Ep" in out,
+          "a latex-macros/ submodule's derived rule is used (\\mathrm{ESE} -> \\ESEt)")
+    p = subprocess.run([sys.executable, HOOK], input=json.dumps(
+        {"tool_name": "Write", "cwd": repo,
+         "tool_input": {"file_path": "chapters/new.qmd", "content": ESE_RAW}}),
+        capture_output=True, text=True)
+    check("\\ESEt" in p.stdout, "a relative file_path is resolved against the payload cwd")
+
+    epi = make_repo(os.path.join(d, "epi"), url="https://github.com/d-morrison/macros",
+                    sub="macros")
+    out = hook("Write", {"file_path": os.path.join(epi, "a.qmd"), "content": ESE_RAW})
+    check("\\ESEt" in out, "a macros/ submodule from d-morrison/macros is found too")
+
+    other = make_repo(os.path.join(d, "other"), url="https://github.com/x/macros")
+    out = hook("Write", {"file_path": os.path.join(other, "a.qmd"), "content": ESE_RAW})
+    check("\\ESEt" not in out and "\\Ep" in out,
+          "a submodule from another repository is not the library; built-ins apply")
+
+    bare = os.path.join(d, "no-git")
+    os.makedirs(bare)
+    out = hook("Write", {"file_path": os.path.join(bare, "a.qmd"), "content": ESE_RAW})
+    check("\\ESEt" not in out and "\\Ep" in out,
+          "no git root or library: falls back to the built-in rules")
+
+    unchecked = make_repo(os.path.join(d, "unchecked"), lib=None)
+    out = hook("Write", {"file_path": os.path.join(unchecked, "a.qmd"), "content": ESE_RAW})
+    check("\\ESEt" not in out and "\\Ep" in out,
+          "a submodule not checked out and with no clone: built-in rules")
+
+    undecodable = make_repo(os.path.join(d, "undecodable"), lib=b"\xff\xfe\\def\n")
+    p = subprocess.run([sys.executable, HOOK], input=json.dumps(
+        {"tool_name": "Write", "tool_input": {
+            "file_path": os.path.join(undecodable, "a.qmd"), "content": ESE_RAW}}),
+        capture_output=True, text=True)
+    check(p.returncode == 0 and "\\Ep" in p.stdout and "Traceback" not in p.stderr,
+          "an undecodable library fails open to the built-in rules")
+
+    if os.geteuid() != 0:  # root can read any file
+        locked = make_repo(os.path.join(d, "locked"))
+        lib = os.path.join(locked, "latex-macros", "macros.qmd")
+        os.chmod(lib, 0)
+        p = subprocess.run([sys.executable, HOOK], input=json.dumps(
+            {"tool_name": "Write", "tool_input": {
+                "file_path": os.path.join(locked, "a.qmd"), "content": ESE_RAW}}),
+            capture_output=True, text=True)
+        os.chmod(lib, 0o600)
+        check(p.returncode == 0 and "\\Ep" in p.stdout and "\\ESEt" not in p.stdout
+              and "Traceback" not in p.stderr,
+              "an unreadable library fails open to the built-in rules")
+
+    os.makedirs(os.path.join(repo, "chapters"))
+    with open(target, "w", encoding="utf-8") as f:
+        f.write(ESE_RAW + "\n")
+    r = subprocess.run([sys.executable, LINT, "chapters"],
+                       capture_output=True, text=True, cwd=repo)
+    check(r.returncode == 1 and "\\ESEt" in r.stdout,
+          "lint finds a latex-macros/ submodule through .gitmodules without --macros")
+
+    # The library must stay inside the repo: no `..` path, no symlink out.
+    outside = os.path.join(d, "outside")
+    os.makedirs(outside)
+    with open(os.path.join(outside, "macros.qmd"), "w", encoding="utf-8") as f:
+        f.write(ESE_DEF)
+    escape = make_repo(os.path.join(d, "escape"), sub="../outside", lib=None)
+    out = hook("Write", {"file_path": os.path.join(escape, "a.qmd"), "content": ESE_RAW})
+    check("\\ESEt" not in out and "\\Ep" in out,
+          "a submodule path with `..` leading out of the repo is not read")
+    linked = make_repo(os.path.join(d, "linked"), lib=None)
+    os.makedirs(os.path.join(linked, "latex-macros"))
+    os.symlink(os.path.join(outside, "macros.qmd"),
+               os.path.join(linked, "latex-macros", "macros.qmd"))
+    out = hook("Write", {"file_path": os.path.join(linked, "a.qmd"), "content": ESE_RAW})
+    check("\\ESEt" not in out and "\\Ep" in out,
+          "a macros.qmd symlinked out of the repo is not read")
+
+    # A path reached through a symlinked directory finds the real repo.
+    alias = os.path.join(d, "alias")
+    os.symlink(os.path.join(repo, "chapters"), alias)
+    out = hook("Write", {"file_path": os.path.join(alias, "x.qmd"), "content": ESE_RAW})
+    check("\\ESEt" in out, "a symlinked directory is resolved before the walk up")
+
+    # A deleted working directory fails open instead of crashing.
+    gone = os.path.join(d, "gone")
+    os.makedirs(gone)
+    script = ("import os, subprocess, sys; os.chdir(sys.argv[1]); os.rmdir(sys.argv[1]); "
+              "p = subprocess.run([sys.executable, sys.argv[2]], input=sys.argv[3], "
+              "capture_output=True, text=True); "
+              "print(p.returncode, 'Traceback' in p.stderr, '\\\\Ep' in p.stdout)")
+    p = subprocess.run([sys.executable, "-c", script, gone, HOOK, json.dumps(
+        {"tool_name": "Write", "tool_input": {"file_path": "a.qmd", "content": ESE_RAW}})],
+        capture_output=True, text=True)
+    check(p.stdout.split() == ["0", "False", "True"],
+          "a deleted working directory fails open to the built-in rules")
+
+    # A worktree leaves the submodule uninitialised: read it from the clone.
+    lib_src = os.path.join(d, "macros-src")
+    os.makedirs(lib_src)
+    with open(os.path.join(lib_src, "macros.qmd"), "w", encoding="utf-8") as f:
+        f.write(ESE_DEF)
+    git("init", "-q", "-b", "main", cwd=lib_src)
+    git("add", ".", cwd=lib_src)
+    git("commit", "-qm", "lib", cwd=lib_src)
+
+    # A submodule name that climbs out of <git-common-dir>/modules is not read,
+    # even when a clone holding the library sits where it points.
+    hostile = os.path.join(d, "hostile")
+    os.makedirs(hostile)
+    git("init", "-q", "-b", "main", cwd=hostile)
+    with open(os.path.join(hostile, ".gitmodules"), "w", encoding="utf-8") as f:
+        f.write('[submodule "../../escaped"]\n\tpath = latex-macros\n'
+                "\turl = https://github.com/Morrison-Lab/macros.git\n")
+    git("clone", "-q", "--bare", "--branch", "main", lib_src,
+        os.path.join(hostile, "escaped"), cwd=d)
+    out = hook("Write", {"file_path": os.path.join(hostile, "a.qmd"), "content": ESE_RAW})
+    check("\\ESEt" not in out and "\\Ep" in out,
+          "a submodule name leading out of .git/modules is not read")
+
+    sup = os.path.join(d, "sup")
+    os.makedirs(sup)
+    git("init", "-q", "-b", "main", cwd=sup)
+    git("submodule", "add", "-q", lib_src, "latex-macros", cwd=sup)
+    git("config", "-f", ".gitmodules", "submodule.latex-macros.url",
+        "https://github.com/Morrison-Lab/macros.git", cwd=sup)
+    git("commit", "-qam", "sub", cwd=sup)
+    wt = os.path.join(d, "wt")
+    git("worktree", "add", "-q", wt, cwd=sup)
+    check(not os.path.exists(os.path.join(wt, "latex-macros", "macros.qmd")),
+          "(setup) the worktree's submodule is not checked out")
+    # Move the clone's HEAD past the pin, to a library without \ESEt.
+    clone = os.path.join(sup, "latex-macros")
+    with open(os.path.join(clone, "macros.qmd"), "w", encoding="utf-8") as f:
+        f.write("\\def\\FOOt{\\operatorname{FOO}}\n")
+    git("commit", "-qam", "moved", cwd=clone)
+    raw = ESE_RAW + " $\\mathrm{FOO}$"
+    out = hook("Write", {"file_path": os.path.join(wt, "ch", "a.qmd"), "content": raw})
+    check("\\ESEt" in out and "\\FOOt" not in out,
+          "an uninitialised submodule in a worktree is read from its clone at the pinned commit")
+    git("-C", wt, "update-index", "--add", "--cacheinfo",
+        "160000," + "1" * 40 + ",latex-macros", cwd=wt)
+    git("-C", wt, "commit", "-qm", "unfetched pin", cwd=wt)
+    out = hook("Write", {"file_path": os.path.join(wt, "ch", "a.qmd"), "content": raw})
+    check("\\FOOt" in out and "\\ESEt" not in out,
+          "a pin the clone never fetched falls back to the clone's HEAD")
+
+    rel = make_repo(os.path.join(d, "rel"), url="../macros.git  # sibling")
+    git("init", "-q", "-b", "main", cwd=rel)
+    git("remote", "add", "origin", "git@github.com:Morrison-Lab/lds.git", cwd=rel)
+    out = hook("Write", {"file_path": os.path.join(rel, "a.qmd"), "content": ESE_RAW})
+    check("\\ESEt" in out,
+          "a relative URL with a trailing comment resolves against the origin remote")
+    git("remote", "set-url", "origin", "https://github.com/x/lds", cwd=rel)
+    out = hook("Write", {"file_path": os.path.join(rel, "a.qmd"), "content": ESE_RAW})
+    check("\\ESEt" not in out and "\\Ep" in out,
+          "a relative URL under another owner is not the library")
+
 # --- definition masking is linear, not quadratic ---------------------------
 sys.path.insert(0, os.path.join(os.path.dirname(HERE), "scripts", "lib"))
 import time  # noqa: E402

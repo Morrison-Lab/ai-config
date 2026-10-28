@@ -73,6 +73,20 @@ CASES = [
      "'let me know if' warns"),
     ([TOOL, say("Ready to push when you are.")], True,
      "'ready to X when you are' warns"),
+    # Morrison-Lab/mds#501, 2026-10-27: two recaps closed on "I can ... if
+    # you want" for an ai-config edit that `add_repo` and the
+    # default-to-action grant already covered. The pattern took only
+    # "if you'd like" / "if you would prefer", so neither warned.
+    ([TOOL, say("The PR is waiting on review and CI. The ai-config rule is "
+                "still unrecorded; I can add it if you want.")], True,
+     "'I can X if you want' warns (mds#501)"),
+    ([TOOL, say("That belongs in ai-config, which isn't attached here. I can "
+                "attach it and open a PR for the rule if you want.\n\nThe "
+                "session isn't done until CI comes back green.")], True,
+     "'I can X if you want' followed by one status line still warns"),
+    ([TOOL, say("I can see the job if you wanted to check it yourself, "
+                "but it already passed.")], False,
+     "'if you wanted' in a past-tense aside stays silent"),
 
     # ai-config#3694: `flag-session-boundaries` appends a stopping-point
     # declaration to every reply, and for a non-clean stop it puts the pending

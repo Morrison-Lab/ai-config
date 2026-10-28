@@ -576,10 +576,8 @@ def _collect_tool_uses(path):
                         sub = str(inp.get("ToolName") or inp.get("toolName") or inp.get("tool") or "").strip()
                         raw_mcp = inp.get("Arguments") or inp.get("arguments") or {}
                         if isinstance(raw_mcp, str) and not _agy_unwrap_args:
-                            try:
-                                raw_mcp = json.loads(raw_mcp)
-                            except Exception:
-                                raw_mcp = {}
+                            try: raw_mcp = json.loads(raw_mcp)
+                            except Exception: raw_mcp = {}
                         mcp_args = _agy_unwrap_args(raw_mcp) if _agy_unwrap_args else raw_mcp
                         if srv and sub and isinstance(mcp_args, dict):
                             tname, inp = f"mcp__{srv}__{sub}", mcp_args

@@ -10,15 +10,19 @@ head=$(sed -n 's/^HEAD: //p' "$f" | head -1)
 state=$(gh pr view "$pr" -R "$repo" --json state,headRefOid --jq '.state+" "+.headRefOid') || { echo "gh pr view failed for $repo#$pr; not posting"; exit 3; }
 cur=${state#* }; st=${state%% *}
 if [ "$st" != OPEN ]; then echo "SKIP $repo#$pr state=$st"; exit 0; fi
-# agy prints its answer, a VERDICT line, then usually a repeat of the answer; take the longer of the two
-# texts so nothing printed after the first VERDICT line is dropped, and blank lines do not count.
+# agy prints its answer, a VERDICT line, then usually a repeat of the answer followed by a second VERDICT line;
+# take the longer of the two texts only when a second VERDICT line closes the repeat, so trailing error output
+# after a single VERDICT line is never mistaken for review findings, and blank lines do not count.
 body_head=$(awk 'NR>2' "$f" | awk '/^VERDICT: /{exit} {print}' | grep -v -E '^\*\*(Stopping Point|Status)' | sed '/^[[:space:]]*$/d')
 body_tail=$(awk 'NR>2' "$f" | awk 'p{print} /^VERDICT: /{p=1}' | grep -v -E '^(VERDICT: |\*\*(Stopping Point|Status))' | sed '/^[[:space:]]*$/d')
-if [ "${#body_tail}" -gt "${#body_head}" ]; then body=$body_tail; else body=$body_head; fi
+verdict_count=$(grep -c -E '^VERDICT: (CLEAN|FINDINGS)$' "$f" || true)
+last_line=$(awk 'NR>2' "$f" | grep -v '^[[:space:]]*$' | grep -v -E '^\*\*(Stopping Point|Status)' | tail -1)
+case "$last_line" in "VERDICT: CLEAN"|"VERDICT: FINDINGS") ;; *) echo "last line is not VERDICT in $f; not posting"; exit 3;; esac
+if [ "$verdict_count" -ge 2 ] && [ "${#body_tail}" -gt "${#body_head}" ]; then body=$body_tail; else body=$body_head; fi
 verdict=$(grep -o '^VERDICT: [A-Z]*' "$f" | tail -1); verdict=${verdict#VERDICT: }
 case "$verdict" in CLEAN|FINDINGS) ;; *) echo "NO VERDICT in $f; not posting"; exit 3;; esac
 [ "$(grep -o '^VERDICT: [A-Z]*' "$f" | sort -u | wc -l)" -eq 1 ] || { echo "conflicting VERDICT lines in $f; not posting"; exit 3; }
-if grep -q -E 'AGY_ERROR|RESOURCE_EXHAUSTED' "$f"; then echo "AGY ERROR in $f; not posting"; exit 3; fi
+if awk 'NR>2' "$f" | grep -v -E '^[[:space:]]*([0-9]+\.|[-*>])' | grep -q -i -E -f "$d/error-patterns.txt"; then echo "AGY ERROR in $f; not posting"; exit 3; fi
 if [ "$verdict" = FINDINGS ] && [ "${#body}" -lt 100 ]; then echo "FINDINGS with no findings text in $f; not posting"; exit 3; fi
 # same 80-character rule as CLEAN_NOTE_CHARS in bigread.py
 if [ "$verdict" = CLEAN ] && { printf '%s\n%s\n' "$body_head" "$body_tail" | grep -q -i 'non-blocking' || [ "${#body}" -gt 80 ]; }; then echo "CLEAN with listed notes in $f; not posting"; exit 4; fi

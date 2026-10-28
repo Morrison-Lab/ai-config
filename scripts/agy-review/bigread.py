@@ -21,6 +21,20 @@ CLEAN_NOTE_CHARS = 80  # a CLEAN part longer than "nothing found" is listing som
 WORKERS = 5
 MODEL = os.environ.get("MODEL", "gemini-4-argon-medium")
 HERE = os.path.dirname(os.path.abspath(__file__))
+with open(os.path.join(HERE, "error-patterns.txt"), encoding="utf-8") as _efh:
+    ERROR_RX = re.compile(
+        "|".join(p.strip() for p in _efh if p.strip()),
+        re.I | re.M,
+    )
+FINDING_LINE_RX = re.compile(r"^\s*(?:\d+\.|[-*>])")
+
+
+def has_agy_error(text):
+    """True when non-finding lines in *text* match a CLI/API error pattern."""
+    non_finding = "\n".join(
+        l for l in text.splitlines() if not FINDING_LINE_RX.match(l)
+    )
+    return bool(ERROR_RX.search(non_finding))
 TAIL = (
     " Do not write a plan, do not create artifacts, do not ask questions or request approval:"
     " answer in one pass with the review itself. List every finding, wording and style nits"
@@ -119,7 +133,7 @@ def read_chunk(idx, total, names, text, repo, pr, meta, focus):
         lines = [l for l in out.splitlines()
                  if l.strip() and not l.startswith(("**Stopping Point", "**Status"))]
         ok = (lines and lines[-1].strip() in ("VERDICT: CLEAN", "VERDICT: FINDINGS")
-              and not re.search(r"AGY_ERROR|RESOURCE_EXHAUSTED", out)
+              and not has_agy_error(out)
               and not re.search(r"awaiting (your )?(approval|confirmation)|implementation plan", out, re.I))
         if ok and lines[-1].strip() == "VERDICT: FINDINGS" and len(clean_part(out)) < 60:
             ok = False  # FINDINGS with no findings text is not a usable part

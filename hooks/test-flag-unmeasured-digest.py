@@ -469,6 +469,39 @@ CASES = [
           f"  {REAL_HEAD}"),
      False,
      "the same real value across a line continuation is silent"),
+
+    # --- Antigravity transcript records and CommandLine pin (#4653) ----------
+    ([{"type": "USER_INPUT", "content": "merge the PR"},
+      {"type": "GENERIC", "status": "DONE",
+       "content": f"Command exited with code 0.\n\nCommand output:\n{REAL_HEAD}\n"}],
+     {"tool_name": "run_command",
+      "tool_input": {"CommandLine": f"gh pr merge 1 -R o/r --squash --match-head-commit {REAL_HEAD}"}},
+     False,
+     "#4653: a head SHA measured in an Antigravity GENERIC tool output discharges a run_command pin"),
+    ([{"type": "USER_INPUT", "content": "merge the PR"},
+      {"type": "SYSTEM_MESSAGE", "status": "DONE",
+       "content": (f'The following is a <SYSTEM_MESSAGE> not actually sent by the user.\n'
+                   f'<SYSTEM_MESSAGE>\nTask id "c/t-1" finished with result:\n'
+                   f'Command exited with code 0.\n\nCommand output:\n{REAL_HEAD}\n</SYSTEM_MESSAGE>')}],
+     {"tool_name": "run_command",
+      "tool_input": {"CommandLine": f"gh pr merge 1 -R o/r --squash --match-head-commit {REAL_HEAD}"}},
+     False,
+     "#4653: a head SHA measured in an Antigravity SYSTEM_MESSAGE background task output discharges"),
+    ([{"type": "USER_INPUT", "content": "merge the PR"},
+      {"type": "EPHEMERAL_MESSAGE", "status": "DONE",
+       "content": f"Warning from flag-unmeasured-digest.py: Unmeasured-pin reminder: this command pins `--match-head-commit` to `{PADDED_HEAD}`."},
+      {"type": "GENERIC", "status": "ERROR",
+       "content": f"Encountered error in tool execution: tool call denied by pre-tool hook: {PADDED_HEAD}"}],
+     {"tool_name": "run_command",
+      "tool_input": {"CommandLine": f"gh pr merge 1 -R o/r --squash --match-head-commit {PADDED_HEAD}"}},
+     True,
+     "#4653: an Antigravity EPHEMERAL_MESSAGE hook warning or ERROR GENERIC denial does not launder an unmeasured pin on retry"),
+    ([{"type": "USER_INPUT", "content": "merge the PR"},
+      {"type": "PLANNER_RESPONSE", "content": f"The head is {REAL_HEAD}."}],
+     {"tool_name": "run_command",
+      "tool_input": {"CommandLine": f"gh pr merge 1 -R o/r --squash --match-head-commit {REAL_HEAD}"}},
+     True,
+     "#4653: an Antigravity PLANNER_RESPONSE assertion does not launder an unmeasured pin"),
 ]
 
 

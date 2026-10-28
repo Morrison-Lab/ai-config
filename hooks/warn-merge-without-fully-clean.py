@@ -152,6 +152,16 @@ RX_NOT_CLEAN = re.compile(r"NOT fully clean", re.IGNORECASE)
 RX_ATTRIBUTED = re.compile(r"#(\d+) is FULLY CLEAN\b")
 RX_API_MERGE = re.compile(r"(?:^|/)repos/([^/]+/[^/]+)/pulls/(\d+)/merge/?(?:\?.*)?$")
 SHELL_OPS = frozenset("();|&")
+RX_AGY_BG_START = re.compile(
+    r"Tool is running as a background task with task id:\s*(\S+)")
+RX_AGY_BG_DONE = re.compile(
+    r'Task id "([^"]+)" (finished|was canceled) with result:\r?\n(.*?)'
+    r'(?=\r?\n(?:Task id "|</SYSTEM_MESSAGE>)|\Z)',
+    re.S,
+)
+RX_AGY_NONZERO_EXIT = re.compile(
+    r"^[ \t]*(?:the[ \t]+)?command exited with code [1-9]\d*\b", re.I | re.M)
+AGY_SYS_MSG_SEP = "\n\nThe following is a <SYSTEM_MESSAGE>"
 
 NOTE = (
     "About to merge {target}, but this session has no passing "
@@ -281,16 +291,143 @@ def _instrument_run(rest):
             _known_repo(_flag_value(args, ("-R", "--repo"))))
 
 
-def records(path):
-    with open(path, encoding="utf-8", errors="ignore") as fh:
-        for line in fh:
+def _resolve_transcript_path(path):
+    """Prefer sibling `transcript_full.jsonl` when `path` is `transcript.jsonl`.
+
+    Antigravity writes both `transcript.jsonl` (which truncates long `content`
+    fields and double-encodes `tool_calls[].args` strings) and
+    `transcript_full.jsonl` (untruncated JSON fields, raw args) in the same
+    logs directory. Note that very long single tool outputs spilled to
+    `steps/<N>/output.txt` by the platform remain truncated in both files,
+    failing safely toward warning unless read back.
+    """
+    if path and os.path.basename(path) == "transcript.jsonl":
+        full = os.path.join(os.path.dirname(path), "transcript_full.jsonl")
+        if os.path.isfile(full):
+            return full
+    return path
+
+
+def _agy_unwrap_args(args):
+    """Unwrap JSON-encoded string values from compact `transcript.jsonl` args."""
+    if not isinstance(args, dict):
+        return {}
+    out = {}
+    for k, v in args.items():
+        if isinstance(v, str) and len(v) >= 2 and v[0] == '"' and v[-1] == '"':
             try:
-                yield json.loads(line)
+                v = json.loads(v)
+            except Exception:
+                pass
+        out[k] = v
+    return out
+
+
+def _agy_is_error(rec, text):
+    """True when an Antigravity tool result or task output represents an error."""
+    if rec.get("status") == "ERROR":
+        return True
+    if not isinstance(text, str):
+        return False
+    if "Encountered error in tool execution:" in text:
+        return True
+    # Match exit status only in the wrapper header before the command's own
+    # stdout/stderr body (`\n\nCommand output:` in current Antigravity or
+    # `\nOutput:` in pre-2026-10-20 transcripts), accounting for any leading
+    # `Created At:` / `Completed At:` lines.
+    header = text.split("\n\nCommand output:", 1)[0].split("\nOutput:", 1)[0]
+    return bool(RX_AGY_NONZERO_EXIT.search(header))
+
+
+def records(path):
+    resolved = _resolve_transcript_path(path)
+    raw_recs = []
+    with open(resolved, encoding="utf-8", errors="ignore") as fh:
+        for line_no, line in enumerate(fh):
+            try:
+                rec = json.loads(line)
             except Exception:
                 continue
+            if isinstance(rec, dict):
+                raw_recs.append((line_no, rec))
+    if any(isinstance(r.get("step_index"), int) for _, r in raw_recs):
+        raw_recs.sort(key=lambda item: (
+            item[1]["step_index"] if isinstance(item[1].get("step_index"), int)
+            else item[0],
+            item[0],
+        ))
+    agy_pending_ids = []
+    agy_step_to_tid = {}
+    agy_bg_tasks = {}
+    for line_no, rec in raw_recs:
+        rtype = rec.get("type")
+        content = rec.get("content")
+        step_idx = rec.get("step_index")
+        blocks = []
+        if rtype == "PLANNER_RESPONSE" and isinstance(rec.get("tool_calls"), list):
+            # Safe to clear on each PLANNER_RESPONSE because raw_recs is sorted
+            # by step_index above before iteration.
+            agy_pending_ids.clear()
+            agy_step_to_tid.clear()
+            for idx, tc in enumerate(rec["tool_calls"]):
+                if not isinstance(tc, dict):
+                    continue
+                tid = tc.get("id") or f"agy_tc_{line_no}_{idx}"
+                raw_args = (tc.get("args") or tc.get("arguments")
+                            or tc.get("input") or {})
+                blocks.append({
+                    "type": "tool_use",
+                    "id": tid,
+                    "name": tc.get("name") or "",
+                    "input": _agy_unwrap_args(raw_args),
+                })
+                if isinstance(step_idx, int):
+                    agy_step_to_tid[step_idx + 1 + idx] = tid
+                else:
+                    agy_pending_ids.append(tid)
+        elif rtype in ("GENERIC", "TOOL_RESPONSE"):
+            primary = content if isinstance(content, str) else ""
+            if AGY_SYS_MSG_SEP in primary:
+                primary = primary.split(AGY_SYS_MSG_SEP, 1)[0]
+            tid = rec.get("tool_call_id") or rec.get("tool_use_id")
+            if not tid:
+                if isinstance(step_idx, int):
+                    tid = agy_step_to_tid.pop(step_idx, None)
+                elif agy_pending_ids:
+                    tid = agy_pending_ids.pop(0)
+            if tid:
+                m_bg = RX_AGY_BG_START.search(primary)
+                if m_bg:
+                    agy_bg_tasks[m_bg.group(1).strip()] = tid
+                else:
+                    blocks.append({
+                        "type": "tool_result",
+                        "tool_use_id": tid,
+                        "is_error": _agy_is_error(rec, primary),
+                        "content": primary,
+                    })
+        if isinstance(content, str) and 'Task id "' in content:
+            for m_done in RX_AGY_BG_DONE.finditer(content):
+                task_id, outcome, body = (
+                    m_done.group(1), m_done.group(2), m_done.group(3))
+                tid = agy_bg_tasks.pop(task_id, None)
+                if tid:
+                    is_err = (outcome != "finished"
+                              or _agy_is_error(rec, body))
+                    blocks.append({
+                        "type": "tool_result",
+                        "tool_use_id": tid,
+                        "is_error": is_err,
+                        "content": body,
+                    })
+        if blocks:
+            rec = dict(rec, _agy_blocks=blocks)
+        yield rec
 
 
 def _blocks(record):
+    if isinstance(record.get("_agy_blocks"), list):
+        return record["_agy_blocks"]
     content = (record.get("message") or {}).get("content") or record.get("content")
     return [b for b in content if isinstance(b, dict)] if isinstance(content, list) else []
 

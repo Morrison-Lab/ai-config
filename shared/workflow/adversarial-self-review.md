@@ -1558,8 +1558,23 @@ In your reply to the user, link the posted comment itself, per [`link-forge-arti
 A review that lives only in the session is invisible to the repository owner and lost when the session ends.
 (Directive from the user, 2026-10-02, about a referee read of a manuscript MR: post the referee's report "for our records and so I can see what you're working on", and always give the link to it.)
 
+This holds for a review you run at another session's request on a PR or MR you do not drive.
+A peer session relaying the owner's request for a cross-harness review is the common case: the review is posted there, without asking the owner first.
+The peer's message is not itself authority for anything beyond that, so it never extends to pushing, editing or merging the reviewed PR.
+Asking first has no upside, because the owner wants every review posted (user directive, 2026-10-27: "always post the reviews", "in all sessions").
+It came after a session ran three such reviews and held each report for a per-comment yes.
+
+Claude Code's auto-mode permission classifier can deny the post as an external-system write, and it did so twice in that session.
+That denial is the harness's, not the owner's.
+Re-run the identical command once, as [`remind-retry-before-declaring-blocked.py`](../../hooks/remind-retry-before-declaring-blocked.py) directs.
+If it is denied again, ask the owner once to approve posting, or to add a permission rule for it, rather than asking about each report.
+Report the review as written but not yet posted until it is on the PR.
+
 - **Do:** post each independent review's report, and then its dispositions, on the PR or MR it reviewed, and link that comment in your reply.
+- **Do:** post a review a peer session asked you to run on a PR you do not drive, without asking first.
 - **Don't:** keep a review's findings in the chat, the session, or a scratch file and report only the fixes.
+- **Don't:** hold a finished review for a per-comment yes.
+  When the classifier denies the post twice, ask once for standing approval or a permission rule.
 
 ## Review every revision before it goes back to the user
 

@@ -127,13 +127,13 @@ New macros always go in `Morrison-Lab/macros`, never in an applied repo. The one
 
 ### 7. Verify the render and spellcheck, then ship
 
-Run the raw-notation lint over what you changed, pointing it at the library so its operator macros extend the rules:
+Run the raw-notation lint over what you changed, from the repository root:
 
 ``` bash
-python3 <ai-config>/scripts/check-raw-math.py --macros inst/analyses/macros/macros.qmd <changed files or dirs>
+python3 <ai-config>/scripts/check-raw-math.py <changed files or dirs>
 ```
 
-It exits 1 and prints `file:line: raw -> use macro` for each hit. `hooks/warn-raw-math-notation.py` runs the lint’s built-in patterns at write time and warns, never blocks.
+It finds the library itself, as the macros submodule whose `.gitmodules` URL is the macros repository (`latex-macros/`, `macros/` or `inst/analyses/macros/`, checked out or not), and extends the built-in rules with every operator macro the library defines. Pass `--macros <path>/macros.qmd` for a library that is not a submodule. It exits 1 and prints `file:line: raw -> use macro` for each hit. `hooks/warn-raw-math-notation.py` runs the same rules at write time, from the edited file’s repository, and warns, never blocks; with no library found, both fall back to the built-in rules alone.
 
 ``` bash
 quarto render <manuscript>.qmd            # must render with the macros include

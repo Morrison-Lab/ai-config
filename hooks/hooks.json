@@ -1647,14 +1647,14 @@
         ]
       },
       {
-        "matcher": "Skill|Bash",
+        "matcher": "Skill|Bash|mcp__claude-code-remote__add_repo|mcp__Claude_Code_Remote__add_repo",
         "hooks": [
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/grant-personal-permissions.py\"",
             "timeout": 10,
             "script": "grant-personal-permissions.py",
-            "why": "The owner's personal grants (Skill(mwc), gh pr merge, glab mr merge) lived in one machine's unsynced settings.json, and a plugin settings.json cannot ship permission rules. Emits permissionDecision allow, unlike every other hook here, for Skill mwc / ai-config:mwc and for a Bash command that is exactly one gh pr merge or glab mr merge with no shell operator, substitution, escape or newline and no prefix but ALLOW_MERGE=. Hook precedence is deny > defer > ask > allow and settings deny/ask rules still apply, so no-unauthorized-merge.py keeps denying what it denies today; only the trailing prompt goes (ai-config#4374). Anything else: no output."
+            "why": "The owner's personal grants (Skill(mwc), gh pr merge, glab mr merge) lived in one machine's unsynced settings.json, and a plugin settings.json cannot ship permission rules. Emits permissionDecision allow, unlike every other hook here, for Skill mwc / ai-config:mwc and for a Bash command that is exactly one gh pr merge or glab mr merge with no shell operator, substitution, escape or newline and no prefix but ALLOW_MERGE=. Hook precedence is deny > defer > ask > allow and settings deny/ask rules still apply, so no-unauthorized-merge.py keeps denying what it denies today; only the trailing prompt goes (ai-config#4374). Anything else: no output. Also allows the cloud session's add_repo for an owner whose repos d-morrison is a member of (d-morrison, Morrison-Lab, UCD-SERG), per the owner's standing rule (2026-10-28) that such repos may always be cloned: the classifier refused add_repo for Morrison-Lab/gha and Morrison-Lab/ai-config with 'Access Added As A Means'."
           }
         ]
       }

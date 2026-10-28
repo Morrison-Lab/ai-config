@@ -151,3 +151,23 @@ reviewer's stash-and-restore of requested reviewers.
 - **Don't:** conclude the comment route is unavailable to an agent session ---
   the comment route is the one path measured to produce a verdict from
   `claude[bot]`.
+
+## Where the comment route does not exist, read the actor before following this page
+
+The `/review` route above needs a `dispatch-on-comment` job, and not every repo has one.
+`Morrison-Lab/psw`'s `claude-code-review.yml` triggers on `pull_request` and `workflow_dispatch` only,
+so a `/review` comment there starts nothing.
+Measured 2026-10-28 from a cloud session that pushed under the maintainer's login:
+the session's push started review run
+[40652387578](https://github.com/Morrison-Lab/psw/actions/runs/40652387578)
+(`pull_request`, `triggering_actor: d-morrison`),
+and its `workflow_dispatch` through the GitHub MCP `actions_run_trigger` tool started
+[40650793647](https://github.com/Morrison-Lab/psw/actions/runs/40650793647)
+(`triggering_actor: d-morrison`, `success`, a real review).
+The two gates this page opens with key on the sender being a bot,
+so they do not apply when the session acts as a person.
+
+- **Do:** read the repo's review-workflow `on:` block for an `issue_comment` trigger before posting `/review`.
+- **Do:** read `triggering_actor` on the session's last review run; when it is a person,
+  dispatch the review workflow with its `pr_number` input.
+- **Don't:** post `/review` where no job answers it and then wait for a verdict.

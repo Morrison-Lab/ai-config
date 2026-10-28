@@ -247,6 +247,17 @@ Detaching the commit SHA leaves those verdicts pointing to an unreachable histor
 Once a commit is pushed, add a new commit instead of amending.
 The extra commit is squashed cleanly at PR merge, so history tidiness is preserved without breaking the review audit trail.
 
+## Never amend right after a reset
+
+`git reset --hard origin/main` leaves `HEAD` on the base branch's own last commit,
+so a `git commit --amend` straight after it folds your change into that commit
+rather than into one of yours.
+Measured 2026-10-27 in a `Morrison-Lab/psw` cloud session:
+an amend meant for a fresh lessons commit rewrote the squash commit of psw#390,
+and was caught before any push.
+Before amending, read `git log -1 --format=%s` and confirm the subject is your own commit;
+after a reset, make a new commit instead.
+
 ## Once pushed, actively monitor CI and review to completion
 
 Pushing a commit to a PR/MR branch is the start of the round, not the end of the turn.
@@ -286,6 +297,7 @@ An agent must never route around a push block by publishing through an alternati
 - **Don't:** read "I opened this branch and its PR" as evidence you are its only driver.
   That belief is what the check exists to test.
 - **Don't:** run `git commit --amend` on a commit that has already been pushed and reviewed, orphaning the SHA cited in review verdicts.
+- **Don't:** amend straight after `git reset --hard origin/main`; `HEAD` is then the base branch's commit, not yours.
 - **Don't:** abandon monitoring after pushing, or assume automated pipelines and reviewer runs will complete without active polling.
 - **Don't:** use out-of-band publish APIs (GitHub Contents API, GraphQL mutations, MCP `push_files`) to route around a blocked `git push`.
 - **Don't:** treat declining a sanctioned override as entitling you to find an unsanctioned publication route.

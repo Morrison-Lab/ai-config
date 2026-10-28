@@ -20,7 +20,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install dependencies
-        run: pip install pyyaml==6.0.2
+        run: pip install pyyaml==6.0.2 pytest==8.3.5
       - name: Validate skills & manifests
         run: python3 scripts/validate-skills.py
       - name: Check markdown links
@@ -232,6 +232,10 @@ jobs:
         run: |
           python3 scripts/test_check_agy_hook_commands.py
           python3 scripts/test_render_agy_hooks.py
+      - name: Run agy-review pytest suites
+        # ai-config#4781: run scripts/agy-review/ pytest suites (test_bigread.py,
+        # test_post.py, test_shell_syntax.py) in CI and run-local-validation.py.
+        run: python3 -m pytest scripts/agy-review
       - name: Run doctor tests
         # ai-config#2540: doctor.py install diagnostics and path checks.
         run: python3 scripts/test_doctor.py

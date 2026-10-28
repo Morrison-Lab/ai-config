@@ -44,7 +44,7 @@ OFFERS = [
     r"would you like me to\b",
     r"shall i\b",
     r"should i (go ahead|proceed)",
-    r"i can .{0,60}\bif you('d| would) (like|prefer)",
+    r"i can .{0,60}\bif you(('d| would) (like|prefer)| want)\b",
     r"happy to .{0,40}\bif you\b",
     r"i'?d be glad to\b",
     r"unless you'?d rather",

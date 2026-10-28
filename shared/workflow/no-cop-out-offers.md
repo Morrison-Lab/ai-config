@@ -51,7 +51,7 @@ strings:
 - "let me know if", "let me know when", "let me know either way"
 - "want me to", "do you want me to", "would you like me to"
 - "shall I", "should I go ahead"
-- "I can X if you'd like", "happy to X", "I'd be glad to"
+- "I can X if you'd like", "I can X if you want", "happy to X", "I'd be glad to"
 - "unless you'd rather", "if that works for you"
 - "ready to X when you are", "standing by to X"
 - "I'll X once you confirm"

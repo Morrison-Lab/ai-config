@@ -533,11 +533,12 @@ def main():
     # reply text and never reach the print this case inspects. Reproduced in
     # round 8 -- a mutation emitting a block decision left the suite fully
     # green.
-    out = subprocess.run(
-        [sys.executable, HOOK], input=json.dumps({"transcript_path": path}),
-        capture_output=True, text=True,
-        env=dict(os.environ, TMPDIR=tempfile.mkdtemp()),
-    ).stdout
+    with tempfile.TemporaryDirectory() as fresh:
+        out = subprocess.run(
+            [sys.executable, HOOK], input=json.dumps({"transcript_path": path}),
+            capture_output=True, text=True,
+            env=dict(os.environ, TMPDIR=fresh),
+        ).stdout
     os.unlink(path)
     payload = json.loads(out) if out.strip() else {}
     if (payload.get("decision") == "block" and payload.get("reason")
@@ -553,18 +554,24 @@ def main():
     with os.fdopen(fd, "w") as fh:
         for e in HAZARD_42 + [say("Reported to the user: Ready for merge.")]:
             fh.write(json.dumps(e) + "\n")
-    again = subprocess.run(
-        [sys.executable, HOOK],
-        input=json.dumps({"transcript_path": path, "stop_hook_active": True}),
-        capture_output=True, text=True,
-        env=dict(os.environ, TMPDIR=tempfile.mkdtemp()),
-    ).stdout
+    with tempfile.TemporaryDirectory() as fresh:
+        again = subprocess.run(
+            [sys.executable, HOOK],
+            input=json.dumps({"transcript_path": path, "stop_hook_active": True}),
+            capture_output=True, text=True,
+            env=dict(os.environ, TMPDIR=fresh),
+        )
     os.unlink(path)
-    if '"decision"' not in again:
+    # Not vacuous: the hook must run cleanly and still show the user the
+    # warning, just without a block, so a crash cannot pass as "no block".
+    again_payload = json.loads(again.stdout) if again.stdout.strip() else {}
+    if (again.returncode == 0 and again_payload.get("systemMessage")
+            and "decision" not in again_payload):
         print("PASS: never blocks a stop that continues an earlier block")
         passes += 1
     else:
-        print(f"FAIL: blocked while stop_hook_active was set: {again!r}")
+        print(f"FAIL: expected a bare systemMessage while stop_hook_active was set: "
+              f"rc={again.returncode} {again.stdout!r}")
         failures += 1
 
     # A valid-JSON payload that is not an object must fail OPEN, not raise.

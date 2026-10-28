@@ -51,7 +51,8 @@ WHY THIS NEVER DECIDES FOR THE AGENT
 -----------------------------------
 It interrupts the stop at most once per turn (agent_notice.stop_notice), so
 the agent reads the warning, which a bare systemMessage never reached
-(ai-config#4796), and the next stop always passes.--
+(ai-config#4796), and the next stop always passes.
+
 Whether an item SHOULD have been filed is not lexically decidable from the
 phrase alone. The reply may be narrating an item that is already filed and
 merely restating its status ("still unfiled" describing last week, before

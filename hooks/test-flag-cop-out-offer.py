@@ -182,9 +182,10 @@ def run(events):
             [sys.executable, HOOK], input=json.dumps({"transcript_path": path}),
             capture_output=True, text=True, env=env,
         )
-        # Must never block, and must SURFACE the warning. Asserting on stderr
-        # alone cannot tell a surfaced warning from discarded output, so the
-        # positive signal is `systemMessage` on stdout.
+        # Must SURFACE the warning to the agent. Asserting on stderr alone
+        # cannot tell a surfaced warning from discarded output, and a bare
+        # systemMessage reaches only the user, so the positive signal is a
+        # block whose reason carries the warning (ai-config#4796).
         if not r.stdout.strip():
             return False
         payload = json.loads(r.stdout)

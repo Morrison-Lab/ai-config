@@ -228,11 +228,12 @@ def main():
             "\U0001F4A1 **OFFER** --- I can build that mechanism."
         )) + "\n")
     # A fresh sentinel dir, so an earlier run cannot have spent this turn's block.
-    out = subprocess.run(
-        [sys.executable, HOOK], input=json.dumps({"transcript_path": path}),
-        capture_output=True, text=True,
-        env=dict(os.environ, TMPDIR=tempfile.mkdtemp()),
-    ).stdout
+    with tempfile.TemporaryDirectory() as fresh:
+        out = subprocess.run(
+            [sys.executable, HOOK], input=json.dumps({"transcript_path": path}),
+            capture_output=True, text=True,
+            env=dict(os.environ, TMPDIR=fresh),
+        ).stdout
     payload = json.loads(out) if out.strip() else {}
     if (payload.get("decision") == "block" and payload.get("reason")
             and payload.get("reason") == payload.get("systemMessage")):
@@ -243,18 +244,24 @@ def main():
         failures += 1
     # ...and never blocks a stop that continues an earlier block, so it cannot
     # wedge a session.
-    again = subprocess.run(
-        [sys.executable, HOOK],
-        input=json.dumps({"transcript_path": path, "stop_hook_active": True}),
-        capture_output=True, text=True,
-        env=dict(os.environ, TMPDIR=tempfile.mkdtemp()),
-    ).stdout
+    with tempfile.TemporaryDirectory() as fresh:
+        again = subprocess.run(
+            [sys.executable, HOOK],
+            input=json.dumps({"transcript_path": path, "stop_hook_active": True}),
+            capture_output=True, text=True,
+            env=dict(os.environ, TMPDIR=fresh),
+        )
     os.unlink(path)
-    if '"decision"' not in again:
+    # Not vacuous: the hook must run cleanly and still show the user the
+    # warning, just without a block, so a crash cannot pass as "no block".
+    again_payload = json.loads(again.stdout) if again.stdout.strip() else {}
+    if (again.returncode == 0 and again_payload.get("systemMessage")
+            and "decision" not in again_payload):
         print("PASS: never blocks a stop that continues an earlier block")
         passes += 1
     else:
-        print(f"FAIL: blocked while stop_hook_active was set: {again!r}")
+        print(f"FAIL: expected a bare systemMessage while stop_hook_active was set: "
+              f"rc={again.returncode} {again.stdout!r}")
         failures += 1
 
     # Fires at most once per distinct message.

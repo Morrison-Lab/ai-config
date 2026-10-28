@@ -653,6 +653,12 @@ See
   GitHub scope, no network path), file in the current working repo, state
   plainly which repo it really belongs to, and ask the user to transfer it
   — the same fallback the `config-ai` skill's step 3 uses.
+- **Out of scope is not unreachable when the session can attach repos.**
+  A cloud session with an `add_repo` tool reaches any repo the account can, so attach the home repo and file there.
+  Never end a reply listing findings as "unfiled because the repo isn't in this session's scope", or ask whether to file them:
+  on 2026-10-27 a session did both for three ai-config hook defects,
+  and the user had to attach ai-config and answer `daytb` before they were filed
+  (ai-config#4785, and comments on #4712 and #3544).
 
 ## A defect that resolved itself on a retry is still a defect
 

@@ -51,7 +51,7 @@ strings:
 - "let me know if", "let me know when", "let me know either way"
 - "want me to", "do you want me to", "would you like me to"
 - "shall I", "should I go ahead"
-- "I can X if you'd like", "happy to X", "I'd be glad to"
+- "I can X if you'd like", "I can X if you want", "happy to X", "I'd be glad to"
 - "unless you'd rather", "if that works for you"
 - "ready to X when you are", "standing by to X"
 - "I'll X once you confirm"
@@ -80,6 +80,15 @@ the *other* work, once the authorized part is already done.
 - **Don't:** read "I told them about it" as having delivered it --- a
   mentioned task and a done task are different artifacts.
 - **Don't:** close a status recap with an offer; that is where this hides.
+- **Don't:** queue a suggested-task card (`spawn_task`) for a small fix in a
+  repository you are already working in and allowed to push to.
+  A card is an offer with a button on it: fix it in its own PR now.
+  Keep cards for work that needs a session of its own, or a decision.
+
+(2026-10-28, Morrison-Lab/mlg: two broken anchor links found while fixing the
+same link in another exam went to a card, and the closing recap offered it.
+The user answered `daytb`, and the fix was two lines,
+[Morrison-Lab/mlg#230](https://github.com/Morrison-Lab/mlg/pull/230).)
 
 (Directive from the user, 2026-08-20: "'say the word' is a sign you're
 probably avoiding something you've already been told to do without my

@@ -446,6 +446,8 @@ Several things changed at once between the failing and working runs:
 No run varied one of these alone, so which change mattered is unknown.
 
 - **Do:** when a long positional prompt stalls, retry with the full recipe above (prompt in a file, short positional message before `-f <file>`, cwd `/tmp`), since that combination is the one measured to work.
+- **Do:** write the `-f <prompt-file>` attachment directly under `/tmp/` (for example, `/tmp/opencode-review-<id>.txt`), keep it at or below 14 KB (`<=14 KB`) on `opencode/glm-5.3-flash-free`, and wrap `opencode run` in `timeout 90` (or `timeout 120`):
+  `opencode`'s file resolver skips paths inside dot-prefixed directories (such as `~/.gemini/` or worktrees nested under it), and `glm-5.3-flash-free` streamed 0 bytes after `> build · glm-5.3-flash-free` on 19 KB and 35 KB attachments while completing in 42--55 s on 11 KB and 13 KB attachments in the same session (measured 2026-10-27 and 2026-10-28, Antigravity).
 - **Don't:** credit any single part of the recipe with the fix, or treat the recipe as proven on models other than `glm-5.3-flash-free`.
 
 On that machine and date, `opencode models` listed no `opencode-go/*` ids, so `opencode-go/deepseek-v4-pro` returned "Model not found".

@@ -36,12 +36,13 @@ SENTENCE_BREAK = re.compile(
 QUOTED = re.compile(r"```.*?```|^>.*$|\"[^\"\n]*\"|\u201c[^\u201d\n]*\u201d", re.S | re.M)
 
 RC = r"(?:remote[-\u2010\u2011 ]{0,3}control|(?-i:\bRC\b))"
-BASE = r"(?:start|run|launch|restart|reconnect|spin(?: up)?|kick off|enable|turn on|bring up)"
+BASE = r"(?:start|run|launch|restart|reconnect|spin(?: up)?|fire up|kick off|enable|turn on|bring up)"
 # Past and -ing forms are asks only after a lead-in aimed at the user ("once you've started");
 # at the start of a sentence they are the agent's own status report.
 VERB = r"(?:" + BASE + r"|started|launched|restarted|starting|launching|restarting|running|spinning(?: up)?)"
 # The ask ends at the name: "start Remote Control on the Mac", not "run remote control tests".
-RC_END = r"(?:\s+session)?(?=`?\s*(?:$|[;,.!?])|`?\s+(?:on|from|in|at|now|first|again|please|and|before|so)\b)"
+RC_END = (r"(?:\s+(?:session|server|command))?"
+          r"(?=`?\s*(?:$|[;,.!?(—])|`?\s+(?:-\w|--\w|-\s)|`?\s+(?:on|from|in|at|now|first|again|please|and|before|so|for|with)\b)")
 FILL = r"[^.!?\n]{0,60}?"
 
 ASKS = (

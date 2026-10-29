@@ -46,6 +46,9 @@ Run the pass, then report it in the past tense, and put any genuine sequencing q
 (Recurrence, 2026-09-28, a `gia` session on `Morrison-Lab/pds` with no ai-config loaded (ai-config#3948): the wave's four PRs merged and no pass ran at any checkpoint.
 The session's closing summary then listed the missing pass as a loose end and ended "say if you want it done anyway", the offer form this section rules out.
 The user's reply was "always do the lessons-learned pass!")
+(2nd occurrence, 2026-10-29, after merging [Morrison-Lab/lds#1511](https://github.com/Morrison-Lab/lds/pull/1511) under `mwc`: the merge report's stopping-point line said the pass had not run, with nothing armed to run it.
+That line is the loose-end listing of the 2026-09-28 case without the offer, and it got the same answer: the user asked "why not?".
+Writing that a pass is owed in a stopping-point line is not a deferral, so run the pass before writing the line.)
 
 **A new instruction arriving at a checkpoint does not cancel the checkpoint.**
 The bullet above covers the pass you *announce* and never run; this is the one you never announce at all, because something else arrived first.

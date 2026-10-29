@@ -47,13 +47,13 @@ class TestBlocks(unittest.TestCase):
     def test_incident_script_file_importing_playwright(self):
         with tempfile.TemporaryDirectory() as tmp:
             script = Path(tmp) / "redir.js"
-            script.write_text("const { chromium } = require('playwright');\n")
+            script.write_text("const { chromium } = require('playwright');\n", encoding="utf-8")
             self.assert_blocked(f"cd {tmp} && node {script}")
 
     def test_python_script_file_importing_playwright(self):
         with tempfile.TemporaryDirectory() as tmp:
             script = Path(tmp) / "check.py"
-            script.write_text("from playwright.sync_api import sync_playwright\n")
+            script.write_text("from playwright.sync_api import sync_playwright\n", encoding="utf-8")
             self.assert_blocked(f"python3 {script}")
 
     def test_inline_node(self):
@@ -112,7 +112,7 @@ class TestReviewedBlocks(unittest.TestCase):
 
     def test_relative_script_uses_payload_cwd(self):
         with tempfile.TemporaryDirectory() as tmp:
-            (Path(tmp) / "pw.py").write_text("from playwright.sync_api import sync_playwright\n")
+            (Path(tmp) / "pw.py").write_text("from playwright.sync_api import sync_playwright\n", encoding="utf-8")
             buf = io.StringIO()
             stdin, sys.stdin = sys.stdin, io.StringIO(json.dumps(
                 {"tool_name": "Bash", "cwd": tmp, "tool_input": {"command": "python3 pw.py"}}))
@@ -147,7 +147,7 @@ class TestReviewedPasses(unittest.TestCase):
     def test_comment_only_mention_in_script(self):
         with tempfile.TemporaryDirectory() as tmp:
             script = Path(tmp) / "notes.py"
-            script.write_text("# we should never use selenium here\nprint(1)\n")
+            script.write_text("# we should never use selenium here\nprint(1)\n", encoding="utf-8")
             self.passes(f"python3 {script}")
 
     def test_non_string_command_fails_open(self):
@@ -177,7 +177,7 @@ class TestPasses(unittest.TestCase):
     def test_ordinary_script(self):
         with tempfile.TemporaryDirectory() as tmp:
             script = Path(tmp) / "ok.js"
-            script.write_text("console.log('hello');\n")
+            script.write_text("console.log('hello');\n", encoding="utf-8")
             self.assert_passes(f"node {script}")
 
     def test_missing_script_fails_open(self):

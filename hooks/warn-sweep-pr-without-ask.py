@@ -55,15 +55,31 @@ def read_file(path):
         return ""
 
 
+def pr_create_words(words):
+    """The words of the `gh pr create` invocation: after `create`, up to the next operator word.
+
+    Cut on tokens, not on the raw text, so a newline or `;` inside a quoted
+    body (a heredoc) does not truncate the command.
+    """
+    for i in range(len(words) - 2):
+        if words[i:i + 3] == ["gh", "pr", "create"]:
+            rest = words[i + 3:]
+            for j, w in enumerate(rest):
+                if w in ("&&", "||", ";", "|"):
+                    return rest[:j]
+            return rest
+    return words
+
+
 def bash_fields(command):
     """Return (title, labels, body-ish text) of a `gh pr create` command, or None."""
     if not CREATE.search(command):
         return None
-    command = next(s for s in re.split(r"&&|\|\||[;|\n]", command) if CREATE.search(s))
     try:
         words = shlex.split(command, comments=False)
     except ValueError:
         words = command.split()
+    words = pr_create_words(words)
     title, labels, text = "", [], command
     for i, w in enumerate(words):
         nxt = words[i + 1] if i + 1 < len(words) else ""

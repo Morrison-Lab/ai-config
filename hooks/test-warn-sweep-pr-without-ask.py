@@ -44,6 +44,10 @@ CASES = [
         'gh pr create --title fix --body x && gh issue create --title "sweep all"'), False),
     ("sweep title survives a later chained command", bash(
         'gh pr create --title "Sweep defs" --body x && gh issue create --title fix'), True),
+    ("heredoc body keeps the marker", bash(
+        'gh pr create --title "Sweep defs" --body "$(cat <<EOF\nSweep authorized: cmsg_0123456789\nEOF\n)"'), False),
+    ("multi-line quoted body then chain", bash(
+        'gh pr create --title "Sweep defs" --body "l1\nSweep authorized: cmsg_0123456789" && echo done'), False),
     ("plain title", bash('gh pr create --title "Fix the definition of bias" --body x'), False),
     ("word inside another word", bash('gh pr create --title "Chimneysweeper notes" --body x'), False),
     ("not a pr create", bash('echo "sweep"'), False),

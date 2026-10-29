@@ -19,6 +19,10 @@ honest reasons (a one-off cleanup of ai-config's own code).
 
 Deliberate limits:
   - A sweep PR titled without the word is not seen.
+  - `gh pr edit` (a later retitle or relabel) and labels on an MCP create
+    call are not seen.
+  - The marker must be followed by at least nine characters (a message id or
+    link); it is not checked against any message.
   - A PR created with `--fill` or `--title-file`-style input is not seen.
   - Fails open on any parse trouble.
 """
@@ -28,7 +32,7 @@ import shlex
 import sys
 
 SWEEP = re.compile(r"\bsweep(?:s|ing|ed)?\b", re.I)
-AUTHORIZED = re.compile(r"\bSweep authorized:\s*\S", re.I)
+AUTHORIZED = re.compile(r"\bSweep authorized:\s*\S.{8,}", re.I)
 CREATE = re.compile(r"\bgh\s+pr\s+create\b")
 
 NOTE = (
@@ -43,6 +47,14 @@ NOTE = (
 )
 
 
+def read_file(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            return "\n" + f.read()
+    except (OSError, ValueError):
+        return ""
+
+
 def bash_fields(command):
     """Return (title, labels, body-ish text) of a `gh pr create` command, or None."""
     if not CREATE.search(command):
@@ -51,10 +63,18 @@ def bash_fields(command):
         words = shlex.split(command, comments=False)
     except ValueError:
         words = command.split()
-    title, labels = "", []
+    title, labels, text = "", [], command
     for i, w in enumerate(words):
         nxt = words[i + 1] if i + 1 < len(words) else ""
-        if w in ("--title", "-t"):
+        if w in ("--body-file", "-F"):
+            text += read_file(nxt)
+        elif w.startswith("--body-file="):
+            text += read_file(w.split("=", 1)[1])
+        elif w.startswith("-t") and len(w) > 2 and not w.startswith("--"):
+            title = w[2:]
+        elif w.startswith("-l") and len(w) > 2 and not w.startswith("--"):
+            labels += w[2:].split(",")
+        elif w in ("--title", "-t"):
             title = nxt
         elif w.startswith("--title="):
             title = w.split("=", 1)[1]
@@ -62,7 +82,7 @@ def bash_fields(command):
             labels += nxt.split(",")
         elif w.startswith("--label="):
             labels += w.split("=", 1)[1].split(",")
-    return title, labels, command
+    return title, labels, text
 
 
 def decide(payload):

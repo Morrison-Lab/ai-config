@@ -35,8 +35,11 @@ CASES = [
     ("sweep label", bash('gh pr create --title "Fix defs" --label sweep --body x'), True),
     ("mcp title says sweep", mcp("Sweep existing chapters"), True),
     ("authorized line in body (gh)", bash(
-        'gh pr create --title "Sweep: defs" --body "Sweep authorized: Ezra, cmsg_1, \'sweep lds\'"'), False),
-    ("authorized line in body (mcp)", mcp("Sweep: defs", "x\nSweep authorized: cmsg_1"), False),
+        'gh pr create --title "Sweep: defs" --body "Sweep authorized: Ezra, cmsg_014QLd5M, \'sweep lds\'"'), False),
+    ("authorized line in body (mcp)", mcp("Sweep: defs", "x\nSweep authorized: cmsg_014QLd5M"), False),
+    ("empty marker still warns", bash('gh pr create --title "Sweep: x" --body "Sweep authorized: "'), True),
+    ("glued -t form", bash("gh pr create -tSweep -b x"), True),
+    ("comma labels", bash('gh pr create --title Fix --label a,sweep --body x'), True),
     ("plain title", bash('gh pr create --title "Fix the definition of bias" --body x'), False),
     ("word inside another word", bash('gh pr create --title "Chimneysweeper notes" --body x'), False),
     ("not a pr create", bash('echo "sweep"'), False),

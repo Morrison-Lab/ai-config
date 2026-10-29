@@ -70,6 +70,19 @@ If the change has no rendered section, such as an infrastructure change, the PR 
 
 (Directive from the user, 2026-10-16: "always link me to the relevant section as well as the relevant pr", then corrected to include the thread.)
 
+## Link other threads, never your own
+
+These thread and session links point the reader at somewhere else.
+A project thread never links itself: inside a thread, say "this thread", and link a PR's thread only when the PR belongs to a different one.
+The coordinator, posting in the project chat, links the owning thread of every PR and merge ask.
+
+- **Do:** write `The merge word goes in [Runner work](#cmsg_…).` from the coordinator, or from a thread about a different thread.
+- **Don't:** write `This is in [Qualify residual risk](#cmsg_…)` inside the Qualify residual risk thread.
+
+`hooks/no-self-thread-link.py` blocks a thread's reply that links that thread.
+Tracked in [ai-config#4843](https://github.com/Morrison-Lab/ai-config/issues/4843).
+(Ezra, 2026-10-29: "threads have started providing links to themselves; why?")
+
 ## Link every session you mention
 
 Whenever a message names a session, either a Claude Code session or a project thread, link it in the sentence that names it.

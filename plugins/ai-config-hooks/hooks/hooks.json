@@ -1633,6 +1633,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-self-thread-link.py\"'",
+            "timeout": 10,
+            "script": "no-self-thread-link.py",
+            "why": "ai-config#4843. The link rules in shared/writing/link-forge-artifacts.md point the reader at another thread or session; threads applied them to themselves (a reply inside 'Qualify residual risk' linking 'Qualify residual risk') and the user asked why (2026-10-29). Blocks (deny) when a user-visible reply tool call (mcp__hearthbot__reply, post_message, update_message) in a thread session links that same thread, `(#cmsg_...)` or a URL with `thread=cmsg_...`. The thread's own id comes from the first `<thread ts>` in its transcript, which must say 'You are a Thread Session'; the coordinator and other sessions are never blocked. Links to other threads and fenced code are fine. Fails open on any parse trouble."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-unlinked-session-mention.py\"'",
             "timeout": 10,
             "script": "no-unlinked-session-mention.py",

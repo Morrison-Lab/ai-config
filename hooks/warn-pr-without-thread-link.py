@@ -26,6 +26,8 @@ What counts, so the warning stays rare enough to be read:
     PRs with one link at the bottom still warns for the other two.
   - Fenced code and inline code spans are removed first: a PR URL quoted as
     code is not a mention.
+  - In a project thread session (its transcript says "You are a Thread Session")
+    the note says never to link the thread itself (ai-config#4843).
   - Nothing can be derived about whether a thread exists for the PR ("wherever
     a thread exists and is relevant"), so the note says to ignore it for a PR
     with no thread.
@@ -47,6 +49,12 @@ THREAD_LINK = re.compile(r"\(#cmsg_\w+\)|[?&]thread=cmsg_\w+")
 # new item. An indented marker is a nested item and stays in its parent's unit,
 # so a thread link on a sub-bullet covers the PR named by the bullet above it.
 UNIT_BREAK = re.compile(r"\n[ \t]*\n|\n(?=(?:[-*+]|\d+[.)])[ \t])")
+
+THREAD_NOTE = """\
+[hook: warn-pr-without-thread-link] This reply names {prs} without a thread \
+link. You are posting inside a project thread: never link this thread \
+(ai-config#4843). Add a [thread title](#cmsg_...) link only for a PR owned by \
+a different thread; for a PR of this thread, ignore this note."""
 
 NOTE = """\
 [hook: warn-pr-without-thread-link] This reply names {prs} without \
@@ -76,6 +84,15 @@ def unlinked_prs(text: str) -> list[str]:
     return seen
 
 
+def in_thread_session(transcript_path) -> bool:
+    """True when the transcript is a project thread's own (ai-config#4843)."""
+    try:
+        with open(transcript_path, encoding="utf-8", errors="replace") as f:
+            return "You are a Thread Session" in f.read(200_000)
+    except (OSError, TypeError, ValueError):
+        return False
+
+
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
@@ -98,7 +115,9 @@ def main() -> int:
     print(json.dumps({
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
-            "additionalContext": NOTE.format(prs=shown),
+            "additionalContext": (
+                THREAD_NOTE if in_thread_session(payload.get("transcript_path"))
+                else NOTE).format(prs=shown),
         }
     }))
     return 0

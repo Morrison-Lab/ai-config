@@ -11,8 +11,8 @@ shared/workflow/lab-operating-rules.md.
 Blocks (deny) an outgoing message that asks the user to start, run, launch or
 restart Remote Control or `claude remote-control`: the hearthbot reply tools
 (post_message, message_thread, message_coordinator, edit_message,
-request_decision) and the forge comment, PR and issue tools. It reads the text,
-body, title, question, context and option fields. The denial points at
+request_decision, post_widget) and the forge comment, PR and issue tools. It reads
+every string in the tool input, nested cards and option lists included. The denial points at
 `start_remote_control`, which the agent calls itself on cf463-02 and the XPS.
 
 It is not an ask when the words are quoted (double quotes, a fenced block, a
@@ -25,11 +25,9 @@ import re
 import sys
 
 TOOL = re.compile(
-    r"^mcp__hearthbot__(?:reply|post_message|update_message|edit_message|message_thread|message_coordinator|request_decision)$"
+    r"^mcp__hearthbot__(?:reply|post_message|update_message|edit_message|message_thread|message_coordinator|request_decision|post_widget)$"
     r"|^mcp__github__(?:add_issue_comment|update_issue_comment|add_reply_to_pull_request_comment"
     r"|add_comment_to_pending_review|pull_request_review_write|create_pull_request|update_pull_request|issue_write)$")
-
-FIELDS = ("text", "body", "title", "question", "context", "reason")
 
 SENTENCE_BREAK = re.compile(
     r"(?<!\be\.g\.)(?<!\bi\.e\.)(?<!\bvs\.)(?<!\betc\.)(?<=[.!?])\s+|\n+", re.I)
@@ -37,19 +35,21 @@ SENTENCE_BREAK = re.compile(
 # Quoted words mention an ask, they do not make one.
 QUOTED = re.compile(r"```.*?```|^>.*$|\"[^\"\n]*\"|\u201c[^\u201d\n]*\u201d", re.S | re.M)
 
-RC = r"(?:remote[- ]control|(?-i:\bRC\b))"
+RC = r"(?:remote[-\u2010\u2011 ]?control|(?-i:\bRC\b))"
 VERB = r"(?:start|started|starting|launched|restarted|run|running|launch|launching|restart|restarting|reconnect|spin(?: up)?|spinning(?: up)?|kick off|enable|turn on|bring up)"
 FILL = r"[^.!?\n]{0,60}?"
 
 ASKS = (
     # "please start RC", "can you run Remote Control", "you need to launch claude remote-control"
     re.compile(
-        r"\b(?:please|can you|could you|would you(?: mind)?|will you|mind|you(?:'ll| will)? need to|you have to|you must|"
+        r"\b(?:please,?(?: kindly)?|kindly|go ahead and|can you|could you|would you(?: mind)?|will you|mind|you(?:'ll| will)? need to|you have to|you must|"
         r"you can|you could|you should|(?:I )?need you to|(?:I )?want you to|I(?:'d| would) like you to|"
         r"ask(?:ing)? you to|have you|if you (?:can|could|would)|once you(?:'ve| have)?|when you(?:'ve| have)?)\s+"
         + VERB + r"\b" + FILL + RC, re.I),
     # sentence-opening imperative: "Start Remote Control on cf463-02."
-    re.compile(r"(?:^|[.!?\n]\s*)" + VERB + r"\b" + FILL + RC, re.I),
+    re.compile(r"(?:^|[.!?\n]\s*)(?:[-*]\s+|\d+[.)]\s+)?" + VERB + r"\b" + FILL + RC, re.I),
+    # "Open a terminal and start Remote Control"
+    re.compile(r"\bopen (?:a|your|the) (?:terminal|shell|console)\b" + FILL + VERB + r"\b" + FILL + RC, re.I),
     # passive: "Remote Control needs to be started on the Mac"
     re.compile(RC + FILL + r"\b(?:needs?|has|have|must|should) (?:to )?be (?:started|launched|run|enabled)\b"
                + FILL + r"\b(?:by you|on (?:your|the) |from (?:your|the) )", re.I),
@@ -62,8 +62,9 @@ ASKS = (
 # A negation counts only before the ask, so "start RC, don't forget" is still an ask.
 NEGATION = re.compile(
     r"\b(?:never|won't|will not|don't|do not|doesn't|not (?:ask|need)|no need|without asking|"
-    r"without you|instead of asking|rather than asking)\b", re.I)
-YOURSELF = re.compile(r"^[^.!?\n]{0,15}\byourself\b", re.I)
+    r"without you|instead of asking|rather than asking|stop|why did I|did I|do I)\b", re.I)
+CLAUSE_BREAK = re.compile(r"[;:,—]|\s-+\s")
+YOURSELF = re.compile(r"^[^.!?\n]{0,25}\byourself\b", re.I)
 
 REASON = (
     "[hook: no-ask-to-start-rc] This message asks the user to start or run Remote Control. "
@@ -79,7 +80,7 @@ def asked(text: str) -> bool:
     for sentence in SENTENCE_BREAK.split(QUOTED.sub(" ", text)):
         for pattern in ASKS:
             for match in pattern.finditer(sentence):
-                if NEGATION.search(sentence[:match.start()]):
+                if NEGATION.search(CLAUSE_BREAK.split(sentence[:match.start()])[-1] + match.group(0)[:14]):
                     continue
                 if YOURSELF.search(sentence[match.end():]):
                     continue
@@ -87,18 +88,16 @@ def asked(text: str) -> bool:
     return False
 
 
-def strings(tool_input: dict):
-    for field in FIELDS:
-        value = tool_input.get(field)
-        if isinstance(value, str):
-            yield value
-    options = tool_input.get("options")
-    if isinstance(options, list):
-        for option in options:
-            if isinstance(option, dict):
-                for key in ("label", "consequence"):
-                    if isinstance(option.get(key), str):
-                        yield option[key]
+def strings(value, depth=0):
+    """Every string in a tool input, whatever its field name, so a card or option list is read too."""
+    if isinstance(value, str):
+        yield value
+    elif depth < 4 and isinstance(value, dict):
+        for item in value.values():
+            yield from strings(item, depth + 1)
+    elif depth < 4 and isinstance(value, list):
+        for item in value:
+            yield from strings(item, depth + 1)
 
 
 def main() -> int:
@@ -113,7 +112,7 @@ def main() -> int:
     tool_input = payload.get("tool_input")
     if not isinstance(tool_input, dict):
         return 0
-    if any(asked(text) for text in strings(tool_input)):
+    if any(asked(text) for text in strings(tool_input)):  # nested cards and option lists included
         print(json.dumps({
             "hookSpecificOutput": {
                 "hookEventName": "PreToolUse",

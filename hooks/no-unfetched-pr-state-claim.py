@@ -139,7 +139,7 @@ NEGATED_BEFORE_RX = re.compile(
 )
 
 # Quoted words are a report of someone's claim, not this message's claim.
-QUOTED_RX = re.compile(r'"[^"\n]*"|“[^”\n]*”|^[ \t]*>.*$', re.M)
+QUOTED_RX = re.compile(r'"[^"\n]*"|\u201c[^\u201d\n]*\u201d|^[ \t]*>.*$', re.M)
 
 REF_RX = re.compile(
     r"(?:\b([\w.-]+)/)?([\w.-]+)?#(\d+)\b|/([\w.-]+)/pull/(\d+)\b"

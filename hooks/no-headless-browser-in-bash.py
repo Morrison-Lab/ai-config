@@ -31,10 +31,12 @@ Fires on a Bash command that *invokes*:
      RSelenium. The script file is read, because the incident's command line
      was just `node redir.js`.
 
-Matching is on invocation, not mention: `grep -rn playwright .` and
-`pip install playwright` start no browser and pass.
+Matching is on invocation, not mention: `grep -rn playwright .`,
+`pip install playwright`, `chrome --version` and a commit message that names
+a browser start no browser and pass. A script on stdin (heredoc or pipe), a
+`-m playwright` module run and a `bash -c '...'` payload are checked too.
 
-Escape valve: `ALLOW_HEADLESS_BROWSER=1` in the command. Using it means saying
+Escape valve: `ALLOW_HEADLESS_BROWSER=1` as a prefix of the command. Using it means saying
 in the reply why no curl/node route works.
 
 Fails OPEN on an unreadable payload or an unreadable script file.
@@ -44,65 +46,124 @@ import os
 import re
 import sys
 
-# Start of a command: line start or just after a shell operator, allowing
-# VAR=value assignments and common wrappers.
-START = (
-    r"(?:^|&&|\|\||;|\||\n|\()\s*"
-    r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
-    r"(?:(?:sudo|env|nice|time|timeout\s+\S+|xvfb-run(?:\s+-\S+)*|exec|command)\s+)*"
-    r"(?:[\w./~-]*/)?"
+# Start of a command: line start or just after a shell operator or keyword,
+# allowing a leading quote, VAR=value assignments and common wrappers
+# (with their flags).
+WRAPPER = (
+    r"(?:(?:sudo|env|nice|nohup|setsid|time|timeout|xvfb-run|exec|command|stdbuf)"
+    r"(?:\s+-\S+(?:\s+(?:[\w.:=,-]+|'[^']*'|\"[^\"]*\"))?|\s+\d\S*)*\s+)*"
 )
+START = (
+    r"(?:^|&&|\|\||;|\||\n|\(|\bthen\b|\bdo\b|\belse\b|!)\s*"
+    r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
+    + WRAPPER
+    + r"[\"']?(?:[\w./~-]*/)?"
+)
+
+# `-` must not continue the name, so `chrome-cli` and `lighthouse-ci` pass.
+END = r"(?![\w-])"
 
 BROWSER_BINARY = re.compile(
     START
     + r"(?:chromium(?:-browser)?|chrome|google-chrome(?:-stable)?|firefox|msedge|"
-    r"microsoft-edge|chrome-headless-shell|headless_shell|chromedriver|geckodriver)\b"
+    r"microsoft-edge|chrome-headless-shell|headless_shell|chromedriver|geckodriver)"
+    + END
+    + r"(?!\s+(?:-v|--version)\b)"
 )
 
 # CLI names, optionally behind a package runner.
 AUTOMATION_CLI = re.compile(
     START
     + r"(?:(?:npx|bunx|uvx|pipx\s+run|pnpm\s+(?:dlx|exec)|yarn\s+dlx|npm\s+exec)\s+(?:-\S+\s+)*)?"
-    r"(?:playwright|puppeteer|lighthouse|selenium-side-runner)\b"
+    r"(?:@playwright/test|playwright|puppeteer|lighthouse|selenium-side-runner)"
+    + END
 )
 
 INTERPRETER = re.compile(
     START
-    + r"(?P<prog>node|nodejs|bun|deno|python3?(?:\.\d+)?|Rscript|uv\s+run)\b(?P<rest>[^\n;&|]*)"
+    + r"(?P<prog>node|nodejs|bun|deno|python3?(?:\.\d+)?|Rscript|R|uv\s+run)"
+    + END
+    + r"(?P<rest>[^\n;&|]*)"
 )
 
+SHELL_C = re.compile(
+    START + r"(?:ba|z|da)?sh\s+(?:-\w+\s+)*-c\s+(?P<q>[\"'])(?P<body>.*?)(?P=q)",
+    re.DOTALL,
+)
+
+# An import or launch, not any mention of the word.
 LIBRARY = re.compile(
-    r"\b(?:playwright|puppeteer|pyppeteer|selenium|webdriver|chromote|webshot2|RSelenium)\b"
-    r"|chromium\.launch|firefox\.launch|webkit\.launch",
-    re.IGNORECASE,
+    r"(?:\bimport\s+(?:playwright|selenium|pyppeteer)\b"
+    r"|\bfrom\s+(?:playwright|selenium|pyppeteer)\b"
+    r"|\brequire\(\s*[\"'](?:@?playwright|puppeteer|selenium-webdriver)[^\"']*[\"']\s*\)"
+    r"|\bfrom\s+[\"'](?:@?playwright|puppeteer|selenium-webdriver)[^\"']*[\"']"
+    r"|\bimport\(\s*[\"'](?:@?playwright|puppeteer)"
+    r"|\b(?:library|require|loadNamespace)\(\s*[\"']?(?:chromote|webshot2|RSelenium)\b"
+    r"|\b(?:chromium|firefox|webkit)\.launch\b"
+    r"|\bchromote::|\bwebshot2::)"
+)
+# Flags that load a browser library or run one as a module.
+LIBRARY_FLAG = re.compile(r"(?:\s-m\s+(?:playwright|selenium)\b|\s(?:-r|--require|--with)[\s=]+@?(?:playwright|puppeteer|selenium)\b)")
+
+SCRIPT_FILE = re.compile(r"""(?:^|\s)["']?([\w./~$()-]+\.(?:js|mjs|cjs|ts|py|R|r))["']?(?=\s|$)""")
+MAX_SCRIPT_BYTES = 400_000
+HEREDOC = re.compile(r"<<-?\s*[\"']?(\w+)[\"']?[^\n]*\n(.*?)\n\s*\1\s*(?:\n|$)", re.DOTALL)
+PROSE_FLAG = re.compile(
+    r"""(?:^|\s)(?:-m|--message|--body|--title|-b|-t|--description)(?:\s+|=)(?:"(?:[^"\\]|\\.)*"|'[^']*')"""
 )
 
-SCRIPT_FILE = re.compile(r"""(?:^|\s)["']?([\w./~-]+\.(?:js|mjs|cjs|ts|py|R|r))["']?(?=\s|$)""")
-MAX_SCRIPT_BYTES = 400_000
 
-
-def script_imports_browser(path: str) -> bool:
+def script_imports_browser(path: str, cwd: str | None) -> bool:
+    path = os.path.expanduser(os.path.expandvars(path))
+    if cwd and not os.path.isabs(path):
+        path = os.path.join(cwd, path)
     try:
-        with open(os.path.expanduser(path), encoding="utf-8", errors="replace") as handle:
+        with open(path, encoding="utf-8", errors="replace") as handle:
             return bool(LIBRARY.search(handle.read(MAX_SCRIPT_BYTES)))
     except OSError:
         return False        # unreadable or not there yet: fail open
 
 
-def offending(command: str):
+def strip_prose(command: str) -> str:
+    """Blank text that is data, not commands: commit/PR message flags and
+    heredoc bodies not fed to an interpreter. A browser word there is a
+    mention (`git commit -m 'block chromium'`)."""
+    command = PROSE_FLAG.sub(" ", command)
+
+    def keep_if_interpreter(match):
+        head = command[: match.start()].rsplit("\n", 1)[-1]
+        if re.search(r"\b(?:node|nodejs|bun|deno|python3?|Rscript|R|sh|bash|zsh)\b", head):
+            return match.group(0)
+        return ""
+    return HEREDOC.sub(keep_if_interpreter, command)
+
+
+def offending(command: str, cwd: str | None = None, depth: int = 0):
     """Return (label, matched text) for the first browser launch, else None."""
+    command = strip_prose(command)
     if match := BROWSER_BINARY.search(command):
-        return "a browser binary", match.group(0).strip(" ;&|(\n")
+        return "a browser binary", match.group(0).strip(" ;&|(\n\"'")
     if match := AUTOMATION_CLI.search(command):
-        return "a browser-automation CLI", match.group(0).strip(" ;&|(\n")
+        return "a browser-automation CLI", match.group(0).strip(" ;&|(\n\"'")
+    if depth < 3:
+        for match in SHELL_C.finditer(command):
+            if hit := offending(match.group("body"), cwd, depth + 1):
+                return hit
     for match in INTERPRETER.finditer(command):
         rest = match.group("rest")
+        shown = match.group(0).strip(" ;&|(\n\"'")
+        if LIBRARY_FLAG.search(" " + rest):
+            return "a flag that loads a browser-automation library", shown
         inline = re.search(r"\s(?:-e|-c|--eval|--print|-p)\s", " " + rest + " ")
-        if inline and LIBRARY.search(command[match.start("rest"):]):
-            return "inline code that imports a browser-automation library", match.group(0).strip(" ;&|(\n")
+        if inline and (LIBRARY.search(rest) or LIBRARY.search(command[match.end():].split("\n", 1)[0])):
+            return "inline code that imports a browser-automation library", shown
         script = SCRIPT_FILE.search(rest)
-        if script and script_imports_browser(script.group(1)):
-            return f"{script.group(1)}, which imports a browser-automation library", match.group(0).strip(" ;&|(\n")
+        if script and script_imports_browser(script.group(1), cwd):
+            return f"{script.group(1)}, which imports a browser-automation library", shown
+        # Script on stdin: a heredoc, a here-string, or a pipe into the interpreter.
+        if not script and not inline and ("<<" in command or re.search(r"\|\s*$", command[: match.start()]) or "|" in command[: match.start()]):
+            if LIBRARY.search(command):
+                return "a script on stdin that imports a browser-automation library", shown
     return None
 
 
@@ -143,7 +204,10 @@ def main() -> int:
     inp = inp if isinstance(inp, dict) else {}
     command = inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or inp.get("script") or ""
 
-    hit = None if re.search(r"\bALLOW_HEADLESS_BROWSER=1\b", command) else offending(command)
+    if not isinstance(command, str):
+        command = ""          # unexpected payload shape: fail open
+    allowed = re.match(r"\s*(?:[A-Za-z_]\w*=\S*\s+)*ALLOW_HEADLESS_BROWSER=1\s", command)
+    hit = None if allowed else offending(command, payload.get("cwd"))
     if not hit:
         if is_dry_run:
             print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))

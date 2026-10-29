@@ -76,6 +76,94 @@ class TestBlocks(unittest.TestCase):
         self.assert_blocked("lighthouse https://example.com --chrome-flags=--headless")
 
 
+class TestReviewedBlocks(unittest.TestCase):
+    def blocked(self, command):
+        result = run(command)
+        self.assertIsNotNone(result, f"expected a block for: {command}")
+
+    def test_stdin_scripts(self):
+        self.blocked("python3 - <<EOF\nfrom playwright.sync_api import sync_playwright\nEOF")
+        self.blocked("node << 'EOF'\nconst p = require('puppeteer')\nEOF")
+
+    def test_module_and_library_flags(self):
+        self.blocked("python3 -m playwright install")
+        self.blocked("node -r playwright x.js")
+        self.blocked("uv run --with playwright python x.py")
+
+    def test_shell_wrappers(self):
+        self.blocked('bash -c "chromium --headless"')
+        self.blocked("sh -c 'chromium --headless'")
+
+    def test_quoted_path_and_flagged_wrappers(self):
+        self.blocked('"/usr/bin/chromium" --headless')
+        self.blocked("nohup chromium --headless &")
+        self.blocked("timeout -s KILL 5 chromium")
+        self.blocked("sudo -u x chromium")
+        self.blocked("nice -n 5 chromium")
+        self.blocked("xvfb-run -a -s '-screen 0 1280x1024x24' chromium")
+
+    def test_shell_keywords(self):
+        self.blocked("if true; then chromium; fi")
+        self.blocked("! chromium")
+
+    def test_scoped_package_and_r(self):
+        self.blocked("npx @playwright/test test")
+        self.blocked("Rscript -e 'library(chromote)'")
+
+    def test_relative_script_uses_payload_cwd(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "pw.py").write_text("from playwright.sync_api import sync_playwright\n")
+            buf = io.StringIO()
+            stdin, sys.stdin = sys.stdin, io.StringIO(json.dumps(
+                {"tool_name": "Bash", "cwd": tmp, "tool_input": {"command": "python3 pw.py"}}))
+            try:
+                with redirect_stdout(buf):
+                    guard.main()
+            finally:
+                sys.stdin = stdin
+            self.assertIn("deny", buf.getvalue())
+
+
+class TestReviewedPasses(unittest.TestCase):
+    def passes(self, command):
+        self.assertIsNone(run(command), f"expected a pass for: {command}")
+
+    def test_prose_mentions(self):
+        self.passes("gh pr create --body 'x\nchromium launch is blocked\n'")
+        self.passes('git commit -m "x; chromium"')
+        self.passes("gh pr create --body \"$(cat <<'EOF'\nchromium here\nEOF\n)\"")
+
+    def test_browser_prefixed_tools_and_versions(self):
+        self.passes("chrome-devtools --help")
+        self.passes("lighthouse-ci --help")
+        self.passes("chromium --version")
+        self.passes("firefox -v")
+
+    def test_library_word_outside_the_interpreter_segment(self):
+        self.passes("python3 -c 'print(1)' ; cat playwright.txt")
+        self.passes("python3 -c 'import json' # playwright")
+        self.passes("python3 -c 'print(\"webdriver\")'")
+
+    def test_comment_only_mention_in_script(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            script = Path(tmp) / "notes.py"
+            script.write_text("# we should never use selenium here\nprint(1)\n")
+            self.passes(f"python3 {script}")
+
+    def test_non_string_command_fails_open(self):
+        stdin, sys.stdin = sys.stdin, io.StringIO(
+            json.dumps({"tool_name": "Bash", "tool_input": {"command": 123}}))
+        try:
+            self.assertEqual(guard.main(), 0)
+        finally:
+            sys.stdin = stdin
+
+    def test_escape_valve_only_as_prefix(self):
+        self.passes("ALLOW_HEADLESS_BROWSER=1 chromium --headless")
+        self.assertIsNotNone(run("echo ALLOW_HEADLESS_BROWSER=1; chromium"))
+        self.assertIsNotNone(run("ALLOW_HEADLESS_BROWSER=10 chromium"))
+
+
 class TestPasses(unittest.TestCase):
     def assert_passes(self, command):
         self.assertIsNone(run(command), f"expected a pass for: {command}")

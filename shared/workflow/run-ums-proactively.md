@@ -46,6 +46,9 @@ Run the pass, then report it in the past tense, and put any genuine sequencing q
 (Recurrence, 2026-09-28, a `gia` session on `Morrison-Lab/pds` with no ai-config loaded (ai-config#3948): the wave's four PRs merged and no pass ran at any checkpoint.
 The session's closing summary then listed the missing pass as a loose end and ended "say if you want it done anyway", the offer form this section rules out.
 The user's reply was "always do the lessons-learned pass!")
+(2nd occurrence, 2026-10-29, after merging [Morrison-Lab/lds#1511](https://github.com/Morrison-Lab/lds/pull/1511) under `mwc`: the merge report's stopping-point line said the pass had not run, with nothing armed to run it.
+That line is the loose-end listing of the 2026-09-28 case without the offer, and it got the same answer: the user asked "why not?".
+Writing that a pass is owed in a stopping-point line is not a deferral, so run the pass before writing the line.)
 
 **A new instruction arriving at a checkpoint does not cancel the checkpoint.**
 The bullet above covers the pass you *announce* and never run; this is the one you never announce at all, because something else arrived first.
@@ -64,12 +67,6 @@ A valid no-change pass still scans the context and, for every candidate, categor
 its report names the candidates and searches rather than asserting a conclusion with no pass behind it.
 A 2026-09-14 post-merge session recurred here: it loaded UMS and ran one narrow grep, then reported "UMS review found no additional durable memory update needed";
 the user's "what about ums?" exposed that the actual pass had never run.
-A 2nd occurrence came on 2026-10-29, after a merge under `mwc` ([Morrison-Lab/lds#1511](https://github.com/Morrison-Lab/lds/pull/1511)).
-The final report's stopping-point line said outright that UMS had not run, with no reason given and no pass started, and the user asked "why not?".
-Saying the pass is owed is not the same as running it, and a stopping-point line is not a deferral when nothing will wake to do the pass.
-
-- **Do:** run the pass in the same turn as the merge report, before writing the stopping-point line.
-- **Don't:** end a turn on "UMS has not run" with no wake armed and no reason.
 
 **A merge you discover rather than perform is still a checkpoint, and it is the one that never feels like a moment.**
 Every bullet above describes a checkpoint that *happens* while you are watching: you push, the verdict lands, the PR merges, you report back.

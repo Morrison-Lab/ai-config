@@ -81,8 +81,29 @@ def run(tool, text):
     return proc.returncode, proc.stdout
 
 
-def main():
+def thread_note_cases():
+    """In a thread session the note says never to link the thread itself (ai-config#4843)."""
+    import tempfile
+    url = "https://github.com/Morrison-Lab/lds/pull/1"
     failures = 0
+    for log, want in (("You are a Thread Session. <thread ts=\"cmsg_01\">", "never link this thread"),
+                      ("<wake>coordinator</wake>", "without linking the project thread")):
+        with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as f:
+            f.write(log)
+        event = {"tool_name": POST, "tool_input": {"text": f"See {url}."},
+                 "transcript_path": f.name}
+        proc = subprocess.run([sys.executable, HOOK], input=json.dumps(event),
+                              capture_output=True, text=True)
+        os.unlink(f.name)
+        ctx = json.loads(proc.stdout)["hookSpecificOutput"]["additionalContext"]
+        if want not in ctx:
+            failures += 1
+            print(f"FAIL thread note for {log[:20]!r}: {ctx[:80]!r}")
+    return failures
+
+
+def main():
+    failures = thread_note_cases()
     for name, tool, text, expected in CASES:
         code, out = run(tool, text)
         ok = code == 0

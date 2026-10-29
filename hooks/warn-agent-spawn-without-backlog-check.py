@@ -42,6 +42,12 @@ _LIB = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 if _LIB not in sys.path:
     sys.path.insert(0, _LIB)
 
+try:
+    from shellcmd import _heredoc_free
+except Exception:  # broken install: match the raw command
+    def _heredoc_free(command):
+        return command
+
 READ_ONLY = {"explore", "plan", "claude-code-guide", "statusline-setup"}
 QUERY_TOOLS = {
     "mcp__github__search_issues", "mcp__github__list_issues",
@@ -82,7 +88,7 @@ def has_query(path: str) -> bool:
             if block.get("name") in QUERY_TOOLS:
                 return True
             cmd = (block.get("input") or {}).get("command")
-            if isinstance(cmd, str) and RX_QUERY_CMD.search(cmd):
+            if isinstance(cmd, str) and RX_QUERY_CMD.search(_heredoc_free(cmd)):
                 return True
     return False
 

@@ -47,6 +47,8 @@ CASES = [
     ("gh pr list after && discharges", dict(events=[use("Bash", command="cd r && gh pr list")]), False),
     ("quoted gh issue list in an echo does not discharge",
      dict(events=[use("Bash", command="echo 'gh issue list'")]), True),
+    ("gh issue list inside a heredoc body does not discharge",
+     dict(events=[use("Bash", command="cat <<'EOF'\ngh issue list\nEOF")]), True),
     ("read-only Explore agent is exempt", dict(events=[], subagent="Explore"), False),
     ("non-Agent tool is ignored", dict(events=[], tool="Bash"), False),
 ]

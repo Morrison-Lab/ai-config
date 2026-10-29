@@ -1651,6 +1651,13 @@
             "timeout": 10,
             "script": "no-manual-step-ask.py",
             "why": "ai-config#4698. Ezra, 2026-10-23: \"don't make me intervene manually to prompt threads to 'go' if there's any other way\"; no merge buttons or manual steps. Blocks (deny) a user-visible reply tool call that asks the user to type go into a Remote Control session or to click a Merge button, or asks the user to paste or hand-add text into a file (Ezra, 2026-10-26: \"never ask me to paste anything into a file; always give me a script-based command to run that does it for me\"), and points at the substitutes (fresh session on an approved environment; plain mwc; an idempotent script run by one command). See shared/workflow/lab-operating-rules.md. Fails open on any parse trouble."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-unfetched-pr-state-claim.py\"'",
+            "timeout": 10,
+            "script": "no-unfetched-pr-state-claim.py",
+            "why": "ai-config#4834, PreToolUse binding of the Stop guard of the same name: a project thread posts through a hearthbot reply tool before the turn ends (ai-config#4830), so a Stop block arrives after the user has read the stale claim. Denies a user-visible reply tool call (mcp__hearthbot__reply, post_message, update_message, edit_message) that says a PR awaits merge or review, or that work is still to do, with no live read since the last user turn. Once per distinct text; fails open."
           }
         ]
       },
@@ -1754,6 +1761,13 @@
             "timeout": 10,
             "script": "no-stale-pr-status.py",
             "why": "Blocks a reply asserting a PR's check state when the last status query predates the last push, so a stale reading is never reported as current."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-unfetched-pr-state-claim.py\"'",
+            "timeout": 10,
+            "script": "no-unfetched-pr-state-claim.py",
+            "why": "ai-config#4834. 2026-10-29: a project coordinator told the user mcsg#52 was 'waiting on your merge' from a stale handoff summary after it had merged, and proposed drafting Homework 2-6 from a stale memory note after those had merged. Blocks a final message that says a PR awaits merge or review or is still open, unless a tool call since the last user turn read that PR live (pull_request_read get, issue_read, a PR list or search, hearthbot list_prs, gh pr view/list, gh api .../pulls[/N], glab mr view/list); a single-PR read must name the claimed number. Also blocks a claim that work is still to do ('still needs drafting', 'X is next') when nothing since the last user turn read the forge or the remote. Yields at Stop when a hearthbot reply tool ran this turn, since the PreToolUse binding judged that text. Once per distinct message; fails open."
           },
           {
             "type": "command",

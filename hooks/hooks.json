@@ -407,6 +407,20 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-headless-browser-in-bash.py\"",
+            "timeout": 10,
+            "script": "no-headless-browser-in-bash.py",
+            "why": "Ezra's standing rule is no Chrome, no browser and no computer use, ever. The rule was enforced only for the browser tools (warn-browser-without-route-check.py watches mcp__claude-in-chrome__*, mcp__Claude_Browser__*, mcp__computer-use__*). On 2026-10-28 an agent checked a hash redirect on the live lds site with a headless Chromium launched from Bash through the container's preinstalled Playwright (`node redir.js`), and the coordinator caught it afterwards. Denies a Bash command that invokes a browser binary, a browser-automation CLI, or an interpreter whose inline code or script file imports a browser-automation library; the escape valve is ALLOW_HEADLESS_BROWSER=1 plus a stated reason.",
+            "_note_invocation_not_mention": [
+              "Matches the invocation position, not the token anywhere, so",
+              "`grep -rn playwright .` and `pip install playwright` pass. A script",
+              "file named on an interpreter's command line is read for a",
+              "browser-automation import, because the incident's command line was",
+              "just `node redir.js` and carried no browser word at all."
+            ]
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-rm-live-render-intermediate.py\"",
             "timeout": 10,
             "script": "no-rm-live-render-intermediate.py",
@@ -552,6 +566,13 @@
             "timeout": 20,
             "script": "no-oversized-pr-push.py",
             "why": "ai-config#4698. Ezra, 2026-10-23: \"don't allow massive sweep PRs like pds#244 anymore; do them in minimal batches\" and \"every PR should be as small and focused as it can be while completely solving its stated task\". DENIES a `git push` of a branch that changes more than 10 files or 300 lines against the merge base with the remote default branch (generated, lock, image and data paths not counted), before CI is spent; gha's check-pr-size (gha#1188) fails the same PR in CI. Clearable with an ALLOW_LARGE_PR=1 prefix for a stacked branch or a maintainer-requested mechanical PR. See shared/workflow/small-prs.md. Fails open on any parse or git trouble."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-sweep-pr-without-ask.py\"",
+            "timeout": 10,
+            "script": "warn-sweep-pr-without-ask.py",
+            "why": "ai-config#4829. Ezra, 2026-10-29: \"don't sweep new rules unless I explicitly tell you to sweep; by default, just fix incrementally when you are editing a passage anyway\". Warns, never blocks, when `gh pr create` has a title or label containing \"sweep\" and the command holds no `Sweep authorized:` marker quoting or linking Ezra's ask. See shared/workflow/no-sweeps-by-default.md. Fails open on parse trouble."
           },
           {
             "type": "command",
@@ -1049,6 +1070,22 @@
         ]
       },
       {
+        "matcher": "mcp__claude-code-remote__create_session|mcp__Claude_Code_Remote__create_session",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-implicit-session-environment.py\"",
+            "timeout": 10,
+            "script": "no-implicit-session-environment.py",
+            "why": "Denies a create_session call that omits `environment_id`, because the new session would silently inherit the caller's environment and an environment cannot be changed afterwards (ai-config#4819: five lds sessions landed in Default instead of R with ai-config, and could not render locally).",
+            "_note_blocks": [
+              "Emits `permissionDecision: deny` only when `environment_id` is absent or blank;",
+              "passing any explicit id, including the caller's own, is silent. Never emits `allow`."
+            ]
+          }
+        ]
+      },
+      {
         "matcher": "Agent",
         "hooks": [
           {
@@ -1198,6 +1235,13 @@
             "timeout": 10,
             "script": "warn-human-review-before-clean-verdict.py",
             "why": "The MCP half of the Bash entry: a remote session has no `gh`, so mcp__github__update_pull_request or create_pull_request with `reviewers` is how it requests a person. Same script, same warn-only behaviour."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-sweep-pr-without-ask.py\"",
+            "timeout": 10,
+            "script": "warn-sweep-pr-without-ask.py",
+            "why": "The MCP half of the Bash entry (ai-config#4829): a remote session has no `gh`, so mcp__github__create_pull_request with \"sweep\" in the title is how it opens a sweep PR. Same script, same warn-only behaviour."
           }
         ]
       },
@@ -1614,6 +1658,13 @@
             "timeout": 10,
             "script": "no-manual-step-ask.py",
             "why": "ai-config#4698. Ezra, 2026-10-23: \"don't make me intervene manually to prompt threads to 'go' if there's any other way\"; no merge buttons or manual steps. Blocks (deny) a user-visible reply tool call that asks the user to type go into a Remote Control session or to click a Merge button, or asks the user to paste or hand-add text into a file (Ezra, 2026-10-26: \"never ask me to paste anything into a file; always give me a script-based command to run that does it for me\"), and points at the substitutes (fresh session on an approved environment; plain mwc; an idempotent script run by one command). See shared/workflow/lab-operating-rules.md. Fails open on any parse trouble."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unfetched-pr-state-claim.py\"",
+            "timeout": 10,
+            "script": "no-unfetched-pr-state-claim.py",
+            "why": "ai-config#4834, PreToolUse binding of the Stop guard of the same name: a project thread posts through a hearthbot reply tool before the turn ends (ai-config#4830), so a Stop block arrives after the user has read the stale claim. Denies a user-visible reply tool call (mcp__hearthbot__reply, post_message, update_message, edit_message) that says a PR awaits merge or review, or that work is still to do, with no live read since the last user turn. Once per distinct text and at most twice per user turn; fails open."
           }
         ]
       },
@@ -1720,6 +1771,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unfetched-pr-state-claim.py\"",
+            "timeout": 10,
+            "script": "no-unfetched-pr-state-claim.py",
+            "why": "ai-config#4834. 2026-10-29: a project coordinator told the user mcsg#52 was 'waiting on your merge' from a stale handoff summary after it had merged, and proposed drafting Homework 2-6 from a stale memory note after those had merged. Blocks a final message that says a PR awaits merge or review or is still open, unless a tool call since the last user turn read that PR live (pull_request_read get, issue_read, a PR list or search, hearthbot list_prs, gh pr view/list, gh api .../pulls[/N], glab mr view/list); a single-PR read must name the claimed number. Also blocks a claim that work is still to do ('Homework 3 still needs drafting', 'drafting Homework 2-6 is next'), in a sentence naming a forge item or course deliverable, when nothing since the last user turn read the forge or the remote (forge writes and remote-tracking refs read without a fetch do not count). Quoted text is skipped. Once per distinct message and at most twice per user turn; fails open. Yields at Stop when a hearthbot reply tool call went through this turn, since the PreToolUse binding judged that text."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-red-own-pr-at-stop.py\"",
             "timeout": 10,
             "script": "warn-red-own-pr-at-stop.py",
@@ -1801,6 +1859,13 @@
             "timeout": 10,
             "script": "flag-cop-out-offer.py",
             "why": "shared/workflow/no-cop-out-offers.md -- warns when a reply CLOSES on an offer to do work (`say the word`, `want me to`, `unless you'd rather`). Directive from the user 2026-08-20 after verified analysis results sat in an unpushed local branch for hours behind `say the word and I'll push`, for a push a standing authorization already covered; an earlier `unless you'd rather` in the same session stalled work 2.5 hours against a hard deadline. Interrupts the stop once per turn so the agent reads the warning (agent_notice.stop_notice, ai-config#4796), and never decides for the author: whether the action was already authorized is not lexically decidable, and asking before a merge or force-push is correct. Tail-anchored, because the failure is a recap that closes on an offer and because this corpus quotes the phrases constantly."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-book-unavailable-without-library-search.py\"",
+            "timeout": 10,
+            "script": "flag-book-unavailable-without-library-search.py",
+            "why": "Ezra's standing rule (2026-10-23): look in the project library (/mnt/project-files/books) AND Morrison-Lab/mlr before saying a book is unavailable; books missing from either get added to both. Violated 2026-10-29 (lds#1548 thread): a reply said ESL, Murphy and Bishop 'could not be reached' after a web search only, when all three sat in the library; Ezra had to ask 'did you check mlr?'. Warns once per message when a reply claims a book is unreachable and the transcript lacks a search of either place. Never decides: a book may truly be in neither."
           },
           {
             "type": "command",

@@ -19,11 +19,13 @@ A visual follows these figure rules:
 
 - figures that show estimates carry confidence intervals (error bars or ribbons);
 - axis ticks are in the variable's original measurement scale and print plain numbers, not scientific notation ([details](axis-tick-labels.md));
+- an axis is extended to show important reference values such as zero when they matter;
 - every figure has alt text ([`alt-text`](../../skills/alt-text/SKILL.md)) and a numbered caption;
 - the code chunk comments what it does and why;
 - colors are colorblind-safe.
 
-Backfilling existing content:
+Backfilling existing content (an explicit ask, so an exception to [`no-sweeps-by-default`](../workflow/no-sweeps-by-default.md);
+other rules are not backfilled unless Ezra says to):
 
 1. Audit the chapters for definitions, examples and results that lack a visual, and save the audit list where other sessions can find it.
 2. Open one PR per chapter with the figures, so each is reviewable alone.

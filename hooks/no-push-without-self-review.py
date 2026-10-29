@@ -2926,9 +2926,11 @@ def read_latest_review(
     transcript_path: str, _known_task_ids: frozenset[str] | None = None,
 ) -> tuple[str | None, list[str], bool]:
     """(verdict, reviewed_commits, saw_reviewer_call) from the transcript."""
-    verdict, reviewed_commits, saw_reviewer_call, _, _ = read_latest_review_with_unparsed(
+    verdict, reviewed_commits, saw_reviewer_call, saw_unparsed_later, _ = read_latest_review_with_unparsed(
         transcript_path, _known_task_ids
     )
+    if saw_unparsed_later and verdict == "clean":
+        return None, [], saw_reviewer_call
     return verdict, reviewed_commits, saw_reviewer_call
 
 
@@ -3065,7 +3067,7 @@ def verify_review(transcript_path: str, directory: str | None,
             "immediately after the verdict; the JSON payload may follow it, and "
             "nothing else should. Without the line nothing ties the verdict to what "
             "this push would ship, and a report cut short before its fingerprint is "
-            "not a verdict."
+            f"not a verdict.{unparsed_hint}"
         )
 
     # Every stated fingerprint must resolve. A report naming several
@@ -3092,7 +3094,7 @@ def verify_review(transcript_path: str, directory: str | None,
                 "different commit -- a reviewer that recalls or reconstructs a SHA instead of "
                 "reading it can get a prefix right and invent the rest. Re-dispatch the "
                 "reviewer and tell it to obtain the SHA by running `git rev-parse HEAD` and "
-                "copy the 40-character output verbatim, not reconstruct or abbreviate it."
+                f"copy the 40-character output verbatim, not reconstruct or abbreviate it.{unparsed_hint}"
             )
         resolved_commits.append(resolved)
 
@@ -3122,6 +3124,15 @@ def verify_review(transcript_path: str, directory: str | None,
             "A push ships commits, so whatever differs -- a later commit, a `main` merge, "
             "a rebase, or a branch other than the reviewed one -- is unreviewed. "
             f"Re-dispatch the reviewer against what you are actually pushing.{unparsed_hint}"
+        )
+
+    if saw_unparsed_later:
+        return False, (
+            f"An earlier clean verdict covered {', '.join(resolved_commits)}, but a later "
+            "reviewer report in this transcript had an unparsed verdict line.\n"
+            "A later report supersedes an earlier verdict (and may be a blocking review "
+            "written with a non-standard verdict phrase), so this guard fails closed rather "
+            f"than trusting the superseded verdict. Re-dispatch the reviewer.{unparsed_hint}"
         )
 
     return True, f"Clean adversarial self-review verified at {', '.join(resolved_commits)}."

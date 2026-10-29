@@ -19,6 +19,7 @@ A visual follows these figure rules:
 
 - figures that show estimates carry confidence intervals (error bars or ribbons);
 - axis ticks are in the variable's original measurement scale and print plain numbers, not scientific notation ([details](axis-tick-labels.md));
+- an axis is extended to show important reference values such as zero when they matter;
 - every figure has alt text ([`alt-text`](../../skills/alt-text/SKILL.md)) and a numbered caption;
 - the code chunk comments what it does and why;
 - colors are colorblind-safe.

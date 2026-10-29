@@ -42,8 +42,10 @@ Use a call that names its own output type:
 # Preferred --- the suffix is the return type, enforced
 purrr::map_dbl(x, mean)
 
-# Acceptable in a base-R file --- FUN.VALUE is the declared template
-vapply(x, mean, FUN.VALUE = double(1))
+# Acceptable in a base-R file --- FUN.VALUE is the declared template,
+# named first so the call nests no other call (avoid-nesting.md)
+one_double <- double(1)
+vapply(x, mean, FUN.VALUE = one_double)
 
 # Avoid --- returns a list, a vector, or a matrix depending on the input
 sapply(x, mean)

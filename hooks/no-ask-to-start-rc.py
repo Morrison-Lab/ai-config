@@ -33,7 +33,11 @@ SENTENCE_BREAK = re.compile(
     r"(?<!\be\.g\.)(?<!\bi\.e\.)(?<!\bvs\.)(?<!\betc\.)(?<=[.!?])\s+|\n+", re.I)
 
 # Quoted words mention an ask, they do not make one.
-QUOTED = re.compile(r"```.*?```|^>.*$|\"[^\"\n]*\"|\u201c[^\u201d\n]*\u201d", re.S | re.M)
+QUOTED = re.compile(
+    r"```.*?```|^>.*$|\"[^\"\n]*\"|\u201c[^\u201d\n]*\u201d|(?<!\w)'[^'\n]{3,}'(?!\w)"
+    r"|`(?!\s*claude\b)[^`\n]*`", re.S | re.M)
+# A PR or issue body lists the agent's own plan and record as bullets and numbered steps.
+LIST_ITEM = re.compile(r"^\s*(?:[-*]|\d+[.)])\s.*$", re.M)
 
 RC = r"(?:remote[-\u2010\u2011 ]{0,3}control|(?-i:\bRC\b))"
 BASE = r"(?:start|run|launch|restart|reconnect|spin(?: up)?|fire up|kick off|enable|turn on|bring up)"
@@ -82,8 +86,11 @@ REASON = (
 )
 
 
-def asked(text: str) -> bool:
-    for sentence in SENTENCE_BREAK.split(QUOTED.sub(" ", text)):
+def asked(text: str, forge: bool = False) -> bool:
+    text = QUOTED.sub(" ", text)
+    if forge:
+        text = LIST_ITEM.sub(" ", text)
+    for sentence in SENTENCE_BREAK.split(text):
         for pattern in ASKS:
             for match in pattern.finditer(sentence):
                 if NEGATION.search(CLAUSE_BREAK.split(sentence[:match.start()])[-1] + match.group(0)[:14]):
@@ -118,7 +125,8 @@ def main() -> int:
     tool_input = payload.get("tool_input")
     if not isinstance(tool_input, dict):
         return 0
-    if any(asked(text) for text in strings(tool_input)):  # nested cards and option lists included
+    forge = str(payload.get("tool_name")).startswith("mcp__github__")
+    if any(asked(text, forge) for text in strings(tool_input)):  # nested cards and option lists included
         print(json.dumps({
             "hookSpecificOutput": {
                 "hookEventName": "PreToolUse",

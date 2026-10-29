@@ -63,7 +63,7 @@ ASKS = (
 NEGATION = re.compile(
     r"\b(?:never|won't|will not|don't|do not|doesn't|not (?:ask|need)|no need|without asking|"
     r"without you|instead of asking|rather than asking|stop|why did I|did I|do I)\b", re.I)
-CLAUSE_BREAK = re.compile(r"[;:,—]|\s-+\s")
+CLAUSE_BREAK = re.compile(r"[;:,\u2014]|\s-+\s")
 YOURSELF = re.compile(r"^[^.!?\n]{0,25}\byourself\b", re.I)
 
 REASON = (

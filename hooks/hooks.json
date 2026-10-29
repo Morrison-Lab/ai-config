@@ -1834,6 +1834,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-book-unavailable-without-library-search.py\"",
+            "timeout": 10,
+            "script": "flag-book-unavailable-without-library-search.py",
+            "why": "Ezra's standing rule (2026-10-23): look in the project library (/mnt/project-files/books) AND Morrison-Lab/mlr before saying a book is unavailable; books missing from either get added to both. Violated 2026-10-29 (lds#1548 thread): a reply said ESL, Murphy and Bishop 'could not be reached' after a web search only, when all three sat in the library; Ezra had to ask 'did you check mlr?'. Warns once per message when a reply claims a book is unreachable and the transcript lacks a search of either place. Never decides: a book may truly be in neither."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-misattributed-quote.py\"",
             "timeout": 10,
             "script": "no-misattributed-quote.py",

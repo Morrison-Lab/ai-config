@@ -37,8 +37,13 @@ When PSW and this guidance disagree, PSW wins.
   - **Don't:** copy their text here; link the section instead
     (see [`dont-reinvent-wheel`](../principles/dont-reinvent-wheel.md)).
 - **Don't use money words as idioms for trade-offs** (Ezra, 2026-10-14).
-  Avoid "X costs us Y", "this buys us Z" and "at the price of";
+  Avoid "X costs us Y", "this buys us Z", "at the price of", "pays off",
+  "the whole bargain" and "that trade" (Ezra, 2026-10-29, mds#529);
   say what is lost or gained.
+  Do not give a derivative, model or approximation a mind either
+  ("recommends", "knows", "trustworthy"):
+  state the condition under which the claim holds.
+  gha's `check-ai-tells` flags both as warn-only.
   Keep literal uses: computational or monetary cost,
   and a cost function the text defines as a term.
   PSW's rule is in

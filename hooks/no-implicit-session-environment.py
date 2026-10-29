@@ -23,14 +23,19 @@ For a `create_session` call:
 
 Denying rather than warning is deliberate: the remedy is one parameter, and
 a warning arrives after the call has already created the session in the
-wrong environment, which cannot be changed afterwards.
+wrong environment, which cannot be changed afterwards. There is no override
+variable, also on purpose: unlike `no-fable-subagent.py`, the compliant call
+always exists and costs nothing more -- pass the caller's own id when it
+really is the right one.
 
-Run with `--dry-run '<payload json>'` to see the verdict without acting.
+Run with `--dry-run '<payload json>'` (or `--simulate`) to see the verdict
+without acting.
 """
 import json
 import sys
 
-TOOL_SUFFIX = "create_session"
+TOOL = "mcp__claude-code-remote__create_session"
+BARE_TOOL = "create_session"
 
 REASON = (
     "create_session was called without `environment_id`, so the new session "
@@ -43,20 +48,38 @@ REASON = (
 
 
 def _read_payload():
-    if len(sys.argv) == 3 and sys.argv[1] == "--dry-run":
-        return json.loads(sys.argv[2]), True
+    args = sys.argv[1:]
+    dry = "--dry-run" in args or "--simulate" in args
+    if dry:
+        positional = [a for a in args if not a.startswith("-")]
+        if positional:
+            try:
+                payload = json.loads(positional[0])
+            except ValueError as exc:
+                print(f"no-implicit-session-environment: unreadable --dry-run payload ({exc})",
+                      file=sys.stderr)
+                return {}, True
+            return (payload if isinstance(payload, dict) else {}), True
     try:
-        return json.load(sys.stdin), False
-    except (json.JSONDecodeError, ValueError):
-        return None, False
+        payload = json.load(sys.stdin)
+    except ValueError as exc:
+        print(f"no-implicit-session-environment: unreadable hook input ({exc})", file=sys.stderr)
+        return {}, dry
+    return (payload if isinstance(payload, dict) else {}), dry
+
+
+def is_create_session(tool):
+    return tool == BARE_TOOL or tool.endswith("__" + BARE_TOOL)
 
 
 def decide(payload):
-    tool = str(payload.get("tool_name") or "")
-    if not tool.endswith(TOOL_SUFFIX):
+    if not is_create_session(str(payload.get("tool_name") or "")):
         return None, ""
-    tool_input = payload.get("tool_input") or {}
-    if str(tool_input.get("environment_id") or "").strip():
+    tool_input = payload.get("tool_input")
+    if not isinstance(tool_input, dict):
+        tool_input = {}
+    env = tool_input.get("environment_id")
+    if isinstance(env, str) and env.strip():
         return None, ""
     return "deny", REASON
 

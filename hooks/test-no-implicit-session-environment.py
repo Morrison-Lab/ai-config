@@ -4,6 +4,7 @@
 Run:  python3 hooks/test-no-implicit-session-environment.py hooks/no-implicit-session-environment.py
 """
 import json
+import os
 import subprocess
 import sys
 
@@ -59,6 +60,46 @@ check("a different tool is ignored", rc == 0 and out == {})
 
 rc, out = run(call({"prompt": "x"}, tool="Bash"))
 check("Bash is ignored", rc == 0 and out == {})
+
+rc, out = run(call({"prompt": "x"}, tool="mcp__x__recreate_session"))
+check("a tool that only ends in create_session is ignored", rc == 0 and out == {})
+
+rc, out = run(call({"prompt": "x", "environment_id": 123}))
+check("a non-string environment_id is denied", decision(out) == "deny")
+
+rc, out = run(call({"prompt": "x", "environment_id": ["env_x"]}))
+check("a list environment_id is denied", decision(out) == "deny")
+
+rc, out = run(call("not a dict"))
+check("a non-dict tool_input is treated as empty and denied", rc == 0 and decision(out) == "deny")
+
+res = subprocess.run([sys.executable, HOOK], input="[1]", capture_output=True, encoding="utf-8")
+check("a non-dict payload exits 0 with no output", res.returncode == 0 and not res.stdout.strip())
+
+rc, out = run(call({"prompt": "x"}))
+check("the deny names the PreToolUse event",
+      (out.get("hookSpecificOutput") or {}).get("hookEventName") == "PreToolUse")
+
+for flag in ("--dry-run", "--simulate"):
+    res = subprocess.run([sys.executable, HOOK, flag, json.dumps(call({"prompt": "x"}))],
+                         capture_output=True, encoding="utf-8", input="")
+    check(f"{flag} reports the deny", decision(json.loads(res.stdout or "{}")) == "deny")
+res = subprocess.run([sys.executable, HOOK, "--dry-run",
+                      json.dumps(call({"prompt": "x", "environment_id": "env_a"}))],
+                     capture_output=True, encoding="utf-8", input="")
+dry_out = json.loads(res.stdout or "{}")
+check("--dry-run on a compliant call prints an empty decision",
+      res.returncode == 0 and "permissionDecision" not in dry_out.get("hookSpecificOutput", {}))
+
+# The registered matcher must be the tool name the hook decides on; a rename of either side
+# would otherwise leave the guard bound to nothing.
+hooks_json = os.path.join(os.path.dirname(os.path.realpath(HOOK)), "hooks.json")
+with open(hooks_json, encoding="utf-8") as fh:
+    registered = json.load(fh)
+matchers = [group.get("matcher") for group in registered["hooks"].get("PreToolUse", [])
+            for h in group.get("hooks", [])
+            if h.get("script") == os.path.basename(HOOK)]
+check("hooks.json binds the hook to exactly the create_session tool", matchers == [TOOL])
 
 res = subprocess.run([sys.executable, HOOK], input="not json", capture_output=True, encoding="utf-8")
 check("unparseable input exits 0 with no output", res.returncode == 0 and not res.stdout.strip())

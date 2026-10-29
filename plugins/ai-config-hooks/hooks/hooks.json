@@ -1042,6 +1042,22 @@
         ]
       },
       {
+        "matcher": "mcp__claude-code-remote__create_session",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-implicit-session-environment.py\"'",
+            "timeout": 10,
+            "script": "no-implicit-session-environment.py",
+            "why": "Denies a create_session call that omits `environment_id`, because the new session would silently inherit the caller's environment and an environment cannot be changed afterwards (ai-config#4819: five lds sessions landed in Default instead of R with ai-config, and could not render locally).",
+            "_note_blocks": [
+              "Emits `permissionDecision: deny` only when `environment_id` is absent or blank;",
+              "passing any explicit id, including the caller's own, is silent. Never emits `allow`."
+            ]
+          }
+        ]
+      },
+      {
         "matcher": "Agent",
         "hooks": [
           {

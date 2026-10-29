@@ -204,7 +204,7 @@ The one exception is a repo that explicitly overrides one specific macro's defau
 (Directive from the user, 2026-10-16: "new macros should always go into our macros repo, never into applied repos (unless you're explicitly overriding the default macros repo for a specific semantic macro)".)
 If the macros PR has to wait, say so and keep the change in a stacked PR on the macros PR;
 do not add a repo-local macro or an inline command.
-A repo-local macro file left over from the old stopgap (such as `_subfiles/_macros-sds.qmd` in sds) is debt: move each definition into `Morrison-Lab/macros` in a sweep PR.
+A repo-local macro file left over from the old stopgap (such as `_subfiles/_macros-sds.qmd` in sds) is debt: move each definition into `Morrison-Lab/macros` in a small PR (this is moving macro definitions, not sweeping content for a new rule).
 File an issue in [`Morrison-Lab/macros`](https://github.com/Morrison-Lab/macros) listing each leftover definition, what it means, and any existing macro it overlaps.
 In a remote session that has the repo attached under its old name,
 the issue tool accepted owner `d-morrison` and GitHub redirected the issue to the migrated repo
@@ -343,7 +343,7 @@ So `\hat{\mean}` is no more semantic than `\mu`: write `\est{\mean}` (from `Morr
 Pick a compound built on a concept macro: `\esig` and `\hs` also spell the Greek letter, so the section above already rules them out.
 When a decorated quantity has no role macro, add one to `Morrison-Lab/macros` first, as for Greek letters.
 Keep `\hat` only where the text discusses the notation itself.
-This is the target state rather than a blocker on current work: write new math this way now, and convert existing hats in their own sweep PRs.
+This is the target state rather than a blocker on current work: write new math this way now, and convert existing hats when you edit that math anyway (no sweep unless Ezra asks: [`no-sweeps-by-default`](../../shared/workflow/no-sweeps-by-default.md)).
 
 - **Do:** write `\est{\mean}` or `\ecoef{j}` for an estimate in new or edited math.
 - **Don't:** introduce `\hat{...}` or a hat-based compound (`\hcoef`, `\hvb`) in new math.

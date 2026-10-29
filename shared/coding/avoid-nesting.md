@@ -22,6 +22,23 @@ It covers a call whose result is a value handed to the outer call as an argument
 It does not cover the steps of a pipe chain, which already name their order, nor an argument the outer function captures and interprets itself: tidyselect helpers (`all_of()`, `any_of()`, `starts_with()`), data-masked expressions inside data-masking verbs such as `mutate()` / `filter()` / `summarise()`, `aes()` mappings, and formulas.
 Those are part of the outer call's own syntax, and pulling them out would break or obscure it.
 
+`lms::default_linters(nested_calls = TRUE)` enforces the rule, and it reads "a call" literally.
+These cases were measured in a `lint-changed-lines` log, with lms at the `lms-ref` that lds's `lint-changed-lines.yaml` pins, on R chunks in a `.qmd` file ([Morrison-Lab/lds#1511](https://github.com/Morrison-Lab/lds/pull/1511), 2026-10-29):
+
+- Even a constructor with literal arguments counts.
+  That covers `c()` inside `cbind()` or `matrix()`, and `numeric(1)` as `vapply()`'s `FUN.VALUE`.
+  Name the vector or the template first.
+- An operator breaks the nesting.
+  `drop(t(b) %*% x)` and `which.max(0.5 * dnorm(x))` were not flagged, but the `sqrt()` in `dnorm(x, 0, sqrt(v))` was.
+- A lambda's body is checked as its own scope.
+  `vapply(xs, \(x) which.max(f(x)), ...)` was flagged for `f(x)` inside `which.max()`, not for the lambda inside `vapply()`.
+- A pipe is never flagged, so `rbind(a = x, b = y) |> round(3)` passes the nesting check.
+  `rbind()` and `cbind()` still trip `undesirable_function_linter` unless they carry `# nolint: undesirable_function_linter.`, which is the escape the linter names for building a matrix.
+
+- **Do:** when lms cannot be installed locally, fix every line the CI log names, then expect the next run to name any line a fix newly nested.
+- **Don't:** assume a literal `c(...)` or `numeric(1)` argument is exempt.
+  That assumption cost a second CI round on lds#1511.
+
 The nested-definition rule is a readability/maintainability default, not an absolute rule --- keep the nesting when flattening it would be more convoluted (a trivial one-argument wrapper, or a closure that genuinely needs the enclosing scope).
 
 ## Name `if()` and `while()` conditions before testing them

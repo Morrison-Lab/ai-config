@@ -64,6 +64,12 @@ A valid no-change pass still scans the context and, for every candidate, categor
 its report names the candidates and searches rather than asserting a conclusion with no pass behind it.
 A 2026-09-14 post-merge session recurred here: it loaded UMS and ran one narrow grep, then reported "UMS review found no additional durable memory update needed";
 the user's "what about ums?" exposed that the actual pass had never run.
+A 2nd occurrence came on 2026-10-29, after a merge under `mwc` ([Morrison-Lab/lds#1511](https://github.com/Morrison-Lab/lds/pull/1511)).
+The final report's stopping-point line said outright that UMS had not run, with no reason given and no pass started, and the user asked "why not?".
+Saying the pass is owed is not the same as running it, and a stopping-point line is not a deferral when nothing will wake to do the pass.
+
+- **Do:** run the pass in the same turn as the merge report, before writing the stopping-point line.
+- **Don't:** end a turn on "UMS has not run" with no wake armed and no reason.
 
 **A merge you discover rather than perform is still a checkpoint, and it is the one that never feels like a moment.**
 Every bullet above describes a checkpoint that *happens* while you are watching: you push, the verdict lands, the PR merges, you report back.

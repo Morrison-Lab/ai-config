@@ -1,21 +1,14 @@
 #!/usr/bin/env python3
 """PreToolUse warn: a PR is titled or labelled as a sweep with no explicit sweep ask cited.
 
-Ezra, 2026-10-29: "don't sweep new rules unless I explicitly tell you to
-sweep; by default, just fix incrementally when you are editing a passage
-anyway" (ai-config#4829). `shared/workflow/no-sweeps-by-default.md` is the
-rule. This hook checks the action: opening a PR whose title says "sweep" (or
-that carries a `sweep` label) is the visible moment an agent turns a new rule
-into a pass over existing content.
+Rule: `shared/workflow/no-sweeps-by-default.md` (Ezra, 2026-10-29, ai-config#4829).
+Opening a PR titled or labelled "sweep" is the visible moment an agent turns
+a new rule into a pass over existing content.
 
-It fires on:
-  - `gh pr create` (title from `--title`/`-t`, labels from `--label`/`-l`)
-  - `mcp__github__create_pull_request` (title)
-and stays silent when the body or command holds a `Sweep authorized:` marker,
-which should quote or link the message in which Ezra asked for the sweep.
-It warns, never blocks: whether a title that merely contains the word is a
-sweep is a judgment a hook cannot make, and a title can say "sweep" for
-honest reasons (a one-off cleanup of ai-config's own code).
+It fires on `gh pr create` (title, `--label`) and
+`mcp__github__create_pull_request` (title), and stays silent when the body or
+command holds a `Sweep authorized:` marker quoting or linking Ezra's ask.
+It warns, never blocks: a title can say "sweep" for honest reasons.
 
 Deliberate limits:
   - A sweep PR titled without the word is not seen.

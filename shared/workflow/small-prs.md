@@ -8,7 +8,7 @@ do them in minimal batches", and "every PR should be as small and focused as it 
 - A PR solves its stated task completely and nothing else.
 - A PR changes at most 10 files and 300 lines (added plus deleted).
   Generated, lock, `_freeze/`, image and data paths are not counted.
-- A sweep across many files goes out as minimal batches.
+- A sweep across many files goes out as minimal batches, and only when Ezra explicitly asked for it ([`no-sweeps-by-default`](no-sweeps-by-default.md)).
   Each batch is one concern, with its own issue and its own PR.
   Open the first batch, then the next, rather than one PR for all of them.
 - Stacked PRs are fine: each layer is small, and each names the layer it needs.

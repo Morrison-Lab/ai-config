@@ -53,3 +53,5 @@ Ways to format the labels:
 
 A log axis with a small range prints a few unlabelled minor ticks by default.
 Check the render, since a formatter can crowd or clip the labels (widen the margin if so).
+
+For each plot, consider whether an axis should be extended to show important reference values such as zero.

@@ -562,6 +562,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-sweep-pr-without-ask.py\"'",
+            "timeout": 10,
+            "script": "warn-sweep-pr-without-ask.py",
+            "why": "ai-config#4829. Ezra, 2026-10-29: \"don't sweep new rules unless I explicitly tell you to sweep; by default, just fix incrementally when you are editing a passage anyway\". Warns, never blocks, when `gh pr create` has a title or label containing \"sweep\" and the command holds no `Sweep authorized:` marker quoting or linking Ezra's ask. See shared/workflow/no-sweeps-by-default.md. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-push-with-failing-notes-checks.py\"'",
             "timeout": 120,
             "script": "no-push-with-failing-notes-checks.py",
@@ -1221,6 +1228,13 @@
             "timeout": 10,
             "script": "warn-human-review-before-clean-verdict.py",
             "why": "The MCP half of the Bash entry: a remote session has no `gh`, so mcp__github__update_pull_request or create_pull_request with `reviewers` is how it requests a person. Same script, same warn-only behaviour."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-sweep-pr-without-ask.py\"'",
+            "timeout": 10,
+            "script": "warn-sweep-pr-without-ask.py",
+            "why": "The MCP half of the Bash entry (ai-config#4829): a remote session has no `gh`, so mcp__github__create_pull_request with \"sweep\" in the title is how it opens a sweep PR. Same script, same warn-only behaviour."
           }
         ]
       },

@@ -25,6 +25,8 @@ by default, just fix incrementally when you are editing a passage anyway."
 
 - `hooks/warn-sweep-pr-without-ask.py` warns when `gh pr create` or `mcp__github__create_pull_request` has "sweep" in the title or a `sweep` label and no `Sweep authorized:` marker.
   It warns rather than blocks because a title containing the word is not always a sweep, and a hook cannot read Ezra's intent.
+- gha's content checks (`check-new-line-breaks`, `check-def-commentary`, `check-exm-figures`, `check-one-div-per-subfile`, `check-tree-lists`, `check-visualization-figures`, `check-typos` and others) are diff-scoped by default (checked 2026-10-29), reflagging nothing already merged.
+  Where a whole-tree mode exists (such as `whole-tree`), it is an opt-in input, so keep it off by default.
 - `hooks/no-oversized-pr-push.py` already caps any PR at 10 files and 300 lines ([`small-prs`](small-prs.md)), so an unrequested sweep that slips past the title check still cannot ship as one large PR.
 - The part with no mechanism: deciding that a fix is incremental, not a sweep, depends on whether the passage was already being edited.
   A hook cannot know that, so this prose carries it.

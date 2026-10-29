@@ -15,7 +15,7 @@ Scope: the user-visible reply tools (`mcp__hearthbot__reply`, `post_message`,
 `update_message`). Blocks, because the fix is one resend.
 
 What counts: `(#<own id>)` or a URL carrying `thread=<own id>` in the text,
-after fenced code is removed. A link to any other thread is fine. Fails open on
+after fenced code and inline code spans are removed. A link to any other thread is fine. Fails open on
 any parse trouble, including an unreadable transcript.
 """
 import json
@@ -25,7 +25,8 @@ import sys
 REPLY_TOOL = re.compile(r"(^|__)(reply|post_message|update_message)$")
 FENCE = re.compile(
     r"^ {0,3}(```+|~~~+).*?(?:^ {0,3}\1[`~]*[ \t]*$|\Z)", re.M | re.S)
-THREAD_TS = re.compile(r'<thread ts="(cmsg_\w+)"')
+INLINE_CODE = re.compile(r"(?<!`)(`+)(?!`).*?(?<!`)\1(?!`)", re.S)
+THREAD_TS =re.compile(r'<thread ts="(cmsg_\w+)"')
 THREAD_SESSION = "You are a Thread Session"
 
 REASON = """\
@@ -51,7 +52,7 @@ def own_thread_id(transcript_path):
 
 
 def self_link(text, cmsg):
-    text = FENCE.sub(" ", text.replace("\r\n", "\n"))
+    text = INLINE_CODE.sub(" ", FENCE.sub(" ", text.replace("\r\n", "\n")))
     return re.search(
         rf"\(#{re.escape(cmsg)}\)|[?&]thread={re.escape(cmsg)}\b", text) is not None
 

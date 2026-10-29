@@ -26,6 +26,7 @@ CASES = [
     ("other thread is fine", THREAD_LOG, f"Merge word goes in {OTHER}.", False),
     ("self and other still blocks", THREAD_LOG, f"{SELF} and {OTHER}", True),
     ("self link in code is ignored", THREAD_LOG, f"```\n(#{OWN})\n```", False),
+    ("self link in inline code is ignored", THREAD_LOG, f"I used to write `{SELF}` here.", False),
     ("coordinator is never blocked", COORD_LOG, f"Merge word in {SELF}.", False),
     ("no transcript", None, f"This is in {SELF}.", False),
     ("prefix of another id is not self", THREAD_LOG, "[x](#cmsg_01OWNER)", False),

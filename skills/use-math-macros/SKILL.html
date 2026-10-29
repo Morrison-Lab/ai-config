@@ -535,6 +535,12 @@ window.Quarto = {
 <li><strong>Do:</strong> add the macro to <code>Morrison-Lab/macros</code>, and file the sweep issue in the same turn that you find a repo-local macro file.</li>
 <li><strong>Don’t:</strong> add a macro to a repo-local file, or leave one for a later upstreaming pass; <a href="https://github.com/Morrison-Lab/sds/pull/54">Morrison-Lab/sds#54</a> accumulated 13 of them before anyone filed the issue.</li>
 </ul>
+<p><strong>A missing macro is never a reason to keep raw LaTeX.</strong> When a macro would make an expression shorter or clearer, and none exists, adding one is the task, not a limit on it (Ezra, 2026-10-28). This is the step that gets skipped when a reviewer asks to “use macros” and part of the expression has no macro yet: the easy answer replaces what the library already covers and reports the rest as unavoidable. That half-answer is the failure, so treat the missing macro as the first piece of work: open the macros PR, then use the macro in the stacked or follow-up change once the pin is bumped.</p>
+<ul>
+<li><strong>Do:</strong> when a reviewer asks for macros, or a hand-written chunk such as <code>\eigval_{\max}</code> repeats, check the library; if nothing names the concept, open a <code>Morrison-Lab/macros</code> PR for it in the same turn.</li>
+<li><strong>Don’t:</strong> write “the macros list has no single macro for X, so it stays as it is”, or any rewording of that, in a reply, a PR description or a commit message. (<a href="https://github.com/Morrison-Lab/lds/pull/1534#discussion_r4408149071">Morrison-Lab/lds#1534</a>, 2026-10-28: asked to condense <span class="math inline">\(\tfrac14 \eigval_{\max}\paren{\tp{X_s} X_s / \nobs}\)</span> with macros, an agent switched to <code>\stprod</code> and <code>\design</code> but kept <code>\eigval_{\max}</code> raw “because the macros list has no single macro for the largest eigenvalue”. Ezra rejected that reasoning, and <a href="https://github.com/Morrison-Lab/macros/pull/317">Morrison-Lab/macros#317</a> added <code>\eigvalmax</code>, <code>\eigvalmin</code> and their call forms, for a chunk the lds notes write by hand about 30 times.)</li>
+<li>A deterministic hook cannot enforce this rule. Whether a macro would help is a judgment about the expression, and a phrase match would catch only one wording of the excuse.</li>
+</ul>
 </section>
 <section id="verify-the-render-and-spellcheck-then-ship" class="level3">
 <h3 class="anchored" data-anchor-id="verify-the-render-and-spellcheck-then-ship">7. Verify the render and spellcheck, then ship</h3>

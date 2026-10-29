@@ -125,6 +125,12 @@ New macros always go in `Morrison-Lab/macros`, never in an applied repo. The one
 - **Do:** add the macro to `Morrison-Lab/macros`, and file the sweep issue in the same turn that you find a repo-local macro file.
 - **Don’t:** add a macro to a repo-local file, or leave one for a later upstreaming pass; [Morrison-Lab/sds#54](https://github.com/Morrison-Lab/sds/pull/54) accumulated 13 of them before anyone filed the issue.
 
+**A missing macro is never a reason to keep raw LaTeX.** When a macro would make an expression shorter or clearer, and none exists, adding one is the task, not a limit on it (Ezra, 2026-10-28). This is the step that gets skipped when a reviewer asks to “use macros” and part of the expression has no macro yet: the easy answer replaces what the library already covers and reports the rest as unavoidable. That half-answer is the failure, so treat the missing macro as the first piece of work: open the macros PR, then use the macro in the stacked or follow-up change once the pin is bumped.
+
+- **Do:** when a reviewer asks for macros, or a hand-written chunk such as `\eigval_{\max}` repeats, check the library; if nothing names the concept, open a `Morrison-Lab/macros` PR for it in the same turn.
+- **Don’t:** write “the macros list has no single macro for X, so it stays as it is”, or any rewording of that, in a reply, a PR description or a commit message. ([Morrison-Lab/lds#1534](https://github.com/Morrison-Lab/lds/pull/1534#discussion_r4408149071), 2026-10-28: asked to condense \\\tfrac14 \eigval\_{\max}\paren{\tp{X_s} X_s / \nobs}\\ with macros, an agent switched to `\stprod` and `\design` but kept `\eigval_{\max}` raw “because the macros list has no single macro for the largest eigenvalue”. Ezra rejected that reasoning, and [Morrison-Lab/macros#317](https://github.com/Morrison-Lab/macros/pull/317) added `\eigvalmax`, `\eigvalmin` and their call forms, for a chunk the lds notes write by hand about 30 times.)
+- A deterministic hook cannot enforce this rule. Whether a macro would help is a judgment about the expression, and a phrase match would catch only one wording of the excuse.
+
 ### 7. Verify the render and spellcheck, then ship
 
 Run the raw-notation lint over what you changed, from the repository root:

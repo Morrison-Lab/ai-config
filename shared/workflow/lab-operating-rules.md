@@ -40,6 +40,12 @@ The rest are prose because no condition in the transcript can decide them.
 - Never ask Ezra to type "go" in a Remote Control session.
   Start a fresh session on an already approved environment with the brief as its opening task.
   Enforced by `hooks/no-manual-step-ask.py`.
+- Never ask Ezra to start or run Remote Control, or `claude remote-control`.
+  He has given standing permission to start it yourself on cf463-02 and the XPS
+  (2026-10-15, [`fetch-untrusted-files`](fetch-untrusted-files.md)).
+  Ezra, 2026-10-29: "you can run remote control yourself", "you should have known that".
+  Call `start_remote_control`; ask only for a prompt the box itself raises or for cf463-02 sudo.
+  Enforced by `hooks/no-ask-to-start-rc.py` on hearthbot replies, thread messages and forge comments.
 - A failed start ("device did not pick up") is retried once before anything is reported.
 
 ## Denied steps

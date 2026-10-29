@@ -265,7 +265,8 @@ def main() -> int:
         run("register", "--id", sid)
         run("enable-mwc", "--id", sid)
         clean_env = {k: v for k, v in os.environ.items()
-                     if k not in ("AI_SESSION_ID", "CLAUDE_SESSION_ID")}
+                     if k not in ("AI_SESSION_ID", "CLAUDE_SESSION_ID",
+                                  "CLAUDE_CODE_SESSION_ID")}
         p = subprocess.run([bash, str(SCRIPT), "check-mwc"],
                            cwd=repo, capture_output=True, text=True, env=clean_env)
         check(p.returncode == 0,
@@ -281,6 +282,20 @@ def main() -> int:
               "disable-mwc without --id fails closed rather than mutating single live session",
               f"rc={p_dis.returncode}")
         check(marker.exists(), "single live session marker untouched after failed disable-mwc")
+
+        # 13. $CLAUDE_CODE_SESSION_ID, the harness's own id, is the last-resort identity,
+        # so a grant made with no --id matches the hook's session.
+        code_env = dict(clean_env, CLAUDE_CODE_SESSION_ID=sid)
+        p = subprocess.run([bash, str(SCRIPT), "check-mwc"],
+                           cwd=repo, capture_output=True, text=True, env=code_env)
+        check(p.returncode == 0 and "Notice:" not in p.stdout,
+              "CLAUDE_CODE_SESSION_ID resolves the session with no --id and no notice",
+              f"rc={p.returncode} out={p.stdout.strip()}")
+        code_env["AI_SESSION_ID"] = "other-session"
+        p = subprocess.run([bash, str(SCRIPT), "check-mwc"],
+                           cwd=repo, capture_output=True, text=True, env=code_env)
+        check(f"session {sid}" not in p.stdout,
+              "AI_SESSION_ID outranks CLAUDE_CODE_SESSION_ID", p.stdout.strip())
 
     print()
     if failures:

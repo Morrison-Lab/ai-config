@@ -40,6 +40,9 @@ The Jules reviewer's own misfires live in [`jules-review.md`](jules-review.md).
   **Do:** read a receiver run's triggering PR from its `workflow_run` payload or its logs, and establish `main`'s status by reproducing on `main` directly: render `main`, or run the checker over `main`'s own output.
   **Don't:** read a `workflow_run` run listed under `main` as `main`'s status, or a red one there as a pre-existing failure.
   (Morrison-Lab/mln `check-site.yml`, 2026-09-28: every run showed `main`, whichever PR's preview build had triggered it.)
+  **Do:** for an `Annotation gate` run, read the `GATE_HEAD_SHA` and `GATE_RUN_ID` lines in its job log before blaming the commit it is listed under.
+  In a cloud session fetch that log with `mcp__github__get_job_logs` (`return_content: true`): `gh api .../actions/jobs/<id>/logs` redirects to a `*.blob.core.windows.net` URL the agent proxy answers with `Forbidden`.
+  (2nd occurrence, [Morrison-Lab/lds#1516](https://github.com/Morrison-Lab/lds/pull/1516), 2026-10-28: gate run 40783835248, listed under merge commit `812c98c2`, failed on `Cache save failed`, but its log read `GATE_HEAD_SHA: 0083336c`, a `pull_request` run on another PR's branch.)
 - **`${{ env.PATH }}` evaluates to an empty string in step `env:` context.**
   Setting `env: PATH: ${{ github.workspace }}/bin:${{ env.PATH }}` in Actions step context overwrites `PATH` with only that directory (dropping `/usr/bin`, `/bin`, etc.), causing `command not found` (exit code 127).
   Use `echo "${GITHUB_WORKSPACE}/bin" >> "$GITHUB_PATH"` in a setup step to

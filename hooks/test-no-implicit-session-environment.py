@@ -91,15 +91,23 @@ dry_out = json.loads(res.stdout or "{}")
 check("--dry-run on a compliant call prints an empty decision",
       res.returncode == 0 and "permissionDecision" not in dry_out.get("hookSpecificOutput", {}))
 
-# The registered matcher must be the tool name the hook decides on; a rename of either side
-# would otherwise leave the guard bound to nothing.
+# The registered matcher must name every spelling the harness uses for this tool, and each one
+# must be a name the hook decides on; a rename of either side would otherwise leave the guard
+# bound to nothing. The harness reports the claude-code-remote server under two spellings
+# (hooks.json's add_repo matcher lists both; memories/subagent-worktrees.md records the second).
+SPELLINGS = {TOOL, "mcp__Claude_Code_Remote__create_session"}
 hooks_json = os.path.join(os.path.dirname(os.path.realpath(HOOK)), "hooks.json")
 with open(hooks_json, encoding="utf-8") as fh:
     registered = json.load(fh)
 matchers = [group.get("matcher") for group in registered["hooks"].get("PreToolUse", [])
             for h in group.get("hooks", [])
             if h.get("script") == os.path.basename(HOOK)]
-check("hooks.json binds the hook to exactly the create_session tool", matchers == [TOOL])
+check("hooks.json registers the hook exactly once", len(matchers) == 1)
+bound = set((matchers[0] if matchers else "").split("|"))
+check("hooks.json binds both create_session spellings and nothing else", bound == SPELLINGS)
+for name in sorted(SPELLINGS):
+    rc, out = run(call({"prompt": "x"}, tool=name))
+    check(f"{name} without environment_id is denied", decision(out) == "deny")
 
 res = subprocess.run([sys.executable, HOOK], input="not json", capture_output=True, encoding="utf-8")
 check("unparseable input exits 0 with no output", res.returncode == 0 and not res.stdout.strip())

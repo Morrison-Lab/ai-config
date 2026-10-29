@@ -1049,7 +1049,7 @@
         ]
       },
       {
-        "matcher": "mcp__claude-code-remote__create_session",
+        "matcher": "mcp__claude-code-remote__create_session|mcp__Claude_Code_Remote__create_session",
         "hooks": [
           {
             "type": "command",

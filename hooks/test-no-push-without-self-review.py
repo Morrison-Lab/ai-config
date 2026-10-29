@@ -4369,6 +4369,46 @@ def deny_resilience_cases() -> tuple[int, int]:
           and (out_mid.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
           and "verdict line could not be parsed" not in reason_mid)
 
+    # 8. Earlier clean verdict for HEAD superseded by a later unparsed report
+    #    naming HEAD fails closed rather than letting the push through (#4782).
+    events_superseded_same_head = (
+        reviewed(text=body(verdict="Ready for merge", commit=HEAD))
+        + reviewed(text=f"### Summary\nFound regression.\n\n### Verdict\n\nBlocking issues found\n\nReviewed-Commit: {HEAD}")
+    )
+    rc_sup, out_sup = run_hook("git push origin main", events_superseded_same_head)
+    reason_sup = (out_sup.get("hookSpecificOutput") or {}).get("permissionDecisionReason", "")
+    check("later unparsed report supersedes earlier clean verdict for same HEAD and fails closed (#4782)",
+          rc_sup == 0
+          and (out_sup.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+          and "later reviewer report" in reason_sup
+          and f"Reviewed-Commit: {HEAD}" in reason_sup)
+
+    # 9. Missing-SHA and unresolved-fingerprint denial branches surface
+    #    {unparsed_hint} when a later unparsed report is present (#4782).
+    events_missing_sha_unparsed = (
+        reviewed(text="### Verdict: Ready for merge\n")
+        + reviewed(text=f"### Verdict\n\nShip it!\n\nReviewed-Commit: {HEAD}")
+    )
+    rc_msha, out_msha = run_hook("git push origin main", events_missing_sha_unparsed)
+    reason_msha = (out_msha.get("hookSpecificOutput") or {}).get("permissionDecisionReason", "")
+    check("missing-SHA denial branch surfaces unparsed_hint when later unparsed report exists (#4782)",
+          rc_msha == 0
+          and (out_msha.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+          and "does not say which commit it read" in reason_msha
+          and f"Reviewed-Commit: {HEAD}" in reason_msha)
+
+    events_bad_sha_unparsed = (
+        reviewed(text=body(verdict="Ready for merge", commit="deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"))
+        + reviewed(text=f"### Verdict\n\nShip it!\n\nReviewed-Commit: {HEAD}")
+    )
+    rc_bsha, out_bsha = run_hook("git push origin main", events_bad_sha_unparsed)
+    reason_bsha = (out_bsha.get("hookSpecificOutput") or {}).get("permissionDecisionReason", "")
+    check("unresolved-fingerprint denial branch surfaces unparsed_hint when later unparsed report exists (#4782)",
+          rc_bsha == 0
+          and (out_bsha.get("hookSpecificOutput") or {}).get("permissionDecision") == "deny"
+          and "does not resolve to any commit" in reason_bsha
+          and f"Reviewed-Commit: {HEAD}" in reason_bsha)
+
     return failures, ran
 
 

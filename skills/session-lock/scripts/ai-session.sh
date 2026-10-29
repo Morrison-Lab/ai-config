@@ -34,7 +34,8 @@
 #   ai-session.sh disable-mwc [--id ID]              # revoke merge-when-confident permission
 #   ai-session.sh check-mwc   [--id ID]              # check if MWC permission is active
 #
-# Identity (--id) resolves: --id flag > $AI_SESSION_ID > $CLAUDE_SESSION_ID.
+# Identity (--id) resolves: --id flag > $AI_SESSION_ID > $CLAUDE_SESSION_ID >
+# $CLAUDE_CODE_SESSION_ID (the id the Claude Code harness gives its hooks).
 # Stale threshold: $AI_SESSION_STALE_SECONDS (default 1800 = 30 min).
 # Worktree parent: $AI_WORKTREE_DIR (default "<repo-toplevel>.worktrees").
 
@@ -85,6 +86,7 @@ resolve_id() {
   if [ -n "${OPT_ID:-}" ]; then printf '%s' "$OPT_ID"; return 0; fi
   if [ -n "${AI_SESSION_ID:-}" ]; then printf '%s' "$AI_SESSION_ID"; return 0; fi
   if [ -n "${CLAUDE_SESSION_ID:-}" ]; then printf '%s' "$CLAUDE_SESSION_ID"; return 0; fi
+  if [ -n "${CLAUDE_CODE_SESSION_ID:-}" ]; then printf '%s' "$CLAUDE_CODE_SESSION_ID"; return 0; fi
   return 1
 }
 
@@ -471,8 +473,8 @@ case "$CMD" in
       exit 2
     fi
     printf 'mwc is active for session %s\n' "$id"
-    if [ -z "${AI_SESSION_ID:-}" ] && [ -z "${CLAUDE_SESSION_ID:-}" ]; then
-      printf '  Notice: AI_SESSION_ID and CLAUDE_SESSION_ID are unset in this shell.\n'
+    if [ -z "${AI_SESSION_ID:-}" ] && [ -z "${CLAUDE_SESSION_ID:-}" ] && [ -z "${CLAUDE_CODE_SESSION_ID:-}" ]; then
+      printf '  Notice: AI_SESSION_ID, CLAUDE_SESSION_ID and CLAUDE_CODE_SESSION_ID are unset in this shell.\n'
       printf '  The pre-tool-use merge guard resolves session id from the harness hook payload\n'
       printf '  (session_id/sessionId, conversation_id/conversationId, transcript_path stem).\n'
       printf '  Ensure the granted id matches the harness session.\n'

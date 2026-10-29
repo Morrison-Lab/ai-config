@@ -76,8 +76,8 @@ These thread and session links point the reader at somewhere else.
 A project thread never links itself: inside a thread, say "this thread", and link a PR's thread only when the PR belongs to a different one.
 The coordinator, posting in the project chat, links the owning thread of every PR and merge ask.
 
-- **Do:** "The merge word goes in [Runner work](#cmsg_…)." from the coordinator, or from a thread about a different thread.
-- **Don't:** write "This is in [Qualify residual risk](#cmsg_…)" inside the Qualify residual risk thread.
+- **Do:** write `The merge word goes in [Runner work](#cmsg_…).` from the coordinator, or from a thread about a different thread.
+- **Don't:** write `This is in [Qualify residual risk](#cmsg_…)` inside the Qualify residual risk thread.
 
 `hooks/no-self-thread-link.py` blocks a thread's reply that links that thread.
 Tracked in [ai-config#4843](https://github.com/Morrison-Lab/ai-config/issues/4843).

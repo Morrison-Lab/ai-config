@@ -36,7 +36,12 @@ SENTENCE_BREAK = re.compile(
 QUOTED = re.compile(r"```.*?```|^>.*$|\"[^\"\n]*\"|\u201c[^\u201d\n]*\u201d", re.S | re.M)
 
 RC = r"(?:remote[-\u2010\u2011 ]{0,3}control|(?-i:\bRC\b))"
-VERB = r"(?:start|started|starting|launched|restarted|run|running|launch|launching|restart|restarting|reconnect|spin(?: up)?|spinning(?: up)?|kick off|enable|turn on|bring up)"
+BASE = r"(?:start|run|launch|restart|reconnect|spin(?: up)?|kick off|enable|turn on|bring up)"
+# Past and -ing forms are asks only after a lead-in aimed at the user ("once you've started");
+# at the start of a sentence they are the agent's own status report.
+VERB = r"(?:" + BASE + r"|started|launched|restarted|starting|launching|restarting|running|spinning(?: up)?)"
+# The ask ends at the name: "start Remote Control on the Mac", not "run remote control tests".
+RC_END = r"(?:\s+session)?(?=`?\s*(?:$|[;,.!?])|`?\s+(?:on|from|in|at|now|first|again|please|and|before|so)\b)"
 FILL = r"[^.!?\n]{0,60}?"
 
 ASKS = (
@@ -44,12 +49,12 @@ ASKS = (
     re.compile(
         r"\b(?:please,?(?: kindly)?|kindly|go ahead and|can you|could you|would you(?: mind)?|will you|mind|you(?:'ll| will)? need to|you have to|you must|"
         r"you can|you could|you should|(?:I )?need you to|(?:I )?want you to|I(?:'d| would) like you to|"
-        r"ask(?:ing)? you to|have you|if you (?:can|could|would)|once you(?:'ve| have)?|when you(?:'ve| have)?)\s+"
-        + VERB + r"\b" + FILL + RC, re.I),
+        r"ask(?:ing)? you to|have you|if you (?:can|could|would)|once you(?:'ve| have)|when you(?:'ve| have))\s+"
+        + VERB + r"\b" + FILL + RC + RC_END, re.I),
     # sentence-opening imperative: "Start Remote Control on cf463-02."
-    re.compile(r"(?:^|[.!?\n]\s*)(?:[-*]\s+|\d+[.)]\s+)?" + VERB + r"\b" + FILL + RC, re.I),
+    re.compile(r"(?:^|[.!?\n]\s*)(?:[-*]\s+|\d+[.)]\s+)?" + BASE + r"\b" + FILL + RC + RC_END, re.I),
     # "Open a terminal and start Remote Control"
-    re.compile(r"\bopen (?:a|your|the) (?:terminal|shell|console)\b" + FILL + VERB + r"\b" + FILL + RC, re.I),
+    re.compile(r"\bopen (?:a|your|the) (?:terminal|shell|console)\b" + FILL + BASE + r"\b" + FILL + RC + RC_END, re.I),
     # passive: "Remote Control needs to be started on the Mac"
     re.compile(RC + FILL + r"\b(?:needs?|has|have|must|should) (?:to )?be (?:started|launched|run|enabled)\b"
                + FILL + r"\b(?:by you|on (?:your|the) |from (?:your|the) )", re.I),

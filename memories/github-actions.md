@@ -43,6 +43,9 @@ The Jules reviewer's own misfires live in [`jules-review.md`](jules-review.md).
   **Do:** for an `Annotation gate` run, read the `GATE_HEAD_SHA` and `GATE_RUN_ID` lines in its job log before blaming the commit it is listed under.
   In a cloud session fetch that log with `mcp__github__get_job_logs` (`return_content: true`): `gh api .../actions/jobs/<id>/logs` redirects to a `*.blob.core.windows.net` URL the agent proxy answers with `Forbidden`.
   (2nd occurrence, [Morrison-Lab/lds#1516](https://github.com/Morrison-Lab/lds/pull/1516), 2026-10-28: gate run 40783835248, listed under merge commit `812c98c2`, failed on `Cache save failed`, but its log read `GATE_HEAD_SHA: 0083336c`, a `pull_request` run on another PR's branch.)
+  **Do:** for `check-equation-renders` in `Morrison-Lab/lds` and `Morrison-Lab/macros`, which runs as `workflow_run` and whose check run carries `main`'s SHA rather than the PR head, read the gate job's `RUN_ID` env var and match it to the preview-build run for the PR head, to learn which preview it rendered.
+  **Don't:** treat an equation-render result as belonging to the PR head because it is listed on the PR.
+  (Reported from [Morrison-Lab/lds#1534](https://github.com/Morrison-Lab/lds/pull/1534), 2026-10-29.)
 - **`${{ env.PATH }}` evaluates to an empty string in step `env:` context.**
   Setting `env: PATH: ${{ github.workspace }}/bin:${{ env.PATH }}` in Actions step context overwrites `PATH` with only that directory (dropping `/usr/bin`, `/bin`, etc.), causing `command not found` (exit code 127).
   Use `echo "${GITHUB_WORKSPACE}/bin" >> "$GITHUB_PATH"` in a setup step to

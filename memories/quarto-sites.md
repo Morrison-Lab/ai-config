@@ -617,6 +617,15 @@ consuming repos.
 - **Don't:** read a green PDF build as evidence the website shows the same
   thing --- that is the direction that fails silently.
 
+A fourth case is a macro whose body ends in a subscript or superscript:
+`\def\foo{\eigval_{\max}}` used as `\foo_i` gives MathJax's "Double subscript"
+error, because the second `_` attaches to the same atom.
+
+- **Do:** brace the body, `\def\foo{{\eigval_{\max}}}`, so the macro is one atom
+  (the same fix as `{\paren{#1}}^{-1}` in `Morrison-Lab/macros`).
+- **Don't:** leave a macro body as a bare `base_sub` or `base^sup` and then
+  subscript the macro (seen in [Morrison-Lab/lds#1534](https://github.com/Morrison-Lab/lds/pull/1534), 2026-10-29).
+
 (Both measured 2026-09-15 on
 [machine_learning_lecture_materials#2](https://github.com/Morrison-Lab/machine_learning_lecture_materials/pull/2);
 tracked as [ai-config#3717](https://github.com/Morrison-Lab/ai-config/issues/3717).)

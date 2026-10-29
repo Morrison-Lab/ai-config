@@ -1664,7 +1664,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unfetched-pr-state-claim.py\"",
             "timeout": 10,
             "script": "no-unfetched-pr-state-claim.py",
-            "why": "ai-config#4834, PreToolUse binding of the Stop guard of the same name: a project thread posts through a hearthbot reply tool before the turn ends (ai-config#4830), so a Stop block arrives after the user has read the stale claim. Denies a user-visible reply tool call (mcp__hearthbot__reply, post_message, update_message, edit_message) that says a PR awaits merge or review, or that work is still to do, with no live read since the last user turn. Once per distinct text; fails open."
+            "why": "ai-config#4834, PreToolUse binding of the Stop guard of the same name: a project thread posts through a hearthbot reply tool before the turn ends (ai-config#4830), so a Stop block arrives after the user has read the stale claim. Denies a user-visible reply tool call (mcp__hearthbot__reply, post_message, update_message, edit_message) that says a PR awaits merge or review, or that work is still to do, with no live read since the last user turn. Once per distinct text and at most twice per user turn; fails open."
           }
         ]
       },
@@ -1774,7 +1774,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unfetched-pr-state-claim.py\"",
             "timeout": 10,
             "script": "no-unfetched-pr-state-claim.py",
-            "why": "ai-config#4834. 2026-10-29: a project coordinator told the user mcsg#52 was 'waiting on your merge' from a stale handoff summary after it had merged, and proposed drafting Homework 2-6 from a stale memory note after those had merged. Blocks a final message that says a PR awaits merge or review or is still open, unless a tool call since the last user turn read that PR live (pull_request_read get, issue_read, a PR list or search, hearthbot list_prs, gh pr view/list, gh api .../pulls[/N], glab mr view/list); a single-PR read must name the claimed number. Also blocks a claim that work is still to do ('still needs drafting', 'X is next') when nothing since the last user turn read the forge or the remote. Yields at Stop when a hearthbot reply tool ran this turn, since the PreToolUse binding judged that text. Once per distinct message; fails open."
+            "why": "ai-config#4834. 2026-10-29: a project coordinator told the user mcsg#52 was 'waiting on your merge' from a stale handoff summary after it had merged, and proposed drafting Homework 2-6 from a stale memory note after those had merged. Blocks a final message that says a PR awaits merge or review or is still open, unless a tool call since the last user turn read that PR live (pull_request_read get, issue_read, a PR list or search, hearthbot list_prs, gh pr view/list, gh api .../pulls[/N], glab mr view/list); a single-PR read must name the claimed number. Also blocks a claim that work is still to do ('Homework 3 still needs drafting', 'drafting Homework 2-6 is next'), in a sentence naming a forge item or course deliverable, when nothing since the last user turn read the forge or the remote (forge writes and remote-tracking refs read without a fetch do not count). Quoted text is skipped. Once per distinct message and at most twice per user turn; fails open. Yields at Stop when a hearthbot reply tool call went through this turn, since the PreToolUse binding judged that text."
           },
           {
             "type": "command",

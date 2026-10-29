@@ -16,19 +16,26 @@ in one call. The condition is decidable from the transcript:
 
 Two kinds of claim, with different evidence:
 
-  1. PR state -- "waiting on your merge", "ready for you to merge", "awaits
-     review", "PR #52 is still open", "hasn't been merged". Needs a fetch of
-     that PR: GitHub MCP `pull_request_read` (get) or `issue_read`, a PR list or
-     search, hearthbot `list_prs`, `gh pr view/list/status`, `gh api
-     .../pulls[/N]`, `glab mr view/list`, or `check-pr-fully-clean.py`. When the
-     sentence names numbers, a single-PR fetch must name the same number; a
-     list or search covers any number.
-  2. Pending work -- "still needs drafting", "hasn't been written yet", "yet to
-     be ported", "drafting X is next". Needs any live forge or remote read: a
-     PR fetch as above, a GitHub MCP issue, commit, branch, file or code read,
-     `gh issue`/`gh search`/`gh api`, or `git fetch`/`pull`/`ls-remote`/`log
-     origin/...`. Reading a local checkout or a memory note does not count;
-     that is where the stale claim comes from.
+  1. PR state -- "waiting on your merge", "awaiting review", "ready for you to
+     merge", "PR #52 is still open", "hasn't been merged". Merge wording counts
+     on its own; review, approval and open-state wording count only when the
+     sentence names a PR. Needs a fetch of that PR: GitHub MCP
+     `pull_request_read` (method get) or `issue_read`, a PR list or search,
+     hearthbot `list_prs`, `gh pr view/list/status`, `gh api .../pulls[/N]`,
+     `glab mr view/list`, or `check-pr-fully-clean.py`. When the sentence names
+     numbers, a single-PR fetch must name the same number, and the same repo
+     when both name one; a list or search covers any number.
+  2. Pending work -- "Homework 3 still needs drafting", "issue #40 hasn't been
+     done", "drafting Homework 2-6 is next". Counts only when the sentence
+     names a forge item or a course deliverable, so "next, write the tests"
+     passes. Needs any live forge or remote read: a PR fetch as above, a
+     GitHub MCP issue, commit, branch, file or code read, a read-only `gh
+     issue`/`gh search`/`gh api` call, or `git fetch`/`pull`/`ls-remote`. A
+     forge write, a local checkout, a remote-tracking ref read without a fetch,
+     and a memory note do not count; those are where a stale claim comes from.
+
+Text in code spans, in double or curly quotes, and on blockquote lines is a
+quotation rather than a claim, and is skipped.
 
 Runs on two events, because a project thread posts its reply through a tool
 call before the turn ends (ai-config#4830):
@@ -36,12 +43,14 @@ call before the turn ends (ai-config#4830):
   PreToolUse on a hearthbot reply tool -- denies the call, so the claim never
       reaches the user.
   Stop -- blocks the final message in a session that replies in plain text.
-      It yields when a reply tool ran since the last user turn, since the
-      PreToolUse run already judged that text.
+      It yields when a reply tool call since the last user turn went through,
+      since the PreToolUse run already judged that text.
 
-Fires at most once per distinct text (sentinel keyed by content hash), so a
-claim the forge cannot settle cannot wedge the session. Fails OPEN on any parse
-trouble, including when the sibling module it reuses cannot load.
+Fires at most once per distinct text and at most twice per user turn, per
+transcript, so a claim the forge cannot settle (the forge is down, or the
+claim is not about forge work) cannot wedge the session however it is
+reworded. Fails OPEN on any parse trouble, including when the sibling module
+it reuses cannot load.
 """
 import hashlib
 import importlib.util
@@ -67,27 +76,30 @@ except Exception:
 REPLY_TOOL_RX = re.compile(
     r"^mcp__hearthbot__(reply|post_message|update_message|edit_message)$"
 )
+MAX_FIRES_PER_TURN = 2
 
-_WHO = r"(your|ezra'?s|the user'?s|a|human|their|his|her)"
-_PR_ACT = r"(merge|merging|review|approval|sign-?off|go-?ahead|merge words?)"
+_WHO = r"(your|ezra'?s|the user'?s|the|a|an|human|their|his|her)"
+_PR_ACT = r"(merge|merging|mwc|review|approval|sign-?off|go-?ahead|merge words?)"
+_WAIT = r"(waiting|waits?|awaiting|blocked|stuck|held|sitting)"
 
-# Merge or review wording that is about a PR on its own.
 PR_STRONG_RX = re.compile(
-    r"\b(waiting|waits?|awaiting) (on|for) (" + _WHO + r" )?" + _PR_ACT + r"\b"
-    r"|\bawaits? (" + _WHO + r" )?" + _PR_ACT + r"\b"
+    r"\b" + _WAIT + r" (on|for) (" + _WHO + r" )?" + _PR_ACT + r"\b"
+    r"|\b(awaits?|awaiting) (" + _WHO + r" )?" + _PR_ACT + r"\b"
     r"|\bready (for (you|ezra|the user) )?to (be )?merged?\b"
-    r"|\bready for (" + _WHO + r" )?(merge|review)\b"
+    r"|\bready for (" + _WHO + r" )?(merge|review|mwc)\b"
+    r"|\bup for (" + _WHO + r" )?(merge|review)\b"
     r"|\bfor (you|ezra|the user) to (merge|review)\b"
-    r"|\bneeds? (" + _WHO + r" )?(merge|review|approval)\b"
+    r"|\bneeds? (" + _WHO + r" )?(merge|review|approval|mwc)\b"
     r"|\b(hasn'?t|has not|haven'?t|have not|isn'?t|is not|aren'?t|are not) (yet )?(been )?(merged|reviewed)\b"
     r"|\bnot (yet )?merged\b|\byet to (be )?merged?\b"
     r"|\bpending (merge|review)\b",
     re.I,
 )
+# Merge wording is about a PR by itself; review or approval wording is not.
+MERGE_WORD_RX = re.compile(r"merg|mwc", re.I)
 
-# State words that are about a PR only when the sentence names one.
 PR_WEAK_RX = re.compile(
-    r"\b(is|are|still|remains?|stays?) (still )?(open|in review|under review|unmerged)\b",
+    r"\b(is|are|still|remains?|stays?|sitting|sits)( still)? (open|in review|under review|unmerged)\b",
     re.I,
 )
 PR_CONTEXT_RX = re.compile(
@@ -111,17 +123,43 @@ WORK_RX = re.compile(
     r"(draft|write|port|implement|build)\w*\b",
     re.I,
 )
-
-# A negation just before the match reports that nothing is pending.
-NEGATED_BEFORE_RX = re.compile(
-    r"\b(no longer|nothing|none|not|isn'?t|aren'?t|wasn'?t|no)\b[^.!?\n]{0,12}$", re.I
-)
-
-NUMBER_RX = re.compile(
-    r"(?:[\w.-]+/[\w.-]+)?#(\d+)\b|/pull/(\d+)\b|\b(?:PR|MR|pull request) (\d+)\b"
-    r"|(?<![\w&])!(\d+)\b",
+# Pending work is about forge state only when it names a forge item or a
+# course deliverable.
+WORK_CONTEXT_RX = re.compile(
+    PR_CONTEXT_RX.pattern
+    + r"|\b(issues?|homeworks?|hw ?\d|labs?|worksheets?|handouts?|exams?|midterms?"
+    r"|quiz(zes)?|chapters?|assignments?|lectures?|syllabus)\b",
     re.I,
 )
+
+# A negation just before the match reports that nothing is pending. The gap
+# stops at clause punctuation, so a stray "no," does not negate what follows.
+NEGATED_BEFORE_RX = re.compile(
+    r"\b(no longer|nothing|none|not|isn'?t|aren'?t|wasn'?t|no)\b[^.!?,;:\n]{0,12}$", re.I
+)
+
+# Quoted words are a report of someone's claim, not this message's claim.
+QUOTED_RX = re.compile(r'"[^"\n]*"|“[^”\n]*”|^[ \t]*>.*$', re.M)
+
+REF_RX = re.compile(
+    r"(?:\b([\w.-]+)/)?([\w.-]+)?#(\d+)\b|/([\w.-]+)/pull/(\d+)\b"
+    r"|\b(?:PR|MR|pull request) (\d+)\b|(?<![\w&])!(\d+)\b",
+    re.I,
+)
+
+
+def claim_refs(sentence):
+    """{(repo or None, number)} named in `sentence`."""
+    out = set()
+    for m in REF_RX.finditer(sentence):
+        if m.group(3):
+            out.add(((m.group(2) or "").lower() or None, m.group(3)))
+        elif m.group(5):
+            out.add((m.group(4).lower(), m.group(5)))
+        else:
+            out.add((None, m.group(6) or m.group(7)))
+    return out
+
 
 # --- live reads ---------------------------------------------------------
 PR_LIST_TOOL_RX = re.compile(
@@ -133,22 +171,36 @@ WORK_TOOL_RX = re.compile(
     r"|get_file_contents|search_code|list_branches|list_pull_requests"
     r"|search_pull_requests|pull_request_read)$"
 )
-PR_ONE_CMD_RX = re.compile(
-    r"\b(?:gh pr view|glab mr view)\s+(?:-\S+\s+\S+\s+)*#?(\d+)\b"
-    r"|/pulls/(\d+)(?![\w/])"
-    r"|/merge_requests/(\d+)(?![\w/])"
-    r"|\b(?:check-pr-fully-clean|build-pr-payload)\.py\b[^|;&\n]*?\s#?(\d+)\b"
+# A command reads the forge only through a forge client.
+FORGE_CLIENT_RX = re.compile(
+    r"(^|[\s;&|(])(gh|glab|curl|wget)\s|\b(check-pr-fully-clean|build-pr-payload)\.py\b"
 )
+WRITE_CMD_RX = re.compile(
+    r"\s(-X|--method)\s*['\"]?(POST|PUT|PATCH|DELETE)\b|\s(-f|-F|--field|--raw-field|--input)\s"
+    r"|\bgh (pr|issue) (merge|create|close|edit|comment|reopen|ready|review)\b"
+    r"|\bglab (mr|issue) (merge|create|close|update|note|approve)\b",
+    re.I,
+)
+GH_VIEW_RX = re.compile(r"\b(gh pr view|glab mr view)\b([^|;&\n]*)")
+VIEW_ARG_RX = re.compile(r"/pull/(\d+)\b|/merge_requests/(\d+)\b|(?<![\w/=-])#?(\d+)\b")
+API_ONE_RX = re.compile(
+    r"repos/[\w.-]+/([\w.-]+)/pulls/(\d+)(?![\w/])|/merge_requests/(\d+)(?![\w/])"
+)
+SCRIPT_RX = re.compile(r"\b(?:check-pr-fully-clean|build-pr-payload)\.py\b([^|;&\n]*)")
+REPO_FLAG_RX = re.compile(r"(?:-R|--repo)[ =]['\"]?[\w.-]+/([\w.-]+)")
 PR_LIST_CMD_RX = re.compile(
     r"\bgh pr (list|status)\b|\bglab mr list\b|\bgh search prs\b"
     r"|/pulls(?:\?|['\"\s]|$)|/merge_requests(?:\?|['\"\s]|$)"
 )
 WORK_CMD_RX = re.compile(
-    r"\bgit (fetch|pull|ls-remote)\b|\bgit log\b[^|;&\n]*\borigin/"
-    r"|\bgh (issue|search|api|pr|run)\b|\bglab (issue|mr|api)\b|api\.github\.com"
+    r"\bgit (fetch|pull|ls-remote)\b"
+    r"|\bgh (issue (view|list)|pr (view|list|status|diff)|search|api|release (view|list))\b"
+    r"|\bglab (issue (view|list)|mr (view|list)|api)\b|api\.github\.com"
 )
 
-SYSTEM_TEXT_RX = re.compile(r"<system-reminder|\[SYSTEM NOTIFICATION", re.I)
+SYSTEM_BLOCK_RX = re.compile(
+    r"<system-reminder[\s\S]*?</system-reminder>|^\s*\[SYSTEM NOTIFICATION[^\n]*", re.I
+)
 
 
 def _blocks(m):
@@ -156,60 +208,73 @@ def _blocks(m):
     return blocks if isinstance(blocks, list) else []
 
 
+def _human_text(text):
+    """True when `text` holds something other than harness-injected blocks."""
+    return bool(SYSTEM_BLOCK_RX.sub("", str(text or "")).strip())
+
+
 def _is_user_turn(m):
-    """A genuine user message: user role with at least one non-tool-result block."""
+    """A genuine user message: user role with text beyond tool results and reminders."""
     if m.get("type") != "user" and m.get("role") != "user":
         return False
     content = (m.get("message") or {}).get("content") or m.get("content")
     if isinstance(content, str):
-        return bool(content.strip()) and not SYSTEM_TEXT_RX.match(content.lstrip())
+        return _human_text(content)
     return any(
-        isinstance(b, dict)
-        and b.get("type") != "tool_result"
-        and not SYSTEM_TEXT_RX.match(str(b.get("text") or "").lstrip())
+        isinstance(b, dict) and b.get("type") != "tool_result" and _human_text(b.get("text"))
         for b in _blocks(m)
     )
 
 
 def classify_call(block):
-    """(pr_numbers, pr_list, work) for one tool_use block.
+    """(prs, pr_list, work) for one tool_use block.
 
-    pr_numbers -- PR numbers this call read the live state of
-    pr_list    -- True when it read a list or search of PRs (covers any number)
-    work       -- True when it read live forge or remote state of any kind
+    prs     -- {(repo or None, number)} whose live state the call read; the
+               number "*" stands for the current branch's PR
+    pr_list -- True when it read a list or search of PRs (covers any number)
+    work    -- True when it read live forge or remote state of any kind
     """
     name = str(block.get("name") or "")
     inp = block.get("input") if isinstance(block.get("input"), dict) else {}
-    nums, pr_list, work = set(), False, False
+    prs, pr_list, work = set(), False, False
     if PR_LIST_TOOL_RX.match(name):
         pr_list = work = True
     if PR_ONE_TOOL_RX.match(name) and str(inp.get("method") or "get") == "get":
         num = inp.get("pullNumber", inp.get("issue_number"))
         if num is not None:
-            nums.add(str(num).lstrip("#"))
+            prs.add(((str(inp.get("repo") or "").lower() or None), str(num).lstrip("#")))
     if WORK_TOOL_RX.match(name):
         work = True
     cmd = inp.get("command")
-    if isinstance(cmd, str):
-        for m in PR_ONE_CMD_RX.finditer(cmd):
-            nums.add(next(g for g in m.groups() if g))
+    if isinstance(cmd, str) and FORGE_CLIENT_RX.search(cmd) and not WRITE_CMD_RX.search(cmd):
+        flag = REPO_FLAG_RX.search(cmd)
+        repo = flag.group(1).lower() if flag else None
+        for v in GH_VIEW_RX.finditer(cmd):
+            args = REPO_FLAG_RX.sub(" ", v.group(2))
+            nums = [next(g for g in a.groups() if g) for a in VIEW_ARG_RX.finditer(args)]
+            prs.update((repo, n) for n in (nums[:1] or ["*"]))
+        for a in API_ONE_RX.finditer(cmd):
+            prs.add(((a.group(1) or "").lower() or None, a.group(2) or a.group(3)))
+        for s in SCRIPT_RX.finditer(cmd):
+            n = re.search(r"\s#?(\d+)\b", s.group(1))
+            if n:
+                prs.add((repo, n.group(1)))
         if PR_LIST_CMD_RX.search(cmd):
             pr_list = True
-        if WORK_CMD_RX.search(cmd):
-            work = True
-    if nums:
+    if isinstance(cmd, str) and not WRITE_CMD_RX.search(cmd) and WORK_CMD_RX.search(cmd):
         work = True
-    return nums, pr_list, work
+    if prs or pr_list:
+        work = True
+    return prs, pr_list, work
 
 
 def turn_reads(path):
-    """Live reads, and whether a reply tool ran, since the last user turn."""
-    calls = {}
-    errored = set()
-    replied = False
+    """Live reads since the last user turn, whether a reply went through, and the turn's id."""
+    calls, errored, replies = {}, set(), set()
+    turn = 0
     try:
         with open(path, encoding="utf-8", errors="ignore") as fh:
-            for line in fh:
+            for idx, line in enumerate(fh):
                 try:
                     m = json.loads(line)
                 except Exception:
@@ -217,53 +282,64 @@ def turn_reads(path):
                 if not isinstance(m, dict):
                     continue
                 if _is_user_turn(m):
-                    calls, errored, replied = {}, set(), False
+                    calls, errored, replies, turn = {}, set(), set(), idx
                 for b in _blocks(m):
                     if not isinstance(b, dict):
                         continue
                     if b.get("type") == "tool_use":
                         if REPLY_TOOL_RX.match(str(b.get("name") or "")):
-                            replied = True
+                            replies.add(b.get("id"))
                         else:
                             calls[b.get("id")] = classify_call(b)
                     elif b.get("type") == "tool_result" and b.get("is_error"):
                         errored.add(b.get("tool_use_id"))
     except Exception:
         pass
-    nums, pr_list, work = set(), False, False
-    for cid, (n, lst, w) in calls.items():
+    prs, pr_list, work = set(), False, False
+    for cid, (p, lst, w) in calls.items():
         if cid in errored:
             continue
-        nums |= n
+        prs |= p
         pr_list = pr_list or lst
         work = work or w
-    return nums, pr_list, work, replied
+    replied = any(r not in errored for r in replies)
+    return prs, pr_list, work, replied, turn
+
+
+def _covered(ref, prs):
+    repo, num = ref
+    return any(n == num and (repo is None or r is None or r == repo) for r, n in prs)
 
 
 def _negated(prose, start):
     return bool(NEGATED_BEFORE_RX.search(prose[max(0, start - 30):start]))
 
 
-def find_claim(prose, nums, pr_list, work):
-    """(kind, phrase, missing_numbers) for the first unsupported claim, or None."""
-    for rx, needs_context in ((PR_STRONG_RX, False), (PR_WEAK_RX, True)):
+def find_claim(prose, prs, pr_list, work):
+    """(kind, phrase, missing_refs) for the first unsupported claim, or None."""
+    for rx, strong in ((PR_STRONG_RX, True), (PR_WEAK_RX, False)):
         for m in rx.finditer(prose):
             if _negated(prose, m.start()):
                 continue
             sentence = sentence_around(prose, m.start(), m.end())
-            if needs_context and not PR_CONTEXT_RX.search(sentence):
+            merge_word = strong and MERGE_WORD_RX.search(m.group(0))
+            if not merge_word and not PR_CONTEXT_RX.search(sentence):
                 continue
-            named = {next(g for g in n.groups() if g) for n in NUMBER_RX.finditer(sentence)}
             if pr_list:
                 continue
-            missing = sorted(named - nums, key=int)
+            named = claim_refs(sentence)
+            missing = sorted((r for r in named if not _covered(r, prs)), key=lambda r: int(r[1]))
             if named and not missing:
                 continue
-            if not named and nums:
+            if not named and prs:
                 continue
             return "pr", m.group(0), missing
+    if work:
+        return None
     for m in WORK_RX.finditer(prose):
-        if work or _negated(prose, m.start()):
+        if _negated(prose, m.start()):
+            continue
+        if not WORK_CONTEXT_RX.search(sentence_around(prose, m.start(), m.end())):
             continue
         return "work", m.group(0), []
     return None
@@ -272,7 +348,8 @@ def find_claim(prose, nums, pr_list, work):
 def reason_for(kind, phrase, missing):
     if kind == "pr":
         which = (
-            "PR " + ", ".join("#" + n for n in missing) if missing else "the PR it names"
+            "PR " + ", ".join(f"{r or ''}#{n}" for r, n in missing)
+            if missing else "the PR it names"
         )
         return (
             "[hook: no-unfetched-pr-state-claim] This message says a PR is still "
@@ -281,8 +358,9 @@ def reason_for(kind, phrase, missing):
             "turn is a reading from the past; on 2026-10-29 one said mcsg#52 was "
             "waiting on the user's merge after it had merged.\n\n"
             "Fetch the PR now (GitHub MCP pull_request_read method get, `gh pr "
-            "view N`, `gh api repos/O/R/pulls/N`, or hearthbot list_prs), then "
-            "state what the reading says. ai-config#4834."
+            "view N -R O/R`, `gh api repos/O/R/pulls/N`, or hearthbot list_prs), "
+            "then state what the reading says. If the forge cannot be reached, "
+            "say the state is unverified. ai-config#4834."
         )
     return (
         "[hook: no-unfetched-pr-state-claim] This message says work is still to "
@@ -291,19 +369,27 @@ def reason_for(kind, phrase, missing):
         "the past; on 2026-10-29 one proposed drafting Homework 2-6 after it had "
         "merged.\n\n"
         "Check live state first (list or search the repo's PRs and issues, read "
-        "the file on the default branch, or `git fetch` and `git log "
+        "the file on the default branch, or `git fetch` then `git log "
         "origin/main`), then restate. If the claim is not about forge work, "
         "send it again unchanged; this fires once per message. ai-config#4834."
     )
 
 
-def _first_time(text):
+def _may_fire(text, path, turn):
+    """Record this firing; False when this text already fired or the turn's cap is spent."""
+    scope = hashlib.sha256(f"{path}\0{turn}".encode()).hexdigest()[:16]
     key = hashlib.sha256(text.encode()).hexdigest()[:16]
-    sentinel = os.path.join(tempfile.gettempdir(), f".claude-pr-state-claim-guard-{key}")
-    if os.path.exists(sentinel):
+    ledger = os.path.join(tempfile.gettempdir(), f".claude-pr-state-claim-guard-{scope}")
+    try:
+        with open(ledger, encoding="utf-8") as fh:
+            seen = fh.read().split()
+    except Exception:
+        seen = []
+    if key in seen or len(seen) >= MAX_FIRES_PER_TURN:
         return False
     try:
-        open(sentinel, "w", encoding="utf-8").close()
+        with open(ledger, "a", encoding="utf-8") as fh:
+            fh.write(key + "\n")
     except Exception:
         pass
     return True
@@ -326,17 +412,18 @@ def main() -> int:
         text = inp.get("text") if isinstance(inp, dict) else None
         if not isinstance(text, str) or not text.strip():
             return 0
-        nums, pr_list, work, _ = turn_reads(path)
+        prs, pr_list, work, _, turn = turn_reads(path)
     else:
         text = last_assistant_text(path)
         if not text:
             return 0
-        nums, pr_list, work, replied = turn_reads(path)
+        prs, pr_list, work, replied, turn = turn_reads(path)
         if replied:
             return 0
 
-    hit = find_claim(strip_code(text), nums, pr_list, work)
-    if not hit or not _first_time(text):
+    prose = QUOTED_RX.sub(" ", strip_code(text))
+    hit = find_claim(prose, prs, pr_list, work)
+    if not hit or not _may_fire(text, path, turn):
         return 0
     reason = reason_for(*hit)
     if tool_name is not None:

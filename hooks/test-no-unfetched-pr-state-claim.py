@@ -57,6 +57,22 @@ FETCH = [call("b1", command="git fetch origin main && git log --oneline origin/m
 LOCAL_LOG = [call("b1", command="git log --oneline -5"), result("b1")]
 READ_MEMORY = [call("r1", name="Read", file_path="/tmp/memory/MEMORY.md"), result("r1")]
 SEARCH = [call("s1", name="mcp__github__search_issues", query="homework"), result("s1")]
+OTHER_REPO = [call("g1", name="mcp__github__pull_request_read", method="get",
+                   owner="Morrison-Lab", repo="mcs", pullNumber=52), result("g1")]
+SAME_REPO = [call("b1", command="gh api repos/Morrison-Lab/mcsg/pulls/52 --jq .state"),
+             result("b1")]
+GHVIEW_URL = [call("b1", command="gh pr view https://github.com/Morrison-Lab/mcsg/pull/52"),
+              result("b1")]
+GHVIEW_CUR = [call("b1", command="gh pr view --json state"), result("b1")]
+GREP_PULLS = [call("b1", command="grep repos/Morrison-Lab/mcsg/pulls/52 notes.md"), result("b1")]
+ORIGIN_LOG = [call("b1", command="git log --oneline origin/main -5"), result("b1")]
+GH_MERGE = [call("b1", command="gh pr merge 52 --squash"), result("b1")]
+GH_CREATE = [call("b1", command="gh issue create -t x -b y"), result("b1")]
+API_PUT = [call("b1", command="gh api repos/o/r/pulls/52/merge -X PUT"), result("b1")]
+GH_API_GET = [call("b1", command="gh api repos/Morrison-Lab/mcsg/contents/Homework"),
+              result("b1")]
+STRING_USER = {"type": "user", "message": {
+    "content": "<system-reminder>ctx</system-reminder>\nplease check status"}}
 ERRORED = [call("g1", name="mcp__github__pull_request_read", method="get",
                 owner="Morrison-Lab", repo="mcsg", pullNumber=52),
            result("g1", "Not Found", is_error=True)]
@@ -77,7 +93,15 @@ CASES = [
     ([USER], "mcs#14 is still open.", True, "numbered 'still open' blocks"),
     ([USER], "The PR is in review.", True, "'PR is in review' blocks"),
     ([USER], "#52 hasn't been merged yet.", True, "hasn't been merged blocks"),
-    ([USER], "It needs your review.", True, "needs your review blocks"),
+    ([USER], "The PR needs your review.", True, "PR needs your review blocks"),
+    ([USER], "#52 is awaiting your merge.", True, "awaiting with no preposition blocks"),
+    ([USER], "PR #52 is awaiting review.", True, "awaiting review blocks"),
+    ([USER], "mcsg#52 is waiting on the merge.", True, "waiting on the merge blocks"),
+    ([USER], "#52 is waiting on mwc.", True, "waiting on mwc blocks"),
+    ([USER], "#52 is blocked on your merge.", True, "blocked on your merge blocks"),
+    ([USER], "#52 is up for review.", True, "up for review blocks"),
+    ([USER], "Hook: no, #52 is waiting on your merge.", True,
+     "a 'no,' in an earlier clause does not negate"),
     ([USER], "mcsg#52 is pending review.", True, "pending review blocks"),
     # Other pending-work shapes
     ([USER], "Homework 3 still needs drafting.", True, "still needs drafting blocks"),
@@ -99,6 +123,17 @@ CASES = [
     ([USER] + GHFILES, INCIDENT, True, "the PR's file list does not report merge state"),
     ([USER] + ERRORED, INCIDENT, True, "an errored fetch does not count"),
     ([USER] + FETCH, INCIDENT, True, "a git fetch does not read a PR's state"),
+    ([USER] + OTHER_REPO, INCIDENT, True, "a fetch of another repo's #52 does not cover mcsg#52"),
+    ([USER] + SAME_REPO, INCIDENT, False, "a fetch of mcsg#52 by repo covers mcsg#52"),
+    ([USER] + GHVIEW_URL, INCIDENT, False, "gh pr view with a PR URL passes"),
+    ([USER] + GREP_PULLS, INCIDENT, True, "grep of a /pulls/52 string is not a fetch"),
+    ([USER] + GHVIEW_CUR, "It's waiting on your merge.", False,
+     "numberless gh pr view covers an unnumbered claim"),
+    ([USER] + GHVIEW_CUR, INCIDENT, True, "numberless gh pr view does not cover #52"),
+    ([STRING_USER] + [], INCIDENT, True,
+     "a string user turn after a reminder prefix still resets the turn"),
+    (GET52 + [STRING_USER], INCIDENT, True,
+     "a fetch before a reminder-prefixed string user turn does not count"),
     (GET52 + [USER], INCIDENT, True, "a fetch before the last user turn does not count"),
     (GET52 + [SYSTEM], INCIDENT, False, "a system-reminder is not a user turn"),
 
@@ -108,6 +143,27 @@ CASES = [
     ([USER] + GHLIST, HOMEWORK, False, "a PR list passes"),
     ([USER] + LOCAL_LOG, HOMEWORK, True, "a local git log does not count"),
     ([USER] + READ_MEMORY, HOMEWORK, True, "reading a memory note does not count"),
+    ([USER] + ORIGIN_LOG, HOMEWORK, True, "a remote-tracking log without a fetch does not count"),
+    ([USER] + GH_MERGE, HOMEWORK, True, "a forge write is not a read"),
+    ([USER] + GH_CREATE, HOMEWORK, True, "an issue create is not a read"),
+    ([USER] + API_PUT, HOMEWORK, True, "a gh api PUT is not a read"),
+    ([USER] + GH_API_GET, HOMEWORK, False, "a gh api GET passes"),
+
+    # Ordinary text with no PR or deliverable in view
+    ([USER], "This draft needs your review before I send it.", False,
+     "needs your review without a PR passes"),
+    ([USER], "The spec is ready for review.", False, "ready for review without a PR passes"),
+    ([USER], "Pending review comments are listed below.", False,
+     "pending review without a PR passes"),
+    ([USER], "The config isn't done by default.", False, "isn't done without a work item passes"),
+    ([USER], "The helper hasn't been added to PATH.", False,
+     "hasn't been added without a work item passes"),
+    ([USER], "Next, write the tests for the parser.", False,
+     "'next, write' without a work item passes"),
+    ([USER], "Step 2 is next: build the image.", False, "'is next' without a work item passes"),
+    ([USER], 'You said "waiting on your merge" earlier.', False, "quoted words pass"),
+    ([USER], "The owner wrote:\n\n> it's waiting on your merge", False,
+     "a blockquote passes"),
 
     # Not a pending claim
     ([USER], "mcsg#52 merged at 00:40 PDT.", False, "past tense passes"),
@@ -184,7 +240,7 @@ def main():
     out = run({"transcript_path": path, "tool_name": "mcp__hearthbot__post_message",
                "tool_input": {"text": INCIDENT}}).stdout
     os.unlink(path)
-    check("PR #52" in out, "the reason names the unfetched PR number")
+    check("read PR mcsg#52 live" in out, "the reason names the unfetched PR and repo")
 
     # A non-reply tool is ignored at PreToolUse.
     path = write([USER])
@@ -197,10 +253,32 @@ def main():
     check(not stop([USER, posted(INCIDENT), result("p0")], INCIDENT),
           "Stop yields when a reply tool ran this turn")
 
-    # Sentinel: the same text is refused once.
+    # A denied reply tool call does not hand the Stop text over.
+    check(stop([USER, posted(INCIDENT), result("p0", "denied", is_error=True)], INCIDENT),
+          "Stop still judges the text when the reply tool call was denied")
+
+    # Sentinel: the same text is refused once, and a turn is refused at most twice.
     d = tempfile.mkdtemp()
-    first, second = pretool([USER], INCIDENT, d), pretool([USER], INCIDENT, d)
-    check(first and not second, "sentinel refuses the same text only once")
+    path = write([USER])
+    try:
+        def deny(text):
+            out = run({"transcript_path": path, "tool_name": "mcp__hearthbot__post_message",
+                       "tool_input": {"text": text}}, d).stdout
+            return '"deny"' in out
+        first, second = deny(INCIDENT), deny(INCIDENT)
+        check(first and not second, "sentinel refuses the same text only once")
+        third = deny("It's waiting on your merge.")
+        fourth = deny("I think it may be waiting on your merge.")
+        check(third and not fourth, "a reworded claim is refused at most twice per turn")
+    finally:
+        os.unlink(path)
+    other = write([USER])
+    try:
+        out = run({"transcript_path": other, "tool_name": "mcp__hearthbot__post_message",
+                   "tool_input": {"text": INCIDENT}}, d).stdout
+    finally:
+        os.unlink(other)
+    check('"deny"' in out, "another transcript's sentinel does not excuse this one")
 
     bad = subprocess.run([sys.executable, HOOK], input="not json",
                          capture_output=True, text=True)

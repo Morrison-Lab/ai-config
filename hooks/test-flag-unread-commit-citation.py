@@ -290,6 +290,37 @@ CASES = [
                 body=CITED_ONE), True,
      "mcp__github__pull_request_review_write is covered via the imported "
      "(wide) MCP_POST_TOOLS, not the narrower local fallback tuple"),
+
+    # --- Antigravity transcript shapes (#4797) -------------------------------
+    ([{"type": "USER_INPUT", "content": "record commits", "step_index": 1},
+      {"type": "PLANNER_RESPONSE", "content": "", "step_index": 2,
+       "tool_calls": [{"id": "tc1", "name": "run_command",
+                       "args": {"CommandLine": "git log --oneline -20"}}]}],
+     {"tool_name": "run_command",
+      "tool_input": {"CommandLine": f'gh issue comment 96 --body "{CITED_BOTH}\n\n{MARKER}"'}},
+     True,
+     "#4797: Antigravity run_command git log --oneline does not discharge commit citation"),
+    ([{"type": "USER_INPUT", "content": "record commits", "step_index": 1},
+      {"type": "PLANNER_RESPONSE", "content": "", "step_index": 2,
+       "tool_calls": [
+           {"id": "tc1", "name": "run_command", "args": {"CommandLine": "git show 2d37c48"}},
+           {"id": "tc2", "name": "run_command", "args": {"CommandLine": "git show 08f5a73"}},
+       ]}],
+     {"tool_name": "run_command",
+      "tool_input": {"CommandLine": f'gh issue comment 96 --body "{CITED_BOTH}\n\n{MARKER}"'}},
+     False,
+     "#4797: Antigravity PLANNER_RESPONSE run_command git show on both SHAs discharges"),
+    ([{"type": "USER_INPUT", "content": "record commits", "step_index": 1},
+      {"type": "PLANNER_RESPONSE", "content": "", "step_index": 2,
+       "tool_calls": [
+           {"id": "tc1", "name": "run_command", "args": {"CommandLine": "git show 2d37c48"}},
+           {"id": "tc2", "name": "run_command", "args": {"CommandLine": "git show 08f5a73"}},
+       ]},
+      {"type": "USER_INPUT", "content": "next turn", "step_index": 3}],
+     {"tool_name": "edit_file",
+      "tool_input": {"Path": "memory/rampp-cases.md", "Replacement": CITED_BOTH}},
+     True,
+     "#4797: Antigravity USER_INPUT advances turn_start so prior-turn git show does not discharge"),
 ]
 
 

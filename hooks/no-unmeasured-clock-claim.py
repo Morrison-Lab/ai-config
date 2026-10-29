@@ -598,6 +598,70 @@ def _result_text(block):
     return None
 
 
+RX_AGY_BG_START = re.compile(
+    r"Tool is running as a background task with task id:\s*(\S+)")
+RX_AGY_BG_DONE = re.compile(
+    r'Task id "([^"]+)" (finished|was canceled) with result:\r?\n(.*?)'
+    r'(?=\r?\n(?:Task id "|</' + r'SYSTEM_MESSAGE>)|\Z)',
+    re.S,
+)
+AGY_SYS_MSG_SEP = "\n\nThe following is a <" + "SYSTEM_MESSAGE>"
+
+
+def _resolve_transcript_path(path):
+    if path and os.path.basename(path) == "transcript.jsonl":
+        full = os.path.join(os.path.dirname(path), "transcript_full.jsonl")
+        if os.path.isfile(full):
+            return full
+    return path
+
+
+def _agy_unwrap_args(raw_args):
+    if isinstance(raw_args, str):
+        try:
+            raw_args = json.loads(raw_args)
+        except Exception:
+            return {}
+    if not isinstance(raw_args, dict):
+        return {}
+    out = dict(raw_args)
+    for wrapper_key in ("args", "arguments", "input", "parameters", "params"):
+        nested = out.get(wrapper_key)
+        if isinstance(nested, str):
+            try:
+                nested = json.loads(nested)
+            except Exception:
+                nested = None
+        if isinstance(nested, dict):
+            out.update(nested)
+            break
+    for k, v in list(out.items()):
+        if isinstance(v, str) and len(v) >= 2 and v[0] == '"' and v[-1] == '"':
+            try:
+                out[k] = json.loads(v)
+            except Exception:
+                pass
+    return out
+
+
+def _iter_records(path):
+    """Yield (index, record) from JSONL `path`, sorted by `step_index` when present."""
+    path = _resolve_transcript_path(path)
+    raw_recs = []
+    with open(path, encoding="utf-8", errors="ignore") as fh:
+        for line_no, line in enumerate(fh, 1):
+            try:
+                m = json.loads(line)
+            except Exception:
+                continue
+            if isinstance(m, dict):
+                raw_recs.append((line_no, m))
+    if any(isinstance(r.get("step_index"), int) for _, r in raw_recs):
+        raw_recs.sort(key=lambda it: (it[1]["step_index"] if isinstance(it[1].get("step_index"), int) else it[0], it[0]))
+    for idx, (_line_no, m) in enumerate(raw_recs, 1):
+        yield idx, m
+
+
 def scan(path):
     """Return (opaque_clock_idx, turn_start_idx, text, measured_minutes).
 
@@ -630,15 +694,87 @@ def scan(path):
     measured = None
     text = ""
     pending = {}
-    i = 0
-    with open(path, encoding="utf-8", errors="ignore") as fh:
-        for line in fh:
-            i += 1
-            try:
-                m = json.loads(line)
-            except Exception:
-                continue
+    agy_pending_ids = []
+    agy_step_to_tid = {}
+    agy_bg_tasks = {}
+    for i, m in _iter_records(path):
             role = m.get("type")
+
+            if role in ("USER_INPUT", "EPHEMERAL_MESSAGE"):
+                if role == "USER_INPUT":
+                    turn_start = i
+                content = m.get("content")
+                if isinstance(content, str) and RX_HOOK_CLOCK.search(content):
+                    got = RX_HOOK_CLOCK_VALUE.search(content)
+                    if got:
+                        measured = (i, int(got.group(1)) * 60 + int(got.group(2)))
+                    else:
+                        last_clock = i
+                continue
+
+            if role == "PLANNER_RESPONSE":
+                content = m.get("content")
+                if isinstance(content, str) and content.strip():
+                    text = content
+                blocks = []
+                if isinstance(m.get("tool_calls"), list):
+                    agy_pending_ids.clear()
+                    agy_step_to_tid.clear()
+                    step_idx = m.get("step_index")
+                    for idx, tc in enumerate(m["tool_calls"]):
+                        if not isinstance(tc, dict):
+                            continue
+                        tid = tc.get("id") or f"agy_tc_{i}_{idx}"
+                        raw_args = (tc.get("args") or tc.get("arguments")
+                                    or tc.get("input") or {})
+                        blocks.append({
+                            "type": "tool_use",
+                            "id": tid,
+                            "name": tc.get("name") or "",
+                            "input": _agy_unwrap_args(raw_args),
+                        })
+                        if isinstance(step_idx, int):
+                            agy_step_to_tid[step_idx + 1 + idx] = tid
+                        else:
+                            agy_pending_ids.append(tid)
+                if not blocks:
+                    continue
+            elif role in ("GENERIC", "TOOL_RESPONSE"):
+                content = m.get("content")
+                primary = content if isinstance(content, str) else ""
+                if AGY_SYS_MSG_SEP in primary:
+                    primary = primary.split(AGY_SYS_MSG_SEP, 1)[0]
+                step_idx = m.get("step_index")
+                tid = m.get("tool_call_id") or m.get("tool_use_id")
+                if not tid:
+                    if isinstance(step_idx, int):
+                        tid = agy_step_to_tid.pop(step_idx, None)
+                    elif agy_pending_ids:
+                        tid = agy_pending_ids.pop(0)
+                blocks = []
+                if tid:
+                    m_bg = RX_AGY_BG_START.search(primary)
+                    if m_bg:
+                        agy_bg_tasks[m_bg.group(1).strip()] = tid
+                    else:
+                        blocks.append({
+                            "type": "tool_result",
+                            "tool_use_id": tid,
+                            "content": primary,
+                        })
+                if isinstance(content, str) and 'Task id "' in content:
+                    for m_done in RX_AGY_BG_DONE.finditer(content):
+                        bg_tid = agy_bg_tasks.pop(m_done.group(1), None)
+                        if bg_tid:
+                            blocks.append({
+                                "type": "tool_result",
+                                "tool_use_id": bg_tid,
+                                "content": m_done.group(3),
+                            })
+                if not blocks:
+                    continue
+            else:
+                blocks = None
 
             # A loaded skill body arrives as a `type: "user"` entry with
             # `isMeta: true` and a `sourceToolUseID`. It was never typed by
@@ -685,7 +821,8 @@ def scan(path):
                             last_clock = i
                 continue
 
-            blocks = (m.get("message") or {}).get("content")
+            if blocks is None:
+                blocks = (m.get("message") or {}).get("content")
             if blocks is None:
                 blocks = m.get("content") or []
             if isinstance(blocks, str):
@@ -728,7 +865,8 @@ def scan(path):
                     inp = b.get("input") or {}
                     blob = (b.get("name") or "") + " " + json.dumps(inp)
                     if RX_CLOCK_READ.search(blob):
-                        command = inp.get("command")
+                        command = (inp.get("command") or inp.get("CommandLine")
+                                   or inp.get("cmd") or inp.get("script"))
                         command = command if isinstance(command, str) else ""
                         if command and _capture_only(command):
                             # The value went into a variable and never into the

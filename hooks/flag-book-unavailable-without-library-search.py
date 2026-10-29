@@ -30,7 +30,7 @@ and report that. Whether the book is there is not lexically decidable, so the
 hook interrupts the stop once per turn (agent_notice.stop_notice) and leaves
 the call to the author. Fails OPEN.
 
-See `shared/workflow/track-useful-resources.md` for the book-library rule.
+See `shared/workflow/search-library-before-saying-book-unavailable.md` for the rule.
 """
 import hashlib
 import json

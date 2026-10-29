@@ -88,7 +88,7 @@ def thread_note_cases():
     failures = 0
     for log, want in (("You are a Thread Session. <thread ts=\"cmsg_01\">", "never link this thread"),
                       ("<wake>coordinator</wake>", "without linking the project thread")):
-        with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as f:
+        with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False, encoding="utf-8") as f:
             f.write(log)
         event = {"tool_name": POST, "tool_input": {"text": f"See {url}."},
                  "transcript_path": f.name}

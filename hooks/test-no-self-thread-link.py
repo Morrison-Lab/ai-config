@@ -36,7 +36,7 @@ def run(tool, text, transcript):
     event = {"tool_name": tool, "tool_input": {"text": text}}
     path = None
     if transcript is not None:
-        with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as f:
+        with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False, encoding="utf-8") as f:
             f.write(transcript)
             path = f.name
         event["transcript_path"] = path

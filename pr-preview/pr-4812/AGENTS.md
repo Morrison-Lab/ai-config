@@ -52,7 +52,6 @@ See [`gate-external-communication`](shared/workflow/gate-external-communication.
 ## Graph and display equation defaults
 
 When authoring analysis figures, prefer `ggplot2` over base graphics wherever the dependency is available or appropriate to add.
-For each plot, consider whether an axis should be extended to show important reference values such as zero.
 Title axes in words, not symbols; print ticks as plain numbers ([details](shared/writing/axis-tick-labels.md)).
 One equation per display line unless a reason favors more;
 one `=` per math line ([details](shared/writing/math-derivation-steps.md)).
@@ -292,6 +291,13 @@ Limits: [`context-budget`](shared/workflow/context-budget.md).
 Always isolate work in a dedicated `git worktree` so parallel sessions never step on or clobber working directory or branch state.
 Never work directly in a primary branch checkout or share a dirty worktree across concurrent tasks.
 
+## No sweeps for new rules by default
+
+Fix a new rule's violations in passages you edit anyway.
+Sweep only if Ezra explicitly says "sweep" (`Sweep authorized:` in the PR body);
+checks default to changed lines.
+See [`no-sweeps-by-default`](shared/workflow/no-sweeps-by-default.md).
+
 ## Check the remote immediately before every push
 
 Take a fresh reading of the remote branch **immediately** before every `git push`, and reconcile what it shows rather than overwriting it.
@@ -335,10 +341,7 @@ See [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md) 
 - When mentioning PRs or issues, format them as clickable hyperlinks to forge URLs, never bare `#NNN` (except `Closes #123`).
 - Semantic line breaks everywhere, enforced by CI ([rule](shared/writing/semantic-line-breaks.md)).
 
-- **Do:** link every pull request or issue cited as a source.
-- **Do:** hyperlink tools, internal rules, and technical terms on first or key mention.
-- **Don't:** link a `#NNN` a passage is displaying rather than citing.
-- **Don't:** leave referenced external tools, forge items, or internal policies as plain unlinked text.
+- **Don't:** link a `#NNN` a passage is displaying rather than citing, or leave referenced tools, forge items or policies unlinked.
 
 ## Deliver completed implementation work
 

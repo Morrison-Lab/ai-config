@@ -407,6 +407,20 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-headless-browser-in-bash.py\"",
+            "timeout": 10,
+            "script": "no-headless-browser-in-bash.py",
+            "why": "Ezra's standing rule is no Chrome, no browser and no computer use, ever. The rule was enforced only for the browser tools (warn-browser-without-route-check.py watches mcp__claude-in-chrome__*, mcp__Claude_Browser__*, mcp__computer-use__*). On 2026-10-28 an agent checked a hash redirect on the live lds site with a headless Chromium launched from Bash through the container's preinstalled Playwright (`node redir.js`), and the coordinator caught it afterwards. Denies a Bash command that invokes a browser binary, a browser-automation CLI, or an interpreter whose inline code or script file imports a browser-automation library; the escape valve is ALLOW_HEADLESS_BROWSER=1 plus a stated reason.",
+            "_note_invocation_not_mention": [
+              "Matches the invocation position, not the token anywhere, so",
+              "`grep -rn playwright .` and `pip install playwright` pass. A script",
+              "file named on an interpreter's command line is read for a",
+              "browser-automation import, because the incident's command line was",
+              "just `node redir.js` and carried no browser word at all."
+            ]
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-rm-live-render-intermediate.py\"",
             "timeout": 10,
             "script": "no-rm-live-render-intermediate.py",

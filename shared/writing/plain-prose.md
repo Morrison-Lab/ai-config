@@ -37,7 +37,8 @@ When PSW and this guidance disagree, PSW wins.
   - **Don't:** copy their text here; link the section instead
     (see [`dont-reinvent-wheel`](../principles/dont-reinvent-wheel.md)).
 - **Don't use money words as idioms for trade-offs** (Ezra, 2026-10-14).
-  Avoid "X costs us Y", "this buys us Z" and "at the price of";
+  Avoid "X costs us Y", "this buys us Z", "at the price of", "pays off",
+  "the whole bargain" and "that trade" (Ezra, 2026-10-29, mds#529);
   say what is lost or gained.
   Keep literal uses: computational or monetary cost,
   and a cost function the text defines as a term.
@@ -85,7 +86,10 @@ When PSW and this guidance disagree, PSW wins.
   "vanish" --- use "equal $0$", "converge to $0$", or "cancel";
   "recover" --- use "give", "equal", or "reduce to"),
   cognitive or speech verbs applied to models or equations
-  ("the model knows nothing about $[0, 1]$", "the boundary decides" --- state the constraint or condition),
+  ("the model knows nothing about $[0, 1]$", "the boundary decides",
+  "the derivative recommends a step", "the recommendation is trustworthy" (Ezra, 2026-10-29, mds#529)
+  --- state the constraint or condition under which the claim holds;
+  gha's `check-ai-tells` flags the literal phrasings as warn-only once gha#1326 merges),
   and imperative or exercise-prompt idioms
   ("Write $X$ as", "Fix $X$", "Take $X$", "Call $X$", "Say which/why" --- use "Express $X$ as", "Let $X$", "Consider $X$", "Denote $X$ by", "State which", or "Explain why").
   PSW's rules and table of literal alternatives live at

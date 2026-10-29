@@ -987,6 +987,13 @@
         "hooks": [
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-agent-spawn-without-backlog-check.py\"'",
+            "timeout": 10,
+            "script": "warn-agent-spawn-without-backlog-check.py",
+            "why": "shared/workflow/triage-new-asks.md -- Ezra 2026-10-29 (cai): an orchestrator triages a new ask against the open issues/PRs, live threads and memory before spawning work, instead of starting parallel work. The omission happens at the launch, so the launch is checked. Warns once per session, never blocks, when a write-capable Agent/Task launch has no tracker query (MCP search/list of issues or PRs, gh/glab issue|pr|mr list, gh search) earlier in the transcript; read-only searchers (Explore, Plan, claude-code-guide, statusline-setup) are exempt. A query having run is not evidence its result was used, and thread/memory checks are not lexically visible; inert in cloud sessions (ai-config#2004)."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/flag-unassigned-worktree.py\"'",
             "timeout": 10,
             "script": "flag-unassigned-worktree.py",

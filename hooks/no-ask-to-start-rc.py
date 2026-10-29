@@ -42,7 +42,7 @@ BASE = r"(?:start|run|launch|restart|reconnect|spin(?: up)?|fire up|kick off|ena
 VERB = r"(?:" + BASE + r"|started|launched|restarted|starting|launching|restarting|running|spinning(?: up)?)"
 # The ask ends at the name: "start Remote Control on the Mac", not "run remote control tests".
 RC_END = (r"(?:\s+(?:session|server|command))?"
-          r"(?=`?\s*(?:$|[;,.!?(—])|`?\s+(?:-\w|--\w|-\s)|`?\s+(?:on|from|in|at|now|first|again|please|and|before|so|for|with)\b)")
+          r"(?=`?\s*(?:$|[;,.!?(\u2014])|`?\s+(?:-\w|--\w|-\s)|`?\s+(?:on|from|in|at|now|first|again|please|and|before|so|for|with)\b)")
 FILL = r"[^.!?\n]{0,60}?"
 
 ASKS = (

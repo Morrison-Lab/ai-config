@@ -40,6 +40,10 @@ CASES = [
     ("empty marker still warns", bash('gh pr create --title "Sweep: x" --body "Sweep authorized: "'), True),
     ("glued -t form", bash("gh pr create -tSweep -b x"), True),
     ("comma labels", bash('gh pr create --title Fix --label a,sweep --body x'), True),
+    ("later chained command's title is ignored", bash(
+        'gh pr create --title fix --body x && gh issue create --title "sweep all"'), False),
+    ("sweep title survives a later chained command", bash(
+        'gh pr create --title "Sweep defs" --body x && gh issue create --title fix'), True),
     ("plain title", bash('gh pr create --title "Fix the definition of bias" --body x'), False),
     ("word inside another word", bash('gh pr create --title "Chimneysweeper notes" --body x'), False),
     ("not a pr create", bash('echo "sweep"'), False),

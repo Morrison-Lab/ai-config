@@ -59,6 +59,7 @@ def bash_fields(command):
     """Return (title, labels, body-ish text) of a `gh pr create` command, or None."""
     if not CREATE.search(command):
         return None
+    command = next(s for s in re.split(r"&&|\|\||[;|\n]", command) if CREATE.search(s))
     try:
         words = shlex.split(command, comments=False)
     except ValueError:

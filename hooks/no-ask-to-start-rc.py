@@ -37,7 +37,9 @@ QUOTED = re.compile(
     r"```.*?```|^>.*$|\"[^\"\n]*\"|\u201c[^\u201d\n]*\u201d|(?<!\w)'[^'\n]{3,}'(?!\w)"
     r"|`(?!\s*claude\b)[^`\n]*`", re.S | re.M)
 # A PR or issue body lists the agent's own plan and record as bullets and numbered steps.
-LIST_ITEM = re.compile(r"^\s*(?:[-*]|\d+[.)])\s.*$", re.M)
+# An item aimed at the reader ("please", "can you", "you") stays, so a bulleted ask is still caught.
+LIST_ITEM = re.compile(
+    r"^\s*(?:[-*+]|\d+[.)])\s(?!.*\b(?:please|can you|could you|would you|you|your)\b).*$", re.M | re.I)
 
 RC = r"(?:remote[-\u2010\u2011 ]{0,3}control|(?-i:\bRC\b))"
 BASE = r"(?:start|run|launch|restart|reconnect|spin(?: up)?|fire up|kick off|enable|turn on|bring up)"

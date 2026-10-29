@@ -51,6 +51,8 @@ CASES = [
     ("question about past ask", POST, "text", "Why did I ask you to start Remote Control?", False),
     ("stop asking", POST, "text", "I will stop asking you to start Remote Control.", False),
     ("nested card field", "mcp__hearthbot__post_widget", "body", {"a": ["Please start Remote Control"]}, True),
+    ("unrelated stop then ask", POST, "text", "Stop what you're doing and please start Remote Control.", True),
+    ("double space in name", POST, "text", "Please start remote  control.", True),
     ("agent started it", POST, "text", "I started a Remote Control session on cf463-02 and the dry run passed.", False),
     ("agent will start", POST, "text", "I'll start Remote Control on the XPS now.", False),
     ("negated ask", POST, "text", "I won't ask you to start Remote Control; I do it myself.", False),

@@ -35,7 +35,7 @@ SENTENCE_BREAK = re.compile(
 # Quoted words mention an ask, they do not make one.
 QUOTED = re.compile(r"```.*?```|^>.*$|\"[^\"\n]*\"|\u201c[^\u201d\n]*\u201d", re.S | re.M)
 
-RC = r"(?:remote[-\u2010\u2011 ]?control|(?-i:\bRC\b))"
+RC = r"(?:remote[-\u2010\u2011 ]{0,3}control|(?-i:\bRC\b))"
 VERB = r"(?:start|started|starting|launched|restarted|run|running|launch|launching|restart|restarting|reconnect|spin(?: up)?|spinning(?: up)?|kick off|enable|turn on|bring up)"
 FILL = r"[^.!?\n]{0,60}?"
 
@@ -62,7 +62,7 @@ ASKS = (
 # A negation counts only before the ask, so "start RC, don't forget" is still an ask.
 NEGATION = re.compile(
     r"\b(?:never|won't|will not|don't|do not|doesn't|not (?:ask|need)|no need|without asking|"
-    r"without you|instead of asking|rather than asking|stop|why did I|did I|do I)\b", re.I)
+    r"without you|instead of asking|rather than asking|stop asking|why did I|did I|do I)\b", re.I)
 CLAUSE_BREAK = re.compile(r"[;:,\u2014]|\s-+\s")
 YOURSELF = re.compile(r"^[^.!?\n]{0,25}\byourself\b", re.I)
 

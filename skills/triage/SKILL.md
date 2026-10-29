@@ -74,3 +74,12 @@ Do-Confirm, at the moment the `--apply` command is about to run:
    duplicate of an older open issue.
 4. Anything unlikely-but-actionable is P3, not closed.
 5. The dry run printed the command set, and its count matches expectations.
+
+## New asks
+
+A new ask from the user is triaged on arrival, before work is spawned for it, per
+[`triage-new-asks`](../../shared/workflow/triage-new-asks.md):
+search open and closed issues and PRs in the affected repos, check live threads and project memory,
+then fold the ask into the work that owns it or state in one line whether it duplicates, extends,
+conflicts with, blocks or is blocked by existing work, with a priority.
+Acknowledge first and do not add questions for the user.

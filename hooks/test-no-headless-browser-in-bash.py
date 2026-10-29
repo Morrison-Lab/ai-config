@@ -102,6 +102,11 @@ class TestReviewedBlocks(unittest.TestCase):
         self.blocked("nice -n 5 chromium")
         self.blocked("xvfb-run -a -s '-screen 0 1280x1024x24' chromium")
 
+    def test_env_assignments_and_background_operator(self):
+        self.blocked("env DISPLAY=:99 chromium --headless")
+        self.blocked("env CHROME_BIN=/usr/bin/chromium chromium-browser --headless")
+        self.blocked("echo hi & chromium --headless")
+
     def test_shell_keywords(self):
         self.blocked("if true; then chromium; fi")
         self.blocked("! chromium")

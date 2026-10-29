@@ -51,10 +51,10 @@ import sys
 # (with their flags).
 WRAPPER = (
     r"(?:(?:sudo|env|nice|nohup|setsid|time|timeout|xvfb-run|exec|command|stdbuf)"
-    r"(?:\s+-\S+(?:\s+(?:[\w.:=,-]+|'[^']*'|\"[^\"]*\"))?|\s+\d\S*)*\s+)*"
+    r"(?:\s+-\S+(?:\s+(?:[\w.:=,-]+|'[^']*'|\"[^\"]*\"))?|\s+\d\S*|\s+[A-Za-z_]\w*=\S*)*\s+)*"
 )
 START = (
-    r"(?:^|&&|\|\||;|\||\n|\(|\bthen\b|\bdo\b|\belse\b|!)\s*"
+    r"(?:^|&&|\|\||;|&|\||\n|\(|\bthen\b|\bdo\b|\belse\b|!)\s*"
     r"(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*"
     + WRAPPER
     + r"[\"']?(?:[\w./~-]*/)?"

@@ -1654,10 +1654,29 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-ask-to-start-rc.py\"'",
+            "timeout": 10,
+            "script": "no-ask-to-start-rc.py",
+            "why": "Ezra, 2026-10-15: \"you can launch sessions on that machine without me; stop forgetting.\" On 2026-10-29 the coordinator still asked him to start Remote Control on cf463-02, and he replied \"you can run remote control yourself\" and \"you should have known that\". Blocks (deny) an outgoing hearthbot reply, message_thread or message_coordinator call that asks the user to start, run or launch Remote Control or claude remote-control, and points at start_remote_control. See shared/workflow/lab-operating-rules.md. Fails open on any parse trouble."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-unfetched-pr-state-claim.py\"'",
             "timeout": 10,
             "script": "no-unfetched-pr-state-claim.py",
             "why": "ai-config#4834, PreToolUse binding of the Stop guard of the same name: a project thread posts through a hearthbot reply tool before the turn ends (ai-config#4830), so a Stop block arrives after the user has read the stale claim. Denies a user-visible reply tool call (mcp__hearthbot__reply, post_message, update_message, edit_message) that says a PR awaits merge or review, or that work is still to do, with no live read since the last user turn. Once per distinct text and at most twice per user turn; fails open."
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__github__add_issue_comment|mcp__github__update_issue_comment|mcp__github__add_reply_to_pull_request_comment|mcp__github__add_comment_to_pending_review|mcp__github__pull_request_review_write|mcp__github__create_pull_request|mcp__github__update_pull_request|mcp__github__issue_write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-ask-to-start-rc.py\"'",
+            "timeout": 10,
+            "script": "no-ask-to-start-rc.py",
+            "why": "Same rule as the hearthbot entry (Ezra, 2026-10-29: \"you can run remote control yourself\"): a forge comment, PR body or issue body that asks the user to start Remote Control is denied, and the denial points at start_remote_control."
           }
         ]
       },

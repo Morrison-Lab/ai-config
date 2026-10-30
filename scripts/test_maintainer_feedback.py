@@ -244,7 +244,8 @@ class TestConfiguredMaintainers(unittest.TestCase):
         with tempfile.TemporaryDirectory() as home:
             (Path(home) / "ai.json").write_text(
                 '{"maintainers": ["dana"]}', encoding="utf-8")
-            env = {"HOME": home, "AI_CONFIG_LOCAL": "~/ai.json"}
+            # expanduser reads USERPROFILE, not HOME, on Windows.
+            env = {"HOME": home, "USERPROFILE": home, "AI_CONFIG_LOCAL": "~/ai.json"}
             with patch.dict(os.environ, env):
                 os.environ.pop("MAINTAINER_LOGINS", None)
                 self.assertEqual(lib.maintainer_logins(), {"dana"})

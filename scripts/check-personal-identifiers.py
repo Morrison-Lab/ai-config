@@ -22,9 +22,11 @@ own accounts (`morri313`, `dougmor`, `dem-extra1`).  The organisation
 repo's own address and have their own handling.
 
 The existing occurrences are recorded per file in
-`scripts/personal-identifiers-baseline.json`.  A file fails when it has more
-occurrences than its baseline (a file absent from the baseline has zero), so
-the count can only fall.  Run with `--update-baseline` after removing one.
+`scripts/personal-identifiers-baseline.json`.  A file fails when its count
+differs from its baseline (a file absent from the baseline has zero): above it
+is a new occurrence, and below it means the baseline is stale, so the count
+can only fall and each fall is recorded.  Run with `--update-baseline` after
+removing one.
 
 Exit status: 1 when any file exceeds its baseline, else 0.
 """
@@ -41,13 +43,14 @@ ROOT = Path(__file__).resolve().parent.parent
 BASELINE = ROOT / "scripts" / "personal-identifiers-baseline.json"
 
 PATTERN = re.compile(
-    r"cf463-\d+|DEM-MBP-\d+|/home/morri313|/Users/ezramorrison|D:\\GitHub"
+    r"cf463-\d+|DEM-MBP-\d+|/home/morri313|ezramorrison|[Dd]:[/\\]GitHub|/d/GitHub"
     r"|morri313|dougmor|dem-extra1"
 )
 
 SCOPE_DIRS = ("shared/", "skills/", "hooks/", "scripts/", "plugins/", "commands/")
 SCOPE_FILES = ("AGENTS.md", "CLAUDE.md", "GEMINI.md", "README.md")
-SKIP_PARTS = ("/test-", "/test_", ".cases.md", "__pycache__")
+SKIP_PARTS = (".cases.md", "__pycache__")
+TEST_DIRS = ("hooks/", "scripts/")
 SKIP_FILES = ("scripts/personal-identifiers-baseline.json",
               "scripts/check-personal-identifiers.py",
               "scripts/test_check_personal_identifiers.py")
@@ -58,6 +61,9 @@ def in_scope(path: str) -> bool:
     """Whether a tracked path is a shared file this check covers."""
     if path in SKIP_FILES or any(part in path for part in SKIP_PARTS):
         return False
+    name = path.rsplit("/", 1)[-1]
+    if path.startswith(TEST_DIRS) and name.startswith(("test-", "test_")):
+        return False
     if not path.endswith(TEXT_SUFFIXES):
         return False
     return path in SCOPE_FILES or path.startswith(SCOPE_DIRS)
@@ -66,6 +72,11 @@ def in_scope(path: str) -> bool:
 def count_hits(text: str) -> int:
     """Number of identifier occurrences in a file's text."""
     return len(PATTERN.findall(text))
+
+
+def hit_lines(text: str) -> list[int]:
+    """1-based numbers of the lines holding an identifier."""
+    return [n for n, line in enumerate(text.splitlines(), start=1) if PATTERN.search(line)]
 
 
 def tracked_files() -> list[str]:
@@ -80,6 +91,8 @@ def scan(paths: list[str]) -> dict[str, int]:
     for path in paths:
         if not in_scope(path):
             continue
+        if not (ROOT / path).is_file():
+            continue
         text = (ROOT / path).read_text(encoding="utf-8", errors="replace")
         hits = count_hits(text)
         if hits:
@@ -87,13 +100,21 @@ def scan(paths: list[str]) -> dict[str, int]:
     return counts
 
 
-def compare(counts: dict[str, int], baseline: dict[str, int]) -> list[str]:
-    """Findings for files over their baseline."""
-    return [
-        f"{path}: {n} occurrence(s), baseline {baseline.get(path, 0)}"
-        for path, n in sorted(counts.items())
-        if n > baseline.get(path, 0)
-    ]
+def compare(counts: dict[str, int], baseline: dict[str, int]) -> list[tuple[str, str]]:
+    """(path, message) findings for files whose count differs from the baseline.
+
+    A count above the baseline is a new occurrence; a count below it means the
+    baseline is stale, and leaving it would let the file regrow unnoticed.
+    """
+    findings = []
+    for path in sorted(set(counts) | set(baseline)):
+        n, base = counts.get(path, 0), baseline.get(path, 0)
+        if n > base:
+            findings.append((path, f"{n} occurrence(s), baseline {base}"))
+        elif n < base:
+            findings.append((path, f"{n} occurrence(s), baseline {base}: the baseline "
+                                   "is stale, run --update-baseline"))
+    return findings
 
 
 def main() -> int:
@@ -113,8 +134,11 @@ def main() -> int:
     findings = compare(counts, baseline)
     print(f"examined {examined} shared file(s); {sum(counts.values())} occurrence(s) "
           f"in {len(counts)} file(s) against a baseline of {sum(baseline.values())}")
-    for finding in findings:
-        print(f"::error::{finding}")
+    for path, message in findings:
+        lines = hit_lines((ROOT / path).read_text(encoding="utf-8", errors="replace")) \
+            if (ROOT / path).is_file() else []
+        where = f" (lines {', '.join(map(str, lines[:8]))})" if lines else ""
+        print(f"::error file={path}::{message}{where}")
     if findings:
         print("Move the value into per-user configuration instead of writing it into "
               "a shared file (see ai-config.local.example.json), or, for a value that "

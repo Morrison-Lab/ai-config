@@ -1,6 +1,8 @@
 {
   "hooks/hooks.json": 1,
   "hooks/no-ask-to-start-rc.py": 5,
+  "hooks/warn-bash-command-for-powershell-user.py": 1,
+  "hooks/warn-cross-drive-toolchain-move.py": 1,
   "plugins/ai-config-hooks/hooks/hooks.json": 1,
   "scripts/agy-dispatch.py": 2,
   "scripts/pr-scope.py": 1,

@@ -11,8 +11,11 @@ The rest are prose because no condition in the transcript can decide them.
   Never ask Ezra to name PR numbers ("don't make me name each one").
   Enforced by `hooks/no-numbered-merge-word-ask.py` and `hooks/remind-plain-english-merge-word.py`.
 - Never offer him a merge button or a manual step, and never ask him to paste, append, or hand-add text into a file.
-  Write an idempotent script, test it, and give him one command that runs it (Ezra, 2026-10-26).
-  Enforced by `hooks/no-manual-step-ask.py`.
+  Ask his permission to do the step yourself (a decision card, an approval prompt, or a permission rule you ask to add), then run it.
+  Hand him a command to type only for a secret or credential (Ezra, 2026-10-29, ai-config#4842: "don't make me do anything myself unless there's absolutely no other way;
+  instead, ask me for permission to do it for me").
+  This replaces the 2026-10-26 fallback of giving him one command that runs an idempotent script.
+  Enforced by `hooks/no-manual-step-ask.py`, which denies a reply that tells him to type or run a shell command, unless the reply names a secret, token, password or credential.
 
 ## Deliverables and approvals
 

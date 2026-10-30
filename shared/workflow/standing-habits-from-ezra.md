@@ -43,6 +43,11 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`, exce
   Ezra, 2026-10-26, after a reply asked him to paste an `autoMode.allow` entry into `~/.claude/settings.json`: "never ask me to paste anything into a file;
   always give me a script-based command to run that does it for me".
   `hooks/no-manual-step-ask.py` denies a reply that asks for a paste or hand-add into a file.
+  Ezra, 2026-10-29 (ai-config#4842) narrowed the fallback: "don't make me do anything myself unless there's absolutely no other way;
+  instead, ask me for permission to do it for me".
+  Ask permission to run the step yourself;
+  hand him a command only for a secret or credential.
+  The same hook now denies a reply that tells him to type or run a shell command.
 - **Don't:** write a script whose purpose is to perform, outside the session, an action that a classifier, hook, or guard denied inside it, unless Ezra has sanctioned that script after the denial and named the action.
   A general wish for scripts, including the quotation above, is not that sanction.
   Ask first, wait for his answer, then write it.

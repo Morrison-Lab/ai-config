@@ -65,7 +65,9 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`, exce
 - **Do:** treat "why did you ...?" as a correction, not a request for an explanation.
   Ezra, 2026-10-30: "but 'why did you ...?' is different and indicates a correction".
 - **Do:** on a "why did you ...?", fix the instance and record the rule that prevents it, as in "Apply each new instruction at once".
-- **Don't:** answer "why did you ...?" with an account of your reasoning and stop there.
+- **Don't:** answer "why did you ...?" with only an account of your reasoning.
+  A short account of the cause is fine when it goes with the fix and the recorded rule.
+- **Don't:** fix the instance and leave the rule that prevents it unrecorded.
 - **Reason:** no hook can read intent from phrasing, so this is prose.
 
 ## Report an unreachable source
@@ -104,13 +106,18 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`, exce
 - **Don't:** invoke a repo's standing merge grant (the ai-config, gha and macros exceptions) there, or relay a grant for him.
 - **Reason:** slips on gha#1169 and ai-config#4692 (2026-10-22), recorded in the [decision log](../../docs/decision-log.md).
 
-## Get the cross-harness verdict before the merge call
+## Get the cross-harness verdict and finish local validation before the merge call
 
-- **Do:** before merging any ai-config PR, even under the standing grant, send the coordinator the head SHA, wait for a CLEAN cross-harness verdict (Gemini Flash while Argon is out of quota) on that head, and let local validation (`scripts/run-local-validation.py`) finish.
-- **Don't:** treat the standing grant, a clean Claude review, or green CI as covering the cross-harness gate in [`adversarial-self-review`](adversarial-self-review.md#cross-model-and-cross-harness-reviews-are-required-for-merging-and-the-harness-list-is-concrete).
+- **Do:** before merging a PR under a standing grant (ai-config, gha or macros), get a CLEAN cross-harness verdict on that head.
+  In a project thread with a coordinator, send the coordinator the head SHA and wait for the verdict.
+  Where there is no coordinator, dispatch the reviewer yourself, as [`adversarial-self-review`](adversarial-self-review.md#cross-model-and-cross-harness-reviews-are-required-for-merging-and-the-harness-list-is-concrete) says.
+  As of 2026-10-30 the reviewer is Gemini Flash through `agy`, because Argon is out of quota.
+- **Do:** let local validation (`scripts/run-local-validation.py`) finish before the merge call.
+- **Don't:** treat the standing grant, a clean Claude review, or green CI as covering the cross-harness gate.
 - **Reason:** ai-config#4853 and ai-config#4854 (2026-10-30) were both merged before their Flash read.
-  `hooks/warn-merge-without-cross-harness-review.py` only warns, and its note arrives with the merge result, after the merge has run.
-  The coordinator gave this rule on 2026-10-30.
+  `hooks/warn-merge-without-cross-harness-review.py` cannot stop the merge, and the agent sees its note only with the merge result.
+  The project coordinator set this rule on 2026-10-30, in Ezra's DATA 571 project, after those two merges.
+  Ezra has not restated it.
 
 ## Keep removed content
 

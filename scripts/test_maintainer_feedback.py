@@ -4,6 +4,8 @@
 `check-pr-fully-clean.py` imports the library; the merge hook keeps its own
 copy because a hook cannot import `scripts/lib`. The parity test feeds both
 the same items so the copies cannot drift apart (ai-config#4611).
+`TestConfiguredMaintainers` pins the maintainer-login reader across the
+library, the merge hook and `remind-generalize-maintainer-pr-comment.py`.
 """
 import importlib.util
 import io
@@ -201,6 +203,92 @@ class TestCheckerGate(unittest.TestCase):
         data = pr_data([comment("Nit.")])
         self.run_check(data, [{"author": user("d-morrison"), "body": "x", "createdAt": LATER}])
         self.assertEqual(data["reviewComments"], [])
+
+
+class TestConfiguredMaintainers(unittest.TestCase):
+    """The three standalone copies resolve maintainers the same way."""
+
+    reminder = load(
+        "reminder_copy", ROOT / "hooks" / "remind-generalize-maintainer-pr-comment.py")
+
+    def resolve(self, env, config=None):
+        import json
+        import os
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "local.json"
+            if config is not None:
+                path.write_text(json.dumps(config), encoding="utf-8")
+            full = {"AI_CONFIG_LOCAL": str(path), **env}
+            with patch.dict(os.environ, full, clear=False):
+                if "MAINTAINER_LOGINS" not in env:
+                    os.environ.pop("MAINTAINER_LOGINS", None)
+                return (lib.maintainer_logins(), hook.maintainer_logins(),
+                        {x.lower() for x in self.reminder.logins()})
+
+    def test_default_is_the_repo_owner(self):
+        for got in self.resolve({}):
+            self.assertEqual(got, {"d-morrison"})
+
+    def test_config_file_names_the_maintainers(self):
+        for got in self.resolve({}, {"maintainers": ["Alice", "bob"]}):
+            self.assertEqual(got, {"alice", "bob"})
+
+    def test_empty_env_means_no_maintainers(self):
+        for got in self.resolve({"MAINTAINER_LOGINS": ""}, {"maintainers": ["alice"]}):
+            self.assertEqual(got, set())
+
+    def test_config_path_expands_a_tilde(self):
+        import os
+        import tempfile
+        with tempfile.TemporaryDirectory() as home:
+            (Path(home) / "ai.json").write_text(
+                '{"maintainers": ["dana"]}', encoding="utf-8")
+            # expanduser reads USERPROFILE, not HOME, on Windows.
+            env = {"HOME": home, "USERPROFILE": home, "AI_CONFIG_LOCAL": "~/ai.json"}
+            with patch.dict(os.environ, env):
+                os.environ.pop("MAINTAINER_LOGINS", None)
+                self.assertEqual(lib.maintainer_logins(), {"dana"})
+                self.assertEqual(hook.maintainer_logins(), {"dana"})
+                self.assertEqual(
+                    {x.lower() for x in self.reminder.logins()}, {"dana"})
+
+    def test_env_wins_over_the_config_file(self):
+        for got in self.resolve({"MAINTAINER_LOGINS": "carol"}, {"maintainers": ["alice"]}):
+            self.assertEqual(got, {"carol"})
+
+    def resolve_text(self, text):
+        """Resolve with a config file holding `text` (None: no file)."""
+        import os
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "local.json"
+            if text is not None:
+                path.write_text(text, encoding="utf-8")
+            err = io.StringIO()
+            with patch.dict(os.environ, {"AI_CONFIG_LOCAL": str(path)}):
+                os.environ.pop("MAINTAINER_LOGINS", None)
+                with contextlib.redirect_stderr(err):
+                    got = (lib.maintainer_logins(), hook.maintainer_logins(),
+                           {x.lower() for x in self.reminder.logins()})
+            return got, err.getvalue()
+
+    def test_bad_config_warns_and_falls_back_to_the_default(self):
+        bad = ["{not json", '["alice"]', '{"maintainers": "alice"}',
+               '{"maintainers": ["alice", 7]}', '{"maintainers": [""]}',
+               '{"maintainers": null}']
+        for text in bad:
+            got, err = self.resolve_text(text)
+            for one in got:
+                self.assertEqual(one, {"d-morrison"}, text)
+            self.assertEqual(err.count("ignoring"), 3, text)
+
+    def test_unconfigured_is_silent_and_uses_the_default(self):
+        for text in (None, "{}", '{"maintainers": []}'):
+            got, err = self.resolve_text(text)
+            for one in got:
+                self.assertEqual(one, {"d-morrison"}, text)
+            self.assertEqual(err, "", text)
 
 
 if __name__ == "__main__":

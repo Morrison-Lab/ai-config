@@ -236,15 +236,38 @@ class TestConfiguredMaintainers(unittest.TestCase):
         for got in self.resolve({"MAINTAINER_LOGINS": "carol"}, {"maintainers": ["alice"]}):
             self.assertEqual(got, {"carol"})
 
-    def test_malformed_config_falls_back_to_the_default(self):
+    def resolve_text(self, text):
+        """Resolve with a config file holding `text` (None: no file)."""
         import os
         import tempfile
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "local.json"
-            path.write_text("{not json", encoding="utf-8")
+            if text is not None:
+                path.write_text(text, encoding="utf-8")
+            err = io.StringIO()
             with patch.dict(os.environ, {"AI_CONFIG_LOCAL": str(path)}):
                 os.environ.pop("MAINTAINER_LOGINS", None)
-                self.assertEqual(lib.maintainer_logins(), {"d-morrison"})
+                with contextlib.redirect_stderr(err):
+                    got = (lib.maintainer_logins(), hook.maintainer_logins(),
+                           {x.lower() for x in self.reminder.logins()})
+            return got, err.getvalue()
+
+    def test_bad_config_warns_and_falls_back_to_the_default(self):
+        bad = ["{not json", '["alice"]', '{"maintainers": "alice"}',
+               '{"maintainers": ["alice", 7]}', '{"maintainers": [""]}',
+               '{"maintainers": null}']
+        for text in bad:
+            got, err = self.resolve_text(text)
+            for one in got:
+                self.assertEqual(one, {"d-morrison"}, text)
+            self.assertIn("ignoring", err, text)
+
+    def test_unconfigured_is_silent_and_uses_the_default(self):
+        for text in (None, "{}", '{"maintainers": []}'):
+            got, err = self.resolve_text(text)
+            for one in got:
+                self.assertEqual(one, {"d-morrison"}, text)
+            self.assertEqual(err, "", text)
 
 
 if __name__ == "__main__":

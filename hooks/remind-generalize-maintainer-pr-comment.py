@@ -44,18 +44,28 @@ def _configured_maintainers():
     "maintainers" list in the JSON file `AI_CONFIG_LOCAL` names (default
     `~/.config/ai-config/local.json`, see `ai-config.local.example.json`),
     else `d-morrison`, the repo owner, so an unconfigured install keeps its
-    behaviour. Standalone: hooks are staged one file at a time and cannot
-    import a sibling module."""
+    behaviour. A missing file or an absent or empty list is "unconfigured";
+    a file that exists but is unreadable, is not a JSON object, or holds
+    anything but a list of non-empty strings warns on stderr and falls back
+    too. Standalone: hooks are staged one file at a time and cannot import
+    a sibling module."""
     raw = os.environ.get("MAINTAINER_LOGINS")
-    if raw is None:
-        path = os.environ.get("AI_CONFIG_LOCAL") or os.path.expanduser(
-            "~/.config/ai-config/local.json")
+    if raw is not None:
+        return raw
+    path = os.environ.get("AI_CONFIG_LOCAL") or os.path.expanduser(
+        "~/.config/ai-config/local.json")
+    if os.path.exists(path):
         try:
             with open(path, encoding="utf-8") as fh:
-                raw = ",".join(json.load(fh).get("maintainers", []))
-        except (OSError, ValueError, AttributeError, TypeError):
-            raw = None
-    return "d-morrison" if raw is None else raw
+                names = json.load(fh).get("maintainers", [])
+            if not isinstance(names, list) or not all(
+                    isinstance(n, str) and n.strip() for n in names):
+                raise ValueError('"maintainers" must be a list of login strings')
+            if names:
+                return ",".join(names)
+        except (OSError, ValueError, AttributeError) as err:
+            print(f"ai-config: ignoring {path}: {err}", file=sys.stderr)
+    return "d-morrison"
 
 
 def logins():

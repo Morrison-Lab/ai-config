@@ -39,8 +39,27 @@ COMMENTISH = re.compile(
     r"|pull_request_review|commit_comment)(?:\.|$)", re.I)
 
 
+def _configured_maintainers():
+    """Comma-separated maintainer logins: `MAINTAINER_LOGINS`, else the
+    "maintainers" list in the JSON file `AI_CONFIG_LOCAL` names (default
+    `~/.config/ai-config/local.json`, see `ai-config.local.example.json`),
+    else `d-morrison`, the repo owner, so an unconfigured install keeps its
+    behaviour. Standalone: hooks are staged one file at a time and cannot
+    import a sibling module."""
+    raw = os.environ.get("MAINTAINER_LOGINS")
+    if raw is None:
+        path = os.environ.get("AI_CONFIG_LOCAL") or os.path.expanduser(
+            "~/.config/ai-config/local.json")
+        try:
+            with open(path, encoding="utf-8") as fh:
+                raw = ",".join(json.load(fh).get("maintainers", []))
+        except (OSError, ValueError, AttributeError, TypeError):
+            raw = None
+    return "d-morrison" if raw is None else raw
+
+
 def logins():
-    raw = os.environ.get("MAINTAINER_LOGINS", "d-morrison")
+    raw = _configured_maintainers()
     return [x.strip() for x in raw.split(",") if x.strip()]
 
 

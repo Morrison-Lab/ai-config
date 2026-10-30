@@ -575,7 +575,7 @@ In the turn the comment arrives:
 A question or thanks needs no rule.
 Everything else does, and "it only applied here" is a claim to state in the reply, not to assume.
 
-`hooks/remind-generalize-maintainer-pr-comment.py` is the mechanism: it fires on a GitHub comment or review event authored by a login in `MAINTAINER_LOGINS` (default `d-morrison`) and injects these four steps, once per event.
+`hooks/remind-generalize-maintainer-pr-comment.py` is the mechanism: it fires on a GitHub comment or review event authored by a login in `MAINTAINER_LOGINS` (or the `maintainers` list in `~/.config/ai-config/local.json`, see `ai-config.local.example.json`; default `d-morrison`) and injects these four steps, once per event.
 It reminds and never blocks.
 Tracked in [#3465](https://github.com/Morrison-Lab/ai-config/issues/3465).
 

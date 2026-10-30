@@ -7,6 +7,7 @@ without `scripts/lib` on its path, and
 `scripts/test_maintainer_feedback.py` pins the two copies to the same verdicts.
 """
 
+import json
 import os
 import re
 from typing import Any, Dict, List, Set
@@ -27,9 +28,28 @@ EXEMPT_RE = re.compile(
 )
 
 
+def _configured_maintainers():
+    """Comma-separated maintainer logins: `MAINTAINER_LOGINS`, else the
+    "maintainers" list in the JSON file `AI_CONFIG_LOCAL` names (default
+    `~/.config/ai-config/local.json`, see `ai-config.local.example.json`),
+    else `d-morrison`, the repo owner, so an unconfigured install keeps its
+    behaviour. Standalone: hooks are staged one file at a time and cannot
+    import a sibling module."""
+    raw = os.environ.get("MAINTAINER_LOGINS")
+    if raw is None:
+        path = os.environ.get("AI_CONFIG_LOCAL") or os.path.expanduser(
+            "~/.config/ai-config/local.json")
+        try:
+            with open(path, encoding="utf-8") as fh:
+                raw = ",".join(json.load(fh).get("maintainers", []))
+        except (OSError, ValueError, AttributeError, TypeError):
+            raw = None
+    return "d-morrison" if raw is None else raw
+
+
 def maintainer_logins() -> Set[str]:
-    """Lowercased logins in `MAINTAINER_LOGINS` (default `d-morrison`)."""
-    raw = os.environ.get("MAINTAINER_LOGINS", "d-morrison")
+    """Lowercased maintainer logins from `_configured_maintainers`."""
+    raw = _configured_maintainers()
     return {x.strip().lower() for x in raw.split(",") if x.strip()}
 
 

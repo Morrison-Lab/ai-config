@@ -203,5 +203,49 @@ class TestCheckerGate(unittest.TestCase):
         self.assertEqual(data["reviewComments"], [])
 
 
+class TestConfiguredMaintainers(unittest.TestCase):
+    """The three standalone copies resolve maintainers the same way."""
+
+    reminder = load(
+        "reminder_copy", ROOT / "hooks" / "remind-generalize-maintainer-pr-comment.py")
+
+    def resolve(self, env, config=None):
+        import json
+        import os
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "local.json"
+            if config is not None:
+                path.write_text(json.dumps(config), encoding="utf-8")
+            full = {"AI_CONFIG_LOCAL": str(path), **env}
+            with patch.dict(os.environ, full, clear=False):
+                if "MAINTAINER_LOGINS" not in env:
+                    os.environ.pop("MAINTAINER_LOGINS", None)
+                return (lib.maintainer_logins(), hook.maintainer_logins(),
+                        {x.lower() for x in self.reminder.logins()})
+
+    def test_default_is_the_repo_owner(self):
+        for got in self.resolve({}):
+            self.assertEqual(got, {"d-morrison"})
+
+    def test_config_file_names_the_maintainers(self):
+        for got in self.resolve({}, {"maintainers": ["Alice", "bob"]}):
+            self.assertEqual(got, {"alice", "bob"})
+
+    def test_env_wins_over_the_config_file(self):
+        for got in self.resolve({"MAINTAINER_LOGINS": "carol"}, {"maintainers": ["alice"]}):
+            self.assertEqual(got, {"carol"})
+
+    def test_malformed_config_falls_back_to_the_default(self):
+        import os
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "local.json"
+            path.write_text("{not json", encoding="utf-8")
+            with patch.dict(os.environ, {"AI_CONFIG_LOCAL": str(path)}):
+                os.environ.pop("MAINTAINER_LOGINS", None)
+                self.assertEqual(lib.maintainer_logins(), {"d-morrison"})
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

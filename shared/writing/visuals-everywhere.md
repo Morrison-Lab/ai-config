@@ -28,7 +28,8 @@ Every example gets one (Ezra, 2026-10-23, [psw rule](https://morrison-lab.github
 give each `#exm-` div a figure of its data, model or results in the same PR that writes or edits it, without being asked.
 Put the figure in the div or in a `_fig` subfile it includes.
 When there is nothing to plot, such as a single number, put `<!-- no-figure: reason -->` in the div.
-Notes repos enforce this with the gha `check-exm-figures` workflow (warn-only, diff-scoped), so an example without a figure is flagged at review.
+Each notes repo enforces this by calling the gha `check-exm-figures` workflow (warn-only, diff-scoped),
+so an example without a figure is flagged at review once that repo's caller has merged.
 
 Backfilling existing content (an explicit ask, so an exception to [`no-sweeps-by-default`](../workflow/no-sweeps-by-default.md);
 other rules are not backfilled unless Ezra says to):

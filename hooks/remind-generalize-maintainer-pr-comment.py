@@ -20,8 +20,9 @@ rule or check in its global home in the same turn, and name where.
 Inject-only, like its siblings: fixing the comment is right, only the follow-up
 is owed, so there is no code path that blocks or alters anything. Fires once per
 distinct event (sentinel in the temp dir keyed on a content hash). Fails OPEN
-and SILENT: any parse trouble prints nothing. The maintainer logins are read
-from MAINTAINER_LOGINS (comma separated), default `d-morrison`.
+and SILENT: any parse trouble prints nothing. The maintainer logins come from
+`_configured_maintainers` (MAINTAINER_LOGINS, else the local config file, else
+`d-morrison`); see its docstring.
 """
 import hashlib
 import json

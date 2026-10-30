@@ -11,7 +11,13 @@ edit_message) whose text asks the user to
   * click or press a Merge button, or merge a PR themselves;
   * paste, append, or hand-add text into a file or settings (Ezra, 2026-10-26:
     "never ask me to paste anything into a file; always give me a script-based
-    command to run that does it for me").
+    command to run that does it for me");
+  * type or run a shell command in their own terminal (Ezra, 2026-10-29,
+    ai-config#4842: "don't make me do anything myself unless there's absolutely
+    no other way; instead, ask me for permission to do it for me"). This
+    replaces the earlier fallback of handing one script command. A message that
+    names a secret, token, password or credential is exempt, because those
+    steps cannot be done for him.
 
 The denial points at the substitute: start a fresh session on an already
 approved environment with the brief as its opening task, retry a denied step
@@ -25,6 +31,15 @@ import sys
 REPLY_TOOL = re.compile(r"^mcp__hearthbot__(?:reply|post_message|update_message|edit_message)$")
 
 FILE_ASK = "a paste or hand-edit of a file"
+COMMAND_ASK = "a shell command for the user to type or run"
+
+# A secret has to be entered by the user, so a message about one may hand over
+# a command (ai-config#4842).
+SECRET = re.compile(r"\b(?:secrets?|tokens?|passwords?|passphrases?|credentials?|api keys?)\b", re.I)
+
+# Imperative lead-in: a sentence start, or a polite or modal lead-in.
+LEAD = r"(?:(?:^|[.!?\n:]\s*)|\b(?:please|you can|you could|can you|could you|just|then|but|and|or|so)\s+)"
+SHELL_WORD = r"(?:ssh|bash|sh|zsh|python3?|Rscript|git|gh|sudo|brew|curl|cd)"
 
 # A sentence that hands over one command running a script is the substitute the
 # rule asks for. It exempts a paste-like clause only in the same sentence; a script
@@ -62,6 +77,14 @@ ASKS = (
         r"\b(?:click|press|hit|tap)\b[^.\n]{0,30}\bmerge\b[^.\n]{0,20}\bbutton\b"
         r"|\bmerge (?:it|them|the PRs?) (?:yourself|manually|by hand)\b",
         re.I)),
+    (COMMAND_ASK, re.compile(
+        LEAD + r"(?:type|run|paste|enter|execute)\b[^.\n]{0,60}"
+        r"\b(?:in|into|on|at)\s+(?:your|the)\s+(?:\w+\s+)?(?:terminal|shell|command line|prompt)\b",
+        re.I)),
+    (COMMAND_ASK, re.compile(
+        LEAD + r"(?:type|run|paste|enter|execute)\b[^.\n]{0,40}?[`'\"]*\b"
+        + SHELL_WORD + r"\s+[~/.\w'\"-]",
+        re.I)),
     # paste, append and insert are rarely anything but a hand-edit, so a bare
     # settings or config is cue enough after them.
     (FILE_ASK, re.compile(
@@ -86,7 +109,8 @@ ASKS = (
 
 REASON = (
     "[hook: no-manual-step-ask] This message asks the user for hand work: {what}. "
-    "Do it another way. For a Remote Control session, start a fresh one on an "
+    "Do it another way: ask the user for permission to do the step yourself (a decision card, an approval prompt, "
+    "or a permission rule you ask to add), then run it; only a secret may be handed back to the user (ai-config#4842). For a Remote Control session, start a fresh one on an "
     "already approved environment with the brief as its opening task (no 'go' to type). "
     "For a merge, ask for plain `mwc`. For a file edit, write an idempotent script, test it, and give one command that runs it (no pasting). For a denied step, retry once unchanged. "
     "shared/workflow/lab-operating-rules.md; ai-config#4698."
@@ -119,6 +143,8 @@ def main() -> int:
     if not isinstance(text, str):
         return 0
     for what, pattern in ASKS:
+        if what == COMMAND_ASK and SECRET.search(text):
+            continue
         for match in pattern.finditer(text):
             if what == FILE_ASK and scripted(text, match):
                 continue

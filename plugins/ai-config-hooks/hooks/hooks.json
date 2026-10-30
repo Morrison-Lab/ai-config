@@ -1330,6 +1330,13 @@
             "timeout": 10,
             "script": "warn-raw-math-notation.py",
             "why": "User directive 2026-10-02: any LaTeX math, in any repo or format, uses the shared semantic macros (d-morrison/macros) wherever a macro names the concept. Broken in a manuscript whose first equation spelled an expectation in raw LaTeX; the rule is broken at composition time inside a Write or Edit, which prose cannot reach. Warns, never blocks: a raw spelling can be deliberate. Patterns live in scripts/lib/raw_math.py, shared with the scripts/check-raw-math.py lint. Tracked as #4221."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-example-without-figure.py\"'",
+            "timeout": 10,
+            "script": "warn-example-without-figure.py",
+            "why": "ai-config#4851 follow-up. Ezra, 2026-10-23: nearly every #exm- div gets a figure, or a <!-- no-figure: reason --> comment. The strict rule sat in psw teaching.qmd, which agents do not load while drafting, and no notes repo called gha check-exm-figures, so agents wrote bare examples. WARNS, never blocks, when a Write or Edit of a .qmd under a notes repo (lds, mds, pds, sds, mcs, rme, cds, ids, win, cie) adds an #exm- div holding no image, fig- label, @fig- reference, _fig include or no-figure comment. See shared/writing/visuals-everywhere.md. Fails open on parse trouble."
           }
         ]
       },
@@ -1385,6 +1392,13 @@
             "timeout": 10,
             "script": "warn-raw-math-notation.py",
             "why": "User directive 2026-10-02: any LaTeX math, in any repo or format, uses the shared semantic macros (d-morrison/macros) wherever a macro names the concept. Broken in a manuscript whose first equation spelled an expectation in raw LaTeX; the rule is broken at composition time inside a Write or Edit, which prose cannot reach. Warns, never blocks: a raw spelling can be deliberate. Patterns live in scripts/lib/raw_math.py, shared with the scripts/check-raw-math.py lint. Tracked as #4221."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-example-without-figure.py\"'",
+            "timeout": 10,
+            "script": "warn-example-without-figure.py",
+            "why": "ai-config#4851 follow-up. Ezra, 2026-10-23: nearly every #exm- div gets a figure, or a <!-- no-figure: reason --> comment. The strict rule sat in psw teaching.qmd, which agents do not load while drafting, and no notes repo called gha check-exm-figures, so agents wrote bare examples. WARNS, never blocks, when a Write or Edit of a .qmd under a notes repo (lds, mds, pds, sds, mcs, rme, cds, ids, win, cie) adds an #exm- div holding no image, fig- label, @fig- reference, _fig include or no-figure comment. See shared/writing/visuals-everywhere.md. Fails open on parse trouble."
           }
         ]
       },

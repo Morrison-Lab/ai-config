@@ -115,7 +115,8 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`, exce
 - **Do:** let local validation (`scripts/run-local-validation.py`) finish before the merge call.
 - **Don't:** treat the standing grant, a clean Claude review, or green CI as covering the cross-harness gate.
 - **Don't:** merge while the local validation run is still going, or while a step it skipped is unexplained.
-- **Reason:** ai-config#4853 and ai-config#4854 (2026-10-30) were both merged before their Flash read, and ai-config#4854 also while its local validation run was still going.
+- **Reason:** ai-config#4853 and ai-config#4854 (2026-10-30) were both merged before their Flash read.
+  The coordinator's rule also requires local validation to finish first.
   `hooks/warn-merge-without-cross-harness-review.py` cannot stop the merge, and the agent sees its note only with the merge result.
   The project coordinator set this rule on 2026-10-30, in Ezra's DATA 571 project, after those two merges.
   Ezra has not restated it.

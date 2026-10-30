@@ -42,10 +42,13 @@ SECRET = re.compile(r"\b(?:secrets?|tokens?|passwords?|passphrases?|credentials?
 # Imperative lead-in: a sentence start, or a polite or modal lead-in.
 LEAD = r"(?:(?:^|[.!?\n:]\s*)|\b(?:please|you can|you could|can you|could you|just|then|but|and|or|so)\s+)"
 # Short words such as cd, gh and sh are ordinary English or product names, so they are
-# left to the "in your terminal" form. git needs a subcommand after it.
+# left to the "in your terminal" form. git and brew need a subcommand after them, and
+# curl a flag or URL, because curl and brew are also ordinary nouns.
 SHELL_WORD = (
-    r"(?:(?:ssh|bash|zsh|python3?|Rscript|sudo|brew|curl)"
-    r"|git(?=\s+(?:push|pull|clone|fetch|checkout|merge|rebase|reset|commit|add|status|log|remote|config|submodule)\b))")
+    r"(?:(?:ssh|bash|zsh|python3?|Rscript|sudo)"
+    r"|git(?=\s+(?:push|pull|clone|fetch|checkout|merge|rebase|reset|commit|add|status|log|remote|config|submodule)\b)"
+    r"|brew(?=\s+(?:install|update|upgrade|uninstall|tap|services|list|doctor)\b)"
+    r"|curl(?=\s+(?:-|https?:|'|\")))")
 
 # A sentence that hands over one command running a script is the substitute the
 # rule asks for. It exempts a paste-like clause only in the same sentence; a script
@@ -132,19 +135,12 @@ def sentence_of(text: str, match: re.Match) -> str:
         position = start + len(piece)
         if start <= ask_end < position:
             return piece
-    return text
+    return ""
 
 
 def scripted(text: str, match: re.Match) -> bool:
     """True when the sentence holding the ask's last visible character tells the user to run a script command."""
-    ask_end = len(text[:match.end()].rstrip()) - 1
-    position = 0
-    for piece in SENTENCE_BREAK.split(text):
-        start = text.find(piece, position)
-        position = start + len(piece)
-        if start <= ask_end < position:
-            return bool(SCRIPT_COMMAND.search(piece))
-    return False
+    return bool(SCRIPT_COMMAND.search(sentence_of(text, match)))
 
 
 def main() -> int:

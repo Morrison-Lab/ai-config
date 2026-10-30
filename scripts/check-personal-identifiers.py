@@ -9,7 +9,7 @@ while the existing ones are moved into per-user configuration
 (`ai-config.local.example.json`, step (b) of making the repo usable by others).
 
 Scope: the files other people load, which are the shared rules, skills, hooks,
-scripts and top-level instruction files.  Out of scope: `memories/`, which are
+scripts, plugins, commands and top-level instruction files.  Out of scope: `memories/`, which are
 the maintainer's own notes and are expected to name their machines, `docs/`,
 `examples/`, case records (`*.cases.md`) and test files, which pin behaviour
 with a fixed login and gain nothing from being forced onto a placeholder.

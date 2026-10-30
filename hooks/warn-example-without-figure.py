@@ -52,6 +52,17 @@ def is_notes_page(path):
     return any(part in NOTES_REPOS for part in path.split("/"))
 
 
+def example_segments(text):
+    """The text of each `#exm-` div opening, up to the next one or the end.
+
+    Scoping the figure test to a segment keeps one figured example from
+    silencing a bare one added in the same edit.
+    """
+    starts = [m.start() for m in EXAMPLE.finditer(text)]
+    ends = starts[1:] + [len(text)]
+    return [text[a:b] for a, b in zip(starts, ends)]
+
+
 def added_text(name, inp):
     if name == "Write":
         return inp.get("content") or ""
@@ -69,11 +80,9 @@ def decide(payload):
         return None
     new = added_text(name, inp)
     old = inp.get("old_string") or ""
-    if not EXAMPLE.search(new):
-        return None
     if len(EXAMPLE.findall(new)) <= len(EXAMPLE.findall(old)):
         return None
-    if FIGURE.search(new):
+    if all(FIGURE.search(seg) for seg in example_segments(new)):
         return None
     return NOTE
 

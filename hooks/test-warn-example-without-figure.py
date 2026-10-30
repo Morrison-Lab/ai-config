@@ -42,6 +42,12 @@ CASES = [
     ("fig reference", write(PAGE, "::: {#exm-a}\nSee @fig-a.\n:::\n"), False),
     ("fig subfile include", write(PAGE, "::: {#exm-a}\n{{< include _fig-odds.qmd >}}\n:::\n"), False),
     ("no-figure comment", write(PAGE, "::: {#exm-a}\n<!-- no-figure: one number -->\n:::\n"), False),
+    ("figured example does not silence a bare one after it",
+     write(PAGE, "::: {#exm-a}\n![alt](a.png)\n:::\n\n" + BARE), True),
+    ("figured example does not silence a bare one before it",
+     write(PAGE, BARE + "\n::: {#exm-b}\n![alt](b.png)\n:::\n"), True),
+    ("two figured examples", write(
+        PAGE, "::: {#exm-a}\n![alt](a.png)\n:::\n\n::: {#exm-b}\n<!-- no-figure: one number -->\n:::\n"), False),
     ("edit keeps the example count", edit(PAGE, BARE, BARE + "more\n"), False),
     ("no example div", write(PAGE, "::: {#def-a}\ntext\n:::\n"), False),
     ("not a qmd file", write("/home/user/lds/README.md", BARE), False),

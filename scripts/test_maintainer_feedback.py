@@ -4,6 +4,8 @@
 `check-pr-fully-clean.py` imports the library; the merge hook keeps its own
 copy because a hook cannot import `scripts/lib`. The parity test feeds both
 the same items so the copies cannot drift apart (ai-config#4611).
+`TestConfiguredMaintainers` pins the maintainer-login reader across the
+library, the merge hook and `remind-generalize-maintainer-pr-comment.py`.
 """
 import importlib.util
 import io

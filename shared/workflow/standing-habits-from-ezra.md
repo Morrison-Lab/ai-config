@@ -104,6 +104,14 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`, exce
 - **Don't:** invoke a repo's standing merge grant (the ai-config, gha and macros exceptions) there, or relay a grant for him.
 - **Reason:** slips on gha#1169 and ai-config#4692 (2026-10-22), recorded in the [decision log](../../docs/decision-log.md).
 
+## Get the cross-harness verdict before the merge call
+
+- **Do:** before merging any ai-config PR, even under the standing grant, send the coordinator the head SHA, wait for a CLEAN cross-harness verdict (Gemini Flash while Argon is out of quota) on that head, and let local validation (`scripts/run-local-validation.py`) finish.
+- **Don't:** treat the standing grant, a clean Claude review, or green CI as covering the cross-harness gate in [`adversarial-self-review`](adversarial-self-review.md#cross-model-and-cross-harness-reviews-are-required-for-merging-and-the-harness-list-is-concrete).
+- **Reason:** ai-config#4853 and ai-config#4854 (2026-10-30) were both merged before their Flash read.
+  `hooks/warn-merge-without-cross-harness-review.py` only warns, and its note arrives with the merge result, after the merge has run.
+  The coordinator gave this rule on 2026-10-30.
+
 ## Keep removed content
 
 - **Do:** move good content you remove into an outtakes file.

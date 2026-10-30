@@ -4,7 +4,8 @@ A maintainer's comment, review or inline comment is feedback until a later
 push answers it. `check-pr-fully-clean.py` calls this; the merge hook
 `hooks/enforce-mwc-review-gate.py` keeps its own copy because a hook runs
 without `scripts/lib` on its path, and
-`scripts/test_maintainer_feedback.py` pins the two copies to the same verdicts.
+`scripts/test_maintainer_feedback.py` pins the two copies to the same verdicts, and the three copies of the
+maintainer-login reader to the same logins.
 """
 
 import json
@@ -42,8 +43,8 @@ def _configured_maintainers():
     raw = os.environ.get("MAINTAINER_LOGINS")
     if raw is not None:
         return raw
-    path = os.environ.get("AI_CONFIG_LOCAL") or os.path.expanduser(
-        "~/.config/ai-config/local.json")
+    path = os.path.expanduser(
+        os.environ.get("AI_CONFIG_LOCAL") or "~/.config/ai-config/local.json")
     if os.path.exists(path):
         try:
             with open(path, encoding="utf-8") as fh:

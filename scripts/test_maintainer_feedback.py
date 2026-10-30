@@ -232,6 +232,24 @@ class TestConfiguredMaintainers(unittest.TestCase):
         for got in self.resolve({}, {"maintainers": ["Alice", "bob"]}):
             self.assertEqual(got, {"alice", "bob"})
 
+    def test_empty_env_means_no_maintainers(self):
+        for got in self.resolve({"MAINTAINER_LOGINS": ""}, {"maintainers": ["alice"]}):
+            self.assertEqual(got, set())
+
+    def test_config_path_expands_a_tilde(self):
+        import os
+        import tempfile
+        with tempfile.TemporaryDirectory() as home:
+            (Path(home) / "ai.json").write_text(
+                '{"maintainers": ["dana"]}', encoding="utf-8")
+            env = {"HOME": home, "AI_CONFIG_LOCAL": "~/ai.json"}
+            with patch.dict(os.environ, env):
+                os.environ.pop("MAINTAINER_LOGINS", None)
+                self.assertEqual(lib.maintainer_logins(), {"dana"})
+                self.assertEqual(hook.maintainer_logins(), {"dana"})
+                self.assertEqual(
+                    {x.lower() for x in self.reminder.logins()}, {"dana"})
+
     def test_env_wins_over_the_config_file(self):
         for got in self.resolve({"MAINTAINER_LOGINS": "carol"}, {"maintainers": ["alice"]}):
             self.assertEqual(got, {"carol"})
@@ -260,7 +278,7 @@ class TestConfiguredMaintainers(unittest.TestCase):
             got, err = self.resolve_text(text)
             for one in got:
                 self.assertEqual(one, {"d-morrison"}, text)
-            self.assertIn("ignoring", err, text)
+            self.assertEqual(err.count("ignoring"), 3, text)
 
     def test_unconfigured_is_silent_and_uses_the_default(self):
         for text in (None, "{}", '{"maintainers": []}'):

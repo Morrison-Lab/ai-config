@@ -1337,8 +1337,8 @@ def _configured_maintainers():
     raw = os.environ.get("MAINTAINER_LOGINS")
     if raw is not None:
         return raw
-    path = os.environ.get("AI_CONFIG_LOCAL") or os.path.expanduser(
-        "~/.config/ai-config/local.json")
+    path = os.path.expanduser(
+        os.environ.get("AI_CONFIG_LOCAL") or "~/.config/ai-config/local.json")
     if os.path.exists(path):
         try:
             with open(path, encoding="utf-8") as fh:

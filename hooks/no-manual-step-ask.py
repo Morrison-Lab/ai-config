@@ -22,7 +22,9 @@ edit_message) whose text asks the user to
 The denial points at the substitute: start a fresh session on an already
 approved environment with the brief as its opening task, retry a denied step
 once, for merges ask for the plain `mwc` word, and for a file edit write an
-idempotent script and give one command that runs it. Fails open on parse trouble.
+idempotent script, test it, ask permission, and run it yourself (ai-config#4842
+replaced the earlier fallback of giving the user one command to run it).
+Fails open on parse trouble.
 """
 import json
 import re
@@ -39,7 +41,11 @@ SECRET = re.compile(r"\b(?:secrets?|tokens?|passwords?|passphrases?|credentials?
 
 # Imperative lead-in: a sentence start, or a polite or modal lead-in.
 LEAD = r"(?:(?:^|[.!?\n:]\s*)|\b(?:please|you can|you could|can you|could you|just|then|but|and|or|so)\s+)"
-SHELL_WORD = r"(?:ssh|bash|sh|zsh|python3?|Rscript|git|gh|sudo|brew|curl|cd)"
+# Short words such as cd, gh and sh are ordinary English or product names, so they are
+# left to the "in your terminal" form. git needs a subcommand after it.
+SHELL_WORD = (
+    r"(?:(?:ssh|bash|zsh|python3?|Rscript|sudo|brew|curl)"
+    r"|git(?=\s+(?:push|pull|clone|fetch|checkout|merge|rebase|reset|commit|add|status|log|remote|config|submodule)\b))")
 
 # A sentence that hands over one command running a script is the substitute the
 # rule asks for. It exempts a paste-like clause only in the same sentence; a script
@@ -112,9 +118,21 @@ REASON = (
     "Do it another way: ask the user for permission to do the step yourself (a decision card, an approval prompt, "
     "or a permission rule you ask to add), then run it; only a secret may be handed back to the user (ai-config#4842). For a Remote Control session, start a fresh one on an "
     "already approved environment with the brief as its opening task (no 'go' to type). "
-    "For a merge, ask for plain `mwc`. For a file edit, write an idempotent script, test it, and give one command that runs it (no pasting). For a denied step, retry once unchanged. "
+    "For a merge, ask for plain `mwc`. For a file edit, write an idempotent script, test it, ask permission, and run it yourself (no pasting, no command for the user to type). For a denied step, retry once unchanged. "
     "shared/workflow/lab-operating-rules.md; ai-config#4698."
 )
+
+
+def sentence_of(text: str, match: re.Match) -> str:
+    """The sentence holding the match's last visible character."""
+    ask_end = max(len(text[:match.end()].rstrip()) - 1, 0)
+    position = 0
+    for piece in SENTENCE_BREAK.split(text):
+        start = text.find(piece, position)
+        position = start + len(piece)
+        if start <= ask_end < position:
+            return piece
+    return text
 
 
 def scripted(text: str, match: re.Match) -> bool:
@@ -143,10 +161,10 @@ def main() -> int:
     if not isinstance(text, str):
         return 0
     for what, pattern in ASKS:
-        if what == COMMAND_ASK and SECRET.search(text):
-            continue
         for match in pattern.finditer(text):
             if what == FILE_ASK and scripted(text, match):
+                continue
+            if what == COMMAND_ASK and SECRET.search(sentence_of(text, match)):
                 continue
             print(json.dumps({
                 "hookSpecificOutput": {

@@ -26,11 +26,11 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`, exce
 
 - **Do:** run the command, apply the patch, and fix the file yourself.
 - **Don't:** ask Ezra to run commands or hand-apply patches, except the single scripted line described below.
-- **Reason:** that moves your work onto the person you work for.
 - **Don't:** hand Ezra a step you could do yourself, as [`default-to-action-grants`](default-to-action-grants.md#never-hand-the-owner-a-step-you-could-do-yourself) says.
   Ezra restated it on 2026-10-30: "never tell me to do things you could have done yourself".
   `hooks/no-manual-step-ask.py` denies the replies that ask for a paste, a hand-edit or a shell command.
   No hook can tell whether you could have done some other step yourself, so the rest is prose.
+- **Reason:** that moves your work onto the person you work for.
 - **Do:** when a step is blocked and you cannot do it, make Ezra's part as small as possible.
   Ezra, 2026-10-16: "don't make me do anything manually unless absolutely necessary, and then make it as simple as possible, for example by writing scripts I can call in a single shell command".
 - **Do:** for a classifier denial of an action he authorized, follow [`ask-for-manual-approval`](ask-for-manual-approval.md).
@@ -60,10 +60,12 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`, exce
 ## Read a question as the asker framed it
 
 - **Do:** treat a question mark, or a "should we" phrasing, as Ezra being uncertain about what to do, and give honest, direct feedback.
-  Ezra, 2026-10-30: "a question mark or a "should we" phrasing indicates I'm uncertain about what I'm asking you to do, and want honest, direct feedback".
+  Ezra, 2026-10-30: "a question mark or a 'should we' phrasing indicates I'm uncertain about what I'm asking you to do, and want honest, direct feedback".
+- **Don't:** answer such a question with agreement for its own sake, or with a hedge that leaves the decision open.
 - **Do:** treat "why did you ...?" as a correction, not a request for an explanation.
-  Ezra, 2026-10-30: "but "why did you ...?" is different and indicates a correction".
+  Ezra, 2026-10-30: "but 'why did you ...?' is different and indicates a correction".
 - **Do:** on a "why did you ...?", fix the instance and record the rule that prevents it, as in "Apply each new instruction at once".
+- **Don't:** answer "why did you ...?" with an account of your reasoning and stop there.
 - **Reason:** no hook can read intent from phrasing, so this is prose.
 
 ## Report an unreachable source

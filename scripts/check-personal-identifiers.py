@@ -28,7 +28,7 @@ is a new occurrence, and below it means the baseline is stale, so the count
 can only fall and each fall is recorded.  Run with `--update-baseline` after
 removing one.
 
-Exit status: 1 when any file exceeds its baseline, else 0.
+Exit status: 1 when any file's count differs from its baseline, else 0.
 """
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ ROOT = Path(__file__).resolve().parent.parent
 BASELINE = ROOT / "scripts" / "personal-identifiers-baseline.json"
 
 PATTERN = re.compile(
-    r"cf463-\d+|DEM-MBP-\d+|/home/morri313|ezramorrison|[Dd]:[/\\]GitHub|/d/GitHub"
+    r"cf463-\d+|DEM-MBP-\d+|/home/morri313|ezramorrison|(?<![A-Za-z])[Dd]:[/\\]GitHub\b|/d/GitHub\b"
     r"|morri313|dougmor|dem-extra1"
 )
 
@@ -139,10 +139,13 @@ def main() -> int:
             if (ROOT / path).is_file() else []
         where = f" (lines {', '.join(map(str, lines[:8]))})" if lines else ""
         print(f"::error file={path}::{message}{where}")
-    if findings:
+    if any(counts.get(path, 0) > baseline.get(path, 0) for path, _ in findings):
         print("Move the value into per-user configuration instead of writing it into "
               "a shared file (see ai-config.local.example.json), or, for a value that "
               "must stay, run with --update-baseline and say why in the PR.")
+    if any(counts.get(path, 0) < baseline.get(path, 0) for path, _ in findings):
+        print("A count fell below its baseline: run --update-baseline and commit it.")
+    if findings:
         return 1
     return 0
 

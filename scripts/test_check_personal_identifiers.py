@@ -26,6 +26,9 @@ class TestCountHits(unittest.TestCase):
     def test_org_and_repo_owner_are_not_counted(self):
         self.assertEqual(checker.count_hits("Morrison-Lab/gha and d-morrison"), 0)
 
+    def test_a_path_pattern_needs_a_boundary(self):
+        self.assertEqual(checker.count_hits("D:\\GitHubDesktop and legend:/GitHub"), 0)
+
     def test_a_generic_machine_name_is_not_counted(self):
         self.assertEqual(checker.count_hits("ssh cf9-01 and my-laptop"), 0)
 

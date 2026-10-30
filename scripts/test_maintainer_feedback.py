@@ -9,6 +9,7 @@ library, the merge hook and `remind-generalize-maintainer-pr-comment.py`.
 """
 import importlib.util
 import io
+import os
 import contextlib
 import sys
 import unittest
@@ -177,7 +178,11 @@ class TestCheckerGate(unittest.TestCase):
         fake.head_sha, fake.branch, fake.state = "a" * 40, "b", "OPEN"
         fake.commit_date, fake.review_decision = PUSHED, ""
         out = io.StringIO()
-        with patch.object(checker, "parse_args", return_value=args), \
+        # A cloud container sets CLAUDE_CODE_REMOTE, which makes main() make
+        # network requests instead of using the patched PR.
+        env = {k: v for k, v in os.environ.items() if k != "CLAUDE_CODE_REMOTE"}
+        with patch.dict(os.environ, env, clear=True), \
+                patch.object(checker, "parse_args", return_value=args), \
                 patch.object(checker, "resolve_repo", return_value="o/r"), \
                 patch.object(checker, "get_pr_info", return_value=fake), \
                 patch.object(checker, "check_ci_runs", return_value=(True, [])), \
@@ -213,7 +218,6 @@ class TestConfiguredMaintainers(unittest.TestCase):
 
     def resolve(self, env, config=None):
         import json
-        import os
         import tempfile
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "local.json"
@@ -239,7 +243,6 @@ class TestConfiguredMaintainers(unittest.TestCase):
             self.assertEqual(got, set())
 
     def test_config_path_expands_a_tilde(self):
-        import os
         import tempfile
         with tempfile.TemporaryDirectory() as home:
             (Path(home) / "ai.json").write_text(
@@ -259,7 +262,6 @@ class TestConfiguredMaintainers(unittest.TestCase):
 
     def resolve_text(self, text):
         """Resolve with a config file holding `text` (None: no file)."""
-        import os
         import tempfile
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "local.json"

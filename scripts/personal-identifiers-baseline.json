@@ -1,0 +1,15 @@
+{
+  "hooks/hooks.json": 1,
+  "hooks/no-ask-to-start-rc.py": 5,
+  "plugins/ai-config-hooks/hooks/hooks.json": 1,
+  "scripts/agy-dispatch.py": 2,
+  "scripts/pr-scope.py": 1,
+  "scripts/push-wwu-gitlab.sh": 1,
+  "shared/workflow/fetch-untrusted-files.md": 3,
+  "shared/workflow/fully-clean.md": 1,
+  "shared/workflow/lab-operating-rules.md": 3,
+  "shared/workflow/manage-quota.md": 1,
+  "shared/workflow/route-to-agy.md": 3,
+  "skills/ardia/SKILL.md": 1,
+  "skills/ums/SKILL.md": 2
+}

@@ -55,10 +55,8 @@ When authoring analysis figures, prefer `ggplot2` over base graphics wherever th
 Title axes in words, not symbols; print ticks as plain numbers ([details](shared/writing/axis-tick-labels.md)).
 One equation per display line unless a reason favors more;
 one `=` per math line ([details](shared/writing/math-derivation-steps.md)).
-Include a visual (graph, diagram, figure) wherever one helps a reader, in new work and in existing content you touch, as a plotly graph (3D where a third dimension helps) wherever feasible, with a static fallback for PDF and Word ([details](shared/writing/visuals-everywhere.md)).
-Give every example (`#exm-` div) a figure of its data, model or results,
-or a `<!-- no-figure: reason -->` comment in the div;
-do not wait to be asked ([details](shared/writing/visuals-everywhere.md)).
+Include a visual wherever one helps a reader, in new work and in existing content you touch, as plotly where feasible with a static fallback.
+Give every `#exm-` div a figure, or a `<!-- no-figure: reason -->` comment, unasked ([details](shared/writing/visuals-everywhere.md)).
 Label every display equation so it receives an equation number and a stable URL.
 Write all LaTeX math, in any repo or format, with the shared semantic macros: [`use-math-macros`](skills/use-math-macros/SKILL.md).
 

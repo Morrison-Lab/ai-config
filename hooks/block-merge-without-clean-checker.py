@@ -410,8 +410,6 @@ def evidence(path):
 
 def deny(reason):
     return {
-        "decision": "deny",
-        "reason": reason,
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "permissionDecision": "deny",

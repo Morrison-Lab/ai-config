@@ -151,11 +151,16 @@ def main():
     # --- denies ----------------------------------------------------------
     denied, out = mcp([])
     check("denies an MCP merge with no checker evidence", denied)
+    # 2026-10-31: a top-level "decision": "deny" is not a value Claude Code
+    # accepts (only approve/block); it invalidates the whole hook output, so
+    # the merge ran in a live cloud session. Deny through hookSpecificOutput only.
+    check("deny output carries no top-level decision or reason key",
+          set(out) == {"hookSpecificOutput"})
     check("...naming the repo, PR and the checker command",
-          out and f"{REPO}#354" in out["reason"]
-          and "check-pr-fully-clean.py 354" in out["reason"])
+          out and f"{REPO}#354" in out["hookSpecificOutput"]["permissionDecisionReason"]
+          and "check-pr-fully-clean.py 354" in out["hookSpecificOutput"]["permissionDecisionReason"])
     check("...and pointing the cloud case at Remote Control",
-          out and "Remote Control" in out["reason"])
+          out and "Remote Control" in out["hookSpecificOutput"]["permissionDecisionReason"])
     check("denies when the only run was for a DIFFERENT head (psw#354 case)",
           mcp([bash(f"python3 scripts/check-pr-fully-clean.py 354 -R {REPO}",
                     line(OTHER))])[0])

@@ -205,6 +205,22 @@ def main():
           not mcp([bash(f"python3 scripts/check-pr-fully-clean.py "
                         f"--from-json /tmp/p.json -R {REPO} 354",
                         line())])[0])
+    # 2026-10-31 (mds#561): once #4862 made the deny take effect, a checker
+    # run followed by `; echo "exit=$?"` or wrapped in `timeout` was not
+    # credited, so a genuinely clean PR could not be merged.
+    chk = f"python3 scripts/check-pr-fully-clean.py 354 -R {REPO}"
+    check("allows a checker run followed by `; echo exit=$?`",
+          not mcp([bash(chk + '; echo "exit=$?"', line())])[0])
+    check("allows a checker run under `timeout 300`",
+          not mcp([bash("timeout 300 " + chk, line())])[0])
+    for pre in ("timeout 30s ", "timeout 0.5 ", "timeout -k 10 300 ",
+                "timeout --signal=SIGKILL 300 "):
+        check(f"allows a checker run under `{pre.strip()}`",
+              not mcp([bash(pre + chk, line())])[0])
+    check("still denies an echo that names CLEAN beside the checker",
+          mcp([bash(chk + f"; echo '{line()}'", line())])[0])
+    check("still denies an echo that expands a variable beside the checker",
+          mcp([bash(chk + '; echo "$L"', line())])[0])
     check("allows an Antigravity PLANNER_RESPONSE + GENERIC checker run",
           not gh(GH_OK, [agy_checker()])[0])
     check("denies an Antigravity checker run with status=ERROR",

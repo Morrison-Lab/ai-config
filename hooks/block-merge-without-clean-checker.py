@@ -140,6 +140,7 @@ RUNNERS = frozenset({"python", "python3", "py", "python3.11", "python3.12",
 NOT_A_FILE = frozenset({"-c", "--command", "-m", "--module", "-h", "--help",
                         "-V", "--version"})
 PRINTERS = frozenset({"echo", "printf", "cat", "tee"})
+RX_DURATION = re.compile(r"^\d+(\.\d+)?[smhd]?$")
 WRAPPERS = frozenset({"timeout", "time", "nice", "nohup", "command", "stdbuf"})
 RX_FORGE = re.compile(r"clean|\$(?!\?)|`", re.IGNORECASE)
 RX_EVIDENCE = re.compile(
@@ -319,6 +320,20 @@ def merge_targets(tool, tool_input):
     return out
 
 
+def _skip_wrapper_args(rest):
+    """Drop the flags and duration `strip_env` leaves before a wrapped command:
+    `timeout 300`, `30s`, `0.5`, `-k 10 300`, `--signal=KILL 300`."""
+    while rest:
+        tok = rest[0]
+        if tok in ("-k", "-s", "--kill-after", "--signal") and len(rest) > 1:
+            rest = rest[2:]
+        elif tok.startswith("-") or RX_DURATION.match(tok):
+            rest = rest[1:]
+        else:
+            break
+    return rest
+
+
 def _runs_instrument(command):
     """True when *command* runs the instrument and cannot print its own line."""
     ran = False
@@ -327,12 +342,9 @@ def _runs_instrument(command):
             rest = strip_env(argv)[1]
             if not rest:
                 continue
-            while rest and rest[0].isdigit():  # `timeout 300` leaves 300
-                rest = rest[1:]
+            rest = _skip_wrapper_args(rest)
             while rest and _basename(rest[0]) in WRAPPERS:
-                rest = rest[1:]
-                while rest and (rest[0].startswith("-") or rest[0].isdigit()):
-                    rest = rest[1:]
+                rest = _skip_wrapper_args(rest[1:])
             if not rest:
                 continue
             head = _basename(rest[0])

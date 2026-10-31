@@ -213,6 +213,10 @@ def main():
           not mcp([bash(chk + '; echo "exit=$?"', line())])[0])
     check("allows a checker run under `timeout 300`",
           not mcp([bash("timeout 300 " + chk, line())])[0])
+    for pre in ("timeout 30s ", "timeout 0.5 ", "timeout -k 10 300 ",
+                "timeout --signal=SIGKILL 300 "):
+        check(f"allows a checker run under `{pre.strip()}`",
+              not mcp([bash(pre + chk, line())])[0])
     check("still denies an echo that names CLEAN beside the checker",
           mcp([bash(chk + f"; echo '{line()}'", line())])[0])
     check("still denies an echo that expands a variable beside the checker",

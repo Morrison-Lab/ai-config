@@ -140,6 +140,8 @@ RUNNERS = frozenset({"python", "python3", "py", "python3.11", "python3.12",
 NOT_A_FILE = frozenset({"-c", "--command", "-m", "--module", "-h", "--help",
                         "-V", "--version"})
 PRINTERS = frozenset({"echo", "printf", "cat", "tee"})
+WRAPPERS = frozenset({"timeout", "time", "nice", "nohup", "command", "stdbuf"})
+RX_FORGE = re.compile(r"clean|\$(?!\?)|`", re.IGNORECASE)
 RX_EVIDENCE = re.compile(
     r"([\w.-]+/[\w.-]+)#(\d+) is FULLY CLEAN on HEAD ([0-9a-f]{7,40})\b")
 RX_NOT_CLEAN = re.compile(r"NOT fully clean", re.IGNORECASE)
@@ -325,8 +327,22 @@ def _runs_instrument(command):
             rest = strip_env(argv)[1]
             if not rest:
                 continue
+            while rest and rest[0].isdigit():  # `timeout 300` leaves 300
+                rest = rest[1:]
+            while rest and _basename(rest[0]) in WRAPPERS:
+                rest = rest[1:]
+                while rest and (rest[0].startswith("-") or rest[0].isdigit()):
+                    rest = rest[1:]
+            if not rest:
+                continue
             head = _basename(rest[0])
             if head in PRINTERS:
+                # `; echo "exit=$?"` is the usual way to read an exit status
+                # and cannot print the evidence line: allow an `echo` whose
+                # arguments hold no "clean" and no expansion but `$?`.
+                if head == "echo" and not any(RX_FORGE.search(t)
+                                              for t in rest[1:]):
+                    continue
                 return False
             if head == INSTRUMENT:
                 ran = True

@@ -1,6 +1,6 @@
 # Standing habits from Ezra
 
-Ezra (d-morrison) gave these rules in the DATA 571 project on 2026-10-02.
+Ezra (d-morrison) gave these rules in the DATA 571 project on 2026-10-02, except where a section says otherwise.
 They apply in every project, per the global-by-default rule in `AGENTS.md`, except where a rule names a narrower scope (the Codex and Databricks lanes below).
 
 ## Apply each new instruction at once
@@ -64,8 +64,10 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`, exce
 - **Don't:** answer such a question with agreement for its own sake, or with a hedge that leaves the decision open.
 - **Do:** treat "why did you ...?" as a correction, not a request for an explanation.
   Ezra, 2026-10-30: "but 'why did you ...?' is different and indicates a correction".
+- **Don't:** answer "why did you ...?" with only an account of your reasoning.
+  A short account of the cause is fine when it goes with the fix and the recorded rule.
 - **Do:** on a "why did you ...?", fix the instance and record the rule that prevents it, as in "Apply each new instruction at once".
-- **Don't:** answer "why did you ...?" with an account of your reasoning and stop there.
+- **Don't:** fix the instance and leave the rule that prevents it unrecorded.
 - **Reason:** no hook can read intent from phrasing, so this is prose.
 
 ## Report an unreachable source
@@ -103,6 +105,21 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`, exce
 - **Do:** in a project thread for Ezra, merge only on his own typed word in the owning thread, for a PR that existed when he typed it.
 - **Don't:** invoke a repo's standing merge grant (the ai-config, gha and macros exceptions) there, or relay a grant for him.
 - **Reason:** slips on gha#1169 and ai-config#4692 (2026-10-22), recorded in the [decision log](../../docs/decision-log.md).
+
+## Get the cross-harness verdict and finish local validation before the merge call
+
+- **Do:** before merging a PR under a standing grant (ai-config, gha or macros), get a CLEAN cross-harness verdict on that head.
+  In a project thread with a coordinator, send the coordinator the head SHA and wait for the verdict.
+  Where there is no coordinator, dispatch the reviewer yourself, as [`adversarial-self-review`](adversarial-self-review.md#cross-model-and-cross-harness-reviews-are-required-for-merging-and-the-harness-list-is-concrete) says.
+  As of 2026-10-30, the reviewer is Gemini Flash through `agy`, because Argon is out of quota.
+- **Do:** let local validation (`scripts/run-local-validation.py`) finish before the merge call.
+- **Don't:** treat the standing grant, a clean Claude review, or green CI as covering the cross-harness gate.
+- **Don't:** merge while the local validation run is still going, or while a step it skipped is unexplained.
+- **Reason:** ai-config#4853 and ai-config#4854 (2026-10-30) were both merged before their Flash read.
+  The coordinator's rule also requires local validation to finish first.
+  `hooks/warn-merge-without-cross-harness-review.py` cannot stop the merge, and the agent sees its note only with the merge result.
+  The project coordinator set this rule on 2026-10-30, in Ezra's DATA 571 project, after those two merges.
+  Ezra has not restated it.
 
 ## Keep removed content
 

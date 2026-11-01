@@ -49,7 +49,8 @@ WORK_RX = re.compile(
 MERGE_RX = re.compile(r"\bmerg(?:e|es|ed|ing)\b(?![- ]word)", re.I)
 NEGATION_RX = re.compile(r"\b(?:no|never|without|neither|nor)\b|n't|\b(?:do|does|need) not\b", re.I)
 
-SENTENCE_SPLIT_RX = re.compile(r"(?<=[.!?;])\s+|\n")
+CLAUSE_SPLIT_RX = re.compile(r"[,:]\s+|\s+but\s+", re.I)
+SENTENCE_SPLIT_RX =re.compile(r"(?<=[.!?;])\s+|\n")
 TAIL_SENTENCES = 4
 STOPPING_POINT_RX = re.compile(r"\*\*Stopping Point\*\*.*\Z", re.S | re.I)
 
@@ -113,14 +114,17 @@ def tail_of(prose):
 def offending_sentence(prose):
     """The last sentence that gates non-merge work on a merge word, or None."""
     for sentence in reversed(tail_of(prose)):
-        mwc = MWC_RX.search(sentence)
-        if not mwc or not GATE_RX.search(sentence) or not WORK_RX.search(sentence):
-            continue
-        if NEGATION_RX.search(sentence):
-            continue
-        if MERGE_RX.search(sentence):
-            continue
-        return sentence.strip()
+        for clause in reversed(CLAUSE_SPLIT_RX.split(sentence)):
+            if not MWC_RX.search(clause) or not GATE_RX.search(clause):
+                continue
+            if not WORK_RX.search(clause) or NEGATION_RX.search(clause):
+                continue
+            # A clause about the merge itself may gate on the word, but a
+            # merge named in an earlier clause ("After merging this one, the
+            # next PRs need mwc") does not excuse a later clause.
+            if MERGE_RX.search(clause):
+                continue
+            return sentence.strip()
     return None
 
 

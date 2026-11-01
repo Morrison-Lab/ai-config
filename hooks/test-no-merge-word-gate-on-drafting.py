@@ -48,6 +48,9 @@ CASES_BLOCK = [
     "I'll draft the remaining PRs once you type mwc.",
     "Waiting for your merge word before opening the next PR.",
     "**Stopping Point**: Not a clean stopping point: continuing the other labs is pending mwc.",
+    # A merge named in an earlier clause does not excuse a later one.
+    "After merging this one, the next PRs still need mwc.",
+    "Merged the first PR, but drafting the next PR waits on mwc.",
 ]
 
 CASES_PASS = [

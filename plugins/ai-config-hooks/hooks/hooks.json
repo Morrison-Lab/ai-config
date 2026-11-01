@@ -2014,6 +2014,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-merge-word-gate-on-drafting.py\"'",
+            "timeout": 10,
+            "script": "no-merge-word-gate-on-drafting.py",
+            "why": "ai-config#4866 -- 2026-11-01, an agent ended a turn after a merge with queued ISL lab work and said the next PRs 'need a fresh mwc'. A merge word gates merging only; drafting, pushing and opening a PR need none. Blocks once per message when the closing sentences say non-merge work needs, waits on or is pending the merge word; a sentence that gates the merge itself, or negates the need, passes. no-announced-start-without-starting.py misses it because the gate reads as a conditional."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/require-stopping-point.py\"'",
             "timeout": 10,
             "script": "require-stopping-point.py",

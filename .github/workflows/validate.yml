@@ -674,6 +674,14 @@ jobs:
         # a fragment once and then names it bare is the miss this corpus
         # states in prose and, before this step, had no instrument for.
         run: python3 scripts/check-bare-fragment-mentions.py
+      - name: Check shared files for new hardcoded machine names, paths and accounts
+        # Step (b) of making ai-config usable by others: the maintainer's own
+        # machines and accounts are moved into per-user configuration, and this
+        # keeps the count from growing meanwhile. Fails only above the
+        # per-file baseline in scripts/personal-identifiers-baseline.json.
+        run: python3 scripts/check-personal-identifiers.py
+      - name: Run check-personal-identifiers tests
+        run: python3 scripts/test_check_personal_identifiers.py
       - name: Check Do/Don't bullet ordering (advisory)
         # ai-config#3751: in any contiguous block of guidance bullets, all
         # `- **Do:**` bullets must appear before any `- **Don't:**` bullets.

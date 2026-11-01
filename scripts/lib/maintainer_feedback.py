@@ -4,10 +4,13 @@ A maintainer's comment, review or inline comment is feedback until a later
 push answers it. `check-pr-fully-clean.py` calls this; the merge hook
 `hooks/enforce-mwc-review-gate.py` keeps its own copy because a hook runs
 without `scripts/lib` on its path, and
-`scripts/test_maintainer_feedback.py` pins the two copies to the same verdicts.
+`scripts/test_maintainer_feedback.py` pins the two copies to the same verdicts,
+and the three copies of the maintainer-login reader to the same logins.
 """
 
+import json
 import os
+import sys
 import re
 from typing import Any, Dict, List, Set
 
@@ -27,9 +30,38 @@ EXEMPT_RE = re.compile(
 )
 
 
+def _configured_maintainers():
+    """Comma-separated maintainer logins: `MAINTAINER_LOGINS`, else the
+    "maintainers" list in the JSON file `AI_CONFIG_LOCAL` names (default
+    `~/.config/ai-config/local.json`, see `ai-config.local.example.json`),
+    else `d-morrison`, the repo owner, so an unconfigured install keeps its
+    behaviour. A missing file or an absent or empty list is "unconfigured";
+    a file that exists but is unreadable, is not a JSON object, or holds
+    anything but a list of non-empty strings warns on stderr and falls back
+    too. Standalone: hooks are staged one file at a time and cannot import
+    a sibling module."""
+    raw = os.environ.get("MAINTAINER_LOGINS")
+    if raw is not None:
+        return raw
+    path = os.path.expanduser(
+        os.environ.get("AI_CONFIG_LOCAL") or "~/.config/ai-config/local.json")
+    if os.path.exists(path):
+        try:
+            with open(path, encoding="utf-8") as fh:
+                names = json.load(fh).get("maintainers", [])
+            if not isinstance(names, list) or not all(
+                    isinstance(n, str) and n.strip() for n in names):
+                raise ValueError('"maintainers" must be a list of login strings')
+            if names:
+                return ",".join(names)
+        except (OSError, ValueError, AttributeError) as err:
+            print(f"ai-config: ignoring {path}: {err}", file=sys.stderr)
+    return "d-morrison"
+
+
 def maintainer_logins() -> Set[str]:
-    """Lowercased logins in `MAINTAINER_LOGINS` (default `d-morrison`)."""
-    raw = os.environ.get("MAINTAINER_LOGINS", "d-morrison")
+    """Lowercased maintainer logins from `_configured_maintainers`."""
+    raw = _configured_maintainers()
     return {x.strip().lower() for x in raw.split(",") if x.strip()}
 
 

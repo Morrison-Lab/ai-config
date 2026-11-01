@@ -151,11 +151,16 @@ def main():
     # --- denies ----------------------------------------------------------
     denied, out = mcp([])
     check("denies an MCP merge with no checker evidence", denied)
+    # 2026-10-31: a top-level "decision": "deny" is not a value Claude Code
+    # accepts (only approve/block); it invalidates the whole hook output, so
+    # the merge ran in a live cloud session. Deny through hookSpecificOutput only.
+    check("deny output carries no top-level decision or reason key",
+          set(out) == {"hookSpecificOutput"})
     check("...naming the repo, PR and the checker command",
-          out and f"{REPO}#354" in out["reason"]
-          and "check-pr-fully-clean.py 354" in out["reason"])
+          out and f"{REPO}#354" in out["hookSpecificOutput"]["permissionDecisionReason"]
+          and "check-pr-fully-clean.py 354" in out["hookSpecificOutput"]["permissionDecisionReason"])
     check("...and pointing the cloud case at Remote Control",
-          out and "Remote Control" in out["reason"])
+          out and "Remote Control" in out["hookSpecificOutput"]["permissionDecisionReason"])
     check("denies when the only run was for a DIFFERENT head (psw#354 case)",
           mcp([bash(f"python3 scripts/check-pr-fully-clean.py 354 -R {REPO}",
                     line(OTHER))])[0])
@@ -200,6 +205,22 @@ def main():
           not mcp([bash(f"python3 scripts/check-pr-fully-clean.py "
                         f"--from-json /tmp/p.json -R {REPO} 354",
                         line())])[0])
+    # 2026-10-31 (mds#561): once #4862 made the deny take effect, a checker
+    # run followed by `; echo "exit=$?"` or wrapped in `timeout` was not
+    # credited, so a genuinely clean PR could not be merged.
+    chk = f"python3 scripts/check-pr-fully-clean.py 354 -R {REPO}"
+    check("allows a checker run followed by `; echo exit=$?`",
+          not mcp([bash(chk + '; echo "exit=$?"', line())])[0])
+    check("allows a checker run under `timeout 300`",
+          not mcp([bash("timeout 300 " + chk, line())])[0])
+    for pre in ("timeout 30s ", "timeout 0.5 ", "timeout -k 10 300 ",
+                "timeout --signal=SIGKILL 300 "):
+        check(f"allows a checker run under `{pre.strip()}`",
+              not mcp([bash(pre + chk, line())])[0])
+    check("still denies an echo that names CLEAN beside the checker",
+          mcp([bash(chk + f"; echo '{line()}'", line())])[0])
+    check("still denies an echo that expands a variable beside the checker",
+          mcp([bash(chk + '; echo "$L"', line())])[0])
     check("allows an Antigravity PLANNER_RESPONSE + GENERIC checker run",
           not gh(GH_OK, [agy_checker()])[0])
     check("denies an Antigravity checker run with status=ERROR",

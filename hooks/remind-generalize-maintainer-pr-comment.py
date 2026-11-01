@@ -20,8 +20,10 @@ rule or check in its global home in the same turn, and name where.
 Inject-only, like its siblings: fixing the comment is right, only the follow-up
 is owed, so there is no code path that blocks or alters anything. Fires once per
 distinct event (sentinel in the temp dir keyed on a content hash). Fails OPEN
-and SILENT: any parse trouble prints nothing. The maintainer logins are read
-from MAINTAINER_LOGINS (comma separated), default `d-morrison`.
+and SILENT: any trouble parsing an event prints nothing (a bad config file
+warns on stderr, see below). The maintainer logins come from
+`_configured_maintainers` (MAINTAINER_LOGINS, else the local config file, else
+`d-morrison`); see its docstring.
 """
 import hashlib
 import json
@@ -39,8 +41,37 @@ COMMENTISH = re.compile(
     r"|pull_request_review|commit_comment)(?:\.|$)", re.I)
 
 
+def _configured_maintainers():
+    """Comma-separated maintainer logins: `MAINTAINER_LOGINS`, else the
+    "maintainers" list in the JSON file `AI_CONFIG_LOCAL` names (default
+    `~/.config/ai-config/local.json`, see `ai-config.local.example.json`),
+    else `d-morrison`, the repo owner, so an unconfigured install keeps its
+    behaviour. A missing file or an absent or empty list is "unconfigured";
+    a file that exists but is unreadable, is not a JSON object, or holds
+    anything but a list of non-empty strings warns on stderr and falls back
+    too. Standalone: hooks are staged one file at a time and cannot import
+    a sibling module."""
+    raw = os.environ.get("MAINTAINER_LOGINS")
+    if raw is not None:
+        return raw
+    path = os.path.expanduser(
+        os.environ.get("AI_CONFIG_LOCAL") or "~/.config/ai-config/local.json")
+    if os.path.exists(path):
+        try:
+            with open(path, encoding="utf-8") as fh:
+                names = json.load(fh).get("maintainers", [])
+            if not isinstance(names, list) or not all(
+                    isinstance(n, str) and n.strip() for n in names):
+                raise ValueError('"maintainers" must be a list of login strings')
+            if names:
+                return ",".join(names)
+        except (OSError, ValueError, AttributeError) as err:
+            print(f"ai-config: ignoring {path}: {err}", file=sys.stderr)
+    return "d-morrison"
+
+
 def logins():
-    raw = os.environ.get("MAINTAINER_LOGINS", "d-morrison")
+    raw = _configured_maintainers()
     return [x.strip() for x in raw.split(",") if x.strip()]
 
 

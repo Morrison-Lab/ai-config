@@ -51,6 +51,9 @@ CASES_BLOCK = [
     # A merge named in an earlier clause does not excuse a later one.
     "After merging this one, the next PRs still need mwc.",
     "Merged the first PR, but drafting the next PR waits on mwc.",
+    # The gate clause may lead and the gated work follow in another clause.
+    "Still need mwc, so the next PRs stay undrafted.",
+    "Waiting on mwc, the next PRs are paused.",
 ]
 
 CASES_PASS = [

@@ -117,7 +117,10 @@ def offending_sentence(prose):
         for clause in reversed(CLAUSE_SPLIT_RX.split(sentence)):
             if not MWC_RX.search(clause) or not GATE_RX.search(clause):
                 continue
-            if not WORK_RX.search(clause) or NEGATION_RX.search(clause):
+            # The gated work may sit in a neighbouring clause ("Still need
+            # mwc, so the next PRs stay undrafted"), so it is sought in the
+            # whole sentence; only the gate and the exemptions are per clause.
+            if not WORK_RX.search(sentence) or NEGATION_RX.search(clause):
                 continue
             # A clause about the merge itself may gate on the word, but a
             # merge named in an earlier clause ("After merging this one, the

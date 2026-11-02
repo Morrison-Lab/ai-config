@@ -78,7 +78,10 @@ def check_message(text):
     text = strip_quotes(text)
     if EXEMPT.search(text):
         return None
-    n_asks = len(ASK.findall(text))
+    # Two phrasings of one either/or question ("Should I push, or would you
+    # like me to wait?") are one ask, so a sentence with "or" counts once.
+    n_asks = sum(1 if ASK.search(s) and re.search(r"\bor\b", s) else len(ASK.findall(s))
+                 for s in SENT.split(text))
     has_cred = any(ASK.search(s) and CRED_ASK.search(s) for s in SENT.split(text))
     if has_cred and n_asks >= 2:
         return "This message asks to use a credential or key alongside another ask"

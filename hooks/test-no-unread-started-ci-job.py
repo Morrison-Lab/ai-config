@@ -53,6 +53,12 @@ check("gh run rerun with no read blocks", [prompt(), BASH_RERUN, result()], True
 check("scheduling a wake is not a read", [prompt(), RERUN, result(), WAKE, result()], True)
 check("read after the rerun is fine", [prompt(), RERUN, result(), READ, result()], False)
 check("gh run watch after the rerun is fine", [prompt(), BASH_RERUN, BASH_READ], False)
+check("pull_request_read get_check_runs after the rerun is fine",
+      [prompt(), RERUN, result(), call("mcp__github__pull_request_read", method="get_check_runs"), result()], False)
+check("a plain pull_request_read get is not a CI read",
+      [prompt(), RERUN, result(), call("mcp__github__pull_request_read", method="get"), result()], True)
+check("gh pr checks after the rerun is fine",
+      [prompt(), RERUN, result(), call("Bash", command="gh pr checks 4877 -R Morrison-Lab/ai-config")], False)
 check("a read before the rerun does not count", [prompt(), READ, RERUN, result()], True)
 check("a rerun in an earlier turn is not this turn's", [prompt(), RERUN, result(), prompt("next")], False)
 check("no job started is silent", [prompt(), READ], False)

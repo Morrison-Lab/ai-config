@@ -38,9 +38,11 @@ if os.path.isdir(_LIB):
 from agent_notice import stop_notice  # noqa: E402
 
 START_TOOLS = ("actions_run_trigger",)
-READ_TOOLS = ("actions_get", "actions_list", "get_job_logs", "get_check_run", "pull_request_read")
+READ_TOOLS = ("actions_get", "actions_list", "get_job_logs", "get_check_run")
 RX_START_CMD = re.compile(r"\bgh\s+(?:run\s+rerun|workflow\s+run)\b")
-RX_READ_CMD = re.compile(r"\bgh\s+run\s+(?:view|watch|list)\b|\bgh\s+api\b[^|;&]*(?:actions/runs|check-runs)")
+RX_READ_CMD = re.compile(
+    r"\bgh\s+run\s+(?:view|watch|list)\b|\bgh\s+pr\s+checks\b"
+    r"|\bgh\s+api\b[^|;&]*(?:actions/runs|check-runs)")
 
 
 def blocks(record):
@@ -65,7 +67,9 @@ def classify(block):
     command = str((block.get("input") or {}).get("command", "")) if name == "Bash" else ""
     if name.endswith(START_TOOLS) or (command and RX_START_CMD.search(command)):
         return "start"
-    if name.endswith(READ_TOOLS) or (command and RX_READ_CMD.search(command)):
+    is_check_runs_read = (name.endswith("pull_request_read")
+                          and (block.get("input") or {}).get("method") == "get_check_runs")
+    if name.endswith(READ_TOOLS) or is_check_runs_read or (command and RX_READ_CMD.search(command)):
         return "read"
     return None
 

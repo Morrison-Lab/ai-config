@@ -26,6 +26,7 @@ CASES = [
     ("capitalised", POST, "REMOTE CONTROL SESSIONS stopped.", "REMOTE CONTROL SESSIONS"),
     ("two words between", POST, "Your remote desktop session is idle.", "Your remote desktop session"),
     ("host-named chat", POST, "The cf463-02 chat is idle.", "cf463-02 chat"),
+    ("documented example", POST, "The ab12-03 chat is idle.", "ab12-03 chat"),
     ("that chat", POST, "Ask that chat to retry.", "that chat"),
     ("RC chat", POST, "The RC chat is waiting.", "RC chat"),
     ("Mac chat", POST, "Your Mac chat is open.", "Your Mac chat"),

@@ -448,9 +448,13 @@ RX_OVERRIDE = re.compile(
     r"\b(?:merge|ship)\s+(?:it|this|that|them)?\s*anyway\b"
     r"|\boverride\s+(?:the\s+)?(?:merge\s+)?(?:hook|gate|checker|check)\b",
     re.IGNORECASE)
+# A negation anywhere earlier in the same clause voids the phrase ("I don't
+# think we should merge it anyway"); fail closed on any such word.
 RX_NEGATED = re.compile(
-    r"(?:\bdon'?t|\bdo\s+not|\bnever|\bnot|\bwon'?t|\bshouldn'?t|\bno)\s*$",
+    r"\b(?:don'?t|do\s+not|never|not|no|won'?t|shouldn'?t|wouldn'?t|can'?t|"
+    r"cannot|couldn'?t|isn'?t|aren'?t|without)\b",
     re.IGNORECASE)
+RX_CLAUSE_START = re.compile(r"[.!?;\n]")
 RX_STRIP = re.compile(
     r"<system-reminder>.*?</system-reminder>"
     r"|<note>.*?</note>"
@@ -480,7 +484,10 @@ def typed_override(path):
                 continue
             text = RX_STRIP.sub(" ", b.get("text") or "")
             for m in RX_OVERRIDE.finditer(text):
-                if not RX_NEGATED.search(text[max(0, m.start() - 16):m.start()]):
+                before = text[:m.start()]
+                starts = [s.end() for s in RX_CLAUSE_START.finditer(before)]
+                clause = before[starts[-1]:] if starts else before
+                if not RX_NEGATED.search(clause):
                     return True
     return False
 

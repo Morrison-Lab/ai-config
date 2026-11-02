@@ -37,6 +37,17 @@ CASES = [
      "skipped then missing, either order, warns"),
     ([say("Julia was missing, so I installed it and re-ran the render.")],
      None, "an excuse that was fixed in the same sentence stays silent"),
+    ([say("I skipped the render because Julia wasn't installed. I then "
+          "installed it and reran the render successfully.")], None,
+     "the fix in the next sentence stays silent (review of #4884)"),
+    ([say("I couldn't finish the migration because a config key was missing "
+          "from the YAML file.")], None, "a missing config key is not a tool"),
+    ([say("The test couldn't pass because fixture data was missing.")], None,
+     "missing fixture data is not a tool"),
+    ([say("I can't complete this because context about the requirements is "
+          "missing.")], None, "missing context is not a tool"),
+    ([say("The render was skipped because the R package knitr was missing.")],
+     "missing tool", "a missing package named after 'package' warns"),
     ([say("Rendered both pages; no warnings.")], None, "plain report is silent"),
     ([user("go"), bash("Rscript -e 'install.packages(\"reticulate\")'"), RESULT,
       say("Rendered the chapter.")], "startup script",

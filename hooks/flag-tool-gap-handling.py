@@ -46,8 +46,14 @@ def _sibling():
 SKIPPED = (r"(?:skipp(?:ed|ing)|couldn'?t|could not|can'?t|cannot|unable to"
            r"|didn'?t (?:run|render|check)|did not (?:run|render|check)"
            r"|not (?:run|rendered|checked)|without (?:running|rendering))")
+# "missing" and "lacks" count only beside a tool-like noun, so "a config key was
+# missing" or "context is missing" stay silent.
+TOOL = (r"(?:tools?|toolchains?|packages?|interpreters?|librar(?:y|ies)"
+        r"|dependenc(?:y|ies)|modules?|binary|binaries|cli|extensions?"
+        r"|compilers?|runtimes?)\b")
 MISSING = (r"(?:(?:isn'?t|is not|aren'?t|are not|wasn'?t|not) installed"
-           r"|(?:lacks|lacked|missing)\b"
+           rf"|{TOOL}\s+(?:\S+\s+){{0,3}}?(?:lacks|lacked|missing)\b"
+           rf"|(?:lacks|lacked|missing)\s+(?:\S+\s+){{0,3}}?{TOOL}"
            r"|(?:isn'?t|is not|not) (?:available|present)"
            r"|(?:no|without) (?:\S+ ){0,3}(?:installed|interpreter))")
 FIXED = re.compile(r"\b(?:i|we) (?:installed|have installed|then installed)\b"
@@ -97,8 +103,15 @@ def turn_installs(path):
 
 
 def excuse(text):
+    """The excusing sentence, unless the reply also says it installed the tool.
+
+    The fix is usually the next sentence ("X was missing. I installed it and
+    reran."), so FIXED is checked against the whole reply.
+    """
+    if FIXED.search(text):
+        return None
     for sentence in re.split(r"(?<=[.!?])\s+|\n+", text):
-        if EXCUSE.search(sentence) and not FIXED.search(sentence):
+        if EXCUSE.search(sentence):
             return sentence.strip()[:160]
     return None
 

@@ -451,7 +451,7 @@ RX_OVERRIDE = re.compile(
 # A negation anywhere earlier in the same clause voids the phrase ("I don't
 # think we should merge it anyway"); fail closed on any such word.
 RX_NEGATED = re.compile(
-    r"\b(?:don'?t|do\s+not|never|not|no|won'?t|shouldn'?t|wouldn'?t|can'?t|"
+    r"\b(?:don'?t|do\s+not|never|not|won'?t|shouldn'?t|wouldn'?t|can'?t|"
     r"cannot|couldn'?t|isn'?t|aren'?t|without)\b",
     re.IGNORECASE)
 RX_CLAUSE_START = re.compile(r"[.!?;\n]")

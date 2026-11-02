@@ -335,6 +335,11 @@ def main():
                 "no, never merge it anyway"):
         check(f"denies a negated phrasing with filler words: {neg!r}",
               mcp([user_text(neg)])[0])
+    for ok_text in ("No rush, but go ahead and merge it anyway.",
+                    "There's no issue, so merge it anyway.",
+                    "No objections here, merge it anyway"):
+        check(f"a bare 'no' is not a negation: {ok_text!r}",
+              not mcp([user_text(ok_text)])[0])
     check("a negation in an EARLIER sentence does not void a later override",
           not mcp([user_text("I did not read it yet. Merge it anyway.")])[0])
     check("denies when only the assistant says 'merge it anyway'",

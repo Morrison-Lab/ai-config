@@ -37,7 +37,7 @@ MENTION = re.compile(
     r"\b(?:(?:Remote Control|RC|Mac|Linux|cloud|local|device|coordinator|your)"
     r"(?: \w+){0,2} sessions?|coordinator"
     # ai-config#4878: a Remote Control session called a "chat".
-    r"|(?:Remote Control|RC|Mac|Linux|cloud|local|device|your|[a-z]+\d+(?:-\d+)?)"
+    r"|(?:Remote Control|RC|Mac|Linux|cloud|local|device|your|[a-z]+\d+-\d+)"
     r"(?: \w+){0,2} chats?|(?:that|those|other) chats?)\b", re.I)
 LINK = re.compile(
     r"claude\.ai/code/session_\w+|\(#cmsg_\w+\)|[?&]thread=cmsg_\w+")

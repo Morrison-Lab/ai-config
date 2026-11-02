@@ -111,9 +111,23 @@ def excuse(text):
     if FIXED.search(text):
         return None
     for sentence in re.split(r"(?<=[.!?])\s+|\n+", text):
-        if EXCUSE.search(sentence) and not NONTOOL.search(sentence):
+        if EXCUSE.search(sentence) and not nontool_subject(sentence):
             return sentence.strip()[:160]
     return None
+
+
+def nontool_subject(sentence):
+    """True when the missing thing is a certificate, key, cron entry and the like.
+
+    Only the span that MISSING matched, plus the one word before it, is checked,
+    so a NONTOOL word elsewhere in the sentence ("the render hook never ran")
+    does not hide a genuinely missing tool.
+    """
+    m = re.search(MISSING, sentence, re.I)
+    if not m:
+        return False
+    before = sentence[:m.start()].split()[-1:]
+    return bool(NONTOOL.search(" ".join(before) + " " + m.group(0)))
 
 
 def main() -> int:

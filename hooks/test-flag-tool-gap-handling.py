@@ -54,6 +54,14 @@ CASES = [
      None, "an uninstalled cron entry is not a tool"),
     ([say("I couldn't proceed because there's no API key installed in the "
           "environment.")], None, "a missing API key is not a tool"),
+    ([say("I couldn't run the pre-commit hook because black wasn't installed.")],
+     "missing tool", "an incidental NONTOOL word does not hide a missing tool"),
+    ([say("Rendering was skipped because the reticulate package wasn't "
+          "installed, so the render hook never ran.")], "missing tool",
+     "the founding incident with a later 'hook' still warns"),
+    ([say("I couldn't configure the systemd unit because the daemon package "
+          "wasn't installed.")], "missing tool",
+     "a package noun right before 'installed' still warns"),
     ([say("Rendered both pages; no warnings.")], None, "plain report is silent"),
     ([user("go"), bash("Rscript -e 'install.packages(\"reticulate\")'"), RESULT,
       say("Rendered the chapter.")], "startup script",

@@ -59,6 +59,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-overdue-scheduled-wake.py\"'",
+            "timeout": 10,
+            "script": "warn-overdue-scheduled-wake.py",
+            "why": "ai-config#4873 -- a one-time scheduled task (send_later / create_trigger) can be skipped by the dispatcher with no error and no last_run, so the session that armed it waits forever. Warn-only: on the next prompt, names any task this session armed that is more than 15 minutes past due with no later get_trigger / list_triggers call and no scheduled continuation, and tells the agent to call get_trigger and delete the dead task. Once per task per session."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/ensure-open-pr-monitor.py\"'",
             "timeout": 10,
             "script": "ensure-open-pr-monitor.py",

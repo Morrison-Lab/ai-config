@@ -63,7 +63,9 @@
 #   a. librsvg2-bin (rsvg-convert, which PDF handouts with SVG figures need);
 #   b. the `typos` spell checker, from the crate-ci/typos GitHub release;
 #   c. the core R packages every lds page needs (knitr, rmarkdown, reticulate,
-#      remotes, lintr, JuliaCall), as Posit Package Manager binaries.
+#      remotes, lintr, JuliaCall), as Posit Package Manager binaries;
+#   d. the lab's `lms` linters (from Morrison-Lab/psc, at the repos' pinned
+#      commit), so lint-changed-lines can run locally before a push.
 # Each is best-effort: a failure warns and the build continues.
 # ---------------------------------------------------------------------------
 #
@@ -206,6 +208,35 @@ if ! $SUDO Rscript -e '
 '; then
   echo "WARNING: could not install the core R packages for lds (reticulate, knitr, ...)." >&2
   echo "         Check that packagemanager.posit.co is allowlisted (see header)." >&2
+fi
+
+# [lds] The lab's `lms` linters (no-nested-calls and the lab's naming rules),
+# which every notes repo's lint-changed-lines workflow runs with
+# `lms::default_linters(nested_calls = TRUE)`. `lms` lives in the lms/ directory
+# of Morrison-Lab/psc, and installing it through remotes::install_github() needs
+# api.github.com, which cloud sessions often deny. A shallow clone over github.com
+# works instead. LMS_REF is the `lms-ref` pinned in the repos' lint-changed-lines
+# workflow; update it when that pin moves. Best-effort: a failure warns and the
+# build continues.
+echo "==> Installing the lab's lms linters"
+LMS_REF="${LMS_REF:-1490eaac059118041bc17e7a846618eac2d41320}"
+if ! Rscript -e 'quit(status = !requireNamespace("lms", quietly = TRUE))' >/dev/null 2>&1; then
+  lms_dir="$(mktemp -d)"
+  if GIT_LFS_SKIP_SMUDGE=1 git clone -q --depth 1 https://github.com/Morrison-Lab/psc "$lms_dir/psc" \
+     && git -C "$lms_dir/psc" fetch -q --depth=1 origin "$LMS_REF" \
+     && git -C "$lms_dir/psc" checkout -q "$LMS_REF" \
+     && $SUDO Rscript -e '
+       options(repos = c(CRAN = "https://packagemanager.posit.co/cran/__linux__/noble/latest"))
+       remotes::install_local(commandArgs(trailingOnly = TRUE)[1], upgrade = "never")
+       stopifnot(requireNamespace("lms", quietly = TRUE))
+     ' "$lms_dir/psc/lms"; then
+    :
+  else
+    echo "WARNING: could not install lms from Morrison-Lab/psc. The lab linters" >&2
+    echo "         (lms::default_linters) will be unavailable; check that github.com" >&2
+    echo "         is allowlisted (see header)." >&2
+  fi
+  rm -rf "$lms_dir"
 fi
 
 # [review] Resolve JULIA_MINOR BEFORE it is referenced in the banner below, so
@@ -427,3 +458,4 @@ fi
 # [lds] Report the pieces added for the lds notes site.
 command -v rsvg-convert >/dev/null 2>&1 && rsvg-convert --version | head -1 || echo "rsvg-convert: NOT installed"
 command -v typos >/dev/null 2>&1 && typos --version || echo "typos: NOT installed (see WARNING above)"
+Rscript -e 'if (requireNamespace("lms", quietly = TRUE)) cat("lms:", as.character(packageVersion("lms")), "\n") else cat("lms: NOT installed (see WARNING above)\n")'

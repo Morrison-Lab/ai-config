@@ -525,6 +525,14 @@ Never interpret an unadorned "or" as an exclusive disjunction (XOR) that excuses
 Full statement: [`or-means-and-or`](or-means-and-or.md).
 Operationalized by: the instruction interpretation rules in `AGENTS.md`, [`specific-beats-general`](specific-beats-general.md), and [`prefer-optionality-over-removal`](prefer-optionality-over-removal.md).
 
+## The absence of a rule is not evidence for its opposite
+
+When no rule addresses an action, do not infer that it is allowed, required or forbidden.
+Reason from the purpose of the nearest rules, or ask with a recommendation, and record the answer as a rule.
+
+Full statement: [`silence-is-not-permission`](silence-is-not-permission.md).
+Operationalized by: the instruction interpretation rules in `AGENTS.md`, [`specific-beats-general`](specific-beats-general.md), and [`default-to-action-grants`](../workflow/default-to-action-grants.md).
+
 ## Think outside the box --- distinguish real from artificial limitations
 
 Do not make unnecessary assumptions about structural limitations;

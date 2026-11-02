@@ -2576,6 +2576,57 @@ COPILOT_NEEDS_A_CLOSER_LOOK_HEADER = re.compile(
 # (memories/copilot-reviews.md, rounds 35 and 36 on ai-config#2913). An
 # affirmative header standing over one is therefore not a clean round.
 COPILOT_SUPPRESSED_BLOCK = re.compile(r"\bSuppressed\s+comments\b", re.IGNORECASE)
+# Copilot's ccr-overview-v2 body, as of 2026-11-02 (Morrison-Lab/mcs#47,
+# reviews 08:52, 08:56, 09:18 and 17:06 UTC), states its inline-finding count
+# as `**No open issues**` (followed by an emoji) or as `<strong>N open issue(s)</strong>` in a
+# `<details>` summary, with no `**Findings:**` or `Comments generated:` field.
+# Without these, an `Approval recommended` body had no count source, read as
+# "no verdict", and never superseded the same reviewer's earlier not-clean.
+COPILOT_NO_OPEN_ISSUES_LINE = re.compile(
+    r"(?:^|\n)[ ]{0,3}\*\*No\s+open\s+issues\*\*", re.IGNORECASE
+)
+COPILOT_OPEN_ISSUES_COUNT = re.compile(
+    r"<strong>[ \t]*(\d{1,6})[ \t]+open[ \t]+issues?[ \t]*</strong>",
+    re.IGNORECASE,
+)
+# The body's own first line. This shape has no `## Copilot review overview`
+# heading, so `_copilot_overview_block_spans` finds no block in it.
+COPILOT_V2_MARKER_FIRST = re.compile(r"\A\s*<!--[ \t]*ccr-overview-v2[ \t]*-->")
+
+
+def _copilot_open_issue_counts(
+    scan, cited, comment_spans, comment_span_starts,
+    details_spans, details_span_starts,
+):
+    """Inline-finding counts from Copilot's `open issue` wording.
+
+    Read only from a body whose first line is the `ccr-overview-v2` marker.
+    A `<strong>N open issue(s)</strong>` summary counts N wherever it sits,
+    `<details>` included, since a nonzero count only ever makes the verdict
+    stricter. A `**No open issues**` line counts zero only when it is live:
+    uncited, and outside every HTML comment and `<details>` region, so a
+    quoted earlier round cannot clear the current one.
+    """
+    marker = COPILOT_V2_MARKER_FIRST.match(scan)
+    if marker is None or match_is_cited(cited, marker.start(), marker.end()):
+        return []
+    counts = []
+    for m in COPILOT_OPEN_ISSUES_COUNT.finditer(scan):
+        if match_is_cited(cited, m.start(), m.end()):
+            continue
+        if _position_in_spans(m.start(), comment_span_starts, comment_spans):
+            continue
+        counts.append(int(m.group(1)))
+    for m in COPILOT_NO_OPEN_ISSUES_LINE.finditer(scan):
+        pos = match_content_start(m)
+        if match_is_cited(cited, pos, m.end()):
+            continue
+        if _position_in_spans(pos, comment_span_starts, comment_spans):
+            continue
+        if _position_in_spans(pos, details_span_starts, details_spans):
+            continue
+        counts.append(0)
+    return counts
 # The two shapes ai-config#4004's empty-Balanced carve-out must NOT apply
 # over, even when the overview's own `**Findings:**` line reads `None`:
 # Copilot's re-review vocabulary states these findings in a different
@@ -2989,6 +3040,10 @@ def copilot_verdict(body: str, scan: str = None, cited: bytearray = None) -> str
             counts.append(None)
     if _has_valid_match(COPILOT_FINDINGS_LINE, scan) is not None:
         counts.append(_copilot_v2_findings_count(scan, cited, match_is_cited))
+    counts.extend(_copilot_open_issue_counts(
+        scan, cited, comment_spans, comment_span_starts,
+        details_spans, details_span_starts,
+    ))
     if not counts:
         return ""
     if any(c is not None and c != 0 for c in counts):

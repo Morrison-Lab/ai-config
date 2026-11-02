@@ -1923,6 +1923,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-tool-gap-handling.py\"",
+            "timeout": 10,
+            "script": "flag-tool-gap-handling.py",
+            "why": "Ezra, 2026-11-02: 'cai: no excuses; always install what you need' (a thread skipped a render because the cloud toolchain lacked R's reticulate), 'cai: tell me to modify the cloud startup script when there's something worth adding', and 'when you tell me to edit the startup script, give me the revised version'. Interrupts the stop once per turn (agent_notice.stop_notice) when a reply says work was skipped or blocked because a tool is missing or not installed, or when the turn ran an install command and the reply never mentions the startup script. Lexical, so it makes the author answer rather than deciding whether the install is worth adding to the script."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-book-unavailable-without-library-search.py\"",
             "timeout": 10,
             "script": "flag-book-unavailable-without-library-search.py",

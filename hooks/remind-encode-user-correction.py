@@ -100,6 +100,8 @@ PATTERNS = [
     r"\bwhat happened to (?:the |our )?(?:[\w-]+ ){0,4}(?:rule|per file)\b",
     r"\bempty promise\?",
     r"\bwhy (?:aren't|are not|don't|do not) (?:the |our )?(?:sub)?agents?\b",
+    # Ezra's "record this in ai-config" prefix (2026-11-02).
+    r"^\s*cai\s*:",
 ]
 MATCHER = re.compile("|".join(PATTERNS), re.IGNORECASE | re.MULTILINE)
 
@@ -119,7 +121,8 @@ The user should never have to say this twice, in this session or any other \
 project. Fix the instance they pointed at, then, in this same turn:
 1. Name the general rule behind the correction, read broadly: an example \
 stands for its category, and "etc." is open-ended.
-2. Commit that rule to the repo that owns it and open the PR: \
+2. Check for a similar rule first and strengthen it rather than duplicating. \
+Commit that rule to the repo that owns it and open the PR: \
 Morrison-Lab/ai-config for anything that applies beyond one repo (AGENTS.md \
 for a cross-agent rule; CLAUDE.md or a shared/ fragment for detail; a skill \
 for a procedure), the current repo's own agent docs for a rule about that \

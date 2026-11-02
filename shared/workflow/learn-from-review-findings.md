@@ -575,6 +575,15 @@ In the turn the comment arrives:
 A question or thanks needs no rule.
 Everything else does, and "it only applied here" is a claim to state in the reply, not to assume.
 
+The same holds for a specific correction Ezra makes in chat (2026-11-02: "always consider generalizing reusable principles and rules from specific corrections I make"), with two additions:
+
+- **Search first.**
+  Strengthen a rule that already covers the class with the new case and its date, rather than adding a second rule.
+- **Pick the home by kind.**
+  Prose and notation go to psw, agent behaviour to ai-config, and anything decidable on a diff to a gha check.
+
+His `cai:` prefix means "record this in ai-config"; `hooks/remind-encode-user-correction.py` matches it.
+
 `hooks/remind-generalize-maintainer-pr-comment.py` is the mechanism:
 it fires on a GitHub comment or review event authored by a maintainer login
 and injects these four steps, once per event.

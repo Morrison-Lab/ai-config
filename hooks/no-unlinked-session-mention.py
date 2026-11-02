@@ -22,8 +22,10 @@ What counts:
     carrying `thread=cmsg_...`.
   - Any other "<words> session" or "<words> thread" counts too, unless the
     word before it is "this", "a", "an", "each", "every", "same", "new",
-    "one", "current", "per", "any", "no", "which" or "whose" ("the cf463-02
-    session", "the runner thread", "that session").
+    "one", "current", "per", "any", "no", "which" or "whose", or a
+    computing or forum word such as "R", "shell", "database", "main",
+    "worker", "review" or "comment" ("the cf463-02 session", "the runner
+    thread", "that session"; not "the R session" or "the main thread").
   - The unit is one paragraph or one list item. A mention in a unit with no
     link of its own blocks.
   - Fenced code and inline code spans are removed first.
@@ -49,7 +51,14 @@ MENTION = re.compile(
 # names this session or an unspecific one is not a mention.
 GENERIC = re.compile(r"(?<![\w-])((?:[\w-]+ ){0,3})(sessions?|threads?)\b", re.I)
 NOT_ANOTHER = {"this", "a", "an", "each", "every", "same", "new", "one",
-               "current", "per", "any", "no", "which", "whose"}
+               "current", "per", "any", "no", "which", "whose",
+               # Computing and forum senses, which name nothing to link.
+               "r", "python", "julia", "shell", "bash", "terminal", "tmux",
+               "ssh", "repl", "rstudio", "jupyter", "kernel", "database",
+               "db", "sql", "login", "browser", "user", "http", "web",
+               "main", "worker", "cpu", "gpu", "background", "foreground",
+               "email", "comment", "review", "reply", "discussion", "github",
+               "forum", "multi", "single"}
 LINK = re.compile(
     r"claude\.ai/code/session_\w+|\(#cmsg_\w+\)|[?&]thread=cmsg_\w+")
 UNIT_BREAK = re.compile(r"\n[ \t]*\n|\n(?=(?:[-*+]|\d+[.)])[ \t])")

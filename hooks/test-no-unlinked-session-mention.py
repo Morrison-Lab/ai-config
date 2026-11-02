@@ -61,6 +61,11 @@ CASES = [
     ("each session is fine", POST, "Each session has its own cache.", None),
     ("multi-thread is fine", POST, "The multi-thread build is faster.", None),
     ("SessionStart is fine", POST, "The SessionStart hook ran.", None),
+    ("R session is fine", POST, "Restart the R session and try again.", None),
+    ("main thread is fine", POST, "Check the main thread for the race.", None),
+    ("database session is fine", POST, "The database session timed out.", None),
+    ("worker thread is fine", POST, "Pull the error from the worker thread.", None),
+    ("review thread is fine", POST, "Resolve the review thread.", None),
     ("no mention", POST, "Done.", None),
 ]
 

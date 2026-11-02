@@ -49,6 +49,18 @@ CASES = [
     ("inline code", POST, "The phrase `Mac session` is blocked.", None),
     ("fenced code", POST, "```\ncoordinator\n```\nDone.", None),
     ("other tool", "Bash", "echo coordinator", None),
+    ("host-named session", POST, "The cf463-02 session is idle.", "cf463-02 session"),
+    ("the runner thread", POST, "Ask the runner thread.", "runner thread"),
+    ("that session", POST, "Ask that session.", "that session"),
+    ("other thread", POST, "See the other thread.", "other thread"),
+    ("the session", POST, "Ask the session to retry.", "the session"),
+    ("host session linked", POST, f"The cf463-02 session ({S}) is idle.", None),
+    ("runner thread linked", POST, f"The runner thread, {T}.", None),
+    ("this thread is fine", POST, "I will keep this thread open.", None),
+    ("a thread is fine", POST, "Start a thread when ready.", None),
+    ("each session is fine", POST, "Each session has its own cache.", None),
+    ("multi-thread is fine", POST, "The multi-thread build is faster.", None),
+    ("SessionStart is fine", POST, "The SessionStart hook ran.", None),
     ("no mention", POST, "Done.", None),
 ]
 

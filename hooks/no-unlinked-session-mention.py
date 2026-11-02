@@ -20,6 +20,10 @@ What counts:
     mentions of another session.
   - A link is `https://claude.ai/code/session_...`, `(#cmsg_...)` or a URL
     carrying `thread=cmsg_...`.
+  - Any other "<words> session" or "<words> thread" counts too, unless the
+    word before it is "this", "a", "an", "each", "every", "same", "new",
+    "one", "current", "per", "any", "no", "which" or "whose" ("the cf463-02
+    session", "the runner thread", "that session").
   - The unit is one paragraph or one list item. A mention in a unit with no
     link of its own blocks.
   - Fenced code and inline code spans are removed first.
@@ -39,6 +43,13 @@ MENTION = re.compile(
     # ai-config#4878: a Remote Control session called a "chat".
     r"|(?:Remote Control|RC|Mac|Linux|cloud|local|device|your|[a-z]+\d+-\d+)"
     r"(?: \w+){0,2} chats?|(?:that|those|other) chats?)\b", re.I)
+# ai-config (Ezra, 2026-11-02, "always link to the session"): any other
+# session or thread, however it is named ("the cf463-02 session", "the runner
+# thread", "that session"). The word before it decides: a determiner that
+# names this session or an unspecific one is not a mention.
+GENERIC = re.compile(r"(?<![\w-])((?:[\w-]+ ){0,3})(sessions?|threads?)\b", re.I)
+NOT_ANOTHER = {"this", "a", "an", "each", "every", "same", "new", "one",
+               "current", "per", "any", "no", "which", "whose"}
 LINK = re.compile(
     r"claude\.ai/code/session_\w+|\(#cmsg_\w+\)|[?&]thread=cmsg_\w+")
 UNIT_BREAK = re.compile(r"\n[ \t]*\n|\n(?=(?:[-*+]|\d+[.)])[ \t])")
@@ -64,6 +75,11 @@ def unlinked_mention(text: str):
         m = MENTION.search(unit)
         if m:
             return m.group(0)
+        for g in GENERIC.finditer(unit):
+            before = g.group(1).split()
+            if before and before[-1].lower() in NOT_ANOTHER:
+                continue
+            return " ".join(before[-1:] + [g.group(2)])
     return None
 
 

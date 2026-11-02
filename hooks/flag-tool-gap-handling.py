@@ -1,24 +1,18 @@
 #!/usr/bin/env python3
 """Stop-hook guard: a missing tool is installed, and a lasting install is reported.
 
-Ezra, 2026-11-02, in a thread that skipped a render because the cloud
-toolchain lacked R's reticulate: "cai: no excuses; always install what you
-need". And, in the same thread: "cai: tell me to modify the cloud startup
-script when there's something worth adding".
+Ezra, 2026-11-02, after a thread skipped a render because the cloud toolchain
+lacked R's reticulate: "cai: no excuses; always install what you need" and
+"cai: tell me to modify the cloud startup script when there's something worth
+adding". Two warn-only checks on the final reply, once per distinct message:
 
-Two checks on the final reply, both warn-only and once per distinct message:
+  1. EXCUSE. A sentence says work was skipped AND a tool, package or
+     interpreter is missing, and the reply never says it installed it.
+  2. STARTUP SCRIPT. This turn ran an install command and the reply never
+     mentions the startup or setup script. Whether the install is worth adding
+     is a judgment, so the hook only makes the author answer it.
 
-  1. EXCUSE. A sentence says something was skipped or could not be done AND
-     that a tool, package or interpreter is missing or not installed. The
-     remedy is to install it and run the work (shared/workflow/growth-mindset.md,
-     "A broken or missing tool is fixed, not routed around").
-  2. STARTUP SCRIPT. This turn ran an install command (pip, uv pip, apt,
-     install.packages, npm -g, tlmgr, ...) and the reply never mentions the
-     environment's startup or setup script. Whether the install is worth
-     adding to it is a judgment, so the hook only makes the author answer it.
-
-Fails OPEN. The two checks are lexical: a sentence that quotes this rule can
-fire check 1, which the once-per-message sentinel keeps cheap.
+See shared/workflow/growth-mindset.md. Lexical, and fails OPEN.
 """
 import hashlib
 import importlib.util

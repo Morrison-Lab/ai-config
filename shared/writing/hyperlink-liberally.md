@@ -77,5 +77,5 @@ Midterm 1 practice exam question 3(c) wrote the decomposition as a formula and l
 
 In general practice, place the link on the term where the sentence uses it and sweep the document for remaining parenthetical link lists:
 
-- **Do:** link each term at its mention, and check matches of `grep -n -E '\((definitions?|see)[: ]' <files>` over the document you are editing for trailing link lists (keeping single `@def-*` crossrefs).
+- **Do:** link each term at its mention, and check matches of `grep -n -E '\((definitions?|see)[: ]' <files>` over the document you are editing for trailing link lists, and `grep -n -E '\(@(def|thm|lem|prp|cor)-' <files>` for a trailing crossref (keeping only one with no word to carry it, such as `see @thm-x`).
 - **Don't:** append a parenthetical list of links after a sentence whose words could carry them.

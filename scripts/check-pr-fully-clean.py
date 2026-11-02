@@ -976,6 +976,7 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
                 f"Check run '{name}'{where} is still in status '{status}'")
         elif (conclusion in ("success", "neutral", "skipped")
               and cr.get("annotations_count")
+              and "all" not in _ANNOTATIONS_READ
               and cr.get("id") not in _ANNOTATIONS_READ
               and not _is_own_job(cr, _own_actions_job(repo)[0])):
             # A passing conclusion hides warning and notice annotations
@@ -4376,8 +4377,9 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--annotations-read", default="", metavar="ID[,ID...]",
-        help="Check-run ids whose warning/notice annotations were read and "
-             "fixed or explained as false positives (ai-config#4892).",
+        help="Check-run ids (or `all`, once every listed run's annotations "
+             "were read) whose warning/notice annotations were fixed or "
+             "explained as false positives (ai-config#4892).",
     )
     return parser.parse_args(argv)
 
@@ -4430,8 +4432,12 @@ def main():
         except PayloadError as exc:
             die(str(exc))
 
-    _ANNOTATIONS_READ.update(
-        int(i) for i in getattr(args, "annotations_read", "").split(",") if i.strip().isdigit())
+    read_arg = getattr(args, "annotations_read", "").strip().lower()
+    if read_arg == "all":
+        _ANNOTATIONS_READ.add("all")
+    else:
+        _ANNOTATIONS_READ.update(
+            int(i) for i in read_arg.split(",") if i.strip().isdigit())
     pr_num = args.pr_number
     repo = resolve_repo(args.repo)
 

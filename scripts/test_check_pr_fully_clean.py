@@ -9848,6 +9848,10 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         checker._ANNOTATIONS_READ.discard(77)
         check("--annotations-read ids clear the annotation finding",
               read_ok and read_issues == [])
+        checker._ANNOTATIONS_READ.add("all")
+        all_ok, _ = checker.check_ci_runs("sha123", TEST_REPO)
+        checker._ANNOTATIONS_READ.discard("all")
+        check("--annotations-read all clears every annotation finding", all_ok)
 
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0

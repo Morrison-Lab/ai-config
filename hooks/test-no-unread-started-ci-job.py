@@ -32,7 +32,7 @@ WAKE = call("mcp__claude-code-remote__send_later", message="check", delay_minute
 def run(records, active=False):
     with tempfile.TemporaryDirectory() as tmp:
         path = os.path.join(tmp, "t.jsonl")
-        with open(path, "w") as stream:
+        with open(path, "w", encoding="utf-8") as stream:
             stream.write("\n".join(json.dumps(r) for r in records))
         payload = json.dumps({"transcript_path": path, "session_id": "s" + str(id(records)),
                               "stop_hook_active": active})

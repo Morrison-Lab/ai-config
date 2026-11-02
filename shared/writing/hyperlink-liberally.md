@@ -59,9 +59,9 @@ A list of definition links after the sentence --- "(definitions: bias, variance,
 Put each link on the word the sentence already uses, once per passage as in [`definition-crossrefs`](definition-crossrefs.md).
 A single crossref after the term it defines, such as "differentiable at $c$ (@def-differentiable)", is the same defect:
 the reader must look past the word to a parenthetical, and on a split site the crossref renders as "(Definition 6 in Derivatives and Taylor Series)", which is longer than the word it explains.
-Link the term itself, as in "[differentiable at](calculus.qmd#def-differentiable) $c$" (Ezra, 2026-11-02, [Morrison-Lab/mds](https://morrison-lab.github.io/mds/optimization-critical-points.html), `_def-critical-point.qmd`).
-The same holds for a parenthetical "([why](...))" or "([proof](...))" after a claim:
-make the whole claim the link text, as in "[A kernel has the same mode as its density](...)", and drop the parenthetical (same date, `_exr-miller-deriv-opt-gamma-kernel.qmd`).
+Link the term itself, as in `[differentiable at](calculus.qmd#def-differentiable) $c$` (Ezra, 2026-11-02, [Morrison-Lab/mds](https://morrison-lab.github.io/mds/optimization-critical-points.html), `_def-critical-point.qmd`).
+The same holds for a parenthetical `([why](url))` or `([proof](url))` after a claim:
+make the whole claim the link text, as in `[A kernel has the same mode as its density](url)`, and drop the parenthetical (same date, `_exr-miller-deriv-opt-gamma-kernel.qmd`).
 A crossref stays only where the sentence has no word to carry it, such as "see @thm-x" naming a result as a whole.
 
 The test is observable: does a sentence in the passage use the term as a word?

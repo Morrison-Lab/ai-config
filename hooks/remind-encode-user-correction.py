@@ -100,10 +100,8 @@ PATTERNS = [
     r"\bwhat happened to (?:the |our )?(?:[\w-]+ ){0,4}(?:rule|per file)\b",
     r"\bempty promise\?",
     r"\bwhy (?:aren't|are not|don't|do not) (?:the |our )?(?:sub)?agents?\b",
-    # Ezra's own marker for "record this in ai-config", at the start of a
-    # message or a line (2026-11-02: "cai: no excuses; always install what you
-    # need"). A plain correction has no other lexical marker, so the prefix he
-    # already types is the trigger.
+    # Ezra's own "record this in ai-config" prefix (2026-11-02), at the start
+    # of a message or line; a plain correction has no other lexical marker.
     r"^\s*cai\s*:",
 ]
 MATCHER = re.compile("|".join(PATTERNS), re.IGNORECASE | re.MULTILINE)

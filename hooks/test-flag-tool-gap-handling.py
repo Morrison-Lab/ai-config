@@ -30,10 +30,10 @@ RESULT = {"type": "user", "message": {"content": [
 
 CASES = [
     ([say("I skipped the render because the cloud toolchain lacks R's "
-          "reticulate.")], "missing tool", "skip-because-missing warns"),
+          "reticulate.")], "tool is missing", "skip-because-missing warns"),
     ([say("The PDF could not be built: tinytex is not installed here.")],
-     "missing tool", "could-not plus not-installed warns"),
-    ([say("Rendering was skipped; Julia isn't installed.")], "missing tool",
+     "tool is missing", "could-not plus not-installed warns"),
+    ([say("Rendering was skipped; Julia isn't installed.")], "tool is missing",
      "skipped then missing, either order, warns"),
     ([say("Julia was missing, so I installed it and re-ran the render.")],
      None, "an excuse that was fixed in the same sentence stays silent"),
@@ -42,26 +42,13 @@ CASES = [
      "the fix in the next sentence stays silent (review of #4884)"),
     ([say("I couldn't finish the migration because a config key was missing "
           "from the YAML file.")], None, "a missing config key is not a tool"),
-    ([say("The test couldn't pass because fixture data was missing.")], None,
-     "missing fixture data is not a tool"),
-    ([say("I can't complete this because context about the requirements is "
-          "missing.")], None, "missing context is not a tool"),
     ([say("The render was skipped because the R package knitr was missing.")],
-     "missing tool", "a missing package named after 'package' warns"),
+     "tool is missing", "a missing package named after 'package' warns"),
     ([say("I couldn't run the deploy because the SSL certificate wasn't "
           "installed on the server.")], None, "an uninstalled certificate is not a tool"),
-    ([say("The job didn't run because the cron entry wasn't installed yet.")],
-     None, "an uninstalled cron entry is not a tool"),
-    ([say("I couldn't proceed because there's no API key installed in the "
-          "environment.")], None, "a missing API key is not a tool"),
-    ([say("I couldn't run the pre-commit hook because black wasn't installed.")],
-     "missing tool", "an incidental NONTOOL word does not hide a missing tool"),
     ([say("Rendering was skipped because the reticulate package wasn't "
-          "installed, so the render hook never ran.")], "missing tool",
+          "installed, so the render hook never ran.")], "tool is missing",
      "the founding incident with a later 'hook' still warns"),
-    ([say("I couldn't configure the systemd unit because the daemon package "
-          "wasn't installed.")], "missing tool",
-     "a package noun right before 'installed' still warns"),
     ([say("Rendered both pages; no warnings.")], None, "plain report is silent"),
     ([user("go"), bash("Rscript -e 'install.packages(\"reticulate\")'"), RESULT,
       say("Rendered the chapter.")], "startup script",

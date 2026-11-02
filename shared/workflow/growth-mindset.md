@@ -91,18 +91,13 @@ The same holds for a skipped check: a render skipped because an interpreter is m
 - **Do:** check the version, upgrade or install, then re-run the original command.
 - **Don't:** substitute a different command (`gh api -X PATCH` for `gh pr edit`) or skip the check without diagnosing why the first one failed.
 - **Don't:** give a missing package, interpreter or toolchain as the reason work was skipped.
-  Ezra, 2026-11-02, after a thread skipped a render because the cloud toolchain lacked R's `reticulate`: "no excuses;
+  Ezra, 2026-11-02, after a render was skipped for want of R's `reticulate`: "no excuses;
   always install what you need".
   Install it, run the work, and say what you installed.
-  `hooks/flag-tool-gap-handling.py` warns when a reply says work was skipped or blocked for a missing tool.
-- **Do:** when an install is worth keeping for future cloud sessions, tell Ezra to edit the cloud environment's startup script, because whatever you install by hand is gone for the next session.
-  Hand him the **full revised script**, not only the lines to add.
-  Ezra, 2026-11-02: "tell me to modify the cloud startup script when there's something worth adding", then "when you tell me to edit the startup script, give me the revised version".
+- **Do:** when an install is worth keeping, tell Ezra to edit the cloud startup script and hand him the **full revised script**, not only the lines to add (2026-11-02: "give me the revised version").
   Read the current script first.
-  If it is not at hand, find it before asking, and give the lines to add only as the fallback when it cannot be found.
-- **Don't:** propose adding an install only this task needs, such as a one-off helper.
-  A clause saying so closes the question.
-  `hooks/flag-tool-gap-handling.py` warns when a turn ran an install command and the reply never mentions the startup script.
+  A clause saying a one-off install is not worth adding closes the question.
+  `hooks/flag-tool-gap-handling.py` warns on both slips.
 
 (2026-10-03: `gh pr edit` failed on `projectCards`;
 the agent switched to `gh api -X PATCH`, copied that into a brief, and had earlier skipped local renders for lack of Julia.

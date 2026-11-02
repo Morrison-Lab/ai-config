@@ -1,16 +1,12 @@
 #!/usr/bin/env python3
 """Stop-hook guard: a missing tool is installed, and a lasting install is reported.
 
-Ezra, 2026-11-02, after a thread skipped a render because the cloud toolchain
-lacked R's reticulate: "cai: no excuses; always install what you need" and
-"cai: tell me to modify the cloud startup script when there's something worth
-adding". Two warn-only checks on the final reply, once per distinct message:
+Ezra, 2026-11-02: "cai: no excuses; always install what you need" and "cai: tell
+me to modify the cloud startup script when there's something worth adding".
+Two warn-only checks on the final reply, once per distinct message:
 
-  1. EXCUSE. A sentence says work was skipped AND a tool, package or
-     interpreter is missing, and the reply never says it installed it.
-  2. STARTUP SCRIPT. This turn ran an install command and the reply never
-     mentions the startup or setup script. Whether the install is worth adding
-     is a judgment, so the hook only makes the author answer it.
+  1. EXCUSE: work skipped because a tool is missing, and no "I installed it".
+  2. STARTUP SCRIPT: the turn ran an install and the reply never mentions the script.
 
 See shared/workflow/growth-mindset.md. Lexical, and fails OPEN.
 """
@@ -117,12 +113,7 @@ def excuse(text):
 
 
 def nontool_subject(sentence):
-    """True when the missing thing is a certificate, key, cron entry and the like.
-
-    Only the span that MISSING matched, plus the one word before it, is checked,
-    so a NONTOOL word elsewhere in the sentence ("the render hook never ran")
-    does not hide a genuinely missing tool.
-    """
+    """True when the missing thing is a certificate, key or the like (MISSING span only)."""
     m = re.search(MISSING, sentence, re.I)
     if not m:
         return False
@@ -144,22 +135,17 @@ def main() -> int:
     hit = excuse(text)
     if hit:
         notes.append(
-            f"Your reply says work was skipped or blocked because a tool is "
-            f"missing: \"{hit}\". Install it (pip, uv, apt, install.packages, "
-            "tinytex, ...) and run the work; a missing tool is a to-do, not a "
-            "reason (Ezra, 2026-11-02: \"no excuses; always install what you "
-            "need\"). If the install truly cannot be done, say what you tried.")
+            f"Your reply says work was skipped because a tool is missing: "
+            f"\"{hit}\". Install it (pip, uv, apt, install.packages, tinytex, ...) "
+            "and run the work (Ezra, 2026-11-02: \"no excuses; always install "
+            "what you need\"). If it truly cannot be installed, say what you tried.")
     installs = turn_installs(path)
     if installs and not SCRIPT.search(text):
         notes.append(
             f"This turn installed something ({installs[0]!r}). If future cloud "
-            "sessions would need it too, tell Ezra to edit the cloud "
-            "environment's startup script and give him the FULL revised "
-            "script, not only the lines to add (read the current script "
-            "first); if it is not worth adding, say so in a clause (Ezra, "
-            "2026-11-02: \"tell me to modify the cloud startup script when "
-            "there's something worth adding\", then \"when you tell me to "
-            "edit the startup script, give me the revised version\").")
+            "sessions need it, tell Ezra to edit the cloud startup script and "
+            "give him the FULL revised script (read the current one first); if "
+            "not worth adding, say so in a clause (Ezra, 2026-11-02).")
     if not notes:
         return 0
     key = hashlib.sha256(("|".join(notes) + text).encode()).hexdigest()[:16]

@@ -36,8 +36,7 @@ def _sibling():
 SKIPPED = (r"(?:skipp(?:ed|ing)|couldn'?t|could not|can'?t|cannot|unable to"
            r"|didn'?t (?:run|render|check)|did not (?:run|render|check)"
            r"|not (?:run|rendered|checked)|without (?:running|rendering))")
-# "missing" and "lacks" count only beside a tool-like noun, so "a config key was
-# missing" or "context is missing" stay silent.
+# "missing" and "lacks" count only beside a tool-like noun.
 TOOL = (r"(?:tools?|toolchains?|packages?|interpreters?|librar(?:y|ies)"
         r"|dependenc(?:y|ies)|modules?|binary|binaries|cli|extensions?"
         r"|compilers?|runtimes?)\b")
@@ -52,7 +51,6 @@ EXCUSE = re.compile(
     rf"(?:{SKIPPED}[^.\n]{{0,120}}{MISSING}|{MISSING}[^.\n]{{0,120}}{SKIPPED})",
     re.I)
 
-# Things that are "installed" in DevOps phrasing but are not tools to install.
 NONTOOL = re.compile(
     r"\b(?:certificates?|certs?|licen[sc]es?|api[- ]?keys?|keys?|tokens?|secrets?"
     r"|credentials?|cron|crontab|systemd|units?|entr(?:y|ies)|configs?|configuration"
@@ -113,12 +111,15 @@ def excuse(text):
 
 
 def nontool_subject(sentence):
-    """True when the missing thing is a certificate, key or the like (MISSING span only)."""
+    """True when the clause holding MISSING names a certificate, key or the like.
+
+    Words after the clause do not count, and a tool noun in it wins."""
     m = re.search(MISSING, sentence, re.I)
     if not m:
         return False
-    before = sentence[:m.start()].split()[-1:]
-    return bool(NONTOOL.search(" ".join(before) + " " + m.group(0)))
+    head = re.split(r"\b(?:because|since|as|so|but|and)\b|[,;:]", sentence[:m.start()], flags=re.I)[-1]
+    clause = head + " " + m.group(0)
+    return bool(NONTOOL.search(clause)) and not re.search(TOOL, clause, re.I)
 
 
 def main() -> int:

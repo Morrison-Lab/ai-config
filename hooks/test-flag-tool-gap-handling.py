@@ -44,11 +44,13 @@ CASES = [
           "from the YAML file.")], None, "a missing config key is not a tool"),
     ([say("The render was skipped because the R package knitr was missing.")],
      "tool is missing", "a missing package named after 'package' warns"),
-    ([say("I couldn't run the deploy because the SSL certificate wasn't "
-          "installed on the server.")], None, "an uninstalled certificate is not a tool"),
     ([say("Rendering was skipped because the reticulate package wasn't "
           "installed, so the render hook never ran.")], "tool is missing",
      "the founding incident with a later 'hook' still warns"),
+    ([say("I couldn't deploy because the API key for the staging environment "
+          "wasn't installed.")], None, "a modifier before 'installed' still reads as a key"),
+    ([say("I couldn't run the pre-commit hook because black wasn't installed.")],
+     "tool is missing", "a hook before the 'because' clause does not hide a tool"),
     ([say("Rendered both pages; no warnings.")], None, "plain report is silent"),
     ([user("go"), bash("Rscript -e 'install.packages(\"reticulate\")'"), RESULT,
       say("Rendered the chapter.")], "startup script",

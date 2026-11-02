@@ -191,4 +191,6 @@ institution-specific content, such as a WWU syllabus section, can still come fro
 - **Do:** before reporting a difference from one sibling as a gap, check the same setting across the public notes sites and name the majority.
 - **Don't:** treat one sibling, however close in subject or school, as the pattern for a setting that depends on its being private.
 
-(Ezra, 2026-11-02, on mcs: "lds is the outlier because it is currently private; look at the other public notes repos too".)
+(Ezra, 2026-11-02, on mcs:
+"lds is the outlier because it is currently private;
+look at the other public notes repos too".)

@@ -57,8 +57,12 @@ It missed UC Davis, Kristen Aiemjoy, two cited books, Quarto, GitHub Actions, an
 
 A list of definition links after the sentence --- "(definitions: bias, variance, irreducible error)" --- makes the reader find each term twice, once in the sentence and once in the list.
 Put each link on the word the sentence already uses, once per passage as in [`definition-crossrefs`](definition-crossrefs.md).
-A single crossref attached to the term it defines, such as "(@def-hessian)", is a different construction and stays;
-a parenthetical list of them does not.
+A single crossref after the term it defines, such as "differentiable at $c$ (@def-differentiable)", is the same defect:
+the reader must look past the word to a parenthetical, and on a split site the crossref renders as "(Definition 6 in Derivatives and Taylor Series)", which is longer than the word it explains.
+Link the term itself, as in `[differentiable at](calculus.qmd#def-differentiable) $c$` (Ezra, 2026-11-02, [Morrison-Lab/mds](https://morrison-lab.github.io/mds/optimization-critical-points.html), `_def-critical-point.qmd`).
+The same holds for a parenthetical `([why](url))` or `([proof](url))` after a claim:
+make the whole claim the link text, as in `[A kernel has the same mode as its density](url)`, and drop the parenthetical (same date, `_exr-miller-deriv-opt-gamma-kernel.qmd`).
+A crossref stays only where the sentence has no word to carry it, such as "see @thm-x" naming a result as a whole.
 
 The test is observable: does a sentence in the passage use the term as a word?
 If so, link it there, rewriting the sentence in prose when the term sat only in a formula.
@@ -73,5 +77,5 @@ Midterm 1 practice exam question 3(c) wrote the decomposition as a formula and l
 
 In general practice, place the link on the term where the sentence uses it and sweep the document for remaining parenthetical link lists:
 
-- **Do:** link each term at its mention, and check matches of `grep -n -E '\((definitions?|see)[: ]' <files>` over the document you are editing for trailing link lists (keeping single `@def-*` crossrefs).
+- **Do:** link each term at its mention, and check matches of `grep -n -E '\((definitions?|see)[: ]' <files>` over the document you are editing for trailing link lists, and `grep -n -E '\(@(def|thm|lem|prp|cor)-' <files>` for a trailing crossref (keeping only one with no word to carry it, such as `see @thm-x`).
 - **Don't:** append a parenthetical list of links after a sentence whose words could carry them.

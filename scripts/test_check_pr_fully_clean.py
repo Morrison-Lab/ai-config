@@ -9780,6 +9780,50 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     check("_auto_build_payload: a non-integer PR number exits 2, not a traceback",
           code == 2)
 
+    # Copilot's "open issues" wording (Morrison-Lab/mcs#47 reviews,
+    # 2026-11-02): no `**Findings:**` or `Comments generated:` field.
+    v2_marker = "<!-- ccr-overview-v2 -->\n\n"
+    approve_none = (
+        v2_marker + "### \U0001f7e2 Approval recommended\n\n"
+        "No active review issues are identified.\n\n"
+        "**No open issues** \U0001f389\n\n<sub>Review effort: Balanced</sub>"
+    )
+    check("copilot_verdict: 'Approval recommended' + '**No open issues**' is clean",
+          checker.copilot_verdict(approve_none) == "clean")
+    approve_two = (
+        v2_marker + "### \U0001f7e2 Approval recommended\n\nok\n\n"
+        "<details open>\n<summary><strong>2 open issues</strong></summary>\n\n"
+        "- a finding\n</details>"
+    )
+    check("copilot_verdict: '<strong>2 open issues</strong>' is not clean",
+          checker.copilot_verdict(approve_two) == "not-clean")
+    quoted_zero = (
+        v2_marker + "### \U0001f7e2 Approval recommended\n\nok\n\n"
+        "<details>\n<summary>Earlier round</summary>\n\n"
+        "**No open issues**\n</details>"
+    )
+    check("copilot_verdict: a '**No open issues**' inside <details> gives no verdict",
+          checker.copilot_verdict(quoted_zero) == "")
+    no_marker = "### \U0001f7e2 Approval recommended\n\n**No open issues**"
+    check("copilot_verdict: '**No open issues**' without the v2 marker gives no verdict",
+          checker.copilot_verdict(no_marker) == "")
+    later_clean = checker.check_latest_verdict(
+        [
+            ("review", "2026-11-02T09:18:26Z",
+             v2_marker + "### \U0001f535 Needs a closer look\n\n"
+             "A maintainer must confirm the license.\n\n"
+             "**No open issues** \U0001f389\n\n<sub>Review effort: Balanced</sub>",
+             "598c277", "COMMENTED", "copilot-pull-request-reviewer[bot]"),
+            ("review", "2026-11-02T17:06:50Z", approve_none,
+             "598c277", "COMMENTED", "copilot-pull-request-reviewer[bot]"),
+        ],
+        head_oid="598c2772f9fc49cd56fcb50c5103ed6ecef91973",
+        review_comments=[],
+    )
+    check("check_latest_verdict: a later Copilot '**No open issues**' approval "
+          "supersedes its own earlier not-clean",
+          later_clean[0] is True)
+
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

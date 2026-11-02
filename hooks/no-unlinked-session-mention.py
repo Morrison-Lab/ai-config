@@ -23,8 +23,8 @@ What counts:
   - A bare "session" or "thread" counts when the word before it points at
     another session: "the", "that", "those", "other", "another", "my",
     "our", "their", "its", "previous", "earlier", "prior", "parent",
-    "child", "sibling", or a host id such as "cf463-02" ("the session",
-    "that thread", "the cf463-02 session"). Any other word before it, as in
+    "child", "sibling", or a host id such as "ab12-03" ("the session",
+    "that thread", "the ab12-03 session"). Any other word before it, as in
     "the R session", "a training session" or "the support thread", names
     nothing to link, so it is not a mention.
   - The unit is one paragraph or one list item. A mention in a unit with no
@@ -47,7 +47,7 @@ MENTION = re.compile(
     r"|(?:Remote Control|RC|Mac|Linux|cloud|local|device|your|[a-z]+\d+-\d+)"
     r"(?: \w+){0,2} chats?|(?:that|those|other) chats?)\b", re.I)
 # ai-config (Ezra, 2026-11-02, "always link to the session"): any other
-# session or thread, however it is named ("the cf463-02 session", "the runner
+# session or thread, however it is named ("the ab12-03 session", "the runner
 # thread", "that session"). The word before it decides: a determiner that
 # names this session or an unspecific one is not a mention.
 GENERIC = re.compile(r"(?<![\w-])([\w-]+) (sessions?|threads?)\b", re.I)

@@ -259,6 +259,8 @@ def build_payload(
             "started_at": c.get("started_at") or "",
             "completed_at": c.get("completed_at") or "",
             "html_url": c.get("html_url") or "",
+            "id": c.get("id"),
+            "output": {"annotations_count": (c.get("output") or {}).get("annotations_count") or 0},
         }
         for c in check_runs_raw
     ]

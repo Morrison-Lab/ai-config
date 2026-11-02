@@ -68,6 +68,8 @@ CHECK_RUNS_RAW = [
         "started_at": "2026-09-01T12:01:00Z",
         "completed_at": "2026-09-01T12:05:00Z",
         "html_url": "https://github.com/example-org/example-repo/runs/1",
+        "id": 1,
+        "output": {"annotations_count": 3},
     }
 ]
 
@@ -90,6 +92,11 @@ def test_maps_pr_fields():
     check("mergeStateStatus uppercased", pr["mergeStateStatus"] == "CLEAN")
     check("labels mapped to name objects", pr["labels"] == [{"name": "bug"}])
     check("check_runs length matches input", len(payload["check_runs"]) == 1)
+    check(
+        "check run id and annotations_count carried through",
+        payload["check_runs"][0]["id"] == 1
+        and payload["check_runs"][0]["output"]["annotations_count"] == 3,
+    )
     check(
         "commit committedDate mapped from commit.committer.date",
         pr["commits"][0]["committedDate"] == "2026-09-01T12:00:00Z",

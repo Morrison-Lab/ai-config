@@ -143,7 +143,7 @@ GH_VALUE_FLAGS = frozenset({"-R", "--repo", "-t", "--subject", "-b", "--body",
                             "-A", "--author-email"})
 # Options of scripts/check-pr-fully-clean.py that take a separate value, from
 # its parse_args() (a test derives this set from the script and compares).
-INSTRUMENT_VALUE_FLAGS = frozenset({"--quorum", "--from-json", "-R", "--repo"})
+INSTRUMENT_VALUE_FLAGS = frozenset({"--quorum", "--from-json", "-R", "--repo", "--annotations-read"})
 RX_PR_NUM = re.compile(r"^\d+$")
 RX_PR_URL = re.compile(r"/pull/(\d+)(?:[/?#].*)?$")
 RX_CLEAN_LINE = re.compile(r"\bis FULLY CLEAN\b")

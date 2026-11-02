@@ -575,6 +575,18 @@ In the turn the comment arrives:
 A question or thanks needs no rule.
 Everything else does, and "it only applied here" is a claim to state in the reply, not to assume.
 
+The same holds for a specific correction Ezra makes in chat (2026-11-02: "always consider generalizing reusable principles and rules from specific corrections I make, including corrections delivered through PR review comments").
+A correction in chat gets the same four steps, with two additions:
+
+- **Search first.**
+  Look for a rule that already covers the class and strengthen it with the new case and its date, rather than adding a second rule beside it.
+- **Pick the home by kind.**
+  Prose and notation rules go to psw, agent behaviour to ai-config, and anything decidable on a diff to a gha check.
+  If you cannot write the PR in this turn, file the issue and name it in the reply.
+
+His `cai:` prefix at the start of a message or line means "record this in ai-config" outright.
+`hooks/remind-encode-user-correction.py` matches it and injects the procedure.
+
 `hooks/remind-generalize-maintainer-pr-comment.py` is the mechanism:
 it fires on a GitHub comment or review event authored by a maintainer login
 and injects these four steps, once per event.

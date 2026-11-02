@@ -1,0 +1,153 @@
+#!/usr/bin/env python3
+"""Stop-hook guard: a missing tool is installed, and a lasting install is reported.
+
+Ezra, 2026-11-02, in a thread that skipped a render because the cloud
+toolchain lacked R's reticulate: "cai: no excuses; always install what you
+need". And, in the same thread: "cai: tell me to modify the cloud startup
+script when there's something worth adding".
+
+Two checks on the final reply, both warn-only and once per distinct message:
+
+  1. EXCUSE. A sentence says something was skipped or could not be done AND
+     that a tool, package or interpreter is missing or not installed. The
+     remedy is to install it and run the work (shared/workflow/growth-mindset.md,
+     "A broken or missing tool is fixed, not routed around").
+  2. STARTUP SCRIPT. This turn ran an install command (pip, uv pip, apt,
+     install.packages, npm -g, tlmgr, ...) and the reply never mentions the
+     environment's startup or setup script. Whether the install is worth
+     adding to it is a judgment, so the hook only makes the author answer it.
+
+Fails OPEN. The two checks are lexical: a sentence that quotes this rule can
+fire check 1, which the once-per-message sentinel keeps cheap.
+"""
+import hashlib
+import importlib.util
+import json
+import os
+import re
+import sys
+import tempfile
+
+_HERE = os.path.dirname(os.path.realpath(__file__))
+_LIB = os.path.join(os.path.dirname(_HERE), "scripts", "lib")
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+from agent_notice import stop_notice  # noqa: E402
+
+
+def _sibling():
+    spec = importlib.util.spec_from_file_location(
+        "flag_cop_out_offer", os.path.join(_HERE, "flag-cop-out-offer.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+SKIPPED = (r"(?:skipp(?:ed|ing)|couldn'?t|could not|can'?t|cannot|unable to"
+           r"|didn'?t (?:run|render|check)|did not (?:run|render|check)"
+           r"|not (?:run|rendered|checked)|without (?:running|rendering))")
+MISSING = (r"(?:(?:isn'?t|is not|aren'?t|are not|wasn'?t|not) installed"
+           r"|(?:lacks|lacked|missing)\b"
+           r"|(?:isn'?t|is not|not) (?:available|present)"
+           r"|(?:no|without) (?:\S+ ){0,3}(?:installed|interpreter))")
+FIXED = re.compile(r"\b(?:i|we) (?:installed|have installed|then installed)\b"
+                   r"|\binstalled (?:it|them|that)\b", re.I)
+EXCUSE = re.compile(
+    rf"(?:{SKIPPED}[^.\n]{{0,120}}{MISSING}|{MISSING}[^.\n]{{0,120}}{SKIPPED})",
+    re.I)
+
+INSTALL = re.compile(
+    r"\b(?:pip3?|uv pip|uv tool|pipx|conda|mamba|npm|pnpm|yarn|cargo|gem|tlmgr"
+    r"|apt(?:-get)?|apk|dnf|yum|brew|pacman)\s+(?:-\S+\s+)*(?:install|add)\b"
+    r"|\binstall\.packages\s*\(|\bpak::pak\s*\(|\bpak::pkg_install\s*\("
+    r"|\bremotes::install_\w+\s*\(|\bquarto install\b|\bjuliaup\b"
+    r"|\bPkg\.add\s*\(|\btinytex::install", re.I)
+SCRIPT = re.compile(r"\b(?:startup|start-up|setup|set-up)[ -]script\b", re.I)
+
+
+def turn_installs(path):
+    """Install commands the agent ran since the last real user prompt."""
+    found = []
+    try:
+        with open(path, encoding="utf-8", errors="ignore") as fh:
+            for line in fh:
+                try:
+                    m = json.loads(line)
+                except Exception:
+                    continue
+                content = (m.get("message") or {}).get("content") or m.get("content")
+                if m.get("type") == "user" or m.get("role") == "user":
+                    is_result = isinstance(content, list) and any(
+                        isinstance(b, dict) and b.get("type") == "tool_result"
+                        for b in content)
+                    if not is_result:
+                        found = []
+                    continue
+                if not isinstance(content, list):
+                    continue
+                for b in content:
+                    if (isinstance(b, dict) and b.get("type") == "tool_use"
+                            and b.get("name") == "Bash"):
+                        cmd = (b.get("input") or {}).get("command") or ""
+                        if INSTALL.search(cmd):
+                            found.append(cmd.strip().splitlines()[0][:100])
+    except Exception:
+        return []
+    return found
+
+
+def excuse(text):
+    for sentence in re.split(r"(?<=[.!?])\s+|\n+", text):
+        if EXCUSE.search(sentence) and not FIXED.search(sentence):
+            return sentence.strip()[:160]
+    return None
+
+
+def main() -> int:
+    try:
+        payload = json.load(sys.stdin)
+        path = payload.get("transcript_path") or ""
+        texts = _sibling().last_visible_texts(path)
+    except Exception:
+        return 0
+    if not texts:
+        return 0
+    text = texts[0]
+    notes = []
+    hit = excuse(text)
+    if hit:
+        notes.append(
+            f"Your reply says work was skipped or blocked because a tool is "
+            f"missing: \"{hit}\". Install it (pip, uv, apt, install.packages, "
+            "tinytex, ...) and run the work; a missing tool is a to-do, not a "
+            "reason (Ezra, 2026-11-02: \"no excuses; always install what you "
+            "need\"). If the install truly cannot be done, say what you tried.")
+    installs = turn_installs(path)
+    if installs and not SCRIPT.search(text):
+        notes.append(
+            f"This turn installed something ({installs[0]!r}). If future cloud "
+            "sessions would need it too, tell Ezra to edit the cloud "
+            "environment's startup script and give him the FULL revised "
+            "script, not only the lines to add (read the current script "
+            "first); if it is not worth adding, say so in a clause (Ezra, "
+            "2026-11-02: \"tell me to modify the cloud startup script when "
+            "there's something worth adding\", then \"when you tell me to "
+            "edit the startup script, give me the revised version\").")
+    if not notes:
+        return 0
+    key = hashlib.sha256(("|".join(notes) + text).encode()).hexdigest()[:16]
+    sentinel = os.path.join(tempfile.gettempdir(), f".claude-toolgap-{key}")
+    if os.path.exists(sentinel):
+        return 0
+    try:
+        open(sentinel, "w", encoding="utf-8").close()
+    except Exception:
+        pass
+    print(stop_notice(payload, " ".join(notes) +
+                      " See shared/workflow/growth-mindset.md.",
+                      "flag-tool-gap-handling"))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

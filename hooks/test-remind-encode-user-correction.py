@@ -75,6 +75,9 @@ FIRES = [
     "what happened to one div per file?",
     "empty promise? that sounded like one",
     "why aren't the subagents following our rules reliably?",
+    # Ezra's "cai:" prefix, at the start of a message or of a later line.
+    "cai: always install what you need",
+    "thanks, that works.\n  cai : give me the revised startup script",
     # The same words in a project-thread wake and in a PR review comment event.
     '<wake reason="mention"><message from="human">why aren\'t we using the macro here?</message></wake>',
     '<wake reason="external-event"><event source="github" kind="review_comment" '
@@ -82,6 +85,7 @@ FIRES = [
     + "</event></wake>",
 ]
 SILENT = [
+    "what does the cai: prefix in his messages mean?",
     "please render the manuscript again",
     "always use Pacific time in recaps",
     "what is the status of the sankey issue?",

@@ -53,6 +53,9 @@ The tell is that nothing about the session resembles a terminal recap: no human 
 - **Do:** end with the declaration in an interactive session, where a person reads the recap (though for non-clean stopping points, pending work may follow the declaration).
 - **Do:** fold it into the substantive message, or leave it out, when a harness will post your last message verbatim.
 - **Don't:** emit a bare declaration as a separate final message in a CI run --- that is the whole failure, and it looks like compliance.
+- **Do:** leave it out of an automated review comment, which no session follows up on.
+  `hooks/require-stopping-point.py` skips the missing-declaration check when `GITHUB_ACTIONS` is true,
+  and still flags a false "session done" there ([mds#591](https://github.com/Morrison-Lab/mds/pull/591)).
 - **Don't:** assume the harness concatenates your turn.
   The common implementation takes one message.
 

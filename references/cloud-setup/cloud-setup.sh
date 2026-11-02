@@ -54,6 +54,17 @@
 #   6. The resolved Quarto version is sanity-checked against a `N.N` pattern
 #      before building the download URL, so a changed redirect format fails
 #      fast into the warning instead of fetching a garbage URL.
+#
+# Additions (2026-11-02), marked `# [lds]`: the repo-independent part of the
+# lds notes site's render toolchain, so a session needs none of it installed by
+# hand. lds's own SessionStart hook (.claude/hooks/render-toolchain.sh) installs
+# the rest, but only in a session rooted in /home/user/lds; a project session
+# rooted at /home/user never runs it. The added pieces:
+#   a. librsvg2-bin (rsvg-convert, which PDF handouts with SVG figures need);
+#   b. the `typos` spell checker, from the crate-ci/typos GitHub release;
+#   c. the core R packages every lds page needs (knitr, rmarkdown, reticulate,
+#      remotes, lintr, JuliaCall), as Posit Package Manager binaries.
+# Each is best-effort: a failure warns and the build continues.
 # ---------------------------------------------------------------------------
 #
 # Network allowlist (for restricted cloud networks that cannot use 'Full'):
@@ -62,8 +73,8 @@
 # and cloud.r-project.org are usually already allowed; add the rest to a custom
 # allowlist:
 #   packagemanager.posit.co                              CRAN packages (renv.lock's repo)
-#   github.com                                           Quarto .deb + GitHub-sourced R pkgs
-#   release-assets.githubusercontent.com                 GitHub release downloads (Quarto, TinyTeX)
+#   github.com                                           Quarto .deb + GitHub-sourced R pkgs + typos release
+#   release-assets.githubusercontent.com                 GitHub release downloads (Quarto, TinyTeX, typos)
 #   objects.githubusercontent.com  codeload.github.com   GitHub release/tarball downloads
 #   api.github.com                                       renv GitHub pkgs + TinyTeX lookup (rate-limited unauth; set GH_TOKEN)
 #   ctan.math.illinois.edu                               one pinned CTAN mirror (see CTAN_REPO below)
@@ -122,6 +133,7 @@ echo "==> Installing system libraries (apt)"
 # No third-party PPAs: this list is sufficient to build the project's R packages
 # (mirrors copilot-setup-steps.yml). curl/ca-certificates are added so the R and
 # Quarto download steps below work on a minimal base image.
+# [lds] librsvg2-bin added: rsvg-convert, which lds's PDF handouts need.
 $SUDO apt-get update
 $SUDO apt-get install -y --no-install-recommends \
   ca-certificates \
@@ -145,7 +157,8 @@ $SUDO apt-get install -y --no-install-recommends \
   pandoc \
   poppler-utils \
   tesseract-ocr \
-  tesseract-ocr-eng
+  tesseract-ocr-eng \
+  librsvg2-bin
 
 echo "==> Installing R (latest release) from the CRAN apt repository"
 # Install R from CRAN's apt repo rather than rig: apt uses the system CA store,
@@ -177,6 +190,23 @@ echo "==> Installing the renv package"
 # adapter doing a per-USER R install should drop $SUDO so renv lands in the
 # user library instead.
 $SUDO Rscript -e 'if (!requireNamespace("renv", quietly = TRUE)) install.packages("renv", repos = "https://cloud.r-project.org")'
+
+# [lds] The core R packages every lds page needs. Posit Package Manager serves
+# Linux binaries, so this takes about a minute, not the compile time of a CRAN
+# source install. The rest of lds's packages (about 100) are installed by lds's
+# own SessionStart hook, which reads them from the render workflows so it never
+# drifts from CI. Best-effort: a failure warns and the build continues.
+echo "==> Installing the core R packages for the lds notes site"
+if ! $SUDO Rscript -e '
+  options(repos = c(CRAN = "https://packagemanager.posit.co/cran/__linux__/noble/latest"))
+  needed <- c("knitr", "rmarkdown", "reticulate", "remotes", "lintr", "JuliaCall")
+  missing <- setdiff(needed, rownames(installed.packages()))
+  if (length(missing) > 0) install.packages(missing)
+  stopifnot(all(needed %in% rownames(installed.packages())))
+'; then
+  echo "WARNING: could not install the core R packages for lds (reticulate, knitr, ...)." >&2
+  echo "         Check that packagemanager.posit.co is allowlisted (see header)." >&2
+fi
 
 # [review] Resolve JULIA_MINOR BEFORE it is referenced in the banner below, so
 # the echo reports the version actually installed (the original echoed it one
@@ -344,6 +374,9 @@ if [ "$quarto_ok" = true ] && command -v quarto >/dev/null 2>&1; then
     if [ -n "$tlmgr_bin" ]; then
       "$tlmgr_bin" option repository "$CTAN_REPO" \
         || echo "WARNING: could not pin tlmgr to ${CTAN_REPO}; render-time LaTeX installs will use the default mirror." >&2
+      # [lds] lds's PDF handouts need these two LaTeX packages.
+      "$tlmgr_bin" install luacolor lua-ul \
+        || echo "WARNING: could not install luacolor and lua-ul; lds PDF handouts will fail to build." >&2
     else
       echo "WARNING: tlmgr not found after TinyTeX install; cannot pin the CTAN mirror." >&2
     fi
@@ -352,6 +385,31 @@ if [ "$quarto_ok" = true ] && command -v quarto >/dev/null 2>&1; then
     echo "         limit?). PDF rendering needs TinyTeX -- set GH_TOKEN/GITHUB_TOKEN in" >&2
     echo "         the environment, or rerun 'quarto install tinytex' later." >&2
   fi
+fi
+
+# [lds] The `typos` spell checker, which lds's pre-commit checklist runs.
+# Same approach as Quarto: read the version from the /releases/latest redirect
+# (not the rate-limited API), then fetch the musl release tarball. Best-effort.
+echo "==> Installing typos"
+if ! command -v typos >/dev/null 2>&1; then
+  typos_arch="$(uname -m)"
+  typos_ver="$(curl -fsS -o /dev/null -w '%{redirect_url}' \
+    https://github.com/crate-ci/typos/releases/latest 2>/dev/null || true)"
+  typos_ver="${typos_ver##*/tag/}"
+  typos_tgz="$(mktemp --suffix=.tar.gz)"
+  if printf '%s' "$typos_ver" | grep -qE '^v[0-9]+(\.[0-9]+)+$' \
+     && curl -fsSL \
+          "https://github.com/crate-ci/typos/releases/download/${typos_ver}/typos-${typos_ver}-${typos_arch}-unknown-linux-musl.tar.gz" \
+          -o "$typos_tgz" \
+     && typos_dir="$(mktemp -d)" \
+     && tar -xzf "$typos_tgz" -C "$typos_dir" \
+     && $SUDO install -m 0755 "$(find "$typos_dir" -type f -name typos | head -1)" /usr/local/bin/typos; then
+    :
+  else
+    echo "WARNING: Could not install typos from github.com. lds's spell check" >&2
+    echo "         (typos path/to/changed/files) will be unavailable." >&2
+  fi
+  rm -f "$typos_tgz"
 fi
 
 echo "==> Setup complete:"
@@ -366,3 +424,6 @@ if command -v quarto >/dev/null 2>&1; then
 else
   echo "quarto: NOT installed (see WARNING above) -- R + renv are ready; fix network for rendering."
 fi
+# [lds] Report the pieces added for the lds notes site.
+command -v rsvg-convert >/dev/null 2>&1 && rsvg-convert --version | head -1 || echo "rsvg-convert: NOT installed"
+command -v typos >/dev/null 2>&1 && typos --version || echo "typos: NOT installed (see WARNING above)"

@@ -26,7 +26,7 @@ api.r-hub.io                  # R-hub system-requirements lookups
 bioconductor.org              # Bioconductor-tagged packages restored by renv::restore()
 
 # --- GitHub (Quarto .deb, TinyTeX, GitHub-sourced R packages) ---
-github.com                    # Quarto .deb + GitHub-sourced R pkgs
+github.com                    # Quarto .deb + GitHub-sourced R pkgs + typos release
 api.github.com                # release lookups (set GH_TOKEN to avoid rate limits)
 codeload.github.com           # source tarball downloads
 release-assets.githubusercontent.com   # GitHub release asset downloads

@@ -179,3 +179,16 @@ Links that are content stay, such as a link to the prerequisite course's notes s
 - **Don't:** leave "follows lds's `CLAUDE.md` as its baseline", "copied from mlg", "(lds#370)" or a pointer to the sibling's docs for the details.
 
 (Ezra, 2026-10-23, on dds#1 and dlg#2: "clear out all the template content and references".)
+
+## Compare a public notes site's settings with the public siblings
+
+The lab's notes sites differ by visibility, so the right sibling to copy depends on what is being copied.
+As of 2026-11-02, lds is private, and its single "Report an issue" link (`repo-actions: [issue]`) reflects that,
+while every public notes site (mds, pds, sds, rme, psw, win, ids, cds) shows `[edit, issue, source]`.
+A setting that follows from visibility (page action links, license, footer) comes from a public sibling, with rme as the closest course site;
+institution-specific content, such as a WWU syllabus section, can still come from lds.
+
+- **Do:** before reporting a difference from one sibling as a gap, check the same setting across the public notes sites and name the majority.
+- **Don't:** treat one sibling, however close in subject or school, as the pattern for a setting that depends on its being private.
+
+(Ezra, 2026-11-02, on mcs: "lds is the outlier because it is currently private; look at the other public notes repos too".)

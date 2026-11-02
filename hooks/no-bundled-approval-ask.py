@@ -80,10 +80,11 @@ def check_message(text):
         return None
     # Two phrasings of one either/or question ("Should I push, or would you
     # like me to wait?") are one ask, so a sentence with "or" counts once.
+    # A credential ask still pairs with every other ask phrase, "or" or not.
     n_asks = sum(1 if ASK.search(s) and re.search(r"\bor\b", s) else len(ASK.findall(s))
                  for s in SENT.split(text))
     has_cred = any(ASK.search(s) and CRED_ASK.search(s) for s in SENT.split(text))
-    if has_cred and n_asks >= 2:
+    if has_cred and len(ASK.findall(text)) >= 2:
         return "This message asks to use a credential or key alongside another ask"
     if n_asks >= 2:
         return "This message carries {} approval asks".format(n_asks)

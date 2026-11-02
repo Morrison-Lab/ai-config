@@ -38,6 +38,7 @@ from datetime import datetime, timedelta, timezone
 OVERDUE_MINUTES = 15
 CHECK_TOOLS = ("get_trigger", "update_trigger", "delete_trigger", "fire_trigger")
 LIST_TOOL = "list_triggers"
+ARM_TOOLS = ("send_later", "create_trigger")
 RX_SEND_LATER = re.compile(r'"fire_at"\s*:\s*"([^"]+)".*?"trigger_id"\s*:\s*"(trig_\w+)"', re.S)
 RX_SEND_LATER_REV = re.compile(r'"trigger_id"\s*:\s*"(trig_\w+)".*?"fire_at"\s*:\s*"([^"]+)"', re.S)
 RX_CREATED = re.compile(r'"id"\s*:\s*"(trig_\w+)".*?"run_once_at"\s*:\s*"([^"]+)"', re.S)
@@ -71,6 +72,7 @@ def scan(path):
     """Return (armed, checks, deliveries): armed maps id -> due time;
     checks is a list of (time, id or None); deliveries is a list of times."""
     armed, checks, deliveries = {}, [], []
+    tool_names = {}
     with open(path, encoding="utf-8", errors="replace") as stream:
         for line in stream:
             try:
@@ -82,6 +84,8 @@ def scan(path):
                 deliveries.append(when)
             for block in blocks(record):
                 if block.get("type") == "tool_result":
+                    if not tool_names.get(block.get("tool_use_id"), "").endswith(ARM_TOOLS):
+                        continue
                     text = result_text(block)
                     found = []
                     match = RX_SEND_LATER.search(text)
@@ -99,6 +103,7 @@ def scan(path):
                             armed[trigger_id] = due_time
                 elif block.get("type") == "tool_use":
                     name = str(block.get("name", ""))
+                    tool_names[block.get("id")] = name
                     if name.endswith(LIST_TOOL):
                         checks.append((when, None))
                     elif name.endswith(CHECK_TOOLS):

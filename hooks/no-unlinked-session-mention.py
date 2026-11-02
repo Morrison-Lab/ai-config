@@ -14,7 +14,7 @@ What counts:
   - A mention is "Remote Control session", "RC session", "Mac session",
     "Linux session", "cloud session", "local session", "device session",
     "coordinator session", "your ... session", or the word "coordinator".
-    The same prefixes before "chat" count too ("the cf463-02 chat", "your Mac
+    The same prefixes before "chat" count too ("the web-01 chat", "your Mac
     chat"), as do "that chat" and "other chat" (ai-config#4878).
     "This session", "a session", "this chat" and "the project chat" are not
     mentions of another session.

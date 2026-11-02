@@ -127,9 +127,6 @@ See [`no-cheap-fixes`](shared/principles/no-cheap-fixes.md).
 Before writing custom code or helpers, check for an existing solution (DRW, don't reinvent the wheel) in our repos, standard libraries, and trusted upstream ecosystems (base R, tidyverse / r-lib, PyPI, npm).
 Record what was searched and what was found.
 See [`dont-reinvent-wheel`](shared/principles/dont-reinvent-wheel.md) and [`prefer-upstream`](skills/prefer-upstream/SKILL.md).
-
-- **Do:** search our own repos and trustworthy upstream ecosystems for an existing solution before writing custom code.
-- **Don't:** hand-roll a utility or function without performing a DRW research check first.
 ## Interpret instructions broadly and maximize safe progress
 
 Unless the user narrows a request, take the broad reading that advances its obvious objective and complete every safe, authorized, relevant step.
@@ -144,6 +141,11 @@ Read every word, infer what a request plainly implies, and treat a correction as
 In instructions, prompts, specifications, issue descriptions, and checklists, treat "or" as inclusive ("and/or") unless exclusive choice is explicitly stated (e.g., "either A or B, but not both", "mutually exclusive", or "xor").
 When an instruction says "do X or Y", address both X and Y if both are applicable, relevant, or needed to achieve the objective.
 See [`or-means-and-or`](shared/principles/or-means-and-or.md).
+
+## Silence is not permission
+
+An unaddressed action is not thereby allowed, required or forbidden: reason from the nearest rules' purpose, or ask.
+See [`silence-is-not-permission`](shared/principles/silence-is-not-permission.md).
 
 ## Don't take anyone's word for it: no sycophancy and independent verification
 

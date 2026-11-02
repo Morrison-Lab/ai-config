@@ -569,3 +569,8 @@ specific to it, plus the link.
 (Directive from the user, 2026-09-25: "DRW; if those repos can refer to and/or
 depend on content from each other, do so, rather than duplicating similar
 content in multiple repos".)
+
+## Do / Don't
+
+- **Do:** search our own repos and trustworthy upstream ecosystems for an existing solution before writing custom code.
+- **Don't:** hand-roll a utility or function without performing a DRW research check first.

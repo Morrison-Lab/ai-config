@@ -87,7 +87,6 @@ def check_message(text):
     return None
 
 
-NEGATED = re.compile(r"\b(?:no|without|not)\s+(?:\w+\s+){0,2}(?:yes|approved|approval|go-?ahead)\b", re.I)
 ROUTINE = re.compile(r"\b(?:allow-?listed|routine|as usual|standing\s+grant|already\s+approved)\b", re.I)
 
 
@@ -112,11 +111,10 @@ def main() -> int:
         what = check_message(flatten(tool_input))
     elif RC_TOOL.search(tool):
         text = tool_input.get("instructions")
-        # A negated approval ("no approval is needed") does not make a credential use
-        # a bundled ask, but a bundle wording is denied whatever else the brief says.
+        # Any approval wording, negated or not, plus a non-routine credential use is denied:
+        # the brief must call a routine use routine or allow-listed.
         cites = isinstance(text, str) and RC_CITES.search(text) and not EXEMPT.search(text)
-        if cites and (RC_BUNDLE.search(text) or (
-                RC_CITES.search(NEGATED.sub("", text)) and new_cred_use(text))):
+        if cites and (RC_BUNDLE.search(text) or new_cred_use(text)):
             what = "These instructions cite one yes/approval as covering several actions or a credential"
     if what:
         print(json.dumps({"hookSpecificOutput": {

@@ -73,6 +73,9 @@ BODIES = [
     "",
     "   ",
     "_Posted by Claude Code (AI agent) --- not written by a human._",
+    "Independent review of head bdb97ca (separate agent):\n\nVerdict: clean",
+    "Verdict: clean\n\n<!-- review-data:\n{\"verdict\": \"CLEAN\"}\n-->",
+    "Please add an independent review of head bdb97ca.",
 ]
 
 

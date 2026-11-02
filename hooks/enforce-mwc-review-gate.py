@@ -1324,6 +1324,16 @@ MAINTAINER_FEEDBACK_EXEMPT_RE = re.compile(
 )
 
 
+# Copy of scripts/lib/maintainer_feedback.py REVIEW_COMMENT_RE (pinned by
+# scripts/test_maintainer_feedback.py): an agent's review posted under the
+# maintainer's login is a review, not feedback.
+REVIEW_COMMENT_RE = re.compile(
+    r"\A\s*Independent review of head\s+`?[0-9a-f]{7,40}`?(?![0-9a-z])"
+    r"|<!--\s*review-data:",
+    re.IGNORECASE,
+)
+
+
 def _configured_maintainers():
     """Comma-separated maintainer logins: `MAINTAINER_LOGINS`, else the
     "maintainers" list in the JSON file `AI_CONFIG_LOCAL` names (default
@@ -1390,7 +1400,8 @@ def unread_maintainer_feedback(pr_data):
         if login not in logins or (when or "") <= head_date:
             continue
         text = body.strip()
-        if not text or AGENT_AUTHORSHIP_RE.search(body) or MAINTAINER_FEEDBACK_EXEMPT_RE.fullmatch(text):
+        if not text or AGENT_AUTHORSHIP_RE.search(body) or MAINTAINER_FEEDBACK_EXEMPT_RE.fullmatch(text) \
+                or REVIEW_COMMENT_RE.search(body):
             continue
         found.append(f"{kind} by {login} at {when}")
     return found

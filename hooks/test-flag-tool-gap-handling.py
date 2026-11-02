@@ -64,6 +64,13 @@ for lines, expect, name in CASES:
     out = p.stdout + p.stderr
     fired = bool(out.strip())
     ok = fired == (expect is not None) and (expect is None or expect in out)
+    if fired and ok:
+        # The block's `reason` is the only part the agent reads.
+        try:
+            payload = json.loads(p.stdout)
+            ok = payload.get("decision") == "block" and bool(payload.get("reason"))
+        except Exception:
+            ok = False
     print(("PASS " if ok else "FAIL ") + name)
     if not ok:
         fails += 1

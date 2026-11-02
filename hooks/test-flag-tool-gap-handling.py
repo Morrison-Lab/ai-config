@@ -48,6 +48,12 @@ CASES = [
           "missing.")], None, "missing context is not a tool"),
     ([say("The render was skipped because the R package knitr was missing.")],
      "missing tool", "a missing package named after 'package' warns"),
+    ([say("I couldn't run the deploy because the SSL certificate wasn't "
+          "installed on the server.")], None, "an uninstalled certificate is not a tool"),
+    ([say("The job didn't run because the cron entry wasn't installed yet.")],
+     None, "an uninstalled cron entry is not a tool"),
+    ([say("I couldn't proceed because there's no API key installed in the "
+          "environment.")], None, "a missing API key is not a tool"),
     ([say("Rendered both pages; no warnings.")], None, "plain report is silent"),
     ([user("go"), bash("Rscript -e 'install.packages(\"reticulate\")'"), RESULT,
       say("Rendered the chapter.")], "startup script",

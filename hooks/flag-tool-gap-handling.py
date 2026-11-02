@@ -56,6 +56,12 @@ EXCUSE = re.compile(
     rf"(?:{SKIPPED}[^.\n]{{0,120}}{MISSING}|{MISSING}[^.\n]{{0,120}}{SKIPPED})",
     re.I)
 
+# Things that are "installed" in DevOps phrasing but are not tools to install.
+NONTOOL = re.compile(
+    r"\b(?:certificates?|certs?|licen[sc]es?|api[- ]?keys?|keys?|tokens?|secrets?"
+    r"|credentials?|cron|crontab|systemd|units?|entr(?:y|ies)|configs?|configuration"
+    r"|services?|daemons?|hooks?|webhooks?)\b", re.I)
+
 INSTALL = re.compile(
     r"\b(?:pip3?|uv pip|uv tool|pipx|conda|mamba|npm|pnpm|yarn|cargo|gem|tlmgr"
     r"|apt(?:-get)?|apk|dnf|yum|brew|pacman)\s+(?:-\S+\s+)*(?:install|add)\b"
@@ -105,7 +111,7 @@ def excuse(text):
     if FIXED.search(text):
         return None
     for sentence in re.split(r"(?<=[.!?])\s+|\n+", text):
-        if EXCUSE.search(sentence):
+        if EXCUSE.search(sentence) and not NONTOOL.search(sentence):
             return sentence.strip()[:160]
     return None
 

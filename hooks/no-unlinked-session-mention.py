@@ -20,12 +20,13 @@ What counts:
     mentions of another session.
   - A link is `https://claude.ai/code/session_...`, `(#cmsg_...)` or a URL
     carrying `thread=cmsg_...`.
-  - Any other "<words> session" or "<words> thread" counts too, unless the
-    word before it is "this", "a", "an", "each", "every", "same", "new",
-    "one", "current", "per", "any", "no", "which" or "whose", or a
-    computing or forum word such as "R", "shell", "database", "main",
-    "worker", "review" or "comment" ("the cf463-02 session", "the runner
-    thread", "that session"; not "the R session" or "the main thread").
+  - A bare "session" or "thread" counts when the word before it points at
+    another session: "the", "that", "those", "other", "another", "my",
+    "our", "their", "its", "previous", "earlier", "prior", "parent",
+    "child", "sibling", or a host id such as "cf463-02" ("the session",
+    "that thread", "the cf463-02 session"). Any other word before it, as in
+    "the R session", "a training session" or "the support thread", names
+    nothing to link, so it is not a mention.
   - The unit is one paragraph or one list item. A mention in a unit with no
     link of its own blocks.
   - Fenced code and inline code spans are removed first.
@@ -49,16 +50,11 @@ MENTION = re.compile(
 # session or thread, however it is named ("the cf463-02 session", "the runner
 # thread", "that session"). The word before it decides: a determiner that
 # names this session or an unspecific one is not a mention.
-GENERIC = re.compile(r"(?<![\w-])((?:[\w-]+ ){0,3})(sessions?|threads?)\b", re.I)
-NOT_ANOTHER = {"this", "a", "an", "each", "every", "same", "new", "one",
-               "current", "per", "any", "no", "which", "whose",
-               # Computing and forum senses, which name nothing to link.
-               "r", "python", "julia", "shell", "bash", "terminal", "tmux",
-               "ssh", "repl", "rstudio", "jupyter", "kernel", "database",
-               "db", "sql", "login", "browser", "user", "http", "web",
-               "main", "worker", "cpu", "gpu", "background", "foreground",
-               "email", "comment", "review", "reply", "discussion", "github",
-               "forum", "multi", "single"}
+GENERIC = re.compile(r"(?<![\w-])([\w-]+) (sessions?|threads?)\b", re.I)
+POINTING = {"the", "that", "those", "other", "another", "my", "our", "their",
+            "its", "previous", "earlier", "prior", "parent", "child",
+            "sibling"}
+HOST_ID = re.compile(r"[a-z]+\d+-\d+", re.I)
 LINK = re.compile(
     r"claude\.ai/code/session_\w+|\(#cmsg_\w+\)|[?&]thread=cmsg_\w+")
 UNIT_BREAK = re.compile(r"\n[ \t]*\n|\n(?=(?:[-*+]|\d+[.)])[ \t])")
@@ -85,10 +81,9 @@ def unlinked_mention(text: str):
         if m:
             return m.group(0)
         for g in GENERIC.finditer(unit):
-            before = g.group(1).split()
-            if before and before[-1].lower() in NOT_ANOTHER:
-                continue
-            return " ".join(before[-1:] + [g.group(2)])
+            before = g.group(1)
+            if before.lower() in POINTING or HOST_ID.fullmatch(before):
+                return g.group(0)
     return None
 
 

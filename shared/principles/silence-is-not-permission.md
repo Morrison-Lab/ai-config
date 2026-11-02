@@ -11,9 +11,12 @@ Most actions have no rule written about them, so the lack of one says nothing ab
 
 Agents make this inference in both directions:
 
-- **Silence as permission.** "No rule forbids deleting this branch, so I may delete it."
-- **Silence as prohibition.** "No rule lets me attach this repository, so I may not."
-- **Silence as requirement.** "Every other check has a caller, so a check without one must be required."
+- **Silence as permission.**
+  "No rule forbids deleting this branch, so I may delete it."
+- **Silence as prohibition.**
+  "No rule lets me attach this repository, so I may not."
+- **Silence as requirement.**
+  "Every other check has a caller, so a check without one must be required."
 
 Each version treats a gap in the text as a decision by the author.
 It is a gap, not a decision.

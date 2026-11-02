@@ -14,7 +14,10 @@ What counts:
   - A mention is "Remote Control session", "RC session", "Mac session",
     "Linux session", "cloud session", "local session", "device session",
     "coordinator session", "your ... session", or the word "coordinator".
-    "This session" and "a session" are not mentions of another session.
+    The same prefixes before "chat" count too ("the cf463-02 chat", "your Mac
+    chat"), as do "that chat" and "other chat" (ai-config#4878).
+    "This session", "a session", "this chat" and "the project chat" are not
+    mentions of another session.
   - A link is `https://claude.ai/code/session_...`, `(#cmsg_...)` or a URL
     carrying `thread=cmsg_...`.
   - The unit is one paragraph or one list item. A mention in a unit with no
@@ -32,7 +35,10 @@ FENCE = re.compile(
 INLINE_CODE = re.compile(r"(?<!`)(`+)(?!`).*?(?<!`)\1(?!`)", re.S)
 MENTION = re.compile(
     r"\b(?:(?:Remote Control|RC|Mac|Linux|cloud|local|device|coordinator|your)"
-    r"(?: \w+){0,2} sessions?|coordinator)\b", re.I)
+    r"(?: \w+){0,2} sessions?|coordinator"
+    # ai-config#4878: a Remote Control session called a "chat".
+    r"|(?:Remote Control|RC|Mac|Linux|cloud|local|device|your|[a-z]+\d+(?:-\d+)?)"
+    r"(?: \w+){0,2} chats?|(?:that|those|other) chats?)\b", re.I)
 LINK = re.compile(
     r"claude\.ai/code/session_\w+|\(#cmsg_\w+\)|[?&]thread=cmsg_\w+")
 UNIT_BREAK = re.compile(r"\n[ \t]*\n|\n(?=(?:[-*+]|\d+[.)])[ \t])")

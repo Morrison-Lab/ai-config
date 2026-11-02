@@ -89,7 +89,8 @@ Whenever a message names a session, either a Claude Code session or a project th
 Write `[session](https://claude.ai/code/session_…)` for a Claude Code session, or the thread link above for a project thread.
 
 - **Do:** write the session as a link the user can open, including a Remote Control session on the user's device, the coordinator, and every other thread or session.
-- **Don't:** name a session by title or id alone, or by a phrase such as "your Mac session".
+- **Don't:** name a session by title or id alone, or by a phrase such as "your Mac session", "the cf463-02 chat" or "that chat".
+  A chat is a session.
 
 (Directive from the user, 2026-10-16: "anytime you mention a session, you must provide a link".
 Reaffirmed 2026-10-22: "always hyperlink when you mention other sessions".

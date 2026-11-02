@@ -887,11 +887,18 @@ def _is_own_job(cr: dict, own: Optional[Tuple[str, int]]) -> bool:
     return bool(m) and m.group(1) == own[0] and int(m.group(2)) == own[1]
 
 
+# Check-run ids whose annotations the agent read and dispositioned (fixed, or
+# explained as a false positive in the PR), set by --annotations-read
+# (ai-config#4892).
+_ANNOTATIONS_READ: set = set()
+
+
 def check_ci_runs(pr) -> Tuple[bool, List[str]]:
     sha = pr.head_sha
     repo = pr.repo
     check_runs = [{"name": cr.name, "status": cr.status, "conclusion": cr.conclusion, "html_url": cr.html_url,
-                   "completed_at": cr.completed_at} for cr in pr.get_check_runs()]
+                   "completed_at": cr.completed_at, "id": cr.id,
+                   "annotations_count": cr.annotations_count} for cr in pr.get_check_runs()]
 
     issues = []
     if not check_runs:
@@ -967,6 +974,20 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
                     "included (ai-config#4521)")
             issues.append(
                 f"Check run '{name}'{where} is still in status '{status}'")
+        elif (conclusion in ("success", "neutral", "skipped")
+              and cr.get("annotations_count")
+              and cr.get("id") not in _ANNOTATIONS_READ
+              and not _is_own_job(cr, _own_actions_job(repo)[0])):
+            # A passing conclusion hides warning and notice annotations
+            # (ai-config#4892). Reading them is part of "clean": fix each, or
+            # say in the PR why it is a false positive, then pass the run id
+            # to --annotations-read.
+            issues.append(
+                f"Check run '{name}'{where} passed but carries "
+                f"{cr['annotations_count']} annotation(s) not yet read: run "
+                f"`gh api repos/{repo}/check-runs/{cr.get('id')}/annotations`, "
+                "fix each or report it as a false positive in the PR, then "
+                f"rerun with `--annotations-read {cr.get('id')}`")
         elif conclusion not in ("success", "neutral", "skipped"):
             # A cancelled or failed run is superseded once a later run of the
             # same job, workflow and event passes on this same head SHA
@@ -4353,6 +4374,11 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
              "Previously an extra argument here was silently ignored and the "
              "check-runs query always named Morrison-Lab/ai-config.",
     )
+    parser.add_argument(
+        "--annotations-read", default="", metavar="ID[,ID...]",
+        help="Check-run ids whose warning/notice annotations were read and "
+             "fixed or explained as false positives (ai-config#4892).",
+    )
     return parser.parse_args(argv)
 
 
@@ -4404,6 +4430,8 @@ def main():
         except PayloadError as exc:
             die(str(exc))
 
+    _ANNOTATIONS_READ.update(
+        int(i) for i in getattr(args, "annotations_read", "").split(",") if i.strip().isdigit())
     pr_num = args.pr_number
     repo = resolve_repo(args.repo)
 

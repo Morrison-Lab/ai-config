@@ -9824,6 +9824,31 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
           "supersedes its own earlier not-clean",
           later_clean[0] is True)
 
+    # ai-config#4892: a passing run that carries annotations is not clean until
+    # the agent has read them.
+    annotated = json.dumps({"check_runs": [
+        {"id": 77, "name": "lint", "status": "completed", "conclusion": "success",
+         "html_url": "https://github.com/o/r/actions/runs/9/job/9",
+         "output": {"annotations_count": 2}},
+        {"id": 78, "name": "build", "status": "completed", "conclusion": "success",
+         "html_url": "https://github.com/o/r/actions/runs/9/job/10",
+         "output": {"annotations_count": 0}},
+    ]})
+
+    def annotated_router(cmd):
+        return annotated if "check-runs" in " ".join(cmd) else "{}"
+
+    with patch.object(checker, "run_cmd", side_effect=annotated_router):
+        ann_ok, ann_issues = checker.check_ci_runs("sha123", TEST_REPO)
+        check("passing run with annotations fails check_ci_runs and names the read command",
+              not ann_ok and len(ann_issues) == 1
+              and "check-runs/77/annotations" in ann_issues[0])
+        checker._ANNOTATIONS_READ.add(77)
+        read_ok, read_issues = checker.check_ci_runs("sha123", TEST_REPO)
+        checker._ANNOTATIONS_READ.discard(77)
+        check("--annotations-read ids clear the annotation finding",
+              read_ok and read_issues == [])
+
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

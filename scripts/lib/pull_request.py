@@ -29,6 +29,10 @@ class CheckRun:
         self.conclusion: Optional[str] = data.get("conclusion")
         self.html_url: str = (data.get("html_url") or "")
         self.completed_at: str = (data.get("completed_at") or "")
+        self.id: Optional[int] = data.get("id")
+        # `output.annotations_count` counts warnings and notices too; a
+        # `success` conclusion hides them (ai-config#4892).
+        self.annotations_count: int = ((data.get("output") or {}).get("annotations_count") or 0)
 
 class ReviewThread:
     def __init__(self, data: Dict[str, Any]):

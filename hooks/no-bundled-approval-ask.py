@@ -87,6 +87,14 @@ def check_message(text):
     return None
 
 
+ROUTINE = re.compile(r"\b(?:allow-?listed|routine|as usual|standing\s+grant|already\s+approved)\b", re.I)
+
+
+def new_cred_use(text):
+    """A credential use that is not a described routine, allow-listed one."""
+    return any(CRED_ASK.search(s) and not ROUTINE.search(s) for s in SENT.split(text))
+
+
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
@@ -103,8 +111,8 @@ def main() -> int:
         what = check_message(flatten(tool_input))
     elif RC_TOOL.search(tool):
         text = tool_input.get("instructions")
-        if isinstance(text, str) and RC_CITES.search(text) and (
-                RC_BUNDLE.search(text) or re.search(CRED, text, re.I)):
+        if isinstance(text, str) and RC_CITES.search(text) and not EXEMPT.search(text) and (
+                RC_BUNDLE.search(text) or new_cred_use(text)):
             what = "These instructions cite one yes/approval as covering several actions or a credential"
     if what:
         print(json.dumps({"hookSpecificOutput": {

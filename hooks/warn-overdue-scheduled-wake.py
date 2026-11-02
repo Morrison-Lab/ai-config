@@ -123,7 +123,7 @@ def already_reported(session_id, trigger_id):
     if os.path.exists(marker):
         return True
     try:
-        open(marker, "w").close()
+        open(marker, "w", encoding="utf-8").close()
     except OSError:
         pass
     return False

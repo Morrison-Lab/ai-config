@@ -25,7 +25,7 @@ def tool_use(name, when, **inputs):
 def run(records, session, shared=None):
     with tempfile.TemporaryDirectory() as tmp:
         path = os.path.join(tmp, "t.jsonl")
-        with open(path, "w") as stream:
+        with open(path, "w", encoding="utf-8") as stream:
             stream.write("\n".join(json.dumps(r) for r in records))
         env = dict(os.environ, OVERDUE_WAKE_NOW=NOW, TMPDIR=shared or tmp)
         payload = json.dumps({"transcript_path": path, "session_id": session})

@@ -55,7 +55,7 @@ fails = 0
 for lines, expect, name in CASES:
     with tempfile.TemporaryDirectory() as d:
         tp = os.path.join(d, "t.jsonl")
-        with open(tp, "w") as fh:
+        with open(tp, "w", encoding="utf-8") as fh:
             fh.write("\n".join(json.dumps(x) for x in lines) + "\n")
         env = dict(os.environ, TMPDIR=d)
         p = subprocess.run([sys.executable, HOOK], input=json.dumps(

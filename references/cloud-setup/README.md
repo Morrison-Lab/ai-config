@@ -8,9 +8,11 @@ setting up a new repo's cloud environment.
 
 > **The lab's environment Setup script is pasted from this file** (Ezra, 2026-11-02).
 > It includes the `# [lds]` additions that give the notes repos' sessions their
-> render toolchain at build time. Edit it here, then paste it into the environment.
+> render toolchain at build time.
+> Edit it here, then paste it into the environment.
 >
-> **Otherwise this is reference material, not active config.** It is **not** wired into
+> **Otherwise this is reference material, not active config.**
+> It is **not** wired into
 > ai-config's own build and is **not** symlinked into `~/.claude` by
 > `bootstrap.sh` (the `references/` dir is on its skip list). Copy the relevant
 > parts into the target project; don't expect ai-config to run it.

@@ -3929,6 +3929,56 @@ def main() -> int:
             (not stuck_ok) and any("d-morrison" in i for i in stuck_issues),
         )
 
+    # --- epi202#4 (2026-11-02): an agent posting through the maintainer's
+    # login writes `Independent review of head <sha>`; a clean that names the
+    # CURRENT head supersedes that login's earlier not-clean, one naming an
+    # older head does not, and it never counts toward quorum. -----------------
+    indep_head = "bdb97ca1137358895e59f10cc88007b365fa6df7"
+    indep_notclean = {
+        "createdAt": "2026-10-31T15:18:24Z",
+        "author": {"login": "d-morrison"},
+        "authorAssociation": "OWNER",
+        "body": ("Independent review of head 12658fd (separate agent):\n\n"
+                 "Blocking:\n- The workflow runs PR code unguarded.\n\n"
+                 "Verdict: not clean\n"),
+    }
+    indep_clean = {
+        "createdAt": "2026-11-02T07:09:20Z",
+        "author": {"login": "d-morrison"},
+        "authorAssociation": "OWNER",
+        "body": ("Independent review of head bdb97ca (separate agent):\n\n"
+                 "- The guard is valid.\n\nVerdict: clean\n"),
+    }
+    indep_clean_old = dict(indep_clean, body=indep_clean["body"].replace(
+        "bdb97ca", "79f3373"))
+    indep_bot = {
+        "createdAt": "2026-11-02T06:54:42Z",
+        "author": {"login": "github-actions[bot]"},
+        "body": ("**Claude finished review**\n\n### Verdict\n"
+                 "**Ready for merge**\n\nReviewed commit: bdb97ca\n"),
+    }
+    for label, rounds, expect_ok in (
+        ("a clean `Independent review of head` naming the current head "
+         "supersedes the login's earlier not-clean (epi202#4)",
+         [indep_notclean, indep_clean, indep_bot], True),
+        ("a clean naming an OLDER head does not supersede (negative control)",
+         [indep_notclean, indep_clean_old, indep_bot], False),
+        ("the earlier not-clean alone still blocks (negative control)",
+         [indep_notclean, indep_bot], False),
+    ):
+        mock_indep = json.dumps({"comments": rounds, "reviews": []})
+        with patch.object(checker, "run_cmd", return_value=mock_indep):
+            indep_ok, indep_issues = checker.check_review_comments(
+                "4", indep_head, TEST_REPO)
+            check(label, indep_ok == expect_ok and
+                  (indep_issues == [] or not expect_ok))
+    mock_indep_solo = json.dumps({"comments": [indep_clean], "reviews": []})
+    with patch.object(checker, "run_cmd", return_value=mock_indep_solo):
+        indep_solo_ok, _ = checker.check_review_comments(
+            "4", indep_head, TEST_REPO)
+        check("an `Independent review of head` clean alone does NOT meet "
+              "quorum (#2308 invariant)", not indep_solo_ok)
+
     # A structured non-bot clean ALONE never meets quorum: approval
     # authority comes from author identity, not body text (#2308).
     mock_solo = json.dumps({"comments": [human_clean_round], "reviews": []})

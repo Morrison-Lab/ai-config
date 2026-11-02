@@ -30,6 +30,18 @@ EXEMPT_RE = re.compile(
 )
 
 
+# A review an agent posts under the maintainer's login is a review, not
+# feedback to answer: it opens `Independent review of head <sha>` or carries a
+# `<!-- review-data:` payload. Without this exemption the review of the current
+# head was itself "feedback newer than the push" and blocked the PR it cleared
+# (epi202#4, 2026-11-02). Its verdict is read by check_latest_verdict.
+REVIEW_COMMENT_RE = re.compile(
+    r"\A\s*Independent review of head\s+`?[0-9a-f]{7,40}`?(?![0-9a-z])"
+    r"|<!--\s*review-data:",
+    re.IGNORECASE,
+)
+
+
 def _configured_maintainers():
     """Comma-separated maintainer logins: `MAINTAINER_LOGINS`, else the
     "maintainers" list in the JSON file `AI_CONFIG_LOCAL` names (default
@@ -98,7 +110,8 @@ def unread_maintainer_feedback(pr_data: Dict[str, Any]) -> List[str]:
         if login not in logins or (when or "") <= head_date:
             continue
         text = body.strip()
-        if not text or AGENT_AUTHORSHIP_RE.search(body) or EXEMPT_RE.fullmatch(text):
+        if not text or AGENT_AUTHORSHIP_RE.search(body) or EXEMPT_RE.fullmatch(text) \
+                or REVIEW_COMMENT_RE.search(body):
             continue
         found.append(f"{kind} by {login} at {when}")
     return found

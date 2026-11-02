@@ -127,9 +127,6 @@ See [`no-cheap-fixes`](shared/principles/no-cheap-fixes.md).
 Before writing custom code or helpers, check for an existing solution (DRW, don't reinvent the wheel) in our repos, standard libraries, and trusted upstream ecosystems (base R, tidyverse / r-lib, PyPI, npm).
 Record what was searched and what was found.
 See [`dont-reinvent-wheel`](shared/principles/dont-reinvent-wheel.md) and [`prefer-upstream`](skills/prefer-upstream/SKILL.md).
-
-- **Do:** search our own repos and trustworthy upstream ecosystems for an existing solution before writing custom code.
-- **Don't:** hand-roll a utility or function without performing a DRW research check first.
 ## Interpret instructions broadly and maximize safe progress
 
 Unless the user narrows a request, take the broad reading that advances its obvious objective and complete every safe, authorized, relevant step.
@@ -145,15 +142,10 @@ In instructions, prompts, specifications, issue descriptions, and checklists, tr
 When an instruction says "do X or Y", address both X and Y if both are applicable, relevant, or needed to achieve the objective.
 See [`or-means-and-or`](shared/principles/or-means-and-or.md).
 
-## The absence of a rule is not evidence for its opposite
+## Silence is not permission
 
-When no rule addresses an action, do not infer that it is allowed, required or forbidden.
-Silence is not a grant, a requirement or a prohibition.
-Reason from the purpose of the nearest rules, or ask with a recommendation.
+An unaddressed action is not thereby allowed, required or forbidden: reason from the nearest rules' purpose, or ask.
 See [`silence-is-not-permission`](shared/principles/silence-is-not-permission.md).
-
-- **Do:** decide an uncovered case by the purpose of the nearby rules, or ask, and record the answer as a rule.
-- **Don't:** justify an action with "no rule forbids it", or skip one with "no rule requires it".
 
 ## Don't take anyone's word for it: no sycophancy and independent verification
 

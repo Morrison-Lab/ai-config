@@ -1979,6 +1979,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-unread-started-ci-job.py\"'",
+            "timeout": 10,
+            "script": "no-unread-started-ci-job.py",
+            "why": "ai-config#4873 -- a turn that starts a CI job (actions_run_trigger, gh run rerun, gh workflow run) must read a run before it ends, because a scheduled check as the only follow-up was delivered 69 minutes late on 2026-11-02 and the session had promised to read short jobs in the same turn with nothing enforcing it. A scheduling call does not count as a read. Blocks once per turn (agent_notice.stop_notice) and allows a longer job when the reply names the wake that re-invokes the session; fails open."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-unchecked-empty-pr-claim.py\"'",
             "timeout": 10,
             "script": "no-unchecked-empty-pr-claim.py",

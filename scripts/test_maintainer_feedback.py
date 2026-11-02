@@ -73,6 +73,9 @@ BODIES = [
     "",
     "   ",
     "_Posted by Claude Code (AI agent) --- not written by a human._",
+    "Independent review of head bdb97ca (separate agent):\n\nVerdict: clean",
+    "Verdict: clean\n\n<!-- review-data:\n{\"verdict\": \"CLEAN\"}\n-->",
+    "Please add an independent review of head bdb97ca.",
 ]
 
 
@@ -97,6 +100,26 @@ class TestLibrary(unittest.TestCase):
     def test_other_author_is_not_reported(self):
         self.assertEqual(
             lib.unread_maintainer_feedback(pr_data([comment("Nit.", login="someone")])), [])
+
+    def test_agent_review_under_the_maintainer_login_is_not_feedback(self):
+        # epi202#4, 2026-11-02: the review of the current head was itself
+        # "feedback newer than the push" and blocked the PR it cleared.
+        bodies = [
+            "Independent review of head bdb97ca (separate agent):\n\nVerdict: clean",
+            "Independent review of head `bdb97ca1137358895e59f10cc88007b365fa6df7`:\n\nok",
+            "Verdict: clean\n\n<!-- review-data:\n{\"verdict\": \"CLEAN\"}\n-->",
+        ]
+        for body in bodies:
+            with self.subTest(body=body[:40]):
+                self.assertEqual(
+                    lib.unread_maintainer_feedback(pr_data([comment(body)])), [])
+
+    def test_prose_that_only_mentions_a_review_is_still_feedback(self):
+        for body in ("Please add an independent review of head bdb97ca.",
+                     "Nit: the Independent review of head bdb97ca is stale."):
+            with self.subTest(body=body[:40]):
+                self.assertEqual(
+                    len(lib.unread_maintainer_feedback(pr_data([comment(body)]))), 1)
 
     def test_missing_commits_reports_nothing(self):
         data = pr_data([comment("Nit.")])

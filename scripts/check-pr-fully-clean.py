@@ -3882,6 +3882,31 @@ def _blank_fences_and_spans(body: str) -> str:
     return "\n".join(out)
 
 
+_INDEPENDENT_REVIEW_HEAD_RE = re.compile(
+    r"\A\s*Independent review of head\s+`?([0-9a-f]{7,40})`?(?![0-9a-z])",
+    re.IGNORECASE,
+)
+_REVIEW_DATA_COMMIT_RE = re.compile(
+    r"<!--\s*review-data:.*?\"commit_sha\"\s*:\s*\"([0-9a-f]{7,40})\"",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _named_review_head(body: str) -> Optional[str]:
+    """The head sha a review comment says it reviewed, or None.
+
+    Two surfaces name it: the opening line `Independent review of head <sha>`
+    that agents post under the maintainer's login, and the `commit_sha` of a
+    `<!-- review-data: ... -->` payload. A comment naming no head is not tied
+    to one, so it cannot stand in for a review of the current head.
+    """
+    m = _INDEPENDENT_REVIEW_HEAD_RE.search(body or "")
+    if m:
+        return m.group(1).lower()
+    m = _REVIEW_DATA_COMMIT_RE.search(body or "")
+    return m.group(1).lower() if m else None
+
+
 def _is_structured_review_body(body: str) -> bool:
     """True when *body* is shaped like a review REPORT rather than prose.
 
@@ -4034,6 +4059,22 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
             # _reviewer_identity over body text. Marker-free bodies
             # resolve to the poster's own login, so a non-bot clean can
             # clear only that same account's earlier verdicts.
+            all_items.append(("comment", c["createdAt"], body, "", "COMMENT", author_login, False))
+        elif (
+            verdict == "clean"
+            and _named_review_head(body)
+            and (sha or "").lower().startswith(_named_review_head(body))
+            and _reviewer_identity(body, author_login) == author_login
+        ):
+            # An agent that posts through the maintainer's login writes
+            # `Independent review of head <sha>` (or a review-data payload
+            # with a commit_sha) and carries no report headings, so the
+            # structured-body test above drops it. Left dropped, an earlier
+            # not-clean from that login stood forever and blocked the PR
+            # (epi202#4, 2026-11-02). A clean that names the CURRENT head
+            # supersedes that login's earlier verdicts; as above it never
+            # counts toward quorum, and a clean naming an older head is not
+            # admitted.
             all_items.append(("comment", c["createdAt"], body, "", "COMMENT", author_login, False))
 
     for r in reviews:

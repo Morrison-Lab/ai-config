@@ -56,6 +56,14 @@ No escape variable: a gate with a reflex escape stops being a gate
 (`feedback-fix-wrong-gate-never-override`). A checker that looks wrong is
 fixed or its input corrected, then re-run.
 
+The one path past condition 2 is the USER'S OWN TYPED WORDS: an explicit
+"merge it anyway" (or "override the merge check") in a user-role text block,
+including a relayed `<cited author="user">` entry (Ezra, 2026-11-02, epi202#4).
+The agent cannot supply it: the coordinator's `<note>`, a cited coordinator
+entry, system reminders, tool results and the assistant's prose never count,
+and a negated phrase does not. Condition 1 (PR, repo, 40-character sha pin)
+still holds, and the merge is logged on stderr.
+
 ## Recognised merge routes
 
 `mcp__github__merge_pull_request`; `gh pr merge`; `gh api -X PUT
@@ -436,6 +444,54 @@ def evidence(path):
     return found
 
 
+RX_OVERRIDE = re.compile(
+    r"\b(?:merge|ship)\s+(?:it|this|that|them)?\s*anyway\b"
+    r"|\boverride\s+(?:the\s+)?(?:merge\s+)?(?:hook|gate|checker|check)\b",
+    re.IGNORECASE)
+# A negation anywhere earlier in the same clause voids the phrase ("I don't
+# think we should merge it anyway"); fail closed on any such word.
+RX_NEGATED = re.compile(
+    r"\b(?:don'?t|do\s+not|never|not|won'?t|shouldn'?t|wouldn'?t|can'?t|"
+    r"cannot|couldn'?t|isn'?t|aren'?t|without)\b",
+    re.IGNORECASE)
+RX_CLAUSE_START = re.compile(r"[.!?;\n]")
+RX_STRIP = re.compile(
+    r"<system-reminder>.*?</system-reminder>"
+    r"|<note>.*?</note>"
+    r"|<cited\b[^>]*author=\"(?!user\")[^\"]*\"[^>]*>.*?</cited>",
+    re.IGNORECASE | re.DOTALL)
+
+
+def typed_override(path):
+    """True when the user typed an explicit "merge it anyway" override.
+
+    Only a user-role TEXT block counts: not a tool result, not the assistant's
+    words, not a hook or system reminder, and not the coordinator's `<note>` or
+    a `<cited author="coordinator">` entry. A relayed `<cited author="user">`
+    entry counts, because the server copies the user's words into it. A negated
+    phrase ("don't merge it anyway") does not. The override replaces only the
+    checker-evidence condition; the PR, repo and 40-character sha pin are still
+    required, so GitHub itself refuses a merge if the head moved.
+    """
+    for rec in _records(path):
+        if rec.get("isSidechain"):
+            continue
+        role = rec.get("type") or (rec.get("message") or {}).get("role")
+        if role not in ("user", "USER_INPUT"):
+            continue
+        for b in _blocks(rec):
+            if b.get("type") != "text":
+                continue
+            text = RX_STRIP.sub(" ", b.get("text") or "")
+            for m in RX_OVERRIDE.finditer(text):
+                before = text[:m.start()]
+                starts = [s.end() for s in RX_CLAUSE_START.finditer(before)]
+                clause = before[starts[-1]:] if starts else before
+                if not RX_NEGATED.search(clause):
+                    return True
+    return False
+
+
 def deny(reason):
     return {
         "hookSpecificOutput": {
@@ -483,6 +539,7 @@ def main() -> int:
         return 0
     try:
         found = evidence(path)
+        overridden = typed_override(path)
     except Exception:
         return 0
 
@@ -509,6 +566,11 @@ def main() -> int:
         sha = sha.lower()
         ok = any(r == repo.lower() and n == num and sha.startswith(s)
                  for r, n, s in found)
+        if not ok and overridden:
+            print(f"block-merge-without-clean-checker: {target} merged on the "
+                  "user's typed override; no checker pass was required",
+                  file=sys.stderr)
+            ok = True
         if not ok:
             print(json.dumps(_refuse(
                 target, f"a `{INSTRUMENT}` pass on head {sha[:8]}",

@@ -28,6 +28,10 @@ persisting standing `NOT_CLEAN` review states from prior rounds across commits,
 and requiring consensus clean verdicts at the current HEAD.
 
 - **Do:** wait for all in-flight reviews (check runs in progress, pending review requests) to finish and verify what each review says before declaring fully clean or merging under MWC.
+- **Do:** read every annotation on the current head, warnings and notices included, even on a run that concluded `success` (Ezra, 2026-11-02, ai-config#4892).
+  List runs with `output.annotations_count > 0`, read each through `check-runs/<id>/annotations`, and fix it or state in the PR why it is a false positive.
+  `check-pr-fully-clean.py` fails until you rerun it with `--annotations-read <id>[,<id>...]` (or `all`, after reading every run the checker listed;
+  GitHub puts a platform notice on every Actions job, so the checker cannot tell a notice you can ignore from a warning you cannot).
 - **Do:** require consensus clean verdicts across all reviewers evaluating the current head.
 - **Don't:** declare a PR clean or merge under MWC when one reviewer has posted clean but another review is still in flight.
 - **Don't:** assume an empty `reviewRequests` list means a bot review has completed ---

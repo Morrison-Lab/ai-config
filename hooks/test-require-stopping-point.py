@@ -1211,18 +1211,32 @@ if not run_direct_payload(harness_feedback_payload_sdk, tmpdir=harness_feedback_
 else:
     print("PASS: scheduled sdk continuation is recognized as a new turn")
 
-# Test: Interactive missing-declaration reply with CI=true or GITHUB_ACTIONS=true warns
-if not run_direct_payload({"reply": "No stopping point declaration here."}, env={"CI": "true"}):
-    print("FAIL: missing-declaration reply with CI=true did not warn")
-    failed += 1
-else:
-    print("PASS: missing-declaration reply with CI=true warns")
+# Test: a CI run (a review or @claude bot reply, posted by a harness) is not asked
+# for the declaration (flag-session-boundaries.md; mds#591)
+for gha_value in ("true", "TRUE"):
+    if run_direct_payload({"reply": "No stopping point declaration here."}, env={"GITHUB_ACTIONS": gha_value}):
+        print(f"FAIL: missing-declaration reply with GITHUB_ACTIONS={gha_value} warned")
+        failed += 1
+    else:
+        print(f"PASS: missing-declaration reply with GITHUB_ACTIONS={gha_value} does not warn")
 
-if not run_direct_payload({"reply": "No stopping point declaration here."}, env={"GITHUB_ACTIONS": "true"}):
-    print("FAIL: missing-declaration reply with GITHUB_ACTIONS=true did not warn")
+if run_direct_payload(
+    {"reply": "Review done.\n\n**Stopping Point**: Not a clean stopping point / work remains queued: session not done; awaiting fixes."},
+    env={"GITHUB_ACTIONS": "true"},
+):
+    print("FAIL: declared reply with GITHUB_ACTIONS=true warned")
     failed += 1
 else:
-    print("PASS: missing-declaration reply with GITHUB_ACTIONS=true warns")
+    print("PASS: declared reply with GITHUB_ACTIONS=true does not warn")
+
+# Negative controls: CI=true alone (devcontainers, Docker images) and a falsy
+# GITHUB_ACTIONS are not a GitHub Actions run, so the check still fires
+for ci_env in ({"CI": "true"}, {"GITHUB_ACTIONS": "false"}):
+    if not run_direct_payload({"reply": "No stopping point declaration here."}, env=ci_env):
+        print(f"FAIL: missing-declaration reply with {ci_env} did not warn")
+        failed += 1
+    else:
+        print(f"PASS: missing-declaration reply with {ci_env} warns")
 
 # Test: Whitespace preservation during chunk reconstruction (assistant branch)
 whitespace_assistant_transcript = [
@@ -1316,6 +1330,12 @@ if not run_direct_payload(payload_dirty):
     failed += 1
 else:
     print("PASS: clean declaration over dirty working tree warns (#4328)")
+
+if not run_direct_payload(payload_dirty, env={"GITHUB_ACTIONS": "true"}):
+    print("FAIL: clean declaration over dirty working tree did not warn in CI (#4328)")
+    failed += 1
+else:
+    print("PASS: clean declaration over dirty working tree still warns in CI (#4328)")
 
 payload_not_done = {
     "cwd": dirty_repo,

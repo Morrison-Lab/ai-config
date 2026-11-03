@@ -441,18 +441,31 @@ def extract_text_from_payload(payload):
     return ""
 
 
+def _in_ci() -> bool:
+    """True on a GitHub Actions runner, where a harness posts the final message.
+
+    Keyed on GITHUB_ACTIONS alone: a bare CI=true is also set by devcontainers
+    and some Docker images used interactively, which would lose the check.
+    """
+    return (os.environ.get("GITHUB_ACTIONS") or "").strip().lower() == "true"
+
+
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
     except Exception:
         return 0
 
-    # Note: shared/workflow/flag-session-boundaries.md:45-50 permits omitting the
-    # declaration in non-interactive runs whose output is posted somewhere by a harness,
-    # but the Stop hook event payload does not currently carry an interactivity discriminator.
-    # stop_notice blocks at most once per turn and never while stop_hook_active is
-    # set, so in an automated run the cost is one extra continuation, never an
-    # aborted or wedged session (#4796).
+    # shared/workflow/flag-session-boundaries.md permits omitting the declaration
+    # in a non-interactive run whose output a harness posts, such as a CI review
+    # or the @claude bot. The Stop payload carries no interactivity field, so the
+    # runner's own GITHUB_ACTIONS variable is the discriminator. #4322
+    # dropped an earlier env check because the test helpers inherited the
+    # runner's variables; make_test_env now blanks them. The exemption mattered
+    # little while the hook only warned the user, but since #4799 it blocks the
+    # agent once, which made CI reviews append the line (mds#591). A false
+    # "session done" claim is still flagged in CI.
+    in_ci = _in_ci()
     text = extract_text_from_payload(payload)
     if not text:
         return 0
@@ -462,6 +475,8 @@ def main() -> int:
     has_decl = has_stopping_point_declaration(text)
 
     if has_decl and not disqualification:
+        return 0
+    if in_ci and not disqualification:
         return 0
 
     # Scope sentinel deduplication to current session and turn so identical replies
@@ -496,7 +511,7 @@ def main() -> int:
             "State whether the session is done or not using "
             "`**Stopping Point**: Clean stopping point reached --- session done; UMS executed; no follow-up items pending` or "
             "`**Stopping Point**: Not a clean stopping point / work remains queued: session not done; <details>` "
-            "before ending the turn (unless this is an automated non-interactive run whose output is posted by a harness; shared/workflow/flag-session-boundaries.md:45-50). "
+            "before ending the turn. "
             "Never say a session is done when there are uncommitted, unpushed, or un-PRed changes, or open PRs authored by that session (#4328)."
         )
 

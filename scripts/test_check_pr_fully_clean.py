@@ -9733,6 +9733,34 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     check("check_base_drift: the base name is percent-encoded",
           calls and calls[0][-1].endswith("/compare/sha123...feat%231%3Fx"))
 
+    # ai-config#4911: an edit that changes no trigger or job is not a new check.
+    wf = ".github/workflows/annotation-gate.yml"
+    body = "@@ -1,3 +1,3 @@\n name: x\n-      run: a\n+      run: b\n"
+    ok, issues, _ = drift({"ahead_by": 90, "files": [
+        {"filename": wf, "status": "modified", "patch": body}]})
+    check("check_base_drift: a step-only edit to a workflow is a NOTE (#4911)",
+          ok and issues and issues[0].startswith("NOTE"))
+    for label, status, diff_text in (
+            ("a new workflow", "added", "@@ -0,0 +1 @@\n+name: x\n"),
+            ("a trigger edit", "modified", "@@ -1 +1 @@\n-  pull_request:\n+  push:\n"),
+            ("a paths filter edit", "modified",
+             "@@ -1 +1 @@\n-      paths: [a]\n+      paths: [b]\n"),
+            ("a new job", "modified", "@@ -1 +1,2 @@\n+  newcheck:\n+    runs-on: x\n"),
+            ("a renamed workflow", "renamed", body),
+            ("a modified workflow with no patch", "modified", None)):
+        ok, issues, _ = drift({"ahead_by": 1, "files": [
+            {"filename": wf, "status": status, "patch": diff_text}]})
+        check(f"check_base_drift: {label} still blocks (#4911)", not ok)
+    ok, issues, _ = drift({"ahead_by": 1, "files": [
+        {"filename": ".github/workflows/scripts/x.sh", "status": "modified",
+         "patch": body}]})
+    check("check_base_drift: a nested workflow script edit still blocks (#4911)", not ok)
+    ok, issues, _ = drift({"ahead_by": 2, "files": [
+        {"filename": wf, "status": "modified", "patch": body},
+        {"filename": ".github/workflows/new.yml", "status": "added", "patch": "+name: n"}]})
+    check("check_base_drift: a new workflow beside a step edit blocks, naming only it (#4911)",
+          not ok and "new.yml" in issues[0] and "annotation-gate" not in issues[0])
+
     # A cloud container (CLAUDE_CODE_REMOTE=true plus a token, and -R) builds
     # its own REST payload; anywhere else main() leaves `gh` in charge.
     from types import SimpleNamespace as NS

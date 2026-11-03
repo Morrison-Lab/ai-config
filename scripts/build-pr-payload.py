@@ -501,7 +501,10 @@ def compact_compare(compare: Any) -> Dict[str, Any]:
         return {"error": f"the comparison's 'files' was a {type(files).__name__}"}
     return {
         "ahead_by": compare.get("ahead_by"),
-        "files": [{"filename": f.get("filename") or ""}
+        "files": [{"filename": f.get("filename") or "",
+                   **({"status": f.get("status"), "patch": f.get("patch")}
+                      if (f.get("filename") or "").startswith(".github/workflows/")
+                      else {})}
                   for f in (files or []) if isinstance(f, dict)],
     }
 

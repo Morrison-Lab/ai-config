@@ -291,8 +291,8 @@ Limits: [`context-budget`](shared/workflow/context-budget.md).
 
 ## Worktree isolation
 
-Always isolate work in a dedicated `git worktree` so parallel sessions never step on or clobber working directory or branch state.
-Never work directly in a primary branch checkout or share a dirty worktree across concurrent tasks.
+Isolate work in a dedicated `git worktree` so parallel sessions never clobber working directory or branch state.
+Never work in a primary branch checkout or share a dirty worktree across tasks.
 
 ## No sweeps for new rules by default
 
@@ -310,16 +310,17 @@ See [`check-before-pushing`](shared/workflow/check-before-pushing.md).
 
 ## Timestamp recaps in local time
 
-Always timestamp session recaps, notes, and milestones in local Pacific Time (`America/Los_Angeles`).
-Run `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"` to get the exact local time string.
+Timestamp recaps, notes, and milestones in Pacific Time: `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`.
 See [`timestamp-local-recaps`](shared/workflow/timestamp-local-recaps.md).
+
+## Record issue and PR relationships in GitHub's relationships field
+
+Record every parent, sub-issue, blocked-by, blocking and linked-PR relationship there, not only in prose.
+See [`github-relationships`](shared/workflow/github-relationships.md).
 
 ## Summarize analysis effects in PR descriptions
 
-When a pull request introduces an analytical, statistical, or modeling change, summarize analysis effects in the PR description: quantify differences in key outputs, estimates, or runtimes compared to baseline.
-
-- **Do:** report quantitative differences and comparison summaries in analytical PR bodies.
-- **Don't:** describe analytical changes with purely qualitative code diff summaries.
+When a PR changes an analysis or model, quantify differences in key outputs, estimates, or runtimes against baseline in its description, not a purely qualitative diff summary.
 
 ## Temporal limitations on software and technology facts
 

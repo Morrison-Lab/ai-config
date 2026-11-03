@@ -1972,6 +1972,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-prose-relationship-without-link.py\"",
+            "timeout": 10,
+            "script": "flag-prose-relationship-without-link.py",
+            "why": "shared/workflow/github-relationships.md -- Ezra, 2026-11-03 (cai:), verbatim: 'agents must use the \"relationships\" field in github to mark all relationships among issues and PRs' (ai-config#4907). Interrupts the stop once per turn (agent_notice.stop_notice) when the turn created or edited an issue or PR (issue_write, create_pull_request, update_pull_request, gh issue|pr create|edit) whose body, code spans and fences excluded, states a relationship in prose (blocked by, blocks, depends on, stacked on, part of, parent, child of, sub-issue of, tracked in/by plus an issue reference) and no relationship call (sub_issue_write, parent_issue_number, /sub_issues, dependencies/blocked_by|blocking, --add-blocked-by|--add-blocking|--add-parent) ran at or after it. A closing keyword is not a cue, since it is the linked-PR mechanism itself. Turn-scoped: a human message resets the check. Fails open."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-idea-without-issue.py\"",
             "timeout": 10,
             "script": "flag-idea-without-issue.py",

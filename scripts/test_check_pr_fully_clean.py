@@ -4055,7 +4055,18 @@ def main() -> int:
               "declined. Merge now.",
               "rebutted. The line already breaks. Separately, the merge "
               "is unsafe.",
+              "rebutted. The finding is already valid.",
+              "rebutted. The finding is already confirmed on the head.",
+              "rebutted. The reviewer missed a second issue.",
+              "rebutted. The reviewer missed a security hole.",
+              "declined. The check already lets bad input through.",
+              "declined. The claim is already true.",
+              "rebutted. The line already breaks after the comma and then "
+              "the reviewer saw it differently.",
           )],
+        ("'The reviewer misread the diff.' after rebutted is not a verdict",
+         [dict(agent_reply, body="- **Blocking, `x.qmd:3`** -- rebutted. "
+               "The reviewer misread the diff." + footer), reply_bot], True),
         ("'fixed, but a new blocking defect' keeps blocking "
          "(negative control)",
          [dict(agent_reply, body="Needs more work: the earlier issue was "

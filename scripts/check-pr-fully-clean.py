@@ -4075,7 +4075,9 @@ _REPLY_RISKY_TAIL_RE = re.compile(
     r"\b(?:\w+n't|not|no|never|cannot|without|remain\w*|un\w+|should|must"
     r"|would|could|need\w*|block\w*|still|fail\w*|but|however|yet|open"
     r"|wrong|missing|bugs?|broken|defects?|crash\w*|leak\w*|reject\w*"
-    r"|wait\w*|right|correct\w*|chang\w*|regress\w*|new|only|part\w*)\b"
+    r"|wait\w*|right|correct\w*|chang\w*|regress\w*|new|only|part\w*"
+    r"|valid\w*|true|confirm\w*|present|lets?|second|issues?|holes?"
+    r"|secur\w*|through|persist\w*|reproduc\w*|agree\w*)\b"
     r"|\d|/|[\w-]+\.[a-z]{1,5}\b",
     re.IGNORECASE,
 )
@@ -4086,10 +4088,13 @@ _REPLY_RISKY_TAIL_RE = re.compile(
 # "The reviewer misread the diff."); an affirmation such as "Persists on
 # the head." or "Agree with the reviewer." matches neither shape.
 _REPLY_REBUTTAL_TAIL_RE = re.compile(
-    r"^(?:(?:The|This)\s+(?:line|code|text|diff|check|claim|finding)\b"
-    r"[^.!?\n]*\b(?:already|intended|deliberate|correct\s+as\s+written)\b"
-    r"|(?:The\s+)?reviewer\s+(?:misread|misreads|is\s+mistaken|missed)\b)"
-    r"[^.!?\n]*[.!]?\s*$",
+    # Closed phrases, then at most six plain words: a keyword followed by
+    # free text ("The finding is already valid.") admits a confirmation.
+    r"^(?:(?:The|This)\s+(?:line|code|text|diff|check)\s+(?:already\s+)?"
+    r"(?:breaks|handles|covers|checks|exists|is\s+intended|is\s+deliberate)"
+    r"|(?:The\s+)?reviewer\s+(?:misread|misreads|is\s+mistaken\s+about)\s+"
+    r"(?:the|this)\s+(?:line|diff|code|text|comment))\b"
+    r"(?:\s+[\w`$,'-]+){0,6}[.!]?\s*$",
     re.IGNORECASE,
 )
 

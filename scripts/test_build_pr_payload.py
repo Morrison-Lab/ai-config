@@ -519,7 +519,7 @@ def test_fetch_payload_integration():
             if compare_fail:
                 raise RuntimeError("HTTP 502")
             return {"ahead_by": 2, "commits": [{"sha": "x"}],
-                    "files": [{"filename": ".github/workflows/v.yml", "patch": "+x"}]}
+                    "files": [{"filename": ".github/workflows/v.yml", "status": "modified", "patch": "+x"}]}
         if "/pulls/123/comments" in endpoint:
             return [{"user": {"login": "Copilot"}, "commit_id": "c1", "original_commit_id": "c0"}]
         if "/pulls/123/reviews" in endpoint:
@@ -544,7 +544,7 @@ def test_fetch_payload_integration():
                 check("fetch_payload carries a compact base_compare (ai-config#2982)",
                       payload.get("base_compare") == {
                           "ahead_by": 2,
-                          "files": [{"filename": ".github/workflows/v.yml"}]})
+                          "files": [{"filename": ".github/workflows/v.yml", "status": "modified", "patch": "+x"}]})
                 head, base = PR_RAW["head"]["sha"], PR_RAW["base"]["ref"]
                 check("fetch_payload compares head...base, in that order",
                       compare_calls and compare_calls[-1].endswith(f"/compare/{head}...{base}"))

@@ -1015,6 +1015,35 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
 WORKFLOW_DIR = ".github/workflows/"
 # GitHub's compare endpoint lists at most this many files.
 COMPARE_FILE_CAP = 300
+# A changed line in a workflow's diff that can alter which PRs it runs on, or
+# which jobs exist: a trigger or filter key, a job condition, or a new/removed
+# job (a key at two-space indent). Any other edit to an existing workflow
+# (a step, a script line, a version pin) cannot add a check the head never ran
+# (ai-config#4911).
+WORKFLOW_GATE_LINE = re.compile(
+    # Trigger and filter keys, at any depth.
+    r"^[+-](?:\s*(?:on|pull_request|pull_request_target|push|schedule|"
+    r"workflow_run|workflow_call|workflow_dispatch|paths|paths-ignore|branches|"
+    r"branches-ignore|tags|types)\s*:"
+    # Job-level keys sit at four-space indent; the same words deeper are
+    # step-level (an action version pin, a step condition) and gate nothing.
+    r"|    (?:if|needs|runs-on|strategy|uses)\s*:"
+    # A job key itself.
+    r"|  [\w-]+:\s*$)")
+
+
+def workflow_edit_adds_no_check(entry: dict) -> bool:
+    """True for a modified top-level workflow whose diff changes no trigger,
+    filter, condition or job, so it cannot gate a PR it did not gate before."""
+    name = entry.get("filename") or ""
+    if (entry.get("status") != "modified"
+            or "/" in name[len(WORKFLOW_DIR):]
+            or not name.endswith((".yml", ".yaml"))):
+        return False
+    patch = entry.get("patch")
+    if not isinstance(patch, str) or not patch:
+        return False  # binary or too large to diff: cannot tell
+    return not any(WORKFLOW_GATE_LINE.match(line) for line in patch.splitlines())
 
 
 def check_base_drift(pr) -> Tuple[bool, List[str]]:
@@ -1029,6 +1058,11 @@ def check_base_drift(pr) -> Tuple[bool, List[str]]:
     them touched `.github/workflows/`, which is where a new check would be
     added. A gate added only by editing a script an existing workflow already
     runs is not caught. Drift with no workflow change is a NOTE.
+
+    An edit to an existing top-level workflow that changes no trigger, filter,
+    condition or job is also a NOTE: it adds no check the head never ran, and
+    blocking on it reset every PR on a repository whose workflows change
+    faster than one CI run (ai-config#4911).
     """
     if pr.state and pr.state != "OPEN":
         return True, []
@@ -1056,8 +1090,11 @@ def check_base_drift(pr) -> Tuple[bool, List[str]]:
                        f"{type(raw_files).__name__}; ai-config#2982)"]
     if behind == 0:
         return True, []
-    files = [f.get("filename") or "" for f in (raw_files or []) if isinstance(f, dict)]
-    gates = sorted({n for n in files if n.startswith(WORKFLOW_DIR)})
+    entries = [f for f in (raw_files or []) if isinstance(f, dict)]
+    files = [f.get("filename") or "" for f in entries]
+    gates = sorted({(f.get("filename") or "") for f in entries
+                    if (f.get("filename") or "").startswith(WORKFLOW_DIR)
+                    and not workflow_edit_adds_no_check(f)})
     if not gates:
         if len(files) >= COMPARE_FILE_CAP:
             return False, [

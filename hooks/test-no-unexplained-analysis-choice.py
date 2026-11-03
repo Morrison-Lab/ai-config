@@ -74,7 +74,7 @@ import tempfile
 page = "Intro.\n\n" + FENCE + "{r}\nd <- read.csv('x.csv')\n" + FENCE + "\n\nAfter.\n"
 with tempfile.TemporaryDirectory() as tmp:
     path = os.path.join(tmp, "p.qmd")
-    with open(path, "w") as handle:
+    with open(path, "w", encoding="utf-8") as handle:
         handle.write(page)
     inside = {
         "tool_name": "Edit",
@@ -95,7 +95,7 @@ with tempfile.TemporaryDirectory() as tmp:
     print("PASS: a bin added inside an existing chunk is denied")
 
     # A reason word in the page's prose within the window clears it.
-    with open(path, "w") as handle:
+    with open(path, "w", encoding="utf-8") as handle:
         handle.write("We chose three groups because the data hold three clusters.\n\n" + page)
     sys.stdin = io.StringIO(json.dumps(inside))
     buf = io.StringIO()
@@ -108,7 +108,7 @@ with tempfile.TemporaryDirectory() as tmp:
     print("PASS: a reason in nearby prose of the existing page clears the edit")
 
     # An edit that leaves an existing bin untouched is not blamed for it.
-    with open(path, "w") as handle:
+    with open(path, "w", encoding="utf-8") as handle:
         handle.write(page.replace("read.csv('x.csv')", "cut(a, breaks = 3)"))
     untouched = {
         "tool_name": "Edit",

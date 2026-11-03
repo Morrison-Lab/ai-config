@@ -370,46 +370,40 @@ cookieconsent.run({
 
 <section id="do-it-for-me-difm" class="level1">
 <h1>do-it-for-me (difm)</h1>
-<p>The user is telling you to stop handing a step back and do it yourself. It usually fires right after you reported a block (“denied”, “needs your approval”, “run this command”) or offered a command for the user to run.</p>
+<p>The user is telling you to stop handing a step back and do it yourself. It usually fires right after you reported a block (“denied”, “needs your approval”) or offered a command for the user to run.</p>
 <section id="when-this-fires" class="level2">
 <h2 class="anchored" data-anchor-id="when-this-fires">When this fires</h2>
 <ul>
 <li>The keyword <code>difm</code> or <code>do it for me</code>, bare or slashed.</li>
-<li>Close variants: “just do it”, “you run it”, “run it yourself”, “don’t make me do that”.</li>
+<li>Close variants: “just do it”, “you run it”, “run it yourself”.</li>
 </ul>
 </section>
 <section id="what-it-grants" class="level2">
 <h2 class="anchored" data-anchor-id="what-it-grants">What it grants</h2>
-<p>Authority to run the specific step that was just blocked or handed back. It is not a blanket grant: the next, different blocked step needs its own <code>difm</code>. It does not lift the safety rules for prohibited actions (credentials entry, permanent deletion, financial transfers, and the like).</p>
+<p>Authority to run the specific step that was just blocked or handed back. Each new blocked step needs its own <code>difm</code>. It does not lift the prohibited-action rules.</p>
 </section>
 <section id="procedure" class="level2">
 <h2 class="anchored" data-anchor-id="procedure">Procedure</h2>
 <ol type="1">
-<li><strong>Name the step</strong> in one clause: the exact command or action you were about to hand back.</li>
-<li><strong>Run it as one command, exactly as before.</strong> An auto-mode classifier denial is a sample, not a wall: an identical re-run has succeeded after several denials with no settings change. Never reword a denied command into new shapes; each denied variant makes the classifier stricter.</li>
-<li><strong>If it is denied again, turn auto mode off temporarily, if that helps.</strong> A denial that cites the classifier (for example “External System Writes”) means the classifier is the blocker, not a missing permission rule. In that case:
-<ul>
-<li>Switch the session to a mode that prompts the user instead of the classifier, using <code>mcp__ccd_session_mgmt__set_session_permission_mode</code> (load it with ToolSearch first), so the user approves the one action in their own prompt.</li>
-<li>Run the same command once.</li>
-<li><strong>Switch the mode back to what it was</strong> the moment the step finishes, whether it succeeded or failed. Note the original mode before changing it. If the tool is unavailable or the mode change is itself refused, stop and say so; do not look for another route around the classifier.</li>
-</ul></li>
-<li><strong>Verify and report in the past tense</strong>: what ran, the read-back or exit status, and that auto mode was restored (or that it was never changed). Count the attempts honestly: “denied N times, succeeded on run N+1”, never “cannot”.</li>
+<li><strong>Name the step</strong> in one clause: the exact command or action.</li>
+<li><strong>Run it as one command, exactly as before.</strong> A classifier denial is a sample, not a wall. The mechanics and limits are in <a href="../../shared/workflow/ask-for-manual-approval.md"><code>ask-for-manual-approval</code></a>: retry the identical command once, never rephrased.</li>
+<li><strong>If it is denied again, turn auto mode off for this step.</strong> Switch the session to <code>default</code> with <code>mcp__ccd_session_mgmt__set_session_permission_mode</code>, run the command once, then restore the original mode. Note the original mode first. The self-switch, the stop conditions, and the managed-settings exception are in <code>ask-for-manual-approval</code>. How a standing grant interacts with a denial is in <a href="../../shared/workflow/default-to-action-grants.md"><code>default-to-action-grants</code></a>.</li>
+<li><strong>Verify and report in the past tense</strong>: what ran, the read-back or exit status, and that auto mode was restored. Count attempts honestly: “denied N times, succeeded on run N+1”, never “cannot”.</li>
 </ol>
 </section>
 <section id="what-it-does-not-grant" class="level2">
 <h2 class="anchored" data-anchor-id="what-it-does-not-grant">What it does not grant</h2>
 <ul>
-<li><strong>Not a standing change to permission mode.</strong> Auto mode is off only for the one step, then restored.</li>
-<li><strong>Not permission to widen the step</strong>: same command, same target, nothing extra.</li>
-<li><strong>Not the safety rules.</strong> Prohibited and explicit-permission actions in the system prompt still apply.</li>
-<li><strong>Not a reason to touch settings files.</strong> Do not add an allow rule on your own; if one would help, ask the user to add it.</li>
+<li>A standing change to permission mode: auto mode is off for one step only.</li>
+<li>A wider step: same command, same target, nothing extra.</li>
+<li>Edits to settings files or allow rules: ask the user to add one if it would help.</li>
 </ul>
 </section>
 <section id="relationship-to-other-skills" class="level2">
 <h2 class="anchored" data-anchor-id="relationship-to-other-skills">Relationship to other skills</h2>
 <ul>
-<li><strong><a href="../../skills/dmmhyh/SKILL.html"><code>dmmhyh</code></a></strong> – lowers the threshold for asking; <code>difm</code> is about executing a step already blocked or handed back.</li>
-<li><strong><a href="../../skills/daytb/SKILL.html"><code>daytb</code></a></strong> – decides a pending question; <code>difm</code> carries out a pending action.</li>
+<li><strong><a href="../../skills/dmmhyh/SKILL.html"><code>dmmhyh</code></a></strong> lowers the threshold for asking. <code>difm</code> carries out a step already blocked or handed back.</li>
+<li><strong><a href="../../skills/daytb/SKILL.html"><code>daytb</code></a></strong> decides a pending question. <code>difm</code> carries out a pending action.</li>
 </ul>
 </section>
 <section id="anti-patterns" class="level2">
@@ -417,8 +411,7 @@ cookieconsent.run({
 <ul>
 <li>Rephrasing the denied command instead of re-running it identically.</li>
 <li>Leaving auto mode off after the step.</li>
-<li>Offering a one-liner for the user to run when the step is something you can run.</li>
-<li>Reporting “cannot” after one denial.</li>
+<li>Offering a one-liner for the user to run when you can run it.</li>
 </ul>
 
 

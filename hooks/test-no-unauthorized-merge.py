@@ -867,6 +867,35 @@ try:
     v_a_revoked = verdict("gh pr merge 411 --squash", env=env_a)
     check(v_a_revoked == "BLOCK")
     print(f"  {v_a_revoked:<6} revoked MWC grant blocks for session A")
+
+    # ai-config#4903: in a cloud container the pid `register` records is a
+    # short-lived `claude` ancestor, dead while the session lives on. A dead
+    # pid with a fresh heartbeat must still honour the grant; a stale
+    # heartbeat must not.
+    import time as _t
+    ai_session("enable-mwc", "--id", session_a)
+    _common = subprocess.check_output(
+        ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+        text=True).strip()
+    _sess = [p for p in (Path(_common) / "ai-sessions").glob("*.session")
+             if "mwc-a" in p.name]
+    check(len(_sess) == 1)
+    _orig = _sess[0].read_text(encoding="utf-8")
+
+    def _with(pid, hb):
+        lines = [ln for ln in _orig.splitlines()
+                 if not ln.startswith(("pid=", "heartbeat="))]
+        return "\n".join(lines + [f"pid={pid}", f"heartbeat={hb}"]) + "\n"
+
+    _sess[0].write_text(_with(2147483646, int(_t.time())), encoding="utf-8")
+    v_dead_fresh = verdict("gh pr merge 411 --squash", env=env_a)
+    check(v_dead_fresh == "allow")
+    print(f"  {v_dead_fresh:<6} dead pid with a fresh heartbeat keeps the MWC grant")
+
+    _sess[0].write_text(_with(2147483646, int(_t.time()) - 7200), encoding="utf-8")
+    v_dead_stale = verdict("gh pr merge 411 --squash", env=env_a)
+    check(v_dead_stale == "BLOCK")
+    print(f"  {v_dead_stale:<6} dead pid with a stale heartbeat blocks")
 finally:
     ai_session("release", "--id", session_a)
     ai_session("release", "--id", session_b)

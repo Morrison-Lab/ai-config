@@ -2153,7 +2153,10 @@ def is_session_alive(sess_file: Path) -> bool:
                     os.kill(int(pid), 0)
                     return True
                 except OSError:
-                    return False  # PID is dead on local host
+                    # The recorded pid can be a short-lived `claude` ancestor
+                    # (cloud containers), dead while the session lives on.
+                    # Fall through to the heartbeat check below.
+                    pass
         hb = int(sess_data.get("heartbeat") or sess_data.get("started") or 0)
         return (time.time() - hb) < 1800
     except Exception:

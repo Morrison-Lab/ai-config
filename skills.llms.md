@@ -132,6 +132,7 @@ Most skills also respond to plain-English triggers listed in their `description`
 | [`prompt-me-all`](skills/prompt-me-all/SKILL.llms.md) | `pma` | Restate every open question still waiting on user input, uncapped |
 | [`pending-decisions`](skills/pending-decisions/SKILL.llms.md) | `pd` | Sweep issues/PRs (not just this conversation) for ones waiting on a decision from you, and ask about them one at a time |
 | [`whats-next`](skills/whats-next/SKILL.llms.md) | `wn` | Recommend the concrete next step or action (agent task, user decision, or session archive) |
+| [`do-it-for-me`](skills/do-it-for-me/SKILL.llms.md) | `difm` | Run the step you just handed back or reported blocked; retry an identical denied command once, then briefly lift auto mode for that one step and restore it |
 | [`checkpoint`](skills/checkpoint/SKILL.llms.md) |  | Save a deliberate mid-task snapshot without ending the session |
 | [`finish-wave`](skills/finish-wave/SKILL.llms.md) | `fw` | Cap an orchestration run at the wave already in flight: grab nothing new, drive the open wave to a terminal state, then ask before the next wave |
 | [`compress-session`](skills/compress-session/SKILL.llms.md) |  | Distill the session into auto memory before context fills up |

@@ -9,6 +9,7 @@ allowed-tools:
   - Write
   - Grep
   - Glob
+  - mcp__ccd_session_mgmt__set_session_permission_mode
 ---
 
 # do-it-for-me (difm)
@@ -20,7 +21,8 @@ or offered a command for the user to run.
 ## When this fires
 
 - The keyword `difm` or `do it for me`, bare or slashed.
-- Close variants: "just do it", "you run it", "run it yourself".
+- Close variants aimed at a step you just reported blocked or handed back:
+  "you run it", "run it yourself".
 
 ## What it grants
 
@@ -38,7 +40,8 @@ It does not lift the prohibited-action rules.
    retry the identical command once, never rephrased.
 3. **If it is denied again, turn auto mode off for this step.**
    Switch the session to `default` with `mcp__ccd_session_mgmt__set_session_permission_mode`,
-   run the command once, then restore the original mode.
+   run the command once, then restore the original mode
+   even if the command failed or timed out.
    Note the original mode first.
    The self-switch, the stop conditions, and the managed-settings exception
    are in `ask-for-manual-approval`.

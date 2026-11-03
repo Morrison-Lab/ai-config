@@ -1021,9 +1021,14 @@ COMPARE_FILE_CAP = 300
 # (a step, a script line, a version pin) cannot add a check the head never ran
 # (ai-config#4911).
 WORKFLOW_GATE_LINE = re.compile(
+    # Trigger and filter keys, at any depth.
     r"^[+-](?:\s*(?:on|pull_request|pull_request_target|push|schedule|"
     r"workflow_run|workflow_call|workflow_dispatch|paths|paths-ignore|branches|"
-    r"branches-ignore|tags|types|if|needs|runs-on|strategy|uses)\s*:"
+    r"branches-ignore|tags|types)\s*:"
+    # Job-level keys sit at four-space indent; the same words deeper are
+    # step-level (an action version pin, a step condition) and gate nothing.
+    r"|    (?:if|needs|runs-on|strategy|uses)\s*:"
+    # A job key itself.
     r"|  [\w-]+:\s*$)")
 
 

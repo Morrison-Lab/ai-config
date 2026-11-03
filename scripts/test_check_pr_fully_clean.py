@@ -9740,6 +9740,18 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         {"filename": wf, "status": "modified", "patch": body}]})
     check("check_base_drift: a step-only edit to a workflow is a NOTE (#4911)",
           ok and issues and issues[0].startswith("NOTE"))
+    for label, step_patch in (
+            ("an action version pin", "@@ -1 +1 @@\n-      - uses: actions/checkout@v4\n+      - uses: actions/checkout@v5\n"),
+            ("a step condition", "@@ -1 +1 @@\n-        if: github.event_name == 'push'\n+        if: always()\n")):
+        ok, issues, _ = drift({"ahead_by": 1, "files": [
+            {"filename": wf, "status": "modified", "patch": step_patch}]})
+        check(f"check_base_drift: {label} is a NOTE (#4911)", ok)
+    for label, job_patch in (
+            ("a job condition", "@@ -1 +1 @@\n-    if: a\n+    if: b\n"),
+            ("a reusable-workflow job call", "@@ -1 +1 @@\n-    uses: o/r/.github/workflows/a.yml@v1\n+    uses: o/r/.github/workflows/a.yml@v2\n")):
+        ok, issues, _ = drift({"ahead_by": 1, "files": [
+            {"filename": wf, "status": "modified", "patch": job_patch}]})
+        check(f"check_base_drift: {label} still blocks (#4911)", not ok)
     for label, status, diff_text in (
             ("a new workflow", "added", "@@ -0,0 +1 @@\n+name: x\n"),
             ("a trigger edit", "modified", "@@ -1 +1 @@\n-  pull_request:\n+  push:\n"),

@@ -37,9 +37,11 @@ allowed = FENCE + "{r}\nx <- cut(a, breaks = 3)  # check-unexplained-choices: al
 assert not subject.choices_without_reason(allowed)
 print("PASS: the allow marker exempts a line")
 
-assert subject.added_text("Edit", {"new_string": "x"}) == "x"
-assert subject.added_text("MultiEdit", {"edits": [{"new_string": "a"}, {"new_string": "b"}]}) == "a\nb"
-print("PASS: added text is read from Write, Edit and MultiEdit")
+assert subject.apply_edits("Write", {"content": "w"}, "old") == "w"
+assert subject.apply_edits("Edit", {"old_string": "b", "new_string": "X"}, "abc") == "aXc"
+multi = {"edits": [{"old_string": "a", "new_string": "1"}, {"old_string": "c", "new_string": "3"}]}
+assert subject.apply_edits("MultiEdit", multi, "abc") == "1b3"
+print("PASS: the post-edit page is rebuilt for Write, Edit and MultiEdit")
 
 
 def run(tool, path, text):
@@ -63,3 +65,61 @@ print("PASS: a page edit with an unexplained bin is denied, with the reason in a
 assert run("Edit", "x.py", bare) == ""
 assert run("Edit", "chapters/x.qmd", reasoned) == ""
 print("PASS: a non-page file and an explained bin pass through silently")
+
+# The review finding on ai-config#4908: a line added INSIDE an existing chunk
+# carries no fence marker, and must still be seen as code.
+import os
+import tempfile
+
+page = "Intro.\n\n" + FENCE + "{r}\nd <- read.csv('x.csv')\n" + FENCE + "\n\nAfter.\n"
+with tempfile.TemporaryDirectory() as tmp:
+    path = os.path.join(tmp, "p.qmd")
+    with open(path, "w") as handle:
+        handle.write(page)
+    inside = {
+        "tool_name": "Edit",
+        "tool_input": {
+            "file_path": path,
+            "old_string": "d <- read.csv('x.csv')\n",
+            "new_string": "d <- read.csv('x.csv')\nd$g <- cut(d$age, breaks = 3)\n",
+        },
+    }
+    sys.stdin = io.StringIO(json.dumps(inside))
+    buf = io.StringIO()
+    sys.stdout, real = buf, sys.stdout
+    try:
+        subject.main()
+    finally:
+        sys.stdout = real
+    assert json.loads(buf.getvalue())["hookSpecificOutput"]["permissionDecision"] == "deny"
+    print("PASS: a bin added inside an existing chunk is denied")
+
+    # A reason word in the page's prose within the window clears it.
+    with open(path, "w") as handle:
+        handle.write("We chose three groups because the data hold three clusters.\n\n" + page)
+    sys.stdin = io.StringIO(json.dumps(inside))
+    buf = io.StringIO()
+    sys.stdout, real = buf, sys.stdout
+    try:
+        subject.main()
+    finally:
+        sys.stdout = real
+    assert buf.getvalue() == ""
+    print("PASS: a reason in nearby prose of the existing page clears the edit")
+
+    # An edit that leaves an existing bin untouched is not blamed for it.
+    with open(path, "w") as handle:
+        handle.write(page.replace("read.csv('x.csv')", "cut(a, breaks = 3)"))
+    untouched = {
+        "tool_name": "Edit",
+        "tool_input": {"file_path": path, "old_string": "After.", "new_string": "After the chunk."},
+    }
+    sys.stdin = io.StringIO(json.dumps(untouched))
+    buf = io.StringIO()
+    sys.stdout, real = buf, sys.stdout
+    try:
+        subject.main()
+    finally:
+        sys.stdout = real
+    assert buf.getvalue() == ""
+    print("PASS: an existing bin the edit does not add is not blocked")

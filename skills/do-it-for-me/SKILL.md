@@ -9,6 +9,7 @@ allowed-tools:
   - Write
   - Grep
   - Glob
+  - mcp__ccd_session_mgmt__get_session
   - mcp__ccd_session_mgmt__set_session_permission_mode
 ---
 
@@ -42,7 +43,7 @@ It does not lift the prohibited-action rules.
    Switch the session to `default` with `mcp__ccd_session_mgmt__set_session_permission_mode`,
    run the command once, then restore the original mode
    even if the command failed or timed out.
-   Note the original mode first.
+   Read the original mode first with `mcp__ccd_session_mgmt__get_session`.
    The self-switch, the stop conditions, and the managed-settings exception
    are in `ask-for-manual-approval`.
    How a standing grant interacts with a denial is in
@@ -59,7 +60,7 @@ It does not lift the prohibited-action rules.
 
 ## Relationship to other skills
 
-- **[`dmmhyh`](../dmmhyh/SKILL.md)** lowers the threshold for asking.
+- **[`dmmhyh`](../dmmhyh/SKILL.md)** makes you ask less.
   `difm` carries out a step already blocked or handed back.
 - **[`daytb`](../daytb/SKILL.md)** decides a pending question.
   `difm` carries out a pending action.

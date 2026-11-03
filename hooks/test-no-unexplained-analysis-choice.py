@@ -123,3 +123,20 @@ with tempfile.TemporaryDirectory() as tmp:
         sys.stdout = real
     assert buf.getvalue() == ""
     print("PASS: an existing bin the edit does not add is not blocked")
+
+    # A page with a byte that is not UTF-8 must not crash the blocking hook.
+    with open(path, "wb") as handle:
+        handle.write(b"Intro \xff\xfe caf\xe9.\n\nAfter.\n")
+    stray = {
+        "tool_name": "Edit",
+        "tool_input": {"file_path": path, "old_string": "After.", "new_string": "Done."},
+    }
+    sys.stdin = io.StringIO(json.dumps(stray))
+    buf = io.StringIO()
+    sys.stdout, real = buf, sys.stdout
+    try:
+        subject.main()
+    finally:
+        sys.stdout = real
+    assert buf.getvalue() == ""
+    print("PASS: a page with non-UTF-8 bytes does not crash the hook")

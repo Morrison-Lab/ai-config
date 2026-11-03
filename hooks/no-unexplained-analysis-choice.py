@@ -78,7 +78,7 @@ and edit again."""
 
 def read_file(path: str) -> str:
     try:
-        with open(path, encoding="utf-8") as handle:
+        with open(path, encoding="utf-8", errors="replace") as handle:
             return handle.read()
     except OSError:
         return ""

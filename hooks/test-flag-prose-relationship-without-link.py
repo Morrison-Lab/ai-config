@@ -57,7 +57,14 @@ def run(events):
         payload = {"transcript_path": path, "session_id": "s", "stop_hook_active": False}
         env = dict(os.environ, TMPDIR=d)
         out = subprocess.run([sys.executable, HOOK], input=json.dumps(payload), capture_output=True, text=True, env=env)
-        return '"decision": "block"' in out.stdout
+        if not out.stdout.strip():
+            return False
+        verdict = json.loads(out.stdout)
+        if verdict.get("decision") != "block":
+            return False
+        # The reason is the only part the agent reads, so assert what it says.
+        assert "relationships field" in verdict.get("reason", ""), verdict
+        return True
 
 
 fail = 0

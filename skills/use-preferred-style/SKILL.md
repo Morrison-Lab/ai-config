@@ -94,8 +94,8 @@ cited individually below.
    > ✅ The model overfit the training data.
    > **This overfitting** poses a problem for deployment.
 
-9. **Test every word for literal truth** (PSW, "Word choice", "Avoid vague
-   and metaphorical language").
+9. **Test every word for literal truth** (PSW, "Avoid vague and
+   metaphorical language").
    Whatever its part of speech, a word must be literally true of what it names
    or describes.
    A point does not "sit" at a height, an estimate does not "live" in an
@@ -172,7 +172,7 @@ and "Word choice" chapters.
    When a hedge is load-bearing, keep it.
    Plainness is the goal, not false confidence.
 8. **Apply rules 9 to 11** to every added line of notes prose, such as a
-   caption, exercise or solution, before the one push on a branch.
+   caption, exercise, or solution, before the one push on a branch.
 9. **Read it back.**
    Each sentence should make one point.
    The data should flow top to bottom.

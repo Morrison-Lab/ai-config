@@ -5,7 +5,7 @@ The user is telling you to stop handing a step back and do it yourself. It usual
 ## When this fires
 
 - The keyword `difm` or `do it for me`, bare or slashed.
-- Close variants: “just do it”, “you run it”, “run it yourself”.
+- Close variants aimed at a step you just reported blocked or handed back: “you run it”, “run it yourself”.
 
 ## What it grants
 
@@ -15,7 +15,7 @@ Authority to run the specific step that was just blocked or handed back. Each ne
 
 1.  **Name the step** in one clause: the exact command or action.
 2.  **Run it as one command, exactly as before.** A classifier denial is a sample, not a wall. The mechanics and limits are in [`ask-for-manual-approval`](../../shared/workflow/ask-for-manual-approval.md): retry the identical command once, never rephrased.
-3.  **If it is denied again, turn auto mode off for this step.** Switch the session to `default` with `mcp__ccd_session_mgmt__set_session_permission_mode`, run the command once, then restore the original mode. Note the original mode first. The self-switch, the stop conditions, and the managed-settings exception are in `ask-for-manual-approval`. How a standing grant interacts with a denial is in [`default-to-action-grants`](../../shared/workflow/default-to-action-grants.md).
+3.  **If it is denied again, turn auto mode off for this step.** Switch the session to `default` with `mcp__ccd_session_mgmt__set_session_permission_mode`, run the command once, then restore the original mode even if the command failed or timed out. Note the original mode first. The self-switch, the stop conditions, and the managed-settings exception are in `ask-for-manual-approval`. How a standing grant interacts with a denial is in [`default-to-action-grants`](../../shared/workflow/default-to-action-grants.md).
 4.  **Verify and report in the past tense**: what ran, the read-back or exit status, and that auto mode was restored. Count attempts honestly: “denied N times, succeeded on run N+1”, never “cannot”.
 
 ## What it does not grant

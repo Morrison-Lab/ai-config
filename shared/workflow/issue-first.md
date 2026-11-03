@@ -27,6 +27,7 @@ Ezra approved this mapping (2026-10-17):
 When the task naturally builds on an existing issue or PR, file the new issue and then:
 
 1. Mark the new issue **blocked by** the existing one in GitHub's issue relationships field.
+   All relationship kinds: [`github-relationships`](github-relationships.md).
    Prefer the packaged command where `gh` has it (v2.94.0 or later, per the gh changelog of 2026-06-10): `gh issue edit <new> --add-blocked-by <existing number or URL>`.
    Otherwise use the REST call `POST /repos/{owner}/{repo}/issues/<new>/dependencies/blocked_by` with the body `{"issue_id": <id>}`, where `<id>` is the blocking issue's numeric `id` (from `GET /repos/{owner}/{repo}/issues/<n>`), not its number.
    A PR is also an issue there, so either form works for a blocking PR.

@@ -20,6 +20,13 @@ What counts:
     mentions of another session.
   - A link is `https://claude.ai/code/session_...`, `(#cmsg_...)` or a URL
     carrying `thread=cmsg_...`.
+  - A bare "session" or "thread" counts when the word before it points at
+    another session: "the", "that", "those", "other", "another", "my",
+    "our", "their", "its", "previous", "earlier", "prior", "parent",
+    "child", "sibling", or a host id such as "ab12-03" ("the session",
+    "that thread", "the ab12-03 session"). Any other word before it, as in
+    "the R session", "a training session" or "the support thread", names
+    nothing to link, so it is not a mention.
   - The unit is one paragraph or one list item. A mention in a unit with no
     link of its own blocks.
   - Fenced code and inline code spans are removed first.
@@ -39,6 +46,15 @@ MENTION = re.compile(
     # ai-config#4878: a Remote Control session called a "chat".
     r"|(?:Remote Control|RC|Mac|Linux|cloud|local|device|your|[a-z]+\d+-\d+)"
     r"(?: \w+){0,2} chats?|(?:that|those|other) chats?)\b", re.I)
+# ai-config (Ezra, 2026-11-02, "always link to the session"): any other
+# session or thread, however it is named ("the ab12-03 session", "the runner
+# thread", "that session"). The word before it decides: a determiner that
+# names this session or an unspecific one is not a mention.
+GENERIC = re.compile(r"(?<![\w-])([\w-]+) (sessions?|threads?)\b", re.I)
+POINTING = {"the", "that", "those", "other", "another", "my", "our", "their",
+            "its", "previous", "earlier", "prior", "parent", "child",
+            "sibling"}
+HOST_ID = re.compile(r"[a-z]+\d+-\d+", re.I)
 LINK = re.compile(
     r"claude\.ai/code/session_\w+|\(#cmsg_\w+\)|[?&]thread=cmsg_\w+")
 UNIT_BREAK = re.compile(r"\n[ \t]*\n|\n(?=(?:[-*+]|\d+[.)])[ \t])")
@@ -51,7 +67,9 @@ Resend with a link in the same paragraph or list item: \
 [session](https://claude.ai/code/session_<id>) for a Claude Code session \
 (the id from the status wake or cross-session message, `cse_` becomes \
 `session_`), or [thread title](#cmsg_...) for a project thread. Do not type \
-an id from memory."""
+an id from memory.
+If the phrase is not a Claude Code session or project thread (an R, database \
+or debugger session, an OS thread), put it in backticks and resend."""
 
 
 def unlinked_mention(text: str):
@@ -64,6 +82,10 @@ def unlinked_mention(text: str):
         m = MENTION.search(unit)
         if m:
             return m.group(0)
+        for g in GENERIC.finditer(unit):
+            before = g.group(1)
+            if before.lower() in POINTING or HOST_ID.fullmatch(before):
+                return g.group(0)
     return None
 
 

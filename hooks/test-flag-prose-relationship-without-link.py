@@ -52,7 +52,7 @@ CASES = [
 def run(events):
     with tempfile.TemporaryDirectory() as d:
         path = os.path.join(d, "t.jsonl")
-        with open(path, "w") as fh:
+        with open(path, "w", encoding="utf-8") as fh:
             fh.write("\n".join(json.dumps(e) for e in events))
         payload = {"transcript_path": path, "session_id": "s", "stop_hook_active": False}
         env = dict(os.environ, TMPDIR=d)

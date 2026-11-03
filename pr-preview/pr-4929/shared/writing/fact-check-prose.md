@@ -1629,6 +1629,28 @@ needs the defining comment or documentation as its source.
 
 (Case record: [`fact-check-prose.cases.md`](fact-check-prose.cases.md).)
 
+## A reason given for why a definition is narrow is a claim about its author
+
+When asked why a definition covers only some cases,
+for example why a notes repository defines a term only for densities,
+the honest first answer is the one you can source:
+the author's reason if it is recorded, and otherwise "I don't know their reason".
+A mathematical justification you supply
+(such as "a mode belongs to a density, not to the distribution")
+is a separate claim that must hold on its own
+and must not be presented as the reason the definition is narrow.
+A definition is often narrow because it was written for one context,
+and the wider usage may be standard.
+
+- **Do:** say whether the narrowness is a convention of one text or a necessity,
+  after checking how the term is used more widely (unimodal functions, the mode of a likelihood).
+- **Do:** keep "here is a true fact about the term" apart from "here is why it was defined this way".
+- **Don't:** turn a true property into a rationale for a limit you have not checked.
+
+(Case: Morrison-Lab/psw#472, 2026-11-03.
+The first answer said the pds `def-mode` was limited to densities for a mathematical reason,
+and it was corrected when asked whether other functions can have modes.)
+
 ## When documenting a protection, check every way around it before the first push
 
 Before pushing prose that instructs readers how to configure a protection

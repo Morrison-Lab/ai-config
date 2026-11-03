@@ -12,7 +12,7 @@ The authority is the user’s own guide, **Principles of Scientific Writing (PSW
 
 ## The rules
 
-Rule 1 restates PSW’s own “Limit complex sentence structures” section (Conciseness chapter). Rules 2–4 are the user’s own emphasis on filler and clause structure, drawing on PSW’s conciseness and word-choice material without matching one specific section. Rules 5–8 come straight from PSW’s word-choice, conciseness, and grammar chapters, cited individually below.
+Rule 1 restates PSW’s own “Limit complex sentence structures” section (Conciseness chapter). Rules 2–4 are the user’s own emphasis on filler and clause structure, drawing on PSW’s conciseness and word-choice material without matching one specific section. Rules 5–8 come straight from PSW’s word-choice, conciseness, and grammar chapters, cited individually below. Rules 9–11 add the user’s review conventions for notes prose, cited individually below.
 
 1.  **Limit dependent clauses.** A dependent (subordinate) clause cannot stand alone. It starts with a word like *because*, *although*, *which*, *while*, *since*, *when*, or *if*. One per sentence is plenty. Two or more stacked together is a rewrite signal. Break the sentence apart instead.
 
@@ -38,7 +38,7 @@ Rule 1 restates PSW’s own “Limit complex sentence structures” section (Con
 
 10. **Make a caption stand alone** (PSW, “Slides, posters, and figures”). A caption states what its own figure shows. It does not rely on another figure’s caption: never write “the same paths as **?@fig-x**” or “the surface of **?@fig-x**” in place of the content.
 
-11. **Break clauses onto their own lines in notes sources** (Ezra’s review rule for `.qmd` prose). Put one sentence per line, and break before “and”, “but”, “so”, “as”, “which”, “then” and “toward” when a line holds two clauses. Link the first use of every defined term in a div to its definition. Before the one push on a branch, run gha’s `check-term-links`, `check-new-line-breaks` (with `NLB_CLAUSE_BREAKS=true`), `check-self-contained-captions` and `check-serial-comma` locally, with the env vars from the repo’s workflow files. A clean script run does not cover rule 9, so do that one by reading.
+11. **Break clauses onto their own lines in notes sources** (Ezra’s review rule for `.qmd` prose). Put one sentence per line, and break before “and”, “but”, “so”, “as”, “which”, “then”, and “toward” when a line holds two clauses. Link the first use of every defined term in a div to its definition. Before the one push on a branch, run gha’s `check-term-links`, `check-new-line-breaks` (with `NLB_CLAUSE_BREAKS=true`), `check-self-contained-captions`, and `check-serial-comma` locally, with the env vars from the repo’s workflow files. A clean script run does not cover rule 9, so do that one by reading.
 
 ## Filler and jargon to cut or swap
 

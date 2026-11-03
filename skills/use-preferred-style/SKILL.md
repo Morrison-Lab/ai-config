@@ -94,7 +94,7 @@ cited individually below.
    > ✅ The model overfit the training data.
    > **This overfitting** poses a problem for deployment.
 
-9. **Test every word for literal truth** (PSW, "Avoid vague and
+9. **Test every word for literal truth** (PSW: "Avoid vague and
    metaphorical language").
    Whatever its part of speech, a word must be literally true of what it names
    or describes.

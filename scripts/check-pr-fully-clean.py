@@ -4048,7 +4048,7 @@ _REPLY_DISPOSITION_LINE_RE = re.compile(
     # disposition ends its clause, so neither "**Needs more work** -- done
     # reviewing" nor "-- declined by the author; still a defect" matches.
     r"\*\*(?:Blocking|Nit|Suggestion|Finding|Item)(?:\s+\d+)?"
-    r"(?:,\s*`?[\w./-]+(?::\d+)?`?)?\*\*\s*(?:---|--|—|:|,)\s*"
+    r"(?:,\s*`?[\w./-]+(?::\d+)?`?)?\*\*\s*(?:---|--|\u2014|:|,)\s*"
     r"(?P<word>" + _REPLY_DISPOSITION_WORD + r")"
     r"(?=\s*(?:[.;:(`]|in\s|$))"
     r"|(?P<verb>Rebutting|Addressing|Deferring)\s+the\s+(?:round-\d+\s+)?"

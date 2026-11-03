@@ -1261,6 +1261,13 @@
             "timeout": 10,
             "script": "no-unexplained-analysis-choice.py",
             "why": "Ezra's rule (2026-11-03, ai-config#4905): every arbitrary analysis choice is explained in detail in the prose; agents ignore a warning, so the rule is a blocking mechanism. Measured on Morrison-Lab/lds fig-logistic-regression, where age was cut into three-year bins with no stated reason. BLOCKS when an edit to a .qmd or .Rmd page adds a binning call (cut(), breaks=, bins=, binwidth=) and adds no prose line holding a reason word. Recognizes binning only, to keep false positives low; `check-unexplained-choices: allow` on the line is the escape hatch. Lexical, so it asks for a reason's existence, not its quality. The gha companion is check-unexplained-choices."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/block-project-memory-write.py\"'",
+            "timeout": 10,
+            "script": "block-project-memory-write.py",
+            "why": "Ezra, 2026-11-03: 'cai: always save memories as tracked files in repos'. The rule existed (memories/project-memory-store.md, 2026-10-16) but the Stop hook no-memory-only-learning.py only reacted after the write and accepted 'memory only: <reason>', so a session wrote the memory and explained it away. BLOCKS a Write, Edit or MultiEdit inside the project memory store (a path containing /memory/team/), except the MEMORY.md index, and names the repo homes to use instead. Fails open on any parse trouble."
           }
         ]
       },

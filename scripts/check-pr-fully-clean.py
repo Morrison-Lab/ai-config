@@ -986,7 +986,8 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
             issues.append(
                 f"Check run '{name}'{where} passed but carries "
                 f"{cr['annotations_count']} annotation(s) not yet read: run "
-                f"`gh api repos/{repo}/check-runs/{cr.get('id')}/annotations`, "
+                f"`gh api repos/{repo}/check-runs/{cr.get('id')}/annotations` "
+                "(for many runs, scripts/summarize-pr-annotations.sh), "
                 "fix each or report it as a false positive in the PR, then "
                 f"rerun with `--annotations-read {cr.get('id')}`")
         elif conclusion not in ("success", "neutral", "skipped"):

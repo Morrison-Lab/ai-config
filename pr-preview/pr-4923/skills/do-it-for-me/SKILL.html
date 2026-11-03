@@ -387,7 +387,7 @@ cookieconsent.run({
 <ol type="1">
 <li><strong>Name the step</strong> in one clause: the exact command or action.</li>
 <li><strong>Run it as one command, exactly as before.</strong> A classifier denial is a sample, not a wall. The mechanics and limits are in <a href="../../shared/workflow/ask-for-manual-approval.md"><code>ask-for-manual-approval</code></a>: retry the identical command once, never rephrased.</li>
-<li><strong>If it is denied again, turn auto mode off for this step.</strong> Switch the session to <code>default</code> with <code>mcp__ccd_session_mgmt__set_session_permission_mode</code>, run the command once, then restore the original mode even if the command failed or timed out. Note the original mode first. The self-switch, the stop conditions, and the managed-settings exception are in <code>ask-for-manual-approval</code>. How a standing grant interacts with a denial is in <a href="../../shared/workflow/default-to-action-grants.md"><code>default-to-action-grants</code></a>.</li>
+<li><strong>If it is denied again, turn auto mode off for this step.</strong> Switch the session to <code>default</code> with <code>mcp__ccd_session_mgmt__set_session_permission_mode</code>, run the command once, then restore the original mode even if the command failed or timed out. Read the original mode first with <code>mcp__ccd_session_mgmt__get_session</code>. The self-switch, the stop conditions, and the managed-settings exception are in <code>ask-for-manual-approval</code>. How a standing grant interacts with a denial is in <a href="../../shared/workflow/default-to-action-grants.md"><code>default-to-action-grants</code></a>.</li>
 <li><strong>Verify and report in the past tense</strong>: what ran, the read-back or exit status, and that auto mode was restored. Count attempts honestly: “denied N times, succeeded on run N+1”, never “cannot”.</li>
 </ol>
 </section>
@@ -402,7 +402,7 @@ cookieconsent.run({
 <section id="relationship-to-other-skills" class="level2">
 <h2 class="anchored" data-anchor-id="relationship-to-other-skills">Relationship to other skills</h2>
 <ul>
-<li><strong><a href="../../skills/dmmhyh/SKILL.html"><code>dmmhyh</code></a></strong> lowers the threshold for asking. <code>difm</code> carries out a step already blocked or handed back.</li>
+<li><strong><a href="../../skills/dmmhyh/SKILL.html"><code>dmmhyh</code></a></strong> makes you ask less. <code>difm</code> carries out a step already blocked or handed back.</li>
 <li><strong><a href="../../skills/daytb/SKILL.html"><code>daytb</code></a></strong> decides a pending question. <code>difm</code> carries out a pending action.</li>
 </ul>
 </section>

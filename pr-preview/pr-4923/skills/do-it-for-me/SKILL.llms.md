@@ -15,7 +15,7 @@ Authority to run the specific step that was just blocked or handed back. Each ne
 
 1.  **Name the step** in one clause: the exact command or action.
 2.  **Run it as one command, exactly as before.** A classifier denial is a sample, not a wall. The mechanics and limits are in [`ask-for-manual-approval`](../../shared/workflow/ask-for-manual-approval.md): retry the identical command once, never rephrased.
-3.  **If it is denied again, turn auto mode off for this step.** Switch the session to `default` with `mcp__ccd_session_mgmt__set_session_permission_mode`, run the command once, then restore the original mode even if the command failed or timed out. Note the original mode first. The self-switch, the stop conditions, and the managed-settings exception are in `ask-for-manual-approval`. How a standing grant interacts with a denial is in [`default-to-action-grants`](../../shared/workflow/default-to-action-grants.md).
+3.  **If it is denied again, turn auto mode off for this step.** Switch the session to `default` with `mcp__ccd_session_mgmt__set_session_permission_mode`, run the command once, then restore the original mode even if the command failed or timed out. Read the original mode first with `mcp__ccd_session_mgmt__get_session`. The self-switch, the stop conditions, and the managed-settings exception are in `ask-for-manual-approval`. How a standing grant interacts with a denial is in [`default-to-action-grants`](../../shared/workflow/default-to-action-grants.md).
 4.  **Verify and report in the past tense**: what ran, the read-back or exit status, and that auto mode was restored. Count attempts honestly: “denied N times, succeeded on run N+1”, never “cannot”.
 
 ## What it does not grant
@@ -26,7 +26,7 @@ Authority to run the specific step that was just blocked or handed back. Each ne
 
 ## Relationship to other skills
 
-- **[`dmmhyh`](../../skills/dmmhyh/SKILL.llms.md)** lowers the threshold for asking. `difm` carries out a step already blocked or handed back.
+- **[`dmmhyh`](../../skills/dmmhyh/SKILL.llms.md)** makes you ask less. `difm` carries out a step already blocked or handed back.
 - **[`daytb`](../../skills/daytb/SKILL.llms.md)** decides a pending question. `difm` carries out a pending action.
 
 ## Anti-patterns

@@ -4081,6 +4081,19 @@ _REPLY_RISKY_TAIL_RE = re.compile(
 )
 
 
+# The explanation must also be one sentence of a shape that says the
+# reviewer's reading is wrong ("The line already breaks after the comma.",
+# "The reviewer misread the diff."); an affirmation such as "Persists on
+# the head." or "Agree with the reviewer." matches neither shape.
+_REPLY_REBUTTAL_TAIL_RE = re.compile(
+    r"^(?:(?:The|This)\s+(?:line|code|text|diff|check|claim|finding)\b"
+    r"[^.!?\n]*\b(?:already|intended|deliberate|correct\s+as\s+written)\b"
+    r"|(?:The\s+)?reviewer\s+(?:misread|misreads|is\s+mistaken|missed)\b)"
+    r"[^.!?\n]*[.!]?\s*$",
+    re.IGNORECASE,
+)
+
+
 def _disposition_drops_line(m: re.Match, tail: str) -> bool:
     """True when a matched disposition line may leave the verdict scan."""
     if _REPLY_BARE_TAIL_RE.match(tail):
@@ -4088,7 +4101,10 @@ def _disposition_drops_line(m: re.Match, tail: str) -> bool:
     word = (m.group("word") or m.group("verb") or "").lower()
     if not word.startswith(_REPLY_EXPLAINED_WORDS):
         return False
-    return not _REPLY_RISKY_TAIL_RE.search(tail)
+    explanation = re.sub(r"^\s*[.;:]?\s*", "", tail)
+    return bool(_REPLY_REBUTTAL_TAIL_RE.match(explanation)) and not (
+        _REPLY_RISKY_TAIL_RE.search(explanation)
+    )
 
 
 def _is_agent_disclosed_reply(body: str) -> bool:

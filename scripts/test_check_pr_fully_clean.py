@@ -4050,6 +4050,11 @@ def main() -> int:
               "rebutted. It never handles empty input.",
               "declined. This must be fixed later.",
               "deferred. See issue 12.",
+              "rebutted. Persists on the head.",
+              "rebutted. Agree with the reviewer.",
+              "declined. Merge now.",
+              "rebutted. The line already breaks. Separately, the merge "
+              "is unsafe.",
           )],
         ("'fixed, but a new blocking defect' keeps blocking "
          "(negative control)",

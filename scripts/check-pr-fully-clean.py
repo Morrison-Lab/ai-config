@@ -4088,13 +4088,14 @@ _REPLY_RISKY_TAIL_RE = re.compile(
 # "The reviewer misread the diff."); an affirmation such as "Persists on
 # the head." or "Agree with the reviewer." matches neither shape.
 _REPLY_REBUTTAL_TAIL_RE = re.compile(
-    # Closed phrases, then at most six plain words: a keyword followed by
-    # free text ("The finding is already valid.") admits a confirmation.
+    # Closed phrases, then at most a place ("after the comma"), with no
+    # free words: free text ("The check handles nothing.") can confirm
+    # the defect the disposition claims to dispose of.
     r"^(?:(?:The|This)\s+(?:line|code|text|diff|check)\s+(?:already\s+)?"
     r"(?:breaks|handles|covers|checks|exists|is\s+intended|is\s+deliberate)"
     r"|(?:The\s+)?reviewer\s+(?:misread|misreads|is\s+mistaken\s+about)\s+"
     r"(?:the|this)\s+(?:line|diff|code|text|comment))\b"
-    r"(?:\s+[\w`$,'-]+){0,6}[.!]?\s*$",
+    r"(?:\s+(?:after|before|at)\s+the\s+[\w`$'-]+)?[.!]?\s*$",
     re.IGNORECASE,
 )
 

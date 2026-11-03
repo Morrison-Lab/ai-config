@@ -4063,6 +4063,11 @@ def main() -> int:
               "declined. The claim is already true.",
               "rebutted. The line already breaks after the comma and then "
               "the reviewer saw it differently.",
+              "rebutted. The check handles nothing.",
+              "rebutted. The code handles bad input incorrectly.",
+              "rebutted. The code handles it badly.",
+              "rebutted. The check already handles it poorly.",
+              "rebutted. The reviewer misread the diff, which hides a leak.",
           )],
         ("'The reviewer misread the diff.' after rebutted is not a verdict",
          [dict(agent_reply, body="- **Blocking, `x.qmd:3`** -- rebutted. "

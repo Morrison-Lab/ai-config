@@ -67,7 +67,9 @@ Resend with a link in the same paragraph or list item: \
 [session](https://claude.ai/code/session_<id>) for a Claude Code session \
 (the id from the status wake or cross-session message, `cse_` becomes \
 `session_`), or [thread title](#cmsg_...) for a project thread. Do not type \
-an id from memory."""
+an id from memory.
+If the phrase is not a Claude Code session or project thread (an R, database \
+or debugger session, an OS thread), put it in backticks and resend."""
 
 
 def unlinked_mention(text: str):

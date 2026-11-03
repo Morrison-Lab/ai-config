@@ -70,6 +70,7 @@ CASES = [
     ("database session is fine", POST, "The database session timed out.", None),
     ("worker thread is fine", POST, "Pull the error from the worker thread.", None),
     ("review thread is fine", POST, "Resolve the review thread.", None),
+    ("backticks exempt a technical thread", POST, "Lock `the thread` before writing.", None),
     ("no mention", POST, "Done.", None),
 ]
 

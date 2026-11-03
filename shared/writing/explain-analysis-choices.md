@@ -23,4 +23,7 @@ If you cannot give a reason, remove the choice.
 On Morrison-Lab/lds `fig-logistic-regression`, age was grouped into three-year bins with no stated reason.
 Each age had 17 to 144 men per behavior pattern, so nothing forced the bins, and the figure now plots one proportion per age.
 
-The hook `hooks/flag-unexplained-analysis-choice.py` warns when an edit to a `.qmd` page adds such a choice in code and no prose with a reason word.
+The hook `hooks/no-unexplained-analysis-choice.py` blocks an edit to a `.qmd` page that adds a binning call and no prose with a reason word.
+The gha check `check-unexplained-choices` fails a pull request for the same thing.
+Both recognize binning only, to keep false positives low,
+and both honor `check-unexplained-choices: allow` on the line.

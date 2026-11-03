@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PreToolUse guard: an arbitrary analysis choice added to a page with no prose explaining it.
+"""PreToolUse guard: a binning choice added to a page with no prose explaining it.
 
 Ezra's rule (2026-11-03, ai-config#4905): every time an agent makes an arbitrary
 analysis choice, such as binning a variable, it must explain the decision in
@@ -14,17 +14,18 @@ the reader had no way to know that.
 WHAT IT CHECKS
 --------------
     a Write, Edit or MultiEdit to a `.qmd` or `.Rmd` file adds a code line that
-    makes a recognized analysis choice (a bin, a cutoff, a seed, a bandwidth,
-    a train/test split)
+    bins a variable (`cut()`, `breaks =`, `bins =`, `binwidth =`)
     AND the same edit adds no prose line that explains a choice
+    AND no added line carries `check-unexplained-choices: allow`
 
 An explaining line is one outside a code fence that contains a reason word
 (`because`, `chose`, `choice`, `so that`, `compromise`, `rather than`, ...).
 
-It warns and never blocks. Whether a sentence explains a choice cannot be
-decided lexically, and a blocking guard on that judgment would be switched off.
-The failing check for a pull request is the gha companion, which asks for prose
-in the diff, not for proof that the prose is good.
+It BLOCKS (Ezra, 2026-11-03: agents ignore a warning, so a rule becomes a
+failing mechanism). To keep false positives low it recognizes binning only, not
+seeds or splits, and it asks for the existence of a reason word, not for proof
+that the explanation is good. The escape hatch is a line carrying
+`check-unexplained-choices: allow`, the same marker the gha check honors.
 """
 from __future__ import annotations
 
@@ -35,18 +36,14 @@ import sys
 PAGE_SUFFIXES = (".qmd", ".Rmd", ".rmd")
 EDIT_TOOLS = ("Write", "Edit", "MultiEdit", "write_to_file", "StrReplace")
 
-# Calls and arguments that are an analysis choice rather than plumbing.
+# Binning calls and arguments: the one analysis choice recognized.
 RX_CHOICE = re.compile(
     r"\bcut\s*\("
     r"|\bcut_(?:number|interval|width)\s*\("
     r"|\bpd\.(?:cut|qcut)\s*\("
-    r"|\bnp\.histogram\s*\("
-    r"|\b(?:breaks|bins|binwidth|nbins|n_bins)\s*=\s*"
-    r"|\bset\.seed\s*\(|\brandom_state\s*=|\bnp\.random\.seed\s*\(|\bseed\s*="
-    r"|\b(?:bw|bandwidth|span|df|degree|lambda|alpha|threshold|cutoff)\s*=\s*[-0-9.]"
-    r"|\b(?:train_test_split|initial_split|sample_frac)\s*\("
-    r"|\btest_size\s*=|\bprop\s*=\s*[0-9.]"
+    r"|\b(?:breaks|bins|binwidth|nbins|n_bins)\s*="
 )
+ALLOW_MARKER = "check-unexplained-choices: allow"
 
 # A reason word in prose: the decision is being explained.
 RX_REASON = re.compile(
@@ -56,18 +53,18 @@ RX_REASON = re.compile(
     re.I,
 )
 
-NOTE = """This edit to {path} adds an analysis choice in code ({found}) \
+NOTE = """BLOCKED: this edit to {path} adds a binning choice in code ({found}) \
 and no prose explaining it.
 
 Ezra's rule (ai-config#4905, 2026-11-03): every arbitrary analysis choice, \
-such as a bin, a cutoff, a seed, a bandwidth or a train/test split, is \
-explained in detail in the prose next to it. Say what was chosen, what the \
-alternatives were, and why this one, with numbers from the data where they \
-bear on it. If a choice has no good reason, remove it \
-(the lds age bins were removed in favour of one point per age).
+such as binning, is explained in detail in the prose next to it. Say what was \
+chosen, what the alternatives were, and why this one, with numbers from the \
+data where they bear on it, and put that prose in the same edit. If a choice \
+has no good reason, remove it (the lds age bins became one point per age).
 
-If the explanation already sits in the page outside this edit, name it in \
-your reply and carry on. This is a reminder, not a refusal."""
+If the explanation already sits elsewhere in the page, or the call is not an \
+analysis choice, add `<!-- check-unexplained-choices: allow -->` or a comment \
+`# check-unexplained-choices: allow` on that code line and edit again."""
 
 
 def added_text(tool: str, inp: dict) -> str:
@@ -98,7 +95,7 @@ def choices_without_reason(text: str) -> list[str]:
     code, prose = split_code_and_prose(text)
     found = []
     for line in code:
-        if line.lstrip().startswith(("#", "//")):
+        if line.lstrip().startswith(("#", "//")) or ALLOW_MARKER in line:
             continue
         m = RX_CHOICE.search(line)
         if m and m.group(0).strip() not in found:
@@ -125,14 +122,17 @@ def main() -> int:
     if not found:
         return 0
     shown = ", ".join(f"`{f}`" for f in found[:4])
+    reason = NOTE.format(path=path, found=shown)
     out = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
-            "additionalContext": NOTE.format(path=path, found=shown),
+            "permissionDecision": "deny",
+            "permissionDecisionReason": reason,
+            "additionalContext": reason,
         },
         "systemMessage": (
-            "Analysis choice without an explanation in the prose: "
-            "say what was chosen, the alternatives and why."
+            "Blocked: binning with no explanation in the prose "
+            "(say what was chosen, the alternatives and why)."
         ),
     }
     print(json.dumps(out))

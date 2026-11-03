@@ -1253,6 +1253,18 @@
         ]
       },
       {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/flag-unexplained-analysis-choice.py\"'",
+            "timeout": 10,
+            "script": "flag-unexplained-analysis-choice.py",
+            "why": "Ezra's rule (2026-11-03, ai-config#4905): every arbitrary analysis choice is explained in detail in the prose. Measured on Morrison-Lab/lds fig-logistic-regression, where age was cut into three-year bins with no stated reason. Warns, never blocks, when an edit to a .qmd or .Rmd page adds a code line making a recognized choice (cut(), breaks=, bins=, set.seed(), bandwidth, a train/test split) and adds no prose line holding a reason word. Lexical, so it cannot judge the explanation; the failing check is the gha companion."
+          }
+        ]
+      },
+      {
         "matcher": "Write",
         "hooks": [
           {

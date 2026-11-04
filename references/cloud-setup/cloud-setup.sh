@@ -66,6 +66,15 @@
 #      remotes, lintr, JuliaCall), as Posit Package Manager binaries;
 #   d. the lab's `lms` linters (from Morrison-Lab/psc, at the repos' pinned
 #      commit), so lint-changed-lines can run locally before a push.
+#   e. (2026-11-04, ai-config#4943) the last step installs the ai-config Claude
+#      Code plugin and also updates it when already installed
+#      (`plugin install` alone never updates), so a container built from this
+#      script does not start on a snapshot older than main. The plugin is installed once per container and
+#      a thread session reuses it for days; a pin from before #4931 let a memory
+#      write through that `block-project-memory-write.py` refuses. The plugin's
+#      own `refresh-stale-plugin-pin-cloud.py` keeps it current afterwards, but
+#      only from a snapshot that already contains it, so this step covers the
+#      first one.
 # Each is best-effort: a failure warns and the build continues.
 # ---------------------------------------------------------------------------
 #
@@ -459,3 +468,19 @@ fi
 command -v rsvg-convert >/dev/null 2>&1 && rsvg-convert --version | head -1 || echo "rsvg-convert: NOT installed"
 command -v typos >/dev/null 2>&1 && typos --version || echo "typos: NOT installed (see WARNING above)"
 Rscript -e 'if (requireNamespace("lms", quietly = TRUE)) cat("lms:", as.character(packageVersion("lms")), "\n") else cat("lms: NOT installed (see WARNING above)\n")'
+
+# [ai-config#4943] Install the ai-config Claude Code plugin, or bring an existing
+# install up to date. Last, and best-effort, so a network failure here never
+# fails the build. `plugin install` does not update an installed plugin, and a
+# container reuses its snapshot for days, so always run the update as well.
+echo "==> Installing or refreshing the ai-config Claude Code plugin"
+if command -v claude >/dev/null 2>&1; then
+  claude plugin marketplace add Morrison-Lab/ai-config \
+    || claude plugin marketplace update Morrison-Lab \
+    || echo "WARNING: could not add or update the Morrison-Lab marketplace." >&2
+  claude plugin install ai-config@Morrison-Lab \
+    || claude plugin update ai-config@Morrison-Lab \
+    || echo "WARNING: could not install or update the ai-config plugin." >&2
+else
+  echo "claude: not on PATH at build time; skipping the ai-config plugin."
+fi

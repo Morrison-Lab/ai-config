@@ -24,6 +24,13 @@
             "timeout": 10,
             "script": "warn-stale-plugin-pin.py",
             "why": "ai-config#2439 -- the plugin cache pin that runs hooks does not advance when the marketplace clone updates, so merged hook fixes went unrun for weeks with nothing saying so. At session start, compares each applicable ai-config pin in installed_plugins.json against the local marketplace clone's HEAD and, when it lags, names the commit count and the per-scope update commands."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/refresh-stale-plugin-pin-cloud.py\"'",
+            "timeout": 120,
+            "script": "refresh-stale-plugin-pin-cloud.py",
+            "why": "A cloud container installs the plugin once at setup and a thread session reuses it for days; a repo's own refresh hook runs only when the session starts in that repo, and warn-stale-plugin-pin.py compares against a marketplace clone that is equally old. Measured 2026-11-04: a pin from 2026-11-03T19:43Z lacked block-project-memory-write.py (#4931), so the memory write it refuses went through. In CLAUDE_CODE_REMOTE sessions, updates the marketplace and, when the user-scope pin lags, runs claude plugin update and reports the move. Opt out with AI_CONFIG_NO_AUTO_REFRESH=1."
           }
         ]
       },

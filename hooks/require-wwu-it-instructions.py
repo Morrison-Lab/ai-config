@@ -20,9 +20,9 @@ WHAT IS DENIED
 A tool call that touches cluster-job machinery, while the transcript holds no
 read of `wwu-cs-it-instructions.md`:
 
-  * Bash: a command naming an HTCondor command (any `condor_` word that is
-    not a file name, so `condor_submit`, `condor_q` and `condor_drain` count
-    while `condor_population.csv` does not), a cluster head (`cse-head`,
+  * Bash: a command naming an HTCondor command (any of the commands in
+    `CONDOR_COMMANDS`, so `condor_submit`, `condor_q` and `condor_drain` count
+    while `condor_population` does not), a cluster head (`cse-head`,
     `csci-lab-head`, `csci-head`), `CLUSTER_CI_ROOT`, or `condor-batch`;
   * Write, Edit, MultiEdit: a `condor-batch` file or directory, a
     `cluster-*.yml` workflow, a `.sub` submit file, or whose new text names
@@ -60,8 +60,19 @@ import sys
 INSTRUCTIONS = "wwu-cs-it-instructions.md"
 EDIT_TOOLS = {"Write", "Edit", "MultiEdit"}
 
+# The HTCondor command set (HTCondor man-pages index, checked 2026-11-04),
+# listed in full so that an unrelated `condor_population` name is not a trigger.
+CONDOR_COMMANDS = (
+    "advertise annex check_userlogs chirp config_val continue dagman drain evicted_files "
+    "fetchlog findhost gather_info history hold init install job_router_info master now off on "
+    "ping power preen prio q qedit reconfig release reschedule restart rm router_history router_q "
+    "router_rm run set_shutdown ssh_to_job stats status store_cred submit submit_dag suspend tail "
+    "test_match token_create token_fetch token_list token_request token_request_approve "
+    "token_request_auto_approve token_request_list transfer_data transform_ads updates_stats "
+    "upgrade_check urlfetch userlog userprio vacate vacate_job version wait watch_q who top"
+).split()
 CLUSTER_RE = re.compile(
-    r"(?<![\w.-])condor_[a-z_]+(?![\w-]|\.\w)"
+    r"(?<![\w.-])condor_(?:" + "|".join(sorted(CONDOR_COMMANDS, key=len, reverse=True)) + r")(?![\w-])"
     r"|(?<![\w-])(?:cse-head|csci-lab-head|csci-head|CLUSTER_CI_ROOT|condor-batch)(?![\w-])"
 )
 FILE_RE = re.compile(

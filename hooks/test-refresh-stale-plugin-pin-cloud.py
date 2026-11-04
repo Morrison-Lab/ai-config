@@ -2,8 +2,8 @@
 """Tests for hooks/refresh-stale-plugin-pin-cloud.py.
 
 A fake `claude` script stands in for the CLI: `plugin marketplace update` advances the
-fake marketplace clone by one commit, `plugin update` rewrites the pin to the clone's HEAD.
-  1. Remote, pin behind clone after update: refreshes, reports old and new, reloadSkills.
+fake marketplace mkt by one commit, `plugin update` rewrites the pin to the mkt's HEAD.
+  1. Remote, pin behind mkt after update: refreshes, reports old and new, reloadSkills.
   2. Remote, pin already HEAD: silent, no `plugin update` call.
   3. Not remote: silent, claude never called.
   4. AI_CONFIG_NO_AUTO_REFRESH=1: silent, claude never called.
@@ -49,11 +49,11 @@ fi
 
 def scenario(remote=True, advance=True, extra=None):
     d = Path(tempfile.mkdtemp())
-    clone = d / "marketplaces" / "m"
-    clone.mkdir(parents=True)
-    git(clone, "init", "-q", "-b", "main")
-    git(clone, "commit", "-q", "--allow-empty", "-m", "one")
-    old = git(clone, "rev-parse", "HEAD")
+    mkt = d / "marketplaces" / "m"
+    mkt.mkdir(parents=True)
+    git(mkt, "init", "-q", "-b", "main")
+    git(mkt, "commit", "-q", "--allow-empty", "-m", "one")
+    old = git(mkt, "rev-parse", "HEAD")
     pin = old
     (d / "installed_plugins.json").write_text(json.dumps({"plugins": {
         "ai-config@m": [{"scope": "user", "gitCommitSha": pin}]}}))

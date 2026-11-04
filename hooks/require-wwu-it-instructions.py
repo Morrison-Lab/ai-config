@@ -61,7 +61,7 @@ INSTRUCTIONS = "wwu-cs-it-instructions.md"
 EDIT_TOOLS = {"Write", "Edit", "MultiEdit"}
 
 CLUSTER_RE = re.compile(
-    r"(?<![\w/.-])condor_[a-z_]+(?![\w-]|\.\w)"
+    r"(?<![\w.-])condor_[a-z_]+(?![\w-]|\.\w)"
     r"|(?<![\w-])(?:cse-head|csci-lab-head|csci-head|CLUSTER_CI_ROOT|condor-batch)(?![\w-])"
 )
 FILE_RE = re.compile(

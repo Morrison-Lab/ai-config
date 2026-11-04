@@ -23,6 +23,7 @@ CASES = [
     ("coordinator", POST, "The coordinator suggested it.", "coordinator"),
     ("coordinator session", POST, "The coordinator session suggested it.", "coordinator session"),
     ("update_message", "mcp__hearthbot__update_message", "Ask the cloud session.", "cloud session"),
+    ("edit_message", "mcp__hearthbot__edit_message", "The thread that owns the runner is waiting.", "The thread"),
     ("capitalised", POST, "REMOTE CONTROL SESSIONS stopped.", "REMOTE CONTROL SESSIONS"),
     ("two words between", POST, "Your remote desktop session is idle.", "Your remote desktop session"),
     ("host-named chat", POST, "The cf463-02 chat is idle.", "cf463-02 chat"),

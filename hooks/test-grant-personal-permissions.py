@@ -77,6 +77,16 @@ for name, payload in [
           and "member owner" in out["hookSpecificOutput"]["permissionDecisionReason"])
 
 for name, payload in [
+    ("create_scheduled_task", {"tool_name": "mcp__scheduled-tasks__create_scheduled_task",
+                               "tool_input": {"taskId": "t", "prompt": "p"}}),
+]:
+    rc, out, _ = run(payload)
+    check(f"allows: {name}", rc == 0 and decision(out) == "allow"
+          and "create_scheduled_task" in out["hookSpecificOutput"]["permissionDecisionReason"])
+
+for name, payload in [
+    ("delete_scheduled_task", {"tool_name": "mcp__scheduled-tasks__delete_scheduled_task",
+                               "tool_input": {"taskId": "t"}}),
     ("add_repo non-member owner", add_repo("someone-else", "repo")),
     ("add_repo owner as prefix", add_repo("Morrison-Lab-fork")),
     ("add_repo missing owner", {"tool_name": "mcp__claude-code-remote__add_repo",

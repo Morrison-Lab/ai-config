@@ -11,7 +11,8 @@ DENY, with no override, when the call would send email:
   - Bash: a command word (first word of any `;`, `&&`, `||`, `|` or newline
     segment) that is a mail sender (`sendmail`, `mail`, `mailx`, `mutt`,
     `msmtp`, `ssmtp`, `swaks`, `mailsend`, `s-nail`, `neomutt`), or
-    `git send-email`, or an `smtp://` / `smtps://` URL, or `smtplib`.
+    `git send-email`, or a network client (`curl`, `openssl`, `nc`...) aimed at an
+    `smtp://` URL or port 25/465/587, or an `import smtplib` / `smtplib.SMTP`.
   - An MCP tool whose name sends mail: a Gmail/mail-server tool whose action
     is `send` (`send_email`, `send_message`, `send_draft`, `sendEmail`...).
     Drafting tools (`create_draft`, `draft_email`) are untouched.
@@ -31,7 +32,11 @@ MAIL_COMMANDS = {
 }
 SEGMENT_SPLIT = re.compile(r"\|\||&&|[;|&\n]")
 WRAPPERS = {"sudo", "env", "command", "exec", "nohup", "time", "xargs", "nice"}
-SMTP_TEXT = re.compile(r"smtps?://|\bsmtplib\b", re.IGNORECASE)
+# An smtp URL counts only as the target of a network client, and smtplib only
+# when imported or called, so `grep smtplib hooks/` and `echo smtp://x` pass.
+NET_COMMANDS = {"curl", "wget", "openssl", "nc", "ncat", "telnet", "socat"}
+SMTP_URL = re.compile(r"smtps?://|[: ](25|465|587)\b", re.IGNORECASE)
+SMTPLIB_USE = re.compile(r"\b(import|from)\s+smtplib\b|\bsmtplib\.SMTP", re.IGNORECASE)
 MCP_SEND = re.compile(
     r"^mcp__.*(mail|gmail|outlook|smtp|inbox).*(send|reply|forward)"
     r"|^mcp__.*(send|reply|forward).*(mail|gmail)"
@@ -61,8 +66,9 @@ def _read_payload():
 
 def bash_sends_email(command):
     """The offending fragment of a shell command, or None."""
-    if SMTP_TEXT.search(command):
-        return SMTP_TEXT.search(command).group(0)
+    use = SMTPLIB_USE.search(command)
+    if use:
+        return use.group(0)
     for seg in SEGMENT_SPLIT.split(command):
         words = seg.split()
         while words and (words[0] in WRAPPERS or "=" in words[0].split("/")[-1]
@@ -73,6 +79,8 @@ def bash_sends_email(command):
         first = words[0].rsplit("/", 1)[-1]
         if first in MAIL_COMMANDS:
             return first
+        if first in NET_COMMANDS and SMTP_URL.search(seg):
+            return f"{first} to an smtp target"
         if first == "git" and "send-email" in words[1:3]:
             return "git send-email"
     return None

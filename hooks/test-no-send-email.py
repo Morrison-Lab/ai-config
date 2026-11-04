@@ -34,14 +34,14 @@ for cmd in ["echo hi | mail -s subj a@b.org", "sendmail -t < msg.txt",
             "sudo /usr/sbin/sendmail a@b.org", "cd x && mutt -s hi a@b.org",
             "git send-email --to a@b.org patch", "FOO=1 msmtp a@b.org",
             "curl --url smtps://smtp.x.org --mail-from a@b.org -T m.txt",
-            "python3 -c 'import smtplib'"]:
+            "python3 -c 'import smtplib'", "nc smtp.x.org 587"]:
     check(f"denies {cmd}", denied(bash(cmd)))
 for name in ["mcp__claude_ai_Gmail__send_email", "mcp__gmail__send_draft",
              "mcp__Gmail__sendEmail", "mcp__outlook__reply_to_email"]:
     check(f"denies {name}", denied({"tool_name": name, "tool_input": {}}))
 
 for cmd in ["git send-pack origin", "grep -r mail hooks", "echo mail",
-            "ls mailbox", "git commit -m 'draft the email'"]:
+            "ls mailbox", "grep -rn smtplib hooks/", "echo smtp://x is a url", "curl https://x.org", "git commit -m 'draft the email'"]:
     check(f"allows {cmd}", not denied(bash(cmd)))
 for name in ["mcp__claude_ai_Gmail__create_draft", "mcp__gmail__search_threads",
              "mcp__github__add_issue_comment"]:

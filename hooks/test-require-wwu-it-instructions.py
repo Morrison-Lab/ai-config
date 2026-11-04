@@ -105,6 +105,8 @@ def main():
          True, "condor_config_val is a trigger"),
         (payload({"tool_name": "Bash", "tool_input": {"command": "cat no-condor-batch-notes.md"}}, unread),
          False, "a hyphenated near-match is allowed"),
+        (payload({"tool_name": "Bash", "tool_input": {"command": "condor_qsub x.sh"}}, unread),
+         True, "condor_qsub is a trigger"),
         (dict(SUBMIT), False, "no transcript path fails open"),
         (payload(SUBMIT, "/nonexistent/transcript.jsonl"), False, "an unreadable transcript fails open"),
     ]

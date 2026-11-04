@@ -60,8 +60,9 @@ import sys
 INSTRUCTIONS = "wwu-cs-it-instructions.md"
 EDIT_TOOLS = {"Write", "Edit", "MultiEdit"}
 
-# The HTCondor command set (HTCondor man-pages index, checked 2026-11-04),
-# listed in full so that an unrelated `condor_population` name is not a trigger.
+# An allowlist of HTCondor commands (man-pages index, checked 2026-11-04), so that
+# an unrelated `condor_population` name is not a trigger. It is not exhaustive by
+# construction: a command HTCondor adds later needs an entry here.
 CONDOR_COMMANDS = (
     "advertise annex check_userlogs chirp config_val continue dagman drain evicted_files "
     "fetchlog findhost gather_info history hold init install job_router_info master now off on "
@@ -69,7 +70,9 @@ CONDOR_COMMANDS = (
     "router_rm run set_shutdown ssh_to_job stats status store_cred submit submit_dag suspend tail "
     "test_match token_create token_fetch token_list token_request token_request_approve "
     "token_request_auto_approve token_request_list transfer_data transform_ads updates_stats "
-    "upgrade_check urlfetch userlog userprio vacate vacate_job version wait watch_q who top"
+    "upgrade_check urlfetch userlog userprio vacate vacate_job version wait watch_q who top "
+    "qsub gpu_discovery dag_checker qusers remote_cluster update_machine_ad pool_job_report "
+    "configure procd sos adstash rmdir ssh_start ssl_fingerprint test_token"
 ).split()
 CLUSTER_RE = re.compile(
     r"(?<![\w.-])condor_(?:" + "|".join(sorted(CONDOR_COMMANDS, key=len, reverse=True)) + r")(?![\w-])"

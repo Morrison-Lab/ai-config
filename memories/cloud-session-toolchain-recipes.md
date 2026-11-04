@@ -79,4 +79,5 @@ a local `file://` render can fail where the https preview works.
   `git clone --depth 1 https://github.com/Morrison-Lab/psc`, fetch and check out the `lms-ref` commit named in the repo's `lint-changed-lines.yaml`, then `remotes::install_local("lms")`.
   `lintr::lint("file.R", linters = lms::default_linters(nested_calls = TRUE))` then reproduces CI's lint-changed-lines result before a push.
 - A render that stops with `UnicodeDecodeError: 'ascii' codec` needs `LANG=C.UTF-8 LC_ALL=C.UTF-8 PYTHONUTF8=1`.
-- `AGENTS.md` sat 36 bytes under Codex's 32,768-byte cap on 2026-11-04, so a new section fails `scripts/test_check_context_closure.py`; put a rule in a `shared/` fragment and free space before linking it.
+- `AGENTS.md` sat 36 bytes under Codex's 32,768-byte cap on 2026-11-04, so a new section fails `scripts/test_check_context_closure.py`;
+  put a rule in a `shared/` fragment and free space before linking it.

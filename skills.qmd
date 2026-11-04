@@ -83,6 +83,7 @@ field (e.g. "grab an issue", "drive to clean", "update memories and skills").
 | Skill | Aliases | What it does |
 |-------|---------|--------------|
 | [`use-preferred-style`](skills/use-preferred-style/SKILL.md) | `style` | Apply the plain-prose writing guide to a draft |
+| [`polish-page`](skills/polish-page/SKILL.md) | | Clean up and flesh out a notes page, and consolidate overlap |
 | [`find-ai-tells`](skills/find-ai-tells/SKILL.md) | `ai-tells` | Scan text for AI-sounding patterns and flag them |
 | [`fact-check-prose`](skills/fact-check-prose/SKILL.md) | `fcp` | Check prose claims, reasoning, and computed values against sources and rendered output |
 | [`fix-forward-references`](skills/fix-forward-references/SKILL.md) | `ffr` | Detect and rearrange/reword forward-pointing references ("see below") in prose |
@@ -148,7 +149,7 @@ field (e.g. "grab an issue", "drive to clean", "update memories and skills").
 
 ## Full skill list
 
-All 222+ canonical skills are in [`skills/`](https://github.com/Morrison-Lab/ai-config/tree/main/skills)
+All 226+ canonical skills are in [`skills/`](https://github.com/Morrison-Lab/ai-config/tree/main/skills)
 on GitHub.
 Generated Codex wrappers live in [`codex-skills/`](https://github.com/Morrison-Lab/ai-config/tree/main/codex-skills).
 Each canonical `SKILL.md` has a `description` field that lists the trigger

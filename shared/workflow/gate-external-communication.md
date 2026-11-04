@@ -40,3 +40,4 @@ over automatic filing, PR-opening, review, and follow-up rules.
 - **Do:** verify membership in the specific target repository before posting any comment, issue, PR, review, or backlink.
 - **Do:** draft locally and ask for explicit approval naming the repo and communication when membership is not positively verified.
 - **Don't:** infer membership from write permissions, public repo status, existing forks, or collaborator access in parent orgs.
+- **Don't:** send email for the user; see [`never-send-email`](never-send-email.md).

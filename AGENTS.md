@@ -49,6 +49,7 @@ See [`gate-external-communication`](shared/workflow/gate-external-communication.
 
 - **Do:** verify membership in the specific target repository before posting outward communication.
 - **Don't:** infer membership from a public repository, write access, a fork, or org membership.
+- **Don't:** send email for the user ("never send emails for me"); draft it.
 ## Graph and display equation defaults
 
 When authoring analysis figures, prefer `ggplot2` over base graphics wherever the dependency is available or appropriate to add.

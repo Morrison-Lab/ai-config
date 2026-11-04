@@ -1809,6 +1809,30 @@
             "why": "The owner's personal grants (Skill(mwc), gh pr merge, glab mr merge) lived in one machine's unsynced settings.json, and a plugin settings.json cannot ship permission rules. Emits permissionDecision allow, unlike every other hook here, for Skill mwc / ai-config:mwc and for a Bash command that is exactly one gh pr merge or glab mr merge with no shell operator, substitution, escape or newline and no prefix but ALLOW_MERGE=. Hook precedence is deny > defer > ask > allow and settings deny/ask rules still apply, so no-unauthorized-merge.py keeps denying what it denies today; only the trailing prompt goes (ai-config#4374). Anything else: no output. Also allows the cloud session's add_repo for an owner whose repos d-morrison is a member of (d-morrison, Morrison-Lab, UCD-SERG), per the owner's standing rule (2026-10-28) that such repos may always be cloned: the classifier refused add_repo for Morrison-Lab/gha and Morrison-Lab/ai-config with 'Access Added As A Means'."
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-send-email.py\"",
+            "timeout": 10,
+            "script": "no-send-email.py",
+            "why": "Denies sending email: a mail-sender command (sendmail, mail, mutt, msmtp, git send-email, smtp URLs) in Bash, or an MCP tool whose action is send/reply/forward on a mail account. Drafting stays allowed. User directive 2026-11-04: \"never send emails for me\". No override."
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__.*mail.*|mcp__.*Mail.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-send-email.py\"",
+            "timeout": 10,
+            "script": "no-send-email.py",
+            "why": "Denies sending email: a mail-sender command (sendmail, mail, mutt, msmtp, git send-email, smtp URLs) in Bash, or an MCP tool whose action is send/reply/forward on a mail account. Drafting stays allowed. User directive 2026-11-04: \"never send emails for me\". No override."
+          }
+        ]
       }
     ],
     "PostToolUse": [

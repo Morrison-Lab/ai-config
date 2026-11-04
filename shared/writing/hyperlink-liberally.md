@@ -18,6 +18,11 @@ A hyperlink provides 1-click access directly to the authoritative documentation,
 - **Technical terms and formal concepts.**
   Hyperlink technical terms and named concepts on first mention to their defining section, glossary anchor, or canonical specification.
   See [`definition-crossrefs`](definition-crossrefs.md).
+- **The exact content a reply mentions, not its container.**
+  When a reply names a figure, page, section, file, comment, or preview, link that item itself (Ezra, 2026-11-03: "always give me direct links to content you mention").
+  A figure links to its anchor on the page or preview (`<preview root>/chapters/<page>.html#fig-<id>`), a file to its path or blob URL, and a comment to its own URL.
+  A link to the PR, the preview root, or the repository alone leaves the reader to hunt for the thing named.
+  Check the anchor id in the source before linking it, and say when a link has not been opened.
 - **Error messages, diagnostic codes, and flags.**
   When discussing a compiler warning, linter rule, or CLI flag, link directly to the manual page or rule documentation explaining its behavior and remediation.
 

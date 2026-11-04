@@ -74,6 +74,11 @@ an owed action requires an armed timer, schedule, or PR watcher that will fire a
 Treat "the pipeline/reviewer will ..." as the same kind of future delivery claim: state current status or arm monitoring for the result.
 See [`no-empty-promises`](shared/workflow/no-empty-promises.md).
 
+## Never answer "can't from this session"
+
+Before calling a repository, host, tool or fact unreachable, attach the repository with `add_repo`, find a mirror or package, add the host to the allowlist repo, or use Remote Control, and verify a fact before stating it.
+See [`no-cant-from-session-excuses`](shared/workflow/no-cant-from-session-excuses.md).
+
 ## Resume every non-clean pause
 
 Whenever work remains at a pause, arm a timer or equivalent wake mechanism that will resume the next concrete step, reporting what will fire and its clock time.

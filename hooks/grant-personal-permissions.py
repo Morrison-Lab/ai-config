@@ -45,6 +45,11 @@ to `no-unauthorized-merge.py` and the settings rules, as before.
     is by owner. The backend's own authorization check still refuses a
     repository the account cannot reach, and an owner outside the set gets
     no decision and goes to the classifier or prompt as before.
+  - `mcp__scheduled-tasks__create_scheduled_task` -> allow. The owner's
+    standing rule (2026-11-04): agents in every project may create
+    scheduled tasks without a prompt. A session was refused the call when it
+    tried to set a durable wake for a report it had promised. Only creation
+    is granted; deleting or editing a task still goes to the normal flow.
   - `Bash` whose command is one `gh pr merge ...` or `glab mr merge ...`
     invocation -> allow. The command must contain none of
     ``; & | < > ( ) $ \\ ` `` or a newline or carriage return, must parse with
@@ -77,6 +82,7 @@ ADD_REPO_TOOLS = frozenset({
 # GitHub owners whose repositories d-morrison is a member of, compared
 # case-insensitively. Extend this set to widen the clone grant.
 MEMBER_OWNERS = frozenset({"d-morrison", "morrison-lab", "ucd-serg"})
+SCHEDULE_TOOLS = frozenset({"mcp__scheduled-tasks__create_scheduled_task"})
 GRANTED_COMMANDS = (["gh", "pr", "merge"], ["glab", "mr", "merge"])
 FORBIDDEN_CHARS = frozenset(";&|<>()$\\`\n\r")
 ALLOWED_ASSIGNMENT = re.compile(r"ALLOW_MERGE=[A-Za-z0-9_.-]*")
@@ -134,6 +140,8 @@ def decide(payload):
             return (f"personal grant: add_repo for {owner.strip()}/..., "
                     "a member owner (repos d-morrison is a member of may always be cloned)")
         return None
+    if tool in SCHEDULE_TOOLS:
+        return "personal grant: create_scheduled_task (owner's standing rule, 2026-11-04)"
     if tool == "Bash":
         name = granted_command(inp.get("command"))
         if name:

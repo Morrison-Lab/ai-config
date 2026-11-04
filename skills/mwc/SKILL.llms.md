@@ -234,7 +234,7 @@ When MWC is enabled for a session: 1. `ai-session.sh enable-mwc` creates a `<san
 |:---|:---|:---|
 | 0 | active | nothing; the guard will honour it |
 | 1 | no grant recorded | `enable-mwc --id <id>` |
-| 2 | granted, but not currently honourable | the message names which case and the fix |
+| 2 | granted, but not currently honourable | the message names which case and the fix; one case is an `--id` that is neither the harness session id nor a transcript stem, which the guard never reads (ai-config#4903) |
 
 It is a **query**: it never prunes and never deletes the marker, so a stale read cannot silently revoke a grant, and a `heartbeat` restores one. Use `disable-mwc`, `release`, or `prune` to actually remove a grant.
 

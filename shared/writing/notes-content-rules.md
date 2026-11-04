@@ -46,6 +46,6 @@ Tracked in [ai-config#4584](https://github.com/Morrison-Lab/ai-config/issues/458
 - **Don't:** limit an exploratory data analysis to counts, means and correlations.
 
 Ezra, 2026-11-04, on the logistic regression lab in lds.
-No mechanism can judge whether an exercise set is exploratory analysis,
-so this stays a prose rule.
+No check for it exists yet, so this is a prose rule for now.
 Its canonical rule in `psw` is not written yet.
+Tracked in [ai-config#4938](https://github.com/Morrison-Lab/ai-config/issues/4938).

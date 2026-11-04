@@ -40,8 +40,8 @@ The rest are prose because no condition in the transcript can decide them.
   Render locally only when the source changed and CI has not built it yet.
   Enforced by `hooks/warn-local-render-when-ci-built.py` (a warning, ai-config#4724).
   Ezra, 2026-10-25: "isn't it already rendered in mlg ... remember that going forward".
-- For a timed release to students, set the date in Canvas itself (a file's or assignment's "available from" date), not a Claude Code scheduled task.
-  A scheduled task (the Claude desktop app's scheduler) only fires while that app is open, and it only reminds.
+- For a timed release to students, set the date in Canvas itself (a file's or assignment's "available from" date), not a scheduled task in the Claude desktop app.
+  Such a scheduled task only fires while that app is open, and it only reminds.
   Canvas releases the item by itself, and students see the same date.
   Ezra, 2026-11-03, after a Midterm 2 practice-exam reminder was scheduled: "why not set the publication date in canvas?"
 

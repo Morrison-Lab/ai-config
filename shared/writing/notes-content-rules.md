@@ -1,6 +1,6 @@
 # Content rules for lecture notes
 
-Four rules from Ezra, 2026-10-16.
+Rules from Ezra, starting 2026-10-16.
 Each has a canonical prose rule in [`psw`](https://github.com/Morrison-Lab/psw/), possibly still in review.
 This fragment only points agents to it.
 
@@ -38,3 +38,14 @@ Tracked in [ai-config#4564](https://github.com/Morrison-Lab/ai-config/issues/456
 
 Canonical rule: [psw#235](https://github.com/Morrison-Lab/psw/pull/235).
 Tracked in [ai-config#4584](https://github.com/Morrison-Lab/ai-config/issues/4584).
+
+## Include graphical methods in exploratory data analysis
+
+- **Do:** pair the numerical summaries of an exploratory data analysis exercise or lab with plots:
+  a histogram or boxplot for a distribution, a scatterplot or time plot for a trend or relationship.
+- **Don't:** limit an exploratory data analysis to counts, means and correlations.
+
+Ezra, 2026-11-04, on the logistic regression lab in lds.
+No check for it exists yet, so this is a prose rule for now.
+Canonical rule: [psw#478](https://github.com/Morrison-Lab/psw/pull/478).
+Tracked in [ai-config#4938](https://github.com/Morrison-Lab/ai-config/issues/4938).

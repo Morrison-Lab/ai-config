@@ -67,9 +67,9 @@
 #   d. the lab's `lms` linters (from Morrison-Lab/psc, at the repos' pinned
 #      commit), so lint-changed-lines can run locally before a push.
 #   e. (2026-11-04, ai-config#4943) the last step installs the ai-config Claude
-#      Code plugin, as before, and now also updates it when already installed
-#      (`plugin install` alone never updates), so a container built from this script does not start on a
-#      snapshot older than main. The plugin is installed once per container and
+#      Code plugin and also updates it when already installed
+#      (`plugin install` alone never updates), so a container built from this
+#      script does not start on a snapshot older than main. The plugin is installed once per container and
 #      a thread session reuses it for days; a pin from before #4931 let a memory
 #      write through that `block-project-memory-write.py` refuses. The plugin's
 #      own `refresh-stale-plugin-pin-cloud.py` keeps it current afterwards, but

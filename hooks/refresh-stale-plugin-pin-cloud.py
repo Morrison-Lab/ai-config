@@ -38,7 +38,8 @@ import sys
 from pathlib import Path
 
 PLUGIN = "ai-config"
-TIMEOUT = 100
+# Two sequential calls must fit the hook's 120-second budget in hooks.json.
+TIMEOUT = 55
 
 
 def plugins_dir() -> Path:

@@ -70,3 +70,13 @@ The preview is built from the head at build time.
 Re-check after a push.
 For behaviour a file cannot show (an embed), open the deployed preview in Playwright Chromium;
 a local `file://` render can fail where the https preview works.
+
+## R packages that need system libraries, and the lab's `lms` linters (Ezra's lds thread, 2026-11-04)
+
+- `install.packages("rugarch")` fails on `gmp` with "Header file gmp.h not found".
+  `apt-get install -y libgmp-dev libmpfr-dev` works in a cloud session, and the install then finishes.
+- `lms` is the `lms/` directory of `Morrison-Lab/psc`.
+  `git clone --depth 1 https://github.com/Morrison-Lab/psc`, fetch and check out the `lms-ref` commit named in the repo's `lint-changed-lines.yaml`, then `remotes::install_local("lms")`.
+  `lintr::lint("file.R", linters = lms::default_linters(nested_calls = TRUE))` then reproduces CI's lint-changed-lines result before a push.
+- A render that stops with `UnicodeDecodeError: 'ascii' codec` needs `LANG=C.UTF-8 LC_ALL=C.UTF-8 PYTHONUTF8=1`.
+- `AGENTS.md` sat 36 bytes under Codex's 32,768-byte cap on 2026-11-04, so a new section fails `scripts/test_check_context_closure.py`; put a rule in a `shared/` fragment and free space before linking it.

@@ -51,7 +51,7 @@ def scenario(remote=True, advance=True, extra=None):
     d = Path(tempfile.mkdtemp())
     clone = d / "marketplaces" / "m"
     clone.mkdir(parents=True)
-    git(clone, "init", "-q")
+    git(clone, "init", "-q", "-b", "main")
     git(clone, "commit", "-q", "--allow-empty", "-m", "one")
     old = git(clone, "rev-parse", "HEAD")
     pin = old

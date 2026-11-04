@@ -24,6 +24,6 @@ do them in minimal batches", and "every PR should be as small and focused as it 
 - gha's `check-pr-size` ([gha#1188](https://github.com/Morrison-Lab/gha/issues/1188)) fails the same PR in CI.
   The `size-exempt` label lifts it.
 - The caps are a decision, recorded here: 10 files and 300 lines, tight on purpose after Ezra changed "waves" to "minimal batches".
-  The 300 was a starting value with no data behind it (ai-config#4928).
+  The 300 was a starting value with no data behind it ([ai-config#4928](https://github.com/Morrison-Lab/ai-config/issues/4928)).
   Before keeping it, measure it against the PRs that hit it.
   Change the caps and the `_fig-*` exemption in the hook, in the gha defaults and here together.

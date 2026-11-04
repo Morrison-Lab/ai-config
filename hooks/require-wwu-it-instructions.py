@@ -20,16 +20,18 @@ WHAT IS DENIED
 A tool call that touches cluster-job machinery, while the transcript holds no
 read of `wwu-cs-it-instructions.md`:
 
-  * Bash: a command naming an HTCondor tool (`condor_submit`, `condor_q`,
-    `condor_rm`, `condor_wait`, `condor_history`, `condor_status`), a cluster
-    head (`cse-head`, `csci-lab-head`, `csci-head`), `CLUSTER_CI_ROOT`, or
-    `condor-batch`;
-  * Write, Edit, MultiEdit: a file whose name has `condor` in it, a
+  * Bash: a command naming an HTCondor command (any `condor_` word that is
+    not a file name, so `condor_submit`, `condor_q` and `condor_drain` count
+    while `condor_population.csv` does not), a cluster head (`cse-head`,
+    `csci-lab-head`, `csci-head`), `CLUSTER_CI_ROOT`, or `condor-batch`;
+  * Write, Edit, MultiEdit: a `condor-batch` file or directory, a
     `cluster-*.yml` workflow, a `.sub` submit file, or whose new text names
     one of the Bash triggers above.
 
-Files under `hooks/`, `memories/` and `shared/` are exempt, because they
-quote these names to explain the rule (this file included).
+Files under `hooks/`, `memories/` and `shared/` are exempt from the new-text
+check only, because they quote these names to explain the rule (this file
+included). The file-name check applies everywhere, so a cluster file cannot
+hide in those directories.
 
 DISCHARGE
 ---------
@@ -59,7 +61,8 @@ INSTRUCTIONS = "wwu-cs-it-instructions.md"
 EDIT_TOOLS = {"Write", "Edit", "MultiEdit"}
 
 CLUSTER_RE = re.compile(
-    r"(?<![\w-])(?:condor_(?:submit(?:_dag)?|q|qedit|rm|wait|history|status|hold|release|run|tail|ssh_to_job|transfer_data|reschedule|prio|userprio|dagman|fetchlog)|cse-head|csci-lab-head|csci-head|CLUSTER_CI_ROOT|condor-batch)(?![\w-])"
+    r"(?<![\w/.-])condor_[a-z_]+(?![\w-]|\.\w)"
+    r"|(?<![\w-])(?:cse-head|csci-lab-head|csci-head|CLUSTER_CI_ROOT|condor-batch)(?![\w-])"
 )
 FILE_RE = re.compile(
     r"(?:(?:^|/)condor-batch(?:[^/]*$|/)|(?:^|/)cluster-[^/]*\.ya?ml$|\.sub$)", re.I)

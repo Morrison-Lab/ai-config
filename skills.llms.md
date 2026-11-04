@@ -75,6 +75,7 @@ Most skills also respond to plain-English triggers listed in their `description`
 | Skill | Aliases | What it does |
 |----|----|----|
 | [`use-preferred-style`](skills/use-preferred-style/SKILL.llms.md) | `style` | Apply the plain-prose writing guide to a draft |
+| [`polish-page`](skills/polish-page/SKILL.llms.md) |  | Clean up and flesh out a notes page, and consolidate overlap |
 | [`find-ai-tells`](skills/find-ai-tells/SKILL.llms.md) | `ai-tells` | Scan text for AI-sounding patterns and flag them |
 | [`fact-check-prose`](skills/fact-check-prose/SKILL.llms.md) | `fcp` | Check prose claims, reasoning, and computed values against sources and rendered output |
 | [`fix-forward-references`](skills/fix-forward-references/SKILL.llms.md) | `ffr` | Detect and rearrange/reword forward-pointing references (“see below”) in prose |
@@ -140,6 +141,6 @@ Most skills also respond to plain-English triggers listed in their `description`
 
 ## Full skill list
 
-All 222+ canonical skills are in [`skills/`](https://github.com/Morrison-Lab/ai-config/tree/main/skills) on GitHub. Generated Codex wrappers live in [`codex-skills/`](https://github.com/Morrison-Lab/ai-config/tree/main/codex-skills). Each canonical `SKILL.md` has a `description` field that lists the trigger phrases and a full procedure.
+All 226+ canonical skills are in [`skills/`](https://github.com/Morrison-Lab/ai-config/tree/main/skills) on GitHub. Generated Codex wrappers live in [`codex-skills/`](https://github.com/Morrison-Lab/ai-config/tree/main/codex-skills). Each canonical `SKILL.md` has a `description` field that lists the trigger phrases and a full procedure.
 
 Back to top

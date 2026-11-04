@@ -33,17 +33,25 @@ def _sibling():
     return mod
 
 
-SKIPPED = (r"(?:skipp(?:ed|ing)|couldn'?t|could not|can'?t|cannot|unable to"
-           r"|didn'?t (?:run|render|check)|did not (?:run|render|check)"
+# Ezra, 2026-11-04, on psw#480's reply "I haven't rendered the page, and
+# `typos` isn't installed in this session": "never make an excuse like this",
+# and "why not?" to "haven't rendered". The perfect tense slipped past the
+# earlier past-tense forms, and a curly apostrophe must match like a straight one.
+SKIPPED = (r"(?:skipp(?:ed|ing)|couldn['\u2019]?t|could not|can['\u2019]?t|cannot|unable to"
+           r"|didn['\u2019]?t (?:run|render|check)|did not (?:run|render|check)"
+           r"|(?:haven['\u2019]?t|have not|hasn['\u2019]?t|has not)(?: yet)?"
+           r" (?:(?:run|checked)\b(?! (?:into|in|out|across)\b)"
+           r"|(?:rendered|spell-checked|linted|tested|built)\b"
+           r"|been able to (?:run|render|check|test|build))"
            r"|not (?:run|rendered|checked)|without (?:running|rendering))")
 # "missing" and "lacks" count only beside a tool-like noun.
 TOOL = (r"(?:tools?|toolchains?|packages?|interpreters?|librar(?:y|ies)"
         r"|dependenc(?:y|ies)|modules?|binary|binaries|cli|extensions?"
         r"|compilers?|runtimes?)\b")
-MISSING = (r"(?:(?:isn'?t|is not|aren'?t|are not|wasn'?t|not) installed"
+MISSING = (r"(?:(?:isn['\u2019]?t|is not|aren['\u2019]?t|are not|wasn['\u2019]?t|not) installed"
            rf"|{TOOL}\s+(?:\S+\s+){{0,3}}?(?:lacks|lacked|missing)\b"
            rf"|(?:lacks|lacked|missing)\s+(?:\S+\s+){{0,3}}?{TOOL}"
-           r"|(?:isn'?t|is not|not) (?:available|present)"
+           r"|(?:isn['\u2019]?t|is not|not) (?:available|present)"
            r"|(?:no|without) (?:\S+ ){0,3}(?:installed|interpreter))")
 FIXED = re.compile(r"\b(?:i|we) (?:installed|have installed|then installed)\b"
                    r"|\binstalled (?:it|them|that)\b", re.I)

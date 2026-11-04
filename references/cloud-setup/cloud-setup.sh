@@ -66,6 +66,14 @@
 #      remotes, lintr, JuliaCall), as Posit Package Manager binaries;
 #   d. the lab's `lms` linters (from Morrison-Lab/psc, at the repos' pinned
 #      commit), so lint-changed-lines can run locally before a push.
+#   e. (2026-11-04, ai-config#4943) a refresh of the ai-config Claude Code
+#      plugin, so a container built from this script does not start on a
+#      snapshot older than main. The plugin is installed once per container and
+#      a thread session reuses it for days; a pin from before #4931 let a memory
+#      write through that `block-project-memory-write.py` refuses. The plugin's
+#      own `refresh-stale-plugin-pin-cloud.py` keeps it current afterwards, but
+#      only from a snapshot that already contains it, so this step covers the
+#      first one.
 # Each is best-effort: a failure warns and the build continues.
 # ---------------------------------------------------------------------------
 #
@@ -441,6 +449,20 @@ if ! command -v typos >/dev/null 2>&1; then
     echo "         (typos path/to/changed/files) will be unavailable." >&2
   fi
   rm -f "$typos_tgz"
+fi
+
+# [ai-config#4943] Refresh the ai-config plugin when one is installed. Best-effort.
+echo "==> Refreshing the ai-config Claude Code plugin"
+if command -v claude >/dev/null 2>&1; then
+  if claude plugin marketplace update Morrison-Lab >/dev/null 2>&1 \
+     && claude plugin update "ai-config@Morrison-Lab"; then
+    :
+  else
+    echo "WARNING: could not refresh the ai-config plugin (not installed yet, or no network)." >&2
+    echo "         Run: claude plugin marketplace update Morrison-Lab && claude plugin update ai-config@Morrison-Lab" >&2
+  fi
+else
+  echo "claude: not on PATH at build time; skipping the plugin refresh."
 fi
 
 echo "==> Setup complete:"

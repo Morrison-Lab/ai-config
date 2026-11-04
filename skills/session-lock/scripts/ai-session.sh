@@ -113,6 +113,18 @@ resolve_id_or_single_live() {
   return 1
 }
 
+# The merge guard looks a grant up under the harness's own session id (the hook
+# payload's session_id, which is $CLAUDE_CODE_SESSION_ID here), never under a
+# label. A grant made under any other id is inert, yet `check-mwc --id <label>`
+# reads the marker it just wrote and says "active" (ai-config#4903). Print why.
+harness_mismatch() { # id -> 0 and a message on stdout when id is not the harness id
+  local h="${CLAUDE_CODE_SESSION_ID:-}"
+  [ -n "$h" ] && [ "$(sanitize "$1")" != "$(sanitize "$h")" ] || return 1
+  printf '  WARNING: id %s is not the harness session id %s.\n' "$1" "$h"
+  printf '  The merge guard looks under the harness id, so this grant will NOT authorize a merge.\n'
+  printf '  Re-run without --id (or with --id %s).\n' "$h"
+}
+
 session_file() { printf '%s/%s.session' "$REG_DIR" "$(sanitize "$1")"; }
 
 # The merge-when-confident grant marker for a session. Composed in ONE place
@@ -425,6 +437,7 @@ case "$CMD" in
     write_record "$id" "${OPT_TASK:-}" ""
     touch "$(mwc_file "$id")"
     printf 'enabled mwc (merge-when-confident) for session %s\n' "$id"
+    harness_mismatch "$id" >&2 || true
     ;;
   disable-mwc)
     id="$(resolve_id)" || die "no session id (pass --id, or set \$AI_SESSION_ID / \$CLAUDE_SESSION_ID)"
@@ -470,6 +483,11 @@ case "$CMD" in
       printf '  Last heartbeat %s; a session goes stale after %ss.\n' \
         "$(fmt_epoch "${S_heartbeat:-0}")" "$STALE_SECONDS"
       printf "  If the session IS live:  ai-session.sh heartbeat --id '%s'\n" "$id"
+      exit 2
+    fi
+    if harness_mismatch "$id" >/dev/null; then
+      printf 'mwc is NOT honourable for session %s: it is not the harness session id.\n' "$id"
+      harness_mismatch "$id"
       exit 2
     fi
     printf 'mwc is active for session %s\n' "$id"

@@ -96,8 +96,10 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as td:
         repo = Path(td) / "repo"
         repo.mkdir()
-        env = dict(os.environ, GIT_CONFIG_GLOBAL=os.devnull,
-                   GIT_CONFIG_SYSTEM=os.devnull)
+        env = {k: v for k, v in os.environ.items()
+               if k not in ("AI_SESSION_ID", "CLAUDE_SESSION_ID",
+                            "CLAUDE_CODE_SESSION_ID")}
+        env.update(GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_SYSTEM=os.devnull)
         for args in (["init", "-q", "-b", "main"],
                      ["config", "user.email", "t@example.com"],
                      ["config", "user.name", "t"]):
@@ -296,6 +298,26 @@ def main() -> int:
                            cwd=repo, capture_output=True, text=True, env=code_env)
         check(f"session {sid}" not in p.stdout,
               "AI_SESSION_ID outranks CLAUDE_CODE_SESSION_ID", p.stdout.strip())
+
+        # 14. ai-config#4903: a label id is not the harness id the guard reads.
+        #     check-mwc must not report it active; enable-mwc must warn.
+        lab_env = dict(clean_env, CLAUDE_CODE_SESSION_ID="harness-4903")
+
+        def lab(*a):
+            return subprocess.run([bash, str(SCRIPT), *a], cwd=repo,
+                                  capture_output=True, text=True, env=lab_env)
+        lab("register", "--id", "thread-label")
+        pe = lab("enable-mwc", "--id", "thread-label")
+        check("harness session id" in pe.stderr,
+              "enable-mwc warns when --id is not the harness id", pe.stderr.strip())
+        pc = lab("check-mwc", "--id", "thread-label")
+        check(pc.returncode == 2 and "NOT honourable" in pc.stdout,
+              "check-mwc rejects a label id that is not the harness id",
+              f"rc={pc.returncode} out={pc.stdout.strip()}")
+        lab("register", "--id", "harness-4903")
+        lab("enable-mwc", "--id", "harness-4903")
+        check(lab("check-mwc", "--id", "harness-4903").returncode == 0,
+              "check-mwc accepts the harness id")
 
     print()
     if failures:

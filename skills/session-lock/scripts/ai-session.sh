@@ -488,9 +488,9 @@ case "$CMD" in
       printf "  If the session IS live:  ai-session.sh heartbeat --id '%s'\n" "$id"
       exit 2
     fi
-    if harness_mismatch "$id" >/dev/null; then
+    if mismatch_msg="$(harness_mismatch "$id")"; then
       printf 'mwc is NOT honourable for session %s: it is not the harness session id.\n' "$id"
-      harness_mismatch "$id"
+      printf '%s\n' "$mismatch_msg"
       exit 2
     fi
     printf 'mwc is active for session %s\n' "$id"

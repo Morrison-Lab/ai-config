@@ -8,7 +8,10 @@ strengthen the rule?". `no-unlinked-thread-pointer.py` covers "in its thread";
 this covers a named session.
 
 Scope: the user-visible reply tools (`mcp__hearthbot__reply`, `post_message`,
-`update_message`). Blocks, because the fix is one resend.
+`update_message`, `edit_message`). An edit is a post the user reads, so it is
+held to the same rule: on 2026-11-03 an edit named "the thread that owns that
+runner" with no link and passed, and the user said "always hyperlink when you
+mention other threads". Blocks, because the fix is one resend.
 
 What counts:
   - A mention is "Remote Control session", "RC session", "Mac session",
@@ -36,7 +39,8 @@ import json
 import re
 import sys
 
-REPLY_TOOL = re.compile(r"(^|__)(reply|post_message|update_message)$")
+REPLY_TOOL = re.compile(
+    r"(^|__)(reply|post_message|update_message|edit_message)$")
 FENCE = re.compile(
     r"^ {0,3}(```+|~~~+).*?(?:^ {0,3}\1[`~]*[ \t]*$|\Z)", re.M | re.S)
 INLINE_CODE = re.compile(r"(?<!`)(`+)(?!`).*?(?<!`)\1(?!`)", re.S)

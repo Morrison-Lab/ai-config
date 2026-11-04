@@ -85,7 +85,11 @@ MARKETPLACE_DESCRIPTION_LIMIT = 1024
 # of headroom at 209 skills. Stepping to 10,000 restores modest runway for notes
 # routing skills (send-notes, psw, rme, etc.) and future additions while keeping
 # growth visible.
-SKILL_LISTING_BUDGET_CHARS = 10_000
+#
+# Stepped again 2026-11-04 (ai-config#4952). The catalog had 9 characters of
+# headroom, so the `polish-page` skill could not be added. 10,500 is the same
+# modest step, about eight entries of runway.
+SKILL_LISTING_BUDGET_CHARS = 10_500
 LISTING_ENTRY_OVERHEAD_CHARS = 8
 
 # How close to the cap counts as "nearly spent", expressed in ENTRIES rather

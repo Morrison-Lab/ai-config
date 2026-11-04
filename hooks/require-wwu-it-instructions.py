@@ -59,10 +59,11 @@ INSTRUCTIONS = "wwu-cs-it-instructions.md"
 EDIT_TOOLS = {"Write", "Edit", "MultiEdit"}
 
 CLUSTER_RE = re.compile(
-    r"\b(?:condor_(?:submit|q|rm|wait|history|status)|cse-head|csci-lab-head|csci-head|"
-    r"CLUSTER_CI_ROOT|condor-batch)\b"
+    r"(?<![\w-])(?:condor_[a-z_]+|cse-head|csci-lab-head|csci-head|CLUSTER_CI_ROOT|condor-batch)(?![\w-])"
 )
-FILE_RE = re.compile(r"(?:condor|(?:^|/)cluster-[^/]*\.ya?ml$|\.sub$)", re.I)
+FILE_RE = re.compile(
+    r"(?:(?:^|/)condor-batch(?:[^/]*$|/)|(?:^|/)cluster-[^/]*\.ya?ml$|\.sub$)", re.I)
+READ_CMD_RE = re.compile(r"(?:^|[;&|(\s])(?:cat|bat|head|tail|less|more|sed|awk|grep|rg|nl|view)\s")
 EXEMPT_RE = re.compile(r"(?:^|/)(?:hooks|memories|shared)/")
 
 REASON = (
@@ -100,9 +101,10 @@ def has_read_instructions(transcript_path):
     for block in tool_uses(transcript_path):
         inp = block.get("input") if isinstance(block.get("input"), dict) else {}
         name = block.get("name") or ""
-        if name == "Read" and str(inp.get("file_path") or "").endswith(INSTRUCTIONS):
+        cmd = str(inp.get("command") or "")
+        if name == "Read" and os.path.basename(str(inp.get("file_path") or "")) == INSTRUCTIONS:
             return True
-        if name == "Bash" and INSTRUCTIONS in str(inp.get("command") or ""):
+        if name == "Bash" and INSTRUCTIONS in cmd and READ_CMD_RE.search(cmd):
             return True
     return False
 
@@ -116,10 +118,10 @@ def trigger(payload):
         return f"the command names `{hit.group(0)}`" if hit else None
     if name in EDIT_TOOLS:
         path = str(inp.get("file_path") or inp.get("path") or "")
-        if EXEMPT_RE.search(path):
-            return None
         if FILE_RE.search(path):
             return f"the file `{os.path.basename(path)}`"
+        if EXEMPT_RE.search(path):
+            return None
         texts = [str(inp.get(k) or "") for k in ("content", "new_string")]
         for edit in inp.get("edits") or []:
             if isinstance(edit, dict):

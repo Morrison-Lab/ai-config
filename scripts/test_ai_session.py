@@ -314,6 +314,20 @@ def main() -> int:
         check(pc.returncode == 2 and "NOT honourable" in pc.stdout,
               "check-mwc rejects a label id that is not the harness id",
               f"rc={pc.returncode} out={pc.stdout.strip()}")
+        # An id whose transcript exists is what the guard resolves too.
+        cfg = Path(td) / "claude" / "projects" / "proj"
+        cfg.mkdir(parents=True)
+        (cfg / "transcript-4903.jsonl").write_text("{}\n", encoding="utf-8")
+        tenv = dict(lab_env, CLAUDE_CONFIG_DIR=str(Path(td) / "claude"))
+        subprocess.run([bash, str(SCRIPT), "register", "--id", "transcript-4903"],
+                       cwd=repo, env=tenv, capture_output=True, text=True)
+        subprocess.run([bash, str(SCRIPT), "enable-mwc", "--id", "transcript-4903"],
+                       cwd=repo, env=tenv, capture_output=True, text=True)
+        pt = subprocess.run([bash, str(SCRIPT), "check-mwc", "--id", "transcript-4903"],
+                            cwd=repo, env=tenv, capture_output=True, text=True)
+        check(pt.returncode == 0,
+              "check-mwc accepts an id whose transcript stem exists",
+              f"rc={pt.returncode} out={pt.stdout.strip()}")
         lab("register", "--id", "harness-4903")
         lab("enable-mwc", "--id", "harness-4903")
         check(lab("check-mwc", "--id", "harness-4903").returncode == 0,

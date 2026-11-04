@@ -120,6 +120,9 @@ resolve_id_or_single_live() {
 harness_mismatch() { # id -> 0 and a message on stdout when id is not the harness id
   local h="${CLAUDE_CODE_SESSION_ID:-}"
   [ -n "$h" ] && [ "$(sanitize "$1")" != "$(sanitize "$h")" ] || return 1
+  # The guard also resolves the transcript filename stem, so an id with a
+  # transcript on disk is honourable even if it differs from the env var.
+  compgen -G "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/*/$(sanitize "$1").jsonl" >/dev/null && return 1
   printf '  WARNING: id %s is not the harness session id %s.\n' "$1" "$h"
   printf '  The merge guard looks under the harness id, so this grant will NOT authorize a merge.\n'
   printf '  Re-run without --id (or with --id %s).\n' "$h"

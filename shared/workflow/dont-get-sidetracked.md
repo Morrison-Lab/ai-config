@@ -35,11 +35,24 @@ obey that explicit instruction.
 Even when changing focus on explicit user direction,
 snapshot or stash the current worktree state first so progress is preserved.
 
+### When the orchestrator's attention splits
+
+Ezra, 2026-11-04 ([ai-config#4945](https://github.com/Morrison-Lab/ai-config/issues/4945)): "when a thread's attention starts splitting between multiple independent tasks, you (the orchestrator) should generally reassign some of those tasks to other threads (possibly new ones)".
+In a Claude Project, a thread (or the coordinator) that finds itself holding several independent tasks hands some of them to other threads, new ones when none fits, rather than interleaving them.
+Hand one off by asking the coordinator for a thread, or by messaging the thread whose work it belongs to, attaching the user's message by id.
+Keep the task that gives the thread its title, and tell the user which thread took each of the others.
+A subagent or a to-do entry is for work that belongs to the current task;
+independent work gets its own thread.
+"Generally" leaves room to keep a small task that would cost more to hand off than to finish.
+
+Why this is prose and not a hook: whether two tasks are independent, and whether a thread's attention is splitting, cannot be decided from a transcript.
+
 ## Summary
 
 - **Do:** stay on your primary task until it reaches a clean stopping point or completion.
 - **Do:** capture tangential topics immediately via subagents, tracking issues, or task lists so nothing is lost.
 - **Do:** switch focus when the user explicitly instructs you to redirect priorities.
+- **Do:** hand independent tasks to other threads when a thread's attention splits.
 - **Don't:** chase tangential questions or minor side quests during primary task execution.
 - **Don't:** drop or forget off-topic information and discovered defects when maintaining focus.
 

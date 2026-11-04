@@ -56,6 +56,15 @@ CASES = [
      "tool is missing", "perfect-tense skip plus not-installed warns (psw#480)"),
     ([say("I haven\u2019t rendered the page, and `typos` isn\u2019t installed here.")],
      "tool is missing", "curly apostrophes warn like straight ones"),
+    ([say("I haven't run into problems; the package is not installed by "
+          "default but uv adds it.")], None,
+     "a phrasal 'haven't run into' is not a skip"),
+    ([say("We haven't checked in yet, and the CLI isn't available until "
+          "tomorrow.")], None, "'haven't checked in' is not a skip"),
+    ([say("I haven't been able to render: quarto isn't installed.")],
+     "tool is missing", "'haven't been able to render' warns"),
+    ([say("I haven't tested it, because pytest isn't installed.")],
+     "tool is missing", "'haven't tested' warns"),
     ([say("Rendered both pages; no warnings.")], None, "plain report is silent"),
     ([user("go"), bash("Rscript -e 'install.packages(\"reticulate\")'"), RESULT,
       say("Rendered the chapter.")], "startup script",

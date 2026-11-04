@@ -39,7 +39,10 @@ def _sibling():
 # earlier past-tense forms, and a curly apostrophe must match like a straight one.
 SKIPPED = (r"(?:skipp(?:ed|ing)|couldn['\u2019]?t|could not|can['\u2019]?t|cannot|unable to"
            r"|didn['\u2019]?t (?:run|render|check)|did not (?:run|render|check)"
-           r"|(?:haven['\u2019]?t|have not|hasn['\u2019]?t|has not)(?: yet)? (?:run|rendered|checked|spell-checked|linted)"
+           r"|(?:haven['\u2019]?t|have not|hasn['\u2019]?t|has not)(?: yet)?"
+           r" (?:(?:run|checked)\b(?! (?:into|in|out|across)\b)"
+           r"|(?:rendered|spell-checked|linted|tested|built)\b"
+           r"|been able to (?:run|render|check|test|build))"
            r"|not (?:run|rendered|checked)|without (?:running|rendering))")
 # "missing" and "lacks" count only beside a tool-like noun.
 TOOL = (r"(?:tools?|toolchains?|packages?|interpreters?|librar(?:y|ies)"

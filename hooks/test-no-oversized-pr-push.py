@@ -76,7 +76,12 @@ def main():
     over = make_repo({f"f{i}.qmd": 1 for i in range(11)})
     ignored = make_repo({**{f"_freeze/p{i}/x.json": 100 for i in range(30)}, "renv.lock": 900, "a.qmd": 5})
 
+    figs = make_repo({"c/_fig-a-3d.qmd": 250, "c/_fig-b-3d.qmd": 250, "c/x.qmd": 10})
+    many_figs = make_repo({f"c/_fig-{i}.qmd": 5 for i in range(11)})
+
     cases = [
+        ("new figure subfiles' lines are free", run("git push", figs), False),
+        ("new figure subfiles still count as files", run("git push", many_figs), True),
         ("sweep of 25 files is denied", run("git push -u origin feature", sweep), True),
         ("500-line change is denied", run("git push", big), True),
         ("small branch passes", run("git push", small), False),

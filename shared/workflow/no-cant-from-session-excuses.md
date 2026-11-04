@@ -8,7 +8,7 @@ Before reporting any resource as unreachable, try each of these and say which yo
 - A repository outside the session's scope: attach it with `add_repo`, then clone it.
 - A blocked host: look for a GitHub-hosted mirror (`raw.githubusercontent.com/cran/<package>` serves a CRAN package's data), a CRAN or PyPI package that bundles the data, or an allowed API.
 - A host that has no mirror: add it to [`d-morrison/stats-allowlist`](https://github.com/d-morrison/stats-allowlist) (`claude-allowlist.txt` and `allowlist.txt`) and give Ezra the lines to paste into the session's settings.
-- Work that needs Ezra's machine: start a Remote Control session, which is standing-approved.
+- Work that needs Ezra's machine: start a Remote Control session yourself on a device the user has granted, as [`claude-app-projects`](../../memories/claude-app-projects.md) describes, and never ask the user to start one.
 
 State a checkable fact only after checking it, never "as I remember".
 If every route fails, report each route and why it failed, never the first failure alone.

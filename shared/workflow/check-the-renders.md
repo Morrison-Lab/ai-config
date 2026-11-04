@@ -40,6 +40,8 @@ Search for the new text, confirm it is present;
 search for the text you removed, confirm it is gone.
 That is a positive and a negative control on the one page that matters, and it is what actually settled #1134 and #1138.
 
+When a CI render fails and a local render of the same page passes, see [`reproduce-ci-failures-locally`](reproduce-ci-failures-locally.md) before pushing again.
+
 ## What already existed
 
 Two pieces of this were already in the corpus, and this fragment adds to them rather than replacing them.

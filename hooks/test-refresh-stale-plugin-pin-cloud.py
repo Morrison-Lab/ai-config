@@ -2,8 +2,8 @@
 """Tests for hooks/refresh-stale-plugin-pin-cloud.py.
 
 A fake `claude` script stands in for the CLI: `plugin marketplace update` advances the
-fake marketplace mkt by one commit, `plugin update` rewrites the pin to the mkt's HEAD.
-  1. Remote, pin behind mkt after update: refreshes, reports old and new, reloadSkills.
+fake marketplace repository by one commit, `plugin update` rewrites the pin to its HEAD.
+  1. Remote, pin behind the repository after update: refreshes, reports old and new, reloadSkills.
   2. Remote, pin already HEAD: silent, no `plugin update` call.
   3. Not remote: silent, claude never called.
   4. AI_CONFIG_NO_AUTO_REFRESH=1: silent, claude never called.

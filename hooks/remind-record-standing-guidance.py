@@ -247,6 +247,10 @@ def main() -> int:
             f'("{phrase}").\n'
             "Record it as a MECHANISM in this same turn: a hook in ai-config "
             "for agent behaviour, or a failing check in gha for content. "
+            "Design the BLOCKING form first: a PreToolUse deny hook, or a "
+            "check that fails the PR. A warning or reminder is context a "
+            "session reads past (ai-config#4741), so build one only where no "
+            "deny can detect the case, and say why in the hook's docstring. "
             "Prose alone (psw, AGENTS.md, a fragment, memory) is allowed only "
             "where no mechanism can work, and the prose must say why. "
             "Start following the rule now, without waiting to be told it is "

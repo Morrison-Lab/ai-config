@@ -954,6 +954,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/require-wwu-it-instructions.py\"",
+            "timeout": 10,
+            "script": "require-wwu-it-instructions.py",
+            "why": "Ezra, 2026-11-04 02:42 UTC (lds project thread): \"you must always follow WWU CS IT's instructions exactly unless I say otherwise\"; his follow-up \"reminder is not enough\" made this a DENY. DENIES a Bash command or a Write/Edit/MultiEdit that touches cluster-job machinery (HTCondor tools, cluster heads, CLUSTER_CI_ROOT, condor-batch, cluster-*.yml, .sub files) until the transcript holds a read of memories/wwu-cs-it-instructions.md; the deny reason prints the instructions. Cause: condor-batch was built and repaired on 2026-11-03/04 against IT's advice to avoid heavy home-directory I/O, and the advice sat in memory unread. No override variable. Fails open and silent on any parse or transcript trouble."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/block-merge-without-clean-checker.py\"",
             "timeout": 20,
             "script": "block-merge-without-clean-checker.py",
@@ -1262,6 +1269,13 @@
       {
         "matcher": "Write|Edit|MultiEdit",
         "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/require-wwu-it-instructions.py\"",
+            "timeout": 10,
+            "script": "require-wwu-it-instructions.py",
+            "why": "Ezra, 2026-11-04 02:42 UTC (lds project thread): \"you must always follow WWU CS IT's instructions exactly unless I say otherwise\"; his follow-up \"reminder is not enough\" made this a DENY. DENIES a Bash command or a Write/Edit/MultiEdit that touches cluster-job machinery (HTCondor tools, cluster heads, CLUSTER_CI_ROOT, condor-batch, cluster-*.yml, .sub files) until the transcript holds a read of memories/wwu-cs-it-instructions.md; the deny reason prints the instructions. Cause: condor-batch was built and repaired on 2026-11-03/04 against IT's advice to avoid heavy home-directory I/O, and the advice sat in memory unread. No override variable. Fails open and silent on any parse or transcript trouble."
+          },
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unexplained-analysis-choice.py\"",

@@ -8,7 +8,9 @@ gha's `check-pr-size` (gha#1188); this hook stops the push before CI is spent.
 
 Measures the branch against the merge base with the remote default branch:
 files changed and added plus deleted lines, not counting generated, lock,
-image and data paths. Over 10 files or 300 lines the push is denied.
+image and data paths, and not counting the lines of a newly added `_fig-*`
+subfile (it still counts as a file). Over 10 files or 300 lines the push is
+denied.
 
 Escape hatch for a deliberate exception (a mechanical rename the maintainer
 asked for in one PR, a stacked branch whose base is not the default branch):
@@ -32,6 +34,9 @@ IGNORE = [
     r"(?:.*/)?_freeze/.*", r"docs/.*",
     r"(?:.*/)?[^/]*\.(?:png|jpe?g|gif|svg|pdf|csv|rds|RData|min\.js)",
 ]
+# Lines (not files) of a newly added figure subfile are free (ai-config#4928).
+# Keep in step with NEW_FIGURE_LINES_FREE in gha's check-pr-size.
+NEW_FIGURE_LINES_FREE = r"(?:.*/)?_fig-[^/]*"
 PUSH = re.compile(r"(?:^|[;&|(\s])git\s+(?:-C\s+(\S+)\s+)?push\b")
 ALLOW = re.compile(r"(?:^|[;&|\s])ALLOW_LARGE_PR=1\b")
 
@@ -62,6 +67,8 @@ def measure(cwd, base):
     out = git(cwd, "diff", "--numstat", "-M", mb, "HEAD")
     if out is None:
         return None
+    added = git(cwd, "diff", "--name-only", "--diff-filter=A", "-M", mb, "HEAD")
+    added = set((added or "").splitlines())
     files = lines = 0
     for row in out.splitlines():
         parts = row.split("\t", 2)
@@ -71,6 +78,8 @@ def measure(cwd, base):
         if any(re.fullmatch(p, path) for p in IGNORE):
             continue
         files += 1
+        if path in added and re.fullmatch(NEW_FIGURE_LINES_FREE, path):
+            continue
         if parts[0] != "-":
             lines += int(parts[0]) + int(parts[1])
     return files, lines

@@ -15,7 +15,7 @@ HOOK = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
 
 def transcript(*tool_uses):
     """A JSONL transcript holding the given (name, input) tool calls."""
-    fh = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False)
+    fh = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False, encoding="utf-8")
     for name, inp in tool_uses:
         rec = {"type": "assistant", "message": {"content": [
             {"type": "tool_use", "name": name, "input": inp}]}}

@@ -81,6 +81,8 @@ def main():
          True, "a cluster file under shared/ is not exempt"),
         (payload({"tool_name": "Write", "tool_input": {"file_path": "/r/notes/condor_population.csv", "content": "x"}}, unread),
          False, "condor inside a longer file name is allowed"),
+        (payload({"tool_name": "Bash", "tool_input": {"command": "cat condor_population.csv"}}, unread),
+         False, "a condor_ name that is not an HTCondor tool is allowed"),
         (payload({"tool_name": "Bash", "tool_input": {"command": "cat no-condor-batch-notes.md"}}, unread),
          False, "a hyphenated near-match is allowed"),
         (dict(SUBMIT), False, "no transcript path fails open"),

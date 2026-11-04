@@ -34,7 +34,8 @@ When a rule changes, the linked source changes and this skill does not.
 - File the issue before editing (`st` / `shared/workflow/issue-first.md`).
   Read the repository's `CLAUDE.md`, `AUTHORING.md` and `.github/copilot-instructions.md` first: they override the lab defaults for that site.
 - Fetch the live page and the source together.
-  The source is the truth; the live page shows what a reader sees (slides and handout too, when the site builds them).
+  The source is the truth.
+  The live page shows what a reader sees (slides and handout too, when the site builds them).
 
 ### 2. Survey overlap before editing
 
@@ -52,7 +53,8 @@ done
 - **Same idea, earlier site** (a prerequisite already defines or derives it): link its definition and drop the local copy
   ([`notes-content-rules`](../../shared/writing/notes-content-rules.md), "Link prerequisite definitions").
 - **Same idea, same site, another page**: keep one home, link from the other, and fix cross-references.
-- **Same idea, later or sibling site**: link as further reading only; never define a page's own terms by pointing forward.
+- **Same idea, later or sibling site**: link as further reading only.
+  Never define a page's own terms by pointing forward.
 - **Copied from a source**: run gha's `check-source-overlap` and read [`avoid-unintentional-plagiarism`](../../shared/writing/avoid-unintentional-plagiarism.md).
 - Track a useful outside resource in every notes repo whose topic it covers (AGENTS.md, "Track each useful resource in each notes repo whose topic it covers").
 - Never lose content: moved or removed text goes to the repository's outtakes location, not the bin.
@@ -69,7 +71,8 @@ Read these, rather than working from memory:
 - Prose: [`use-preferred-style`](../use-preferred-style/SKILL.md), [`plain-prose`](../../shared/writing/plain-prose.md), [`semantic-line-breaks`](../../shared/writing/semantic-line-breaks.md), and psw's `chapters/word-choice.qmd`, `chapters/conciseness.qmd` and `chapters/defining-terms.qmd`.
 - Lecture structure (exercise and solution pairs, definitions, one term or result per div, headings): [`lecture-conventions`](../../shared/writing/lecture-conventions.md) and [`quarto-divs-for-typed-content`](../../shared/writing/quarto-divs-for-typed-content.md).
 - Math: [`use-math-macros`](../use-math-macros/SKILL.md).
-  Look each operator up in the `macros` repository's `macros.qmd` before writing LaTeX; add a missing macro there instead of writing `\operatorname`.
+  Look each operator up in the `macros` repository's `macros.qmd` before writing LaTeX.
+  Add a missing macro there instead of writing `\operatorname`.
   Also psw's `chapters/notation/` pages.
 - Figures and data: [`visuals-everywhere`](../../shared/writing/visuals-everywhere.md), [`quarto-figure-captions`](../../shared/writing/quarto-figure-captions.md), [`quarto-visible-chunk-results`](../../shared/writing/quarto-visible-chunk-results.md).
   Code produces every output the page shows; never type output.
@@ -80,9 +83,11 @@ Read these, rather than working from memory:
 
 Find what a reader needs and the page lacks, and add it in the page's existing form.
 
-- List the page's topic against the course outline and the calendar, and against the gap map or source book the site follows (for `lds`, ISL; see the repository's `CLAUDE.md`).
+- List the page's topic against the course outline and the calendar, and against the gap map or source book the site follows.
+  For `lds`, that is ISL: see the repository's `CLAUDE.md`.
 - Add each missing item as the lecture form requires: an exercise, then its solution, then the formal definition or result.
-- Cite every source through `references.bib`; check the citation against the source, and never invent one ([`citations`](../../shared/writing/citations.md)).
+- Cite every source through `references.bib`.
+  Check the citation against the source, and never invent one ([`citations`](../../shared/writing/citations.md)).
 - Fact-check every number and claim, and recompute every value the page states ([`fact-check-prose`](../../shared/writing/fact-check-prose.md)).
 
 ### 5. Check before the one push
@@ -107,11 +112,13 @@ NLB_GLOBS='*.qmd' NLB_BASE_REF=origin/main python3 <gha-checkout>/check-new-line
 
 Then render the page to every format the site builds, and read the rendered output against the prose.
 A renamed heading changes its anchor: grep the repository for the old `#slug` before pushing.
-Checks are diff-scoped; do not sweep other pages (AGENTS.md, "No sweeps for new rules by default").
+Checks are diff-scoped.
+Do not sweep other pages (AGENTS.md, "No sweeps for new rules by default").
 
 ### 6. Ship
 
-- Small PRs: at most 10 files and 300 lines; content and infrastructure never share one.
+- Small PRs: at most 10 files and 300 lines.
+  Content and infrastructure never share one.
   Split a large page into stacked PRs (`stack-prs`).
 - Then `ardi` to clean.
   Do not merge without the merge grant in force (`mwc`).

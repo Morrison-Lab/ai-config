@@ -56,9 +56,9 @@ def scenario(remote=True, advance=True, extra=None):
     old = git(mkt, "rev-parse", "HEAD")
     pin = old
     (d / "installed_plugins.json").write_text(json.dumps({"plugins": {
-        "ai-config@m": [{"scope": "user", "gitCommitSha": pin}]}}))
+        "ai-config@m": [{"scope": "user", "gitCommitSha": pin}]}}), encoding="utf-8")
     fake = d / "claude"
-    fake.write_text(FAKE)
+    fake.write_text(FAKE, encoding="utf-8")
     fake.chmod(0o755)
     env = {**ENV, "AI_CONFIG_PLUGINS_DIR": str(d), "AI_CONFIG_CLAUDE_BIN": str(fake),
            **({"FAKE_ADVANCE": "1"} if advance else {}),
@@ -68,7 +68,7 @@ def scenario(remote=True, advance=True, extra=None):
         env["CLAUDE_CODE_REMOTE"] = "true"
     out = subprocess.run([sys.executable, str(HOOK)], input="{}", capture_output=True,
                          text=True, env=env)
-    calls = (d / "calls.log").read_text() if (d / "calls.log").exists() else ""
+    calls = (d / "calls.log").read_text(encoding="utf-8") if (d / "calls.log").exists() else ""
     return out, calls, pin
 
 

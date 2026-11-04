@@ -196,6 +196,7 @@ Detail: [`structured-data-in-structured-formats`](shared/workflow/structured-dat
 ## Don't get sidetracked from your primary task
 
 When working on a primary task, stay on it, including through tangential user input: keep independent lines of thought separate without losing track of them (subagent, fork, tracking issue, or to-do list), unless the user explicitly redirects focus.
+In a Claude Project, when a thread's attention splits across independent tasks, the orchestrator generally reassigns some of them to other threads, new ones if needed.
 Detail: [`dont-get-sidetracked`](shared/workflow/dont-get-sidetracked.md).
 ## Always give recommendations with questions
 

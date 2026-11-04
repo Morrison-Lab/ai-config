@@ -94,6 +94,9 @@ The same holds for a skipped check: a render skipped because an interpreter is m
   Ezra, 2026-11-02, after a render was skipped for want of R's `reticulate`: "no excuses;
   always install what you need".
   Install it, run the work, and say what you installed.
+  Ezra, 2026-11-04, on a psw#480 reply that said "I haven't rendered the page, and `typos` isn't installed in this session":
+  "never make an excuse like this", and "why not?" to the unrendered page.
+  Both were installable in the session, so the push should have waited for the render and the spell check.
 - **Do:** when an install is worth keeping, tell Ezra to edit the cloud startup script and hand him the **full revised script**, not only the lines to add (2026-11-02: "give me the revised version").
   Read the current script first.
   A clause saying a one-off install is not worth adding closes the question.

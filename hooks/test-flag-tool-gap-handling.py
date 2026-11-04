@@ -51,6 +51,11 @@ CASES = [
           "wasn't installed.")], None, "a modifier before 'installed' still reads as a key"),
     ([say("I couldn't run the pre-commit hook because black wasn't installed.")],
      "tool is missing", "a hook before the 'because' clause does not hide a tool"),
+    ([say("I haven't rendered the page, and `typos` isn't installed in this "
+          "session, so CI will be the first render and spell check.")],
+     "tool is missing", "perfect-tense skip plus not-installed warns (psw#480)"),
+    ([say("I haven\u2019t rendered the page, and `typos` isn\u2019t installed here.")],
+     "tool is missing", "curly apostrophes warn like straight ones"),
     ([say("Rendered both pages; no warnings.")], None, "plain report is silent"),
     ([user("go"), bash("Rscript -e 'install.packages(\"reticulate\")'"), RESULT,
       say("Rendered the chapter.")], "startup script",

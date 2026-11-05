@@ -30,13 +30,14 @@ REPLY_TOOL = re.compile(
     r"^mcp__hearthbot__(?:reply|post_message|update_message|edit_message|message_coordinator|message_thread)$")
 
 RECALL = re.compile(
-    r"\bfrom\s+(?:my\s+)?(?:memory|recall|recollection)\b"
+    r"\bfrom\s+(?:my\s+)?(?:memory|recall|recollection)\b(?!\s+(?:card|stick|buffer|bank|usage|leak|address))"
     r"|\b(?:my|a\s+vague)\s+(?:memory|recollection)\s+of\b"
-    r"|\bas\s+I\s+(?:recall|remember)\b"
+    r"|\bas\s+I\s+(?:recall|remember)\b(?!\s+you)"
     r"|\bif\s+I\s+(?:recall|remember)\s+(?:correctly|right)\b"
     r"|\boff\s+the\s+top\s+of\s+my\s+head\b"
-    r"|(?:\b(?:not|never|without)|n['\u2019]t)\s+(?:been\s+)?(?:checked|verified)\s+against\b"
-    r"|\bunchecked\s+against\b",
+    r"|(?:\b(?:not|never|without)|n['\u2019]t)\s+(?:been\s+)?(?:checked|verified)\s+against\s+(?:the\s+|a\s+|that\s+)?"
+    r"(?:text|book|textbook|source|sources|pdf|paper|docs|documentation|original|reference|library|repo|repository)\b"
+    r"|\bunchecked\s+against\s+(?:the\s+)?(?:text|book|source|pdf|paper|original)\b",
     re.I)
 
 # "not from memory" and the like say the author did check.

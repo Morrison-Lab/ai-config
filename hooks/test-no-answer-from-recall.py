@@ -42,6 +42,13 @@ CASES = [
     ("review3: memory of growing up", POST, "From the memory of growing up here, this town has changed a lot.", False),
     ("review3: recollection of survivors", POST, "The museum exhibit tells the story from the recollection of survivors.", False),
     ("review3: book club", POST, "Where is the book club meeting this week?", False),
+    ("review4: test suite", POST, "I haven't checked against the test suite yet, but the build passes.", False),
+    ("review4: linter rules", POST, "This hasn't been checked against the linter rules.", False),
+    ("review4: migration", POST, "The schema was not checked against the latest migration.", False),
+    ("review4: memory card", POST, "I retrieved the photos from my memory card.", False),
+    ("review4: recall buffer", POST, "From my memory buffer, the files restored fine.", False),
+    ("review4: as I recall you", POST, "Let's meet tomorrow, as I recall you mentioned 3pm works.", False),
+    ("review4: not checked against the book", POST, "The list was not checked against the book.", True),
     ("unrelated tool", "Bash", "From my memory this works.", False),
     ("no text", POST, None, False),
 ]

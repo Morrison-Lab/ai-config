@@ -127,7 +127,15 @@ def read_transcript(path):
 # library was never searched. The transcript condition below is what keeps this
 # from over-matching "book club" or "software library": it fires only when
 # neither place was searched, and once per message.
-ASK_RX = re.compile(rf"\bwhere\b[^.\n?]*{BOOK}[^.\n?]*\?", re.I)
+# The ask drops the UNREACHED co-requirement, so it matches only NAMED books:
+# the generic `books?` alternative substring-matches "notebook" and "book club"
+# (review of #4977).
+BOOK_NAMED = (
+    r"(?:\bESL\b|\bISL[RP]?\b|\bISLR2?\b|\bMurphy\b|\bBishop\b|\bHastie\b|"
+    r"\bCasella\b|\bDobson\b|\bKutner\b|\bSmola\b|\bGoodfellow\b|"
+    r"Elements of Statistical Learning|Pattern Recognition)"
+)
+ASK_RX = re.compile(rf"\bwhere\b[^.\n?]*{BOOK_NAMED}[^.\n?]*\?", re.I)
 
 
 def find_claim(text):

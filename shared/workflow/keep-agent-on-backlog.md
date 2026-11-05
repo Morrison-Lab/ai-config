@@ -15,7 +15,8 @@ An idle agent with an unowned backlog is a defect, not a rest.
 - It does not license merges.
   Merging still needs Ezra's `mwc`, except in repos with a standing grant for fully clean PRs.
 - It does not relax the other limits: issue first, small PRs, no scope creep, FERPA, no browser, no force-push, no push to main.
-- It does not apply when every open issue is owned or closed-out; then there is no backlog to work.
+- It does not apply when every open issue is owned.
+  Then there is no unowned backlog to work.
 
 ## Mechanism
 

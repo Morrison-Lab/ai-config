@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""UserPromptSubmit reminder: a classifier denial is a sample, not a wall.
+"""UserPromptSubmit reminder: report a classifier denial to the user and ask (ai-config#4960).
 
 ai-config#2994, measured 2026-09-02 (PT): an
 `ALLOW_UNREVIEWED_PUSH=1 git push` and the attempt to grant it a permission
@@ -40,9 +40,10 @@ refreshing the classifier's per-conversation state.
 
 #2994 does not record whether its successful attempt followed a restart, so
 the two readings are unsettled. The reminder this hook prints is right under
-either: re-running the identical command once is cheap, and reporting "denied
-N times so far" instead of "cannot" is accurate whichever mechanism holds. Any
-claim stronger than that would be asserting the thing the incident is about.
+either: reporting "denied N times so far" instead of "cannot" is accurate
+whichever mechanism holds, and the decision to retry belongs to the user, per
+Ezra's rule not to push past classifier denials (ai-config#4960). Any claim
+stronger than that would be asserting the thing the incident is about.
 
 WHY THIS INJECTS RATHER THAN BLOCKS
 -----------------------------------
@@ -144,18 +145,13 @@ about an outage. Widening to it is a separate change with its own evidence.
 
 WHAT THE SECOND DENIAL CHANGES, AND WHAT IT DOES NOT
 -----------------------------------------------------
-Past the first denial of the stretch, the reminder stops RECOMMENDING a
-further re-run and starts warning against rephrasing. It does not tell the
-session to stop re-running, and that distinction is load-bearing enough to
-state twice, because the obvious message here would reproduce the incident
-exactly.
+Since ai-config#4960 the reminder recommends no re-run at any denial: the
+first denial says to stop and ask. Past the first denial of the stretch, it
+also warns against rephrasing.
 
 #2994's success arrived after three denials, on either reading of how many
-were the command itself. A message answering the second denial with "hand the
-user the decision" and nothing else would stop the session short of the thing
-that worked -- which is precisely what the incident session did. So the
-second-denial branch says an identical re-run is still supported, and reserves
-"hand the user the decision" for the case where the session stops anyway.
+were the command itself. The second-denial branch puts that measurement and
+Pattern 43 to the user and lets them choose.
 
 What it does warn off is variation, which is Pattern 43's actual mechanism:
 "each denied variant makes the classifier more suspicious", its three denials
@@ -462,10 +458,12 @@ def message(label, stretch, total, shapes=1):
     )
     if stretch == 1:
         act = (
-            "A denial is a sample, not a wall. ai-config#2994 measured a "
-            "byte-identical command succeeding after three denials, with no "
-            "settings change and no permission rule added. Re-run the same "
-            "command once before treating this path as closed.\n"
+            "A denial is a decision to report, not a wall to push past. "
+            "Ezra's standing rule is not to push past auto-mode classifier "
+            "denials: stop, tell the user what was denied, and ask. "
+            "ai-config#2994 measured a byte-identical command succeeding "
+            "after three denials; that is background for the user's "
+            "decision, not an instruction to retry.\n"
         )
     else:
         # Deliberately NOT a verdict either way. The corpus is in genuine

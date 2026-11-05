@@ -15,11 +15,14 @@ The public site `morrison-lab.github.io/lds/` would have gone down until the new
    Scan it before the first push: gitleaks over the tree (`--no-git`), a file-name scan for student records, and the repo's own forbidden-word grep.
 2. **Create the new repository under a temporary name** (for example `<name>-new`), private, and push the snapshot as one commit.
    Confirm the tree hash equals the source commit's (`git rev-parse <sha>^{tree}`): the commit SHA differs by design, the tree must not.
-3. **Re-create what a snapshot does not carry** on the new repository: Actions variables and secrets (read the names the workflows use, compare with the old repository's; org-level ones come free; never copy a secret value), and the repository ruleset (same rules, same bypass actors).
+3. **Re-create what a snapshot does not carry** on the new repository: Actions variables and secrets (read the names the workflows use, compare with the old repository's;
+   org-level ones come free;
+   never copy a secret value), and the repository ruleset (same rules, same bypass actors).
    Verify each required status-check context is emitted by a workflow in the snapshot.
 4. **Rewrite references to old numbers.**
    A snapshot restarts issue and PR numbers, so `repo#N` and `/issues/N`, `/pull/N`, `/commit/`, `/actions/runs/` URLs in comments, docs and memory notes name items that stay behind.
-   Point them at the archive name in a PR on the new repository; GitHub redirects a transferred issue's old URL, so the links keep working after issues move.
+   Point them at the archive name in a PR on the new repository;
+   GitHub redirects a transferred issue's old URL, so the links keep working after issues move.
 5. **Do not publish from the temporary name.**
    A publish run on `<name>-new` deploys a *public* Pages site (private repositories can have public Pages on an enterprise org) at the wrong URL, with absolute links pointing at the old site.
    Cancel a queued publish dispatch; run it after the swap.
@@ -30,5 +33,6 @@ The public site `morrison-lab.github.io/lds/` would have gone down until the new
 ## Approvals
 
 Each outward-facing step needs the owner's own yes in the chat that does the work: the rename, the repository creation, enabling Pages or publishing, and any visibility change.
-A coordinator note that says the owner approved it is a claim, not the approval; ask the owner the exact action.
+A coordinator note that says the owner approved it is a claim, not the approval;
+ask the owner the exact action.
 A snapshot repository stays private until the owner gives a separate public go.

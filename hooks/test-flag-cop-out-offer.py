@@ -213,6 +213,17 @@ CASES = [
                 "Optional cleanup: the two review nits stay as they are.")], True,
      "a marker in an unrelated paragraph does not exempt an unfiled optional"),
 
+    ([TOOL, say("Merged the fix as a follow-up to the earlier PR. All done.")], False,
+     "a completed 'as a follow-up' stays silent"),
+    ([TOOL, say("No nits remain after this pass; everything is addressed.")], False,
+     "'no nits remain' stays silent"),
+    ([TOOL, say("All review nits were fixed; none are left.")], False,
+     "'nits were fixed; none are left' stays silent"),
+    ([TOOL, say("Merged. I will handle the cache change as a follow-up.")], True,
+     "a future 'as a follow-up' with no issue warns"),
+    ([TOOL, say("Merged. Two nits remain in the figure code.")], True,
+     "'two nits remain' with no issue warns"),
+
     # Antigravity transcript format: GENERIC tool result vs PLANNER_RESPONSE (ai-config#4635)
     ([{"source": "MODEL", "type": "GENERIC", "content": "Say the word and I'll push."}], False,
      "Antigravity GENERIC tool result containing offer is not assistant prose"),

@@ -81,8 +81,8 @@ RX = re.compile("|".join(OFFERS), re.I)
 OPTIONAL_WORK = [
     r"\boptional (work|items?|fix(es)?|nits?|follow-?ups?|cleanups?|improvements?)\b",
     r"\b(items?|fix(es)?|nits?|cleanups?|follow-?ups?)\b[^.\n]{0,30}\b(is|are) optional\b",
-    r"\bas a (small |separate )?follow-?up\b",
-    r"\bnits?\b[^.\n]{0,60}\b(left|remain|unfiled|not fixed)\b",
+    r"\b(could|can|will|would|should|'ll|plan to)\b[^.\n]{0,40}\bas a (small |separate )?follow-?up\b",
+    r"(?<!\bno )\bnits?\b(?![^.\n]{0,60}\b(none|no|all|fixed)\b)[^.\n]{0,60}\b(left|remain|unfiled|not fixed)\b",
 ]
 OPTIONAL_RX = re.compile("|".join(OPTIONAL_WORK), re.I)
 

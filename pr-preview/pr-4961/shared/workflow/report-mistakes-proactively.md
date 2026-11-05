@@ -87,10 +87,10 @@ proactively) is a user directive, stated in exactly those terms, and it
 covers ideas as much as mistakes.
 
 Ezra, 2026-11-04: "always at least file optional items as issues, and do them immediately if they are important and/or quick".
-An optional item is a review nit, a "could also" or an offer to do more.
+An optional item is a review nit, a "could also", or an offer to do more.
+It counts as an idea for this section.
 
-- **Do:** file every optional item as an issue, and do it immediately if it is important and/or quick.
-- **Don't:** list an optional item in a reply with no issue behind it, or close a reply with it as an offer.
+- **Do:** do an optional item immediately if it is important and/or quick, and file it as an issue either way.
 
 A `⚠️ **FLAG**` or a `💡 **OFFER**` (per `CLAUDE.md`'s chat-output-tagging
 convention) is a heads-up in chat, not a filing.

@@ -515,12 +515,6 @@ Otherwise a plain push is the fix.
 (Another instance of **never assume; always verify** — `git fetch` to check main's actual position instead of assuming the branch is current.
 The `sync-pr-branch` / `merge-main` skill runs this.)
 
-## Replace a repository with a history-free snapshot under a temporary name
-
-[`shared/workflow/build-replacement-under-temporary-name.md`](shared/workflow/build-replacement-under-temporary-name.md)
-
-Build the new version under a temporary name and swap names only after the owner approves, so the live site and links stay up.
-
 ## Batch merge and resolve, always
 
 The section above is one branch against `main`.

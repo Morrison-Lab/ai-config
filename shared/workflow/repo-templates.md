@@ -87,3 +87,5 @@ See [ai-config#4674](https://github.com/Morrison-Lab/ai-config/issues/4674).)
   A merged repository would make every such site clone the other site's chapters, data and Quarto configuration to get one function.
 - A package has checks and a release cycle that prose does not: a dev version bump, a `NEWS.md` bullet, and `R CMD check` on three operating systems.
   A merged repository would put both sets of checks on every change.
+
+When a repository is replaced by a history-free snapshot, build the new one under a temporary name first: see [`build-replacement-under-temporary-name`](build-replacement-under-temporary-name.md).

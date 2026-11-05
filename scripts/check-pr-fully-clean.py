@@ -4553,8 +4553,8 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
              "check-runs query always named Morrison-Lab/ai-config.",
     )
     parser.add_argument(
-        "--annotations-read", default="", metavar="ID[,ID...]",
-        help="Check-run ids (or `all`, once every listed run's annotations "
+        "--annotations-read", action="append", default=[], metavar="ID[,ID...]",
+        help="Repeatable; values accumulate (ai-config#4980). Check-run ids (or `all`, once every listed run's annotations "
              "were read) whose warning/notice annotations were fixed or "
              "explained as false positives (ai-config#4892).",
     )
@@ -4609,12 +4609,13 @@ def main():
         except PayloadError as exc:
             die(str(exc))
 
-    read_arg = getattr(args, "annotations_read", "").strip().lower()
-    if read_arg == "all":
+    read_tokens = [
+        tok.strip().lower()
+        for value in (getattr(args, "annotations_read", None) or [])
+        for tok in value.split(",")]
+    if "all" in read_tokens:
         _ANNOTATIONS_READ.add("all")
-    else:
-        _ANNOTATIONS_READ.update(
-            int(i) for i in read_arg.split(",") if i.strip().isdigit())
+    _ANNOTATIONS_READ.update(int(tok) for tok in read_tokens if tok.isdigit())
     pr_num = args.pr_number
     repo = resolve_repo(args.repo)
 

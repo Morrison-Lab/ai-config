@@ -1770,6 +1770,18 @@
         ]
       },
       {
+        "matcher": "mcp__github__add_issue_comment|mcp__github__update_issue_comment|mcp__github__add_reply_to_pull_request_comment|mcp__github__add_comment_to_pending_review|mcp__github__pull_request_review_write|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-undefined-claim-without-def-search.py\"'",
+            "timeout": 10,
+            "script": "no-undefined-claim-without-def-search.py",
+            "why": "ai-config#4949, measured on Morrison-Lab/dds#36 (2026-11-04): a PR comment said 'no lds, mds, pds or sds page defines them' with no search of any site; mds had def-rank and lds had def-reinforcement. Denies a forge comment (or gh pr/issue comment) whose body claims a term is undefined on the prereq sites when no tool call since the last user message searched a `def-` anchor (grep, rg, find, curl, gh api, search/code); the posting tools are excluded from the evidence scan, and a quoted or backticked claim is a citation. The denial names the search to run. Fails open on an unreadable transcript."
+          }
+        ]
+      },
+      {
         "matcher": "mcp__hearthbot__.*|mcp__github__add_issue_comment|mcp__github__update_issue_comment|mcp__github__add_reply_to_pull_request_comment|mcp__github__add_comment_to_pending_review|mcp__github__pull_request_review_write",
         "hooks": [
           {

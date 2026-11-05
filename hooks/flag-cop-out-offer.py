@@ -98,10 +98,13 @@ DONE_RX = re.compile(
 )
 
 
-# A clause ends at . ; ? ! : or a newline, or at a contrast word ("but",
-# "however", ...) with its comma, so "no nits remain in A, but two nits remain
-# in B" is two clauses (review of #4979, rounds 5-7).
-BREAK_RX = re.compile(r"[.;?!:\n]|,?\s*\b(?:but|however|though|although|while|yet)\b", re.I)
+# A clause ends at . ; ? ! : , or a newline, or at a contrast word ("but",
+# "however", ...), so "no nits remain in A, but two nits remain in B" and
+# "No one complained, two nits remain though" are each two clauses (review of
+# #4979, rounds 5-8). Splitting at every comma errs toward warning on a list
+# such as "no bugs, nits, or issues remain"; one extra once-per-message notice
+# is the cheaper mistake than a silent miss.
+BREAK_RX = re.compile(r"[.;?!:,\n]|\s*\b(?:but|however|though|although|while|yet)\b", re.I)
 
 
 def _sentence_around(window, start, end):

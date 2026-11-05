@@ -82,10 +82,10 @@ OPTIONAL_WORK = [
     r"\boptional (work|items?|fix(es)?|nits?|follow-?ups?|cleanups?|improvements?)\b",
     r"\b(items?|fix(es)?|nits?|cleanups?|follow-?ups?)\b[^.;?!:\n]{0,30}\b(is|are) optional\b",
     r"\b(could|can|will|would|should|'ll|plan to)\b[^.;?!:\n]{0,40}\bas a (small |separate )?follow-?up\b",
-    # The span stops at a comma or a joining word, so it never reaches across
-    # clauses to a later verb (review of #4979, round 9).
-    r"\bnits?\b(?:(?!\b(?:but|however|though|although|while|whereas|yet|and|or|nor|so)\b)"
-    r"[^.;?!:,\n]){0,60}?\b(left|remain|unfiled|not fixed)\b",
+    # The span may cross "and"/"or" ("two nits or issues remain"). Which clause
+    # the report belongs to is decided by the clause holding its VERB, in
+    # find_optional (review of #4979, rounds 9-10).
+    r"\bnits?\b[^.;?!:,\n]{0,60}?\b(left|remain|unfiled|not fixed)\b",
 ]
 OPTIONAL_RX = re.compile("|".join(OPTIONAL_WORK), re.I)
 
@@ -304,7 +304,7 @@ def find_optional(text):
     """Return the optional-work phrase when the reply closes on one."""
     for window in offer_windows(text):
         m = next((x for x in OPTIONAL_RX.finditer(window)
-                  if not DONE_RX.search(_sentence_around(window, x.start(), x.end()))), None)
+                  if not DONE_RX.search(_sentence_around(window, x.end() - 1, x.end()))), None)
         if not m:
             continue
         start = window.rfind("\n\n", 0, m.start()) + 1

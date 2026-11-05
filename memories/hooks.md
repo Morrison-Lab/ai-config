@@ -1179,7 +1179,5 @@ What ended the oscillation was a structural rule, not a sharper pattern.
 - **Do:** reuse the sibling hooks' regexes (`flag-idea-without-issue.py`, `no-unfiled-finding.py`) for discharge detection, and fail open when they cannot load.
 - **Don't:** widen or narrow one pattern per review round.
   The third round on the same pattern is the signal to restructure.
-- **Don't:** let guard or diagnostic code in a merge-gate hook raise.
-  A raise there reads as a refusal.
 
 Related, already recorded: `scripts/check-text-encoding.py` flags bare `write_text` (give `encoding=`), and the GitHub MCP `merge_pull_request` takes the head pin as `expectedHeadSha` (`skills/mwc/SKILL.md`).

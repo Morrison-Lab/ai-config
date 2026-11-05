@@ -50,6 +50,9 @@ The rest are prose because no condition in the transcript can decide them.
 - Never ask Ezra to type "go" in a Remote Control session.
   Start a fresh session on an already approved environment with the brief as its opening task.
   Enforced by `hooks/no-manual-step-ask.py`.
+- Never make Ezra the trigger for your own next step ("tell me when to re-check", "say when and I'll merge").
+  Schedule the re-check with `send_later` or rely on the PR-activity subscription, fix failures, and merge under a given `mwc` when a PR is fully clean (ai-config#4955).
+  Enforced by `hooks/no-manual-step-ask.py`.
 - Never ask Ezra to start or run Remote Control, or `claude remote-control`.
   He has given standing permission to start it yourself on cf463-02 and the XPS
   (2026-10-15, [`fetch-untrusted-files`](fetch-untrusted-files.md)).

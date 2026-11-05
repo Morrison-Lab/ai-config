@@ -12,6 +12,9 @@ edit_message) whose text asks the user to
   * paste, append, or hand-add text into a file or settings (Ezra, 2026-10-26:
     "never ask me to paste anything into a file; always give me a script-based
     command to run that does it for me");
+  * say when to start the agent's own next step ("tell me when to re-check
+    and I'll merge"; ai-config#4955). The agent schedules the step with
+    send_later or a PR-activity subscription and reports the state instead;
   * type or run a shell command in their own terminal (Ezra, 2026-10-29,
     ai-config#4842: "don't make me do anything myself unless there's absolutely
     no other way; instead, ask me for permission to do it for me"). This
@@ -34,6 +37,7 @@ REPLY_TOOL = re.compile(r"^mcp__hearthbot__(?:reply|post_message|update_message|
 
 FILE_ASK = "a paste or hand-edit of a file"
 COMMAND_ASK = "a shell command for the user to type or run"
+TRIGGER_ASK = "the user's word to start the agent's own next step"
 
 # A secret has to be entered by the user, so a message about one may hand over
 # a command (ai-config#4842).
@@ -82,6 +86,17 @@ ASKS = (
         r"\b(?:remote control|RC|session|device)\b"
         r"|\b(?:remote control|RC)\b[^.\n]{0,80}\b(?:type|say|send|reply|enter)\b[^.\n]{0,40}[`'\"*]\bgo\b",
         re.I)),
+    # The agent's own next step must not wait on the user's word (Ezra via the
+    # coordinator, 2026-11-04, ai-config#4955): schedule it with send_later or a
+    # PR-activity subscription instead.
+    (TRIGGER_ASK, re.compile(
+        r"\b(?:tell|ping|message|notify|signal)\s+me\s+(?:when|if|to)\b[^.\n]{0,80}"
+        r"\b(?:re-?check|check again|check back|merge|continue|proceed|resume|retry|go ahead)\b"
+        r"|\blet\s+me\s+know\s+when\b[^.\n]{0,80}"
+        r"\b(?:re-?check|check again|check back|merge|continue|proceed|resume|retry)\b"
+        r"|\bsay\s+when\b[^.\n]{0,60}\bI(?:'ll| will)\b"
+        r"|\b(?:I(?:'ll| will)|I am|I'm)\s+wait(?:ing)?\s+for\s+(?:you|Ezra)\s+to\s+(?:say|tell|ping|type|give)\b",
+        re.I)),
     ("a merge button or manual merge", re.compile(
         r"\b(?:click|press|hit|tap)\b[^.\n]{0,30}\bmerge\b[^.\n]{0,20}\bbutton\b"
         r"|\bmerge (?:it|them|the PRs?) (?:yourself|manually|by hand)\b",
@@ -121,6 +136,7 @@ REASON = (
     "Do it another way: ask the user for permission to do the step yourself (a decision card, an approval prompt, "
     "or a permission rule you ask to add), then run it; only a secret may be handed back to the user (ai-config#4842). For a Remote Control session, start a fresh one on an "
     "already approved environment with the brief as its opening task (no 'go' to type). "
+    "For the agent's own next step (a re-check, a merge under a given mwc, a retry), schedule it with send_later or rely on the PR-activity subscription, and report the state instead of asking the user to say when (ai-config#4955). "
     "For a merge, ask for plain `mwc`. For a file edit, write an idempotent script, test it, ask permission, and run it yourself (no pasting, no command for the user to type). For a denied step, retry once unchanged. "
     "shared/workflow/lab-operating-rules.md; ai-config#4698."
 )

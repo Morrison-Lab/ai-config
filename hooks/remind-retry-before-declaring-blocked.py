@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""UserPromptSubmit reminder: a classifier denial is a sample, not a wall.
+"""UserPromptSubmit reminder: report a classifier denial to the user and ask (ai-config#4960).
 
 ai-config#2994, measured 2026-09-02 (PT): an
 `ALLOW_UNREVIEWED_PUSH=1 git push` and the attempt to grant it a permission
@@ -462,10 +462,12 @@ def message(label, stretch, total, shapes=1):
     )
     if stretch == 1:
         act = (
-            "A denial is a sample, not a wall. ai-config#2994 measured a "
-            "byte-identical command succeeding after three denials, with no "
-            "settings change and no permission rule added. Re-run the same "
-            "command once before treating this path as closed.\n"
+            "A denial is a decision to report, not a wall to push past. "
+            "Ezra's standing rule is not to push past auto-mode classifier "
+            "denials: stop, tell the user what was denied, and ask. "
+            "ai-config#2994 measured a byte-identical command succeeding "
+            "after three denials; that is background for the user's "
+            "decision, not an instruction to retry.\n"
         )
     else:
         # Deliberately NOT a verdict either way. The corpus is in genuine

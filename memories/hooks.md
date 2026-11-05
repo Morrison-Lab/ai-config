@@ -1167,3 +1167,19 @@ Count a line only when it is added relative to every parent the commit will have
 - **Do:** keep the repair commands (`git commit -am`, `git add -A && git commit --amend`) as must-allow cases in the hook's suite.
 - **Don't:** read the index alone for a path the working tree will overwrite before the commit is written.
 - **Don't:** count the earlier `git add`s of a compound command as committed under `--only`.
+
+## A phrase detector that must exempt a completion clause: anchor the match, then look for breaks outside its span
+
+Case: `hooks/flag-cop-out-offer.py` (ai-config#4962, #4979) took 12 review rounds.
+Each round patched the clause-splitting regex for one false positive or false negative and opened the opposite one.
+What ended the oscillation was a structural rule, not a sharper pattern.
+
+- **Do:** start the match at the nearest trigger noun (a lookahead that forbids another trigger inside the span), and look for clause breaks (`. ; ? ! : ,` and `but/and/or/while...`) only outside that span, then test the surrounding clause for the completion wording.
+- **Do:** make each trigger phrase-bound (`optional work`, `as a follow-up`), so a bare `optional` in "the parameter is optional" never matches.
+- **Do:** reuse the sibling hooks' regexes (`flag-idea-without-issue.py`, `no-unfiled-finding.py`) for discharge detection, and fail open when they cannot load.
+- **Don't:** widen or narrow one pattern per review round.
+  The third round on the same pattern is the signal to restructure.
+- **Don't:** let guard or diagnostic code in a merge-gate hook raise.
+  A raise there reads as a refusal.
+
+Related, already recorded: `scripts/check-text-encoding.py` flags bare `write_text` (give `encoding=`), and the GitHub MCP `merge_pull_request` takes the head pin as `expectedHeadSha` (`skills/mwc/SKILL.md`).

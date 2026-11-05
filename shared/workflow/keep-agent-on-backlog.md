@@ -10,6 +10,13 @@ Check the tracker, the live threads and project memory first, as [`triage-new-as
 
 An idle agent with an unowned backlog is a defect, not a rest.
 
+## A backlog thread keeps going
+
+The thread that takes the top issue does not stop after one issue or one batch while unowned backlog remains (coordinator correction, 2026-11-05: a backlog thread stopped after finishing one split and a few closes, and had to be told to continue).
+When the next issues are large, pick the most tractable and break off a small first slice that ships on its own, then continue to the next.
+Stop only when every remaining issue is owned, waits on a person's decision, or cannot be worked with the access the session has, and say which of those it is.
+Do not stop merely because the remaining issues look large.
+
 ## Deciding whether an agent is working
 
 Do not rely on `list_threads` with `state: "working"` alone, because it can return an empty list while threads are active (measured 2026-11-05).

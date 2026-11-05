@@ -405,6 +405,11 @@ Use a browser only if none can (or could be set up), or the task is visual.
 Never use Chrome or Claude in Chrome (Ezra, 2026-10-22).
 See [`browser-last-resort`](shared/workflow/browser-last-resort.md) and [`gh-pages`](shared/workflow/read-published-html-from-gh-pages.md).
 
+## Draft communications in Ezra's voice
+
+Imitate Ezra's writing style in any draft that goes out as him ([`draft-in-ezras-voice`](skills/draft-in-ezras-voice/SKILL.md)).
+Learn it only from his own text, never FERPA data.
+
 ## Default to action without asking
 
 The owner grants standing permission for non-destructive steps (branch commits, pushes, opening/updating PRs, read commands, editing memory).
@@ -452,12 +457,6 @@ re-arm periodic check-ins using the session's wake mechanism.
 After every push, actively poll forge CI and review state with `gh` or `glab` until terminal.
 Baking a self-merge directive into the loop prompt is allowed only under a standing `mwc` grant.
 See [`persistent-pr-loop`](shared/workflow/persistent-pr-loop.md).
-
-- **Do:** arm a persistent loop in the turn you open, push to, or take over a PR.
-- **Do:** actively query current-head CI and review state with `gh`/`glab` after every push until terminal.
-- **Do:** in the Claude desktop app, turn on the PR's Auto-fix switch;
-  it replaces the polling loop there.
-- **Don't:** treat a webhook subscription or one-shot status poll as watching.
 
 ## Monitor scoped open PRs and MRs
 

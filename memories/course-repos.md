@@ -204,4 +204,6 @@ A pure move over the 10-file cap is pushed with `ALLOW_LARGE_PR=1`, and the pre-
 - **Do:** fix each finding on a line the PR touched in the same PR (a trailing "(@def-x)" becomes a link on the term;
   a "moreover" in a theorem statement becomes "and"), and file warnings on untouched lines, such as examples without figures, as one issue.
 - **Do:** fix every listed term-link finding before the second push, since each failed push is a round.
+- **Do:** when you leave a file unchanged (reverted) to avoid a whole-file check, file the follow-up issue in the same turn, attached under the tracking issue (pds#328 and rme#1443 under mcs#60, 2026-11-05).
 - **Don't:** widen a pure-move PR to clear findings on lines it did not touch.
+- **Don't:** leave a reverted file unfiled until the coordinator asks.

@@ -1743,6 +1743,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-answer-from-recall.py\"",
+            "timeout": 10,
+            "script": "no-answer-from-recall.py",
+            "why": "ai-config#4957. Ezra, 2026-11-04: \"cai: never use memory when you can check.\" A reply named the datasets ISL uses \"from my memory of the book, not checked against the text\" and then asked where the book lives; the library held it. Blocks (deny) a user-visible reply or relay tool call that says the answer is from memory or recall, says it was not checked against a source, or asks the user where a source lives without naming a search; points at checking the library, repos, docs or API and citing what was read. Fails open on any parse trouble."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-ask-to-start-rc.py\"",
             "timeout": 10,
             "script": "no-ask-to-start-rc.py",

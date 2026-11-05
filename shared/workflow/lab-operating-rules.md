@@ -45,6 +45,13 @@ The rest are prose because no condition in the transcript can decide them.
   Canvas releases the item by itself, and students see the same date.
   Ezra, 2026-11-03, after a Midterm 2 practice-exam reminder was scheduled: "why not set the publication date in canvas?"
 
+## Sources
+
+- Never answer from memory when a source can be checked.
+  Check it and cite what you read (Ezra, 2026-11-04, ai-config#4957).
+  See [`check-sources-over-recall`](check-sources-over-recall.md).
+  Enforced by `hooks/no-answer-from-recall.py`.
+
 ## Remote Control
 
 - Never ask Ezra to type "go" in a Remote Control session.

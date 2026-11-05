@@ -832,7 +832,7 @@ See ai-config#694 for the precedent.
   string with no regard for Markdown context, so an angle-bracket span inside
   a code span is stripped exactly like a bare one, leaving an empty pair of
   backticks. This is the same formatting-blind-substring failure mode as the
-  bot-mention gate in `memories/claude-bot-workflows.md` -- a pass that inspects
+  bot-mention gate in `memories/claude-bot-mention-gates.md` -- a pass that inspects
   raw text while the author reasons in rendered Markdown.
   **An empty backtick pair is the most visible damage, not the only damage, so
   do not use it as the tell.**

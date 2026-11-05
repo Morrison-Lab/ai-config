@@ -9,9 +9,10 @@ framing all leave the mention live.
 
 [`claude-bot-workflows.md`](claude-bot-workflows.md) owns that mechanism and
 the incident history: the canonical statement, the five numbered instances in
-its CI-action section, the `@v1`-versus-`@v2` pin analysis for gha#342's
-markup stripper, and the fact that a fired run cannot be called back.
-Read it for any of those.
+its CI-action section, and the fact that a fired run cannot be called back.
+[`claude-bot-mention-gates.md`](claude-bot-mention-gates.md) holds
+the `@v1`-versus-`@v2` pin analysis for gha#342's markup stripper.
+Read them for any of those.
 
 Note how that sentence cites the section: by description, not by its verbatim
 title, which carries the mention.
@@ -37,13 +38,13 @@ earlier.
 
 That repo pins `Morrison-Lab/gha/.github/workflows/claude.yml@v1`, so the
 stripper was never in play, exactly as the pin analysis in
-[`claude-bot-workflows.md`](claude-bot-workflows.md) predicts.
+[`claude-bot-mention-gates.md`](claude-bot-mention-gates.md) predicts.
 
 ## Every Do/Don't bullet scopes the warning to its own incident's surface, and the gate has no surfaces
 
-The bullets in
-[`claude-bot-workflows.md`](claude-bot-workflows.md)'s "A comment a workflow
-*posts* is a mention-trigger surface" section each attach the backtick warning
+The bullets in the section of
+[`claude-bot-mention-gates.md`](claude-bot-mention-gates.md)
+on a comment a workflow *posts* as a mention-trigger surface each attach the backtick warning
 to a narrower case than the mechanism has.
 One says not to trust a code span "in a body your workflow posts"; another
 covers "a quoted rule title".
@@ -63,8 +64,9 @@ Read those bullets as instances, and the substring gate itself as the rule.
 This is the more useful half, because the rule was not missing.
 
 By the sixth instance the hazard was stated in five places: the numbered
-instance sequence and the mention-trigger section in
-[`claude-bot-workflows.md`](claude-bot-workflows.md),
+instance sequence in [`claude-bot-workflows.md`](claude-bot-workflows.md),
+the mention-trigger section in
+[`claude-bot-mention-gates.md`](claude-bot-mention-gates.md),
 [`github-actions.md`](github-actions.md)'s "it retriggers even in backticks"
 bullet, and the trigger-phrase-leak bullets in
 [`ardi`](../skills/ardi/SKILL.md) and [`ard`](../skills/ard/SKILL.md).
@@ -104,7 +106,7 @@ where it already sits.
 - **Don't:** treat a mention as inert because it is descriptive, backticked,
   or inside a heading --- the gate sees one string and no markup.
 - **Don't:** read the narrower bullets in
-  [`claude-bot-workflows.md`](claude-bot-workflows.md) as the boundary of the
-  rule; they name the incidents that produced them.
+  [`claude-bot-mention-gates.md`](claude-bot-mention-gates.md)
+  as the boundary of the rule; they name the incidents that produced them.
 - **Don't:** answer a recurrence by restating the rule in a file that already
   carries it --- that is the move which had already failed five times.

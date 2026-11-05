@@ -253,5 +253,61 @@ class TestPullRequest(unittest.TestCase):
         self.assertIn("API rate limit exceeded", str(ctx.exception))
 
 
+class TestCheckRunPagination(unittest.TestCase):
+    """A head with more than 100 check runs is read across pages (ai-config#4916).
+
+    gha#1410 head 76cf6f92 had 148 runs; the failing `one-function-per-file`
+    run was on page 2, and a single `per_page=100` read printed FULLY CLEAN.
+    """
+
+    @staticmethod
+    def _runs(first, last, failing=None):
+        return [
+            {"id": i, "name": f"job-{i}", "status": "completed",
+             "conclusion": "failure" if i == failing else "success"}
+            for i in range(first, last + 1)
+        ]
+
+    def _pr(self, fetcher):
+        with patch.object(PullRequest, "_fetch_pr_data", return_value={"headRefOid": "abc"}):
+            return PullRequest("1", "o/r", fetcher=fetcher)
+
+    def test_a_failing_run_on_page_two_is_read(self):
+        pages = {1: self._runs(1, 100), 2: self._runs(101, 148, failing=148)}
+        calls = []
+
+        def fetcher(cmd):
+            calls.append(cmd[-1])
+            page = int(cmd[-1].rsplit("page=", 1)[1])
+            return json.dumps({"total_count": 148, "check_runs": pages.get(page, [])})
+
+        runs = self._pr(fetcher).get_check_runs()
+        self.assertEqual(len(runs), 148)
+        self.assertEqual([r.name for r in runs if r.conclusion == "failure"], ["job-148"])
+        self.assertEqual(len(calls), 2)
+
+    def test_a_fetcher_that_ignores_the_page_does_not_loop(self):
+        everything = self._runs(1, 148, failing=148)
+        calls = []
+
+        def fetcher(cmd):
+            calls.append(cmd[-1])
+            return json.dumps({"check_runs": everything})
+
+        runs = self._pr(fetcher).get_check_runs()
+        self.assertEqual(len(runs), 148)
+        self.assertEqual(len(calls), 2)
+
+    def test_a_single_short_page_makes_one_call(self):
+        calls = []
+
+        def fetcher(cmd):
+            calls.append(cmd[-1])
+            return json.dumps({"total_count": 3, "check_runs": self._runs(1, 3)})
+
+        self.assertEqual(len(self._pr(fetcher).get_check_runs()), 3)
+        self.assertEqual(len(calls), 1)
+
+
 if __name__ == '__main__':
     unittest.main()

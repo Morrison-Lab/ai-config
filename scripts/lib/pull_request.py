@@ -174,10 +174,32 @@ class PullRequest:
 
     def get_check_runs(self) -> List[CheckRun]:
         if self._check_runs is None:
-            cmd = ["gh", "api", f"repos/{self.repo}/commits/{self.head_sha}/check-runs?per_page=100"]
-            stdout = self._fetcher(cmd)
-            self._check_runs = [CheckRun(cr) for cr in (json.loads(stdout).get("check_runs") or [])]
+            self._check_runs = [CheckRun(cr) for cr in self._all_check_run_data()]
         return self._check_runs
+
+    def _all_check_run_data(self) -> List[Dict[str, Any]]:
+        """Every check run on the head, across pages (ai-config#4916).
+
+        One `per_page=100` read drops everything past the first page: gha#1410
+        had 148 runs, and the failing one sat on page 2, so the checker printed
+        FULLY CLEAN over a red check. Stops on a short page, once `total_count`
+        runs are held, or when a page adds nothing new (a fetcher that ignores
+        `page=` returns the same list again).
+        """
+        runs: List[Dict[str, Any]] = []
+        seen = set()
+        page = 1
+        while True:
+            path = f"repos/{self.repo}/commits/{self.head_sha}/check-runs?per_page=100&page={page}"
+            data = json.loads(self._fetcher(["gh", "api", path]))
+            chunk = data.get("check_runs") or []
+            new = [cr for cr in chunk if (cr.get("id") or json.dumps(cr, sort_keys=True)) not in seen]
+            seen.update(cr.get("id") or json.dumps(cr, sort_keys=True) for cr in new)
+            runs.extend(new)
+            total = data.get("total_count")
+            if not new or len(chunk) < 100 or (isinstance(total, int) and len(runs) >= total):
+                return runs
+            page += 1
 
     def get_review_threads(self) -> List[ReviewThread]:
         if self._review_threads is None:

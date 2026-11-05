@@ -565,7 +565,7 @@ try:
                   *[t for t, _ in noreset]):
             os.unlink(p)
     content += [
-        ("Re-run the same command once" in out_one,
+        ("tell the user what was denied, and ask" in out_one,
          "one denial: advises a single retry"),
         ("denied once so far" in out_one,
          "one denial: supplies the measured wording"),
@@ -593,12 +593,12 @@ try:
          "the session total is reported alongside it"),
         ("denied 2 times so far" in out_reset,
          "the wording to report quotes the total, not the stretch"),
-        ("Re-run the same command once" in out_reset,
+        ("tell the user what was denied, and ask" in out_reset,
          "an allowed run restores the retry advice"),
         ("denied a tool call once in a row" in out_failed,
          "a run the classifier allowed resets it even if it failed"),
         ("git push origin alpha" in out_interleaved.split("denied:")[1]
-         .split("A denial is a sample")[0],
+         .split("A denial is a decision to report")[0],
          "interleaved denials: ordered by each command's FIRST denial"),
         ("gh secret delete TOKEN -R Morrison-Lab/qmt 2>&1\n"
          in out_multiline,
@@ -607,7 +607,7 @@ try:
          "and is not collapsed into a different shell command"),
         ("denied a tool call once in this session" in out_replayed,
          "a replayed record is not a second denial"),
-        ("Re-run the same command once" in out_replayed,
+        ("tell the user what was denied, and ask" in out_replayed,
          "so the retry advice is not withheld by a replay"),
         ("denied a tool call once in this session" in out_no_uuid,
          "a record with no uuid is still counted"),

@@ -26,7 +26,7 @@ figure, or table explicitly, so a pattern that *requires* a paired
 reference cue would miss all four:
 
 ```bash
-rg -niE '\b(below|later|following|subsequently|further down|next|afterward)\b' <file>
+rg -ni '\b(below|later|following|subsequently|further down|next|afterward)\b' <file>
 ```
 
 A **stronger, higher-confidence subset**: a cross-reference or
@@ -37,8 +37,8 @@ later. Use this narrower pattern when the primary grep returns too many
 idiom hits to triage one by one:
 
 ```bash
-rg -niE '(@[a-z0-9_-]+|section|figure|table|chapter)[^.]{0,60}\b(below|later|following|subsequently|further down|next|afterward)\b' <file>
-rg -niE '\b(below|later|following|subsequently|further down|next|afterward)\b[^.]{0,60}(@[a-z0-9_-]+|section|figure|table|chapter)' <file>
+rg -ni '(@[a-z0-9_-]+|section|figure|table|chapter)[^.]{0,60}\b(below|later|following|subsequently|further down|next|afterward)\b' <file>
+rg -ni '\b(below|later|following|subsequently|further down|next|afterward)\b[^.]{0,60}(@[a-z0-9_-]+|section|figure|table|chapter)' <file>
 ```
 
 Treat every hit --- from either pattern --- as a **candidate**, not a
@@ -53,7 +53,7 @@ as an "as discussed below".
 Add a pattern for it when the file contains an ordered procedure:
 
 ```bash
-rg -niE '\b(per|see|as in|described in|from) (step|item|point) [0-9]+' <file>
+rg -ni '\b(per|see|as in|described in|from) (step|item|point) [0-9]+' <file>
 ```
 
 The direction test is positional, not textual: compare the pointer's own
@@ -213,7 +213,7 @@ the prose left behind, since a stranded reference can sit on either side of the
 split:
 
 ```bash
-rg -niE '\b(above|below|here|earlier|later)\b|this (section|file)' <moved> <survivor>
+rg -ni '\b(above|below|here|earlier|later)\b|this (section|file)' <moved> <survivor>
 ```
 
 Then classify each hit rather than trusting a zero count.

@@ -167,7 +167,7 @@ allowed-tools:               # real skill: list its tools. alias: mirror the can
   modes. If the skill is mostly judgment/exploration, skip checklist boilerplate.
 - **Include reusable, copy-pasteable shell commands where useful.**
   Instead of leaving procedural steps as abstract prose ("grep for X", "check CI logs", "query PRs"),
-  provide concrete, tested shell command snippets with realistic placeholders (e.g. `gh pr list ...`, `rg -niE ...`).
+  provide concrete, tested shell command snippets with realistic placeholders (e.g. `gh pr list ...`, `rg -ni ...`).
   This ensures agents and users don't have to reformulate or debug command pipelines every time they execute the skill.
 - **Pair short names with spelled-out aliases.** When the canonical skill has an
   acronym/short name (`gi`, `sup`, `ums`, `dc`), also create the spelled-out

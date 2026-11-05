@@ -44,14 +44,14 @@ read it before running this skill; the steps below are the short version.
    when the primary grep returns too many idiom hits:
    ```bash
    # Primary grep: directional words
-   rg -niE '\b(below|later|following|subsequently|further down|next|afterward)\b' <file>
+   rg -ni '\b(below|later|following|subsequently|further down|next|afterward)\b' <file>
 
    # Narrower secondary filter: cue paired with directional word
-   rg -niE '(@[a-z0-9_-]+|section|figure|table|chapter)[^.]{0,60}\b(below|later|following|subsequently|further down|next|afterward)\b' <file>
-   rg -niE '\b(below|later|following|subsequently|further down|next|afterward)\b[^.]{0,60}(@[a-z0-9_-]+|section|figure|table|chapter)' <file>
+   rg -ni '(@[a-z0-9_-]+|section|figure|table|chapter)[^.]{0,60}\b(below|later|following|subsequently|further down|next|afterward)\b' <file>
+   rg -ni '\b(below|later|following|subsequently|further down|next|afterward)\b[^.]{0,60}(@[a-z0-9_-]+|section|figure|table|chapter)' <file>
 
    # Numbered procedural pointers (e.g. in sequential steps)
-   rg -niE '\b(per|see|as in|described in|from) (step|item|point) [0-9]+' <file>
+   rg -ni '\b(per|see|as in|described in|from) (step|item|point) [0-9]+' <file>
    ```
 3. **Confirm each hit.** Read the sentence: is it a genuine reference (not
    an idiom like "below average"), and does the target really come after

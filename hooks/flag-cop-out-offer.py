@@ -82,9 +82,28 @@ OPTIONAL_WORK = [
     r"\boptional (work|items?|fix(es)?|nits?|follow-?ups?|cleanups?|improvements?)\b",
     r"\b(items?|fix(es)?|nits?|cleanups?|follow-?ups?)\b[^.\n]{0,30}\b(is|are) optional\b",
     r"\b(could|can|will|would|should|'ll|plan to)\b[^.\n]{0,40}\bas a (small |separate )?follow-?up\b",
-    r"\b(\d+|two|three|four|five|several|some|a few|few|remaining|leftover|these|those|the)\s+(\w+\s+)?nits?\b(?![^.\n]{0,60}\b(none|no|all|fixed)\b)[^.\n]{0,60}\b(left|remain|unfiled|not fixed)\b",
+    r"\bnits?\b[^.\n]{0,60}\b(left|remain|unfiled|not fixed)\b",
 ]
 OPTIONAL_RX = re.compile("|".join(OPTIONAL_WORK), re.I)
+
+# A sentence that says nothing is outstanding ("no further nits are left",
+# "there aren't any nits left", "all nits were fixed") is a completion report,
+# whatever the distance between the negation and the matched phrase. Checked
+# per sentence instead of by regex adjacency (review of #4979, rounds 3-5).
+DONE_RX = re.compile(
+    r"\b(no|none|zero|nothing)\b"
+    r"|\b(aren't|isn't|are not|is not|there's not|there is not|there are not)\s+(any|a)\b"
+    r"|\ball\b[^.\n]*\b(fixed|addressed|done|resolved)\b",
+    re.I,
+)
+
+
+def _sentence_around(window, start, end):
+    """The sentence (bounded by a period or newline) holding window[start:end]."""
+    left = max(window.rfind(".", 0, start), window.rfind("\n", 0, start)) + 1
+    stops = [i for i in (window.find(".", end), window.find("\n", end)) if i >= 0]
+    return window[left:min(stops) if stops else len(window)]
+
 
 # A message carrying a FLAG or OFFER marker belongs to flag-idea-without-issue.py,
 # which already files ideas proposed that way; this hook leaves it alone so one
@@ -268,7 +287,8 @@ def find_offer(text):
 def find_optional(text):
     """Return the optional-work phrase when the reply closes on one."""
     for window in offer_windows(text):
-        m = OPTIONAL_RX.search(window)
+        m = next((x for x in OPTIONAL_RX.finditer(window)
+                  if not DONE_RX.search(_sentence_around(window, x.start(), x.end()))), None)
         if not m:
             continue
         start = window.rfind("\n\n", 0, m.start()) + 1

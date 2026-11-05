@@ -205,6 +205,14 @@ CASES = [
       say("Merged the fix. I can also fix the nits.")], False,
      "an issue comment discharges the optional check"),
 
+    ([TOOL, say("You could also add a grouping variable with group_by().")], False,
+     "'could also add' in instructional prose stays silent"),
+    ([TOOL, say("The model fits well. I can also do a residual plot.")], False,
+     "a plain 'I can also do' stays silent"),
+    ([TOOL, say("**OFFER** -- add a dashboard later.\n\nMerged the fix.\n\n"
+                "Optional cleanup: the two review nits stay as they are.")], True,
+     "a marker in an unrelated paragraph does not exempt an unfiled optional"),
+
     # Antigravity transcript format: GENERIC tool result vs PLANNER_RESPONSE (ai-config#4635)
     ([{"source": "MODEL", "type": "GENERIC", "content": "Say the word and I'll push."}], False,
      "Antigravity GENERIC tool result containing offer is not assistant prose"),

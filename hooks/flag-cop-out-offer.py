@@ -75,12 +75,12 @@ RX = re.compile("|".join(OFFERS), re.I)
 # issues, and do them immediately if they are important and/or quick").
 # Matched against the same tail windows as OFFERS.
 # Every entry is phrase-bound: a bare "optional" fires on "this parameter is
-# optional" in ordinary technical prose (review of #4979).
+# optional" in ordinary technical prose, and "could also X" / "I can X" fire on
+# routine suggestions (review of #4979). Conditional offers ("I can X if you
+# want") belong to OFFERS above.
 OPTIONAL_WORK = [
     r"\boptional (work|items?|fix(es)?|nits?|follow-?ups?|cleanups?|improvements?)\b",
     r"\b(items?|fix(es)?|nits?|cleanups?|follow-?ups?)\b[^.\n]{0,30}\b(is|are) optional\b",
-    r"\bcould also (fix|add|do|file|clean|tidy)\b",
-    r"\bi can (also |additionally )?(fix|add|file|open|clean|tidy|do)\b",
     r"\bas a (small |separate )?follow-?up\b",
     r"\bnits?\b[^.\n]{0,60}\b(left|remain|unfiled|not fixed)\b",
 ]
@@ -269,8 +269,14 @@ def find_optional(text):
     """Return the optional-work phrase when the reply closes on one."""
     for window in offer_windows(text):
         m = OPTIONAL_RX.search(window)
-        if m:
-            return m.group(0)
+        if not m:
+            continue
+        start = window.rfind("\n\n", 0, m.start()) + 1
+        end = window.find("\n\n", m.end())
+        paragraph = window[start:end if end >= 0 else len(window)]
+        if MARKER_RX.search(paragraph):
+            continue  # that paragraph is flag-idea-without-issue.py's case
+        return m.group(0)
     return None
 
 
@@ -332,8 +338,7 @@ def main() -> int:
         return 0
     phrase = next((p for p in (find_offer(t) for t in texts) if p), None)
     optional = next((p for p in (find_optional(t) for t in texts) if p), None)
-    if optional and (MARKER_RX.search(texts[0])
-                     or filed_issue_this_turn(payload.get("transcript_path") or "", texts[0])):
+    if optional and filed_issue_this_turn(payload.get("transcript_path") or "", texts[0]):
         optional = None
     if not phrase and not optional:
         return 0

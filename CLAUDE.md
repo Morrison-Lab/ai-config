@@ -80,8 +80,8 @@ This could be a checkpointed or wrapped multi-step task, a PR merged with no oth
 Place the tag at the natural end of that turn's recap (or immediately before a `wrap-up` report) rather than mid-task.
 A clean stopping point requires that something actually finished, and the fragment's disqualifier list cannot tell you whether anything did --- so name the thing that finished, and read a turn that only explored as having completed nothing however few blockers it trips.
 Hold the flag while any PR this session opened or pushed to is still unmerged, per the bright line the fragment states in full; run `wrap-up`'s state sweep first rather than trusting memory, since a bot-opened PR or a leftover branch never entered the conversation.
-Default to archive-and-start-new over a bare `/clear` whenever the session might be worth revisiting, and to `/compact` when the next work continues the same loose thread; the fragment covers each option's tradeoff and the same menu applied at the moment of opening a *new* PR, not only at a stopping point.
-When you recommend a new session, offer to start it yourself: write its opening prompt and attach the harness's way to start a session with that prompt already in it (a `spawn_task` chip in the desktop app, otherwise a paste-ready prompt and a plain question), rather than leaving the user to open it and type the prompt.
+Default to archive-and-start-new over a bare `/clear` whenever the session might be worth revisiting, and to `/compact` when the next work continues the same loose thread (the fragment covers the tradeoffs).
+When you recommend a new session, offer to start it yourself, with its opening prompt written (the fragment names the harness mechanisms).
 
 ## Flag good moments to run `compress-session`, too
 
@@ -378,13 +378,11 @@ A new symptom of a tracked defect family is a comment on that family's issue, no
 `scripts/triage-backlog.py` is the instrument and the `triage` skill runs it.
 (Measured 2026-09-03: 15 to 410 open issues in six weeks with 14 not-planned closes in the repo's history, ai-config#3134.)
 
-## Keep at least one agent working while a backlog exists
+## Keep an agent working while a backlog exists
 
 [shared/workflow/keep-agent-on-backlog.md](shared/workflow/keep-agent-on-backlog.md)
 
-When the last working thread goes idle and any project repo has an open issue that no thread, PR or claim owns, the coordinator starts a thread on the top such issue (P-label, then age).
-It licenses no merges and relaxes no other limit.
-(Ezra, 2026-11-05, ai-config#4967; the enforcing routine is ai-config#4968.)
+When no thread is working and a project repo has an unowned open issue, start a thread on the top one; no merges (ai-config#4967).
 
 ## If you see something, say something --- file an issue for every noticed mistake, concern, or idea, your own mistakes included
 

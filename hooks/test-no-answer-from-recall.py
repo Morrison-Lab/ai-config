@@ -45,6 +45,7 @@ CASES = [
     ("review4: memory card", POST, "I retrieved the photos from my memory card.", False),
     ("review4: recall buffer", POST, "From my memory buffer, the files restored fine.", False),
     ("review4: as I recall you", POST, "Let's meet tomorrow, as I recall you mentioned 3pm works.", False),
+    ("review6: memory bank as personal recall", POST, "From my memory bank of childhood experiences, I'd say it was 1995.", True),
     ("unrelated tool", "Bash", "From my memory this works.", False),
     ("no text", POST, None, False),
 ]

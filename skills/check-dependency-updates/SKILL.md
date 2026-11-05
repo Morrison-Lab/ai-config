@@ -41,8 +41,10 @@ Actions pins and `renv.lock`; the rest are common in this user's R/Quarto repos.
 List every action and how it's pinned:
 
 ```bash
-grep -rnE '^\s*uses:' .github/workflows/ .github/actions/ 2>/dev/null
+grep -rnE '^\s*(-\s+)?uses:' .github/workflows/ .github/actions/ 2>/dev/null
 ```
+
+The optional `-\s+` matters: a step is written `- uses: ...`, and without it the pattern lists only job-level reusable-workflow calls and misses every step.
 
 Pins come in two forms:
 

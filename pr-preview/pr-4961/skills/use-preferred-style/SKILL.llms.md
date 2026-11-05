@@ -38,7 +38,7 @@ Rule 1 restates PSW’s own “Limit complex sentence structures” section (Con
 
 10. **Make a caption stand alone** (PSW, “Slides, posters, and figures”). A caption states what its own figure shows. It does not rely on another figure’s caption: never write “the same paths as **?@fig-x**” or “the surface of **?@fig-x**” in place of the content.
 
-11. **Break clauses onto their own lines in notes sources** (Ezra’s review rule for `.qmd` prose). Put one sentence per line, and break before “and”, “but”, “so”, “as”, “which”, “then”, and “toward” when a line holds two clauses. Link the first use of every defined term in a div to its definition. Procedure step 9 lists the checks that enforce this rule and rule 10.
+11. **Break clauses onto their own lines in notes sources** (Ezra’s review rule for `.qmd` prose). Put one sentence per line, and break before “and”, “but”, “so”, “as”, “which”, “then”, and “toward” when a line holds two clauses. Link the first use of every defined term in a div to its definition.
 
 ## Filler and jargon to cut or swap
 

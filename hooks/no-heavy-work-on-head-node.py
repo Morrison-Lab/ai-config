@@ -43,7 +43,8 @@ import sys
 # `;` inside the R expression, leaving a fragment whose leading word is `res`.
 # The `;` is R syntax, not a shell separator, and nothing at this level can
 # tell the two apart. So instead: find each invocation, then scan from there
-# to the end of the string, which keeps quoted code with the command running
+# to the end of that invocation (invocation_end: the next quote-aware `&&`,
+# `||` or `|`, never `;`), which keeps quoted code with the command running
 # it. Anything before the first invocation stays unexamined, which is what
 # keeps the grep case above passing.
 #
@@ -78,9 +79,42 @@ EXPENSIVE = [
 EXPENSIVE = [(re.compile(p), label) for p, label in EXPENSIVE]
 
 
+def invocation_end(command: str, start: int) -> int:
+    """Index where the invocation beginning at `start` ends.
+
+    Walks forward tracking quotes, and stops at the first `&&`, `||` or `|`
+    outside them, so an unrelated later command is not scanned (ai-config#1141).
+    It does NOT stop at `;`: the reported incident has an unquoted `;` that is
+    R syntax (`-e Sys.setenv(...); res <- devtools::test()`), and nothing here
+    can tell that from a shell separator.
+    Errs toward scanning more, which only over-blocks: an unbalanced quote or
+    a heredoc (`<<`, whose body is code the shell hands to the interpreter)
+    scans to the end of the string.
+    """
+    quote = None
+    i = start
+    while i < len(command):
+        char = command[i]
+        if quote:
+            if char == "\\" and quote == '"':
+                i += 1
+            elif char == quote:
+                quote = None
+        elif char in ("'", '"'):
+            quote = char
+        elif command.startswith("<<", i):
+            return len(command)
+        elif command.startswith("|>", i):
+            i += 1  # R's native pipe is code, not a shell pipe
+        elif char == "|" or command.startswith("&&", i):
+            return i
+        i += 1
+    return len(command)
+
+
 def offending(command: str):
     for match in INVOCATION.finditer(command):
-        tail = command[match.start(1):]      # from the program name onward
+        tail = command[match.start(1):invocation_end(command, match.start(1))]
         for pattern, label in EXPENSIVE:
             if pattern.search(tail):
                 return label, tail.strip()

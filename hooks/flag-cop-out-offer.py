@@ -96,11 +96,19 @@ OPTIONAL_RX = re.compile("|".join(OPTIONAL_WORK), re.I)
 # whatever the distance between the negation and the matched phrase. Checked
 # per sentence instead of by regex adjacency (review of #4979, rounds 3-5).
 DONE_RX = re.compile(
-    r"\b(no|none|zero|nothing)\b"
-    r"|\b(aren't|isn't|are not|is not|there's not|there is not|there are not)\s+(any|a)\b"
+    r"\b(aren't|isn't|are not|is not|there's not|there is not|there are not)\s+(any|a)\b"
     r"|\ball\b[^.;?!:\n]*\b(fixed|addressed|done|resolved)\b",
     re.I,
 )
+
+# A bare negation counts only when it can be about the matched phrase: after
+# it ("nits remain: none"), or at most NEG_REACH words before it ("no further
+# outstanding nits remain"). "no one" negates a person, never a nit, and a
+# negation further back is a different thought, so the run-on "No one
+# complained still two nits remain unfiled" is not a completion report
+# (ai-config#4988).
+NEG_RX = re.compile(r"\b(?:no(?!\s+one\b)|none|zero|nothing)\b", re.I)
+NEG_REACH = 3
 
 
 # A clause ends at . ; ? ! : , or a newline, or at a contrast word ("but",
@@ -121,6 +129,21 @@ def _sentence_around(window, start, end):
     left = max((b.end() for b in breaks if b.end() <= start), default=0)
     right = min((b.start() for b in breaks if b.start() >= end), default=len(window))
     return window[left:right]
+
+
+def _is_completion_report(window, start, end):
+    """True when the clause around window[start:end] says nothing is outstanding."""
+    clause = _sentence_around(window, start, end)
+    if DONE_RX.search(clause):
+        return True
+    offset = max(window.find(clause), 0)
+    rel_start = start - offset
+    for neg in NEG_RX.finditer(clause):
+        if neg.end() > rel_start:
+            return True  # a negation after the phrase starts: as before
+        if len(clause[neg.end():rel_start].split()) <= NEG_REACH:
+            return True
+    return False
 
 
 # A message carrying a FLAG or OFFER marker belongs to flag-idea-without-issue.py,
@@ -306,7 +329,7 @@ def find_optional(text):
     """Return the optional-work phrase when the reply closes on one."""
     for window in offer_windows(text):
         m = next((x for x in OPTIONAL_RX.finditer(window)
-                  if not DONE_RX.search(_sentence_around(window, x.start(), x.end()))), None)
+                  if not _is_completion_report(window, x.start(), x.end())), None)
         if not m:
             continue
         start = window.rfind("\n\n", 0, m.start()) + 1

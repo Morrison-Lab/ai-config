@@ -360,6 +360,19 @@ def unquoted_angle_brackets(command: str) -> bool:
     return False
 
 
+def trailing_description(command: str) -> bool:
+    """True if `command` ends in a parenthetical that describes rather than alternates.
+
+    `gh api graphql (addDiscussionComment)` starts like an invocation and
+    stops, so a reader completes it by guessing (ai-config#1154). A trailing
+    `(or <other command>)` is a real alternative and passes, and a value that
+    is only a parenthetical, such as `(no CLI equivalent)`, is an honest
+    statement rather than a command prefix.
+    """
+    match = re.search(r"\S\s+\(([^()]*)\)\s*$", command)
+    return bool(match) and not match.group(1).startswith("or ")
+
+
 def check_mapping_placeholders() -> None:
     mappings_file = ROOT / "tool-mappings.yml"
     if not mappings_file.is_file():
@@ -379,6 +392,13 @@ def check_mapping_placeholders() -> None:
                     f"tool-mappings.yml: {op.get('id', '<unknown>')}.{field} has an "
                     f"unquoted `<` or `>` the shell would read as a redirect: "
                     f"{value!r} -- quote the operand carrying the placeholder"
+                )
+            if field == "cli" and trailing_description(value):
+                errors.append(
+                    f"tool-mappings.yml: {op.get('id', '<unknown>')}.cli ends in a "
+                    f"parenthetical description, so it reads as the start of a "
+                    f"command: {value!r} -- write the runnable command, or "
+                    f"`(or <other command>)` for an alternative"
                 )
     print(f"  checked {checked} command fields for unquoted placeholders")
 

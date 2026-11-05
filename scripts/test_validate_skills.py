@@ -366,6 +366,25 @@ def main() -> int:
         )
 
 
+    check(
+        "descriptive trailing parenthetical on a cli value is flagged",
+        vs.trailing_description("gh api graphql (addDiscussionComment)"),
+    )
+    check(
+        "a trailing (or ...) alternative is allowed",
+        not vs.trailing_description(
+            'git log "<branch>" (or gh api "repos/<owner>/<repo>/commits")'
+        ),
+    )
+    check(
+        "a value that is only a parenthetical is allowed",
+        not vs.trailing_description("(no CLI equivalent)"),
+    )
+    check(
+        "a full command with no parenthetical is allowed",
+        not vs.trailing_description("gh api graphql -f query='mutation { x }'"),
+    )
+
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

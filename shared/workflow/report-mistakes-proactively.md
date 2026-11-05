@@ -86,6 +86,12 @@ That reading is the gap this section closes: the Do above (file
 proactively) is a user directive, stated in exactly those terms, and it
 covers ideas as much as mistakes.
 
+Ezra, 2026-11-04: "always at least file optional items as issues, and do them immediately if they are important and/or quick".
+An optional item is a review nit, a "could also", or an offer to do more.
+It counts as an idea for this section.
+
+- **Do:** do an optional item immediately if it is important and/or quick, and file it as an issue either way.
+
 A `⚠️ **FLAG**` or a `💡 **OFFER**` (per `CLAUDE.md`'s chat-output-tagging
 convention) is a heads-up in chat, not a filing.
 Ending either one with the idea still unfiled repeats the exact failure

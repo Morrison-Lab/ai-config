@@ -5,7 +5,10 @@
 tier actually running (ai-config#879). A session cannot self-report it by
 introspection, so this reads the one source that records it: the session's own
 transcript, `<projects-dir>/<project-slug>/<session-id>.jsonl`, whose assistant
-records carry `message.model`, `requestedModel` and `effort`.
+records carry `message.model` and `effort`, and in some sessions
+`requestedModel` (present on every model record in the session that wrote this
+script, absent from a CI review session's transcript, measured 2026-11-05).
+Without `requestedModel` the reroute check (step 4) cannot fire and passes.
 
 The posture is fail-closed, taken from `scdenney/open-science-skills`'
 `check-lead-runtime.sh` (pattern only): the script prints `runtime OK` only

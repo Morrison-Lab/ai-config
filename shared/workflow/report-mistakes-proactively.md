@@ -112,6 +112,15 @@ user.
   this failure directly, because an idea reads as outside the "mistake"
   rules above.)
 
+**An optional item is filed too.**
+An item a reply labels "optional" (a low-severity review finding, a nice-to-have, an offered follow-up) is a noticed follow-up, so it is filed on the same terms.
+(Directive from the user, 2026-11-04, verbatim: "cai: always at least file optional items as issues, and do them immediately if they are important and/or quick".)
+
+- **Do:** file every optional item as an issue, and do it immediately if it is important and/or quick.
+- **Don't:** list an optional item in a reply with no issue behind it.
+
+No hook enforces this: whether an item is "optional" is ordinary prose, and no deny can detect it from a transcript.
+
 **The boundary.**
 This covers a concrete, actionable idea that is the lab's
 own work to do --- a mechanism, a follow-up, an improvement with a next step.

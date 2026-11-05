@@ -2249,6 +2249,46 @@ def check_mwc_active(payload: dict | None = None) -> bool:
     return False
 
 
+def mwc_diagnosis(payload: dict | None = None) -> str:
+    """One sentence saying which id the grant lookup used and what it found.
+
+    Mirrors check_mwc_active, case for case, so a refusal names the actual
+    reason instead of a generic "run enable-mwc" (ai-config#4950): a live
+    grant under a different id, a marker whose session record is missing, and
+    a marker whose session reads dead each need a different remedy.
+    """
+    current = resolve_session_id(payload)
+    if not current:
+        return ("Grant lookup: no session id in the hook payload or in "
+                "AI_SESSION_ID / CLAUDE_SESSION_ID, so no grant could be found.")
+    sanitized = sanitize(current)
+    seen_dirs = 0
+    for common_dir in get_git_common_dirs():
+        reg_dir = common_dir / "ai-sessions"
+        if not reg_dir.exists():
+            continue
+        seen_dirs += 1
+        mwc_file = reg_dir / f"{sanitized}.mwc"
+        sess_file = reg_dir / f"{sanitized}.session"
+        if not mwc_file.exists():
+            continue
+        if not sess_file.exists():
+            return (f"Grant lookup for session id `{sanitized}`: found the mwc marker "
+                    f"{mwc_file} but no session record {sess_file.name}, so the grant "
+                    "does not count. Re-run `ai-session.sh enable-mwc --id "
+                    f"{sanitized}`, which writes both.")
+        if not is_session_alive(sess_file):
+            return (f"Grant lookup for session id `{sanitized}`: found the mwc marker and "
+                    f"{sess_file.name}, but the session reads dead (its pid is gone or its "
+                    "heartbeat is over 30 minutes old). Refresh it with "
+                    f"`ai-session.sh heartbeat --id {sanitized}`, then retry.")
+    where = (f"searched {seen_dirs} ai-sessions director{'y' if seen_dirs == 1 else 'ies'}"
+             if seen_dirs else "found no ai-sessions directory")
+    return (f"Grant lookup for session id `{sanitized}`: no mwc marker under that id "
+            f"({where}). If the user granted /mwc under a different id, run "
+            f"`ai-session.sh enable-mwc --id {sanitized}`.")
+
+
 def offending(command: str, payload: dict | None = None):
     # 1. Normalize bash backslash-newline line continuations (matching bash semantics: remove backslash and newline without inserting a space)
     norm_command = re.sub(r"\\\n", "", command)
@@ -2440,7 +2480,8 @@ def main() -> int:
         "Only if the user themselves gave a grant in this session (a bare /mwc or /mwc all, "
         "no PR number needed, possibly relayed with their message id), this block means "
         "`ai-session.sh enable-mwc` has not run: run it, confirm with `check-mwc`, then retry. "
-        "Without that grant, do not merge."
+        "Without that grant, do not merge.\n\n"
+        + mwc_diagnosis(payload)
     )
     print(json.dumps({
         "hookSpecificOutput": {

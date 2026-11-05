@@ -20,5 +20,7 @@ An idle agent with an unowned backlog is a defect, not a rest.
 
 ## Mechanism
 
-A scheduled routine that starts a thread when none is active is filed as [ai-config#4968](https://github.com/Morrison-Lab/ai-config/issues/4968).
-Hooks do not run in cloud sessions ([#2004](https://github.com/Morrison-Lab/ai-config/issues/2004)), so until that routine exists this fragment is the only enforcement there, and it rests on the coordinator.
+An hourly scheduled task, `trig_01N2XJVzro32Mtpv6ZrGLKPu`, fires into the project coordinator session.
+When no thread is working, it has the coordinator start one on the top unowned issue ([ai-config#4968](https://github.com/Morrison-Lab/ai-config/issues/4968), created 2026-11-05 with Ezra's OK).
+Hooks do not run in cloud sessions ([#2004](https://github.com/Morrison-Lab/ai-config/issues/2004)), so the scheduled task is the only enforcement there.
+Update or delete that task rather than adding a second one.

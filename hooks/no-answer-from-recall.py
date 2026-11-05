@@ -7,13 +7,15 @@ the datasets ISL uses "from my memory of the book, not checked against the text"
 and then asked Ezra where the book lives; the library at /mnt/project-files
 holds it. Blocks (deny) a user-visible reply or relay tool call
 (mcp__hearthbot__reply, post_message, update_message, edit_message,
-message_coordinator, message_thread) whose text
+message_coordinator, message_thread) whose text says the answer comes from
+memory or recall ("from my memory", "as I recall", "if I remember correctly",
+"off the top of my head"), or that it was "not checked against" / "not verified
+against" a source.
 
-  * says the answer comes from memory or recall ("from my memory", "as I
-    recall", "if I remember correctly", "off the top of my head"), or that it
-    was "not checked against" / "not verified against" a source; or
-  * asks the user where a book, file, repo or other source lives, without
-    saying where the agent already searched.
+Only first-person hedges and the fixed "not checked against" phrase are matched,
+because each reads as an admission and almost never as ordinary English. Wider
+patterns ("from the memory of", asking where a book lives) over-matched ordinary
+prose in review, so the where-ask half is left to a follow-up issue.
 
 A hook cannot tell whether a source exists, so the denial sends the author back
 to check (library, attached repos, docs, the API) and to restate the answer
@@ -29,7 +31,6 @@ REPLY_TOOL = re.compile(
 
 RECALL = re.compile(
     r"\bfrom\s+(?:my\s+)?(?:memory|recall|recollection)\b"
-    r"|\bfrom\s+the\s+(?:memory|recollection)\s+of\b"
     r"|\b(?:my|a\s+vague)\s+(?:memory|recollection)\s+of\b"
     r"|\bas\s+I\s+(?:recall|remember)\b"
     r"|\bif\s+I\s+(?:recall|remember)\s+(?:correctly|right)\b"
@@ -43,17 +44,8 @@ DISCLAIMED = re.compile(
     r"\b(?:not|never|rather\s+than|instead\s+of|no\s+longer|than)\s+(?:just\s+|only\s+)?from\s+(?:my\s+)?(?:memory|recall)\b",
     re.I)
 
-WHERE_ASK = re.compile(
-    r"\b(?:where\s+(?:does|is|are)|point\s+me\s+to|tell\s+me\s+where)\b"
-    r"[^.?\n]{0,60}\b(?:books?|textbooks?|project\s+library)\b",
-    re.I)
-
-SEARCHED = re.compile(
-    r"\b(?:searched|looked\s+(?:in|through|at)|grepped|listed|found\s+no|did\s+not\s+find|didn['\u2019]t\s+find)\b",
-    re.I)
-
 REASON = (
-    "[hook: no-answer-from-recall] This message {what}. "
+    "[hook: no-answer-from-recall] This message answers from memory or says it was not checked against a source. "
     "Check the source first: search the project library (/mnt/project-files, and the books under Morrison-Lab/mlr), "
     "the attached repos, the docs or the API, read the passage, and restate the answer with what you read "
     "(file and page or line). Ask the user where a source lives only after naming the places you searched. "
@@ -65,13 +57,8 @@ def sentences(text: str):
     return re.split(r"(?<=[.!?])\s+|\n+", text)
 
 
-def verdict(text: str):
-    for sentence in sentences(text):
-        if RECALL.search(sentence) and not DISCLAIMED.search(sentence):
-            return "answers from memory or says it was not checked against a source"
-    if WHERE_ASK.search(text) and not SEARCHED.search(text):
-        return "asks the user where a source lives without naming where you searched"
-    return None
+def recalls(text: str) -> bool:
+    return any(RECALL.search(s) and not DISCLAIMED.search(s) for s in sentences(text))
 
 
 def main() -> int:
@@ -85,15 +72,12 @@ def main() -> int:
         return 0
     tool_input = payload.get("tool_input")
     text = tool_input.get("text") if isinstance(tool_input, dict) else None
-    if not isinstance(text, str):
-        return 0
-    what = verdict(text)
-    if what:
+    if isinstance(text, str) and recalls(text):
         print(json.dumps({
             "hookSpecificOutput": {
                 "hookEventName": "PreToolUse",
                 "permissionDecision": "deny",
-                "permissionDecisionReason": REASON.format(what=what),
+                "permissionDecisionReason": REASON,
             }
         }))
     return 0

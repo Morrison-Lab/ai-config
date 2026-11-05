@@ -6,7 +6,8 @@ generic Actions-authoring material.
 
 Triggering a review, and what becomes of the reply it writes, live in
 [`claude-review-dispatch.md`](claude-review-dispatch.md).
-The `pull_request_target` App-token failure lives in
+The token and identity failures (`pull_request_target`, the OAuth token,
+the shared bot identity) live in
 [`claude-bot-token-failures.md`](claude-bot-token-failures.md).
 
 ## @claude CI action (Morrison-Lab/gha `claude.yml`)
@@ -861,52 +862,6 @@ That run is the one whose `Prompt is too long` comment finally explained the
 afternoon's failures, so an accidental dispatch is the only reason the answer
 existed at all --- which is luck, and not a reason to leave the hole open.)
 
-## `CLAUDE_CODE_OAUTH_TOKEN` carries no recoverable account identity
-
-Which Claude account minted a repo's `CLAUDE_CODE_OAUTH_TOKEN` is not
-recorded anywhere, and cannot be recovered after provisioning.
-Worth knowing before spending a session trying, because several surfaces
-look like they should answer it and none does.
-
-- **The secrets API returns metadata only.**
-  `GET /repos/{owner}/{repo}/actions/secrets` gives `name`, `created_at`, and
-  `updated_at`.
-  Values are write-only by design.
-- **The run logs mask it.**
-  `claude-code-action` prints `CLAUDE_CODE_OAUTH_TOKEN: ***` and
-  `"claude_code_oauth_token": "***"`, and the neighbouring
-  `anthropic_organization_id` / `anthropic_service_account_id` fields are
-  empty strings on a subscription token.
-  Nothing in the log names an account, an email, or an org.
-- **`total_cost_usd` is not an identity signal.**
-  It reports a real figure on a subscription token
-  (`4.352437800000001` on one ai-config review run), so it distinguishes a
-  run that did work from one that died early -- not one account from another.
-
-Two consequences.
-Behavioural inference is the only route, and it is weak: a repo whose review
-job completed real work has a token with quota, which says nothing about
-whose.
-Do not build an account attribution on "this succeeded after the other
-account ran out"; that premise is usually itself unverified, and the local
-usage chart (`/status` -> Stats) can refute it outright.
-
-The provisioning path explains why the estate ends up mixed.
-`/install-github-app` mints from **whichever account the local CLI is logged
-into at that moment**, with no account picker and no confirmation naming it,
-and `claude setup-token` behaves the same way.
-So a repo-by-repo rollout across several sittings records nothing about which
-account each sitting used.
-
-`scripts/rotate-claude-token.py` (ai-config#952) is the remedy rather than the
-diagnosis: set every repo from one known account so the question stops
-mattering.
-
-(2026-07-30: a sweep of 324 admin repos found 35 carrying the secret and zero
-org-level Claude secrets, provisioned in three batches between 2026-05-09 and
-2026-07-14.
-Attribution proved unrecoverable by any of the three surfaces above.)
-
 ## `claude-code-action`'s `Task`/`Agent` tool is not gated behind `--allowedTools`
 
 Split out of [`github.md`](github.md) (ai-config#2267 / #694 pattern).
@@ -1088,28 +1043,3 @@ already have posted a verdict, as happened on #3762.
   The event differs; the actor does not.
 - **Don't:** spend one comment per PR re-measuring this.
   A single run's `mention-filter` conclusion settles it for the whole repo.
-
-## Every session in a project shares one bot identity, so `merged_by` attributes nothing
-
-Every Claude session working a project posts, pushes, and merges as the same
-`claude[bot]` App installation.
-A peer session's merge and your own are therefore indistinguishable after the
-fact: `merged_by` names `claude[bot]` for both, and so does the commit's
-committer.
-
-That matters because the question it cannot answer is one a concurrent session
-actually asks --- "did I merge this, or did the peer holding the other half of
-this queue?" --- and the field looks like it answers it.
-The two failures also stack: a list read omits `merged_by` entirely
-([`github-mcp-tools`](github-mcp-tools.md)), and a `get` read returns the
-constant.
-
-- **Do:** treat the SHA your own merge call returned as the only attribution
-  you have;
-  a refusal naming a moved head means the head changed between scoring and
-  merging, so re-run the clean gate rather than retrying on the old verdict,
-  per [`fully-clean`](../shared/workflow/fully-clean.md)'s pin machinery,
-  which carries the one status code measured here (`422`, on the
-  `update-branch` endpoint's `expected_head_sha`).
-- **Don't:** read `merged_by: claude[bot]` as evidence that this session was
-  the one that merged it.

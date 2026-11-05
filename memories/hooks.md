@@ -1180,4 +1180,4 @@ What ended the oscillation was a structural rule, not a sharper pattern.
 - **Don't:** widen or narrow one pattern per review round.
   The third round on the same pattern is the signal to restructure.
 
-Related, already recorded: `scripts/check-text-encoding.py` flags bare `write_text` (give `encoding=`), and the GitHub MCP `merge_pull_request` takes the head pin as `expectedHeadSha` (`skills/mwc/SKILL.md`).
+See also `scripts/check-text-encoding.py`, which flags bare `write_text` (give `encoding=`), and `skills/mwc/SKILL.md`, which names the `expectedHeadSha` pin the GitHub MCP `merge_pull_request` takes.

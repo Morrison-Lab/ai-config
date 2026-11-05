@@ -2250,6 +2250,19 @@ def check_mwc_active(payload: dict | None = None) -> bool:
 
 
 def mwc_diagnosis(payload: dict | None = None) -> str:
+    """The diagnosis line, which can never raise.
+
+    A crash inside this PreToolUse hook exits 1 and does not stop the command,
+    so the merge would go through; check_mwc_active guards its own filesystem
+    walk the same way.
+    """
+    try:
+        return _mwc_diagnosis(payload)
+    except Exception as exc:
+        return f"Grant lookup: the diagnosis itself failed ({type(exc).__name__}); the refusal stands."
+
+
+def _mwc_diagnosis(payload: dict | None = None) -> str:
     """One sentence saying which id the grant lookup used and what it found.
 
     Mirrors check_mwc_active, case for case, so a refusal names the actual

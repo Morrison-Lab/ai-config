@@ -1929,6 +1929,12 @@ with tempfile.TemporaryDirectory() as _tmp:
         _dead = _guard.mwc_diagnosis(_pl)
         _check("dead session: names the heartbeat command",
                "reads dead" in _dead and "heartbeat --id diag_1" in _dead)
+        def _boom():
+            raise OSError("unreadable")
+        _guard.get_git_common_dirs = _boom
+        _boomed = _guard.mwc_diagnosis(_pl)
+        _check("a failing lookup yields a line instead of raising (fail-closed)",
+               "diagnosis itself failed" in _boomed and "OSError" in _boomed)
     finally:
         _guard.get_git_common_dirs = _real_dirs
 

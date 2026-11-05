@@ -378,6 +378,14 @@ A new symptom of a tracked defect family is a comment on that family's issue, no
 `scripts/triage-backlog.py` is the instrument and the `triage` skill runs it.
 (Measured 2026-09-03: 15 to 410 open issues in six weeks with 14 not-planned closes in the repo's history, ai-config#3134.)
 
+## Keep at least one agent working while a backlog exists
+
+[shared/workflow/keep-agent-on-backlog.md](shared/workflow/keep-agent-on-backlog.md)
+
+When the last working thread goes idle and any project repo has an open issue that no thread, PR or claim owns, the coordinator starts a thread on the top such issue (P-label, then age).
+It licenses no merges and relaxes no other limit.
+(Ezra, 2026-11-05, ai-config#4967; the enforcing routine is ai-config#4968.)
+
 ## If you see something, say something --- file an issue for every noticed mistake, concern, or idea, your own mistakes included
 
 [shared/workflow/report-mistakes-proactively.md](shared/workflow/report-mistakes-proactively.md)

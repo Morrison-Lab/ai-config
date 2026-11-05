@@ -432,7 +432,8 @@ cookieconsent.run({
 <section id="github-actions-pins-.githubworkflows.yml" class="level3">
 <h3 class="anchored" data-anchor-id="github-actions-pins-.githubworkflows.yml">1. GitHub Actions pins (<code>.github/workflows/*.yml</code>)</h3>
 <p>List every action and how it’s pinned:</p>
-<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">grep</span> <span class="at">-rnE</span> <span class="st">'^\s*uses:'</span> .github/workflows/ .github/actions/ <span class="dv">2</span><span class="op">&gt;</span>/dev/null</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">grep</span> <span class="at">-rnE</span> <span class="st">'^\s*(-\s+)?uses:'</span> .github/workflows/ .github/actions/ <span class="dv">2</span><span class="op">&gt;</span>/dev/null</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The optional <code>-\s+</code> matters: a step is written <code>- uses: ...</code>, and without it the pattern lists only job-level reusable-workflow calls and misses every step.</p>
 <p>Pins come in two forms:</p>
 <ul>
 <li><p><strong>Tag pin</strong> — <code>uses: actions/checkout@v4</code>. Check the latest release:</p>

@@ -21,8 +21,10 @@ Run the checks that apply to the repo. The two headline cases are GitHub Actions
 List every action and how it’s pinned:
 
 ``` bash
-grep -rnE '^\s*uses:' .github/workflows/ .github/actions/ 2>/dev/null
+grep -rnE '^\s*(-\s+)?uses:' .github/workflows/ .github/actions/ 2>/dev/null
 ```
+
+The optional `-\s+` matters: a step is written `- uses: ...`, and without it the pattern lists only job-level reusable-workflow calls and misses every step.
 
 Pins come in two forms:
 

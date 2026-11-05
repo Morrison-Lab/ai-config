@@ -2,31 +2,16 @@
 """PreToolUse deny: a forge comment says no prereq site defines a term, and
 this turn never searched the sites for a `def-` anchor.
 
-THE MEASURED CASE (2026-11-04, Morrison-Lab/dds#36)
----------------------------------------------------
-The Claude review suggested linking some terms. The session answered with a PR
-comment saying "no lds, mds, pds or sds page defines them" without searching
-any of those sites. A search afterwards found `def-rank` in mds and
-`def-reinforcement` in lds; the session linked both and edited the comment.
-The prose rules (link prereq definitions; check, do not hedge) were read and
-then broken at composition time. ai-config#4949.
+Measured on Morrison-Lab/dds#36 (2026-11-04): a PR comment said "no lds, mds,
+pds or sds page defines them" with no search; mds had `def-rank` and lds had
+`def-reinforcement`. The prose rules were read, then broken at composition time.
 
-WHAT IT CHECKS
---------------
-    a GitHub comment tool call (or `gh pr|issue comment`) whose body claims a
-    term is undefined on the prereq sites ("no lds, mds, pds or sds page
-    defines it", "is not defined in mds", "no prereq site defines")
-    AND no search of a `def-` anchor ran since the last user message
-
-Evidence is a tool call, other than one that posts a message, whose input
-names a `def-` anchor and a search verb (grep, rg, find, Grep, `search/code`,
-curl, `gh api`). A comment that merely mentions `def-rank` is not evidence:
-the posting tools are excluded from the scan.
-
-The claim is decidable from the text, so this denies rather than warns. A
-quoted or backticked claim (a rule being cited) is not a claim. The denial
-names the search to run; the retry after the search passes. Fails OPEN on any
-parse trouble, so a missing transcript never blocks a comment.
+Denies when the body of a GitHub comment tool call (or `gh pr|issue comment`)
+makes that claim AND no tool call since the last user message named a `def-`
+anchor with a search verb (grep, rg, find, curl, `gh api`, `search/code`).
+Posting tools are excluded from the scan, so a comment mentioning `def-rank` is
+not evidence. A quoted or backticked claim is a citation. The denial names the
+search to run, and the retry after it passes. Fails OPEN on parse trouble.
 """
 import json
 import re
@@ -60,7 +45,6 @@ CLAIMS = (
     re.compile(rf"\bnone of (?:the )?[^.\n]{{0,40}}\b{SITE}\b[^.\n]{{0,40}}\bdefin", re.I),
 )
 
-# Quoted words mention a claim; they do not make one.
 QUOTED = re.compile(r"```.*?```|^>.*$|\"[^\"\n]*\"|“[^”\n]*”|`[^`\n]*`", re.S | re.M)
 
 # A tool whose input is the agent's own prose is never evidence of a search.

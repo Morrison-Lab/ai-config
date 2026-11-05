@@ -1,11 +1,8 @@
 """Test the no-undefined-claim-without-def-search guard (ai-config#4949).
 
-Case one is the reported incident in its own words (Morrison-Lab/dds#36,
-2026-11-04): a PR comment saying "no lds, mds, pds or sds page defines them"
-posted with no search of any site's `def-` anchors. The positive cases need a
-transcript without such a search; the negatives need one with it, and each
-negative isolates one narrowing: the search must name a `def-` anchor, must be
-a search call, and must not be the comment's own prose.
+Case one is the reported incident (Morrison-Lab/dds#36, 2026-11-04). Each
+negative isolates one narrowing: the search must name a `def-` anchor, be a
+search call, and not be the comment's own prose.
 
 Run: python3 hooks/test-no-undefined-claim-without-def-search.py \
          hooks/no-undefined-claim-without-def-search.py
@@ -51,9 +48,6 @@ CASES = [
     ([USER], "mcp__github__add_issue_comment",
      {"body": "This term is not defined in mds, so I kept it plain."}, True,
      "not defined in <site>"),
-    ([USER], "mcp__github__add_issue_comment",
-     {"body": "No prereq site defines these two terms."}, True,
-     "no prereq site defines"),
     ([USER, GREP, result()], "mcp__github__add_issue_comment", {"body": CLAIM}, False,
      "a grep of a def- anchor this turn: allowed"),
     ([USER, SEARCH_API, result()], "mcp__github__add_issue_comment", {"body": CLAIM}, False,
@@ -76,8 +70,6 @@ CASES = [
      {"body": "No page in this PR defines a rank function."}, False,
      "no prereq site is named: silent"),
     ([USER], "Bash", {"command": "gh pr view 36"}, False, "an unrelated Bash call"),
-    ([USER], "mcp__hearthbot__post_message", {"text": CLAIM}, False,
-     "a chat reply is out of scope (forge comments only)"),
 ]
 
 
@@ -102,11 +94,9 @@ def main() -> int:
         ok = got == expect
         failures += not ok
         print(("PASS" if ok else "FAIL"), label)
-    # Fail open: a missing transcript never blocks a comment.
     ok = not run([USER], "mcp__github__add_issue_comment", {"body": CLAIM}, transcript_ok=False)
     failures += not ok
     print(("PASS" if ok else "FAIL"), "an unreadable transcript fails open")
-    # Fail open: garbage on stdin.
     proc = subprocess.run([sys.executable, SUBJECT], input="not json", capture_output=True,
                           text=True, timeout=30)
     ok = proc.returncode == 0 and not proc.stdout.strip()

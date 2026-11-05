@@ -179,21 +179,31 @@ CASES = [
 
     # ai-config#4962: optional work left as a closing remark, with no issue
     # filed or linked in the same turn.
-    ([TOOL, say("Merged the fix.\n\nOptional: the two review nits are cosmetic "
+    ([TOOL, say("Merged the fix.\n\nOptional cleanup: the two review nits are cosmetic "
                 "and stay as they are.")], True,
      "'optional' with no issue filed or linked warns (ai-config#4962)"),
-    ([TOOL, say("Merged the fix.\n\nOptional: the two review nits are filed as "
+    ([TOOL, say("Merged the fix.\n\nOptional cleanup: the two review nits are filed as "
                 "https://github.com/Morrison-Lab/ai-config/issues/4970.")], False,
      "'optional' with an issue link in the reply stays silent"),
-    ([TOOL, issue_filed(), say("Merged the fix.\n\nOptional: the two review nits "
+    ([TOOL, issue_filed(), say("Merged the fix.\n\nOptional cleanup: the two review nits "
                                "are cosmetic and stay as they are.")], False,
      "'optional' after an issue_write create in the same turn stays silent"),
     ([issue_filed(), USER_TURN, TOOL,
-      say("Merged the fix.\n\nOptional: the two review nits are cosmetic.")], True,
+      say("Merged the fix.\n\nOptional cleanup: the two review nits are cosmetic.")], True,
      "an issue filed in an EARLIER turn does not cover this one"),
     ([TOOL, bash_call("gh issue create --title nits --body-file b.md"),
-      say("Merged the fix.\n\nOptional: the two review nits are cosmetic.")], False,
+      say("Merged the fix.\n\nOptional cleanup: the two review nits are cosmetic.")], False,
      "'optional' after gh issue create in the same turn stays silent"),
+
+    ([TOOL, say("The parameter is optional and defaults to 10.")], False,
+     "'optional' describing a parameter stays silent"),
+    ([TOOL, say("Merged the fix. Filed #4970 for the two nits.")], False,
+     "a 'Filed #N' close stays silent"),
+    ([TOOL, say("**OFFER** -- I can also add the chart.")], False,
+     "a FLAG/OFFER-marked message is left to flag-idea-without-issue"),
+    ([TOOL, bash_call("gh issue comment 12 --body-file b.md"),
+      say("Merged the fix. I can also fix the nits.")], False,
+     "an issue comment discharges the optional check"),
 
     # Antigravity transcript format: GENERIC tool result vs PLANNER_RESPONSE (ai-config#4635)
     ([{"source": "MODEL", "type": "GENERIC", "content": "Say the word and I'll push."}], False,

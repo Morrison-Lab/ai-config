@@ -38,6 +38,7 @@ Fires once per distinct message (sentinel keyed by content hash).
 Fails OPEN.
 """
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -73,8 +74,11 @@ RX = re.compile("|".join(OFFERS), re.I)
 # (ai-config#4962; Ezra, 2026-11-04: "always at least file optional items as
 # issues, and do them immediately if they are important and/or quick").
 # Matched against the same tail windows as OFFERS.
+# Every entry is phrase-bound: a bare "optional" fires on "this parameter is
+# optional" in ordinary technical prose (review of #4979).
 OPTIONAL_WORK = [
-    r"\boptional\b",
+    r"\boptional (work|items?|fix(es)?|nits?|follow-?ups?|cleanups?|improvements?)\b",
+    r"\b(items?|fix(es)?|nits?|cleanups?|follow-?ups?)\b[^.\n]{0,30}\b(is|are) optional\b",
     r"\bcould also (fix|add|do|file|clean|tidy)\b",
     r"\bi can (also |additionally )?(fix|add|file|open|clean|tidy|do)\b",
     r"\bas a (small |separate )?follow-?up\b",
@@ -82,10 +86,33 @@ OPTIONAL_WORK = [
 ]
 OPTIONAL_RX = re.compile("|".join(OPTIONAL_WORK), re.I)
 
-# Evidence that an issue was filed or linked in the same turn.
-ISSUE_LINK_RX = re.compile(r"/issues/\d+|\bissues?\s+#\d+", re.I)
-ISSUE_FILE_TOOL_RX = re.compile(r"(^|__)issue_write$", re.I)
-ISSUE_FILE_CMD_RX = re.compile(r"\bgh\s+issue\s+create\b|\bglab\s+issue\s+create\b", re.I)
+# A message carrying a FLAG or OFFER marker belongs to flag-idea-without-issue.py,
+# which already files ideas proposed that way; this hook leaves it alone so one
+# message does not trip two independently maintained matchers (review of #4979).
+MARKER_RX = re.compile(r"\*\*(FLAG|OFFER)\*\*")
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+
+
+def _sibling(name):
+    """Import a hyphenated sibling module, or None if unavailable."""
+    try:
+        spec = importlib.util.spec_from_file_location("_sib_" + name.replace("-", "_"), os.path.join(HERE, name))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+    except Exception:
+        return None
+
+
+# Evidence that an issue was filed or linked in the same turn: reuse the
+# discharge patterns flag-idea-without-issue.py and no-unfiled-finding.py
+# already own, rather than keeping a narrower copy here.
+_idea = _sibling("flag-idea-without-issue.py")
+_unfiled = _sibling("no-unfiled-finding.py")
+RX_CREATE = getattr(_idea, "RX_CREATE", None)
+RX_ALREADY_URL = getattr(_idea, "RX_ALREADY_URL", None)
+RX_ALREADY = getattr(_unfiled, "RX_ALREADY", None)
 
 # How much of the tail to inspect. An offer is the closing move, so a short
 # window is the point: it keeps a mid-message aside from firing.
@@ -268,7 +295,9 @@ def filed_issue_this_turn(path, reply_text):
     cites an issue URL counts, because filing and linking are the two halves
     of the rule.
     """
-    if ISSUE_LINK_RX.search(reply_text or ""):
+    if RX_CREATE is None or RX_ALREADY is None or RX_ALREADY_URL is None:
+        return True  # fail open: the shared discharge patterns are unavailable
+    if RX_ALREADY.search(reply_text or "") or RX_ALREADY_URL.search(reply_text or ""):
         return True
     filed = False
     try:
@@ -284,11 +313,8 @@ def filed_issue_this_turn(path, reply_text):
                 for b in _blocks(m):
                     if not isinstance(b, dict) or b.get("type") != "tool_use":
                         continue
-                    inp = b.get("input") if isinstance(b.get("input"), dict) else {}
-                    name = b.get("name") or ""
-                    if ISSUE_FILE_TOOL_RX.search(name) and inp.get("method") == "create":
-                        filed = True
-                    elif ISSUE_FILE_CMD_RX.search(str(inp.get("command") or "")):
+                    blob = (b.get("name") or "") + " " + json.dumps(b.get("input") or {})
+                    if RX_CREATE.search(blob):
                         filed = True
     except Exception:
         return True  # fail open: an unreadable transcript is not evidence of a slip
@@ -306,7 +332,8 @@ def main() -> int:
         return 0
     phrase = next((p for p in (find_offer(t) for t in texts) if p), None)
     optional = next((p for p in (find_optional(t) for t in texts) if p), None)
-    if optional and filed_issue_this_turn(payload.get("transcript_path") or "", texts[0]):
+    if optional and (MARKER_RX.search(texts[0])
+                     or filed_issue_this_turn(payload.get("transcript_path") or "", texts[0])):
         optional = None
     if not phrase and not optional:
         return 0

@@ -98,12 +98,13 @@ cited individually below.
    metaphorical language").
    Whatever its part of speech, a word must be literally true of what it names
    or describes.
-   A point does not "sit" at a height, and an estimate does not "live" in an
-   interval.
+   A point does not "sit" at a height,
+   and an estimate does not "live" in an interval.
    Write that the point is at the height and the estimate is in the interval.
-   No list of phrases is complete, so apply the test to each word you wrote.
-   Run each phrase through the test before you copy it from a neighbouring
-   figure or paragraph.
+   No list of phrases is complete,
+   so apply the test to each word you wrote.
+   Run each phrase through the test
+   before you copy it from a neighbouring figure or paragraph.
 
 10. **Make a caption stand alone** (PSW, "Slides, posters, and figures").
     A caption states what its own figure shows.

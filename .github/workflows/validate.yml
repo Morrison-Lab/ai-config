@@ -202,6 +202,8 @@ jobs:
         run: python3 scripts/test_sync_nlb_checker.py
       - name: Run memory-file-size check tests
         run: python3 scripts/test_check_memory_file_size.py
+      - name: Run session-runtime check tests
+        run: python3 scripts/test_check_session_runtime.py
       - name: Run tui-alloc README check tests
         run: python3 scripts/test_check_tui_alloc_readme.py
       - name: Run near-duplicate detector tests

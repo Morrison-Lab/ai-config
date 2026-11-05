@@ -33,7 +33,7 @@ RECALL = re.compile(
     r"|\bas\s+I\s+(?:recall|remember)\b"
     r"|\bif\s+I\s+(?:recall|remember)\s+(?:correctly|right)\b"
     r"|\boff\s+the\s+top\s+of\s+my\s+head\b"
-    r"|(?:\b(?:not|never|without)|n['’]t)\s+(?:been\s+)?(?:checked|verified)\s+against\b"
+    r"|(?:\b(?:not|never|without)|n['\u2019]t)\s+(?:been\s+)?(?:checked|verified)\s+against\b"
     r"|\bunchecked\s+against\b",
     re.I)
 
@@ -48,7 +48,7 @@ WHERE_ASK = re.compile(
     re.I)
 
 SEARCHED = re.compile(
-    r"\b(?:searched|looked\s+(?:in|through|at)|grepped|listed|found\s+no|did\s+not\s+find|didn['’]t\s+find)\b",
+    r"\b(?:searched|looked\s+(?:in|through|at)|grepped|listed|found\s+no|did\s+not\s+find|didn['\u2019]t\s+find)\b",
     re.I)
 
 REASON = (

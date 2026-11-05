@@ -22,7 +22,7 @@ CASES = [
     ("off the top of my head", POST, "Off the top of my head, it is Table 3.4.", True),
     ("not checked against", POST, "The list is not checked against the PDF.", True),
     ("haven't verified against", POST, "These page numbers were never verified against the book.", True),
-    ("curly apostrophe form", POST, "It wasn’t verified against the repo.", True),
+    ("curly apostrophe form", POST, "It wasn\u2019t verified against the repo.", True),
     ("relay to the coordinator", "mcp__hearthbot__message_coordinator", "From my memory the rule lives in psw.", True),
     ("where does the book live", POST, "Where does the book live so I can check it?", True),
     ("point me to the PDF", POST, "Point me to the PDF and I will read it.", True),

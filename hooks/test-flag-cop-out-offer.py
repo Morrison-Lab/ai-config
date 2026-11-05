@@ -56,6 +56,20 @@ def reply(text):
          "input": {"text": text}}]}}
 
 
+def issue_filed():
+    """An issue_write create call, as the GitHub MCP server names it."""
+    return {"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "name": "mcp__github__issue_write",
+         "input": {"method": "create", "title": "nits"}}]}}
+
+
+def bash_call(command):
+    return {"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "name": "Bash", "input": {"command": command}}]}}
+
+
+USER_TURN = {"type": "user", "message": {"content": "next request"}}
+
 LONG = ("Setup job 143472 completed in 19m32s and the array is running. " * 12)
 
 CASES = [
@@ -162,6 +176,24 @@ CASES = [
         "Internal note: the merge landed cleanly.",
         "Done. Say the word and I'll open the follow-up PR.")], True,
      "an offer in the reply wins over clean narration"),
+
+    # ai-config#4962: optional work left as a closing remark, with no issue
+    # filed or linked in the same turn.
+    ([TOOL, say("Merged the fix.\n\nOptional: the two review nits are cosmetic "
+                "and stay as they are.")], True,
+     "'optional' with no issue filed or linked warns (ai-config#4962)"),
+    ([TOOL, say("Merged the fix.\n\nOptional: the two review nits are filed as "
+                "https://github.com/Morrison-Lab/ai-config/issues/4970.")], False,
+     "'optional' with an issue link in the reply stays silent"),
+    ([TOOL, issue_filed(), say("Merged the fix.\n\nOptional: the two review nits "
+                               "are cosmetic and stay as they are.")], False,
+     "'optional' after an issue_write create in the same turn stays silent"),
+    ([issue_filed(), USER_TURN, TOOL,
+      say("Merged the fix.\n\nOptional: the two review nits are cosmetic.")], True,
+     "an issue filed in an EARLIER turn does not cover this one"),
+    ([TOOL, bash_call("gh issue create --title nits --body-file b.md"),
+      say("Merged the fix.\n\nOptional: the two review nits are cosmetic.")], False,
+     "'optional' after gh issue create in the same turn stays silent"),
 
     # Antigravity transcript format: GENERIC tool result vs PLANNER_RESPONSE (ai-config#4635)
     ([{"source": "MODEL", "type": "GENERIC", "content": "Say the word and I'll push."}], False,

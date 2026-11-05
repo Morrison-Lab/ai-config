@@ -28,6 +28,12 @@ TAIL-ANCHORED, not whole-message and not substring. Two reasons:
     mid-message, followed by more substance, is usually a real question posed
     in passing.
 
+It also flags OPTIONAL work left as a closing remark ("optional", "I can also
+fix ...", "as a follow-up") when no issue was filed or linked in the same turn
+(ai-config#4962): optional items are filed as issues, and done at once when
+they are important or quick. A link to an issue in the reply, an issue_write
+create call, or a `gh issue create` after the last user message counts as filed.
+
 Fires once per distinct message (sentinel keyed by content hash).
 Fails OPEN.
 """
@@ -62,6 +68,24 @@ OFFERS = [
     r"once you confirm",
 ]
 RX = re.compile("|".join(OFFERS), re.I)
+
+# Optional work left as a closing remark instead of a filed issue
+# (ai-config#4962; Ezra, 2026-11-04: "always at least file optional items as
+# issues, and do them immediately if they are important and/or quick").
+# Matched against the same tail windows as OFFERS.
+OPTIONAL_WORK = [
+    r"\boptional\b",
+    r"\bcould also (fix|add|do|file|clean|tidy)\b",
+    r"\bi can (also |additionally )?(fix|add|file|open|clean|tidy|do)\b",
+    r"\bas a (small |separate )?follow-?up\b",
+    r"\bnits?\b[^.\n]{0,60}\b(left|remain|unfiled|not fixed)\b",
+]
+OPTIONAL_RX = re.compile("|".join(OPTIONAL_WORK), re.I)
+
+# Evidence that an issue was filed or linked in the same turn.
+ISSUE_LINK_RX = re.compile(r"/issues/\d+|\bissues?\s+#\d+", re.I)
+ISSUE_FILE_TOOL_RX = re.compile(r"(^|__)issue_write$", re.I)
+ISSUE_FILE_CMD_RX = re.compile(r"\bgh\s+issue\s+create\b|\bglab\s+issue\s+create\b", re.I)
 
 # How much of the tail to inspect. An offer is the closing move, so a short
 # window is the point: it keeps a mid-message aside from firing.
@@ -214,6 +238,63 @@ def find_offer(text):
     return None
 
 
+def find_optional(text):
+    """Return the optional-work phrase when the reply closes on one."""
+    for window in offer_windows(text):
+        m = OPTIONAL_RX.search(window)
+        if m:
+            return m.group(0)
+    return None
+
+
+def _is_user_turn(m):
+    """A real user message, not a tool result echoed back as a user entry."""
+    if m.get("type") != "user" and m.get("role") != "user":
+        return False
+    content = (m.get("message") or {}).get("content") or m.get("content")
+    if isinstance(content, str):
+        return bool(content.strip())
+    if isinstance(content, list):
+        return any(
+            isinstance(b, dict) and b.get("type") != "tool_result" for b in content
+        )
+    return False
+
+
+def filed_issue_this_turn(path, reply_text):
+    """True when the reply links an issue or this turn filed one.
+
+    The turn is everything after the last real user message. A reply that
+    cites an issue URL counts, because filing and linking are the two halves
+    of the rule.
+    """
+    if ISSUE_LINK_RX.search(reply_text or ""):
+        return True
+    filed = False
+    try:
+        with open(path, encoding="utf-8", errors="ignore") as fh:
+            for line in fh:
+                try:
+                    m = json.loads(line)
+                except Exception:
+                    continue
+                if _is_user_turn(m):
+                    filed = False
+                    continue
+                for b in _blocks(m):
+                    if not isinstance(b, dict) or b.get("type") != "tool_use":
+                        continue
+                    inp = b.get("input") if isinstance(b.get("input"), dict) else {}
+                    name = b.get("name") or ""
+                    if ISSUE_FILE_TOOL_RX.search(name) and inp.get("method") == "create":
+                        filed = True
+                    elif ISSUE_FILE_CMD_RX.search(str(inp.get("command") or "")):
+                        filed = True
+    except Exception:
+        return True  # fail open: an unreadable transcript is not evidence of a slip
+    return filed
+
+
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
@@ -224,7 +305,10 @@ def main() -> int:
     if not texts:
         return 0
     phrase = next((p for p in (find_offer(t) for t in texts) if p), None)
-    if not phrase:
+    optional = next((p for p in (find_optional(t) for t in texts) if p), None)
+    if optional and filed_issue_this_turn(payload.get("transcript_path") or "", texts[0]):
+        optional = None
+    if not phrase and not optional:
         return 0
 
     # `last_visible_texts` returns at most one string, so the sentinel hashes
@@ -245,13 +329,22 @@ def main() -> int:
     # the failure this hook is about -- something that looks like it is
     # working and delivers nothing. stop_notice blocks once per turn, with
     # the warning as the reason the agent reads.
-    print(stop_notice(payload, f"Your reply closes on an offer to do work: \"{phrase}\". "
-        "Was that action already authorized? If so, do it and report in the "
-        "past tense -- an unanswered offer leaves no branch, no PR, no issue.", "flag-cop-out-offer"))
+    parts = []
+    if phrase:
+        parts.append(f"Your reply closes on an offer to do work: \"{phrase}\". "
+                     "Was that action already authorized? If so, do it and report in the "
+                     "past tense -- an unanswered offer leaves no branch, no PR, no issue.")
+    if optional:
+        parts.append(f"Your reply leaves optional work as an offer: \"{optional}\", and no "
+                     "issue was filed or linked this turn. File each optional item as an "
+                     "issue now, and do it immediately if it is important or quick "
+                     "(shared/workflow/report-mistakes-proactively.md, \"An idea is filed "
+                     "the same way a mistake is\").")
+    print(stop_notice(payload, " ".join(parts), "flag-cop-out-offer"))
 
     sys.stderr.write(
         f"[hook: flag-cop-out-offer] Your reply closes on an offer: "
-        f"\"{phrase}\".\n\n"
+        f"\"{phrase or optional}\".\n\n"
         "Ask one question: was that action ALREADY AUTHORIZED? A standing "
         "instruction (pr-on-claim opens the PR, issue-first files the issue), "
         "a daytb/away grant, or the user having asked for the outcome earlier "

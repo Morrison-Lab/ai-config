@@ -60,7 +60,15 @@ import re
 import sys
 import tempfile
 
+_LIB = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"
+)
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+
 try:
+    from transcript_meta import is_real_user_turn as _is_user_turn  # ai-config#4983
+
     _spec = importlib.util.spec_from_file_location(
         "no_offer_to_file",
         os.path.join(os.path.dirname(os.path.realpath(__file__)), "no-offer-to-file.py"),
@@ -198,32 +206,9 @@ WORK_CMD_RX = re.compile(
     r"|\bglab (issue (view|list)|mr (view|list)|api)\b|api\.github\.com"
 )
 
-SYSTEM_BLOCK_RX = re.compile(
-    r"<system-reminder[\s\S]*?</system-reminder>|^\s*\[SYSTEM NOTIFICATION[^\n]*", re.I
-)
-
-
 def _blocks(m):
     blocks = (m.get("message") or {}).get("content") or m.get("content")
     return blocks if isinstance(blocks, list) else []
-
-
-def _human_text(text):
-    """True when `text` holds something other than harness-injected blocks."""
-    return bool(SYSTEM_BLOCK_RX.sub("", str(text or "")).strip())
-
-
-def _is_user_turn(m):
-    """A genuine user message: user role with text beyond tool results and reminders."""
-    if m.get("type") != "user" and m.get("role") != "user":
-        return False
-    content = (m.get("message") or {}).get("content") or m.get("content")
-    if isinstance(content, str):
-        return _human_text(content)
-    return any(
-        isinstance(b, dict) and b.get("type") != "tool_result" and _human_text(b.get("text"))
-        for b in _blocks(m)
-    )
 
 
 def classify_call(block):

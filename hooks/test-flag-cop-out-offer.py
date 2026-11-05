@@ -56,6 +56,20 @@ def reply(text):
          "input": {"text": text}}]}}
 
 
+def issue_filed():
+    """An issue_write create call, as the GitHub MCP server names it."""
+    return {"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "name": "mcp__github__issue_write",
+         "input": {"method": "create", "title": "nits"}}]}}
+
+
+def bash_call(command):
+    return {"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "name": "Bash", "input": {"command": command}}]}}
+
+
+USER_TURN = {"type": "user", "message": {"content": "next request"}}
+
 LONG = ("Setup job 143472 completed in 19m32s and the array is running. " * 12)
 
 CASES = [
@@ -162,6 +176,99 @@ CASES = [
         "Internal note: the merge landed cleanly.",
         "Done. Say the word and I'll open the follow-up PR.")], True,
      "an offer in the reply wins over clean narration"),
+
+    # ai-config#4962: optional work left as a closing remark, with no issue
+    # filed or linked in the same turn.
+    ([TOOL, say("Merged the fix.\n\nOptional cleanup: the two review nits are cosmetic "
+                "and stay as they are.")], True,
+     "'optional' with no issue filed or linked warns (ai-config#4962)"),
+    ([TOOL, say("Merged the fix.\n\nOptional cleanup: the two review nits are filed as "
+                "https://github.com/Morrison-Lab/ai-config/issues/4970.")], False,
+     "'optional' with an issue link in the reply stays silent"),
+    ([TOOL, issue_filed(), say("Merged the fix.\n\nOptional cleanup: the two review nits "
+                               "are cosmetic and stay as they are.")], False,
+     "'optional' after an issue_write create in the same turn stays silent"),
+    ([issue_filed(), USER_TURN, TOOL,
+      say("Merged the fix.\n\nOptional cleanup: the two review nits are cosmetic.")], True,
+     "an issue filed in an EARLIER turn does not cover this one"),
+    ([TOOL, bash_call("gh issue create --title nits --body-file b.md"),
+      say("Merged the fix.\n\nOptional cleanup: the two review nits are cosmetic.")], False,
+     "'optional' after gh issue create in the same turn stays silent"),
+
+    ([TOOL, say("The parameter is optional and defaults to 10.")], False,
+     "'optional' describing a parameter stays silent"),
+    ([TOOL, say("Merged the fix. Filed #4970 for the two nits.")], False,
+     "a 'Filed #N' close stays silent"),
+    ([TOOL, say("**OFFER** -- I can also add the chart.")], False,
+     "a FLAG/OFFER-marked message is left to flag-idea-without-issue"),
+    ([TOOL, bash_call("gh issue comment 12 --body-file b.md"),
+      say("Merged the fix. I can also fix the nits.")], False,
+     "an issue comment discharges the optional check"),
+
+    ([TOOL, say("You could also add a grouping variable with group_by().")], False,
+     "'could also add' in instructional prose stays silent"),
+    ([TOOL, say("The model fits well. I can also do a residual plot.")], False,
+     "a plain 'I can also do' stays silent"),
+    ([TOOL, say("**OFFER** -- add a dashboard later.\n\nMerged the fix.\n\n"
+                "Optional cleanup: the two review nits stay as they are.")], True,
+     "a marker in an unrelated paragraph does not exempt an unfiled optional"),
+
+    ([TOOL, say("Merged the fix as a follow-up to the earlier PR. All done.")], False,
+     "a completed 'as a follow-up' stays silent"),
+    ([TOOL, say("No nits remain after this pass; everything is addressed.")], False,
+     "'no nits remain' stays silent"),
+    ([TOOL, say("All review nits were fixed; none are left.")], False,
+     "'nits were fixed; none are left' stays silent"),
+    ([TOOL, say("There are no new nits left after this pass.")], False,
+     "'no new nits left' stays silent"),
+    ([TOOL, say("No further nits are left; everything is addressed.")], False,
+     "'no further nits are left' stays silent"),
+    ([TOOL, say("There aren't any nits left.")], False,
+     "'aren't any nits left' stays silent"),
+    ([TOOL, say("Merged. Outstanding nits remain in the file.")], True,
+     "'outstanding nits remain' with no issue warns"),
+    ([TOOL, say("Merged. A couple of nits remain unaddressed.")], True,
+     "'a couple of nits remain' with no issue warns"),
+    ([TOOL, say("Merged. There's one nit left to fix.")], True,
+     "'one nit left' with no issue warns"),
+    ([TOOL, say("Merged. All nits were fixed, so none remain.")], False,
+     "'all nits were fixed' stays silent"),
+    ([TOOL, say("Status: all fixed; two nits remain in the output file.")], True,
+     "a semicolon-joined 'all fixed; two nits remain' warns"),
+    ([TOOL, say("No nits remain after this pass? Actually yes, two nits remain "
+                "in the config.")], True,
+     "a corrected question-then-answer 'two nits remain' warns"),
+    ([TOOL, say("There are no nits left in module A, but two nits remain in "
+                "module B.")], True,
+     "a comma-joined contrast 'no nits in A, but two nits remain in B' warns"),
+    ([TOOL, say("No nits remain, however two nits remain in the config file.")], True,
+     "'No nits remain, however two nits remain' warns"),
+    ([TOOL, say("No one complained, two nits remain though.")], True,
+     "an unrelated 'No' before a comma does not silence a postposed-though report"),
+    ([TOOL, say("Nothing broke in testing, two nits remain, however.")], True,
+     "an unrelated 'Nothing' before a comma does not silence 'two nits remain'"),
+    ([TOOL, say("No nits remain in module A and two nits remain in module B.")], True,
+     "an 'and'-joined 'no nits in A and two nits remain in B' warns"),
+    ([TOOL, say("All style nits were fixed in file A and two nits remain in file B.")],
+     True, "an 'and'-joined 'all fixed in A and two nits remain in B' warns"),
+    ([TOOL, say("Merged. Two nits or issues remain in the figure code.")], True,
+     "'two nits or issues remain' (nouns joined by or) warns"),
+    ([TOOL, say("Merged. The style nits and formatting issues remain unfiled.")], True,
+     "'nits and issues remain unfiled' warns"),
+    ([TOOL, say("Merged the fix. No nits or issues remain.")], False,
+     "'No nits or issues remain' stays silent"),
+    ([TOOL, say("No nits nor issues remain.")], False,
+     "'No nits nor issues remain' stays silent"),
+    ([TOOL, say("There are no nits or follow-ups left.")], False,
+     "'no nits or follow-ups left' stays silent"),
+    ([TOOL, say("None of the nits or follow-ups remain.")], False,
+     "'None of the nits or follow-ups remain' stays silent"),
+    ([TOOL, say("Zero nits or follow-ups remain unfiled.")], False,
+     "'Zero nits or follow-ups remain unfiled' stays silent"),
+    ([TOOL, say("Merged. I will handle the cache change as a follow-up.")], True,
+     "a future 'as a follow-up' with no issue warns"),
+    ([TOOL, say("Merged. Two nits remain in the figure code.")], True,
+     "'two nits remain' with no issue warns"),
 
     # Antigravity transcript format: GENERIC tool result vs PLANNER_RESPONSE (ai-config#4635)
     ([{"source": "MODEL", "type": "GENERIC", "content": "Say the word and I'll push."}], False,

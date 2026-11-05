@@ -28,10 +28,17 @@ TAIL-ANCHORED, not whole-message and not substring. Two reasons:
     mid-message, followed by more substance, is usually a real question posed
     in passing.
 
+It also flags OPTIONAL work left as a closing remark ("optional", "I can also
+fix ...", "as a follow-up") when no issue was filed or linked in the same turn
+(ai-config#4962): optional items are filed as issues, and done at once when
+they are important or quick. A link to an issue in the reply, an issue_write
+create call, or a `gh issue create` after the last user message counts as filed.
+
 Fires once per distinct message (sentinel keyed by content hash).
 Fails OPEN.
 """
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -62,6 +69,86 @@ OFFERS = [
     r"once you confirm",
 ]
 RX = re.compile("|".join(OFFERS), re.I)
+
+# Optional work left as a closing remark instead of a filed issue
+# (ai-config#4962; Ezra, 2026-11-04: "always at least file optional items as
+# issues, and do them immediately if they are important and/or quick").
+# Matched against the same tail windows as OFFERS.
+# Every entry is phrase-bound: a bare "optional" fires on "this parameter is
+# optional" in ordinary technical prose, and "could also X" / "I can X" fire on
+# routine suggestions (review of #4979). Conditional offers ("I can X if you
+# want") belong to OFFERS above.
+OPTIONAL_WORK = [
+    r"\boptional (work|items?|fix(es)?|nits?|follow-?ups?|cleanups?|improvements?)\b",
+    r"\b(items?|fix(es)?|nits?|cleanups?|follow-?ups?)\b[^.;?!:\n]{0,30}\b(is|are) optional\b",
+    r"\b(could|can|will|would|should|'ll|plan to)\b[^.;?!:\n]{0,40}\bas a (small |separate )?follow-?up\b",
+    # The span starts at the NEAREST "nits" before the verb (it cannot contain
+    # another one) and may cross "and"/"or"/"nor" joining nouns ("no nits or
+    # issues remain"). Clause breaks are looked for only outside the span, in
+    # find_optional (review of #4979, rounds 9-11).
+    r"\bnits?\b(?:(?!\bnits?\b)[^.;?!:,\n]){0,60}?\b(left|remain|unfiled|not fixed)\b",
+]
+OPTIONAL_RX = re.compile("|".join(OPTIONAL_WORK), re.I)
+
+# A sentence that says nothing is outstanding ("no further nits are left",
+# "there aren't any nits left", "all nits were fixed") is a completion report,
+# whatever the distance between the negation and the matched phrase. Checked
+# per sentence instead of by regex adjacency (review of #4979, rounds 3-5).
+DONE_RX = re.compile(
+    r"\b(no|none|zero|nothing)\b"
+    r"|\b(aren't|isn't|are not|is not|there's not|there is not|there are not)\s+(any|a)\b"
+    r"|\ball\b[^.;?!:\n]*\b(fixed|addressed|done|resolved)\b",
+    re.I,
+)
+
+
+# A clause ends at . ; ? ! : , or a newline, or at a contrast word ("but",
+# "however", ...), so "no nits remain in A, but two nits remain in B" and
+# "No one complained, two nits remain though" are each two clauses (review of
+# #4979, rounds 5-8). Splitting at every comma errs toward warning on a list
+# such as "no bugs, nits, or issues remain"; one extra once-per-message notice
+# is the cheaper mistake than a silent miss.
+BREAK_RX = re.compile(
+    r"[.;?!:,\n]|\s*\b(?:but|however|though|although|while|whereas|yet|and|or|nor|so)\b",
+    re.I,
+)
+
+
+def _sentence_around(window, start, end):
+    """The clause holding window[start:end]."""
+    breaks = list(BREAK_RX.finditer(window))
+    left = max((b.end() for b in breaks if b.end() <= start), default=0)
+    right = min((b.start() for b in breaks if b.start() >= end), default=len(window))
+    return window[left:right]
+
+
+# A message carrying a FLAG or OFFER marker belongs to flag-idea-without-issue.py,
+# which already files ideas proposed that way; this hook leaves it alone so one
+# message does not trip two independently maintained matchers (review of #4979).
+MARKER_RX = re.compile(r"\*\*(FLAG|OFFER)\*\*")
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+
+
+def _sibling(name):
+    """Import a hyphenated sibling module, or None if unavailable."""
+    try:
+        spec = importlib.util.spec_from_file_location("_sib_" + name.replace("-", "_"), os.path.join(HERE, name))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+    except Exception:
+        return None
+
+
+# Evidence that an issue was filed or linked in the same turn: reuse the
+# discharge patterns flag-idea-without-issue.py and no-unfiled-finding.py
+# already own, rather than keeping a narrower copy here.
+_idea = _sibling("flag-idea-without-issue.py")
+_unfiled = _sibling("no-unfiled-finding.py")
+RX_CREATE = getattr(_idea, "RX_CREATE", None)
+RX_ALREADY_URL = getattr(_idea, "RX_ALREADY_URL", None)
+RX_ALREADY = getattr(_unfiled, "RX_ALREADY", None)
 
 # How much of the tail to inspect. An offer is the closing move, so a short
 # window is the point: it keeps a mid-message aside from firing.
@@ -214,6 +301,69 @@ def find_offer(text):
     return None
 
 
+def find_optional(text):
+    """Return the optional-work phrase when the reply closes on one."""
+    for window in offer_windows(text):
+        m = next((x for x in OPTIONAL_RX.finditer(window)
+                  if not DONE_RX.search(_sentence_around(window, x.start(), x.end()))), None)
+        if not m:
+            continue
+        start = window.rfind("\n\n", 0, m.start()) + 1
+        end = window.find("\n\n", m.end())
+        paragraph = window[start:end if end >= 0 else len(window)]
+        if MARKER_RX.search(paragraph):
+            continue  # that paragraph is flag-idea-without-issue.py's case
+        return m.group(0)
+    return None
+
+
+def _is_user_turn(m):
+    """A real user message, not a tool result echoed back as a user entry."""
+    if m.get("type") != "user" and m.get("role") != "user":
+        return False
+    content = (m.get("message") or {}).get("content") or m.get("content")
+    if isinstance(content, str):
+        return bool(content.strip())
+    if isinstance(content, list):
+        return any(
+            isinstance(b, dict) and b.get("type") != "tool_result" for b in content
+        )
+    return False
+
+
+def filed_issue_this_turn(path, reply_text):
+    """True when the reply links an issue or this turn filed one.
+
+    The turn is everything after the last real user message. A reply that
+    cites an issue URL counts, because filing and linking are the two halves
+    of the rule.
+    """
+    if RX_CREATE is None or RX_ALREADY is None or RX_ALREADY_URL is None:
+        return True  # fail open: the shared discharge patterns are unavailable
+    if RX_ALREADY.search(reply_text or "") or RX_ALREADY_URL.search(reply_text or ""):
+        return True
+    filed = False
+    try:
+        with open(path, encoding="utf-8", errors="ignore") as fh:
+            for line in fh:
+                try:
+                    m = json.loads(line)
+                except Exception:
+                    continue
+                if _is_user_turn(m):
+                    filed = False
+                    continue
+                for b in _blocks(m):
+                    if not isinstance(b, dict) or b.get("type") != "tool_use":
+                        continue
+                    blob = (b.get("name") or "") + " " + json.dumps(b.get("input") or {})
+                    if RX_CREATE.search(blob):
+                        filed = True
+    except Exception:
+        return True  # fail open: an unreadable transcript is not evidence of a slip
+    return filed
+
+
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
@@ -224,7 +374,10 @@ def main() -> int:
     if not texts:
         return 0
     phrase = next((p for p in (find_offer(t) for t in texts) if p), None)
-    if not phrase:
+    optional = next((p for p in (find_optional(t) for t in texts) if p), None)
+    if optional and filed_issue_this_turn(payload.get("transcript_path") or "", texts[0]):
+        optional = None
+    if not phrase and not optional:
         return 0
 
     # `last_visible_texts` returns at most one string, so the sentinel hashes
@@ -245,13 +398,22 @@ def main() -> int:
     # the failure this hook is about -- something that looks like it is
     # working and delivers nothing. stop_notice blocks once per turn, with
     # the warning as the reason the agent reads.
-    print(stop_notice(payload, f"Your reply closes on an offer to do work: \"{phrase}\". "
-        "Was that action already authorized? If so, do it and report in the "
-        "past tense -- an unanswered offer leaves no branch, no PR, no issue.", "flag-cop-out-offer"))
+    parts = []
+    if phrase:
+        parts.append(f"Your reply closes on an offer to do work: \"{phrase}\". "
+                     "Was that action already authorized? If so, do it and report in the "
+                     "past tense -- an unanswered offer leaves no branch, no PR, no issue.")
+    if optional:
+        parts.append(f"Your reply leaves optional work as an offer: \"{optional}\", and no "
+                     "issue was filed or linked this turn. File each optional item as an "
+                     "issue now, and do it immediately if it is important or quick "
+                     "(shared/workflow/report-mistakes-proactively.md, \"An idea is filed "
+                     "the same way a mistake is\").")
+    print(stop_notice(payload, " ".join(parts), "flag-cop-out-offer"))
 
     sys.stderr.write(
         f"[hook: flag-cop-out-offer] Your reply closes on an offer: "
-        f"\"{phrase}\".\n\n"
+        f"\"{phrase or optional}\".\n\n"
         "Ask one question: was that action ALREADY AUTHORIZED? A standing "
         "instruction (pr-on-claim opens the PR, issue-first files the issue), "
         "a daytb/away grant, or the user having asked for the outcome earlier "

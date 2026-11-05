@@ -10047,6 +10047,11 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         checker._ANNOTATIONS_READ.discard("all")
         check("--annotations-read all clears every annotation finding", all_ok)
 
+    parsed = checker.parse_args(
+        ["1", "--annotations-read", "5", "--annotations-read", "6,7"])
+    check("repeated --annotations-read keeps every value (ai-config#4980)",
+          parsed.annotations_read == ["5", "6,7"])
+
     print(f"\n{passes} passed, {failures} failed")
     return 1 if failures else 0
 

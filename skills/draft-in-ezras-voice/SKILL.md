@@ -21,16 +21,18 @@ Any draft that goes out as Ezra, or that he will send or post himself:
 - Issue, PR, and review comments written in his voice.
 - Messages to collaborators, students, or colleagues.
 
-It does not apply to agent-voice text such as status replies, agent-authored
-PR bodies, or comments marked as posted by an agent. Those keep the agent
-marker and follow [use-preferred-style](../use-preferred-style/SKILL.md).
+It does not apply to agent-voice text.
+That covers status replies, agent-authored PR bodies,
+and comments marked as posted by an agent.
+Those keep the agent marker and follow [use-preferred-style](../use-preferred-style/SKILL.md).
 
 ## Procedure
 
 1. Read [references/ezra-voice.md](references/ezra-voice.md) before drafting.
 2. Draft with its traits, and apply [use-preferred-style](../use-preferred-style/SKILL.md)
    underneath (plain words, active voice, few dependent clauses).
-3. Show the draft as a draft. Never send it for him without his go-ahead.
+3. Show the draft as a draft.
+   Never send it for him without his go-ahead.
 4. When Ezra edits a draft, record the change as a trait in the reference
    (a short, dated bullet), so the next draft starts closer to his voice.
 

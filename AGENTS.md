@@ -405,6 +405,13 @@ Use a browser only if none can (or could be set up), or the task is visual.
 Never use Chrome or Claude in Chrome (Ezra, 2026-10-22).
 See [`browser-last-resort`](shared/workflow/browser-last-resort.md) and [`gh-pages`](shared/workflow/read-published-html-from-gh-pages.md).
 
+## Draft communications in Ezra's voice
+
+When you draft a communication that goes out as Ezra (announcement, email, or a comment in his voice), imitate his writing style.
+Follow [`skills/draft-in-ezras-voice/SKILL.md`](skills/draft-in-ezras-voice/SKILL.md) and its [trait reference](skills/draft-in-ezras-voice/references/ezra-voice.md).
+Learn traits only from text Ezra wrote himself, never from student messages or other FERPA data.
+Show the draft and wait for his go-ahead before anything is sent (Ezra, 2026-11-05).
+
 ## Default to action without asking
 
 The owner grants standing permission for non-destructive steps (branch commits, pushes, opening/updating PRs, read commands, editing memory).

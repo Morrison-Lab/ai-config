@@ -587,12 +587,6 @@ Pass `model` on every `Agent` call and `Workflow` `agent()` call, and never laun
 `FABLE_SUBAGENT_OK=1` on the approved command only).
 Detail, rationale, and cases: [`shared/workflow/no-fable-subagents.md`](shared/workflow/no-fable-subagents.md).
 
-## Verify the running model and effort; never infer them
-
-A session cannot report its own tier by introspection.
-Before work that is only valid on a given tier, run `python3 scripts/check-session-runtime.py --expect-model <ids> --expect-effort <levels>` and treat exit 2 as a stop.
-Detail, rationale, and limits: [`shared/workflow/verify-running-model.md`](shared/workflow/verify-running-model.md) ([#879](https://github.com/Morrison-Lab/ai-config/issues/879)).
-
 ## Derive a set of work items; never hand over an enumeration of it
 
 The section above governs *whether* to dispatch.

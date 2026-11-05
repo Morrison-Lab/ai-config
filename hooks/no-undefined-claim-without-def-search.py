@@ -45,7 +45,7 @@ CLAIMS = (
     re.compile(rf"\bnone of (?:the )?[^.\n]{{0,40}}\b{SITE}\b[^.\n]{{0,40}}\bdefin", re.I),
 )
 
-QUOTED = re.compile(r"```.*?```|^>.*$|\"[^\"\n]*\"|“[^”\n]*”|`[^`\n]*`", re.S | re.M)
+QUOTED = re.compile(r"```.*?```|^>.*$|\"[^\"\n]*\"|\u201c[^\u201d\n]*\u201d|`[^`\n]*`", re.S | re.M)
 
 # A tool whose input is the agent's own prose is never evidence of a search.
 POSTING = re.compile(

@@ -382,7 +382,8 @@ A new symptom of a tracked defect family is a comment on that family's issue, no
 
 [shared/workflow/keep-agent-on-backlog.md](shared/workflow/keep-agent-on-backlog.md)
 
-When no thread is working and a project repo has an unowned open issue, start a thread on the top one; no merges (ai-config#4967).
+When no thread is working and a project repo has an unowned open issue, start a thread on the top one.
+It licenses no merges (ai-config#4967).
 
 ## If you see something, say something --- file an issue for every noticed mistake, concern, or idea, your own mistakes included
 

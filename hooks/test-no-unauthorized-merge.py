@@ -1892,6 +1892,57 @@ _ok_refusal = (_run.returncode == 0
 wrong += not _ok_refusal
 print(f"  {'ok' if _ok_refusal else 'WRONG':<6} refusal text points at enable-mwc")
 
+# The refusal names the id it looked up and what it found (ai-config#4950).
+import tempfile  # noqa: E402
+
+print("\nmwc_diagnosis:")
+with tempfile.TemporaryDirectory() as _tmp:
+    _common = Path(_tmp)
+    _reg = _common / "ai-sessions"
+    _real_dirs = _guard.get_git_common_dirs
+    _guard.get_git_common_dirs = lambda: [_common]
+    try:
+        _pl = {"session_id": "diag/1"}  # sanitizes to diag_1
+        _saved = {k: os.environ.pop(k, None) for k in ("AI_SESSION_ID", "CLAUDE_SESSION_ID")}
+        _no_id = _guard.mwc_diagnosis({})
+        for _k, _v in _saved.items():
+            if _v is not None:
+                os.environ[_k] = _v
+        _check("no session id: says so", "no session id" in _no_id)
+
+        _none = _guard.mwc_diagnosis(_pl)
+        _check("no ai-sessions dir: names the id and says none found",
+               "`diag_1`" in _none and "no ai-sessions directory" in _none)
+
+        _reg.mkdir()
+        _none2 = _guard.mwc_diagnosis(_pl)
+        _check("no marker: names the id and the enable-mwc command",
+               "`diag_1`" in _none2 and "no mwc marker" in _none2
+               and "enable-mwc --id diag_1" in _none2)
+
+        (_reg / "diag_1.mwc").write_text("", encoding="utf-8")
+        _nosess = _guard.mwc_diagnosis(_pl)
+        _check("marker without session record: says the record is missing",
+               "no session record diag_1.session" in _nosess)
+
+        (_reg / "diag_1.session").write_text("pid=0\nheartbeat=1\nstarted=1\n", encoding="utf-8")
+        _dead = _guard.mwc_diagnosis(_pl)
+        _check("dead session: names the heartbeat command",
+               "reads dead" in _dead and "heartbeat --id diag_1" in _dead)
+        def _boom():
+            raise OSError("unreadable")
+        _guard.get_git_common_dirs = _boom
+        _boomed = _guard.mwc_diagnosis(_pl)
+        _check("a failing lookup yields a line instead of raising (fail-closed)",
+               "diagnosis itself failed" in _boomed and "OSError" in _boomed)
+    finally:
+        _guard.get_git_common_dirs = _real_dirs
+
+_run = subprocess.run([sys.executable, HOOK, '--dry-run', 'gh pr merge 411 --squash'],
+                      capture_output=True, text=True, env=_bare_env)
+_check("refusal text carries the grant lookup line", "Grant lookup:" in _run.stdout
+       or "Grant lookup for session id" in _run.stdout)
+
 total = checks
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
 sys.exit(1 if wrong else 0)

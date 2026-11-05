@@ -126,6 +126,34 @@ class TestBlocks(unittest.TestCase):
             with self.subTest(command=command):
                 self.assert_allowed(command)
 
+    def test_cheap_invocation_then_unrelated_banned_text_is_allowed(self):
+        """ai-config#1141: the tail scan must stop at the invocation's end."""
+        for command in [
+            "Rscript --version && git log | grep 'devtools::test'",
+            "R --version | grep devtools::test",
+        ]:
+            with self.subTest(command=command):
+                self.assert_allowed(command)
+
+    def test_quoted_separators_do_not_end_the_invocation(self):
+        """Killer regression: `&&` or `|` inside the R code stays with it."""
+        for command in [
+            "Rscript -e 'if (TRUE && TRUE) devtools::test()'",
+            'Rscript -e "x <- 1 || 2; devtools::test()"',
+            "Rscript -e 'devtools::test()' | tee out.log",
+            "Rscript --version && Rscript -e 'devtools::test()'",
+        ]:
+            with self.subTest(command=command):
+                self.assert_blocked(command)
+
+    def test_heredoc_and_unbalanced_quote_still_scan_to_the_end(self):
+        for command in [
+            "R --no-save <<EOF\nx <- 1 | 2\ndevtools::test()\nEOF",
+            "Rscript -e 'devtools::test()",
+        ]:
+            with self.subTest(command=command):
+                self.assert_blocked(command)
+
     # -- the salloc trap ----------------------------------------------------
     def test_salloc_on_head_node_still_blocked(self):
         """An allocation reserves resources; it does not move you onto them."""

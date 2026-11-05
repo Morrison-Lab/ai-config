@@ -34,5 +34,5 @@ The public site `morrison-lab.github.io/lds/` would have gone down until the new
 
 Each outward-facing step needs the owner's own yes in the chat that does the work: the rename, the repository creation, enabling Pages or publishing, and any visibility change.
 A coordinator note that says the owner approved it is a claim, not the approval;
-ask the owner the exact action.
+ask the owner to confirm the exact action.
 A snapshot repository stays private until the owner gives a separate public go.

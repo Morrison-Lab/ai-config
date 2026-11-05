@@ -100,6 +100,17 @@ Scale the harness to the ask: a quick "find any bugs" wants a few finders and a
 single verify; "thoroughly audit this" wants a larger finder pool, a 3--5 vote
 adversarial pass, and a synthesis stage.
 
+## Fit the wave to the time left before launching it
+
+A deadline is a scope constraint, and the unit to compare it against is one full fix-and-verify cycle for a single item, not the time to write a patch.
+When the time left is shorter than that cycle, parallel implementers cannot finish, and launching more of them does not change that.
+On 2026-11-04 a `Lacaedemon/sparta` orchestrator, told to "go hard until 10am", launched four implementers with about 16 minutes left;
+three of the four came back with code-reading notes and no verified fix.
+(Figures from that orchestrator session's own account, not re-derived from an artifact.)
+
+- **Do:** before launching, compare the time left with one measured verify cycle for this repo (its local check run plus any measurement step, taken from the last completed item in this session or from the CI job durations `gh run list` reports), say so when it does not fit, and propose a scope that does --- a single item, a read-only triage, or a brief the next session can pick up.
+- **Don't:** launch a full implement-and-verify wave into a window shorter than one verify cycle because the user asked for effort.
+
 ## Route each agent's model/effort, don't default every call to the same tier
 
 `agent()`'s own guidance says to omit `model`/`effort` unless "highly

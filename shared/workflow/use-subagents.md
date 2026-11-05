@@ -256,6 +256,30 @@ multiple agents wrote to `pr.md` in the shared scratchpad,
 resulting in `qwt#148` temporarily receiving `mds` PR content with `Closes #41`;
 caught and remediated in ai-config#4105.)
 
+**2nd occurrence, 2026-11-03: the agents used generic names again, this time for directories as well as files.**
+In a `Lacaedemon/sparta` wave, the agents for sparta#1905 and sparta#1904 both wrote `judge.sh` and `variant.sh` to the shared scratchpad root,
+and one `git archive`d its baseline tree over the other's `main/` directory.
+The #1905 agent's jobs then ran the #1904 agent's rewritten script against the wrong worktree and left orphaned Godot processes.
+A brief that names one subdirectory per agent removes the need to name each file and directory uniquely, so it is harder to breach than a per-path rule.
+
+- **Do:** name a dedicated scratch subdirectory for each parallel agent in its brief, next to its assigned worktree (for example `<scratchpad>/a1905/`), and say that scripts, dumps and baseline trees all go there.
+- **Don't:** brief parallel agents with only the scratchpad root, or let them create generic names (`judge.sh`, `main/`) in it.
+
+See also the next section, which applies to the same per-agent subdirectories.
+
+## Delete measurement scratch as each item finishes
+
+Scratch fills the disk even with one agent, since copies of a whole tree and dense state dumps run to gigabytes per item.
+In the same sparta session, waves 14 and 15 left about 57 GB of scratch on `C:`, 1 to 18 GB per item.
+`C:` reached 0 MB free on 2026-11-04,
+and a `git worktree add` failed partway through, leaving a broken worktree.
+A full disk corrupts more than the step that hit it;
+[`memories/tools.md`](../../memories/tools.md)'s "Disk exhaustion corrupts state silently" section records the failure modes.
+
+- **Do:** tell each measurement-heavy agent to delete its own dumps and tree copies once it has read the figures, keeping only small logs and any prototype patch.
+- **Do:** when an item's PR merges or its findings are posted, move out any prototype patch still needed (to a branch or the PR), then delete that item's scratch subdirectory yourself.
+- **Don't:** leave finished items' scratch in place until the end-of-session wrap-up.
+
 
 
 

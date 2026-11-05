@@ -883,6 +883,14 @@
   The reliable fix is to state the constraint explicitly and up front in the **original** delegation prompt, not just discover it when resuming after the fact: add a line like "Run every verification step to actual completion within this turn --- a long-running local command (tests, coverage, a benchmark) must be waited on synchronously (the Bash tool call itself blocks until it returns); there is no background monitor that will wake you when it finishes, so do not end your turn describing yourself as waiting for one."
   Each resume in this session did recover cleanly once sent, but two of the three had already produced real, uncommitted-or-unpushed work sitting idle in the worktree for a full poll cycle.
   Before deciding whether to resume a "waiting" agent or treat it as done, always check `git log`/`git status` in its worktree directly --- don't just read its prose.
+  **3rd occurrence (`Lacaedemon/sparta` wave 16, 2026-11-04): both the agent and the orchestrator dropped it.**
+  The sparta#1791 agent committed its review fixes (297f508a, 17:07:53 PT) and paused at 17:08 to wait on its own check run.
+  No report arrived.
+  Whether it never resumed or its report was lost is not established.
+  The next heartbeat (17:17 PT) ended in `no_reply_needed` without looking at the worktree, and the work sat idle until the user asked "did you stop working?" at 22:29 PT.
+  - **Do:** when a notice says an agent is "waiting on its own background work", arm a one-shot wake to check its worktree, due shortly after that check run should finish (on sparta, about 60 minutes out).
+  - **Do:** on every heartbeat, run `git -C <worktree> log --oneline -3` for each in-flight item and act on any commit newer than the last report received.
+  - **Don't:** end a heartbeat with nothing to report while an item waits on an agent you have not confirmed is still running.
 - Before trusting a subagent's claim that it pushed a specific fix commit, independently verify the SHA actually reached the remote --- `gh pr view <N> --json headRefOid` (or `git ls-remote origin <branch>`) compared against the claimed SHA --- rather than trusting narrative confidence in the report.
   A subagent reported "both fixed, pushed in f7d5c60" with full circumstantial detail (file names, line numbers, a plausible-sounding diff); the commit was never actually on the remote branch, and only an independent PR-state check caught it before it was reported upstream as done.
   This is the commit-SHA-specific instance of the standing "verify agent reports with unfakeable asks" rule --- the unfakeable ask here is the remote ref itself, not more narrative.

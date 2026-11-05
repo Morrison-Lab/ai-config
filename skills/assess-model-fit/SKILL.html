@@ -376,7 +376,7 @@ cookieconsent.run({
 <section id="assess-model-fit-manual-procedural-mode" class="level3">
 <h3 class="anchored" data-anchor-id="assess-model-fit-manual-procedural-mode">Assess model fit (manual, procedural mode)</h3>
 <ol type="1">
-<li><strong>Identify the current model.</strong> Check your session or settings. Common tiers:
+<li><strong>Identify the current model.</strong> Do not guess it: run <code>python3 scripts/check-session-runtime.py</code>, which reads the session’s own transcript (see <a href="../../shared/workflow/verify-running-model.md"><code>verify-running-model</code></a>). Common tiers:
 <ul>
 <li>Tier 1: Fable 5 (<code>claude-fable-5</code>), Opus 4.8 (<code>claude-opus-4-8</code>)</li>
 <li>Tier 2: Sonnet 4.6 / 5 (<code>claude-sonnet-4-6</code>)</li>

@@ -6,7 +6,7 @@ Determine whether the current Claude model is sufficient for your task, or recom
 
 ### Assess model fit (manual, procedural mode)
 
-1.  **Identify the current model.** Check your session or settings. Common tiers:
+1.  **Identify the current model.** Do not guess it: run `python3 scripts/check-session-runtime.py`, which reads the session’s own transcript (see [`verify-running-model`](../../shared/workflow/verify-running-model.md)). Common tiers:
     - Tier 1: Fable 5 (`claude-fable-5`), Opus 4.8 (`claude-opus-4-8`)
     - Tier 2: Sonnet 4.6 / 5 (`claude-sonnet-4-6`)
     - Tier 3: Haiku 4.5 (`claude-haiku-4-5-20251001`)

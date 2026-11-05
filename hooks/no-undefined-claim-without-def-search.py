@@ -34,10 +34,10 @@ CLAIMS = (
     # "no page on the prereq sites defines it"
     re.compile(
         r"\bno\b[^.\n]{0,20}\b(?:page|site|chapter|section)s?\b[^.\n]{0,40}"
-        r"\b(?:prereq\w*|lds|mds|pds|sds)\b[^.\n]{0,30}\bdefines?\b", re.I),
+        rf"\b(?:prereq\w*|{SITE})\b[^.\n]{{0,30}}\bdefines?\b", re.I),
     # "is not defined in mds", "isn't defined on any of the prereq sites"
     re.compile(
-        rf"\b(?:is|are|was|were)(?: not|n't)\s+defined\s+(?:in|on|by|at)\s+"
+        rf"\b(?:is|are|was|were)(?: not|n't)\s+defined\s+(?:anywhere\s+)?(?:in|on|by|at)\s+"
         rf"(?:any\s+)?(?:of\s+)?(?:the\s+)?(?:prereq\w*\s+)?(?:{SITE}\b|sites?\b|pages?\b)", re.I),
     # "no prereq site defines it", "no prerequisite page covers"
     re.compile(r"\bno prereq\w*\s+(?:site|page|chapter)s?\b[^.\n]{0,30}\bdefin", re.I),

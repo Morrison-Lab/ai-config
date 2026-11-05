@@ -115,7 +115,6 @@ cited individually below.
     Put one sentence per line, and break before "and", "but", "so", "as",
     "which", "then", and "toward" when a line holds two clauses.
     Link the first use of every defined term in a div to its definition.
-    Procedure step 9 lists the checks that enforce this rule and rule 10.
 
 ## Filler and jargon to cut or swap
 

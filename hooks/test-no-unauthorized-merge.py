@@ -1920,12 +1920,12 @@ with tempfile.TemporaryDirectory() as _tmp:
                "`diag_1`" in _none2 and "no mwc marker" in _none2
                and "enable-mwc --id diag_1" in _none2)
 
-        (_reg / "diag_1.mwc").write_text("")
+        (_reg / "diag_1.mwc").write_text("", encoding="utf-8")
         _nosess = _guard.mwc_diagnosis(_pl)
         _check("marker without session record: says the record is missing",
                "no session record diag_1.session" in _nosess)
 
-        (_reg / "diag_1.session").write_text("pid=0\nheartbeat=1\nstarted=1\n")
+        (_reg / "diag_1.session").write_text("pid=0\nheartbeat=1\nstarted=1\n", encoding="utf-8")
         _dead = _guard.mwc_diagnosis(_pl)
         _check("dead session: names the heartbeat command",
                "reads dead" in _dead and "heartbeat --id diag_1" in _dead)

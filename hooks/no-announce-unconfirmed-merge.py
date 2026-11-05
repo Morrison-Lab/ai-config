@@ -32,7 +32,15 @@ import re
 import sys
 import tempfile
 
+_LIB = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"
+)
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+
 try:
+    from transcript_meta import is_real_user_turn as _is_user_turn  # ai-config#4983
+
     _spec = importlib.util.spec_from_file_location(
         "no_offer_to_file",
         os.path.join(os.path.dirname(os.path.realpath(__file__)), "no-offer-to-file.py"),
@@ -91,10 +99,6 @@ MERGE_CALL_RX = re.compile(
 )
 
 
-# Harness-injected text in a user-role message is not something the user said.
-SYSTEM_TEXT_RX = re.compile(r"<system-reminder|\[SYSTEM NOTIFICATION", re.I)
-
-
 def find_announcement(prose):
     """The first unconditional future-merge announcement in `prose`, or None."""
     for m in ANNOUNCE_RX.finditer(prose):
@@ -124,21 +128,6 @@ def _result_text(block):
     if isinstance(content, list):
         return " ".join(b.get("text", "") for b in content if isinstance(b, dict))
     return ""
-
-
-def _is_user_turn(m):
-    """A genuine user message: user role with at least one non-tool-result block."""
-    if m.get("type") != "user" and m.get("role") != "user":
-        return False
-    content = (m.get("message") or {}).get("content") or m.get("content")
-    if isinstance(content, str):
-        return bool(content.strip())
-    return any(
-        isinstance(b, dict)
-        and b.get("type") != "tool_result"
-        and not SYSTEM_TEXT_RX.match(str(b.get("text") or "").lstrip())
-        for b in _blocks(m)
-    )
 
 
 def merge_confirmed(path):

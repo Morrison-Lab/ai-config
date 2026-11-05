@@ -51,6 +51,7 @@ _AGENT_NOTICE_LIB = os.path.join(
 if _AGENT_NOTICE_LIB not in sys.path:
     sys.path.insert(0, _AGENT_NOTICE_LIB)
 from agent_notice import stop_notice  # noqa: E402 -- reaches the agent (ai-config#4796)
+from transcript_meta import is_real_user_turn as _is_user_turn  # noqa: E402 -- ai-config#4983
 
 # Matched against the LAST few lines of the reply only.
 OFFERS = [
@@ -315,20 +316,6 @@ def find_optional(text):
             continue  # that paragraph is flag-idea-without-issue.py's case
         return m.group(0)
     return None
-
-
-def _is_user_turn(m):
-    """A real user message, not a tool result echoed back as a user entry."""
-    if m.get("type") != "user" and m.get("role") != "user":
-        return False
-    content = (m.get("message") or {}).get("content") or m.get("content")
-    if isinstance(content, str):
-        return bool(content.strip())
-    if isinstance(content, list):
-        return any(
-            isinstance(b, dict) and b.get("type") != "tool_result" for b in content
-        )
-    return False
 
 
 def filed_issue_this_turn(path, reply_text):

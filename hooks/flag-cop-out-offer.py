@@ -80,9 +80,9 @@ RX = re.compile("|".join(OFFERS), re.I)
 # want") belong to OFFERS above.
 OPTIONAL_WORK = [
     r"\boptional (work|items?|fix(es)?|nits?|follow-?ups?|cleanups?|improvements?)\b",
-    r"\b(items?|fix(es)?|nits?|cleanups?|follow-?ups?)\b[^.\n]{0,30}\b(is|are) optional\b",
-    r"\b(could|can|will|would|should|'ll|plan to)\b[^.\n]{0,40}\bas a (small |separate )?follow-?up\b",
-    r"\bnits?\b[^.\n]{0,60}\b(left|remain|unfiled|not fixed)\b",
+    r"\b(items?|fix(es)?|nits?|cleanups?|follow-?ups?)\b[^.;?!:\n]{0,30}\b(is|are) optional\b",
+    r"\b(could|can|will|would|should|'ll|plan to)\b[^.;?!:\n]{0,40}\bas a (small |separate )?follow-?up\b",
+    r"\bnits?\b[^.;?!:\n]{0,60}\b(left|remain|unfiled|not fixed)\b",
 ]
 OPTIONAL_RX = re.compile("|".join(OPTIONAL_WORK), re.I)
 
@@ -93,15 +93,18 @@ OPTIONAL_RX = re.compile("|".join(OPTIONAL_WORK), re.I)
 DONE_RX = re.compile(
     r"\b(no|none|zero|nothing)\b"
     r"|\b(aren't|isn't|are not|is not|there's not|there is not|there are not)\s+(any|a)\b"
-    r"|\ball\b[^.\n]*\b(fixed|addressed|done|resolved)\b",
+    r"|\ball\b[^.;?!:\n]*\b(fixed|addressed|done|resolved)\b",
     re.I,
 )
 
 
+CLAUSE_BREAKS = (".", ";", "?", "!", ":", "\n")
+
+
 def _sentence_around(window, start, end):
-    """The sentence (bounded by a period or newline) holding window[start:end]."""
-    left = max(window.rfind(".", 0, start), window.rfind("\n", 0, start)) + 1
-    stops = [i for i in (window.find(".", end), window.find("\n", end)) if i >= 0]
+    """The clause (bounded by . ; ? ! : or a newline) holding window[start:end]."""
+    left = max(window.rfind(c, 0, start) for c in CLAUSE_BREAKS) + 1
+    stops = [i for i in (window.find(c, end) for c in CLAUSE_BREAKS) if i >= 0]
     return window[left:min(stops) if stops else len(window)]
 
 

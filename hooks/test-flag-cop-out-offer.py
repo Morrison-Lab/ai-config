@@ -233,6 +233,11 @@ CASES = [
      "'one nit left' with no issue warns"),
     ([TOOL, say("Merged. All nits were fixed, so none remain.")], False,
      "'all nits were fixed' stays silent"),
+    ([TOOL, say("Status: all fixed; two nits remain in the output file.")], True,
+     "a semicolon-joined 'all fixed; two nits remain' warns"),
+    ([TOOL, say("No nits remain after this pass? Actually yes, two nits remain "
+                "in the config.")], True,
+     "a corrected question-then-answer 'two nits remain' warns"),
     ([TOOL, say("Merged. I will handle the cache change as a follow-up.")], True,
      "a future 'as a follow-up' with no issue warns"),
     ([TOOL, say("Merged. Two nits remain in the figure code.")], True,

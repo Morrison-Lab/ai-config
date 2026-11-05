@@ -10,6 +10,11 @@ Check the tracker, the live threads and project memory first, as [`triage-new-as
 
 An idle agent with an unowned backlog is a defect, not a rest.
 
+## Deciding whether an agent is working
+
+Do not rely on `list_threads` with `state: "working"` alone, because it can return an empty list while threads are active (measured 2026-11-05).
+Also count any thread with a post or a PR event in the last 15 minutes, and read the live thread list rather than memory.
+
 ## What the rule does not license
 
 - It does not license merges.

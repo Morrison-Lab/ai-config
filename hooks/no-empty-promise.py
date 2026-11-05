@@ -211,11 +211,6 @@ _DEBT_SRC = r"""(
       \bowed\s+by\s+""" + _SUBJ_OBJ + r"""\b
     | \b """ + _SUBJ + r"""\s+(?:still\s+)?owe\b
     | \b """ + _SUBJ + _MODAL + r"""\s+wait\s+(?:right\s+)?here\b
-    # Announced-but-unstarted work: "I'll start with X", "I'm on it".
-    # Added after a thread ended on "I'll start with the equivalence-negation
-    # chapter" and never began it (Ezra: "empty promise?", 2026-11-05).
-    | \b """ + _SUBJ + _MODAL + r"""\s+(?:start|begin)\s+(?:with|on|by)\b
-    | \b """ + _SUBJ + r"""\s*(?:am|""" + _APOS + r"""m)\s+on\s+it\b
     | \b(?:scheduled|next)\s+check(?:[- ]?in)?\s+(?:is\s+)?at\b
       (?![^.!?\n]{0,120}\b(?:already|earlier|fired|completed|done|finished|ran|reported|confirmed|showed|found|passed|concluded|was|were|has\s+been)\b)
     )"""
@@ -231,6 +226,21 @@ _AUTOMATION_SRC = r"""(
             \s+(?:automatically\s+)?(?:launch|run|produce|post|start|complete|pass)\b
         )"""
 
+# Announced-but-unstarted work: "I'll start with X", "I'm on it".
+# Added after a thread ended on "I'll start with the equivalence-negation
+# chapter" and never began it (Ezra: "empty promise?", 2026-11-05).
+#
+# These are ordinary opening narration ("I'll start by reading the config"),
+# so unlike the debt phrasings they count ONLY when no tool call follows them
+# in the turn: the failure is announcing work and then ending the turn, and
+# any later tool call is the work starting. `scan()` clears the match on a
+# tool call and folds a surviving one into the debt text. Review on
+# ai-config#4985 reproduced the false block on a version that ignored order.
+_ANNOUNCE_SRC = r"""(
+      \b """ + _SUBJ + _MODAL + r"""\s+(?:start|begin)\s+(?:with|on|by)\b
+    | \b """ + _SUBJ + r"""\s*(?:am|""" + _APOS + r"""m)\s+on\s+it\b
+    )"""
+ANNOUNCE = re.compile(_ANNOUNCE_SRC, re.I | re.X)
 RULE = re.compile(_RULE_SRC, re.I | re.X)
 DEBT = re.compile(_DEBT_SRC, re.I | re.X)
 AUTOMATION = re.compile(_AUTOMATION_SRC, re.I | re.X)
@@ -575,7 +585,7 @@ def scan(path):
     requiring the write to come after the promise would block the correct
     case and pass almost nothing else.
     """
-    rule_txt = debt_txt = automation_txt = None
+    rule_txt = debt_txt = automation_txt = announce_txt = None
     # tool_use ids whose call LOOKED like a mechanism, pending their result,
     # keyed by WHICH mechanism it looked like. A call is only evidence once it
     # did not come back an error: permission denial is an ordinary way for a
@@ -620,7 +630,7 @@ def scan(path):
                 if b.get("is_error"):
                     failed.add(b.get("tool_use_id"))
             if not is_tool_result:
-                rule_txt = debt_txt = None
+                rule_txt = debt_txt = announce_txt = None
                 for ids in pending.values():
                     ids.clear()
                 failed.clear()
@@ -677,6 +687,13 @@ def scan(path):
             hit = AUTOMATION.search(prose)
             if hit:
                 automation_txt = hit.group(0).strip()
+            hit = ANNOUNCE.search(prose)
+            if hit:
+                announce_txt = hit.group(0).strip()
+
+        if tool_calls:
+            # Work followed the announcement, so it was not left unstarted.
+            announce_txt = None
 
         for tname, tinp, tid in tool_calls:
             kind_of = discharges(tname, tinp)
@@ -691,6 +708,8 @@ def scan(path):
     durable = bool(pending["durable"] - failed)
     scheduled = bool(pending["scheduled"] - failed)
     monitored = bool(pending["monitored"] - failed)
+    if debt_txt is None:
+        debt_txt = announce_txt
     return rule_txt, debt_txt, automation_txt, durable, scheduled, monitored
 
 

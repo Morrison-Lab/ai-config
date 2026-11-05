@@ -442,6 +442,14 @@ CASES = [
      True, "'I'm on it' with no work blocks"),
     ([say("I'll start with the equivalence-negation chapter."), WROTE_FRAGMENT],
      False, "'I'll start with X' discharged by a durable write"),
+    # Review finding on ai-config#4985: ordinary narration followed by the
+    # work itself must not block.
+    ([say("I'll start by reading the config file."), UNRELATED],
+     False, "'I'll start by X' followed by a tool call is work, not a promise"),
+    ([say("I'm on it -- give me a minute."), UNRELATED],
+     False, "'I'm on it' followed by a tool call passes"),
+    ([say("I'll start with the failing test."), UNRELATED, say("Done.")],
+     False, "announcement, work, then a recap passes"),
     ([say("I owe you a hook for this one.")],
      True, "'I owe you' with no mechanism blocks"),
     ([say("I still owe that follow-up entry.")],

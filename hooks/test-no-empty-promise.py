@@ -436,6 +436,12 @@ CASES = [
     # them, and the bookkeeping tone is what makes them pass self-review.
     ([say("The UMS pass is owed by me.")],
      True, "'owed by me' with no mechanism blocks"),
+    ([say("I'll start with the equivalence-negation chapter.")],
+     True, "'I'll start with X' and no work blocks (empty promise 2026-11-05)"),
+    ([say("I'm on it now.")],
+     True, "'I'm on it' with no work blocks"),
+    ([say("I'll start with the equivalence-negation chapter."), WROTE_FRAGMENT],
+     False, "'I'll start with X' discharged by a durable write"),
     ([say("I owe you a hook for this one.")],
      True, "'I owe you' with no mechanism blocks"),
     ([say("I still owe that follow-up entry.")],

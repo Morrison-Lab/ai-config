@@ -211,6 +211,11 @@ _DEBT_SRC = r"""(
       \bowed\s+by\s+""" + _SUBJ_OBJ + r"""\b
     | \b """ + _SUBJ + r"""\s+(?:still\s+)?owe\b
     | \b """ + _SUBJ + _MODAL + r"""\s+wait\s+(?:right\s+)?here\b
+    # Announced-but-unstarted work: "I'll start with X", "I'm on it".
+    # Added after a thread ended on "I'll start with the equivalence-negation
+    # chapter" and never began it (Ezra: "empty promise?", 2026-11-05).
+    | \b """ + _SUBJ + _MODAL + r"""\s+(?:start|begin)\s+(?:with|on|by)\b
+    | \b """ + _SUBJ + r"""\s*(?:am|""" + _APOS + r"""m)\s+on\s+it\b
     | \b(?:scheduled|next)\s+check(?:[- ]?in)?\s+(?:is\s+)?at\b
       (?![^.!?\n]{0,120}\b(?:already|earlier|fired|completed|done|finished|ran|reported|confirmed|showed|found|passed|concluded|was|were|has\s+been)\b)
     )"""

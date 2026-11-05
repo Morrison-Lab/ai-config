@@ -63,7 +63,7 @@
 #   a. librsvg2-bin (rsvg-convert, which PDF handouts with SVG figures need);
 #   b. the `typos` spell checker, from the crate-ci/typos GitHub release;
 #   c. the core R packages every lds page needs (knitr, rmarkdown, reticulate,
-#      remotes, lintr, JuliaCall), as Posit Package Manager binaries;
+#      remotes, lintr, JuliaCall, ggplot2), as Posit Package Manager binaries;
 #   d. the lab's `lms` linters (from Morrison-Lab/psc, at the repos' pinned
 #      commit), so lint-changed-lines can run locally before a push.
 #   e. (2026-11-04, ai-config#4943) the last step installs the ai-config Claude
@@ -210,7 +210,7 @@ $SUDO Rscript -e 'if (!requireNamespace("renv", quietly = TRUE)) install.package
 echo "==> Installing the core R packages for the lds notes site"
 if ! $SUDO Rscript -e '
   options(repos = c(CRAN = "https://packagemanager.posit.co/cran/__linux__/noble/latest"))
-  needed <- c("knitr", "rmarkdown", "reticulate", "remotes", "lintr", "JuliaCall")
+  needed <- c("knitr", "rmarkdown", "reticulate", "remotes", "lintr", "JuliaCall", "ggplot2")
   missing <- setdiff(needed, rownames(installed.packages()))
   if (length(missing) > 0) install.packages(missing)
   stopifnot(all(needed %in% rownames(installed.packages())))

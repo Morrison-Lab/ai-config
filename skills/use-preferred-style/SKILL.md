@@ -115,7 +115,7 @@ cited individually below.
     Put one sentence per line, and break before "and", "but", "so", "as",
     "which", "then", and "toward" when a line holds two clauses.
     Link the first use of every defined term in a div to its definition.
-    Procedure step 8 lists the checks that enforce this rule and rule 10.
+    Procedure step 9 lists the checks that enforce this rule and rule 10.
 
 ## Filler and jargon to cut or swap
 
@@ -167,16 +167,16 @@ and "Word choice" chapters.
    technical precision.
    When a hedge is load-bearing, keep it.
    Plainness is the goal, not false confidence.
-8. **Apply rules 9 to 11** to every added line of notes prose, such as a
+8. **Read it back.**
+   Each sentence should make one point.
+   The data should flow top to bottom.
+9. **Apply rules 9 to 11** to every added line of notes prose, such as a
    caption, exercise, or solution, before the one push on a branch.
    Run gha's `check-term-links`, `check-new-line-breaks` (with
    `NLB_CLAUSE_BREAKS=true`), `check-self-contained-captions`, and
    `check-serial-comma` locally, with the environment variables from the
    repo's workflow files.
    A clean script run does not cover rule 9, so do that one by reading.
-9. **Read it back.**
-   Each sentence should make one point.
-   The data should flow top to bottom.
 
 ## Before / after
 

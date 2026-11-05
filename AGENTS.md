@@ -417,6 +417,10 @@ The grant also covers installs and updates, `add_repo` (even to read), and posti
 Never ask the owner to perform a step you could do: [`default-to-action-grants`](shared/workflow/default-to-action-grants.md).
 Create new repos with `gh repo create --template`: [`templates`](shared/workflow/repo-templates.md).
 
+File every optional item as an issue, at the least, and do it at once if it is important or quick (Ezra, 2026-11-05).
+An optional item is a review nit, a "could also" or an offer to do more.
+Do not close a reply with it as an offer.
+
 ## Strict Merge Control Policy
 
 - **NEVER merge a PR or MR without explicit user permission**: a session grant (`/mwc`, `/maw`) or a merge instruction for that PR.

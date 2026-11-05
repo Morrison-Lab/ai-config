@@ -36,8 +36,8 @@ RECALL = re.compile(
     r"|\bif\s+I\s+(?:recall|remember)\s+(?:correctly|right)\b"
     r"|\boff\s+the\s+top\s+of\s+my\s+head\b"
     r"|(?:\b(?:not|never|without)|n['\u2019]t)\s+(?:been\s+)?(?:checked|verified)\s+against\s+(?:the\s+|a\s+|that\s+)?"
-    r"(?:text|book|textbook|source|sources|pdf|paper|docs|documentation|original|reference|library|repo|repository)\b"
-    r"|\bunchecked\s+against\s+(?:the\s+)?(?:text|book|source|pdf|paper|original)\b",
+    r"(?:text|book|textbook|source|sources|pdf|paper|docs|documentation|original|reference|library|repo|repository|api|readme|spec|specification|dataset|schema)\b"
+    r"|\bunchecked\s+against\s+(?:the\s+)?(?:text|book|source|pdf|paper|original|spec|api|readme|dataset)\b",
     re.I)
 
 # "not from memory" and the like say the author did check.

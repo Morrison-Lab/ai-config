@@ -49,6 +49,10 @@ CASES = [
     ("review4: recall buffer", POST, "From my memory buffer, the files restored fine.", False),
     ("review4: as I recall you", POST, "Let's meet tomorrow, as I recall you mentioned 3pm works.", False),
     ("review4: not checked against the book", POST, "The list was not checked against the book.", True),
+    ("review5: API docs", POST, "I haven't checked against the API docs, but it should work.", True),
+    ("review5: dataset", POST, "This hasn't been checked against the dataset yet.", True),
+    ("review5: README", POST, "Not checked against the README, but should be fine.", True),
+    ("review5: unchecked against the spec", POST, "This answer is unchecked against the spec.", True),
     ("unrelated tool", "Bash", "From my memory this works.", False),
     ("no text", POST, None, False),
 ]

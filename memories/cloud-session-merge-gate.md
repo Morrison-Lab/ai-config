@@ -43,6 +43,13 @@ The marker lives in the repository's git common directory, so it is per repo che
   The gate prints only 8; read the rest from the payload JSON (`headRefOid`).
 - **Do:** locate the script with `ls -d ~/.claude/plugins/cache/Morrison-Lab/ai-config/*/skills/session-lock/scripts/ai-session.sh`.
   `build-pr-payload.py` and `check-pr-fully-clean.py` are under `scripts/` in the same plugin directory.
+- **Do:** pass `--id <transcript uuid>` to `enable-mwc` itself, and not only to `check-mwc`.
+  Without it, `check-mwc` still reported "active" while the merge hook said no grant was recorded, and two merge calls were refused (mds#650, 2026-11-05).
+- **Do:** print the checker's result line into the transcript (`... | tail -3`) in the Bash call just before the merge call, with the checker named by its literal path.
+  The hook answers "needs a check-pr-fully-clean.py pass" when the line is only in a file or an earlier turn.
+- **Don't:** retry a refused merge as `ALLOW_MERGE=1 gh pr merge`.
+  The auto-mode classifier denied that shape (mds#650, 2026-11-05).
+  Fix the marker instead.
 - **Don't:** run the marker commands from `/home/user/ai-config` or `/home/claude` for a merge in another repo.
   A merge from the wrong cwd was denied as "MECHANISTIC PROHIBITION" despite an active grant (2026-10-15).
 - **Don't:** tell the user a hook blocks a granted merge before running the documented `enable-mwc` step (2026-10-10, lds#557 and psw#163).

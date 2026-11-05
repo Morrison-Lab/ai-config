@@ -16,7 +16,8 @@ saying a book is unavailable; books missing from either get added to both).
 
 WHAT IT CHECKS
 --------------
-    the final reply says a book is unreachable / unavailable / unchecked
+    the final reply says a book is unreachable / unavailable / unchecked,
+    or asks where a book is (ai-config#4959)
     AND the transcript shows no tool call that touched the project library
         (`project-files/books`) OR no tool call that touched `mlr`
 
@@ -121,10 +122,30 @@ def read_transcript(path):
     return (last_reply if saw_reply_tool else last_text), "\n".join(calls)
 
 
+# A question asking where a book is (ai-config#4959): "Where does the ISL book
+# live?" Asking the user is the same slip as saying it is unreachable when the
+# library was never searched. The transcript condition below is what keeps this
+# from over-matching "book club" or "software library": it fires only when
+# neither place was searched, and once per message.
+# The ask drops the UNREACHED co-requirement, so it matches only NAMED books:
+# the generic `books?` alternative substring-matches "notebook" and "book club"
+# (review of #4977).
+BOOK_NAMED = (
+    r"(?:\bESL\b|\bISL[RP]?\b|\bISLR2?\b|\bMurphy\b|\bBishop\b|\bHastie\b|"
+    r"\bCasella\b|\bDobson\b|\bKutner\b|\bSmola\b|\bGoodfellow\b|"
+    r"Elements of Statistical Learning|Pattern Recognition)"
+)
+ASK_RX = re.compile(rf"\bwhere\b[^.\n?]*{BOOK_NAMED}[^.\n?]*\?", re.I)
+
+
 def find_claim(text):
-    """The first sentence saying a book is unreachable, ignoring `quoted` spans."""
-    for m in SENTENCE_RX.finditer(QUOTED_RX.sub("", text)):
-        return m.group(0).strip()
+    """The first sentence saying a book is unreachable or asking where it is,
+    ignoring `quoted` spans."""
+    plain = QUOTED_RX.sub("", text)
+    for rx in (SENTENCE_RX, ASK_RX):
+        m = rx.search(plain)
+        if m:
+            return m.group(0).strip()
     return None
 
 
@@ -154,7 +175,7 @@ def main() -> int:
         pass
     print(stop_notice(
         payload,
-        f"Your reply says a book is unavailable (\"{claim[:120]}\"), but this session "
+        f"Your reply says a book is unavailable or asks where it is (\"{claim[:120]}\"), but this session "
         f"never searched {' or '.join(missing)}. Search both (pdftotext + grep for the "
         "library; the mlr books/ listing), then revise the reply. A book missing from "
         "either place gets added to both.",

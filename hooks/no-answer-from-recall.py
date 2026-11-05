@@ -28,7 +28,7 @@ REPLY_TOOL = re.compile(
     r"^mcp__hearthbot__(?:reply|post_message|update_message|edit_message|message_coordinator|message_thread)$")
 
 RECALL = re.compile(
-    r"\bfrom\s+(?:my\s+|the\s+)?(?:memory|recall|recollection)\b"
+    r"\bfrom\s+(?:my\s+)?(?:memory|recall|recollection)\b"
     r"|\b(?:my|a\s+vague)\s+(?:memory|recollection)\s+of\b"
     r"|\bas\s+I\s+(?:recall|remember)\b"
     r"|\bif\s+I\s+(?:recall|remember)\s+(?:correctly|right)\b"
@@ -43,8 +43,8 @@ DISCLAIMED = re.compile(
     re.I)
 
 WHERE_ASK = re.compile(
-    r"\b(?:where\s+(?:does|do|is|are|can\s+I\s+find)|point\s+me\s+to|tell\s+me\s+where|which\s+(?:folder|repo|path)\s+(?:holds|has|contains))\b"
-    r"[^.?\n]{0,60}\b(?:book|textbook|text|pdf|library|source|repo|file|folder|paper|docs?)\b",
+    r"\b(?:where\s+(?:does|is|are)|point\s+me\s+to|tell\s+me\s+where)\b"
+    r"[^.?\n]{0,60}\b(?:books?|textbooks?|pdfs?|papers?|library)\b",
     re.I)
 
 SEARCHED = re.compile(

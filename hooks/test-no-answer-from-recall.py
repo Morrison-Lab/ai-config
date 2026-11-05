@@ -33,6 +33,10 @@ CASES = [
     ("memory as a noun in code", POST, "The job uses 4 GB of memory and finished.", False),
     ("project memory file", POST, "I saved the rule to project memory.", False),
     ("where should the file go", POST, "Where should the new file go?", False),
+    ("review: where can I find the API docs", POST, "Where can I find the API docs for this?", False),
+    ("review: where is the migration file", POST, "Tell me where the migration file is so I can edit it.", False),
+    ("review: where to save the output file", POST, "Where do you want the output file saved?", False),
+    ("review: memory bank subsystem", POST, "From the memory bank subsystem, the value was loaded correctly.", False),
     ("unrelated tool", "Bash", "From my memory this works.", False),
     ("no text", POST, None, False),
 ]

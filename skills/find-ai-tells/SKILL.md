@@ -88,7 +88,7 @@ Define the pattern once, then run it through whichever tool is on hand:
 
 ```bash
 tells='delve|leverage|utilize|seamless(ly)?|robust|holistic|nuanced|multifaceted|intricate|tapestry|testament|realm|landscape|beacon|plethora|myriad|pivotal|crucial|paramount|underscore|foster|harness|embark|unlock|elevate|game-?changer|cutting-edge|state-of-the-art|ever-evolving|treasure trove|fast-paced|in the realm of|at the heart of|more than just|shed light|dive in(to)?|deep dive|serves as|stands as|the whole of it|own-goal|about what|things?'
-rg -niE "\b($tells)\b" <target>          # ripgrep
+rg -ni "\b($tells)\b" <target>          # ripgrep
 grep -rniE "\b($tells)\b" <target>       # no ripgrep — same pattern, via grep
 ```
 
@@ -102,9 +102,9 @@ grep -rniE "\b($tells)\b" <target>       # no ripgrep — same pattern, via grep
   the end of a factual clause to simulate analysis ("...thereby highlighting the
   importance of X", "...ensuring seamless alignment", "...paving the way for").
   Cut the participle clause or split into a concrete second sentence.
-- **The negation-reversal antithesis** — the single biggest tell:
-  "It's not just X, it's Y" / "It isn't about X; it's about Y" / "This isn't
-  merely X — it's Z". Grep: `rg -niE "(it'?s|this is) not (just|only|merely|about)"`.
+- **The negation-reversal antithesis** --- the single biggest tell: "It's not just X, it's Y" / "It isn't about X;
+  it's about Y" / "This isn't merely X --- it's Z".
+  Grep: `rg -ni "(it'?s|this is) not (just|only|merely|about)"`.
 - **Formulaic sentence openers** --- a declarative fronted by an
   underspecified reference (bare demonstrative "This is", "That is", "These are",
   "Those are", or "The one that"), a fronted wh-clause ("Who", "What", "Where",

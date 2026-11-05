@@ -112,7 +112,7 @@ tokens (`\bv?\d+\.\d+(\.\d+)?\b`), date-anchored phrases ("currently",
 
 ```bash
 # Grep for likely staleness carriers: versions, dates, temporal and deprecation phrases
-rg -niE '\bv?\d+\.\d+(\.\d+)?\b|\b(currently|as of|the latest|now supports|deprecated|no longer|legacy)\b' <target>
+rg -ni '\bv?\d+\.\d+(\.\d+)?\b|\b(currently|as of|the latest|now supports|deprecated|no longer|legacy)\b' <target>
 ```
 
 ### B. Irrelevant information

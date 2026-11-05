@@ -753,7 +753,7 @@ def render_fragment_caps(files, cap):
         # so dropping an alternative here would commit the exact error the
         # cited rule exists to prevent.
         lines.append(
-            "    rg -niE "
+            "    rg -ni "
             "'\\b(above|below|here|earlier|later)\\b|this (section|file)' "
             "<companion> <fragment>"
         )

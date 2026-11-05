@@ -29,6 +29,7 @@ REPLY_TOOL = re.compile(
 
 RECALL = re.compile(
     r"\bfrom\s+(?:my\s+)?(?:memory|recall|recollection)\b"
+    r"|\bfrom\s+the\s+(?:memory|recollection)\s+of\b"
     r"|\b(?:my|a\s+vague)\s+(?:memory|recollection)\s+of\b"
     r"|\bas\s+I\s+(?:recall|remember)\b"
     r"|\bif\s+I\s+(?:recall|remember)\s+(?:correctly|right)\b"
@@ -44,7 +45,7 @@ DISCLAIMED = re.compile(
 
 WHERE_ASK = re.compile(
     r"\b(?:where\s+(?:does|is|are)|point\s+me\s+to|tell\s+me\s+where)\b"
-    r"[^.?\n]{0,60}\b(?:books?|textbooks?|pdfs?|papers?|library)\b",
+    r"[^.?\n]{0,60}\b(?:books?|textbooks?|project\s+library)\b",
     re.I)
 
 SEARCHED = re.compile(

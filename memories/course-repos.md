@@ -194,3 +194,13 @@ institution-specific content, such as a WWU syllabus section, can still come fro
 (Ezra, 2026-11-02, on mcs:
 "lds is the outlier because it is currently private;
 look at the other public notes repos too".)
+
+## Pure-move PRs between notes repos: whole-file checks, the size cap, and what to file
+
+The notes repos' doc checks (`check-term-links`, `check-avoided-words`, `check-proof-statements`, `check-exm-figures`) read whole files once any line of the file changes.
+A scripted link repoint therefore trips findings that were already there, on files it only touched (Morrison-Lab/mcs#60, mds#657 and mds#661, 2026-11-05).
+A pure move over the 10-file cap is pushed with `ALLOW_LARGE_PR=1`, and the pre-push hook lists every `check-term-links` finding at once.
+
+- **Do:** fix each finding on a line the PR touched in the same PR (a trailing "(@def-x)" becomes a link on the term; a "moreover" in a theorem statement becomes "and"), and file warnings on untouched lines, such as examples without figures, as one issue.
+- **Do:** fix every listed term-link finding before the second push, since each failed push is a round.
+- **Don't:** widen a pure-move PR to clear findings on lines it did not touch.

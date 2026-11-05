@@ -55,6 +55,16 @@ CASES = [
     ([WEB, say("The rule says `could not reach the book` is never acceptable.")], False,
      "a claim quoted in backticks is not an assertion"),
     ([WEB], False, "no reply text: silent"),
+    ([WEB, reply("Where does the ISL book live?")], True,
+     "asking where a book lives, with no library search: warns (ai-config#4959)"),
+    ([WEB, say("Where can I find ESL?")], True,
+     "asking where a named book is, with no library search: warns"),
+    ([LIB, mlr_listing(), reply("Where does the ISL book live?")], False,
+     "the same question after searching both places: silent"),
+    ([WEB, reply("Where do the lectures start? The book is in chapter 2.")], False,
+     "a where-question that does not mention a book is silent"),
+    ([WEB, say("The rule says `where is the book?` must be searched first.")], False,
+     "a where-question quoted in backticks is not an ask"),
 ]
 
 

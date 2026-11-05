@@ -13,6 +13,7 @@ The project library at `/mnt/project-files` held it.
 - A hedge such as "from memory" or "not checked against" is a defect, not a disclosure: replace it with the check.
 - If no source exists, say what you searched and that the claim rests on inference.
 
-Enforced by `hooks/no-answer-from-recall.py`, which denies a reply that says it answers from memory or recall, or says it was not checked against a source.
-Asking where a source lives is not matched, because every pattern for it over-matched ordinary prose.
+Enforced by `hooks/no-answer-from-recall.py`, which denies a reply that says it answers from memory or recall in the first person.
+"Not checked against" and asking where a source lives are not matched, because every pattern for them over-matched ordinary prose or missed real cases.
+Those two rest on this rule alone (#4959).
 Related: `hooks/flag-book-unavailable-without-library-search.py`, [`dont-take-my-word-for-it`](../principles/dont-take-my-word-for-it.md).

@@ -407,10 +407,8 @@ See [`browser-last-resort`](shared/workflow/browser-last-resort.md) and [`gh-pag
 
 ## Draft communications in Ezra's voice
 
-When you draft a communication that goes out as Ezra (announcement, email, or a comment in his voice), imitate his writing style.
-Follow [`skills/draft-in-ezras-voice/SKILL.md`](skills/draft-in-ezras-voice/SKILL.md) and its [trait reference](skills/draft-in-ezras-voice/references/ezra-voice.md).
-Learn traits only from text Ezra wrote himself, never from student messages or other FERPA data.
-Show the draft and wait for his go-ahead before anything is sent (Ezra, 2026-11-05).
+Imitate Ezra's writing style in any draft that goes out as him ([`draft-in-ezras-voice`](skills/draft-in-ezras-voice/SKILL.md)).
+Learn it only from his own text, never FERPA data.
 
 ## Default to action without asking
 
@@ -459,12 +457,6 @@ re-arm periodic check-ins using the session's wake mechanism.
 After every push, actively poll forge CI and review state with `gh` or `glab` until terminal.
 Baking a self-merge directive into the loop prompt is allowed only under a standing `mwc` grant.
 See [`persistent-pr-loop`](shared/workflow/persistent-pr-loop.md).
-
-- **Do:** arm a persistent loop in the turn you open, push to, or take over a PR.
-- **Do:** actively query current-head CI and review state with `gh`/`glab` after every push until terminal.
-- **Do:** in the Claude desktop app, turn on the PR's Auto-fix switch;
-  it replaces the polling loop there.
-- **Don't:** treat a webhook subscription or one-shot status poll as watching.
 
 ## Monitor scoped open PRs and MRs
 

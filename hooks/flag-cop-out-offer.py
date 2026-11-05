@@ -82,7 +82,7 @@ OPTIONAL_WORK = [
     r"\boptional (work|items?|fix(es)?|nits?|follow-?ups?|cleanups?|improvements?)\b",
     r"\b(items?|fix(es)?|nits?|cleanups?|follow-?ups?)\b[^.;?!:\n]{0,30}\b(is|are) optional\b",
     r"\b(could|can|will|would|should|'ll|plan to)\b[^.;?!:\n]{0,40}\bas a (small |separate )?follow-?up\b",
-    r"\bnits?\b[^.;?!:\n]{0,60}\b(left|remain|unfiled|not fixed)\b",
+    r"\bnits?\b[^.;?!:\n]{0,60}?\b(left|remain|unfiled|not fixed)\b",
 ]
 OPTIONAL_RX = re.compile("|".join(OPTIONAL_WORK), re.I)
 
@@ -98,14 +98,18 @@ DONE_RX = re.compile(
 )
 
 
-CLAUSE_BREAKS = (".", ";", "?", "!", ":", "\n")
+# A clause ends at . ; ? ! : or a newline, or at a contrast word ("but",
+# "however", ...) with its comma, so "no nits remain in A, but two nits remain
+# in B" is two clauses (review of #4979, rounds 5-7).
+BREAK_RX = re.compile(r"[.;?!:\n]|,?\s*\b(?:but|however|though|although|while|yet)\b", re.I)
 
 
 def _sentence_around(window, start, end):
-    """The clause (bounded by . ; ? ! : or a newline) holding window[start:end]."""
-    left = max(window.rfind(c, 0, start) for c in CLAUSE_BREAKS) + 1
-    stops = [i for i in (window.find(c, end) for c in CLAUSE_BREAKS) if i >= 0]
-    return window[left:min(stops) if stops else len(window)]
+    """The clause holding window[start:end]."""
+    breaks = list(BREAK_RX.finditer(window))
+    left = max((b.end() for b in breaks if b.end() <= start), default=0)
+    right = min((b.start() for b in breaks if b.start() >= end), default=len(window))
+    return window[left:right]
 
 
 # A message carrying a FLAG or OFFER marker belongs to flag-idea-without-issue.py,

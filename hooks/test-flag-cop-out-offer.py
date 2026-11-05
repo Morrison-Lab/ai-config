@@ -238,6 +238,11 @@ CASES = [
     ([TOOL, say("No nits remain after this pass? Actually yes, two nits remain "
                 "in the config.")], True,
      "a corrected question-then-answer 'two nits remain' warns"),
+    ([TOOL, say("There are no nits left in module A, but two nits remain in "
+                "module B.")], True,
+     "a comma-joined contrast 'no nits in A, but two nits remain in B' warns"),
+    ([TOOL, say("No nits remain, however two nits remain in the config file.")], True,
+     "'No nits remain, however two nits remain' warns"),
     ([TOOL, say("Merged. I will handle the cache change as a follow-up.")], True,
      "a future 'as a follow-up' with no issue warns"),
     ([TOOL, say("Merged. Two nits remain in the figure code.")], True,

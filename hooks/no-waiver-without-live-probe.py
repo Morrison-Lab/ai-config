@@ -39,7 +39,11 @@ NOT_EXHAUSTED = re.compile(
     r"\b(?:not|isn'?t|aren'?t|never|no\s+longer)\s+(?:been\s+)?"
     r"(?:exhausted|unavailable|waived|rate[- ]limited|out\s+of\s+quota)\b", re.I)
 
-READ_TOOL = re.compile(
+# The comma or semicolon clause holding a negation is dropped, so a negated
+# route does not hide a different route's claim in the same sentence.
+NEGATED_CLAUSE = re.compile(r"[^,;]*" + NOT_EXHAUSTED.pattern + r"[^,;]*", re.I)
+
+READ_TOOL =re.compile(
     r"^(?:mcp__hearthbot__read_\w+|mcp__claude-code-remote__(?:get_event|list_events)|ReadNotifications)$")
 PROBE_OUTPUT = re.compile(r"probe|GoUsageLimitError|usage limit|quota|unavailable|exit\s*(?:code|status)?\s*\d|models?\b|HTTP\s*\d{3}", re.I)
 
@@ -63,7 +67,8 @@ def claimed_routes(text):
     unavailable. A cross-harness claim names both. Empty when nothing is claimed."""
     routes = set()
     for s in sentences(text):
-        if not CLAIM.search(s) or NOT_EXHAUSTED.search(s):
+        s = NEGATED_CLAUSE.sub("", s)
+        if not CLAIM.search(s):
             continue
         for m in TARGET.finditer(s):
             w = m.group(0).lower()

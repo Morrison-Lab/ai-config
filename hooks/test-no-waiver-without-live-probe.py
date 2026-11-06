@@ -79,6 +79,8 @@ CASES = [
     ("one-route claim needs only that probe", POST, "OpenCode is rate-limited, so I used another reviewer.", [human()] + OC, False),
     ("one-route claim still needs its own probe", POST, "OpenCode is rate-limited, so I used another reviewer.", [human()] + AGY, True),
     ("not rate-limited is no claim", POST, "OpenCode is not rate-limited, so I ran it.", [human()], False),
+    ("negated route does not hide another route's claim", POST, "Agy is exhausted, and OpenCode is not rate-limited.", [human()] + OC, True),
+    ("negation first, claim after", POST, "OpenCode is not rate-limited, but Agy is exhausted.", [human()] + OC, True),
     ("e.g. does not split a claim", POST, "Cross-harness review via agy (e.g. Gemini) is waived.", [human()], True),
     ("human reviewer unavailable is no claim", POST, "The human reviewer is unavailable this week.", [human()], False),
     ("not exhausted is no claim", POST, "agy is not exhausted, so I ran it.", [human()], False),

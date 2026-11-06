@@ -422,6 +422,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python3 scripts/test_check_hook_catalog.py
+      - name: Check the topic map is current
+        run: python3 scripts/gen-topic-map.py --check
+      - name: Run topic-map generator tests
+        run: python3 scripts/test_gen_topic_map.py
       - name: Run hook-delivery check tests
         run: python3 scripts/test_check_hook_delivery.py
       - name: Check hook output shape (warn-only hooks emit systemMessage)

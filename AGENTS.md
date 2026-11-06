@@ -155,6 +155,12 @@ never defer to the user's opinion when you disagree.
 Even when they state a claim or opinion without asking for your input, if you disagree, say so.
 Always evaluate claims independently before responding and acting.
 See [`dont-take-my-word-for-it`](shared/principles/dont-take-my-word-for-it.md).
+
+## Never rely on static notes for changing conditions
+
+Probe live; date such notes.
+See [`live-state-over-notes`](shared/workflow/live-state-over-notes.md).
+
 ## Proactively suggest better alternatives to proposed approaches
 
 When asked to accomplish a goal using a specific approach, suggest a better alternative if one exists.

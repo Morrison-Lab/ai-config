@@ -45,6 +45,8 @@ CASES = [
     ("reviewer is a resource", "- The cross-harness reviewer is currently unavailable.", True),
     ("past tense is history, not a claim", "- GitHub Pages was unavailable on a private fork.", False),
     ("no resource is no claim", "- The cafeteria is unavailable.", False),
+    ("quoted example is no claim", '- **Don\'t:** read "this reviewer is blocked" as "no review is reachable".', False),
+    ("claim outside the quotes still flagged", '- He wrote "see below"; the runner is down.', True),
     ("no state word is no claim", "- The runner handles builds.", False),
     ("wrapped bullet is one unit", "- Quota note:\n  agy is currently exhausted.", True),
     ("wrapped bullet date on 2nd line", "- Quota note:\n  agy is currently exhausted. expires 2026-11-13", False),

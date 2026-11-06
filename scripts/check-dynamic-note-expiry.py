@@ -56,6 +56,8 @@ SENTENCE = re.compile(r"(?<=[.!?])\s+")
 
 def is_state_claim(unit):
     """True when some sentence of *unit* claims a resource is currently down."""
+    # A quoted phrase is an example of wording, not an assertion by the note.
+    unit = re.sub(r'"[^"]*"|\u201c[^\u201d]*\u201d', " ", unit)
     for s in SENTENCE.split(" ".join(unit.split())):
         if STATE.search(s) and RESOURCE.search(s) and not MECHANISM.search(s):
             return True

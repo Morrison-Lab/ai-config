@@ -97,7 +97,7 @@ def segments(cmd):
     out.append("".join(cur))
     return out
 
-HEREDOC = re.compile(r"(?<=<<)-?\s*['\"]?([^\s'\"<>|;&]*)['\"]?[^\n]*\n(?:.*\n)*?\s*\1[ \t]*(?=\n|$)")
+HEREDOC = re.compile(r"(?<=<<)-?\s*['\"]?([^\s'\"<>|;&]*)['\"]?[^\n]*\n(?:(?:.*\n)*?\s*\1[ \t]*(?=\n|$)|(?s:.*))")
 
 
 def argvs(cmd, depth=0):

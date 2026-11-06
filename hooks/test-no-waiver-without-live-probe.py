@@ -63,6 +63,7 @@ CASES = [
     ("heredoc with a ~EOF delimiter is no probe", POST, WAIVE, [human()] + bash(1, "cat <<~EOF\nagy run\nopencode run -m x ok\n~EOF"), True),
     ("heredoc <<~EOF with a stray EOF line stays data", POST, WAIVE, [human()] + bash(1, "cat <<~EOF\nnotes\nEOF\nagy run\nopencode run -m x ok\n~EOF"), True),
     ("heredoc with an empty delimiter is no probe", POST, WAIVE, [human()] + bash(1, "cat <<''\nagy run\nopencode run -m x ok\n\necho done"), True),
+    ("unterminated heredoc swallows the rest as data", POST, WAIVE, [human()] + bash(1, "cat <<~EOF\nagy run\nopencode run -m x ok\nEOF"), True),
     ("multi-line quoted argument is no probe", POST, WAIVE, [human()] + bash(1, "echo 'notes:\nagy run\nopencode run -m x ok\n'"), True),
     ("human reviewer unavailable is no claim", POST, "The human reviewer is unavailable this week.", [human()], False),
     ("not exhausted is no claim", POST, "agy is not exhausted, so I ran it.", [human()], False),

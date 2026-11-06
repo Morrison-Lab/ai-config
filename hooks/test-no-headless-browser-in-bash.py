@@ -189,6 +189,11 @@ class TestBlocks(unittest.TestCase):
         self.assert_blocked(f"cat > /tmp/bypass2.js <<'X'; gh pr comment 1 -b done\n{body}X\nnode /tmp/bypass2.js")
         self.assert_blocked(f"cat > /tmp/bypass3.js <<'X' # git commit later\n{body}X\nnode /tmp/bypass3.js")
 
+    def test_prose_words_inside_a_quoted_path_do_not_exempt(self):
+        body = "const { chromium } = require('playwright');\n"
+        for n, word in enumerate(["git commit", "gh pr", "--body-file", "gh issue"]):
+            self.assert_blocked(f"cat > '/tmp/{word}/evil{n}.js' <<'X'\n{body}X\nnode '/tmp/{word}/evil{n}.js'")
+
     def test_quoted_heredoc_body_ending_in_backslash(self):
         self.assert_blocked(
             "cat > /tmp/shot26.js <<'X'\n"

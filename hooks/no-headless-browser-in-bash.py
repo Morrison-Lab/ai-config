@@ -114,6 +114,7 @@ MAX_SCRIPT_BYTES = 400_000
 HEREDOC = re.compile(r"<<-?\s*[\"']?(\w+)[\"']?[^\n]*\n(.*?)\n\s*\1\s*(?:\n|$)", re.DOTALL)
 # A command whose heredoc supplies prose: a commit message, a PR or issue body.
 PROSE_CONSUMER = re.compile(r"\bgit\s+commit\b|\bgh\s+(?:pr|issue)\b|--body-file\b|\s-F\s+-")
+GIT_OR_GH_FIRST = re.compile(r"\s*(?:\w+=\S*\s+)*(?:git|gh)\s")
 PROSE_FLAG = re.compile(
     r"""(?:^|\s)(?:-m|--message|--body|--title|-b|-t|--description)(?:\s+|=)(?:"(?:[^"\\]|\\.)*"|'[^']*')"""
 )
@@ -154,7 +155,13 @@ def _script_name_counts(command: str) -> dict:
         opener = command[: match.start(2)].rsplit("\n", 2)[-2]
         return re.split(r"&&|\|\||[;|]", opener.partition("<<")[0])[-1]
 
-    matches_writing = [m for m in matches if not PROSE_CONSUMER.search(owner(m))]
+    def is_prose(match):
+        # Quoted text is dropped and the command must start with git or gh,
+        # so a path that merely contains `git commit` is not prose.
+        text = re.sub(r"\"[^\"]*\"|'[^']*'", "", owner(match))
+        return bool(GIT_OR_GH_FIRST.match(text) and PROSE_CONSUMER.search(text))
+
+    matches_writing = [m for m in matches if not is_prose(m)]
     if not any(LIBRARY.search(m.group(2)) for m in matches_writing):
         return {}
     # Drop each body and its closing line, but keep the opener line, which

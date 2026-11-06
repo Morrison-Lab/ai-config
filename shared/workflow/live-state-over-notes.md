@@ -11,6 +11,11 @@ Both were available.
 Extends [`check-sources-over-recall`](check-sources-over-recall.md), which covers recalled facts.
 This rule covers a note's claim about a condition that changes.
 
+Conditions that change include quota, availability, outages, pauses, CI state, branch or PR state, and open or merged status.
+Memories, handoffs, recaps and earlier transcript turns are hints, not evidence.
+An earlier case: a remembered "agy Argon quota out until 2026-11-04" note was acted on after Argon had recovered (Ezra, 2026-11-05).
+This text started as the `AGENTS.md` section in ai-config#5019, which this file replaces.
+
 - **Probe before you act on the condition.**
   Probe each route.
   For agy, make a real call on cf463-02 through Remote Control, since agy is absent in cloud containers.

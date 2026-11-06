@@ -94,6 +94,7 @@ CASES = [
     ("elliptical after a negation is no claim", POST, "Agy is not exhausted, and OpenCode is not either.", [human()], False),
     ("bash -norc takes a script file, not a command", POST, WAIVE, [human()] + bash(1, "bash -norc 'agy run ok'") + bash(2, "bash -norc 'opencode run x ok'"), True),
     ("bash -rc counts", POST, WAIVE, [human()] + bash(1, "bash -rc 'agy -p ok'") + bash(2, "sh -ec 'opencode run x ok'"), False),
+    ("bash single-dash long options take a script file", POST, WAIVE, [human()] + bash(1, "bash -restricted 'agy run ok'") + bash(2, "bash -rcfile /etc/x 'opencode run x ok'"), True),
     ("negation first, claim after", POST, "OpenCode is not rate-limited, but Agy is exhausted.", [human()] + OC, True),
     ("e.g. does not split a claim", POST, "Cross-harness review via agy (e.g. Gemini) is waived.", [human()], True),
     ("human reviewer unavailable is no claim", POST, "The human reviewer is unavailable this week.", [human()], False),

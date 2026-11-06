@@ -40,6 +40,10 @@ NOT_EXHAUSTED = re.compile(
     r"(?:exhausted|unavailable|waived|rate[- ]limited|out\s+of\s+quota)\b", re.I)
 
 
+# A cluster of at most four of bash's argument-less single-letter flags that
+# includes -c (-lc, -ec, -rc). The length cap and the missing o and O keep
+# single-dash long options (-norc, -rcfile, -restricted) from matching.
+SHELL_C_FLAGS = re.compile(r"(?=.{2,5}$)-[abefhiklmnprstuvxBCDEHPT]*c[abefhiklmnprstuvxBCDEHPT]*")
 ELLIPSIS = re.compile(r"\b(?:too|also|as\s+well|so\s+(?:is|are|does|has))\b", re.I)
 
 READ_TOOL = re.compile(
@@ -229,7 +233,7 @@ def argvs(cmd, depth=0):
         yield argv
         word = os.path.basename(argv[0])
         if depth < 3 and word in ("bash", "sh", "zsh"):
-            flags = [i for i, a in enumerate(argv[1:-1], 1) if re.fullmatch(r"-[A-NP-Za-np-z]*c[A-NP-Za-np-z]*", a)]  # not o or O: they take an argument
+            flags = [i for i, a in enumerate(argv[1:-1], 1) if SHELL_C_FLAGS.fullmatch(a)]
             if flags:
                 yield from argvs(argv[flags[0] + 1], depth + 1)
         elif depth < 3 and word == "ssh":

@@ -242,7 +242,9 @@ def argvs(cmd, depth=0):
                 yield from argvs(argv[flags[0] + 1], depth + 1)
         elif depth < 3 and word == "ssh":
             # ssh options end at the host; everything after it is the remote
-            # command, which ssh joins with spaces for the remote shell.
+            # command, which ssh joins with spaces for the remote shell, so
+            # quoting is lost exactly as on the real remote: `ssh h bash -c
+            # 'agy run ok'` runs plain `agy` there, and is not a probe.
             i = 1
             while i < len(argv) and argv[i].startswith("-"):
                 i += 2 if argv[i] in SSH_ARG_OPTS else 1

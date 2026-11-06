@@ -1288,7 +1288,7 @@ A model is never "Bayesian"; only how it is fitted is.
 
 [`shared/writing/course-sequence.md`](shared/writing/course-sequence.md)
 
-The lab's course sites run mds -> pds -> sds,
+The lab's course sites run mcs -> mds -> pds -> sds,
 which branches into lds (prediction) and rme (model inference);
 win and cie (causal inference) feed rme; ids and cds feed lds.
 Define content in the earliest site that needs it, and link to later or sibling sites only as further reading on advanced topics.

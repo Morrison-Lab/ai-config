@@ -77,11 +77,13 @@ def is_human_turn(rec):
 
 HELP = frozenset({"-h", "-v", "-V", "--help", "--version", "version"})
 SEGMENT = re.compile(r"[;&|\n]+")
+HEREDOC = re.compile(r"(?<=<<)-?\s*['\"]?(\w+)['\"]?[^\n]*\n(?:.*\n)*?\s*\1[ \t]*(?=\n|$)")
 
 
 def argvs(cmd, depth=0):
     """Yield the argv of each simple command in *cmd*, looking through
     `ssh host '...'`, `bash -c '...'`, env assignments, nohup and timeout."""
+    cmd = HEREDOC.sub("", cmd)  # a heredoc body is data, not commands
     for seg in SEGMENT.split(cmd):
         try:
             argv = shlex.split(seg)

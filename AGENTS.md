@@ -158,8 +158,8 @@ See [`dont-take-my-word-for-it`](shared/principles/dont-take-my-word-for-it.md).
 
 ## Never rely on static notes for changing conditions
 
-Probe live; date every note about one.
-See [rule](shared/workflow/live-state-over-notes.md).
+Probe live; date such notes.
+See [`live-state-over-notes`](shared/workflow/live-state-over-notes.md).
 
 ## Proactively suggest better alternatives to proposed approaches
 

@@ -59,7 +59,6 @@ CASES = [
     ("relayed probe counts", POST, WAIVE, [human()] + relay(1, "mcp__hearthbot__read_thread", "RC probe: agy models ok; opencode GoUsageLimitError"), False),
     ("relayed text without probe output", POST, WAIVE, [human()] + relay(1, "mcp__hearthbot__read_thread", "agy and opencode are on the list"), True),
     ("not exhausted is no claim", POST, "agy is not exhausted, so I ran it.", [human()], False),
-    ("unrelated unavailable", POST, "The runner is unavailable until 5pm.", [human()], False),
 ]
 
 

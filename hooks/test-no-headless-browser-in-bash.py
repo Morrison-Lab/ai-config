@@ -151,6 +151,12 @@ class TestBlocks(unittest.TestCase):
             "node shot11.js"
         )
 
+    def test_write_and_run_spelled_differently(self):
+        body = "const { chromium } = require('playwright');\n"
+        self.assert_blocked(f"cat > ./shot12.js <<'X'\n{body}X\nnode shot12.js")
+        self.assert_blocked(f"cat > shot13.js <<'X'\n{body}X\nnode ./shot13.js")
+        self.assert_blocked(f"cat > /tmp//shot14.js <<'X'\n{body}X\nnode /tmp/shot14.js")
+
     def test_inline_node(self):
         self.assert_blocked("node -e \"require('playwright').chromium.launch()\"")
 

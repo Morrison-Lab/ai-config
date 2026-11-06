@@ -149,7 +149,7 @@ def heredoc_written_files(command: str) -> dict:
             if target.group(1) != "/dev/null":
                 # Accumulate: a later heredoc whose line merely mentions the
                 # name (in a quoted argument) must not erase an earlier body.
-                key = target.group(1)
+                key = os.path.normpath(target.group(1))
                 written[key] = written.get(key, "") + "\n" + match.group(2)
     return written
 
@@ -189,7 +189,8 @@ def offending(command: str, cwd: str | None = None, depth: int = 0):
         if inline and (LIBRARY.search(rest) or LIBRARY.search(command[match.end():].split("\n", 1)[0])):
             return "inline code that imports a browser-automation library", shown
         script = SCRIPT_FILE.search(rest)
-        if script and LIBRARY.search(written.get(script.group(1), "")):
+        if script and LIBRARY.search(
+                written.get(os.path.normpath(script.group(1)), "")):
             return f"{script.group(1)}, written by a heredoc in this command, which imports a browser-automation library", shown
         if script and script_imports_browser(script.group(1), cwd):
             return f"{script.group(1)}, which imports a browser-automation library", shown

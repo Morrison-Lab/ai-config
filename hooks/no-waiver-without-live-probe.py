@@ -45,7 +45,7 @@ REASON = (
     "[hook: no-waiver-without-live-probe] This message calls agy, OpenCode or a cross-harness reviewer "
     "exhausted, unavailable or waived, but this turn shows no live probe of both routes. A note or an earlier "
     "session is not evidence (Ezra, 2026-11-06: \"agy is not exhausted, you cant rely on out of date notes\"). "
-    "Probe now: `agy` (a models or review call, not --version) via cf463-02, since agy is absent in cloud "
+    "Probe now: `agy` (a models or review call, not --version) through Remote Control, since agy is absent in cloud "
     "containers, and `opencode run -m <model> ok` or a curl to https://opencode.ai/zen/go/v1/chat/completions. "
     "Then state what each returned. shared/workflow/live-state-over-notes.md; ai-config#5018."
 )

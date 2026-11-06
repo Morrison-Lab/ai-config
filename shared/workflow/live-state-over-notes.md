@@ -11,7 +11,7 @@ This replaces the `AGENTS.md` text proposed in ai-config#5019.
 It extends [`check-sources-over-recall`](check-sources-over-recall.md), which covers recalled facts.
 
 - **Probe in the turn that decides.**
-  For agy, make a real call on cf463-02 through Remote Control, since agy is absent in cloud containers.
+  For agy, make a real call through Remote Control, since agy is absent in cloud containers.
   For OpenCode, run `opencode run` or curl `https://opencode.ai/zen/go/v1/chat/completions`.
   A version flag proves installation, not quota, and an earlier probe is a note.
 - **A note may order your checks, never settle them.**

@@ -80,7 +80,10 @@ def claimed_routes(text):
         spans = [s[m.start():ms[i + 1].start() if i + 1 < len(ms) else len(s)]
                  for i, m in enumerate(ms)]
         if not any(CLAIM.search(sp) for sp in spans):
-            spans = [s] * len(ms)  # the claim word comes before every mention
+            # The claim word comes before every mention, but not past a clause
+            # break: "The human reviewer is unavailable, so I will use agy."
+            ends = [b.end() for b in CLAUSE_BREAK.finditer(s)]
+            spans = [s[max([e for e in ends if e <= m.start()], default=0):] for m in ms]
         # An elliptical mention ("and OpenCode is too") repeats the claim before it.
         for i in range(1, len(spans)):
             if not CLAIM.search(spans[i]) and ELLIPSIS.search(spans[i - 1] + spans[i]):

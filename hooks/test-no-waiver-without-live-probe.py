@@ -103,6 +103,8 @@ CASES = [
     ("not over its quota is no claim", POST, "agy is not over its quota.", [human()], False),
     ("ssh joins its arguments with spaces, so bash -c takes only the first word", POST, WAIVE, [human()] + bash(1, "ssh host bash -c 'agy run ok'") + bash(2, "ssh host bash -c 'opencode run x ok'"), True),
     ("ssh with the whole remote command quoted counts", POST, WAIVE, [human()] + bash(1, "ssh host \"bash -c 'agy run ok'\"") + bash(2, "ssh host 'opencode run x ok'"), False),
+    ("another party unavailable, then agy used", POST, "The human reviewer is unavailable, so I will use agy.", [human()], False),
+    ("claim word before the mention, same clause", POST, "The waiver covers agy, so I ran OpenCode instead.", [human()] + AGY, False),
     ("negation first, claim after", POST, "OpenCode is not rate-limited, but Agy is exhausted.", [human()] + OC, True),
     ("e.g. does not split a claim", POST, "Cross-harness review via agy (e.g. Gemini) is waived.", [human()], True),
     ("human reviewer unavailable is no claim", POST, "The human reviewer is unavailable this week.", [human()], False),

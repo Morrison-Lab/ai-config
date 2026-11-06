@@ -27,7 +27,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 OUT = Path("docs") / "topic-map.md"
 COMPANION = re.compile(r"\.(rationale|cases)\.md$")
-FRONT = re.compile(r"\A---\n(.*?)\n---\n", re.S)
+LINK = re.compile(r"\[([^\]]*)\]\([^)]*\)")
+FRONT =re.compile(r"\A---\n(.*?)\n---\n", re.S)
 
 
 def frontmatter(text: str) -> tuple[dict[str, str], str]:
@@ -46,7 +47,8 @@ def first_paragraph(body: str) -> str:
     for block in re.split(r"\n\s*\n", body.strip()):
         block = block.strip()
         if block and not block.startswith(("#", "<!--", "|", "```")):
-            return " ".join(block.split())
+            # Links are relative to the source file, so they break here: keep the text.
+            return " ".join(LINK.sub(r"\1", block).split())
     return ""
 
 

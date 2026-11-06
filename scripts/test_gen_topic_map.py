@@ -54,6 +54,14 @@ class TopicMapTest(unittest.TestCase):
         text = (self.root / "docs" / "topic-map.md").read_text()
         self.assertNotIn("fail-fast.cases.md", text)
 
+    def test_relative_links_are_reduced_to_their_text(self):
+        frag = self.root / "shared" / "principles" / "linked.md"
+        frag.write_text("See [the rule](issue-first.md) and [more](../../CLAUDE.md#x).\n")
+        run(self.root)
+        text = (self.root / "docs" / "topic-map.md").read_text()
+        self.assertIn("See the rule and more.", text)
+        self.assertNotIn("issue-first.md", text)
+
     def test_check_passes_when_fresh(self):
         run(self.root)
         self.assertEqual(run(self.root, "--check").returncode, 0)

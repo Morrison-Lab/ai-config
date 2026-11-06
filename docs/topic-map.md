@@ -253,10 +253,10 @@ its description does not use (ai-config#949).
 | `shared/coding/function-signature-style.md` | When an R function signature doesn't fit on one line, format the argument list with **single-indent** style: nothing after `function(`, each argument on its... |  |
 | `shared/coding/heredoc-backslash-collapse.md` | Moved out of the auto-loaded `CLAUDE.md` (ai-config#3568), which keeps the rule and its pattern/anti-pattern pairs and links here for the mechanics, the repr... |  |
 | `shared/coding/least-flexible-tool.md` | Use the least-flexible construct that does the job. When two constructs both work, prefer the one that can do less, because a narrower construct announces it... |  |
-| `shared/coding/loop-hygiene.md` | When a `for` loop really is the right construct --- see [`least-flexible-tool`](least-flexible-tool.md) for when it is not --- three checks apply. Each is me... |  |
+| `shared/coding/loop-hygiene.md` | When a `for` loop really is the right construct --- see `least-flexible-tool` for when it is not --- three checks apply. Each is mechanical, greppable, and c... |  |
 | `shared/coding/one-function-per-file.md` | When adding a new function to a codebase, give it its own file rather than bundling it into a file that already holds other functions --- unless the function... |  |
 | `shared/coding/per-operation-grouping.md` | When reviewing or writing `dplyr` code, prefer **per-operation grouping** (the `.by` argument) over persistent `group_by()` / `ungroup()` pairs. Apply it whe... |  |
-| `shared/coding/powershell-cli-safety.md` | Moved whole from [`CLAUDE.md`](../../CLAUDE.md#powershell-cli-command-safety) to keep it out of the always-loaded context; that section keeps the rule's one-... |  |
+| `shared/coding/powershell-cli-safety.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/coding/prefer-packaged-functions.md` | Before writing a function, **perform a research step to look for an existing packaged one that already does the job** --- and prefer it over rolling your own: |  |
 | `shared/coding/regex-backtracking-pitfalls.md` | When authoring regular expressions that handle variable user or reviewer text, ensure that repeated groups and quantifiers cannot backtrack catastrophically... |  |
 | `shared/coding/restore-global-state.md` | When a function has to change global state, restore it on the way out --- on every exit path, including the ones that throw. State a function changes and doe... |  |
@@ -291,10 +291,10 @@ its description does not use (ai-config#949).
 | `shared/workflow/adversarial-self-review.md` | Every self-review is an **adversarial review by a separate subagent**. Whenever this corpus calls for reviewing your own work --- before a push, as the fallb... |  |
 | `shared/workflow/agent-teams.md` | Agent teams are a third way Claude Code parallelizes work, and the corpus's job is to know when to *recommend* one --- not to reach for it, because unlike th... |  |
 | `shared/workflow/algorithmatize-checks.md` | Never spend LLM reasoning on a check a deterministic algorithm can decide. Whenever a verification, measurement, or classification step is decidable by compu... |  |
-| `shared/workflow/always-reply.md` | Moved whole from [`CLAUDE.md`](../../CLAUDE.md#always-produce-a-reply-----never-end-a-turn-silently) to keep it out of the always-loaded context; that sectio... |  |
+| `shared/workflow/always-reply.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/workflow/ardi.md` | Whenever you are working a PR/MR, run the full **ARDI** loop by default, without being asked: **A**ddress every flagged item, **R**ebut findings that are wro... |  |
 | `shared/workflow/ask-for-manual-approval.md` | Applies to every agent that runs under a permission classifier or approval mode. The measured case is Claude Code's auto mode. Codex approval modes, Gemini,... |  |
-| `shared/workflow/assign-subagent-worktrees.md` | Moved whole from [`CLAUDE.md`](../../CLAUDE.md#subagent-worktrees-are-assigned-and-an-incident-never-silently-repeals-a-decision) to keep it out of the alway... |  |
+| `shared/workflow/assign-subagent-worktrees.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/workflow/automated-review-before-human.md` | Never ask a person to review work until its automated review is clean or deadlocked. That holds in every repository, project and forge (GitHub, GitLab, or an... |  |
 | `shared/workflow/avoid-false-dichotomies.md` | Avoid false dichotomies. When laying out alternatives --- in a question to the user, a design note, a PR description --- test whether they are actually exclu... |  |
 | `shared/workflow/batch-merge-and-resolve.md` | When several open PRs need syncing or conflict resolution, do them **together in one pass**, not one at a time as each conflict flag appears. Batch merge and... |  |
@@ -308,19 +308,19 @@ its description does not use (ai-config#949).
 | `shared/workflow/check-purpose-before-reusing.md` | Never take shortcuts, and never copy-paste or pattern-match blindly. Before reusing a structure --- a template, a working script, a neighbouring file's shape... |  |
 | `shared/workflow/check-sources-over-recall.md` | When a source can be checked, check it before answering. Sources include books, repositories, documentation, APIs and files. Cite what you read (file and pag... |  |
 | `shared/workflow/check-the-renders.md` | In a repo that publishes a website or a book, the deliverable is the rendered page. A `.qmd` or `.md` diff can be entirely correct while the published page i... |  |
-| `shared/workflow/choose-issue-or-discussion.md` | [`issue-first`](issue-first.md) governs *whether* something is tracked before work starts. It does not settle *where*, and defaulting everything to the issue... |  |
+| `shared/workflow/choose-issue-or-discussion.md` | `issue-first` governs *whether* something is tracked before work starts. It does not settle *where*, and defaulting everything to the issue tracker misfiles... |  |
 | `shared/workflow/claim-pr.md` | Before starting a work session on a GitHub PR or issue --- i.e. before fetching the branch, making edits, posting a review, or invoking an automated review c... |  |
 | `shared/workflow/commit-reusable-work.md` | Potentially-reusable work produced incidentally in any medium must be committed, pushed, and PRed into an owning repository. |  |
 | `shared/workflow/context-budget.md` | Keep always-loaded instruction files (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`) compact and budgeted. |  |
 | `shared/workflow/cursor-cloud-instructions.md` | This repo has no compiled app or long-running service. The "product" is three things: a Quarto documentation website, a suite of Python validators/tests unde... |  |
-| `shared/workflow/default-to-action-grants.md` | Detail for [`AGENTS.md`'s "Default to action without asking"](../../AGENTS.md), moved here to keep `AGENTS.md` under Codex's byte cap. |  |
+| `shared/workflow/default-to-action-grants.md` | Detail for `AGENTS.md`'s "Default to action without asking", moved here to keep `AGENTS.md` under Codex's byte cap. |  |
 | `shared/workflow/derive-dont-enumerate.md` | A brief that enumerates work items is a snapshot. Before dispatching work scoped to a list --- PR numbers, issue numbers, files, hosts --- ask whether that s... |  |
 | `shared/workflow/disclose-agent-authorship.md` | Every comment an agent posts to a forge --- GitHub, GitLab, or any other --- says, in the body, that an agent posted it. |  |
 | `shared/workflow/dont-get-sidetracked.md` | Ezra (d-morrison), 2026-10-13 (ai-config#4488): when you have a primary task, don't get sidetracked, including by the user's input; if a tangential or irrele... |  |
 | `shared/workflow/efficient-pr-babysitting.md` | When babysitting a PR (subscribed to its activity, driving ARDI, watching CI), default to the cheapest tool call and the smallest push that actually answers... |  |
-| `shared/workflow/encode-reusable-feedback.md` | Moved whole from [`CLAUDE.md`](../../CLAUDE.md#encoding-reusable-feedback-into-ai-config) to keep it out of the always-loaded context; that section keeps the... |  |
+| `shared/workflow/encode-reusable-feedback.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/workflow/fetch-untrusted-files.md` | Ezra, 2026-10-15: use best practice to reach useful resources without taking unnecessary risk. A PDF, web page or archive can carry malware or hidden instruc... |  |
-| `shared/workflow/file-pre-existing-violations.md` | This policy specializes the lab's general ["If you see something, say something" rule](report-mistakes-proactively.md) to pre-existing guideline violations a... |  |
+| `shared/workflow/file-pre-existing-violations.md` | This policy specializes the lab's general "If you see something, say something" rule to pre-existing guideline violations and software maintenance drift. Whe... |  |
 | `shared/workflow/fixing-mistakes-is-top-priority.md` | When an error, mistake, bad merge, regression, broken test, or policy violation is identified in your work: - **Remediating it is the absolute top priority**... |  |
 | `shared/workflow/fixtures-are-not-evidence.md` | A test fixture records what someone believed the real thing looks like. Reasoning from a fixture back to the real thing is circular, so a fixture -- or a tes... |  |
 | `shared/workflow/flag-practice-slippage.md` | Say so when a practice is slipping, not only when an artifact is wrong. |  |
@@ -338,37 +338,37 @@ its description does not use (ai-config#949).
 | `shared/workflow/iterative-editing.md` | Writing agents do not need to enforce all style guidelines on first draft. They should work iteratively: write a substantively-correct but stylistically loos... |  |
 | `shared/workflow/keep-agent-on-backlog.md` | Keep at least one agent working while any project repo has an open issue backlog. |  |
 | `shared/workflow/keep-checkouts-fresh.md` | In every session --- at session start, and again periodically during long sessions --- refresh the local state that goes stale as PRs merge elsewhere: |  |
-| `shared/workflow/lab-operating-rules.md` | These rules came out of the coordinator's work with Ezra. Each was kept only in project memory until [ai-config#4698](https://github.com/Morrison-Lab/ai-conf... |  |
-| `shared/workflow/label-agent-filed-issues.md` | The rule lives in [`issue-first`](issue-first.md)'s "Label an agent-filed issue with its authorship and its model" section. This fragment carries the mechani... |  |
+| `shared/workflow/lab-operating-rules.md` | These rules came out of the coordinator's work with Ezra. Each was kept only in project memory until ai-config#4698, where Ezra asked that everything learned... |  |
+| `shared/workflow/label-agent-filed-issues.md` | The rule lives in `issue-first`'s "Label an agent-filed issue with its authorship and its model" section. This fragment carries the mechanics. It is linked r... |  |
 | `shared/workflow/learn-from-review-findings.md` | A reviewer's valid finding is a mistake that reached the reviewer, so treat every one you accept as a first-push miss to learn from --- not merely an item to... |  |
 | `shared/workflow/live-state-over-notes.md` | A note records what was true when someone wrote it. Quota, availability, runner state, outages, CI state and a PR's state change. Decide such a condition fro... |  |
-| `shared/workflow/manage-quota.md` | Moved whole from [`CLAUDE.md`](../../CLAUDE.md#actively-manage-quota-usage-models-compaction-and-workflow-structure) to keep it out of the always-loaded cont... |  |
+| `shared/workflow/manage-quota.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/workflow/merge-queue.md` | A GitHub merge queue eliminates the O(N^2) review and CI churn that occurs when landing multiple pull requests under strict branch protection. By decoupling... |  |
 | `shared/workflow/metacognitive-monitoring.md` | Monitor your own claims as you make them. |  |
 | `shared/workflow/migrate-referenced-assets.md` | When moving or removing content that references local files by relative path --- images, data files, other assets a document embeds rather than links to exte... |  |
-| `shared/workflow/monitor-pushed-heads.md` | Moved whole from [`CLAUDE.md`](../../CLAUDE.md#monitor-every-pushed-pr-head-to-completion) to keep it out of the always-loaded context; that section keeps th... |  |
+| `shared/workflow/monitor-pushed-heads.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/workflow/monitor-scoped-open-prs.md` | Continuously derive and monitor open pull requests and merge requests in repositories the agent is actively working in. |  |
 | `shared/workflow/never-send-email.md` | Ezra's standing rule, 2026-11-04: "never send emails for me". |  |
 | `shared/workflow/no-cant-from-session-excuses.md` | Never answer "I can't do that from this session" when a way exists to do it. |  |
 | `shared/workflow/no-cop-out-offers.md` | A **cop-out offer** is a sentence that converts work you have already been authorized to do back into a request for permission. |  |
 | `shared/workflow/no-empty-promises.md` | A promise about my own future behaviour is not work. It is a claim that work will happen later, made in a conversation that will not outlive it. |  |
-| `shared/workflow/no-fable-subagents.md` | Moved whole from [`CLAUDE.md`](../../CLAUDE.md#never-launch-a-subagent-on-fable-without-explicit-specific-permission) to keep it out of the always-loaded con... |  |
-| `shared/workflow/no-sweeps-by-default.md` | Ezra, 2026-10-29 ([ai-config#4829](https://github.com/Morrison-Lab/ai-config/issues/4829)): "don't sweep new rules unless I explicitly tell you to sweep; by... |  |
+| `shared/workflow/no-fable-subagents.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
+| `shared/workflow/no-sweeps-by-default.md` | Ezra, 2026-10-29 (ai-config#4829): "don't sweep new rules unless I explicitly tell you to sweep; by default, just fix incrementally when you are editing a pa... |  |
 | `shared/workflow/notes-pre-review-pass.md` | A notes PR (psw, rme, mds, lds, pds, sds, win, araomm) reaches the maintainer already checked against the notes rules, so he reviews the ideas and not the wo... |  |
 | `shared/workflow/persistent-pr-loop.md` | When you open, push to, or are handed a PR, arm a persistent monitoring loop if one is not already running. Keep it running until the PR merges, closes, or t... |  |
 | `shared/workflow/port-by-script.md` | When content moves from one repository to another, copy the source files with a script. Keep the ids, wording and citations. Edit only what the target reposi... |  |
-| `shared/workflow/post-feedback-to-pr.md` | Moved whole from [`CLAUDE.md`](../../CLAUDE.md#post-in-chat-feedback-to-the-pr) to keep it out of the always-loaded context; that section keeps the rule's on... |  |
+| `shared/workflow/post-feedback-to-pr.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/workflow/pr-on-claim.md` | When an agent claims an issue it's about to work --- in `gi`, `gii`, `gip`, or `st` --- open the PR **immediately**, before writing any code, and keep it a *... |  |
 | `shared/workflow/pr-prioritization.md` | When picking which PR or issue to work on next  ---  choosing among several open PRs to review, iterate (ARDI), or pick up first in a queue, or triaging whic... |  |
 | `shared/workflow/pr-scope.md` | Before pushing to, editing, commenting on, reviewing, resolving threads on, dispatching a paid review of, or merging any PR, resolve the invoking user and re... |  |
-| `shared/workflow/present-decisions-one-at-a-time.md` | Moved whole from [`CLAUDE.md`](../../CLAUDE.md#present-decisions-one-at-a-time) to keep it out of the always-loaded context; that section keeps the rule's on... |  |
+| `shared/workflow/present-decisions-one-at-a-time.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/workflow/put-prs-in-ready-mode.md` | A Pull Request that is ready for review must be in ready mode, not left in draft. |  |
 | `shared/workflow/quotable-findings.md` | Drop any review finding you are about to post if it cannot quote the passage it is about. |  |
 | `shared/workflow/read-canonical-doc-before-starting.md` | When a repo's own `CLAUDE.md` (or an equivalent short orientation file) names a fuller document as the actual authority --- `.github/copilot-instructions.md`... |  |
 | `shared/workflow/read-instructions-fully.md` | AGENTS.md's "Interpret instructions broadly" section sets the breadth of a reading. This fragment covers two habits that keep a reading complete, each one a... |  |
 | `shared/workflow/read-published-html-from-gh-pages.md` | Every Morrison-Lab notes repo (`lds`, `mds`, `pds`, `sds`, `rme` and the rest) publishes its rendered site to the `gh-pages` branch. Pull request previews si... |  |
 | `shared/workflow/recheck-review-findings.md` | Moved out of the auto-loaded `CLAUDE.md` (ai-config#3568), which keeps the rule and its pattern/anti-pattern pairs and links here for the queries, the login-... |  |
-| `shared/workflow/record-every-decision.md` | Ezra, 2026-10-22 ([ai-config#4676](https://github.com/Morrison-Lab/ai-config/issues/4676)): every decision gets documented somewhere outside the thread, typi... |  |
+| `shared/workflow/record-every-decision.md` | Ezra, 2026-10-22 (ai-config#4676): every decision gets documented somewhere outside the thread, typically in a repo file. |  |
 | `shared/workflow/red-main.md` | When a check on `main` fails after a change an agent merged or enabled, fixing it is already requested. Find the root cause and open the fix, without waiting... |  |
 | `shared/workflow/remove-redundant-plugin-submodules.md` | Native plugin integration is the primary mechanism for consuming AI tools and skills across Claude Code, Cursor, Antigravity, and GitHub Actions workflows (v... |  |
 | `shared/workflow/repo-templates.md` | Before creating a repository in the Morrison-Lab organization, look for a template repository that matches it, and create the new repository from that templa... |  |
@@ -379,27 +379,27 @@ its description does not use (ai-config#949).
 | `shared/workflow/revert-merge.md` | When you run `git revert` on a merge commit that was merged prematurely or incorrectly, the issue it originally closed is NOT automatically reopened by GitHub. |  |
 | `shared/workflow/revert-premature-merge.md` | When a Pull Request is prematurely or incorrectly merged (e.g. merged before external review completion, merged over open findings, or merged without authori... |  |
 | `shared/workflow/review-rendered-documents.md` | A PR or MR that changes a rendered document is not ready, and is not mergeable under any grant, until someone has opened the rendered output at the current h... |  |
-| `shared/workflow/review-verdict-pitfalls.md` | Continuation of [`fully-clean.md`](fully-clean.md)'s criterion 2: the several distinct ways a review job's check color, or the presence and content of a post... |  |
+| `shared/workflow/review-verdict-pitfalls.md` | Continuation of `fully-clean.md`'s criterion 2: the several distinct ways a review job's check color, or the presence and content of a posted comment, can di... |  |
 | `shared/workflow/route-to-agy.md` | Ezra's request (2026-10-26): move work off the Claude subscription onto Antigravity (`agy`) to save Claude quota. Subscription-only: `agy` uses the Antigravi... |  |
 | `shared/workflow/run-ums-proactively.md` | Don't wait for `/clear` or the end of a task to run `ums` (Update Memories and Skills). As soon as a learning worth saving shows up during a session --- a co... |  |
 | `shared/workflow/salvage-superseded-work.md` | When your fix is superseded --- someone else's landed first, or landed a better version of the same thing --- closing your PR is not the whole disposition. D... |  |
 | `shared/workflow/search-library-before-saying-book-unavailable.md` | Before a reply says a reference book cannot be reached, is unavailable, or was not checked, search both places that hold the lab's books: |  |
 | `shared/workflow/self-review-fallback.md` | When a PR you're managing has its `@claude` review workflow fail to produce a usable verdict --- whether because it was **skipped for quota** or because it *... |  |
-| `shared/workflow/session-lab-notebook.md` | Moved whole from [`CLAUDE.md`](../../CLAUDE.md#keep-a-running-on-disk-session-lab-notebook) to keep it out of the always-loaded context; that section keeps t... |  |
+| `shared/workflow/session-lab-notebook.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/workflow/skill-checklists.md` | Use checklists in skills deliberately, not by default. |  |
-| `shared/workflow/small-prs.md` | Ezra, 2026-10-23: "don't allow massive sweep PRs like [pds#244](https://github.com/Morrison-Lab/pds/pull/244) anymore; do them in minimal batches", and "ever... |  |
+| `shared/workflow/small-prs.md` | Ezra, 2026-10-23: "don't allow massive sweep PRs like pds#244 anymore; do them in minimal batches", and "every PR should be as small and focused as it can be... |  |
 | `shared/workflow/stack-dont-pause.md` | The clear-all family --- `ardia`, `gia`, `gii`, `gip`, and the `clear-all` alias --- clears a whole queue of PRs and issues in one run. Merging stays human-g... |  |
 | `shared/workflow/standing-habits-from-ezra.md` | Ezra (d-morrison) gave these rules in the DATA 571 project on 2026-10-02, except where a section says otherwise. They apply in every project, per the global-... |  |
-| `shared/workflow/state-check-in-time.md` | Moved whole from [`CLAUDE.md`](../../CLAUDE.md#state-the-actual-time-when-reporting-a-scheduled-check-in) to keep it out of the always-loaded context; that s... |  |
-| `shared/workflow/status-requests-act.md` | Moved whole from [`CLAUDE.md`](../../CLAUDE.md#status-requests-do-not-make-issues-report-only) to keep it out of the always-loaded context; that section keep... |  |
+| `shared/workflow/state-check-in-time.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
+| `shared/workflow/status-requests-act.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/workflow/strict-merge-policy.md` | Merging a Pull Request or Merge Request is strictly controlled across all agents and harnesses. |  |
 | `shared/workflow/structured-data-in-structured-formats.md` | Ezra (d-morrison), 2026-10-13 (DATA 571 project, "Track every course resource" thread): store structured data in structured formats where feasible, and rende... |  |
 | `shared/workflow/subagent-core-rules.md` | `hooks/inject-subagent-rules.py` prints this file into every subagent's context at SubagentStart. A dispatched agent otherwise starts with only its brief, so... |  |
-| `shared/workflow/surface-merge-order.md` | Moved whole from [`CLAUDE.md`](../../CLAUDE.md#surface-merge-order-constraints) to keep it out of the always-loaded context; that section keeps the rule's on... |  |
+| `shared/workflow/surface-merge-order.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/workflow/sync-with-main.md` | Whenever `main` has moved ahead of a PR branch you're working on, **merge `main` into the PR branch** before the next push or review trigger. Don't wait for... |  |
 | `shared/workflow/terminate-superseded-tasks.md` | When background tasks, asynchronous command executions, monitors, or subagents are dispatched to inspect, search, or diagnose an issue, actively terminate th... |  |
 | `shared/workflow/timestamp-local-recaps.md` | Moved out of the auto-loaded `CLAUDE.md` (ai-config#3568), which keeps the rule and its pattern/anti-pattern pairs and links here for the platform mechanics,... |  |
-| `shared/workflow/track-useful-resources.md` | A notes repo is a site listed in [`course-sequence`](../writing/course-sequence.md) or in the notes repository registry of [`send-notes`](../../skills/send-n... |  |
+| `shared/workflow/track-useful-resources.md` | A notes repo is a site listed in `course-sequence` or in the notes repository registry of `send-notes`. Track every useful resource (textbooks, articles, sof... |  |
 | `shared/workflow/triage-backlog.md` | Triage the issue backlog on a fixed cadence, and treat closing an issue as not-planned as a normal outcome of that pass rather than as a failure to do the work. |  |
 | `shared/workflow/triage-new-asks.md` | Triage a new ask against the current backlogs before acting on it, so it joins the work that already owns it instead of spawning parallel work. |  |
 | `shared/workflow/ultracode-merge-conflicts.md` | When orchestrating an **ultracode** (`Workflow`-tool, multi-agent) session that touches git, check for merge conflicts **every time a merge actually occurs**... |  |
@@ -411,11 +411,11 @@ its description does not use (ai-config#949).
 | `shared/workflow/use-subagents.md` | When available, use subagents for helpful sidecar work: independent investigation, verification, or disjoint implementation slices. Keep immediate blocking c... |  |
 | `shared/workflow/user-profanity-signal.md` | Profanity, exasperation, or intense frustration from the user is almost always a high-signal indicator that an agent made a severe mistake, regressed previou... |  |
 | `shared/workflow/verify-merge-commit-ci.md` | A PR's own CI is not the whole story once it merges. A repo can run a workflow on `push` that it never runs on `pull_request` --- a full or PDF render, a dep... |  |
-| `shared/workflow/verify-running-model.md` | A session cannot report its own model or effort by introspection, so a claim such as "I am on Opus at high effort" is a guess until an instrument reads it. [... |  |
+| `shared/workflow/verify-running-model.md` | A session cannot report its own model or effort by introspection, so a claim such as "I am on Opus at high effort" is a guess until an instrument reads it. `... |  |
 | `shared/workflow/verify-the-right-artifact.md` | Before reporting a finding, name the artifact the claim is about, and confirm that is the one you read. |  |
-| `shared/workflow/watch-and-ardi.md` | Moved whole from [`CLAUDE.md`](../../CLAUDE.md#watch-and-ardi-every-pr-you-touch-----dont-ask-first) to keep it out of the always-loaded context; that sectio... |  |
+| `shared/workflow/watch-and-ardi.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/workflow/when-to-orchestrate.md` | When a heavy skill runs, decide whether to fan the work out to a **Workflow** (multi-agent orchestration) instead of handling it inline. This is the shared d... |  |
-| `shared/workflow/wrap-up-merged-pr.md` | Moved whole from [`CLAUDE.md`](../../CLAUDE.md#wrap-up-a-merged-pr-with-ums) to keep it out of the always-loaded context; that section keeps the rule's one-s... |  |
+| `shared/workflow/wrap-up-merged-pr.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/writing/ai-tells.md` | Write plainly up front, then **scan the draft for AI tells before sending**. Before presenting non-trivial prose --- PR/issue descriptions, commit bodies, RE... |  |
 | `shared/writing/ambiguous-reference.md` | Avoid ambiguity in writing. A referring expression --- a pronoun, a demonstrative, a relative `which` --- must have exactly one reading, and the reading a re... |  |
 | `shared/writing/avoid-unintentional-plagiarism.md` | A language model that has read a textbook can reproduce its sentences from memory without knowing it, and a bulk-generated chapter ("content from multiple so... |  |
@@ -432,25 +432,25 @@ its description does not use (ai-config#949).
 | `shared/writing/hypothetical-examples.md` | A worked example that illustrates a definition or theorem with **invented, round-number quantities** --- "Suppose a binary covariate Z...", "If 20% of the ex... |  |
 | `shared/writing/informal-definitions.md` | An **informal definition** is prose that does the work of defining a concept --- naming it, giving it a precise meaning, often an equation or an `\eqdef` ---... |  |
 | `shared/writing/lecture-conventions.md` | Rules for writing lecture notes, slides and teaching pages in any Morrison-Lab course repository. They come from Ezra's directions for DATA 571, recorded in... |  |
-| `shared/writing/link-forge-artifacts.md` | Moved whole from [`CLAUDE.md`](../../CLAUDE.md#link-prs-in-tables) to keep it out of the always-loaded context; that section keeps the rule's one-sentence co... |  |
+| `shared/writing/link-forge-artifacts.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/writing/manuscript-float-layout.md` | These rules govern the layout of a manuscript prepared for journal submission, whatever tool produces it --- Quarto, R Markdown, LaTeX, or Word. They concern... |  |
 | `shared/writing/math-derivation-steps.md` | When writing or reviewing a mathematical derivation --- an algebraic manipulation, a proof, a statistical argument --- hold it to a stricter completeness bar... |  |
 | `shared/writing/media-links-beside-content.md` | In lecture notes and other teaching pages, put each video or other external media link in a short note right after the exercise, figure or definition it supp... |  |
 | `shared/writing/models-vs-inference.md` | Keep a model's structure and its estimation or inference method separate, in wording as well as in the exposition itself. |  |
-| `shared/writing/no-code-messages.md` | Code in the notes prints its output and no warning or non-output message (Ezra, 2026-10-26, [Morrison-Lab/lds#1440](https://github.com/Morrison-Lab/lds/issue... |  |
+| `shared/writing/no-code-messages.md` | Code in the notes prints its output and no warning or non-output message (Ezra, 2026-10-26, Morrison-Lab/lds#1440). A reader should never see "`geom_smooth()... |  |
 | `shared/writing/no-rug-pulls.md` | Don't write "rug-pulls": present a model, claim, or picture, and then a sentence or two later retract or replace it. Every individual sentence in a rug-pull... |  |
 | `shared/writing/no-vague-attribution.md` | Name the real source of a claim, or write the claim as the author's own judgment, or cut it. Never invent a vague attribution to give a claim the look of sup... |  |
-| `shared/writing/notes-content-rules.md` | Rules from Ezra, starting 2026-10-16. Each has a canonical prose rule in [`psw`](https://github.com/Morrison-Lab/psw/), possibly still in review. This fragme... |  |
+| `shared/writing/notes-content-rules.md` | Rules from Ezra, starting 2026-10-16. Each has a canonical prose rule in `psw`, possibly still in review. This fragment only points agents to it. |  |
 | `shared/writing/plain-prose.md` | Write user-facing prose in a plain, direct style. This applies to everything a reader sees --- PR/issue/commit text, docs, READMEs, code comments, release no... |  |
 | `shared/writing/quarto-divs-for-typed-content.md` | In Quarto lecture notes, books, and sites, put every block of content that has a type into a div or callout of that type. The box tells the reader what kind... |  |
 | `shared/writing/quarto-figure-captions.md` | In Quarto `.qmd` files, label and caption figures and tables with **div syntax**, not chunk-option syntax. Wrap the code chunk in a `::: {#fig-...}` / `::: {... |  |
 | `shared/writing/quarto-remarks-vs-callouts.md` | In lecture notes where every block sits in a typed div, a reader should be able to tell from the box alone whether a block is part of the mathematical develo... |  |
 | `shared/writing/quarto-revealjs-div-styling.md` | Theorem-like and callout divs (`#def-`, `#thm-`, `#exr-`, `#sol-`, custom callouts) render as boxed, colored blocks in HTML, but the `revealjs` format render... |  |
 | `shared/writing/quarto-visible-chunk-results.md` | In lecture notes and other rendered documents, a code chunk that readers can see should produce a visible result: a figure, a table, or console output. A chu... |  |
-| `shared/writing/record-pattern-and-anti-pattern.md` | Moved whole from [`CLAUDE.md`](../../CLAUDE.md#record-both-the-pattern-and-the-anti-pattern) to keep it out of the always-loaded context; that section keeps... |  |
+| `shared/writing/record-pattern-and-anti-pattern.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/writing/reorganize-prose.md` | When writing or editing prose, rearranging is part of the edit, not a separate permission to seek. A section, subsection, paragraph, or sentence may move ---... |  |
 | `shared/writing/semantic-line-breaks.md` | Break lines in prose at major phrase and sentence boundaries  ---  one clause per line, roughly 60 to 80 characters  ---  rather than wrapping at a fixed col... |  |
-| `shared/writing/tag-chat-output.md` | Moved whole from [`CLAUDE.md`](../../CLAUDE.md#tag-chat-output-by-category-so-long-recaps-stay-scannable) to keep it out of the always-loaded context; that s... |  |
+| `shared/writing/tag-chat-output.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/writing/timestamp-volatile-claims.md` | When you state a factual claim about a **condition that can change over time**, attach the time the claim was true --- "as of 2026-07-24", or the abbreviated... |  |
 | `shared/writing/visible-attributions.md` | Credit a source where the document's readers can see it. An HTML comment (`<!-- Source: ... -->`), a commit message, or a PR description is not an attributio... |  |
 | `shared/writing/visuals-everywhere.md` | Include a visual (graph, diagram, figure) wherever one helps a reader, in new work and in existing content (Ezra, 2026-10-14: "going forward, we want to incl... |  |

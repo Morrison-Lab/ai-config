@@ -167,6 +167,17 @@ class TestBlocks(unittest.TestCase):
         self.assert_blocked(f"dd of=/tmp/shot24.js <<'X' 2>/dev/null\n{body}X\nnode /tmp/shot24.js")
         self.assert_blocked(f"cat > \"$PWD/shot25.js\" <<'X'\n{body}X\nnode shot25.js")
 
+    def test_agy_review_of_5031_spellings(self):
+        body = "const { chromium } = require('playwright');\n"
+        # A redirect on a continued opener line.
+        self.assert_blocked(f"cat <<'X' \\\n  > /tmp/shot30.js\n{body}X\nnode /tmp/shot30.js")
+        # A library name split by a continuation inside an unquoted body.
+        self.assert_blocked(
+            "cat > /tmp/shot31.js <<X\nconst { chromium } = require('play\\\nwright');\nX\nnode /tmp/shot31.js"
+        )
+        # A quoted extension on the write side.
+        self.assert_blocked(f"cat > /tmp/shot32.\"js\" <<'X'\n{body}X\nnode /tmp/shot32.js")
+
     def test_quoted_heredoc_body_ending_in_backslash(self):
         self.assert_blocked(
             "cat > /tmp/shot26.js <<'X'\n"
@@ -303,6 +314,18 @@ class TestPasses(unittest.TestCase):
             script = Path(tmp) / "ok.js"
             script.write_text("console.log('hello');\n", encoding="utf-8")
             self.assert_passes(f"node {script}")
+
+    def test_commit_heredoc_naming_a_browser_and_an_ordinary_script(self):
+        # agy's false-positive probe for ai-config#5031: a message that only
+        # mentions a browser library is not an import, so it taints nothing.
+        self.assert_passes(
+            "git add tools/check-links.py && git commit -F - <<'EOF' && python3 tools/check-links.py\n"
+            "Update playwright heredoc detection tests\nEOF"
+        )
+        self.assert_passes(
+            "cat > docs/notes.md <<'EOF'\nDo not launch playwright from Bash.\nEOF\n"
+            "# Run check-links.py to validate docs/notes.md\npython3 scripts/check-links.py"
+        )
 
     def test_heredoc_script_without_browser_then_run(self):
         self.assert_passes(

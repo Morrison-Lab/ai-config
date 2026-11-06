@@ -128,12 +128,35 @@ def script_imports_browser(path: str, cwd: str | None) -> bool:
         return False        # unreadable or not there yet: fail open
 
 
-SCRIPT_NAME = re.compile(r"""[\w./~${}()-]+\.(?:js|mjs|cjs|ts|py|R|r)\b""")
+SCRIPT_NAME = re.compile(
+    r"""[\w./~${}()-]+\.(?:js|mjs|cjs|jsx|ts|mts|cts|tsx|py|R|r)\b"""
+)
 
 
 def script_key(token: str) -> str:
     """The file name a script token stands for, however it is spelled."""
-    return os.path.basename(os.path.normpath(token.strip("\"'")))
+    return os.path.basename(os.path.normpath(token))
+
+
+def _script_name_counts(command: str) -> dict:
+    """Count script file names outside heredoc bodies, if a body imports a
+    browser library; quote characters are dropped first, so `shot."js"` and
+    `shot.js` are one name."""
+    matches = list(HEREDOC.finditer(command))
+    if not any(LIBRARY.search(m.group(2)) for m in matches):
+        return {}
+    # Drop each body and its closing line, but keep the opener line, which
+    # is where `cat <<'X' > shot.js` names the file.
+    outside, last = "", 0
+    for match in matches:
+        outside += command[last : match.start(2)]
+        last = match.end()
+    outside = (outside + command[last:]).replace('"', "").replace("'", "")
+    counts: dict = {}
+    for token in SCRIPT_NAME.findall(outside):
+        key = script_key(token)
+        counts[key] = counts.get(key, 0) + 1
+    return counts
 
 
 def heredoc_script_names(command: str) -> dict:
@@ -149,22 +172,20 @@ def heredoc_script_names(command: str) -> dict:
     outside the heredoc bodies at least twice, once to write it in some way
     and once to run it, counts as written by the browser heredoc. A false
     positive needs a browser-importing heredoc and an unrelated script of
-    the same name in one command, and fails closed."""
-    bodies = [m.group(2) for m in HEREDOC.finditer(command)]
-    if not any(LIBRARY.search(body) for body in bodies):
-        return {}
-    # Drop each body and its closing line, but keep the opener line, which
-    # is where `cat <<'X' > shot.js` names the file.
-    outside, last = "", 0
-    for match in HEREDOC.finditer(command):
-        outside += command[last : match.start(2)]
-        last = match.end()
-    outside = (outside + command[last:]).replace("\\\n", " ")
-    counts: dict = {}
-    for token in SCRIPT_NAME.findall(outside):
-        key = script_key(token)
-        counts[key] = counts.get(key, 0) + 1
-    return counts
+    the same base name in one command, and fails closed.
+
+    The command is read twice, as written and with every backslash-newline
+    removed the way the shell removes it, and the larger count wins. Neither
+    reading alone is right: joining first breaks a quoted heredoc whose last
+    body line ends in a backslash, and not joining hides a redirect on a
+    continued opener line or a library name split inside an unquoted body
+    (agy review of ai-config#5031, 2026-11-06). Not covered: a script with
+    no extension, or one that a directory name stands for (`python3 dir`
+    runs `dir/__main__.py`)."""
+    as_written = _script_name_counts(command)
+    joined = _script_name_counts(command.replace("\\\n", ""))
+    return {key: max(as_written.get(key, 0), joined.get(key, 0))
+            for key in as_written.keys() | joined.keys()}
 
 
 def strip_prose(command: str) -> str:

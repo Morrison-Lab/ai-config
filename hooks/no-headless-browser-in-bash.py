@@ -111,15 +111,14 @@ LIBRARY_FLAG = re.compile(r"(?:\s-m\s+(?:playwright|selenium)\b|\s(?:-r|--requir
 
 SCRIPT_FILE = re.compile(r"""(?:^|\s)["']?([\w./~$()-]+\.(?:js|mjs|cjs|ts|py|R|r))["']?(?=\s|$)""")
 MAX_SCRIPT_BYTES = 400_000
-HEREDOC = re.compile(r"<<-?\s*\\?[\"']?(\w+)[\"']?[^\n]*\n(.*?)\n\s*\1\s*(?:\n|$)", re.DOTALL)
-# A command whose heredoc supplies prose: a commit message, a PR or issue body.
-# `git -C . commit` has a flag between the two words.
-PROSE_CONSUMER = re.compile(
-    r"\bgit\b[^|;&\n]*?\bcommit\b|\bgh\s+(?:pr|issue)\b|--body-file\b|\s-F\s*-|--file=-"
+HEREDOC = re.compile(
+    r"<<-?\s*\\?[\"']?([^\s\"'\\;&|<>()]+)[\"']?[^\n]*\n(.*?)\n\s*\1\s*(?:\n|$)", re.DOTALL
 )
-# A redirect, `tee` or `dd of=` in the owning command writes the heredoc to a file.
-WRITES_FILE = re.compile(r">|\btee\b|\bof=")
-GIT_OR_GH_FIRST = re.compile(r"\s*(?:\w+=\S*\s+)*(?:git|gh)\s")
+# A body line that starts like a sentence ("Document require('playwright')
+# hook behavior") quotes an import; it does not run one. Judging the body, not
+# the command that owns the heredoc, leaves no `git commit` text to spoof
+# (four agy rounds on ai-config#5031 each found a new spelling that did).
+PROSE_LINE = re.compile(r"\s*(?:[A-Z][a-z]+|[a-z]+:|[-*])\s+(?![=(.\[:])")
 PROSE_FLAG = re.compile(
     r"""(?:^|\s)(?:-m|--message|--body|--title|-b|-t|--description)(?:\s+|=)(?:"(?:[^"\\]|\\.)*"|'[^']*')"""
 )
@@ -151,29 +150,12 @@ def _script_name_counts(command: str) -> dict:
     browser library; quote characters are dropped first, so `shot."js"` and
     `shot.js` are one name."""
     matches = list(HEREDOC.finditer(command))
-    # A heredoc that feeds a commit message or a PR or issue body is prose
-    # that may quote an import, not a script being written.
-    # Only the command that owns the heredoc counts: the text before `<<`,
-    # back to the last `&&`, `||`, `;` or `|`. A `git commit` after the
-    # heredoc, or in a trailing comment, does not make it prose.
-    def owner(match):
-        prefix = command[: match.start(2)].replace("\\\n", " ")
-        lines = prefix.split("\n")
-        opener = lines[-2] if len(lines) > 1 else lines[-1]
-        return re.split(r"&&|\|\||[;|]", opener.partition("<<")[0])[-1]
-
-    def is_prose(match):
-        # Quoted text is dropped and the command must start with git or gh,
-        # so a path that merely contains `git commit` is not prose.
-        text = re.sub(r"\"[^\"]*\"|'[^']*'", "", owner(match))
-        return bool(
-            GIT_OR_GH_FIRST.match(text)
-            and PROSE_CONSUMER.search(text)
-            and not WRITES_FILE.search(text)
-        )
-
-    matches_writing = [m for m in matches if not is_prose(m)]
-    if not any(LIBRARY.search(m.group(2)) for m in matches_writing):
+    code_bodies = [
+        m for m in matches
+        if any(LIBRARY.search(line) and not PROSE_LINE.match(line)
+               for line in m.group(2).split("\n"))
+    ]
+    if not code_bodies:
         return {}
     # Drop each body and its closing line, but keep the opener line, which
     # is where `cat <<'X' > shot.js` names the file.

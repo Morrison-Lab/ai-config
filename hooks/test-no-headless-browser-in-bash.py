@@ -194,6 +194,14 @@ class TestBlocks(unittest.TestCase):
         for n, word in enumerate(["git commit", "gh pr", "--body-file", "gh issue"]):
             self.assert_blocked(f"cat > '/tmp/{word}/evil{n}.js' <<'X'\n{body}X\nnode '/tmp/{word}/evil{n}.js'")
 
+    def test_agy_fourth_round_bypasses(self):
+        body = "const { chromium } = require('playwright');\n"
+        self.assert_blocked(f"git commit -m \"$(cat <<'X' > /tmp/shot40.js\n{body}X\n)\" ; node /tmp/shot40.js")
+        self.assert_blocked(f"git commit -F - <<'X' | tee /tmp/shot41.js\n{body}X\nnode /tmp/shot41.js")
+        self.assert_blocked(f"git commit -m \"$(cat > \"/tmp/shot42.js\" <<'X'\n{body}X\n)\" ; node /tmp/shot42.js")
+        self.assert_blocked(f"git commit -m ok & cat <<'X' > /tmp/shot43.js\n{body}X\nnode /tmp/shot43.js")
+        self.assert_blocked(f"cat > /tmp/shot44.js <<'EOF-1'\n{body}EOF-1\nnode /tmp/shot44.js")
+
     def test_agy_third_round_bypasses(self):
         body = "const { chromium } = require('playwright');\n"
         self.assert_blocked(f"git commit -m \"$(cat > /tmp/shot30.js <<'X'\n{body}X\n)\" ; node /tmp/shot30.js")
@@ -335,6 +343,11 @@ class TestPasses(unittest.TestCase):
             script = Path(tmp) / "ok.js"
             script.write_text("console.log('hello');\n", encoding="utf-8")
             self.assert_passes(f"node {script}")
+
+    def test_agy_fourth_round_false_positives(self):
+        line = "Document require('playwright') hook behavior\n"
+        self.assert_passes(f"git add scripts/check-links.py\ngit commit -m \"Fix a -> b: $(cat <<'EOF'\n{line}EOF\n)\"\npython3 scripts/check-links.py")
+        self.assert_passes(f"git add scripts/check-links.py\ngh pr create --title \"Update docs\" --body \"Summary:\n$(cat <<'EOF'\n{line}EOF\n)\"\npython3 scripts/check-links.py")
 
     def test_git_flag_before_commit_and_continued_gh_are_prose(self):
         line = "Document require('playwright') hook behavior\n"

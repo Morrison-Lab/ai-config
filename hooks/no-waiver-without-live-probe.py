@@ -39,9 +39,11 @@ NOT_EXHAUSTED = re.compile(
     r"\b(?:not|isn'?t|aren'?t|never|no\s+longer)\s+(?:been\s+)?"
     r"(?:exhausted|unavailable|waived|rate[- ]limited|out\s+of\s+quota)\b", re.I)
 
-# The comma or semicolon clause holding a negation is dropped, so a negated
-# route does not hide a different route's claim in the same sentence.
-NEGATED_CLAUSE = re.compile(r"[^,;]*" + NOT_EXHAUSTED.pattern + r"[^,;]*", re.I)
+# A sentence splits into clauses at a comma, a semicolon, "but", or an "and"
+# that starts a new singular subject ("and OpenCode is ..."). A clause holding
+# a negation is dropped, so a negated route does not hide another route's claim.
+CLAUSE_SPLIT = re.compile(
+    r"[,;]|\bbut\b|\band\s+(?=\S+\s+(?:is|was|has|isn'?t|wasn'?t|hasn'?t)\b)", re.I)
 
 READ_TOOL =re.compile(
     r"^(?:mcp__hearthbot__read_\w+|mcp__claude-code-remote__(?:get_event|list_events)|ReadNotifications)$")
@@ -67,7 +69,7 @@ def claimed_routes(text):
     unavailable. A cross-harness claim names both. Empty when nothing is claimed."""
     routes = set()
     for s in sentences(text):
-        s = NEGATED_CLAUSE.sub("", s)
+        s = " ".join(c for c in CLAUSE_SPLIT.split(s) if not NOT_EXHAUSTED.search(c))
         if not CLAIM.search(s):
             continue
         for m in TARGET.finditer(s):

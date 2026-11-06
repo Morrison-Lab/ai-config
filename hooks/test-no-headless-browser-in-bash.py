@@ -56,6 +56,107 @@ class TestBlocks(unittest.TestCase):
             script.write_text("from playwright.sync_api import sync_playwright\n", encoding="utf-8")
             self.assert_blocked(f"python3 {script}")
 
+    def test_incident_2026_11_06_heredoc_script_written_then_run(self):
+        # The file does not exist yet when the hook runs, so only the heredoc
+        # body in the same command shows the import (ai-config#5027).
+        self.assert_blocked(
+            "grep -c plotly page.html\n"
+            "cat > /tmp/shot.js <<'X'\n"
+            "const { chromium } = require('playwright');\n"
+            "(async () => { const b = await chromium.launch(); })();\n"
+            "X\n"
+            "node /tmp/shot.js 2>&1 | tail -3"
+        )
+
+    def test_heredoc_tee_script_written_then_run(self):
+        self.assert_blocked(
+            "tee shot.py <<'EOF' > /dev/null\n"
+            "from playwright.sync_api import sync_playwright\n"
+            "EOF\n"
+            "python3 shot.py"
+        )
+
+    def test_heredoc_after_unrelated_redirect_on_same_line(self):
+        self.assert_blocked(
+            "ls > /tmp/listing.txt && cat > /tmp/shot2.js <<'X'\n"
+            "const { chromium } = require('playwright');\n"
+            "X\n"
+            "node /tmp/shot2.js"
+        )
+
+    def test_heredoc_with_trailing_redirects_after_operator(self):
+        self.assert_blocked(
+            "cat > shot3.js <<'X' 2> /tmp/err.log\n"
+            "const { chromium } = require('playwright');\n"
+            "X\n"
+            "node shot3.js"
+        )
+        self.assert_blocked(
+            "tee shot4.py <<'X' >> /tmp/out.log\n"
+            "from playwright.sync_api import sync_playwright\n"
+            "X\n"
+            "python3 shot4.py"
+        )
+        self.assert_blocked(
+            "cat <<'X' > shot5.js\n"
+            "const { chromium } = require('playwright');\n"
+            "X\n"
+            "node shot5.js"
+        )
+
+    def test_heredoc_two_redirects_after_operator_last_wins(self):
+        self.assert_blocked(
+            "cat <<'X' > /tmp/decoy.log > shot6.js\n"
+            "const { chromium } = require('playwright');\n"
+            "X\n"
+            "node shot6.js"
+        )
+
+    def test_heredoc_redirects_on_both_sides_of_operator(self):
+        self.assert_blocked(
+            "cat > /tmp/before.txt <<'X' > shot7.js\n"
+            "const { chromium } = require('playwright');\n"
+            "X\n"
+            "node shot7.js"
+        )
+        self.assert_blocked(
+            "cat > /dev/null <<'X' > shot8.js\n"
+            "const { chromium } = require('playwright');\n"
+            "X\n"
+            "node shot8.js"
+        )
+
+    def test_later_heredoc_mentioning_the_name_does_not_erase_it(self):
+        self.assert_blocked(
+            "cat > shot9.js <<'A'\n"
+            "const { chromium } = require('playwright');\n"
+            "A\n"
+            "grep \"> shot9.js\" readme.txt > /tmp/other.log <<'B'\n"
+            "console.log('fine');\n"
+            "B\n"
+            "node shot9.js"
+        )
+
+    def test_heredoc_opener_split_by_line_continuation(self):
+        self.assert_blocked(
+            "cat > \\\nshot10.js <<'X'\n"
+            "const { chromium } = require('playwright');\n"
+            "X\n"
+            "node shot10.js"
+        )
+        self.assert_blocked(
+            "cat > shot11.js \\\n<<'X'\n"
+            "const { chromium } = require('playwright');\n"
+            "X\n"
+            "node shot11.js"
+        )
+
+    def test_write_and_run_spelled_differently(self):
+        body = "const { chromium } = require('playwright');\n"
+        self.assert_blocked(f"cat > ./shot12.js <<'X'\n{body}X\nnode shot12.js")
+        self.assert_blocked(f"cat > shot13.js <<'X'\n{body}X\nnode ./shot13.js")
+        self.assert_blocked(f"cat > /tmp//shot14.js <<'X'\n{body}X\nnode /tmp/shot14.js")
+
     def test_inline_node(self):
         self.assert_blocked("node -e \"require('playwright').chromium.launch()\"")
 
@@ -184,6 +285,16 @@ class TestPasses(unittest.TestCase):
             script = Path(tmp) / "ok.js"
             script.write_text("console.log('hello');\n", encoding="utf-8")
             self.assert_passes(f"node {script}")
+
+    def test_heredoc_script_without_browser_then_run(self):
+        self.assert_passes(
+            "cat > /tmp/ok.js <<'X'\nconsole.log('hello');\nX\nnode /tmp/ok.js"
+        )
+
+    def test_heredoc_browser_script_written_but_not_run(self):
+        self.assert_passes(
+            "cat > /tmp/notes.js <<'X'\nconst { chromium } = require('playwright');\nX\nls /tmp"
+        )
 
     def test_missing_script_fails_open(self):
         self.assert_passes("node /nonexistent/redir.js")

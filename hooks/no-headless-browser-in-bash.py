@@ -131,7 +131,7 @@ def script_imports_browser(path: str, cwd: str | None) -> bool:
 
 
 SCRIPT_NAME = re.compile(
-    r"""[\w./~${}()-]+\.(?:js|mjs|cjs|jsx|ts|mts|cts|tsx|py|R|r)\b"""
+    r"""[\w./~-]+\.(?:js|mjs|cjs|jsx|ts|mts|cts|tsx|py|R|r)\b"""
 )
 
 
@@ -141,27 +141,19 @@ def script_key(token: str) -> str:
 
 
 def _script_name_counts(command: str) -> dict:
-    """Count script file names outside heredoc bodies, if a body imports a
-    browser library; quote characters are dropped first, so `shot."js"` and
-    `shot.js` are one name."""
-    matches = list(HEREDOC.finditer(command))
-    # The whole command is searched, not each parsed body: a second heredoc
-    # opened on the same line is swallowed by the first match's opener.
+    """Count script file names in the whole command, if it imports a browser
+    library anywhere. Nothing is parsed: not heredocs (a `# <<true` comment or
+    an empty heredoc made the heredoc pattern swallow the real writer), not
+    quotes. Characters that the shell removes or expands (quotes, backslashes,
+    `$`, backticks, braces, parentheses) are deleted, so `shot."js"`,
+    `$'shot'.js`, `shot.``js` and `{a,shot}.js` all name `shot.js`. A body that
+    names a script counts too, which only adds blocks."""
     if not LIBRARY.search(command):
         return {}
-    # Drop each body and its closing line, but keep the opener line, which
-    # is where `cat <<'X' > shot.js` names the file.
-    outside, last = "", 0
-    for match in matches:
-        outside += command[last : match.start(2)]
-        last = match.end()
-    outside = outside + command[last:]
-    # Quotes, backslash escapes and empty `${...}` expansions do not change
-    # which file a word names: `shot."js"`, `shot\.js`, `shot${u}.js`.
-    outside = re.sub(r"\$\{[^}]*\}", "", outside)
-    outside = re.sub(r"""["'\\]""", "", outside)
+    text = re.sub(r"\$\{[^}]*\}", "", command)
+    text = re.sub(r"""["'\\$`{}()]""", "", text)
     counts: dict = {}
-    for token in SCRIPT_NAME.findall(outside):
+    for token in SCRIPT_NAME.findall(text):
         key = script_key(token)
         counts[key] = counts.get(key, 0) + 1
     return counts
@@ -177,7 +169,7 @@ def heredoc_script_names(command: str) -> dict:
     or pipeline stage really writes the file is shell syntax this hook cannot
     parse without drifting from the shell (six review rounds each found one
     more spelling). So it does not try: a file name that the command names
-    outside the heredoc bodies at least twice, once to write it in some way
+    in the command at least twice, once to write it in some way
     and once to run it, counts as written by the browser heredoc. A false
     positive needs a browser-importing heredoc and an unrelated script of
     the same base name in one command, and fails closed.

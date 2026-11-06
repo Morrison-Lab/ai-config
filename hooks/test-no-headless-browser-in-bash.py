@@ -194,6 +194,15 @@ class TestBlocks(unittest.TestCase):
         for n, word in enumerate(["git commit", "gh pr", "--body-file", "gh issue"]):
             self.assert_blocked(f"cat > '/tmp/{word}/evil{n}.js' <<'X'\n{body}X\nnode '/tmp/{word}/evil{n}.js'")
 
+    def test_agy_sixth_round_bypasses(self):
+        lib = "const { chromium } = require('playwright');\n"
+        self.assert_blocked(f"# <<true\ncat > /tmp/shot60.js <<'EOF'\n{lib}EOF\ntrue\nnode /tmp/shot60.js")
+        self.assert_blocked(f"cat <<'EOF'\nEOF\ncat > /tmp/shot61.js <<'X'\n{lib}X\n#\nEOF\nnode /tmp/shot61.js")
+        self.assert_blocked(f"cat <<'X' |\n{lib.rstrip()} // \\\nX\ncat > /tmp/shot62.\\\njs\n#\nX\nnode /tmp/shot62.js")
+        self.assert_blocked(f"cat > /tmp/$'shot63'.js <<'X'\n{lib}X\nnode /tmp/shot63.js")
+        self.assert_blocked(f"cat > /tmp/shot64.``js <<'X'\n{lib}X\nnode /tmp/shot64.js")
+        self.assert_blocked(f"tee /tmp/{{a,shot65}}.js <<'X' >/dev/null\n{lib}X\nnode /tmp/shot65.js")
+
     def test_agy_fifth_round_bypasses(self):
         self.assert_blocked("cat > /tmp/shot50.js <<'EOF'\nrun: const { chromium } = require('playwright');\nEOF\nnode /tmp/shot50.js")
         self.assert_blocked("cat <<'A' >/dev/null; cat <<'B' > /tmp/shot51.js\nok\nA\nconst { chromium } = require('playwright');\nB\nnode /tmp/shot51.js")

@@ -114,8 +114,8 @@ def heredoc_delims(line):
             i += 2
         elif line.startswith("<<", i):
             i += 2
-            if line.startswith("-", i):
-                i += 1
+            dash = line.startswith("-", i)
+            i += dash
             while i < n and line[i] in " \t":
                 i += 1
             word, q = [], None
@@ -136,7 +136,7 @@ def heredoc_delims(line):
                 else:
                     word.append(c)
                 i += 1
-            found.append("".join(word))
+            found.append(("".join(word), dash))
             continue
         i += 1
     return found
@@ -149,7 +149,8 @@ def strip_heredocs(cmd):
     out, pending = [], []
     for line in cmd.split("\n"):
         if pending:
-            if line.strip(" \t") == pending[0]:
+            word, dash = pending[0]
+            if (line.lstrip("\t") if dash else line) == word:
                 pending.pop(0)
             continue
         out.append(line)

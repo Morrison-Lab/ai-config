@@ -48,10 +48,13 @@ STATE = re.compile(
 MECHANISM = re.compile(
     r"\b(?:if|when|whenever|once|unless|how\s+to|diagnos\w*|detect\w*|check\w*|probe\w*|"
     r"means|looks?\s+like|returns?|before|after|so\s+that|in\s+case)\b", re.I)
-# until/while are deliberately NOT mechanism words: "down until Monday" and
-# "Until Monday, X is down" both claim the present, and word order cannot tell
-# them from a conditional. A hypothetical that trips the check takes the allow
-# marker; a missed stale claim is the costlier error for this gate.
+# until/while are NOT mechanism words: "down until Monday" and "Until Monday, X
+# is down" claim the present. The one structural exception: a sentence that
+# OPENS with While/Until and holds the state inside that opening clause (before
+# its first comma) is a conditional ("While the quota is exhausted, switch
+# routes."), unlike a fronted duration ("While maintenance finishes, X is down.").
+# A hypothetical that still trips the check takes the allow marker.
+FRONTED = re.compile(r"\s*(?:(?:[-*+]|\d+[.)])\s+)?(?:while|until)\b", re.I)
 EXPIRES = re.compile(r"\bexpires?\b\s*:?\s*20\d\d-\d\d-\d\d", re.I)
 ALLOW = "<!-- dynamic-note: allow -->"
 BULLET = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
@@ -63,8 +66,12 @@ def is_state_claim(unit):
     # A quoted phrase is an example of wording, not an assertion by the note.
     unit = re.sub(r'"[^"]*"|\u201c[^\u201d]*\u201d', " ", unit)
     for s in SENTENCE.split(" ".join(unit.split())):
-        if STATE.search(s) and RESOURCE.search(s) and not MECHANISM.search(s):
-            return True
+        state = STATE.search(s)
+        if not (state and RESOURCE.search(s)) or MECHANISM.search(s):
+            continue
+        if FRONTED.match(s) and state.start() < s.find(","):
+            continue
+        return True
     return False
 
 

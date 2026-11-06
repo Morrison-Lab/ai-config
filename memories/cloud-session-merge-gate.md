@@ -135,6 +135,7 @@ Learned on ai-config#5023 (2026-11-06).
 - A cloud session has no `agy`, `gemini`, `cursor-agent` or `opencode` CLI.
   Probe OpenCode Go by curl first: a Python `urllib` request needs a `User-Agent` header, or Cloudflare returns 403 code 1010.
   On 2026-11-06 it returned `GoUsageLimitError` (monthly) for every model tried, so the gate was not waived.
+  That quota state is dynamic and expires with the monthly limit (by 2026-12-06 at the latest): re-probe live and never waive from this note.
 - Start a Remote Control session on the Mac (`start_remote_control`, read-only brief) to run `agy` on `gh pr diff N -R O/R`.
   Ask for it in parallel with the fully-clean checker, not after, because Ezra must approve the card.
 - Run `check-pr-fully-clean.py` as its own Bash call, with no `&&` and no pipe, and `--annotations-read=all` after `-R`.

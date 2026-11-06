@@ -78,9 +78,14 @@ def is_human_turn(rec):
 HELP = frozenset({"-h", "-v", "-V", "--help", "--version", "version"})
 
 def segments(cmd):
-    """Split *cmd* on unquoted `;`, `&`, `|` and newlines (quote-aware)."""
-    out, cur, quote, esc = [], [], None, False
+    """Split *cmd* on unquoted `;`, `&`, `|` and newlines (quote-aware).
+    A `#` that starts a word comments out the rest of its line."""
+    out, cur, quote, esc, comment = [], [], None, False, False
     for ch in cmd:
+        if comment:
+            if ch != "\n":
+                continue
+            comment = False
         if esc:
             esc = False
         elif ch == "\\" and quote != "'":
@@ -89,6 +94,9 @@ def segments(cmd):
             quote = None if ch == quote else quote
         elif ch in "'\"":
             quote = ch
+        elif ch == "#" and (not cur or cur[-1] in " \t"):
+            comment = True
+            continue
         elif ch in ";&|\n":
             out.append("".join(cur))
             cur = []

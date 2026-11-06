@@ -71,6 +71,8 @@ CASES = [
     ("# after a closing paren is not a comment", POST, WAIVE, [human()] + bash(1, "cat $(true)#foo <<REALEOF\nagy run\nopencode run -m x ok\nREALEOF"), True),
     ("ssh options with arguments, timeout flags", POST, WAIVE, [human()] + bash(1, "ssh -i ~/.ssh/k -o ConnectTimeout=5 host 'agy -p ok'") + bash(2, "timeout -k 5 30 opencode run -m x ok"), False),
     ("combined curl flag -sd", POST, WAIVE, [human()] + AGY + bash(3, "curl -sd '{}' https://opencode.ai/zen/go/v1/chat/completions"), False),
+    ("probe text inside a comment is no probe", POST, WAIVE, [human()] + bash(1, "echo setup #c; agy run\necho two # x | opencode run -m x ok"), True),
+    ("apostrophe in a comment does not hide a real probe", POST, WAIVE, [human()] + bash(1, "# check agy's quota\nagy -p ok\nopencode run -m kimi-k3 ok"), False),
     ("multi-line quoted argument is no probe", POST, WAIVE, [human()] + bash(1, "echo 'notes:\nagy run\nopencode run -m x ok\n'"), True),
     ("human reviewer unavailable is no claim", POST, "The human reviewer is unavailable this week.", [human()], False),
     ("not exhausted is no claim", POST, "agy is not exhausted, so I ran it.", [human()], False),

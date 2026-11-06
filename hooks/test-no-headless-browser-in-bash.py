@@ -157,6 +157,24 @@ class TestBlocks(unittest.TestCase):
         self.assert_blocked(f"cat > shot13.js <<'X'\n{body}X\nnode ./shot13.js")
         self.assert_blocked(f"cat > /tmp//shot14.js <<'X'\n{body}X\nnode /tmp/shot14.js")
 
+    def test_agy_review_of_5029_spellings(self):
+        # Findings from the post-merge cross-harness review of ai-config#5029.
+        body = "const { chromium } = require('playwright');\n"
+        self.assert_blocked(f"{{ cat <<'X'\n{body}X\n}} > /tmp/shot20.js\nnode /tmp/shot20.js")
+        self.assert_blocked(f"cat <<'X' |\n{body}X\ncat > /tmp/shot21.js\nnode /tmp/shot21.js")
+        self.assert_blocked(f"tee /tmp/build.log /tmp/shot22.js <<'X' > /dev/null\n{body}X\nnode /tmp/shot22.js")
+        self.assert_blocked(f"cat >| /tmp/shot23.js <<'X'\n{body}X\nnode /tmp/shot23.js")
+        self.assert_blocked(f"dd of=/tmp/shot24.js <<'X' 2>/dev/null\n{body}X\nnode /tmp/shot24.js")
+        self.assert_blocked(f"cat > \"$PWD/shot25.js\" <<'X'\n{body}X\nnode shot25.js")
+
+    def test_quoted_heredoc_body_ending_in_backslash(self):
+        self.assert_blocked(
+            "cat > /tmp/shot26.js <<'X'\n"
+            "const { chromium } = require('playwright'); // \\\n"
+            "X\n"
+            "node /tmp/shot26.js"
+        )
+
     def test_inline_node(self):
         self.assert_blocked("node -e \"require('playwright').chromium.launch()\"")
 

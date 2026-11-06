@@ -128,30 +128,43 @@ def script_imports_browser(path: str, cwd: str | None) -> bool:
         return False        # unreadable or not there yet: fail open
 
 
-WRITE_TARGET = re.compile(r"""(?:>>?|\btee(?:\s+-\S+)*)\s*["']?([\w./~$()-]+)["']?""")
+SCRIPT_NAME = re.compile(r"""[\w./~${}()-]+\.(?:js|mjs|cjs|ts|py|R|r)\b""")
 
 
-def heredoc_written_files(command: str) -> dict:
-    """Map each file a heredoc writes (`cat > shot.js <<'X' ... X`) to its body.
+def script_key(token: str) -> str:
+    """The file name a script token stands for, however it is spelled."""
+    return os.path.basename(os.path.normpath(token.strip("\"'")))
 
-    The script is then run by a later `node shot.js` in the same command, when
-    the file does not exist yet at hook time, so reading it from disk finds
-    nothing (2026-11-06: a Playwright screenshot script got through this way,
-    ai-config#5027)."""
-    written = {}
-    command = command.replace("\\\n", " ")      # the shell joins continued lines
+
+def heredoc_script_names(command: str) -> dict:
+    """Map a script file name to how often the command names it, but only when
+    some heredoc in the command carries a browser-library import.
+
+    `cat > shot.js <<'X' ... X` followed by `node shot.js` writes the script
+    in the same command, so it is not on disk when the hook runs
+    (2026-11-06, ai-config#5027). Which redirect, `tee` argument, brace group
+    or pipeline stage really writes the file is shell syntax this hook cannot
+    parse without drifting from the shell (six review rounds each found one
+    more spelling). So it does not try: a file name that the command names
+    outside the heredoc bodies at least twice, once to write it in some way
+    and once to run it, counts as written by the browser heredoc. A false
+    positive needs a browser-importing heredoc and an unrelated script of
+    the same name in one command, and fails closed."""
+    bodies = [m.group(2) for m in HEREDOC.finditer(command)]
+    if not any(LIBRARY.search(body) for body in bodies):
+        return {}
+    # Drop each body and its closing line, but keep the opener line, which
+    # is where `cat <<'X' > shot.js` names the file.
+    outside, last = "", 0
     for match in HEREDOC.finditer(command):
-        opener = command[: match.start(2)].rsplit("\n", 2)[-2]
-        # Which redirect the shell applies last depends on fd and order, so
-        # bind the body to every file the opener line writes: a decoy key is
-        # harmless, and the file that is later run is always among them.
-        for target in WRITE_TARGET.finditer(opener):
-            if target.group(1) != "/dev/null":
-                # Accumulate: a later heredoc whose line merely mentions the
-                # name (in a quoted argument) must not erase an earlier body.
-                key = os.path.normpath(target.group(1))
-                written[key] = written.get(key, "") + "\n" + match.group(2)
-    return written
+        outside += command[last : match.start(2)]
+        last = match.end()
+    outside = (outside + command[last:]).replace("\\\n", " ")
+    counts: dict = {}
+    for token in SCRIPT_NAME.findall(outside):
+        key = script_key(token)
+        counts[key] = counts.get(key, 0) + 1
+    return counts
 
 
 def strip_prose(command: str) -> str:
@@ -170,7 +183,7 @@ def strip_prose(command: str) -> str:
 
 def offending(command: str, cwd: str | None = None, depth: int = 0):
     """Return (label, matched text) for the first browser launch, else None."""
-    written = heredoc_written_files(command)
+    named = heredoc_script_names(command)
     command = strip_prose(command)
     if match := BROWSER_BINARY.search(command):
         return "a browser binary", match.group(0).strip(" ;&|(\n\"'")
@@ -189,8 +202,7 @@ def offending(command: str, cwd: str | None = None, depth: int = 0):
         if inline and (LIBRARY.search(rest) or LIBRARY.search(command[match.end():].split("\n", 1)[0])):
             return "inline code that imports a browser-automation library", shown
         script = SCRIPT_FILE.search(rest)
-        if script and LIBRARY.search(
-                written.get(os.path.normpath(script.group(1)), "")):
+        if script and named.get(script_key(script.group(1)), 0) >= 2:
             return f"{script.group(1)}, written by a heredoc in this command, which imports a browser-automation library", shown
         if script and script_imports_browser(script.group(1), cwd):
             return f"{script.group(1)}, which imports a browser-automation library", shown

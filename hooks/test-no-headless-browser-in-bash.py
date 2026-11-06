@@ -76,6 +76,14 @@ class TestBlocks(unittest.TestCase):
             "python3 shot.py"
         )
 
+    def test_heredoc_after_unrelated_redirect_on_same_line(self):
+        self.assert_blocked(
+            "ls > /tmp/listing.txt && cat > /tmp/shot2.js <<'X'\n"
+            "const { chromium } = require('playwright');\n"
+            "X\n"
+            "node /tmp/shot2.js"
+        )
+
     def test_inline_node(self):
         self.assert_blocked("node -e \"require('playwright').chromium.launch()\"")
 

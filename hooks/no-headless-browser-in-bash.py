@@ -141,8 +141,10 @@ def heredoc_written_files(command: str) -> dict:
     written = {}
     for match in HEREDOC.finditer(command):
         opener = command[: match.start(2)].rsplit("\n", 2)[-2]
-        if target := WRITE_TARGET.search(opener):
-            written[target.group(1)] = match.group(2)
+        targets = [m for m in WRITE_TARGET.finditer(opener)
+                   if m.group(1) != "/dev/null"]
+        if targets:
+            written[targets[-1].group(1)] = match.group(2)
     return written
 
 

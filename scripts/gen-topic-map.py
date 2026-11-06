@@ -28,7 +28,7 @@ ROOT = Path(__file__).resolve().parent.parent
 OUT = Path("docs") / "topic-map.md"
 COMPANION = re.compile(r"\.(rationale|cases)\.md$")
 LINK = re.compile(r"\[([^\]]*)\]\([^)]*\)")
-FRONT =re.compile(r"\A---\n(.*?)\n---\n", re.S)
+FRONT = re.compile(r"\A---\n(.*?)\n---\n", re.S)
 
 
 def frontmatter(text: str) -> tuple[dict[str, str], str]:
@@ -57,15 +57,25 @@ def clip(s: str, n: int = 160) -> str:
     return s if len(s) <= n else s[: n - 3].rstrip() + "..."
 
 
+def submodule_paths(root: Path) -> list[str]:
+    """Paths of git submodules: their files exist in some checkouts and not in others."""
+    gm = root / ".gitmodules"
+    if not gm.is_file():
+        return []
+    return re.findall(r"^\s*path\s*=\s*(\S+)", gm.read_text(encoding="utf-8"), re.M)
+
+
 def rows(root: Path) -> list[tuple[str, str, str, str]]:
     out = []
+    subs = submodule_paths(root)
     for p in sorted((root / "skills").glob("*/SKILL.md")):
         fm, body = frontmatter(p.read_text(encoding="utf-8"))
         desc = fm.get("description") or first_paragraph(body)
         out.append(("skill", p.parent.name, desc, fm.get("keywords", "")))
     for p in sorted((root / "shared").rglob("*.md")):
         rel = p.relative_to(root / "shared")
-        if COMPANION.search(p.name) or rel.parts[0] == "vendored":
+        in_submodule = any(("shared/" + rel.as_posix()).startswith(s + "/") for s in subs)
+        if COMPANION.search(p.name) or rel.parts[0] == "vendored" or in_submodule:
             continue
         fm, body = frontmatter(p.read_text(encoding="utf-8"))
         out.append(("shared", rel.as_posix(), first_paragraph(body), fm.get("keywords", "")))

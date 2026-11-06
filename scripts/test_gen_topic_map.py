@@ -64,6 +64,21 @@ class TopicMapTest(unittest.TestCase):
         self.assertIn("See the rule and more.", text)
         self.assertNotIn("issue-first.md", text)
 
+    def test_submodule_files_are_skipped(self):
+        # A submodule is checked out in CI and empty locally, so its files
+        # must never reach the map or --check disagrees between the two.
+        (self.root / ".gitmodules").write_text(
+            '[submodule "shared/sub"]\n\tpath = shared/sub\n\turl = https://example.invalid/x.git\n',
+            encoding="utf-8",
+        )
+        sub = self.root / "shared" / "sub"
+        sub.mkdir()
+        sub.joinpath("outside.md").write_text("Third-party text.\n", encoding="utf-8")
+        run(self.root)
+        text = (self.root / "docs" / "topic-map.md").read_text(encoding="utf-8")
+        self.assertNotIn("outside.md", text)
+        self.assertIn("fail-fast.md", text)
+
     def test_check_passes_when_fresh(self):
         run(self.root)
         self.assertEqual(run(self.root, "--check").returncode, 0)

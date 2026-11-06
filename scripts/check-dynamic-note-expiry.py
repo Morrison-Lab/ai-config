@@ -48,9 +48,10 @@ STATE = re.compile(
 MECHANISM = re.compile(
     r"\b(?:if|when|whenever|once|unless|how\s+to|diagnos\w*|detect\w*|check\w*|probe\w*|"
     r"means|looks?\s+like|returns?|before|after|so\s+that|in\s+case)\b", re.I)
-# until/while open a conditional only BEFORE the state; after it they give a
-# duration of the present ("is down until Monday, while ...").
-LEADING = re.compile(r"\b(?:until|while)\b", re.I)
+# until/while are deliberately NOT mechanism words: "down until Monday" and
+# "Until Monday, X is down" both claim the present, and word order cannot tell
+# them from a conditional. A hypothetical that trips the check takes the allow
+# marker; a missed stale claim is the costlier error for this gate.
 EXPIRES = re.compile(r"\bexpires?\b\s*:?\s*20\d\d-\d\d-\d\d", re.I)
 ALLOW = "<!-- dynamic-note: allow -->"
 BULLET = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
@@ -62,13 +63,8 @@ def is_state_claim(unit):
     # A quoted phrase is an example of wording, not an assertion by the note.
     unit = re.sub(r'"[^"]*"|\u201c[^\u201d]*\u201d', " ", unit)
     for s in SENTENCE.split(" ".join(unit.split())):
-        state = STATE.search(s)
-        if not (state and RESOURCE.search(s)) or MECHANISM.search(s):
-            continue
-        lead = LEADING.search(s)
-        if lead and lead.start() < state.start():
-            continue
-        return True
+        if STATE.search(s) and RESOURCE.search(s) and not MECHANISM.search(s):
+            return True
     return False
 
 

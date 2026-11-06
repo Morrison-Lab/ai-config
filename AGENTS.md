@@ -160,7 +160,9 @@ See [`dont-take-my-word-for-it`](shared/principles/dont-take-my-word-for-it.md).
 Quota, availability, outages, pauses, CI state, branch or PR state, and open or merged status change faster than any note records.
 Memories, handoffs, recaps, and earlier transcript turns are hints, not evidence.
 Probe live (for example `agy models` plus a small run, `gh pr view`, an API call) before choosing a route around a remembered limit.
-Give any time-bound note an expiry date and delete it once it passes.
+Every note that records a dynamic condition must state its expiration date (or the event that ends it) in the note itself.
+A note with no expiration date is treated as already expired: re-probe before acting on it.
+Delete or refresh a note once its date passes.
 This is prose only: the failure is a stale belief in the agent's reasoning, and I identified no tool-call pattern a deny hook could match (not exhaustively enumerated).
 Origin: a remembered "agy Argon quota out until 2026-11-04" note was acted on after Argon had recovered (Ezra, 2026-11-05).
 ## Proactively suggest better alternatives to proposed approaches

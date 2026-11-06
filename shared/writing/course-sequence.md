@@ -11,11 +11,11 @@ mcs -> mds -> pds -> sds -+-> lds   (prediction-focused statistics)
         |      +-> ids ---|----+    (information theory)
         |                 |    |
         +----> cds -------|----+    (computational complexity)
-                   |
-                   +-> rme   (model-inference-focused statistics)
-                        ^
-                        |
-                  win, cie   (causal inference)
+                          |
+                          +-> rme   (model-inference-focused statistics)
+                               ^
+                               |
+                         win, cie   (causal inference)
 ```
 
 - mcs, mds, pds and sds form a linear chain:

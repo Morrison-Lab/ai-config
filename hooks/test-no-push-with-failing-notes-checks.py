@@ -207,6 +207,35 @@ env_tl = json.load(open(os.path.join(LOG, "check-term-links.py.env"), encoding="
 expect("T34 caller NLB_/TERM_LINKS_ variables do not leak into a check",
        env_tl.get("TERM_LINKS_GLOBS"), None)
 
+terms_root = tempfile.mkdtemp(prefix="npc-terms-")
+for site in ("mds", "pds", "sds"):
+    os.makedirs(os.path.join(terms_root, site))
+lds = make_repo({"check-term-links.yml": WORKFLOW})
+git(lds, "remote", "add", "origin", "https://github.com/Morrison-Lab/lds.git")
+run("git push origin feat", lds, 0, extra={"PUSH_CHECK_TERMS_ROOT": terms_root})
+env_tl = json.load(open(os.path.join(LOG, "check-term-links.py.env"), encoding="utf-8"))
+expect("T35 lds gets mds, pds and sds as terms dirs, as CI does",
+       env_tl.get("TERM_LINKS_TERMS_DIRS"), " ".join(os.path.join(terms_root, s) for s in ("mds", "pds", "sds")))
+verdict, _ = run("git push origin feat", lds, 0, extra={"PUSH_CHECK_TERMS_ROOT": "/nonexistent-terms"})
+expect("T36 unfetchable terms repos fail open with a note", verdict, "NOTE")
+sds = make_repo({"check-term-links.yml": WORKFLOW})
+git(sds, "remote", "add", "origin", "git@github.com:Morrison-Lab/sds.git")
+run("git push origin feat", sds, 0, extra={"PUSH_CHECK_TERMS_ROOT": terms_root})
+env_tl = json.load(open(os.path.join(LOG, "check-term-links.py.env"), encoding="utf-8"))
+expect("T37 sds gets only mds and pds (ssh remote parsed)",
+       env_tl.get("TERM_LINKS_TERMS_DIRS"), " ".join(os.path.join(terms_root, s) for s in ("mds", "pds")))
+none = make_repo({"check-term-links.yml": WORKFLOW.replace("whole-tree:", "terms-from: none\n      whole-tree:")})
+git(none, "remote", "add", "origin", "https://github.com/Morrison-Lab/lds.git")
+run("git push origin feat", none, 0, extra={"PUSH_CHECK_TERMS_ROOT": terms_root})
+env_tl = json.load(open(os.path.join(LOG, "check-term-links.py.env"), encoding="utf-8"))
+expect("T38 terms-from: none turns the default off", "TERM_LINKS_TERMS_DIRS" in env_tl, False)
+explicit = make_repo({"check-term-links.yml": WORKFLOW.replace("whole-tree:", "terms-from: 'Morrison-Lab/pds'\n      whole-tree:")})
+git(explicit, "remote", "add", "origin", "https://github.com/Morrison-Lab/lds.git")
+run("git push origin feat", explicit, 0, extra={"PUSH_CHECK_TERMS_ROOT": terms_root})
+env_tl = json.load(open(os.path.join(LOG, "check-term-links.py.env"), encoding="utf-8"))
+expect("T39 a literal terms-from overrides the default",
+       env_tl.get("TERM_LINKS_TERMS_DIRS"), os.path.join(terms_root, "pds"))
+
 real = os.environ.get("GHA_REAL_DIR")
 if real:
     r = make_repo({"check-new-line-breaks.yml": NLB})

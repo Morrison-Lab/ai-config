@@ -147,10 +147,14 @@ def _script_name_counts(command: str) -> dict:
     matches = list(HEREDOC.finditer(command))
     # A heredoc that feeds a commit message or a PR or issue body is prose
     # that may quote an import, not a script being written.
-    matches_writing = [
-        m for m in matches
-        if not PROSE_CONSUMER.search(command[: m.start(2)].rsplit("\n", 2)[-2])
-    ]
+    # Only the command that owns the heredoc counts: the text before `<<`,
+    # back to the last `&&`, `||`, `;` or `|`. A `git commit` after the
+    # heredoc, or in a trailing comment, does not make it prose.
+    def owner(match):
+        opener = command[: match.start(2)].rsplit("\n", 2)[-2]
+        return re.split(r"&&|\|\||[;|]", opener.partition("<<")[0])[-1]
+
+    matches_writing = [m for m in matches if not PROSE_CONSUMER.search(owner(m))]
     if not any(LIBRARY.search(m.group(2)) for m in matches_writing):
         return {}
     # Drop each body and its closing line, but keep the opener line, which

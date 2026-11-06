@@ -183,6 +183,12 @@ class TestBlocks(unittest.TestCase):
         self.assert_blocked(f"cat > /tmp/shot33\\.js <<'X'\n{body}X\nnode /tmp/shot33.js")
         self.assert_blocked(f"cat > /tmp/shot34${{u}}.js <<'X'\n{body}X\nnode /tmp/shot34.js")
 
+    def test_prose_exemption_only_for_the_command_that_owns_the_heredoc(self):
+        body = "const { chromium } = require('playwright');\n"
+        self.assert_blocked(f"cat > /tmp/bypass1.js <<'X' && git commit --amend --no-edit\n{body}X\nnode /tmp/bypass1.js")
+        self.assert_blocked(f"cat > /tmp/bypass2.js <<'X'; gh pr comment 1 -b done\n{body}X\nnode /tmp/bypass2.js")
+        self.assert_blocked(f"cat > /tmp/bypass3.js <<'X' # git commit later\n{body}X\nnode /tmp/bypass3.js")
+
     def test_quoted_heredoc_body_ending_in_backslash(self):
         self.assert_blocked(
             "cat > /tmp/shot26.js <<'X'\n"
@@ -337,6 +343,14 @@ class TestPasses(unittest.TestCase):
             "git add scripts/check-links.py\n"
             "git commit -F - <<'EOF'\n"
             "Document require('playwright') hook behavior\nEOF\n"
+            "python3 scripts/check-links.py"
+        )
+
+    def test_commit_message_in_command_substitution_taints_nothing(self):
+        self.assert_passes(
+            "git add scripts/check-links.py\n"
+            "git commit -m \"$(cat <<'EOF'\n"
+            "Document require('playwright') hook behavior\nEOF\n)\"\n"
             "python3 scripts/check-links.py"
         )
 

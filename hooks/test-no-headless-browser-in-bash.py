@@ -194,6 +194,11 @@ class TestBlocks(unittest.TestCase):
         for n, word in enumerate(["git commit", "gh pr", "--body-file", "gh issue"]):
             self.assert_blocked(f"cat > '/tmp/{word}/evil{n}.js' <<'X'\n{body}X\nnode '/tmp/{word}/evil{n}.js'")
 
+    def test_agy_fifth_round_bypasses(self):
+        self.assert_blocked("cat > /tmp/shot50.js <<'EOF'\nrun: const { chromium } = require('playwright');\nEOF\nnode /tmp/shot50.js")
+        self.assert_blocked("cat <<'A' >/dev/null; cat <<'B' > /tmp/shot51.js\nok\nA\nconst { chromium } = require('playwright');\nB\nnode /tmp/shot51.js")
+        self.assert_blocked("cat > /tmp/shot52.py <<'EOF'\ntry: from playwright.sync_api import sync_playwright\nEOF\npython3 /tmp/shot52.py")
+
     def test_agy_fourth_round_bypasses(self):
         body = "const { chromium } = require('playwright');\n"
         self.assert_blocked(f"git commit -m \"$(cat <<'X' > /tmp/shot40.js\n{body}X\n)\" ; node /tmp/shot40.js")
@@ -329,6 +334,9 @@ class TestReviewedPasses(unittest.TestCase):
 
 
 class TestPasses(unittest.TestCase):
+    def assert_blocked(self, command):
+        self.assertIsNotNone(run(command), f"expected a block for: {command}")
+
     def assert_passes(self, command):
         self.assertIsNone(run(command), f"expected a pass for: {command}")
 
@@ -344,16 +352,16 @@ class TestPasses(unittest.TestCase):
             script.write_text("console.log('hello');\n", encoding="utf-8")
             self.assert_passes(f"node {script}")
 
-    def test_agy_fourth_round_false_positives(self):
+    def test_failclosed_agy_fourth_round_false_positives(self):
         line = "Document require('playwright') hook behavior\n"
-        self.assert_passes(f"git add scripts/check-links.py\ngit commit -m \"Fix a -> b: $(cat <<'EOF'\n{line}EOF\n)\"\npython3 scripts/check-links.py")
-        self.assert_passes(f"git add scripts/check-links.py\ngh pr create --title \"Update docs\" --body \"Summary:\n$(cat <<'EOF'\n{line}EOF\n)\"\npython3 scripts/check-links.py")
+        self.assert_blocked(f"git add scripts/check-links.py\ngit commit -m \"Fix a -> b: $(cat <<'EOF'\n{line}EOF\n)\"\npython3 scripts/check-links.py")
+        self.assert_blocked(f"git add scripts/check-links.py\ngh pr create --title \"Update docs\" --body \"Summary:\n$(cat <<'EOF'\n{line}EOF\n)\"\npython3 scripts/check-links.py")
 
-    def test_git_flag_before_commit_and_continued_gh_are_prose(self):
+    def test_failclosed_git_flag_before_commit_and_continued_gh_are_prose(self):
         line = "Document require('playwright') hook behavior\n"
-        self.assert_passes(f"git -C . add scripts/check-links.py\ngit -C . commit -m \"$(cat <<'EOF'\n{line}EOF\n)\"\npython3 scripts/check-links.py")
-        self.assert_passes(f"git add scripts/check-links.py\ngh pr create --title \"Update docs\" \\\n  --body \"$(cat <<'EOF'\n{line}EOF\n)\"\npython3 scripts/check-links.py")
-        self.assert_passes(f"git -C . add scripts/check-links.py\ngit -C . commit --file=- <<'EOF'\n{line}EOF\npython3 scripts/check-links.py")
+        self.assert_blocked(f"git -C . add scripts/check-links.py\ngit -C . commit -m \"$(cat <<'EOF'\n{line}EOF\n)\"\npython3 scripts/check-links.py")
+        self.assert_blocked(f"git add scripts/check-links.py\ngh pr create --title \"Update docs\" \\\n  --body \"$(cat <<'EOF'\n{line}EOF\n)\"\npython3 scripts/check-links.py")
+        self.assert_blocked(f"git -C . add scripts/check-links.py\ngit -C . commit --file=- <<'EOF'\n{line}EOF\npython3 scripts/check-links.py")
 
     def test_commit_heredoc_naming_a_browser_and_an_ordinary_script(self):
         # agy's false-positive probe for ai-config#5031: a message that only
@@ -367,16 +375,16 @@ class TestPasses(unittest.TestCase):
             "# Run check-links.py to validate docs/notes.md\npython3 scripts/check-links.py"
         )
 
-    def test_commit_message_quoting_an_import_taints_nothing(self):
-        self.assert_passes(
+    def test_failclosed_commit_message_quoting_an_import_taints_nothing(self):
+        self.assert_blocked(
             "git add scripts/check-links.py\n"
             "git commit -F - <<'EOF'\n"
             "Document require('playwright') hook behavior\nEOF\n"
             "python3 scripts/check-links.py"
         )
 
-    def test_commit_message_in_command_substitution_taints_nothing(self):
-        self.assert_passes(
+    def test_failclosed_commit_message_in_command_substitution_taints_nothing(self):
+        self.assert_blocked(
             "git add scripts/check-links.py\n"
             "git commit -m \"$(cat <<'EOF'\n"
             "Document require('playwright') hook behavior\nEOF\n)\"\n"

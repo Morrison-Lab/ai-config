@@ -114,11 +114,6 @@ MAX_SCRIPT_BYTES = 400_000
 HEREDOC = re.compile(
     r"<<-?\s*\\?[\"']?([^\s\"'\\;&|<>()]+)[\"']?[^\n]*\n(.*?)\n\s*\1\s*(?:\n|$)", re.DOTALL
 )
-# A body line that starts like a sentence ("Document require('playwright')
-# hook behavior") quotes an import; it does not run one. Judging the body, not
-# the command that owns the heredoc, leaves no `git commit` text to spoof
-# (four agy rounds on ai-config#5031 each found a new spelling that did).
-PROSE_LINE = re.compile(r"\s*(?:[A-Z][a-z]+|[a-z]+:|[-*])\s+(?![=(.\[:])")
 PROSE_FLAG = re.compile(
     r"""(?:^|\s)(?:-m|--message|--body|--title|-b|-t|--description)(?:\s+|=)(?:"(?:[^"\\]|\\.)*"|'[^']*')"""
 )
@@ -150,12 +145,9 @@ def _script_name_counts(command: str) -> dict:
     browser library; quote characters are dropped first, so `shot."js"` and
     `shot.js` are one name."""
     matches = list(HEREDOC.finditer(command))
-    code_bodies = [
-        m for m in matches
-        if any(LIBRARY.search(line) and not PROSE_LINE.match(line)
-               for line in m.group(2).split("\n"))
-    ]
-    if not code_bodies:
+    # The whole command is searched, not each parsed body: a second heredoc
+    # opened on the same line is swallowed by the first match's opener.
+    if not LIBRARY.search(command):
         return {}
     # Drop each body and its closing line, but keep the opener line, which
     # is where `cat <<'X' > shot.js` names the file.
@@ -177,7 +169,7 @@ def _script_name_counts(command: str) -> dict:
 
 def heredoc_script_names(command: str) -> dict:
     """Map a script file name to how often the command names it, but only when
-    some heredoc in the command carries a browser-library import.
+    the command carries a browser-library import anywhere.
 
     `cat > shot.js <<'X' ... X` followed by `node shot.js` writes the script
     in the same command, so it is not on disk when the hook runs
@@ -195,10 +187,15 @@ def heredoc_script_names(command: str) -> dict:
     reading alone is right: joining first breaks a quoted heredoc whose last
     body line ends in a backslash, and not joining hides a redirect on a
     continued opener line or a library name split inside an unquoted body
-    (agy review of ai-config#5031, 2026-11-06). A heredoc on a `git commit`, `gh pr`, `gh issue`, `--body-file` or `-F -`
-    line is prose and never counts as a script (a message may quote an import).
-    Not covered: a name built from a variable (`/tmp/$s.js`), a command that
-    puts a commit line and a script heredoc on one line, a script with
+    (agy review of ai-config#5031, 2026-11-06).
+
+    There is no prose exemption. Telling a commit message that quotes an
+    import from a script that runs one took a regex over the owning command
+    and then over the body, and five agy rounds each found a new spelling
+    of both; so a commit message that quotes an import, plus a same-named
+    script named twice in one command, blocks (fails closed; run the two
+    steps as separate commands).
+    Not covered: a name built from a variable (`/tmp/$s.js`), a script with
     no extension, a script run by `npx tsx` or named with `${...}` in the
     interpreter call (the interpreter side only knows plain file names), or
     one that a directory name stands for (`python3 dir`

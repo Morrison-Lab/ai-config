@@ -45,6 +45,8 @@ CASES = [
     ("reviewer is a resource", "- The cross-harness reviewer is currently unavailable.", True),
     ("past tense is history, not a claim", "- GitHub Pages was unavailable on a private fork.", False),
     ("no resource is no claim", "- The cafeteria is unavailable.", False),
+    ("sentence-level while elsewhere is a mechanism",
+     "- An app whose quota is exhausted leaves the same trace, so the lever may govern nothing, while reviews run elsewhere.", False),
     ("plural runners", "- All self-hosted runners are currently offline.", True),
     ("plural clusters", "- Both clusters are currently down.", True),
     ("plural quotas", "- Model quotas are currently exhausted.", True),

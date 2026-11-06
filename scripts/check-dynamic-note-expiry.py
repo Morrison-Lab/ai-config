@@ -46,8 +46,10 @@ STATE = re.compile(
     r"\b(?:exhausted|offline|down|unavailable|rate[- ]limited|unreachable|blocked)\b", re.I)
 # A conditional or instructional sentence describes a mechanism, not the present.
 MECHANISM = re.compile(
-    r"\b(?:if|when|whenever|once|unless|how\s+to|diagnos\w*|detect\w*|check\w*|probe\w*|"
+    r"\b(?:if|when|whenever|once|unless|until|while|how\s+to|diagnos\w*|detect\w*|check\w*|probe\w*|"
     r"means|looks?\s+like|returns?|before|after|so\s+that|in\s+case)\b", re.I)
+DURATIVE = re.compile(
+    r"\b(exhausted|offline|down|unavailable|rate[- ]limited|unreachable|blocked)\s+(?:until|while)\b", re.I)
 EXPIRES = re.compile(r"\bexpires?\b\s*:?\s*20\d\d-\d\d-\d\d", re.I)
 ALLOW = "<!-- dynamic-note: allow -->"
 BULLET = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
@@ -59,6 +61,9 @@ def is_state_claim(unit):
     # A quoted phrase is an example of wording, not an assertion by the note.
     unit = re.sub(r'"[^"]*"|\u201c[^\u201d]*\u201d', " ", unit)
     for s in SENTENCE.split(" ".join(unit.split())):
+        # "is down until Monday" states a duration of the present; only a
+        # sentence-level until/while elsewhere marks a mechanism.
+        s = DURATIVE.sub(r"\1", s)
         if STATE.search(s) and RESOURCE.search(s) and not MECHANISM.search(s):
             return True
     return False

@@ -10,7 +10,7 @@ cross-model reviewer can run") already requires one live attempt per route.
 
 Denies a hearthbot reply or relay message with a sentence that calls agy,
 OpenCode or a cross-harness reviewer waived, exhausted or unavailable, unless
-the transcript holds, since the latest human turn, a probe of BOTH routes: a
+the transcript holds, since the latest human turn, a probe of each route the message names (a cross-harness claim names BOTH): a
 Bash call running `agy` or `opencode` with an argument other than a help or
 version flag (also inside `ssh host '...'`), a curl to opencode.ai, or a
 message-reading tool result relaying a probe run elsewhere (agy is absent in
@@ -35,7 +35,9 @@ CLAIM = re.compile(
 TARGET = re.compile(
     r"\b(?:agy|antigravity|opencode|cross[- ]?(?:harness|model))\b", re.I)
 # A sentence that says the route was probed and works is not a waiver.
-NOT_EXHAUSTED = re.compile(r"\b(?:not|isn'?t|aren'?t|never|no\s+longer)\s+(?:been\s+)?(?:exhausted|unavailable|waived)\b", re.I)
+NOT_EXHAUSTED = re.compile(
+    r"\b(?:not|isn'?t|aren'?t|never|no\s+longer)\s+(?:been\s+)?"
+    r"(?:exhausted|unavailable|waived|rate[- ]limited|out\s+of\s+quota)\b", re.I)
 
 READ_TOOL = re.compile(
     r"^(?:mcp__hearthbot__read_\w+|mcp__claude-code-remote__(?:get_event|list_events)|ReadNotifications)$")
@@ -52,12 +54,26 @@ REASON = (
 
 
 def sentences(text):
+    text = re.sub(r"\b(?:e\.g|i\.e)\.", lambda m: m.group(0).replace(".", "_"), text)
     return re.split(r"(?<=[.!?])\s+|\n+", text)
 
 
-def claims_unavailable(text):
-    return any(CLAIM.search(s) and TARGET.search(s) and not NOT_EXHAUSTED.search(s)
-               for s in sentences(text))
+def claimed_routes(text):
+    """Routes ('agy', 'opencode') that a sentence calls waived, exhausted or
+    unavailable. A cross-harness claim names both. Empty when nothing is claimed."""
+    routes = set()
+    for s in sentences(text):
+        if not CLAIM.search(s) or NOT_EXHAUSTED.search(s):
+            continue
+        for m in TARGET.finditer(s):
+            w = m.group(0).lower()
+            if w in ("agy", "antigravity"):
+                routes.add("agy")
+            elif w == "opencode":
+                routes.add("opencode")
+            else:
+                routes |= {"agy", "opencode"}
+    return routes
 
 
 def blocks(rec):
@@ -168,6 +184,7 @@ def strip_heredocs(cmd):
     return "\n".join(out)
 
 
+WRAPPERS = ("nohup", "timeout", "env", "command", "exec")
 SSH_ARG_OPTS = frozenset("-B -b -c -D -E -e -F -I -i -J -L -l -m -O -o -p -Q -R -S -W -w".split())
 
 
@@ -180,9 +197,12 @@ def argvs(cmd, depth=0):
             argv = shlex.split(seg)
         except ValueError:
             argv = seg.split()
-        while argv and (re.match(r"[A-Za-z_]\w*=", argv[0]) or os.path.basename(argv[0]) in ("nohup", "timeout")):
+        while argv and (re.match(r"[A-Za-z_]\w*=", argv[0]) or os.path.basename(argv[0]) in WRAPPERS):
             was_timeout = os.path.basename(argv[0]) == "timeout"
+            was_env = os.path.basename(argv[0]) in ("env", "command", "exec")
             argv = argv[1:]
+            while was_env and argv and argv[0].startswith("-"):
+                argv = argv[2:] if argv[0] in ("-u", "-C", "-S") else argv[1:]
             while was_timeout and argv and argv[0].startswith("-"):
                 argv = argv[2:] if argv[0] in ("-k", "-s", "--kill-after", "--signal") else argv[1:]
             if was_timeout and argv and re.match(r"\d+(\.\d+)?[smhd]?$", argv[0]):
@@ -191,8 +211,10 @@ def argvs(cmd, depth=0):
             continue
         yield argv
         word = os.path.basename(argv[0])
-        if depth < 3 and word in ("bash", "sh", "zsh") and "-c" in argv[:-1]:
-            yield from argvs(argv[argv.index("-c") + 1], depth + 1)
+        if depth < 3 and word in ("bash", "sh", "zsh"):
+            flags = [i for i, a in enumerate(argv[1:-1], 1) if re.fullmatch(r"-[A-Za-z]*c[A-Za-z]*", a)]
+            if flags:
+                yield from argvs(argv[flags[0] + 1], depth + 1)
         elif depth < 3 and word == "ssh":
             rest, skip = [], False
             for a in argv[1:]:
@@ -278,13 +300,14 @@ def main():
     if not isinstance(ti, dict):
         return 0
     text = " \n".join(str(ti[k]) for k in ("text", "body", "message") if isinstance(ti.get(k), str))
-    if not text or not claims_unavailable(text):
+    need = claimed_routes(text) if text else set()
+    if not need:
         return 0
     path = payload.get("transcript_path") or ""
     if not path or not os.path.isfile(path):
         return 0
     try:
-        if {"agy", "opencode"} <= probes(path):
+        if need <= probes(path):
             return 0
     except Exception:
         return 0

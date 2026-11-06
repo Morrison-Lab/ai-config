@@ -74,6 +74,12 @@ CASES = [
     ("probe text inside a comment is no probe", POST, WAIVE, [human()] + bash(1, "echo setup #c; agy run\necho two # x | opencode run -m x ok"), True),
     ("apostrophe in a comment does not hide a real probe", POST, WAIVE, [human()] + bash(1, "# check agy's quota\nagy -p ok\nopencode run -m kimi-k3 ok"), False),
     ("multi-line quoted argument is no probe", POST, WAIVE, [human()] + bash(1, "echo 'notes:\nagy run\nopencode run -m x ok\n'"), True),
+    ("env wrapper and bash -lc count", POST, WAIVE, [human()] + bash(1, "env FOO=1 agy -p ok") + bash(2, "bash -lc 'opencode run -m x ok'"), False),
+    ("command and exec wrappers count", POST, WAIVE, [human()] + bash(1, "command agy -p ok") + bash(2, "exec opencode run -m x ok"), False),
+    ("one-route claim needs only that probe", POST, "OpenCode is rate-limited, so I used another reviewer.", [human()] + OC, False),
+    ("one-route claim still needs its own probe", POST, "OpenCode is rate-limited, so I used another reviewer.", [human()] + AGY, True),
+    ("not rate-limited is no claim", POST, "OpenCode is not rate-limited, so I ran it.", [human()], False),
+    ("e.g. does not split a claim", POST, "Cross-harness review via agy (e.g. Gemini) is waived.", [human()], True),
     ("human reviewer unavailable is no claim", POST, "The human reviewer is unavailable this week.", [human()], False),
     ("not exhausted is no claim", POST, "agy is not exhausted, so I ran it.", [human()], False),
 ]

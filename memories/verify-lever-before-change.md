@@ -33,7 +33,7 @@
   An app whose quota is exhausted and one that was never active on the repo leave
   exactly the same trace, so the lever I configured may govern nothing that was
   running, while reviews driven from the Antigravity dashboard or IDE are toggled
-  there rather than in-repo.
+  there rather than in-repo. <!-- dynamic-note: allow -->
   The change stands as a documented statement of intent; the point is that one
   grep and two API reads would have established all of this before any of it was
   written.

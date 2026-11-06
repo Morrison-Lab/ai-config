@@ -178,6 +178,11 @@ class TestBlocks(unittest.TestCase):
         # A quoted extension on the write side.
         self.assert_blocked(f"cat > /tmp/shot32.\"js\" <<'X'\n{body}X\nnode /tmp/shot32.js")
 
+    def test_agy_second_review_of_5031_spellings(self):
+        body = "const { chromium } = require('playwright');\n"
+        self.assert_blocked(f"cat > /tmp/shot33\\.js <<'X'\n{body}X\nnode /tmp/shot33.js")
+        self.assert_blocked(f"cat > /tmp/shot34${{u}}.js <<'X'\n{body}X\nnode /tmp/shot34.js")
+
     def test_quoted_heredoc_body_ending_in_backslash(self):
         self.assert_blocked(
             "cat > /tmp/shot26.js <<'X'\n"
@@ -325,6 +330,14 @@ class TestPasses(unittest.TestCase):
         self.assert_passes(
             "cat > docs/notes.md <<'EOF'\nDo not launch playwright from Bash.\nEOF\n"
             "# Run check-links.py to validate docs/notes.md\npython3 scripts/check-links.py"
+        )
+
+    def test_commit_message_quoting_an_import_taints_nothing(self):
+        self.assert_passes(
+            "git add scripts/check-links.py\n"
+            "git commit -F - <<'EOF'\n"
+            "Document require('playwright') hook behavior\nEOF\n"
+            "python3 scripts/check-links.py"
         )
 
     def test_heredoc_script_without_browser_then_run(self):

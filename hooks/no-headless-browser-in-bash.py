@@ -112,6 +112,8 @@ LIBRARY_FLAG = re.compile(r"(?:\s-m\s+(?:playwright|selenium)\b|\s(?:-r|--requir
 SCRIPT_FILE = re.compile(r"""(?:^|\s)["']?([\w./~$()-]+\.(?:js|mjs|cjs|ts|py|R|r))["']?(?=\s|$)""")
 MAX_SCRIPT_BYTES = 400_000
 HEREDOC = re.compile(r"<<-?\s*[\"']?(\w+)[\"']?[^\n]*\n(.*?)\n\s*\1\s*(?:\n|$)", re.DOTALL)
+# A command whose heredoc supplies prose: a commit message, a PR or issue body.
+PROSE_CONSUMER = re.compile(r"\bgit\s+commit\b|\bgh\s+(?:pr|issue)\b|--body-file\b|\s-F\s+-")
 PROSE_FLAG = re.compile(
     r"""(?:^|\s)(?:-m|--message|--body|--title|-b|-t|--description)(?:\s+|=)(?:"(?:[^"\\]|\\.)*"|'[^']*')"""
 )
@@ -143,7 +145,13 @@ def _script_name_counts(command: str) -> dict:
     browser library; quote characters are dropped first, so `shot."js"` and
     `shot.js` are one name."""
     matches = list(HEREDOC.finditer(command))
-    if not any(LIBRARY.search(m.group(2)) for m in matches):
+    # A heredoc that feeds a commit message or a PR or issue body is prose
+    # that may quote an import, not a script being written.
+    matches_writing = [
+        m for m in matches
+        if not PROSE_CONSUMER.search(command[: m.start(2)].rsplit("\n", 2)[-2])
+    ]
+    if not any(LIBRARY.search(m.group(2)) for m in matches_writing):
         return {}
     # Drop each body and its closing line, but keep the opener line, which
     # is where `cat <<'X' > shot.js` names the file.
@@ -151,7 +159,11 @@ def _script_name_counts(command: str) -> dict:
     for match in matches:
         outside += command[last : match.start(2)]
         last = match.end()
-    outside = (outside + command[last:]).replace('"', "").replace("'", "")
+    outside = outside + command[last:]
+    # Quotes, backslash escapes and empty `${...}` expansions do not change
+    # which file a word names: `shot."js"`, `shot\.js`, `shot${u}.js`.
+    outside = re.sub(r"\$\{[^}]*\}", "", outside)
+    outside = re.sub(r"""["'\\]""", "", outside)
     counts: dict = {}
     for token in SCRIPT_NAME.findall(outside):
         key = script_key(token)
@@ -179,7 +191,10 @@ def heredoc_script_names(command: str) -> dict:
     reading alone is right: joining first breaks a quoted heredoc whose last
     body line ends in a backslash, and not joining hides a redirect on a
     continued opener line or a library name split inside an unquoted body
-    (agy review of ai-config#5031, 2026-11-06). Not covered: a script with
+    (agy review of ai-config#5031, 2026-11-06). A heredoc on a `git commit`, `gh pr`, `gh issue`, `--body-file` or `-F -`
+    line is prose and never counts as a script (a message may quote an import).
+    Not covered: a name built from a variable (`/tmp/$s.js`), a command that
+    puts a commit line and a script heredoc on one line, a script with
     no extension, or one that a directory name stands for (`python3 dir`
     runs `dir/__main__.py`)."""
     as_written = _script_name_counts(command)

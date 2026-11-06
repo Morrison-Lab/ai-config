@@ -37,9 +37,9 @@ REPO = Path(__file__).resolve().parent.parent
 
 RESOURCE = re.compile(
     r"\b(?:agy|antigravity|opencode|codex|gemini|copilot|cursor|claude(?:\s+code)?\s+(?:quota|budget)|"
-    r"quota|runner|cf463\S*|cluster|csci-\S+|cse-\S+|github\s+actions|pages|api|service|server)\b", re.I)
+    r"quota|runner|cf463\S*|cluster|csci-\S+|cse-\S+|github\s+actions|pages|api|service|server|reviewers?)\b", re.I)
 STATE = re.compile(
-    r"\b(?:is|are|was|were|remains?|stays?)\s+(?:currently\s+|still\s+|now\s+)?"
+    r"\b(?:is|are|remains?|stays?)\s+(?:currently\s+|still\s+|now\s+)?"
     r"(?:exhausted|offline|down|unavailable|rate[- ]limited|out\s+of\s+quota|over\s+(?:its\s+|the\s+)?(?:quota|limit)|"
     r"unreachable|blocked)\b|"
     r"\b(?:currently|right\s+now|at\s+the\s+moment|as\s+of\s+now)\b[^.]*"

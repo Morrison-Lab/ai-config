@@ -16,4 +16,4 @@ The project library at `/mnt/project-files` held it.
 Enforced by `hooks/no-answer-from-recall.py`, which denies a reply that says it answers from memory or recall in the first person.
 "Not checked against" and asking where a source lives are not matched, because every pattern for them over-matched ordinary prose or missed real cases.
 Those two rest on this rule alone (#4959).
-Related: `hooks/flag-book-unavailable-without-library-search.py`, [`dont-take-my-word-for-it`](../principles/dont-take-my-word-for-it.md).
+Related: [`live-state-over-notes`](live-state-over-notes.md) (a note's claim about a changing condition), `hooks/flag-book-unavailable-without-library-search.py`, [`dont-take-my-word-for-it`](../principles/dont-take-my-word-for-it.md).

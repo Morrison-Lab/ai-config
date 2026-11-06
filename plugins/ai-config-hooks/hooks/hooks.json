@@ -1743,6 +1743,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-waiver-without-live-probe.py\"'",
+            "timeout": 10,
+            "script": "no-waiver-without-live-probe.py",
+            "why": "ai-config#5018. Ezra, 2026-11-06: 'agy is not exhausted, you cant rely on out of date notes'; 'cai: never rely on static notes to determine dynamic conditions'. A thread waived the cross-harness review on a project-memory note that said the agy and OpenCode quotas were exhausted; both were available. Blocks (deny) a reply or relay message that calls agy, OpenCode or a cross-harness reviewer exhausted, unavailable or waived unless this turn shows a live probe of both routes (a real agy or opencode call, a curl to opencode.ai, or a relayed Remote Control probe result); a version flag does not count. Fails open on any parse trouble."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-ask-to-start-rc.py\"'",
             "timeout": 10,
             "script": "no-ask-to-start-rc.py",

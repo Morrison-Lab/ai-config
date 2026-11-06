@@ -157,6 +157,78 @@ class TestBlocks(unittest.TestCase):
         self.assert_blocked(f"cat > shot13.js <<'X'\n{body}X\nnode ./shot13.js")
         self.assert_blocked(f"cat > /tmp//shot14.js <<'X'\n{body}X\nnode /tmp/shot14.js")
 
+    def test_agy_review_of_5029_spellings(self):
+        # Findings from the post-merge cross-harness review of ai-config#5029.
+        body = "const { chromium } = require('playwright');\n"
+        self.assert_blocked(f"{{ cat <<'X'\n{body}X\n}} > /tmp/shot20.js\nnode /tmp/shot20.js")
+        self.assert_blocked(f"cat <<'X' |\n{body}X\ncat > /tmp/shot21.js\nnode /tmp/shot21.js")
+        self.assert_blocked(f"tee /tmp/build.log /tmp/shot22.js <<'X' > /dev/null\n{body}X\nnode /tmp/shot22.js")
+        self.assert_blocked(f"cat >| /tmp/shot23.js <<'X'\n{body}X\nnode /tmp/shot23.js")
+        self.assert_blocked(f"dd of=/tmp/shot24.js <<'X' 2>/dev/null\n{body}X\nnode /tmp/shot24.js")
+        self.assert_blocked(f"cat > \"$PWD/shot25.js\" <<'X'\n{body}X\nnode shot25.js")
+
+    def test_agy_review_of_5031_spellings(self):
+        body = "const { chromium } = require('playwright');\n"
+        # A redirect on a continued opener line.
+        self.assert_blocked(f"cat <<'X' \\\n  > /tmp/shot30.js\n{body}X\nnode /tmp/shot30.js")
+        # A library name split by a continuation inside an unquoted body.
+        self.assert_blocked(
+            "cat > /tmp/shot31.js <<X\nconst { chromium } = require('play\\\nwright');\nX\nnode /tmp/shot31.js"
+        )
+        # A quoted extension on the write side.
+        self.assert_blocked(f"cat > /tmp/shot32.\"js\" <<'X'\n{body}X\nnode /tmp/shot32.js")
+
+    def test_agy_second_review_of_5031_spellings(self):
+        body = "const { chromium } = require('playwright');\n"
+        self.assert_blocked(f"cat > /tmp/shot33\\.js <<'X'\n{body}X\nnode /tmp/shot33.js")
+        self.assert_blocked(f"cat > /tmp/shot34${{u}}.js <<'X'\n{body}X\nnode /tmp/shot34.js")
+
+    def test_prose_exemption_only_for_the_command_that_owns_the_heredoc(self):
+        body = "const { chromium } = require('playwright');\n"
+        self.assert_blocked(f"cat > /tmp/bypass1.js <<'X' && git commit --amend --no-edit\n{body}X\nnode /tmp/bypass1.js")
+        self.assert_blocked(f"cat > /tmp/bypass2.js <<'X'; gh pr comment 1 -b done\n{body}X\nnode /tmp/bypass2.js")
+        self.assert_blocked(f"cat > /tmp/bypass3.js <<'X' # git commit later\n{body}X\nnode /tmp/bypass3.js")
+
+    def test_prose_words_inside_a_quoted_path_do_not_exempt(self):
+        body = "const { chromium } = require('playwright');\n"
+        for n, word in enumerate(["git commit", "gh pr", "--body-file", "gh issue"]):
+            self.assert_blocked(f"cat > '/tmp/{word}/evil{n}.js' <<'X'\n{body}X\nnode '/tmp/{word}/evil{n}.js'")
+
+    def test_agy_sixth_round_bypasses(self):
+        lib = "const { chromium } = require('playwright');\n"
+        self.assert_blocked(f"# <<true\ncat > /tmp/shot60.js <<'EOF'\n{lib}EOF\ntrue\nnode /tmp/shot60.js")
+        self.assert_blocked(f"cat <<'EOF'\nEOF\ncat > /tmp/shot61.js <<'X'\n{lib}X\n#\nEOF\nnode /tmp/shot61.js")
+        self.assert_blocked(f"cat <<'X' |\n{lib.rstrip()} // \\\nX\ncat > /tmp/shot62.\\\njs\n#\nX\nnode /tmp/shot62.js")
+        self.assert_blocked(f"cat > /tmp/$'shot63'.js <<'X'\n{lib}X\nnode /tmp/shot63.js")
+        self.assert_blocked(f"cat > /tmp/shot64.``js <<'X'\n{lib}X\nnode /tmp/shot64.js")
+        self.assert_blocked(f"tee /tmp/{{a,shot65}}.js <<'X' >/dev/null\n{lib}X\nnode /tmp/shot65.js")
+
+    def test_agy_fifth_round_bypasses(self):
+        self.assert_blocked("cat > /tmp/shot50.js <<'EOF'\nrun: const { chromium } = require('playwright');\nEOF\nnode /tmp/shot50.js")
+        self.assert_blocked("cat <<'A' >/dev/null; cat <<'B' > /tmp/shot51.js\nok\nA\nconst { chromium } = require('playwright');\nB\nnode /tmp/shot51.js")
+        self.assert_blocked("cat > /tmp/shot52.py <<'EOF'\ntry: from playwright.sync_api import sync_playwright\nEOF\npython3 /tmp/shot52.py")
+
+    def test_agy_fourth_round_bypasses(self):
+        body = "const { chromium } = require('playwright');\n"
+        self.assert_blocked(f"git commit -m \"$(cat <<'X' > /tmp/shot40.js\n{body}X\n)\" ; node /tmp/shot40.js")
+        self.assert_blocked(f"git commit -F - <<'X' | tee /tmp/shot41.js\n{body}X\nnode /tmp/shot41.js")
+        self.assert_blocked(f"git commit -m \"$(cat > \"/tmp/shot42.js\" <<'X'\n{body}X\n)\" ; node /tmp/shot42.js")
+        self.assert_blocked(f"git commit -m ok & cat <<'X' > /tmp/shot43.js\n{body}X\nnode /tmp/shot43.js")
+        self.assert_blocked(f"cat > /tmp/shot44.js <<'EOF-1'\n{body}EOF-1\nnode /tmp/shot44.js")
+
+    def test_agy_third_round_bypasses(self):
+        body = "const { chromium } = require('playwright');\n"
+        self.assert_blocked(f"git commit -m \"$(cat > /tmp/shot30.js <<'X'\n{body}X\n)\" ; node /tmp/shot30.js")
+        self.assert_blocked(f"cat > /tmp/shot31.js <<\\EOF\n{body}EOF\nnode /tmp/shot31.js")
+
+    def test_quoted_heredoc_body_ending_in_backslash(self):
+        self.assert_blocked(
+            "cat > /tmp/shot26.js <<'X'\n"
+            "const { chromium } = require('playwright'); // \\\n"
+            "X\n"
+            "node /tmp/shot26.js"
+        )
+
     def test_inline_node(self):
         self.assert_blocked("node -e \"require('playwright').chromium.launch()\"")
 
@@ -271,6 +343,9 @@ class TestReviewedPasses(unittest.TestCase):
 
 
 class TestPasses(unittest.TestCase):
+    def assert_blocked(self, command):
+        self.assertIsNotNone(run(command), f"expected a block for: {command}")
+
     def assert_passes(self, command):
         self.assertIsNone(run(command), f"expected a pass for: {command}")
 
@@ -285,6 +360,45 @@ class TestPasses(unittest.TestCase):
             script = Path(tmp) / "ok.js"
             script.write_text("console.log('hello');\n", encoding="utf-8")
             self.assert_passes(f"node {script}")
+
+    def test_failclosed_agy_fourth_round_false_positives(self):
+        line = "Document require('playwright') hook behavior\n"
+        self.assert_blocked(f"git add scripts/check-links.py\ngit commit -m \"Fix a -> b: $(cat <<'EOF'\n{line}EOF\n)\"\npython3 scripts/check-links.py")
+        self.assert_blocked(f"git add scripts/check-links.py\ngh pr create --title \"Update docs\" --body \"Summary:\n$(cat <<'EOF'\n{line}EOF\n)\"\npython3 scripts/check-links.py")
+
+    def test_failclosed_git_flag_before_commit_and_continued_gh_are_prose(self):
+        line = "Document require('playwright') hook behavior\n"
+        self.assert_blocked(f"git -C . add scripts/check-links.py\ngit -C . commit -m \"$(cat <<'EOF'\n{line}EOF\n)\"\npython3 scripts/check-links.py")
+        self.assert_blocked(f"git add scripts/check-links.py\ngh pr create --title \"Update docs\" \\\n  --body \"$(cat <<'EOF'\n{line}EOF\n)\"\npython3 scripts/check-links.py")
+        self.assert_blocked(f"git -C . add scripts/check-links.py\ngit -C . commit --file=- <<'EOF'\n{line}EOF\npython3 scripts/check-links.py")
+
+    def test_commit_heredoc_naming_a_browser_and_an_ordinary_script(self):
+        # agy's false-positive probe for ai-config#5031: a message that only
+        # mentions a browser library is not an import, so it taints nothing.
+        self.assert_passes(
+            "git add tools/check-links.py && git commit -F - <<'EOF' && python3 tools/check-links.py\n"
+            "Update playwright heredoc detection tests\nEOF"
+        )
+        self.assert_passes(
+            "cat > docs/notes.md <<'EOF'\nDo not launch playwright from Bash.\nEOF\n"
+            "# Run check-links.py to validate docs/notes.md\npython3 scripts/check-links.py"
+        )
+
+    def test_failclosed_commit_message_quoting_an_import_taints_nothing(self):
+        self.assert_blocked(
+            "git add scripts/check-links.py\n"
+            "git commit -F - <<'EOF'\n"
+            "Document require('playwright') hook behavior\nEOF\n"
+            "python3 scripts/check-links.py"
+        )
+
+    def test_failclosed_commit_message_in_command_substitution_taints_nothing(self):
+        self.assert_blocked(
+            "git add scripts/check-links.py\n"
+            "git commit -m \"$(cat <<'EOF'\n"
+            "Document require('playwright') hook behavior\nEOF\n)\"\n"
+            "python3 scripts/check-links.py"
+        )
 
     def test_heredoc_script_without_browser_then_run(self):
         self.assert_passes(

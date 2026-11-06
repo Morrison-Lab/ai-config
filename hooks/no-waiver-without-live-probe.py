@@ -229,7 +229,7 @@ def argvs(cmd, depth=0):
         yield argv
         word = os.path.basename(argv[0])
         if depth < 3 and word in ("bash", "sh", "zsh"):
-            flags = [i for i, a in enumerate(argv[1:-1], 1) if re.fullmatch(r"-[abefhiklmnpstuvxBCEHPT]*c[abefhiklmnpstuvxBCEHPT]*", a)]
+            flags = [i for i, a in enumerate(argv[1:-1], 1) if re.fullmatch(r"-[A-NP-Za-np-z]*c[A-NP-Za-np-z]*", a)]  # not o or O: they take an argument
             if flags:
                 yield from argvs(argv[flags[0] + 1], depth + 1)
         elif depth < 3 and word == "ssh":

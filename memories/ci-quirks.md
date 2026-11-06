@@ -71,3 +71,8 @@ When the gha `Claude Code Review` run hits a 429 quota, the `claude-review` job 
   A fix in flight makes the note stale on merge (ai-config#4748 was closed for this reason, 2026-10-26).
   **Do:** search open PRs and issues for the job name first, and link the fix instead of writing a timing.
   **Don't:** record a measured duration for a job someone is already reworking.
+- A generated file with a `--check` gate must be generated from the same inputs CI sees.
+  CI checks out git submodules and a cloud clone does not, so `shared/sembr-skills` was empty locally and populated in CI, and `scripts/gen-topic-map.py --check` passed locally and failed in CI (ai-config#5037, 2026-11-06).
+  **Do:** when you write the generator, have it skip every path listed in `.gitmodules`.
+  **Do:** before you push, test it against a populated submodule, by putting a file inside the empty submodule folder and running `--check`.
+  **Don't:** treat a green local `--check` as proof the committed output matches CI's tree.

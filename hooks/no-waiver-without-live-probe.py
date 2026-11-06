@@ -97,13 +97,30 @@ def segments(cmd):
     out.append("".join(cur))
     return out
 
-HEREDOC = re.compile(r"(?<=<<)-?\s*['\"]?([^\s'\"<>|;&]*)['\"]?[^\n]*\n(?:(?:.*\n)*?[ \t]*\1[ \t]*(?=\n|$)|(?s:.*))")
+HEREDOC_OP = re.compile(r"(?<!<)<<(?!<)-?[ \t]*(['\"]?)([^\s'\"<>|;&]*)\1")
+
+
+def strip_heredocs(cmd):
+    """Drop heredoc bodies (data, not commands), line by line. A body ends at
+    its delimiter line, or at the end of the command when none closes it, as
+    bash reads it."""
+    out, delim = [], None
+    for line in cmd.split("\n"):
+        if delim is not None:
+            if line.strip(" \t") == delim:
+                delim = None
+            continue
+        out.append(line)
+        m = HEREDOC_OP.search(line)
+        if m:
+            delim = m.group(2)
+    return "\n".join(out)
 
 
 def argvs(cmd, depth=0):
     """Yield the argv of each simple command in *cmd*, looking through
     `ssh host '...'`, `bash -c '...'`, env assignments, nohup and timeout."""
-    cmd = HEREDOC.sub("", cmd)  # a heredoc body is data, not commands
+    cmd = strip_heredocs(cmd)
     for seg in segments(cmd):
         try:
             argv = shlex.split(seg)

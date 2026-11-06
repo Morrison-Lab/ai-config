@@ -142,3 +142,10 @@ Learned on [ai-config#5023](https://github.com/Morrison-Lab/ai-config/pull/5023)
   Pass `--annotations-read=all` after `-R` only once you have read every listed annotation and posted an "Annotations reviewed" comment.
   The merge hook does not credit a compound or piped run.
 - `validate` runs twice on one head (pull_request and push events), and the checker blocks until both finish.
+
+## The merge hook needs literal ids in the checker command
+
+- The merge hook reads the checker's result line from this transcript, and a run whose `--annotations-read` value is a shell variable (`"$IDS"`) did not satisfy it on mds#671 (2026-11-06).
+  Paste the comma-separated ids into the command itself, copied whole from the id listing: a list with one id dropped (`127720012940`) ends with a not-clean line for the check run that carries it.
+- A bare mwc covers the PRs open when Ezra sends it.
+  A PR whose branch you update afterwards (sds#537, new head 9c75704) keeps that grant, but its re-review and checker run must be clean on the new head before the merge.

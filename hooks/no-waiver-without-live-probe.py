@@ -76,7 +76,27 @@ def is_human_turn(rec):
 
 
 HELP = frozenset({"-h", "-v", "-V", "--help", "--version", "version"})
-SEGMENT = re.compile(r"[;&|\n]+")
+
+def segments(cmd):
+    """Split *cmd* on unquoted `;`, `&`, `|` and newlines (quote-aware)."""
+    out, cur, quote, esc = [], [], None, False
+    for ch in cmd:
+        if esc:
+            esc = False
+        elif ch == "\\" and quote != "'":
+            esc = True
+        elif quote:
+            quote = None if ch == quote else quote
+        elif ch in "'\"":
+            quote = ch
+        elif ch in ";&|\n":
+            out.append("".join(cur))
+            cur = []
+            continue
+        cur.append(ch)
+    out.append("".join(cur))
+    return out
+
 HEREDOC = re.compile(r"(?<=<<)-?\s*['\"]?(\w+)['\"]?[^\n]*\n(?:.*\n)*?\s*\1[ \t]*(?=\n|$)")
 
 
@@ -84,7 +104,7 @@ def argvs(cmd, depth=0):
     """Yield the argv of each simple command in *cmd*, looking through
     `ssh host '...'`, `bash -c '...'`, env assignments, nohup and timeout."""
     cmd = HEREDOC.sub("", cmd)  # a heredoc body is data, not commands
-    for seg in SEGMENT.split(cmd):
+    for seg in segments(cmd):
         try:
             argv = shlex.split(seg)
         except ValueError:

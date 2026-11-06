@@ -21,6 +21,13 @@ What it does, for each `git push` in the command:
      `GHA_CHECKS_DIR` for a checkout), against `origin/main`.
   3. DENIES the push when either check exits non-zero, naming the findings.
 
+`check-term-links` also learns terms from the prerequisite sites (mds, pds, sds, ...),
+as CI does through its `terms-dirs` input. The hook picks the same sites per repository
+(`TERMS_FROM_DEFAULTS`, mirroring gha's `check-term-links.yml`; a literal `terms-from`
+in the caller workflow overrides it), shallow-clones them into
+`~/.cache/ai-config/terms-from/`, and passes them as `TERM_LINKS_TERMS_DIRS`. Without
+them the hook knew 823 terms to CI's 1909 and passed pushes CI then failed (ai-config#5022).
+
 Bypass: prefix the command with `AI_CONFIG_SKIP_PUSH_CHECKS='<reason>'`. The
 reason must be real text (not `1`/`true`); every bypass is appended to
 `~/.cache/ai-config/push-check-bypass.log` as one JSON line.
@@ -71,6 +78,21 @@ CHECKS = {
         "extra": {"NLB_SCOPE": "committed"},
     },
 }
+
+# Mirrors the default of `terms-from` in gha's check-term-links.yml: the sites before
+# the calling repository in the course sequence. Keep in sync with that workflow.
+TERMS_FROM_DEFAULTS = {
+    "morrison-lab/pds": ["Morrison-Lab/mds"],
+    "morrison-lab/cds": ["Morrison-Lab/mds"],
+    "morrison-lab/mcs": ["Morrison-Lab/mds"],
+    "morrison-lab/sds": ["Morrison-Lab/mds", "Morrison-Lab/pds"],
+    "morrison-lab/ids": ["Morrison-Lab/mds", "Morrison-Lab/pds"],
+    "morrison-lab/lds": ["Morrison-Lab/mds", "Morrison-Lab/pds", "Morrison-Lab/sds"],
+    "morrison-lab/rme": ["Morrison-Lab/mds", "Morrison-Lab/pds", "Morrison-Lab/sds"],
+    "morrison-lab/mlg": ["Morrison-Lab/mds", "Morrison-Lab/pds", "Morrison-Lab/sds", "Morrison-Lab/lds"],
+}
+TERMS_CACHE = os.path.join(CACHE_ROOT, "terms-from")
+REMOTE_SLUG = re.compile(r"github\.com[:/]+([^/\s]+/[^/\s]+?)(?:\.git)?/?$")
 
 USES = re.compile(
     r"^\s*uses:\s*Morrison-Lab/gha/\.github/workflows/(?P<name>[\w-]+)\.yml@(?P<ref>[\w.\-/]+)",
@@ -218,6 +240,58 @@ def ensure_gha(ref: str) -> str | None:
         return dest if os.path.isdir(os.path.join(dest, ".git")) else None
 
 
+def repo_slug(git_root: str) -> str:
+    """Lower-cased `owner/repo` of origin, or "" when it is not a GitHub remote."""
+    url = _git(["remote", "get-url", "origin"], cwd=git_root) or ""
+    m = REMOTE_SLUG.search(url)
+    return m.group(1).lower() if m else ""
+
+
+def terms_from(git_root: str, call: dict) -> list[str]:
+    """The prerequisite sites CI would clone for this call: the caller's literal
+    `terms-from` input, else the course-sequence default for the repository."""
+    explicit = call["inputs"].get("terms-from", "").strip()
+    if explicit:
+        return [] if explicit == "none" else explicit.split()
+    return TERMS_FROM_DEFAULTS.get(repo_slug(git_root), [])
+
+
+def ensure_terms_repo(slug: str) -> str | None:
+    """A shallow checkout of a prerequisite site, refreshed daily; None on failure."""
+    override = os.environ.get("PUSH_CHECK_TERMS_ROOT")  # a directory holding one checkout per repo name
+    if override:
+        local = os.path.join(override, slug.split("/")[-1])
+        return local if os.path.isdir(local) else None
+    dest = os.path.join(TERMS_CACHE, slug.replace("/", "__"))
+    stamp = os.path.join(dest, ".git", "refreshed")
+    try:
+        if os.path.isdir(os.path.join(dest, ".git")):
+            last = os.path.getmtime(stamp) if os.path.exists(stamp) else 0
+            if time.time() - last > REFRESH_SECONDS:
+                # Stamp first, so an offline machine retries once a day, not on every push.
+                with open(stamp, "w", encoding="utf-8") as fh:
+                    fh.write(str(time.time()))
+                fetched = subprocess.run(["git", "-C", dest, "fetch", "--depth", "1", "origin", "HEAD"],
+                                         capture_output=True, timeout=30)
+                if fetched.returncode == 0:
+                    subprocess.run(["git", "-C", dest, "reset", "--hard", "FETCH_HEAD"],
+                                   capture_output=True, timeout=30)
+            return dest
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        cloned = subprocess.run(["git", "clone", "-q", "--depth", "1", f"https://github.com/{slug}.git", dest],
+                                capture_output=True, timeout=CLONE_TIMEOUT,
+                                env={**os.environ, "GIT_TERMINAL_PROMPT": "0"})
+        if cloned.returncode != 0:
+            shutil.rmtree(dest, ignore_errors=True)
+            return None
+        return dest
+    except (OSError, subprocess.SubprocessError):
+        if os.path.isdir(os.path.join(dest, ".git")):
+            return dest
+        shutil.rmtree(dest, ignore_errors=True)
+        return None
+
+
 def resolve_base(git_root: str) -> str | None:
     base = os.environ.get("PUSH_CHECK_BASE_REF", "").strip()
     if base:  # An explicit base that does not resolve is a missing base, not a cue to guess.
@@ -229,7 +303,7 @@ def resolve_base(git_root: str) -> str | None:
     return None
 
 
-def run_check(git_root: str, gha_dir: str, call: dict, base: str):
+def run_check(git_root: str, gha_dir: str, call: dict, base: str, terms_dirs: str = ""):
     """Run one check; return (name, status, output) with status ok|fail|error."""
     spec = CHECKS[call["name"]]
     script = os.path.join(gha_dir, spec["script"])
@@ -245,6 +319,8 @@ def run_check(git_root: str, gha_dir: str, call: dict, base: str):
     # CI's default is blocking; a repo that sets `fail: false` is not predicted to fail, so honor it.
     env[spec["prefix"] + spec["fail"]] = call["inputs"].get("fail", "true")
     env.update(spec.get("extra", {}))
+    if terms_dirs and call["name"] == "check-term-links":
+        env["TERM_LINKS_TERMS_DIRS"] = terms_dirs
     try:
         proc = subprocess.run([sys.executable, script], capture_output=True, text=True,
                               cwd=git_root, env=env, timeout=CHECK_TIMEOUT)
@@ -397,8 +473,19 @@ def evaluate(command: str):
                 runnable.append((call, by_ref[call["ref"]]))
             else:
                 notes.append(f"{call['name']} skipped: could not fetch gha@{call['ref']}.")
-        with ThreadPoolExecutor(max_workers=max(1, len(runnable))) as pool:
-            results = list(pool.map(lambda cg: run_check(git_root, cg[1], cg[0], base), runnable))
+        wanted = sorted({r for c, _ in runnable if c["name"] == "check-term-links"
+                         for r in terms_from(git_root, c)})
+        with ThreadPoolExecutor(max_workers=max(1, len(runnable), len(wanted))) as pool:
+            fetched = dict(zip(wanted, pool.map(ensure_terms_repo, wanted)))
+            for slug in wanted:
+                if not fetched[slug]:
+                    notes.append(f"check-term-links: could not fetch {slug} for its terms, "
+                                 "so it knows fewer terms than CI.")
+            results = list(pool.map(
+                lambda cg: run_check(
+                    git_root, cg[1], cg[0], base,
+                    " ".join(fetched[r] for r in terms_from(git_root, cg[0]) if fetched.get(r))),
+                runnable))
         failed = [(n, out) for n, status, out in results if status == "fail"]
         for n, status, out in results:
             if status == "error":

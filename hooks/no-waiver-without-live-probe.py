@@ -40,7 +40,9 @@ NOT_EXHAUSTED = re.compile(
     r"(?:exhausted|unavailable|waived|rate[- ]limited|out\s+of\s+quota)\b", re.I)
 
 
-READ_TOOL =re.compile(
+ELLIPSIS = re.compile(r"\b(?:too|also|as\s+well|so\s+(?:is|are|does|has))\b", re.I)
+
+READ_TOOL = re.compile(
     r"^(?:mcp__hearthbot__read_\w+|mcp__claude-code-remote__(?:get_event|list_events)|ReadNotifications)$")
 PROBE_OUTPUT = re.compile(r"probe|GoUsageLimitError|usage limit|quota|unavailable|exit\s*(?:code|status)?\s*\d|models?\b|HTTP\s*\d{3}", re.I)
 
@@ -72,6 +74,10 @@ def claimed_routes(text):
                  for i, m in enumerate(ms)]
         if not any(CLAIM.search(sp) for sp in spans):
             spans = [s] * len(ms)  # the claim word comes before every mention
+        # An elliptical mention ("and OpenCode is too") repeats the claim before it.
+        for i in range(1, len(spans)):
+            if not CLAIM.search(spans[i]) and ELLIPSIS.search(spans[i - 1] + spans[i]):
+                spans[i] = spans[i - 1]
         eff = ""
         for m, sp in reversed(list(zip(ms, spans))):
             eff = sp if CLAIM.search(sp) else eff

@@ -141,18 +141,12 @@ def heredoc_written_files(command: str) -> dict:
     written = {}
     for match in HEREDOC.finditer(command):
         opener = command[: match.start(2)].rsplit("\n", 2)[-2]
-        before, _, after = opener.partition("<<")
-        # `cat > f <<X` names the file before the operator (the last write
-        # there wins); `cat <<X > f` names it after. In both places the last
-        # redirect wins, as in the shell, and /dev/null is skipped after.
-        names = [m.group(1) for m in WRITE_TARGET.finditer(before)]
-        if names:
-            written[names[-1]] = match.group(2)
-            continue
-        names = [m.group(1) for m in WRITE_TARGET.finditer(after)
-                 if m.group(1) != "/dev/null"]
-        if names:
-            written[names[-1]] = match.group(2)
+        # Which redirect the shell applies last depends on fd and order, so
+        # bind the body to every file the opener line writes: a decoy key is
+        # harmless, and the file that is later run is always among them.
+        for target in WRITE_TARGET.finditer(opener):
+            if target.group(1) != "/dev/null":
+                written[target.group(1)] = match.group(2)
     return written
 
 

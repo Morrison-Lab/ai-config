@@ -112,6 +112,20 @@ class TestBlocks(unittest.TestCase):
             "node shot6.js"
         )
 
+    def test_heredoc_redirects_on_both_sides_of_operator(self):
+        self.assert_blocked(
+            "cat > /tmp/before.txt <<'X' > shot7.js\n"
+            "const { chromium } = require('playwright');\n"
+            "X\n"
+            "node shot7.js"
+        )
+        self.assert_blocked(
+            "cat > /dev/null <<'X' > shot8.js\n"
+            "const { chromium } = require('playwright');\n"
+            "X\n"
+            "node shot8.js"
+        )
+
     def test_inline_node(self):
         self.assert_blocked("node -e \"require('playwright').chromium.launch()\"")
 

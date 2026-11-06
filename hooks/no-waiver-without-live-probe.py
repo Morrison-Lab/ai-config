@@ -8,32 +8,15 @@ project-memory note said the agy and OpenCode quotas were exhausted. Both were
 available. `shared/workflow/adversarial-self-review.md` ("Waiver when no
 cross-model reviewer can run") already requires one live attempt per route.
 
-## The condition (all must hold, or the call is DENIED)
-
-The call posts text (a user-visible reply, or a relay message to the
-coordinator or another thread; forge comments are not matched, see
-ai-config#5018) in which one sentence says a reviewer, quota or tool is waived,
-exhausted or unavailable AND names agy, OpenCode, a cross-harness or
-cross-model reviewer.
-
-The text is allowed only when the transcript holds, since the latest human
-turn, a live probe of BOTH routes:
-
-* agy: a Bash call whose command word is `agy`, with a first argument that
-  is not `--help`, `-h` or `--version`;
-* OpenCode: a Bash call whose command word is `opencode` (same exclusion),
-  or a `curl` to `opencode.ai`;
-* or a RELAYED probe (agy is not installed in cloud containers; it runs on
-  cf463-02 through Remote Control): the result of a message-reading tool
-  (`mcp__hearthbot__read_*`, `mcp__claude-code-remote__get_event|list_events`,
-  `ReadNotifications`) that names the route and shows probe output.
-
-An attempt counts whatever it returned: a quota error in the result is the
-evidence the waiver needs. A version flag proves installation, not quota, so
-it does not count. Fails open on any parse trouble.
-
-Not matched: a claim made in other words, or by a tool outside the list. The
-written rule covers those.
+Denies a hearthbot reply or relay message with a sentence that calls agy,
+OpenCode or a cross-harness reviewer waived, exhausted or unavailable, unless
+the transcript holds, since the latest human turn, a probe of BOTH routes: a
+Bash call running `agy` or `opencode` with an argument other than a help or
+version flag (also inside `ssh host '...'`), a curl to opencode.ai, or a
+message-reading tool result relaying a probe run elsewhere (agy is absent in
+cloud containers). A probe counts whatever it returned. Forge comments and
+claims in other words are not matched; the written rule covers them. Fails
+open on any parse trouble.
 """
 import json
 import os
@@ -54,7 +37,6 @@ NOT_EXHAUSTED = re.compile(r"\b(?:not|isn'?t|aren'?t|never|no\s+longer)\s+(?:bee
 
 READ_TOOL = re.compile(
     r"^(?:mcp__hearthbot__read_\w+|mcp__claude-code-remote__(?:get_event|list_events)|ReadNotifications)$")
-HELP = {"-h", "--help", "--version", "-v", "-V", "version"}
 PROBE_OUTPUT = re.compile(r"probe|GoUsageLimitError|usage limit|quota|unavailable|exit\s*(?:code|status)?\s*\d|models?\b|HTTP\s*\d{3}", re.I)
 
 REASON = (

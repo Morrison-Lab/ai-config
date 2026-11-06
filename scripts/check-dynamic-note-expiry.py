@@ -14,6 +14,9 @@ reviewer, quota, runner, cluster, service) and says it is currently exhausted,
 down, offline, unavailable or rate-limited.  A sentence that is conditional or
 instructional ("when the quota is exhausted ...", "diagnose a runner that is
 down") describes a mechanism, not the present, so it is not a state claim.
+Known limitation: a sentence that opens with while/until is flagged even when
+it is a conditional, since it cannot be told from a stative clause; it takes
+the allow marker (ai-config#5035).
 
 The unit is a bullet item or a paragraph.  The unit needs `expires
 YYYY-MM-DD` (or `expire: ...`) somewhere in it, or the marker
@@ -48,10 +51,8 @@ STATE = re.compile(
 MECHANISM = re.compile(
     r"\b(?:if|when|whenever|once|unless|how\s+to|diagnos\w*|detect\w*|check\w*|probe\w*|"
     r"means|looks?\s+like|returns?|before|after|so\s+that|in\s+case)\b", re.I)
-# Known limitation, by design: until/while are NOT mechanism words. "Down until
-# Monday" and "While X holds, Y is down" claim the present, and a fronted
-# "While the quota is exhausted, switch routes." has the same surface shape, so
-# it is flagged too; that rare conditional takes the allow marker (ai-config#5035).
+# until/while are NOT mechanism words ("down until Monday", "While X holds, Y is
+# down" claim the present); see the docstring's known limitation.
 EXPIRES = re.compile(r"\bexpires?\b\s*:?\s*20\d\d-\d\d-\d\d", re.I)
 ALLOW = "<!-- dynamic-note: allow -->"
 BULLET = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")

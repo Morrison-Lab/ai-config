@@ -67,6 +67,7 @@ CASES = [
     ("stacked heredocs on one line stay data", POST, WAIVE, [human()] + bash(1, "cat <<A <<B\nnotes\nA\nagy run\nopencode run -m x ok\nB"), True),
     ("mid-word quote in a heredoc delimiter stays data", POST, WAIVE, [human()] + bash(1, 'cat <<EO"F"\nnotes\nEO\nagy run\nopencode run -m x ok\nEOF'), True),
     ("indented closing line does not close a plain heredoc", POST, WAIVE, [human()] + bash(1, "cat <<EOF\nnotes\n  EOF\nagy run\nopencode run -m x ok\nEOF"), True),
+    ("<< inside a trailing comment is no operator", POST, WAIVE, [human()] + bash(1, "cat <<EOF # see <<HELP\nnotes\nEOF\nagy run\nopencode run -m x ok"), False),
     ("multi-line quoted argument is no probe", POST, WAIVE, [human()] + bash(1, "echo 'notes:\nagy run\nopencode run -m x ok\n'"), True),
     ("human reviewer unavailable is no claim", POST, "The human reviewer is unavailable this week.", [human()], False),
     ("not exhausted is no claim", POST, "agy is not exhausted, so I ran it.", [human()], False),

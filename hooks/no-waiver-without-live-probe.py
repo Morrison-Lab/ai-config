@@ -110,6 +110,8 @@ def heredoc_delims(line):
             quote = ch
         elif ch == "\\":
             i += 1
+        elif ch == "#" and (i == 0 or line[i - 1] in " \t;&|()"):
+            break  # a comment: nothing after it is an operator
         elif line.startswith("<<<", i):
             i += 2
         elif line.startswith("<<", i):

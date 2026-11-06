@@ -73,7 +73,7 @@ def main():
         mem = root / "memories"
         mem.mkdir()
         note = mem / "n.md"
-        note.write_text("- Old: agy is currently exhausted.\n")
+        note.write_text("- Old: agy is currently exhausted.\n", encoding="utf-8")
         git(root, "add", "-A")
         git(root, "commit", "-qm", "base")
         git(root, "checkout", "-qb", "work")
@@ -82,16 +82,16 @@ def main():
         def run(*argv):
             return cdne.main(list(argv))
 
-        note.write_text("- Old: agy is currently exhausted.\n\n- Fine note.\n")
+        note.write_text("- Old: agy is currently exhausted.\n\n- Fine note.\n", encoding="utf-8")
         git(root, "commit", "-qam", "touch other unit")
         check("untouched old claim passes in diff mode", run("--base", "main"), 0)
         check("--all still finds the old claim", run("--all"), 1)
 
-        note.write_text(note.read_text() + "\n- The cf463-02 runner is down.\n")
+        note.write_text(note.read_text(encoding="utf-8") + "\n- The cf463-02 runner is down.\n", encoding="utf-8")
         git(root, "commit", "-qam", "add claim")
         check("new undated claim fails in diff mode", run("--base", "main"), 1)
 
-        note.write_text(note.read_text().replace("is down.", "is down. expires 2026-11-13"))
+        note.write_text(note.read_text(encoding="utf-8").replace("is down.", "is down. expires 2026-11-13"), encoding="utf-8")
         git(root, "commit", "-qam", "date it")
         check("dated claim passes in diff mode", run("--base", "main"), 0)
 

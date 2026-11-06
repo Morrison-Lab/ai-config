@@ -155,6 +155,14 @@ never defer to the user's opinion when you disagree.
 Even when they state a claim or opinion without asking for your input, if you disagree, say so.
 Always evaluate claims independently before responding and acting.
 See [`dont-take-my-word-for-it`](shared/principles/dont-take-my-word-for-it.md).
+## Never rely on static notes to determine dynamic conditions
+
+Quota, availability, outages, pauses, CI state, branch or PR state, and open or merged status change faster than any note records.
+Memories, handoffs, recaps, and earlier transcript turns are hints, not evidence.
+Probe live (for example `agy models` plus a small run, `gh pr view`, an API call) before choosing a route around a remembered limit.
+Give any time-bound note an expiry date and delete it once it passes.
+This is prose only: the failure is a stale belief in the agent's reasoning, and I identified no tool-call pattern a deny hook could match (not exhaustively enumerated).
+Origin: a remembered "agy Argon quota out until 2026-11-04" note was acted on after Argon had recovered (Ezra, 2026-11-05).
 ## Proactively suggest better alternatives to proposed approaches
 
 When asked to accomplish a goal using a specific approach, suggest a better alternative if one exists.

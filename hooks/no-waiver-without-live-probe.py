@@ -37,13 +37,16 @@ TARGET = re.compile(
 # A sentence that says the route was probed and works is not a waiver.
 NOT_EXHAUSTED = re.compile(
     r"\b(?:not|isn'?t|aren'?t|never|no\s+longer)\s+(?:been\s+)?"
-    r"(?:exhausted|unavailable|waived|rate[- ]limited|out\s+of\s+quota)\b", re.I)
+    r"(?:exhausted|unavailable|waiv\w*|rate[- ]limited|out\s+of\s+quota|"
+    r"over\s+(?:its\s+|the\s+)?(?:quota|limit))\b", re.I)
 
 
 # A cluster of at most four of bash's argument-less single-letter flags that
 # includes -c (-lc, -ec, -rc). The length cap and the missing o and O keep
 # single-dash long options (-norc, -rcfile, -restricted) from matching.
 SHELL_C_FLAGS = re.compile(r"(?=.{2,5}$)-[abefhiklmnprstuvxBCDEHPT]*c[abefhiklmnprstuvxBCDEHPT]*")
+CLAUSE_BREAK = re.compile(
+    r"\b(?:because|since|so|while|whereas|but|although|though|instead|then|next)\b|[;:]", re.I)
 ELLIPSIS = re.compile(r"\b(?:too|also|as\s+well|so\s+(?:is|are|does|has))\b", re.I)
 
 READ_TOOL = re.compile(
@@ -84,7 +87,8 @@ def claimed_routes(text):
                 spans[i] = spans[i - 1]
         eff = ""
         for m, sp in reversed(list(zip(ms, spans))):
-            eff = sp if CLAIM.search(sp) else eff
+            # A new clause ("because OpenCode is ...") starts its own claim.
+            eff = sp if CLAIM.search(sp) else ("" if CLAUSE_BREAK.search(sp) else eff)
             if not CLAIM.search(eff) or NOT_EXHAUSTED.search(eff):
                 continue
             w = m.group(0).lower()
@@ -237,16 +241,13 @@ def argvs(cmd, depth=0):
             if flags:
                 yield from argvs(argv[flags[0] + 1], depth + 1)
         elif depth < 3 and word == "ssh":
-            rest, skip = [], False
-            for a in argv[1:]:
-                if skip:
-                    skip = False
-                elif a in SSH_ARG_OPTS:
-                    skip = True
-                elif not a.startswith("-"):
-                    rest.append(a)
-            if len(rest) > 1:
-                yield from argvs(" ".join(rest[1:]), depth + 1)
+            # ssh options end at the host; everything after it is the remote
+            # command, which ssh joins with spaces for the remote shell.
+            i = 1
+            while i < len(argv) and argv[i].startswith("-"):
+                i += 2 if argv[i] in SSH_ARG_OPTS else 1
+            if i + 1 < len(argv):
+                yield from argvs(" ".join(argv[i + 1:]), depth + 1)
 
 
 def ran(tool, cmd):

@@ -143,8 +143,8 @@ def heredoc_written_files(command: str) -> dict:
         opener = command[: match.start(2)].rsplit("\n", 2)[-2]
         before, _, after = opener.partition("<<")
         # `cat > f <<X` names the file before the operator (the last write
-        # there wins); `cat <<X > f` names it after, where a first redirect
-        # that is not /dev/null is the file and a later one is unrelated.
+        # there wins); `cat <<X > f` names it after. In both places the last
+        # redirect wins, as in the shell, and /dev/null is skipped after.
         names = [m.group(1) for m in WRITE_TARGET.finditer(before)]
         if names:
             written[names[-1]] = match.group(2)
@@ -152,7 +152,7 @@ def heredoc_written_files(command: str) -> dict:
         names = [m.group(1) for m in WRITE_TARGET.finditer(after)
                  if m.group(1) != "/dev/null"]
         if names:
-            written[names[0]] = match.group(2)
+            written[names[-1]] = match.group(2)
     return written
 
 

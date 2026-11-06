@@ -104,6 +104,14 @@ class TestBlocks(unittest.TestCase):
             "node shot5.js"
         )
 
+    def test_heredoc_two_redirects_after_operator_last_wins(self):
+        self.assert_blocked(
+            "cat <<'X' > /tmp/decoy.log > shot6.js\n"
+            "const { chromium } = require('playwright');\n"
+            "X\n"
+            "node shot6.js"
+        )
+
     def test_inline_node(self):
         self.assert_blocked("node -e \"require('playwright').chromium.launch()\"")
 

@@ -137,6 +137,20 @@ class TestBlocks(unittest.TestCase):
             "node shot9.js"
         )
 
+    def test_heredoc_opener_split_by_line_continuation(self):
+        self.assert_blocked(
+            "cat > \\\nshot10.js <<'X'\n"
+            "const { chromium } = require('playwright');\n"
+            "X\n"
+            "node shot10.js"
+        )
+        self.assert_blocked(
+            "cat > shot11.js \\\n<<'X'\n"
+            "const { chromium } = require('playwright');\n"
+            "X\n"
+            "node shot11.js"
+        )
+
     def test_inline_node(self):
         self.assert_blocked("node -e \"require('playwright').chromium.launch()\"")
 

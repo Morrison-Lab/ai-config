@@ -139,6 +139,7 @@ def heredoc_written_files(command: str) -> dict:
     nothing (2026-11-06: a Playwright screenshot script got through this way,
     ai-config#5027)."""
     written = {}
+    command = command.replace("\\\n", " ")      # the shell joins continued lines
     for match in HEREDOC.finditer(command):
         opener = command[: match.start(2)].rsplit("\n", 2)[-2]
         # Which redirect the shell applies last depends on fd and order, so

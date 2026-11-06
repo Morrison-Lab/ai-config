@@ -23,4 +23,6 @@ It extends [`check-sources-over-recall`](check-sources-over-recall.md), which co
 
 Enforced by `hooks/no-waiver-without-live-probe.py`, which denies a reply or relay message that calls agy, OpenCode or a cross-harness reviewer exhausted, unavailable or waived when the transcript since the latest human turn shows no probe of each route the message names (a cross-harness claim names both).
 Everything else rests on this rule.
-A check for undated notes is tracked in ai-config#5018.
+`scripts/check-dynamic-note-expiry.py` (a `validate.yml` step) fails a PR that adds or edits a memory note stating a changing condition without `expires YYYY-MM-DD` or `<!-- dynamic-note: allow -->`.
+It reads wording, not meaning: a sentence that opens with "While" or "Until" is flagged even when it is a conditional, and the allow marker clears it (ai-config#5035).
+When a wording heuristic keeps reopening its mirror case, document the limitation with a named test and an escape marker instead of adding another rule.

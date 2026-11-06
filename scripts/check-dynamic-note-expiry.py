@@ -37,7 +37,7 @@ REPO = Path(__file__).resolve().parent.parent
 
 RESOURCE = re.compile(
     r"\b(?:agy|antigravity|opencode|codex|gemini|copilot|cursor|claude(?:\s+code)?\s+(?:quota|budget)|"
-    r"quota|runner|cf463\S*|cluster|csci-\S+|cse-\S+|github\s+actions|pages|api|service|server|reviewers?)\b", re.I)
+    r"quotas?|budgets?|runners?|cf463\S*|clusters?|csci-\S+|cse-\S+|github\s+actions|pages|apis?|services?|servers?|reviewers?)\b", re.I)
 STATE = re.compile(
     r"\b(?:is|are|remains?|stays?)\s+(?:currently\s+|still\s+|now\s+)?"
     r"(?:exhausted|offline|down|unavailable|rate[- ]limited|out\s+of\s+quota|over\s+(?:its\s+|the\s+)?(?:quota|limit)|"
@@ -46,7 +46,7 @@ STATE = re.compile(
     r"\b(?:exhausted|offline|down|unavailable|rate[- ]limited|unreachable|blocked)\b", re.I)
 # A conditional or instructional sentence describes a mechanism, not the present.
 MECHANISM = re.compile(
-    r"\b(?:if|when|whenever|once|unless|until|while|how\s+to|diagnos\w*|detect\w*|check\w*|probe\w*|"
+    r"\b(?:if|when|whenever|once|unless|how\s+to|diagnos\w*|detect\w*|check\w*|probe\w*|"
     r"means|looks?\s+like|returns?|before|after|so\s+that|in\s+case)\b", re.I)
 EXPIRES = re.compile(r"\bexpires?\b\s*:?\s*20\d\d-\d\d-\d\d", re.I)
 ALLOW = "<!-- dynamic-note: allow -->"

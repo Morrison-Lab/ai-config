@@ -51,6 +51,10 @@ The rest are prose because no condition in the transcript can decide them.
   Check it and cite what you read (Ezra, 2026-11-04, ai-config#4957).
   See [`check-sources-over-recall`](check-sources-over-recall.md).
   Enforced by `hooks/no-answer-from-recall.py`.
+- Never decide a changing condition (quota, availability, runner state) from a note.
+  Probe it live in the turn that acts on it, and date every note about one (Ezra, 2026-11-06, ai-config#5018).
+  See [`live-state-over-notes`](live-state-over-notes.md).
+  Enforced by `hooks/no-waiver-without-live-probe.py`.
 
 ## Remote Control
 

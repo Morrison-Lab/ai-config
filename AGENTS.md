@@ -155,6 +155,20 @@ never defer to the user's opinion when you disagree.
 Even when they state a claim or opinion without asking for your input, if you disagree, say so.
 Always evaluate claims independently before responding and acting.
 See [`dont-take-my-word-for-it`](shared/principles/dont-take-my-word-for-it.md).
+## Never rely on static notes to determine dynamic conditions
+
+Quota, availability, outages, pauses, CI state, branch or PR state, and open or merged status change faster than any note records.
+Memories, handoffs, recaps, and earlier transcript turns are hints, not evidence.
+Probe live (for example `agy models` plus a small run, `gh pr view`, an API call) before choosing a route around a remembered limit.
+Every note that records a dynamic condition must state its expiration date (or the event that ends it) in the note itself.
+A note with no expiration date is treated as already expired: re-probe before acting on it.
+Delete or refresh a note once its date passes.
+Enforced for one tool-call pattern: `hooks/no-waiver-without-live-probe.py` denies a reply or relay message that calls agy, OpenCode or a cross-harness reviewer exhausted, unavailable or waived with no live probe in the turn.
+Everything else rests on the written rule.
+Origin: a remembered "agy Argon quota out until 2026-11-04" note was acted on after Argon had recovered (Ezra, 2026-11-05), and a review was waived on a note that said agy and OpenCode were exhausted (Ezra, 2026-11-06, ai-config#5018).
+See [`live-state-over-notes`](shared/workflow/live-state-over-notes.md).
+Text adopted from ai-config#5019.
+
 ## Proactively suggest better alternatives to proposed approaches
 
 When asked to accomplish a goal using a specific approach, suggest a better alternative if one exists.

@@ -102,6 +102,17 @@ CASES = [
 ]
 
 
+def reason_for(text, recs):
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w") as fh:
+        for r in recs:
+            fh.write(json.dumps(r) + "\n")
+    payload = {"tool_name": POST, "tool_input": {"text": text}, "transcript_path": path}
+    p = subprocess.run([sys.executable, HOOK], input=json.dumps(payload), capture_output=True, text=True)
+    os.unlink(path)
+    return p.stdout
+
+
 def main():
     fails = 0
     for name, tool, text, recs, deny in CASES:
@@ -114,7 +125,11 @@ def main():
     ok = p.returncode == 0 and not p.stdout
     print(("  ok      " if ok else "  FAIL    ") + "fails open on garbage stdin")
     fails += 0 if ok else 1
-    total = len(CASES) + 1
+    out = reason_for("OpenCode is rate-limited.", [human()] + AGY)
+    ok = "no live probe of opencode." in out and "both routes" not in out
+    print(("  ok      " if ok else "  FAIL    ") + "deny reason names only the missing route")
+    fails += 0 if ok else 1
+    total = len(CASES) + 2
     print(f"\n{total - fails}/{total} correct")
     return 1 if fails else 0
 

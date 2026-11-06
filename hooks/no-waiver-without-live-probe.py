@@ -52,7 +52,7 @@ PROBE_OUTPUT = re.compile(r"probe|GoUsageLimitError|usage limit|quota|unavailabl
 
 REASON = (
     "[hook: no-waiver-without-live-probe] This message calls agy, OpenCode or a cross-harness reviewer "
-    "exhausted, unavailable or waived, but this turn shows no live probe of both routes. A note or an earlier "
+    "exhausted, unavailable or waived, but this turn shows no live probe of {routes}. A note or an earlier "
     "session is not evidence (Ezra, 2026-11-06: \"agy is not exhausted, you cant rely on out of date notes\"). "
     "Probe now: `agy` (a models or review call, not --version) through Remote Control, since agy is absent in cloud "
     "containers, and `opencode run -m <model> ok` or a curl to https://opencode.ai/zen/go/v1/chat/completions. "
@@ -328,14 +328,15 @@ def main():
     if not path or not os.path.isfile(path):
         return 0
     try:
-        if need <= probes(path):
-            return 0
+        missing = need - probes(path)
     except Exception:
+        return 0
+    if not missing:
         return 0
     print(json.dumps({"hookSpecificOutput": {
         "hookEventName": "PreToolUse",
         "permissionDecision": "deny",
-        "permissionDecisionReason": REASON}}))
+        "permissionDecisionReason": REASON.format(routes=" and ".join(sorted(missing)))}}))
     return 0
 
 

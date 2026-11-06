@@ -32,3 +32,11 @@ They were byte-identical to files already on origin/main, uploaded through the G
 - **Don't:** treat `??` in a stale checkout as proof that a file is absent from the repository.
 
 `hooks/warn-untracked-in-behind-checkout.py` adds this as context after such a `git status` ([ai-config#4360](https://github.com/Morrison-Lab/ai-config/issues/4360)).
+
+## Fetch again after your own PR merges, before branching the next one
+
+A `origin/main` ref fetched before a merge does not contain the merge.
+On 2026-11-05, in a run of Morrison-Lab/mds page moves (Morrison-Lab/mcs#60), a branch cut from such a stale ref missed the just-merged commit and conflicted when the stashed work came back.
+
+- **Do:** run `git fetch origin main` after every merge of a PR you drove, then branch from `origin/main`, then check `git log --oneline -1 origin/main` names the merge.
+- **Don't:** reuse the `origin/main` that an earlier fetch in the same session left behind.

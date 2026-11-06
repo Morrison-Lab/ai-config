@@ -194,6 +194,11 @@ class TestBlocks(unittest.TestCase):
         for n, word in enumerate(["git commit", "gh pr", "--body-file", "gh issue"]):
             self.assert_blocked(f"cat > '/tmp/{word}/evil{n}.js' <<'X'\n{body}X\nnode '/tmp/{word}/evil{n}.js'")
 
+    def test_agy_third_round_bypasses(self):
+        body = "const { chromium } = require('playwright');\n"
+        self.assert_blocked(f"git commit -m \"$(cat > /tmp/shot30.js <<'X'\n{body}X\n)\" ; node /tmp/shot30.js")
+        self.assert_blocked(f"cat > /tmp/shot31.js <<\\EOF\n{body}EOF\nnode /tmp/shot31.js")
+
     def test_quoted_heredoc_body_ending_in_backslash(self):
         self.assert_blocked(
             "cat > /tmp/shot26.js <<'X'\n"
@@ -330,6 +335,12 @@ class TestPasses(unittest.TestCase):
             script = Path(tmp) / "ok.js"
             script.write_text("console.log('hello');\n", encoding="utf-8")
             self.assert_passes(f"node {script}")
+
+    def test_git_flag_before_commit_and_continued_gh_are_prose(self):
+        line = "Document require('playwright') hook behavior\n"
+        self.assert_passes(f"git -C . add scripts/check-links.py\ngit -C . commit -m \"$(cat <<'EOF'\n{line}EOF\n)\"\npython3 scripts/check-links.py")
+        self.assert_passes(f"git add scripts/check-links.py\ngh pr create --title \"Update docs\" \\\n  --body \"$(cat <<'EOF'\n{line}EOF\n)\"\npython3 scripts/check-links.py")
+        self.assert_passes(f"git -C . add scripts/check-links.py\ngit -C . commit --file=- <<'EOF'\n{line}EOF\npython3 scripts/check-links.py")
 
     def test_commit_heredoc_naming_a_browser_and_an_ordinary_script(self):
         # agy's false-positive probe for ai-config#5031: a message that only

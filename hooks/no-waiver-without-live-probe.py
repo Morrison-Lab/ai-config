@@ -40,14 +40,12 @@ READ_TOOL = re.compile(
 PROBE_OUTPUT = re.compile(r"probe|GoUsageLimitError|usage limit|quota|unavailable|exit\s*(?:code|status)?\s*\d|models?\b|HTTP\s*\d{3}", re.I)
 
 REASON = (
-    "[hook: no-waiver-without-live-probe] This message says a reviewer, quota or tool "
-    "(agy, OpenCode, cross-harness) is exhausted, unavailable or waived, but this turn shows no live probe "
-    "of both routes. A note, a memory entry or an earlier session is not evidence: quota and availability "
-    "change (Ezra, 2026-11-06: \"agy is not exhausted, you cant rely on out of date notes\"). "
-    "Probe now: run `agy` (a models or review call, not --version) and `opencode run -m <model> ok` or a curl to "
-    "https://opencode.ai/zen/go/v1/chat/completions; agy is absent in cloud containers, so run it through a "
-    "Remote Control session on cf463-02 and read the result back. Then state what the probe returned. "
-    "shared/workflow/live-state-over-notes.md; adversarial-self-review.md 'Waiver when no cross-model reviewer can run'; ai-config#5018."
+    "[hook: no-waiver-without-live-probe] This message calls agy, OpenCode or a cross-harness reviewer "
+    "exhausted, unavailable or waived, but this turn shows no live probe of both routes. A note or an earlier "
+    "session is not evidence (Ezra, 2026-11-06: \"agy is not exhausted, you cant rely on out of date notes\"). "
+    "Probe now: `agy` (a models or review call, not --version) via cf463-02, since agy is absent in cloud "
+    "containers, and `opencode run -m <model> ok` or a curl to https://opencode.ai/zen/go/v1/chat/completions. "
+    "Then state what each returned. shared/workflow/live-state-over-notes.md; ai-config#5018."
 )
 
 

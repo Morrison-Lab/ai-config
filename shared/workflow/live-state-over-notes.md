@@ -7,7 +7,6 @@ Decide such a condition from a live check, never from a memory entry, an instruc
 Ezra, 2026-11-06: "agy is not exhausted, you cant rely on out of date notes", "cai: never rely on static notes to determine dynamic conditions" (ai-config#5018).
 A thread waived the cross-harness review because a project-memory note said the agy and OpenCode quotas were exhausted.
 Both were available.
-An earlier case: a remembered "agy Argon quota out until 2026-11-04" note was acted on after Argon had recovered (Ezra, 2026-11-05).
 This replaces the `AGENTS.md` text proposed in ai-config#5019.
 It extends [`check-sources-over-recall`](check-sources-over-recall.md), which covers recalled facts.
 
@@ -23,5 +22,5 @@ It extends [`check-sources-over-recall`](check-sources-over-recall.md), which co
   Ezra, 2026-11-06: "notes on dynamic conditions must record their expiration dates".
 
 Enforced by `hooks/no-waiver-without-live-probe.py`, which denies a reply or relay message that calls agy, OpenCode or a cross-harness reviewer exhausted, unavailable or waived when the current turn shows no probe of both routes.
-Everything else rests on this rule; a check for undated notes is tracked in ai-config#5018.
-See also [`adversarial-self-review`](adversarial-self-review.md) ("Waiver when no cross-model reviewer can run").
+Everything else rests on this rule.
+A check for undated notes is tracked in ai-config#5018.

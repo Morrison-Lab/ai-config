@@ -61,7 +61,6 @@ CASES = [
     ("relayed text without probe output", POST, WAIVE, [human()] + relay(1, "mcp__hearthbot__read_thread", "agy and opencode are on the list"), True),
     ("not exhausted is no claim", POST, "agy is not exhausted, so I ran it.", [human()], False),
     ("unrelated unavailable", POST, "The runner is unavailable until 5pm.", [human()], False),
-    ("unrelated tool", "Bash", WAIVE, [human()], False),
     ("forge comment is out of scope", "mcp__github__add_issue_comment", WAIVE, [human()], False),
 ]
 

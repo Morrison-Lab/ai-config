@@ -104,16 +104,14 @@ def strip_heredocs(cmd):
     """Drop heredoc bodies (data, not commands), line by line. A body ends at
     its delimiter line, or at the end of the command when none closes it, as
     bash reads it."""
-    out, delim = [], None
+    out, pending = [], []
     for line in cmd.split("\n"):
-        if delim is not None:
-            if line.strip(" \t") == delim:
-                delim = None
+        if pending:
+            if line.strip(" \t") == pending[0]:
+                pending.pop(0)
             continue
         out.append(line)
-        m = HEREDOC_OP.search(line)
-        if m:
-            delim = m.group(2)
+        pending = [m.group(2) for m in HEREDOC_OP.finditer(line)]
     return "\n".join(out)
 
 

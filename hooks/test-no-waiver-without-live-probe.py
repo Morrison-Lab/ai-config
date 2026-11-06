@@ -58,6 +58,8 @@ CASES = [
     ("probe before the latest human turn does not count", POST, WAIVE, [human()] + AGY + OC + [human("again")], True),
     ("relayed probe counts", POST, WAIVE, [human()] + relay(1, "mcp__hearthbot__read_thread", "RC probe: agy models ok; opencode GoUsageLimitError"), False),
     ("relayed text without probe output", POST, WAIVE, [human()] + relay(1, "mcp__hearthbot__read_thread", "agy and opencode are on the list"), True),
+    ("echo mentioning the tools is no probe", POST, WAIVE, [human()] + bash(1, 'echo "agy ok, opencode ok"'), True),
+    ("human reviewer unavailable is no claim", POST, "The human reviewer is unavailable this week.", [human()], False),
     ("not exhausted is no claim", POST, "agy is not exhausted, so I ran it.", [human()], False),
 ]
 

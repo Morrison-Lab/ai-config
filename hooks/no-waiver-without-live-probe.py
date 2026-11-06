@@ -21,7 +21,9 @@ open on any parse trouble.
 import json
 import os
 import re
+import shlex
 import sys
+import urllib.parse
 
 TEXT_TOOL = re.compile(
     r"^mcp__hearthbot__(?:reply|post_message|update_message|edit_message|"
@@ -31,7 +33,7 @@ CLAIM = re.compile(
     r"\b(?:waiv\w*|exhaust\w*|unavailable|out\s+of\s+quota|over\s+(?:its\s+|the\s+)?(?:quota|limit)|"
     r"quota\s+(?:is\s+)?(?:gone|used|spent)|rate[- ]limited)\b", re.I)
 TARGET = re.compile(
-    r"\b(?:agy|antigravity|opencode|cross[- ]?(?:harness|model)|reviewer)\b", re.I)
+    r"\b(?:agy|antigravity|opencode|cross[- ]?(?:harness|model))\b", re.I)
 # A sentence that says the route was probed and works is not a waiver.
 NOT_EXHAUSTED = re.compile(r"\b(?:not|isn'?t|aren'?t|never|no\s+longer)\s+(?:been\s+)?(?:exhausted|unavailable|waived)\b", re.I)
 
@@ -74,18 +76,49 @@ def is_human_turn(rec):
 
 
 HELP = frozenset({"-h", "-v", "-V", "--help", "--version", "version"})
-SPLIT = re.compile(r"""[\s'";&|()]+""")
+SEGMENT = re.compile(r"[;&|\n]+")
+
+
+def argvs(cmd, depth=0):
+    """Yield the argv of each simple command in *cmd*, looking through
+    `ssh host '...'`, `bash -c '...'`, env assignments, nohup and timeout."""
+    for seg in SEGMENT.split(cmd):
+        try:
+            argv = shlex.split(seg)
+        except ValueError:
+            argv = seg.split()
+        while argv and (re.match(r"[A-Za-z_]\w*=", argv[0]) or os.path.basename(argv[0]) in ("nohup", "timeout")):
+            was_timeout = os.path.basename(argv[0]) == "timeout"
+            argv = argv[1:]
+            if was_timeout and argv and re.match(r"\d+[smhd]?$", argv[0]):
+                argv = argv[1:]
+        if not argv:
+            continue
+        yield argv
+        word = os.path.basename(argv[0])
+        if depth < 3 and word in ("bash", "sh", "zsh") and "-c" in argv[:-1]:
+            yield from argvs(argv[argv.index("-c") + 1], depth + 1)
+        elif depth < 3 and word == "ssh":
+            rest = [a for a in argv[1:] if not a.startswith("-")]
+            if len(rest) > 1:
+                yield from argvs(" ".join(rest[1:]), depth + 1)
 
 
 def ran(tool, cmd):
-    """True when *cmd* runs *tool* with an argument other than a help or version flag.
+    """True when *cmd* runs *tool* as a command with an argument other than a
+    help or version flag. Mentions in `echo`, `grep` and the like do not count."""
+    return any(os.path.basename(a[0]) == tool and len(a) > 1 and a[1] not in HELP for a in argvs(cmd))
 
-    Tokenizes the whole command, so it also sees `ssh host 'agy -p ok'` and
-    `bash -c '...'`: agy runs on cf463-02 through ssh or Remote Control.
-    """
-    tokens = [t for t in SPLIT.split(cmd) if t]
-    return any(t == tool and i + 1 < len(tokens) and tokens[i + 1] not in HELP
-               for i, t in enumerate(tokens))
+
+def curled(cmd):
+    """True when *cmd* POSTs a payload to opencode.ai."""
+    for a in argvs(cmd):
+        if os.path.basename(a[0]) != "curl":
+            continue
+        hosts = {urllib.parse.urlsplit(x).netloc.split(":")[0].lower() for x in a[1:] if "://" in x}
+        if "opencode.ai" in hosts and any(x.startswith(("-d", "--data", "--json", "-F")) for x in a[1:]):
+            return True
+    return False
 
 
 def text_of(block):
@@ -120,7 +153,7 @@ def probes(path):
                 if isinstance(cmd, str):
                     if ran("agy", cmd):
                         found.add("agy")
-                    if ran("opencode", cmd) or ("curl" in cmd and "opencode.ai" in cmd):
+                    if ran("opencode", cmd) or curled(cmd):
                         found.add("opencode")
             elif b.get("type") == "tool_result" and READ_TOOL.match(names.get(b.get("tool_use_id"), "")):
                 t = text_of(b)

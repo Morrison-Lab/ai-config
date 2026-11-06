@@ -74,9 +74,53 @@ CASES = [
     ("probe text inside a comment is no probe", POST, WAIVE, [human()] + bash(1, "echo setup #c; agy run\necho two # x | opencode run -m x ok"), True),
     ("apostrophe in a comment does not hide a real probe", POST, WAIVE, [human()] + bash(1, "# check agy's quota\nagy -p ok\nopencode run -m kimi-k3 ok"), False),
     ("multi-line quoted argument is no probe", POST, WAIVE, [human()] + bash(1, "echo 'notes:\nagy run\nopencode run -m x ok\n'"), True),
+    ("env wrapper and bash -lc count", POST, WAIVE, [human()] + bash(1, "env FOO=1 agy -p ok") + bash(2, "bash -lc 'opencode run -m x ok'"), False),
+    ("command and exec wrappers count", POST, WAIVE, [human()] + bash(1, "command agy -p ok") + bash(2, "exec opencode run -m x ok"), False),
+    ("one-route claim needs only that probe", POST, "OpenCode is rate-limited, so I used another reviewer.", [human()] + OC, False),
+    ("one-route claim still needs its own probe", POST, "OpenCode is rate-limited, so I used another reviewer.", [human()] + AGY, True),
+    ("not rate-limited is no claim", POST, "OpenCode is not rate-limited, so I ran it.", [human()], False),
+    ("negated route does not hide another route's claim", POST, "Agy is exhausted, and OpenCode is not rate-limited.", [human()] + OC, True),
+    ("no comma: and", POST, "Agy is exhausted and OpenCode is not rate-limited.", [human()] + OC, True),
+    ("no comma: but", POST, "Agy is exhausted but OpenCode is not rate-limited.", [human()] + OC, True),
+    ("no comma: negated route first", POST, "OpenCode is not rate-limited and agy is exhausted.", [human()] + OC, True),
+    ("other connectors: so", POST, "Agy is exhausted so OpenCode is not rate-limited.", [human()] + OC, True),
+    ("other connectors: while", POST, "Agy is exhausted while OpenCode is not rate-limited.", [human()] + OC, True),
+    ("other connectors: because", POST, "Agy is exhausted because OpenCode is not rate-limited.", [human()] + OC, True),
+    ("shared plural subject, both probed", POST, "Agy and OpenCode are exhausted.", [human()] + AGY + OC, False),
+    ("shared plural subject, one probed", POST, "Agy and OpenCode are exhausted.", [human()] + OC, True),
+    ("claim word before the mention", POST, "The waiver covers agy.", [human()], True),
+    ("elliptical second route: too", POST, "Agy is exhausted, and OpenCode is too.", [human()] + AGY, True),
+    ("elliptical second route: so is", POST, "Agy is exhausted, and so is OpenCode.", [human()] + AGY, True),
+    ("elliptical after a negation is no claim", POST, "Agy is not exhausted, and OpenCode is not either.", [human()], False),
+    ("bash -norc takes a script file, not a command", POST, WAIVE, [human()] + bash(1, "bash -norc 'agy run ok'") + bash(2, "bash -norc 'opencode run x ok'"), True),
+    ("bash -rc counts", POST, WAIVE, [human()] + bash(1, "bash -rc 'agy -p ok'") + bash(2, "sh -ec 'opencode run x ok'"), False),
+    ("bash single-dash long options take a script file", POST, WAIVE, [human()] + bash(1, "bash -restricted 'agy run ok'") + bash(2, "bash -rcfile /etc/x 'opencode run x ok'"), True),
+    ("unquoted ssh remote command", POST, WAIVE, [human()] + bash(1, "ssh cf463-02 agy -p ok") + bash(2, "ssh -i k host opencode run -m x ok"), False),
+    ("ssh remote flags are not ssh options", POST, WAIVE, [human()] + bash(1, "ssh host echo agy -p ok") + OC, True),
+    ("used one route because the other is exhausted", POST, "Trying agy next because OpenCode is rate-limited.", [human()] + OC, False),
+    ("whereas clause", POST, "agy worked cleanly, whereas OpenCode is unavailable.", [human()] + OC, False),
+    ("did not waive is no claim", POST, "We did not waive cross-harness review.", [human()], False),
+    ("not over its quota is no claim", POST, "agy is not over its quota.", [human()], False),
+    ("ssh joins its arguments with spaces, so bash -c takes only the first word", POST, WAIVE, [human()] + bash(1, "ssh host bash -c 'agy run ok'") + bash(2, "ssh host bash -c 'opencode run x ok'"), True),
+    ("ssh with the whole remote command quoted counts", POST, WAIVE, [human()] + bash(1, "ssh host \"bash -c 'agy run ok'\"") + bash(2, "ssh host 'opencode run x ok'"), False),
+    ("another party unavailable, then agy used", POST, "The human reviewer is unavailable, so I will use agy.", [human()], False),
+    ("claim word before the mention, same clause", POST, "The waiver covers agy, so I ran OpenCode instead.", [human()] + AGY, False),
+    ("negation first, claim after", POST, "OpenCode is not rate-limited, but Agy is exhausted.", [human()] + OC, True),
+    ("e.g. does not split a claim", POST, "Cross-harness review via agy (e.g. Gemini) is waived.", [human()], True),
     ("human reviewer unavailable is no claim", POST, "The human reviewer is unavailable this week.", [human()], False),
     ("not exhausted is no claim", POST, "agy is not exhausted, so I ran it.", [human()], False),
 ]
+
+
+def reason_for(text, recs):
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w") as fh:
+        for r in recs:
+            fh.write(json.dumps(r) + "\n")
+    payload = {"tool_name": POST, "tool_input": {"text": text}, "transcript_path": path}
+    p = subprocess.run([sys.executable, HOOK], input=json.dumps(payload), capture_output=True, text=True)
+    os.unlink(path)
+    return p.stdout
 
 
 def main():
@@ -91,7 +135,11 @@ def main():
     ok = p.returncode == 0 and not p.stdout
     print(("  ok      " if ok else "  FAIL    ") + "fails open on garbage stdin")
     fails += 0 if ok else 1
-    total = len(CASES) + 1
+    out = reason_for("OpenCode is rate-limited.", [human()] + AGY)
+    ok = "no live probe of opencode." in out and "both routes" not in out
+    print(("  ok      " if ok else "  FAIL    ") + "deny reason names only the missing route")
+    fails += 0 if ok else 1
+    total = len(CASES) + 2
     print(f"\n{total - fails}/{total} correct")
     return 1 if fails else 0
 

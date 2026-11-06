@@ -10,7 +10,7 @@ cross-model reviewer can run") already requires one live attempt per route.
 
 Denies a hearthbot reply or relay message with a sentence that calls agy,
 OpenCode or a cross-harness reviewer waived, exhausted or unavailable, unless
-the transcript holds, since the latest human turn, a probe of BOTH routes: a
+the transcript holds, since the latest human turn, a probe of each route the message names (a cross-harness claim names BOTH): a
 Bash call running `agy` or `opencode` with an argument other than a help or
 version flag (also inside `ssh host '...'`), a curl to opencode.ai, or a
 message-reading tool result relaying a probe run elsewhere (agy is absent in
@@ -35,7 +35,19 @@ CLAIM = re.compile(
 TARGET = re.compile(
     r"\b(?:agy|antigravity|opencode|cross[- ]?(?:harness|model))\b", re.I)
 # A sentence that says the route was probed and works is not a waiver.
-NOT_EXHAUSTED = re.compile(r"\b(?:not|isn'?t|aren'?t|never|no\s+longer)\s+(?:been\s+)?(?:exhausted|unavailable|waived)\b", re.I)
+NOT_EXHAUSTED = re.compile(
+    r"\b(?:not|isn'?t|aren'?t|never|no\s+longer)\s+(?:been\s+)?"
+    r"(?:exhausted|unavailable|waiv\w*|rate[- ]limited|out\s+of\s+quota|"
+    r"over\s+(?:its\s+|the\s+)?(?:quota|limit))\b", re.I)
+
+
+# A cluster of at most four of bash's argument-less single-letter flags that
+# includes -c (-lc, -ec, -rc). The length cap and the missing o and O keep
+# single-dash long options (-norc, -rcfile, -restricted) from matching.
+SHELL_C_FLAGS = re.compile(r"(?=.{2,5}$)-[abefhiklmnprstuvxBCDEHPT]*c[abefhiklmnprstuvxBCDEHPT]*")
+CLAUSE_BREAK = re.compile(
+    r"\b(?:because|since|so|while|whereas|but|although|though|instead|then|next)\b|[;:]", re.I)
+ELLIPSIS = re.compile(r"\b(?:too|also|as\s+well|so\s+(?:is|are|does|has))\b", re.I)
 
 READ_TOOL = re.compile(
     r"^(?:mcp__hearthbot__read_\w+|mcp__claude-code-remote__(?:get_event|list_events)|ReadNotifications)$")
@@ -43,7 +55,7 @@ PROBE_OUTPUT = re.compile(r"probe|GoUsageLimitError|usage limit|quota|unavailabl
 
 REASON = (
     "[hook: no-waiver-without-live-probe] This message calls agy, OpenCode or a cross-harness reviewer "
-    "exhausted, unavailable or waived, but this turn shows no live probe of both routes. A note or an earlier "
+    "exhausted, unavailable or waived, but this turn shows no live probe of {routes}. A note or an earlier "
     "session is not evidence (Ezra, 2026-11-06: \"agy is not exhausted, you cant rely on out of date notes\"). "
     "Probe now: `agy` (a models or review call, not --version) through Remote Control, since agy is absent in cloud "
     "containers, and `opencode run -m <model> ok` or a curl to https://opencode.ai/zen/go/v1/chat/completions. "
@@ -52,12 +64,44 @@ REASON = (
 
 
 def sentences(text):
+    text = re.sub(r"\b(?:e\.g|i\.e)\.", lambda m: m.group(0).replace(".", "_"), text)
     return re.split(r"(?<=[.!?])\s+|\n+", text)
 
 
-def claims_unavailable(text):
-    return any(CLAIM.search(s) and TARGET.search(s) and not NOT_EXHAUSTED.search(s)
-               for s in sentences(text))
+def claimed_routes(text):
+    """Routes ('agy', 'opencode') that a sentence calls waived, exhausted or
+    unavailable. A cross-harness claim names both. Empty when nothing is claimed."""
+    routes = set()
+    for s in sentences(text):
+        ms = list(TARGET.finditer(s))
+        # Each mention owns the text up to the next mention. One with no claim
+        # word shares the claim of the mention after it ("agy and OpenCode are
+        # exhausted"), so a negation attaches only to the route it follows.
+        spans = [s[m.start():ms[i + 1].start() if i + 1 < len(ms) else len(s)]
+                 for i, m in enumerate(ms)]
+        if not any(CLAIM.search(sp) for sp in spans):
+            # The claim word comes before every mention, but not past a clause
+            # break: "The human reviewer is unavailable, so I will use agy."
+            ends = [b.end() for b in CLAUSE_BREAK.finditer(s)]
+            spans = [s[max([e for e in ends if e <= m.start()], default=0):] for m in ms]
+        # An elliptical mention ("and OpenCode is too") repeats the claim before it.
+        for i in range(1, len(spans)):
+            if not CLAIM.search(spans[i]) and ELLIPSIS.search(spans[i - 1] + spans[i]):
+                spans[i] = spans[i - 1]
+        eff = ""
+        for m, sp in reversed(list(zip(ms, spans))):
+            # A new clause ("because OpenCode is ...") starts its own claim.
+            eff = sp if CLAIM.search(sp) else ("" if CLAUSE_BREAK.search(sp) else eff)
+            if not CLAIM.search(eff) or NOT_EXHAUSTED.search(eff):
+                continue
+            w = m.group(0).lower()
+            if w in ("agy", "antigravity"):
+                routes.add("agy")
+            elif w == "opencode":
+                routes.add("opencode")
+            else:
+                routes |= {"agy", "opencode"}
+    return routes
 
 
 def blocks(rec):
@@ -168,6 +212,7 @@ def strip_heredocs(cmd):
     return "\n".join(out)
 
 
+WRAPPERS = ("nohup", "timeout", "env", "command", "exec")
 SSH_ARG_OPTS = frozenset("-B -b -c -D -E -e -F -I -i -J -L -l -m -O -o -p -Q -R -S -W -w".split())
 
 
@@ -180,9 +225,12 @@ def argvs(cmd, depth=0):
             argv = shlex.split(seg)
         except ValueError:
             argv = seg.split()
-        while argv and (re.match(r"[A-Za-z_]\w*=", argv[0]) or os.path.basename(argv[0]) in ("nohup", "timeout")):
+        while argv and (re.match(r"[A-Za-z_]\w*=", argv[0]) or os.path.basename(argv[0]) in WRAPPERS):
             was_timeout = os.path.basename(argv[0]) == "timeout"
+            was_env = os.path.basename(argv[0]) in ("env", "command", "exec")
             argv = argv[1:]
+            while was_env and argv and argv[0].startswith("-"):
+                argv = argv[2:] if argv[0] in ("-u", "-C", "-S") else argv[1:]
             while was_timeout and argv and argv[0].startswith("-"):
                 argv = argv[2:] if argv[0] in ("-k", "-s", "--kill-after", "--signal") else argv[1:]
             if was_timeout and argv and re.match(r"\d+(\.\d+)?[smhd]?$", argv[0]):
@@ -191,19 +239,20 @@ def argvs(cmd, depth=0):
             continue
         yield argv
         word = os.path.basename(argv[0])
-        if depth < 3 and word in ("bash", "sh", "zsh") and "-c" in argv[:-1]:
-            yield from argvs(argv[argv.index("-c") + 1], depth + 1)
+        if depth < 3 and word in ("bash", "sh", "zsh"):
+            flags = [i for i, a in enumerate(argv[1:-1], 1) if SHELL_C_FLAGS.fullmatch(a)]
+            if flags:
+                yield from argvs(argv[flags[0] + 1], depth + 1)
         elif depth < 3 and word == "ssh":
-            rest, skip = [], False
-            for a in argv[1:]:
-                if skip:
-                    skip = False
-                elif a in SSH_ARG_OPTS:
-                    skip = True
-                elif not a.startswith("-"):
-                    rest.append(a)
-            if len(rest) > 1:
-                yield from argvs(" ".join(rest[1:]), depth + 1)
+            # ssh options end at the host; everything after it is the remote
+            # command, which ssh joins with spaces for the remote shell, so
+            # quoting is lost exactly as on the real remote: `ssh h bash -c
+            # 'agy run ok'` runs plain `agy` there, and is not a probe.
+            i = 1
+            while i < len(argv) and argv[i].startswith("-"):
+                i += 2 if argv[i] in SSH_ARG_OPTS else 1
+            if i + 1 < len(argv):
+                yield from argvs(" ".join(argv[i + 1:]), depth + 1)
 
 
 def ran(tool, cmd):
@@ -278,20 +327,22 @@ def main():
     if not isinstance(ti, dict):
         return 0
     text = " \n".join(str(ti[k]) for k in ("text", "body", "message") if isinstance(ti.get(k), str))
-    if not text or not claims_unavailable(text):
+    need = claimed_routes(text) if text else set()
+    if not need:
         return 0
     path = payload.get("transcript_path") or ""
     if not path or not os.path.isfile(path):
         return 0
     try:
-        if {"agy", "opencode"} <= probes(path):
-            return 0
+        missing = need - probes(path)
     except Exception:
+        return 0
+    if not missing:
         return 0
     print(json.dumps({"hookSpecificOutput": {
         "hookEventName": "PreToolUse",
         "permissionDecision": "deny",
-        "permissionDecisionReason": REASON}}))
+        "permissionDecisionReason": REASON.format(routes=" and ".join(sorted(missing)))}}))
     return 0
 
 

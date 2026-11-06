@@ -21,6 +21,6 @@ It extends [`check-sources-over-recall`](check-sources-over-recall.md), which co
   After that date it is a hint only, and a note with no date is treated as expired.
   Ezra, 2026-11-06: "notes on dynamic conditions must record their expiration dates".
 
-Enforced by `hooks/no-waiver-without-live-probe.py`, which denies a reply or relay message that calls agy, OpenCode or a cross-harness reviewer exhausted, unavailable or waived when the current turn shows no probe of both routes.
+Enforced by `hooks/no-waiver-without-live-probe.py`, which denies a reply or relay message that calls agy, OpenCode or a cross-harness reviewer exhausted, unavailable or waived when the transcript since the latest human turn shows no probe of each route the message names (a cross-harness claim names both).
 Everything else rests on this rule.
 A check for undated notes is tracked in ai-config#5018.

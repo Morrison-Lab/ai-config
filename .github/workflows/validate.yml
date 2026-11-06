@@ -50,6 +50,9 @@ jobs:
         run: python3 scripts/check-ascii-punctuation.py
       - name: Run check-ascii-punctuation tests
         run: python3 scripts/test_check_ascii_punctuation.py
+      - name: Run check-dynamic-note-expiry tests
+        # ai-config#5018: a memory note stating a changing condition carries `expires YYYY-MM-DD`.
+        run: python3 scripts/test_check_dynamic_note_expiry.py
       - name: Check mistake-pattern numbering
         # ai-config#2946: `## Pattern N:` headings unique and sequential; the
         # test below dogfoods the live file, so this step names the defect.
@@ -812,6 +815,11 @@ jobs:
             exit 0
           fi
           exit "$STATUS"
+      - name: Check memory notes that state a changing condition carry an expiry date
+        # ai-config#5018. Diff mode: only a note unit the PR touches is checked.
+        # Exit 2 (git diff failed, or no memory files) fails the job too, so the
+        # gate cannot pass without having looked.
+        run: python3 scripts/check-dynamic-note-expiry.py --base "${{ github.event.pull_request.base.sha }}"
       - name: Check added prose for unverifiable citations (advisory)
         # ai-config#3660. Rides this job for its full-history checkout and its
         # pull_request gate. Non-blocking: main() returns 0 whatever it finds,

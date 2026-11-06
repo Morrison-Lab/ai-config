@@ -97,7 +97,49 @@ def segments(cmd):
     out.append("".join(cur))
     return out
 
-HEREDOC_OP = re.compile(r"(?<!<)<<(?!<)-?[ \t]*(['\"]?)([^\s'\"<>|;&]*)\1")
+def heredoc_delims(line):
+    """Delimiter words of the heredoc operators on *line*, dequoted as bash
+    does: quotes anywhere in the word are removed and the pieces joined.
+    Operators inside quotes, and `<<<`, do not count."""
+    found, quote, i, n = [], None, 0, len(line)
+    while i < n:
+        ch = line[i]
+        if quote:
+            quote = None if ch == quote else quote
+        elif ch in "'\"":
+            quote = ch
+        elif ch == "\\":
+            i += 1
+        elif line.startswith("<<<", i):
+            i += 2
+        elif line.startswith("<<", i):
+            i += 2
+            if line.startswith("-", i):
+                i += 1
+            while i < n and line[i] in " \t":
+                i += 1
+            word, q = [], None
+            while i < n:
+                c = line[i]
+                if q:
+                    if c == q:
+                        q = None
+                    else:
+                        word.append(c)
+                elif c in "'\"":
+                    q = c
+                elif c == "\\" and i + 1 < n:
+                    i += 1
+                    word.append(line[i])
+                elif c in " \t|&;<>()":
+                    break
+                else:
+                    word.append(c)
+                i += 1
+            found.append("".join(word))
+            continue
+        i += 1
+    return found
 
 
 def strip_heredocs(cmd):
@@ -111,7 +153,7 @@ def strip_heredocs(cmd):
                 pending.pop(0)
             continue
         out.append(line)
-        pending = [m.group(2) for m in HEREDOC_OP.finditer(line)]
+        pending = heredoc_delims(line)
     return "\n".join(out)
 
 

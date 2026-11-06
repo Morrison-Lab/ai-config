@@ -84,6 +84,26 @@ class TestBlocks(unittest.TestCase):
             "node /tmp/shot2.js"
         )
 
+    def test_heredoc_with_trailing_redirects_after_operator(self):
+        self.assert_blocked(
+            "cat > shot3.js <<'X' 2> /tmp/err.log\n"
+            "const { chromium } = require('playwright');\n"
+            "X\n"
+            "node shot3.js"
+        )
+        self.assert_blocked(
+            "tee shot4.py <<'X' >> /tmp/out.log\n"
+            "from playwright.sync_api import sync_playwright\n"
+            "X\n"
+            "python3 shot4.py"
+        )
+        self.assert_blocked(
+            "cat <<'X' > shot5.js\n"
+            "const { chromium } = require('playwright');\n"
+            "X\n"
+            "node shot5.js"
+        )
+
     def test_inline_node(self):
         self.assert_blocked("node -e \"require('playwright').chromium.launch()\"")
 

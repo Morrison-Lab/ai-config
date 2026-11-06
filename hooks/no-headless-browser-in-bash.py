@@ -141,10 +141,18 @@ def heredoc_written_files(command: str) -> dict:
     written = {}
     for match in HEREDOC.finditer(command):
         opener = command[: match.start(2)].rsplit("\n", 2)[-2]
-        targets = [m for m in WRITE_TARGET.finditer(opener)
-                   if m.group(1) != "/dev/null"]
-        if targets:
-            written[targets[-1].group(1)] = match.group(2)
+        before, _, after = opener.partition("<<")
+        # `cat > f <<X` names the file before the operator (the last write
+        # there wins); `cat <<X > f` names it after, where a first redirect
+        # that is not /dev/null is the file and a later one is unrelated.
+        names = [m.group(1) for m in WRITE_TARGET.finditer(before)]
+        if names:
+            written[names[-1]] = match.group(2)
+            continue
+        names = [m.group(1) for m in WRITE_TARGET.finditer(after)
+                 if m.group(1) != "/dev/null"]
+        if names:
+            written[names[0]] = match.group(2)
     return written
 
 

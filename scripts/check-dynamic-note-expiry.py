@@ -48,11 +48,10 @@ STATE = re.compile(
 MECHANISM = re.compile(
     r"\b(?:if|when|whenever|once|unless|how\s+to|diagnos\w*|detect\w*|check\w*|probe\w*|"
     r"means|looks?\s+like|returns?|before|after|so\s+that|in\s+case)\b", re.I)
-# until/while are NOT mechanism words ("down until Monday" claims the present),
-# except when a sentence OPENS with one and holds the state before its first
-# comma: "While the quota is exhausted, switch routes." is a conditional, while
-# "While maintenance finishes, X is down." is a fronted duration and is flagged.
-FRONTED = re.compile(r"\s*(?:(?:[-*+]|\d+[.)])\s+)?(?:while|until)\b", re.I)
+# Known limitation, by design: until/while are NOT mechanism words. "Down until
+# Monday" and "While X holds, Y is down" claim the present, and a fronted
+# "While the quota is exhausted, switch routes." has the same surface shape, so
+# it is flagged too; that rare conditional takes the allow marker (ai-config#5035).
 EXPIRES = re.compile(r"\bexpires?\b\s*:?\s*20\d\d-\d\d-\d\d", re.I)
 ALLOW = "<!-- dynamic-note: allow -->"
 BULLET = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
@@ -64,12 +63,8 @@ def is_state_claim(unit):
     # A quoted phrase is an example of wording, not an assertion by the note.
     unit = re.sub(r'"[^"]*"|\u201c[^\u201d]*\u201d', " ", unit)
     for s in SENTENCE.split(" ".join(unit.split())):
-        state = STATE.search(s)
-        if not (state and RESOURCE.search(s)) or MECHANISM.search(s):
-            continue
-        if FRONTED.match(s) and state.start() < s.find(","):
-            continue
-        return True
+        if STATE.search(s) and RESOURCE.search(s) and not MECHANISM.search(s):
+            return True
     return False
 
 

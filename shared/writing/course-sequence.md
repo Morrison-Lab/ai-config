@@ -6,20 +6,23 @@ Place content, and direct links, according to it.
 ## The sequence
 
 ```
-mds -> pds -> sds -+-> lds   (prediction-focused statistics)
- |      |          |    ^
- |      +-> ids ---|----+    (information theory)
- |                 |    |
- +----> cds -------|----+    (computational complexity)
-                   |
-                   +-> rme   (model-inference-focused statistics)
-                        ^
-                        |
-                  win, cie   (causal inference)
+mcs -> mds -> pds -> sds -+-> lds   (prediction-focused statistics)
+        |      |          |    ^
+        |      +-> ids ---|----+    (information theory)
+        |                 |    |
+        +----> cds -------|----+    (computational complexity)
+                          |
+                          +-> rme   (model-inference-focused statistics)
+                               ^
+                               |
+                         win, cie   (causal inference)
 ```
 
-- mds, pds and sds form a linear chain:
+- mcs, mds, pds and sds form a linear chain:
   each site assumes the ones before it.
+- mcs ([*Math for Computer Science*](https://morrison-lab.github.io/mcs/)) holds the shared math basics:
+  logic and proof writing, sets, functions, number systems, relations, induction, growth rates, expressions and algorithms, and notation.
+  mds links to those pages and no longer defines them (Morrison-Lab/mcs#60).
 - sds branches into two sites that both build on it:
   - lds, which focuses on prediction
   - rme ([*Regression Models for Epidemiology*](https://morrison-lab.github.io/rme/)),

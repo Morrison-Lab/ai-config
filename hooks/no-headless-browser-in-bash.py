@@ -31,6 +31,10 @@ Fires on a Bash command that *invokes*:
      RSelenium. The script file is read, because the incident's command line
      was just `node redir.js`.
 
+A script that a heredoc in the same command writes (`cat > shot.js <<'X' ... X`
+followed by `node shot.js`) does not exist on disk when the hook runs, so the
+heredoc body is checked too (2026-11-06, ai-config#5027).
+
 Matching is on invocation, not mention: `grep -rn playwright .`,
 `pip install playwright`, `chrome --version` and a commit message that names
 a browser start no browser and pass. A script on stdin (heredoc or pipe), a
@@ -124,6 +128,24 @@ def script_imports_browser(path: str, cwd: str | None) -> bool:
         return False        # unreadable or not there yet: fail open
 
 
+WRITE_TARGET = re.compile(r"""(?:>>?|\btee(?:\s+-\S+)*)\s*["']?([\w./~$()-]+)["']?""")
+
+
+def heredoc_written_files(command: str) -> dict:
+    """Map each file a heredoc writes (`cat > shot.js <<'X' ... X`) to its body.
+
+    The script is then run by a later `node shot.js` in the same command, when
+    the file does not exist yet at hook time, so reading it from disk finds
+    nothing (2026-11-06: a Playwright screenshot script got through this way,
+    ai-config#5027)."""
+    written = {}
+    for match in HEREDOC.finditer(command):
+        opener = command[: match.start(2)].rsplit("\n", 2)[-2]
+        if target := WRITE_TARGET.search(opener):
+            written[target.group(1)] = match.group(2)
+    return written
+
+
 def strip_prose(command: str) -> str:
     """Blank text that is data, not commands: commit/PR message flags and
     heredoc bodies not fed to an interpreter. A browser word there is a
@@ -134,12 +156,13 @@ def strip_prose(command: str) -> str:
         head = command[: match.start()].rsplit("\n", 1)[-1]
         if re.search(r"\b(?:node|nodejs|bun|deno|python3?|Rscript|R|sh|bash|zsh)\b", head):
             return match.group(0)
-        return ""
+        return "\n"     # keep the line break the heredoc match consumed
     return HEREDOC.sub(keep_if_interpreter, command)
 
 
 def offending(command: str, cwd: str | None = None, depth: int = 0):
     """Return (label, matched text) for the first browser launch, else None."""
+    written = heredoc_written_files(command)
     command = strip_prose(command)
     if match := BROWSER_BINARY.search(command):
         return "a browser binary", match.group(0).strip(" ;&|(\n\"'")
@@ -158,6 +181,8 @@ def offending(command: str, cwd: str | None = None, depth: int = 0):
         if inline and (LIBRARY.search(rest) or LIBRARY.search(command[match.end():].split("\n", 1)[0])):
             return "inline code that imports a browser-automation library", shown
         script = SCRIPT_FILE.search(rest)
+        if script and LIBRARY.search(written.get(script.group(1), "")):
+            return f"{script.group(1)}, written by a heredoc in this command, which imports a browser-automation library", shown
         if script and script_imports_browser(script.group(1), cwd):
             return f"{script.group(1)}, which imports a browser-automation library", shown
         # Script on stdin: a heredoc, a here-string, or a pipe into the interpreter.

@@ -207,3 +207,11 @@ A pure move over the 10-file cap is pushed with `ALLOW_LARGE_PR=1`, and the pre-
 - **Do:** when you leave a file unchanged (reverted) to avoid a whole-file check, file the follow-up issue in the same turn, attached under the tracking issue (pds#328 and rme#1443 under mcs#60, 2026-11-05).
 - **Don't:** widen a pure-move PR to clear findings on lines it did not touch.
 - **Don't:** leave a reverted file unfiled until the coordinator asks.
+
+## `lds-site` is a built mirror: fix links at the source
+
+`Morrison-Lab/lds-site` holds the rendered output of `lds`, and each `lds` publish overwrites it.
+A hand edit there is lost on the next publish (Morrison-Lab/mcs#60 phase 6, 2026-11-05: lds-site#5 was opened and closed after Ezra asked why it was being edited).
+
+- **Do:** before repointing links in a repo, check whether it holds generated output (a `_site` mirror, a publish target), and fix the source repo instead.
+- **Don't:** list `lds-site` as a repoint target in a link sweep.

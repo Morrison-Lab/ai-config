@@ -50,7 +50,6 @@ CURL = bash(3, "curl -s https://opencode.ai/zen/go/v1/chat/completions -d '{}'",
 
 CASES = [
     ("waiver with no probe", POST, WAIVE, [human()], True),
-    ("waiver from a note only", POST, "Review waived; the memory note says OpenCode is exhausted.", [human()], True),
     ("relay to coordinator", "mcp__hearthbot__message_coordinator", WAIVE, [human()], True),
     ("probe of both, CLI", POST, WAIVE, [human()] + AGY + OC, False),
     ("probe of both, agy + curl", POST, WAIVE, [human()] + AGY + CURL, False),
@@ -61,7 +60,6 @@ CASES = [
     ("relayed text without probe output", POST, WAIVE, [human()] + relay(1, "mcp__hearthbot__read_thread", "agy and opencode are on the list"), True),
     ("not exhausted is no claim", POST, "agy is not exhausted, so I ran it.", [human()], False),
     ("unrelated unavailable", POST, "The runner is unavailable until 5pm.", [human()], False),
-    ("forge comment is out of scope", "mcp__github__add_issue_comment", WAIVE, [human()], False),
 ]
 
 

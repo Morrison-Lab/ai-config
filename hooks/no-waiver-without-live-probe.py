@@ -160,6 +160,9 @@ def strip_heredocs(cmd):
     return "\n".join(out)
 
 
+SSH_ARG_OPTS = frozenset("-B -b -c -D -E -e -F -I -i -J -L -l -m -O -o -p -Q -R -S -W -w".split())
+
+
 def argvs(cmd, depth=0):
     """Yield the argv of each simple command in *cmd*, looking through
     `ssh host '...'`, `bash -c '...'`, env assignments, nohup and timeout."""
@@ -172,7 +175,9 @@ def argvs(cmd, depth=0):
         while argv and (re.match(r"[A-Za-z_]\w*=", argv[0]) or os.path.basename(argv[0]) in ("nohup", "timeout")):
             was_timeout = os.path.basename(argv[0]) == "timeout"
             argv = argv[1:]
-            if was_timeout and argv and re.match(r"\d+[smhd]?$", argv[0]):
+            while was_timeout and argv and argv[0].startswith("-"):
+                argv = argv[2:] if argv[0] in ("-k", "-s", "--kill-after", "--signal") else argv[1:]
+            if was_timeout and argv and re.match(r"\d+(\.\d+)?[smhd]?$", argv[0]):
                 argv = argv[1:]
         if not argv:
             continue
@@ -181,7 +186,14 @@ def argvs(cmd, depth=0):
         if depth < 3 and word in ("bash", "sh", "zsh") and "-c" in argv[:-1]:
             yield from argvs(argv[argv.index("-c") + 1], depth + 1)
         elif depth < 3 and word == "ssh":
-            rest = [a for a in argv[1:] if not a.startswith("-")]
+            rest, skip = [], False
+            for a in argv[1:]:
+                if skip:
+                    skip = False
+                elif a in SSH_ARG_OPTS:
+                    skip = True
+                elif not a.startswith("-"):
+                    rest.append(a)
             if len(rest) > 1:
                 yield from argvs(" ".join(rest[1:]), depth + 1)
 
@@ -198,7 +210,7 @@ def curled(cmd):
         if os.path.basename(a[0]) != "curl":
             continue
         hosts = {urllib.parse.urlsplit(x).netloc.split(":")[0].lower() for x in a[1:] if "://" in x}
-        if "opencode.ai" in hosts and any(x.startswith(("-d", "--data", "--json", "-F")) for x in a[1:]):
+        if "opencode.ai" in hosts and any(x.startswith(("--data", "--json")) or re.match(r"-[A-Za-z]*[dF]", x) for x in a[1:]):
             return True
     return False
 

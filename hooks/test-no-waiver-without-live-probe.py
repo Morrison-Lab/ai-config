@@ -69,6 +69,8 @@ CASES = [
     ("indented closing line does not close a plain heredoc", POST, WAIVE, [human()] + bash(1, "cat <<EOF\nnotes\n  EOF\nagy run\nopencode run -m x ok\nEOF"), True),
     ("<< inside a trailing comment is no operator", POST, WAIVE, [human()] + bash(1, "cat <<EOF # see <<HELP\nnotes\nEOF\nagy run\nopencode run -m x ok"), False),
     ("# after a closing paren is not a comment", POST, WAIVE, [human()] + bash(1, "cat $(true)#foo <<REALEOF\nagy run\nopencode run -m x ok\nREALEOF"), True),
+    ("ssh options with arguments, timeout flags", POST, WAIVE, [human()] + bash(1, "ssh -i ~/.ssh/k -o ConnectTimeout=5 host 'agy -p ok'") + bash(2, "timeout -k 5 30 opencode run -m x ok"), False),
+    ("combined curl flag -sd", POST, WAIVE, [human()] + AGY + bash(3, "curl -sd '{}' https://opencode.ai/zen/go/v1/chat/completions"), False),
     ("multi-line quoted argument is no probe", POST, WAIVE, [human()] + bash(1, "echo 'notes:\nagy run\nopencode run -m x ok\n'"), True),
     ("human reviewer unavailable is no claim", POST, "The human reviewer is unavailable this week.", [human()], False),
     ("not exhausted is no claim", POST, "agy is not exhausted, so I ran it.", [human()], False),

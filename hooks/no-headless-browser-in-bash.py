@@ -146,7 +146,10 @@ def heredoc_written_files(command: str) -> dict:
         # harmless, and the file that is later run is always among them.
         for target in WRITE_TARGET.finditer(opener):
             if target.group(1) != "/dev/null":
-                written[target.group(1)] = match.group(2)
+                # Accumulate: a later heredoc whose line merely mentions the
+                # name (in a quoted argument) must not erase an earlier body.
+                key = target.group(1)
+                written[key] = written.get(key, "") + "\n" + match.group(2)
     return written
 
 

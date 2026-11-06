@@ -126,6 +126,17 @@ class TestBlocks(unittest.TestCase):
             "node shot8.js"
         )
 
+    def test_later_heredoc_mentioning_the_name_does_not_erase_it(self):
+        self.assert_blocked(
+            "cat > shot9.js <<'A'\n"
+            "const { chromium } = require('playwright');\n"
+            "A\n"
+            "grep \"> shot9.js\" readme.txt > /tmp/other.log <<'B'\n"
+            "console.log('fine');\n"
+            "B\n"
+            "node shot9.js"
+        )
+
     def test_inline_node(self):
         self.assert_blocked("node -e \"require('playwright').chromium.launch()\"")
 

@@ -1715,6 +1715,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-announced-work-in-post-message.py\"",
+            "timeout": 10,
+            "script": "no-announced-work-in-post-message.py",
+            "why": "ai-config#5053, layer 2 of the defense-in-depth rule (#5051). The Stop hook no-announced-start-without-starting.py fires after post_message has already sent the claim (#4830); this hook denies the post_message itself when its closing sentences unconditionally announce next work ('Next I'm opening the PR') while the latest update_progress_checklist still has an unstarted step. Reuses the Stop hook's matchers so the two cannot drift, runs with the Stop hook off, and requires the checklist because mid-turn 'I'm opening the PR' is often true and a deny on true narration gets switched off. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-numbered-merge-word-ask.py\"",
             "timeout": 10,
             "script": "no-numbered-merge-word-ask.py",

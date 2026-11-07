@@ -88,6 +88,13 @@ PATTERNS = [
     r"(?:I am|I'?m) (?:now )?(?:beginning|kicking off) (?:it|that|this|the)\b",
     r"(?:continuing|continue with)\s+(?:gia|gii|the\s+next|next\s+task|next\s+issue|phase\s+\d)\b",
     r"(?:I am|I'?m)\s+(?:now\s+)?continuing\s+(?:with\s+)?(?:gia|gii|the\s+next|next\s+task|next\s+issue|phase\s+\d)\b",
+    # ai-config#5050: "Next I'm opening the first workflow PR", sent as a
+    # closing post_message with no tool call after it. A sentence-leading
+    # "Next" plus a first-person verb is an announcement; the two-sentence
+    # tail window and the conditional exemption keep a mid-reply "Next, I'll
+    # summarize below." that goes on to deliver from matching.
+    r"^[\s*_>-]*next(?: up)?,?:?\s+(?:I am|I'?m|I'?ll|I will)\s+(?:now\s+)?[a-z]+",
+    r"(?:I am|I'?m)\s+now\s+[a-z]+ing\s+(?:it|that|this|the|a|an|my|our|them)\b",
 ]
 # `start WITH` was dropped from the two `I'll start` alternatives above.
 # "I'll start with the easy part: the data looks clean" is expository -- it
@@ -106,7 +113,8 @@ RX = re.compile("|".join(f"(?:{p})" for p in PATTERNS), re.I)
 # rather than an unstarted announcement.
 CONDITIONAL_RX = re.compile(
     r"\b(?:once|when|after|if|unless|pending|awaiting|until|as soon as|"
-    r"provided|assuming|depending on)\b",
+    r"provided|assuming|depending on|blocked|blocker|blocking|waiting|"
+    r"wait for)\b",
     re.I,
 )
 
@@ -166,8 +174,35 @@ except Exception:
         return _CODE_SPAN_RE.sub(" ", _FENCE_RE.sub(" ", text))
 
 
+def _post_message_text(block):
+    """The text a project-thread reply sends: a hearthbot post_message call.
+
+    In Claude Projects threads the user-facing message is not a text block but
+    the `text` input of `mcp__hearthbot__post_message` (ai-config#5050), so a
+    reader of text blocks alone never sees it.
+    """
+    if not isinstance(block, dict) or block.get("type") != "tool_use":
+        return None
+    if not str(block.get("name") or "").endswith("post_message"):
+        return None
+    text = (block.get("input") or {}).get("text")
+    return text if isinstance(text, str) and text.strip() else None
+
+
+def _is_work_call(block):
+    """A tool call that is work, not the harness's own reply or end-of-turn call."""
+    if not isinstance(block, dict) or block.get("type") != "tool_use":
+        return False
+    return not str(block.get("name") or "").startswith("mcp__hearthbot__")
+
+
 def last_assistant_text(path):
-    """The final user-visible assistant prose in the transcript."""
+    """The final user-visible assistant prose in the transcript.
+
+    That is the later of the last text block and the last post_message input.
+    A work tool call (anything but a hearthbot call) after it clears it,
+    because the announcement was then followed by work.
+    """
     last_text = ""
     try:
         with open(path, encoding="utf-8", errors="ignore") as fh:
@@ -180,11 +215,16 @@ def last_assistant_text(path):
                 if m.get("type") == "assistant" or m.get("role") == "assistant":
                     blocks = (m.get("message") or {}).get("content") or m.get("content") or []
                     if isinstance(blocks, list):
-                        txt = "".join(
-                            b.get("text", "")
-                            for b in blocks
-                            if isinstance(b, dict) and b.get("type") == "text"
-                        )
+                        parts = []
+                        for b in blocks:
+                            posted = _post_message_text(b)
+                            if posted:
+                                last_text, parts = posted, []
+                            elif _is_work_call(b):
+                                last_text, parts = "", []
+                            elif isinstance(b, dict) and b.get("type") == "text":
+                                parts.append(b.get("text", ""))
+                        txt = "".join(parts)
                         if txt.strip():
                             last_text = txt
                     elif isinstance(blocks, str) and blocks.strip():

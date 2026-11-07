@@ -49,6 +49,21 @@ def say_antigravity(text):
     }
 
 
+def tool(name, **inp):
+    return {
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "name": name, "input": inp}]},
+    }
+
+
+def post(text):
+    return tool("mcp__hearthbot__post_message", text=text)
+
+
+def end_turn():
+    return tool("mcp__hearthbot__no_reply_needed")
+
+
 def run(messages):
     with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False, encoding="utf-8") as fh:
         for m in messages:
@@ -185,6 +200,46 @@ def main():
         print(f"FAIL once-per-message: first={first} second={second}")
     else:
         print("PASS once-per-message")
+
+    # ai-config#5050: Projects threads reply through post_message tool calls.
+    posted_block = [
+        "Next I'm opening the first workflow PR.",
+        "Merged the first PR.\n\nNext, I'll file the second issue.",
+        "Done with CI.\n\nI'm now opening the follow-up PR.",
+    ]
+    posted_pass = [
+        "Next I'm opening the first workflow PR once the review lands.",
+        "Next I'll file it, but I'm blocked on the repo grant.",
+        "Next I'm waiting for the runner thread.",
+        "Next, I'll summarize the findings below.\n\nFinding 1 is fixed.\n\n"
+        "Finding 2 is filed as #12.",
+        "Opened the PR and filed the issue.",
+    ]
+    for text in posted_block:
+        clear_sentinels()
+        out = run([post(text), end_turn()])
+        if not out or json.loads(out).get("decision") != "block":
+            failures += 1
+            print(f"FAIL (post_message should block): {text!r}")
+        else:
+            print(f"PASS post_message block: {text.splitlines()[0][:50]!r}")
+    for text in posted_pass:
+        clear_sentinels()
+        out = run([post(text), end_turn()])
+        if out:
+            failures += 1
+            print(f"FAIL (post_message should pass): {text!r}")
+        else:
+            print(f"PASS post_message allow: {text[:50]!r}")
+
+    # Work after the announcement (any non-hearthbot tool call) clears it.
+    clear_sentinels()
+    out = run([post("Next I'm opening the first workflow PR."), tool("Bash"), end_turn()])
+    if out:
+        failures += 1
+        print(f"FAIL work after announcement should pass: out={out}")
+    else:
+        print("PASS work after announcement")
 
     print(f"\n{failures} failure(s)")
     return 1 if failures else 0

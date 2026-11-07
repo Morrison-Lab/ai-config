@@ -229,6 +229,14 @@ def main():
         "I looked at the code. Next, I'll explain the key insight: the loop "
         "never terminates because of an off-by-one error.",
     ]
+    posted_block += [
+        # Claude review on #5052: immediate-future "I'm <adjective> to" forms
+        # that the gerund requirement dropped.
+        "I read the issue. Next, I'm about to fix the bug.",
+        "Next, I'm set to deploy the fix.",
+        "Next, I'm ready to deploy the fix.",
+        "Next, I'm due to start the migration.",
+    ]
     posted_pass = [
         # Claude review on #5052: declining, uncertainty and stative gerunds
         # announce no work.

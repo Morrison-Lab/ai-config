@@ -103,7 +103,7 @@ PATTERNS = [
     # by a word that is not a negation or a state, so "Next, I'm not going to
     # fix this" and "Next, I'm uncertain whether ..." do not match (Claude
     # review on #5052). Stative gerunds are excluded for the same reason.
-    r"^[\s*_>-]*next(?: up)?,?:?\s+(?:(?:I am|I'?m)\s+(?:now\s+)?(?!" + _STATIVE + r")[a-z]+ing\b"
+    r"^[\s*_>-]*next(?: up)?,?:?\s+(?:(?:I am|I'?m)\s+(?:now\s+)?(?:(?:about|set|ready|due)\s+to\b|(?!" + _STATIVE + r")[a-z]+ing\b)"
     r"|(?:I'?ll|I will)\s+(?:now\s+)?(?!not\b|never\b|be\b|also\b|probably\b|just\b)[a-z]+)",
     r"(?:I am|I'?m)\s+now\s+(?!" + _STATIVE + r")[a-z]+ing\s+(?:it|that|this|the|a|an|my|our|them)\b",
 ]

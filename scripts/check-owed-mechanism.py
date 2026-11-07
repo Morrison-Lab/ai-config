@@ -61,6 +61,12 @@ PROCEDURE = re.compile(
 # (an adjective) does not negate the claim around it.
 NEGATED = re.compile(r"(?<![\w-])(?:no|never|nothing|nobody|not)(?![\w-])|n't\b", re.I)
 NEGATION_WINDOW = 3
+FILLER = frozenset(
+    "a an the this that any separate new further more other additional extra "
+    "such is are was were be been being still yet now really".split())
+BULLET = re.compile(r"^[\s*+\d.)-]+")
+# A conditional counts only when it opens its clause.
+OPENING = re.compile(r"(?:(?:and|so|then)\s+)?(?:" + PROCEDURE.pattern + ")", re.I)
 CLAUSE = re.compile(r"[,;:]|\s+(?:but|although|though|while|and)\s+", re.I)
 LINK = re.compile(r"(?:^|[\s(\[])(?:[\w.-]+/[\w.-]+)?#\d+\b|/(?:issues|pull)/\d+")
 ALLOW = "<!-- owed-mechanism: allow -->"
@@ -80,22 +86,44 @@ def is_owed_claim(unit):
         # Each owed phrase is judged on its own lead-in: not negated, and not
         # introduced by a conditional.
         if any(not negated_at(s, m)
-               and not PROCEDURE.search(CLAUSE.split(s[:m.start()])[-1])
+               and not opens_with_conditional(s, m)
                for m in OWED.finditer(s)):
             return True
     return False
 
 
-def negated_at(sentence, match):
-    """True when a negator sits in the few words just before this owed phrase.
+def lead_clause(sentence, match):
+    """The clause that leads into this owed phrase, without a bullet marker."""
+    clause = CLAUSE.split(sentence[:match.start()])[-1]
+    return BULLET.sub("", clause)
 
-    Negation is judged for each owed phrase on its own, from the words that
-    lead into it, so a negation elsewhere in the sentence ("the old guard
-    isn't needed, but a new check is owed") or inside a relative clause ("a
-    hook that hasn't been written yet is owed") cannot hide a real debt.
+
+def opens_with_conditional(sentence, match):
+    """True when the clause holding this owed phrase opens with a conditional.
+
+    "When a check is owed, file its issue" opens with "When"; "a check for
+    when the hook fails is owed" only mentions it inside a noun phrase, so it
+    states a debt.
     """
-    lead = CLAUSE.split(sentence[:match.start()])[-1].split()
-    return bool(NEGATED.search(" ".join(lead[-NEGATION_WINDOW:])))
+    return bool(OPENING.match(lead_clause(sentence, match)))
+
+
+def negated_at(sentence, match):
+    """True when a negator governs this owed phrase.
+
+    The negator must sit in the few words before the phrase, and only filler
+    words (articles, adjectives like "separate", a copula) may stand between
+    them. A negator inside a noun phrase ("cases with no fallback is owed")
+    or a relative clause ("a hook that hasn't been written yet is owed")
+    therefore cannot hide a real debt.
+    """
+    lead = lead_clause(sentence, match).split()
+    window = " ".join(lead[-NEGATION_WINDOW:])
+    negators = list(NEGATED.finditer(window))
+    if not negators:
+        return False
+    rest = window[negators[-1].end():].split()
+    return all(w.lower() in FILLER or MECHANISM_WORD.fullmatch(w) for w in rest)
 
 
 def violations(lines, changed=None):

@@ -219,6 +219,12 @@ CASES = [
     ("for your sign-off", [say("mcs#99 waits on #12 for your sign-off.")], False),
     ("for your token", [say("mcs#99 waits on #12 for your token.")], False),
     ("for a manual merge", [say("mcs#99 waits on #12 for a manual merge.")], False),
+    # Claude review of d5b7501a: a leading while/after clause is not narrative.
+    ("leading while clause park", [say("While mds#649 waits on gha#1544, I'll do something else.")], True),
+    ("while waiting then future", [say("While waiting on #12, I will do something else.")], True),
+    ("leading after clause park",
+     [say("After mds#649 waits on gha#1544 a while longer, I'll check again.")], True),
+    ("while waiting past report", [say("While waiting on #12, I fixed the lint warnings.")], False),
 ]
 
 

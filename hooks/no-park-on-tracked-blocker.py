@@ -30,7 +30,8 @@ The object rule keeps reports out: "PR #12 is waiting on the runner" and
 what is waited on. The object also ends at a clause boundary or
 conjunction, at a line wrap after anything but a function word, and at a
 preposition right after a non-filler word, so "Waiting on CI for #12" names
-CI. A phrase after "after", "spent" or "while" in its clause is narrative.
+CI. "After waiting on #12" or "spent a minute waiting for #12" is
+narrative, unless the sentence looks ahead ("While waiting on #12, I'll").
 A form spanning several clauses is judged by the clause it ends in.
 A person-only gate ("needs you", "your approval", "requires a manual
 action") exempts only its own clause and trailing which-clauses; a bare
@@ -225,8 +226,14 @@ _TRAILING_CLAUSE_RX = re.compile(
     r"^\s*(?:which|that|since|because|as|it|this|pending|until)\b", re.I
 )
 _LEADING_CLAUSE_RX = re.compile(r"^\s*(?:because|since|as)\b", re.I)
-# A narrative report: "After waiting on #12 ...", "I spent a minute waiting for #12".
-_NARRATIVE_RX = re.compile(r"\b(?:after|spent|while)\b", re.I)
+# A narrative report: "After waiting on #12 ...", "I spent a minute waiting
+# for #12". The narrative word must lead straight into the gerund, and the
+# sentence must not look ahead ("While waiting on #12, I'll ..." is a park).
+_NARRATIVE_RX = re.compile(
+    r"(?:\b(?:after|while)\s+|\bspent\s+(?:\S+\s+){0,3}?)$", re.I
+)
+_GERUND_PHRASE_RX = re.compile(r"(?:wait|await|depend)ing\b", re.I)
+_FUTURE_RX = re.compile(_FIRST_PERSON_FUTURE + r"|\bwill\b|\bgoing\s+to\b", re.I)
 REPLY_TOOL_RX = re.compile(
     r"(^|__)(reply|post_message|update_message|edit_message|send_message)$", re.I
 )
@@ -393,7 +400,12 @@ def find_park(text):
             own, start, gate = _gate_region(sentence, pos)
             if PERSON_GATE_RX.search(gate) or RESOLVED_RX.search(own):
                 continue
-            if narrative and _NARRATIVE_RX.search(sentence[start:pos]):
+            if (
+                narrative
+                and _GERUND_PHRASE_RX.match(sentence, pos)
+                and _NARRATIVE_RX.search(sentence[start:pos])
+                and not _FUTURE_RX.search(sentence)
+            ):
                 continue
             return sentence.strip()
     return None

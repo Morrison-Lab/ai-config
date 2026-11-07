@@ -30,9 +30,29 @@ Also count any thread with a post or a PR event in the last 15 minutes, and read
 - It does not apply when every open issue is owned.
   Then there is no unowned backlog to work.
 
+## Owners stay active
+
+Checking that some thread is working is not enough ([ai-config#5088](https://github.com/Morrison-Lab/ai-config/issues/5088)).
+On 2026-11-07 the ids owner thread sat idle from 09:56Z to 19:20Z while its repo had open issues and PRs, and the check said "no action" because other threads were working.
+
+Every hourly run also reads the last activity of each owner thread listed in project memory.
+It restarts any owner with no post or PR event in the last 60 minutes whose repo has an open issue or PR, by messaging that thread or starting a replacement.
+An owner whose repo has nothing open is left alone.
+"Any thread working" never ends the run early.
+
 ## Mechanism
 
-An hourly scheduled task, `trig_01N2XJVzro32Mtpv6ZrGLKPu`, fires into the project coordinator session.
-When no thread is working, it has the coordinator start one on the top unowned issue ([ai-config#4968](https://github.com/Morrison-Lab/ai-config/issues/4968), created 2026-11-05 with Ezra's OK).
+An hourly scheduled task, `trig_01N2XJVzro32Mtpv6ZrGLKPu`, fires into the project coordinator session ([ai-config#4968](https://github.com/Morrison-Lab/ai-config/issues/4968), created 2026-11-05 with Ezra's OK).
+Its prompt exists only in the scheduled task, so this file holds the source text, and the task is updated from it.
+Prompt as of 2026-11-07:
+
+> Hourly backlog check (Ezra's rule, ai-config#4967 / #4968 / #5088).
+> Step 1, owners: read the last activity of every owner thread listed in project memory with read_thread, not list_threads with state "working", which can return empty.
+> Restart any owner with no post or PR event in the last 60 minutes whose repo has an open issue or PR, by message_thread or a new thread, and say which you restarted.
+> Step 2, backlog: if no thread is working, find the top open issue that no thread, open PR or claim comment owns, across the project repos (lds, mds, pds, sds, mcs, psw, ai-config, gha, macros): rank by P1, P2, P3 label, then by age, and check live PR and thread state first rather than trusting memory.
+> Start a thread on it.
+> Standing limits apply: issue first, small PRs, no merges without mwc or a standing grant, FERPA, no browser use, never Codex, never force-push or push to main.
+> Reply "no action" only after step 1 restarted nothing and step 2 found nothing to start.
+
 Hooks do not run in cloud sessions ([#2004](https://github.com/Morrison-Lab/ai-config/issues/2004)), so the scheduled task is the only enforcement there.
 Update or delete that task rather than adding a second one.

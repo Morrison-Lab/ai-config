@@ -323,7 +323,10 @@ _STOP_PHRASE_RX = re.compile(
     r"(?:\s+(?:it|them|this|that|things|work|everything|here|there))?"
     r"|left\s+(?:it|things|the\s+rest)(?:\s+(?:here|there))?|held\s+off"
     r"|put\s+(?:it|things)\s+(?:off|aside)|ended\s+there)"
-    r"\s*(?:[.,;:!?)]|$)))",
+    # ...then a time ("and halted today", "and halted for now") and the
+    # clause end, a dash included ("and halted - see you tomorrow").
+    r"(?:\s+(?:(?:for|until)\s+)?" + _STOP_TIME + r")?"
+    r"\s*(?:[.,;:!?)]|$|\s(?:-{1,2}|\u2014|\u2013)\s|[\u2014\u2013])))",
     re.I,
 )
 # Verbs that describe stopping only with a stopping object: "I left the rest

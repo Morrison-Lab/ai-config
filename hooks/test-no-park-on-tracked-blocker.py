@@ -414,6 +414,11 @@ CASES = [
     ("wrapped up and postponed the meeting", [say("After waiting on #12, I wrapped things up and postponed the meeting to next week.")], False),
     ("wrapped up and quit side project", [say("While waiting on #12, I wrapped things up and quit my side project.")], False),
     ("wrapped up and suspended work", [say("After waiting on #12, I wrapped things up and suspended work.")], True),
+    # Claude review of 0cf39895: a time or a dash after the stop verb ends it.
+    ("halted - see you tomorrow", [say("After waiting on #12, I wrapped things up and halted - see you tomorrow.")], True),
+    ("halted em dash", [say("After waiting on #12, I wrapped things up and halted \u2014 see you tomorrow.")], True),
+    ("halted today", [say("After waiting on #12, I wrapped things up and halted today.")], True),
+    ("halted for now", [say("After waiting on #12, I wrapped things up and halted for now.")], True),
     # glm review of fd98389a: a time of day after the day is still a time.
     ("stop until tomorrow afternoon", [say("After waiting on gha#1544, I decided to stop until tomorrow afternoon.")], True),
     ("sole string-input reply blocks",

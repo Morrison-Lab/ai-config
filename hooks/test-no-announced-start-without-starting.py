@@ -246,6 +246,14 @@ def main():
         "I read the issue. Next, I'm committed to fixing the bug.",
         "I read the issue. Next, I'm all set to fix the bug.",
     ]
+    posted_block += [
+        # agy review on #5068: these verbs also announce real actions.
+        "I read the issue. Next, I'll pass --force-with-lease to git push.",
+        "I read the issue. Next, I'll pass the token to the script.",
+        "I read the issue. Next, I'll leave a comment on the PR.",
+        "I read the issue. Next, I'll leave a review note.",
+        "I read the issue. Next, I'll stop the background daemon.",
+    ]
     posted_pass = [
         # Claude review on #5052: declining, uncertainty and stative gerunds
         # announce no work.

@@ -29,7 +29,7 @@ def reply(text):
 
 
 def run(entries, active=False):
-    with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as fh:
+    with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False, encoding="utf-8") as fh:
         for e in entries:
             fh.write(json.dumps(e) + "\n")
         path = fh.name

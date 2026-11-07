@@ -56,11 +56,16 @@ PROCEDURE = re.compile(
 NEGATED = re.compile(r"\b(?:no|never|nothing)\b|n't\b|\bnot\b(?!\s+yet\b)", re.I)
 LINK = re.compile(r"(?:^|[\s(\[])(?:[\w.-]+/[\w.-]+)?#\d+\b|/(?:issues|pull)/\d+")
 ALLOW = "<!-- owed-mechanism: allow -->"
+# Straight-quoted, curly-quoted and code-span text is wording, not an assertion.
+# The curly quotes come from code points so this source stays ASCII
+# (check-ascii-punctuation).
+LQ, RQ = chr(0x201C), chr(0x201D)
+QUOTED = "\"[^\"]*\"|" + LQ + "[^" + RQ + "]*" + RQ + "|`[^`]*`"
 
 
 def is_owed_claim(unit):
     """True when some sentence of *unit* says a mechanism is owed."""
-    unit = re.sub(r'"[^"]*"|“[^”]*”|`[^`]*`', " ", unit)
+    unit = re.sub(QUOTED, " ", unit)
     for s in cdne.SENTENCE.split(" ".join(unit.split())):
         if (OWED.search(s) and MECHANISM_WORD.search(s)
                 and not PROCEDURE.search(s) and not NEGATED.search(s)):

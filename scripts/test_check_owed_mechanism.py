@@ -39,6 +39,7 @@ CASES = [
     ("link in a continuation line passes", "- A hook is owed\n  and tracked at #5050.", False),
     ("conditional instruction passes", "- When a rule needs a check, file its issue.", False),
     ("quoted wording passes", '- The word "owed" next to a hook is the trigger.', False),
+    ("curly-quoted wording passes", "- The word " + chr(0x201C) + "owed" + chr(0x201D) + " beside a hook is the trigger.", False),
     ("code-span wording passes", "- Flag `owed` beside a hook.", False),
     ("negated need passes", "- No separate hook is needed.", False),
     ("not yet filed is not a negation", "- The check is not yet filed.", True),

@@ -1,0 +1,3 @@
+# Thread ids allowed to start Remote Control (hooks/no-rc-outside-runner.py, ai-config#5090).
+# One id per line. This is the Data 571 project's runner thread, per project memory.
+cmsg_014QLd5McmoUEgMPRiXeVnjSRTRrasdmWDa2KQ6RfWFYmJ

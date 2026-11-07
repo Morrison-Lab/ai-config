@@ -67,19 +67,55 @@ _STATIVE = (
     r"(?:realiz|think|wonder|hop|feel|guess|assum|doubt|worr|forget|"
     r"understand|see|know|believ|suspect)ing"
 )
-# Words after "I'm" / "I'll" that state a negation, a feeling or a state of
-# mind instead of announcing work.
-_NOT_ANNOUNCING = (
-    r"(?:not|never|no|be|also|probably|just|sure|unsure|uncertain|certain|"
-    r"sorry|glad|happy|afraid|aware|confused|stuck|unable|unclear|"
-    r"curious|worried|hesitant|inclined|"
-    # Declining or stopping work (ai-config#5061). Only the declining
-    # collocations: bare `pass`, `leave` and `stop` also announce real actions
-    # ("pass the flag", "leave a comment", "stop the daemon").
-    r"leave\s+(?:this|it|that|things|them)\s+(?:alone|as|be|for|until)|"
-    r"pass\s+on|stop\s+(?:here|now|there|for|working)|"
-    r"(?:skip|defer)\s+(?:this|it|that|these|those)|"
-    r"done\s+for|finished\s+(?:for|with\s+(?:this|it|that)))\b|" + _STATIVE
+# Verbs that announce work after "Next, I'll / I'm" (ai-config#5071). The rule
+# is a POSITIVE list: only these verbs, in base or gerund form, start an
+# announcement. An exclusion list ("anything except not, never, leave ...")
+# is an open class, and each patch moved the hole from one word to the next
+# (#5052, #5068). A positive list fails toward a missed announcement, which the
+# other patterns and the two-sentence tail window partly cover, instead of a
+# false block on every declining or stative sentence. To block a new
+# announcing verb, add it here.
+_WORK_VERBS = (
+    "open file fix add run push merge review create write check build test "
+    "update delete remove move rename implement draft post send start begin "
+    "investigate read search grep fetch pull clone install deploy ship commit "
+    "rebase resolve address patch refactor rewrite reproduce verify confirm "
+    "retry rerun trigger dispatch subscribe request summarize explain record "
+    "save document list look dig continue proceed finish wire land "
+    "publish release tag triage close reopen cancel restart "
+    "analyze analyse inspect debug trace diff compare compile "
+    "format lint render regenerate generate port migrate sync revert "
+    "backport squash upload download"
+).split()
+# Doubled final consonant in the gerund (run -> running).
+_DOUBLE_FINAL = {
+    "run", "rerun", "commit", "ship", "plan", "wrap", "drop", "cut", "split",
+    "put", "set", "get", "begin", "grep", "tag", "dig", "debug", "format",
+    "cancel",
+}
+
+
+def _gerund(verb):
+    if verb in _DOUBLE_FINAL:
+        return verb + verb[-1] + "ing"
+    if verb.endswith("e") and not verb.endswith("ee"):
+        return verb[:-1] + "ing"
+    return verb + "ing"
+
+
+# Verbs that also decline or stop work ("leave this alone", "pass on it",
+# "stop here"), so only a collocation with an object announces work.
+_OBJECT_VERBS = r"(?:pass(?:ing)?|leav(?:e|ing)|stop(?:ping)?|skip(?:ping)?|defer(?:ring)?)\s+(?:a|an|the|my|our|--\S+)\b"
+_WORK_VERB_RX = (
+    r"(?:"
+    + "|".join(sorted({v for w in _WORK_VERBS for v in (w, _gerund(w))}))
+    + r"|set(?:ting)?\s+up|kick(?:ing)?\s+off|go(?:ing)?\s+(?:ahead|through|over)|"
+    r"tak(?:e|ing)\s+a\s+look|" + _OBJECT_VERBS + r")\b"
+)
+# "Next, I'm about to / poised to / committed to <verb>" is the same claim.
+_LEAD_IN = (
+    r"(?:(?:about|going|set|ready|due|poised|prepared|slated|scheduled|"
+    r"committed|planning|preparing|aiming|all\s+set)\s+to\s+)?"
 )
 
 PATTERNS = [
@@ -113,13 +149,12 @@ PATTERNS = [
     # "Next" plus a first-person verb is an announcement; the two-sentence
     # tail window and the conditional exemption keep a mid-reply "Next, I'll
     # summarize below." that goes on to deliver from matching.
-    # Any word may follow "Next, I'm / I'll", EXCEPT the explicit non-announcing
-    # words in _NOT_ANNOUNCING. The rule is an exclusion list on purpose: an
-    # inclusion list of announcing words ("about to", "ready to", "poised to",
-    # ...) can never cover the open class of immediate-future phrasings, and
-    # each patch only moved the hole (four review rounds on #5052). The cost of
-    # a missed exclusion is one false block per message.
-    r"^[\s*_>-]*next(?: up)?,?:?\s+(?:I am|I'?m|I'?ll|I will)\s+(?:now\s+)?(?!" + _NOT_ANNOUNCING + r")[a-z]+",
+    # Only a verb on the positive list _WORK_VERBS may follow "Next, I'm /
+    # I'll" (ai-config#5071), after an optional "about to / poised to / ..."
+    # lead-in. Declining and stative sentences ("Next, I'll leave this alone",
+    # "Next, I'm uncertain", "Next, I'll not touch it") are not listed, so
+    # they pass without being enumerated.
+    r"^[\s*_>-]*next(?: up)?,?:?\s+(?:I am|I'?m|I'?ll|I will)\s+(?:now\s+)?" + _LEAD_IN + r"(?=" + _WORK_VERB_RX + r")[a-z]+",
     r"(?:I am|I'?m)\s+now\s+(?!" + _STATIVE + r")[a-z]+ing\s+(?:it|that|this|the|a|an|my|our|them)\b",
 ]
 # `start WITH` was dropped from the two `I'll start` alternatives above.

@@ -893,6 +893,27 @@ def _is_own_job(cr: dict, own: Optional[Tuple[str, int]]) -> bool:
 _ANNOTATIONS_READ: set = set()
 
 
+def _repo_has_no_ci(repo: str, sha: str) -> bool:
+    """True only when the repo has no workflows AND the head has no check suites.
+
+    A repo with workflows but no runs is a stalled or missing CI, a real
+    problem, so any read that fails or is absent from the payload answers
+    False and the caller keeps failing (ai-config#5065).
+    """
+    try:
+        wf = json.loads(fetch(["gh", "api", f"repos/{repo}/actions/workflows?per_page=1"]))
+        cs = json.loads(fetch(["gh", "api", f"repos/{repo}/commits/{sha}/check-suites?per_page=1"]))
+    except (RuntimeError, ValueError):
+        return False
+    counts = []
+    for data in (wf, cs):
+        total = data.get("total_count") if isinstance(data, dict) else None
+        if not isinstance(total, int) or isinstance(total, bool):
+            return False
+        counts.append(total)
+    return counts == [0, 0]
+
+
 def check_ci_runs(pr) -> Tuple[bool, List[str]]:
     sha = pr.head_sha
     repo = pr.repo
@@ -902,6 +923,11 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
 
     issues = []
     if not check_runs:
+        if _repo_has_no_ci(repo, sha):
+            return True, [
+                "NOTE: repo has no CI workflows and no check suites on this "
+                "head; check-run gate not applicable (ai-config#5065)"
+            ]
         issues.append(f"No check runs found for SHA {sha[:8]}")
         return False, issues
 

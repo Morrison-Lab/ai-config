@@ -62,6 +62,26 @@ import tempfile
 # trailing object is deliberately loose (`it`, `that`, or a noun phrase),
 # because what is being started is not what decides this -- whether it started
 # is.
+# Gerunds that describe a state of mind, not work in progress.
+_STATIVE = (
+    r"(?:realiz|think|wonder|hop|feel|guess|assum|doubt|worr|forget|"
+    r"understand|see|know|believ|suspect)ing"
+)
+# Words after "I'm" / "I'll" that state a negation, a feeling or a state of
+# mind instead of announcing work.
+_NOT_ANNOUNCING = (
+    r"(?:not|never|no|be|also|probably|just|sure|unsure|uncertain|certain|"
+    r"sorry|glad|happy|afraid|aware|confused|stuck|unable|unclear|"
+    r"curious|worried|hesitant|inclined|"
+    # Declining or stopping work (ai-config#5061). Only the declining
+    # collocations: bare `pass`, `leave` and `stop` also announce real actions
+    # ("pass the flag", "leave a comment", "stop the daemon").
+    r"leave\s+(?:this|it|that|things|them)\s+(?:alone|as|be|for|until)|"
+    r"pass\s+on|stop\s+(?:here|now|there|for|working)|"
+    r"(?:skip|defer)\s+(?:this|it|that|these|those)|"
+    r"done\s+for|finished\s+(?:for|with\s+(?:this|it|that)))\b|" + _STATIVE
+)
+
 PATTERNS = [
     r"I'?ll start (?:on )?(?:it|that|this|these|those|them)\b",
     r"I'?ll start (?:on )?(?:the|a|an|my|our) \w+",
@@ -88,6 +108,19 @@ PATTERNS = [
     r"(?:I am|I'?m) (?:now )?(?:beginning|kicking off) (?:it|that|this|the)\b",
     r"(?:continuing|continue with)\s+(?:gia|gii|the\s+next|next\s+task|next\s+issue|phase\s+\d)\b",
     r"(?:I am|I'?m)\s+(?:now\s+)?continuing\s+(?:with\s+)?(?:gia|gii|the\s+next|next\s+task|next\s+issue|phase\s+\d)\b",
+    # ai-config#5050: "Next I'm opening the first workflow PR", sent as a
+    # closing post_message with no tool call after it. A sentence-leading
+    # "Next" plus a first-person verb is an announcement; the two-sentence
+    # tail window and the conditional exemption keep a mid-reply "Next, I'll
+    # summarize below." that goes on to deliver from matching.
+    # Any word may follow "Next, I'm / I'll", EXCEPT the explicit non-announcing
+    # words in _NOT_ANNOUNCING. The rule is an exclusion list on purpose: an
+    # inclusion list of announcing words ("about to", "ready to", "poised to",
+    # ...) can never cover the open class of immediate-future phrasings, and
+    # each patch only moved the hole (four review rounds on #5052). The cost of
+    # a missed exclusion is one false block per message.
+    r"^[\s*_>-]*next(?: up)?,?:?\s+(?:I am|I'?m|I'?ll|I will)\s+(?:now\s+)?(?!" + _NOT_ANNOUNCING + r")[a-z]+",
+    r"(?:I am|I'?m)\s+now\s+(?!" + _STATIVE + r")[a-z]+ing\s+(?:it|that|this|the|a|an|my|our|them)\b",
 ]
 # `start WITH` was dropped from the two `I'll start` alternatives above.
 # "I'll start with the easy part: the data looks clean" is expository -- it
@@ -106,9 +139,17 @@ RX = re.compile("|".join(f"(?:{p})" for p in PATTERNS), re.I)
 # rather than an unstarted announcement.
 CONDITIONAL_RX = re.compile(
     r"\b(?:once|when|after|if|unless|pending|awaiting|until|as soon as|"
-    r"provided|assuming|depending on)\b",
+    r"provided|assuming|depending on|blocked|blocker|blocking|waiting|"
+    r"wait for)\b",
     re.I,
 )
+
+# There is no exemption for a sentence-leading "Next, I'll <verb>: ..." that
+# appears to deliver content after a colon. Every proxy tried for "delivers"
+# (a colon, an expository-verb list, a word count) was satisfied by padding
+# that delivers nothing (agy and Claude reviews on #5052). The cost of the
+# false positive is one block per distinct message, answered by rewording or
+# doing the work, so an ungameable rule beats a gameable exemption.
 
 SENTENCE_SPLIT_RX = re.compile(r"(?<=[.!?;])\s+|\n")
 
@@ -166,9 +207,46 @@ except Exception:
         return _CODE_SPAN_RE.sub(" ", _FENCE_RE.sub(" ", text))
 
 
+REPLY_TOOL_RX = re.compile(r"(^|__)(reply|post_message|update_message)$", re.I)
+
+
+def _post_message_text(block):
+    """The text a project-thread reply sends: a hearthbot post_message call.
+
+    In Claude Projects threads the user-facing message is not a text block but
+    the `text` input of `mcp__hearthbot__post_message` (ai-config#5050), so a
+    reader of text blocks alone never sees it.
+    """
+    if not isinstance(block, dict) or block.get("type") != "tool_use":
+        return None
+    # The user-visible reply tools, as the sibling hooks define them
+    # (require-stopping-point.py, no-offer-to-file.py, no-self-thread-link.py).
+    if not REPLY_TOOL_RX.search(str(block.get("name") or "")):
+        return None
+    text = (block.get("input") or {}).get("text")
+    return text if isinstance(text, str) and text.strip() else None
+
+
+def _is_work_call(block):
+    """A tool call that is work, not the harness's own reply or end-of-turn call."""
+    if not isinstance(block, dict) or block.get("type") != "tool_use":
+        return False
+    name = str(block.get("name") or "")
+    # A reply tool call is never work, even with empty text (agy review on #5052).
+    return not (name.startswith("mcp__hearthbot__") or REPLY_TOOL_RX.search(name))
+
+
 def last_assistant_text(path):
-    """The final user-visible assistant prose in the transcript."""
+    """The final user-visible assistant prose in the transcript.
+
+    A reply-tool input (post_message and its siblings) wins over plain text
+    blocks, because in a Projects thread plain text is not delivered, so a
+    trailing log note must not hide the announcement that was sent. A work
+    tool call (anything but a hearthbot or reply call) after either clears
+    both, because the announcement was then followed by work.
+    """
     last_text = ""
+    last_posted = ""
     try:
         with open(path, encoding="utf-8", errors="ignore") as fh:
             for line in fh:
@@ -180,11 +258,16 @@ def last_assistant_text(path):
                 if m.get("type") == "assistant" or m.get("role") == "assistant":
                     blocks = (m.get("message") or {}).get("content") or m.get("content") or []
                     if isinstance(blocks, list):
-                        txt = "".join(
-                            b.get("text", "")
-                            for b in blocks
-                            if isinstance(b, dict) and b.get("type") == "text"
-                        )
+                        parts = []
+                        for b in blocks:
+                            posted = _post_message_text(b)
+                            if posted:
+                                last_posted = posted
+                            elif _is_work_call(b):
+                                last_text, last_posted, parts = "", "", []
+                            elif isinstance(b, dict) and b.get("type") == "text":
+                                parts.append(b.get("text", ""))
+                        txt = "".join(parts)
                         if txt.strip():
                             last_text = txt
                     elif isinstance(blocks, str) and blocks.strip():
@@ -204,7 +287,7 @@ def last_assistant_text(path):
                             last_text = txt
     except Exception:
         return ""
-    return last_text
+    return last_posted or last_text
 
 
 def offending_sentence(prose):

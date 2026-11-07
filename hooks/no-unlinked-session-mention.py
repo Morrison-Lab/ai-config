@@ -59,8 +59,40 @@ POINTING = {"the", "that", "those", "other", "another", "my", "our", "their",
             "its", "previous", "earlier", "prior", "parent", "child",
             "sibling"}
 HOST_ID = re.compile(r"[a-z]+\d+-\d+", re.I)
+# ai-config#5058 (Ezra, 2026-11-07, "always hyperlink; don't make me ask"):
+# a descriptive name between a pointing word and "thread" ("the runner
+# thread", "the CI thread") names a project thread. These words name a
+# technical or forge thread instead and stay exempt.
+NAMED_THREAD = re.compile(
+    r"(?<![\w-])(?:the|that|those|other|another|my|our|their|its|your)"
+    r" ([\w-]+) threads?\b", re.I)
+TECHNICAL_THREAD = {
+    "main", "worker", "review", "support", "comment", "email", "forum",
+    "discussion", "reply", "background", "conversation", "os", "kernel", "gui",
+    "ui", "io", "gpu", "cpu", "python", "r", "julia", "java", "jvm", "event",
+    "render", "download", "upload", "polling", "daemon"}
 LINK = re.compile(
     r"claude\.ai/code/session_\w+|\(#cmsg_\w+\)|[?&]thread=cmsg_\w+")
+# ai-config#5060 (Ezra, 2026-11-07, "always hyperlink; don't make me ask"): a
+# PR, issue or run named outside a markdown link or URL. Detected: `repo#N`,
+# `owner/repo#N`, a bare `#N` of two or more digits, "PR 12", "issue 12" and
+# "run 123456". Not detected: file paths. A pattern for a slash or dot also
+# matches version numbers, URLs' hosts and prose such as "and/or", and a list
+# of known repo files goes stale, so a deny would block valid replies
+# (ai-config#4741 says to name what a deny does not catch).
+# A run id is six or more digits, so "the suite runs 12 times" is not one.
+# The repo prefix is two or more characters, so "C#12" is not a reference.
+FORGE_REF = re.compile(
+    r"(?<![\w/&.-])(?:[\w.-]+/)?[\w.-]{2,}#\d{2,}\b"
+    r"|(?<![\w/&.-])#\d{2,}\b"
+    r"|\b(?:PRs?|pull requests?|issues?) #?\d{2,}\b"
+    r"|\bruns? #?\d{6,}\b", re.I)
+# A reference counts as linked only inside a markdown link or a bare URL, so
+# one link elsewhere in the paragraph does not cover the rest.
+LINKED = re.compile(r"\[[^\]]*\]\(https?://[^)]*\)|https?://\S+")
+# The target of any other markdown link is not prose: "[here](./a.md#5060)"
+# names no PR. Its text still counts, so "[#5059](#cmsg_1)" is flagged.
+LINK_TARGET = re.compile(r"(?<=\])\([^)]*\)")
 UNIT_BREAK = re.compile(r"\n[ \t]*\n|\n(?=(?:[-*+]|\d+[.)])[ \t])")
 
 REASON = """\
@@ -70,8 +102,8 @@ without a link. The user's standing rule (2026-10-16, reaffirmed 2026-10-22): \
 Resend with a link in the same paragraph or list item: \
 [session](https://claude.ai/code/session_<id>) for a Claude Code session \
 (the id from the status wake or cross-session message, `cse_` becomes \
-`session_`), or [thread title](#cmsg_...) for a project thread. Do not type \
-an id from memory.
+`session_`), or [thread title](#cmsg_...) for a project thread (find its \
+title and id with `list_threads`). Do not type an id from memory.
 If the phrase is not a Claude Code session or project thread (an R, database \
 or debugger session, an OS thread), put it in backticks and resend."""
 
@@ -90,6 +122,33 @@ def unlinked_mention(text: str):
             before = g.group(1)
             if before.lower() in POINTING or HOST_ID.fullmatch(before):
                 return g.group(0)
+        for n in NAMED_THREAD.finditer(unit):
+            if n.group(1).lower() not in TECHNICAL_THREAD:
+                return n.group(0)
+    return None
+
+
+FORGE_REASON = """\
+[hook: no-unlinked-session-mention] This post names a forge artifact \
+("{phrase}") that is not itself a link. The user's \
+standing rule (2026-11-07): "always hyperlink; don't make me ask".
+Resend with that text as a markdown link to its https URL (a URL elsewhere \
+in the paragraph does not cover it), for example \
+[owner/repo#12](https://github.com/owner/repo/pull/12) or \
+[run 123](https://github.com/owner/repo/actions/runs/123).
+If the text is not a PR, issue or run (a footnote number, a heading), put it \
+in backticks and resend."""
+
+
+def unlinked_forge_ref(text: str):
+    """The first PR, issue or run reference outside a link, or None."""
+    text = FENCE.sub(" ", text.replace("\r\n", "\n"))
+    for unit in UNIT_BREAK.split(text):
+        unit = INLINE_CODE.sub(" ", unit)
+        unit = LINK_TARGET.sub("", LINKED.sub(" ", unit))
+        m = FORGE_REF.search(unit)
+        if m:
+            return m.group(0)
     return None
 
 
@@ -107,13 +166,17 @@ def main() -> int:
     if not isinstance(text, str):
         return 0
     phrase = unlinked_mention(text)
+    reason = REASON
+    if not phrase:
+        phrase = unlinked_forge_ref(text)
+        reason = FORGE_REASON
     if not phrase:
         return 0
     print(json.dumps({
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "permissionDecision": "deny",
-            "permissionDecisionReason": REASON.format(phrase=phrase),
+            "permissionDecisionReason": reason.format(phrase=phrase),
         }
     }))
     return 0

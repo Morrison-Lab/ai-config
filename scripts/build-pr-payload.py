@@ -479,6 +479,19 @@ def fetch_payload(owner_repo: str, pr_number: int, token: str) -> Dict[str, Any]
         review_threads,
         review_comments_raw,
     )
+    # Only needed when the head has no check runs (ai-config#5065); a failed
+    # read leaves the key out, and the checker then keeps failing on no runs.
+    if not check_runs_raw:
+        try:
+            workflows = rest_get(f"{base}/actions/workflows", token)
+            suites = rest_get(
+                f"{base}/commits/{pr_raw['head']['sha']}/check-suites", token)
+            payload["ci_surface"] = {
+                "workflows": workflows.get("total_count"),
+                "check_suites": suites.get("total_count"),
+            }
+        except Exception as exc:  # noqa: BLE001
+            print(f"warning: could not read the CI surface ({exc})", file=sys.stderr)
     # A failed fetch is recorded rather than omitted, so the checker refuses
     # the payload (exit 2) instead of scoring around the missing gate.
     base_ref = urllib.parse.quote(pr_raw["base"]["ref"], safe="/")

@@ -53,6 +53,9 @@ jobs:
       - name: Run check-dynamic-note-expiry tests
         # ai-config#5018: a memory note stating a changing condition carries `expires YYYY-MM-DD`.
         run: python3 scripts/test_check_dynamic_note_expiry.py
+      - name: Run find-quiet-announcing-threads tests
+        # ai-config#5054: the coordinator-side nudge flags a thread that announced work and went quiet.
+        run: python3 scripts/test_find_quiet_announcing_threads.py
       - name: Run check-owed-mechanism tests
         # ai-config#5049: a memory note that says a check or hook is owed links its issue.
         run: python3 scripts/test_check_owed_mechanism.py

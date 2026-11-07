@@ -965,6 +965,45 @@ def main() -> int:
         ),
     )
 
+    # ai-config#5065: a repo with no CI workflows and no check suites has no
+    # check runs to find; a repo WITH workflows but no runs is a stalled CI.
+    import json as _json
+
+    class _NoRunsPR:
+        repo = "Morrison-Lab/stats-allowlist"
+        head_sha = "ebbb8d39" + "0" * 32
+
+        def get_check_runs(self):
+            return []
+
+    def _no_ci_score(workflows, suites):
+        replies = {
+            "/actions/workflows": workflows,
+            "/check-suites": suites,
+        }
+
+        def _fake_fetch(cmd):
+            for key, value in replies.items():
+                if key in cmd[-1]:
+                    if value is None:
+                        raise RuntimeError("HTTP 404")
+                    return _json.dumps({"total_count": value})
+            raise AssertionError(cmd)
+
+        with patch.object(checker, "fetch", side_effect=_fake_fetch):
+            return original_check_ci_runs(_NoRunsPR())
+
+    nc_ok, nc_issues = _no_ci_score(0, 0)
+    check("check_ci_runs: a repo with no workflows and no check suites passes with a NOTE (#5065)",
+          nc_ok and any(i.startswith("NOTE: ") and "no CI workflows" in i for i in nc_issues))
+    nw_ok, nw_issues = _no_ci_score(3, 0)
+    check("check_ci_runs: a repo with workflows but no check runs still fails (#5065)",
+          (not nw_ok) and any("No check runs found" in i for i in nw_issues))
+    ns_ok, _ns = _no_ci_score(0, 1)
+    check("check_ci_runs: no workflows but a check suite on the head still fails (#5065)", not ns_ok)
+    ne_ok, _ne = _no_ci_score(None, 0)
+    check("check_ci_runs: an unreadable workflow count keeps failing (#5065)", not ne_ok)
+
     items_same_reviewer = [
         (
             "comment",

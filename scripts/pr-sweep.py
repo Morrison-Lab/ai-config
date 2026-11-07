@@ -76,6 +76,13 @@ FAILING_CONCLUSIONS = {
 # Legacy commit-status states that mean failure.
 FAILING_STATUS_STATES = {"FAILURE", "ERROR"}
 
+# Substring identifying the review workflow's check run. A stale PR branch can
+# fail it before any model call ("Workflow validation failed", not retryable)
+# when the branch's workflow files differ from the base branch's (issue #1023,
+# seen on #981). A parameter rather than a literal, per
+# `shared/coding/configurable-parameters.md`.
+REVIEW_CHECK_MARKER = "claude-review"
+
 # Substrings marking a review that declined to review, rather than one that
 # read the diff. Matched case-insensitively against the review body.
 REFUSAL_MARKERS = (
@@ -92,7 +99,7 @@ query($owner:String!, $name:String!, $first:Int!) {
     pullRequests(states:OPEN, first:$first, orderBy:{field:UPDATED_AT, direction:DESC}) {
       totalCount
       nodes {
-        number title url isDraft updatedAt
+        number title url isDraft updatedAt mergeStateStatus
         author { login }
         files(first:100) { totalCount nodes { path } }
         reviewThreads(first:100) { totalCount nodes { isResolved } }
@@ -156,6 +163,22 @@ def failing_checks(pr):
     # can each define a job by the same name -- so de-duplicate for display
     # while keeping the order stable.
     return sorted(set(failed))
+
+
+def stale_review_blocked(pr):
+    """True when the PR is behind its base AND its review check failed.
+
+    A branch behind the base can carry an older copy of the review workflow,
+    which the review action refuses to run, unretryably, before the model
+    call. Merging the base into the branch clears it. GraphQL does not
+    expose a workflow-file diff, so this is a proxy: `mergeStateStatus ==
+    BEHIND` plus a genuinely failing check whose name contains
+    REVIEW_CHECK_MARKER. It can name a PR whose failure has another cause,
+    but "merge the base in" is harmless advice to a branch that is behind.
+    """
+    if pr.get("mergeStateStatus") != "BEHIND":
+        return False
+    return any(REVIEW_CHECK_MARKER in name for name in failing_checks(pr))
 
 
 def pending_checks(pr):
@@ -258,6 +281,8 @@ def findings_for(pr):
     blocked = changes_requested_by(pr)
     if blocked:
         reasons.append("changes-requested(" + ", ".join(blocked) + ")")
+    if stale_review_blocked(pr):
+        reasons.append("stale-branch-review-blocked(merge base into branch)")
     open_threads = unresolved_threads(pr)
     if open_threads:
         reasons.append(f"unresolved-threads({open_threads})")

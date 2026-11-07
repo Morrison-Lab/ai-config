@@ -1901,6 +1901,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-park-on-tracked-blocker.py\"",
+            "timeout": 10,
+            "script": "no-park-on-tracked-blocker.py",
+            "why": "Ezra, 2026-11-07: never stop because work waits on another issue or PR. Blocks the stop once per turn when the final reply parks work as waiting on, blocked by, or depending on a tracked item, unless the same sentence names a person-only step. Do the blocking item instead."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-announce-unconfirmed-merge.py\"",
             "timeout": 10,
             "script": "no-announce-unconfirmed-merge.py",

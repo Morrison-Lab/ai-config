@@ -83,6 +83,16 @@ check("unchanged unit is not reflagged", [n for n, _ in com.violations(two.split
 check("changed first unit is flagged", [n for n, _ in com.violations(two.splitlines(), {1})], [1])
 check("no changed lines flags nothing", com.violations(two.splitlines(), set()), [])
 
+# A table row is its own unit: adding a row must not reflag an older row.
+table = ("| Hook | Rule |\n|---|---|\n"
+         "| a.py | Arm a timer for owed actions; ship the hook now. |\n"
+         "| b.py | Blocks a parked reply. |")
+check("added table row does not reflag an older row", com.violations(table.splitlines(), {4}), [])
+check("changed table row is still checked", [n for n, _ in com.violations(table.splitlines(), {3})], [3])
+after = "| Hook | Rule |\n|---|---|\n| a.py | Tracked in #12. |\nA hook is owed for b.py."
+check("a plain line after a row is its own unit",
+      [n for n, _ in com.violations(after.splitlines(), {4})], [4])
+
 # Negative control: the scan covers real files, so a zero cannot be an empty search.
 check("covered files are found", len(com.covered_files(com.REPO)) > 0, True)
 

@@ -1,0 +1,86 @@
+#!/usr/bin/env python3
+"""Test the no-park-on-tracked-blocker guard.
+
+Run: python3 hooks/test-no-park-on-tracked-blocker.py hooks/no-park-on-tracked-blocker.py
+"""
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import uuid
+
+HOOK = sys.argv[1]
+
+
+def say(text):
+    return {"type": "assistant", "message": {"content": [{"type": "text", "text": text}]}}
+
+
+def reply(text):
+    return {
+        "type": "assistant",
+        "message": {"content": [{
+            "type": "tool_use",
+            "name": "mcp__hearthbot__post_message",
+            "input": {"text": text},
+        }]},
+    }
+
+
+def run(entries, active=False):
+    with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as fh:
+        for e in entries:
+            fh.write(json.dumps(e) + "\n")
+        path = fh.name
+    payload = {
+        "transcript_path": path,
+        "session_id": str(uuid.uuid4()),
+        "stop_hook_active": active,
+    }
+    try:
+        out = subprocess.run(
+            [sys.executable, HOOK], input=json.dumps(payload),
+            capture_output=True, text=True, timeout=20,
+        ).stdout.strip()
+    finally:
+        os.unlink(path)
+    return json.loads(out) if out else {}
+
+
+def blocked(entries, active=False):
+    return run(entries, active).get("decision") == "block"
+
+
+CASES = [
+    # (name, entries, expect_block)
+    ("measured case", [reply("**Stopping Point**: Not clean; mds#649 waits on gha#1544.")], True),
+    ("blocked by url", [say("This is blocked by https://github.com/o/r/issues/12 for now.")], True),
+    ("depends on bare ref", [say("The stub change depends on #1545.")], True),
+    ("until merges", [say("I'll hold the mds PR until gha#1545 merges.")], True),
+    ("person gate passes", [say("mcs#99 waits on your approval.")], False),
+    ("needs you passes", [say("gha#12 is blocked: it needs you to rotate the secret.")], False),
+    ("no ref passes", [say("CI is still waiting on the runner.")], False),
+    ("code span passes", [say("The phrase `waits on gha#1` is what the hook matches.")], False),
+    ("plain status passes", [say("I merged mds#679, which closed #656.")], False),
+    ("reply wins over text", [say("x waits on #3."), reply("All merged.")], False),
+]
+
+
+def main():
+    failures = 0
+    for name, entries, expect in CASES:
+        got = blocked(entries)
+        if got != expect:
+            failures += 1
+            print(f"FAIL {name}: expected block={expect}, got {got}")
+    if blocked([say("mds#649 waits on gha#1544.")], active=True):
+        failures += 1
+        print("FAIL stop_hook_active must not block")
+    total = len(CASES) + 1
+    print(f"{total - failures} of {total} passed")
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

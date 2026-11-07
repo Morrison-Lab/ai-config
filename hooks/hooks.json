@@ -1220,7 +1220,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/require-agent-disclosure.py\"",
             "timeout": 10,
             "script": "require-agent-disclosure.py",
-            "why": "The MCP half of the Bash entry above. A remote/web session has no `gh` on PATH, so mcp__github__add_issue_comment and its siblings are the ONLY way it posts a comment -- and hooks.json matches by tool name, so the Bash entry never sees them. Same script, same warn-only behaviour; it reads tool_input.body directly rather than parsing a command line, and stays silent when no string body is present (some pull_request_review_write methods submit without one)."
+            "why": "The MCP half of the Bash entry above. A remote/web session has no `gh` on PATH, so mcp__github__add_issue_comment and its siblings are the ONLY way it posts a comment -- and hooks.json matches by tool name, so the Bash entry never sees them. Same script, but this MCP path DENIES an unmarked comment (ai-config#4966) while the Bash path only warns; it reads tool_input.body directly rather than parsing a command line, and stays silent when no string body is present (some pull_request_review_write methods submit without one)."
           },
           {
             "type": "command",
@@ -1787,6 +1787,18 @@
             "timeout": 10,
             "script": "no-update-branch-on-clean-pr.py",
             "why": "ai-config#5093. ids#47 lost its Clean verdict at head 98ed862a on 2026-11-07 when main was merged into it. Denies update_pull_request_branch on a PR the transcript shows as FULLY CLEAN on its head, unless check-pr-fully-clean.py later reported base drift (the base gained a CI gate the head never ran). A PR with no clean line in the transcript is untouched. Fails open on any parse trouble."
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__hearthbot__start_remote_control",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-rc-outside-runner.py\"",
+            "timeout": 10,
+            "script": "no-rc-outside-runner.py",
+            "why": "ai-config#5090. Ezra, 2026-11-07: threads never open their own device run, and only the runner thread merges. The ids owner thread tried to open its own Remote Control session to run the checker and merge, then withdrew. Denies start_remote_control in a project thread session whose id is not in hooks/rc-runner-threads.txt (or RC_RUNNER_THREAD_IDS); the coordinator and ordinary sessions have no own thread and are untouched. Fails open on any parse trouble."
           }
         ]
       },

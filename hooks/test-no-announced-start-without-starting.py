@@ -219,10 +219,17 @@ def main():
         "Next: I'll open the first workflow PR and run the test suite.",
         "Next up: I'm opening the first workflow PR and running the test suite.",
     ]
-    posted_pass = [
-        # Review finding on #5052: exposition that delivers in the same sentence.
+    posted_block += [
+        # Padding after a colon must not exempt (Claude review on #5052): no
+        # proxy for "delivers" is ungameable, so a colon never exempts. The
+        # cost is one block per message, answered by rewording.
+        "I read the PR. Next, I'll review: the file at src/a.py which has the "
+        "parser bug in it.",
+        "Looked at it. Next, I'll fix: the the the the the the the the.",
         "I looked at the code. Next, I'll explain the key insight: the loop "
         "never terminates because of an off-by-one error.",
+    ]
+    posted_pass = [
         "Next I'm opening the first workflow PR once the review lands.",
         "Next I'll file it, but I'm blocked on the repo grant.",
         "Next I'm waiting for the runner thread.",

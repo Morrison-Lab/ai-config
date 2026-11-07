@@ -118,27 +118,14 @@ CONDITIONAL_RX = re.compile(
     re.I,
 )
 
-# A sentence-leading "Next, I'll <verb>" is an announcement of work, but
-# "Next, I'll explain the key insight: ..." is exposition that delivers in the
-# same sentence. Delivery means a colon followed by at least
-# DELIVERY_MIN_WORDS words of content; a bare colon or a short target
-# ("Next, I'll fix: the parser bug.") is still an unstarted announcement. There
-# is no verb list: "add", "review" and "summarize" name unstarted work when
-# nothing follows (agy and Claude reviews on #5052).
-NEXT_LEAD_RX = re.compile(r"^[\s*_>-]*next\b", re.I)
-DELIVERY_MIN_WORDS = 8
+# There is no exemption for a sentence-leading "Next, I'll <verb>: ..." that
+# appears to deliver content after a colon. Every proxy tried for "delivers"
+# (a colon, an expository-verb list, a word count) was satisfied by padding
+# that delivers nothing (agy and Claude reviews on #5052). The cost of the
+# false positive is one block per distinct message, answered by rewording or
+# doing the work, so an ungameable rule beats a gameable exemption.
 
-
-def _delivers_after_colon(after_match):
-    """True when the text after the matched phrase has a colon, then enough words.
-
-    Called with the text AFTER the match, so the colon in "Next: I'll ..."
-    (which the pattern allows) is not counted as the delivery colon.
-    """
-    head, sep, rest = after_match.partition(":")
-    return bool(sep) and len(rest.split()) >= DELIVERY_MIN_WORDS
-
-SENTENCE_SPLIT_RX =re.compile(r"(?<=[.!?;])\s+|\n")
+SENTENCE_SPLIT_RX = re.compile(r"(?<=[.!?;])\s+|\n")
 
 # The rule is about how a reply ENDS, so only its tail is inspected. Scanning
 # the whole message contradicts the rule's own premise and is what made an
@@ -282,12 +269,6 @@ def offending_sentence(prose):
     for sentence in reversed(tail_of(prose)):
         hit = RX.search(sentence)
         if hit and not CONDITIONAL_RX.search(sentence):
-            if NEXT_LEAD_RX.match(hit.group(0)) and _delivers_after_colon(
-                sentence[hit.end():]
-            ):
-                # "Next, I'll explain the key insight: ..." delivers its own
-                # content; it announces no unstarted work.
-                continue
             return sentence.strip(), hit.group(0).strip()
     return None
 

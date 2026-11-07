@@ -204,8 +204,11 @@ _PERSON = (
 )
 # A person-only action: "for Dana to sign off", "for the team to review".
 _PERSON_ACTION = (
-    r"(?:review|approve|sign\s+off|decide|answer|reply|respond|confirm|weigh\s+in|look)"
+    r"(?:review|approve|sign(?:\s+off)?|merge|decide|answer|reply|respond|confirm|weigh\s+in|look)"
 )
+# "them" names a person only in "for them to ...": "waits on them (#1, #2)"
+# names the tracked items.
+_PERSON_NOT_THEM = _PERSON.replace("|them", "")
 PERSON_GATE_RX = re.compile(
     r"\bneeds?\s+(?:you|your|ezra|the\s+user|a\s+(?:human|person|maintainer|reviewer))\b"
     r"|\b(?:your|ezra" + _APOS + r"s|(?:(?:the|a|an|upstream)\s+)?" + _ROLE
@@ -214,10 +217,11 @@ PERSON_GATE_RX = re.compile(
     r"confirmation|token|secret|credentials?)\b"
     r"|\bfor\s+" + _PERSON + r"\s+to\b"
     r"|\bfor\s+(?!(?:the\s+|an?\s+)?(?:\S+[-\s])?(?:bots?|ci|copilot|claude|codex|gemini|agents?|"
-    r"automated|workflows?|checks?)\b)(?:\S+\s+){1,2}?to\s+" + _PERSON_ACTION + r"\b"
+    r"automated|workflows?|checks?|dependabot|renovate|mergify|canary|webhooks?|deploy(?:ment)?s?|"
+    r"pipelines?|runners?|builds?|tests?|actions)\b)(?:\S+\s+){1,3}?to\s+" + _PERSON_ACTION + r"\b"
     r"|\b(?:wait(?:s|ing)?\s+(?:on|for)|blocked\s+(?:on|by)|gated\s+(?:on|by)|await(?:s|ing)?|"
     r"needs?|requires?)\s+"
-    r"(?:an?\s+)?(?:mwc|manual|your|" + _PERSON + r")\b"
+    r"(?:an?\s+)?(?:mwc|manual|your|" + _PERSON_NOT_THEM + r")\b"
     r"|\b(?:needs?|requires?)\s+(?:a|an|the)\s+(?:secret|token|credentials?|password|"
     r"api\s+key|key|2fa|login|sign-?in)\b"
     r"|\buntil\s+(?:you|ezra|the\s+(?:user|maintainer|owner)|a\s+(?:human|person|maintainer))\b"
@@ -268,14 +272,28 @@ _STOP_VERBS = {
     "stopped", "paused", "parked", "deferred", "halted", "quit", "waited",
     "shelved", "postponed", "suspended",
 }
+# Stopping language anywhere in the reported clauses makes the sentence a
+# park, whatever verb carries it ("so I called it a day", "I decided to stop").
+_STOP_PHRASE_RX = re.compile(
+    r"\b(?:stop(?:s|ped|ping)?|paus(?:e|es|ed|ing)|call(?:ed)?\s+it\s+a\s+(?:day|night)"
+    r"|wrap(?:ped)?\s+up|sign(?:ed)?\s+off|log(?:ged)?\s+off|for\s+the\s+(?:night|day|weekend))\b",
+    re.I,
+)
 # Verbs that describe stopping only with a stopping object: "I left the rest
 # for the morning" stops, "I left review comments" reports work, and "I
 # ended up merging it" reports work while "I ended there" stops.
 _STOP_WITH_OBJECT = {"left", "put", "kept", "held", "ended"}
 _STOP_OBJECT_RX = re.compile(
     r"\s+(?:(?:the\s+)?rest|everything|things|it\s+there|there|it\s+at|off\b|aside\b"
-    r"|(?:\S+\s+){0,3}?(?:aside|on\s+hold|for\s+(?:later|tomorrow|now|the\s+(?:morning|night|day)))\b"
+    r"|(?:\S+\s+){0,3}?(?:aside|on\s+hold|for\s+(?:later|tomorrow|now|the\s+(?:morning|night|day)))\b(?!')"
     r"|(?:\S+\s+){0,3}?until\b)",
+    re.I,
+)
+# The work objects that make one of those verbs a report: "I ended up
+# merging it", "I left a comment", "I put the patch up", "I kept CI green".
+_WORK_OBJECT_RX = re.compile(
+    r"\s+(?:up\s+\w+ing\b|(?:\S+\s+){0,3}?(?:comments?|repl(?:y|ies)|reviews?|feedback|meetings?"
+    r"|patch(?:es)?|updated|green|current|passing)\b|(?:\S+\s+){1,3}?up\b)",
     re.I,
 )
 # A line wrap ends a clause unless the line ends mid-phrase.
@@ -477,32 +495,43 @@ def _reports_past(sentence, start, pos):
     """True when the narrative wait's own clause, or the clause right after
     it, has a first-person past verb ("After waiting on #12, I merged it").
     A past verb about other work elsewhere in the sentence does not count,
-    and neither does one that describes stopping (_STOP_VERBS)."""
-    if _done_verb(sentence[start:pos]):
-        return True
+    and a report that ends in stopping ("so I called it a day") is a park."""
     rest = sentence[pos:]
     m = re.search(r"[,;]\s+", rest)
-    # The wait's own clause ("After waiting on #12 I merged it") counts.
-    if _done_verb(rest[:m.start()] if m else rest):
-        return True
-    if not m:
+    own = rest[:m.start()] if m else rest
+    # The next clause, carried on through "so" (", so", ", and so", "; so"),
+    # but not through a bare "and"/"but", which starts other work.
+    nxt = ""
+    if m:
+        nxt = re.split(
+            r";\s+(?!so\b)|,\s+(?!(?:and\s+)?so\b)|\s(?:and|but)\s+(?!so\b)",
+            rest[m.end():], maxsplit=1, flags=re.I,
+        )[0]
+    if _STOP_PHRASE_RX.search(sentence[start:pos] + " " + own + " " + nxt):
         return False
-    # The next clause, carried on through ", so" ("the run went green, so I
-    # merged it"), but not through "and"/"but", which start other work.
-    nxt = re.split(r";\s|,\s+(?!so\b)|\s(?:and|but)\s", rest[m.end():], maxsplit=1)[0]
-    if _done_verb(nxt):
+    if _done_verb(sentence[start:pos]) or _done_verb(own) or _done_verb(nxt):
         return True
     # A bare "then merged it" needs a first-person subject before the wait.
     t = re.match(r"then\s+(\w+ed)\b", nxt, re.I)
     return bool(
         t and t.group(1).lower() not in _STOP_VERBS
-        and re.search(r"\b(?:I|we)\b", sentence[start:pos])
+        and re.search(r"\b(?:I|we)\b", sentence[:pos])
     )
 
 
 def _done_verb(text):
-    """True when `text` has a first-person past verb that is not a stop verb."""
-    return any(not _is_stop(text, m) for m in _PAST_RX.finditer(text))
+    """True when `text` has a first-person past verb reporting work. A verb
+    that stops only with a stopping object (left, put, kept, held, ended)
+    reports work only with a work object, since "I held the fix in place"
+    says nothing about progress while "I left review comments" does."""
+    for m in _PAST_RX.finditer(text):
+        verb = m.group().split()[-1].lower()
+        if verb in _STOP_VERBS:
+            continue
+        if verb in _STOP_WITH_OBJECT and not _WORK_OBJECT_RX.match(text, m.end()):
+            continue
+        return True
+    return False
 
 
 def _is_stop(text, m):

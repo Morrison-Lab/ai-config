@@ -54,11 +54,13 @@ def drift_after(text, repo, num, after):
 
     The drift message names no PR, so it is attributed to the checker run whose
     header ("Checking ARDI / fully-clean status for <repo>#<N>...") most
-    recently precedes it. A report under another PR's header, or under none,
-    does not count (review of ai-config#5094).
+    recently precedes it, and that header must itself come after position
+    *after* (the clean line): a report under another PR's header, under none, or
+    under this PR's earlier clean-run header does not count (review of
+    ai-config#5094, #5095).
     """
     headers = [(m.start(), m.group(1).lower(), m.group(2))
-               for m in HEADER.finditer(text)]
+               for m in HEADER.finditer(text) if m.start() > after]
     for d in DRIFT.finditer(text):
         if d.start() <= after:
             continue

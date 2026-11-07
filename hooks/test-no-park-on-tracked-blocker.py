@@ -308,6 +308,12 @@ CASES = [
     ("for a named person to sign off", [say("mcs#99 waits on #12, for Dana to sign off.")], False),
     ("for the bot to review", [say("mcs#99 waits on #12, for the review bot to review it.")], True),
     ("for CI to finish", [say("mcs#99 waits on #12 for CI to finish.")], True),
+    # Claude review of bceff310: a stop verb with a work object is a report.
+    ("left a comment then future", [say("After waiting on #12 to pass CI, I left a comment, and I will tag a release.")], False),
+    ("held a meeting then future", [say("After waiting on #12 to pass CI, I held a meeting, and I will tag a release.")], False),
+    ("kept notes then future", [say("While waiting on #12, I kept my notes updated, and I will check back tomorrow.")], False),
+    ("put a comment then future", [say("After waiting on #12 to pass CI, I put a comment on it, and I will tag a release.")], False),
+    ("held off on the rest", [say("While waiting on #12, I held off on the rest.")], True),
     ("sole string-input reply blocks",
      [{"type": "assistant", "message": {"content": [{
          "type": "tool_use", "name": "mcp__hearthbot__post_message",

@@ -259,7 +259,7 @@ _GERUND_PHRASE_RX = re.compile(r"(?:wait|await|depend)ing\b", re.I)
 # A report needs a first-person past-tense verb ("I merged it").
 _PAST_RX = re.compile(
     r"\b(?:I|we)\s+(?:then\s+|also\s+|finally\s+|just\s+)?(?:\w+ed|did|was|were|went|ran|made|"
-    r"wrote|spent|found|got|took|saw|kept|left|put|built|sent|set|rebuilt|reran|re-ran)\b",
+    r"wrote|spent|found|got|took|saw|kept|left|put|held|built|sent|set|rebuilt|reran|re-ran)\b",
     re.I,
 )
 # A past verb that describes the park itself ("I left the rest", "I finally

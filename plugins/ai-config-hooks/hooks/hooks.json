@@ -1213,7 +1213,7 @@
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/require-agent-disclosure.py\"'",
             "timeout": 10,
             "script": "require-agent-disclosure.py",
-            "why": "The MCP half of the Bash entry above. A remote/web session has no `gh` on PATH, so mcp__github__add_issue_comment and its siblings are the ONLY way it posts a comment -- and hooks.json matches by tool name, so the Bash entry never sees them. Same script, same warn-only behaviour; it reads tool_input.body directly rather than parsing a command line, and stays silent when no string body is present (some pull_request_review_write methods submit without one)."
+            "why": "The MCP half of the Bash entry above. A remote/web session has no `gh` on PATH, so mcp__github__add_issue_comment and its siblings are the ONLY way it posts a comment -- and hooks.json matches by tool name, so the Bash entry never sees them. Same script, but this MCP path DENIES an unmarked comment (ai-config#4966) while the Bash path only warns; it reads tool_input.body directly rather than parsing a command line, and stays silent when no string body is present (some pull_request_review_write methods submit without one)."
           },
           {
             "type": "command",

@@ -267,6 +267,27 @@ CASES = [
      [{"type": "PLANNER_RESPONSE", "content": "mds#649 waits on gha#1544.", "step_index": 1},
       {"type": "USER_INPUT", "content": "go", "step_index": 2},
       {"type": "PLANNER_RESPONSE", "content": "Merged both; all done.", "step_index": 3}], False),
+    # Round 6 (opencode/glm-5.3-flash-free on cf463-02).
+    ("odd text block does not hide a park",
+     [say("mds#649 waits on gha#1544."),
+      {"type": "assistant", "message": {"content": [{"type": "text", "text": 123}]}}], True),
+    ("string tool input does not hide a park",
+     [say("mds#649 waits on gha#1544."),
+      {"type": "assistant", "message": {"content": [{
+          "type": "tool_use", "name": "mcp__hearthbot__post_message", "input": "x"}]}}], True),
+    ("numeric tool name does not hide a park",
+     [say("mds#649 waits on gha#1544."),
+      {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": 5, "input": {}}]}}], True),
+    ("while waiting I left the rest", [say("While waiting on #12, I left the rest for the morning.")], True),
+    ("after waiting I finally stopped", [say("After waiting on gha#1544 all morning, I finally stopped.")], True),
+    ("after waiting then stopped", [say("After waiting on #12, then stopped.")], True),
+    ("the wait is over", [say("The wait on gha#1544 is over, and mds#649 is merged cleanly.")], False),
+    ("comma then your sign-off", [say("mcs#99 waits on #12, for your sign-off.")], False),
+    ("the maintainer's sign-off", [say("mcs#99 waits on #12 for the maintainer's sign-off.")], False),
+    ("upstream maintainers to sign off", [say("mcs#99 waits on #12 for upstream maintainers to sign off.")], False),
+    ("the user's OK", [say("mcs#99 waits on #12 for the user's OK.")], False),
+    ("once item is green", [say("I'll rerun the export once CI on #12 is green.")], True),
+    ("comma then a non-person for clause", [say("mcs#99 waits on #12, for the CI rerun.")], True),
 ]
 
 
@@ -280,7 +301,12 @@ def main():
     if blocked([say("mds#649 waits on gha#1544.")], active=True):
         failures += 1
         print("FAIL stop_hook_active must not block")
-    total = len(CASES) + 1
+    for raw in ("null", "[]", '"x"', "5"):
+        res = subprocess.run([sys.executable, HOOK], input=raw, capture_output=True, text=True, timeout=20)
+        if res.returncode != 0 or res.stdout.strip():
+            failures += 1
+            print(f"FAIL non-object payload {raw}: rc={res.returncode} {res.stderr.strip()[:80]}")
+    total = len(CASES) + 5
     print(f"{total - failures} of {total} passed")
     return 1 if failures else 0
 

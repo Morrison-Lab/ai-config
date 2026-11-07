@@ -136,8 +136,9 @@ PHRASE_RX = re.compile(
     re.I,
 )
 _DONE = (
-    r"(?:merges|lands|ships|closes|is\s+(?:merged|ready|fixed|done|closed|resolved)"
-    r"|gets\s+merged)"
+    r"(?:merges|lands|ships|closes|passes"
+    r"|is\s+(?:merged|ready|fixed|done|closed|resolved|green|approved|released|deployed)"
+    r"|(?:goes|turns)\s+green|gets\s+merged)"
 )
 # A present- or future-tense parking verb. Past tense ("waited", "held")
 # reports what happened, and "Stopping" is the status-line label.
@@ -195,15 +196,21 @@ _OBJECT_END_RX = re.compile(
 )
 _TOKEN_STRIP = "[](){}*_\"'`<>,:"
 # A clause that gates the park on a person-only step.
+_ROLE = r"(?:user|maintainer|owner|reviewer|human|person)"
+# A person, singular or plural: "you", "Ezra", "the maintainer", "upstream maintainers".
+_PERSON = (
+    r"(?:you|ezra|people|(?:(?:the|a|an|upstream)\s+)?" + _ROLE + r"s?)"
+)
 PERSON_GATE_RX = re.compile(
     r"\bneeds?\s+(?:you|your|ezra|the\s+user|a\s+(?:human|person|maintainer|reviewer))\b"
-    r"|\b(?:your|ezra" + _APOS + r"s|the\s+user" + _APOS + r"s|a\s+maintainer" + _APOS + r"s)\s+"
-    r"(?:approval|go-?ahead|answer|decision|review|click|sign-?in|sign-?off|merge|input|"
+    r"|\b(?:your|ezra" + _APOS + r"s|(?:(?:the|a|an|upstream)\s+)?" + _ROLE
+    + r"(?:" + _APOS + r"s|s" + _APOS + r"))\s+"
+    r"(?:approval|go-?ahead|ok|okay|say-?so|answer|decision|review|click|sign-?in|sign-?off|merge|input|"
     r"confirmation|token|secret|credentials?)\b"
+    r"|\bfor\s+" + _PERSON + r"\s+to\b"
     r"|\b(?:wait(?:s|ing)?\s+(?:on|for)|blocked\s+(?:on|by)|gated\s+(?:on|by)|await(?:s|ing)?|"
     r"needs?|requires?)\s+"
-    r"(?:an?\s+)?(?:mwc|manual|you|your|users?|ezra|the\s+(?:user|maintainer|owner)|"
-    r"(?:a\s+)?(?:human|person|maintainer))\b"
+    r"(?:an?\s+)?(?:mwc|manual|your|" + _PERSON + r")\b"
     r"|\b(?:needs?|requires?)\s+(?:a|an|the)\s+(?:secret|token|credentials?|password|"
     r"api\s+key|key|2fa|login|sign-?in)\b"
     r"|\buntil\s+(?:you|ezra|the\s+(?:user|maintainer|owner)|a\s+(?:human|person|maintainer))\b"
@@ -218,6 +225,7 @@ RESOLVED_RX = re.compile(
     r"|\bunblocked\b|\bnot\s+(?:blocked|blocking|waiting|gated|parked|awaiting|pending|dependent|held)\b"
     r"|\b(?:does|do|did)(?:\s+not|n" + _APOS + r"t)\s+(?:depend|wait|await)\b"
     r"|\bno\s+longer\s+on\s+hold\b"
+    r"|\b(?:is|are|was)\s+(?:now\s+)?over\b"
     r"|\bdepends\s+on\s+nothing\b",
     re.I,
 )
@@ -231,7 +239,7 @@ SENTENCE_SPLIT_RX = re.compile(
 CLAUSE_SPLIT_RX = re.compile(r"[;,]\s+(?:(?:and|but)\s+)?|:\s+|\s[\u2014\u2013]\s|\s--\s|\s(?:and|but)\s+|\s(?=(?:since|because|while)\s)", re.I)
 # A trailing clause that still modifies the park, for the person gate only.
 _TRAILING_CLAUSE_RX = re.compile(
-    r"^\s*(?:which|that|since|because|as|it|this|pending|until)\b", re.I
+    r"^\s*(?:which|that|since|because|as|it|this|pending|until|for)\b", re.I
 )
 _LEADING_CLAUSE_RX = re.compile(r"^\s*(?:because|since|as)\b", re.I)
 # A narrative report: "After waiting on #12 ...", "I spent a minute waiting
@@ -247,6 +255,12 @@ _PAST_RX = re.compile(
     r"wrote|spent|found|got|took|saw|kept|left|put|built|sent|set|rebuilt|reran|re-ran)\b",
     re.I,
 )
+# A past verb that describes the park itself ("I left the rest", "I finally
+# stopped") does not make the sentence a report of finished work.
+_STOP_VERBS = {
+    "stopped", "left", "paused", "parked", "held", "deferred", "halted", "ended",
+    "quit", "waited", "shelved", "put", "kept", "postponed", "suspended",
+}
 # A line wrap ends a clause unless the line ends mid-phrase.
 _WRAP_JOIN = {
     "wait", "waits", "waiting", "await", "awaits", "awaiting", "blocked", "held", "parked",
@@ -275,8 +289,10 @@ def _is_user_turn(m):
     else:
         if any(isinstance(b, dict) and b.get("type") == "tool_result" for b in blocks):
             return False
-        texts = [b.get("text") or "" for b in blocks if isinstance(b, dict) and b.get("type") == "text"]
-    return any(t.strip() and not t.lstrip().startswith("<") for t in texts)
+        if not isinstance(blocks, list):
+            return False
+        texts = [b.get("text") for b in blocks if isinstance(b, dict) and b.get("type") == "text"]
+    return any(isinstance(t, str) and t.strip() and not t.lstrip().startswith("<") for t in texts)
 
 
 def turn_outputs(path):
@@ -316,19 +332,31 @@ def turn_outputs(path):
                     if blocks.strip():
                         outs.append(blocks)
                     continue
+                if not isinstance(blocks, list):
+                    continue
                 for b in blocks:
-                    if not isinstance(b, dict):
-                        continue
-                    if b.get("type") == "text" and (b.get("text") or "").strip():
-                        outs.append(b["text"])
-                    if b.get("type") == "tool_use" and REPLY_TOOL_RX.search(b.get("name") or ""):
-                        inp = b.get("input") or {}
-                        txt = inp.get("text") or inp.get("message")
-                        if isinstance(txt, str) and txt.strip():
-                            outs.append(txt)
-    except Exception:
+                    txt = _block_output(b)
+                    if txt:
+                        outs.append(txt)
+    except OSError:
         return []
     return outs
+
+
+def _block_output(b):
+    """The user-visible text of one content block, or None. Odd types are skipped."""
+    if not isinstance(b, dict):
+        return None
+    if b.get("type") == "text":
+        txt = b.get("text")
+    elif b.get("type") == "tool_use" and isinstance(b.get("name"), str) and REPLY_TOOL_RX.search(b["name"]):
+        inp = b.get("input")
+        if not isinstance(inp, dict):
+            return None
+        txt = inp.get("text") or inp.get("message")
+    else:
+        return None
+    return txt if isinstance(txt, str) and txt.strip() else None
 
 
 def _object_is_ref(rest):
@@ -430,14 +458,23 @@ def _park_positions(sentence):
 def _reports_past(sentence, start, pos):
     """True when the narrative wait's own clause, or the clause right after
     it, has a first-person past verb ("After waiting on #12, I merged it").
-    A past verb about other work elsewhere in the sentence does not count."""
-    if _PAST_RX.search(sentence[start:pos]):
+    A past verb about other work elsewhere in the sentence does not count,
+    and neither does one that describes stopping (_STOP_VERBS)."""
+    if _done_verb(sentence[start:pos]):
         return True
     m = re.search(r"[,;]\s+", sentence[pos:])
     if not m:
         return False
     nxt = re.split(r"[,;]\s|\s(?:and|but)\s", sentence[pos + m.end():], maxsplit=1)[0]
-    return bool(_PAST_RX.search(nxt) or re.match(r"then\s+\w+ed\b", nxt, re.I))
+    if _done_verb(nxt):
+        return True
+    t = re.match(r"then\s+(\w+ed)\b", nxt, re.I)
+    return bool(t and t.group(1).lower() not in _STOP_VERBS)
+
+
+def _done_verb(text):
+    """True when `text` has a first-person past verb that is not a stop verb."""
+    return any(m.group().split()[-1].lower() not in _STOP_VERBS for m in _PAST_RX.finditer(text))
 
 
 def find_park(text):
@@ -482,7 +519,10 @@ def main():
         payload = json.load(sys.stdin)
     except Exception:
         return 0
-    text = last_reply_text(payload.get("transcript_path") or "")
+    if not isinstance(payload, dict):
+        return 0
+    path = payload.get("transcript_path")
+    text = last_reply_text(path) if isinstance(path, str) else ""
     if not text:
         return 0
     hit = find_park(text)

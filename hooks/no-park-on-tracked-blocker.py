@@ -13,20 +13,24 @@ is work to do; only a step that needs a person is a reason to stop.
 
 WHAT IT CHECKS
 --------------
-The last user-visible output of the current turn (a reply-tool payload
-such as hearthbot post_message or claude-code-remote send_message, or
-assistant text, whichever came last since the person last wrote), with
-code spans and fences stripped, has a sentence whose parking phrase
-("waits on", "waiting for", "blocked on/by", "depends/depending on",
-"on hold until", "held until", "held up by") takes a tracked item as its
-object, or that says "until <item> merges/lands/is ready".
+Any user-visible output of the current turn (a reply-tool payload such as
+hearthbot post_message or claude-code-remote send_message, or assistant
+text, since the person last wrote), with code fences and non-ref code
+spans stripped, has a sentence whose parking phrase ("waits on",
+"blocked on/by", "parked on", "depends/depending on", "held until",
+"held pending") takes a tracked item as its object within six tokens, or
+that says "holding X until <item> merges", "once <item> lands", or
+"<item> needs to merge first". Every output counts, so a park followed by
+a closing line is still caught.
 A tracked item is an issue/PR URL, owner/repo#N, repo#N, or #N, but not a
 file anchor such as README.md#2.
 
 The object rule keeps reports out: "PR #12 is waiting on the runner" and
 "I merged gha#1545, which mds#649 was waiting on" name the item, but not as
-what is waited on. A sentence naming a person-only gate ("needs you",
-"your approval") passes; a bare "mwc" or "approval" elsewhere does not.
+what is waited on, and a CI noun ("Waiting on CI for #12") ends the object.
+A person-only gate ("needs you", "your approval", "requires a manual
+action") exempts only its own clause and trailing which-clauses; a bare
+"mwc" or "approval" elsewhere does not.
 
 WHY IT BLOCKS ONCE RATHER THAN EVERY TIME
 -----------------------------------------
@@ -67,46 +71,65 @@ except Exception:  # pragma: no cover
 HOOK = "no-park-on-tracked-blocker"
 
 # A tracked item: an issue/PR URL, owner/repo#N, repo#N, or #N. A file
-# anchor such as README.md#2 is not an item.
+# anchor (README.md#2, docs/spec.json#2) is not an item. A bare x/y#N stays
+# an item, as GitHub's own autolinker reads it, so docs/setup#2 is accepted
+# as a known false positive.
 _REF = (
-    r"(?:https?://[^\s/]+/[^\s]*?/(?:issues|pull|pulls|merge_requests)/\d+"
-    r"|[\w.-]+/[\w-]+(?:\.[\w-]+)*(?<!\.md)(?<!\.qmd)(?<!\.html)(?<!\.rst)(?<!\.txt)#\d+\b"
-    r"|\b[A-Za-z][\w-]*#\d+\b"
+    r"(?:https?://[^\s/]+/[^\s)\]]*?/(?:issues|pull|pulls|merge_requests)/\d+"
+    r"|(?<![\w./-])[\w-]+/[\w-]+(?:\.[\w-]+)?(?<!\.json)(?<!\.md)(?<!\.qmd)(?<!\.html)"
+    r"(?<!\.rst)(?<!\.txt)(?<!\.yml)(?<!\.yaml)(?<!\.py)(?<!\.R)#\d+\b"
+    r"|(?<![\w./-])[A-Za-z][\w-]*#\d+\b"
     r"|(?<![\w/#&.])#\d+\b)"
+    r"(?!['\u2019]s\b)"
 )
 REF_RX = re.compile(_REF, re.I)
+_REF_SPAN_RX = re.compile(r"(`+)\s*(" + _REF + r")\s*\1", re.I)
 
-# Words that may sit between a parking phrase and the item it names, as in
-# "waits on the PR for gha#1544" or "blocked by [#12](...)".
-_FILLER = (
-    r"(?:(?:the|a|an|its|their|that|this|PR|pull\s+request|MR|issue|fix|change|"
-    r"work|merge\s+of|landing\s+of|upstream|in|from|both|and|or|being)\s+|[\[(*_\"'])*"
-)
-_PHRASE = (
+# A parking phrase whose object is read token by token (see _object_is_ref).
+PHRASE_RX = re.compile(
     r"\b(?:wait(?:s|ing)?\s+(?:on|for)"
-    r"|blocked\s+(?:on|by)"
+    r"|blocked\s+(?:on|by|until)"
     r"|held\s+(?:up\s+)?(?:on|by|until)"
+    r"|parked\s+(?:on|behind|until)"
     r"|on\s+hold\s+(?:for|until|pending)"
-    r"|(?:held|parked)\s+pending"
-    r"|depend(?:s|ing|ent)?\s+on)\s+"
-)
-# The park counts only when the phrase's OBJECT is the tracked item, so
-# "PR #12 is waiting on the macOS runner" and "I merged gha#1545, which
-# mds#649 was waiting on" are reports, not parks.
-PARK_RX = re.compile(
-    _PHRASE + _FILLER + _REF
-    + r"|\buntil\s+(?:[^.!?\n]|\.(?!\s)){0,100}?" + _REF
-    + r"(?:[^.!?\n]|\.(?!\s)){0,40}?\b(?:merges|lands|is\s+merged|ships|closes|is\s+ready)\b",
+    r"|(?:held|parked|is|are|remains?|stays?)\s+pending"
+    r"|depend(?:s|ing|ent)?\s+on)\s+",
     re.I,
 )
-# A sentence whose park is on a person-only step passes.
+_DONE = r"(?:merges|lands|ships|closes|is\s+(?:merged|ready|fixed|done|closed|resolved)|gets\s+merged)"
+# Forms that name the item inside the phrase rather than after it.
+FORM_RX = [
+    # "holding X until gha#1 merges": needs a parking verb before "until".
+    re.compile(
+        r"\b(?:hold\w*|held|park\w*|wait\w*|stop\w*|paus\w*|leav\w*|defer\w*|keep\w*|resum\w*)\b"
+        r"(?:[^.!?\n]|\.(?!\s)){0,80}?\buntil\s+(?:[^.!?\n]|\.(?!\s)){0,60}?" + _REF
+        + r"(?:[^.!?\n]|\.(?!\s)){0,40}?\b" + _DONE + r"\b",
+        re.I,
+    ),
+    # "after gha#1 merges" / "once gha#1 lands": present tense, so future.
+    re.compile(r"\b(?:after|once|when)\s+(?:\S+\s+){0,3}?" + _REF + r"\s+" + _DONE + r"\b", re.I),
+    # "gha#1 needs to merge first".
+    re.compile(_REF + r"\s+(?:needs|has|must)\s+(?:to\s+)?(?:merge|land|ship)\s+first\b", re.I),
+]
+# A wait on CI, a runner or a build is not a wait on a tracked item, even
+# when an item is named after it ("Waiting on CI for #12").
+_NOT_ITEM = re.compile(
+    r"^(?:ci|checks?|runners?|builds?|jobs?|workflows?|tests?|deploy\w*|tags?|pipelines?|actions?)$",
+    re.I,
+)
+_TOKEN_STRIP = "[](){}*_\"'`<>,:"
+# A clause that gates the park on a person-only step.
 PERSON_GATE_RX = re.compile(
     r"\bneeds?\s+(?:you|your|ezra|the\s+user|a\s+(?:human|person|maintainer|reviewer))\b"
     r"|\b(?:your|ezra['\u2019]s|the\s+user['\u2019]s|a\s+maintainer['\u2019]s)\s+"
-    r"(?:approval|go-?ahead|answer|decision|review|click|sign-?in|merge)\b",
+    r"(?:approval|go-?ahead|answer|decision|review|click|sign-?in|merge)\b"
+    r"|\b(?:wait(?:s|ing)?\s+(?:on|for)|blocked\s+(?:on|by)|needs?|requires?)\s+"
+    r"(?:an?\s+)?(?:mwc|manual|you|users?|ezra|the\s+(?:user|maintainer|owner)|"
+    r"(?:a\s+)?(?:human|person|maintainer))\b"
+    r"|\bmanual\s+(?:step|action|click)\b",
     re.I,
 )
-# A sentence that says the dependency is gone is a report, not a park.
+# A clause that says the dependency is gone is a report, not a park.
 RESOLVED_RX = re.compile(
     r"\bno\s+longer\s+(?:waits?|waiting|blocked|depends?|held)\b"
     r"|\bunblocked\b|\bnot\s+(?:blocked|waiting)\b|\bdepends\s+on\s+nothing\b",
@@ -117,6 +140,11 @@ RESOLVED_RX = re.compile(
 SENTENCE_SPLIT_RX = re.compile(
     r"(?<=[.!?])\s+|\n\s*\n|\n(?=\s*(?:[-*+]|\d+[.)])\s)|\n(?=\s*\|)|(?<=\|)\s*\n"
 )
+# Clauses split a sentence for the gates, so a gate in one clause cannot
+# exempt a park in another. A single newline also ends a clause, so status
+# lines joined into one sentence stay apart.
+CLAUSE_SPLIT_RX = re.compile(r"[;,]\s+|:\s+|\n|\s[\u2014\u2013]\s|\s--\s")
+_TRAILING_CLAUSE_RX = re.compile(r"^\s*(?:which|that|since|because|as)\b", re.I)
 REPLY_TOOL_RX = re.compile(
     r"(^|__)(reply|post_message|update_message|edit_message|send_message)$", re.I
 )
@@ -130,23 +158,27 @@ def _blocks(m):
 
 
 def _is_user_turn(m):
-    """True for a line a person (not a tool result) wrote."""
-    if not (m.get("type") == "user" or m.get("role") == "user"):
+    """True for a line a person wrote: not a tool result, a meta line or a reminder."""
+    if not (m.get("type") == "user" or m.get("role") == "user") or m.get("isMeta"):
         return False
     blocks = _blocks(m)
     if isinstance(blocks, str):
-        return bool(blocks.strip())
-    return any(isinstance(b, dict) and b.get("type") == "text" for b in blocks)
+        texts = [blocks]
+    else:
+        if any(isinstance(b, dict) and b.get("type") == "tool_result" for b in blocks):
+            return False
+        texts = [b.get("text") or "" for b in blocks if isinstance(b, dict) and b.get("type") == "text"]
+    return any(t.strip() and not t.lstrip().startswith("<") for t in texts)
 
 
-def last_reply_text(path):
-    """The last user-visible output of the current turn at `path`, or ''.
+def turn_outputs(path):
+    """Every user-visible output of the current turn at `path`, in order.
 
     The turn starts at the last line a person wrote, so an earlier turn's
-    reply can neither block nor hide this one. Within the turn the latest
-    output wins, whether a reply-tool payload or plain text.
+    reply can neither block nor hide this one. Every output counts, so a
+    reply-tool park followed by a closing line is still checked.
     """
-    last = ""
+    outs = []
     try:
         with open(path, encoding="utf-8", errors="ignore") as fh:
             for line in fh:
@@ -157,44 +189,82 @@ def last_reply_text(path):
                 if not isinstance(m, dict):
                     continue
                 if _is_user_turn(m):
-                    last = ""
+                    outs = []
                     continue
                 if not (m.get("type") == "assistant" or m.get("role") == "assistant"):
                     continue
                 blocks = _blocks(m)
                 if isinstance(blocks, str):
                     if blocks.strip():
-                        last = blocks
+                        outs.append(blocks)
                     continue
                 for b in blocks:
                     if not isinstance(b, dict):
                         continue
                     if b.get("type") == "text" and (b.get("text") or "").strip():
-                        last = b["text"]
+                        outs.append(b["text"])
                     if b.get("type") == "tool_use" and REPLY_TOOL_RX.search(b.get("name") or ""):
                         inp = b.get("input") or {}
                         txt = inp.get("text") or inp.get("message")
                         if isinstance(txt, str) and txt.strip():
-                            last = txt
+                            outs.append(txt)
     except Exception:
-        return ""
-    return last
+        return []
+    return outs
+
+
+def _object_is_ref(rest):
+    """True when the phrase's object, within six tokens on its line, is an item."""
+    line = rest.split("\n", 1)[0]
+    line = re.split(r"[.!?;,](?:\s|$)", line, maxsplit=1)[0]
+    for i, tok in enumerate(line.split()[:6]):
+        if REF_RX.fullmatch(tok.strip(_TOKEN_STRIP)) or REF_RX.match(tok.lstrip(_TOKEN_STRIP)):
+            return True
+        if _NOT_ITEM.match(tok.strip(_TOKEN_STRIP)):
+            return False
+        if REF_RX.search(tok):
+            return True
+    return False
+
+
+def _gate_region(sentence, pos):
+    """The clause holding `pos`, plus trailing which-clauses and asides."""
+    bounds = [0] + [m.end() for m in CLAUSE_SPLIT_RX.finditer(sentence)] + [len(sentence) + 1]
+    for k in range(len(bounds) - 1):
+        if bounds[k] <= pos < bounds[k + 1]:
+            region = sentence[bounds[k]:bounds[k + 1]]
+            j = k + 1
+            while j < len(bounds) - 1 and _TRAILING_CLAUSE_RX.match(sentence[bounds[j]:bounds[j + 1]]):
+                region += " " + sentence[bounds[j]:bounds[j + 1]]
+                j += 1
+            return region
+    return sentence
+
+
+def _park_positions(sentence):
+    for m in PHRASE_RX.finditer(sentence):
+        if _object_is_ref(sentence[m.end():]):
+            yield m.start()
+    for rx in FORM_RX:
+        for m in rx.finditer(sentence):
+            yield m.start()
 
 
 def find_park(text):
     """The first sentence parking work on a tracked item, or None."""
-    prose = strip_code(text)
+    prose = strip_code(_REF_SPAN_RX.sub(r" \2 ", text)).replace("](", "] (")
     for sentence in SENTENCE_SPLIT_RX.split(prose):
-        if not PARK_RX.search(sentence):
-            continue
-        if not REF_RX.search(sentence):
-            continue
-        if PERSON_GATE_RX.search(sentence):
-            continue
-        if RESOLVED_RX.search(sentence):
-            continue
-        return sentence.strip()
+        for pos in _park_positions(sentence):
+            region = _gate_region(sentence, pos)
+            if PERSON_GATE_RX.search(region) or RESOLVED_RX.search(region):
+                continue
+            return sentence.strip()
     return None
+
+
+def last_reply_text(path):
+    """All of the current turn's outputs, joined (kept for callers)."""
+    return "\n\n".join(turn_outputs(path))
 
 
 MESSAGE = (

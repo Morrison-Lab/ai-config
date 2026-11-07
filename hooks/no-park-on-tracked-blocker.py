@@ -31,7 +31,10 @@ what is waited on. The object also ends at a clause boundary or
 conjunction, at a line wrap after anything but a function word, and at a
 preposition right after a non-filler word, so "Waiting on CI for #12" names
 CI. "After waiting on #12" or "spent a minute waiting for #12" is
-narrative, unless the sentence looks ahead ("While waiting on #12, I'll").
+narrative when the sentence has a first-person past verb ("I merged it");
+"While waiting on #12, I'm working on #13" is still a park. A line wrap
+ends a clause unless the line stops mid-phrase, so a status line such as
+"#10: unblocked" cannot exempt the next line.
 A form spanning several clauses is judged by the clause it ends in.
 A person-only gate ("needs you", "your approval", "requires a manual
 action") exempts only its own clause and trailing which-clauses; a bare
@@ -127,7 +130,8 @@ PHRASE_RX = re.compile(
     r"|held\s+(?:up\s+)?(?:on|by|until)"
     r"|parked\s+(?:on|behind|until)"
     r"|on\s+hold\s+(?:for|until|pending)"
-    r"|(?:held|parked|is|are|remains?|stays?)\s+(?:still\s+|currently\s+)?pending"
+    r"|(?:paused|deferred|gated|on\s+hold)\s+until"
+    r"|(?:held|parked|is|are|remains?|stays?)\s+(?:still\s+|currently\s+)?pending(?!\s+(?:on|for|in)\b)"
     r"|depend(?:s|ing|ent)?\s+on)\s+",
     re.I,
 )
@@ -166,7 +170,7 @@ FORM_RX = [
     ),
     # "gha#1544 is blocking mds#649": the blocker is the subject.
     re.compile(
-        _REF + _AFTER_REF + r"(?:blocks|is\s+blocking|is\s+holding\s+up)\s+(?:\S+\s+){0,2}?[\[(`]*" + _REF,
+        _REF + _AFTER_REF + r"(?:blocks|is\s+blocking|is\s+holding\s+up)\s+(?:\S+\s+){0,3}?[\[(`]*" + _REF,
         re.I,
     ),
 ]
@@ -176,7 +180,7 @@ FORM_RX = [
 _FILLER = {
     "the", "a", "an", "its", "their", "that", "this", "pr", "prs", "pull", "request",
     "mr", "mrs", "issue", "issues", "fix", "fixes", "change", "changes", "requests",
-    "work", "merge", "landing", "resolution", "open", "upstream", "in",
+    "work", "merge", "patch", "bump", "refactor", "update", "landing", "resolution", "open", "upstream", "in",
     "both", "or", "being", "of", "from", "for",
 }
 # A preposition right after a non-filler word ends the object.
@@ -196,20 +200,24 @@ PERSON_GATE_RX = re.compile(
     r"|\b(?:your|ezra" + _APOS + r"s|the\s+user" + _APOS + r"s|a\s+maintainer" + _APOS + r"s)\s+"
     r"(?:approval|go-?ahead|answer|decision|review|click|sign-?in|sign-?off|merge|input|"
     r"confirmation|token|secret|credentials?)\b"
-    r"|\b(?:wait(?:s|ing)?\s+(?:on|for)|blocked\s+(?:on|by)|needs?|requires?)\s+"
+    r"|\b(?:wait(?:s|ing)?\s+(?:on|for)|blocked\s+(?:on|by)|gated\s+(?:on|by)|await(?:s|ing)?|"
+    r"needs?|requires?)\s+"
     r"(?:an?\s+)?(?:mwc|manual|you|your|users?|ezra|the\s+(?:user|maintainer|owner)|"
     r"(?:a\s+)?(?:human|person|maintainer))\b"
     r"|\b(?:needs?|requires?)\s+(?:a|an|the)\s+(?:secret|token|credentials?|password|"
     r"api\s+key|key|2fa|login|sign-?in)\b"
-    r"|\buntil\s+you\b|\bpending\s+your\b"
-    r"|\bmanual\s+(?:step|action|click|merge|review)\b",
+    r"|\buntil\s+(?:you|ezra|the\s+(?:user|maintainer|owner)|a\s+(?:human|person|maintainer))\b"
+    r"|\bpending\s+your\b|\bfor\s+you\s+to\b"
+    r"|\bmanual\s+(?:step|action|click|merge|review|approval|sign-?off)\b",
     re.I,
 )
 # A clause that says the park's own dependency is gone is a report.
 RESOLVED_RX = re.compile(
     r"\bno\s+longer\s+(?:waits?|waiting|blocked|blocking|depends?|held|gated|parked|"
     r"awaits?|awaiting|pending)\b"
-    r"|\bunblocked\b|\bnot\s+(?:blocked|blocking|waiting|gated|parked|awaiting|pending)\b"
+    r"|\bunblocked\b|\bnot\s+(?:blocked|blocking|waiting|gated|parked|awaiting|pending|dependent|held)\b"
+    r"|\b(?:does|do|did)(?:\s+not|n" + _APOS + r"t)\s+(?:depend|wait|await)\b"
+    r"|\bno\s+longer\s+on\s+hold\b"
     r"|\bdepends\s+on\s+nothing\b",
     re.I,
 )
@@ -220,7 +228,7 @@ SENTENCE_SPLIT_RX = re.compile(
 )
 # Clauses split a sentence for the gates, so a gate in one clause cannot
 # exempt a park in another. A line wrap does not end a clause.
-CLAUSE_SPLIT_RX = re.compile(r"[;,]\s+(?:(?:and|but)\s+)?|:\s+|\s[\u2014\u2013]\s|\s--\s|\s(?:and|but)\s+", re.I)
+CLAUSE_SPLIT_RX = re.compile(r"[;,]\s+(?:(?:and|but)\s+)?|:\s+|\s[\u2014\u2013]\s|\s--\s|\s(?:and|but)\s+|\s(?=(?:since|because|while)\s)", re.I)
 # A trailing clause that still modifies the park, for the person gate only.
 _TRAILING_CLAUSE_RX = re.compile(
     r"^\s*(?:which|that|since|because|as|it|this|pending|until)\b", re.I
@@ -230,10 +238,21 @@ _LEADING_CLAUSE_RX = re.compile(r"^\s*(?:because|since|as)\b", re.I)
 # for #12". The narrative word must lead straight into the gerund, and the
 # sentence must not look ahead ("While waiting on #12, I'll ..." is a park).
 _NARRATIVE_RX = re.compile(
-    r"(?:\b(?:after|while)\s+|\bspent\s+(?:\S+\s+){0,3}?)$", re.I
+    r"(?:\b(?:after|while)\s+(?:still\s+|now\s+)?|\bspent\s+(?:\S+\s+){0,5}?)$", re.I
 )
 _GERUND_PHRASE_RX = re.compile(r"(?:wait|await|depend)ing\b", re.I)
-_FUTURE_RX = re.compile(_FIRST_PERSON_FUTURE + r"|\bwill\b|\bgoing\s+to\b", re.I)
+# A report needs a first-person past-tense verb ("I merged it").
+_PAST_RX = re.compile(
+    r"\b(?:I|we)\s+(?:then\s+|also\s+|finally\s+|just\s+)?(?:\w+ed|did|was|were|went|ran|made|"
+    r"wrote|spent|found|got|took|saw|kept|left|put|built|sent|set|rebuilt|reran|re-ran)\b",
+    re.I,
+)
+# A line wrap ends a clause unless the line ends mid-phrase.
+_WRAP_JOIN = {
+    "wait", "waits", "waiting", "await", "awaits", "awaiting", "blocked", "held", "parked",
+    "gated", "depends", "depend", "depending", "up", "by", "until", "no", "not", "longer",
+    "pending", "hold",
+} | {"the", "a", "an", "on", "for", "of", "in", "to", "this", "that", "its", "their"}
 REPLY_TOOL_RX = re.compile(
     r"(^|__)(reply|post_message|update_message|edit_message|send_message)$", re.I
 )
@@ -276,6 +295,16 @@ def turn_outputs(path):
                 except Exception:
                     continue
                 if not isinstance(m, dict):
+                    continue
+                # Antigravity transcripts: USER_INPUT starts a turn and a
+                # PLANNER_RESPONSE's content is the visible reply.
+                if m.get("type") == "USER_INPUT":
+                    outs = []
+                    continue
+                if m.get("type") == "PLANNER_RESPONSE":
+                    txt = m.get("content")
+                    if isinstance(txt, str) and txt.strip():
+                        outs.append(txt)
                     continue
                 if _is_user_turn(m):
                     outs = []
@@ -338,9 +367,17 @@ def _object_is_ref(rest):
 
 def _clauses(sentence):
     """The sentence's clauses, with whether each follows a bare and/but split."""
-    marks = list(CLAUSE_SPLIT_RX.finditer(sentence))
-    bounds = [0] + [m.end() for m in marks] + [len(sentence) + 1]
-    conj = [False] + [m.group().strip().lower() in ("and", "but") for m in marks]
+    marks = [(m.start(), m.end(), m.group().strip().lower() in ("and", "but"))
+             for m in CLAUSE_SPLIT_RX.finditer(sentence)]
+    # A status line ("#10: unblocked") ends at its line wrap.
+    for m in re.finditer(r"(\S+)[ \t]*\n\s*", sentence):
+        if m.group(1).strip(_TOKEN_STRIP).lower() in _WRAP_JOIN:
+            continue
+        if not any(s <= m.end(1) < e or s < m.end() <= e for s, e, _c in marks):
+            marks.append((m.end(1), m.end(), False))
+    marks.sort()
+    bounds = [0] + [e for _s, e, _c in marks] + [len(sentence) + 1]
+    conj = [False] + [c for _s, _e, c in marks]
     return [(bounds[k], sentence[bounds[k]:bounds[k + 1]], conj[k]) for k in range(len(bounds) - 1)]
 
 
@@ -404,7 +441,7 @@ def find_park(text):
                 narrative
                 and _GERUND_PHRASE_RX.match(sentence, pos)
                 and _NARRATIVE_RX.search(sentence[start:pos])
-                and not _FUTURE_RX.search(sentence)
+                and _PAST_RX.search(sentence)
             ):
                 continue
             return sentence.strip()

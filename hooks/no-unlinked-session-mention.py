@@ -73,6 +73,16 @@ TECHNICAL_THREAD = {
     "render", "download", "upload", "polling", "daemon"}
 LINK = re.compile(
     r"claude\.ai/code/session_\w+|\(#cmsg_\w+\)|[?&]thread=cmsg_\w+")
+# ai-config#5060 (Ezra, 2026-11-07, "always hyperlink; don't make me ask"): a
+# PR, issue or run named in a unit that holds no URL at all. Detected: an
+# `owner/repo#N`, a bare `#N` of two or more digits, "PR 12", "issue 12" and
+# "run 12345". Not detected, because no regex can tell a repo file from any
+# other word with a slash or dot: file paths (ai-config#4741 says to name
+# what a deny cannot catch).
+FORGE_REF = re.compile(
+    r"(?<![\w/&])(?:[\w.-]+/[\w.-]+)?#\d{2,}\b"
+    r"|\b(?:PRs?|pull requests?|issues?|runs?) #?\d{2,}\b", re.I)
+ANY_URL = re.compile(r"https?://\S+")
 UNIT_BREAK = re.compile(r"\n[ \t]*\n|\n(?=(?:[-*+]|\d+[.)])[ \t])")
 
 REASON = """\
@@ -108,6 +118,30 @@ def unlinked_mention(text: str):
     return None
 
 
+FORGE_REASON = """\
+[hook: no-unlinked-session-mention] This post names a forge artifact \
+("{phrase}") with no link in the same paragraph or list item. The user's \
+standing rule (2026-11-07): "always hyperlink; don't make me ask".
+Resend with its URL in the same paragraph or list item, for example \
+[owner/repo#12](https://github.com/owner/repo/pull/12) or \
+[run 123](https://github.com/owner/repo/actions/runs/123).
+If the text is not a PR, issue or run (a footnote number, a heading), put it \
+in backticks and resend."""
+
+
+def unlinked_forge_ref(text: str):
+    """The first PR, issue or run reference in a unit with no URL, or None."""
+    text = FENCE.sub(" ", text.replace("\r\n", "\n"))
+    for unit in UNIT_BREAK.split(text):
+        unit = INLINE_CODE.sub(" ", unit)
+        if ANY_URL.search(unit):
+            continue
+        m = FORGE_REF.search(unit)
+        if m:
+            return m.group(0)
+    return None
+
+
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
@@ -122,13 +156,17 @@ def main() -> int:
     if not isinstance(text, str):
         return 0
     phrase = unlinked_mention(text)
+    reason = REASON
+    if not phrase:
+        phrase = unlinked_forge_ref(text)
+        reason = FORGE_REASON
     if not phrase:
         return 0
     print(json.dumps({
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "permissionDecision": "deny",
-            "permissionDecisionReason": REASON.format(phrase=phrase),
+            "permissionDecisionReason": reason.format(phrase=phrase),
         }
     }))
     return 0

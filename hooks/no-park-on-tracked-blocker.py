@@ -222,6 +222,8 @@ PERSON_GATE_RX = re.compile(
     r"confirmation|token|secret|credentials?)\b"
     r"|\bfor\s+" + _PERSON + r"\s+to\b"
     r"|\bfor\s+(?:their|his|her|your|human|manual)?\s*(?:approval|sign-?off|go-?ahead)\b"
+    r"(?!\s+(?:by|from)\s+(?:the\s+|an?\s+)?(?:\S+[-\s])?(?:bots?|ci|checks?|automation|workflows?|"
+    r"dependabot|renovate|mergify)\b)"
     r"|\bfor\s+(?!(?:the\s+|an?\s+)?(?:\S+[-\s])?(?:bots?|ci|copilot|claude|codex|gemini|agents?|"
     r"automated|workflows?|checks?|dependabot|renovate|mergify|bors|(?:merge\s+)?queues?|canary|"
     r"webhooks?|deploy(?:ment)?s?|"
@@ -288,10 +290,14 @@ _STOP_TIME = (
 # day", "I decided to stop").
 _STOP_PHRASE_RX = re.compile(
     r"\b(?:stop(?:s|ped|ping)?|paus(?:e|es|ed|ing)|call(?:ed)?\s+it\s+a\s+(?:day|night)"
-    r"|wrap(?:ped)?\s+up|sign(?:ed)?\s+off|log(?:ged)?\s+off)"
-    # Only a stop that ends its clause, alone or with a time or place:
-    # "I stopped the leak", "I'll stop by" and "I wrapped up the docs" report work.
-    r"(?:\s+(?:(?:for|until)\s+" + _STOP_TIME + r"|there|here))?"
+    r"|took\s+a\s+break|wrap(?:ped)?\s+(?:(?:things|it|everything)\s+)?up"
+    r"|(?:sign(?:ed)?|log(?:ged)?|switch(?:ed)?)\s+off)"
+    # Only a stop that ends its clause, alone or with a place or time:
+    # "I stopped the leak", "I'll stop by" and "I wrapped up the docs" report
+    # work, while a time makes even an object a stop ("I signed off the
+    # notes for the day").
+    r"(?:\s+(?:here|there))?"
+    r"(?:(?:\s+\S+){0,4}?\s+(?:for|until)\s+" + _STOP_TIME + r")?"
     # The clause also ends where the wait itself starts ("I signed off after
     # waiting on #12"), but not at a reason or a time ("I signed off since
     # the release looked fine").

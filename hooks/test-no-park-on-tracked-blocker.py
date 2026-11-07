@@ -375,6 +375,15 @@ CASES = [
     ("called it a day when shipped", [say("After waiting on #12, I called it a day when the release shipped.")], False),
     ("signed off because fine", [say("After waiting on #12, I signed off because the release looked fine.")], False),
     ("signed off as manager", [say("After waiting on #12, I signed off as the release manager.")], False),
+    # glm reviews of 42e59183 through ea935254.
+    ("switched off for the night", [say("After waiting on #12, I switched off for the night.")], True),
+    ("took a break then a night", [say("After waiting on #12, I took a break, so I called it a night.")], True),
+    ("stop here for today", [say("After waiting on #12, I decided to stop here for today.")], True),
+    ("stop here for now", [say("After waiting on #12, I decided to stop here for now.")], True),
+    ("wrapped things up", [say("After waiting on #12, I wrapped things up for the day.")], True),
+    ("signed off notes for the day", [say("After waiting on #12, I signed off the release notes for the day.")], True),
+    ("approval by the label bot", [say("mds#649 waits on gha#1544 for approval by the label bot.")], True),
+    ("signed off the notes", [say("After waiting on #12, I signed off the release notes.")], False),
     ("decided to stop comma", [say("After waiting on #12 I decided to stop, and #13 can wait.")], True),
     ("sole string-input reply blocks",
      [{"type": "assistant", "message": {"content": [{

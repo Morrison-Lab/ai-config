@@ -129,9 +129,13 @@ NEXT_LEAD_RX = re.compile(r"^[\s*_>-]*next\b", re.I)
 DELIVERY_MIN_WORDS = 8
 
 
-def _delivers_after_colon(sentence):
-    """True when the sentence has a colon followed by enough words to be content."""
-    head, sep, rest = sentence.partition(":")
+def _delivers_after_colon(after_match):
+    """True when the text after the matched phrase has a colon, then enough words.
+
+    Called with the text AFTER the match, so the colon in "Next: I'll ..."
+    (which the pattern allows) is not counted as the delivery colon.
+    """
+    head, sep, rest = after_match.partition(":")
     return bool(sep) and len(rest.split()) >= DELIVERY_MIN_WORDS
 
 SENTENCE_SPLIT_RX =re.compile(r"(?<=[.!?;])\s+|\n")
@@ -278,7 +282,9 @@ def offending_sentence(prose):
     for sentence in reversed(tail_of(prose)):
         hit = RX.search(sentence)
         if hit and not CONDITIONAL_RX.search(sentence):
-            if NEXT_LEAD_RX.match(hit.group(0)) and _delivers_after_colon(sentence):
+            if NEXT_LEAD_RX.match(hit.group(0)) and _delivers_after_colon(
+                sentence[hit.end():]
+            ):
                 # "Next, I'll explain the key insight: ..." delivers its own
                 # content; it announces no unstarted work.
                 continue

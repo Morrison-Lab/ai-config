@@ -215,6 +215,9 @@ def main():
         "I read the PR. Next, I'll review: the file at src/a.py.",
         "I read the PR. Next, I'll fix: the bug in the parser.",
         "Looked at the issue. Next, I'll add:",
+        # agy review on #5052: the colon in "Next:" is not a delivery colon.
+        "Next: I'll open the first workflow PR and run the test suite.",
+        "Next up: I'm opening the first workflow PR and running the test suite.",
     ]
     posted_pass = [
         # Review finding on #5052: exposition that delivers in the same sentence.

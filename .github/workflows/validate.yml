@@ -53,6 +53,13 @@ jobs:
       - name: Run check-dynamic-note-expiry tests
         # ai-config#5018: a memory note stating a changing condition carries `expires YYYY-MM-DD`.
         run: python3 scripts/test_check_dynamic_note_expiry.py
+      - name: Run check-stop-hook-shapes tests
+        # ai-config#5055: a Stop hook that reads the final message names its transcript shapes.
+        run: python3 scripts/test_check_stop_hook_shapes.py
+      - name: Check Stop hooks name the transcript shapes they read
+        # ai-config#5055. Exit 2 (unreadable hooks.json, or no Stop hook reads the
+        # final message) fails the job too, so the gate cannot pass without looking.
+        run: python3 scripts/check-stop-hook-shapes.py
       - name: Check mistake-pattern numbering
         # ai-config#2946: `## Pattern N:` headings unique and sequential; the
         # test below dogfoods the live file, so this step names the defect.

@@ -256,11 +256,13 @@ def main():
         # Claude review on #5068: the other added words, with a real action in the clause.
         "I read the issue. Next, I'll skip the linter and push directly to main.",
         "I read the issue. Next, I'll defer the migration to next week and push this hotfix now.",
-        "I read the issue. Next, I'm done reviewing, let me merge the PR.",
-        "I read the issue. Next, I'm finished with the tests, now deploying to production.",
-        # Claude review on #5068: `tired` is not exempt, it pairs with real actions.
-        "I read the issue. Next, I'm tired of debugging this, let me merge the PR now.",
-        "I read the issue. Next, I'm tired, so I'll push this straight to main.",
+        # Known misses under the positive verb list (#5071): the verb right
+        # after "Next, I'm" is "done", "finished" or "tired", not a work verb,
+        # so "Next, I'm done reviewing, let me merge the PR." is not flagged.
+        # The trade accepted in #5071: a missed edge case beats the
+        # whack-a-mole of the exclusion list.
+        "I read the issue. Next, I'll merge the PR.",
+        "I read the issue. Next, I'm pushing this straight to main.",
     ]
     posted_pass = [
         # Claude review on #5052: declining, uncertainty and stative gerunds

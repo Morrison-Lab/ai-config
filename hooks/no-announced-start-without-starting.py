@@ -81,14 +81,18 @@ _WORK_VERBS = (
     "investigate read search grep fetch pull clone install deploy ship commit "
     "rebase resolve address patch refactor rewrite reproduce verify confirm "
     "retry rerun trigger dispatch subscribe request summarize explain record "
-    "save document list look dig continue proceed finish wire merge land "
-    "publish release tag file triage close reopen cancel rerun restart "
-    "investigate analyze analyse inspect debug trace diff compare compile "
-    "format lint render regenerate generate port migrate sync rebase revert "
+    "save document list look dig continue proceed finish wire land "
+    "publish release tag triage close reopen cancel restart "
+    "analyze analyse inspect debug trace diff compare compile "
+    "format lint render regenerate generate port migrate sync revert "
     "backport squash upload download"
 ).split()
 # Doubled final consonant in the gerund (run -> running).
-_DOUBLE_FINAL = {"run", "commit", "ship", "plan", "wrap", "drop", "cut", "split", "put", "set", "get"}
+_DOUBLE_FINAL = {
+    "run", "rerun", "commit", "ship", "plan", "wrap", "drop", "cut", "split",
+    "put", "set", "get", "begin", "grep", "tag", "dig", "debug", "format",
+    "cancel",
+}
 
 
 def _gerund(verb):
@@ -101,7 +105,7 @@ def _gerund(verb):
 
 # Verbs that also decline or stop work ("leave this alone", "pass on it",
 # "stop here"), so only a collocation with an object announces work.
-_OBJECT_VERBS = r"(?:pass|leave|stop|skip|defer)(?:ing)?\s+(?:a|an|the|my|our|--\S+)\b"
+_OBJECT_VERBS = r"(?:pass(?:ing)?|leav(?:e|ing)|stop(?:ping)?|skip(?:ping)?|defer(?:ring)?)\s+(?:a|an|the|my|our|--\S+)\b"
 _WORK_VERB_RX = (
     r"(?:"
     + "|".join(sorted({v for w in _WORK_VERBS for v in (w, _gerund(w))}))

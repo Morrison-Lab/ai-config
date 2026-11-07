@@ -262,6 +262,17 @@ def main():
         # The trade accepted in #5071: a missed edge case beats the
         # whack-a-mole of the exclusion list.
         "I read the issue. Next, I'll merge the PR.",
+        # Claude review on #5074: consonant-doubling gerunds.
+        "I read the issue. Next, I'm formatting the file now.",
+        "I read the issue. Next, I'm debugging the parser now.",
+        "I read the issue. Next, I'm grepping the logs now.",
+        "I read the issue. Next, I'm tagging the release now.",
+        "I read the issue. Next, I'm digging into the logs now.",
+        "I read the issue. Next, I'm rerunning the pipeline now.",
+        "I read the issue. Next, I'm beginning the migration now.",
+        "I read the issue. Next, I'm cancelling the stale runs now.",
+        "I read the issue. Next, I'm skipping the linter and pushing now.",
+        "I read the issue. Next, I'm stopping the daemon now.",
         "I read the issue. Next, I'm pushing this straight to main.",
     ]
     posted_pass = [

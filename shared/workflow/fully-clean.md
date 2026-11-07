@@ -33,7 +33,7 @@ and requiring consensus clean verdicts at the current HEAD.
   `check-pr-fully-clean.py` fails until you rerun it with `--annotations-read <id>[,<id>...]` (or `all`, after reading every run the checker listed;
   GitHub puts a platform notice on every Actions job, so the checker cannot tell a notice you can ignore from a warning you cannot).
 - **Do:** substitute a reviewer that is out of quota (Ezra, 2026-11-07, ai-config#5064).
-  A Clean verdict on the live head from another reviewer (agy or Claude) fills its slot, and the condition alone is never escalated as a waiver.
+  A Clean verdict on the live head from another reviewer (agy or Claude) fills its slot, so being out of quota is never, by itself, grounds to ask for a manual waiver.
   Rerun the checker with `--reviewer-out-of-quota <name>` (for example `copilot`):
   the quota-blocked reviewer's stale not-clean verdict then stops vetoing and a NOTE names the substitute,
   but its not-clean verdict on the live head itself still vetoes.

@@ -59,6 +59,18 @@ POINTING = {"the", "that", "those", "other", "another", "my", "our", "their",
             "its", "previous", "earlier", "prior", "parent", "child",
             "sibling"}
 HOST_ID = re.compile(r"[a-z]+\d+-\d+", re.I)
+# ai-config#5058 (Ezra, 2026-11-07, "always hyperlink; don't make me ask"):
+# a descriptive name between a pointing word and "thread" ("the runner
+# thread", "the CI thread") names a project thread. These words name a
+# technical or forge thread instead and stay exempt.
+NAMED_THREAD = re.compile(
+    r"(?<![\w-])(?:the|that|those|other|another|my|our|their|its|your)"
+    r" ([\w-]+) threads?\b", re.I)
+TECHNICAL_THREAD = {
+    "main", "worker", "review", "support", "comment", "email", "forum",
+    "discussion", "reply", "background", "conversation", "os", "kernel", "gui",
+    "ui", "io", "gpu", "cpu", "python", "r", "julia", "java", "jvm", "event",
+    "render", "download", "upload", "polling", "daemon"}
 LINK = re.compile(
     r"claude\.ai/code/session_\w+|\(#cmsg_\w+\)|[?&]thread=cmsg_\w+")
 UNIT_BREAK = re.compile(r"\n[ \t]*\n|\n(?=(?:[-*+]|\d+[.)])[ \t])")
@@ -70,8 +82,8 @@ without a link. The user's standing rule (2026-10-16, reaffirmed 2026-10-22): \
 Resend with a link in the same paragraph or list item: \
 [session](https://claude.ai/code/session_<id>) for a Claude Code session \
 (the id from the status wake or cross-session message, `cse_` becomes \
-`session_`), or [thread title](#cmsg_...) for a project thread. Do not type \
-an id from memory.
+`session_`), or [thread title](#cmsg_...) for a project thread (find its \
+title and id with `list_threads`). Do not type an id from memory.
 If the phrase is not a Claude Code session or project thread (an R, database \
 or debugger session, an OS thread), put it in backticks and resend."""
 
@@ -90,6 +102,9 @@ def unlinked_mention(text: str):
             before = g.group(1)
             if before.lower() in POINTING or HOST_ID.fullmatch(before):
                 return g.group(0)
+        for n in NAMED_THREAD.finditer(unit):
+            if n.group(1).lower() not in TECHNICAL_THREAD:
+                return n.group(0)
     return None
 
 

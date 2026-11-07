@@ -64,12 +64,17 @@ def check_records(threads):
     input) and never crashes with Python's default exit 1, which means
     "flagged"; nothing is printed for a list that cannot be trusted.
     """
+    if not isinstance(threads, list):
+        raise ValueError("snapshots must be a JSON list")
     for i, t in enumerate(threads):
         if not isinstance(t, dict):
             raise ValueError(f"snapshot {i} is not an object")
         missing = [k for k in REQUIRED if k not in t]
         if missing:
             raise ValueError(f"snapshot {i} lacks {', '.join(missing)}")
+        wrong = [k for k in (*REQUIRED, "title") if k in t and not isinstance(t[k], str)]
+        if wrong:
+            raise ValueError(f"snapshot {i}: {', '.join(wrong)} must be text")
         parse_time(t["last_activity"])
 
 
@@ -112,10 +117,13 @@ def main(argv=None):
         return 2
     try:
         check_records(threads)
-    except ValueError as e:
-        print(f"error: {e}", file=sys.stderr)
+        flagged = quiet_announcers(threads, now, args.quiet_minutes)
+    except Exception as e:  # noqa: BLE001 -- reported loudly, never swallowed
+        # Python's default for an uncaught exception is exit 1, the code for
+        # "flagged". Any failure to examine the input is bad input (exit 2),
+        # whatever shape of defect the check_records list missed.
+        print(f"error: {type(e).__name__}: {e}", file=sys.stderr)
         return 2
-    flagged = quiet_announcers(threads, now, args.quiet_minutes)
     for f in flagged:
         print(json.dumps(f))
     print(f"examined {len(threads)} thread(s), flagged {len(flagged)}", file=sys.stderr)

@@ -81,5 +81,13 @@ check("exit 2 on a --now with no UTC offset",
 check("an offset other than Z is accepted",
       run([thread("Merged.", last="2026-11-07T02:30:00-08:00")]).returncode, 0)
 
+for field, value in (("last_reply", 12345), ("last_reply", ["a"]), ("last_reply", True),
+                     ("id", 7), ("title", 3), ("state", None)):
+    bad = thread("I'm starting the next layer now.")
+    bad[field] = value
+    check(f"exit 2 when {field} is {value!r}", run([bad]).returncode, 2)
+check("exit 2 when the snapshots are a number", run(5).returncode, 2)
+check("exit 2 when the snapshots are an object", run({"id": "x"}).returncode, 2)
+
 print(f"\n{len(FAILS)} failure(s)")
 sys.exit(1 if FAILS else 0)

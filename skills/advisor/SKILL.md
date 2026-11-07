@@ -36,7 +36,7 @@ Each value below is a parameter with today's default, so a caller can change it 
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| `engine` | `opencode` | The CLI or endpoint that reaches the advisor. `agy` is the other seat. Codex is never a seat: the lab forbids it, for this skill and every other. |
+| `engine` | `opencode` | The CLI or endpoint that reaches the advisor. `agy` is the other seat. Codex is never a seat, because the lab allows it only in UCDH projects (`bcs`, `hac`) and this skill is for the rest. |
 | `model` | the strongest model `engine` offers outside the caller's family | Look it up at call time; do not hard-code a model name in a brief. |
 | `effort` | the highest the engine offers | Pinned, not inherited: a cheap consult on a hard question wastes the reason for asking. |
 | `briefing_path` | a file in the scratchpad directory | Where the briefing is written before the call. |

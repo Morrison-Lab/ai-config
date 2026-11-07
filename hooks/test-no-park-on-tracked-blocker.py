@@ -408,6 +408,12 @@ CASES = [
     ("wrapped up and left it there", [say("After waiting on #12, I wrapped things up and left it there.")], True),
     ("wrapped up and held off", [say("After waiting on #12, I wrapped things up and held off.")], True),
     ("wrapped up and left comments", [say("After waiting on #12, I wrapped things up and left review comments.")], False),
+    # Claude review of 0ef18d1a: a stop verb with a real object is other news.
+    ("wrapped up and quit smoking", [say("After waiting on #12, I wrapped things up and quit smoking.")], False),
+    ("wrapped up and suspended the job", [say("After waiting on #12, I wrapped things up and suspended the other job for review.")], False),
+    ("wrapped up and postponed the meeting", [say("After waiting on #12, I wrapped things up and postponed the meeting to next week.")], False),
+    ("wrapped up and quit side project", [say("While waiting on #12, I wrapped things up and quit my side project.")], False),
+    ("wrapped up and suspended work", [say("After waiting on #12, I wrapped things up and suspended work.")], True),
     # glm review of fd98389a: a time of day after the day is still a time.
     ("stop until tomorrow afternoon", [say("After waiting on gha#1544, I decided to stop until tomorrow afternoon.")], True),
     ("sole string-input reply blocks",

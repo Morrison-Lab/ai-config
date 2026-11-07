@@ -317,9 +317,13 @@ _STOP_PHRASE_RX = re.compile(
     # logged off"); "I wrapped things up and merged #13" reports work.
     r"|\s(?:and|but)\s+(?:then\s+)?(?:(?:I|we)\s+)?(?:stop|paus|call(?:ed)?\s+it\b"
     r"|took\s+a\s+break|wrap|(?:sign(?:ed)?|log(?:ged)?|switch(?:ed)?)\s+off"
-    r"|(?:" + "|".join(sorted(_STOP_VERBS)) + r")\b"
-    r"|left\s+(?:it|things|the\s+rest)\b|held\s+off\b|put\s+(?:it|things)\s+(?:off|aside)\b"
-    r"|ended\s+there\b))",
+    # A stop verb counts there only alone or with a bare work object ("and
+    # halted", "and shelved it"), since "and quit smoking" is other news.
+    r"|(?:(?:" + "|".join(sorted(_STOP_VERBS)) + r")"
+    r"(?:\s+(?:it|them|this|that|things|work|everything|here|there))?"
+    r"|left\s+(?:it|things|the\s+rest)(?:\s+(?:here|there))?|held\s+off"
+    r"|put\s+(?:it|things)\s+(?:off|aside)|ended\s+there)"
+    r"\s*(?:[.,;:!?)]|$)))",
     re.I,
 )
 # Verbs that describe stopping only with a stopping object: "I left the rest

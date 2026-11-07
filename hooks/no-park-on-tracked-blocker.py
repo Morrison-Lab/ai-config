@@ -279,14 +279,19 @@ _STOP_VERBS = {
     "stopped", "paused", "parked", "deferred", "halted", "quit", "waited",
     "shelved", "postponed", "suspended",
 }
-# Stopping language anywhere in the reported clauses makes the sentence a
-# park, whatever verb carries it ("so I called it a day", "I decided to stop").
+# The times a stop is put off to: "for the morning", "until tomorrow".
+_STOP_TIME = (
+    r"(?:later|tomorrow|now|today|tonight|the\s+(?:morning|afternoon|evening|night|day|"
+    r"weekend|week))"
+)
+# A stop phrase that ends its clause stops its own verb ("so I called it a
+# day", "I decided to stop").
 _STOP_PHRASE_RX = re.compile(
     r"\b(?:stop(?:s|ped|ping)?|paus(?:e|es|ed|ing)|call(?:ed)?\s+it\s+a\s+(?:day|night)"
     r"|wrap(?:ped)?\s+up|sign(?:ed)?\s+off|log(?:ged)?\s+off)"
     # Only a stop that ends its clause, alone or with a time or place:
     # "I stopped the leak", "I'll stop by" and "I wrapped up the docs" report work.
-    r"(?:\s+(?:for\s+(?:now|today|tonight|the\s+(?:night|day|weekend))|there|here))?"
+    r"(?:\s+(?:(?:for|until)\s+" + _STOP_TIME + r"|there|here))?"
     r"\s*(?=[.,;:!?)]|$)",
     re.I,
 )
@@ -296,7 +301,7 @@ _STOP_PHRASE_RX = re.compile(
 _STOP_WITH_OBJECT = {"left", "put", "kept", "held", "ended"}
 _STOP_OBJECT_RX = re.compile(
     r"\s+(?:(?:the\s+)?rest|everything|things|it\s+there|there|it\s+at|off\b|aside\b"
-    r"|(?:\S+\s+){0,3}?(?:aside|on\s+hold|for\s+(?:later|tomorrow|now|the\s+(?:morning|night|day)))\b(?!')"
+    r"|(?:\S+\s+){0,3}?(?:aside|on\s+hold|for\s+" + _STOP_TIME + r")\b(?!')"
     r"|(?:\S+\s+){0,3}?until\b)",
     re.I,
 )

@@ -357,6 +357,11 @@ CASES = [
     ("for the merge queue", [say("mds#649 waits on #12, for the merge queue to merge it.")], True),
     ("them for approval", [say("I sent the patch to both reviewers; mds#649 waits on them (#12) for approval.")], False),
     ("then called it a day", [say("After waiting on #12 for CI, then called it a day.")], True),
+    # Claude review of 42e59183: every stop time counts.
+    ("signed off for the evening", [say("After waiting on #12, I signed off for the evening.")], True),
+    ("signed off for the morning", [say("After waiting on #12, I signed off for the morning.")], True),
+    ("logged off for the evening", [say("After waiting on #12, I logged off for the evening.")], True),
+    ("left the rest for the afternoon", [say("While waiting on #12, I left the rest for the afternoon.")], True),
     ("decided to stop comma", [say("After waiting on #12 I decided to stop, and #13 can wait.")], True),
     ("sole string-input reply blocks",
      [{"type": "assistant", "message": {"content": [{

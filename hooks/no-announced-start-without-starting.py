@@ -67,6 +67,13 @@ _STATIVE = (
     r"(?:realiz|think|wonder|hop|feel|guess|assum|doubt|worr|forget|"
     r"understand|see|know|believ|suspect)ing"
 )
+# Words after "I'm" / "I'll" that state a negation, a feeling or a state of
+# mind instead of announcing work.
+_NOT_ANNOUNCING = (
+    r"(?:not|never|no|be|also|probably|just|sure|unsure|uncertain|certain|"
+    r"sorry|glad|happy|afraid|aware|confused|stuck|unable|unclear|"
+    r"curious|worried|hesitant|inclined)\b|" + _STATIVE
+)
 
 PATTERNS = [
     r"I'?ll start (?:on )?(?:it|that|this|these|those|them)\b",
@@ -99,12 +106,13 @@ PATTERNS = [
     # "Next" plus a first-person verb is an announcement; the two-sentence
     # tail window and the conditional exemption keep a mid-reply "Next, I'll
     # summarize below." that goes on to deliver from matching.
-    # "I'm" must be followed by a gerund (an action in progress), and "I'll"
-    # by a word that is not a negation or a state, so "Next, I'm not going to
-    # fix this" and "Next, I'm uncertain whether ..." do not match (Claude
-    # review on #5052). Stative gerunds are excluded for the same reason.
-    r"^[\s*_>-]*next(?: up)?,?:?\s+(?:(?:I am|I'?m)\s+(?:now\s+)?(?:(?:about|set|ready|due)\s+to\b|(?!" + _STATIVE + r")[a-z]+ing\b)"
-    r"|(?:I'?ll|I will)\s+(?:now\s+)?(?!not\b|never\b|be\b|also\b|probably\b|just\b)[a-z]+)",
+    # Any word may follow "Next, I'm / I'll", EXCEPT the explicit non-announcing
+    # words in _NOT_ANNOUNCING. The rule is an exclusion list on purpose: an
+    # inclusion list of announcing words ("about to", "ready to", "poised to",
+    # ...) can never cover the open class of immediate-future phrasings, and
+    # each patch only moved the hole (four review rounds on #5052). The cost of
+    # a missed exclusion is one false block per message.
+    r"^[\s*_>-]*next(?: up)?,?:?\s+(?:I am|I'?m|I'?ll|I will)\s+(?:now\s+)?(?!" + _NOT_ANNOUNCING + r")[a-z]+",
     r"(?:I am|I'?m)\s+now\s+(?!" + _STATIVE + r")[a-z]+ing\s+(?:it|that|this|the|a|an|my|our|them)\b",
 ]
 # `start WITH` was dropped from the two `I'll start` alternatives above.

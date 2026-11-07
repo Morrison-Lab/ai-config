@@ -237,6 +237,15 @@ def main():
         "Next, I'm ready to deploy the fix.",
         "Next, I'm due to start the migration.",
     ]
+    posted_block += [
+        # Claude review on #5052: the open class of immediate-future phrasings.
+        "I read the issue. Next, I'm poised to fix the bug.",
+        "I read the issue. Next, I'm prepared to fix the bug.",
+        "I read the issue. Next, I'm slated to fix the bug.",
+        "I read the issue. Next, I'm scheduled to fix the bug.",
+        "I read the issue. Next, I'm committed to fixing the bug.",
+        "I read the issue. Next, I'm all set to fix the bug.",
+    ]
     posted_pass = [
         # Claude review on #5052: declining, uncertainty and stative gerunds
         # announce no work.

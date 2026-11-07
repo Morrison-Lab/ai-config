@@ -246,6 +246,35 @@ def main():
         "I read the issue. Next, I'm committed to fixing the bug.",
         "I read the issue. Next, I'm all set to fix the bug.",
     ]
+    posted_block += [
+        # agy review on #5068: these verbs also announce real actions.
+        "I read the issue. Next, I'll pass --force-with-lease to git push.",
+        "I read the issue. Next, I'll pass the token to the script.",
+        "I read the issue. Next, I'll leave a comment on the PR.",
+        "I read the issue. Next, I'll leave a review note.",
+        "I read the issue. Next, I'll stop the background daemon.",
+        # Claude review on #5068: the other added words, with a real action in the clause.
+        "I read the issue. Next, I'll skip the linter and push directly to main.",
+        "I read the issue. Next, I'll defer the migration to next week and push this hotfix now.",
+        # Known misses under the positive verb list (#5071): the verb right
+        # after "Next, I'm" is "done", "finished" or "tired", not a work verb,
+        # so "Next, I'm done reviewing, let me merge the PR." is not flagged.
+        # The trade accepted in #5071: a missed edge case beats the
+        # whack-a-mole of the exclusion list.
+        "I read the issue. Next, I'll merge the PR.",
+        # Claude review on #5074: consonant-doubling gerunds.
+        "I read the issue. Next, I'm formatting the file now.",
+        "I read the issue. Next, I'm debugging the parser now.",
+        "I read the issue. Next, I'm grepping the logs now.",
+        "I read the issue. Next, I'm tagging the release now.",
+        "I read the issue. Next, I'm digging into the logs now.",
+        "I read the issue. Next, I'm rerunning the pipeline now.",
+        "I read the issue. Next, I'm beginning the migration now.",
+        "I read the issue. Next, I'm cancelling the stale runs now.",
+        "I read the issue. Next, I'm skipping the linter and pushing now.",
+        "I read the issue. Next, I'm stopping the daemon now.",
+        "I read the issue. Next, I'm pushing this straight to main.",
+    ]
     posted_pass = [
         # Claude review on #5052: declining, uncertainty and stative gerunds
         # announce no work.
@@ -253,6 +282,14 @@ def main():
         "I checked the logs. Next, I'm uncertain whether this is worth pursuing.",
         "I checked the logs. I'm now realizing this was a mistake.",
         "Next, I'll not touch the config.",
+        # ai-config#5061: declining or stopping work announces no work.
+        "Next, I'll leave this alone for now.",
+        "Next, I'll skip this for now.",
+        "Next, I'll defer this to the backlog.",
+        "Next, I'll pass on this one.",
+        "Next, I'll stop here.",
+        "Next, I'm done for today.",
+        "Next, I'm finished with this task.",
         "Next I'm opening the first workflow PR once the review lands.",
         "Next I'll file it, but I'm blocked on the repo grant.",
         "Next I'm waiting for the runner thread.",

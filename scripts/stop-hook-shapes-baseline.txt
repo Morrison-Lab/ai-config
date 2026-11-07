@@ -1,0 +1,35 @@
+# ai-config#5055 ratchet: Stop hooks that read the final message but name no handling for a transcript shape.
+# One `hook shape` pair per line. Delete a line when the hook handles the shape or declares it skips it.
+# A new hook must never be added here (scripts/check-stop-hook-shapes.py).
+# Burn-down tracked in ai-config#5075.
+flag-blocker-without-retry.py antigravity
+flag-blocker-without-retry.py post_message
+flag-book-unavailable-without-library-search.py antigravity
+flag-clean-claim-over-findings.py post_message
+flag-config-deletion-without-ref-check.py antigravity
+flag-stale-clean-tree-claim.py post_message
+no-clean-stop-with-live-agent.py antigravity
+no-clean-stop-with-live-agent.py post_message
+no-empty-promise.py post_message
+no-incomplete-check-enumeration.py post_message
+no-memory-only-learning.py antigravity
+no-memory-only-learning.py post_message
+no-merge-word-gate-on-drafting.py post_message
+no-mistake-without-a-hook.py post_message
+no-reauth-without-host-check.py antigravity
+no-stale-pr-status.py post_message
+no-unchecked-empty-pr-claim.py antigravity
+no-unchecked-empty-pr-claim.py post_message
+no-unfiled-finding.py post_message
+no-unmeasured-clock-claim.py post_message
+no-unmonitored-pr.py post_message
+no-unread-issue-claim.py antigravity
+no-unread-issue-claim.py post_message
+no-unreviewed-pr.py antigravity
+no-unreviewed-pr.py post_message
+no-user-correction-without-mechanism.py antigravity
+no-user-correction-without-mechanism.py post_message
+remind-mergeability-on-status.py antigravity
+remind-mergeability-on-status.py post_message
+warn-bash-command-for-powershell-user.py antigravity
+warn-stale-test-claim.py post_message

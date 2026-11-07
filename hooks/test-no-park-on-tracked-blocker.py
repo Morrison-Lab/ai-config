@@ -294,6 +294,24 @@ CASES = [
     ("comma-less while report", [say("While waiting on #12 I merged #13.")], False),
     ("subjectless then merged", [say("After waiting on #12 for CI, then merged the follow-up.")], True),
     ("comma-less while then stopping", [say("While waiting on #12 I stopped.")], True),
+    # Round 7 (glm-5.3 on eb8f08f3).
+    ("ended up merging", [say("After waiting on #12, I ended up merging it before lunch.")], False),
+    ("put a patch up", [say("While waiting on #12, I put the final patch up in #13 and merged the docs fix.")], False),
+    ("kept CI green", [say("While waiting on #12, I kept the CI green and filed the release notes.")], False),
+    ("left review comments", [say("After waiting on #12, I left review comments on the sub-issues.")], False),
+    ("ended there", [say("After waiting on #12, I ended there.")], True),
+    ("put it aside", [say("While waiting on #12, I put the export aside.")], True),
+    ("then called it a day", [say("After waiting on #12, then called it a day.")], True),
+    ("once item gets approved", [say("I'll tag the release once gha#1544 gets approved.")], True),
+    ("for the team to review", [say("mcs#99 waits on #12, for the team to review the patch.")], False),
+    ("for them to review", [say("mcs#99 waits on #12, for them to review it.")], False),
+    ("for a named person to sign off", [say("mcs#99 waits on #12, for Dana to sign off.")], False),
+    ("for the bot to review", [say("mcs#99 waits on #12, for the review bot to review it.")], True),
+    ("for CI to finish", [say("mcs#99 waits on #12 for CI to finish.")], True),
+    ("sole string-input reply blocks",
+     [{"type": "assistant", "message": {"content": [{
+         "type": "tool_use", "name": "mcp__hearthbot__post_message",
+         "input": "mds#649 waits on gha#1544."}]}}], True),
 ]
 
 

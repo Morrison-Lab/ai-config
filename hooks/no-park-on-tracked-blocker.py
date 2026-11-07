@@ -138,7 +138,8 @@ PHRASE_RX = re.compile(
 _DONE = (
     r"(?:merges|lands|ships|closes|passes"
     r"|is\s+(?:merged|ready|fixed|done|closed|resolved|green|approved|released|deployed)"
-    r"|(?:goes|turns)\s+green|gets\s+merged)"
+    r"|(?:goes|turns|gets|becomes)\s+green"
+    r"|gets\s+(?:merged|approved|released|deployed|fixed|resolved|closed))"
 )
 # A present- or future-tense parking verb. Past tense ("waited", "held")
 # reports what happened, and "Stopping" is the status-line label.
@@ -199,7 +200,11 @@ _TOKEN_STRIP = "[](){}*_\"'`<>,:"
 _ROLE = r"(?:user|maintainer|owner|reviewer|human|person)"
 # A person, singular or plural: "you", "Ezra", "the maintainer", "upstream maintainers".
 _PERSON = (
-    r"(?:you|ezra|people|(?:(?:the|a|an|upstream)\s+)?" + _ROLE + r"s?)"
+    r"(?:you|ezra|people|them|(?:(?:the|a|an|upstream)\s+)?(?:" + _ROLE + r"s?|team))"
+)
+# A person-only action: "for Dana to sign off", "for the team to review".
+_PERSON_ACTION = (
+    r"(?:review|approve|sign\s+off|decide|answer|reply|respond|confirm|weigh\s+in|look)"
 )
 PERSON_GATE_RX = re.compile(
     r"\bneeds?\s+(?:you|your|ezra|the\s+user|a\s+(?:human|person|maintainer|reviewer))\b"
@@ -208,6 +213,8 @@ PERSON_GATE_RX = re.compile(
     r"(?:approval|go-?ahead|ok|okay|say-?so|answer|decision|review|click|sign-?in|sign-?off|merge|input|"
     r"confirmation|token|secret|credentials?)\b"
     r"|\bfor\s+" + _PERSON + r"\s+to\b"
+    r"|\bfor\s+(?!(?:the\s+|an?\s+)?(?:\S+[-\s])?(?:bots?|ci|copilot|claude|codex|gemini|agents?|"
+    r"automated|workflows?|checks?)\b)(?:\S+\s+){1,2}?to\s+" + _PERSON_ACTION + r"\b"
     r"|\b(?:wait(?:s|ing)?\s+(?:on|for)|blocked\s+(?:on|by)|gated\s+(?:on|by)|await(?:s|ing)?|"
     r"needs?|requires?)\s+"
     r"(?:an?\s+)?(?:mwc|manual|your|" + _PERSON + r")\b"
@@ -225,7 +232,7 @@ RESOLVED_RX = re.compile(
     r"|\bunblocked\b|\bnot\s+(?:blocked|blocking|waiting|gated|parked|awaiting|pending|dependent|held)\b"
     r"|\b(?:does|do|did)(?:\s+not|n" + _APOS + r"t)\s+(?:depend|wait|await)\b"
     r"|\bno\s+longer\s+on\s+hold\b"
-    r"|\b(?:is|are|was)\s+(?:now\s+)?over\b"
+    r"|\b(?:is|are|was)\s+(?:now\s+)?over\b(?!-)"
     r"|\bdepends\s+on\s+nothing\b",
     re.I,
 )
@@ -258,9 +265,19 @@ _PAST_RX = re.compile(
 # A past verb that describes the park itself ("I left the rest", "I finally
 # stopped") does not make the sentence a report of finished work.
 _STOP_VERBS = {
-    "stopped", "left", "paused", "parked", "held", "deferred", "halted", "ended",
-    "quit", "waited", "shelved", "put", "kept", "postponed", "suspended",
+    "stopped", "paused", "parked", "deferred", "halted", "quit", "waited",
+    "shelved", "postponed", "suspended",
 }
+# Verbs that describe stopping only with a stopping object: "I left the rest
+# for the morning" stops, "I left review comments" reports work, and "I
+# ended up merging it" reports work while "I ended there" stops.
+_STOP_WITH_OBJECT = {"left", "put", "kept", "held", "ended"}
+_STOP_OBJECT_RX = re.compile(
+    r"\s+(?:(?:the\s+)?rest|everything|things|it\s+there|there|it\s+at|off\b|aside\b"
+    r"|(?:\S+\s+){0,3}?(?:aside|on\s+hold|for\s+(?:later|tomorrow|now|the\s+(?:morning|night|day)))\b"
+    r"|(?:\S+\s+){0,3}?until\b)",
+    re.I,
+)
 # A line wrap ends a clause unless the line ends mid-phrase.
 _WRAP_JOIN = {
     "wait", "waits", "waiting", "await", "awaits", "awaiting", "blocked", "held", "parked",
@@ -351,9 +368,10 @@ def _block_output(b):
         txt = b.get("text")
     elif b.get("type") == "tool_use" and isinstance(b.get("name"), str) and REPLY_TOOL_RX.search(b["name"]):
         inp = b.get("input")
-        if not isinstance(inp, dict):
-            return None
-        txt = inp.get("text") or inp.get("message")
+        # A string input is the reply text itself; other odd types are skipped.
+        txt = inp if isinstance(inp, str) else (
+            inp.get("text") or inp.get("message") if isinstance(inp, dict) else None
+        )
     else:
         return None
     return txt if isinstance(txt, str) and txt.strip() else None
@@ -484,7 +502,15 @@ def _reports_past(sentence, start, pos):
 
 def _done_verb(text):
     """True when `text` has a first-person past verb that is not a stop verb."""
-    return any(m.group().split()[-1].lower() not in _STOP_VERBS for m in _PAST_RX.finditer(text))
+    return any(not _is_stop(text, m) for m in _PAST_RX.finditer(text))
+
+
+def _is_stop(text, m):
+    """True when the past verb at match `m` describes stopping."""
+    verb = m.group().split()[-1].lower()
+    if verb in _STOP_VERBS:
+        return True
+    return verb in _STOP_WITH_OBJECT and bool(_STOP_OBJECT_RX.match(text, m.end()))
 
 
 def find_park(text):

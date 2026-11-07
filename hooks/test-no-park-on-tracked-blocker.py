@@ -288,6 +288,12 @@ CASES = [
     ("the user's OK", [say("mcs#99 waits on #12 for the user's OK.")], False),
     ("once item is green", [say("I'll rerun the export once CI on #12 is green.")], True),
     ("comma then a non-person for clause", [say("mcs#99 waits on #12, for the CI rerun.")], True),
+    # Round 6b (glm-5.3 on ef3ec136).
+    ("past verb after so", [say("After waiting on #12 for CI, the run went green, so I merged it.")], False),
+    ("comma-less after report", [say("After waiting on #12 I merged it.")], False),
+    ("comma-less while report", [say("While waiting on #12 I merged #13.")], False),
+    ("subjectless then merged", [say("After waiting on #12 for CI, then merged the follow-up.")], True),
+    ("comma-less while then stopping", [say("While waiting on #12 I stopped.")], True),
 ]
 
 

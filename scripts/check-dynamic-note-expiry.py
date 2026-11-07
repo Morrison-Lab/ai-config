@@ -76,12 +76,14 @@ def units(lines):
 
     A table row is its own unit. To the blank-line rule a table is one
     paragraph, so a row added to a table made every older row a changed unit,
-    and one row's wording could fail the whole table.
+    and one row's wording could fail the whole table. A plain line after a row
+    starts a new unit too, so it cannot shelter under the row's expiry date.
     """
     start, buf = None, []
     for i, line in enumerate(lines, 1):
         blank = not line.strip()
-        if blank or BULLET.match(line) or TABLE_ROW.match(line):
+        after_row = bool(buf) and TABLE_ROW.match(buf[-1])
+        if blank or BULLET.match(line) or TABLE_ROW.match(line) or after_row:
             if buf:
                 yield start, i - 1, "\n".join(buf)
             start, buf = (None, []) if blank else (i, [line])

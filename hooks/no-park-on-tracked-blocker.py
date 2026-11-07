@@ -462,14 +462,24 @@ def _reports_past(sentence, start, pos):
     and neither does one that describes stopping (_STOP_VERBS)."""
     if _done_verb(sentence[start:pos]):
         return True
-    m = re.search(r"[,;]\s+", sentence[pos:])
+    rest = sentence[pos:]
+    m = re.search(r"[,;]\s+", rest)
+    # The wait's own clause ("After waiting on #12 I merged it") counts.
+    if _done_verb(rest[:m.start()] if m else rest):
+        return True
     if not m:
         return False
-    nxt = re.split(r"[,;]\s|\s(?:and|but)\s", sentence[pos + m.end():], maxsplit=1)[0]
+    # The next clause, carried on through ", so" ("the run went green, so I
+    # merged it"), but not through "and"/"but", which start other work.
+    nxt = re.split(r";\s|,\s+(?!so\b)|\s(?:and|but)\s", rest[m.end():], maxsplit=1)[0]
     if _done_verb(nxt):
         return True
+    # A bare "then merged it" needs a first-person subject before the wait.
     t = re.match(r"then\s+(\w+ed)\b", nxt, re.I)
-    return bool(t and t.group(1).lower() not in _STOP_VERBS)
+    return bool(
+        t and t.group(1).lower() not in _STOP_VERBS
+        and re.search(r"\b(?:I|we)\b", sentence[start:pos])
+    )
 
 
 def _done_verb(text):

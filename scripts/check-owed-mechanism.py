@@ -51,10 +51,12 @@ MECHANISM_WORD = re.compile(rf"\b{MECH}\b", re.I)
 # A conditional or instructional sentence describes a procedure, not a debt.
 PROCEDURE = re.compile(
     r"\b(?:if|when|whenever|once|unless|whether|how\s+to|before|after|in\s+case)\b", re.I)
-# "No separate hook is needed" denies a debt. "not yet filed" is a debt, so
-# `not` counts as a negation only when `yet` does not follow it.
-NEGATED = re.compile(r"\b(?:no|never|nothing)\b|n't\b|\bnot\b(?!\s+yet\b)", re.I)
-CLAUSE = re.compile(r"[,;:]|\s+(?:but|although|though|while|and)\s+", re.I)
+# "No separate hook is needed" denies a debt; the negator is within a few words
+# of the owed phrase. "not yet filed" is itself a debt phrase, so it is matched
+# by OWED and never by its own lead-in.
+NEGATED = re.compile(r"\b(?:no|never|nothing|nobody|not)\b|n't\b", re.I)
+NEGATION_WINDOW = 3
+CLAUSE =re.compile(r"[,;:]|\s+(?:but|although|though|while|and)\s+", re.I)
 LINK = re.compile(r"(?:^|[\s(\[])(?:[\w.-]+/[\w.-]+)?#\d+\b|/(?:issues|pull)/\d+")
 ALLOW = "<!-- owed-mechanism: allow -->"
 # Straight-quoted, curly-quoted and code-span text is wording, not an assertion.
@@ -70,11 +72,21 @@ def is_owed_claim(unit):
     for s in cdne.SENTENCE.split(" ".join(unit.split())):
         if not (MECHANISM_WORD.search(s) and not PROCEDURE.search(s)):
             continue
-        # Negation is judged per clause: "the old guard isn't needed, but a new
-        # check is owed" denies one need and asserts another debt.
-        if any(OWED.search(c) and not NEGATED.search(c) for c in CLAUSE.split(s)):
+        if any(not negated_at(s, m) for m in OWED.finditer(s)):
             return True
     return False
+
+
+def negated_at(sentence, match):
+    """True when a negator sits in the few words just before this owed phrase.
+
+    Negation is judged for each owed phrase on its own, from the words that
+    lead into it, so a negation elsewhere in the sentence ("the old guard
+    isn't needed, but a new check is owed") or inside a relative clause ("a
+    hook that hasn't been written yet is owed") cannot hide a real debt.
+    """
+    lead = CLAUSE.split(sentence[:match.start()])[-1].split()
+    return bool(NEGATED.search(" ".join(lead[-NEGATION_WINDOW:])))
 
 
 def violations(lines, changed=None):

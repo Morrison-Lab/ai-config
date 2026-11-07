@@ -427,6 +427,19 @@ def _park_positions(sentence):
             yield m.end() - 1, False
 
 
+def _reports_past(sentence, start, pos):
+    """True when the narrative wait's own clause, or the clause right after
+    it, has a first-person past verb ("After waiting on #12, I merged it").
+    A past verb about other work elsewhere in the sentence does not count."""
+    if _PAST_RX.search(sentence[start:pos]):
+        return True
+    m = re.search(r"[,;]\s+", sentence[pos:])
+    if not m:
+        return False
+    nxt = re.split(r"[,;]\s|\s(?:and|but)\s", sentence[pos + m.end():], maxsplit=1)[0]
+    return bool(_PAST_RX.search(nxt) or re.match(r"then\s+\w+ed\b", nxt, re.I))
+
+
 def find_park(text):
     """The first sentence parking work on a tracked item, or None."""
     prose = strip_code(_REF_SPAN_RX.sub(r" \2", text))
@@ -441,7 +454,7 @@ def find_park(text):
                 narrative
                 and _GERUND_PHRASE_RX.match(sentence, pos)
                 and _NARRATIVE_RX.search(sentence[start:pos])
-                and _PAST_RX.search(sentence)
+                and _reports_past(sentence, start, pos)
             ):
                 continue
             return sentence.strip()

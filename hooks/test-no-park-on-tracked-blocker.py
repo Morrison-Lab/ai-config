@@ -252,6 +252,13 @@ CASES = [
      [say("After waiting on #12 to pass CI, I merged it and I'll start #13 next.")], False),
     ("while still waiting report", [say("While still waiting on #12, I fixed the lint warnings.")], False),
     ("spent a long duration", [say("I spent about two more minutes waiting for #12, then merged it.")], False),
+    # Claude reviews of 45165a5c and e5ad0766: the past verb must be the wait's own.
+    ("past then unrelated future", [say("After waiting on #12 to pass CI, I merged it, and I will tag a release.")], False),
+    ("spent then future", [say("I spent two minutes waiting for #12 to finish CI, and I will now clean up.")], False),
+    ("while earlier then future", [say("While waiting on #12 earlier, I filed a follow-up; I will check back tomorrow.")], False),
+    ("unrelated past verb does not exempt",
+     [say("I've already merged #20, but after waiting on #12, I'll start #13 instead.")], True),
+    ("everything after item", [say("Everything after #10 depends on gha#1544.")], True),
     # Antigravity transcript shape.
     ("antigravity park blocks", [{"type": "USER_INPUT", "content": "go", "step_index": 1},
                                  {"type": "PLANNER_RESPONSE", "content": "mds#649 waits on gha#1544.",

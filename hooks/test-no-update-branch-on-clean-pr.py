@@ -13,6 +13,8 @@ HOOK = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
     os.path.dirname(__file__), "no-update-branch-on-clean-pr.py")
 TOOL = "mcp__github__update_pull_request_branch"
 CLEAN47 = "Morrison-Lab/ids#47 is FULLY CLEAN on HEAD 98ed862a"
+HDR47 = "Checking ARDI / fully-clean status for Morrison-Lab/ids#47..."
+HDR99 = "Checking ARDI / fully-clean status for Morrison-Lab/other#99..."
 DRIFT = "main gained 3 commit(s) since this head's merge base, including changes to .github/workflows/x.yml."
 
 # (name, tool, owner, repo, number, transcript text or None for a missing file, should_deny)
@@ -22,10 +24,16 @@ CASES = [
     ("other PR number untouched", TOOL, "Morrison-Lab", "ids", 48, CLEAN47, False),
     ("other repo untouched", TOOL, "Morrison-Lab", "lds", 47, CLEAN47, False),
     ("no clean line untouched", TOOL, "Morrison-Lab", "ids", 47, "just chatting", False),
-    ("later base-drift report lifts the denial", TOOL, "Morrison-Lab", "ids", 47,
-     CLEAN47 + "\n" + DRIFT, False),
+    ("later base-drift report for this PR lifts the denial", TOOL, "Morrison-Lab", "ids", 47,
+     CLEAN47 + "\n" + HDR47 + "\n" + DRIFT, False),
     ("earlier base-drift report does not lift it", TOOL, "Morrison-Lab", "ids", 47,
-     DRIFT + "\n" + CLEAN47, True),
+     HDR47 + "\n" + DRIFT + "\n" + CLEAN47, True),
+    ("a drift report under another PR's header does not lift it", TOOL, "Morrison-Lab", "ids", 47,
+     CLEAN47 + "\n" + HDR99 + "\n" + DRIFT, True),
+    ("a drift report with no checker header does not lift it", TOOL, "Morrison-Lab", "ids", 47,
+     CLEAN47 + "\n" + DRIFT, True),
+    ("drift under this PR's header after another PR's still lifts it", TOOL, "Morrison-Lab", "ids", 47,
+     CLEAN47 + "\n" + HDR99 + "\n" + HDR47 + "\n" + DRIFT, False),
     ("other tool ignored", "mcp__github__merge_pull_request", "Morrison-Lab", "ids", 47, CLEAN47, False),
     ("unreadable transcript fails open", TOOL, "Morrison-Lab", "ids", 47, None, False),
 ]

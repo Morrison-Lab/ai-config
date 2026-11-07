@@ -27,6 +27,7 @@ import sys
 TOOL = "mcp__github__update_pull_request_branch"
 CLEAN = re.compile(r"([\w.-]+/[\w.-]+)#(\d+) is FULLY CLEAN on HEAD ([0-9a-f]{7,40})\b")
 DRIFT = re.compile(r"gained \d+ commit\(s\) since this head's merge base")
+HEADER = re.compile(r"fully-clean status for ([\w.-]+/[\w.-]+)#(\d+)")
 
 REASON = """\
 [hook: no-update-branch-on-clean-pr] {repo}#{num} is already fully clean on \
@@ -46,6 +47,25 @@ def last_clean(text, repo, num):
         if m.group(1).lower() == repo and m.group(2) == num:
             found = (m.start(), m.group(3))
     return found
+
+
+def drift_after(text, repo, num, after):
+    """True when a base-drift report for THIS PR follows position *after*.
+
+    The drift message names no PR, so it is attributed to the checker run whose
+    header ("Checking ARDI / fully-clean status for <repo>#<N>...") most
+    recently precedes it. A report under another PR's header, or under none,
+    does not count (review of ai-config#5094).
+    """
+    headers = [(m.start(), m.group(1).lower(), m.group(2))
+               for m in HEADER.finditer(text)]
+    for d in DRIFT.finditer(text):
+        if d.start() <= after:
+            continue
+        owner = [h for h in headers if h[0] < d.start()]
+        if owner and owner[-1][1:] == (repo, num):
+            return True
+    return False
 
 
 def main() -> int:
@@ -71,7 +91,7 @@ def main() -> int:
     clean = last_clean(text, repo, num)
     if clean is None:
         return 0
-    if any(m.start() > clean[0] for m in DRIFT.finditer(text)):
+    if drift_after(text, repo, num, clean[0]):
         return 0
     print(json.dumps({
         "hookSpecificOutput": {

@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 
 REPOS = ["lds", "mds", "pds", "sds", "mcs", "psw", "ai-config", "gha", "macros"]
 ORG = "Morrison-Lab"
-CLAIM = re.compile(r"\b(claim(ed|ing)?|working on|taking this|owner:)\b", re.I)
+CLAIM = re.compile(r"\b(claim(ed|ing)?|working on|taking this)\b|\bowner:", re.I)
 PRIORITY = {"P1": 1, "P2": 2}
 
 
@@ -59,10 +59,14 @@ def find_unowned(issues: list[dict], now: datetime, grace_minutes: int = 60) -> 
 
 
 def gh(path: str) -> list | dict:
-    done = subprocess.run(["gh", "api", "-X", "GET", path, "--paginate"],
+    done = subprocess.run(["gh", "api", "-X", "GET", path, "--paginate", "--slurp"],
                           capture_output=True, text=True, check=True)
-    text = done.stdout.replace("][", ",")
-    return json.loads(text)
+    return flatten_pages(json.loads(done.stdout))
+
+
+def flatten_pages(pages: list) -> list:
+    """Join the per-page arrays that `gh api --paginate --slurp` returns."""
+    return [row for page in pages for row in page]
 
 
 def load(repos: list[str]) -> list[dict]:

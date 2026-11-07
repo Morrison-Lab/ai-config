@@ -5,6 +5,7 @@ A zero from the checker means nothing until it has been seen to report a
 KNOWN unowned issue (shared/principles/fail-fast.md).
 """
 import importlib.util
+import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -50,5 +51,15 @@ check("owed-followup issue is overdue after the grace period",
 
 found = cui.find_unowned([issue(8, ["P2"]), issue(9, ["P1"])], NOW)
 check("P1 sorts before P2", [i["number"] for i in found] == [9, 8])
+
+for body in ["Owner: alice", "Owner: @alice", "owner:bob", "Claimed by X"]:
+    check(f"claim recognized: {body!r}",
+          cui.find_unowned([issue(10, ["P1"], comments=[body])], NOW) == [])
+check("unrelated comment is not a claim",
+      len(cui.find_unowned([issue(11, ["P1"], comments=["Reproduced on main"])], NOW)) == 1)
+
+pages = json.loads('[[{"title": "a ][ b"}], [{"title": "c"}]]')
+check("slurped pages flatten without touching '][' inside titles",
+      cui.flatten_pages(pages) == [{"title": "a ][ b"}, {"title": "c"}])
 
 sys.exit(1 if failures else 0)

@@ -45,6 +45,8 @@ Also count any thread with a post or a PR event in the last 15 minutes, and read
 ## Mechanism
 
 An hourly scheduled task, `trig_01N2XJVzro32Mtpv6ZrGLKPu`, fires into the project coordinator session.
-It has the coordinator run the check above and start a thread on every issue it reports as overdue, busy threads or not, and on the top unowned issue when no thread is working ([ai-config#4968](https://github.com/Morrison-Lab/ai-config/issues/4968), created 2026-11-05 with Ezra's OK).
+Each firing has the coordinator run the check above.
+The coordinator starts a thread on every issue the check reports as overdue, whether or not other threads are working.
+It also starts a thread on the top unowned issue when no thread is working ([ai-config#4968](https://github.com/Morrison-Lab/ai-config/issues/4968), created 2026-11-05 with Ezra's OK).
 Hooks do not run in cloud sessions ([#2004](https://github.com/Morrison-Lab/ai-config/issues/2004)), so the scheduled task is the only enforcement there.
 Update or delete that task rather than adding a second one.

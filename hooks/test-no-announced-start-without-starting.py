@@ -208,6 +208,10 @@ def main():
         "Done with CI.\n\nI'm now opening the follow-up PR.",
     ]
     posted_pass = [
+        # Review finding on #5052: exposition that delivers in the same sentence.
+        "I looked at the code. Next, I'll explain the key insight: the loop "
+        "never terminates because of an off-by-one error.",
+        "Next, I'll summarize the findings.",
         "Next I'm opening the first workflow PR once the review lands.",
         "Next I'll file it, but I'm blocked on the repo grant.",
         "Next I'm waiting for the runner thread.",
@@ -231,6 +235,16 @@ def main():
             print(f"FAIL (post_message should pass): {text!r}")
         else:
             print(f"PASS post_message allow: {text[:50]!r}")
+
+    # Review finding on #5052: every user-visible reply tool is read.
+    for name in ("mcp__hearthbot__reply", "mcp__hearthbot__update_message"):
+        clear_sentinels()
+        out = run([tool(name, text="Next I'm opening the first workflow PR."), end_turn()])
+        if not out or json.loads(out).get("decision") != "block":
+            failures += 1
+            print(f"FAIL ({name} should block)")
+        else:
+            print(f"PASS {name} block")
 
     # Work after the announcement (any non-hearthbot tool call) clears it.
     clear_sentinels()

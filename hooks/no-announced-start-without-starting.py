@@ -118,7 +118,17 @@ CONDITIONAL_RX = re.compile(
     re.I,
 )
 
-SENTENCE_SPLIT_RX = re.compile(r"(?<=[.!?;])\s+|\n")
+# A sentence-leading "Next, I'll <verb>" is an announcement of work, but
+# "Next, I'll explain the key insight: ..." is exposition that delivers in the
+# same sentence. A colon, or a verb that presents content, exempts it.
+NEXT_LEAD_RX = re.compile(r"^[\s*_>-]*next\b", re.I)
+EXPOSITORY_VERB_RX = re.compile(
+    r"\b(?:explain|summari[sz]e|note|describe|outline|walk|list|show|cover|"
+    r"recap|mention|flag|add|review)\b",
+    re.I,
+)
+
+SENTENCE_SPLIT_RX =re.compile(r"(?<=[.!?;])\s+|\n")
 
 # The rule is about how a reply ENDS, so only its tail is inspected. Scanning
 # the whole message contradicts the rule's own premise and is what made an
@@ -174,6 +184,9 @@ except Exception:
         return _CODE_SPAN_RE.sub(" ", _FENCE_RE.sub(" ", text))
 
 
+REPLY_TOOL_RX = re.compile(r"(^|__)(reply|post_message|update_message)$", re.I)
+
+
 def _post_message_text(block):
     """The text a project-thread reply sends: a hearthbot post_message call.
 
@@ -183,7 +196,9 @@ def _post_message_text(block):
     """
     if not isinstance(block, dict) or block.get("type") != "tool_use":
         return None
-    if not str(block.get("name") or "").endswith("post_message"):
+    # The user-visible reply tools, as the sibling hooks define them
+    # (require-stopping-point.py, no-offer-to-file.py, no-self-thread-link.py).
+    if not REPLY_TOOL_RX.search(str(block.get("name") or "")):
         return None
     text = (block.get("input") or {}).get("text")
     return text if isinstance(text, str) and text.strip() else None
@@ -257,6 +272,12 @@ def offending_sentence(prose):
     for sentence in reversed(tail_of(prose)):
         hit = RX.search(sentence)
         if hit and not CONDITIONAL_RX.search(sentence):
+            if NEXT_LEAD_RX.match(hit.group(0)) and (
+                ":" in sentence or EXPOSITORY_VERB_RX.search(hit.group(0))
+            ):
+                # "Next, I'll explain the key insight: ..." delivers its own
+                # content; it announces no unstarted work.
+                continue
             return sentence.strip(), hit.group(0).strip()
     return None
 

@@ -74,16 +74,22 @@ TECHNICAL_THREAD = {
 LINK = re.compile(
     r"claude\.ai/code/session_\w+|\(#cmsg_\w+\)|[?&]thread=cmsg_\w+")
 # ai-config#5060 (Ezra, 2026-11-07, "always hyperlink; don't make me ask"): a
-# PR, issue or run named in a unit that holds no URL at all. Detected: an
+# PR, issue or run named outside a markdown link or URL. Detected: `repo#N`,
 # `owner/repo#N`, a bare `#N` of two or more digits, "PR 12", "issue 12" and
-# "run 12345". Not detected: file paths. A pattern for a slash or dot also
+# "run 123456". Not detected: file paths. A pattern for a slash or dot also
 # matches version numbers, URLs' hosts and prose such as "and/or", and a list
 # of known repo files goes stale, so a deny would block valid replies
 # (ai-config#4741 says to name what a deny does not catch).
+# A run id is six or more digits, so "the suite runs 12 times" is not one.
+# The repo prefix is two or more characters, so "C#12" is not a reference.
 FORGE_REF = re.compile(
-    r"(?<![\w/&])(?:[\w.-]+/[\w.-]+)?#\d{2,}\b"
-    r"|\b(?:PRs?|pull requests?|issues?|runs?) #?\d{2,}\b", re.I)
-ANY_URL = re.compile(r"https?://\S+")
+    r"(?<![\w/&.-])(?:[\w.-]+/)?[\w.-]{2,}#\d{2,}\b"
+    r"|(?<![\w/&.-])#\d{2,}\b"
+    r"|\b(?:PRs?|pull requests?|issues?) #?\d{2,}\b"
+    r"|\bruns? #?\d{6,}\b", re.I)
+# A reference counts as linked only inside a markdown link or a bare URL, so
+# one link elsewhere in the paragraph does not cover the rest.
+LINKED = re.compile(r"\[[^\]]*\]\([^)]*\)|https?://\S+")
 UNIT_BREAK = re.compile(r"\n[ \t]*\n|\n(?=(?:[-*+]|\d+[.)])[ \t])")
 
 REASON = """\
@@ -134,9 +140,7 @@ def unlinked_forge_ref(text: str):
     """The first PR, issue or run reference in a unit with no URL, or None."""
     text = FENCE.sub(" ", text.replace("\r\n", "\n"))
     for unit in UNIT_BREAK.split(text):
-        unit = INLINE_CODE.sub(" ", unit)
-        if ANY_URL.search(unit):
-            continue
+        unit = LINKED.sub(" ", INLINE_CODE.sub(" ", unit))
         m = FORGE_REF.search(unit)
         if m:
             return m.group(0)

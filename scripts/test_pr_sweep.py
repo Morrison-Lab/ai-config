@@ -58,6 +58,7 @@ def make_pr(
     checks=(),
     head_minutes_ago=90,
     draft=False,
+    merge_state="CLEAN",
 ):
     """Build a PR node matching the GraphQL payload shape."""
     if isinstance(files, int):
@@ -72,6 +73,7 @@ def make_pr(
         "title": f"PR {number}",
         "url": f"https://example.invalid/{number}",
         "isDraft": draft,
+        "mergeStateStatus": merge_state,
         "updatedAt": stamp(updated_minutes_ago),
         "author": {"login": "someone"},
         "files": {
@@ -485,6 +487,34 @@ with patch.object(pr_sweep.subprocess, "run", _rec):
     pr_sweep.fetch("owner/name", 10)
 check("fetch decodes gh output as UTF-8 explicitly",
       recorded.get("encoding") == "utf-8")
+
+# ai-config#1023: a PR behind its base whose review check failed is blocked by
+# a stale workflow copy, and the fix is to merge the base in. A failure on a
+# current branch, or a behind branch whose review check passed, is not this.
+STALE_REVIEW = make_pr(
+    number=981, merge_state="BEHIND",
+    checks=[check_run("review / claude-review", "FAILURE")],
+)
+check("behind base + failed claude-review is stale-review-blocked",
+      pr_sweep.stale_review_blocked(STALE_REVIEW))
+check("stale-review-blocked appears as a finding",
+      any(r.startswith("stale-branch-review-blocked")
+          for r in pr_sweep.findings_for(STALE_REVIEW)))
+check("failed claude-review on an up-to-date branch is not stale-blocked",
+      not pr_sweep.stale_review_blocked(make_pr(
+          merge_state="CLEAN",
+          checks=[check_run("review / claude-review", "FAILURE")])))
+check("behind base with a passing claude-review is not stale-blocked",
+      not pr_sweep.stale_review_blocked(make_pr(
+          merge_state="BEHIND",
+          checks=[check_run("review / claude-review", "SUCCESS")])))
+check("behind base with a cancelled claude-review is not stale-blocked",
+      not pr_sweep.stale_review_blocked(make_pr(
+          merge_state="BEHIND",
+          checks=[check_run("review / claude-review", "CANCELLED")])))
+check("behind base with an unrelated failing check is not stale-blocked",
+      not pr_sweep.stale_review_blocked(make_pr(
+          merge_state="BEHIND", checks=[check_run("lint", "FAILURE")])))
 
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

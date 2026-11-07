@@ -258,6 +258,9 @@ def main():
         "I read the issue. Next, I'll defer the migration to next week and push this hotfix now.",
         "I read the issue. Next, I'm done reviewing, let me merge the PR.",
         "I read the issue. Next, I'm finished with the tests, now deploying to production.",
+        # Claude review on #5068: `tired` is not exempt, it pairs with real actions.
+        "I read the issue. Next, I'm tired of debugging this, let me merge the PR now.",
+        "I read the issue. Next, I'm tired, so I'll push this straight to main.",
     ]
     posted_pass = [
         # Claude review on #5052: declining, uncertainty and stative gerunds
@@ -274,7 +277,6 @@ def main():
         "Next, I'll stop here.",
         "Next, I'm done for today.",
         "Next, I'm finished with this task.",
-        "Next, I'm tired of chasing this bug, so I'll leave it as is.",
         "Next I'm opening the first workflow PR once the review lands.",
         "Next I'll file it, but I'm blocked on the repo grant.",
         "Next I'm waiting for the runner thread.",

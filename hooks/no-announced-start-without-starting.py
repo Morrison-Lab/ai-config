@@ -120,9 +120,19 @@ CONDITIONAL_RX = re.compile(
 
 # A sentence-leading "Next, I'll <verb>" is an announcement of work, but
 # "Next, I'll explain the key insight: ..." is exposition that delivers in the
-# same sentence. A colon marks that. There is no verb list: "add", "review" and
-# "summarize" name unstarted work when nothing follows (agy review on #5052).
+# same sentence. Delivery means a colon followed by at least
+# DELIVERY_MIN_WORDS words of content; a bare colon or a short target
+# ("Next, I'll fix: the parser bug.") is still an unstarted announcement. There
+# is no verb list: "add", "review" and "summarize" name unstarted work when
+# nothing follows (agy and Claude reviews on #5052).
 NEXT_LEAD_RX = re.compile(r"^[\s*_>-]*next\b", re.I)
+DELIVERY_MIN_WORDS = 8
+
+
+def _delivers_after_colon(sentence):
+    """True when the sentence has a colon followed by enough words to be content."""
+    head, sep, rest = sentence.partition(":")
+    return bool(sep) and len(rest.split()) >= DELIVERY_MIN_WORDS
 
 SENTENCE_SPLIT_RX =re.compile(r"(?<=[.!?;])\s+|\n")
 
@@ -268,7 +278,7 @@ def offending_sentence(prose):
     for sentence in reversed(tail_of(prose)):
         hit = RX.search(sentence)
         if hit and not CONDITIONAL_RX.search(sentence):
-            if NEXT_LEAD_RX.match(hit.group(0)) and ":" in sentence:
+            if NEXT_LEAD_RX.match(hit.group(0)) and _delivers_after_colon(sentence):
                 # "Next, I'll explain the key insight: ..." delivers its own
                 # content; it announces no unstarted work.
                 continue

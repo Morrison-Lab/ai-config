@@ -211,6 +211,10 @@ def main():
         "Next, I'll review the PR.",
         "Next, I'll add the unit tests.",
         "Next, I'll summarize the findings.",
+        # Claude review on #5052: a colon with no delivered content.
+        "I read the PR. Next, I'll review: the file at src/a.py.",
+        "I read the PR. Next, I'll fix: the bug in the parser.",
+        "Looked at the issue. Next, I'll add:",
     ]
     posted_pass = [
         # Review finding on #5052: exposition that delivers in the same sentence.

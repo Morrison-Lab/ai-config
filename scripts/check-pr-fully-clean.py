@@ -118,7 +118,7 @@ from review_payload import (  # noqa: E402
     payload_is_clean,
     normalize_verdict,
 )
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 # The status glyphs below are non-ASCII, and a Windows console defaults to
 # cp1252, which cannot encode them -- so every run raised UnicodeEncodeError
@@ -891,6 +891,10 @@ def _is_own_job(cr: dict, own: Optional[Tuple[str, int]]) -> bool:
 # explained as a false positive in the PR), set by --annotations-read
 # (ai-config#4892).
 _ANNOTATIONS_READ: set = set()
+
+# Reviewer names (`copilot`, ...) declared out of quota by
+# --reviewer-out-of-quota (ai-config#5064).
+_OUT_OF_QUOTA: set = set()
 
 
 def check_ci_runs(pr) -> Tuple[bool, List[str]]:
@@ -3665,12 +3669,22 @@ def _has_live_inline_bot_item(review_comments, login, head_oid):
     return False
 
 
+def _names_head(oid: str, body: str, head_oid: str) -> bool:
+    """True when a review item's commit oid or body names the live head."""
+    if not head_oid or len(head_oid) < 7:
+        return False
+    if oid and len(oid) >= 7 and head_oid.lower().startswith(oid.lower()):
+        return True
+    return head_oid[:7].lower() in (body or "").lower()
+
+
 def check_latest_verdict(
     all_items: List[Tuple[Any, ...]],
     approved_authors: Optional[Set[str]] = None,
     commit_activity: Optional[Dict[str, str]] = None,
     head_oid: str = "",
     review_comments: Optional[List[Dict[str, Any]]] = None,
+    out_of_quota: Optional[Iterable[str]] = None,
 ) -> Tuple[bool, List[str]]:
     """Fail when any reviewer's latest verdict-bearing statement is not clean.
 
@@ -3691,6 +3705,14 @@ def check_latest_verdict(
     inline review comments on that head clears standing not-clean state for
     Copilot ([ai-config#4318](https://github.com/Morrison-Lab/ai-config/issues/4318)), since the reviewer re-evaluated the current head
     with zero findings and no live comments.
+
+    A reviewer named in `out_of_quota` (``--reviewer-out-of-quota``) cannot
+    refresh its verdict, so its STALE not-clean verdict stops vetoing when a
+    different reviewer (agy, Claude, ...) posted a clean verdict that names the
+    live head; a NOTE records the substitution
+    ([ai-config#5064](https://github.com/Morrison-Lab/ai-config/issues/5064)).
+    The veto stays when that reviewer's not-clean verdict is on the live head
+    itself, or when no substitute verdict on the live head exists.
 
     Formal-review authors whose latest GitHub state is APPROVED have
     superseded their own earlier CHANGES_REQUESTED; pass those logins as
@@ -3720,6 +3742,9 @@ def check_latest_verdict(
     n_with_verdict = 0
     unreadable_items = []
     per_reviewer: Dict[str, Tuple[str, str, str]] = {}
+    # (commit oid, body) of each reviewer's latest verdict item, so the
+    # out-of-quota substitution can tell a stale verdict from one on the head.
+    per_reviewer_src: Dict[str, Tuple[str, str]] = {}
     # Latest "I could not review this" notice per reviewer identity (#3587).
     unavailable_since: Dict[str, str] = {}
     # Latest activity per author, for the expired-ledger test (#2482):
@@ -3783,6 +3808,7 @@ def check_latest_verdict(
             latest_verdict, latest_when = "not-clean", when
             latest_identity, latest_author = identity, author
             per_reviewer[identity] = ("not-clean", when, author)
+            per_reviewer_src[identity] = (_oid, body)
         elif verdict == "unreadable":
             agent = _detect_review_agent(body) or "unknown"
             unreadable_items.append((when, agent))
@@ -3791,6 +3817,7 @@ def check_latest_verdict(
             latest_verdict, latest_when = verdict, when
             latest_identity, latest_author = identity, author
             per_reviewer[identity] = (verdict, when, author)
+            per_reviewer_src[identity] = (_oid, body)
         elif identity == "Copilot" and is_copilot_empty_balanced_closer_look(body):
             # An empty Balanced 'Needs a closer look' review on HEAD with no live
             # inline comments clears standing not-clean state (ai-config#4318).
@@ -3858,11 +3885,44 @@ def check_latest_verdict(
     # here too, or it reaches only the case where some OTHER reviewer happened to
     # post afterwards. A PR whose sole reviewer went unavailable takes this
     # branch instead, and is exactly the case that can never resolve (#3587).
+    quota_names = {str(n).strip().lower() for n in (out_of_quota or []) if str(n).strip()}
+    quota_notes: List[str] = []
+
+    def _quota_released(identity: str, author: str) -> bool:
+        """True when *identity* is out of quota and a substitute covers the head."""
+        if not quota_names or not (
+            identity.lower() in quota_names or str(author).lower() in quota_names
+        ):
+            return False
+        v_oid, v_body = per_reviewer_src.get(identity, ("", ""))
+        if _names_head(v_oid, v_body, head_oid):
+            return False  # a real finding on the shipping code, not a stale one
+        for other, (o_verdict, o_when, _o_author) in sorted(per_reviewer.items()):
+            o_oid, o_body = per_reviewer_src.get(other, ("", ""))
+            if (
+                other != identity
+                and o_verdict == "clean"
+                and other.lower() not in quota_names
+                and _names_head(o_oid, o_body, head_oid)
+            ):
+                note = (
+                    f"NOTE: {identity} is marked out of quota; its stale "
+                    f"NOT-clean verdict ({per_reviewer[identity][1]}) no longer "
+                    f"vetoes because {other} posted a clean verdict on live head "
+                    f"{head_oid[:8]} ({o_when}) -- substitute reviewer "
+                    "(ai-config#5064)"
+                )
+                if note not in quota_notes:
+                    quota_notes.append(note)
+                return True
+        return False
+
     latest_outage = unavailable_since.get(latest_identity, "")
     if (
         latest_verdict == "not-clean"
         and not _approval_clears(latest_identity, latest_author, approved_authors)
         and not latest_outage > latest_when
+        and not _quota_released(latest_identity, latest_author)
     ):
         return False, [
             f"Latest verdict-bearing review statement ({latest_when}) is NOT clean, "
@@ -3877,6 +3937,8 @@ def check_latest_verdict(
         if verdict != "not-clean":
             continue
         if _approval_clears(identity, author, approved_authors):
+            continue
+        if _quota_released(identity, author):
             continue
         # The reviewer reported, AFTER this stale verdict, that it could not
         # review at all. It is unavailable rather than pending, so waiting on it
@@ -3914,6 +3976,7 @@ def check_latest_verdict(
     issues.extend(ledger_notes)
     issues.extend(payload_notes)
     issues.extend(review_comment_notes)
+    issues.extend(quota_notes)
     blocking = [i for i in issues if not i.startswith("NOTE: ")]
     return len(blocking) == 0, issues
 
@@ -4392,6 +4455,7 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
         commit_activity=_commit_activity(pr),
         head_oid=sha,
         review_comments=_lazy_rcs,
+        out_of_quota=_OUT_OF_QUOTA,
     )
     issues.extend(verdict_issues)
 
@@ -4563,6 +4627,14 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
              "were read) whose warning/notice annotations were fixed or "
              "explained as false positives (ai-config#4892).",
     )
+    parser.add_argument(
+        "--reviewer-out-of-quota", action="append", default=[], metavar="NAME[,NAME...]",
+        help="Repeatable; values accumulate. Reviewers (e.g. `copilot`) that "
+             "are out of quota and cannot refresh a stale not-clean verdict. "
+             "Such a verdict stops vetoing when another reviewer (agy, Claude) "
+             "posted a clean verdict on the live head; it still vetoes if it "
+             "is on the live head itself (ai-config#5064).",
+    )
     return parser.parse_args(argv)
 
 
@@ -4621,6 +4693,11 @@ def main():
     if "all" in read_tokens:
         _ANNOTATIONS_READ.add("all")
     _ANNOTATIONS_READ.update(int(tok) for tok in read_tokens if tok.isdigit())
+    _OUT_OF_QUOTA.update(
+        tok.strip().lower()
+        for value in (getattr(args, "reviewer_out_of_quota", None) or [])
+        for tok in value.split(",")
+        if tok.strip())
     pr_num = args.pr_number
     repo = resolve_repo(args.repo)
 

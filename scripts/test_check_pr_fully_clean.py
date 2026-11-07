@@ -965,6 +965,43 @@ def main() -> int:
         ),
     )
 
+    # ai-config#5064: a reviewer out of quota cannot refresh a stale not-clean,
+    # so a clean substitute on the live head fills its slot; a not-clean on the
+    # live head itself, or no substitute, still vetoes.
+    HEAD = "abcdef1234567890abcdef1234567890abcdef12"
+    CLAUDE_CLEAR_HEAD = (
+        "**Claude finished** review\n\nReviewed `abcdef1`.\n\n### Verdict\n\n"
+        "**Ready for merge**"
+    )
+    stale_copilot = ("review", "2026-11-07T05:00:00Z", COPILOT_BLOCKS, "1111111aaaa", "",
+                     "copilot-pull-request-reviewer")
+    head_copilot = ("review", "2026-11-07T05:00:00Z", COPILOT_BLOCKS, HEAD, "",
+                    "copilot-pull-request-reviewer")
+    sub_clean = ("comment", "2026-11-07T07:00:00Z", CLAUDE_CLEAR_HEAD, "", "", "github-actions")
+    sub_stale = ("comment", "2026-11-07T07:00:00Z",
+                 CLAUDE_CLEAR_HEAD.replace("abcdef1", "9999999"), "", "", "github-actions")
+    q_ok, q_issues = checker.check_latest_verdict(
+        [stale_copilot, sub_clean], head_oid=HEAD, out_of_quota=["copilot"])
+    check(
+        "check_latest_verdict: out-of-quota reviewer's stale not-clean is replaced "
+        "by a clean substitute on the live head, with a NOTE (#5064)",
+        q_ok and any(i.startswith("NOTE: ") and "substitute reviewer" in i
+                     and "Copilot" in i and "Claude" in i for i in q_issues),
+    )
+    qh_ok, _qh = checker.check_latest_verdict(
+        [head_copilot, sub_clean], head_oid=HEAD, out_of_quota=["copilot"])
+    check("check_latest_verdict: out-of-quota reviewer's not-clean ON the live head still vetoes (#5064)",
+          not qh_ok)
+    qn_ok, _qn = checker.check_latest_verdict(
+        [stale_copilot], head_oid=HEAD, out_of_quota=["copilot"])
+    check("check_latest_verdict: out-of-quota with no substitute still vetoes (#5064)", not qn_ok)
+    qs_ok, _qs = checker.check_latest_verdict(
+        [stale_copilot, sub_stale], head_oid=HEAD, out_of_quota=["copilot"])
+    check("check_latest_verdict: a substitute clean on an older head does not count (#5064)", not qs_ok)
+    qd_ok, _qd = checker.check_latest_verdict([stale_copilot, sub_clean], head_oid=HEAD)
+    check("check_latest_verdict: without the out-of-quota flag the stale veto stands (#5064)",
+          not qd_ok)
+
     items_same_reviewer = [
         (
             "comment",

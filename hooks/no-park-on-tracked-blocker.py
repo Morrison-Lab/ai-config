@@ -70,10 +70,11 @@ HOOK = "no-park-on-tracked-blocker"
 
 PARK_RX = re.compile(
     r"\b(?:"
-    r"wait(?:s|ing|ed)?\s+(?:on|for)"
+    r"wait(?:s|ing)?\s+(?:on|for)"
     r"|blocked\s+(?:on|by)"
     r"|held\s+(?:up\s+)?(?:on|by)"
     r"|on\s+hold\s+(?:for|until|pending)"
+    r"|(?:held|parked)\s+pending"
     r"|depends\s+on"
     r"|until\s+[^.!?\n]{0,60}?\b(?:merges|lands|is\s+merged|ships|closes)"
     r")\b",
@@ -87,18 +88,29 @@ REF_RX = re.compile(
     re.I,
 )
 PERSON_GATE_RX = re.compile(
-    r"\bneeds?\s+(?:you|your|ezra|a\s+(?:human|person|maintainer))\b"
-    r"|\byour\s+(?:approval|go-?ahead|answer|decision|review|click|sign-?in)\b"
-    r"|\b(?:waiting|waits)\s+(?:on|for)\s+(?:you|ezra|a\s+(?:human|person))\b"
-    r"|\bmanual(?:ly)?\b|\bhuman\b",
+    r"\bneeds?\s+(?:you|your|ezra|the\s+user|a\s+(?:human|person|maintainer|reviewer))\b"
+    r"|\b(?:your|ezra['\u2019]s|the\s+user['\u2019]s|a\s+maintainer['\u2019]s)\s+"
+    r"(?:approval|go-?ahead|answer|decision|review|click|sign-?in|merge)\b"
+    r"|\b(?:wait(?:s|ing)?\s+(?:on|for)|blocked\s+(?:on|by))\s+"
+    r"(?:you|ezra|the\s+(?:user|maintainer|owner)|users?|a\s+(?:human|person|maintainer))\b"
+    r"|\bmwc\b|\bapproval\b|\bmanual\s+(?:step|action|click)\b",
     re.I,
 )
-SENTENCE_SPLIT_RX = re.compile(r"(?<=[.!?])\s+|\n+")
+# A sentence that says the dependency is gone is a report, not a park.
+RESOLVED_RX = re.compile(
+    r"\bno\s+longer\b|\bunblocked\b|\bnot\s+(?:blocked|waiting)\b"
+    r"|\bdepends\s+on\s+nothing\b",
+    re.I,
+)
+SENTENCE_SPLIT_RX = re.compile(r"(?<=[.!?])\s+|\n\s*\n|\n(?=\s*(?:[-*+]|\d+[.)])\s)")
 REPLY_TOOL_RX = re.compile(r"(^|__)(reply|post_message|update_message|edit_message)$", re.I)
 
 
 def _blocks(m):
-    return (m.get("message") or {}).get("content") or m.get("content") or []
+    msg = m.get("message")
+    if not isinstance(msg, dict):
+        msg = {}
+    return msg.get("content") or m.get("content") or []
 
 
 def last_reply_text(path):
@@ -110,6 +122,8 @@ def last_reply_text(path):
                 try:
                     m = json.loads(line)
                 except Exception:
+                    continue
+                if not isinstance(m, dict):
                     continue
                 if not (m.get("type") == "assistant" or m.get("role") == "assistant"):
                     continue
@@ -141,6 +155,8 @@ def find_park(text):
         if not REF_RX.search(sentence):
             continue
         if PERSON_GATE_RX.search(sentence):
+            continue
+        if RESOLVED_RX.search(sentence):
             continue
         return sentence.strip()
     return None

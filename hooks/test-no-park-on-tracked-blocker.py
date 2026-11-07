@@ -64,6 +64,18 @@ CASES = [
     ("code span passes", [say("The phrase `waits on gha#1` is what the hook matches.")], False),
     ("plain status passes", [say("I merged mds#679, which closed #656.")], False),
     ("reply wins over text", [say("x waits on #3."), reply("All merged.")], False),
+    ("wrapped line still caught", [say("mds#649 waits\non gha#1544, so I stopped.")], True),
+    ("pending phrasing", [say("The stub PR is held pending gha#1545.")], True),
+    ("no longer passes", [say("Unblocked: #5 no longer depends on #6.")], False),
+    ("depends on nothing passes", [say("Done: closes #5; this depends on nothing.")], False),
+    ("past tense passes", [say("I waited for #12 to merge, and it did.")], False),
+    ("user gate passes", [say("Blocked on user: #5")], False),
+    ("ezra's approval passes", [say("#5 is blocked on Ezra's approval.")], False),
+    ("mwc passes", [say("PR #5 waits on mwc from the user.")], False),
+    ("human-readable is not a gate", [say("It is human-readable, but waits on #5.")], True),
+    ("separate bullets stay separate", [say("- waits on a fix\n- merged #4")], False),
+    ("malformed lines tolerated", [[1], "x", {"type": "assistant", "message": "str"},
+                                   say("x waits on #5.")], True),
 ]
 
 

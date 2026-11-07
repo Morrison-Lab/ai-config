@@ -8,12 +8,8 @@ A thread finishing the mds/mcs consolidation ended its turn with
 clean, unmerged PR (gha#1545) that the thread was free to drive, and the
 gha repo carries a standing merge grant. Nothing about the dependency
 needed the user. Six hours later the user wrote "why did you stop? don't
-stop", and then "never do that again".
-
-A dependency on another issue or PR is work, not a wall: the agent can
-claim the blocking item, implement it, drive its PR, and come back. Only a
-step that genuinely needs a person (an approval, a secret, a manual click
-on a device) is a reason to stop.
+stop", and then "never do that again". A dependency on another issue or PR
+is work to do; only a step that needs a person is a reason to stop.
 
 WHAT IT CHECKS
 --------------
@@ -26,9 +22,7 @@ sentence that BOTH
       "until ... merges/lands"), AND
     * names a tracked item (an issue/PR URL, owner/repo#N, or #N).
 
-A sentence that names a person-only gate in the same breath ("needs you",
-"your approval", "needs Ezra", "a human", "manual") passes, since that is
-the one legitimate reason to wait.
+A sentence naming a person-only gate ("your approval", "mwc") passes.
 
 WHY IT BLOCKS ONCE RATHER THAN EVERY TIME
 -----------------------------------------

@@ -90,6 +90,9 @@ FORGE_REF = re.compile(
 # A reference counts as linked only inside a markdown link or a bare URL, so
 # one link elsewhere in the paragraph does not cover the rest.
 LINKED = re.compile(r"\[[^\]]*\]\(https?://[^)]*\)|https?://\S+")
+# The target of any other markdown link is not prose: "[here](./a.md#5060)"
+# names no PR. Its text still counts, so "[#5059](#cmsg_1)" is flagged.
+LINK_TARGET = re.compile(r"(?<=\])\([^)]*\)")
 UNIT_BREAK = re.compile(r"\n[ \t]*\n|\n(?=(?:[-*+]|\d+[.)])[ \t])")
 
 REASON = """\
@@ -141,7 +144,8 @@ def unlinked_forge_ref(text: str):
     """The first PR, issue or run reference outside a link, or None."""
     text = FENCE.sub(" ", text.replace("\r\n", "\n"))
     for unit in UNIT_BREAK.split(text):
-        unit = LINKED.sub(" ", INLINE_CODE.sub(" ", unit))
+        unit = INLINE_CODE.sub(" ", unit)
+        unit = LINK_TARGET.sub("", LINKED.sub(" ", unit))
         m = FORGE_REF.search(unit)
         if m:
             return m.group(0)

@@ -95,6 +95,8 @@ CASES = [
      "See [psc#100](https://github.com/Morrison-Lab/psc/pull/100).", None),
     ("one link does not cover the rest", POST,
      "Merged [#5059](https://x.test/5059); follow-up in #5060.", "#5060"),
+    ("relative link target is not a ref", POST,
+     "See [the table](./file.md#5060) for it.", None),
     ("verb runs is not a run", POST, "The suite runs 12 times.", None),
     ("noun run is not a run", POST, "A dry run 10 minutes ago passed.", None),
     ("pull request N", POST, "The pull request 12 is open.", "pull request 12"),

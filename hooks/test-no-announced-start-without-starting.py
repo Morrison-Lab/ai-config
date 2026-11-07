@@ -206,12 +206,16 @@ def main():
         "Next I'm opening the first workflow PR.",
         "Merged the first PR.\n\nNext, I'll file the second issue.",
         "Done with CI.\n\nI'm now opening the follow-up PR.",
+        # agy review on #5052: work verbs and a closing "summarize" with
+        # nothing delivered are still unstarted announcements.
+        "Next, I'll review the PR.",
+        "Next, I'll add the unit tests.",
+        "Next, I'll summarize the findings.",
     ]
     posted_pass = [
         # Review finding on #5052: exposition that delivers in the same sentence.
         "I looked at the code. Next, I'll explain the key insight: the loop "
         "never terminates because of an off-by-one error.",
-        "Next, I'll summarize the findings.",
         "Next I'm opening the first workflow PR once the review lands.",
         "Next I'll file it, but I'm blocked on the repo grant.",
         "Next I'm waiting for the runner thread.",

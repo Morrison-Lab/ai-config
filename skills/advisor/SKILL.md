@@ -15,7 +15,8 @@ The advisor reads and answers.
 It does not edit files, implement, or take over the task.
 Claude stays the orchestrator and decides what to do with the answer.
 
-The pattern comes from the `advisor` skill in `scdenney/open-science-skills` (CC BY-NC 4.0; pattern only, nothing copied).
+The pattern comes from the `advisor` skill in `scdenney/open-science-skills`.
+It is CC BY-NC 4.0, so this skill takes the pattern only and copies nothing.
 
 ## When this fires
 
@@ -35,7 +36,7 @@ Each value below is a parameter with today's default, so a caller can change it 
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| `engine` | `opencode` | The CLI or endpoint that reaches the advisor. `agy` is the other seat. Codex is not a seat (lab policy). |
+| `engine` | `opencode` | The CLI or endpoint that reaches the advisor. `agy` is the other seat. Codex is never a seat: the lab forbids it, for this skill and every other. |
 | `model` | the strongest model `engine` offers outside the caller's family | Look it up at call time; do not hard-code a model name in a brief. |
 | `effort` | the highest the engine offers | Pinned, not inherited: a cheap consult on a hard question wastes the reason for asking. |
 | `briefing_path` | a file in the scratchpad directory | Where the briefing is written before the call. |

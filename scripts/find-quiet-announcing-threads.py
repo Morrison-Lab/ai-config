@@ -43,7 +43,15 @@ _spec.loader.exec_module(stop)
 
 
 def parse_time(text):
-    return datetime.fromisoformat(text.replace("Z", "+00:00"))
+    """Parse an ISO time; raise ValueError unless it carries a UTC offset.
+
+    A naive time cannot be subtracted from an aware one, so accepting it here
+    would crash later with TypeError and Python's exit 1, the "flagged" code.
+    """
+    parsed = datetime.fromisoformat(str(text).replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        raise ValueError(f"time {text!r} has no UTC offset (end it with Z or +00:00)")
+    return parsed
 
 
 REQUIRED = ("id", "state", "last_reply", "last_activity")

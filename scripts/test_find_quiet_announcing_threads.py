@@ -73,5 +73,13 @@ check("exit 2 when a record is not an object", run(["text"]).returncode, 2)
 check("exit 2 on an unparseable last_activity",
       run([thread("Merged.", last="yesterday")]).returncode, 2)
 
+check("exit 2 on a last_activity with no UTC offset",
+      run([thread("I'm starting the next layer now.", last="2026-11-07T10:00:00")]).returncode, 2)
+check("exit 2 on a --now with no UTC offset",
+      subprocess.run([sys.executable, script, "--now", "2026-11-07T11:00:00"],
+                     input=json.dumps([thread("Merged.")]), capture_output=True, text=True).returncode, 2)
+check("an offset other than Z is accepted",
+      run([thread("Merged.", last="2026-11-07T02:30:00-08:00")]).returncode, 0)
+
 print(f"\n{len(FAILS)} failure(s)")
 sys.exit(1 if FAILS else 0)

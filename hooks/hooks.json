@@ -1779,6 +1779,18 @@
         ]
       },
       {
+        "matcher": "mcp__hearthbot__start_remote_control",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-rc-outside-runner.py\"",
+            "timeout": 10,
+            "script": "no-rc-outside-runner.py",
+            "why": "ai-config#5090. Ezra, 2026-11-07: threads never open their own device run, and only the runner thread merges. The ids owner thread tried to open its own Remote Control session to run the checker and merge, then withdrew. Denies start_remote_control in a project thread session whose id is not in hooks/rc-runner-threads.txt (or RC_RUNNER_THREAD_IDS); the coordinator and ordinary sessions have no own thread and are untouched. Fails open on any parse trouble."
+          }
+        ]
+      },
+      {
         "matcher": "mcp__github__add_issue_comment|mcp__github__update_issue_comment|mcp__github__add_reply_to_pull_request_comment|mcp__github__add_comment_to_pending_review|mcp__github__pull_request_review_write|mcp__github__create_pull_request|mcp__github__update_pull_request|mcp__github__issue_write",
         "hooks": [
           {

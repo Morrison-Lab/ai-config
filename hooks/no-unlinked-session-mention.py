@@ -76,9 +76,10 @@ LINK = re.compile(
 # ai-config#5060 (Ezra, 2026-11-07, "always hyperlink; don't make me ask"): a
 # PR, issue or run named in a unit that holds no URL at all. Detected: an
 # `owner/repo#N`, a bare `#N` of two or more digits, "PR 12", "issue 12" and
-# "run 12345". Not detected, because no regex can tell a repo file from any
-# other word with a slash or dot: file paths (ai-config#4741 says to name
-# what a deny cannot catch).
+# "run 12345". Not detected: file paths. A pattern for a slash or dot also
+# matches version numbers, URLs' hosts and prose such as "and/or", and a list
+# of known repo files goes stale, so a deny would block valid replies
+# (ai-config#4741 says to name what a deny does not catch).
 FORGE_REF = re.compile(
     r"(?<![\w/&])(?:[\w.-]+/[\w.-]+)?#\d{2,}\b"
     r"|\b(?:PRs?|pull requests?|issues?|runs?) #?\d{2,}\b", re.I)

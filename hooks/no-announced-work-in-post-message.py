@@ -76,6 +76,13 @@ def last_checklist(path):
 
 
 def has_unstarted_step(checklist):
+    """True when a checklist line starts with the unstarted glyph.
+
+    The glyphs are the format the update_progress_checklist tool documents
+    for itself: a step line starts with a check mark (done), a six-spoked
+    asterisk (in progress) or an open circle (not started). The tool's
+    description is the source, so this hook does not rest on its own fixture.
+    """
     return bool(checklist) and any(
         ln.lstrip().startswith("○") for ln in checklist.splitlines()
     )
@@ -84,12 +91,12 @@ def has_unstarted_step(checklist):
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
-        if not str(payload.get("tool_name") or "").endswith("post_message"):
+        stop = _load_stop_hook()
+        if not stop.REPLY_TOOL_RX.search(str(payload.get("tool_name") or "")):
             return 0
         text = (payload.get("tool_input") or {}).get("text")
         if not isinstance(text, str) or not text.strip():
             return 0
-        stop = _load_stop_hook()
         found = stop.offending_sentence(stop.strip_code(text))
         if not found:
             return 0

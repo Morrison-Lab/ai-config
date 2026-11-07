@@ -59,6 +59,9 @@ CASES = [
     ("conditional", [checklist(OPEN)], "Next I'll open the PR once the review lands.", POST, "allow"),
     ("past tense", [checklist(OPEN)], "Opened the PR and filed the issue.", POST, "allow"),
     ("other tool", [checklist(OPEN)], "Next I'm opening the first workflow PR.", "Bash", "allow"),
+    ("reply tool", [checklist(OPEN)], "Next I'm opening the first workflow PR.", "mcp__hearthbot__reply", "deny"),
+    ("update_message tool", [checklist(OPEN)], "Next I'm opening the first workflow PR.", "mcp__hearthbot__update_message", "deny"),
+    ("in-progress glyph is not unstarted", [checklist("Work\n\n✓ first\n✱ second")], "Next I'm opening the first workflow PR.", POST, "allow"),
     ("latest checklist wins", [checklist(OPEN), checklist(DONE)], "Next I'm opening the PR.", POST, "allow"),
 ]
 

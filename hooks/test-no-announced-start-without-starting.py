@@ -264,6 +264,41 @@ def main():
         else:
             print(f"PASS {name} block")
 
+    # agy review on #5052: a trailing text block must not hide a sent
+    # announcement, and an empty-text reply call is not work.
+    for label, msgs in (
+        (
+            "trailing text block",
+            [
+                {
+                    "type": "assistant",
+                    "message": {
+                        "content": [
+                            {
+                                "type": "tool_use",
+                                "name": "mcp__hearthbot__post_message",
+                                "input": {"text": "Next I'm opening the first workflow PR."},
+                            },
+                            {"type": "text", "text": "Posted status update."},
+                        ]
+                    },
+                },
+                end_turn(),
+            ],
+        ),
+        (
+            "empty-text reply call",
+            [post("Next I'm opening the first workflow PR."), tool("reply"), end_turn()],
+        ),
+    ):
+        clear_sentinels()
+        out = run(msgs)
+        if not out or json.loads(out).get("decision") != "block":
+            failures += 1
+            print(f"FAIL ({label} should block)")
+        else:
+            print(f"PASS {label} block")
+
     # Work after the announcement (any non-hearthbot tool call) clears it.
     clear_sentinels()
     out = run([post("Next I'm opening the first workflow PR."), tool("Bash"), end_turn()])

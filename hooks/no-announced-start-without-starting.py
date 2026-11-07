@@ -205,17 +205,22 @@ def _is_work_call(block):
     """A tool call that is work, not the harness's own reply or end-of-turn call."""
     if not isinstance(block, dict) or block.get("type") != "tool_use":
         return False
-    return not str(block.get("name") or "").startswith("mcp__hearthbot__")
+    name = str(block.get("name") or "")
+    # A reply tool call is never work, even with empty text (agy review on #5052).
+    return not (name.startswith("mcp__hearthbot__") or REPLY_TOOL_RX.search(name))
 
 
 def last_assistant_text(path):
     """The final user-visible assistant prose in the transcript.
 
-    That is the later of the last text block and the last post_message input.
-    A work tool call (anything but a hearthbot call) after it clears it,
-    because the announcement was then followed by work.
+    A reply-tool input (post_message and its siblings) wins over plain text
+    blocks, because in a Projects thread plain text is not delivered, so a
+    trailing log note must not hide the announcement that was sent. A work
+    tool call (anything but a hearthbot or reply call) after either clears
+    both, because the announcement was then followed by work.
     """
     last_text = ""
+    last_posted = ""
     try:
         with open(path, encoding="utf-8", errors="ignore") as fh:
             for line in fh:
@@ -231,9 +236,9 @@ def last_assistant_text(path):
                         for b in blocks:
                             posted = _post_message_text(b)
                             if posted:
-                                last_text, parts = posted, []
+                                last_posted = posted
                             elif _is_work_call(b):
-                                last_text, parts = "", []
+                                last_text, last_posted, parts = "", "", []
                             elif isinstance(b, dict) and b.get("type") == "text":
                                 parts.append(b.get("text", ""))
                         txt = "".join(parts)
@@ -256,7 +261,7 @@ def last_assistant_text(path):
                             last_text = txt
     except Exception:
         return ""
-    return last_text
+    return last_posted or last_text
 
 
 def offending_sentence(prose):

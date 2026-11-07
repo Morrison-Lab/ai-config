@@ -79,7 +79,8 @@ def is_owed_claim(unit):
             continue
         # Each owed phrase is judged on its own lead-in: not negated, and not
         # introduced by a conditional.
-        if any(not negated_at(s, m) and not PROCEDURE.search(s[:m.start()])
+        if any(not negated_at(s, m)
+               and not PROCEDURE.search(CLAUSE.split(s[:m.start()])[-1])
                for m in OWED.finditer(s)):
             return True
     return False

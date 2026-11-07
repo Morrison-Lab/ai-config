@@ -61,6 +61,8 @@ CASES = [
     ("before later in the sentence does not exempt", "- A check is owed for this; it was raised before in review.", True),
     ("after before a new owed clause does not exempt", "- The guard was fine after the last patch, but a new check is owed.", True),
     ("still owed after a while does not exempt", "- A hook is still owed after all this time.", True),
+    ("conditional in an earlier clause does not exempt", "- When reviewing PRs, remember that a hook is owed for the Stop check.", True),
+    ("conditional in an earlier clause before and does not exempt", "- If you are curious, a lint is owed for the expiry path, and nobody has filed it.", True),
     ("only negated clauses pass", "- The hook isn't needed, and no check is needed either.", False),
     ("allow marker passes", "- A hook is owed. <!-- owed-mechanism: allow -->", False),
     ("owed with no mechanism word passes", "- The invoice is owed to the vendor.", False),

@@ -48,9 +48,12 @@ OWED = re.compile(
     r"\bto\s+be\s+(?:built|written|implemented|filed)\b",
     re.I)
 MECHANISM_WORD = re.compile(rf"\b{MECH}\b", re.I)
-# A conditional or instructional sentence describes a procedure, not a debt.
+# A conditional lead-in ("When a check is owed, file its issue") describes a
+# procedure, not a debt. Only the words before the owed phrase count: "before"
+# and "after" are ordinary time words, not conditionals, and a conditional
+# that follows the phrase ("owed once the review lands") still states a debt.
 PROCEDURE = re.compile(
-    r"\b(?:if|when|whenever|once|unless|whether|how\s+to|before|after|in\s+case)\b", re.I)
+    r"\b(?:if|when|whenever|once|unless|whether|how\s+to|in\s+case)\b", re.I)
 # "No separate hook is needed" denies a debt; the negator is within a few words
 # of the owed phrase. "not yet filed" is itself a debt phrase, so it is matched
 # by OWED and never by its own lead-in.
@@ -58,7 +61,7 @@ PROCEDURE = re.compile(
 # (an adjective) does not negate the claim around it.
 NEGATED = re.compile(r"(?<![\w-])(?:no|never|nothing|nobody|not)(?![\w-])|n't\b", re.I)
 NEGATION_WINDOW = 3
-CLAUSE =re.compile(r"[,;:]|\s+(?:but|although|though|while|and)\s+", re.I)
+CLAUSE = re.compile(r"[,;:]|\s+(?:but|although|though|while|and)\s+", re.I)
 LINK = re.compile(r"(?:^|[\s(\[])(?:[\w.-]+/[\w.-]+)?#\d+\b|/(?:issues|pull)/\d+")
 ALLOW = "<!-- owed-mechanism: allow -->"
 # Straight-quoted, curly-quoted and code-span text is wording, not an assertion.
@@ -72,9 +75,12 @@ def is_owed_claim(unit):
     """True when some sentence of *unit* says a mechanism is owed."""
     unit = re.sub(QUOTED, " ", unit)
     for s in cdne.SENTENCE.split(" ".join(unit.split())):
-        if not (MECHANISM_WORD.search(s) and not PROCEDURE.search(s)):
+        if not MECHANISM_WORD.search(s):
             continue
-        if any(not negated_at(s, m) for m in OWED.finditer(s)):
+        # Each owed phrase is judged on its own lead-in: not negated, and not
+        # introduced by a conditional.
+        if any(not negated_at(s, m) and not PROCEDURE.search(s[:m.start()])
+               for m in OWED.finditer(s)):
             return True
     return False
 

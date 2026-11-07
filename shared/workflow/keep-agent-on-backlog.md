@@ -6,8 +6,8 @@ Ezra, 2026-11-05 ([ai-config#4967](https://github.com/Morrison-Lab/ai-config/iss
 
 When any project repo has an open issue that no thread, open PR or claim comment owns, the coordinator starts a thread on the top such issue.
 A busy thread does not satisfy the rule.
-With any thread busy, an issue filed as owed follow-up would never be picked up
-(gha#1563, 2026-11-07: filed, no owner, nothing moved; [ai-config#5056](https://github.com/Morrison-Lab/ai-config/issues/5056)).
+With any thread busy, an issue filed as owed follow-up would never be picked up (gha#1563, 2026-11-07: filed, no owner, nothing moved;
+[ai-config#5056](https://github.com/Morrison-Lab/ai-config/issues/5056)).
 Each P1 issue, and each issue a thread files as owed follow-up, gets an owner within one hour of being filed.
 Rank by priority label (`P1`, then `P2`, then `P3`), then by age.
 Check the tracker, the live threads and project memory first, as [`triage-new-asks`](triage-new-asks.md) says.

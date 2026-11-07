@@ -152,3 +152,11 @@ Reserve a local re-run for **verifying a fix**, once you've already decided what
 **Give a pure re-post webhook event a one-line acknowledgment, not fresh analysis.** A benchmark comment that updates in place with the same verdict on a later commit, or a demo-transcript re-post after a test-only change, carries no new information --- confirm nothing material changed (a glance at the numbers/timestamps, not a re-investigation) and move on, rather than re-running the reasoning that already covered it.
 
 **Prefer the minimal API call that answers the question.** See [`memories/github-mcp-tools.md`](../../memories/github-mcp-tools.md) for concrete cases: `get_check_runs` over `get_status` (the latter can show a stale `pending` after CI has actually finished), and a single targeted field read (e.g. `pull_request_read` `get`'s `head.sha`) over fetching a full PR object plus a separate check-runs call when only one fact is needed.
+
+**Send "final head" to whoever runs the independent review only after the current head is clean on the checks that can still move it.**
+A head the authoring session still has reason to change is not final: it is the head the author expects to be done with.
+The independent review is the expensive step (an agy run, then the fully-clean checker), so spend it on a sha that has already cleared the Claude review and `validate`, and send "final head" once.
+A later push to that PR wastes the earlier run (2026-11-07: two agy runs spent on heads that a Claude-review finding changed afterwards, on [ai-config#5073](https://github.com/Morrison-Lab/ai-config/pull/5073)).
+
+- **Do:** wait until the Claude review verdict and `validate` on the exact sha are both clean, then name the sha once.
+- **Don't:** send "final head" as soon as you push a fix, on the expectation that the review will pass.

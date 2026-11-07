@@ -72,7 +72,9 @@ _STATIVE = (
 _NOT_ANNOUNCING = (
     r"(?:not|never|no|be|also|probably|just|sure|unsure|uncertain|certain|"
     r"sorry|glad|happy|afraid|aware|confused|stuck|unable|unclear|"
-    r"curious|worried|hesitant|inclined)\b|" + _STATIVE
+    r"curious|worried|hesitant|inclined|"
+    # Declining or stopping work (ai-config#5061).
+    r"leave|skip|defer|pass|stop|done|finished|tired)\b|" + _STATIVE
 )
 
 PATTERNS = [

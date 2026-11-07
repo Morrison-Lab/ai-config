@@ -27,7 +27,11 @@ file anchor such as README.md#2.
 
 The object rule keeps reports out: "PR #12 is waiting on the runner" and
 "I merged gha#1545, which mds#649 was waiting on" name the item, but not as
-what is waited on, and a CI noun ("Waiting on CI for #12") ends the object.
+what is waited on. The object also ends at a clause boundary or
+conjunction, at a line wrap after anything but a function word, and at a
+preposition right after a non-filler word, so "Waiting on CI for #12" names
+CI. A phrase after "after", "spent" or "while" in its clause is narrative.
+A form spanning several clauses is judged by the clause it ends in.
 A person-only gate ("needs you", "your approval", "requires a manual
 action") exempts only its own clause and trailing which-clauses; a bare
 "mwc" or "approval" elsewhere does not.
@@ -54,7 +58,10 @@ shapes, and these are accepted rather than chased:
 - Parks phrased without any of the phrases or forms above ("I'll leave
   that for later", "next step is #12") are not caught.
 - A person gate is honoured only in the park's own clause, a trailing
-  which/that/it/until clause, or a leading because/since clause.
+  which/that/it/until clause, or a leading because/since clause (each
+  with any parts a bare and/but joins to it).
+- "I'll keep polling until #12 merges" counts as a park on purpose: it
+  waits on #12 rather than driving it.
 """
 import json
 import os
@@ -102,7 +109,9 @@ REF_RX = re.compile(_REF, re.I)
 # A code span holding only an item (optionally "PR"/"issue" before it) is
 # unwrapped before code is stripped, so "waits on `gha#1544`" still counts.
 _REF_SPAN_RX = re.compile(
-    r"(`+)\s*((?:(?:PR|MR|issue|pull\s+request)\s+)?" + _REF + r")\s*\1(?!" + _APOS + r"s\b)", re.I
+    r"(?<!`)(`{1,2})[ \t]*((?:(?:PR|MR|issue|pull\s+request)[ \t]+)?" + _REF + r")[ \t]*\1(?!`)"
+    r"(?!" + _APOS + r"s\b)",
+    re.I,
 )
 _POSSESSIVE_LINK_RX = re.compile(r"\[([^\]\n]*)\]\([^)\s]*\)(?=" + _APOS + r"s\b)")
 # What may follow an item before a completion verb: closing link brackets.
@@ -129,7 +138,7 @@ _DONE = (
 # reports what happened, and "Stopping" is the status-line label.
 _PARK_VERB = (
     r"\b(?:hold(?:s|ing)?|park(?:s|ing|ed)?|wait(?:s|ing)?|paus(?:e|es|ing)"
-    r"|leav(?:e|es|ing)|defer(?:s|ring)?|keep(?:s|ing)?|resum(?:e|es|ing)|stay(?:s|ing)?)\b"
+    r"|leav(?:e|es|ing)|defer(?:s|ring)?|keep(?:s|ing)?|resum(?:e|es|ing))\b"
 )
 _FIRST_PERSON_FUTURE = (
     r"\b(?:I" + _APOS + r"ll|I\s+will|we" + _APOS + r"ll|we\s+will|I" + _APOS + r"m\s+going\s+to)\b"
@@ -155,36 +164,52 @@ FORM_RX = [
         re.I,
     ),
     # "gha#1544 is blocking mds#649": the blocker is the subject.
-    re.compile(_REF + _AFTER_REF + r"(?:blocks|is\s+blocking|is\s+holding\s+up)\s+", re.I),
+    re.compile(
+        _REF + _AFTER_REF + r"(?:blocks|is\s+blocking|is\s+holding\s+up)\s+(?:\S+\s+){0,2}?[\[(`]*" + _REF,
+        re.I,
+    ),
 ]
 # Words that may sit between a parking phrase and the item, as in "waits on
 # the PR for gha#1544". A preposition after any other word ends the object,
 # so "Waiting on codecov for #12" names codecov, not #12.
 _FILLER = {
     "the", "a", "an", "its", "their", "that", "this", "pr", "prs", "pull", "request",
-    "mr", "issue", "fix", "change", "work", "merge", "landing", "in",
-    "both", "and", "or", "being", "of", "from", "for",
+    "mr", "mrs", "issue", "issues", "fix", "fixes", "change", "changes", "requests",
+    "work", "merge", "landing", "resolution", "open", "upstream", "in",
+    "both", "or", "being", "of", "from", "for",
 }
-_ENDING_PREP = {"for", "to", "on", "at", "of", "before", "after", "with", "from"}
+# A preposition right after a non-filler word ends the object.
+_ENDING_PREP = {"for", "to", "on", "at", "of", "in", "before", "after", "with", "from"}
+# A line wrap continues the object only after one of these.
+_FUNCTION_WORDS = {"the", "a", "an", "on", "for", "of", "in", "to", "this", "that", "its", "their"}
+# Where the object ends: a clause boundary or a conjunction.
+_OBJECT_END_RX = re.compile(
+    r"[.!?;,](?:\s|$)|:\s|\s[\u2014\u2013]\s|\s--\s"
+    r"|\s(?:and|but|while|because|since|then|as)\s",
+    re.I,
+)
 _TOKEN_STRIP = "[](){}*_\"'`<>,:"
 # A clause that gates the park on a person-only step.
 PERSON_GATE_RX = re.compile(
     r"\bneeds?\s+(?:you|your|ezra|the\s+user|a\s+(?:human|person|maintainer|reviewer))\b"
     r"|\b(?:your|ezra" + _APOS + r"s|the\s+user" + _APOS + r"s|a\s+maintainer" + _APOS + r"s)\s+"
-    r"(?:approval|go-?ahead|answer|decision|review|click|sign-?in|merge)\b"
+    r"(?:approval|go-?ahead|answer|decision|review|click|sign-?in|sign-?off|merge|input|"
+    r"confirmation|token|secret|credentials?)\b"
     r"|\b(?:wait(?:s|ing)?\s+(?:on|for)|blocked\s+(?:on|by)|needs?|requires?)\s+"
     r"(?:an?\s+)?(?:mwc|manual|you|your|users?|ezra|the\s+(?:user|maintainer|owner)|"
     r"(?:a\s+)?(?:human|person|maintainer))\b"
     r"|\b(?:needs?|requires?)\s+(?:a|an|the)\s+(?:secret|token|credentials?|password|"
     r"api\s+key|key|2fa|login|sign-?in)\b"
     r"|\buntil\s+you\b|\bpending\s+your\b"
-    r"|\bmanual\s+(?:step|action|click)\b",
+    r"|\bmanual\s+(?:step|action|click|merge|review)\b",
     re.I,
 )
 # A clause that says the park's own dependency is gone is a report.
 RESOLVED_RX = re.compile(
-    r"\bno\s+longer\s+(?:waits?|waiting|blocked|depends?|held)\b"
-    r"|\bunblocked\b|\bnot\s+(?:blocked|waiting)\b|\bdepends\s+on\s+nothing\b",
+    r"\bno\s+longer\s+(?:waits?|waiting|blocked|blocking|depends?|held|gated|parked|"
+    r"awaits?|awaiting|pending)\b"
+    r"|\bunblocked\b|\bnot\s+(?:blocked|blocking|waiting|gated|parked|awaiting|pending)\b"
+    r"|\bdepends\s+on\s+nothing\b",
     re.I,
 )
 # Sentences end at terminal punctuation, a blank line, a list item, or a
@@ -194,12 +219,14 @@ SENTENCE_SPLIT_RX = re.compile(
 )
 # Clauses split a sentence for the gates, so a gate in one clause cannot
 # exempt a park in another. A line wrap does not end a clause.
-CLAUSE_SPLIT_RX = re.compile(r"[;,]\s+|:\s+|\s[\u2014\u2013]\s|\s--\s|\s(?:and|but)\s+", re.I)
+CLAUSE_SPLIT_RX = re.compile(r"[;,]\s+(?:(?:and|but)\s+)?|:\s+|\s[\u2014\u2013]\s|\s--\s|\s(?:and|but)\s+", re.I)
 # A trailing clause that still modifies the park, for the person gate only.
 _TRAILING_CLAUSE_RX = re.compile(
     r"^\s*(?:which|that|since|because|as|it|this|pending|until)\b", re.I
 )
 _LEADING_CLAUSE_RX = re.compile(r"^\s*(?:because|since|as)\b", re.I)
+# A narrative report: "After waiting on #12 ...", "I spent a minute waiting for #12".
+_NARRATIVE_RX = re.compile(r"\b(?:after|spent|while)\b", re.I)
 REPLY_TOOL_RX = re.compile(
     r"(^|__)(reply|post_message|update_message|edit_message|send_message)$", re.I
 )
@@ -271,58 +298,89 @@ def turn_outputs(path):
 def _object_is_ref(rest):
     """True when the phrase's object, within six tokens, is an item.
 
-    The object ends at a clause boundary, at a line break after a
-    non-filler word, and at a preposition after a non-filler word.
+    The object ends at a clause boundary or conjunction, at a line break
+    after anything but a function word, and at a preposition right after a
+    non-filler word.
     """
-    rest = re.split(r"[.!?;,](?:\s|$)", rest, maxsplit=1)[0]
-    content = False
-    for i, raw in enumerate(rest.split(" ")[:8]):
-        parts = raw.split("\n")
-        for j, tok in enumerate(parts):
-            if j and content:
-                return False
+    rest = _OBJECT_END_RX.split(rest, maxsplit=1)[0]
+    prev = None
+    prev_content = False
+    wrapped = False
+    count = 0
+    for raw in re.split(r"[ \t]+", rest):
+        for j, tok in enumerate(raw.split("\n")):
+            if j:
+                wrapped = True
             if not tok:
                 continue
-            word = tok.strip(_TOKEN_STRIP)
-            if REF_RX.fullmatch(word) or REF_RX.match(tok.lstrip(_TOKEN_STRIP)) or REF_RX.search(tok):
-                return True
-            low = word.lower()
-            if content and low in _ENDING_PREP:
+            if wrapped and prev is not None and prev not in _FUNCTION_WORDS:
                 return False
-            if low not in _FILLER:
-                content = True
-        if i >= 5:
-            break
+            wrapped = False
+            if REF_RX.search(tok):
+                return True
+            low = tok.strip(_TOKEN_STRIP).lower()
+            if prev_content and low in _ENDING_PREP:
+                return False
+            prev_content = low not in _FILLER
+            prev = low
+            count += 1
+            if count >= 6:
+                return False
     return False
 
 
+def _clauses(sentence):
+    """The sentence's clauses, with whether each follows a bare and/but split."""
+    marks = list(CLAUSE_SPLIT_RX.finditer(sentence))
+    bounds = [0] + [m.end() for m in marks] + [len(sentence) + 1]
+    conj = [False] + [m.group().strip().lower() in ("and", "but") for m in marks]
+    return [(bounds[k], sentence[bounds[k]:bounds[k + 1]], conj[k]) for k in range(len(bounds) - 1)]
+
+
 def _gate_region(sentence, pos):
-    """The clause holding `pos`, and the clauses a person gate may sit in."""
-    bounds = [0] + [m.end() for m in CLAUSE_SPLIT_RX.finditer(sentence)] + [len(sentence) + 1]
-    clauses = [sentence[bounds[k]:bounds[k + 1]] for k in range(len(bounds) - 1)]
-    for k in range(len(clauses)):
-        if bounds[k] <= pos < bounds[k + 1]:
-            own = clauses[k]
-            gate = own
-            j = k + 1
-            while j < len(clauses) and _TRAILING_CLAUSE_RX.match(clauses[j]):
-                gate += " " + clauses[j]
+    """The clause holding `pos`, its start, and the clauses a person gate may sit in.
+
+    A trailing which/that/it clause, or a leading because/since clause,
+    keeps any parts it is joined to by a bare and/but ("which touches prod
+    and needs your approval").
+    """
+    cl = _clauses(sentence)
+    for k, (start, own, _conj) in enumerate(cl):
+        end = cl[k + 1][0] if k + 1 < len(cl) else len(sentence) + 1
+        if not start <= pos < end:
+            continue
+        gate = own
+        j = k + 1
+        while j < len(cl) and _TRAILING_CLAUSE_RX.match(cl[j][1]):
+            gate += " " + cl[j][1]
+            j += 1
+            while j < len(cl) and cl[j][2]:
+                gate += " " + cl[j][1]
                 j += 1
-            j = k - 1
-            while j >= 0 and _LEADING_CLAUSE_RX.match(clauses[j]):
-                gate = clauses[j] + " " + gate
-                j -= 1
-            return own, gate
-    return sentence, sentence
+        j = k - 1
+        while j >= 0:
+            unit = cl[j][1]
+            i = j
+            while i > 0 and cl[i][2]:
+                i -= 1
+                unit = cl[i][1] + unit
+            if not _LEADING_CLAUSE_RX.match(unit):
+                break
+            gate = unit + " " + gate
+            j = i - 1
+        return own, start, gate
+    return sentence, 0, sentence
 
 
 def _park_positions(sentence):
+    """(position, narrative-check) for each park. A form is placed at its
+    end, so an earlier clause it spans cannot exempt it."""
     for m in PHRASE_RX.finditer(sentence):
         if _object_is_ref(sentence[m.end():]):
-            yield m.start()
+            yield m.start(), True
     for rx in FORM_RX:
         for m in rx.finditer(sentence):
-            yield m.start()
+            yield m.end() - 1, False
 
 
 def find_park(text):
@@ -331,9 +389,11 @@ def find_park(text):
     # A possessive on a link ("[#12](url)'s CI") belongs to its text.
     prose = _POSSESSIVE_LINK_RX.sub(r"\1", prose).replace("](", "] (")
     for sentence in SENTENCE_SPLIT_RX.split(prose):
-        for pos in _park_positions(sentence):
-            own, gate = _gate_region(sentence, pos)
+        for pos, narrative in _park_positions(sentence):
+            own, start, gate = _gate_region(sentence, pos)
             if PERSON_GATE_RX.search(gate) or RESOLVED_RX.search(own):
+                continue
+            if narrative and _NARRATIVE_RX.search(sentence[start:pos]):
                 continue
             return sentence.strip()
     return None

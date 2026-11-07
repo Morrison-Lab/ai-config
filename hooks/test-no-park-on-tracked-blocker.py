@@ -368,6 +368,13 @@ CASES = [
     ("logged off after waiting", [say("I logged off for the night after waiting on #12.")], True),
     ("wrapped up after waiting", [say("I wrapped up after waiting on #12.")], True),
     ("merged after waiting", [say("I merged it after waiting on #12.")], False),
+    # Claude review of cf664932: a reason or a time after the stop word is a report.
+    ("wrapped up before the deadline", [say("After waiting on #12, I wrapped up before the deadline.")], False),
+    ("wrapped up since ready", [say("After waiting on #12, I wrapped up since the release was ready.")], False),
+    ("logged off once deployed", [say("After waiting on #12, I logged off once the deploy finished.")], False),
+    ("called it a day when shipped", [say("After waiting on #12, I called it a day when the release shipped.")], False),
+    ("signed off because fine", [say("After waiting on #12, I signed off because the release looked fine.")], False),
+    ("signed off as manager", [say("After waiting on #12, I signed off as the release manager.")], False),
     ("decided to stop comma", [say("After waiting on #12 I decided to stop, and #13 can wait.")], True),
     ("sole string-input reply blocks",
      [{"type": "assistant", "message": {"content": [{

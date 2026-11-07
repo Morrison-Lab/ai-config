@@ -1741,6 +1741,17 @@ def main() -> int:
         "classify_verdict: 'approved for merge pending CI' is NOT clean",
         checker.classify_verdict("Approved for merge pending a green CI run.") == "",
     )
+    # ai-config#1318: a verdict line that names an open nit is not clean.
+    check(
+        "classify_verdict: 'Ready for merge (one minor nit noted above, non-blocking)' is not clean",
+        checker.classify_verdict(
+            "### Verdict\n\n**Ready for merge** (one minor doc-accuracy nit noted above, non-blocking)"
+        ) != "clean",
+    )
+    check(
+        "classify_verdict: 'Ready for merge -- three nits fixed' stays clean",
+        checker.classify_verdict("### Verdict\n\n**Ready for merge** -- three nits fixed.") == "clean",
+    )
     # NEGATIVE CONTROLS -- the guard must not swallow a genuine sign-off, or
     # criterion 4 never passes and the gate becomes unusable.
     check(

@@ -2530,7 +2530,12 @@ CLEAN_QUALIFIER = re.compile(
     r"\b(?:once|after|when|if|unless|pending|provided|assuming"
     r"|subject\s+to|as\s+soon\s+as|contingent|but|however|except|though|although"
     r"|aside\s+from|other\s+than|apart\s+from|save\s+for|modulo|barring"
-    r"|yet|so\s+far)\b",
+    r"|yet|so\s+far)\b"
+    # A sign-off that names a finding it does not count (ai-config#1318):
+    # "(one minor nit noted above, non-blocking)". "noted above" points at a
+    # finding stated in the same comment, unlike "three nits fixed". Bare
+    # "non-blocking" is deliberately not a qualifier (ai-config#2369).
+    r"|noted\s+above|nits?\s+(?:noted|remain\w*)",
     re.IGNORECASE,
 )
 # A BARE newline does not end a sentence in this corpus, which writes semantic

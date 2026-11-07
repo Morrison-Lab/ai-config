@@ -16,7 +16,7 @@ Phrases that do this:
 
 Each one tells the reader that a source exists and withholds it.
 
-Two rules follow.
+Three rules follow.
 
 - **A source exists:** cite it, with a locator, through the repository's bibliography ([`citations`](citations.md)).
   If the claim came from a lecturer, a slide deck or an earlier version of the text, say so by name ([`visible-attributions`](visible-attributions.md)).

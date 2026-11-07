@@ -8,6 +8,10 @@ the answer was "yes, always").
 A repo's own "merge main only when it conflicts" guidance does not make the
 merge a question for the user: do it when `main` has moved, and say so after.
 
+The one exception is a PR that is already fully clean on its current head and waiting for a merge word.
+Merging `main` into it moves the head and voids the Clean review and the checker pass (ids#47 lost its Clean verdict this way, 2026-11-07, [ai-config#5093](https://github.com/Morrison-Lab/ai-config/issues/5093)).
+`hooks/no-update-branch-on-clean-pr.py` denies `update_pull_request_branch` there, unless `check-pr-fully-clean.py` has reported that the base gained a CI gate the head never ran.
+
 Worked-example case records for the rules below live in
 [`sync-with-main.cases.md`](sync-with-main.cases.md), moved out of the auto-loaded context.
 

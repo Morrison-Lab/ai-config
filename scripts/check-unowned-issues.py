@@ -58,39 +58,66 @@ def find_unowned(issues: list[dict], now: datetime, grace_minutes: int = 60) -> 
     return sorted(out, key=lambda i: (i["rank"], -i["age_minutes"]))
 
 
-def gh(path: str) -> list | dict:
-    done = subprocess.run(["gh", "api", "-X", "GET", path, "--paginate", "--slurp"],
-                          capture_output=True, text=True, check=True)
-    return flatten_pages(json.loads(done.stdout))
+PER_PAGE = 100
 
 
-def flatten_pages(pages: list) -> list:
-    """Join the per-page arrays that `gh api --paginate --slurp` returns."""
-    return [row for page in pages for row in page]
+def fetch_page(path: str, page: int) -> list:
+    """One page, parsed on its own: no splicing of raw JSON.
+
+    `gh api --paginate` follows Link headers that name repositories/{id}/...
+    paths, which the cloud session proxy refuses with HTTP 403, so page
+    explicitly.
+    """
+    joiner = "&" if "?" in path else "?"
+    done = subprocess.run(
+        ["gh", "api", "-X", "GET", f"{path}{joiner}per_page={PER_PAGE}&page={page}"],
+        capture_output=True, text=True, check=True)
+    return json.loads(done.stdout)
 
 
-def load(repos: list[str]) -> list[dict]:
+def gh(path: str) -> list:
+    rows, page = [], 1
+    while True:
+        chunk = fetch_page(path, page)
+        rows += chunk
+        if len(chunk) < PER_PAGE:
+            return rows
+        page += 1
+
+
+def load_repo(repo: str) -> list[dict]:
     issues = []
-    for repo in repos:
-        rows = gh(f"repos/{ORG}/{repo}/issues?state=open&per_page=100")
-        for row in rows:
-            if "pull_request" in row:
-                continue
-            label_names = [label["name"] for label in row["labels"]]
-            if priority(label_names) is None and "owed-followup" not in label_names:
-                continue
-            comments = gh(f"repos/{ORG}/{repo}/issues/{row['number']}/comments?per_page=100")
-            events = gh(f"repos/{ORG}/{repo}/issues/{row['number']}/timeline?per_page=100")
-            refs = sum(
-                1 for e in events
-                if e.get("event") == "cross-referenced"
-                and e["source"]["issue"].get("pull_request")
-                and e["source"]["issue"]["state"] == "open"
-            )
-            issues.append({"repo": repo, "number": row["number"], "title": row["title"],
-                           "labels": label_names, "created_at": row["created_at"],
-                           "open_pr_refs": refs, "comments": [c["body"] for c in comments]})
+    rows = gh(f"repos/{ORG}/{repo}/issues?state=open")
+    for row in rows:
+        if "pull_request" in row:
+            continue
+        label_names = [label["name"] for label in row["labels"]]
+        if priority(label_names) is None and "owed-followup" not in label_names:
+            continue
+        comments = gh(f"repos/{ORG}/{repo}/issues/{row['number']}/comments")
+        events = gh(f"repos/{ORG}/{repo}/issues/{row['number']}/timeline")
+        refs = sum(
+            1 for e in events
+            if e.get("event") == "cross-referenced"
+            and e["source"]["issue"].get("pull_request")
+            and e["source"]["issue"]["state"] == "open"
+        )
+        issues.append({"repo": repo, "number": row["number"], "title": row["title"],
+                       "labels": label_names, "created_at": row["created_at"],
+                       "open_pr_refs": refs, "comments": [c["body"] for c in comments]})
     return issues
+
+
+def load(repos: list[str]) -> tuple[list[dict], list[str]]:
+    """Return (issues, repos that failed to load); one bad repo never hides the rest."""
+    issues, failed = [], []
+    for repo in repos:
+        try:
+            issues += load_repo(repo)
+        except subprocess.CalledProcessError as err:
+            print(f"gh failed for {repo}: {(err.stderr or '').strip()[:300]}", file=sys.stderr)
+            failed.append(repo)
+    return issues, failed
 
 
 def main() -> int:
@@ -98,13 +125,18 @@ def main() -> int:
     parser.add_argument("--grace-minutes", type=int, default=60)
     parser.add_argument("--repo", action="append", help="limit to these repos")
     args = parser.parse_args()
-    found = find_unowned(load(args.repo or REPOS), datetime.now(timezone.utc), args.grace_minutes)
+    issues, failed = load(args.repo or REPOS)
+    for repo in failed:
+        print(f"ERROR could not read {ORG}/{repo}", file=sys.stderr)
+    found = find_unowned(issues, datetime.now(timezone.utc), args.grace_minutes)
     for item in found:
         flag = "OVERDUE" if item["overdue"] else "unowned"
         print(f"{flag} P{item['rank']} {ORG}/{item['repo']}#{item['number']} "
               f"({int(item['age_minutes'])} min) {item['title']}")
     if not found:
         print("No unowned P1/P2/owed issues.")
+    if failed:
+        return 2
     return 1 if any(i["overdue"] for i in found) else 0
 
 

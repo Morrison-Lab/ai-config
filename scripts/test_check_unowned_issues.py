@@ -58,8 +58,27 @@ for body in ["Owner: alice", "Owner: @alice", "owner:bob", "Claimed by X"]:
 check("unrelated comment is not a claim",
       len(cui.find_unowned([issue(11, ["P1"], comments=["Reproduced on main"])], NOW)) == 1)
 
-pages = json.loads('[[{"title": "a ][ b"}], [{"title": "c"}]]')
-check("slurped pages flatten without touching '][' inside titles",
-      cui.flatten_pages(pages) == [{"title": "a ][ b"}, {"title": "c"}])
+full_page = [{"title": "a ][ b"}] * cui.PER_PAGE
+fake_pages = {1: full_page, 2: [{"title": "c"}]}
+real_fetch = cui.fetch_page
+cui.fetch_page = lambda path, page: fake_pages[page]
+rows = cui.gh("repos/x/y/issues")
+cui.fetch_page = real_fetch
+check("explicit paging joins pages and leaves '][' inside titles alone",
+      len(rows) == cui.PER_PAGE + 1 and rows[0]["title"] == "a ][ b" and rows[-1]["title"] == "c")
+
+import subprocess
+
+
+def fake_load_repo(repo):
+    if repo == "bad":
+        raise subprocess.CalledProcessError(1, "gh")
+    return [issue(12, ["P1"])]
+
+
+cui.load_repo = fake_load_repo
+got, failed = cui.load(["bad", "good"])
+check("one unreadable repo is reported and the others still load",
+      failed == ["bad"] and [i["number"] for i in got] == [12])
 
 sys.exit(1 if failures else 0)

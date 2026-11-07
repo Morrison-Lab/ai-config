@@ -396,6 +396,12 @@ CASES = [
     ("signed off when #13's review", [say("After waiting on #12, I signed off when #13's review comes up tomorrow.")], True),
     ("logged off as #13 is owed", [say("While waiting on #12, I logged off as I still owe #13 a look tomorrow.")], True),
     ("signed off because #12 merged", [say("After waiting on #12, I signed off because #12 merged.")], False),
+    # Claude review of aa5742e0: a bare "and" before other work ends no stop.
+    ("wrapped things up and merged", [say("After waiting on #12, I wrapped things up and merged #13.")], False),
+    ("wrapped everything up and filed", [say("While waiting on #12, I wrapped everything up and filed the release notes.")], False),
+    ("wrapped up and merged", [say("After waiting on #12, I wrapped up and merged #13.")], False),
+    ("called it a day and logged off", [say("After waiting on #12, I called it a day and logged off.")], True),
+    ("wrapped things up and signed off", [say("After waiting on #12, I wrapped things up and signed off.")], True),
     # glm review of fd98389a: a time of day after the day is still a time.
     ("stop until tomorrow afternoon", [say("After waiting on gha#1544, I decided to stop until tomorrow afternoon.")], True),
     ("sole string-input reply blocks",

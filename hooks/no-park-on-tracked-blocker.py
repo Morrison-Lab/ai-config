@@ -312,7 +312,11 @@ _STOP_PHRASE_RX = re.compile(
     + r"|(?<![\w/#&.])#\d+\b)"
     # ...unless the item is done: "I signed off because #12 merged".
     r"(?!\s+(?:merged|landed|closed|shipped|passed|went\s+green|was\s+merged)\b)"
-    r"|\sbefore\s+\w+ing\b)",
+    r"|\sbefore\s+\w+ing\b"
+    # A bare "and" ends it only before another stop ("I called it a day and
+    # logged off"); "I wrapped things up and merged #13" reports work.
+    r"|\s(?:and|but)\s+(?:then\s+)?(?:(?:I|we)\s+)?(?:stop|paus|call(?:ed)?\s+it\b"
+    r"|took\s+a\s+break|wrap|(?:sign(?:ed)?|log(?:ged)?|switch(?:ed)?)\s+off))",
     re.I,
 )
 # Verbs that describe stopping only with a stopping object: "I left the rest
@@ -537,13 +541,16 @@ def _reports_past(sentence, start, pos):
     own = rest[:m.start()] if m else rest
     # The next clause, carried on through "so" (", so", ", and so", "; so"),
     # but not through a bare "and"/"but", which starts other work.
-    nxt = ""
+    nxt = nxt_tail = ""
     if m:
+        after = rest[m.end():]
         nxt = re.split(
             r";\s+(?!so\b)|,\s+(?!(?:and\s+)?so\b)|\s(?:and|but)\s+(?!so\b)",
-            rest[m.end():], maxsplit=1, flags=re.I,
+            after, maxsplit=1, flags=re.I,
         )[0]
-    if _done_verb(sentence[start:pos]) or _done_verb(own) or _done_verb(nxt):
+        nxt_tail = after[len(nxt):]
+    if (_done_verb(sentence[start:pos]) or _done_verb(own, rest[len(own):])
+            or _done_verb(nxt, nxt_tail)):
         return True
     # A bare "then merged it" needs a first-person subject before the wait.
     t = re.match(r"then\s+(\w+ed)\b", nxt, re.I)
@@ -559,20 +566,22 @@ def _is_stop_phrase(text, at):
     return bool(_STOP_PHRASE_RX.match(text, at))
 
 
-def _done_verb(text):
+def _done_verb(text, tail=""):
     """True when `text` has a first-person past verb reporting work. A verb
     that stops only with a stopping object (left, put, kept, held, ended)
     reports work only with a work object, since "I held the fix in place"
     says nothing about progress while "I left review comments" does. A verb
     that starts or leads into a stop phrase ("I called it a day", "I decided
     to stop") is the stop itself, while "I merged it, so I called it a day"
-    still reports the merge."""
+    still reports the merge. `tail` is the text after `text`, read only to
+    see where a stop phrase ends ("I wrapped things up" + " and merged #13")."""
+    full = text + tail
     for m in _PAST_RX.finditer(text):
         verb = m.group().split()[-1].lower()
-        if verb in _STOP_VERBS or _is_stop_phrase(text, m.end() - len(verb)):
+        if verb in _STOP_VERBS or _is_stop_phrase(full, m.end() - len(verb)):
             continue
         to = re.match(r"\s+to\s+", text[m.end():])
-        if to and _is_stop_phrase(text, m.end() + to.end()):
+        if to and _is_stop_phrase(full, m.end() + to.end()):
             continue
         if verb in _STOP_WITH_OBJECT and not _WORK_OBJECT_RX.match(text, m.end()):
             continue

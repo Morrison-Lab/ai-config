@@ -28,6 +28,25 @@ def reply(text):
     }
 
 
+def send(text):
+    return {
+        "type": "assistant",
+        "message": {"content": [{
+            "type": "tool_use",
+            "name": "mcp__claude-code-remote__send_message",
+            "input": {"message": text},
+        }]},
+    }
+
+
+def user(text):
+    return {"type": "user", "message": {"content": [{"type": "text", "text": text}]}}
+
+
+def tool_result():
+    return {"type": "user", "message": {"content": [{"type": "tool_result", "content": "ok"}]}}
+
+
 def run(entries, active=False):
     with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False, encoding="utf-8") as fh:
         for e in entries:
@@ -76,6 +95,27 @@ CASES = [
     ("separate bullets stay separate", [say("- waits on a fix\n- merged #4")], False),
     ("malformed lines tolerated", [[1], "x", {"type": "assistant", "message": "str"},
                                    say("x waits on #5.")], True),
+    # ai-config#5063 review findings (agy, 2026-11-07).
+    ("earlier turn's park does not block", [reply("mds#649 waits on gha#1544."), user("go"),
+                                            say("I drove gha#1544 and merged mds#649; all done.")], False),
+    ("earlier turn's all-clear does not hide", [reply("All clean."), user("go"),
+                                                say("mds#649 waits on gha#1544.")], True),
+    ("tool result is not a new turn", [reply("mds#649 waits on gha#1544."), tool_result()], True),
+    ("CI wait with a later ref passes", [say("Waiting on CI for #12.")], False),
+    ("ref as subject passes", [say("PR #12 is waiting on the macOS runner before auto-merge fires.")], False),
+    ("past-tense which-clause passes", [say("I merged gha#1545, which mds#649 was waiting on.")], False),
+    ("table rows stay separate", [say("| #12 | Merged |\n| Release | Waiting on tag build |")], False),
+    ("status lines stay separate", [say("Merged #12\nWaiting on the deploy job")], False),
+    ("until url merges", [say("Holding mds#685 until https://github.com/o/r/pull/12 merges.")], True),
+    ("until dotted repo merges", [say("Holding it until owner/repo.name#7 merges.")], True),
+    ("depending on", [say("Stopping here, depending on gha#1544.")], True),
+    ("depend on", [say("Both mds#649 and mds#650 depend on gha#1544.")], True),
+    ("held until ready", [say("mds#649 is held until gha#1544 is ready.")], True),
+    ("bare mwc does not exempt", [say("Even with mwc active, mds#649 waits on gha#1544.")], True),
+    ("bare approval does not exempt", [say("The token-approval PR (#649) waits on gha#1544.")], True),
+    ("bare no longer does not exempt", [say("mds#649 no longer fails lint, and now waits on gha#1544.")], True),
+    ("file anchor is not an item", [say("The test waits on [section 2](README.md#2) of the spec.")], False),
+    ("send_message payload checked", [send("mds#649 waits on gha#1544.")], True),
 ]
 
 

@@ -89,7 +89,7 @@ FORGE_REF = re.compile(
     r"|\bruns? #?\d{6,}\b", re.I)
 # A reference counts as linked only inside a markdown link or a bare URL, so
 # one link elsewhere in the paragraph does not cover the rest.
-LINKED = re.compile(r"\[[^\]]*\]\([^)]*\)|https?://\S+")
+LINKED = re.compile(r"\[[^\]]*\]\(https?://[^)]*\)|https?://\S+")
 UNIT_BREAK = re.compile(r"\n[ \t]*\n|\n(?=(?:[-*+]|\d+[.)])[ \t])")
 
 REASON = """\
@@ -127,9 +127,10 @@ def unlinked_mention(text: str):
 
 FORGE_REASON = """\
 [hook: no-unlinked-session-mention] This post names a forge artifact \
-("{phrase}") with no link in the same paragraph or list item. The user's \
+("{phrase}") that is not itself a link. The user's \
 standing rule (2026-11-07): "always hyperlink; don't make me ask".
-Resend with its URL in the same paragraph or list item, for example \
+Resend with that text as a markdown link to its https URL (a URL elsewhere \
+in the paragraph does not cover it), for example \
 [owner/repo#12](https://github.com/owner/repo/pull/12) or \
 [run 123](https://github.com/owner/repo/actions/runs/123).
 If the text is not a PR, issue or run (a footnote number, a heading), put it \
@@ -137,7 +138,7 @@ in backticks and resend."""
 
 
 def unlinked_forge_ref(text: str):
-    """The first PR, issue or run reference in a unit with no URL, or None."""
+    """The first PR, issue or run reference outside a link, or None."""
     text = FENCE.sub(" ", text.replace("\r\n", "\n"))
     for unit in UNIT_BREAK.split(text):
         unit = LINKED.sub(" ", INLINE_CODE.sub(" ", unit))

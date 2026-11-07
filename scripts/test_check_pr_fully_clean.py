@@ -1752,6 +1752,12 @@ def main() -> int:
         "classify_verdict: 'Ready for merge -- three nits fixed' stays clean",
         checker.classify_verdict("### Verdict\n\n**Ready for merge** -- three nits fixed.") == "clean",
     )
+    check(
+        "classify_verdict: 'annotated above' and 'units remaining' do not veto (word boundaries)",
+        checker.classify_verdict(
+            "### Verdict\n\n**Ready for merge** -- annotated above, 3 units remaining checked."
+        ) == "clean",
+    )
     # NEGATIVE CONTROLS -- the guard must not swallow a genuine sign-off, or
     # criterion 4 never passes and the gate becomes unusable.
     check(

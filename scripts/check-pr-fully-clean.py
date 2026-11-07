@@ -2535,7 +2535,7 @@ CLEAN_QUALIFIER = re.compile(
     # "(one minor nit noted above, non-blocking)". "noted above" points at a
     # finding stated in the same comment, unlike "three nits fixed". Bare
     # "non-blocking" is deliberately not a qualifier (ai-config#2369).
-    r"|noted\s+above|nits?\s+(?:noted|remain\w*)",
+    r"|\bnoted\s+above\b|\bnits?\s+(?:noted|remain\w*)\b",
     re.IGNORECASE,
 )
 # A BARE newline does not end a sentence in this corpus, which writes semantic

@@ -965,6 +965,82 @@ def main() -> int:
         ),
     )
 
+    # ai-config#5064: a reviewer out of quota cannot refresh a stale not-clean,
+    # so a clean substitute on the live head fills its slot; a not-clean on the
+    # live head itself, or no substitute, still vetoes.
+    HEAD = "abcdef1234567890abcdef1234567890abcdef12"
+    CLAUDE_CLEAR_HEAD = (
+        "**Claude finished** review\n\nReviewed `abcdef1`.\n\n### Verdict\n\n"
+        "**Ready for merge**"
+    )
+    stale_copilot = ("review", "2026-11-07T05:00:00Z", COPILOT_BLOCKS, "1111111aaaa", "",
+                     "copilot-pull-request-reviewer")
+    head_copilot = ("review", "2026-11-07T05:00:00Z", COPILOT_BLOCKS, HEAD, "",
+                    "copilot-pull-request-reviewer")
+    sub_clean = ("comment", "2026-11-07T07:00:00Z", CLAUDE_CLEAR_HEAD, "", "", "github-actions")
+    sub_stale = ("comment", "2026-11-07T07:00:00Z",
+                 CLAUDE_CLEAR_HEAD.replace("abcdef1", "9999999"), "", "", "github-actions")
+    q_ok, q_issues = checker.check_latest_verdict(
+        [stale_copilot, sub_clean], head_oid=HEAD, out_of_quota=["copilot"])
+    check(
+        "check_latest_verdict: out-of-quota reviewer's stale not-clean is replaced "
+        "by a clean substitute on the live head, with a NOTE (#5064)",
+        q_ok and any(i.startswith("NOTE: ") and "substitute reviewer" in i
+                     and "Copilot" in i and "Claude" in i for i in q_issues),
+    )
+    qh_ok, _qh = checker.check_latest_verdict(
+        [head_copilot, sub_clean], head_oid=HEAD, out_of_quota=["copilot"])
+    check("check_latest_verdict: out-of-quota reviewer's not-clean ON the live head still vetoes (#5064)",
+          not qh_ok)
+    qn_ok, _qn = checker.check_latest_verdict(
+        [stale_copilot], head_oid=HEAD, out_of_quota=["copilot"])
+    check("check_latest_verdict: out-of-quota with no substitute still vetoes (#5064)", not qn_ok)
+    qs_ok, _qs = checker.check_latest_verdict(
+        [stale_copilot, sub_stale], head_oid=HEAD, out_of_quota=["copilot"])
+    check("check_latest_verdict: a substitute clean on an older head does not count (#5064)", not qs_ok)
+    qd_ok, _qd = checker.check_latest_verdict([stale_copilot, sub_clean], head_oid=HEAD)
+    check("check_latest_verdict: without the out-of-quota flag the stale veto stands (#5064)",
+          not qd_ok)
+
+    # ai-config#5065: a repo with no CI workflows and no check suites has no
+    # check runs to find; a repo WITH workflows but no runs is a stalled CI.
+    import json as _json
+
+    class _NoRunsPR:
+        repo = "Morrison-Lab/stats-allowlist"
+        head_sha = "ebbb8d39" + "0" * 32
+
+        def get_check_runs(self):
+            return []
+
+    def _no_ci_score(workflows, suites):
+        replies = {
+            "/actions/workflows": workflows,
+            "/check-suites": suites,
+        }
+
+        def _fake_fetch(cmd):
+            for key, value in replies.items():
+                if key in cmd[-1]:
+                    if value is None:
+                        raise RuntimeError("HTTP 404")
+                    return _json.dumps({"total_count": value})
+            raise AssertionError(cmd)
+
+        with patch.object(checker, "fetch", side_effect=_fake_fetch):
+            return original_check_ci_runs(_NoRunsPR())
+
+    nc_ok, nc_issues = _no_ci_score(0, 0)
+    check("check_ci_runs: a repo with no workflows and no check suites passes with a NOTE (#5065)",
+          nc_ok and any(i.startswith("NOTE: ") and "no CI workflows" in i for i in nc_issues))
+    nw_ok, nw_issues = _no_ci_score(3, 0)
+    check("check_ci_runs: a repo with workflows but no check runs still fails (#5065)",
+          (not nw_ok) and any("No check runs found" in i for i in nw_issues))
+    ns_ok, _ns = _no_ci_score(0, 1)
+    check("check_ci_runs: no workflows but a check suite on the head still fails (#5065)", not ns_ok)
+    ne_ok, _ne = _no_ci_score(None, 0)
+    check("check_ci_runs: an unreadable workflow count keeps failing (#5065)", not ne_ok)
+
     items_same_reviewer = [
         (
             "comment",

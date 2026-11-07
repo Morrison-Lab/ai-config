@@ -72,7 +72,14 @@ _STATIVE = (
 _NOT_ANNOUNCING = (
     r"(?:not|never|no|be|also|probably|just|sure|unsure|uncertain|certain|"
     r"sorry|glad|happy|afraid|aware|confused|stuck|unable|unclear|"
-    r"curious|worried|hesitant|inclined)\b|" + _STATIVE
+    r"curious|worried|hesitant|inclined|"
+    # Declining or stopping work (ai-config#5061). Only the declining
+    # collocations: bare `pass`, `leave` and `stop` also announce real actions
+    # ("pass the flag", "leave a comment", "stop the daemon").
+    r"leave\s+(?:this|it|that|things|them)\s+(?:alone|as|be|for|until)|"
+    r"pass\s+on|stop\s+(?:here|now|there|for|working)|"
+    r"(?:skip|defer)\s+(?:this|it|that|these|those)|"
+    r"done\s+for|finished\s+(?:for|with\s+(?:this|it|that)))\b|" + _STATIVE
 )
 
 PATTERNS = [

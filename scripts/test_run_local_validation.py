@@ -459,6 +459,28 @@ GIT_IDENTITY = {
 }
 
 
+def test_slow_steps_run_last_and_each_step_reports():
+    """ai-config#5085: the slow hooks stage must not precede cheap steps."""
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+        wf = Path(tmp) / "wf.yml"
+        wf.write_text(
+            "name: t\non: push\njobs:\n  validate:\n    runs-on: x\n    steps:\n"
+            "      - name: Slow\n        run: python3 scripts/test_hooks.py\n"
+            "      - name: Fast\n        run: 'true'\n",
+            encoding="utf-8")
+        out = io.StringIO()
+        with redirect_stdout(out), redirect_stderr(io.StringIO()):
+            rlv.main(["--workflow", str(wf), "--root", tmp, "--list", "--no-other-workflows"])
+        text = out.getvalue()
+        check("the slow step is listed after the fast one",
+              text.index("Fast") < text.index("Slow"))
+        out = io.StringIO()
+        with redirect_stdout(out), redirect_stderr(io.StringIO()):
+            rlv.main(["--workflow", str(wf), "--root", tmp, "--only", "Fast", "--no-other-workflows"])
+        check("each finished step prints its own result line before the summary",
+              "<== [validate] Fast: rc 0 in " in out.getvalue())
+
+
 def test_changed_end_to_end():
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         wf = _write_fixture(tmp)
@@ -515,6 +537,8 @@ def main():
     test_scope_matching()
     print('running test_list_shows_availability_note()', flush=True)
     test_list_shows_availability_note()
+    print('running test_slow_steps_run_last_and_each_step_reports()', flush=True)
+    test_slow_steps_run_last_and_each_step_reports()
     print('running test_changed_end_to_end()', flush=True)
     test_changed_end_to_end()
     print('running test_live_workflow_derives_every_python_test_suite()', flush=True)

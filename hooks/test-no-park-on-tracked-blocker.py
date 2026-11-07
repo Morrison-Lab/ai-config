@@ -402,6 +402,12 @@ CASES = [
     ("wrapped up and merged", [say("After waiting on #12, I wrapped up and merged #13.")], False),
     ("called it a day and logged off", [say("After waiting on #12, I called it a day and logged off.")], True),
     ("wrapped things up and signed off", [say("After waiting on #12, I wrapped things up and signed off.")], True),
+    # Claude review of 612d9300: every stop verb counts after a bare "and".
+    ("wrapped up and halted", [say("After waiting on #12, I wrapped things up and halted.")], True),
+    ("wrapped up and shelved it", [say("After waiting on #12, I wrapped things up and shelved it.")], True),
+    ("wrapped up and left it there", [say("After waiting on #12, I wrapped things up and left it there.")], True),
+    ("wrapped up and held off", [say("After waiting on #12, I wrapped things up and held off.")], True),
+    ("wrapped up and left comments", [say("After waiting on #12, I wrapped things up and left review comments.")], False),
     # glm review of fd98389a: a time of day after the day is still a time.
     ("stop until tomorrow afternoon", [say("After waiting on gha#1544, I decided to stop until tomorrow afternoon.")], True),
     ("sole string-input reply blocks",

@@ -316,7 +316,10 @@ _STOP_PHRASE_RX = re.compile(
     # A bare "and" ends it only before another stop ("I called it a day and
     # logged off"); "I wrapped things up and merged #13" reports work.
     r"|\s(?:and|but)\s+(?:then\s+)?(?:(?:I|we)\s+)?(?:stop|paus|call(?:ed)?\s+it\b"
-    r"|took\s+a\s+break|wrap|(?:sign(?:ed)?|log(?:ged)?|switch(?:ed)?)\s+off))",
+    r"|took\s+a\s+break|wrap|(?:sign(?:ed)?|log(?:ged)?|switch(?:ed)?)\s+off"
+    r"|(?:" + "|".join(sorted(_STOP_VERBS)) + r")\b"
+    r"|left\s+(?:it|things|the\s+rest)\b|held\s+off\b|put\s+(?:it|things)\s+(?:off|aside)\b"
+    r"|ended\s+there\b))",
     re.I,
 )
 # Verbs that describe stopping only with a stopping object: "I left the rest

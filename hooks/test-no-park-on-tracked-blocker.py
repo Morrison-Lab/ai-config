@@ -342,6 +342,22 @@ CASES = [
     ("for the lead reviewer", [say("mcs#99 waits on #12, for the lead reviewer to sign off.")], False),
     ("for the release manager", [say("mcs#99 waits on #12, for the release manager to sign off.")], False),
     ("put the hotfix up", [say("While waiting on #12, I put the hotfix up for tomorrow's release.")], False),
+    # Claude review of b45e9d54: a stop word with an object reports work.
+    # A plan is not a report, and a stop verb stops whatever its object
+    # (KNOWN LIMITS); another verb for the work makes it pass.
+    ("stop by tomorrow", [say("After waiting on #12, I'll stop by to check on #13 tomorrow.")], True),
+    ("fixed the leak", [say("After waiting on #12, I fixed the leak in the retry logic and merged it.")], False),
+    ("stop-loss logic", [say("After waiting on #12, I fixed the stop-loss logic and merged it.")], False),
+    ("signed off on the release", [say("After waiting on #12, I signed off on the release and merged it.")], False),
+    ("wrapped up the docs", [say("After waiting on #12, I wrapped up the documentation and merged it.")], False),
+    ("stopped the leak", [say("After waiting on #12, I stopped the leak in the retry logic and merged it.")], True),
+    # glm review of b45e9d54.
+    ("merged then called it a day", [say("After waiting on #12 for CI, I merged it, so I called it a day.")], False),
+    ("wrapped up a fix then merged", [say("While waiting on #12, I wrapped up the flaky-test fix, and I merged it.")], False),
+    ("for the merge queue", [say("mds#649 waits on #12, for the merge queue to merge it.")], True),
+    ("them for approval", [say("I sent the patch to both reviewers; mds#649 waits on them (#12) for approval.")], False),
+    ("then called it a day", [say("After waiting on #12 for CI, then called it a day.")], True),
+    ("decided to stop comma", [say("After waiting on #12 I decided to stop, and #13 can wait.")], True),
     ("sole string-input reply blocks",
      [{"type": "assistant", "message": {"content": [{
          "type": "tool_use", "name": "mcp__hearthbot__post_message",

@@ -66,6 +66,11 @@ shapes, and these are accepted rather than chased:
   with any parts a bare and/but joins to it).
 - "I'll keep polling until #12 merges" counts as a park on purpose: it
   waits on #12 rather than driving it.
+- A stop verb (stopped, paused, halted, ...) counts as stopping whatever
+  its object, so "After waiting on #12, I stopped the leak and merged it"
+  blocks; the agent answers with another verb ("I fixed the leak").
+- A narrative wait followed only by a plan ("After waiting on #12, I'll
+  stop by #13 tomorrow") blocks, since a plan is not a report.
 """
 import json
 import os
@@ -216,8 +221,10 @@ PERSON_GATE_RX = re.compile(
     r"(?:approval|go-?ahead|ok|okay|say-?so|answer|decision|review|click|sign-?in|sign-?off|merge|input|"
     r"confirmation|token|secret|credentials?)\b"
     r"|\bfor\s+" + _PERSON + r"\s+to\b"
+    r"|\bfor\s+(?:their|his|her|your|human|manual)?\s*(?:approval|sign-?off|go-?ahead)\b"
     r"|\bfor\s+(?!(?:the\s+|an?\s+)?(?:\S+[-\s])?(?:bots?|ci|copilot|claude|codex|gemini|agents?|"
-    r"automated|workflows?|checks?|dependabot|renovate|mergify|canary|webhooks?|deploy(?:ment)?s?|"
+    r"automated|workflows?|checks?|dependabot|renovate|mergify|bors|(?:merge\s+)?queues?|canary|"
+    r"webhooks?|deploy(?:ment)?s?|"
     r"pipelines?|runners?|builds?|tests?|actions)\b)(?:\S+\s+){1,3}?to\s+" + _PERSON_ACTION + r"\b"
     r"|\b(?:wait(?:s|ing)?\s+(?:on|for)|blocked\s+(?:on|by)|gated\s+(?:on|by)|await(?:s|ing)?|"
     r"needs?|requires?)\s+"
@@ -276,7 +283,11 @@ _STOP_VERBS = {
 # park, whatever verb carries it ("so I called it a day", "I decided to stop").
 _STOP_PHRASE_RX = re.compile(
     r"\b(?:stop(?:s|ped|ping)?|paus(?:e|es|ed|ing)|call(?:ed)?\s+it\s+a\s+(?:day|night)"
-    r"|wrap(?:ped)?\s+up|sign(?:ed)?\s+off|log(?:ged)?\s+off|for\s+the\s+(?:night|day|weekend))\b",
+    r"|wrap(?:ped)?\s+up|sign(?:ed)?\s+off|log(?:ged)?\s+off)"
+    # Only a stop that ends its clause, alone or with a time or place:
+    # "I stopped the leak", "I'll stop by" and "I wrapped up the docs" report work.
+    r"(?:\s+(?:for\s+(?:now|today|tonight|the\s+(?:night|day|weekend))|there|here))?"
+    r"\s*(?=[.,;:!?)]|$)",
     re.I,
 )
 # Verbs that describe stopping only with a stopping object: "I left the rest
@@ -507,26 +518,36 @@ def _reports_past(sentence, start, pos):
             r";\s+(?!so\b)|,\s+(?!(?:and\s+)?so\b)|\s(?:and|but)\s+(?!so\b)",
             rest[m.end():], maxsplit=1, flags=re.I,
         )[0]
-    if _STOP_PHRASE_RX.search(sentence[start:pos] + " " + own + " " + nxt):
-        return False
     if _done_verb(sentence[start:pos]) or _done_verb(own) or _done_verb(nxt):
         return True
     # A bare "then merged it" needs a first-person subject before the wait.
     t = re.match(r"then\s+(\w+ed)\b", nxt, re.I)
     return bool(
         t and t.group(1).lower() not in _STOP_VERBS
+        and not _is_stop_phrase(nxt, t.start(1))
         and re.search(r"\b(?:I|we)\b", sentence[:pos])
     )
+
+
+def _is_stop_phrase(text, at):
+    """True when a stop phrase that ends its clause starts at index `at`."""
+    return bool(_STOP_PHRASE_RX.match(text, at))
 
 
 def _done_verb(text):
     """True when `text` has a first-person past verb reporting work. A verb
     that stops only with a stopping object (left, put, kept, held, ended)
     reports work only with a work object, since "I held the fix in place"
-    says nothing about progress while "I left review comments" does."""
+    says nothing about progress while "I left review comments" does. A verb
+    that starts or leads into a stop phrase ("I called it a day", "I decided
+    to stop") is the stop itself, while "I merged it, so I called it a day"
+    still reports the merge."""
     for m in _PAST_RX.finditer(text):
         verb = m.group().split()[-1].lower()
-        if verb in _STOP_VERBS:
+        if verb in _STOP_VERBS or _is_stop_phrase(text, m.end() - len(verb)):
+            continue
+        to = re.match(r"\s+to\s+", text[m.end():])
+        if to and _is_stop_phrase(text, m.end() + to.end()):
             continue
         if verb in _STOP_WITH_OBJECT and not _WORK_OBJECT_RX.match(text, m.end()):
             continue

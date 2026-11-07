@@ -54,7 +54,9 @@ PROCEDURE = re.compile(
 # "No separate hook is needed" denies a debt; the negator is within a few words
 # of the owed phrase. "not yet filed" is itself a debt phrase, so it is matched
 # by OWED and never by its own lead-in.
-NEGATED = re.compile(r"\b(?:no|never|nothing|nobody|not)\b|n't\b", re.I)
+# A negator is a whole word: a hyphen is not a boundary, so "not-yet-released"
+# (an adjective) does not negate the claim around it.
+NEGATED = re.compile(r"(?<![\w-])(?:no|never|nothing|nobody|not)(?![\w-])|n't\b", re.I)
 NEGATION_WINDOW = 3
 CLAUSE =re.compile(r"[,;:]|\s+(?:but|although|though|while|and)\s+", re.I)
 LINK = re.compile(r"(?:^|[\s(\[])(?:[\w.-]+/[\w.-]+)?#\d+\b|/(?:issues|pull)/\d+")

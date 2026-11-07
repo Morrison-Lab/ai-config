@@ -52,6 +52,8 @@ CASES = [
     ("earlier negated need does not hide the debt", "- A check that wasn't needed earlier is now owed.", True),
     ("a negator directly before the phrase negates it", "- No check owed.", False),
     ("negated owed phrase passes", "- The lint is not owed.", False),
+    ("hyphenated not- adjective does not negate", "- A check for not-yet-released features is owed.", True),
+    ("hyphenated not-fully adjective does not negate", "- A hook for the not-fully-tested path is owed.", True),
     ("only negated clauses pass", "- The hook isn't needed, and no check is needed either.", False),
     ("allow marker passes", "- A hook is owed. <!-- owed-mechanism: allow -->", False),
     ("owed with no mechanism word passes", "- The invoice is owed to the vendor.", False),

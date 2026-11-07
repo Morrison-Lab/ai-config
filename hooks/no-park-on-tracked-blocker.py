@@ -292,7 +292,9 @@ _STOP_PHRASE_RX = re.compile(
     # Only a stop that ends its clause, alone or with a time or place:
     # "I stopped the leak", "I'll stop by" and "I wrapped up the docs" report work.
     r"(?:\s+(?:(?:for|until)\s+" + _STOP_TIME + r"|there|here))?"
-    r"\s*(?=[.,;:!?)]|$)",
+    # The clause also ends at a subordinating word ("I signed off after
+    # waiting on #12").
+    r"\s*(?=[.,;:!?)]|$|\s(?:after|while|since|because|before|once|when|as|until)\b)",
     re.I,
 )
 # Verbs that describe stopping only with a stopping object: "I left the rest

@@ -362,6 +362,12 @@ CASES = [
     ("signed off for the morning", [say("After waiting on #12, I signed off for the morning.")], True),
     ("logged off for the evening", [say("After waiting on #12, I logged off for the evening.")], True),
     ("left the rest for the afternoon", [say("While waiting on #12, I left the rest for the afternoon.")], True),
+    # Claude review of fd98389a: a stop before the wait, with no comma.
+    ("signed off after waiting", [say("I signed off for the evening after waiting on #12.")], True),
+    ("called it a day after waiting", [say("I called it a day after waiting on #12.")], True),
+    ("logged off after waiting", [say("I logged off for the night after waiting on #12.")], True),
+    ("wrapped up after waiting", [say("I wrapped up after waiting on #12.")], True),
+    ("merged after waiting", [say("I merged it after waiting on #12.")], False),
     ("decided to stop comma", [say("After waiting on #12 I decided to stop, and #13 can wait.")], True),
     ("sole string-input reply blocks",
      [{"type": "assistant", "message": {"content": [{

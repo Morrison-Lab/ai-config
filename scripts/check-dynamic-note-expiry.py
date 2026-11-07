@@ -56,6 +56,7 @@ MECHANISM = re.compile(
 EXPIRES = re.compile(r"\bexpires?\b\s*:?\s*20\d\d-\d\d-\d\d", re.I)
 ALLOW = "<!-- dynamic-note: allow -->"
 BULLET = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
+TABLE_ROW = re.compile(r"^\s*\|")
 SENTENCE = re.compile(r"(?<=[.!?])\s+")
 
 
@@ -70,11 +71,17 @@ def is_state_claim(unit):
 
 
 def units(lines):
-    """Yield (first_line_no, last_line_no, text) for each bullet or paragraph."""
+    """Yield (first_line_no, last_line_no, text) for each bullet, paragraph,
+    or table row.
+
+    A table row is its own unit. To the blank-line rule a table is one
+    paragraph, so a row added to a table made every older row a changed unit,
+    and one row's wording could fail the whole table.
+    """
     start, buf = None, []
     for i, line in enumerate(lines, 1):
         blank = not line.strip()
-        if blank or BULLET.match(line):
+        if blank or BULLET.match(line) or TABLE_ROW.match(line):
             if buf:
                 yield start, i - 1, "\n".join(buf)
             start, buf = (None, []) if blank else (i, [line])

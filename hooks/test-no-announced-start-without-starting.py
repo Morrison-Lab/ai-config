@@ -230,6 +230,12 @@ def main():
         "never terminates because of an off-by-one error.",
     ]
     posted_pass = [
+        # Claude review on #5052: declining, uncertainty and stative gerunds
+        # announce no work.
+        "I looked at the repo. Next, I'm not going to fix this now, since it's out of scope.",
+        "I checked the logs. Next, I'm uncertain whether this is worth pursuing.",
+        "I checked the logs. I'm now realizing this was a mistake.",
+        "Next, I'll not touch the config.",
         "Next I'm opening the first workflow PR once the review lands.",
         "Next I'll file it, but I'm blocked on the repo grant.",
         "Next I'm waiting for the runner thread.",

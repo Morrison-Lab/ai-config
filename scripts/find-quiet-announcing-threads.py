@@ -1,0 +1,94 @@
+#!/usr/bin/env python3
+"""Flag project threads whose last reply announced work and then went quiet.
+
+ai-config#5054, layer 4 of the defense-in-depth rule (ai-config#5051).  The
+session-side hooks (the announced-start Stop hook, the post_message deny) can
+all be bypassed or absent; this check runs from outside the thread, on the
+coordinator's schedule, so a thread that announced work and stopped is nudged
+within minutes instead of when the person notices (2026-10-30: 80 minutes of
+silence; 2026-11-07: the CI thread).
+
+Input is a JSON list of thread snapshots on stdin or from --file:
+
+  [{"id": "cmsg_...", "title": "...", "last_reply": "<text of the last reply>",
+    "last_activity": "2026-11-07T10:00:00Z", "state": "working"}, ...]
+
+`last_activity` is the newest of the last reply and the last tool activity.
+A thread is flagged when all hold:
+
+  - its state is `working` (a blocked, done or stopped thread is not quiet);
+  - its last reply ends on an unconditional immediate-start sentence, judged
+    by `offending_sentence` imported from the announced-start Stop hook so the
+    two never drift;
+  - `last_activity` is at least --quiet-minutes (default 10) before --now.
+
+Output is one JSON object per flagged thread, naming the announcement, so the
+coordinator can wake the thread with a nudge that quotes it.
+
+Exit codes: 0 nothing flagged, 1 at least one flagged, 2 bad input or an empty
+snapshot list (a check that examined nothing must not pass).
+"""
+import argparse
+import importlib.util
+import json
+import sys
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+_spec = importlib.util.spec_from_file_location(
+    "stop", HERE.parent / "hooks" / "no-announced-start-without-starting.py")
+stop = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(stop)
+
+
+def parse_time(text):
+    return datetime.fromisoformat(text.replace("Z", "+00:00"))
+
+
+def quiet_announcers(threads, now, quiet_minutes=10):
+    """Snapshots whose last reply announces work and whose activity is stale."""
+    flagged = []
+    for t in threads:
+        if t.get("state") != "working":
+            continue
+        found = stop.offending_sentence(stop.strip_code(t.get("last_reply") or ""))
+        if not found:
+            continue
+        idle = now - parse_time(t["last_activity"])
+        if idle < timedelta(minutes=quiet_minutes):
+            continue
+        flagged.append({
+            "id": t["id"],
+            "title": t.get("title", ""),
+            "announcement": found[0],
+            "idle_minutes": int(idle.total_seconds() // 60),
+        })
+    return flagged
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("--file", help="snapshot JSON (default: stdin)")
+    ap.add_argument("--now", help="ISO time to measure idleness from (default: clock)")
+    ap.add_argument("--quiet-minutes", type=int, default=10)
+    args = ap.parse_args(argv)
+    try:
+        raw = Path(args.file).read_text(encoding="utf-8") if args.file else sys.stdin.read()
+        threads = json.loads(raw)
+        now = parse_time(args.now) if args.now else datetime.now(timezone.utc)
+    except (OSError, ValueError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
+    if not threads:
+        print("error: no thread snapshots; the search space is empty", file=sys.stderr)
+        return 2
+    flagged = quiet_announcers(threads, now, args.quiet_minutes)
+    for f in flagged:
+        print(json.dumps(f))
+    print(f"examined {len(threads)} thread(s), flagged {len(flagged)}", file=sys.stderr)
+    return 1 if flagged else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

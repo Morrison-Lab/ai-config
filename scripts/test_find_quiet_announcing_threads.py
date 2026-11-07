@@ -64,5 +64,14 @@ check("exit 1 when a thread is flagged",
 check("exit 0 when nothing is flagged", run([thread("Merged.")]).returncode, 0)
 check("exit 2 on an empty snapshot list", run([]).returncode, 2)
 
+bad = thread("I'm starting the next layer now.")
+del bad["last_activity"]
+r = run([thread("I'm starting the next layer now."), bad])
+check("exit 2 when a record lacks a required key", r.returncode, 2)
+check("nothing printed for an untrustworthy list", r.stdout, "")
+check("exit 2 when a record is not an object", run(["text"]).returncode, 2)
+check("exit 2 on an unparseable last_activity",
+      run([thread("Merged.", last="yesterday")]).returncode, 2)
+
 print(f"\n{len(FAILS)} failure(s)")
 sys.exit(1 if FAILS else 0)

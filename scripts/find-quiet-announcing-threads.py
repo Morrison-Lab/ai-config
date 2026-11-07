@@ -46,6 +46,25 @@ def parse_time(text):
     return datetime.fromisoformat(text.replace("Z", "+00:00"))
 
 
+REQUIRED = ("id", "state", "last_reply", "last_activity")
+
+
+def check_records(threads):
+    """Raise ValueError unless every snapshot is an object with the required keys.
+
+    Checked before any record is examined, so a malformed record exits 2 (bad
+    input) and never crashes with Python's default exit 1, which means
+    "flagged"; nothing is printed for a list that cannot be trusted.
+    """
+    for i, t in enumerate(threads):
+        if not isinstance(t, dict):
+            raise ValueError(f"snapshot {i} is not an object")
+        missing = [k for k in REQUIRED if k not in t]
+        if missing:
+            raise ValueError(f"snapshot {i} lacks {', '.join(missing)}")
+        parse_time(t["last_activity"])
+
+
 def quiet_announcers(threads, now, quiet_minutes=10):
     """Snapshots whose last reply announces work and whose activity is stale."""
     flagged = []
@@ -82,6 +101,11 @@ def main(argv=None):
         return 2
     if not threads:
         print("error: no thread snapshots; the search space is empty", file=sys.stderr)
+        return 2
+    try:
+        check_records(threads)
+    except ValueError as e:
+        print(f"error: {e}", file=sys.stderr)
         return 2
     flagged = quiet_announcers(threads, now, args.quiet_minutes)
     for f in flagged:

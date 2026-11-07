@@ -385,6 +385,19 @@ CASES = [
     ("approval by the label bot", [say("mds#649 waits on gha#1544 for approval by the label bot.")], True),
     ("signed off the notes", [say("After waiting on #12, I signed off the release notes.")], False),
     ("decided to stop comma", [say("After waiting on #12 I decided to stop, and #13 can wait.")], True),
+    # Claude review of ea935254: a reason naming another item, or a stop
+    # before an action, is still a stop.
+    ("signed off before reviewing #13", [say("After waiting on #12, I signed off before continuing to review #13.")], True),
+    ("signed off before anything else", [say("After waiting on #12, I signed off before doing anything else.")], True),
+    ("wrapped up before starting #13", [say("After waiting on #12, I wrapped up before starting #13.")], True),
+    ("called it a day before #13", [say("After waiting on #12, I called it a day before looking at #13.")], True),
+    ("signed off since #13 is owed", [say("After waiting on #12, I signed off since I still need to review #13.")], True),
+    ("wrapped up because of #13", [say("After waiting on #12, I wrapped up because I plan to pick up #13 tomorrow.")], True),
+    ("signed off when #13's review", [say("After waiting on #12, I signed off when #13's review comes up tomorrow.")], True),
+    ("logged off as #13 is owed", [say("While waiting on #12, I logged off as I still owe #13 a look tomorrow.")], True),
+    ("signed off because #12 merged", [say("After waiting on #12, I signed off because #12 merged.")], False),
+    # glm review of fd98389a: a time of day after the day is still a time.
+    ("stop until tomorrow afternoon", [say("After waiting on gha#1544, I decided to stop until tomorrow afternoon.")], True),
     ("sole string-input reply blocks",
      [{"type": "assistant", "message": {"content": [{
          "type": "tool_use", "name": "mcp__hearthbot__post_message",

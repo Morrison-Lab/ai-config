@@ -284,7 +284,8 @@ _STOP_VERBS = {
 # The times a stop is put off to: "for the morning", "until tomorrow".
 _STOP_TIME = (
     r"(?:later|tomorrow|now|today|tonight|the\s+(?:morning|afternoon|evening|night|day|"
-    r"weekend|week))"
+    r"weekend|week)|next\s+(?:week|session))"
+    r"(?:\s+(?:morning|afternoon|evening|night))?"
 )
 # A stop phrase that ends its clause stops its own verb ("so I called it a
 # day", "I decided to stop").
@@ -302,7 +303,16 @@ _STOP_PHRASE_RX = re.compile(
     # waiting on #12"), but not at a reason or a time ("I signed off since
     # the release looked fine").
     # The text before the wait ends at its "after", so that counts too.
-    r"\s*(?=[.,;:!?)]|$|\s(?:after|while|until)(?:\s*$|\s+(?:waiting|being\s+blocked|blocked|held)\b))",
+    # A reason or time that names another tracked item is still a stop ("I
+    # signed off before starting #13", "since #13's review is tomorrow"), and
+    # so is a stop before an action ("I signed off before doing anything
+    # else").
+    r"\s*(?=[.,;:!?)]|$|\s(?:after|while|until)(?:\s*$|\s+(?:waiting|being\s+blocked|blocked|held)\b)"
+    r"|\s(?:before|since|because|once|when|as|until)\b[^.;!?\n]*?(?:" + _REF
+    + r"|(?<![\w/#&.])#\d+\b)"
+    # ...unless the item is done: "I signed off because #12 merged".
+    r"(?!\s+(?:merged|landed|closed|shipped|passed|went\s+green|was\s+merged)\b)"
+    r"|\sbefore\s+\w+ing\b)",
     re.I,
 )
 # Verbs that describe stopping only with a stopping object: "I left the rest

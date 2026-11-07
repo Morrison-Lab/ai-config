@@ -72,6 +72,18 @@ CASES = [
     ("worker thread is fine", POST, "Pull the error from the worker thread.", None),
     ("review thread is fine", POST, "Resolve the review thread.", None),
     ("backticks exempt a technical thread", POST, "Lock `the thread` before writing.", None),
+    ("the runner thread", POST, "Ask the runner thread to retry.", "the runner thread"),
+    ("the CI thread", POST, "The CI thread found it.", "The CI thread"),
+    ("our metrics thread", POST, "See our metrics thread.", "our metrics thread"),
+    ("hyphenated name", POST, "Ask the gha-runner thread.", "the gha-runner thread"),
+    ("plural", POST, "Both of the metrics threads agree.", "the metrics threads"),
+    ("named thread linked", POST, f"The CI thread ({T}) found it.", None),
+    ("named thread in other paragraph", POST, f"The CI thread found it.\n\n{T}", "The CI thread"),
+    ("named thread in code", POST, "The `the runner thread` string is blocked.", None),
+    ("this thread stays exempt", POST, "I will keep this thread open.", None),
+    ("the main thread stays exempt", POST, "The main thread blocks.", None),
+    ("the email thread stays exempt", POST, "Reply on the email thread.", None),
+    ("the comment thread stays exempt", POST, "Resolve the comment thread.", None),
     ("no mention", POST, "Done.", None),
 ]
 

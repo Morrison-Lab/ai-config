@@ -202,6 +202,16 @@ class PayloadFetcher:
                 )
             return json.dumps(compare)
 
+        if "/actions/workflows" in path or "/check-suites" in path:
+            # Optional (ai-config#5065): only read when the head has no check
+            # runs, to tell a repo with no CI from a stalled CI. Absent or
+            # malformed means "not known", and the checker keeps failing.
+            surface = self.payload.get("ci_surface")
+            key = "workflows" if "/actions/workflows" in path else "check_suites"
+            if not isinstance(surface, dict) or not isinstance(surface.get(key), int):
+                return json.dumps({"_not_in_payload": True})
+            return json.dumps({"total_count": surface[key]})
+
         if "/check-runs" in path:
             runs = _require(self.payload, "check_runs", "check-run status")
             if isinstance(runs, list):

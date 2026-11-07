@@ -14,6 +14,7 @@ its description does not use (ai-config#949).
 | `skills/adri/SKILL.md` | -> ardi. |  |
 | `skills/adria/SKILL.md` | -> ardia. |  |
 | `skills/adv/SKILL.md` | Adversarial review from another local model. |  |
+| `skills/advisor/SKILL.md` | Read-only second opinion from a different model family. |  |
 | `skills/agent-builder/SKILL.md` | Author new subagent definition. |  |
 | `skills/agy-review-workflow/SKILL.md` | Set up Antigravity workflow. |  |
 | `skills/ai-tells/SKILL.md` | -> find-ai-tells. |  |

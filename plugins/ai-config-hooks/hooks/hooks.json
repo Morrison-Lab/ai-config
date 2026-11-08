@@ -1722,6 +1722,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-mwc-ask-for-infra-pr.py\"'",
+            "timeout": 10,
+            "script": "no-mwc-ask-for-infra-pr.py",
+            "why": "ai-config#5097. Ezra, 2026-11-07, about lds#2009 (workflow-only): \"it's infra and shouldn't need my word. why didn't you realize that\" Blocks (deny) a user-visible reply tool call whose text mentions mwc and names a PR that is provably infrastructure (any PR in gha, macros or ai-config, or a Morrison-Lab PR whose changed paths all match no-unauthorized-merge.py INFRA_PATH_PATTERNS), unless the text says it merges under the infra grant. Fails open on any parse or lookup trouble."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-stepwise-approval-ask.py\"'",
             "timeout": 10,
             "script": "no-stepwise-approval-ask.py",

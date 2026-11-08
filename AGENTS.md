@@ -289,7 +289,7 @@ Files under `shared/` are shared across repos and docs (such as the lab manual):
 
 ## Adding an enforcement hook
 
-When adding an enforcement hook under `hooks/`, author deterministic Python with companion tests (`hooks/test-<name>.py`), register in `hooks/hooks.json`, and sync via `scripts/gen-hooks-plugin.py`.
+Add a hook in `hooks/` with `hooks/test-<name>.py`, register it in `hooks/hooks.json`, run `scripts/gen-hooks-plugin.py`, and run [`hook-first-push`](shared/workflow/hook-first-push.md) first.
 
 ## Context budget
 

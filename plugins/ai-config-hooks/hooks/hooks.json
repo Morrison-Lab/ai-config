@@ -1671,7 +1671,7 @@
         ]
       },
       {
-        "matcher": "mcp__.*[Pp]laywright.*|mcp__.*[Pp]uppeteer.*|mcp__.*[Ss]elenium.*",
+        "matcher": "mcp__.*laywright.*|mcp__.*uppeteer.*|mcp__.*elenium.*",
         "hooks": [
           {
             "type": "command",

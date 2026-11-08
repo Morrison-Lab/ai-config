@@ -121,9 +121,11 @@ HEREDOC = re.compile(
     r"<<-?\s*\\?[\"']?([^\s\"'\\;&|<>()]+)[\"']?[^\n]*\n(.*?)\n\s*\1\s*(?:\n|$)", re.DOTALL
 )
 # A browser-automation MCP server's tool, such as `mcp__playwright__browser_navigate`.
-# Case-sensitive on purpose: hooks.json matches the same tool names, and a
-# matcher regex cannot carry a case-insensitive flag.
-MCP_AUTOMATION_TOOL = re.compile(r"^mcp__.*(?:[Pp]laywright|[Pp]uppeteer|[Ss]elenium)")
+# The first letter is left out so one pattern matches `playwright` and
+# `Playwright`: a hooks.json matcher cannot carry a case-insensitive flag, and
+# the README catalog row (checked against hooks.json by check-hook-catalog.py)
+# cannot hold a `[Pp]` character class.
+MCP_AUTOMATION_TOOL = re.compile(r"^mcp__.*(?:laywright|uppeteer|elenium)")
 
 ALTERNATIVES = (
     "Instead:\n"

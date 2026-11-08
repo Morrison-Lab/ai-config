@@ -74,7 +74,10 @@ fails = 0
 for name, entries, deny in CASES:
     first, second = run(entries)
     # The second run of a blocked turn degrades to a systemMessage, never a second block.
-    ok = ('"block"' in first) == deny and '"block"' not in second
+    out1 = json.loads(first) if first else {}
+    out2 = json.loads(second) if second else {}
+    blocked = out1.get("decision") == "block" and "reported nothing" in out1.get("reason", "")
+    ok = blocked == deny and out2.get("decision") != "block"
     print(("PASS: " if ok else "FAIL: ") + name)
     fails += not ok
 out = run(CASES[0][1], {"stop_hook_active": True})[0]

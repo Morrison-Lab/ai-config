@@ -1722,6 +1722,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-mwc-ask-in-other-thread-unread.py\"'",
+            "timeout": 10,
+            "script": "no-mwc-ask-in-other-thread-unread.py",
+            "why": "ai-config#5013. On 2026-11-05 a thread asked Ezra twice to type mwc in another thread for lds#1868, a PR that thread owned; he had typed it there at 22:04Z. Whether the other thread already holds a merge word is answered by a read, so this denies a user-visible reply tool call that asks for a merge word in another thread (a #cmsg_ link or 'in the ... thread' in the same sentence) when no hearthbot thread read (read_thread, read_messages_by_id, read_project_chat, list_threads) ran since the last user turn. Fails open on any parse trouble."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-mwc-ask-for-infra-pr.py\"'",
             "timeout": 10,
             "script": "no-mwc-ask-for-infra-pr.py",

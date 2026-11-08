@@ -8,7 +8,7 @@ import os
 import subprocess
 import sys
 
-HOOK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "no-mwc-ask-for-infra-pr.py")
+HOOK = os.path.join(os.path.dirname(os.path.realpath(__file__)), "no-mwc-ask-for-infra-pr.py")
 POST = "mcp__hearthbot__post_message"
 
 # (name, tool, text, should_deny); the fetch is disabled, so only repo-level infra is decided here.

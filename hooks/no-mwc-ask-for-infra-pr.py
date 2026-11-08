@@ -57,7 +57,7 @@ _MERGE_HOOK = None
 def load_merge_hook():
     global _MERGE_HOOK
     if _MERGE_HOOK is None:
-        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "no-unauthorized-merge.py")
+        path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "no-unauthorized-merge.py")
         spec = importlib.util.spec_from_file_location("no_unauthorized_merge", path)
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)

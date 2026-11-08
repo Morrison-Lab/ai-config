@@ -333,6 +333,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/going-public.md` | Making a repository public is hard to undo: the contents can be cached and indexed even if the repository is later made private. Follow this order, and chang... |  |
 | `shared/workflow/grep-is-not-coverage.md` | A grep matches strings. Coverage is a claim about concepts. So a grep that returns nothing never entails that the corpus does not cover something, and the st... |  |
 | `shared/workflow/growth-mindset.md` | Treat limitations as a starting point to work past, not a fixed constraint to accept. When something can't currently be done --- a missing tool, an awkward m... |  |
+| `shared/workflow/hook-first-push.md` | ai-config#5117 took four pushes because scripts that decide each miss ran only in CI and review (2026-11-08). |  |
 | `shared/workflow/improve-your-subagents.md` | Part of an orchestrator's job is to find ways for its subagents to improve over time. Correcting each output as it arrives keeps the work moving and leaves t... |  |
 | `shared/workflow/incidents-dont-repeal-decisions.md` | When an incident makes you stop doing something you had decided to do, either re-argue the decision explicitly or fix the misuse. Never just change the behav... |  |
 | `shared/workflow/issue-first.md` | When starting a **new** piece of work, go **issue-first**: before branching, editing, or opening a PR, make sure a tracking issue exists. Search the tracker... |  |

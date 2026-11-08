@@ -961,6 +961,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/block-redo-denied-write-via-other-tool.py\"'",
+            "timeout": 20,
+            "script": "block-redo-denied-write-via-other-tool.py",
+            "why": "ai-config#5121, 2026-11-08: a thread's `gh api` POST/PATCH closing gha#1631 and gha#1635 was denied by the auto-mode classifier, and the same writes then succeeded through `mcp__github__add_issue_comment` and `mcp__github__issue_write`. remind-retry-before-declaring-blocked.py keys on the identical command and only reminds, so a tool switch was invisible to it. DENIES a GitHub write (comment, close, reopen, edit, merge or review, through gh, gh api or the MCP tools) whose number and verb match a classifier-denied write earlier in the transcript, until a typed user message after the denial names the number with a go-ahead word, or the permission layer later let the same target and verb through. An unparseable number records and denies nothing, leaving the reminder as the fallback."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/block-merge-without-clean-checker.py\"'",
             "timeout": 20,
             "script": "block-merge-without-clean-checker.py",
@@ -1158,6 +1165,13 @@
             "timeout": 20,
             "script": "warn-merge-without-fully-clean.py",
             "why": "ai-config#4399: on 2026-10-08 two ai-config PRs were merged on gh pr checks, mergeStateStatus and a hand-parsed review verdict, and scripts/check-pr-fully-clean.py ran only afterwards when a Stop hook objected to the wording. no-unauthorized-merge.py gates permission to merge, not cleanliness. Warns, never denies, unless the transcript holds a Bash run of check-pr-fully-clean.py for that PR number (and -R repo when both name one) whose result shows the 'is FULLY CLEAN' line for that PR, after the last push (git push or an MCP push tool); a NOT-fully-clean line vetoes. Warn rather than deny because the transcript is a lossy witness (a peer session, a resumed session, or an unseen push by another session) and a deny on an inference teaches an escape-variable reflex. Command position via shellcmd, so a quoted or echoed merge is inert."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/block-redo-denied-write-via-other-tool.py\"'",
+            "timeout": 20,
+            "script": "block-redo-denied-write-via-other-tool.py",
+            "why": "ai-config#5121, 2026-11-08: a thread's `gh api` POST/PATCH closing gha#1631 and gha#1635 was denied by the auto-mode classifier, and the same writes then succeeded through `mcp__github__add_issue_comment` and `mcp__github__issue_write`. remind-retry-before-declaring-blocked.py keys on the identical command and only reminds, so a tool switch was invisible to it. DENIES a GitHub write (comment, close, reopen, edit, merge or review, through gh, gh api or the MCP tools) whose number and verb match a classifier-denied write earlier in the transcript, until a typed user message after the denial names the number with a go-ahead word, or the permission layer later let the same target and verb through. An unparseable number records and denies nothing, leaving the reminder as the fallback."
           },
           {
             "type": "command",

@@ -77,18 +77,38 @@ def refs(sentence):
     return sorted(found.items())
 
 
+LIST_GAP = re.compile(r"[\s,]*(?:and|or|&)?[\s,]*", re.I)
+REF_TOKEN = re.compile(r"^[^\s,;]+")
+
+
+def _same_list(sentence, left, right):
+    """True when only list connectors (commas, and, or, &) separate two references."""
+    gap = sentence[left:right]
+    return bool(LIST_GAP.fullmatch(REF_TOKEN.sub("", gap, count=1)))
+
+
 def exempt_refs(sentence, found):
     """Positions of the refs a grant statement in this sentence is about.
 
-    Each grant phrase belongs to the nearest PR reference, so it exempts that
-    reference only, not another one named in the same sentence.
+    Each grant phrase belongs to the nearest PR reference and to the references
+    listed with it ("a#1 and b#2 merge under the grant"), not to another one
+    named across other words in the same sentence.
     """
     exempt = set()
     if not found:
         return exempt
+    positions = [item[0] for item in found]
     for g in GRANT_STATED.finditer(sentence):
-        nearest = min(found, key=lambda item: abs(item[0] - g.start()))
-        exempt.add(nearest[0])
+        i = min(range(len(positions)), key=lambda k: abs(positions[k] - g.start()))
+        exempt.add(positions[i])
+        j = i
+        while j > 0 and _same_list(sentence, positions[j - 1], positions[j]):
+            j -= 1
+            exempt.add(positions[j])
+        j = i
+        while j + 1 < len(positions) and _same_list(sentence, positions[j], positions[j + 1]):
+            j += 1
+            exempt.add(positions[j])
     return exempt
 
 

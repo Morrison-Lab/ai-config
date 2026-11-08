@@ -20,6 +20,7 @@ import json
 import os
 import re
 import sys
+import time
 
 REPLY_TOOL = re.compile(r"^mcp__hearthbot__(?:reply|post_message|update_message|edit_message)$")
 MWC = re.compile(r"\bmwc\b", re.I)
@@ -44,32 +45,50 @@ REASON = (
 )
 
 
+# One shared budget for every live lookup, well under the 10s hooks.json timeout.
+TOTAL_BUDGET_S = 7.0
+MAX_REFS = 8
+SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+|\n")
+
+
+_MERGE_HOOK = None
+
+
 def load_merge_hook():
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "no-unauthorized-merge.py")
-    spec = importlib.util.spec_from_file_location("no_unauthorized_merge", path)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+    global _MERGE_HOOK
+    if _MERGE_HOOK is None:
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "no-unauthorized-merge.py")
+        spec = importlib.util.spec_from_file_location("no_unauthorized_merge", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        _MERGE_HOOK = mod
+    return _MERGE_HOOK
 
 
-def refs(text):
+def refs(sentence):
     seen = []
-    for o, r, n in URL_REF.findall(text) + FULL_REF.findall(text):
+    for o, r, n in URL_REF.findall(sentence) + FULL_REF.findall(sentence):
         seen.append((o.lower(), r.lower(), int(n)))
-    for r, n in SHORT_REF.findall(text):
+    for r, n in SHORT_REF.findall(sentence):
         seen.append((OWNER, r.lower(), int(n)))
     return list(dict.fromkeys(seen))
 
 
-def classify(owner, repo, number):
+def classify(owner, repo, number, deadline):
     """Return a reason string when the PR is provably infra, else None."""
+    if (owner, repo) == ("d-morrison", "macros"):
+        return "every PR in d-morrison/macros is infrastructure"
     if owner != OWNER:
         return None
     if repo in INFRA_REPOS:
         return f"every PR in Morrison-Lab/{repo} is infrastructure"
     if os.environ.get("NO_MWC_INFRA_HOOK_DISABLE_FETCH"):
         return None
+    remaining = deadline - time.monotonic()
+    if remaining < 1.0:
+        return None
     mod = load_merge_hook()
+    mod.INFRA_FETCH_BUDGET_S = remaining
     res = mod.fetch_pr_changed_paths(f"{owner}/{repo}", number)
     if not res:
         return None
@@ -88,17 +107,26 @@ def main() -> int:
             return 0
         tool_input = payload.get("tool_input")
         text = tool_input.get("text") if isinstance(tool_input, dict) else None
-        if not isinstance(text, str) or not MWC.search(text) or GRANT_STATED.search(text):
+        if not isinstance(text, str) or not MWC.search(text):
             return 0
-        for owner, repo, number in refs(text)[:8]:
-            why = classify(owner, repo, number)
-            if why:
-                print(json.dumps({"hookSpecificOutput": {
-                    "hookEventName": "PreToolUse",
-                    "permissionDecision": "deny",
-                    "permissionDecisionReason": REASON.format(ref=f"{repo}#{number}", why=why),
-                }}))
-                return 0
+        deadline = time.monotonic() + TOTAL_BUDGET_S
+        checked = 0
+        # The grant statement exempts only the sentence that names the PR, not the whole message.
+        for sentence in SENTENCE_SPLIT.split(text):
+            if GRANT_STATED.search(sentence):
+                continue
+            for owner, repo, number in refs(sentence):
+                checked += 1
+                if checked > MAX_REFS:
+                    return 0
+                why = classify(owner, repo, number, deadline)
+                if why:
+                    print(json.dumps({"hookSpecificOutput": {
+                        "hookEventName": "PreToolUse",
+                        "permissionDecision": "deny",
+                        "permissionDecisionReason": REASON.format(ref=f"{repo}#{number}", why=why),
+                    }}))
+                    return 0
     except Exception:
         return 0
     return 0

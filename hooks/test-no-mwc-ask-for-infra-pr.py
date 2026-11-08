@@ -16,6 +16,8 @@ CASES = [
     ("gha PR waiting on mwc", POST, "Needs your mwc: Morrison-Lab/gha#1628 is clean.", True),
     ("short ref macros", POST, "Type mwc to merge macros#349.", True),
     ("ai-config url", POST, "mwc for https://github.com/Morrison-Lab/ai-config/pull/5097 please.", True),
+    ("grant for one PR, ask for another", POST, "gha#1628 merges under the infra grant already. mwc needed for macros#99 too.", True),
+    ("d-morrison macros", POST, "Needs mwc: d-morrison/macros#12.", True),
     ("grant stated", POST, "gha#1628 merges under the infra grant, no mwc needed.", False),
     ("content repo", POST, "Type mwc to merge lds#2063.", False),
     ("no mwc word", POST, "gha#1628 is clean.", False),

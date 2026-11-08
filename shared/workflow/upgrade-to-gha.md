@@ -86,8 +86,8 @@ That split moves as capabilities are added, so read gha's README "Versioning" se
 ## Read the migration hazards before writing the stub
 
 A stub that resolves is not yet a stub that runs.
-One precondition and two traps, the traps being specific to migration rather than to gha in general.
-[`gha-reusable-workflow-permissions.md`](../../memories/gha-reusable-workflow-permissions.md) carries both traps in full.
+One precondition and three traps, the traps being specific to migration rather than to gha in general.
+[`gha-reusable-workflow-permissions.md`](../../memories/gha-reusable-workflow-permissions.md) carries the first two traps in full.
 
 - **A private consumer must be granted access first.** gha is public, so public repos can call its reusable workflows automatically.
   A private repo cannot until someone allows access under Settings, Actions, General, Access --- a human step, so establish it before the migration rather than after the first red run.
@@ -99,6 +99,11 @@ One precondition and two traps, the traps being specific to migration rather tha
 - **Carrying the old workflow's `concurrency:` group across deadlocks the run.**
   Preserving an existing per-PR dedup group is the natural thing to write during a migration, and where the reusable workflow already declares an identically-named group on a nested job, GitHub cancels the run outright every time.
   The reusable workflow supplies that dedup itself, so the caller needs no block.
+- **A caller opened before the gha `v3` slide it needs dies at startup, and cannot be retried.**
+  The run fails with no jobs, GitHub refuses a re-run with HTTP 403 ("cannot be retried"), and it never appears in the PR's check list.
+  A `workflow_dispatch` run only proves the workflow resolves; it attaches nothing to the PR.
+  Once the slide has happened, push a real commit, such as merging `main` into the branch, to get a PR-attached run.
+  Never push an empty commit (ai-config#5104).
 
 The `examples/` stub is authoritative for `permissions:` and not for `secrets:`: [`gha-reusable-workflows.md`](../../memories/gha-reusable-workflows.md) records an example passing a secret the tagged workflow does not declare, which fails the caller at startup.
 So fetch the workflow file at the tag you are pinning and read its own `workflow_call: secrets:` block.

@@ -66,12 +66,30 @@ def load_merge_hook():
 
 
 def refs(sentence):
-    seen = []
-    for o, r, n in URL_REF.findall(sentence) + FULL_REF.findall(sentence):
-        seen.append((o.lower(), r.lower(), int(n)))
-    for r, n in SHORT_REF.findall(sentence):
-        seen.append((OWNER, r.lower(), int(n)))
-    return list(dict.fromkeys(seen))
+    """Return (position, (owner, repo, number)) for each PR reference, in order."""
+    found = {}
+    for m in URL_REF.finditer(sentence):
+        found.setdefault(m.start(), (m.group(1).lower(), m.group(2).lower(), int(m.group(3))))
+    for m in FULL_REF.finditer(sentence):
+        found.setdefault(m.start(), (m.group(1).lower(), m.group(2).lower(), int(m.group(3))))
+    for m in SHORT_REF.finditer(sentence):
+        found.setdefault(m.start(), (OWNER, m.group(1).lower(), int(m.group(2))))
+    return sorted(found.items())
+
+
+def exempt_refs(sentence, found):
+    """Positions of the refs a grant statement in this sentence is about.
+
+    Each grant phrase belongs to the nearest PR reference, so it exempts that
+    reference only, not another one named in the same sentence.
+    """
+    exempt = set()
+    if not found:
+        return exempt
+    for g in GRANT_STATED.finditer(sentence):
+        nearest = min(found, key=lambda item: abs(item[0] - g.start()))
+        exempt.add(nearest[0])
+    return exempt
 
 
 def classify(owner, repo, number, deadline):
@@ -111,11 +129,13 @@ def main() -> int:
             return 0
         deadline = time.monotonic() + TOTAL_BUDGET_S
         checked = 0
-        # The grant statement exempts only the sentence that names the PR, not the whole message.
+        # A grant statement exempts only the PR reference nearest to it.
         for sentence in SENTENCE_SPLIT.split(text):
-            if GRANT_STATED.search(sentence):
-                continue
-            for owner, repo, number in refs(sentence):
+            found = refs(sentence)
+            exempt = exempt_refs(sentence, found)
+            for position, (owner, repo, number) in found:
+                if position in exempt:
+                    continue
                 checked += 1
                 if checked > MAX_REFS:
                     return 0

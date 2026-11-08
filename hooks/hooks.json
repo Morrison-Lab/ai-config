@@ -1932,6 +1932,13 @@
         "hooks": [
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-owner-silence-while-pr-waits.py\"",
+            "timeout": 10,
+            "script": "no-owner-silence-while-pr-waits.py",
+            "why": "ai-config#5116. On 2026-11-08 an owner thread said nothing for 90 minutes while its PR sat in the merge queue, so the coordinator could not tell queued from stalled. Blocks a stop, once per user turn, when the thread created or subscribed to a PR, has not resolved itself, and its last post_message or message_coordinator is an hour old. Fails open on any parse trouble."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-offer-to-file.py\"",
             "timeout": 10,
             "script": "no-offer-to-file.py",

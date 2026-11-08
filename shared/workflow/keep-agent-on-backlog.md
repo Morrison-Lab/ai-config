@@ -56,3 +56,16 @@ Prompt as of 2026-11-07:
 
 Hooks do not run in cloud sessions ([#2004](https://github.com/Morrison-Lab/ai-config/issues/2004)), so the scheduled task is the only enforcement there.
 Update or delete that task rather than adding a second one.
+
+## While a PR waits, report hourly and keep working
+
+[ai-config#5116](https://github.com/Morrison-Lab/ai-config/issues/5116).
+On 2026-11-08 an owner thread posted nothing for 90 minutes while its PR waited in the merge queue, and the coordinator's hourly check could not tell a queued thread from a stalled one.
+
+- **Do:** while a PR waits, take the next backlog item, and post one status to the coordinator per hourly check, naming the PR, its head and what it waits on.
+- **Don't:** go silent because the PR is queued, or merge main into a queued PR that is already clean.
+
+`hooks/no-owner-silence-while-pr-waits.py` blocks a stop once per user turn when the thread has created or subscribed to a PR, has not resolved itself, and its last `post_message` or `message_coordinator` is over an hour old.
+A Stop hook can read that time, because every transcript entry carries a timestamp.
+It cannot read whether the PR is still open, so a merged PR in an unresolved thread also triggers it.
+Hooks do not run in cloud sessions ([#2004](https://github.com/Morrison-Lab/ai-config/issues/2004)), so the hourly check above is the enforcement there.

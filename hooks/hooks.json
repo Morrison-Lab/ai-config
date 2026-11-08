@@ -1664,6 +1664,18 @@
         ]
       },
       {
+        "matcher": "mcp__.*[Pp]laywright.*|mcp__.*[Pp]uppeteer.*|mcp__.*[Ss]elenium.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-headless-browser-in-bash.py\"",
+            "timeout": 10,
+            "script": "no-headless-browser-in-bash.py",
+            "why": "ai-config#5123, 2026-11-08: a thread checked MathJax output in headless Chromium through Playwright. The Bash binding of this script denies a browser launched from a command; an MCP server that drives a browser (mcp__playwright__*, mcp__puppeteer__*, mcp__selenium__*) is the same act through a tool name that says nothing about Bash, and returned early. DENIES such a tool with no escape variable, since ALLOW_HEADLESS_BROWSER=1 is a Bash command prefix. The message points to curl, node with mathjax-full, and pdflatex."
+          }
+        ]
+      },
+      {
         "matcher": "mcp__claude-in-chrome__javascript_tool",
         "hooks": [
           {

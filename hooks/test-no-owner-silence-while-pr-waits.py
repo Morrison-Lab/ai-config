@@ -38,7 +38,7 @@ CASES = [
 def run(entries, payload_extra=None, marker_reset=True):
     with tempfile.TemporaryDirectory() as d:
         p = os.path.join(d, "t.jsonl")
-        with open(p, "w") as f:
+        with open(p, "w", encoding="utf-8") as f:
             f.write("\n".join(json.dumps(e) for e in entries) + "\n")
         env = dict(os.environ, OWNER_SILENCE_NOW=NOW)
         pl = json.dumps(dict({"transcript_path": p}, **(payload_extra or {})))

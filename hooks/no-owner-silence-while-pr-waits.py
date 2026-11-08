@@ -100,9 +100,9 @@ def main():
             return 0
         marker = os.path.join(os.path.dirname(path), "." + os.path.basename(path) + ".owner-silence")
         key = str(turn)
-        if os.path.isfile(marker) and open(marker).read() == key:
+        if os.path.isfile(marker) and open(marker, encoding="utf-8").read() == key:
             return 0
-        with open(marker, "w") as f:
+        with open(marker, "w", encoding="utf-8") as f:
             f.write(key)
         print(json.dumps({"decision": "block", "reason": REASON.format(
             mins=int(age // 60), last=ref if last else "none since the thread began")}))

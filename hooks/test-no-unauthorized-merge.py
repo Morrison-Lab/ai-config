@@ -1407,6 +1407,13 @@ _infra_case("one content file among infra files", "BLOCK",
 _infra_case("a rename whose previous path is content", "BLOCK",
             [".github/moved.qmd", "_subfiles/_def-probability.qmd"],
             f"gh pr merge 15 -R Morrison-Lab/pds --match-head-commit {TEST_HEAD_SHA}")
+_infra_case("tools/ checkers and their tests are infra", "allow",
+            ["tools/check_site.py", "tools/check-links.sh", "tools/tests/test_check_site.py"],
+            f"gh pr merge 15 -R Morrison-Lab/pds --match-head-commit {TEST_HEAD_SHA}")
+_infra_case("a tools/ figure generator is not infra", "BLOCK",
+            ["tools/make_figures.py"], f"gh pr merge 15 -R Morrison-Lab/pds --match-head-commit {TEST_HEAD_SHA}")
+_infra_case("a path only resembling a tools/ checker is not infra", "BLOCK",
+            ["tools/check_site/../make_figures.py"], f"gh pr merge 15 -R Morrison-Lab/pds --match-head-commit {TEST_HEAD_SHA}")
 _infra_case("a top-level scripts/ file is not infra", "BLOCK",
             ["scripts/analysis.R"], f"gh pr merge 15 -R Morrison-Lab/pds --match-head-commit {TEST_HEAD_SHA}")
 _infra_case("a path only resembling .github is not infra", "BLOCK",

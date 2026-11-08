@@ -39,10 +39,9 @@ Full procedure: [`adversarial-self-review`](adversarial-self-review.md#waiver-wh
 ## Infrastructure PRs standing `mwc` grant
 
 Infrastructure PRs carry a standing `mwc` grant in every repo the user can push to.
-A PR whose diff is only infrastructure --- CI workflows, tooling and scripts, configuration,
-and recorded instructions and notes for AI and human developers
-(`CLAUDE.md`, `AGENTS.md`, `.github/`, `.claude/`, memories, skills, contributor docs, `tools/`) ---
-may be merged without asking once it is fully clean.
+A PR whose diff is only infrastructure --- CI workflows, tooling and scripts, configuration, and recorded instructions and notes for AI and human developers (`CLAUDE.md`, `AGENTS.md`, `.github/`, `.claude/`, memories, skills, contributor docs, checker scripts and their tests under `tools/`) --- may be merged without asking once it is fully clean.
+The exact path list the merge guard accepts is `INFRA_PATH_PATTERNS` in `hooks/no-unauthorized-merge.py`.
+It leaves the rest of `tools/` out, because figure and data generators there change what readers see.
 Every other rule in this section still binds, including the clean automated review on the current head,
 so a quota-skipped review still holds the merge.
 The test is effect rather than file type: infrastructure is whatever does not directly change the repo's consumer's experience.

@@ -9999,8 +9999,20 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ok, issues, _ = drift({"ahead_by": 1, "files": [
             {"filename": wf, "status": "modified", "patch": job_patch}]})
         check(f"check_base_drift: {label} still blocks (#4911)", not ok)
+    # ai-config#5099: a manual or reusable-call trigger cannot gate a PR.
+    for label, trig_patch in (
+            ("a new workflow_dispatch trigger", "@@ -1 +1,2 @@\n+  workflow_dispatch:\n"),
+            ("a workflow_call trigger edit", "@@ -1 +1 @@\n-  workflow_call:\n+  workflow_call: {}\n")):
+        ok, issues, _ = drift({"ahead_by": 1, "files": [
+            {"filename": wf, "status": "modified", "patch": trig_patch}]})
+        check(f"check_base_drift: {label} is a NOTE (#5099)",
+              ok and issues and issues[0].startswith("NOTE"))
+    ok, issues, _ = drift({"ahead_by": 1, "files": [
+        {"filename": wf, "status": "modified",
+         "patch": "@@ -1 +1,2 @@\n+  workflow_dispatch:\n+  pull_request:\n"}]})
+    check("check_base_drift: a dispatch trigger beside a pull_request trigger blocks (#5099)", not ok)
     for label, status, diff_text in (
-            ("a new workflow", "added", "@@ -0,0 +1 @@\n+name: x\n"),
+            ("a new workflow", "added","@@ -0,0 +1 @@\n+name: x\n"),
             ("a trigger edit", "modified", "@@ -1 +1 @@\n-  pull_request:\n+  push:\n"),
             ("a paths filter edit", "modified",
              "@@ -1 +1 @@\n-      paths: [a]\n+      paths: [b]\n"),

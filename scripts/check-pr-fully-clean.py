@@ -1046,6 +1046,8 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
 WORKFLOW_DIR = ".github/workflows/"
 # GitHub's compare endpoint lists at most this many files.
 COMPARE_FILE_CAP = 300
+# `workflow_call` and `workflow_dispatch` are left out on purpose: neither runs
+# on a pull request, so adding or editing one gates nothing (ai-config#5099).
 # A changed line in a workflow's diff that can alter which PRs it runs on, or
 # which jobs exist: a trigger or filter key, a job condition, or a new/removed
 # job (a key at two-space indent). Any other edit to an existing workflow
@@ -1054,13 +1056,14 @@ COMPARE_FILE_CAP = 300
 WORKFLOW_GATE_LINE = re.compile(
     # Trigger and filter keys, at any depth.
     r"^[+-](?:\s*(?:on|pull_request|pull_request_target|push|schedule|"
-    r"workflow_run|workflow_call|workflow_dispatch|paths|paths-ignore|branches|"
+    r"workflow_run|paths|paths-ignore|branches|"
     r"branches-ignore|tags|types)\s*:"
     # Job-level keys sit at four-space indent; the same words deeper are
     # step-level (an action version pin, a step condition) and gate nothing.
     r"|    (?:if|needs|runs-on|strategy|uses)\s*:"
     # A job key itself.
-    r"|  [\w-]+:\s*$)")
+    # The two triggers left out above sit at the same indent, so exclude them.
+    r"|  (?!(?:workflow_call|workflow_dispatch):)[\w-]+:\s*$)")
 
 
 def workflow_edit_adds_no_check(entry: dict) -> bool:

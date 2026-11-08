@@ -12,14 +12,15 @@ tool_use is readable.
 
 What it cannot read is whether the PR is still open: that is forge state, and a
 hook does not call the forge. It uses the transcript as the proxy. The thread
-counts as an owner with a PR waiting when it has created or subscribed to a PR
-and has not resolved its thread since (`set_thread_resolved`). A merged PR whose
-thread is still open therefore blocks too, and the one reply that ends the
-silence also clears it.
+counts as an owner with a PR waiting when a create or subscribe call succeeded
+(the paired tool_result is not an error) and it has not resolved its thread
+since (`set_thread_resolved`). A merged PR whose thread is still open therefore
+blocks too, and the one reply that ends the silence also clears it.
 
 Blocks the stop when the last report is an hour old (the thread's first entry
-counts when it never reported). Fires at most once per user turn, so it cannot
-wedge a session. Fails OPEN on any parse trouble.
+counts when it never reported). `agent_notice.stop_notice` blocks at most once
+per turn and never while `stop_hook_active` is set, so it cannot wedge a
+session. Fails OPEN on any parse trouble.
 """
 import datetime
 import json
@@ -30,6 +31,11 @@ _LIB = os.path.join(
     os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib")
 if _LIB not in sys.path:
     sys.path.insert(0, _LIB)
+
+try:
+    from agent_notice import stop_notice
+except Exception:
+    sys.exit(0)
 
 LIMIT_S = int(os.environ.get("OWNER_SILENCE_LIMIT_S", "3600"))
 REPORT_TOOLS = {"mcp__hearthbot__post_message", "mcp__hearthbot__message_coordinator",
@@ -56,10 +62,10 @@ def now():
 
 
 def scan(path):
-    """(first_ts, last_report_ts, owns_pr, turn_key) from the transcript."""
-    from transcript_meta import is_real_user_turn
-    first = last = turn = None
+    """(first_ts, last_report_ts, owns_pr) from the transcript."""
+    first = last = None
     owns = False
+    pending = {}
     for line in open(path, encoding="utf-8"):
         try:
             e = json.loads(line)
@@ -68,21 +74,23 @@ def scan(path):
         ts = e.get("timestamp")
         if ts and first is None:
             first = ts
-        if is_real_user_turn(e):
-            turn = ts or turn
         msg = e.get("message")
         blocks = msg.get("content") if isinstance(msg, dict) else None
         for b in blocks if isinstance(blocks, list) else []:
-            if not (isinstance(b, dict) and b.get("type") == "tool_use"):
+            if not isinstance(b, dict):
                 continue
-            name = b.get("name")
-            if name in REPORT_TOOLS and ts:
-                last = ts
-            elif name in PR_TOOLS:
-                owns = True
-            elif name == RESOLVE and (b.get("input") or {}).get("resolved", True):
-                owns = False
-    return first, last, owns, turn
+            if b.get("type") == "tool_use":
+                name = b.get("name")
+                if name in REPORT_TOOLS and ts:
+                    last = ts
+                elif name in PR_TOOLS:
+                    pending[b.get("id")] = name
+                elif name == RESOLVE and (b.get("input") or {}).get("resolved", True):
+                    owns = False
+            elif b.get("type") == "tool_result":
+                if pending.pop(b.get("tool_use_id"), None) and not b.get("is_error"):
+                    owns = True
+    return first, last, owns
 
 
 def main():
@@ -91,21 +99,16 @@ def main():
         path = payload.get("transcript_path")
         if payload.get("stop_hook_active") or not path or not os.path.isfile(path):
             return 0
-        first, last, owns, turn = scan(path)
+        first, last, owns = scan(path)
         ref = last or first
         if not owns or not ref:
             return 0
         age = (now() - parse_ts(ref)).total_seconds()
         if age < LIMIT_S:
             return 0
-        marker = os.path.join(os.path.dirname(path), "." + os.path.basename(path) + ".owner-silence")
-        key = str(turn)
-        if os.path.isfile(marker) and open(marker, encoding="utf-8").read() == key:
-            return 0
-        with open(marker, "w", encoding="utf-8") as f:
-            f.write(key)
-        print(json.dumps({"decision": "block", "reason": REASON.format(
-            mins=int(age // 60), last=ref if last else "none since the thread began")}))
+        message = REASON.format(
+            mins=int(age // 60), last=ref if last else "none since the thread began")
+        print(stop_notice(payload, message, "no-owner-silence-while-pr-waits"))
     except Exception:
         return 0
     return 0

@@ -165,7 +165,7 @@ A later push to that PR wastes the earlier run (2026-11-07: two agy runs spent o
 A failure that comes from the runner or the infrastructure under it, such as a 504 from the runner or its registry, a lost runner, or a job that never started, is not a defect of the PR.
 Read the job log to classify it before reacting: if no step running the PR's own code failed, it is runner-side.
 Post one PR comment that links the issue tracking the runner fault, then hold the PR.
-Re-run once, after the fix for the runner fault lands (2026-11-08: the 504s on [gha#1667](https://github.com/Morrison-Lab/gha/pull/1667), [ai-config#5108](https://github.com/Morrison-Lab/ai-config/issues/5108)).
+Re-run once, after the fix for the runner fault lands (2026-11-08: the 504s on [gha#1667](https://github.com/Morrison-Lab/gha/issues/1667), [ai-config#5108](https://github.com/Morrison-Lab/ai-config/issues/5108)).
 
 - **Do:** classify the failure from the job log, comment once with the tracking issue, and hold.
 - **Do:** re-run once, after the runner fix has landed.

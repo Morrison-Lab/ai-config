@@ -39,9 +39,10 @@ REASON = (
     "[hook: no-mwc-ask-for-infra-pr] This message mentions `mwc` and names {ref}, which is an "
     "infrastructure PR ({why}). Infra PRs carry a standing merge grant once fully clean "
     "(strict-merge-policy.md; Ezra, 2026-11-07 about lds#2009: \"it's infra and shouldn't need "
-    "my word\"). Do not ask for or wait on his word: run the fully-clean checker, route the PR "
-    "to the runner thread / merge it, and say it merges under the infra grant. Drop it from the "
-    "mwc list. ai-config#5097."
+    "my word\"). Do not ask for or wait on his word. In a project, an owner thread never merges: "
+    "send the PR's final head to the coordinator, whose runner thread merges it once the "
+    "fully-clean checker exits 0, and say it merges under the infra grant. Outside a project, "
+    "merge it yourself once fully clean. Drop it from the mwc list. ai-config#5097, #5111."
 )
 
 

@@ -54,6 +54,7 @@ Do not enable session-wide `/mwc` for it.
   If every path matches `INFRA_PATH_PATTERNS` in `hooks/no-unauthorized-merge.py` (`.github/`, `.claude/`, `CLAUDE.md`/`AGENTS.md`, lint, spell and link-check configuration) or the repo is gha, macros or ai-config, report it as merging under the infra grant, not as waiting on the user (Ezra, 2026-11-07, about lds#2009: "it's infra and shouldn't need my word").
   `hooks/no-mwc-ask-for-infra-pr.py` denies a reply that asks otherwise (ai-config#5097).
 - **Do:** merge a fully clean infrastructure PR without asking, and say in the same reply that you did and why it qualified.
+  In a project, an owner thread never merges: it sends the PR's final head to the coordinator, and the runner thread merges once the fully-clean checker exits 0 (ai-config#5111).
 - **Don't:** extend the grant to a PR that mixes infrastructure with content, or merge one whose review was skipped.
 
 See [`AGENTS.cases.md`](../../AGENTS.cases.md), "Strict Merge Control Policy" for the authentic user directives.

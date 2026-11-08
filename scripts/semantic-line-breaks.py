@@ -586,6 +586,17 @@ def _diff_preview(path: Path, before: str, after: str) -> list[str]:
     ))
 
 
+# The script reflows Markdown prose. Source code is not prose: reflowing a
+# Python string literal joined adjacent strings and left a SyntaxError
+# (ai-config#5113), so any other file type is refused rather than edited.
+PROSE_SUFFIXES = frozenset({'.md', '.markdown', '.qmd', '.rmd'})
+
+
+def is_prose_path(path: Path) -> bool:
+    """True when `path` has a Markdown or Quarto suffix."""
+    return path.suffix.lower() in PROSE_SUFFIXES
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description='Reformat Markdown prose to semantic line breaks.',
@@ -621,6 +632,14 @@ def main(argv: list[str] | None = None) -> int:
     errors = 0
 
     for path in args.paths:
+        if not is_prose_path(path):
+            errors += 1
+            print(
+                f'  ERROR:   {path}: not a Markdown or Quarto file '
+                f'({", ".join(sorted(PROSE_SUFFIXES))}); refusing to reflow it (ai-config#5113)',
+                file=sys.stderr,
+            )
+            continue
         try:
             before = path.read_text(encoding='utf-8')
 

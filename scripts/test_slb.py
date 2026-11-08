@@ -1173,5 +1173,18 @@ check(
     "Second sentence after equation.\n",
 )
 
+# ai-config#5113: a non-Markdown path is refused and left byte-for-byte unchanged.
+with tempfile.TemporaryDirectory() as tmp:
+    src = Path(tmp) / "hook.py"
+    body = 'REASON = (\n    "First sentence. Second sentence."\n)\n'
+    src.write_text(body, encoding="utf-8")
+    rc = slb.main([str(src), "--write", "--all"])
+    if rc == 1 and src.read_text(encoding="utf-8") == body:
+        print("PASS: a .py path is refused and left unchanged")
+        passes += 1
+    else:
+        print("FAIL: a .py path is refused and left unchanged")
+        failures += 1
+
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

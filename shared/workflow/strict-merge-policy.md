@@ -50,6 +50,10 @@ Every PR in `Morrison-Lab/gha` or `Morrison-Lab/ai-config` counts as infrastruct
 Where `hooks/no-unauthorized-merge.py` is active, clear it with `ALLOW_MERGE=1` on that one merge command, and state in the reply why the PR qualified.
 Do not enable session-wide `/mwc` for it.
 
+- **Classify before asking.**
+  Before telling the user a PR waits on `mwc`, list its changed paths.
+  If every path matches `INFRA_PATH_PATTERNS` in `hooks/no-unauthorized-merge.py` (`.github/`, `.claude/`, `CLAUDE.md`/`AGENTS.md`, lint, spell and link-check configuration) or the repo is gha, macros or ai-config, report it as merging under the infra grant, not as waiting on the user (Ezra, 2026-11-07, about lds#2009: "it's infra and shouldn't need my word").
+  `hooks/no-mwc-ask-for-infra-pr.py` denies a reply that asks otherwise (ai-config#5097).
 - **Do:** merge a fully clean infrastructure PR without asking, and say in the same reply that you did and why it qualified.
 - **Don't:** extend the grant to a PR that mixes infrastructure with content, or merge one whose review was skipped.
 

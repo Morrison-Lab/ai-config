@@ -152,7 +152,7 @@ RX_DURATION = re.compile(r"^\d+(\.\d+)?[smhd]?$")
 WRAPPERS = frozenset({"timeout", "time", "nice", "nohup", "command", "stdbuf"})
 RX_FORGE = re.compile(r"clean|\$(?!\?)|`", re.IGNORECASE)
 RX_EVIDENCE = re.compile(
-    r"([\w.-]+/[\w.-]+)#(\d+) is FULLY CLEAN on HEAD ([0-9a-f]{7,40})\b")
+    r"([\w.-]+/[\w.-]+)#(\d+) is FULLY CLEAN on HEAD ([0-9a-f]{7,40})!? \[stale-base rule\]")
 RX_NOT_CLEAN = re.compile(r"NOT fully clean", re.IGNORECASE)
 RX_SHA40 = re.compile(r"^[0-9a-fA-F]{40}$")
 RX_API_MERGE = re.compile(

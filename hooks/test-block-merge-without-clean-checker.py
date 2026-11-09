@@ -24,7 +24,7 @@ MCP = "mcp__github__merge_pull_request"
 
 
 def line(sha=SHA, n=354, repo=REPO):
-    return f"✅ {repo}#{n} is FULLY CLEAN on HEAD {sha[:8]}!"
+    return f"✅ {repo}#{n} is FULLY CLEAN on HEAD {sha[:8]}! [stale-base rule]"
 
 
 def bash(cmd, out="", sidechain=False):

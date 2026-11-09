@@ -8,7 +8,7 @@ when main was merged into it. Merging main into a PR branch is always allowed
 checker pass stop applying and the PR needs a new review round.
 
 Denies `mcp__github__update_pull_request_branch` when the transcript holds the
-checker's line `<owner>/<repo>#<N> is FULLY CLEAN on HEAD <sha8>` for that PR
+checker's line `<owner>/<repo>#<N> is FULLY CLEAN on HEAD <sha8>! [stale-base rule]` for that PR
 and no later base-drift report from the checker. The checker prints the drift
 report ("<base> gained N commit(s) since this head's merge base") when the base
 gained a CI gate the head never ran, which is the case where merging the base

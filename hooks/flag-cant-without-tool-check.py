@@ -44,15 +44,13 @@ APOS = "['\u2019]?"
 # tool, permission or access word, or "my own" / "myself" / "from here".
 ANCHOR = (r"(?:session|sandbox|environment|tools?|permissions?|access|my own|on my own|myself"
           r"|from here|in this (?:thread|chat)|settings|mode)")
+# "Unable to" is the same: "unable to reproduce / verify / say" is idiom (review round 3).
+INABILITY = (rf"(?:can{APOS}t|cannot|can not|(?:am|are|{APOS}m|{APOS}re) (?:unable|not able) to)")
 CLAIM_RX = re.compile(
-    rf"\b(?:i|we)\s+(?:can{APOS}t|cannot|can not)\b[^.\n]{{0,80}}\b{ANCHOR}\b"
-    rf"|\b(?:i|we) (?:am|are|'m) (?:unable|not able) to\b"
-    rf"|\b(?:i{APOS}m|we{APOS}re) (?:unable|not able) to\b"
-    rf"|\b(?:i|we) have no (?:tool|way|means) (?:to|for)\b"
-    rf"|\b(?:i|we) (?:do not|don{APOS}t) have (?:a|the|any) (?:tool|way|means|access)\b"
+    rf"\b(?:i|we)\s*{INABILITY}\b[^.\n]{{0,80}}\b{ANCHOR}\b"
+    rf"|\b(?:i|we) (?:do not|don{APOS}t) have (?:a|the|any) (?:tool|access)\b"
     r"|\bonly (?:you|ezra|the user|a human|a person)\s+(?:can|could|may|control|controls|has|have)\b"
-    r"|\bno (?:tool|way|means) (?:exists )?(?:to|for)\b"
-    r"|\bnot something (?:i|we) can\b",
+    r"|\bno tool (?:exists )?(?:to|for)\b",
     re.I)
 QUOTED_RX = re.compile(r"`[^`]*`|\"[^\"]*\"|\u201c[^\u201d]*\u201d")
 

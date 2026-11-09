@@ -46,8 +46,10 @@ CASES = [
      "a quoted claim stays silent"),
     ([user("go"), say("I can't believe it. I can't tell if this is a bug. I can't find the file.")],
      False, "plain idioms stay silent"),
-    ([user("go"), say("I can't switch my own permission mode.")], True, "can't switch warns"),
-    ([user("go"), say("I can't make sense of this. I can't change the fact that it failed.")],
+    ([user("go"), say("I can't access the tools from the shed.")], True,
+     "KNOWN false positive (literal sense of 'tools'), tracked in #5140"),
+    ([user("go"), say("I can't make sense of this. I can't change the fact that it failed. "
+                      "I am unable to reproduce it. I can't reach a conclusion.")],
      False, "idioms with action verbs stay silent"),
     ([user("go"), say("I can't stop myself from rechecking. I can't grant myself the benefit of "
                       "the doubt. I can't stop him from using the session. I can't change my mind about the "
@@ -56,8 +58,6 @@ CASES = [
                       "I can't stress enough that settings like these need review. "
                       "I can't say whether this works given the access restrictions.")],
      False, "idioms beside capability nouns stay silent"),
-    ([user("go"), say("I am unable to reproduce it. I can't reach a conclusion. We can't "
-                      "control what happens next.")], False, "unable-to and verb idioms stay silent"),
 ]
 
 

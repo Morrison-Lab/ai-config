@@ -419,6 +419,34 @@ class TestPasses(unittest.TestCase):
     def test_non_bash_tool(self):
         self.assertIsNone(run("chromium", tool="Read"))
 
+    def test_mcp_automation_tools_denied(self):
+        for tool in ("mcp__playwright__browser_navigate",
+                     "mcp__puppeteer__puppeteer_screenshot",
+                     "mcp__plugin_x_selenium__click"):
+            out = run("", tool=tool)
+            self.assertIsNotNone(out, tool)
+            spec = out["hookSpecificOutput"]
+            self.assertEqual(spec["permissionDecision"], "deny", tool)
+            self.assertIn("mathjax-full", spec["permissionDecisionReason"])
+            self.assertIn(tool, spec["permissionDecisionReason"])
+
+    def test_mcp_automation_deny_ignores_escape_valve(self):
+        out = run("ALLOW_HEADLESS_BROWSER=1 x", tool="mcp__playwright__browser_navigate")
+        self.assertEqual(out["hookSpecificOutput"]["permissionDecision"], "deny")
+
+    def test_other_mcp_tools_pass(self):
+        for tool in ("mcp__github__add_issue_comment",
+                     "mcp__claude-in-chrome__navigate",
+                     "mcp__hearthbot__post_message"):
+            self.assertIsNone(run("", tool=tool), tool)
+
+    def test_bash_deny_names_mathjax_and_latex_routes(self):
+        reason = run("chromium --headless x")["hookSpecificOutput"][
+            "permissionDecisionReason"]
+        self.assertIn("mathjax-full", reason)
+        self.assertIn("pdflatex", reason)
+        self.assertIn("ALLOW_HEADLESS_BROWSER=1", reason)
+
     def test_escape_valve(self):
         self.assert_passes("ALLOW_HEADLESS_BROWSER=1 chromium --headless --dump-dom x")
 

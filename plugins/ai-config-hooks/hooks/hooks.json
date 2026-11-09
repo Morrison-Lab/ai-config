@@ -1767,6 +1767,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-merge-ask-in-post-message.py\"'",
+            "timeout": 10,
+            "script": "no-merge-ask-in-post-message.py",
+            "why": "ai-config#5155. Ezra, 2026-11-09: owner threads never ask him for a merge or mwc; the coordinator puts a PR on his merge line after the agy review and the fully-clean checker pass. On 2026-11-07 the psc#100 thread told him it would ask for mwc and was corrected twice. Blocks (deny) a thread session's post_message or request_decision (also reply, update_message, edit_message) whose text, question or option asks the user to merge, to give mwc, or for permission to merge, and points at message_coordinator with the head SHA. The coordinator and other sessions are never blocked; a thread session is recognized as in no-self-thread-link.py. Inline code is not ignored. ALLOW_MERGE_ASK=1 overrides. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-mwc-ask-in-other-thread-unread.py\"'",
             "timeout": 10,
             "script": "no-mwc-ask-in-other-thread-unread.py",

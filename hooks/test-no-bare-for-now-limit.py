@@ -24,6 +24,7 @@ CASES = [
     ("paused for now", "The runner is paused for now.", True),
     ("unavailable for now", "Review is unavailable for now.", True),
     ("exhausted, later sentence has time", "Quota is exhausted for now. It resets at 00:00 UTC.", True),
+    ("pst reset", "Quota is used up for now; back at 4 pm PST.", False),
     ("duration same sentence", "Quota is used up for now, about 2 hours.", False),
     ("reset in sentence", "Quota is used up for now and resets 2026-11-10T00:00Z.", False),
     ("until", "The runner is paused for now until 23:00 UTC.", False),

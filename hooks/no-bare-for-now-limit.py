@@ -10,7 +10,11 @@ Scope: the user-visible hearthbot tools (post_message, request_decision, reply,
 update_message, edit_message), in every session. Denies a sentence that pairs a
 limit word with "for now" and holds no time, duration or reset in that same
 sentence. A deny is possible because the failing shape is lexical; a reminder
-would be read past (ai-config#4741). `ALLOW_BARE_FOR_NOW=1` overrides. Fails
+would be read past (ai-config#4741). The denial text also carries the companion
+rule (coordinator, 2026-11-09): never estimate a rate-limit reset time, read it from
+`gh api rate_limit` and quote it in PST. Whether a quoted time was read or guessed
+is not decidable from text, so that half is carried by the denial text, not a deny.
+`ALLOW_BARE_FOR_NOW=1` overrides. Fails
 open on any parse trouble.
 """
 import json
@@ -29,15 +33,16 @@ FOR_NOW = re.compile(r"\bfor\s+now\b", re.I)
 HAS_TIME = re.compile(
     r"(?:\b\d+(?:\.\d+)?\s*(?:s|sec|secs|seconds?|m|min|mins|minutes?|h|hr|hrs|hours?|"
     r"d|days?|weeks?)\b"
-    r"|\b\d{1,2}:\d{2}\b|\b\d{4}-\d{2}-\d{2}\b|\butc\b|\bresets?\b|\buntil\b|\btill\b"
+    r"|\b\d{1,2}:\d{2}\b|\b\d{4}-\d{2}-\d{2}\b|\b(?:utc|pst|pdt|pacific)\b|\bresets?\b|\buntil\b|\btill\b"
     r"|\b(?:an?|one|two|three|few|several)\s+(?:hours?|minutes?|days?|weeks?)\b)",
     re.I)
 
 REASON = (
     '[hook: no-bare-for-now-limit] "{sentence}" reports a limit or outage "for now" with '
-    "no duration (ai-config#5160, Ezra 2026-11-09). Say for how long: a reset time in UTC "
-    'or a duration ("until 2026-11-10T00:00Z", "for about 2 hours"). If it is unknown, '
-    "say that it is unknown and when you will recheck. "
+    "no duration (ai-config#5160, Ezra 2026-11-09). Say for how long: a reset time in PST "
+    'or a duration ("until 16:00 PST", "for about 2 hours"). Never estimate a '
+    "GitHub rate-limit reset: read the reset field of `gh api rate_limit` and convert it to "
+    "PST. If it is unknown, say that it is unknown and when you will recheck. "
     "Set ALLOW_BARE_FOR_NOW=1 only when the user asked for the bare form."
 )
 

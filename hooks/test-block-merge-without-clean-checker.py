@@ -187,6 +187,8 @@ def main():
           mcp([bash("grep -n x scripts/check-pr-fully-clean.py", line())])[0])
     check("denies a checker run whose result has no FULLY CLEAN line",
           mcp([checker(out="PR is NOT fully clean:\n - x")])[0])
+    check("denies an old checker's line without the stale-base marker",
+          mcp([checker(out=line().replace(" [stale-base rule]", ""))])[0])
     check("denies a backgrounded checker run (silence is not success)",
           mcp([checker(out="Command running in background with ID: b1")])[0])
     check("denies a merge naming no repository",

@@ -37,6 +37,14 @@ changed line the new-line-breaks gate can flag.
 Run `python3 scripts/check-memory-file-size.py --strict` before pushing to match CI.
 When run without `--strict`, the script is advisory (exits 0 while printing findings).
 
+OUTSIDE memories/ (ai-config#897)
+---------------------------------
+The gate covers `memories/` only. A report-only section also lists `CLAUDE.md`
+(ceiling `--auto-loaded-max-lines`, lower because every session loads it) and
+`shared/**/*.md` (ceiling `--max-lines`). It never changes the exit code, per
+ai-config#695. Renaming this script to describe its wider scope is left to a
+separate change, since 20+ files cite its current name.
+
 APPROACHING THE CAP (`--warn-fraction`)
 ---------------------------------------
 Reporting only the breach is what made this check arrive too late to act on.
@@ -72,6 +80,11 @@ DEFAULT_MAX_LINES = 1250
 # by whichever session happens to run out of room first. A parameter rather
 # than a literal per `shared/coding/configurable-parameters.md`.
 DEFAULT_WARN_FRACTION = 0.92
+
+# Ceiling for CLAUDE.md, which is loaded into every session. Lower than
+# DEFAULT_MAX_LINES because the cost is per session, not per use
+# (ai-config#897). 500 lines is roughly 5k tokens. Advisory only.
+DEFAULT_AUTO_LOADED_MAX_LINES = 500
 
 # The one line the warning band prints above its per-file listing. It reports
 # and does not instruct, for the reason `report_approaching` gives. Kept as a
@@ -229,6 +242,46 @@ def report_approaching(
         print(f"  {rel_path}: {n_lines} lines ({headroom} lines of headroom)")
 
 
+def auto_loaded_findings(
+    max_lines: int, auto_loaded_max_lines: int
+) -> list[tuple[str, int, int]]:
+    """(path, line-count, ceiling) for CLAUDE.md and `shared/` files over their ceiling.
+
+    ai-config#897: the gate above covers `memories/` only, which are read on
+    demand, while `CLAUDE.md` is loaded into every session. A per-session cost
+    is paid whether or not any of the text is relevant, so its ceiling is lower
+    (`auto_loaded_max_lines`) than the per-use ceiling `shared/` fragments share
+    with memory files (`max_lines`).
+
+    Report-only: nothing here changes the exit code. ai-config#695 settled that
+    crossing a threshold prompts a split and does not block an unrelated PR, and
+    this first run is the measurement that decides whether any split follows.
+    """
+    claude_md = REPO_ROOT / "CLAUDE.md"
+    measured = []
+    if claude_md.is_file():
+        n_lines = len(claude_md.read_text(encoding="utf-8").splitlines())
+        measured.append(("CLAUDE.md", n_lines, auto_loaded_max_lines))
+    measured += [
+        (rel_path, len(lines), max_lines)
+        for rel_path, lines in measured_files("shared")
+    ]
+    findings = [m for m in measured if m[1] > m[2]]
+    return sorted(findings, key=lambda f: -(f[1] - f[2]))
+
+
+def report_auto_loaded(findings: list[tuple[str, int, int]]) -> None:
+    """Print the advisory auto-loaded / `shared/` findings, if any."""
+    if not findings:
+        return
+    print(
+        f"\n{len(findings)} file(s) outside memories/ are over their ceiling "
+        "(advisory, never fails; ai-config#897). Most over first.\n"
+    )
+    for rel_path, n_lines, ceiling in findings:
+        print(f"  {rel_path}: {n_lines} lines (ceiling {ceiling})")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -252,6 +305,15 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--auto-loaded-max-lines",
+        type=int,
+        default=DEFAULT_AUTO_LOADED_MAX_LINES,
+        help=(
+            "advisory ceiling for CLAUDE.md, which every session loads "
+            f"(default: {DEFAULT_AUTO_LOADED_MAX_LINES})"
+        ),
+    )
+    parser.add_argument(
         "--strict",
         action="store_true",
         help="exit 1 if any file is over the threshold (default: advisory, exits 0)",
@@ -269,10 +331,12 @@ def main() -> None:
     measured = measured_files(args.directory)
     findings = oversized_files(measured, args.max_lines)
     approaching = approaching_files(measured, args.max_lines, warn_lines)
+    advisory = auto_loaded_findings(args.max_lines, args.auto_loaded_max_lines)
 
     if not findings:
         print(f"No memory file exceeds {args.max_lines} lines.")
         report_approaching(approaching, args.max_lines, warn_lines)
+        report_auto_loaded(advisory)
         return
 
     print(
@@ -292,6 +356,7 @@ def main() -> None:
     )
 
     report_approaching(approaching, args.max_lines, warn_lines, announce_empty=False)
+    report_auto_loaded(advisory)
 
     if args.strict:
         sys.exit(1)

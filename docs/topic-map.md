@@ -351,6 +351,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/monitor-pushed-heads.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/workflow/monitor-scoped-open-prs.md` | Continuously derive and monitor open pull requests and merge requests in repositories the agent is actively working in. |  |
 | `shared/workflow/never-send-email.md` | Ezra's standing rule, 2026-11-04: "never send emails for me". |  |
+| `shared/workflow/check-tools-before-saying-cant.md` | Before a reply says "I can't" or "only you can", check the visible and deferred tools. |  |
 | `shared/workflow/no-cant-from-session-excuses.md` | Never answer "I can't do that from this session" when a way exists to do it. |  |
 | `shared/workflow/no-cop-out-offers.md` | A **cop-out offer** is a sentence that converts work you have already been authorized to do back into a request for permission. |  |
 | `shared/workflow/no-empty-promises.md` | A promise about my own future behaviour is not work. It is a claim that work will happen later, made in a conversation that will not outlive it. |  |

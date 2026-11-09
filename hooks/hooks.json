@@ -2105,6 +2105,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-cant-without-tool-check.py\"",
+            "timeout": 10,
+            "script": "flag-cant-without-tool-check.py",
+            "why": "ai-config#5136, Ezra 2026-11-09: a runner answered 'I can't, only you control that' to a request to switch its own permission mode, without checking its tools; it had a mode-switch tool. 'Never forget to check your available tools' and 'make sure we don't get that behavior from a runner again'. Interrupts the stop once per message (agent_notice.stop_notice) when the final reply claims an inability or hands the action to the user and the turn made no ToolSearch call. Warns rather than denies: whether a tool exists is not decidable from the transcript, and some limits are real (permission rules in settings files change only through a prompt Ezra approves)."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-book-unavailable-without-library-search.py\"",
             "timeout": 10,
             "script": "flag-book-unavailable-without-library-search.py",

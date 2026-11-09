@@ -46,6 +46,11 @@ ASKS = [
     re.compile(r"\b(?:waiting|awaiting)\s+(?:for\s+)?(?:you|ezra)\s+to\s+merge\b", re.I),
 ]
 
+# A negated statement ("mwc isn't needed", "no mwc needed", "not asking for mwc")
+# is the behaviour the rule wants, so it is not an ask.
+NEGATION = re.compile(r"\b(?:no|not|never|without)\b|n't", re.I)
+NEGATION_WINDOW = 20
+
 REASON = (
     '[hook: no-merge-ask-in-post-message] This post asks the user for a merge or `mwc` '
     '("{phrase}"). Owner threads never ask Ezra for either (ai-config#5155, 2026-11-09): '
@@ -76,9 +81,10 @@ def user_text(tool_input: dict) -> str:
 def merge_ask(text: str):
     """The first phrase that asks for a merge or mwc, or None."""
     for pattern in ASKS:
-        m = pattern.search(text)
-        if m:
-            return " ".join(m.group(0).split())
+        for m in pattern.finditer(text):
+            context = text[max(0, m.start() - NEGATION_WINDOW):m.end()]
+            if not NEGATION.search(context):
+                return " ".join(m.group(0).split())
     return None
 
 

@@ -55,6 +55,10 @@ CASES = [
     ("ready to merge state", "The head is clean and ready to merge.", False),
     ("past tense report", "I sent the final head to the coordinator.", False),
     ("mwc noun, no ask", "mwc is the merge word.", False),
+    ("negated: isn't needed", "Your mwc isn't needed yet.", False),
+    ("negated: no needed", "No mwc needed here.", False),
+    ("negated: not asking", "I am not asking for mwc.", False),
+    ("negation far away does not shield", "Not done yet. Later, say mwc please.", True),
     ("empty", "", False),
 ]
 

@@ -46,7 +46,7 @@ Acceptable destinations are the surviving copy of a duplicate, the page it moved
 Acceptable reasons are that the content was wrong (say what was wrong), that it duplicates content that stays (name where), or that its owner asked for removal (cite the request).
 "Tidied", "simplified" and "shortened" are not reasons.
 
-This is the writer and reviewer layer behind the content-preservation check ([gha#1791](https://github.com/Morrison-Lab/gha/pull/1791)), which flags removed content that lands nowhere.
+This is the writer and reviewer layer behind the proposed content-preservation check ([gha#1791](https://github.com/Morrison-Lab/gha/issues/1791), in progress as [gha PR 1793](https://github.com/Morrison-Lab/gha/pull/1793)), which flags removed content that lands nowhere.
 The three layers are described in [`checks-need-writer-and-reviewer-instructions`](../workflow/checks-need-writer-and-reviewer-instructions.md).
 
 - **Writer:** before deleting a passage, decide its destination or its reason, and write it in the PR description.

@@ -1520,6 +1520,13 @@
             "timeout": 10,
             "script": "flag-cd-into-main-checkout.py",
             "why": "Warns when a worktree-rooted session cd's into the MAIN checkout of its own repo -- a real path on a different branch, where every edit and every check silently succeeds against somebody else's tree."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-patch-comment-id.py\"'",
+            "timeout": 10,
+            "script": "no-patch-comment-id.py",
+            "why": "ai-config#1152. On Morrison-Lab/ai-config#1151 `gh api -X PATCH repos/<o>/<r>/pulls/comments/<id>` was used to reply to five claude[bot] findings and overwrote all five; each call returned success and the REST surface has no edit-history read, so a restore cannot be diffed. DENIES a `gh api` command that asks for PATCH on a `pulls/comments/<id>` or `issues/comments/<id>` path, decidable from the command text alone (no network call), and names the `/replies` POST route. Clearable with an `ALLOW_COMMENT_PATCH=1` prefix for editing your own comment. Reads only segments whose command word is `gh api`, so quoting the command in a commit message never fires; fails open on parse trouble."
           }
         ]
       },

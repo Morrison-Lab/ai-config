@@ -38,16 +38,18 @@ from agent_notice import stop_notice  # noqa: E402
 
 REPLY_TOOL_RX = re.compile(r"(^|__)(reply|post_message|update_message)$", re.I)
 APOS = "['\u2019]?"
-# "I can't" is mostly idiom ("can't believe", "can't make sense of", "can't change the
-# fact"), and no verb list separates idiom from capability (review of #5137, twice).
-# So it counts only beside a capability anchor in the same sentence: a session,
-# tool, permission or access word, or "my own" / "myself" / "from here".
-ANCHOR = (r"(?:session|sandbox|environment|tools?|permissions?|access|my own|on my own|myself"
-          r"|from here|in this (?:thread|chat)|settings|mode)")
-# "Unable to" is the same: "unable to reproduce / verify / say" is idiom (review round 3).
+# "Can't" and "unable to" are mostly idiom, and neither a verb list nor a nearby noun
+# list alone separates idiom from capability (review of #5137, three rounds).  A claim
+# needs both: an action verb right after the inability phrase, then a capability noun
+# within four words ("can't switch my own permission mode").  Precision over recall.
+ACTION = (r"(?:do|change|switch|set|run|start|stop|access|reach|create|edit|modify|merge|push"
+          r"|open|install|enable|disable|approve|grant|use|send|add|attach|post|delete"
+          r"|update|perform|fetch|download|clone|connect|control|invoke)")
+ANCHOR = (r"(?:session|sandbox|environment|tools?|permissions?|my own|on my own|myself"
+          r"|from here|in this (?:thread|chat)|settings|(?:session|permission) mode)")
 INABILITY = (rf"(?:can{APOS}t|cannot|can not|(?:am|are|{APOS}m|{APOS}re) (?:unable|not able) to)")
 CLAIM_RX = re.compile(
-    rf"\b(?:i|we)\s*{INABILITY}\b[^.\n]{{0,80}}\b{ANCHOR}\b"
+    rf"\b(?:i|we)\s*{INABILITY}\s+{ACTION}\b(?:\s+\S+){{0,4}}?\s+{ANCHOR}\b"
     rf"|\b(?:i|we) (?:do not|don{APOS}t) have (?:a|the|any) (?:tool|access)\b"
     r"|\bonly (?:you|ezra|the user|a human|a person)\s+(?:can|could|may|control|controls|has|have)\b"
     r"|\bno tool (?:exists )?(?:to|for)\b",

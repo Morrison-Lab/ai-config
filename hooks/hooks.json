@@ -1538,6 +1538,18 @@
         ]
       },
       {
+        "matcher": "mcp__github__update_issue_comment",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-mcp-overwrite-others-comment.py\"",
+            "timeout": 15,
+            "script": "no-mcp-overwrite-others-comment.py",
+            "why": "ai-config#5153, the MCP counterpart of no-patch-comment-id.py (#1152). `mcp__github__update_issue_comment` replaces a comment by id and never passes the Bash hook. DENIES the call when GitHub reports the comment's author as a different login from the authenticated account (for example a claude[bot] review), since the overwrite leaves no edit history to restore from. Editing your own comment is allowed. A comment the agent posted carries the account holder's login, so this separates yours from someone else's, not an agent's from a human's. Fails open when either lookup fails; `ALLOW_COMMENT_PATCH=1` clears it."
+          }
+        ]
+      },
+      {
         "matcher": "Agent",
         "hooks": [
           {

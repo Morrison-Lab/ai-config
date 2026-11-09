@@ -1,38 +1,23 @@
 #!/usr/bin/env python3
 """Stop-hook guard: a reply says "I can't" or "only you can", and the turn never searched the tool list.
 
-THE MEASURED CASE (2026-11-09 03:51-04:07Z, Data 571 runner thread, ai-config#5136)
------------------------------------------------------------------------------------
-Ezra asked the runner to switch its own permission mode.  The runner replied
-"I can't, only you control that" without looking at its tools.  It had a
-mode-switch tool and used it once Ezra insisted.  The coordinator then repeated
-the same wrong "can't".  Ezra: "never forget to check your available tools" and
-"make sure we don't get that behavior from a runner again".
+THE MEASURED CASE (2026-11-09, Data 571 runner thread, ai-config#5136)
+Ezra asked the runner to switch its own permission mode.  It replied "I can't,
+only you control that" without looking at its tools, though it had a mode-switch
+tool.  Ezra: "never forget to check your available tools".
 
 WHAT IT CHECKS
---------------
-    the final reply claims an inability or hands the action to the user
-        ("I can't", "I'm unable to", "only you can", "no tool to ...")
-    AND the turn (since the last real user prompt) made no ToolSearch call
-
-A ToolSearch call is the evidence that deferred tools were looked for; a tool
-that is already in the visible list is not in the transcript, so a session
-with no deferred tools can still be warned once.  The warning tells the agent
-to check the list and then revise or stand by the claim.
+The final reply claims an inability or hands the action to the user ("I can't
+switch", "I'm unable to", "only you can"), AND the turn made no ToolSearch call.
+A tool in the visible list leaves no trace in the transcript, so a session with
+no deferred tools can still be warned once.
 
 WHY A WARNING AND NOT A DENY
-----------------------------
-Whether a tool exists for the action is not decidable from the transcript, and
-some "can't" claims are true (editing permission rules in settings files needs
-a prompt Ezra approves; that stays a real limit).  The hook interrupts the stop
-at most once per message (agent_notice.stop_notice) so the agent reads it, and
-the next stop passes.
-
-NOT CHECKED
------------
-"The user did X" claims the user never made (the coordinator misrelayed that
-Ezra switched the mode himself) cannot be verified lexically; the rule
-shared/workflow/check-tools-before-saying-cant.md covers them in prose.
+Whether a tool exists is not decidable from the transcript, and some claims are
+true (permission rules in settings files change only through a prompt Ezra
+approves).  The stop is interrupted once per message (agent_notice.stop_notice).
+"The user did X" claims the user never made cannot be checked lexically; the
+rule covers them in prose.
 
 transcript-shapes-skip: antigravity -- Antigravity sessions have no deferred-tool search, so the ToolSearch condition cannot hold there.
 

@@ -24,7 +24,8 @@ The real limits stay:
   Change them only through a prompt Ezra approves.
 - Switching to a stricter permission mode when asked is fine.
 
-Why this is prose for now: whether a reply claims an inability to act cannot be decided by a lexical rule.
+Why the check does not read the reply's wording: whether a reply claims an inability to act cannot be decided by a lexical rule.
 A Stop hook that matched "can't" plus an action verb and a capability noun was tried and withdrawn after six review rounds, each finding a new idiom or literal sense it matched.
-A check that does not rely on matching the phrasing is tracked in [ai-config#5140](https://github.com/Morrison-Lab/ai-config/issues/5140).
+`hooks/flag-reply-without-tool-search.py` ([ai-config#5140](https://github.com/Morrison-Lab/ai-config/issues/5140)) decides from structure instead: it warns once per message when a turn replied and made no other tool call and no `ToolSearch`.
+A plain answer to a question has the same shape, so it also gets one notice.
 See also [no-cant-from-session-excuses.md](no-cant-from-session-excuses.md).

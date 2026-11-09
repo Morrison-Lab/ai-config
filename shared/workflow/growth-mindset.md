@@ -97,6 +97,14 @@ The same holds for a skipped check: a render skipped because an interpreter is m
   Ezra, 2026-11-04, on a psw#480 reply that said "I haven't rendered the page, and `typos` isn't installed in this session":
   "never make an excuse like this", and "why not?" to the unrendered page.
   Both were installable in the session, so the push should have waited for the render and the spell check.
+
+- **Do:** when a cloud session's token or sandbox blocks a read or an action, run it from a local session that holds Ezra's credentials: a Remote Control session on his usual Linux work device, or on his Mac.
+  The CI runner processes on the lab machines only execute triggered jobs, so they are not this route.
+- **Don't:** report "we can't read X" while a local session could.
+  Ezra, 2026-11-09, after a cloud thread said it could not read the Pages visibility setting of mlg:
+  "why not?", then "you should have used a local session in the first place to check".
+  No hook can see this: a refusal to try is a sentence, not a tool call, so the rule is prose in this fragment.
+
 - **Do:** when an install is worth keeping, tell Ezra to edit the cloud startup script and hand him the **full revised script**, not only the lines to add (2026-11-02: "give me the revised version").
   Read the current script first.
   A clause saying a one-off install is not worth adding closes the question.

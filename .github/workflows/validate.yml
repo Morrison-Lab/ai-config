@@ -698,6 +698,17 @@ jobs:
         # a fragment once and then names it bare is the miss this corpus
         # states in prose and, before this step, had no instrument for.
         run: python3 scripts/check-bare-fragment-mentions.py
+      - name: Check bare repo#N references on added prose lines (advisory)
+        # ai-config#5132. Advisory because the corpus already holds many bare
+        # references (14 on the last 40 commits of main, 2026-11-09), so a gate
+        # would block unrelated PRs. Run the script without --advisory before
+        # pushing a prose change. Needs history to diff, so it fetches the base.
+        run: |
+          git fetch --quiet --unshallow origin || true
+          git fetch --quiet origin "${{ github.base_ref || github.event.repository.default_branch }}"
+          python3 scripts/check-bare-forge-refs.py --advisory FETCH_HEAD
+      - name: Run check-bare-forge-refs tests
+        run: python3 scripts/test_check_bare_forge_refs.py
       - name: Check shared files for new hardcoded machine names, paths and accounts
         # Step (b) of making ai-config usable by others: the maintainer's own
         # machines and accounts are moved into per-user configuration, and this

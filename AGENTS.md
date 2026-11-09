@@ -221,6 +221,17 @@ Do not wait for a clean verdict, an accepted finding, or a first-person admissio
 answering with the corrected fact is not the pass.
 See [`run-ums-proactively`](shared/workflow/run-ums-proactively.md).
 
+## Persist the lesson on every "ums", correction and self-correction
+
+Every time Ezra says "ums", every time he corrects you in any way, and every time you correct yourself, persist the lesson in the same turn in BOTH the project memory store AND ai-config and/or the relevant project repo, and name what you recorded in your reply (Ezra, 2026-11-09, ai-config#5162).
+Memory alone is not enough, because a later session in another project cannot read it.
+`hooks/remind-ums-on-trigger-events.py` reminds on the word "ums" and on a coordinator note;
+a correction has no wording a hook can match, so this rule carries that half.
+See [`run-ums-proactively`](shared/workflow/run-ums-proactively.md).
+
+- **Do:** write the rule where the next session will load it, then say where.
+- **Don't:** treat a self-correction as too small to record.
+
 ## Run UMS before every pause
 
 Before ending a turn to wait on anything --- CI, a review round, a subagent, or an answer from the user --- run `ums` first if learnings have accumulated.

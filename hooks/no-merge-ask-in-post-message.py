@@ -34,7 +34,7 @@ _VERB = (r"(?:say|type|write|reply|respond|send|post|give|grant|issue|need|needs
          r"ask(?:ing)?(?:\s+\w+)?\s+for|request(?:ing)?)")
 ASKS = [
     re.compile(rf"\b{_VERB}\b[^.\n?!]{{0,40}}?\bmwc\b", re.I),
-    re.compile(r"\bmwc\b[^.\n]{0,20}\b(?:please|needed|from you|from ezra)\b", re.I),
+    re.compile(r"\bmwc\b[^.\n]{0,20}\b(?:please|from you|from ezra)\b", re.I),
     re.compile(r"\b(?:can|could|may|should|shall)\s+i\s+merge\b", re.I),
     re.compile(r"\b(?:want|would you like)\s+me\s+to\s+merge\b", re.I),
     re.compile(r"\b(?:ok|okay|fine|good)\s+to\s+merge\s*\?", re.I),
@@ -46,11 +46,10 @@ ASKS = [
     re.compile(r"\b(?:waiting|awaiting)\s+(?:for\s+)?(?:you|ezra)\s+to\s+merge\b", re.I),
 ]
 
-# A negated statement ("mwc isn't needed", "no mwc needed", "not asking for mwc")
-# is the behaviour the rule wants, so it is not an ask.
-NEGATION = re.compile(r"\b(?:no|not|never|without)\b|n't", re.I)
-# A negation in an earlier clause ("Not sure, but can I merge") does not negate the ask.
-CLAUSE_BREAK = re.compile(r"[,;:.!?\n]|\bbut\b|\bhowever\b", re.I)
+# There is deliberately no negation check. A negated mention ("I am not asking for
+# mwc") is denied too: the fix is one rewording, whereas every negation heuristic
+# tried (a fixed window, a clause split) let a real ask through behind a hedge
+# ("Not sure, but can I merge") or a connector ("... and please merge").
 
 REASON = (
     '[hook: no-merge-ask-in-post-message] This post asks the user for a merge or `mwc` '
@@ -82,10 +81,9 @@ def user_text(tool_input: dict) -> str:
 def merge_ask(text: str):
     """The first phrase that asks for a merge or mwc, or None."""
     for pattern in ASKS:
-        for m in pattern.finditer(text):
-            before = CLAUSE_BREAK.split(text[:m.start()])[-1]
-            if not NEGATION.search(before + m.group(0)):
-                return " ".join(m.group(0).split())
+        m = pattern.search(text)
+        if m:
+            return " ".join(m.group(0).split())
     return None
 
 

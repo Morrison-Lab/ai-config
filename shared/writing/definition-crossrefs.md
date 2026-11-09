@@ -22,6 +22,12 @@ every mention:
   One exception: you may leave out the pointer when the passage motivates
   the definition that follows, per
   [`forward-references.md`](forward-references.md#keep-the-crossref).
+- **Every result div links a definition.**
+  A `#thm-`, `#lem-`, `#cor-` or `#prp-` div links each defined term it uses
+  to that term's definition (Ezra, 2026-11-09), with `@def-id` or a link to the `#def-id` anchor.
+  A result with no defined term to link, such as an identity between numbers,
+  carries `<!-- check-result-definition-links: allow: reason -->`.
+  gha's `check-result-definition-links` warns on a result div a PR edits that links no definition.
 - **No hand-written type word in front of the crossref.**
   Quarto emits the type name as part of a theorem-family crossref, so
   `@def-hessian` already renders as "Definition 5".

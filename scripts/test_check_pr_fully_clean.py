@@ -9915,6 +9915,43 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     )
 
 
+    # check_required_checks (ai-config#5143): a required check that never ran
+    # blocks the merge even though every check run that exists passed.
+    from types import SimpleNamespace
+
+    def required(rules, state, runs, status=None, pr_state="OPEN"):
+        pr = SimpleNamespace(state=pr_state, base_ref="main", head_sha="sha123",
+                             repo=TEST_REPO, pr_num="7",
+                             get_check_runs=lambda: [SimpleNamespace(name=n) for n in runs])
+
+        def fake_fetch(cmd):
+            path = cmd[2]
+            if "/rules/branches/" in path:
+                return json.dumps(rules)
+            if path.endswith("/pulls/7"):
+                return json.dumps({"mergeable_state": state})
+            return json.dumps({"statuses": status or []})
+
+        with patch.object(checker, "fetch", side_effect=fake_fetch):
+            return checker.check_required_checks(pr)
+
+    gate_rule = [{"type": "required_status_checks", "parameters": {
+        "required_status_checks": [{"context": "annotation-gate"}]}}]
+    ok, issues = required(gate_rule, "blocked", ["lint"])
+    check("check_required_checks: a required check with no run blocks (#5143)",
+          not ok and "annotation-gate" in issues[0])
+    ok, issues = required(gate_rule, "clean", ["lint", "annotation-gate"])
+    check("check_required_checks: a present required check is clean (#5143)",
+          ok and issues == [])
+    ok, issues = required(gate_rule, "clean", ["lint"], status=[{"context": "annotation-gate"}])
+    check("check_required_checks: a required commit status counts as present (#5143)",
+          ok and issues == [])
+    ok, issues = required([], "blocked", ["lint"])
+    check("check_required_checks: blocked with no missing check is still not clean (#5143)",
+          not ok and "'blocked'" in issues[0])
+    ok, issues = required(gate_rule, "blocked", ["lint"], pr_state="MERGED")
+    check("check_required_checks: a merged PR is skipped (#5143)", ok and issues == [])
+
     # check_base_drift (ai-config#2982): a head the base gained a workflow
     # change behind is not clean, since a check added there never ran on it.
     from types import SimpleNamespace

@@ -309,6 +309,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/check-purpose-before-reusing.md` | Never take shortcuts, and never copy-paste or pattern-match blindly. Before reusing a structure --- a template, a working script, a neighbouring file's shape... |  |
 | `shared/workflow/check-sources-over-recall.md` | When a source can be checked, check it before answering. Sources include books, repositories, documentation, APIs and files. Cite what you read (file and pag... |  |
 | `shared/workflow/check-the-renders.md` | In a repo that publishes a website or a book, the deliverable is the rendered page. A `.qmd` or `.md` diff can be entirely correct while the published page i... |  |
+| `shared/workflow/check-tools-before-saying-cant.md` | Before a reply says "I can't", "I'm unable to" or "only you can", check the tools you have, deferred ones included. |  |
 | `shared/workflow/choose-issue-or-discussion.md` | `issue-first` governs *whether* something is tracked before work starts. It does not settle *where*, and defaulting everything to the issue tracker misfiles... |  |
 | `shared/workflow/claim-pr.md` | Before starting a work session on a GitHub PR or issue --- i.e. before fetching the branch, making edits, posting a review, or invoking an automated review c... |  |
 | `shared/workflow/commit-reusable-work.md` | Potentially-reusable work produced incidentally in any medium must be committed, pushed, and PRed into an owning repository. |  |

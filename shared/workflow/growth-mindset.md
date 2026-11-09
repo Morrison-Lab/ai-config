@@ -98,8 +98,8 @@ The same holds for a skipped check: a render skipped because an interpreter is m
   "never make an excuse like this", and "why not?" to the unrendered page.
   Both were installable in the session, so the push should have waited for the render and the spell check.
 
-- **Do:** when a cloud session's token or sandbox blocks a read or an action, run it from a local session that holds Ezra's credentials: a Remote Control session on cf463-02 (his default device for Remote Control), or on his Mac.
-  The CI runner processes on `cf463-01` and `cf463-02` only execute triggered jobs, so they are not this route.
+- **Do:** when a cloud session's token or sandbox blocks a read or an action, run it from a local session that holds Ezra's credentials: a Remote Control session on his default device for Remote Control (named in per-user configuration), or on his Mac.
+  The CI runner processes on the lab machines only execute triggered jobs, so they are not this route.
 - **Don't:** report "we can't read X" while a local session could.
   Ezra, 2026-11-09, after a cloud thread said it could not read the Pages visibility setting of mlg:
   "why not?", then "you should have used a local session in the first place to check".

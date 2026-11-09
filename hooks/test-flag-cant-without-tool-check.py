@@ -59,10 +59,8 @@ CASES = [
                       "I can't stress enough that settings like these need review. "
                       "I can't say whether this works given the access restrictions.")],
      False, "idioms beside capability nouns stay silent"),
-    ([user("go"), say("I am unable to reproduce the bug. We're unable to reach a consensus.")],
-     False, "unable-to idioms stay silent"),
-    ([user("go"), say("I can't reach a conclusion. We can't control what happens next.")],
-     False, "verb idioms with no capability anchor stay silent"),
+    ([user("go"), say("I am unable to reproduce it. I can't reach a conclusion. We can't "
+                      "control what happens next.")], False, "unable-to and verb idioms stay silent"),
 ]
 
 

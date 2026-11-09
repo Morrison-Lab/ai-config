@@ -43,11 +43,14 @@ def run(transcript, tag):
         fh.write(transcript)
         path = fh.name
     payload = {"transcript_path": path, "session_id": f"s-{tag}-{os.getpid()}"}
-    try:
-        return subprocess.run([sys.executable, HOOK], input=json.dumps(payload),
-                              capture_output=True, text=True)
-    finally:
-        os.unlink(path)
+    # A fresh TMPDIR per run: the warn-once sentinel lives there and must not leak between runs.
+    with tempfile.TemporaryDirectory() as tmp:
+        env = dict(os.environ, TMPDIR=tmp, TEMP=tmp, TMP=tmp)
+        try:
+            return subprocess.run([sys.executable, HOOK], input=json.dumps(payload),
+                                  capture_output=True, text=True, env=env)
+        finally:
+            os.unlink(path)
 
 
 def fired(proc):

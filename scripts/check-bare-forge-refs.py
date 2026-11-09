@@ -12,8 +12,10 @@ Scope, decided so the check can gate without crying wolf:
   reference elsewhere never blocks an unrelated PR;
 * fenced code blocks and inline code spans are skipped, as are the text and
   target of a markdown link, bare URLs, and HTML comments;
-* the gating form is `name#N` or `owner/name#N`, which names a repository and
-  cannot be anything else.  A bare `#N` is reported as advisory only, because
+* the gating form is `name#N` or `owner/name#N`, where `name` is a lowercase
+  repository-shaped word (`pre-#2085` and `v1.2.3#4` do not match; a rare word
+  such as `section#4` still can, and `<!-- bare-ref: allow -->` clears it).
+  A bare `#N` is reported as advisory only, because
   within the repository that owns the file it can be a heading anchor or a
   citation style the file chose;
 * `<!-- bare-ref: allow -->` on the line exempts it, for prose that discusses
@@ -47,7 +49,10 @@ CODE_SPAN = re.compile(r"`[^`\n]*`")
 LINK = re.compile(r"!?\[[^\]\n]*\]\([^)\n]*\)")
 URL = re.compile(r"https?://\S+")
 COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
-STRONG = re.compile(r"(?<![\w/#@.\-])[A-Za-z][\w.\-]*(?:/[\w.\-]+)?#\d+\b")
+# A repository name is lowercase, hyphenated at most, and ends in a letter or
+# digit, so `pre-#2085`, `v1.2.3#4` and `CVE-2021-1234#5` do not match.
+REPO = r"[a-z][a-z0-9_\-]*[a-z0-9]|[a-z]"
+STRONG = re.compile(rf"(?<![\w/#@.\-])(?:[\w.\-]+/)?(?:{REPO})#\d+\b")
 WEAK = re.compile(r"(?<![\w&/#\-])#\d+\b")
 
 
@@ -82,7 +87,10 @@ def scrub(line: str) -> str:
 def scan(text: str, wanted: set[int]) -> list[tuple[int, str, bool]]:
     """Return (line number, reference, gating) for each bare reference."""
     findings = []
-    fenced = strip_fences(text).split("\n")
+    # Blank comments over the whole text, newlines kept, so a comment whose
+    # delimiters sit on different lines hides what is inside it.
+    blanked = COMMENT.sub(lambda m: re.sub(r"[^\n]", " ", m.group(0)), text)
+    fenced = strip_fences(blanked).split("\n")
     raw = text.split("\n")
     for number in sorted(wanted):
         if number > len(fenced) or ALLOW in raw[number - 1]:

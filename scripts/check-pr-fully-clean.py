@@ -1146,6 +1146,68 @@ def check_base_drift(pr) -> Tuple[bool, List[str]]:
         f"the branch and let CI re-run (ai-config#2982)"]
 
 
+def check_required_checks(pr) -> Tuple[bool, List[str]]:
+    """Refuse a head that GitHub holds as blocked by a required check that never ran.
+
+    Every other criterion reads the check runs that exist, so a required check
+    that never posted is invisible: lds#2125 read FULLY CLEAN while its ruleset
+    required `annotation-gate`, which had no run on the head, and GitHub held
+    the PR as `blocked` (ai-config#5143).
+
+    Reads the base branch's required status checks from
+    `GET /repos/{repo}/rules/branches/{base}` and fails with a named line when
+    a required context has no check run (or status) on the head. Also treats
+    `mergeable_state` `blocked` or `behind` as not clean. A `--from-json`
+    payload carries neither read, so the check is a NOTE there.
+    """
+    if pr.state and pr.state != "OPEN":
+        return True, []
+    if _FETCHER is not None:
+        return True, ["NOTE: required checks not checked: a --from-json payload "
+                      "carries no ruleset or merge state (ai-config#5143)"]
+    base, sha = pr.base_ref, pr.head_sha
+    if not base or not sha:
+        return True, ["NOTE: required checks not checked: the PR names no base "
+                      "branch or head SHA (ai-config#5143)"]
+    issues: List[str] = []
+    quoted = urllib.parse.quote(base, safe="/")
+    try:
+        rules = json.loads(fetch(["gh", "api", f"repos/{pr.repo}/rules/branches/{quoted}"]))
+        info = json.loads(fetch(["gh", "api", f"repos/{pr.repo}/pulls/{pr.pr_num}"]))
+    except (RuntimeError, ValueError) as exc:
+        # Exit 2, not a NOTE: a NOTE would pass the PR on a gate that never ran.
+        die(f"Could not read the required checks or merge state of {pr.repo}#{pr.pr_num}: {exc}")
+    required = set()
+    for rule in rules if isinstance(rules, list) else []:
+        if isinstance(rule, dict) and rule.get("type") == "required_status_checks":
+            for item in (rule.get("parameters") or {}).get("required_status_checks") or []:
+                if isinstance(item, dict) and item.get("context"):
+                    required.add(item["context"])
+    if required:
+        present = {cr.name for cr in pr.get_check_runs()}
+        try:
+            status = json.loads(fetch(["gh", "api", f"repos/{pr.repo}/commits/{sha}/status"]))
+            present |= {s.get("context") for s in status.get("statuses") or []
+                        if isinstance(s, dict)}
+        except (RuntimeError, ValueError, AttributeError):
+            pass
+        missing = sorted(required - present)
+        if missing:
+            issues.append(
+                f"Required check(s) never ran on this head: {', '.join(missing)}. "
+                f"The {base} ruleset requires them, so GitHub will not merge it "
+                f"(ai-config#5143)")
+    state = (info.get("mergeable_state") if isinstance(info, dict) else "") or ""
+    if state in ("blocked", "behind") and not issues:
+        issues.append(
+            f"GitHub holds this PR as {state!r} and no missing required check "
+            f"explains it: look for a required review, an unresolved-thread "
+            f"rule or a head behind {base} (ai-config#5143)")
+    elif state in ("behind", "dirty"):
+        issues.append(f"GitHub reports mergeable_state {state!r} (ai-config#5143)")
+    return not issues, issues
+
+
 def check_maintainer_feedback(pr) -> Tuple[bool, List[str]]:
     """Fail when a maintainer comment, review or inline comment is newer than
     the head commit: the merge hook denies the same state (ai-config#4611)."""
@@ -4744,8 +4806,9 @@ def main():
     feedback_ok, feedback_issues = check_maintainer_feedback(pr)
     review_ok, review_issues = check_review_comments(pr, args.quorum)
     drift_ok, drift_issues = check_base_drift(pr)
+    required_ok, required_issues = check_required_checks(pr)
 
-    all_issues = ci_issues + thread_issues + feedback_issues + review_issues + drift_issues
+    all_issues = ci_issues + thread_issues + feedback_issues + review_issues + drift_issues + required_issues
 
     # Inside a CI job whose own check run is on this head, some review items
     # describe the PR BEFORE that job posts anything: no review on this head

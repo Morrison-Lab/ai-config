@@ -49,7 +49,6 @@ ASKS = [
 # A negated statement ("mwc isn't needed", "no mwc needed", "not asking for mwc")
 # is the behaviour the rule wants, so it is not an ask.
 NEGATION = re.compile(r"\b(?:no|not|never|without)\b|n't", re.I)
-NEGATION_WINDOW = 20
 # A negation in an earlier clause ("Not sure, but can I merge") does not negate the ask.
 CLAUSE_BREAK = re.compile(r"[,;:.!?\n]|\bbut\b|\bhowever\b", re.I)
 
@@ -84,8 +83,7 @@ def merge_ask(text: str):
     """The first phrase that asks for a merge or mwc, or None."""
     for pattern in ASKS:
         for m in pattern.finditer(text):
-            before = text[max(0, m.start() - NEGATION_WINDOW):m.start()]
-            before = CLAUSE_BREAK.split(before)[-1]
+            before = CLAUSE_BREAK.split(text[:m.start()])[-1]
             if not NEGATION.search(before + m.group(0)):
                 return " ".join(m.group(0).split())
     return None

@@ -63,6 +63,8 @@ CASES = [
     ("hedge no rush", "No rush, but please merge when you can.", True),
     ("hedge n't", "I'm not confident, but want me to merge this?", True),
     ("hedge without but", "No rush, please merge when you can.", True),
+    ("long same-clause negation", "I don't think this PR actually needs your mwc at this point.", False),
+    ("long same-clause negation 2", "No, I don't think I actually need your mwc for this specific PR.", False),
     ("empty", "", False),
 ]
 

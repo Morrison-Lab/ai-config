@@ -2021,6 +2021,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-reply-without-tool-search.py\"",
+            "timeout": 10,
+            "script": "flag-reply-without-tool-search.py",
+            "why": "A runner told Ezra it could not switch its own permission mode without checking its tools; it had a mode-switch tool (ai-config#5136). A phrase regex for refusals failed six review rounds, so this decides from structure: interrupts the stop once per message (agent_notice.stop_notice) when the turn replied and made no other tool call and no ToolSearch. Plain answers trip it too, which costs one extra turn. Fails open."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-incomplete-check-enumeration.py\"",
             "timeout": 10,
             "script": "no-incomplete-check-enumeration.py",

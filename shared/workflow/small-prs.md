@@ -18,7 +18,7 @@ do them in minimal batches", and "every PR should be as small and focused as it 
   The cap still applies to a PR that mixes a move with an edit.
   Moved lines count as changed for `lint-changed-lines`, so a lint fix on them may be needed.
   A mechanical split lists in its body every such lint-driven edit to moved lines
-  ([ai-config#5130](https://github.com/Morrison-Lab/ai-config/issues/5130), from pds#364).
+  ([ai-config#5130](https://github.com/Morrison-Lab/ai-config/issues/5130), from [pds#364](https://github.com/Morrison-Lab/pds/pull/364)).
 - A sweep across many files goes out as minimal batches, and only when Ezra explicitly asked for it ([`no-sweeps-by-default`](no-sweeps-by-default.md)).
   Each batch is one concern, with its own issue and its own PR.
   Open the first batch, then the next, rather than one PR for all of them.

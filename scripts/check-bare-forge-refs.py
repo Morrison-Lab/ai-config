@@ -46,7 +46,7 @@ HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
 CODE_SPAN = re.compile(r"`[^`\n]*`")
 LINK = re.compile(r"!?\[[^\]\n]*\]\([^)\n]*\)")
 URL = re.compile(r"https?://\S+")
-COMMENT = re.compile(r"<!--.*?-->")
+COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 STRONG = re.compile(r"(?<![\w/#@.\-])[A-Za-z][\w.\-]*(?:/[\w.\-]+)?#\d+\b")
 WEAK = re.compile(r"(?<![\w&/#\-])#\d+\b")
 

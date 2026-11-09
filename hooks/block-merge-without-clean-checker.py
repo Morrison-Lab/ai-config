@@ -34,7 +34,7 @@ AGENTS.md, and both sessions knew it. It had happened before (ai-config#4399,
    `-f sha=` on `gh api .../merge`, `"sha"` in a `curl` body. Pinning the sha
    is what lets GitHub itself refuse a merge if the head moved after the run.
 2. The transcript holds the instrument's own line
-   `<owner>/<repo>#<N> is FULLY CLEAN on HEAD <sha8>` for that repo, that
+   `<owner>/<repo>#<N> is FULLY CLEAN on HEAD <sha8>! [stale-base rule]` for that repo, that
    number, and a sha that is a prefix of the merge's sha. That line is printed
    only on exit 0, so it IS the exit status; it is tied to the head by
    construction, which makes "after the last push" a non-question: a push
@@ -152,7 +152,7 @@ RX_DURATION = re.compile(r"^\d+(\.\d+)?[smhd]?$")
 WRAPPERS = frozenset({"timeout", "time", "nice", "nohup", "command", "stdbuf"})
 RX_FORGE = re.compile(r"clean|\$(?!\?)|`", re.IGNORECASE)
 RX_EVIDENCE = re.compile(
-    r"([\w.-]+/[\w.-]+)#(\d+) is FULLY CLEAN on HEAD ([0-9a-f]{7,40})\b")
+    r"([\w.-]+/[\w.-]+)#(\d+) is FULLY CLEAN on HEAD ([0-9a-f]{7,40})!? \[stale-base rule\]")
 RX_NOT_CLEAN = re.compile(r"NOT fully clean", re.IGNORECASE)
 RX_SHA40 = re.compile(r"^[0-9a-fA-F]{40}$")
 RX_API_MERGE = re.compile(
@@ -165,7 +165,7 @@ DENY_TEXT = (
     "What to do:\n"
     "1. Get the head SHA: the PR's `head.sha` (40 hex).\n"
     "2. Run `python3 scripts/{inst} {num} -R {repo}` (local or Bash), and see "
-    "exit 0 with the line `{repo}#{num} is FULLY CLEAN on HEAD <sha8>`.\n"
+    "exit 0 with the line `{repo}#{num} is FULLY CLEAN on HEAD <sha8>! [stale-base rule]`.\n"
     "   The same command works in a cloud session: with CLAUDE_CODE_REMOTE=true "
     "and a GITHUB_TOKEN or GH_TOKEN set, `-R` makes the checker build its own REST "
     "payload (older checkouts: run `scripts/build-pr-payload.py` first and "
@@ -574,7 +574,7 @@ def main() -> int:
         if not ok:
             print(json.dumps(_refuse(
                 target, f"a `{INSTRUMENT}` pass on head {sha[:8]}",
-                f"No `{repo}#{num} is FULLY CLEAN on HEAD {sha[:8]}` line is "
+                f"No `{repo}#{num} is FULLY CLEAN on HEAD {sha[:8]}! [stale-base rule]` line is "
                 "in this session's checker results or relayed messages.",
                 num, repo)))
             return 0

@@ -465,6 +465,7 @@ The payload gaps that remain and the per-guard status are in
 | `require-gh-repo-flag.py` | `PreToolUse` (Bash) | blocks a mutating repo-scoped `gh` command that omits `-R` |
 | `no-offer-to-file.py` | `Stop` | blocks a reply that *offers* to file or record instead of doing it |
 | `no-park-on-tracked-blocker.py` | `Stop` | blocks a reply that parks work as waiting on another issue or PR, once per turn |
+| `no-ums-deferral-in-stopping-point.py` | `Stop` | blocks a Stopping Point line that says UMS was not run, pending or deferred, once per turn |
 | `no-announce-unconfirmed-merge.py` | `Stop` | blocks a reply that announces a future merge ("merges as soon as", "will merge") when no merge call since the last user turn confirmed one, unless the merge waits on the user's words |
 | `no-redundant-push-pr-authorization.py` | `Stop` | blocks a request for routine push or PR/MR authorization already covered by the standing grant; deliberately leaves merge, force-push, and unverified external-membership questions alone |
 | `no-empty-promise.py` | `Stop` | blocks a reply committing to future behaviour when the same turn shipped no mechanism: a rule ("going forward, I will/won't") needs a durable write, an owed action ("I owe #N the ARDI loop") needs that or an armed timer/watcher |

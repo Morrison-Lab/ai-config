@@ -2256,6 +2256,13 @@
             "timeout": 10,
             "script": "no-memory-only-learning.py",
             "why": "ai-config#4698. Ezra, 2026-10-23: 'I hope you're recording everything we learn in one of our repos'. Project memory is unversioned and no hook reads it. Blocks once per turn when the turn wrote a memory file and reached no repo (hook, check, shared fragment, issue, PR, a Mechanism: URL line, or 'memory only: <reason>'). See shared/workflow/lab-operating-rules.md. Fails open on any parse trouble."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-ums-deferral-in-stopping-point.py\"",
+            "timeout": 10,
+            "script": "no-ums-deferral-in-stopping-point.py",
+            "why": "ai-config#5133. Ezra, 2026-11-08 ('wtf ums'): the gha owner ended pauses with a Stopping Point line saying UMS was not run. Blocks the stop once per turn when a Stopping Point line says UMS is not run, pending, skipped or deferred; run the ums skill and restate the line in the past tense."
           }
         ]
       }

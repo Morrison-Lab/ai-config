@@ -59,6 +59,10 @@ CASES = [
     ("negated: no needed", "No mwc needed here.", False),
     ("negated: not asking", "I am not asking for mwc.", False),
     ("negation far away does not shield", "Not done yet. Later, say mwc please.", True),
+    ("hedge clause does not shield", "Not sure, but can I merge this one?", True),
+    ("hedge no rush", "No rush, but please merge when you can.", True),
+    ("hedge n't", "I'm not confident, but want me to merge this?", True),
+    ("hedge without but", "No rush, please merge when you can.", True),
     ("empty", "", False),
 ]
 

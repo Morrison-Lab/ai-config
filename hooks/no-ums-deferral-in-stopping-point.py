@@ -58,7 +58,8 @@ RX_LINE = re.compile(
 )
 _UMS = r"(?:UMS|update[- ]memories(?:[- ]and[- ]skills)?|memory pass|lessons[- ]learned pass)"
 _NOT = (
-    r"(?:not|n't|never|hasn't|has not|yet to|still to|still need(?:s|ed)? to|"
+    r"(?:not|never|(?:has|have|had|did|do|does|was|is|are|were|wo|would|should|could|ca)n[^\w\s]t|"
+    r"yet to|still to|still need(?:s|ed)? to|"
     r"pending|owed|outstanding|skipped|deferred|postponed|next|later|queued|todo)"
 )
 RX_DEFER = re.compile(

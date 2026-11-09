@@ -44,9 +44,9 @@ APOS = "['\u2019]?"
 # within four words ("can't switch my own permission mode").  Precision over recall.
 ACTION = (r"(?:do|change|switch|set|run|start|stop|access|reach|create|edit|modify|merge|push"
           r"|open|install|enable|disable|approve|grant|use|send|add|attach|post|delete"
-          r"|update|perform|fetch|download|clone|connect|control|invoke)")
-ANCHOR = (r"(?:session|sandbox|environment|tools?|permissions?|my own|on my own|myself"
-          r"|from here|in this (?:thread|chat)|settings|(?:session|permission) mode)")
+          r"|update|perform|fetch|download|clone|invoke)")
+ANCHOR = (r"(?:session|sandbox|tools?|permissions?|settings|(?:session|permission) mode"
+          r"|from here|in this (?:thread|chat))")
 INABILITY = (rf"(?:can{APOS}t|cannot|can not|(?:am|are|{APOS}m|{APOS}re) (?:unable|not able) to)")
 CLAIM_RX = re.compile(
     rf"\b(?:i|we)\s*{INABILITY}\s+{ACTION}\b(?:\s+\S+){{0,4}}?\s+{ANCHOR}\b"

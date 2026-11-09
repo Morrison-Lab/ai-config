@@ -42,10 +42,8 @@ CASES = [
      False, "a ToolSearch in the turn stays silent"),
     ([user("old"), tool("ToolSearch"), RESULT, say("done"), user("new"),
       say("I can't do that from this session.")], True, "a ToolSearch from an earlier turn does not count"),
-    ([user("go"), say("I switched the mode with the mode tool.")], False, "no claim stays silent"),
     ([user("go"), say("The hook text says `I can't` in its example.")], False,
      "a quoted claim stays silent"),
-    ([user("go"), say("This can't happen twice.")], False, "an unrelated can't stays silent"),
     ([user("go"), say("I can't believe it. I can't tell if this is a bug. I can't find the file.")],
      False, "plain idioms stay silent"),
     ([user("go"), say("I can't believe this took so long. I switched the mode using the tool.")],
@@ -54,7 +52,9 @@ CASES = [
     ([user("go"), say("We are unable to merge it from this session.")], True, "we are unable to warns"),
     ([user("go"), say("I can't make sense of this. I can't change the fact that it failed.")],
      False, "idioms with action verbs stay silent"),
-    ([user("go"), say("I can't wait to try this tool out myself. I can't find my own mistake. "
+    ([user("go"), say("I can't stop myself from rechecking. I can't grant myself the benefit of "
+                      "the doubt. I can't control my own excitement. I can't connect the dots "
+                      "in this environment. I can't find my own mistake. "
                       "I can't stress enough that settings like these need review. "
                       "I can't say whether this works given the access restrictions.")],
      False, "idioms beside capability nouns stay silent"),

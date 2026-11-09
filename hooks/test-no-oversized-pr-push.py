@@ -79,7 +79,13 @@ def main():
     figs = make_repo({"c/_fig-a-3d.qmd": 250, "c/_fig-b-3d.qmd": 250, "c/x.qmd": 10})
     many_figs = make_repo({f"c/_fig-{i}.qmd": 5 for i in range(11)})
 
+    renames = make_repo({f"old/r{i}.qmd": 5 for i in range(12)})
+    git(renames, "update-ref", "refs/remotes/origin/main", "HEAD")
+    git(renames, "mv", "old", "new")
+    git(renames, "commit", "-q", "-m", "move")
+
     cases = [
+        ("12 pure renames are not counted", run("git push", renames), False),
         ("new figure subfiles' lines are free", run("git push", figs), False),
         ("new figure subfiles still count as files", run("git push", many_figs), True),
         ("sweep of 25 files is denied", run("git push -u origin feature", sweep), True),

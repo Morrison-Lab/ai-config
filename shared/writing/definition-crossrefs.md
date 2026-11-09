@@ -22,6 +22,13 @@ every mention:
   One exception: you may leave out the pointer when the passage motivates
   the definition that follows, per
   [`forward-references.md`](forward-references.md#keep-the-crossref).
+- **Every result div links a definition.**
+  A `#thm-`, `#lem-`, `#cor-`, or `#prp-` div links each defined term that it uses
+  to that term's definition, with `@def-id` or a link to the `#def-id` anchor.
+  A result with no defined term to link, such as an identity between numbers,
+  carries `<!-- check-result-definition-links: allow: reason -->`.
+  gha's `check-result-definition-links` warns on a result div a PR edits that links no definition
+  (Ezra, 2026-11-09).
 - **No hand-written type word in front of the crossref.**
   Quarto emits the type name as part of a theorem-family crossref, so
   `@def-hessian` already renders as "Definition 5".
@@ -104,6 +111,9 @@ one of:
   The checklist bullet's "no formal definition yet" case is this one, and
   [`informal-definitions.md`](informal-definitions.md) covers a concept
   defined only in plain prose.
+- **Missing definition link** --- a `#thm-`, `#lem-`, `#cor-`, or `#prp-` div
+  links no definition; link each defined term it uses to its definition,
+  or add the `check-result-definition-links: allow: reason` comment when it has none.
 - **Doubled type word** --- the mention writes the type name in front of a
   crossref that already supplies it; drop the hand-written word.
 

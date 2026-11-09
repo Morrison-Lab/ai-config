@@ -39,5 +39,6 @@ Across repos: `Morrison-Lab/gha` for CI logic, `Morrison-Lab/ai-config` for agen
 
 ## Why prose and not a hook
 
-No deny can read a plan or a diff and tell whether the author chose: a near-copy and a deliberate per-repo variant look the same to a check.
+I found no decidable condition for whether an author chose: a near-copy and a deliberate per-repo variant look the same in a diff, so a deny hook would have to guess intent from text.
+That was a judgment from the cases in the survey above, not a test of every hook shape.
 Where part of the question is mechanical, use a check instead: a `--check` drift flag on a generated copy, or a CI check that a caller file contains no job of its own (see [`prefer-systemic-solutions-over-one-off-fixes`](../principles/prefer-systemic-solutions-over-one-off-fixes.md) and [`algorithmatize-checks`](algorithmatize-checks.md)).

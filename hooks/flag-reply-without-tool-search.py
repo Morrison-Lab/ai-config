@@ -23,12 +23,10 @@ transcript-shapes-skip: antigravity -- Antigravity sessions have no deferred-too
 
 See shared/workflow/check-tools-before-saying-cant.md.  Fails OPEN.
 """
-import hashlib
 import json
 import os
 import re
 import sys
-import tempfile
 
 _LIB = os.path.join(
     os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib")
@@ -83,19 +81,13 @@ def reply_only_turn(path):
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
-        flagged, reply = reply_only_turn(payload.get("transcript_path") or "")
+        flagged, _reply = reply_only_turn(payload.get("transcript_path") or "")
     except Exception:
         return 0
     if not flagged:
         return 0
-    key = hashlib.sha256(reply.encode()).hexdigest()[:16]
-    sentinel = os.path.join(tempfile.gettempdir(), f".claude-reply-no-tools-{key}")
-    if os.path.exists(sentinel):
-        return 0
-    try:
-        open(sentinel, "w", encoding="utf-8").close()
-    except Exception:
-        pass
+    # Once-per-message dedup is stop_notice's, scoped by session and turn.  A sentinel keyed
+    # on the reply text would suppress unrelated sessions that reply alike (review of #5141).
     print(stop_notice(
         payload,
         "This turn replied without making any tool call or searching for tools. If the "

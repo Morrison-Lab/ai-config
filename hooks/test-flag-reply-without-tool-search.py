@@ -37,14 +37,15 @@ def result():
 REPLY = "mcp__hearthbot__post_message"
 
 
-def run(transcript, tag):
+def run(transcript, tag, tmp=None):
     with tempfile.NamedTemporaryFile(
             "w", suffix=".jsonl", delete=False, encoding="utf-8") as fh:
         fh.write(transcript)
         path = fh.name
     payload = {"transcript_path": path, "session_id": f"s-{tag}-{os.getpid()}"}
-    # A fresh TMPDIR per run: the warn-once sentinel lives there and must not leak between runs.
-    with tempfile.TemporaryDirectory() as tmp:
+    # A fresh TMPDIR per run unless one is passed: the warn-once state lives there.
+    with tempfile.TemporaryDirectory() as fresh:
+        tmp = tmp or fresh
         env = dict(os.environ, TMPDIR=tmp, TEMP=tmp, TMP=tmp)
         try:
             return subprocess.run([sys.executable, HOOK], input=json.dumps(payload),
@@ -88,4 +89,13 @@ case("earlier turn's reply-only does not fire a tooled later turn",
      user("a") + use(REPLY, text="a") + user("b") + use("Bash", command="ls") + result()
      + use(REPLY, text="b"), False)
 case("unreadable transcript fails open", "not json\n", False)
+
+# Two unrelated sessions replying alike (a reply with no text, or "Done.") share one TMPDIR,
+# as real sessions do; each must still be warned (review of #5141).
+with tempfile.TemporaryDirectory() as shared:
+    for text in ({}, {"text": "Done."}):
+        t = user() + use(REPLY, **text)
+        assert fired(run(t, "sessA", shared)), f"first session {text} not warned"
+        assert fired(run(t, "sessB", shared)), f"second session {text} suppressed"
+print("ok  same reply in two sessions warns both")
 print("all passed")

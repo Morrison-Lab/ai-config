@@ -114,6 +114,15 @@ See [`prefer-systemic-solutions-over-one-off-fixes`](shared/principles/prefer-sy
 - **Do:** diagnose root causes, fix underlying mechanisms, and install automated guards or structural invariants.
 - **Don't:** settle for a one-off patch that leaves the defect class open to recur elsewhere.
 
+## Choose explicitly: centralize or distribute
+
+When planning or performing work that more than one file, repo, job or session could carry, state whether you centralize it in one referenced place or distribute a copy to each place that needs it, and why, within a repo and across repos (Ezra, 2026-11-09).
+An unmade choice becomes a copy by default.
+See [`centralize-or-distribute`](shared/workflow/centralize-or-distribute.md).
+
+- **Do:** name the choice and its one-line reason in the plan, issue or PR, and name what is meant to differ when you distribute.
+- **Don't:** paste a second copy because the first is nearby, or centralize by reflex when the copies are meant to differ.
+
 ## No cheap fixes
 
 A fix is done when the rule behind the finding is met, not when the finding stops matching.

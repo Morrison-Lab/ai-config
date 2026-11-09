@@ -76,10 +76,7 @@ LINK = re.compile(
 # ai-config#5060 (Ezra, 2026-11-07, "always hyperlink; don't make me ask"): a
 # PR, issue or run named outside a markdown link or URL. Detected: `repo#N`,
 # `owner/repo#N`, a bare `#N` of two or more digits, "PR 12", "issue 12" and
-# "run 123456". Not detected: file paths. A pattern for a slash or dot also
-# matches version numbers, URLs' hosts and prose such as "and/or", and a list
-# of known repo files goes stale, so a deny would block valid replies
-# (ai-config#4741 says to name what a deny does not catch).
+# "run 123456". File paths are the separate FILE_REF check below.
 # A run id is six or more digits, so "the suite runs 12 times" is not one.
 # The repo prefix is two or more characters, so "C#12" is not a reference.
 FORGE_REF = re.compile(
@@ -93,6 +90,26 @@ LINKED = re.compile(r"\[[^\]]*\]\(https?://[^)]*\)|https?://\S+")
 # The target of any other markdown link is not prose: "[here](./a.md#5060)"
 # names no PR. Its text still counts, so "[#5059](#cmsg_1)" is flagged.
 LINK_TARGET = re.compile(r"(?<=\])\([^)]*\)")
+# ai-config#5072 (the file half of #5060): a file named outside a link. Detected:
+# a name ending in a known document, code or data extension, with or without
+# directories, a leading slash, or a ":line" anchor ("hooks/a.py", "AGENTS.md",
+# "/mnt/project-files/x/plan.md", "a.py:12"). Not detected: a file with another
+# extension, an extensionless name ("Makefile") and a directory ("hooks/"). A
+# pattern for any slash or dot also matches "and/or", version numbers and
+# hosts, and a list of every repo file goes stale, so the extension list is the
+# bound; a deny that cannot decide stays silent (ai-config#4741).
+# A word then "." then letters, as in "e.g.", is not a name: the extension must
+# be one of the listed ones and end the token.
+FILE_EXT = (r"py|md|qmd|ya?ml|json|jsonl|sh|toml|bib|csv|txt|html|lua|scss|css"
+            r"|R|Rmd|ipynb|pdf|docx|pptx|xlsx|cff|lock")
+FILE_REF = re.compile(
+    r"(?<![\w/@.:=#-])/?(?:[\w.-]+/)*[\w-][\w.-]*\.(?:" + FILE_EXT + r")"
+    r"(?::\d+)?(?![\w/@-])(?!\.\w)")
+# A file is linked inside a markdown link to an https URL or to a published
+# project file, or inside a bare URL; the project-file target is the form the
+# thread tools document ("[plan.md](/mnt/project-files/notes/plan.md)").
+FILE_LINKED = re.compile(
+    r"\[[^\]]*\]\((?:https?://|/mnt/project-files/)[^)]*\)|https?://\S+")
 UNIT_BREAK = re.compile(r"\n[ \t]*\n|\n(?=(?:[-*+]|\d+[.)])[ \t])")
 
 REASON = """\
@@ -152,6 +169,29 @@ def unlinked_forge_ref(text: str):
     return None
 
 
+FILE_REASON = """\
+[hook: no-unlinked-session-mention] This post names a file ("{phrase}") that \
+is not itself a link. The user's standing rule (2026-11-07): "always \
+hyperlink; don't make me ask", and ai-config#5072 extends it to files.
+Resend with that name as a markdown link: its https URL on the forge, for \
+example [hooks/a.py](https://github.com/owner/repo/blob/main/hooks/a.py), or \
+[name](/mnt/project-files/<path>) for a file you wrote to the project folder.
+If the text is not a file (a domain, a version string), put it in backticks \
+and resend."""
+
+
+def unlinked_file_ref(text: str):
+    """The first file name outside a link, or None."""
+    text = FENCE.sub(" ", text.replace("\r\n", "\n"))
+    for unit in UNIT_BREAK.split(text):
+        unit = INLINE_CODE.sub(" ", unit)
+        unit = LINK_TARGET.sub("", FILE_LINKED.sub(" ", unit))
+        m = FILE_REF.search(unit)
+        if m:
+            return m.group(0)
+    return None
+
+
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
@@ -170,6 +210,9 @@ def main() -> int:
     if not phrase:
         phrase = unlinked_forge_ref(text)
         reason = FORGE_REASON
+    if not phrase:
+        phrase = unlinked_file_ref(text)
+        reason = FILE_REASON
     if not phrase:
         return 0
     print(json.dumps({

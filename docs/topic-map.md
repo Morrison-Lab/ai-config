@@ -309,6 +309,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/check-purpose-before-reusing.md` | Never take shortcuts, and never copy-paste or pattern-match blindly. Before reusing a structure --- a template, a working script, a neighbouring file's shape... |  |
 | `shared/workflow/check-sources-over-recall.md` | When a source can be checked, check it before answering. Sources include books, repositories, documentation, APIs and files. Cite what you read (file and pag... |  |
 | `shared/workflow/check-the-renders.md` | In a repo that publishes a website or a book, the deliverable is the rendered page. A `.qmd` or `.md` diff can be entirely correct while the published page i... |  |
+| `shared/workflow/check-tools-before-saying-cant.md` | Before a reply says "I can't", "I'm unable to" or "only you can", check the tools you have, deferred ones included. |  |
 | `shared/workflow/choose-issue-or-discussion.md` | `issue-first` governs *whether* something is tracked before work starts. It does not settle *where*, and defaulting everything to the issue tracker misfiles... |  |
 | `shared/workflow/claim-pr.md` | Before starting a work session on a GitHub PR or issue --- i.e. before fetching the branch, making edits, posting a review, or invoking an automated review c... |  |
 | `shared/workflow/commit-reusable-work.md` | Potentially-reusable work produced incidentally in any medium must be committed, pushed, and PRed into an owning repository. |  |
@@ -351,7 +352,6 @@ its description does not use (ai-config#949).
 | `shared/workflow/monitor-pushed-heads.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/workflow/monitor-scoped-open-prs.md` | Continuously derive and monitor open pull requests and merge requests in repositories the agent is actively working in. |  |
 | `shared/workflow/never-send-email.md` | Ezra's standing rule, 2026-11-04: "never send emails for me". |  |
-| `shared/workflow/check-tools-before-saying-cant.md` | Before a reply says "I can't" or "only you can", check the visible and deferred tools. |  |
 | `shared/workflow/no-cant-from-session-excuses.md` | Never answer "I can't do that from this session" when a way exists to do it. |  |
 | `shared/workflow/no-cop-out-offers.md` | A **cop-out offer** is a sentence that converts work you have already been authorized to do back into a request for permission. |  |
 | `shared/workflow/no-empty-promises.md` | A promise about my own future behaviour is not work. It is a claim that work will happen later, made in a conversation that will not outlive it. |  |

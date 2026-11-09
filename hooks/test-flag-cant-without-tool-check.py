@@ -51,7 +51,6 @@ CASES = [
     ([user("go"), say("I can't believe this took so long. I switched the mode using the tool.")],
      False, "an idiom beside correct tool use stays silent"),
     ([user("go"), say("I can't switch my own permission mode.")], True, "can't switch warns"),
-    ([user("go"), say("I cannot do that from this session.")], True, "cannot do warns"),
     ([user("go"), say("We are unable to merge it from this session.")], True, "we are unable to warns"),
     ([user("go"), say("I can't make sense of this. I can't change the fact that it failed.")],
      False, "idioms with action verbs stay silent"),

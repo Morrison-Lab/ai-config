@@ -17,7 +17,7 @@ HOOK = os.path.join(HOOKS_DIR, "warn-merge-without-fully-clean.py")
 PASSED = []
 FAILED = []
 
-CLEAN_OUT = "all checks pass\n\n[ok] Morrison-Lab/ai-config#12 is FULLY CLEAN on HEAD abcd1234!"
+CLEAN_OUT = "all checks pass\n\n[ok] Morrison-Lab/ai-config#12 is FULLY CLEAN on HEAD abcd1234! [stale-base rule]"
 DIRTY_OUT = "Exit code 1\n\nPR is NOT fully clean:\n - finding"
 
 
@@ -143,6 +143,8 @@ def main():
     check("silent after a clean run (FULLY CLEAN line)", not run(MERGE, [clean()])[0])
     check("a NOT-fully-clean line vetoes even beside a FULLY CLEAN line",
           run(MERGE, [clean(out=CLEAN_OUT + chr(10) + "NOT fully clean")])[0])
+    check("warns after an old checker's FULLY CLEAN line without the stale-base marker",
+          run(MERGE, [clean(out=CLEAN_OUT.replace(" [stale-base rule]", ""))])[0])
     check("warns after a result with no FULLY CLEAN line, however quiet",
           run(MERGE, [clean(out="done")])[0])
     check("warns after a run with EMPTY output",
@@ -231,8 +233,8 @@ def main():
     # --- round 3 -----------------------------------------------------------
     IC = "python3 scripts/check-pr-fully-clean.py "
     R = " -R Morrison-Lab/ai-config"
-    OUT5 = "Morrison-Lab/ai-config#5 is FULLY CLEAN on HEAD aaaa1111!"
-    OUT6 = "Morrison-Lab/ai-config#6 is FULLY CLEAN on HEAD bbbb2222!"
+    OUT5 = "Morrison-Lab/ai-config#5 is FULLY CLEAN on HEAD aaaa1111! [stale-base rule]"
+    OUT6 = "Morrison-Lab/ai-config#6 is FULLY CLEAN on HEAD bbbb2222! [stale-base rule]"
     M5 = "gh pr merge 5 -R Morrison-Lab/ai-config"
     M6 = "gh pr merge 6 -R Morrison-Lab/ai-config"
     # item 1: the merge's own command pushes first
@@ -282,10 +284,10 @@ def main():
     check("silent: only #6 named in the output credits #6", not run(M6, [ONLY6])[0])
     check("silent: no per-PR naming, no NOT-clean line: all explicit runs credited",
           not run(M5, [step(IC + "5" + R + " && " + IC + "6" + R,
-                            "ok is FULLY CLEAN")])[0])
+                            "ok is FULLY CLEAN [stale-base rule]")])[0])
     check("warns: no per-PR naming but a NOT-clean line present",
           run(M5, [step(IC + "5" + R + " && " + IC + "6" + R,
-                        "ok is FULLY CLEAN" + chr(10) + "NOT fully clean")])[0])
+                        "ok is FULLY CLEAN [stale-base rule]" + chr(10) + "NOT fully clean")])[0])
     check("silent: failing #6 does not veto the attributed clean #5",
           not run(M5, [step(IC + "5" + R + " && " + IC + "6" + R,
                             OUT5 + chr(10) + "PR is NOT fully clean")])[0])
@@ -295,9 +297,9 @@ def main():
                             is_error=True)])[0])
     # item 3: shell-variable or missing run number
     check("warns: run number is a shell variable and output names nothing",
-          run(M5, [step(IC + "$PR" + R, "is FULLY CLEAN")])[0])
+          run(M5, [step(IC + "$PR" + R, "is FULLY CLEAN [stale-base rule]")])[0])
     check("warns: run number missing and output names nothing",
-          run(M5, [step(IC + R.strip(), "is FULLY CLEAN")])[0])
+          run(M5, [step(IC + R.strip(), "is FULLY CLEAN [stale-base rule]")])[0])
     check("silent: variable run number but the output names #5",
           not run(M5, [step(IC + "$PR" + R, OUT5)])[0])
     check("warns: variable run number, output names #6 only",

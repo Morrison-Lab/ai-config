@@ -356,7 +356,7 @@ Each fact below was measured in a claude.ai cloud session on the date given, so 
   This is the same bar as persuading any reviewer with evidence, and the rebuttals must be facts you verified, not assertions.
   On those three PRs it accepted the rebuttals and returned CLEAN.
 - The reviewer differs from Claude in model and harness, so it meets the independence rule in [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md).
-  The data rules apply here as to any hosted model.
+  The data rules apply here as to any hosted model, so use it only for work no data trigger covers.
 - When posting the result, use the envelope above with `(Ollama Cloud <model>)` in the heading.
 - `hooks/warn-merge-without-cross-harness-review.py` does not yet count a call to `api.ollama.com`, so it warns on a merge after this review ([ai-config#4849](https://github.com/Morrison-Lab/ai-config/issues/4849)).
   The warning is a false positive when the transcript shows the review.
@@ -380,6 +380,7 @@ done
 ```
 
 Any non-zero exit, an empty `$REVIEW`, or a reply without a `VERDICT:` line counts as no verdict.
+The trap keeps `$REVIEW` so you can read it; delete it once the verdict is recorded.
 
 ## OpenCode 2.0
 

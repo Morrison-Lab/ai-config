@@ -38,7 +38,8 @@ REPLY = "mcp__hearthbot__post_message"
 
 
 def run(transcript, tag):
-    with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as fh:
+    with tempfile.NamedTemporaryFile(
+            "w", suffix=".jsonl", delete=False, encoding="utf-8") as fh:
         fh.write(transcript)
         path = fh.name
     payload = {"transcript_path": path, "session_id": f"s-{tag}-{os.getpid()}"}

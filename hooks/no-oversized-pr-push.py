@@ -9,8 +9,8 @@ gha's `check-pr-size` (gha#1188); this hook stops the push before CI is spent.
 Measures the branch against the merge base with the remote default branch:
 files changed and added plus deleted lines, not counting generated, lock,
 image and data paths, and not counting the lines of a newly added `_fig-*`
-subfile (it still counts as a file). Over 10 files or 300 lines the push is
-denied.
+subfile (it still counts as a file), and not counting a pure rename (no line
+changed). Over 10 files or 300 lines the push is denied.
 
 Escape hatch for a deliberate exception (a mechanical rename the maintainer
 asked for in one PR, a stacked branch whose base is not the default branch):
@@ -77,6 +77,9 @@ def measure(cwd, base):
         path = new_path(parts[2])
         if any(re.fullmatch(p, path) for p in IGNORE):
             continue
+        # A pure rename (no line changed) is content-identical (ai-config#5128).
+        if " => " in parts[2] and parts[:2] == ["0", "0"]:
+            continue
         files += 1
         if path in added and re.fullmatch(NEW_FIGURE_LINES_FREE, path):
             continue
@@ -111,8 +114,9 @@ def decide(command, cwd):
         "out as minimal batches (Ezra, 2026-10-23, ai-config#4698). Split the work: one "
         "branch and PR per batch of one concern, each opened with its own issue, and "
         "push the first batch now. gha's check-pr-size fails the same PR in CI. If this "
-        "is a stacked branch whose base is not the default branch, or the maintainer asked "
-        "for one mechanical PR, rerun with the prefix ALLOW_LARGE_PR=1 and state why."
+        "is a stacked branch whose base is not the default branch, or a mechanical, "
+        "content-identical PR (a move or split with no wording change; the PR body "
+        "must say so), rerun with the prefix ALLOW_LARGE_PR=1 and state why."
     )
 
 

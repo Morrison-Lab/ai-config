@@ -22,6 +22,16 @@ changes to tracked files) to `<ref>` is exactly its documented behaviour. The
 mistake was reaching for it in a working tree that held unrelated live
 edits, for an operation that never needed to touch that tree at all.
 
+## Recurrence
+
+2nd occurrence, 2026-11-08, in `Morrison-Lab/lds` (lds#2019): a session ran
+`git checkout -- .` to bring back a deleted, untracked-in-the-index
+`latex-macros/` copy, and the command also reverted ten uncommitted `sed`
+edits in the same tree. The edits were redone and checked (10 files, 0
+`role="img"` left) before the commit. The command's intent was one path; its
+pathspec `.` named the whole tree. Restore the single path you mean
+(`git checkout -- latex-macros`) or stash first.
+
 ## Why a hook rather than a rule
 
 The auto-mode system reminder already states the general form of this rule

@@ -53,9 +53,17 @@ from agent_notice import stop_notice  # noqa: E402
 
 REPLY_TOOL_RX = re.compile(r"(^|__)(reply|post_message|update_message)$", re.I)
 APOS = "['\u2019]?"
+# A bare "I can't" is mostly idiom ("I can't believe", "I can't tell", "I can't find"),
+# so it counts only before an action verb or "from this session" (review of #5137).
+ACTION = (r"(?:do|change|switch|set|run|start|stop|access|reach|create|edit|modify|merge|push"
+          r"|open|install|enable|disable|approve|grant|use|send|write|add|attach|post|delete"
+          r"|update|make|perform|fetch|download|clone|connect|control|invoke|call|touch)")
 CLAIM_RX = re.compile(
-    rf"\b(?:i|we){APOS}?\s*(?:can{APOS}t|cannot|can not|am unable to|am not able to|{APOS}m unable to"
-    rf"|{APOS}m not able to|are unable to|have no (?:tool|way|means) (?:to|for))\b"
+    rf"\b(?:i|we)\s+(?:can{APOS}t|cannot|can not)\s+(?:\w+\s+){{0,2}}?{ACTION}\b"
+    rf"|\b(?:i|we)\s+(?:can{APOS}t|cannot|can not)\b[^.\n]{{0,60}}\b(?:from this session|on my own|myself)\b"
+    rf"|\b(?:i|we) (?:am|are|'m) (?:unable|not able) to\b"
+    rf"|\b(?:i{APOS}m|we{APOS}re) (?:unable|not able) to\b"
+    rf"|\b(?:i|we) have no (?:tool|way|means) (?:to|for)\b"
     rf"|\b(?:i|we) (?:do not|don{APOS}t) have (?:a|the|any) (?:tool|way|means|access)\b"
     r"|\bonly (?:you|ezra|the user|a human|a person)\s+(?:can|could|may|control|controls|has|have)\b"
     r"|\bno (?:tool|way|means) (?:exists )?(?:to|for)\b"

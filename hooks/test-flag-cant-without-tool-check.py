@@ -46,6 +46,15 @@ CASES = [
     ([user("go"), say("The hook text says `I can't` in its example.")], False,
      "a quoted claim stays silent"),
     ([user("go"), say("This can't happen twice.")], False, "an unrelated can't stays silent"),
+    ([user("go"), say("I can't believe how good this is.")], False, "idiom: believe"),
+    ([user("go"), say("I can't tell if this is a bug.")], False, "idiom: tell"),
+    ([user("go"), say("I can't find the file.")], False, "idiom: find"),
+    ([user("go"), say("I can't wait to see the results.")], False, "idiom: wait"),
+    ([user("go"), say("I can't believe this took so long. I switched the mode using the tool.")],
+     False, "an idiom beside correct tool use stays silent"),
+    ([user("go"), say("I can't switch my own permission mode.")], True, "can't switch warns"),
+    ([user("go"), say("I cannot do that from this session.")], True, "cannot do warns"),
+    ([user("go"), say("We are unable to merge it.")], True, "we are unable to warns"),
 ]
 
 

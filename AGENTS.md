@@ -111,25 +111,16 @@ When addressing a defect, failure, edge case, or recurring mistake, prefer syste
 Fix the underlying mechanism that allowed the error to occur, install an automated guard or architectural invariant preventing the defect class from recurring, and audit the repo for other instances in the same turn.
 See [`prefer-systemic-solutions-over-one-off-fixes`](shared/principles/prefer-systemic-solutions-over-one-off-fixes.md).
 
-- **Do:** diagnose root causes, fix underlying mechanisms, and install automated guards or structural invariants.
-- **Don't:** settle for a one-off patch that leaves the defect class open to recur elsewhere.
-
 ## No cheap fixes
 
 A fix is done when the rule behind the finding is met, not when the finding stops matching.
 Name that rule, check the fixed state against it, and when a reviewer offers several fixes, take the one that meets it.
 See [`no-cheap-fixes`](shared/principles/no-cheap-fixes.md).
 
-- **Do:** check each fix against the rule behind the finding, not the finding's wording.
-- **Don't:** take a fix because it silences a check, such as un-bolding a definition hidden in another div instead of giving it its own.
-
 ## Give every algorithmic check a writer and a reviewer instruction
 
-Every algorithmic check (a hook, a `scripts/check-*.py`, a `gha` workflow) also gets an instruction to the writer that prevents the defect and an instruction to the reviewer agent that looks for it, so no single silent failure lets the defect through (Ezra, 2026-11-09).
+Every algorithmic check (hook, script, `gha` workflow) also gets a writer instruction that prevents the defect and a reviewer instruction that looks for it (Ezra, 2026-11-09).
 See [`checks-need-writer-and-reviewer-instructions`](shared/workflow/checks-need-writer-and-reviewer-instructions.md).
-
-- **Do:** ship all three layers in the PR that adds the check.
-- **Don't:** count a passing check as the reviewer's verdict.
 
 ## Research existing solutions before implementing (DRW)
 

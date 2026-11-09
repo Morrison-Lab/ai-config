@@ -14,10 +14,8 @@ no deferred tools can still be warned once.
 
 WHY A WARNING AND NOT A DENY
 Whether a tool exists is not decidable from the transcript, and some claims are
-true (permission rules in settings files change only through a prompt Ezra
-approves).  The stop is interrupted once per message (agent_notice.stop_notice).
-"The user did X" claims the user never made cannot be checked lexically; the
-rule covers them in prose.
+true.  The stop is interrupted once per message (agent_notice.stop_notice).
+"The user did X" misrelays cannot be checked lexically; the rule covers them.
 
 transcript-shapes-skip: antigravity -- Antigravity sessions have no deferred-tool search, so the ToolSearch condition cannot hold there.
 
@@ -38,18 +36,22 @@ from agent_notice import stop_notice  # noqa: E402
 
 REPLY_TOOL_RX = re.compile(r"(^|__)(reply|post_message|update_message)$", re.I)
 APOS = "['\u2019]?"
-# "Can't" and "unable to" are mostly idiom, and neither a verb list nor a nearby noun
-# list alone separates idiom from capability (review of #5137, three rounds).  A claim
-# needs both: an action verb right after the inability phrase, then a capability noun
-# within four words ("can't switch my own permission mode").  Precision over recall.
+# "Can't" and "unable to" are mostly idiom (review of #5137, four rounds), so a claim is
+# an action verb right after the inability phrase, then a capability noun as its object,
+# separated only by function words ("can't switch my own permission mode").
+# Precision over recall.
 ACTION = (r"(?:do|change|switch|set|run|start|stop|access|reach|create|edit|modify|merge|push"
           r"|open|install|enable|disable|approve|grant|use|send|add|attach|post|delete"
           r"|update|perform|fetch|download|clone|invoke)")
 ANCHOR = (r"(?:session|sandbox|tools?|permissions?|settings|(?:session|permission) mode"
           r"|from here|in this (?:thread|chat))")
+# A content word between verb and noun ("stop myself from checking the session") is not
+# the object, so only these may intervene.
+FILLER = (r"(?:\s+(?:my|own|the|this|that|it|a|an|any|your|our|these|those|current"
+          r"|from|in|on|within|with|via|using|of))")
 INABILITY = (rf"(?:can{APOS}t|cannot|can not|(?:am|are|{APOS}m|{APOS}re) (?:unable|not able) to)")
 CLAIM_RX = re.compile(
-    rf"\b(?:i|we)\s*{INABILITY}\s+{ACTION}\b(?:\s+\S+){{0,4}}?\s+{ANCHOR}\b"
+    rf"\b(?:i|we)\s*{INABILITY}\s+{ACTION}\b{FILLER}{{0,4}}\s+{ANCHOR}\b"
     rf"|\b(?:i|we) (?:do not|don{APOS}t) have (?:a|the|any) (?:tool|access)\b"
     r"|\bonly (?:you|ezra|the user|a human|a person)\s+(?:can|could|may|control|controls|has|have)\b"
     r"|\bno tool (?:exists )?(?:to|for)\b",

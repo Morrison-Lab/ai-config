@@ -24,7 +24,7 @@ The real limits stay:
   Change them only through a prompt Ezra approves.
 - Switching to a stricter permission mode when asked is fine.
 
-Why a hook backs this: `hooks/flag-cant-without-tool-check.py` warns once per message when the final reply claims an inability or says only the user can, and the turn made no `ToolSearch` call.
-It warns and does not deny, because whether a tool exists is not decidable from a transcript, and some limits are real.
-The "someone did X" half cannot be checked lexically, so it is prose only.
+`hooks/flag-cant-without-tool-check.py` warns once per message when the final reply claims an inability and the turn made no `ToolSearch` call.
+It warns and does not deny, because whether a tool exists is not decidable from a transcript.
+The "someone did X" half is prose only.
 See also [no-cant-from-session-excuses.md](no-cant-from-session-excuses.md).

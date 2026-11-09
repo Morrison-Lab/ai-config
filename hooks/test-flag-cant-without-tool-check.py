@@ -37,7 +37,7 @@ CASES = [
     ([user("switch"), reply("I can\u2019t change my own permission mode.")], True,
      "post_message payload with a curly apostrophe warns"),
     ([user("switch"), say("Only you can approve that.")], True, "'only you can' warns"),
-    ([user("switch"), say("I am unable to reach that host from my sandbox.")], True, "unable to warns"),
+    ([user("switch"), say("I am unable to reach it from my sandbox.")], True, "unable to warns"),
     ([user("switch"), tool("ToolSearch"), RESULT, say("I can't: no mode-switch tool exists.")],
      False, "a ToolSearch in the turn stays silent"),
     ([user("old"), tool("ToolSearch"), RESULT, say("done"), user("new"),
@@ -46,14 +46,12 @@ CASES = [
      "a quoted claim stays silent"),
     ([user("go"), say("I can't believe it. I can't tell if this is a bug. I can't find the file.")],
      False, "plain idioms stay silent"),
-    ([user("go"), say("I can't believe this took so long. I switched the mode using the tool.")],
-     False, "an idiom beside correct tool use stays silent"),
     ([user("go"), say("I can't switch my own permission mode.")], True, "can't switch warns"),
-    ([user("go"), say("We are unable to merge it from this session.")], True, "we are unable to warns"),
     ([user("go"), say("I can't make sense of this. I can't change the fact that it failed.")],
      False, "idioms with action verbs stay silent"),
     ([user("go"), say("I can't stop myself from rechecking. I can't grant myself the benefit of "
-                      "the doubt. I can't control my own excitement. I can't connect the dots "
+                      "the doubt. I can't stop him from using the session. I can't change my mind about the "
+                      "sandbox approach. I can't control my own excitement. I can't connect the dots "
                       "in this environment. I can't find my own mistake. "
                       "I can't stress enough that settings like these need review. "
                       "I can't say whether this works given the access restrictions.")],

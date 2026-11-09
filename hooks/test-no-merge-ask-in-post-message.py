@@ -21,7 +21,7 @@ DECIDE = "mcp__hearthbot__request_decision"
 
 
 def transcript(thread: bool) -> str:
-    f = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False)
+    f = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False, encoding="utf-8")
     f.write("You are a Thread Session.\n" if thread else "You are the coordinator.\n")
     f.close()
     return f.name

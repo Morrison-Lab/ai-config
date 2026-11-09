@@ -34,7 +34,7 @@ RESULT = {"type": "user", "message": {"content": [{"type": "tool_result", "conte
 CASES = [
     ([user("switch to auto mode"), say("I can't, only you control that.")], True,
      "the founding incident warns"),
-    ([user("switch"), reply("I can’t change my own permission mode.")], True,
+    ([user("switch"), reply("I can\u2019t change my own permission mode.")], True,
      "post_message payload with a curly apostrophe warns"),
     ([user("switch"), say("Only you can approve that.")], True, "'only you can' warns"),
     ([user("switch"), say("I am unable to reach that host.")], True, "unable to warns"),

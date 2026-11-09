@@ -52,7 +52,7 @@ if _LIB not in sys.path:
 from agent_notice import stop_notice  # noqa: E402
 
 REPLY_TOOL_RX = re.compile(r"(^|__)(reply|post_message|update_message)$", re.I)
-APOS = "['’]?"
+APOS = "['\u2019]?"
 CLAIM_RX = re.compile(
     rf"\b(?:i|we){APOS}?\s*(?:can{APOS}t|cannot|can not|am unable to|am not able to|{APOS}m unable to"
     rf"|{APOS}m not able to|are unable to|have no (?:tool|way|means) (?:to|for))\b"
@@ -61,7 +61,7 @@ CLAIM_RX = re.compile(
     r"|\bno (?:tool|way|means) (?:exists )?(?:to|for)\b"
     r"|\bnot something (?:i|we) can\b",
     re.I)
-QUOTED_RX = re.compile(r"`[^`]*`|\"[^\"]*\"|“[^”]*”")
+QUOTED_RX = re.compile(r"`[^`]*`|\"[^\"]*\"|\u201c[^\u201d]*\u201d")
 
 
 def _blocks(msg):

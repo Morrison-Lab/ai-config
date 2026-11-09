@@ -123,6 +123,14 @@ See [`no-cheap-fixes`](shared/principles/no-cheap-fixes.md).
 - **Do:** check each fix against the rule behind the finding, not the finding's wording.
 - **Don't:** take a fix because it silences a check, such as un-bolding a definition hidden in another div instead of giving it its own.
 
+## Give every algorithmic check a writer and a reviewer instruction
+
+Every algorithmic check (a hook, a `scripts/check-*.py`, a `gha` workflow) also gets an instruction to the writer that prevents the defect and an instruction to the reviewer agent that looks for it, so no single silent failure lets the defect through (Ezra, 2026-11-09).
+See [`checks-need-writer-and-reviewer-instructions`](shared/workflow/checks-need-writer-and-reviewer-instructions.md).
+
+- **Do:** ship all three layers in the PR that adds the check.
+- **Don't:** count a passing check as the reviewer's verdict.
+
 ## Research existing solutions before implementing (DRW)
 
 Before writing custom code or helpers, check for an existing solution (DRW, don't reinvent the wheel) in our repos, standard libraries, and trusted upstream ecosystems (base R, tidyverse / r-lib, PyPI, npm).

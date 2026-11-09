@@ -24,7 +24,7 @@ The real limits stay:
   Change them only through a prompt Ezra approves.
 - Switching to a stricter permission mode when asked is fine.
 
-`hooks/flag-cant-without-tool-check.py` warns once per message when the final reply claims an inability and the turn made no `ToolSearch` call.
-It warns and does not deny, because whether a tool exists is not decidable from a transcript.
-The "someone did X" half is prose only.
+Why this is prose for now: whether a reply claims an inability to act cannot be decided by a lexical rule.
+A Stop hook that matched "can't" plus an action verb and a capability noun was tried and withdrawn after six review rounds, each finding a new idiom or literal sense it matched.
+A check that does not rely on matching the phrasing is tracked in [ai-config#5140](https://github.com/Morrison-Lab/ai-config/issues/5140).
 See also [no-cant-from-session-excuses.md](no-cant-from-session-excuses.md).

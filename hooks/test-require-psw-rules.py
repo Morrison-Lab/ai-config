@@ -19,7 +19,7 @@ def run(payload, raw=None):
 
 
 def transcript(reads):
-    f = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False)
+    f = tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False, encoding="utf-8")
     for name, inp in reads:
         f.write(json.dumps({"message": {"content": [
             {"type": "tool_use", "name": name, "input": inp}]}}) + "\n")

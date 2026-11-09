@@ -23,7 +23,7 @@ every mention:
   the definition that follows, per
   [`forward-references.md`](forward-references.md#keep-the-crossref).
 - **Every result div links a definition.**
-  A `#thm-`, `#lem-`, `#cor-`, or `#prp-` div links each defined term it uses
+  A `#thm-`, `#lem-`, `#cor-`, or `#prp-` div links each defined term that it uses
   to that term's definition, with `@def-id` or a link to the `#def-id` anchor.
   A result with no defined term to link, such as an identity between numbers,
   carries `<!-- check-result-definition-links: allow: reason -->`.

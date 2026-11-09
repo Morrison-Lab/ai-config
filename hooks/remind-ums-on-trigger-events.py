@@ -12,6 +12,10 @@ decidable signature; the rest (below) stay rules in run-ums-proactively.md.
   needless-question  UserPromptSubmit: the user's whole message is a grant
                      ("daytb", "yes, do it", "your call", "rec?"). The thread
                      asked something it could have decided.
+  ums-word           UserPromptSubmit: the user wrote the word "ums" (ai-config#5162).
+                     The reminder is inject-only because no deny can decide
+                     whether a lesson was persisted; a correction has no
+                     lexical signature, so AGENTS.md carries that half.
   compaction         SessionStart (source compact): learnings held only in
                      the compacted context may be summarized away.
   revert             PreToolUse Bash running `git revert`, `git reset --hard`
@@ -41,10 +45,21 @@ COMMON = (
     "psw for prose rules, the repo's own instructions for repo-only rules), "
     "and name what you recorded in your reply. See run-ums-proactively.md."
 )
+BOTH_PLACES = (
+    " Persist it in the same turn in BOTH the project memory store AND ai-config and/or the "
+    "project repo (Ezra, 2026-11-09, ai-config#5162): every 'ums', every correction of you, "
+    "and every correction you make to yourself."
+)
+UMS_WORD = re.compile(r"(?<![\w/:.-])ums(?![\w-])", re.I)
 MESSAGES = {
     "coordinator-note": (
         "[hook: remind-ums-on-trigger-events] The coordinator session's note steers or corrects "
         "this thread. A correction given to one thread is a rule for all of them. " + COMMON
+        + BOTH_PLACES
+    ),
+    "ums-word": (
+        "[hook: remind-ums-on-trigger-events] The user wrote 'ums'. Run the pass now, before "
+        "anything else." + BOTH_PLACES
     ),
     "needless-question": (
         "[hook: remind-ums-on-trigger-events] The user's reply is a grant ({quote!r}): the thread "
@@ -115,6 +130,8 @@ def main() -> int:
             print(MESSAGES["coordinator-note"])
         elif GRANT.match(prompt) and first_time("needless-question", prompt + str(payload.get("transcript_path"))):
             print(MESSAGES["needless-question"].format(quote=prompt.strip()))
+        elif UMS_WORD.search(prompt) and first_time("ums-word", prompt):
+            print(MESSAGES["ums-word"])
     except Exception:
         return 0
     return 0

@@ -325,3 +325,7 @@ Each is recorded in its global home, never in project memory, and the reply name
 
 - **Do:** treat each of these as the moment to run `ums`, in the turn it happens.
 - **Don't:** wait for a review or a merge to bank a learning that already has a name.
+
+**A hook enforces the stopping-point case.**
+[`hooks/no-ums-deferral-in-stopping-point.py`](../../hooks/no-ums-deferral-in-stopping-point.py) blocks a stop, once per turn, when a `Stopping Point` line says UMS was not run, is pending, or was skipped ([ai-config#5133](https://github.com/Morrison-Lab/ai-config/issues/5133)).
+Run the pass, then write the line in the past tense.

@@ -51,7 +51,7 @@ CASES = [
      False, "idioms with action verbs stay silent"),
     ([user("go"), say("I can't stop myself from rechecking. I can't grant myself the benefit of "
                       "the doubt. I can't stop him from using the session. I can't change my mind about the "
-                      "sandbox approach. I can't control my own excitement. I can't connect the dots "
+                      "sandbox approach. I can't approve of this session's tone. I can't control my own excitement. I can't connect the dots "
                       "in this environment. I can't find my own mistake. "
                       "I can't stress enough that settings like these need review. "
                       "I can't say whether this works given the access restrictions.")],

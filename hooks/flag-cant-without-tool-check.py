@@ -48,7 +48,7 @@ ANCHOR = (r"(?:session|sandbox|tools?|permissions?|settings|(?:session|permissio
 # A content word between verb and noun ("stop myself from checking the session") is not
 # the object, so only these may intervene.
 FILLER = (r"(?:\s+(?:my|own|the|this|that|it|a|an|any|your|our|these|those|current"
-          r"|from|in|on|within|with|via|using|of))")
+          r"|from|in|on|within|with|via|using))")
 INABILITY = (rf"(?:can{APOS}t|cannot|can not|(?:am|are|{APOS}m|{APOS}re) (?:unable|not able) to)")
 CLAIM_RX = re.compile(
     rf"\b(?:i|we)\s*{INABILITY}\s+{ACTION}\b{FILLER}{{0,4}}\s+{ANCHOR}\b"

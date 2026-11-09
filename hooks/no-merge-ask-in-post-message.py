@@ -34,7 +34,7 @@ _VERB = (r"(?:say|type|write|reply|respond|send|post|give|grant|issue|need|needs
          r"ask(?:ing)?(?:\s+\w+)?\s+for|request(?:ing)?)")
 ASKS = [
     re.compile(rf"\b{_VERB}\b[^.\n?!]{{0,40}}?\bmwc\b", re.I),
-    re.compile(r"\bmwc\b[^.\n]{0,20}\b(?:please|from you|from ezra)\b", re.I),
+    re.compile(r"\bmwc\b[^.\n]{0,20}\b(?:please|needed|required|from you|from ezra)\b", re.I),
     re.compile(r"\b(?:can|could|may|should|shall)\s+i\s+merge\b", re.I),
     re.compile(r"\b(?:want|would you like)\s+me\s+to\s+merge\b", re.I),
     re.compile(r"\b(?:ok|okay|fine|good)\s+to\s+merge\s*\?", re.I),

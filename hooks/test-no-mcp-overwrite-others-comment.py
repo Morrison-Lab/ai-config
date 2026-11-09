@@ -8,7 +8,7 @@ import os
 import subprocess
 import sys
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+HERE = os.path.dirname(os.path.realpath(__file__))
 spec = importlib.util.spec_from_file_location(
     "hook", os.path.join(HERE, "no-mcp-overwrite-others-comment.py"))
 hook = importlib.util.module_from_spec(spec)

@@ -335,14 +335,6 @@ Software versions, APIs, and docs change over time;
 verify technology facts against live docs or current code rather than training memory, and timestamp volatile claims.
 See [`timestamp-volatile-claims`](shared/writing/timestamp-volatile-claims.md).
 
-## Hyperlink every PR and issue mention
-
-Every PR or issue you mention, such as `psw#542`, is a markdown link to its GitHub URL, in every post, chat reply and comment (Ezra, 2026-11-09).
-`hooks/no-bare-repo-ref.py` denies a `repo#N` left bare in a user-visible hearthbot reply (ai-config#5164).
-
-- **Do:** write `[psw#542](https://github.com/Morrison-Lab/psw/pull/542)`, checking whether it is a pull or an issue.
-- **Don't:** leave `repo#N` as plain text, even in a list of many.
-
 ## Every comment you post to a forge says an agent posted it
 
 Every comment an agent posts to a forge --- GitHub, GitLab, or any other --- must state in the body that an agent posted it.

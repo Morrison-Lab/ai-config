@@ -308,6 +308,19 @@ so the absence of the first two is no evidence about the third.
   established it; a claim that ends the inquiry can never be contradicted by
   it.
 
+The same test applies to a claim that a project's own tooling lacks a
+capability.
+The project's history is evidence the tool listing never holds: on 2026-11-09 a
+coordinator wrote that nothing in the Canvas tooling could schedule solution
+releases, and Ezra answered that it had already been done for the midterm 2
+practice exam.
+
+- **Do:** before writing that existing tooling cannot do something, search
+  the repo's scripts, workflows, and closed issues and PRs for a past use of it
+  (`git log -S`, the tracker across all states), and name what you searched.
+- **Don't:** conclude a capability is missing from not having seen it used
+  in this session.
+
 ### The route via a true measurement, over-generalized
 
 **The claim is more durable when a real measurement sits under it, and that

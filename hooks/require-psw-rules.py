@@ -19,12 +19,14 @@ of each chapter in `REQUIRED`:
 
 DISCHARGE
 ---------
-A Read tool call on a path ending in the chapter's name, under a `psw`
-directory, or a Bash, WebFetch or similar call naming the chapter under
-`morrison-lab.github.io/psw` or `Morrison-Lab/psw`. The deny reason lists the
-paths and URLs, so the next call can read them and retry.
+A read-shaped call naming the chapter under a `psw` directory,
+`morrison-lab.github.io/psw` or `Morrison-Lab/psw`: a Read, a WebFetch, a
+GitHub file-contents call, or a Bash command using a read command (cat, head,
+sed, grep, curl and the like). An Edit, a Write, or a Bash `ls` or `rm` that
+merely names the path does not count. The deny reason lists the paths and
+URLs, so the next call can read them and retry.
 
-Exempt: files under `hooks/`, `memories/` and `shared/` are not notes pages,
+Exempt: files under `hooks/`, `memories/`, `shared/` and `outtakes/` are not notes pages,
 and psw's own `chapters/` are matched like any other (editing psw is the
 likeliest time to need its rules).
 
@@ -42,6 +44,9 @@ REQUIRED = {
     "relative-pronouns.qmd": "chapters/grammar/relative-pronouns.qmd",
 }
 EDIT_TOOLS = {"Write", "Edit", "MultiEdit"}
+READ_TOOLS = {"Read", "WebFetch", "mcp__github__get_file_contents"}
+READ_CMD_RE = re.compile(
+    r"(?:^|[;&|(\s])(?:cat|bat|head|tail|less|more|sed|awk|grep|rg|nl|view|curl|wget)\s")
 PAGE_RE = re.compile(r"(?:^|/)(?:chapters|_subfiles)/(?:[^/]+/)*[^/]+\.qmd$")
 EXEMPT_RE = re.compile(r"(?:^|/)(?:hooks|memories|shared|outtakes)/")
 SOURCE_RE = re.compile(r"(?:morrison-lab\.github\.io/psw|Morrison-Lab/psw|(?:^|/)psw/)", re.I)
@@ -79,8 +84,14 @@ def chapters_read(transcript_path):
     seen = set()
     for block in tool_uses(transcript_path):
         inp = block.get("input") if isinstance(block.get("input"), dict) else {}
+        tool = block.get("name") or ""
         text = " ".join(
             str(inp.get(k) or "") for k in ("file_path", "path", "command", "url"))
+        if tool == "Bash":
+            if not READ_CMD_RE.search(text):
+                continue
+        elif tool not in READ_TOOLS:
+            continue
         if not SOURCE_RE.search(text):
             continue
         for name in REQUIRED:

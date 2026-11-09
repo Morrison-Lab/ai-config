@@ -53,6 +53,12 @@ check("allow after WebFetch reads", run(edit(PAGE, transcript(urls))) is None)
 bash = [("Bash", {"command": "cat /home/u/psw/chapters/%s.qmd" % n})
         for n in ("defining-terms", "conciseness", "grammar/relative-pronouns")]
 check("allow after Bash reads", run(edit(PAGE, transcript(bash))) is None)
+names = ("defining-terms", "conciseness", "grammar/relative-pronouns")
+check("Edit naming the chapters does not discharge",
+      run(edit(PAGE, transcript([("Edit", {"file_path": PSW + n + ".qmd"}) for n in names]))) is not None)
+check("Bash rm/ls naming the chapters does not discharge",
+      run(edit(PAGE, transcript([("Bash", {"command": "ls -la /home/u/psw/chapters/%s.qmd" % n})
+                                 for n in names]))) is not None)
 check("non-psw read does not count",
       run(edit(PAGE, transcript([("Read", {"file_path": "/x/conciseness.qmd"})]))) is not None)
 check("non-page file ignored", run(edit("/repo/lds/tools/a.py", transcript([]))) is None)

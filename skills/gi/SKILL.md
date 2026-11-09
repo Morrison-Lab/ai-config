@@ -162,7 +162,9 @@ If an open PR already exists for the issue:
 
 Before implementing, invoke the `check-history` skill to review merged MRs/PRs that touched the same area so you don't undo past progress.
 Perform a research step to check whether the functionality or helper already exists (DRW) in our own repos or upstream ecosystems before writing custom code, following [`prefer-upstream`](../prefer-upstream/SKILL.md) and [`dont-reinvent-wheel`](../../shared/principles/dont-reinvent-wheel.md).
-Also choose explicitly whether to centralize or distribute the work, per [`centralize-or-distribute`](../../shared/workflow/centralize-or-distribute.md), and state the choice in the PR.
+Also choose explicitly whether to centralize or distribute the work,
+per [`centralize-or-distribute`](../../shared/workflow/centralize-or-distribute.md),
+and state the choice in the PR.
 If the issue is a new feature or architectural change, also consider running `scout-peers` to see how other comparable projects solved it, ensuring we don't reinvent the wheel. (Do NOT run `opposition-research` / `oppo` here;
 `oppo` mines community demand to decide *what* to build and feeds the issue tracker, while `scout-peers` checks *how* others built it once you've already grabbed an issue).
 

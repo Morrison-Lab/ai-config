@@ -10,6 +10,9 @@ Do this before any such claim:
 - Read your visible tool list for a tool that does the action.
 - Call `ToolSearch` with the action's keywords (for example `permission mode`, `add repo`, `remote control`), because a deferred tool appears only by name until it is searched for.
 - If a tool fits, use it.
+  Example: `mcp__ccd_session_mgmt__set_session_permission_mode` switches the session's permission mode.
+  A switch to a stricter mode needs no approval card, and a looser one shows Ezra a card.
+  `ToolSearch` found it when the runner finally looked, after Ezra asked four times.
 - If none does, say what you searched, so the claim is checkable.
 
 Never tell a user, or relay to a thread, that someone did something unless that person said so.

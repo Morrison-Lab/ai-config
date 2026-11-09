@@ -139,8 +139,8 @@ def main() -> int:
         payload,
         f"Your reply says you cannot do something, or that only the user can: \"{claim}\". "
         "This turn never searched for tools. Check your visible tool list, then call "
-        "ToolSearch (deferred tools are not in it, e.g. a permission-mode switch, add_repo, "
-        "start_remote_control) before claiming a limit, and use the tool if one fits "
+        "ToolSearch (deferred tools are not in it, e.g. mcp__ccd_session_mgmt__set_session_permission_mode, "
+        "add_repo, start_remote_control) before claiming a limit, and use the tool if one fits "
         "(Ezra, 2026-11-09: \"never forget to check your available tools\"). Never say the "
         "user did something they did not say. Real limits stay: never edit permission rules "
         "in settings files except through a prompt Ezra approves. If a tool search finds "

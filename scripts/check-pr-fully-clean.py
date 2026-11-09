@@ -4848,7 +4848,7 @@ def main():
             print(f"  - {issue}")
         sys.exit(1)
 
-    print(f"\n\u2705 {repo}#{pr_num} is FULLY CLEAN on HEAD {sha[:8]}!")
+    print(f"\n\u2705 {repo}#{pr_num} is FULLY CLEAN on HEAD {sha[:8]}! [stale-base rule]")
     sys.exit(0)
 
 

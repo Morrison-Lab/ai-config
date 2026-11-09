@@ -12,7 +12,8 @@ import tempfile
 HOOK = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
     os.path.dirname(__file__), "no-update-branch-on-clean-pr.py")
 TOOL = "mcp__github__update_pull_request_branch"
-CLEAN47 = "Morrison-Lab/ids#47 is FULLY CLEAN on HEAD 98ed862a"
+CLEAN47 = "Morrison-Lab/ids#47 is FULLY CLEAN on HEAD 98ed862a! [stale-base rule]"
+OLD47 = "Morrison-Lab/ids#47 is FULLY CLEAN on HEAD 98ed862a!"
 HDR47 = "Checking ARDI / fully-clean status for Morrison-Lab/ids#47..."
 HDR99 = "Checking ARDI / fully-clean status for Morrison-Lab/other#99..."
 DRIFT = "main gained 3 commit(s) since this head's merge base, including changes to .github/workflows/x.yml."
@@ -37,6 +38,7 @@ CASES = [
      HDR47 + "\n" + CLEAN47 + "\nUnrelated: " + DRIFT, True),
     ("drift under this PR's header after another PR's still lifts it", TOOL, "Morrison-Lab", "ids", 47,
      CLEAN47 + "\n" + HDR99 + "\n" + HDR47 + "\n" + DRIFT, False),
+    ("an old checker line without the stale-base marker is not trusted", TOOL, "Morrison-Lab", "ids", 47, OLD47, False),
     ("other tool ignored", "mcp__github__merge_pull_request", "Morrison-Lab", "ids", 47, CLEAN47, False),
     ("unreadable transcript fails open", TOOL, "Morrison-Lab", "ids", 47, None, False),
 ]

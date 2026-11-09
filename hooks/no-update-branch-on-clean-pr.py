@@ -25,7 +25,11 @@ import re
 import sys
 
 TOOL = "mcp__github__update_pull_request_branch"
-CLEAN = re.compile(r"([\w.-]+/[\w.-]+)#(\d+) is FULLY CLEAN on HEAD ([0-9a-f]{7,40})\b")
+# Only a line carrying the "[stale-base rule]" marker counts: a checker older
+# than ai-config#5144 prints the same line without it and also lacks the
+# stale-base rule, so trusting it refused a main merge on a stale head (lds#2208).
+CLEAN = re.compile(
+    r"([\w.-]+/[\w.-]+)#(\d+) is FULLY CLEAN on HEAD ([0-9a-f]{7,40})!? \[stale-base rule\]")
 DRIFT = re.compile(r"gained \d+ commit\(s\) since this head's merge base")
 HEADER = re.compile(r"fully-clean status for ([\w.-]+/[\w.-]+)#(\d+)")
 

@@ -298,7 +298,7 @@ Two mechanisms now do, both in `hooks/require-ums-before-resolve.py` (ai-config#
 
 The triggers above fire on an admission, a read review, a questioned claim or a pause.
 Six more moments owe the same pass (ai-config#4480).
-Each is recorded in its global home, never in project memory, and the reply names what was recorded.
+Each is recorded in its global home, and also in project memory where the session may write it (see "Persist the lesson" at the end of this file), and the reply names what was recorded.
 
 1. **A coordinator note corrects a thread.**
    A correction given to one thread is a rule for every thread the coordinator will start.
@@ -329,3 +329,12 @@ Each is recorded in its global home, never in project memory, and the reply name
 **A hook enforces the stopping-point case.**
 [`hooks/no-ums-deferral-in-stopping-point.py`](../../hooks/no-ums-deferral-in-stopping-point.py) blocks a stop, once per turn, when a `Stopping Point` line says UMS was not run, is pending, or was skipped ([ai-config#5133](https://github.com/Morrison-Lab/ai-config/issues/5133)).
 Run the pass, then write the line in the past tense.
+
+**Persist the lesson on every "ums", correction and self-correction.**
+Every time Ezra says "ums", every time he corrects you in any way, and every time you correct yourself, persist the lesson in the same turn in BOTH the project memory store AND ai-config and/or the relevant project repo, and name what you recorded in your reply (Ezra, 2026-11-09, [ai-config#5162](https://github.com/Morrison-Lab/ai-config/issues/5162)).
+Memory alone is not enough, because a later session in another project cannot read it.
+`hooks/remind-ums-on-trigger-events.py` reminds on the word "ums" and on a coordinator note;
+a correction has no wording a hook can match, so this rule carries that half.
+
+- **Do:** write the rule where the next session will load it, then say where.
+- **Don't:** treat a self-correction as too small to record.

@@ -38,14 +38,14 @@ from agent_notice import stop_notice  # noqa: E402
 
 REPLY_TOOL_RX = re.compile(r"(^|__)(reply|post_message|update_message)$", re.I)
 APOS = "['\u2019]?"
-# A bare "I can't" is mostly idiom ("I can't believe", "I can't tell", "I can't find"),
-# so it counts only before an action verb or "from this session" (review of #5137).
-ACTION = (r"(?:do|change|switch|set|run|start|stop|access|reach|create|edit|modify|merge|push"
-          r"|open|install|enable|disable|approve|grant|use|send|write|add|attach|post|delete"
-          r"|update|make|perform|fetch|download|clone|connect|control|invoke|call|touch)")
+# "I can't" is mostly idiom ("can't believe", "can't make sense of", "can't change the
+# fact"), and no verb list separates idiom from capability (review of #5137, twice).
+# So it counts only beside a capability anchor in the same sentence: a session,
+# tool, permission or access word, or "my own" / "myself" / "from here".
+ANCHOR = (r"(?:session|sandbox|environment|tools?|permissions?|access|my own|on my own|myself"
+          r"|from here|in this (?:thread|chat)|settings|mode)")
 CLAIM_RX = re.compile(
-    rf"\b(?:i|we)\s+(?:can{APOS}t|cannot|can not)\s+(?:\w+\s+){{0,2}}?{ACTION}\b"
-    rf"|\b(?:i|we)\s+(?:can{APOS}t|cannot|can not)\b[^.\n]{{0,60}}\b(?:from this session|on my own|myself)\b"
+    rf"\b(?:i|we)\s+(?:can{APOS}t|cannot|can not)\b[^.\n]{{0,80}}\b{ANCHOR}\b"
     rf"|\b(?:i|we) (?:am|are|'m) (?:unable|not able) to\b"
     rf"|\b(?:i{APOS}m|we{APOS}re) (?:unable|not able) to\b"
     rf"|\b(?:i|we) have no (?:tool|way|means) (?:to|for)\b"

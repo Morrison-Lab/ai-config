@@ -41,7 +41,7 @@ CASES = [
     ([user("switch"), tool("ToolSearch"), RESULT, say("I can't: no mode-switch tool exists.")],
      False, "a ToolSearch in the turn stays silent"),
     ([user("old"), tool("ToolSearch"), RESULT, say("done"), user("new"),
-      say("I can't do that.")], True, "a ToolSearch from an earlier turn does not count"),
+      say("I can't do that from this session.")], True, "a ToolSearch from an earlier turn does not count"),
     ([user("go"), say("I switched the mode with the mode tool.")], False, "no claim stays silent"),
     ([user("go"), say("The hook text says `I can't` in its example.")], False,
      "a quoted claim stays silent"),
@@ -55,6 +55,10 @@ CASES = [
     ([user("go"), say("I can't switch my own permission mode.")], True, "can't switch warns"),
     ([user("go"), say("I cannot do that from this session.")], True, "cannot do warns"),
     ([user("go"), say("We are unable to merge it.")], True, "we are unable to warns"),
+    ([user("go"), say("I can't make sense of this. I can't change the fact that it failed.")],
+     False, "idioms with action verbs stay silent"),
+    ([user("go"), say("I can't reach a conclusion. We can't control what happens next.")],
+     False, "verb idioms with no capability anchor stay silent"),
 ]
 
 
@@ -84,7 +88,7 @@ for events, expect, name in CASES:
 with tempfile.TemporaryDirectory() as d:
     path = os.path.join(d, "t.jsonl")
     with open(path, "w", encoding="utf-8") as fh:
-        for e in [user("x"), say("I can't do that.")]:
+        for e in [user("x"), say("I can't do that from this session.")]:
             fh.write(json.dumps(e) + "\n")
     env = dict(os.environ, TMPDIR=d)
     args = dict(input=json.dumps({"transcript_path": path, "session_id": "once"}),

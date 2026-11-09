@@ -131,3 +131,32 @@ jobs:
   Otherwise the stale-base rule in [`fully-clean`](fully-clean.md) applies, because the queue then either cannot block on a check that runs, or never runs a check it would block on.
 - **Don't:** run manual `gh pr update-branch` loops on simultaneously ready PRs when a merge queue is active and configured that way.
 - **Don't:** omit the `merge_group` trigger from CI workflows when enabling merge queue rulesets.
+
+## Running a manual merge queue: lessons from 2026-11-09
+
+These come from a merge runner landing PRs by hand across several repositories, without a platform merge queue ([ai-config#5191](https://github.com/Morrison-Lab/ai-config/issues/5191)).
+This is prose because no mechanism enforces it yet, and the issue names the candidates.
+
+- **API budget is shared.**
+  The GitHub core budget of 5000 an hour is shared by the PR monitor and every thread.
+  An annotation read of one gha PR cost about 800 calls and one checker run 100 to 300, and the budget reached 0 twice.
+  Read `gh api rate_limit` first, since it is free, and when pausing give the duration and the reset time in PST (see [`memories/gh-cli.md`](../../memories/gh-cli.md)).
+- **Classifier denials.**
+  A merge was denied ("Merge Without Review") when the user's grant reached the runner only as a coordinator cite, and the identical retry passed once the message arrived as a wake.
+  A one-off typed ok unlocks that one action, not an unattended loop, and `gh workflow disable` was denied as "CI Bypass".
+  See [`memories/claude-code-permissions.md`](../../memories/claude-code-permissions.md).
+- **Workflow merges re-stale everything.**
+  A merge that touches `.github/workflows/` leaves every other open PR on that repository stale.
+- **Flooded queues.**
+  A workflow that queued 500 to 650 no-op runs starved the build jobs that wait for a handful of runners.
+  Cancel only that workflow's queued runs, after the user's typed ok.
+- **Same-line PRs conflict after the first merge.**
+  PRs that touch the same navigation or bibliography lines conflict once one of them lands.
+
+- **Do:** read the rate limit, and check a head's staleness (cheap), before spending annotation reads on it.
+- **Do:** limit gha annotation reads to 3 an hour.
+- **Do:** merge workflow changes last, and content PRs first when the user's merge grant is waiting.
+- **Do:** merge same-line PRs one at a time, re-verifying the live head before each.
+- **Do:** report a merge the wrapper refuses (a non-default base, or non-CI paths in a content repository), and list a PR's changed paths before calling it infra ([ai-config#5189](https://github.com/Morrison-Lab/ai-config/issues/5189)).
+- **Don't:** read annotations for a stale head.
+- **Don't:** bypass a refused merge, or turn a one-off ok into an unattended loop.

@@ -83,7 +83,7 @@ When the task naturally builds on an open issue or PR (it needs that work’s co
 
 - Invoke `check-history` before implementing — review merged/closed MRs that touched the same area so you don’t undo past progress.
 - Perform a research step to check whether the functionality or helper already exists (Don’t Reinvent the Wheel / DRW): search our own repos (`Morrison-Lab/gha`, lab packages, ai-config) and trustworthy upstream ecosystems (standard libraries, r-lib / tidyverse, PyPI, npm) via [`prefer-upstream`](../../skills/prefer-upstream/SKILL.llms.md) and [`dont-reinvent-wheel`](../../shared/principles/dont-reinvent-wheel.md) before hand-rolling custom code.
-- Choose explicitly whether to centralize or distribute the content or other work, both within the repo and across repos, and state the choice in the issue or PR. Ezra, 2026-11-09: “when planning and/or performing work, we should choose explicitly whether to centralize vs distribute content or other work, both within and across repos” ([ai-config#5185](https://github.com/Morrison-Lab/ai-config/issues/5185)).
+- Choose explicitly whether to centralize or distribute the content or other work, both within the repo and across repos, and state the choice in the issue or PR, per [`centralize-or-distribute`](../../shared/workflow/centralize-or-distribute.md). Ezra, 2026-11-09: “when planning and/or performing work, we should choose explicitly whether to centralize vs distribute content or other work, both within and across repos” ([ai-config#5185](https://github.com/Morrison-Lab/ai-config/issues/5185)).
 
 ### 5. Branch → open draft PR → implement → ready → ARDI
 

@@ -47,6 +47,7 @@ CASES = [
     ("read that errored", COORD, FINAL_MSG, [USER, RUNS_MCP, result(is_error=True)], True),
     ("read whose output is an HTTP error", COORD, FINAL_MSG, [USER, RUNS_BASH, result("HTTP 403: nope")], True),
     ("negated claim", COORD, "ai-config#5167 is not final yet: validate is running.", [USER], False),
+    ("neither denies the claim", COORD, "Neither ai-config#5167 nor ai-config#5168 is a final head yet.", [USER], False),
     ("no PR cited", COORD, "The final head will be reported soon.", [USER], False),
     ("no final claim", COORD, "ai-config#5167: Clean review, CI running.", [USER], False),
     ("unrelated tool", "Bash", FINAL_MSG, [USER], False),

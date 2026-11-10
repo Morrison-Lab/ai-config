@@ -6,7 +6,8 @@ Every open PR costs a CI run and a review round on each push, and the cost multi
 On 2026-11-09 the lds queue reached 676 runs while owners kept opening PRs behind ones still waiting on review.
 
 - **Do:** before `create_pull_request` or `gh pr create`, list your open PRs in that repo.
-  At two or more, push to one of them, stack onto it with [`stack-prs`](../../skills/stack-prs/SKILL.md), close one, or file an issue.
+  At two or more, push to one of them, close one, or file an issue.
+  A stacked PR is still a PR, so [`stack-prs`](../../skills/stack-prs/SKILL.md) is not a way around the cap.
 - **Do:** count only PRs you opened or drive, in that repository.
   Another repo's PRs do not count against this one.
 - **Don't:** open a third PR in a repo while two wait on review or CI.

@@ -2066,3 +2066,6 @@ rme#1450 had `build` still running and ai-config#5186 was reported before its CI
 - **Don't:** call a head final from a review verdict, a check-suite wake or an earlier read.
 - **Do:** also read the PR's `mergeable_state` (`gh api repos/<r>/pulls/<n> --jq .mergeable_state`) and merge `main` if it is `dirty`, before reporting the head final.
 - **Don't:** report a head final on Clean review and green checks alone: ai-config#5246 was reported final at 6c456cc9 while it conflicted with `main` (coordinator, 2026-11-10).
+
+The `mergeable_state` read is prose because the hook above matches only check-runs reads and no hook yet requires this second read.
+Extending it is a possible follow-up on [ai-config#5198](https://github.com/Morrison-Lab/ai-config/issues/5198).

@@ -188,6 +188,14 @@ grants the move, it does not exempt it from what a move costs.
   grandfathering for content that merely changed address.
   Bring a moved block into compliance with both on the way, the same as any
   other line you add.
+- **An insertion can split a list item from its continuation.**
+  A bullet's later lines are indented under it, so a block added after the bullet's first lines, rather than after its last, leaves the remaining indented lines attached to the wrong item, and a reader's "neither" or "the check" loses its antecedent.
+  Read the lines that follow the insertion point before writing, and run `scripts/semantic-line-breaks.py` on the file without `--write` and read its diff, since the preview shows a stranded continuation line.
+  (Two insertions on 2026-11-09, ai-config#5239 and psw#553, each stranded one;
+  a reviewer caught the first, the preview the second.)
+  - **Do:** insert after the last indented line of the item you are extending.
+  - **Don't:** treat a one-line summary from the formatter as the check.
+    Read the diff it prints.
 - **Referenced assets move with their content.**
   [`migrate-referenced-assets.md`](../workflow/migrate-referenced-assets.md)
   covers images, data files, and anything else a moved passage embeds by

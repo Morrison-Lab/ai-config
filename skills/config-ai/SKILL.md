@@ -29,6 +29,11 @@ never gets silently dropped just because the current session can't push to
   tell that this skill, not a specific builder skill, is the right entry
   point.
 
+Every message that starts with `cai:` or `ca:` runs this skill, in whichever session receives it.
+A coordinator session has no repository clone, so repo skills never load for it.
+A coordinator must therefore send every `cai:` message to a thread that has the clone and invokes this skill, and must not answer it itself.
+Step 2's reuse check is the part that gets skipped when the skill is not invoked ([ai-config#5219](https://github.com/Morrison-Lab/ai-config/issues/5219)).
+
 ## Step 0 -- Restate the capability, not the mechanism
 
 State in one sentence what the requester wants Claude (or Codex, or the

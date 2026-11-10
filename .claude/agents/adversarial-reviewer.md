@@ -70,6 +70,7 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
      - a figure with no real `fig-alt`, a matplotlib call without a trailing `;`, or `code-fold: false` on a chunk whose output is the point;
      - a bracketed citation that should be bare, or the reverse, where the author is not the sentence's subject;
      - three or more parallel items in running prose instead of a bullet list, or `---` where `{{< slidebreak >}}` belongs;
+     - output typed or pasted into a page instead of produced by a chunk, such as a `# ->` comment under code or a computed number written into a sentence by hand ([ai-config#5241](https://github.com/Morrison-Lab/ai-config/issues/5241));
      - a worked solution or exercise that reveals an answer to a graded item in the course's assessment repository, even with different numbers;
      - a Quarto site whose search `keyboard-shortcut` includes a key a browser uses with Ctrl or Cmd, such as `f` for find or `s` for save, so the search box opens over the reader's own command ([ai-config#5238](https://github.com/Morrison-Lab/ai-config/issues/5238)).
    - When you suggest a fix, suggest only fixes that meet the rule behind the finding.

@@ -1,6 +1,7 @@
 # User preferences (cross-workspace)
 
 - NEVER assume; ALWAYS verify.
+  Ezra, 2026-11-09: "cai: never assume anything that could be checked empirically" ([`check-dont-assume`](../shared/workflow/check-dont-assume.md), ai-config#5215).
   Before stating a status/fact/outcome (PR or issue state, merge status, CI/review verdict, branch position, file contents, or which TOOLS/MCP servers are actually available in the current session) or acting on one, confirm it with a tool call --- don't rely on what was true earlier in the session, what "should" be the case, or what memory/documentation says was true as of some earlier point.
   State drifts between turns; tool availability drifts between sessions/environments.
   "It should be X" / "I left it as X" / "presumably X" / "no such tool exists" are all red flags; replace with a fresh check.

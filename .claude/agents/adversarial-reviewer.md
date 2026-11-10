@@ -60,6 +60,10 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
      Each definition div defines one quantity,
      and its display shows that quantity rather than a use of it.
      The div and its Source callout hold no example, usage rule or rationale ([`the display must define the term`](../../shared/writing/informal-definitions.md#the-display-must-define-the-term-and-only-the-term)).
+   - In lecture and notes pages (`.qmd` with exercise, definition and result divs), read the diff for these structural defects, whether or not the gha structure checks ran ([`checks-need-writer-and-reviewer-instructions`](../../shared/workflow/checks-need-writer-and-reviewer-instructions.md), [ai-config#5181](https://github.com/Morrison-Lab/ai-config/issues/5181)):
+     - an exercise that has several parts, or that does not end in a question or an instruction;
+     - a theorem, lemma, corollary or proposition stated in a remark div, or commentary, an example or a usage rule inside a definition div;
+     - a second new term defined inside one definition div, or a term used before its div.
    - When you suggest a fix, suggest only fixes that meet the rule behind the finding.
      Never offer a cosmetic option, such as dropping the bold from a hidden definition, as an acceptable alternative ([`no-cheap-fixes`](../../shared/principles/no-cheap-fixes.md)).
 

@@ -82,6 +82,7 @@ the author-dispatched cross-model, cross-harness reviewer's
 
 In a cloud session (e.g. claude.ai) where no external CLI tools are installed,
 OpenCode Go over HTTP serves as the cross-harness reviewer (see [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md)).
+When Go and its free ids are exhausted, that skill's "Ollama Cloud when Go is exhausted" route (`curl` to `api.ollama.com`) comes after them, and after `agy` on a device when the session can reach one.
 The cloud session's agent proxy injects credentials for `curl` to `https://opencode.ai/zen/go/v1/chat/completions` with `"stream": true`,
 piped into `skills/delegate-to-opencode/scripts/parse-sse.py`.
 Python `urllib` (or `requests`) gets HTTP 403 from the agent proxy and cannot be used.
@@ -120,6 +121,7 @@ This section is the exception that the other "required for merging" statements i
 - **Try the whole ladder once first.**
   Enumerate every route per [`Availability is a per-route question`](#availability-is-a-per-route-question-and-command--v-answers-one-route) (local CLIs `agy`, `opencode`, `codex`;
   the OpenCode Go HTTP route;
+  the Ollama Cloud HTTP route;
   any other configured credential), then make one pass of each route's documented fallback ladder on the shipping head (for OpenCode Go, the candidate-model loop in [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md)).
   A probe that decides a route is enough for that route (`opencode run -m <model> "ok"` under `timeout 60`, or a `curl` to the endpoint), and keep the output.
   A quota error reroutes to the next route first and counts as unrunnable only once every route has failed.

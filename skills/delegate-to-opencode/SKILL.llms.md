@@ -1,6 +1,6 @@
 # delegate-to-opencode — run sidecar work on OpenCode or OpenRouter models
 
-The `opencode` CLI reaches an active OpenCode Go (\$10/mo subscription), hosted free (`opencode Zen`), and OpenRouter tiers. Use only hosted providers. Never invoke an `ollama/*` model or another local inference runtime because local inference can crash the user’s computer.
+The `opencode` CLI reaches an active OpenCode Go (\$10/mo subscription), hosted free (`opencode Zen`), and OpenRouter tiers. Use only hosted providers. Never invoke an `ollama/*` model or another local inference runtime because local inference can crash the user’s computer. That ban covers models run on the machine, and it covers every `ollama/*` id run through the `opencode` CLI. A `curl` call to Ollama Cloud’s API (`api.ollama.com`) runs the model on Ollama’s servers. This skill reads the ban’s crash-risk reason as not reaching that call (inferred; the user has not ruled on Ollama Cloud). “Ollama Cloud when Go is exhausted” below says when to use it.
 
 Claude stays the orchestrator. It writes the prompt, runs the delegate, validates what comes back, and does the synthesis. This skill is the mechanism. The budget preference it plugs into lives in `memories/delegation.md`.
 
@@ -19,7 +19,7 @@ The `Agent` tool’s `model` parameter is an enum of Claude aliases, and `.claud
 - **The task needs strong reasoning, judgment, or long-context synthesis — unless explicitly routed to a frontier model.** Free models hosted via Zen are small, unbenchmarked ids where a wrong answer costs more to detect than the quota saved. When delegating judgment-bearing work, route explicitly to OpenRouter stealth/frontier models or capable OpenCode Go tiers.
 - **The critical-path edit the rest of the work waits on.** Do it inline, in this session, so progress does not block on a round-trip.
 - **The result must conform to a schema and you have no cheap validator.** `opencode run` has no schema flag, so conformance is asked for in the prompt and checked on the way back rather than enforced at the boundary.
-- **The destination tier is unavailable or exhausted.** OpenCode Go operates on **dollar** caps rather than request counts. As of 2026-10-15 each model has its own monthly dollar limit. Its 5-hour limit is 20% of that and its weekly limit 50% (vendor docs, <https://opencode.ai/docs/go>, fetched 2026-10-15). DeepSeek V4.1 Flash is \$80 per month on Go and \$160 on Go Plus; DeepSeek V4 Pro and Kimi K3 are \$15 on Go. The vendor’s page lists the other models’ limits. Exhaustion shows as HTTP 429 `GoUsageLimitError` with `limitName` `weekly`, `5-hour` or `monthly`. On 2026-10-15 every model returned the weekly error at once, so the documented per-model limits did not isolate one model’s exhaustion from another’s. The response carries no reset time. When exhausted, fall back to Codex or OpenRouter per the ladder. Zen free tier rate-limiting is an availability state rather than window exhaustion.
+- **The destination tier is unavailable or exhausted.** OpenCode Go operates on **dollar** caps rather than request counts. As of 2026-10-15 each model has its own monthly dollar limit. Its 5-hour limit is 20% of that and its weekly limit 50% (vendor docs, <https://opencode.ai/docs/go>, fetched 2026-10-15). DeepSeek V4.1 Flash is \$80 per month on Go and \$160 on Go Plus; DeepSeek V4 Pro and Kimi K3 are \$15 on Go. The vendor’s page lists the other models’ limits. Exhaustion shows as HTTP 429 `GoUsageLimitError` with `limitName` `weekly`, `5-hour` or `monthly`. On 2026-10-15 every model returned the weekly error at once, so the documented per-model limits did not isolate one model’s exhaustion from another’s. The response carries no reset time. When exhausted, fall back to Codex or OpenRouter per the ladder. In a cloud session, where neither is reachable, follow “Ollama Cloud when Go is exhausted” below. Zen free tier rate-limiting is an availability state rather than window exhaustion.
 
 The first two transfer from `delegate-to-codex`, but for a reason that skill does not have. There, work shape and model capability were independent. Here they point the same way: authoring and judgment work is exactly what the free tier is worst at.
 
@@ -35,13 +35,13 @@ The separate “result must conform to a schema and you have no cheap validator�
 - **Do:** settle the data question before the shape question — a mechanical acceptance test does not license a hosted dispatch the consuming repo’s data rules forbid.
 - **Don’t:** condition the dispatch on the acceptance test alone — a vague brief with a passing check is a combination nobody measured.
 - **Don’t:** let your own reading of the returned diff stand in for the mechanical check.
-- **Don’t:** apply this exception to restricted data — a data trigger forbids OpenCode and OpenRouter dispatch, the free tier included, unless the consuming repository has explicitly approved that hosted destination.
+- **Don’t:** apply this exception to restricted data — a data trigger forbids OpenCode, OpenRouter and Ollama Cloud dispatch, the free tier included, unless the consuming repository has explicitly approved that hosted destination.
 
 ## Hosted-only routing rule
 
 [`delegate-to-codex`](../../skills/delegate-to-codex/SKILL.llms.md)’s “Data sensitivity is a second trigger” section says a repo can route work to codex because of **what the work reads**, that this trigger overrides the shape exceptions, and that when codex is busy the work waits rather than falling back.
 
-`opencode/*` (hosted Zen gateway) and `opencode-go/*` (OpenCode Go subscription) are hosted destinations. The payload leaves the machine exactly as it does for any other hosted model. Free or subscription-covered pricing is a **billing** fact and says nothing about where bytes go. OpenRouter is hosted too. A data trigger therefore forbids all OpenCode and OpenRouter model dispatch unless the consuming repository explicitly approves that hosted destination.
+`opencode/*` (hosted Zen gateway) and `opencode-go/*` (OpenCode Go subscription) are hosted destinations. The payload leaves the machine exactly as it does for any other hosted model. Free or subscription-covered pricing is a **billing** fact and says nothing about where bytes go. OpenRouter is hosted too. Ollama Cloud (`api.ollama.com`) is hosted too. A data trigger therefore forbids all OpenCode, OpenRouter and Ollama Cloud model dispatch unless the consuming repository explicitly approves that hosted destination.
 
 **The discriminator is the provider prefix, not the `-free` suffix.** `opencode models` on 2026-08-19 listed `opencode/big-pickle` alongside six ids ending in `-free`, all under the same hosted provider. The suffix answers a pricing question. The prefix answers which hosted tier a job goes to, which is the routing question.
 
@@ -50,7 +50,8 @@ The separate “result must conform to a schema and you have no cheap validator�
 As in the codex skill, do not infer a data trigger from a repo merely holding sensitive data. It applies where the consuming repo has written the rule down, and that repo owns the path list.
 
 - **Do:** keep data-triggered work in the authoring session and use deterministic tools when no hosted destination is approved.
-- **Don’t:** start or invoke Ollama, LM Studio, llama.cpp, or another local model.
+- **Don’t:** start or invoke a model on the machine: local Ollama, LM Studio, llama.cpp, or another local runtime.
+- **Don’t:** send data-triggered work to Ollama Cloud. Being allowed past the local-inference ban does not make it local, and the payload leaves the machine as it does for OpenCode.
 - **Don’t:** read a `-free` suffix, or its absence, as evidence about where the payload goes.
 
 ## A third destination: OpenRouter, for models neither tier carries
@@ -80,7 +81,7 @@ curl -s https://openrouter.ai/api/v1/models \
 
 Two routing consequences:
 
-- **The data-sensitivity rule extends to OpenRouter and Go on the split’s own terms.** A hosted destination’s payload leaves the machine, so a data trigger forbids `openrouter/*`, `opencode-go/*`, and `opencode/*` alike — and a stealth preview is the worse case, since the lab behind it is unnamed by construction.
+- **The data-sensitivity rule extends to OpenRouter and Go on the split’s own terms.** A hosted destination’s payload leaves the machine, so a data trigger forbids `openrouter/*`, `opencode-go/*`, `opencode/*`, and Ollama Cloud alike — and a stealth preview is the worse case, since the lab behind it is unnamed by construction.
 
 - **A stealth model inverts the capability caveat rather than sharing it** — the consequence the split cannot supply. The hosted-free ids are unbenchmarked *small* models, so the “no judgment work” exception binds them. A stealth id is an unbenchmarked *frontier preview*, so it can plausibly carry judgment-bearing work the free tier cannot — but “plausibly” is the operative word: validate its output like any other delegate’s, and timestamp any claim about a specific id. First probe rather than a benchmark: on 2026-08-23 `stealth/ox-alpha` scored 4/4 on a known-answer crash-diagnosis task with strict-JSON output, including a byte-level UTF-8 detail (0x9d as the tail of U+201D) — one task, so it licenses trying such work, not trusting it unvalidated.
 
@@ -90,21 +91,21 @@ Two routing consequences:
 
 - **Don’t:** read an empty `openrouter/*` listing as OpenRouter being unreachable — an unreferenced provider is inactive, and one config entry activates the whole roster.
 
-- **Don’t:** send data-triggered work to `openrouter/*`, `opencode-go/*`, or `opencode/*` — free or subscription pricing is a billing fact, and bytes still leave the machine.
+- **Don’t:** send data-triggered work to `openrouter/*`, `opencode-go/*`, `opencode/*`, or Ollama Cloud — free or subscription pricing is a billing fact, and bytes still leave the machine.
 
 ## Cloud sessions: OpenCode Go over HTTP, no key needed
 
-A claude.ai cloud session has no `opencode` CLI preinstalled (`npm i -g opencode-ai` installs one), but its agent proxy injects the OpenCode credential for `opencode.ai`, so `curl` to the chat endpoint works without a key (verified 2026-10-09). A GitHub Actions review job reported 401 `Missing API key` on the same call and no proxy variable (PR review run 37907648792, 2026-10-09), so do not assume it holds there. Use the Go endpoint `https://opencode.ai/zen/go/v1`, which both Go and Go Plus plans serve. Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402.
+A claude.ai cloud session has no `opencode` CLI preinstalled (`npm i -g opencode-ai` installs one), but its agent proxy injects the OpenCode credential for `opencode.ai`, so `curl` to the chat endpoint works without a key (verified 2026-10-09). A GitHub Actions review job reported 401 `Missing API key` on the same call and no proxy variable (PR review run 37907648792, 2026-10-09), so do not assume it holds there. Use the Go endpoint `https://opencode.ai/zen/go/v1`, which both Go and Go Plus plans serve. Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402 (“Insufficient account funds” on 2026-11-05).
 
 - `/chat/completions`: `glm-5.3`, `glm-5.3-flash`, `kimi-k3`, `deepseek-v4-pro`, and others. Use this endpoint in a cloud session. `qwen3.8-max` is documented under `/messages`, yet it returned a normal reply here on 2026-10-09, so it is usable on this endpoint.
 - `/messages` (`claude-haiku-5-5`, `minimax-m3`) returned 401 `Missing API key` through the proxy on 2026-10-09, so it is not usable there.
 - `/responses` and `/models` also exist; `/models` lists every id.
 - Send a stable `x-opencode-session` UUID header for each conversation, or the request fails with 400 `MissingSessionID`.
 - Models seen on `/models` on 2026-10-15 include `deepseek-v4.1-flash` (the vendor estimates about 87,000 requests per week on Go at 410 input, 71,300 cached and 310 output tokens per request, with input at \$0.15 per million tokens off-peak; a review that returns a longer answer gets fewer requests, and several smaller models list lower prices) and `gemini-4-argon-contributor` (the Argon model, 2x usage for a limited time). Treat `/models` as the authority, since the vendor says the list changes as models are added.
-- `cat-jam-free` and `longcat-2.5-preview-free` answered through the proxy on 2026-10-15 while the Go quota was exhausted. Both are free for a limited time and reasoning models (a 16-token request returned only reasoning), so give them a generous `max_tokens`.
+- `cat-jam-free` and `longcat-2.5-preview-free` answered through the proxy on 2026-10-15 while the Go quota was exhausted. On 2026-11-09 both returned “Upstream request failed: Model is unavailable”. Those two ids were free for a limited time and reasoning models (a 16-token request returned only reasoning). Give any free reasoning id a generous `max_tokens`. On 2026-11-09 `/models` listed the free ids `beam-free`, `iceman-contributor-free` and `longcat-2.5-free` instead, which were not tried. Check `/models` for the current free ids and try them before relying on this route.
 - **A review through these two ids worked on 2026-10-16, while every Go model returned the weekly `GoUsageLimitError`** ([ai-config#4581](https://github.com/Morrison-Lab/ai-config/issues/4581)). Stream with `"stream": true` and `max_tokens` 30000, and assemble `delta.content`; the text comes only after 40,000 to 70,000 characters of `reasoning_content`, about five minutes. On [ai-config#4572](https://github.com/Morrison-Lab/ai-config/pull/4572), `longcat-2.5-preview-free` found three real defects in the first push and then returned no text on the fix commit in two attempts, while `cat-jam-free` returned a clean verdict on both heads. Run both, treat an empty answer as no verdict rather than clean, and address, rebut or defer every defect in a list as for any review. The user accepted a clean verdict from one of these free models as the non-Claude gate while Go is exhausted (relayed by the coordinator session, 2026-10-16), with the other model’s empty answer counted as no verdict.
 - **In a cloud session on 2026-10-16 these other routes did not work, so use the streamed Go-endpoint recipe above instead.** The free ids on the pay-as-you-go path `https://opencode.ai/zen/v1` (not the Go path) return `FreeTierError` with the message that the free tier can only be used from within OpenCode, whereas the paid ids on that path return the 402 above. With the CLI installed by `npm i -g opencode-ai` and the opencode API-key environment variable set to any non-empty value (the proxy supplies the real key), `opencode run -m opencode/<free id>` printed only its banner and hit a 280 to 420 second timeout. That held for `deepseek-v4.1-flash-free` and `nemotron-3-ultra-free`, each with the brief passed as the argument and with the brief attached by `-f`. A message placed after `-f` is read as a file name, because `-f` takes several files, so put the message before `-f`. `codex` and `agy` are not installed in a cloud session, no OpenRouter, Databricks or Gemini key is set, and `openrouter.ai` and `api.openai.com` are refused by the network policy.
-- On 2026-10-15 the Argon model was blocked by the same weekly limit as every other Go model. Route the review to `agy` on a device, per `memories/delegation.md`.
+- On 2026-10-15 the Argon model was blocked by the same weekly limit as every other Go model. Route the review to `agy` on a device, per `memories/delegation.md`, when the session can reach one. Otherwise use Ollama Cloud below.
 
 A non-streaming call works for short prompts (such as a smoke test):
 
@@ -201,6 +202,44 @@ _Posted by <Agent Name> (AI agent) --- not written by a human._
 ```
 
 This ensures `check-pr-fully-clean.py` admits the review by construction and allows a clean verdict to supersede any earlier standing not-clean comments (#4425). Never use Codex for this routing.
+
+## Ollama Cloud when Go is exhausted
+
+Ollama Cloud is a hosted route for a cross-model review in a cloud session ([ai-config#5197](https://github.com/Morrison-Lab/ai-config/issues/5197)). Try the routes in this order:
+
+1.  Smoke-test a Go model. On 2026-11-05 every Go model returned `GoUsageLimitError` with `limitName` `monthly`. By 2026-11-09 `kimi-k3` answered on Go again. No cause for that recovery was measured, so test Go each time rather than assume it is still capped.
+2.  Try the current free ids on the Go endpoint, as described above.
+3.  Use `agy` on a device if the session can reach one.
+4.  Use Ollama Cloud.
+
+Each fact below was measured in a claude.ai cloud session on the date given, so re-check it before relying on it.
+
+- The proxy injects the Ollama credential for `https://api.ollama.com/api/chat`, so the request carries no key (2026-11-05). A request to `ollama.com` itself failed at CONNECT with 403 (2026-11-05).
+- On this account’s free plan only `gpt-oss:120b` and `gemma4:31b-cloud` answered (2026-11-09). `/api/tags` lists `gemma4:31b`, but the id that answered was `gemma4:31b-cloud`. No review from `gemma4:31b-cloud` is recorded here, so the quality of its reviews has not been measured. `kimi-k3`, `glm-5.3` and `deepseek-v4-pro:0813` were refused as “not included in your free usage” (2026-11-09).
+- Send `"stream": false` and read `message.content`. A non-streaming request with a diff of about 30 KB returned a full review on 2026-11-05. The Go gateway’s 30-second cutoff above did not apply.
+- `gpt-oss:120b` raised confident false positives in every first pass on [Morrison-Lab/swc#11](https://github.com/Morrison-Lab/swc/pull/11), [\#13](https://github.com/Morrison-Lab/swc/pull/13) and [\#14](https://github.com/Morrison-Lab/swc/pull/14) (2026-11-05 to 2026-11-09). It reported a “missing import” and an “undefined” function that were both present in unchanged context. It also said “Python 3.13 is not available on hosted runners”. Verify every finding against the code before acting on it, as for any review. For each false positive, write a rebuttal that cites the evidence you checked yourself, such as the file and line that defines the name. Then re-run with the rebuttals in the prompt and count only the re-run’s verdict. This is the same bar as persuading any reviewer with evidence, and the rebuttals must be facts you verified, not assertions. On those three PRs it accepted the rebuttals and returned CLEAN.
+- The reviewer differs from Claude in model and harness, so it meets the independence rule in [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md). The data rules apply here as to any hosted model, so use it only for work no data trigger covers.
+- When posting the result, use the envelope above with `(Ollama Cloud <model>)` in the heading.
+- `hooks/warn-merge-without-cross-harness-review.py` does not yet count a call to `api.ollama.com`, so it warns on a merge after this review ([ai-config#4849](https://github.com/Morrison-Lab/ai-config/issues/4849)). The warning is a false positive when the transcript shows the review.
+
+Write the brief and the diff to files in the scratchpad first, and set `BRIEF` and `DIFF` to their paths. The brief must ask the model to end with one line, `VERDICT: CLEAN` or `VERDICT: NOT_CLEAN`. The loop tries each model and stops at the first reply that holds a `VERDICT:` line.
+
+``` bash
+set -o pipefail
+PAYLOAD=$(mktemp); REVIEW=$(mktemp); trap 'rm -f "$PAYLOAD"' EXIT
+for model in gpt-oss:120b gemma4:31b-cloud; do
+  python3 -I -c 'import json, sys; m, b, d, o = sys.argv[1:5]; json.dump({"model": m, "stream": False, "messages": [{"role": "user", "content": open(b).read() + chr(10) * 2 + open(d).read()}]}, open(o, "w"))' \
+    "$model" "$BRIEF" "$DIFF" "$PAYLOAD" || break
+  curl -sS --max-time 600 https://api.ollama.com/api/chat \
+    -H "Content-Type: application/json" --data-binary "@$PAYLOAD" \
+    | python3 -I -c 'import json, sys; r = json.load(sys.stdin); c = r.get("message", {}).get("content", ""); print(c) if c.strip() else sys.exit("no content: " + str(r)[:500])' \
+    > "$REVIEW" && grep -q 'VERDICT:' "$REVIEW" && { echo "MODEL: $model (Ollama Cloud)" >> "$REVIEW"; break; }
+  : > "$REVIEW"
+done
+[ -s "$REVIEW" ] || { echo "Error: no Ollama Cloud verdict" >&2; false; }
+```
+
+Any non-zero exit, an empty `$REVIEW`, or a reply without a `VERDICT:` line counts as no verdict. The trap keeps `$REVIEW` so you can read it; delete it once the verdict is recorded.
 
 ## OpenCode 2.0
 

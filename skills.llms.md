@@ -127,7 +127,7 @@ Most skills also respond to plain-English triggers listed in their `description`
 | [`daytb`](skills/daytb/SKILL.llms.md) | `do-as-you-think-best` | Decide the question at hand yourself and report the choice – scoped to that task, unlike `away`’s whole-session grant |
 | [`delegate-to-codex`](skills/delegate-to-codex/SKILL.llms.md) | `dtc` | Offload heavy read/draft/verify work to the `codex` CLI before spending Claude quota, with Claude fallback |
 | [`delegate-to-agy`](skills/delegate-to-agy/SKILL.llms.md) | `dta` | Offload work to the Antigravity `agy` CLI (subscription login, local machines only) before spending Claude quota, with Claude fallback |
-| [`delegate-to-opencode`](skills/delegate-to-opencode/SKILL.llms.md) | `dto` | Offload work to OpenCode (Go subscription, hosted Zen free, local Ollama) or OpenRouter models |
+| [`delegate-to-opencode`](skills/delegate-to-opencode/SKILL.llms.md) | `dto` | Offload work to OpenCode (Go subscription, hosted Zen free) or OpenRouter models, with hosted Ollama Cloud as a cloud-session fallback |
 | [`rec`](skills/rec/SKILL.llms.md) | `recommend` | Provide clear, actionable recommendations when presenting choices or questions |
 | [`prompt-me`](skills/prompt-me/SKILL.llms.md) | `pm` | Surface the single most pressing open question (or top N) waiting on user input |
 | [`prompt-me-all`](skills/prompt-me-all/SKILL.llms.md) | `pma` | Restate every open question still waiting on user input, uncapped |

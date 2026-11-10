@@ -158,3 +158,9 @@ On a diff that edits a notes `.qmd` page, check the prose against psw's `definin
 Look for an unlinked term at first use, filler that adds nothing, and a dropped "that" before a relative clause.
 Read the diff; do not report a script's output as your finding.
 See [`notes-pre-review-pass`](../../shared/workflow/notes-pre-review-pass.md#read-the-psw-chapters-before-editing-a-page).
+
+## Final-head claims
+
+On a message or PR comment that calls a head final, check that the transcript or the PR shows a live read of that sha's check runs, every run complete and none failed, beside a Clean review naming that sha.
+A verdict alone is not that evidence.
+See [`fully-clean`](../../shared/workflow/fully-clean.md#read-the-check-runs-before-calling-a-head-final).

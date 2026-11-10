@@ -14,6 +14,11 @@ Check the tracker, the live threads and project memory first, as [`triage-new-as
 
 An idle agent with an unowned backlog is a defect, not a rest.
 
+- **Do:** give each P1 and each owed follow-up an owner within an hour, while other threads are busy, because the issue waits on its own clock and not on theirs.
+- **Don't:** write or apply a trigger such as "when no thread is working" to an issue that has a deadline.
+
+The check is [`scripts/check-unowned-issues.py`](../../scripts/check-unowned-issues.py) (below), and the reviewer layer is the "Filed issues with no owner" item in [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md#filed-issues-with-no-owner).
+
 ## A backlog thread keeps going
 
 The thread that takes the top issue does not stop after one issue or one batch while unowned backlog remains (coordinator correction, 2026-11-05: a backlog thread stopped after finishing one split and a few closes, and had to be told to continue).
@@ -65,7 +70,8 @@ Prompt as of 2026-11-07:
 > Hourly backlog check (Ezra's rule, ai-config#4967 / #4968 / #5088).
 > Step 1, owners: read the last activity of every owner thread listed in project memory with read_thread, not list_threads with state "working", which can return empty.
 > Restart any owner with no post or PR event in the last 60 minutes whose repo has an open issue or PR, by message_thread or a new thread, and say which you restarted.
-> Step 2, backlog: if no thread is working, find the top open issue that no thread, open PR or claim comment owns, across the project repos (lds, mds, pds, sds, mcs, psw, ai-config, gha, macros): rank by P1, P2, P3 label, then by age, and check live PR and thread state first rather than trusting memory.
+> Step 2, backlog, whether or not any thread is working: run `python3 scripts/check-unowned-issues.py` from an ai-config checkout and start a thread on every issue it reports OVERDUE.
+> Then find the top open issue that no thread, open PR or claim comment owns, across the project repos (lds, mds, pds, sds, mcs, psw, ai-config, gha, macros): rank by P1, P2, P3 label, then by age, and check live PR and thread state first rather than trusting memory.
 > Start a thread on it.
 > Standing limits apply: issue first, small PRs, no merges without mwc or a standing grant, FERPA, no browser use, never Codex, never force-push or push to main.
 > Reply "no action" only after step 1 restarted nothing and step 2 found nothing to start.

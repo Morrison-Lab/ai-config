@@ -161,6 +161,13 @@ Look for an unlinked term at first use, filler that adds nothing, and a dropped 
 Read the diff; do not report a script's output as your finding.
 See [`notes-pre-review-pass`](../../shared/workflow/notes-pre-review-pass.md#read-the-psw-chapters-before-editing-a-page).
 
+## Filed issues with no owner
+
+On a diff that adds or changes a rule about who works filed issues, check that no condition lets an unowned P1 or owed follow-up issue wait because some other agent is busy.
+Look for a trigger written as "when no thread is working", "when idle" or "if any agent is active", and ask what happens to a P1 issue filed while a thread is busy.
+Read the diff; do not report the output of `scripts/check-unowned-issues.py` as your finding.
+See [`keep-agent-on-backlog`](../../shared/workflow/keep-agent-on-backlog.md#the-rule).
+
 ## Final-head claims
 
 On a message or PR comment that calls a head final, check that the transcript or the PR shows a live read of that sha's check runs, every run complete and none failed, beside a Clean review naming that sha.

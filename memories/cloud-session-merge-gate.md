@@ -149,6 +149,10 @@ Learned on [ai-config#5023](https://github.com/Morrison-Lab/ai-config/pull/5023)
   Paste the comma-separated ids into the command itself, copied whole from the id listing: a list with one id dropped (`127720012940`) ends with a not-clean line for the check run that carries it.
 - A bare mwc covers the PRs open when Ezra sends it.
   A PR whose branch you update afterwards (sds#537, new head 9c75704) keeps that grant, but its re-review and checker run must be clean on the new head before the merge.
+  That carry-over holds only for a PR an mwc line actually names, with content unchanged beyond a main merge.
+  Never infer coverage for an unnamed PR from its unchanged content
+  (the coordinator did so for lds#2176, 2026-11-10; ai-config#5275).
+  Cite the line that names the PR in the merge command's report.
 
 ## A runner session's merge queue, 2026-11-09 to 2026-11-10
 

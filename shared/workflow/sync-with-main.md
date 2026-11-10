@@ -12,6 +12,22 @@ The one exception is a PR that is already fully clean on its current head and wa
 Merging `main` into it moves the head and voids the Clean review and the checker pass (ids#47 lost its Clean verdict this way, 2026-11-07, [ai-config#5093](https://github.com/Morrison-Lab/ai-config/issues/5093)).
 `hooks/no-update-branch-on-clean-pr.py` denies `update_pull_request_branch` there, unless `check-pr-fully-clean.py` has reported that the base gained a CI gate the head never ran.
 
+**Exception for `Morrison-Lab/lds`** (Ezra, 2026-11-09, [ai-config#5210](https://github.com/Morrison-Lab/ai-config/issues/5210)):
+do not merge `main` into an lds PR branch unless the runner's checker reports that PR stale.
+Every main merge resets CI and review, and that was growing the lds backlog.
+While you have two or more open lds PRs, open no new ones:
+drive the existing ones to final, or do non-lds work.
+
+**Small lds workflow fixes ride along** (coordinator, 2026-11-10, [ai-config#5245](https://github.com/Morrison-Lab/ai-config/issues/5245)):
+every lds workflow merge re-stales all open lds PRs, so do not open a standalone lds workflow PR for a small workflow fix.
+File an issue, and let the fix ride along with the next lds workflow PR (lds#2264 rides with lds#2263).
+
+- **Do:** file the issue and name the workflow PR it will ride with.
+- **Don't:** open a separate lds PR for a one-line workflow fix.
+
+This is prose because the deny form needs a live read of lds PR file lists and a definition of "small" that no hook has yet.
+The hook is a possible follow-up on [ai-config#5245](https://github.com/Morrison-Lab/ai-config/issues/5245).
+
 Worked-example case records for the rules below live in
 [`sync-with-main.cases.md`](sync-with-main.cases.md), moved out of the auto-loaded context.
 

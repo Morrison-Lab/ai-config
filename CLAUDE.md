@@ -498,14 +498,12 @@ Whenever starting or working on a Pull Request:
 [`shared/workflow/check-before-pushing.md`](shared/workflow/check-before-pushing.md)
 
 Take a fresh `git ls-remote` reading of the branch immediately before every `git push` --- not at the start of the round, not when you last synced, not when you opened the PR.
-The branch you cut and whose PR you opened is the one you are *least* likely to check, because ownership makes the check read as ceremony rather than as a question with an unknown answer.
-`claim-pr` records three ways it gains another agent's commits anyway (the `@claude` agent's `main`-sync, a second CLI session, a human), and every recovery procedure there runs *after* the collision.
-An earlier fetch is a measurement of a moment that has passed, and it expires exactly the way a clock reading does.
+Your own branch is the one you are least likely to check, and an earlier fetch expires like a clock reading.
 
-`--force-with-lease` alone is not the safe form, which no site in this corpus previously said: the lease compares against your remote-tracking ref, so any background fetch silently satisfies it over the very commits it was protecting.
-Always pair it with `--force-if-includes` (added in Git 2.30.0), and note that pairing `--force` *with* the lease is not a middle ground --- git documents `-f, --force` as one that "disables that check, the other safety checks in PUSH RULES below, and the checks in `--force-with-lease`".
+`--force-with-lease` alone is not the safe form: any background fetch silently satisfies the lease over the very commits it was protecting.
+Always pair it with `--force-if-includes` (Git 2.30.0 or later), and never pair `--force` with the lease, since `--force` disables the lease's checks.
 A `stale info` refusal is not a reason to force either.
-It reports only that your remote-tracking ref no longer matches the remote, and never why --- the branch may have been deleted (which recurs on this repo's flow, after a squash-merge with auto-delete), a peer may have pushed, or you may never have fetched it.
+It never says why: the branch may have been deleted (after a squash-merge with auto-delete), a peer may have pushed, or you may never have fetched it.
 `git ls-remote --heads origin <branch>` settles existence and nothing further: empty means deleted.
 Non-empty means the branch is live, so compare its tip against the ref you are pushing before choosing a remedy --- an ancestor tip fast-forwards, and only a diverged one needs a reconcile.
 When it is empty, query `gh pr list --state all --head <branch>` before a plain push.
@@ -799,6 +797,20 @@ If the item cannot be checked from this session, say that plainly instead of gue
 - **Don't:** write "it is probably waiting on CI" when the check runs are one read away.
 
 `hooks/warn-hedged-checkable-claim.py` warns, never blocks, when a hedge shares a sentence with a PR or issue reference, a CI or check word, or merged, open or closed, in a reply or a GitHub comment.
+
+## Don't hedge gratuitously
+
+[`shared/writing/dont-hedge-gratuitously.md`](shared/writing/dont-hedge-gratuitously.md)
+
+The rule above covers a hedge about a state one call can read.
+This one covers a conditional, softener or escape-hatch offer that no uncertainty justifies, such as "ready, if you still want it" (Ezra, 2026-11-10: "cai: don't hedge gratuitously").
+Before writing one, name the uncertainty or risk it reflects: keep it and say what it is, or delete it.
+An honest flag of an unverified fact stays.
+
+- **Do:** write "mlg#330 is ready for your merge word".
+- **Don't:** write "mlg#330 is ready, if you still want it".
+
+No hook: whether a hedge is gratuitous is not lexically decidable.
 
 ## Question the assignment, not only the claims
 

@@ -57,4 +57,8 @@ This one says the review's *own* gate, e.g. `review / require-clean-verdict`, do
 - **Do:** treat a green review-gating check run as unverified until the latest review comment's own verdict field confirms it, even when that check run's name implies it enforces the verdict directly.
 - **Don't:** read a named review-verdict check (e.g. `require-clean-verdict`) as SUCCESS meaning the review is clean --- name and outcome can disagree.
 
+A review comment names its commit in two places that can disagree, and neither is the PR head by default.
+The "Reviewed commit" line and the `commit_sha` in its JSON block can differ, and `commit_sha` can be the sha of the merge ref the workflow checked out rather than the branch head (2026-11-09: [psw#553](https://github.com/Morrison-Lab/psw/pull/553) reported as 56f1b380, live head 52f9dbac).
 
+- **Do:** read `head.sha` from the PR itself, and report a head as final only when a review names that sha in its "Reviewed commit" line or its diff range covers the head's commits.
+- **Don't:** copy a sha out of a review's JSON block into a status report.

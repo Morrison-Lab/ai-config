@@ -16,7 +16,7 @@ Together a defect has to slip through three unrelated layers.
 
 A PR that adds an algorithmic check (a `gha` workflow or script, a hook, a `scripts/check-*.py`) also adds or updates:
 
-- a writer instruction in the fragment that owns the rule, stated as a Do/Don't pair;
+- a writer instruction in the fragment that owns the rule, stated as a Do/Don't pair in the example format that document already uses (an ai-config fragment uses bold **Do:** and **Don't:** bullets, while a psw chapter uses a `> ❌` and `> ✅` blockquote pair, and [psw#553](https://github.com/Morrison-Lab/psw/pull/553) was flagged for the first inside the second);
 - a reviewer instruction in the checklist of [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md), or of the reviewer agent that owns the domain (`prose-fact-checker`, `hallucination-detector` and the others in `.claude/agents/`);
 - a link from each layer to the other two, so a reader who finds one finds all three.
 
@@ -41,8 +41,8 @@ Do not fix them in one sweep.
 - **Don't:** treat a passing check as the reviewer's answer.
 - **Don't:** add the instruction to one agent and call the check covered.
 
-## Not yet mechanical
+## The check for this rule
 
-Whether a PR that adds a check also touches a writer and a reviewer instruction is decidable from the diff.
-That check is owed and tracked in [ai-config#5174](https://github.com/Morrison-Lab/ai-config/issues/5174).
-Until it exists, this fragment and the reviewer's checklist item are the remaining layers.
+`scripts/check-check-has-instructions.py` ([ai-config#5174](https://github.com/Morrison-Lab/ai-config/issues/5174)) fails a PR that adds a `scripts/check-*.py` script or a hook without also changing a writer instruction (a `.md` under `shared/`, `AGENTS.md`, `CLAUDE.md` or a `SKILL.md`) and a reviewer instruction (`.claude/agents/*.md`).
+A PR that cannot supply a layer puts `check-instructions: exempt - <reason>` in its body.
+It sees only added files, so a check added as a workflow in another repository, or a layer that is present but vacuous, still needs the reviewer's checklist item.

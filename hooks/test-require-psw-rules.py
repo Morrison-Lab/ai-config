@@ -6,7 +6,7 @@ import subprocess
 import sys
 import tempfile
 
-HOOK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "require-psw-rules.py")
+HOOK = os.path.join(os.path.dirname(os.path.realpath(__file__)), "require-psw-rules.py")
 PSW = "/home/u/psw/chapters/"
 
 

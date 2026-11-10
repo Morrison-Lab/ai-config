@@ -359,6 +359,14 @@ Its last section is the mirror, and it covers requests that arrive rather than w
 The grant is latitude rather than an instruction, and the tracking issue is the whole of what licenses it --- an untracked deferral is a dropped request wearing the vocabulary of scope discipline.
 Read the fragment's boundary with `dont-incur-technical-debt` before invoking it, since a defect inside your own diff stays yours to fix now.
 
+## An ad-hoc choice is not a convention
+
+[shared/workflow/ad-hoc-choices-are-not-conventions.md](shared/workflow/ad-hoc-choices-are-not-conventions.md)
+
+Never copy, standardize or record as a rule a choice made once for local convenience, in any repository and for any kind of choice, unless Ezra decided it or a sourced rule backs it (Ezra, 2026-11-10: "learn the broader rule about random decisions not turning into habits").
+Find a pattern's source before reusing it, ask once when there is none, and have reviewers flag an unsourced pattern.
+Existing code is not a source.
+
 ## Issue or discussion? Pick the venue by best practice, not by precedent
 
 [shared/workflow/choose-issue-or-discussion.md](shared/workflow/choose-issue-or-discussion.md)

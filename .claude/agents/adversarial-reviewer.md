@@ -158,3 +158,8 @@ On a diff that edits a notes `.qmd` page, check the prose against psw's `definin
 Look for an unlinked term at first use, filler that adds nothing, and a dropped "that" before a relative clause.
 Read the diff; do not report a script's output as your finding.
 See [`notes-pre-review-pass`](../../shared/workflow/notes-pre-review-pass.md#read-the-psw-chapters-before-editing-a-page).
+
+## Standalone lds workflow PRs
+
+On a new `Morrison-Lab/lds` PR that changes only workflow files, check that it is not a small fix that could ride with another open lds workflow PR, since each lds workflow merge re-stales every open lds PR.
+See [`sync-with-main`](../../shared/workflow/sync-with-main.md).

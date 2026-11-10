@@ -300,6 +300,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/avoid-false-dichotomies.md` | Avoid false dichotomies. When laying out alternatives --- in a question to the user, a design note, a PR description --- test whether they are actually exclu... |  |
 | `shared/workflow/batch-merge-and-resolve.md` | When several open PRs need syncing or conflict resolution, do them **together in one pass**, not one at a time as each conflict flag appears. Batch merge and... |  |
 | `shared/workflow/browser-last-resort.md` | Driving a browser, whether the built-in browser pane, Claude in Chrome, or computer use against a web page, is a last resort. Before opening one for a task,... |  |
+| `shared/workflow/build-replacement-under-temporary-name.md` | When a repository's replacement is a history-free snapshot (a public release, a purge of history), build the new version under a *temporary name* and swap na... |  |
 | `shared/workflow/centralize-or-distribute.md` | Choose explicitly whether to centralize or distribute. |  |
 | `shared/workflow/challenge-ambiguous-terminology.md` | When reviewing code or prose, challenge ambiguous phrasing and terminology instead of silently accepting it. Flag a term or phrase when its meaning depends o... |  |
 | `shared/workflow/challenge-redundant-content.md` | When reviewing code or prose --- including mathematical content (derivations, proofs, restated formulas) --- check for redundant content that could be consol... |  |

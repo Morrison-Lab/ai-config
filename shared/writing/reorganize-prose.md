@@ -191,7 +191,7 @@ grants the move, it does not exempt it from what a move costs.
 - **An insertion can split a list item from its continuation.**
   A bullet's later lines are indented under it, so a block added after the bullet's first lines, rather than after its last, leaves the remaining indented lines attached to the wrong item, and a reader's "neither" or "the check" loses its antecedent.
   Read the lines that follow the insertion point before writing, and run `scripts/semantic-line-breaks.py` on the file without `--write` and read its diff, since the preview shows a stranded continuation line.
-  (Two insertions on 2026-11-09, ai-config#5239 and psw#553, each stranded one;
+  (Two insertions on 2026-11-09, [ai-config#5239](https://github.com/Morrison-Lab/ai-config/pull/5239) and [psw#553](https://github.com/Morrison-Lab/psw/pull/553), each stranded one;
   a reviewer caught the first, the preview the second.)
   - **Do:** insert after the last indented line of the item you are extending.
   - **Don't:** treat a one-line summary from the formatter as the check.

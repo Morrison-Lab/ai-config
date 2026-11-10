@@ -64,6 +64,8 @@ Track each completed issue in a running table:
 A clean-but-unmerged MR is **not** a stopping point. Merging is human-gated
 (you don't self-merge), but that gates only the merge, not the loop — keep
 going to the next issue instead of pausing to wait for a human to merge first.
+The [WIP cap](../../shared/workflow/wip-cap.md) still applies:
+at two open PRs in a repo, hold new grabs there (a wave boundary).
 Stacking is what lets the loop keep moving without merges. See
 [`stack-dont-pause`](../../shared/workflow/stack-dont-pause.md).
 

@@ -15,5 +15,12 @@ On 2026-11-09 the lds queue reached 676 runs while owners kept opening PRs behin
 
 The cap is on open PRs, not on distinct concerns, so a mechanical split in the middle of a stack still counts.
 
+**The cap wins over the batch skills.**
+`gii`, `gia` and `gip` keep grabbing issues while earlier PRs wait for a human merge, so left alone they open a third PR.
+Under this cap they hold new grabs in a repo at two open PRs and treat that as a wave boundary.
+They resume when one of the two merges or closes.
+`gip` grabs at most as many issues as the repo has room for under the cap.
+This tie-break is explicit because "specific beats general" would otherwise favor the skill.
+
 This is prose because the deny form needs a live API count of the owner's open PRs and a definition of "owner" that no hook has yet.
 The hook is a follow-up on ai-config#5213.

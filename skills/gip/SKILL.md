@@ -12,6 +12,8 @@ allowed-tools:
 
 # GIP — Grab Issues in Parallel
 
+The [WIP cap](../../shared/workflow/wip-cap.md) bounds the batch: grab no more issues in a repo than leave it at two open PRs.
+
 Grab a batch of open issues and work them **at the same time** — one subagent
 per issue, each in its own git worktree, each running the full grab-issue flow
 (claim → check history → open draft PR → implement → mark ready → ARDI to

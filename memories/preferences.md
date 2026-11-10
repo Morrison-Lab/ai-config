@@ -1,5 +1,7 @@
 # User preferences (cross-workspace)
 
+- WIP cap: with two open PRs in a repo, open no third there (ai-config#5213).
+  See [`wip-cap`](../shared/workflow/wip-cap.md).
 - NEVER assume; ALWAYS verify.
   Before stating a status/fact/outcome (PR or issue state, merge status, CI/review verdict, branch position, file contents, or which TOOLS/MCP servers are actually available in the current session) or acting on one, confirm it with a tool call --- don't rely on what was true earlier in the session, what "should" be the case, or what memory/documentation says was true as of some earlier point.
   State drifts between turns; tool availability drifts between sessions/environments.

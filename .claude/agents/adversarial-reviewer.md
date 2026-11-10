@@ -64,7 +64,8 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
      - an exercise that has several parts, or that does not end in a question or an instruction;
      - an exercise instruction that opens with "Write" where the task is to derive, express or show, so two readers answer different questions ([ai-config#5232](https://github.com/Morrison-Lab/ai-config/issues/5232));
      - a theorem, lemma, corollary or proposition stated in a remark div, or commentary, an example or a usage rule inside a definition div;
-     - a second new term defined inside one definition div, or a term used before its div.
+     - a second new term defined inside one definition div, or a term used before its div;
+     - a definition of a term that a site earlier in the course sequence (mcs, mds, pds, sds) already defines, where the page should link that definition instead, so the same term has two statements that can drift apart ([ai-config#5242](https://github.com/Morrison-Lab/ai-config/issues/5242)).
    - In the same pages, read the diff for these defects in the families the gha checks leave uncovered or unwired ([ai-config#5181](https://github.com/Morrison-Lab/ai-config/issues/5181)):
      - math written with raw LaTeX where a shared macro names the concept, or a bare `\exp` where the macros redefine it;
      - a figure with no real `fig-alt`, a matplotlib call without a trailing `;`, or `code-fold: false` on a chunk whose output is the point;

@@ -163,7 +163,8 @@ Learned over about 90 merges through `merge-infra-pr` and pinned `gh pr merge` i
   or the repo is gha, macros, ai-config or teaching-tools (Ezra, 2026-11-10: "teaching-tools is infra").
   A blanket `tools/` or `scripts/` is refused in any other repo, as in `hooks/no-unauthorized-merge.py`.
   One `_quarto.yml` or `canvas/` file in a content repo makes the PR content, which needs a typed mwc (mlg#330).
-  Canvas writes still need Ezra's explicit ok, whatever repo the PR is in.
+  Canvas writes still need Ezra's explicit ok, whatever repo the PR is in,
+  and `merge-infra-pr` refuses any PR that touches a `canvas/` path.
 - Every merge that changes `.github/workflows/` makes the other open PRs of that repo stale by the checker's stale-base rule.
   Merge workflow PRs last, merge content PRs first when an mwc is waiting, and for caller pairs (mds#705/#706, mcs#122/#123, pds#415/#416, sds#574/#575) merge one and ask the owner to merge main into the second.
 - `slide-major-tag.yml` fails if any check run on main's tip is cancelled (`r-cmd-check-tests` was, twice).

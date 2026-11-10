@@ -158,9 +158,13 @@ Learned over about 90 merges through `merge-infra-pr` and pinned `gh pr merge` i
   Ezra's mwc lines cited by the coordinator, or read back with `read_thread`, were denied "Merge Without Review" or "Auto-Mode Bypass" two to three times each.
   The identical command passed once his message arrived as a wake (psc "Sync site scaffolding" dispatch, pds#392, #406, #408).
   Try once after a cite, report the denial, and stop before a third attempt.
-- `merge-infra-pr` accepts a PR only when every changed file is under `.github/` or `changelog.d/`, or is a `tools/check_*`, `tools/check-*` or `tools/tests/` checker (or the repo is gha, macros or ai-config).
-  A blanket `tools/` or `scripts/` is refused, as in `hooks/no-unauthorized-merge.py`.
-  One `_quarto.yml` or `canvas/` file makes it content, which needs a typed mwc (mlg#330, teaching-tools#12).
+- `merge-infra-pr` accepts a PR only when every changed file is under `.github/` or `changelog.d/`,
+  or is a `tools/check_*`, `tools/check-*` or `tools/tests/` checker,
+  or the repo is gha, macros, ai-config or teaching-tools (Ezra, 2026-11-10: "teaching-tools is infra").
+  A blanket `tools/` or `scripts/` is refused in any other repo, as in `hooks/no-unauthorized-merge.py`.
+  One `_quarto.yml` or `canvas/` file in a content repo makes the PR content, which needs a typed mwc (mlg#330).
+  Canvas writes still need Ezra's explicit ok, whatever repo the PR is in,
+  and `merge-infra-pr` refuses any PR that touches a `canvas/` path.
 - Every merge that changes `.github/workflows/` makes the other open PRs of that repo stale by the checker's stale-base rule.
   Merge workflow PRs last, merge content PRs first when an mwc is waiting, and for caller pairs (mds#705/#706, mcs#122/#123, pds#415/#416, sds#574/#575) merge one and ask the owner to merge main into the second.
 - `slide-major-tag.yml` fails if any check run on main's tip is cancelled (`r-cmd-check-tests` was, twice).

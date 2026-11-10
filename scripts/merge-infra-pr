@@ -5,10 +5,12 @@
 # (Ezra, 2026-11-08: "do it"). Content PRs never go through this script.
 #
 # It merges only when ALL of these hold, and refuses (exit 2, nothing merged) otherwise:
-#   1. the repository is Morrison-Lab/gha, Morrison-Lab/macros or Morrison-Lab/ai-config, OR every
+#   1. the repository is Morrison-Lab/gha, Morrison-Lab/macros, Morrison-Lab/ai-config or
+#      Morrison-Lab/teaching-tools (Ezra, 2026-11-10: "teaching-tools is infra"), OR every
 #      file the PR changes is under .github/ or changelog.d/, or is a tools/check_*, tools/check-* or
 #      tools/tests/ checker (CI, checkers, changelog). A blanket tools/ or scripts/ is not accepted:
 #      a content repository can keep figure and analysis code there (see hooks/no-unauthorized-merge.py);
+#      No PR that touches a canvas/ path is merged here, in any repository: Canvas writes need Ezra's explicit ok.
 #   2. the PR is open, targets the default branch, and is not a draft;
 #   3. scripts/check-pr-fully-clean.py exits 0 on the exact head SHA read in step 0
 #      (--annotations-read passes through only after the caller has read those annotations);
@@ -46,11 +48,14 @@ default=$(gh repo view "$ORG/$repo" --json defaultBranchRef -q .defaultBranchRef
 [ "$base" = "$default" ] || refuse "base is $base, not the default branch $default"
 
 # 1. scope: infra repo, or every changed file is CI / tooling / changelog
+files=$(gh api "repos/$ORG/$repo/pulls/$pr/files" --paginate --jq '.[].filename') || refuse "cannot list files"
+[ -n "$files" ] || refuse "PR has no files"
+# Canvas writes need Ezra's explicit ok in every repo, including the whole-repo infra ones.
+canvas=$(printf '%s\n' "$files" | grep -E '(^|/)canvas/' | head -3)
+[ -z "$canvas" ] || refuse "touches Canvas paths, which need Ezra's explicit ok: $(echo $canvas)"
 case "$repo" in
-  gha|macros|ai-config) scope="infra repository $repo" ;;
+  gha|macros|ai-config|teaching-tools) scope="infra repository $repo" ;;
   *)
-    files=$(gh api "repos/$ORG/$repo/pulls/$pr/files" --paginate --jq '.[].filename') || refuse "cannot list files"
-    [ -n "$files" ] || refuse "PR has no files"
     bad=$(printf '%s\n' "$files" | grep -v -E '^(\.github/|changelog\.d/|tools/check[_-][^/]+$|tools/tests/)' | head -3)
     [ -z "$bad" ] || refuse "not infra-only; first non-CI paths: $(echo $bad)"
     scope="every changed file is under .github/ or changelog.d/, or is a tools/ checker" ;;

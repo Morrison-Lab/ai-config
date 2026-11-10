@@ -109,6 +109,7 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
 
    (For a not-clean verdict, set "verdict": "NOT_CLEAN" and give "findings" one object per finding, each with exactly these four keys: {"file": "<repo-relative path>", "line": <1-indexed int>, "category": "<kebab-case slug>", "message": "<one sentence stating the defect>"}.
    Use those key names literally -- a consumer that cannot find them reports the finding as "structured finding in unknown: ", which names nothing.
+   A finding's line must exist in its file at the reviewed commit: check it against `wc -l` before you report it, since a line past the end quotes nothing ([`quotable-findings`](../../shared/workflow/quotable-findings.md)).
    Any finding listed here blocks, whatever the "verdict" string says, and a CLEAN payload requires an explicit empty "findings" array -- omitting the key does not clear.)
 
    Read that sha yourself rather than taking it from the brief: run `git rev-parse HEAD` in your own worktree, and confirm it resolves with `git rev-parse --verify --quiet <sha>^{commit}` before writing the line.

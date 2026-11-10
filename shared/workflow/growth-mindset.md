@@ -241,7 +241,8 @@ that history is kept.
 
 - **Do:** before concluding a capability is unavailable, run an all-state
   issue search for the failure and check the same directory for a sibling
-  script, in addition to reading the tool's own output.
+  script, in addition to reading the tool's own output; with no failure to
+  search for, search the scripts, workflows and `git log -S` for a past use.
 - **Do:** treat a closed issue on the exact failure as evidence the remedy
   already shipped, not merely as evidence the gap is known.
 - **Don't:** stop at "the tool's error names no remedy" --- that rules out
@@ -316,18 +317,12 @@ so the absence of the first two is no evidence about the third.
   established it; a claim that ends the inquiry can never be contradicted by
   it.
 
-The same test applies to a claim that a project's own tooling lacks a
-capability.
-The project's history is evidence the tool listing never holds: on 2026-11-09 a
-coordinator wrote that nothing in the Canvas tooling could schedule solution
-releases, and Ezra answered that it had already been done for the midterm 2
-practice exam.
-
-- **Do:** before writing that existing tooling cannot do something, search
-  the repo's scripts, workflows, and closed issues and PRs for a past use of it
-  (`git log -S`, the tracker across all states), and name what you searched.
-- **Don't:** conclude a capability is missing from not having seen it used
-  in this session.
+The same search applies with no call made at all, to a claim that a
+project's own tooling lacks a capability: see
+[the remedy can be filed history](#the-remedy-can-be-filed-history-rather-than-anything-the-tool-says).
+On 2026-11-09 a coordinator wrote that nothing in the Canvas tooling could
+schedule solution releases, and Ezra answered that it had already been done
+for the midterm 2 practice exam.
 
 ### The route via a true measurement, over-generalized
 

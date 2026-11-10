@@ -1,5 +1,12 @@
 # User preferences (cross-workspace)
 
+- Don't hedge gratuitously.
+  Ezra, 2026-11-10: "cai: don't hedge gratuitously" ([ai-config#5263](https://github.com/Morrison-Lab/ai-config/issues/5263)).
+  An agent called two PRs ready "if you still want them" and he answered "why wouldn't I?".
+  Name the uncertainty a hedge reflects or delete it;
+  keep honest flags of unverified facts.
+  See [`dont-hedge-gratuitously`](../shared/writing/dont-hedge-gratuitously.md).
+
 - WIP cap: with two open PRs in a repo, open no third there (ai-config#5213).
   See [`wip-cap`](../shared/workflow/wip-cap.md).
 - Choose explicitly whether to centralize or distribute work, within and across repos ([ai-config#5185](https://github.com/Morrison-Lab/ai-config/issues/5185)).

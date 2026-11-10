@@ -800,6 +800,20 @@ If the item cannot be checked from this session, say that plainly instead of gue
 
 `hooks/warn-hedged-checkable-claim.py` warns, never blocks, when a hedge shares a sentence with a PR or issue reference, a CI or check word, or merged, open or closed, in a reply or a GitHub comment.
 
+## Don't hedge gratuitously
+
+[`shared/writing/dont-hedge-gratuitously.md`](shared/writing/dont-hedge-gratuitously.md)
+
+The rule above covers a hedge about a state one call can read.
+This one covers a conditional, softener or escape-hatch offer that no uncertainty justifies, such as "ready, if you still want it" (Ezra, 2026-11-10: "cai: don't hedge gratuitously").
+Before writing one, name the uncertainty or risk it reflects: keep it and say what it is, or delete it.
+An honest flag of an unverified fact stays.
+
+- **Do:** write "mlg#330 is ready for your merge word".
+- **Don't:** write "mlg#330 is ready, if you still want it".
+
+No hook: whether a hedge is gratuitous is not lexically decidable.
+
 ## Question the assignment, not only the claims
 
 The rule above governs **claims** --- the ones you generate as much as the ones

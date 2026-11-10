@@ -1,5 +1,7 @@
 # User preferences (cross-workspace)
 
+- WIP cap: with two open PRs in a repo, open no third there (ai-config#5213).
+  See [`wip-cap`](../shared/workflow/wip-cap.md).
 - Choose explicitly whether to centralize or distribute work, within and across repos ([ai-config#5185](https://github.com/Morrison-Lab/ai-config/issues/5185)).
   See [`centralize-or-distribute`](../shared/workflow/centralize-or-distribute.md).
 - NEVER assume; ALWAYS verify.

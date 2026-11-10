@@ -379,6 +379,7 @@ cookieconsent.run({
 <li>“extend AI capabilities”, “add an AI capability for X”, “teach Claude to X”, “give Claude the ability to X”, “make Claude able to X”, “wire this up so Claude always/automatically does X”</li>
 <li>A request names a desired behavior without naming a mechanism – that’s the tell that this skill, not a specific builder skill, is the right entry point.</li>
 </ul>
+<p>Every message that starts with <code>cai:</code> or <code>ca:</code> runs this skill, in whichever session receives it. A coordinator session has no repository clone, so repo skills never load for it. A coordinator must therefore send every <code>cai:</code> message to a thread that has the clone and invokes this skill, and must not answer it itself. Step 2’s reuse check is the part that gets skipped when the skill is not invoked (<a href="https://github.com/Morrison-Lab/ai-config/issues/5219">ai-config#5219</a>).</p>
 </section>
 <section id="step-0-restate-the-capability-not-the-mechanism" class="level2">
 <h2 class="anchored" data-anchor-id="step-0-restate-the-capability-not-the-mechanism">Step 0 – Restate the capability, not the mechanism</h2>

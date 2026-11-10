@@ -129,7 +129,10 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`, exce
 - **Don't:** delete it.
 - **Don't:** leave a reviewer to discover a removal and ask whether it moved (Ezra, 2026-11-09, [lds#2032](https://github.com/Morrison-Lab/lds/pull/2032): "are we deleting content when we should be moving it?").
 
-`check-removed-content` in `Morrison-Lab/gha` ([gha#1791](https://github.com/Morrison-Lab/gha/issues/1791)) is the mechanical half: it fails a PR whose removed sentences reappear nowhere, unless a `removed-content-ok` marker states why.
+`check-removed-content` in `Morrison-Lab/gha` ([gha#1793](https://github.com/Morrison-Lab/gha/pull/1793), merged 2026-11-09) is the mechanical half:
+it fails a PR whose removed sentences reappear nowhere, unless a `removed-content-ok` marker states why.
+A notes repo enforces it only once its own workflow calls it,
+and a code search of the organization found no such call on 2026-11-09.
 
 ## Leave no thread idle
 

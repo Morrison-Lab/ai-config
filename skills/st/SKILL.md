@@ -122,7 +122,8 @@ When the task naturally builds on an open issue or PR (it needs that work's code
   before hand-rolling custom code.
 - Choose explicitly whether to centralize or distribute the content or other
   work, both within the repo and across repos, and state the choice in the
-  issue or PR.
+  issue or PR, per
+  [`centralize-or-distribute`](../../shared/workflow/centralize-or-distribute.md).
   Ezra, 2026-11-09: "when planning and/or performing work, we
   should choose explicitly whether to centralize vs distribute content or other
   work, both within and across repos"

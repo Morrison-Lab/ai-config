@@ -462,3 +462,12 @@ six bundled composite actions and reusable workflows consolidate standard check 
   passing `paths` or `fail` causes silent parameter drops.
   Contract tests (`run-bundle-repo-actions-tests.py`) should parse callee `action.yml` files
   and statically assert zero undeclared inputs.
+- **Counting which checks a repo runs:**
+  A repo runs a gha check by either of two routes:
+  a workflow that calls `Morrison-Lab/gha/.github/workflows/<check>.yml`,
+  or (lds) `.github/workflows/cluster-checks.yml` running `.gha/run-check/run-check.sh <check>`.
+  Grepping only the first route undercounted lds
+  (15 checks reported, 29 actual; 58 of 96 gha checks reported unwired, 59 of 100 actual; ai-config#5236, gha#1803).
+  Before saying a check is unwired,
+  grep both routes on freshly fetched `origin/main` of each repo,
+  and name the routes you searched.

@@ -38,7 +38,9 @@ Run the full GI procedure:
 1. List open issues, triage, label, and prioritize candidate issues
 2. Select the highest-priority issue automatically from the triage signals,
    state which one and why, and proceed without pausing for confirmation
-3. Check history and research existing solutions (DRW check via [`prefer-upstream`](../prefer-upstream/SKILL.md))
+3. Check history and research existing solutions (DRW check via [`prefer-upstream`](../prefer-upstream/SKILL.md)),
+   and choose explicitly whether to centralize or distribute the work
+   ([`centralize-or-distribute`](../../shared/workflow/centralize-or-distribute.md))
 4. Claim the issue
 5. Create a branch
 6. Open the draft PR up front, from an empty commit, before implementing —
@@ -62,6 +64,8 @@ Track each completed issue in a running table:
 A clean-but-unmerged MR is **not** a stopping point. Merging is human-gated
 (you don't self-merge), but that gates only the merge, not the loop — keep
 going to the next issue instead of pausing to wait for a human to merge first.
+The [WIP cap](../../shared/workflow/wip-cap.md) still applies:
+at two open PRs in a repo, hold new grabs there (a wave boundary).
 Stacking is what lets the loop keep moving without merges. See
 [`stack-dont-pause`](../../shared/workflow/stack-dont-pause.md).
 
@@ -84,6 +88,8 @@ Stop the loop when:
 - User interrupts or says "stop" / "that's enough"
 - A configurable max is reached (default: 5 issues), which ends the current
   **wave**, not the session — see below
+- Two open PRs of yours are in this repo (the [WIP cap](../../shared/workflow/wip-cap.md)),
+  which is also a wave boundary
 - An issue is blocked and no other unblocked issues remain — otherwise
   **bypass** the blocked issue (surface it) and keep going with the rest
 

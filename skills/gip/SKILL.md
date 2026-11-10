@@ -12,6 +12,8 @@ allowed-tools:
 
 # GIP — Grab Issues in Parallel
 
+The [WIP cap](../../shared/workflow/wip-cap.md) bounds the batch: grab no more issues in a repo than leave it at two open PRs.
+
 Grab a batch of open issues and work them **at the same time** — one subagent
 per issue, each in its own git worktree, each running the full grab-issue flow
 (claim → check history → open draft PR → implement → mark ready → ARDI to
@@ -92,7 +94,12 @@ hand off to [`gii`](../gii/SKILL.md) (serial) and stop here.
 
 ### 3. Pick the concurrency cap (orchestrator)
 
-Fan out **at most N at once** (default **N = 3**). Bound it because every
+Fan out **at most N at once** (default **N = 3**, and never more than the
+[WIP cap](../../shared/workflow/wip-cap.md) leaves room for: N = min(3, 2 minus
+your open PRs in that repo)).
+If N is 0, grab nothing: hold the batch at the wave boundary and stop until
+one of the open PRs merges or closes.
+Bound it because every
 subagent pushes commits, triggers a review workflow, and polls for the result —
 too many at once swamps shared CI runners and the review bot (the same
 runner-contention reason [`ardia`](../ardia/SKILL.md) processes PRs one at a
@@ -155,6 +162,8 @@ and the default branch for each issue:
 >    or upstream ecosystems like r-lib/tidyverse, PyPI, npm).
 >    Follow `prefer-upstream`.
 >    If custom implementation is required, note what was searched in the PR.
+>    Also choose explicitly whether to centralize or distribute the work,
+>    per `shared/workflow/centralize-or-distribute.md`, and state the choice in the PR.
 > 4. **Branch from current `<default-branch>`**:
 >    `git fetch origin <default-branch> -q && git checkout -b <slug> origin/<default-branch>`.
 >    Use a descriptive `<slug>`.

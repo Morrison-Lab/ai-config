@@ -44,5 +44,8 @@ Ask separately whether one PR asserts something the other makes true.
 For a citation the better fix is to dissolve the dependency rather than sequence it,
 by phrasing it as a conditional that is accurate either way ---
 see [`challenge-ambiguous-terminology`](challenge-ambiguous-terminology.md)'s cross-repo citation trap, which applies to a same-repo sibling PR unchanged.
+**A repo with a serial queue (one PR at a time, such as `Morrison-Lab/gha`) gets the next PR opened only after the PR ahead of it merges.**
+Prepare it locally in the meantime, and never stack it on your own open PR ([ai-config#5227](https://github.com/Morrison-Lab/ai-config/issues/5227)).
+The issue dependencies API accepts issues and rejects a PR with HTTP 422, so record a PR's order in its body.
 The rationale behind each surface lives in `memories/output-highlighting.md`,
 alongside the rest of the taxonomy.

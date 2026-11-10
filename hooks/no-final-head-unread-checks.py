@@ -45,7 +45,7 @@ PR_READ_TOOL = re.compile(r"^mcp__github__pull_request_read$")
 CHECK_RUNS_COMMAND = re.compile(r"check-runs|check-pr-fully-clean")
 
 FINAL = re.compile(r"\bfinal\s+heads?\b|\b(?:is|are|now|as)\s+final\b", re.I)
-NEGATED = re.compile(r"\bnot\b|n't\b|\bnever\b|\bno longer\b|\buntil\b|\bonce\b|\bif\b", re.I)
+NEGATED = re.compile(r"\bnot\b|n't\b|\bnever\b|\bneither\b|\bnor\b|\bno longer\b|\buntil\b|\bonce\b|\bif\b", re.I)
 PR_REF = re.compile(r"/pull/\d+|\b[\w.-]*#\d{2,}\b", re.I)
 
 REASON = (

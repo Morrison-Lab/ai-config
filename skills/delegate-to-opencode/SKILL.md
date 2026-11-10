@@ -189,7 +189,7 @@ Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402 
 - `cat-jam-free` and `longcat-2.5-preview-free` answered through the proxy on 2026-10-15 while the Go quota was exhausted.
   On 2026-11-09 both returned "Upstream request failed: Model is unavailable".
   Those two ids were free for a limited time and reasoning models (a 16-token request returned only reasoning), so give them a generous `max_tokens`.
-  That day `/models` listed the free ids `beam-free`, `iceman-contributor-free` and `longcat-2.5-free` instead, which were not tried.
+  On 2026-11-09 `/models` listed the free ids `beam-free`, `iceman-contributor-free` and `longcat-2.5-free` instead, which were not tried.
   Check `/models` for the current free ids and try them before relying on this route.
 - **A review through these two ids worked on 2026-10-16, while every Go model returned the weekly `GoUsageLimitError`** ([ai-config#4581](https://github.com/Morrison-Lab/ai-config/issues/4581)).
   Stream with `"stream": true` and `max_tokens` 30000, and assemble `delta.content`;

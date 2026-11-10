@@ -268,8 +268,7 @@ When working in a consumer repo, check if the `.ai-config` submodule is outdated
 
 ## Remove redundant submodules when using native plugins
 
-On moving to native agent plugins, remove submodules that duplicated them.
-See [`remove-redundant-plugin-submodules`](shared/workflow/remove-redundant-plugin-submodules.md).
+On moving to native agent plugins, [remove submodules that duplicated them](shared/workflow/remove-redundant-plugin-submodules.md).
 
 ## WIP cap
 

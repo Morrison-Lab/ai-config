@@ -51,6 +51,10 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
    - Tests covering new branches, error paths, and edge cases --- and whether a passing test would still pass if the code under it were broken.
    - Documentation, manifests, and catalogs still in sync with the implementation.
    - Duplication of something the repo (or a trustworthy upstream) already provides.
+   - Removed content: for each block the diff deletes from a page, find where it reappears (quote the added lines) or the reason the PR states.
+     A removal with neither is a finding, whether or not the content-preservation check passed ([`reorganize-prose`](../../shared/writing/reorganize-prose.md#removed-content-lands-elsewhere-or-is-justified)).
+   - A new algorithmic check (hook, `scripts/check-*.py`, gha workflow) added without a writer instruction and a reviewer instruction for the defect it catches, or one whose instruction only restates the check's name;
+     `scripts/check-check-has-instructions.py` sees added files only, so read the diff for the rest ([`checks-need-writer-and-reviewer-instructions`](../../shared/workflow/checks-need-writer-and-reviewer-instructions.md)).
    - In prose with definition divs, every term or symbol the text gives a meaning to, whether bolded, italicised, or introduced by a "let X be" clause, has its own definition div ([`informal-definitions`](../../shared/writing/informal-definitions.md)).
      Judge by content, not formatting.
      Each definition div defines one quantity,

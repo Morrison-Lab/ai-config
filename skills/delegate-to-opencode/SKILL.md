@@ -188,9 +188,9 @@ Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402 
   Treat `/models` as the authority, since the vendor says the list changes as models are added.
 - `cat-jam-free` and `longcat-2.5-preview-free` answered through the proxy on 2026-10-15 while the Go quota was exhausted.
   On 2026-11-09 both returned "Upstream request failed: Model is unavailable".
+  Those two ids were free for a limited time and reasoning models (a 16-token request returned only reasoning), so give them a generous `max_tokens`.
   That day `/models` listed the free ids `beam-free`, `iceman-contributor-free` and `longcat-2.5-free` instead, which were not tried.
   Check `/models` for the current free ids and try them before relying on this route.
-  Both are free for a limited time and reasoning models (a 16-token request returned only reasoning), so give them a generous `max_tokens`.
 - **A review through these two ids worked on 2026-10-16, while every Go model returned the weekly `GoUsageLimitError`** ([ai-config#4581](https://github.com/Morrison-Lab/ai-config/issues/4581)).
   Stream with `"stream": true` and `max_tokens` 30000, and assemble `delta.content`;
   the text comes only after 40,000 to 70,000 characters of `reasoning_content`, about five minutes.
@@ -362,6 +362,7 @@ Each fact below was measured in a claude.ai cloud session on the date given, so 
   The warning is a false positive when the transcript shows the review.
 
 Write the brief and the diff to files in the scratchpad first, and set `BRIEF` and `DIFF` to their paths.
+The brief must ask the model to end with one line, `VERDICT: CLEAN` or `VERDICT: NOT_CLEAN`.
 The loop tries each model and stops at the first reply that holds a `VERDICT:` line.
 
 ```bash
@@ -369,7 +370,7 @@ set -o pipefail
 PAYLOAD=$(mktemp); REVIEW=$(mktemp); trap 'rm -f "$PAYLOAD"' EXIT
 for model in gpt-oss:120b gemma4:31b-cloud; do
   python3 -I -c 'import json, sys; m, b, d, o = sys.argv[1:5]; json.dump({"model": m, "stream": False, "messages": [{"role": "user", "content": open(b).read() + chr(10) * 2 + open(d).read()}]}, open(o, "w"))' \
-    "$model" "$BRIEF" "$DIFF" "$PAYLOAD"
+    "$model" "$BRIEF" "$DIFF" "$PAYLOAD" || break
   curl -sS --max-time 600 https://api.ollama.com/api/chat \
     -H "Content-Type: application/json" --data-binary "@$PAYLOAD" \
     | python3 -I -c 'import json, sys; r = json.load(sys.stdin); c = r.get("message", {}).get("content", ""); print(c) if c.strip() else sys.exit("no content: " + str(r)[:500])' \

@@ -82,7 +82,7 @@ the author-dispatched cross-model, cross-harness reviewer's
 
 In a cloud session (e.g. claude.ai) where no external CLI tools are installed,
 OpenCode Go over HTTP serves as the cross-harness reviewer (see [`delegate-to-opencode`](../../skills/delegate-to-opencode/SKILL.md)).
-When Go and its free ids are exhausted, that skill's "Ollama Cloud when Go is exhausted" route (`curl` to `api.ollama.com`) is the next one to try.
+When Go and its free ids are exhausted, that skill's "Ollama Cloud when Go is exhausted" route (`curl` to `api.ollama.com`) comes after them, and after `agy` on a device when the session can reach one.
 The cloud session's agent proxy injects credentials for `curl` to `https://opencode.ai/zen/go/v1/chat/completions` with `"stream": true`,
 piped into `skills/delegate-to-opencode/scripts/parse-sse.py`.
 Python `urllib` (or `requests`) gets HTTP 403 from the agent proxy and cannot be used.

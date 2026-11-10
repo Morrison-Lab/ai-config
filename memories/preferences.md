@@ -7,7 +7,8 @@
   keep honest flags of unverified facts.
   See [`dont-hedge-gratuitously`](../shared/writing/dont-hedge-gratuitously.md).
 
-- WIP cap: with two open PRs in a repo, open no third there (ai-config#5213).
+- WIP cap: with three open PRs in a repo, open no fourth there (ai-config#5213).
+  The 3 is Ezra's daytb on the coordinator's recommendation, 2026-11-10.
   See [`wip-cap`](../shared/workflow/wip-cap.md).
 - Choose explicitly whether to centralize or distribute work, within and across repos ([ai-config#5185](https://github.com/Morrison-Lab/ai-config/issues/5185)).
   See [`centralize-or-distribute`](../shared/workflow/centralize-or-distribute.md).

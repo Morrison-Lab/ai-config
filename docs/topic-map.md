@@ -423,7 +423,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/verify-the-right-artifact.md` | Before reporting a finding, name the artifact the claim is about, and confirm that is the one you read. |  |
 | `shared/workflow/watch-and-ardi.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/workflow/when-to-orchestrate.md` | When a heavy skill runs, decide whether to fan the work out to a **Workflow** (multi-agent orchestration) instead of handling it inline. This is the shared d... |  |
-| `shared/workflow/wip-cap.md` | An owner thread with two or more open PRs in a repository opens no new PR in that repository (ai-config#5213, 2026-11-09). Every open PR costs a CI run and a... |  |
+| `shared/workflow/wip-cap.md` | An owner thread with three or more open PRs in a repository opens no new PR in that repository (ai-config#5213, 2026-11-09). The number is 3 because the coor... |  |
 | `shared/workflow/wrap-up-merged-pr.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/writing/ai-tells.md` | Write plainly up front, then **scan the draft for AI tells before sending**. Before presenting non-trivial prose --- PR/issue descriptions, commit bodies, RE... |  |
 | `shared/writing/ambiguous-reference.md` | Avoid ambiguity in writing. A referring expression --- a pronoun, a demonstrative, a relative `which` --- must have exactly one reading, and the reading a re... |  |

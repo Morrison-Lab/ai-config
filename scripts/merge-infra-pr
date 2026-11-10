@@ -6,7 +6,9 @@
 #
 # It merges only when ALL of these hold, and refuses (exit 2, nothing merged) otherwise:
 #   1. the repository is Morrison-Lab/gha, Morrison-Lab/macros or Morrison-Lab/ai-config, OR every
-#      file the PR changes is under .github/, tools/, scripts/ or changelog.d/ (CI, tooling, changelog);
+#      file the PR changes is under .github/ or changelog.d/, or is a tools/check_*, tools/check-* or
+#      tools/tests/ checker (CI, checkers, changelog). A blanket tools/ or scripts/ is not accepted:
+#      a content repository can keep figure and analysis code there (see hooks/no-unauthorized-merge.py);
 #   2. the PR is open, targets the default branch, and is not a draft;
 #   3. scripts/check-pr-fully-clean.py exits 0 on the exact head SHA read in step 0
 #      (--annotations-read passes through only after the caller has read those annotations);
@@ -15,7 +17,7 @@
 # never --delete-branch, never --auto.
 set -u
 ORG=Morrison-Lab
-CHECKER=/home/morri313/Documents/GitHub/ai-config/scripts/check-pr-fully-clean.py
+AI_CONFIG_CHECKOUT=${AI_CONFIG_CHECKOUT:-/home/morri313/Documents/GitHub/ai-config}
 usage() { echo "usage: merge-infra-pr REPO PR [--annotations-read IDS] [--dry-run]" >&2; exit 64; }
 refuse() { echo "REFUSED: $*" >&2; exit 2; }
 
@@ -49,12 +51,12 @@ case "$repo" in
   *)
     files=$(gh api "repos/$ORG/$repo/pulls/$pr/files" --paginate --jq '.[].filename') || refuse "cannot list files"
     [ -n "$files" ] || refuse "PR has no files"
-    bad=$(printf '%s\n' "$files" | grep -v -E '^(\.github/|tools/|scripts/|changelog\.d/)' | head -3)
+    bad=$(printf '%s\n' "$files" | grep -v -E '^(\.github/|changelog\.d/|tools/check[_-][^/]+$|tools/tests/)' | head -3)
     [ -z "$bad" ] || refuse "not infra-only; first non-CI paths: $(echo $bad)"
-    scope="every changed file is under .github/, tools/, scripts/ or changelog.d/" ;;
+    scope="every changed file is under .github/ or changelog.d/, or is a tools/ checker" ;;
 esac
 
-# 3. the fully-clean checker, on this head
+# 2. the fully-clean checker, on this head
 args=(--reviewer-out-of-quota agy)
 [ -z "$ann" ] || args+=(--annotations-read "$ann")
 # Use the checker from ai-config's default branch, not the local checkout (which can be stale and
@@ -75,6 +77,6 @@ now=$(gh pr view "$pr" -R "$ORG/$repo" --json headRefOid -q .headRefOid)
 if [ $dry -eq 1 ]; then echo "dry run: would merge $ORG/$repo#$pr at $head with a merge commit"; exit 0; fi
 
 # the pinned merge
-cd /home/morri313/Documents/GitHub/ai-config || refuse "no ai-config checkout"
+cd "$AI_CONFIG_CHECKOUT" || refuse "no ai-config checkout"
 ALLOW_MERGE=1 gh pr merge "$pr" -R "$ORG/$repo" --merge --match-head-commit "$head" || exit $?
 gh pr view "$pr" -R "$ORG/$repo" --json state,mergeCommit -q '"merged: \(.state) \(.mergeCommit.oid)"'

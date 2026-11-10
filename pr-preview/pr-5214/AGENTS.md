@@ -268,8 +268,12 @@ When working in a consumer repo, check if the `.ai-config` submodule is outdated
 
 ## Remove redundant submodules when using native plugins
 
-When a repository migrates to native AI agent plugins (Antigravity or Claude Code plugins), remove redundant git submodules that duplicated those configurations.
+On moving to native agent plugins, remove submodules that duplicated them.
 See [`remove-redundant-plugin-submodules`](shared/workflow/remove-redundant-plugin-submodules.md).
+
+## WIP cap
+
+At two open PRs per repo, open no third ([`wip-cap`](shared/workflow/wip-cap.md)).
 
 ## Verify changes before pushing
 

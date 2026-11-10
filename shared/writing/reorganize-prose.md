@@ -53,6 +53,18 @@ The three layers are described in [`checks-need-writer-and-reviewer-instructions
   A move is a deletion plus an addition, so name both ends.
 - **Reviewer:** for each deleted block in the diff, find where it reappears, quoting the added lines, or find the stated reason.
   Search by a distinctive phrase, then by the idea, since a reworded move shares no phrase.
+
+An image belongs to its figure.
+When a diff removes the last reference to an image file, the image has no reader and no owner.
+It either moves to the outtakes file with its figure, or is deleted in the same PR with the reason in the description.
+A file left in the image directory with no reference hides the loss, because nothing renders it and nothing fails.
+
+- **Writer:** after removing a figure, search the repo for the image's file name.
+  If nothing else references it, move or delete it in the same PR and say which in the description.
+- **Reviewer:** for each figure the diff removes, find where its image file went, or find that another page still uses it.
+  Do this from the diff, not from the output of an orphaned-image check, since the check is off in most repos ([#5233](https://github.com/Morrison-Lab/ai-config/issues/5233)).
+- **Don't:** leave an unreferenced image in the tree because deleting it feels risky.
+  Git history keeps it, and an outtakes file keeps it where a reader can see.
   A deletion with neither is a finding, even when the check passed, because the check matches text and a reworded or half-moved passage can evade it.
 - **Do:** report a removal whose destination you cannot find as a finding that quotes the removed lines.
 - **Don't:** accept "consolidated" or "cleaned up" without finding the surviving text.

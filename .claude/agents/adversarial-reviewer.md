@@ -62,6 +62,7 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
      The div and its Source callout hold no example, usage rule or rationale ([`the display must define the term`](../../shared/writing/informal-definitions.md#the-display-must-define-the-term-and-only-the-term)).
    - In lecture and notes pages (`.qmd` with exercise, definition and result divs), read the diff for these structural defects, whether or not the gha structure checks ran ([`checks-need-writer-and-reviewer-instructions`](../../shared/workflow/checks-need-writer-and-reviewer-instructions.md), [ai-config#5181](https://github.com/Morrison-Lab/ai-config/issues/5181)):
      - an exercise that has several parts, or that does not end in a question or an instruction;
+     - an exercise instruction that opens with "Write" where the task is to derive, express or show, so two readers answer different questions ([ai-config#5232](https://github.com/Morrison-Lab/ai-config/issues/5232));
      - a theorem, lemma, corollary or proposition stated in a remark div, or commentary, an example or a usage rule inside a definition div;
      - a second new term defined inside one definition div, or a term used before its div.
    - In the same pages, read the diff for these defects in the families the gha checks leave uncovered or unwired ([ai-config#5181](https://github.com/Morrison-Lab/ai-config/issues/5181)):
@@ -69,7 +70,8 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
      - a figure with no real `fig-alt`, a matplotlib call without a trailing `;`, or `code-fold: false` on a chunk whose output is the point;
      - a bracketed citation that should be bare, or the reverse, where the author is not the sentence's subject;
      - three or more parallel items in running prose instead of a bullet list, or `---` where `{{< slidebreak >}}` belongs;
-     - a worked solution or exercise that reveals an answer to a graded item in the course's assessment repository, even with different numbers.
+     - a worked solution or exercise that reveals an answer to a graded item in the course's assessment repository, even with different numbers;
+     - a Quarto site whose search `keyboard-shortcut` includes a key a browser uses with Ctrl or Cmd, such as `f` for find or `s` for save, so the search box opens over the reader's own command ([ai-config#5238](https://github.com/Morrison-Lab/ai-config/issues/5238)).
    - When you suggest a fix, suggest only fixes that meet the rule behind the finding.
      Never offer a cosmetic option, such as dropping the bold from a hidden definition, as an acceptable alternative ([`no-cheap-fixes`](../../shared/principles/no-cheap-fixes.md)).
 
@@ -164,3 +166,9 @@ See [`notes-pre-review-pass`](../../shared/workflow/notes-pre-review-pass.md#rea
 On a new `Morrison-Lab/lds` PR that changes only workflow files, check that it is not a small fix that could ride with another open lds workflow PR, since each lds workflow merge re-stales every open lds PR.
 See [`sync-with-main`](../../shared/workflow/sync-with-main.md).
 This check is prose because no hook yet decides "small workflow fix" from lds PR file lists.
+
+## Final-head claims
+
+On a message or PR comment that calls a head final, check that the transcript or the PR shows a live read of that sha's check runs, every run complete and none failed, beside a Clean review naming that sha.
+A verdict alone is not that evidence.
+See [`fully-clean`](../../shared/workflow/fully-clean.md#read-the-check-runs-before-calling-a-head-final).

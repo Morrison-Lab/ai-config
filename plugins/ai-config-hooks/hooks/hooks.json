@@ -1802,6 +1802,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-final-head-unread-checks.py\"'",
+            "timeout": 10,
+            "script": "no-final-head-unread-checks.py",
+            "why": "ai-config#5198. Coordinator, 2026-11-09: owners keep calling a head final while CI is still running (rme#1450 had build running; ai-config#5186 was reported before its CI was read). Denies a user-visible hearthbot reply (post_message, message_coordinator, message_thread, edit_message) that calls a head final ('final head', 'is final', 'now final') and cites a pull request when no check-runs read (get_check_runs, get_check_run, a Bash check-runs or check-pr-fully-clean command) returned without error since the last user turn. A sentence that negates the claim is left alone. A deny, not a reminder, because the failing shape is lexical (ai-config#4741). ALLOW_FINAL_HEAD=1 overrides. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-mwc-ask-for-infra-pr.py\"'",
             "timeout": 10,
             "script": "no-mwc-ask-for-infra-pr.py",

@@ -446,7 +446,7 @@ its description does not use (ai-config#949).
 | `shared/writing/models-vs-inference.md` | Keep a model's structure and its estimation or inference method separate, in wording as well as in the exposition itself. |  |
 | `shared/writing/no-code-messages.md` | Code in the notes prints its output and no warning or non-output message (Ezra, 2026-10-26, Morrison-Lab/lds#1440). A reader should never see "`geom_smooth()... |  |
 | `shared/writing/no-rug-pulls.md` | Don't write "rug-pulls": present a model, claim, or picture, and then a sentence or two later retract or replace it. Every individual sentence in a rug-pull... |  |
-| `shared/writing/no-vague-attribution.md` | Name the real source of a claim, or write the claim as the author's own judgment, or cut it. Never invent a vague attribution to give a claim the look of sup... |  |
+| `shared/writing/no-vague-attribution.md` | Name the real source of a claim. When the draft has none, go and find one. That is the fix, not dropping the claim (Ezra, 2026-11-06). Never invent a vague a... |  |
 | `shared/writing/notes-content-rules.md` | Rules from Ezra, starting 2026-10-16. Each has a canonical prose rule in `psw`, possibly still in review. This fragment only points agents to it. |  |
 | `shared/writing/plain-prose.md` | Write user-facing prose in a plain, direct style. This applies to everything a reader sees --- PR/issue/commit text, docs, READMEs, code comments, release no... |  |
 | `shared/writing/quarto-divs-for-typed-content.md` | In Quarto lecture notes, books, and sites, put every block of content that has a type into a div or callout of that type. The box tells the reader what kind... |  |

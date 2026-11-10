@@ -4272,6 +4272,77 @@ def _disposition_drops_line(m: re.Match, tail: str) -> bool:
     )
 
 
+def _has_agent_reply_shape(body: str) -> bool:
+    """True when *body* ends with the disclosure footer and has no review shape.
+
+    The review shapes are the ones this scan admits from a human login
+    (report structure, a named review head) and a review-data payload, so a
+    relayed or self-posted review keeps its verdict.
+    """
+    if not body or not _AGENT_REPLY_FOOTER_RE.search(body):
+        return False
+    return not (
+        _is_structured_review_body(body)
+        or _named_review_head(body)
+        or "review-data" in body.lower()
+        or extract_structured_review(body) is not None
+    )
+
+
+_HEX_TOKEN_RE = re.compile(r"(?<![0-9a-z])[0-9a-f]{7,40}(?![0-9a-z])", re.IGNORECASE)
+
+
+def _body_names_head(body: str, head_sha: str) -> bool:
+    """True when *body* names *head_sha* by a prefix of 7 or more characters."""
+    head = (head_sha or "").lower()
+    return bool(head) and any(
+        head.startswith(tok.lower()) for tok in _HEX_TOKEN_RE.findall(body or "")
+    )
+
+
+def _superseded_agent_replies(comments: List[dict], head_sha: str) -> set:
+    """Indices of disclosed agent replies that a later disclosed clean supersedes.
+
+    An agent's reply under the maintainer's login can read as not-clean in
+    its own words ("Rebuttal of the blocking finding", "**Blocking (wiring
+    missing): ...**") without matching a disposition shape, and then it
+    vetoed the gate as the maintainer's verdict until the agent edited its
+    own comment (ai-config#5283, gha#1826). A later comment from the same
+    login that also has the agent-reply shape, names the current head, and
+    reads as clean supersedes it.
+
+    Only disclosed replies are superseded: a comment without the footer is
+    the maintainer's own, and a review-shaped one is a review, so neither
+    leaves the scan this way. The superseding comment is not admitted as a
+    review either, so it never counts toward quorum (#2308).
+    """
+    clean_at: Dict[str, str] = {}
+    for c in comments:
+        body = c.get("body", "")
+        login = (c.get("author") or {}).get("login", "")
+        if (
+            login
+            and _has_agent_reply_shape(body)
+            and _body_names_head(body, head_sha)
+            and classify_verdict(body, "", login) == "clean"
+        ):
+            at = c.get("createdAt") or ""
+            if at > clean_at.get(login, ""):
+                clean_at[login] = at
+    superseded = set()
+    for idx, c in enumerate(comments):
+        body = c.get("body", "")
+        login = (c.get("author") or {}).get("login", "")
+        at = c.get("createdAt") or ""
+        if (
+            login in clean_at
+            and at < clean_at[login]
+            and _has_agent_reply_shape(body)
+        ):
+            superseded.add(idx)
+    return superseded
+
+
 def _is_agent_disclosed_reply(body: str) -> bool:
     """True when *body* is an agent's reply to a review, not a verdict.
 
@@ -4287,14 +4358,7 @@ def _is_agent_disclosed_reply(body: str) -> bool:
       as not-clean. The test runs on the whole remainder, not line by line,
       so a verdict spread over several lines still counts.
     """
-    if not body or not _AGENT_REPLY_FOOTER_RE.search(body):
-        return False
-    if (
-        _is_structured_review_body(body)
-        or _named_review_head(body)
-        or "review-data" in body.lower()
-        or extract_structured_review(body) is not None
-    ):
+    if not _has_agent_reply_shape(body):
         return False
     # A disposition line drops only its label and disposition; the text
     # after them stays in the scan, so "-- rebutted. A new blocking defect
@@ -4411,7 +4475,8 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
 
     # Collect automated review reports only (filtering out human/author disposition comments)
     all_items = []
-    for c in comments:
+    superseded_replies = _superseded_agent_replies(comments, sha)
+    for idx, c in enumerate(comments):
         body = c.get("body", "")
         author_login = (c.get("author") or {}).get("login", "")
 
@@ -4450,13 +4515,16 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
         # which casual prose does not carry (#1798's guard, restated).
         if is_bot_author:
             all_items.append(("comment", c["createdAt"], body, "", "COMMENT", author_login, True))
-        elif _is_agent_disclosed_reply(body):
+        elif idx in superseded_replies or _is_agent_disclosed_reply(body):
             # An agent's reply under the maintainer's login (an ARD
             # disposition, a rebuttal) is not the maintainer's verdict, even
             # when it quotes a reviewer's "Blocking" label. Without this skip
             # the quote vetoed the merge gate for good, and the only way out
             # was editing the agent's own comment (ai-config#4826). See
-            # _is_agent_disclosed_reply for the evidence a skip needs.
+            # _is_agent_disclosed_reply for the evidence a skip needs. A
+            # reply that reads as not-clean in its own words also leaves once
+            # a later disclosed clean naming the head supersedes it
+            # (ai-config#5283; see _superseded_agent_replies).
             continue
         elif verdict == "not-clean":
             all_items.append(("comment", c["createdAt"], body, "", "COMMENT", author_login, False))

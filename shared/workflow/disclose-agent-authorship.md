@@ -30,6 +30,14 @@ The comments that need this are the ones that read most like a person: a claim, 
 An issue's own **body** is not a comment and stays unattributed, per [`defer-issue`](../../skills/defer-issue/SKILL.md), which is why this item says *comment* rather than *issue*.
 Each of those is short, conversational, and posted under a human login, which is exactly the shape that gets mistaken for a human.
 
+**A disclosed reply can still read as a verdict.**
+`check-pr-fully-clean.py` drops a disclosed reply only when its rejection words sit in a recognized disposition line, so a rebuttal that labels a finding in its own words ("**Blocking (wiring missing):** ...") vetoes the merge as the maintainer's not-clean.
+A later disclosed comment from the same login that names the current head and reads as clean (a status ending `Verdict: Clean`) supersedes it;
+it never counts toward quorum, and it never supersedes a comment without the marker or a review that names its head (ai-config#5283).
+
+- **Writer:** label each finding in a reply with a disposition shape (`- **Blocking, path:line** -- rebutted.`), and after a reply that may read as not-clean, post a status naming the head with `Verdict: Clean` instead of editing the reply.
+- **Reviewer:** flag a reply that labels a finding with a rejection word outside a disposition shape and has no later clean status naming the head.
+
 **A comment posted under a genuine BOT identity needs no marker.**
 The whole argument above is that the forge cannot report authorship when the token belongs to a person.
 Where it belongs to an app --- a workflow posting as `github-actions[bot]`, so the API returns `type: Bot` and the UI shows a bot badge --- the forge already says it, and a marker adds nothing.

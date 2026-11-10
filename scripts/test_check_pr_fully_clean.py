@@ -4226,6 +4226,62 @@ def main() -> int:
             check(label, reply_ok == expect_ok and
                   (reply_issues == [] or not expect_ok))
 
+    # --- ai-config#5283 (gha#1826, 2026-11-10): an agent's rebuttal that
+    # labels the finding in its own words ("Rebuttal of the blocking
+    # finding", "**Blocking (wiring missing): ...**") matches no disposition
+    # shape and reads as not-clean. A later disclosed comment from the same
+    # login that names the current head and reads as clean supersedes it;
+    # nothing else does. ------------------------------------------------------
+    rebuttal = dict(agent_reply, createdAt="2026-11-03T17:50:00Z", body=(
+        "Rebuttal of the blocking finding on 12658fd, and what happens to "
+        "the suggestions.\n\n**Blocking (wiring missing): this PR is part 2 "
+        "of a 4-part stack, by design.** Adding them here would put this PR "
+        "over the cap.\n" + footer))
+    status_clean = dict(agent_reply, createdAt="2026-11-03T18:50:00Z", body=(
+        "Status of every review finding on this PR, as of head bdb97ca.\n\n"
+        "- Wiring missing: answered in the earlier reply.\n\n"
+        "Verdict: Clean. Every finding is addressed or answered.\n" + footer))
+    status_clean_old = dict(status_clean, body=status_clean["body"].replace(
+        "bdb97ca", "79f3373"))
+    status_clean_undisclosed = dict(status_clean, body=status_clean[
+        "body"].replace(footer, "\n"))
+    status_clean_early = dict(status_clean, createdAt="2026-11-03T17:00:00Z")
+    status_clean_other = dict(status_clean, author={"login": "someone-else"})
+    human_notclean = dict(agent_reply, createdAt="2026-11-03T17:50:00Z",
+                          body="Needs more work: foo.py:3 drops the guard.\n")
+    relayed_named = dict(relayed_notclean, createdAt="2026-11-03T17:50:00Z")
+    for label, rounds, expect_ok in (
+        ("a rebuttal labelling the finding 'Blocking' still blocks alone "
+         "(ai-config#5283 baseline)", [rebuttal, reply_bot], False),
+        ("a later disclosed clean naming the head supersedes the rebuttal "
+         "(ai-config#5283)", [rebuttal, status_clean, reply_bot], True),
+        ("the supersession holds whatever order the payload lists them in",
+         [status_clean, reply_bot, rebuttal], True),
+        ("a later disclosed clean naming an OLDER head does not supersede "
+         "(negative control)", [rebuttal, status_clean_old, reply_bot], False),
+        ("a later clean WITHOUT the footer does not supersede (negative "
+         "control)", [rebuttal, status_clean_undisclosed, reply_bot], False),
+        ("an EARLIER disclosed clean does not supersede (negative control)",
+         [status_clean_early, rebuttal, reply_bot], False),
+        ("a disclosed clean from another login does not supersede "
+         "(negative control)", [rebuttal, status_clean_other, reply_bot],
+         False),
+        ("the maintainer's own not-clean is not superseded by a disclosed "
+         "clean (negative control)",
+         [human_notclean, status_clean, reply_bot], False),
+        ("a relayed review naming its head is not superseded by a disclosed "
+         "clean (negative control)",
+         [relayed_named, status_clean, reply_bot], False),
+        ("a disclosed clean alone never meets quorum (#2308 invariant)",
+         [rebuttal, status_clean], False),
+    ):
+        mock_sup = json.dumps({"comments": rounds, "reviews": []})
+        with patch.object(checker, "run_cmd", return_value=mock_sup):
+            sup_ok, sup_issues = checker.check_review_comments(
+                "1826", indep_head, TEST_REPO)
+            check(label, sup_ok == expect_ok and
+                  (sup_issues == [] or not expect_ok))
+
     # A structured non-bot clean ALONE never meets quorum: approval
     # authority comes from author identity, not body text (#2308).
     mock_solo = json.dumps({"comments": [human_clean_round], "reviews": []})

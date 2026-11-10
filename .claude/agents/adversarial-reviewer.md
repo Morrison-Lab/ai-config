@@ -151,3 +151,10 @@ Do not run anything that writes, moves, or deletes a file, pushes, or posts.
 Staying read-only is backed by instruction-level discipline and by mechanical PreToolUse hook enforcement (`hooks/no-mutation-in-read-only-reviewer.py`, ai-config#3612).
 Mutating git commands (`checkout`, `commit`, `stash`, `merge`, `reset`, `rebase`, `branch`, etc.) and file write tools are mechanically blocked.
 Report; the authoring session Addresses, Rebuts, or Defers each finding.
+
+## Notes-page prose
+
+On a diff that edits a notes `.qmd` page, check the prose against psw's `defining-terms`, `conciseness` and `relative-pronouns` chapters, even when the hook that requires reading them is absent.
+Look for an unlinked term at first use, filler that adds nothing, and a dropped "that" before a relative clause.
+Read the diff; do not report a script's output as your finding.
+See [`notes-pre-review-pass`](../../shared/workflow/notes-pre-review-pass.md#read-the-psw-chapters-before-editing-a-page).

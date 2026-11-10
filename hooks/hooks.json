@@ -1299,6 +1299,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/require-psw-rules.py\"",
+            "timeout": 10,
+            "script": "require-psw-rules.py",
+            "why": "ai-config#5166. Ezra, 2026-11-09: content sessions and the Claude CI review must load the psw writing rules (the Classification thread missed psw rules the same day; the CLAUDE.md prose telling sessions to read psw first was already missed). DENIES a Write, Edit or MultiEdit on a .qmd under chapters/ or _subfiles/ until the transcript holds a read of psw's defining-terms, conciseness and grammar/relative-pronouns chapters (a Read, or a Bash/WebFetch naming them under psw); the deny reason lists the paths and URLs. Exempts hooks/, memories/, shared/ and outtakes/. No override variable. Fails open and silent on any parse or transcript trouble. The gha companion for the CI review prompt is a separate issue."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unexplained-analysis-choice.py\"",
             "timeout": 10,
             "script": "no-unexplained-analysis-choice.py",

@@ -17,8 +17,10 @@ What it does, for each `git push` in the command:
      every repo that calls those workflows is covered (as of 2026-10-26: lds,
      sds, pds, mds and rme; psw and ids once they adopt the two checks).
   2. Runs gha's own scripts at the ref the workflow pins (`@v3`) from a cached
-     shallow clone in `~/.cache/ai-config/gha/` (refreshed daily; override with
-     `GHA_CHECKS_DIR` for a checkout), against `origin/main`.
+     shallow clone in `~/.cache/ai-config/gha/` (refetched whenever `git ls-remote`
+     shows the tag or branch moved, since `v3` slides; the daily stamp is the
+     offline fallback; override with `GHA_CHECKS_DIR` for a checkout), against
+     `origin/main`.
   3. DENIES the push when either check exits non-zero, naming the findings.
 
 `check-term-links` also learns terms from the prerequisite sites (mds, pds, sds, ...),
@@ -196,6 +198,27 @@ def find_calls(git_root: str) -> list[dict]:
     return calls
 
 
+def remote_moved(dest: str, ref: str) -> bool | None:
+    """True when origin's `ref` is a different commit from the cached HEAD, False when
+    it is the same, None when the remote cannot be read (the caller then falls back
+    to the daily stamp). A peeled `^{}` line, present for an annotated tag, wins."""
+    try:
+        listed = subprocess.run(["git", "-C", dest, "ls-remote", "origin", f"refs/tags/{ref}", f"refs/heads/{ref}"],
+                                capture_output=True, text=True, timeout=15)
+        head = subprocess.run(["git", "-C", dest, "rev-parse", "HEAD"], capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if listed.returncode != 0 or head.returncode != 0 or not listed.stdout.strip():
+        return None
+    shas = {}
+    for line in listed.stdout.splitlines():
+        sha, _, name = line.partition(chr(9))
+        shas[name] = sha
+    tag = f"refs/tags/{ref}"
+    remote = shas.get(tag + "^{}") or shas.get(tag) or shas.get(f"refs/heads/{ref}")
+    return remote is not None and remote != head.stdout.strip()
+
+
 def ensure_gha(ref: str) -> str | None:
     """Return a gha checkout at `ref`, cloning or refreshing a cache; None on failure."""
     override = os.environ.get("GHA_CHECKS_DIR")
@@ -207,7 +230,13 @@ def ensure_gha(ref: str) -> str | None:
         if os.path.isdir(os.path.join(dest, ".git")):
             last = os.path.getmtime(stamp) if os.path.exists(stamp) else 0
             # A commit pin is immutable, so only a tag or branch pin is ever refreshed.
-            if not re.fullmatch(r"[0-9a-f]{40}", ref) and time.time() - last > REFRESH_SECONDS:
+            # A tag such as v3 moves when gha slides it, so the remote's sha is read on
+            # every push; the daily stamp is only the fallback when the remote is unreachable.
+            pinned = re.fullmatch(r"[0-9a-f]{40}", ref) is not None
+            moved = None if pinned else remote_moved(dest, ref)
+            if moved is None:
+                moved = time.time() - last > REFRESH_SECONDS
+            if not pinned and moved:
                 # Stamp first, so an offline machine retries once a day, not on every push.
                 with open(stamp, "w", encoding="utf-8") as fh:
                     fh.write(str(time.time()))

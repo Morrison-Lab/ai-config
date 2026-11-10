@@ -32,6 +32,9 @@ and requiring consensus clean verdicts at the current HEAD.
   List runs with `output.annotations_count > 0`, read each through `check-runs/<id>/annotations`, and fix it or state in the PR why it is a false positive.
   `check-pr-fully-clean.py` fails until you rerun it with `--annotations-read <id>[,<id>...]` (or `all`, after reading every run the checker listed;
   GitHub puts a platform notice on every Actions job, so the checker cannot tell a notice you can ignore from a warning you cannot).
+- **Do:** when you compare a head's annotations with the base branch's tip, run `scripts/diff-annotations-vs-base.py --repo <owner/repo> --base <sha> --head <sha>` (ai-config#5281).
+  It reads every page of check runs and annotations on both commits, compares per check-run name after normalizing temp paths, shas and run ids, and exits 1 on any difference you have not traced and named with `--explained <run name>`.
+- **Don't:** report a bare annotation total, or a total from the first page of `commits/<sha>/check-runs`, as evidence that a head adds nothing (gha#1825 counted 174 against 168 that way; over every page both had 249).
 - **Do:** substitute a reviewer that is out of quota (Ezra, 2026-11-07, ai-config#5064).
   A Clean verdict on the live head from another reviewer (agy or Claude) fills its slot, so being out of quota is never, by itself, grounds to ask for a manual waiver.
   Rerun the checker with `--reviewer-out-of-quota <name>` (for example `copilot`):

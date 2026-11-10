@@ -94,7 +94,10 @@ hand off to [`gii`](../gii/SKILL.md) (serial) and stop here.
 
 ### 3. Pick the concurrency cap (orchestrator)
 
-Fan out **at most N at once** (default **N = 3**). Bound it because every
+Fan out **at most N at once** (default **N = 3**, and never more than the
+[WIP cap](../../shared/workflow/wip-cap.md) leaves room for: N = min(3, 2 minus
+your open PRs in that repo)).
+Bound it because every
 subagent pushes commits, triggers a review workflow, and polls for the result —
 too many at once swamps shared CI runners and the review bot (the same
 runner-contention reason [`ardia`](../ardia/SKILL.md) processes PRs one at a

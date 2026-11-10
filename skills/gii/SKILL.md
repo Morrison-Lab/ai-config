@@ -88,6 +88,8 @@ Stop the loop when:
 - User interrupts or says "stop" / "that's enough"
 - A configurable max is reached (default: 5 issues), which ends the current
   **wave**, not the session — see below
+- Two open PRs of yours are in this repo (the [WIP cap](../../shared/workflow/wip-cap.md)),
+  which is also a wave boundary
 - An issue is blocked and no other unblocked issues remain — otherwise
   **bypass** the blocked issue (surface it) and keep going with the rest
 

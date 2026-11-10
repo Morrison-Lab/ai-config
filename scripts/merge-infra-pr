@@ -36,7 +36,7 @@ while [ $# -gt 0 ]; do
 done
 case "$ann" in *[!0-9,]*) refuse "--annotations-read takes comma-separated numeric ids" ;; esac
 
-# 0. read the PR once
+# 0. read the PR once, and check condition 2 (open, not a draft, base is the default branch)
 info=$(gh pr view "$pr" -R "$ORG/$repo" --json state,isDraft,headRefOid,baseRefName -q '"\(.state) \(.isDraft) \(.headRefOid) \(.baseRefName)"') || refuse "cannot read $ORG/$repo#$pr"
 read -r state draft head base <<<"$info"
 [ "$state" = OPEN ] || refuse "PR is $state, not OPEN"
@@ -56,7 +56,7 @@ case "$repo" in
     scope="every changed file is under .github/ or changelog.d/, or is a tools/ checker" ;;
 esac
 
-# 2. the fully-clean checker, on this head
+# 3. the fully-clean checker, on this head
 args=(--reviewer-out-of-quota agy)
 [ -z "$ann" ] || args+=(--annotations-read "$ann")
 # Use the checker from ai-config's default branch, not the local checkout (which can be stale and

@@ -52,7 +52,18 @@ df[df$group == which_group, ]
 `rlang::.data$x` written with the prefix instead fails inside `filter()`
 (`stop_fake_data_subset`), so attach the pronoun rather than namespace it.
 
-This is a readability default, not an absolute rule: reach for base R when
+Subsetting a dataset is not a default but a rule
+(Ezra, 2026-11-10: "psc: let's use dplyr's filter() and select() to subset datasets in R, instead of base [] (for example https://morrison-lab.github.io/lds/chapters/discriminant-analysis.html#sol-lab-knn-split)").
+Use `dplyr::filter()` for rows, `dplyr::select()` for columns and `dplyr::pull()` for one column as a vector;
+base `[]` stays for vectors, lists and matrices.
+This holds when the surrounding file already uses `[]`: convert the lines you touch.
+
+- **Do:** write `smarket |> dplyr::filter(Year < 2005) |> dplyr::select(Lag1, Lag2)`.
+- **Don't:** write `smarket[smarket$Year < 2005, c("Lag1", "Lag2")]`.
+
+`lms::base_subset_linter()` in Morrison-Lab/psc flags `x[i, ]` and `x[, j]`.
+
+The rest of this section is a readability default, not an absolute rule: reach for base R when
 the tidyverse equivalent pulls in a heavy dependency for a one-liner, when
 performance in a hot loop matters, or when base R is already the idiom the
 surrounding file uses throughout. `{rlang}`'s lower-level tidy-eval building

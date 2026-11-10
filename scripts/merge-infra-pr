@@ -5,7 +5,8 @@
 # (Ezra, 2026-11-08: "do it"). Content PRs never go through this script.
 #
 # It merges only when ALL of these hold, and refuses (exit 2, nothing merged) otherwise:
-#   1. the repository is Morrison-Lab/gha, Morrison-Lab/macros or Morrison-Lab/ai-config, OR every
+#   1. the repository is Morrison-Lab/gha, Morrison-Lab/macros, Morrison-Lab/ai-config or
+#      Morrison-Lab/teaching-tools (Ezra, 2026-11-10: "teaching-tools is infra"), OR every
 #      file the PR changes is under .github/ or changelog.d/, or is a tools/check_*, tools/check-* or
 #      tools/tests/ checker (CI, checkers, changelog). A blanket tools/ or scripts/ is not accepted:
 #      a content repository can keep figure and analysis code there (see hooks/no-unauthorized-merge.py);
@@ -47,7 +48,7 @@ default=$(gh repo view "$ORG/$repo" --json defaultBranchRef -q .defaultBranchRef
 
 # 1. scope: infra repo, or every changed file is CI / tooling / changelog
 case "$repo" in
-  gha|macros|ai-config) scope="infra repository $repo" ;;
+  gha|macros|ai-config|teaching-tools) scope="infra repository $repo" ;;
   *)
     files=$(gh api "repos/$ORG/$repo/pulls/$pr/files" --paginate --jq '.[].filename') || refuse "cannot list files"
     [ -n "$files" ] || refuse "PR has no files"

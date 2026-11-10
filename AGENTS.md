@@ -276,13 +276,7 @@ See [`remove-redundant-plugin-submodules`](shared/workflow/remove-redundant-plug
 Always run relevant local linters, tests, and formatting checks before pushing commits to a remote branch.
 At minimum for `ai-config`: `python3 scripts/validate-skills.py`, `python3 scripts/check-links.py`, `python3 scripts/check-ascii-punctuation.py`.
 Run the full test suite (`python3 scripts/test_*.py`) when touching shared tools or scripts.
-
-Parse every data file a change touches with a real parser before calling a PR ready or reporting a head as final:
-a CSV with a CSV reader (every row's field count equals the header's),
-and YAML and JSON by loading them.
-Reading a row beside its neighbours is not a check:
-an unquoted comma in `courses.csv` made a row five fields wide on Morrison-Lab/lds#2220,
-and two review rounds repeated "same four columns" until a third parsed the file (ai-config#5206).
+Parse changed data files: [rule](shared/workflow/parse-data-files.md).
 
 ## Canonical sources vs generated output
 

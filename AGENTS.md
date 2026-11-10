@@ -272,7 +272,7 @@ On moving to native agent plugins, [remove submodules that duplicated them](shar
 
 ## WIP cap
 
-At two open PRs per repo, open no third ([`wip-cap`](shared/workflow/wip-cap.md)).
+At three open PRs per repo, open no fourth ([`wip-cap`](shared/workflow/wip-cap.md)).
 
 ## Verify changes before pushing
 

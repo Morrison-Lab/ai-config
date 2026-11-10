@@ -380,7 +380,7 @@ cookieconsent.run({
 
 <section id="gip-grab-issues-in-parallel" class="level1">
 <h1>GIP — Grab Issues in Parallel</h1>
-<p>The <a href="../../shared/workflow/wip-cap.md">WIP cap</a> bounds the batch: grab no more issues in a repo than leave it at two open PRs.</p>
+<p>The <a href="../../shared/workflow/wip-cap.md">WIP cap</a> bounds the batch: grab no more issues in a repo than leave it at three open PRs.</p>
 <p>Grab a batch of open issues and work them <strong>at the same time</strong> — one subagent per issue, each in its own git worktree, each running the full grab-issue flow (claim → check history → open draft PR → implement → mark ready → ARDI to clean). Then assemble one combined report.</p>
 <p>This is the <strong>parallel</strong> counterpart to <a href="../../skills/gii/SKILL.html"><code>gii</code></a>, which is <strong>deliberately serial</strong>. The whole job of this skill is to safely lift that serialization — and that is only safe for issues that are <strong>provably independent</strong>. Read <em>The independence gate</em> before fanning anything out; it is the load-bearing part.</p>
 <section id="when-this-fires" class="level2">
@@ -427,7 +427,7 @@ cookieconsent.run({
 </section>
 <section id="pick-the-concurrency-cap-orchestrator" class="level3">
 <h3 class="anchored" data-anchor-id="pick-the-concurrency-cap-orchestrator">3. Pick the concurrency cap (orchestrator)</h3>
-<p>Fan out <strong>at most N at once</strong> (default <strong>N = 3</strong>, and never more than the <a href="../../shared/workflow/wip-cap.md">WIP cap</a> leaves room for: N = min(3, 2 minus your open PRs in that repo)). If N is 0, grab nothing: hold the batch at the wave boundary and stop until one of the open PRs merges or closes. Bound it because every subagent pushes commits, triggers a review workflow, and polls for the result — too many at once swamps shared CI runners and the review bot (the same runner-contention reason <a href="../../skills/ardia/SKILL.html"><code>ardia</code></a> processes PRs one at a time). If the independent set is larger than N, run it in waves of N.</p>
+<p>Fan out <strong>at most N at once</strong> (default <strong>N = 3</strong>, and never more than the <a href="../../shared/workflow/wip-cap.md">WIP cap</a> leaves room for: N = min(3, 3 minus your open PRs in that repo)). If N is 0, grab nothing: hold the batch at the wave boundary and stop until one of the open PRs merges or closes. Bound it because every subagent pushes commits, triggers a review workflow, and polls for the result — too many at once swamps shared CI runners and the review bot (the same runner-contention reason <a href="../../skills/ardia/SKILL.html"><code>ardia</code></a> processes PRs one at a time). If the independent set is larger than N, run it in waves of N.</p>
 </section>
 <section id="fan-out-one-worktree-isolated-subagent-per-issue-concurrent" class="level3">
 <h3 class="anchored" data-anchor-id="fan-out-one-worktree-isolated-subagent-per-issue-concurrent">4. Fan out — one worktree-isolated subagent per issue (concurrent)</h3>

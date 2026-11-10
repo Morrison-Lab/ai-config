@@ -163,3 +163,4 @@ See [`notes-pre-review-pass`](../../shared/workflow/notes-pre-review-pass.md#rea
 
 On a new `Morrison-Lab/lds` PR that changes only workflow files, check that it is not a small fix that could ride with another open lds workflow PR, since each lds workflow merge re-stales every open lds PR.
 See [`sync-with-main`](../../shared/workflow/sync-with-main.md).
+This check is prose because no hook yet decides "small workflow fix" from lds PR file lists.

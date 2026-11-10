@@ -25,6 +25,9 @@ File an issue, and let the fix ride along with the next lds workflow PR (lds#226
 - **Do:** file the issue and name the workflow PR it will ride with.
 - **Don't:** open a separate lds PR for a one-line workflow fix.
 
+This is prose because the deny form needs a live read of lds PR file lists and a definition of "small" that no hook has yet.
+The hook is a possible follow-up on [ai-config#5245](https://github.com/Morrison-Lab/ai-config/issues/5245).
+
 Worked-example case records for the rules below live in
 [`sync-with-main.cases.md`](sync-with-main.cases.md), moved out of the auto-loaded context.
 

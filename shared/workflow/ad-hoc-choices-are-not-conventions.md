@@ -32,11 +32,11 @@ Its existence shows what someone typed once, not what Ezra wants.
 
 ## Style is decided in psc and psw
 
-Ezra, 2026-11-10: "imitating existing code style is not a good justification for style choices;
-all style decisions must be made explicitly in psc or psw".
+Ezra, 2026-11-10: "imitating existing code style is not a good justification for style choices"
+and, in a later message, "all style decisions must be made explicitly by the repo maintainers and recorded in psc or psw".
 Code style comes from [psc](https://morrison-lab.github.io/psc/) and writing style from [psw](https://morrison-lab.github.io/psw/), or from a repository instruction that cites them.
 It never comes from the code or prose around the edit.
-A style choice that neither guide states is a question for Ezra, raised as an issue on psc (code) or psw (writing) with a recommendation.
+A style choice that neither guide states is a question for the repo maintainers, raised as an issue on psc (code) or psw (writing) with a recommendation.
 It is not copied from a neighbouring file.
 
 - **Do:** when psc or psw is silent on a style choice, file an issue there asking Ezra, and follow his answer once it is in the guide.

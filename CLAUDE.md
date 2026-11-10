@@ -366,8 +366,8 @@ Read the fragment's boundary with `dont-incur-technical-debt` before invoking it
 Never copy, standardize or record as a rule a choice made once for local convenience, in any repository and for any kind of choice, unless Ezra decided it or a sourced rule backs it (Ezra, 2026-11-10: "learn the broader rule about random decisions not turning into habits").
 Find a pattern's source before reusing it, ask once when there is none, and have reviewers flag an unsourced pattern.
 Existing code is not a source.
-Style is decided explicitly in psc and psw: "imitating existing code style is not a good justification for style choices;
-all style decisions must be made explicitly in psc or psw" (Ezra, 2026-11-10).
+Style is decided explicitly in psc and psw: "imitating existing code style is not a good justification for style choices"
+and "all style decisions must be made explicitly by the repo maintainers and recorded in psc or psw" (Ezra, 2026-11-10).
 A style choice neither guide states is a question for Ezra on psc or psw, never copied from surrounding code or text, and reviewers flag style they do not support.
 
 ## Issue or discussion? Pick the venue by best practice, not by precedent
@@ -646,7 +646,8 @@ read it before launching or proposing a workflow, and before choosing a dispatch
 ## Agent teams: a third parallelism primitive, human-gated and advisory
 
 An **agent team** is several separate Claude Code sessions that message each other directly.
-When the workers need to communicate, or a human wants to steer one mid-run, recommend a team to the user; otherwise use a subagent or a `Workflow` sweep.
+When the workers need to communicate, or a human wants to steer one mid-run, recommend a team to the user;
+otherwise use a subagent or a `Workflow` sweep.
 Never assume a team is available and never author a step that spawns one: teams are experimental, off by default and spawned by the user.
 The discriminator, the enabling setting and the subagent-definition reuse angle are in [shared/workflow/agent-teams.md](shared/workflow/agent-teams.md).
 

@@ -300,6 +300,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/avoid-false-dichotomies.md` | Avoid false dichotomies. When laying out alternatives --- in a question to the user, a design note, a PR description --- test whether they are actually exclu... |  |
 | `shared/workflow/batch-merge-and-resolve.md` | When several open PRs need syncing or conflict resolution, do them **together in one pass**, not one at a time as each conflict flag appears. Batch merge and... |  |
 | `shared/workflow/browser-last-resort.md` | Driving a browser, whether the built-in browser pane, Claude in Chrome, or computer use against a web page, is a last resort. Before opening one for a task,... |  |
+| `shared/workflow/build-replacement-under-temporary-name.md` | When a repository's replacement is a history-free snapshot (a public release, a purge of history), build the new version under a *temporary name* and swap na... |  |
 | `shared/workflow/centralize-or-distribute.md` | Choose explicitly whether to centralize or distribute. |  |
 | `shared/workflow/challenge-ambiguous-terminology.md` | When reviewing code or prose, challenge ambiguous phrasing and terminology instead of silently accepting it. Flag a term or phrase when its meaning depends o... |  |
 | `shared/workflow/challenge-redundant-content.md` | When reviewing code or prose --- including mathematical content (derivations, proofs, restated formulas) --- check for redundant content that could be consol... |  |
@@ -430,6 +431,7 @@ its description does not use (ai-config#949).
 | `shared/writing/citations.md` | When explaining a concept or writing documentation, **cite claims to their primary or authoritative source, thoroughly and by default** --- not only when ask... |  |
 | `shared/writing/course-sequence.md` | The Morrison-Lab course sites form a prerequisite sequence. Place content, and direct links, according to it. |  |
 | `shared/writing/definition-crossrefs.md` | When reviewing prose that defines technical terms or named results via formal cross-reference divs --- Quarto's theorem-like div syntax (`::: {#def-...}`, `{... |  |
+| `shared/writing/dont-hedge-gratuitously.md` | Ezra, 2026-11-10: "cai: don't hedge gratuitously" (ai-config#5263). |  |
 | `shared/writing/examples-are-scanned.md` | An illustrative example sits inside the document, so a mechanical check that scans the document may scan the example too. When the document's subject *is* a... |  |
 | `shared/writing/explain-analysis-choices.md` | Ezra's rule (2026-11-03, ai-config#4905): every time you make an arbitrary analysis choice, explain the decision in detail in the prose next to it. |  |
 | `shared/writing/fact-check-prose.md` | When reviewing prose in a PR/MR --- documentation, lecture notes, a README, any non-code narrative content --- assess it for **accuracy and clarity**, not ju... |  |
@@ -446,7 +448,7 @@ its description does not use (ai-config#949).
 | `shared/writing/models-vs-inference.md` | Keep a model's structure and its estimation or inference method separate, in wording as well as in the exposition itself. |  |
 | `shared/writing/no-code-messages.md` | Code in the notes prints its output and no warning or non-output message (Ezra, 2026-10-26, Morrison-Lab/lds#1440). A reader should never see "`geom_smooth()... |  |
 | `shared/writing/no-rug-pulls.md` | Don't write "rug-pulls": present a model, claim, or picture, and then a sentence or two later retract or replace it. Every individual sentence in a rug-pull... |  |
-| `shared/writing/no-vague-attribution.md` | Name the real source of a claim, or write the claim as the author's own judgment, or cut it. Never invent a vague attribution to give a claim the look of sup... |  |
+| `shared/writing/no-vague-attribution.md` | Name the real source of a claim. When the draft has none, go and find one. That is the fix, not dropping the claim (Ezra, 2026-11-06). Never invent a vague a... |  |
 | `shared/writing/notes-content-rules.md` | Rules from Ezra, starting 2026-10-16. Each has a canonical prose rule in `psw`, possibly still in review. This fragment only points agents to it. |  |
 | `shared/writing/plain-prose.md` | Write user-facing prose in a plain, direct style. This applies to everything a reader sees --- PR/issue/commit text, docs, READMEs, code comments, release no... |  |
 | `shared/writing/quarto-divs-for-typed-content.md` | In Quarto lecture notes, books, and sites, put every block of content that has a type into a div or callout of that type. The box tells the reader what kind... |  |

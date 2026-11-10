@@ -650,6 +650,16 @@ reply's timestamp against the review run's `started_at` (`gh run view <id>
 `get_check_runs` when `gh` is absent): if the reply landed after the run
 began, it is a stale re-raise, not a genuine disagreement.
 
+**The Claude review reads the diff and the files, not the PR body or the comments, so a finding it got wrong has to be answered where it can be read.**
+In [mlg#319](https://github.com/Morrison-Lab/mlg/pull/319) the review cited line 150 of a 53-line file.
+A line number past the end of the file is checkable (`wc -l` at the reviewed commit) and proves the finding is about text that is not there.
+Rebut it in a comment, quote the file's real length, and re-request the review with `/review`, which then reads the thread;
+a rebuttal alone never reaches the next round.
+A fact the review needs to judge the change belongs in the diff, such as a file comment or a commit, not only in the PR body.
+
+- **Do:** check a cited `path:line` against the file's length at the reviewed commit before acting on the finding, and re-request the review after the rebuttal.
+- **Don't:** leave a rebuttal as the only record and wait for the review to change its mind.
+
 **Reply-first collides with citing the fix's SHA, and the way out is to commit
 between them rather than to pick one.**
 

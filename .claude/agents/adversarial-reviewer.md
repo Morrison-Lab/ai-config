@@ -64,12 +64,14 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
      - an exercise that has several parts, or that does not end in a question or an instruction;
      - an exercise instruction that opens with "Write" where the task is to derive, express or show, so two readers answer different questions ([ai-config#5232](https://github.com/Morrison-Lab/ai-config/issues/5232));
      - a theorem, lemma, corollary or proposition stated in a remark div, or commentary, an example or a usage rule inside a definition div;
-     - a second new term defined inside one definition div, or a term used before its div.
+     - a second new term defined inside one definition div, or a term used before its div;
+     - a definition of a term that a site earlier in the course sequence (mcs, mds, pds, sds) already defines, where the page should link that definition instead, so the same term has two statements that can drift apart ([ai-config#5242](https://github.com/Morrison-Lab/ai-config/issues/5242)).
    - In the same pages, read the diff for these defects in the families the gha checks leave uncovered or unwired ([ai-config#5181](https://github.com/Morrison-Lab/ai-config/issues/5181)):
      - math written with raw LaTeX where a shared macro names the concept, or a bare `\exp` where the macros redefine it;
      - a figure with no real `fig-alt`, a matplotlib call without a trailing `;`, or `code-fold: false` on a chunk whose output is the point;
      - a bracketed citation that should be bare, or the reverse, where the author is not the sentence's subject;
      - three or more parallel items in running prose instead of a bullet list, or `---` where `{{< slidebreak >}}` belongs;
+     - output typed or pasted into a page instead of produced by a chunk, such as a `# ->` comment under code or a computed number written into a sentence by hand ([ai-config#5241](https://github.com/Morrison-Lab/ai-config/issues/5241));
      - a worked solution or exercise that reveals an answer to a graded item in the course's assessment repository, even with different numbers;
      - a Quarto site whose search `keyboard-shortcut` includes a key a browser uses with Ctrl or Cmd, such as `f` for find or `s` for save, so the search box opens over the reader's own command ([ai-config#5238](https://github.com/Morrison-Lab/ai-config/issues/5238)).
    - When you suggest a fix, suggest only fixes that meet the rule behind the finding.
@@ -107,6 +109,7 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
 
    (For a not-clean verdict, set "verdict": "NOT_CLEAN" and give "findings" one object per finding, each with exactly these four keys: {"file": "<repo-relative path>", "line": <1-indexed int>, "category": "<kebab-case slug>", "message": "<one sentence stating the defect>"}.
    Use those key names literally -- a consumer that cannot find them reports the finding as "structured finding in unknown: ", which names nothing.
+   A finding's line must exist in its file at the reviewed commit: check it against `wc -l` before you report it, since a line past the end quotes nothing ([`quotable-findings`](../../shared/workflow/quotable-findings.md)).
    Any finding listed here blocks, whatever the "verdict" string says, and a CLEAN payload requires an explicit empty "findings" array -- omitting the key does not clear.)
 
    Read that sha yourself rather than taking it from the brief: run `git rev-parse HEAD` in your own worktree, and confirm it resolves with `git rev-parse --verify --quiet <sha>^{commit}` before writing the line.
@@ -167,6 +170,12 @@ On a diff that adds or changes a rule about who works filed issues, check that n
 Look for a trigger written as "when no thread is working", "when idle" or "if any agent is active", and ask what happens to a P1 issue filed while a thread is busy.
 Read the diff; do not report the output of `scripts/check-unowned-issues.py` as your finding.
 See [`keep-agent-on-backlog`](../../shared/workflow/keep-agent-on-backlog.md#the-rule).
+
+## Standalone lds workflow PRs
+
+On a new `Morrison-Lab/lds` PR that changes only workflow files, check that it is not a small fix that could ride with another open lds workflow PR, since each lds workflow merge re-stales every open lds PR.
+See [`sync-with-main`](../../shared/workflow/sync-with-main.md).
+This check is prose because no hook yet decides "small workflow fix" from lds PR file lists.
 
 ## Final-head claims
 

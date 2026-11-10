@@ -149,3 +149,22 @@ Learned on [ai-config#5023](https://github.com/Morrison-Lab/ai-config/pull/5023)
   Paste the comma-separated ids into the command itself, copied whole from the id listing: a list with one id dropped (`127720012940`) ends with a not-clean line for the check run that carries it.
 - A bare mwc covers the PRs open when Ezra sends it.
   A PR whose branch you update afterwards (sds#537, new head 9c75704) keeps that grant, but its re-review and checker run must be clean on the new head before the merge.
+
+## A runner session's merge queue, 2026-11-09 to 2026-11-10
+
+Learned over about 90 merges through `merge-infra-pr` and pinned `gh pr merge` in the Data 571 project.
+
+- A merge grant must reach the runner session as the user's own wake.
+  Ezra's mwc lines cited by the coordinator, or read back with `read_thread`, were denied "Merge Without Review" or "Auto-Mode Bypass" two to three times each.
+  The identical command passed once his message arrived as a wake (psc "Sync site scaffolding" dispatch, pds#392, #406, #408).
+  Try once after a cite, report the denial, and stop before a third attempt.
+- `merge-infra-pr` accepts a PR only when every changed file is under `.github/`, `tools/`, `scripts/` or `changelog.d/` (or the repo is gha, macros or ai-config).
+  One `_quarto.yml` or `canvas/` file makes it content, which needs a typed mwc (mlg#330, teaching-tools#12).
+- Every merge that changes `.github/workflows/` makes the other open PRs of that repo stale by the checker's stale-base rule.
+  Merge workflow PRs last, merge content PRs first when an mwc is waiting, and for caller pairs (mds#705/#706, mcs#122/#123, pds#415/#416, sds#574/#575) merge one and ask the owner to merge main into the second.
+- `slide-major-tag.yml` fails if any check run on main's tip is cancelled (`r-cmd-check-tests` was, twice).
+  Re-run that one job, then slide once at the end of a gha batch: every gha merge moves the tip.
+- When agy has no quota, enumerate the other routes once (here `cursor-agent` needed a key, `opencode` and `gemini` were absent), post the waiver note on the PR, and owe the review after the reset.
+- `gh api rate_limit` costs nothing.
+  A gha PR needs about 800 calls for the annotation read and 100 to 300 for the checker.
+  The 5,000 per hour budget therefore supports about four gha merges plus a few content checks, so pace by the reset time.

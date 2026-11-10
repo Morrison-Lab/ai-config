@@ -54,6 +54,11 @@ This fragment is the agent-facing copy: follow the rules, and link to psw instea
 - **Use real data and compute every number.**
   Never type or paste output.
   See [`hypothetical-examples`](hypothetical-examples.md).
+  The rule holds in every notes repository (`mds`, `pds`, `sds`, `mcs`, `lds`, `rme`), not only in lds, whose `CLAUDE.md` first stated it.
+  A typed number goes stale when the data or the code changes, and nothing on the page shows that it did.
+  The wording is canonical in psw's "Writing for teaching" chapter, and gha's `check-typed-output` flags a comment in a code chunk that stands in for a printed value (`# ->`, `#>`).
+  - **Do:** run the code in an executable chunk, and take each number in the prose from inline code.
+  - **Don't:** type the result as a comment under the code, or write a computed value into a sentence by hand.
 - **Give every topic an applied example on real data and at least one figure.**
   This holds for lectures and for the prerequisite sites (`mds`, `pds`, `sds`), not only for one deck.
   Do not leave a page that is only definitions and algebra.

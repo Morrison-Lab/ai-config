@@ -104,6 +104,35 @@ When static source reading is insufficient to resolve runtime behavior:
   and process exit statuses directly rather than inferring them from subsequent
   steps.
 
+## A quoted error line may be expected test output
+
+A test step prints errors on purpose, so the first `##[error]` or `::error::`
+line in its log is not the failure.
+[gha#1809](https://github.com/Morrison-Lab/gha/issues/1809) (2026-11-10)
+named a failure "Failed to fetch PR diff" from such a line.
+`antigravity-review/tests/test_run_antigravity.py` mocks that failure, so the
+line also appears in green runs.
+The failing assertion was `test_preflight_checks_pass`, further down, caused by
+a changelog fragment that did not start with `- `.
+The wrong reading cost a wrong issue title, a wrong "transient" note and a
+planned separate PR.
+
+**Writer instruction** (when filing or diagnosing a failed CI job):
+
+- **Do:** take the cause from the test runner's own summary: the
+  `FAIL:` or `AssertionError` line, the named test and its traceback.
+- **Do:** before blaming infrastructure, `grep -rn "<quoted string>"` the repo's
+  test files, since a string that exists there is likely expected output.
+- **Don't:** take the first error annotation in a test step's output as the
+  failure.
+
+**Reviewer instruction** (when reviewing an issue or PR that reports a CI failure):
+
+- **Do:** ask which test or step the quoted line came from, and whether the same
+  line appears in a green run on `main`.
+- **Don't:** accept a root-cause claim that quotes an error line without a
+  failing test name beside it.
+
 ## A guard's refusal message goes unread precisely because it arrives with a remedy
 
 The failure modes above all concern a component you are trying to *use*.

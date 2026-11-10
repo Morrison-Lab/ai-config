@@ -288,6 +288,7 @@ its description does not use (ai-config#949).
 | `shared/principles/teach-a-man-to-fish.md` | When an agent, subagent, or assistant produces defective, incomplete, or misaligned work, do not absorb the defect by quietly fixing it yourself. Help the ag... |  |
 | `shared/principles/think-outside-the-box.md` | Think outside the box. Do not make unnecessary assumptions about structural limitations; consider which limitations are real and which are artificial. |  |
 | `shared/principles/use-real-world-examples.md` | When we do or see something that would be a good example for general practice, use it. When authoring, reviewing, or observing work that exemplifies good gen... |  |
+| `shared/workflow/ad-hoc-choices-are-not-conventions.md` | An ad-hoc choice made once, for local convenience, is not a convention. Do not copy it, standardize it, or record it as a rule unless Ezra decided it or a so... |  |
 | `shared/workflow/address-every-comment.md` | When iterating on a PR with a reviewer, **address every in-scope flagged item**, regardless of severity label. The reviewer's "Informational", "Not a blocker... |  |
 | `shared/workflow/adversarial-self-review.md` | Every self-review is an **adversarial review by a separate subagent**. Whenever this corpus calls for reviewing your own work --- before a push, as the fallb... |  |
 | `shared/workflow/agent-teams.md` | Agent teams are a third way Claude Code parallelizes work, and the corpus's job is to know when to *recommend* one --- not to reach for it, because unlike th... |  |

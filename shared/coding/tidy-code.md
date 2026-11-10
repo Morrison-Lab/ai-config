@@ -61,7 +61,9 @@ This holds when the surrounding file already uses `[]`: convert the lines you to
 - **Do:** write `smarket |> dplyr::filter(Year < 2005) |> dplyr::select(Lag1, Lag2)`.
 - **Don't:** write `smarket[smarket$Year < 2005, c("Lag1", "Lag2")]`.
 
-`lms::base_subset_linter()` in Morrison-Lab/psc flags `x[i, ]` and `x[, j]`.
+As of 2026-11-10, [psc#112](https://github.com/Morrison-Lab/psc/pull/112) is open
+and adds `lms::base_subset_linter()`, which flags `x[i, ]` and `x[, j]`.
+Until it merges, no check enforces this rule.
 
 The rest of this section is a readability default, not an absolute rule: reach for base R when
 the tidyverse equivalent pulls in a heavy dependency for a one-liner, when

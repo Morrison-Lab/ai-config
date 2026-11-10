@@ -642,6 +642,9 @@ jobs:
         run: python3 scripts/check-memory-file-size.py --strict
       - name: Run stale-record check tests
         run: python3 scripts/test_check_stale_records.py
+      - name: Run unowned-issue check tests
+        # ai-config#5056: the negative control reports a known unowned P1.
+        run: python3 scripts/test_check_unowned_issues.py
       - name: Run bare-fragment-mention check tests
         # ai-config#3034. The negative control: until the detector has been
         # seen to produce a non-zero, a zero from the corpus scan below is not

@@ -701,6 +701,9 @@ I don't care if they run on this computer or in the cloud."
   This later directive supersedes the 2026-08-27 inclusion of local
   Ollama in the cost ladder without changing the CLI-reachable meaning of
   "local" for hosted tools.
+- **Do (inferred, 2026-11-09):** treat a `curl` call to Ollama Cloud's hosted API (`api.ollama.com`) as outside that ban, since it runs nothing on the machine.
+  It is a hosted destination, so the data rules apply to it.
+  `delegate-to-opencode` gives the route ([ai-config#5197](https://github.com/Morrison-Lab/ai-config/issues/5197)).
 - **Don't (inferred):** route work to a cheap tier where it
   predictably fails for a small model ---
   adversarial review, long-list triage, or any of the judgment-heavy

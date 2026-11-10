@@ -16,7 +16,7 @@ Together a defect has to slip through three unrelated layers.
 
 A PR that adds an algorithmic check (a `gha` workflow or script, a hook, a `scripts/check-*.py`) also adds or updates:
 
-- a writer instruction in the fragment that owns the rule, stated as a Do/Don't pair;
+- a writer instruction in the fragment that owns the rule, stated as a Do/Don't pair in the example format that document already uses (an ai-config fragment uses bold **Do:** and **Don't:** bullets, while a psw chapter uses a `> ❌` and `> ✅` blockquote pair, and psw#553 was flagged for the first inside the second);
 - a reviewer instruction in the checklist of [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md), or of the reviewer agent that owns the domain (`prose-fact-checker`, `hallucination-detector` and the others in `.claude/agents/`);
 - a link from each layer to the other two, so a reader who finds one finds all three.
 

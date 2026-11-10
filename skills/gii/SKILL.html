@@ -461,7 +461,7 @@ cookieconsent.run({
 </section>
 <section id="c.-decide-the-next-base-branch-stacking" class="level4">
 <h4 class="anchored" data-anchor-id="c.-decide-the-next-base-branch-stacking">c.&nbsp;Decide the next base branch (stacking)</h4>
-<p>A clean-but-unmerged MR is <strong>not</strong> a stopping point. Merging is human-gated (you don’t self-merge), but that gates only the merge, not the loop — keep going to the next issue instead of pausing to wait for a human to merge first. Stacking is what lets the loop keep moving without merges. See <a href="../../shared/workflow/stack-dont-pause.md"><code>stack-dont-pause</code></a>.</p>
+<p>A clean-but-unmerged MR is <strong>not</strong> a stopping point. Merging is human-gated (you don’t self-merge), but that gates only the merge, not the loop — keep going to the next issue instead of pausing to wait for a human to merge first. The <a href="../../shared/workflow/wip-cap.md">WIP cap</a> still applies: at two open PRs in a repo, hold new grabs there (a wave boundary). Stacking is what lets the loop keep moving without merges. See <a href="../../shared/workflow/stack-dont-pause.md"><code>stack-dont-pause</code></a>.</p>
 <p>After ARDI completes clean on the current MR/PR:</p>
 <ul>
 <li><p><strong>If the MR was merged</strong> (user said “merge” or auto-merge is on): base the next branch on <code>origin/main</code> (which now includes the fix).</p></li>
@@ -474,7 +474,7 @@ cookieconsent.run({
 </section>
 <section id="d.-check-stopping-conditions" class="level4">
 <h4 class="anchored" data-anchor-id="d.-check-stopping-conditions">d.&nbsp;Check stopping conditions</h4>
-<p>Stop the loop when: - No more open issues (backlog empty) - User interrupts or says “stop” / “that’s enough” - A configurable max is reached (default: 5 issues), which ends the current <strong>wave</strong>, not the session — see below - An issue is blocked and no other unblocked issues remain — otherwise <strong>bypass</strong> the blocked issue (surface it) and keep going with the rest</p>
+<p>Stop the loop when: - No more open issues (backlog empty) - User interrupts or says “stop” / “that’s enough” - A configurable max is reached (default: 5 issues), which ends the current <strong>wave</strong>, not the session — see below - Two open PRs of yours are in this repo (the <a href="../../shared/workflow/wip-cap.md">WIP cap</a>), which is also a wave boundary - An issue is blocked and no other unblocked issues remain — otherwise <strong>bypass</strong> the blocked issue (surface it) and keep going with the rest</p>
 <p>Hitting the max is a <strong>wave boundary</strong>. Wrap up one wave of PRs before starting another: hold new issue grabs, babysit the wave’s open PRs to completion (merge-ready, and merged where a merge grant applies), then stop and ask whether to continue into the next wave or archive the session, giving a recommendation either way (user directive, 2026-08-28, ai-config#2549). A wave is “completely finished” only once every item in it has reached a terminal state; a PR still in CI/review is not a finished wave, and the check-in loop that drives it to green continues uninterrupted. <a href="../../skills/finish-wave/SKILL.html"><code>finish-wave</code></a> (alias <code>fw</code>) is the procedure for that hold.</p>
 <ul>
 <li><strong>Do:</strong> hold at the boundary and drive the open wave to completion, then stop and ask before starting the next wave, with a recommendation.</li>

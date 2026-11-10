@@ -1,5 +1,7 @@
 # GIP — Grab Issues in Parallel
 
+The [WIP cap](../../shared/workflow/wip-cap.md) bounds the batch: grab no more issues in a repo than leave it at two open PRs.
+
 Grab a batch of open issues and work them **at the same time** — one subagent per issue, each in its own git worktree, each running the full grab-issue flow (claim → check history → open draft PR → implement → mark ready → ARDI to clean). Then assemble one combined report.
 
 This is the **parallel** counterpart to [`gii`](../../skills/gii/SKILL.llms.md), which is **deliberately serial**. The whole job of this skill is to safely lift that serialization — and that is only safe for issues that are **provably independent**. Read *The independence gate* before fanning anything out; it is the load-bearing part.
@@ -47,7 +49,7 @@ If the independent set has **0 or 1** issues, there’s nothing to parallelize �
 
 ### 3. Pick the concurrency cap (orchestrator)
 
-Fan out **at most N at once** (default **N = 3**). Bound it because every subagent pushes commits, triggers a review workflow, and polls for the result — too many at once swamps shared CI runners and the review bot (the same runner-contention reason [`ardia`](../../skills/ardia/SKILL.llms.md) processes PRs one at a time). If the independent set is larger than N, run it in waves of N.
+Fan out **at most N at once** (default **N = 3**, and never more than the [WIP cap](../../shared/workflow/wip-cap.md) leaves room for: N = min(3, 2 minus your open PRs in that repo)). If N is 0, grab nothing: hold the batch at the wave boundary and stop until one of the open PRs merges or closes. Bound it because every subagent pushes commits, triggers a review workflow, and polls for the result — too many at once swamps shared CI runners and the review bot (the same runner-contention reason [`ardia`](../../skills/ardia/SKILL.llms.md) processes PRs one at a time). If the independent set is larger than N, run it in waves of N.
 
 ### 4. Fan out — one worktree-isolated subagent per issue (concurrent)
 

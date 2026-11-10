@@ -431,6 +431,7 @@ its description does not use (ai-config#949).
 | `shared/writing/citations.md` | When explaining a concept or writing documentation, **cite claims to their primary or authoritative source, thoroughly and by default** --- not only when ask... |  |
 | `shared/writing/course-sequence.md` | The Morrison-Lab course sites form a prerequisite sequence. Place content, and direct links, according to it. |  |
 | `shared/writing/definition-crossrefs.md` | When reviewing prose that defines technical terms or named results via formal cross-reference divs --- Quarto's theorem-like div syntax (`::: {#def-...}`, `{... |  |
+| `shared/writing/dont-hedge-gratuitously.md` | Ezra, 2026-11-10: "cai: don't hedge gratuitously" (ai-config#5263). |  |
 | `shared/writing/examples-are-scanned.md` | An illustrative example sits inside the document, so a mechanical check that scans the document may scan the example too. When the document's subject *is* a... |  |
 | `shared/writing/explain-analysis-choices.md` | Ezra's rule (2026-11-03, ai-config#4905): every time you make an arbitrary analysis choice, explain the decision in detail in the prose next to it. |  |
 | `shared/writing/fact-check-prose.md` | When reviewing prose in a PR/MR --- documentation, lecture notes, a README, any non-code narrative content --- assess it for **accuracy and clarity**, not ju... |  |

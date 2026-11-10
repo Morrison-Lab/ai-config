@@ -467,7 +467,9 @@ six bundled composite actions and reusable workflows consolidate standard check 
   a workflow that calls `Morrison-Lab/gha/.github/workflows/<check>.yml`,
   or (lds) `.github/workflows/cluster-checks.yml` running `.gha/run-check/run-check.sh <check>`.
   Grepping only the first route undercounted lds
-  (15 checks reported, 29 actual; 58 of 96 gha checks reported unwired, 59 of 100 actual; ai-config#5236, gha#1803).
+  (15 checks reported, 29 actual;
+  58 of 96 gha checks reported unwired, 59 of 100 actual;
+  ai-config#5236, gha#1803).
   Before saying a check is unwired,
   grep both routes on freshly fetched `origin/main` of each repo,
   and name the routes you searched.

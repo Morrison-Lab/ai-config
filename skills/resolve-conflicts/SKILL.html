@@ -439,6 +439,7 @@ cookieconsent.run({
 <li>Two different features touching neighbouring lines → keep <strong>both</strong> edits.</li>
 <li>A refactor on one side + a bugfix on the other → apply the bugfix <em>to the refactored code</em>.</li>
 <li>A rename on one side + an edit to the old name on the other → carry the edit onto the new name.</li>
+<li><strong>A conflict over a string your branch turned into one shared definition</strong> (several per-consumer copies of a text, now read from one variable or file) is not a one-hunk decision. Main’s edit may have been meant for only some of the consumers. Before folding main’s wording into the shared string, list every file or chunk that reads it (<code>grep</code> for the name), and read what main did to each consumer. If main treated them differently, split the string. (Morrison-Lab/lds#2208: main reworded the alt text of the interactive figures and deliberately kept the old wording for the static matplotlib figure; putting the new wording into the shared string changed both, and the review blocked the merge head, ai-config#5270.)</li>
 <li><strong><code>CONFLICT (add/add)</code> on the same newly-added file</strong> (common with sibling PRs) → compare <code>:2:</code> vs <code>:3:</code> first; keep the side that carries the newer baseline (often <code>main</code> after a sibling PR merged), then manually re-apply any newer deltas from the other side (review fixes, wording corrections, version pins) before staging.</li>
 </ul>
 <p>If you can’t see why a side changed the hunk, you’re not ready to resolve it — go read the history first (step 2).</p>
@@ -495,6 +496,7 @@ cookieconsent.run({
 <ul>
 <li>❌ Blind <code>git checkout --ours/--theirs &lt;file&gt;</code> (or <code>git merge -X ours/theirs</code>) without confirming the dropped side had nothing worth keeping — the classic silent-data-loss move.</li>
 <li>❌ Resolving a hunk before understanding <em>why</em> each side changed it.</li>
+<li>❌ Carrying the wording from one conflicting hunk into a string that several consumers share, without reading main’s version of each consumer.</li>
 <li>❌ Mixing up “ours”/“theirs” in a rebase (they’re reversed vs a merge).</li>
 <li>❌ Committing with conflict markers still in a file — always <code>git diff --check</code>.</li>
 <li>❌ Committing the resolution without running the repo’s build/lint/test checks.</li>

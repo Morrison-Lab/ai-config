@@ -40,6 +40,7 @@ Each conflict hunk has three inputs — the common **base**, **our** side, and *
 - Two different features touching neighbouring lines → keep **both** edits.
 - A refactor on one side + a bugfix on the other → apply the bugfix *to the refactored code*.
 - A rename on one side + an edit to the old name on the other → carry the edit onto the new name.
+- **A conflict over a string your branch turned into one shared definition** (several per-consumer copies of a text, now read from one variable or file) is not a one-hunk decision. Main’s edit may have been meant for only some of the consumers. Before folding main’s wording into the shared string, list every file or chunk that reads it (`grep` for the name), and read what main did to each consumer. If main treated them differently, split the string. (Morrison-Lab/lds#2208: main reworded the alt text of the interactive figures and deliberately kept the old wording for the static matplotlib figure; putting the new wording into the shared string changed both, and the review blocked the merge head, ai-config#5270.)
 - **`CONFLICT (add/add)` on the same newly-added file** (common with sibling PRs) → compare `:2:` vs `:3:` first; keep the side that carries the newer baseline (often `main` after a sibling PR merged), then manually re-apply any newer deltas from the other side (review fixes, wording corrections, version pins) before staging.
 
 If you can’t see why a side changed the hunk, you’re not ready to resolve it — go read the history first (step 2).
@@ -109,6 +110,7 @@ Confirm which physical branch is “ours” before you reach for `--ours` / `--t
 
 - ❌ Blind `git checkout --ours/--theirs <file>` (or `git merge -X ours/theirs`) without confirming the dropped side had nothing worth keeping — the classic silent-data-loss move.
 - ❌ Resolving a hunk before understanding *why* each side changed it.
+- ❌ Carrying the wording from one conflicting hunk into a string that several consumers share, without reading main’s version of each consumer.
 - ❌ Mixing up “ours”/“theirs” in a rebase (they’re reversed vs a merge).
 - ❌ Committing with conflict markers still in a file — always `git diff --check`.
 - ❌ Committing the resolution without running the repo’s build/lint/test checks.

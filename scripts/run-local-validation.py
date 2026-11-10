@@ -83,6 +83,11 @@ _REQUIRES_CACHE = {}
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_WORKFLOW = ROOT / ".github" / "workflows" / "validate.yml"
 DEFAULT_SKIP = r"^Install dependencies$"
+# Steps whose command matches run after every other step (ai-config#5085).
+# scripts/test_hooks.py runs all ~176 hooks/test-*.py suites and took over
+# 500 s in a 4-CPU cloud container; run first, it used up a time-limited run
+# before the cheap scripts/test_*.py steps got to report anything.
+SLOW_COMMAND = re.compile(r"scripts/test_hooks\.py\b")
 # Non-greedy to the closing `}}`, so a body carrying its own `}` (a fromJSON
 # literal) still matches; `[^}]*` would silently pass such a step as runnable.
 GITHUB_EXPRESSION = re.compile(r"\$\{\{.*?\}\}")
@@ -517,6 +522,9 @@ def main(argv: Optional[List[str]] = None) -> int:
 
         plan.append((s, skipped, reason))
 
+    # Stable: only the slow steps move, to the end (ai-config#5085).
+    plan.sort(key=lambda item: bool(SLOW_COMMAND.search(item[0].command)))
+
     if args.list:
         for s, skipped, reason in plan:
             if skipped:
@@ -565,7 +573,11 @@ def main(argv: Optional[List[str]] = None) -> int:
             rc = run_step(s, root, args.timeout)
         except subprocess.TimeoutExpired:
             rc = "timeout"
-        results.append((s, rc, time.monotonic() - t0, ""))
+        secs = time.monotonic() - t0
+        results.append((s, rc, secs, ""))
+        # One line per finished step, so a run killed by an outer timeout
+        # still shows which steps passed or failed (ai-config#5085).
+        print(f"<== [{s.source}] {s.name}: rc {rc} in {secs:.1f}s", flush=True)
 
     print()
     print(f"{'step':60} {'rc':>8} {'seconds':>8}")

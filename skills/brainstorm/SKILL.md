@@ -44,7 +44,9 @@ filing an issue now would lock in the wrong scope.
 4. **Research existing solutions & write the plan file.**
    Before committing to building custom components,
    research existing libraries, tools, or lab implementations
-   (DRW check via [`prefer-upstream`](../prefer-upstream/SKILL.md)).
+   (DRW check via [`prefer-upstream`](../prefer-upstream/SKILL.md)),
+   and decide explicitly whether to centralize or distribute the work
+   ([`centralize-or-distribute`](../../shared/workflow/centralize-or-distribute.md)).
    Once the approach is agreed,
    write it to `plans/<slug>.md` in the target repo
    (create the directory if it doesn't exist yet),

@@ -133,6 +133,15 @@ Under pandoc 3.1.3 the original converts to
 and the merged copy converts to an empty line: the whole paragraph is gone.
 Rendering in Word was not checked.
 
+**Re-checked 2026-11-09:** the skill's `merge_runs.py` has the same md5
+(`0bf6ac0b4c40368f1094129999c5e095`) as on 2026-10-08
+and still contains no `fldChar` or `instrText` handling (`grep -c` returns 0),
+so the 2026-10-08 measurement still describes the shipped script.
+Re-check whenever that md5 changes.
+The skill is Anthropic's, outside the organizations we administer,
+so the upstream-issues ladder allows no autonomous filing there;
+a person decides whether to route it.
+
 The diagnosis matters as much as the fact.
 The corruption is indistinguishable from "my edits broke the document",
 so the natural response is to hunt through your own edits.

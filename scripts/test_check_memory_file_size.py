@@ -65,6 +65,13 @@ def make_repo(tmpdir: Path) -> Path:
     (memories / "big.md").write_text(big, encoding="utf-8")
     (memories / "MEMORY.md").write_text("# index\n" + "row\n" * 200, encoding="utf-8")
     (memories / "session" / "notes.md").write_text("# s\n" + "n\n" * 200, "utf-8")
+    # ai-config#897: an auto-loaded CLAUDE.md of 50 lines and a shared/
+    # fragment of 130 lines, each over its own ceiling in the tests below.
+    (tmpdir / "CLAUDE.md").write_text("# C\n" + "c\n" * 49, encoding="utf-8")
+    (tmpdir / "shared" / "workflow").mkdir(parents=True)
+    (tmpdir / "shared" / "workflow" / "frag.md").write_text(
+        "# F\n" + "f\n" * 129, encoding="utf-8"
+    )
 
     subprocess.run(["git", "init", "-q", "-b", "main"], cwd=tmpdir, check=True)
     subprocess.run(["git", "config", "user.email", "t@t.com"], cwd=tmpdir, check=True)
@@ -104,6 +111,23 @@ with tempfile.TemporaryDirectory() as tmp:
     out, code = run_check(repo, "--max-lines", "500")
     check("clean corpus reports no findings", "No memory file exceeds" in out)
     check("clean corpus exits 0", code == 0)
+
+    # ai-config#897: CLAUDE.md and shared/ are reported, advisory only.
+    out, code = run_check(
+        repo, "--max-lines", "500", "--auto-loaded-max-lines", "40", "--strict"
+    )
+    check("CLAUDE.md over its own ceiling is reported", "CLAUDE.md: 50 lines (ceiling 40)" in out)
+    check("advisory findings never change the exit code", code == 0)
+    check("shared/ under the per-use ceiling is not reported", "frag.md" not in out)
+    out, code = run_check(
+        repo, "--max-lines", "100", "--auto-loaded-max-lines", "500", "--strict"
+    )
+    check(
+        "a shared/ fragment over the per-use ceiling is reported",
+        "shared/workflow/frag.md: 130 lines (ceiling 100)" in out,
+    )
+    check("CLAUDE.md under its ceiling is not reported", "CLAUDE.md:" not in out)
+    check("a memory breach still fails under --strict", code == 1)
 
     # The warning band (ai-config#3102). Reporting only the breach is what
     # made the check arrive too late to act on, so the band has to print in

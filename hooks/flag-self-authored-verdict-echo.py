@@ -372,9 +372,11 @@ _ARD_LABEL = r"(?:\d+(?:[ \t]*(?:--|-|to)[ \t]*\d+)?[ \t]*[.):][ \t]*)?"
 # 15, finding 4. Measured by widening one slot at a time to `[\s]*` and
 # running the suite against each: slots 1, 2 and 4 leave it at 125/125, and
 # only slot 3 turns `LABEL_GAP_SPANS_NEWLINE` red at 124/125. The other
-# three are guarded by the cost ceiling alone, which the paragraph above
-# says is not enough. Pinning them is ai-config#3982 rather than a widening
-# bolted onto a comment fix.
+# three were guarded by the cost ceiling alone, which the paragraph above
+# says is not enough. ai-config#3982 pinned slot 1 with
+# `LABEL_RANGE_GAP_SPANS_NEWLINE`. Slots 2 and 4 cannot be pinned: the text
+# after each gap is itself a valid line-start disposition, so widening
+# either changes no verdict on any body.
 #
 # The original measurement was right and its generalization was wrong: 302
 # bodies agreeing is evidence about those bodies, not about every body.

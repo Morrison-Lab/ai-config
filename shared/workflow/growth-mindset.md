@@ -97,6 +97,14 @@ The same holds for a skipped check: a render skipped because an interpreter is m
   Ezra, 2026-11-04, on a psw#480 reply that said "I haven't rendered the page, and `typos` isn't installed in this session":
   "never make an excuse like this", and "why not?" to the unrendered page.
   Both were installable in the session, so the push should have waited for the render and the spell check.
+
+- **Do:** when a cloud session's token or sandbox blocks a read or an action, run it from a local session that holds Ezra's credentials: a Remote Control session on his usual Linux work device, or on his Mac.
+  The CI runner processes on the lab machines only execute triggered jobs, so they are not this route.
+- **Don't:** report "we can't read X" while a local session could.
+  Ezra, 2026-11-09, after a cloud thread said it could not read the Pages visibility setting of mlg:
+  "why not?", then "you should have used a local session in the first place to check".
+  No hook can see this: a refusal to try is a sentence, not a tool call, so the rule is prose in this fragment.
+
 - **Do:** when an install is worth keeping, tell Ezra to edit the cloud startup script and hand him the **full revised script**, not only the lines to add (2026-11-02: "give me the revised version").
   Read the current script first.
   A clause saying a one-off install is not worth adding closes the question.
@@ -233,7 +241,8 @@ that history is kept.
 
 - **Do:** before concluding a capability is unavailable, run an all-state
   issue search for the failure and check the same directory for a sibling
-  script, in addition to reading the tool's own output.
+  script, in addition to reading the tool's own output; with no failure to
+  search for, search the scripts, workflows and `git log -S` for a past use.
 - **Do:** treat a closed issue on the exact failure as evidence the remedy
   already shipped, not merely as evidence the gap is known.
 - **Don't:** stop at "the tool's error names no remedy" --- that rules out
@@ -307,6 +316,13 @@ so the absence of the first two is no evidence about the third.
 - **Don't:** count having repeated the limitation across turns as having
   established it; a claim that ends the inquiry can never be contradicted by
   it.
+
+The same search applies with no call made at all, to a claim that a
+project's own tooling lacks a capability: see
+[the remedy can be filed history](#the-remedy-can-be-filed-history-rather-than-anything-the-tool-says).
+On 2026-11-09 a coordinator wrote that nothing in the Canvas tooling could
+schedule solution releases, and Ezra answered that it had already been done
+for the midterm 2 practice exam.
 
 ### The route via a true measurement, over-generalized
 

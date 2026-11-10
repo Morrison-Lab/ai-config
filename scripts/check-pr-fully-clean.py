@@ -118,7 +118,7 @@ from review_payload import (  # noqa: E402
     payload_is_clean,
     normalize_verdict,
 )
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 # The status glyphs below are non-ASCII, and a Windows console defaults to
 # cp1252, which cannot encode them -- so every run raised UnicodeEncodeError
@@ -892,6 +892,31 @@ def _is_own_job(cr: dict, own: Optional[Tuple[str, int]]) -> bool:
 # (ai-config#4892).
 _ANNOTATIONS_READ: set = set()
 
+# Reviewer names (`copilot`, ...) declared out of quota by
+# --reviewer-out-of-quota (ai-config#5064).
+_OUT_OF_QUOTA: set = set()
+
+
+def _repo_has_no_ci(repo: str, sha: str) -> bool:
+    """True only when the repo has no workflows AND the head has no check suites.
+
+    A repo with workflows but no runs is a stalled or missing CI, a real
+    problem, so any read that fails or is absent from the payload answers
+    False and the caller keeps failing (ai-config#5065).
+    """
+    try:
+        wf = json.loads(fetch(["gh", "api", f"repos/{repo}/actions/workflows?per_page=1"]))
+        cs = json.loads(fetch(["gh", "api", f"repos/{repo}/commits/{sha}/check-suites?per_page=1"]))
+    except (RuntimeError, ValueError):
+        return False
+    counts = []
+    for data in (wf, cs):
+        total = data.get("total_count") if isinstance(data, dict) else None
+        if not isinstance(total, int) or isinstance(total, bool):
+            return False
+        counts.append(total)
+    return counts == [0, 0]
+
 
 def check_ci_runs(pr) -> Tuple[bool, List[str]]:
     sha = pr.head_sha
@@ -902,6 +927,11 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
 
     issues = []
     if not check_runs:
+        if _repo_has_no_ci(repo, sha):
+            return True, [
+                "NOTE: repo has no CI workflows and no check suites on this "
+                "head; check-run gate not applicable (ai-config#5065)"
+            ]
         issues.append(f"No check runs found for SHA {sha[:8]}")
         return False, issues
 
@@ -1016,6 +1046,8 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
 WORKFLOW_DIR = ".github/workflows/"
 # GitHub's compare endpoint lists at most this many files.
 COMPARE_FILE_CAP = 300
+# `workflow_call` and `workflow_dispatch` are left out on purpose: neither runs
+# on a pull request, so adding or editing one gates nothing (ai-config#5099).
 # A changed line in a workflow's diff that can alter which PRs it runs on, or
 # which jobs exist: a trigger or filter key, a job condition, or a new/removed
 # job (a key at two-space indent). Any other edit to an existing workflow
@@ -1024,13 +1056,14 @@ COMPARE_FILE_CAP = 300
 WORKFLOW_GATE_LINE = re.compile(
     # Trigger and filter keys, at any depth.
     r"^[+-](?:\s*(?:on|pull_request|pull_request_target|push|schedule|"
-    r"workflow_run|workflow_call|workflow_dispatch|paths|paths-ignore|branches|"
+    r"workflow_run|paths|paths-ignore|branches|"
     r"branches-ignore|tags|types)\s*:"
     # Job-level keys sit at four-space indent; the same words deeper are
     # step-level (an action version pin, a step condition) and gate nothing.
     r"|    (?:if|needs|runs-on|strategy|uses)\s*:"
     # A job key itself.
-    r"|  [\w-]+:\s*$)")
+    # The two triggers left out above sit at the same indent, so exclude them.
+    r"|  (?!(?:workflow_call|workflow_dispatch):)[\w-]+:\s*$)")
 
 
 def workflow_edit_adds_no_check(entry: dict) -> bool:
@@ -1111,6 +1144,68 @@ def check_base_drift(pr) -> Tuple[bool, List[str]]:
         f"including changes to {shown}. A check added there never ran on this "
         f"head, so green CI here does not show it passes. Merge {base} into "
         f"the branch and let CI re-run (ai-config#2982)"]
+
+
+def check_required_checks(pr) -> Tuple[bool, List[str]]:
+    """Refuse a head that GitHub holds as blocked by a required check that never ran.
+
+    Every other criterion reads the check runs that exist, so a required check
+    that never posted is invisible: lds#2125 read FULLY CLEAN while its ruleset
+    required `annotation-gate`, which had no run on the head, and GitHub held
+    the PR as `blocked` (ai-config#5143).
+
+    Reads the base branch's required status checks from
+    `GET /repos/{repo}/rules/branches/{base}` and fails with a named line when
+    a required context has no check run (or status) on the head. Also treats
+    `mergeable_state` `blocked` or `behind` as not clean. A `--from-json`
+    payload carries neither read, so the check is a NOTE there.
+    """
+    if pr.state and pr.state != "OPEN":
+        return True, []
+    if _FETCHER is not None:
+        return True, ["NOTE: required checks not checked: a --from-json payload "
+                      "carries no ruleset or merge state (ai-config#5143)"]
+    base, sha = pr.base_ref, pr.head_sha
+    if not base or not sha:
+        return True, ["NOTE: required checks not checked: the PR names no base "
+                      "branch or head SHA (ai-config#5143)"]
+    issues: List[str] = []
+    quoted = urllib.parse.quote(base, safe="/")
+    try:
+        rules = json.loads(fetch(["gh", "api", f"repos/{pr.repo}/rules/branches/{quoted}"]))
+        info = json.loads(fetch(["gh", "api", f"repos/{pr.repo}/pulls/{pr.pr_num}"]))
+    except (RuntimeError, ValueError) as exc:
+        # Exit 2, not a NOTE: a NOTE would pass the PR on a gate that never ran.
+        die(f"Could not read the required checks or merge state of {pr.repo}#{pr.pr_num}: {exc}")
+    required = set()
+    for rule in rules if isinstance(rules, list) else []:
+        if isinstance(rule, dict) and rule.get("type") == "required_status_checks":
+            for item in (rule.get("parameters") or {}).get("required_status_checks") or []:
+                if isinstance(item, dict) and item.get("context"):
+                    required.add(item["context"])
+    if required:
+        present = {cr.name for cr in pr.get_check_runs()}
+        try:
+            status = json.loads(fetch(["gh", "api", f"repos/{pr.repo}/commits/{sha}/status"]))
+            present |= {s.get("context") for s in status.get("statuses") or []
+                        if isinstance(s, dict)}
+        except (RuntimeError, ValueError, AttributeError):
+            pass
+        missing = sorted(required - present)
+        if missing:
+            issues.append(
+                f"Required check(s) never ran on this head: {', '.join(missing)}. "
+                f"The {base} ruleset requires them, so GitHub will not merge it "
+                f"(ai-config#5143)")
+    state = (info.get("mergeable_state") if isinstance(info, dict) else "") or ""
+    if state in ("blocked", "behind") and not issues:
+        issues.append(
+            f"GitHub holds this PR as {state!r} and no missing required check "
+            f"explains it: look for a required review, an unresolved-thread "
+            f"rule or a head behind {base} (ai-config#5143)")
+    elif state in ("behind", "dirty"):
+        issues.append(f"GitHub reports mergeable_state {state!r} (ai-config#5143)")
+    return not issues, issues
 
 
 def check_maintainer_feedback(pr) -> Tuple[bool, List[str]]:
@@ -3665,12 +3760,22 @@ def _has_live_inline_bot_item(review_comments, login, head_oid):
     return False
 
 
+def _names_head(oid: str, body: str, head_oid: str) -> bool:
+    """True when a review item's commit oid or body names the live head."""
+    if not head_oid or len(head_oid) < 7:
+        return False
+    if oid and len(oid) >= 7 and head_oid.lower().startswith(oid.lower()):
+        return True
+    return head_oid[:7].lower() in (body or "").lower()
+
+
 def check_latest_verdict(
     all_items: List[Tuple[Any, ...]],
     approved_authors: Optional[Set[str]] = None,
     commit_activity: Optional[Dict[str, str]] = None,
     head_oid: str = "",
     review_comments: Optional[List[Dict[str, Any]]] = None,
+    out_of_quota: Optional[Iterable[str]] = None,
 ) -> Tuple[bool, List[str]]:
     """Fail when any reviewer's latest verdict-bearing statement is not clean.
 
@@ -3691,6 +3796,14 @@ def check_latest_verdict(
     inline review comments on that head clears standing not-clean state for
     Copilot ([ai-config#4318](https://github.com/Morrison-Lab/ai-config/issues/4318)), since the reviewer re-evaluated the current head
     with zero findings and no live comments.
+
+    A reviewer named in `out_of_quota` (``--reviewer-out-of-quota``) cannot
+    refresh its verdict, so its STALE not-clean verdict stops vetoing when a
+    different reviewer (agy, Claude, ...) posted a clean verdict that names the
+    live head; a NOTE records the substitution
+    ([ai-config#5064](https://github.com/Morrison-Lab/ai-config/issues/5064)).
+    The veto stays when that reviewer's not-clean verdict is on the live head
+    itself, or when no substitute verdict on the live head exists.
 
     Formal-review authors whose latest GitHub state is APPROVED have
     superseded their own earlier CHANGES_REQUESTED; pass those logins as
@@ -3720,6 +3833,9 @@ def check_latest_verdict(
     n_with_verdict = 0
     unreadable_items = []
     per_reviewer: Dict[str, Tuple[str, str, str]] = {}
+    # (commit oid, body) of each reviewer's latest verdict item, so the
+    # out-of-quota substitution can tell a stale verdict from one on the head.
+    per_reviewer_src: Dict[str, Tuple[str, str]] = {}
     # Latest "I could not review this" notice per reviewer identity (#3587).
     unavailable_since: Dict[str, str] = {}
     # Latest activity per author, for the expired-ledger test (#2482):
@@ -3783,6 +3899,7 @@ def check_latest_verdict(
             latest_verdict, latest_when = "not-clean", when
             latest_identity, latest_author = identity, author
             per_reviewer[identity] = ("not-clean", when, author)
+            per_reviewer_src[identity] = (_oid, body)
         elif verdict == "unreadable":
             agent = _detect_review_agent(body) or "unknown"
             unreadable_items.append((when, agent))
@@ -3791,6 +3908,7 @@ def check_latest_verdict(
             latest_verdict, latest_when = verdict, when
             latest_identity, latest_author = identity, author
             per_reviewer[identity] = (verdict, when, author)
+            per_reviewer_src[identity] = (_oid, body)
         elif identity == "Copilot" and is_copilot_empty_balanced_closer_look(body):
             # An empty Balanced 'Needs a closer look' review on HEAD with no live
             # inline comments clears standing not-clean state (ai-config#4318).
@@ -3858,11 +3976,44 @@ def check_latest_verdict(
     # here too, or it reaches only the case where some OTHER reviewer happened to
     # post afterwards. A PR whose sole reviewer went unavailable takes this
     # branch instead, and is exactly the case that can never resolve (#3587).
+    quota_names = {str(n).strip().lower() for n in (out_of_quota or []) if str(n).strip()}
+    quota_notes: List[str] = []
+
+    def _quota_released(identity: str, author: str) -> bool:
+        """True when *identity* is out of quota and a substitute covers the head."""
+        if not quota_names or not (
+            identity.lower() in quota_names or str(author).lower() in quota_names
+        ):
+            return False
+        v_oid, v_body = per_reviewer_src.get(identity, ("", ""))
+        if _names_head(v_oid, v_body, head_oid):
+            return False  # a real finding on the shipping code, not a stale one
+        for other, (o_verdict, o_when, _o_author) in sorted(per_reviewer.items()):
+            o_oid, o_body = per_reviewer_src.get(other, ("", ""))
+            if (
+                other != identity
+                and o_verdict == "clean"
+                and other.lower() not in quota_names
+                and _names_head(o_oid, o_body, head_oid)
+            ):
+                note = (
+                    f"NOTE: {identity} is marked out of quota; its stale "
+                    f"NOT-clean verdict ({per_reviewer[identity][1]}) no longer "
+                    f"vetoes because {other} posted a clean verdict on live head "
+                    f"{head_oid[:8]} ({o_when}) -- substitute reviewer "
+                    "(ai-config#5064)"
+                )
+                if note not in quota_notes:
+                    quota_notes.append(note)
+                return True
+        return False
+
     latest_outage = unavailable_since.get(latest_identity, "")
     if (
         latest_verdict == "not-clean"
         and not _approval_clears(latest_identity, latest_author, approved_authors)
         and not latest_outage > latest_when
+        and not _quota_released(latest_identity, latest_author)
     ):
         return False, [
             f"Latest verdict-bearing review statement ({latest_when}) is NOT clean, "
@@ -3877,6 +4028,8 @@ def check_latest_verdict(
         if verdict != "not-clean":
             continue
         if _approval_clears(identity, author, approved_authors):
+            continue
+        if _quota_released(identity, author):
             continue
         # The reviewer reported, AFTER this stale verdict, that it could not
         # review at all. It is unavailable rather than pending, so waiting on it
@@ -3914,6 +4067,7 @@ def check_latest_verdict(
     issues.extend(ledger_notes)
     issues.extend(payload_notes)
     issues.extend(review_comment_notes)
+    issues.extend(quota_notes)
     blocking = [i for i in issues if not i.startswith("NOTE: ")]
     return len(blocking) == 0, issues
 
@@ -4392,6 +4546,7 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
         commit_activity=_commit_activity(pr),
         head_oid=sha,
         review_comments=_lazy_rcs,
+        out_of_quota=_OUT_OF_QUOTA,
     )
     issues.extend(verdict_issues)
 
@@ -4563,6 +4718,14 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
              "were read) whose warning/notice annotations were fixed or "
              "explained as false positives (ai-config#4892).",
     )
+    parser.add_argument(
+        "--reviewer-out-of-quota", action="append", default=[], metavar="NAME[,NAME...]",
+        help="Repeatable; values accumulate. Reviewers (e.g. `copilot`) that "
+             "are out of quota and cannot refresh a stale not-clean verdict. "
+             "Such a verdict stops vetoing when another reviewer (agy, Claude) "
+             "posted a clean verdict on the live head; it still vetoes if it "
+             "is on the live head itself (ai-config#5064).",
+    )
     return parser.parse_args(argv)
 
 
@@ -4621,6 +4784,11 @@ def main():
     if "all" in read_tokens:
         _ANNOTATIONS_READ.add("all")
     _ANNOTATIONS_READ.update(int(tok) for tok in read_tokens if tok.isdigit())
+    _OUT_OF_QUOTA.update(
+        tok.strip().lower()
+        for value in (getattr(args, "reviewer_out_of_quota", None) or [])
+        for tok in value.split(",")
+        if tok.strip())
     pr_num = args.pr_number
     repo = resolve_repo(args.repo)
 
@@ -4638,8 +4806,9 @@ def main():
     feedback_ok, feedback_issues = check_maintainer_feedback(pr)
     review_ok, review_issues = check_review_comments(pr, args.quorum)
     drift_ok, drift_issues = check_base_drift(pr)
+    required_ok, required_issues = check_required_checks(pr)
 
-    all_issues = ci_issues + thread_issues + feedback_issues + review_issues + drift_issues
+    all_issues = ci_issues + thread_issues + feedback_issues + review_issues + drift_issues + required_issues
 
     # Inside a CI job whose own check run is on this head, some review items
     # describe the PR BEFORE that job posts anything: no review on this head
@@ -4679,7 +4848,7 @@ def main():
             print(f"  - {issue}")
         sys.exit(1)
 
-    print(f"\n\u2705 {repo}#{pr_num} is FULLY CLEAN on HEAD {sha[:8]}!")
+    print(f"\n\u2705 {repo}#{pr_num} is FULLY CLEAN on HEAD {sha[:8]}! [stale-base rule]")
     sys.exit(0)
 
 

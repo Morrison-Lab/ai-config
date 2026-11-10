@@ -1760,6 +1760,9 @@ INFRA_GRANT_OWNERS = frozenset({"morrison-lab"})
 #     and lint, spell and link-check configuration;
 #   - agent configuration: CLAUDE.md, AGENTS.md and GEMINI.md at any depth,
 #     `.claude/`, and Copilot's instructions (both under `.github/`).
+#   - checkers: `tools/check_*` and `tools/check-*` scripts and `tools/tests/`.
+#     A blanket `tools/` is absent: lds keeps figure and data generators there,
+#     which change what readers see (ai-config#5102).
 # A top-level `scripts/` is deliberately absent: in a content repository it
 # can hold analysis code, not tooling.
 INFRA_PATH_PATTERNS = tuple(re.compile(p) for p in (
@@ -1770,6 +1773,8 @@ INFRA_PATH_PATTERNS = tuple(re.compile(p) for p in (
     r"lychee\.toml",
     r"_typos\.toml",
     r"inst/WORDLIST",
+    r"tools/check[_-][\w.-]+",
+    r"tools/tests/.+",
 ))
 
 # Setting this only ever DENIES (the infra grant stops firing), so unlike an

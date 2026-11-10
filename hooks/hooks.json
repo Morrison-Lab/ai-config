@@ -968,6 +968,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/block-redo-denied-write-via-other-tool.py\"",
+            "timeout": 20,
+            "script": "block-redo-denied-write-via-other-tool.py",
+            "why": "ai-config#5121, 2026-11-08: a thread's `gh api` POST/PATCH closing gha#1631 and gha#1635 was denied by the auto-mode classifier, and the same writes then succeeded through `mcp__github__add_issue_comment` and `mcp__github__issue_write`. remind-retry-before-declaring-blocked.py keys on the identical command and only reminds, so a tool switch was invisible to it. DENIES a GitHub write (comment, close, reopen, edit, merge or review, through gh, gh api or the MCP tools) whose number and verb match a classifier-denied write earlier in the transcript, until a typed user message after the denial names the number with a go-ahead word, or the permission layer later let the same target and verb through. An unparseable number records and denies nothing, leaving the reminder as the fallback."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/block-merge-without-clean-checker.py\"",
             "timeout": 20,
             "script": "block-merge-without-clean-checker.py",
@@ -1168,6 +1175,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/block-redo-denied-write-via-other-tool.py\"",
+            "timeout": 20,
+            "script": "block-redo-denied-write-via-other-tool.py",
+            "why": "ai-config#5121, 2026-11-08: a thread's `gh api` POST/PATCH closing gha#1631 and gha#1635 was denied by the auto-mode classifier, and the same writes then succeeded through `mcp__github__add_issue_comment` and `mcp__github__issue_write`. remind-retry-before-declaring-blocked.py keys on the identical command and only reminds, so a tool switch was invisible to it. DENIES a GitHub write (comment, close, reopen, edit, merge or review, through gh, gh api or the MCP tools) whose number and verb match a classifier-denied write earlier in the transcript, until a typed user message after the denial names the number with a go-ahead word, or the permission layer later let the same target and verb through. An unparseable number records and denies nothing, leaving the reminder as the fallback."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/block-merge-without-clean-checker.py\"",
             "timeout": 20,
             "script": "block-merge-without-clean-checker.py",
@@ -1220,7 +1234,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/require-agent-disclosure.py\"",
             "timeout": 10,
             "script": "require-agent-disclosure.py",
-            "why": "The MCP half of the Bash entry above. A remote/web session has no `gh` on PATH, so mcp__github__add_issue_comment and its siblings are the ONLY way it posts a comment -- and hooks.json matches by tool name, so the Bash entry never sees them. Same script, same warn-only behaviour; it reads tool_input.body directly rather than parsing a command line, and stays silent when no string body is present (some pull_request_review_write methods submit without one)."
+            "why": "The MCP half of the Bash entry above. A remote/web session has no `gh` on PATH, so mcp__github__add_issue_comment and its siblings are the ONLY way it posts a comment -- and hooks.json matches by tool name, so the Bash entry never sees them. Same script, but this MCP path DENIES an unmarked comment (ai-config#4966) while the Bash path only warns; it reads tool_input.body directly rather than parsing a command line, and stays silent when no string body is present (some pull_request_review_write methods submit without one)."
           },
           {
             "type": "command",
@@ -1282,6 +1296,13 @@
             "timeout": 10,
             "script": "require-wwu-it-instructions.py",
             "why": "Ezra, 2026-11-04 02:42 UTC (lds project thread): \"you must always follow WWU CS IT's instructions exactly unless I say otherwise\"; his follow-up \"reminder is not enough\" made this a DENY. DENIES a Bash command or a Write/Edit/MultiEdit that touches cluster-job machinery (HTCondor tools, cluster heads, CLUSTER_CI_ROOT, condor-batch, cluster-*.yml, .sub files) until the transcript holds a read of memories/wwu-cs-it-instructions.md; the deny reason prints the instructions. Cause: condor-batch was built and repaired on 2026-11-03/04 against IT's advice to avoid heavy home-directory I/O, and the advice sat in memory unread. No override variable. Fails open and silent on any parse or transcript trouble."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/require-psw-rules.py\"",
+            "timeout": 10,
+            "script": "require-psw-rules.py",
+            "why": "ai-config#5166. Ezra, 2026-11-09: content sessions and the Claude CI review must load the psw writing rules (the Classification thread missed psw rules the same day; the CLAUDE.md prose telling sessions to read psw first was already missed). DENIES a Write, Edit or MultiEdit on a .qmd under chapters/ or _subfiles/ until the transcript holds a read of psw's defining-terms, conciseness and grammar/relative-pronouns chapters (a Read, or a Bash/WebFetch naming them under psw); the deny reason lists the paths and URLs. Exempts hooks/, memories/, shared/ and outtakes/. No override variable. Fails open and silent on any parse or transcript trouble. The gha companion for the CI review prompt is a separate issue."
           },
           {
             "type": "command",
@@ -1513,6 +1534,25 @@
             "timeout": 10,
             "script": "flag-cd-into-main-checkout.py",
             "why": "Warns when a worktree-rooted session cd's into the MAIN checkout of its own repo -- a real path on a different branch, where every edit and every check silently succeeds against somebody else's tree."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-patch-comment-id.py\"",
+            "timeout": 10,
+            "script": "no-patch-comment-id.py",
+            "why": "ai-config#1152. On Morrison-Lab/ai-config#1151 `gh api -X PATCH repos/<o>/<r>/pulls/comments/<id>` was used to reply to five claude[bot] findings and overwrote all five; each call returned success and the REST surface has no edit-history read, so a restore cannot be diffed. DENIES a `gh api` command that asks for PATCH on a `pulls/comments/<id>` or `issues/comments/<id>` path, decidable from the command text alone (no network call), and names the `/replies` POST route. Clearable with an `ALLOW_COMMENT_PATCH=1` prefix for editing your own comment. Reads only segments whose command word is `gh api`, so quoting the command in a commit message never fires; fails open on parse trouble."
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__github__update_issue_comment",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-mcp-overwrite-others-comment.py\"",
+            "timeout": 15,
+            "script": "no-mcp-overwrite-others-comment.py",
+            "why": "ai-config#5153, the MCP counterpart of no-patch-comment-id.py (#1152). `mcp__github__update_issue_comment` replaces a comment by id and never passes the Bash hook. DENIES the call when GitHub reports the comment's author as a different login from the authenticated account (for example a claude[bot] review), since the overwrite leaves no edit history to restore from. Editing your own comment is allowed. A comment the agent posted carries the account holder's login, so this separates yours from someone else's, not an agent's from a human's. Fails open when either lookup fails; `ALLOW_COMMENT_PATCH=1` clears it."
           }
         ]
       },
@@ -1664,6 +1704,18 @@
         ]
       },
       {
+        "matcher": "mcp__.*laywright.*|mcp__.*uppeteer.*|mcp__.*elenium.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-headless-browser-in-bash.py\"",
+            "timeout": 10,
+            "script": "no-headless-browser-in-bash.py",
+            "why": "ai-config#5123, 2026-11-08: a thread checked MathJax output in headless Chromium through Playwright. The Bash binding of this script denies a browser launched from a command; an MCP server that drives a browser (mcp__playwright__*, mcp__puppeteer__*, mcp__selenium__*) is the same act through a tool name that says nothing about Bash, and returned early. DENIES such a tool with no escape variable, since ALLOW_HEADLESS_BROWSER=1 is a Bash command prefix. The message points to curl, node with mathjax-full, and pdflatex."
+          }
+        ]
+      },
+      {
         "matcher": "mcp__claude-in-chrome__javascript_tool",
         "hooks": [
           {
@@ -1715,10 +1767,59 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-announced-work-in-post-message.py\"",
+            "timeout": 10,
+            "script": "no-announced-work-in-post-message.py",
+            "why": "ai-config#5053, layer 2 of the defense-in-depth rule (#5051). The Stop hook no-announced-start-without-starting.py fires after post_message has already sent the claim (#4830); this hook denies the post_message itself when its closing sentences unconditionally announce next work ('Next I'm opening the PR') while the latest update_progress_checklist still has an unstarted step. Reuses the Stop hook's matchers so the two cannot drift, runs with the Stop hook off, and requires the checklist because mid-turn 'I'm opening the PR' is often true and a deny on true narration gets switched off. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-numbered-merge-word-ask.py\"",
             "timeout": 10,
             "script": "no-numbered-merge-word-ask.py",
             "why": "ai-config#4698. Ezra, 2026-10-23: \"don't make me name each one; mwc them all!\" A bare mwc already covers every ready PR in the thread's scope, yet agents asked him to type 'mwc 4699'. Blocks (deny) a user-visible reply tool call (mcp__hearthbot__reply, post_message, update_message, edit_message) whose text asks for mwc followed by a number or a reference, and points at plain mwc. Inline code is not ignored: the ask sits in a code span. Fails open on any parse trouble."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-bare-repo-ref.py\"",
+            "timeout": 10,
+            "script": "no-bare-repo-ref.py",
+            "why": "ai-config#5164. Ezra, 2026-11-09: 'why didn't you hyperlink those PR mentions?' Every repo#N or owner/repo#N mention must be a markdown link to its GitHub URL. Denies a user-visible reply tool call (post_message, request_decision, reply, update_message, edit_message) in any session whose text holds such a token outside a markdown link, code span, fenced block or URL. A deny, not a reminder, because the failing shape is lexical and the CLAUDE.md prose rule was already missed (ai-config#4741). ALLOW_BARE_REPO_REF=1 overrides. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-merge-ask-in-post-message.py\"",
+            "timeout": 10,
+            "script": "no-merge-ask-in-post-message.py",
+            "why": "ai-config#5155. Ezra, 2026-11-09: owner threads never ask him for a merge or mwc; the coordinator puts a PR on his merge line after the agy review and the fully-clean checker pass. On 2026-11-07 the psc#100 thread told him it would ask for mwc and was corrected twice. Blocks (deny) a thread session's post_message or request_decision (also reply, update_message, edit_message) whose text, question or option asks the user to merge, to give mwc, or for permission to merge, and points at message_coordinator with the head SHA. The coordinator and other sessions are never blocked; a thread session is recognized as in no-self-thread-link.py. Inline code is not ignored. ALLOW_MERGE_ASK=1 overrides. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-bare-for-now-limit.py\"",
+            "timeout": 10,
+            "script": "no-bare-for-now-limit.py",
+            "why": "ai-config#5160. Ezra, 2026-11-09: told 'used up for now', he asked to be told for how long. Denies a user-visible reply tool call (post_message, request_decision, reply, update_message, edit_message) in any session when one sentence pairs a limit word (used up, exhausted, paused, unavailable, quota, limit) with 'for now' and holds no duration, clock time, date, UTC, PST or reset in that sentence, and points at giving a reset time in PST or a duration. The denial text also says never to estimate a GitHub rate-limit reset: read the reset field of gh api rate_limit and quote it in PST (coordinator, 2026-11-09). A deny, not a reminder, because the failing shape is lexical (ai-config#4741). ALLOW_BARE_FOR_NOW=1 overrides. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-mwc-ask-in-other-thread-unread.py\"",
+            "timeout": 10,
+            "script": "no-mwc-ask-in-other-thread-unread.py",
+            "why": "ai-config#5013. On 2026-11-05 a thread asked Ezra twice to type mwc in another thread for lds#1868, a PR that thread owned; he had typed it there at 22:04Z. Whether the other thread already holds a merge word is answered by a read, so this denies a user-visible reply tool call that asks for a merge word in another thread (a #cmsg_ link or 'in the ... thread' in the same sentence) when no hearthbot thread read (read_thread, read_messages_by_id, read_project_chat, list_threads) ran since the last user turn. Fails open on any parse trouble."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-final-head-unread-checks.py\"",
+            "timeout": 10,
+            "script": "no-final-head-unread-checks.py",
+            "why": "ai-config#5198. Coordinator, 2026-11-09: owners keep calling a head final while CI is still running (rme#1450 had build running; ai-config#5186 was reported before its CI was read). Denies a user-visible hearthbot reply (post_message, message_coordinator, message_thread, edit_message) that calls a head final ('final head', 'is final', 'now final') and cites a pull request when no check-runs read (get_check_runs, get_check_run, a Bash check-runs or check-pr-fully-clean command) returned without error since the last user turn. A sentence that negates the claim is left alone. A deny, not a reminder, because the failing shape is lexical (ai-config#4741). ALLOW_FINAL_HEAD=1 overrides. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-mwc-ask-for-infra-pr.py\"",
+            "timeout": 10,
+            "script": "no-mwc-ask-for-infra-pr.py",
+            "why": "ai-config#5097. Ezra, 2026-11-07, about lds#2009 (workflow-only): \"it's infra and shouldn't need my word. why didn't you realize that\" Blocks (deny) a user-visible reply tool call whose text mentions mwc and names a PR that is provably infrastructure (any PR in gha, macros or ai-config, or a Morrison-Lab PR whose changed paths all match no-unauthorized-merge.py INFRA_PATH_PATTERNS), unless the text says it merges under the infra grant. Fails open on any parse or lookup trouble."
           },
           {
             "type": "command",
@@ -1768,6 +1869,30 @@
             "timeout": 10,
             "script": "no-unfetched-pr-state-claim.py",
             "why": "ai-config#4834, PreToolUse binding of the Stop guard of the same name: a project thread posts through a hearthbot reply tool before the turn ends (ai-config#4830), so a Stop block arrives after the user has read the stale claim. Denies a user-visible reply tool call (mcp__hearthbot__reply, post_message, update_message, edit_message) that says a PR awaits merge or review, or that work is still to do, with no live read since the last user turn. Once per distinct text and at most twice per user turn; fails open."
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__github__update_pull_request_branch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-update-branch-on-clean-pr.py\"",
+            "timeout": 10,
+            "script": "no-update-branch-on-clean-pr.py",
+            "why": "ai-config#5093. ids#47 lost its Clean verdict at head 98ed862a on 2026-11-07 when main was merged into it. Denies update_pull_request_branch on a PR the transcript shows as FULLY CLEAN on its head, unless check-pr-fully-clean.py later reported base drift (the base gained a CI gate the head never ran). A PR with no clean line in the transcript is untouched. Fails open on any parse trouble."
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__hearthbot__start_remote_control",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-rc-outside-runner.py\"",
+            "timeout": 10,
+            "script": "no-rc-outside-runner.py",
+            "why": "ai-config#5090. Ezra, 2026-11-07: threads never open their own device run, and only the runner thread merges. The ids owner thread tried to open its own Remote Control session to run the checker and merge, then withdrew. Denies start_remote_control in a project thread session whose id is not in hooks/rc-runner-threads.txt (or RC_RUNNER_THREAD_IDS); the coordinator and ordinary sessions have no own thread and are untouched. Fails open on any parse trouble."
           }
         ]
       },
@@ -1887,10 +2012,24 @@
         "hooks": [
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-owner-silence-while-pr-waits.py\"",
+            "timeout": 10,
+            "script": "no-owner-silence-while-pr-waits.py",
+            "why": "ai-config#5116. On 2026-11-08 an owner thread said nothing for 90 minutes while its PR sat in the merge queue, so the coordinator could not tell queued from stalled. Blocks a stop, once per user turn, when the thread created or subscribed to a PR, has not resolved itself, and its last post_message or message_coordinator is an hour old. Fails open on any parse trouble."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-offer-to-file.py\"",
             "timeout": 10,
             "script": "no-offer-to-file.py",
             "why": "report-mistakes-proactively 'Filing is not gated on approval' -- blocks a reply that offers to file or record instead of doing it."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-park-on-tracked-blocker.py\"",
+            "timeout": 10,
+            "script": "no-park-on-tracked-blocker.py",
+            "why": "Ezra, 2026-11-07: never stop because work waits on another issue or PR. Blocks the stop once per turn when the final reply parks work as waiting on, blocked by, or depending on a tracked item, unless the same sentence names a person-only step. Do the blocking item instead."
           },
           {
             "type": "command",
@@ -1933,6 +2072,13 @@
             "timeout": 10,
             "script": "warn-red-own-pr-at-stop.py",
             "why": "The rule to fix red CI on your own PRs unprompted existed and nothing fired at turn end, so the person had to ask 'fix failing CI?' twice in one day. Interrupts the stop once per turn so the agent reads the warning (agent_notice.stop_notice, ai-config#4796), when a turn ends while a PR this session opened still has a failing check (a check_run wake event or a get_check_runs result) and nothing that had an effect followed: a push, update_pull_request_branch or a comment on that PR, or a later passing reading. A rejected or failed push, a dry-run, branch-delete or other-repo push, 'Everything up-to-date' and any errored tool call do not count as acting, and a failed merge, close or create neither drops nor adopts a PR. Bot-review checks whose name and title or summary say quota, session limit or did not finish are exempt, since nothing in the PR fixes them. Reads only the transcript and fails open per record."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-reply-without-tool-search.py\"",
+            "timeout": 10,
+            "script": "flag-reply-without-tool-search.py",
+            "why": "A runner told Ezra it could not switch its own permission mode without checking its tools; it had a mode-switch tool (ai-config#5136). A phrase regex for refusals failed six review rounds, so this decides from structure: interrupts the stop once per message (agent_notice.stop_notice) when the turn replied and made no other tool call and no ToolSearch. Plain answers trip it too, which costs one extra turn. Fails open."
           },
           {
             "type": "command",
@@ -2142,7 +2288,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-announced-start-without-starting.py\"",
             "timeout": 10,
             "script": "no-announced-start-without-starting.py",
-            "why": "CLAUDE.md 'no empty promises' and the dont-stop-keep-working directive -- blocks a reply that ends by announcing work in the present progressive or immediate future without having begun it. Distinct from no-empty-promise.py, which asks whether a mechanism shipped; a turn that filed an issue and then closed on 'I'll start on it' satisfies that and still never starts."
+            "why": "CLAUDE.md 'no empty promises' and the dont-stop-keep-working directive -- blocks a reply that ends by announcing work in the present progressive or immediate future without having begun it. Distinct from no-empty-promise.py, which asks whether a mechanism shipped; a turn that filed an issue and then closed on 'I'll start on it' satisfies that and still never starts. ai-config#5050 -- also reads the text of mcp__hearthbot__post_message, reply and update_message calls (the reply channel in Projects threads, invisible to a text-block reader) and matches 'Next I'm/I'll <verb>' and 'I'm now <verb>ing'; a later non-hearthbot tool call clears the announcement, and a named blocker or wait exempts it."
           },
           {
             "type": "command",
@@ -2171,6 +2317,13 @@
             "timeout": 10,
             "script": "no-memory-only-learning.py",
             "why": "ai-config#4698. Ezra, 2026-10-23: 'I hope you're recording everything we learn in one of our repos'. Project memory is unversioned and no hook reads it. Blocks once per turn when the turn wrote a memory file and reached no repo (hook, check, shared fragment, issue, PR, a Mechanism: URL line, or 'memory only: <reason>'). See shared/workflow/lab-operating-rules.md. Fails open on any parse trouble."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-ums-deferral-in-stopping-point.py\"",
+            "timeout": 10,
+            "script": "no-ums-deferral-in-stopping-point.py",
+            "why": "ai-config#5133. Ezra, 2026-11-08 ('wtf ums'): the gha owner ended pauses with a Stopping Point line saying UMS was not run. Blocks the stop once per turn when a Stopping Point line says UMS is not run, pending, skipped or deferred; run the ums skill and restate the line in the past tense."
           }
         ]
       }

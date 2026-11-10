@@ -3039,3 +3039,23 @@ is testing.
   shared wrapper also emits.
 - **Don't:** count a `try` block with several `except` arms as covered by
   one case, however precisely that case is worded.
+
+## Anchor a heuristic check's exemptions by position
+
+A check that reads prose or text with patterns needs exemptions (a negation, a conditional, a quotation), and an exemption searched for anywhere near the match is gameable.
+`scripts/check-owed-mechanism.py` took five review rounds for this reason (2026-11-07, ai-config#5073).
+Each round found one more way a nearby word hid a real debt: a negator elsewhere in the sentence, then in a relative clause, then inside a hyphenated word, then a conditional in an earlier clause, then either word inside a noun phrase.
+Narrowing the search window each time only moved the gap.
+What closed it was a positional rule: a conditional exempts only when it opens the clause, and a negator only when filler words alone separate it from the phrase.
+
+- **Do:** state where an exempting word must sit, and write the test for the same word sitting one position away.
+- **Don't:** shrink a search window and call the exemption fixed.
+
+## An exit code that means "found" must not be the default failure code
+
+A checker whose exit 1 means "violations found" shares that code with Python's uncaught-exception exit.
+A malformed input that crashes the script then reads as a finding.
+Give bad input its own code (2), validate every field up front, and catch any other failure around the examination itself, printing its type and message, so the contract holds without listing every malformed shape (ai-config#5077 took three rounds to find them one at a time).
+
+- **Do:** exit 2 on any failure to examine the input, and print what failed.
+- **Don't:** let an uncaught exception reach the interpreter's default exit.

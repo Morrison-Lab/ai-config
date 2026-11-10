@@ -92,6 +92,14 @@ Write `[session](https://claude.ai/code/session_…)` for a Claude Code session,
 - **Don't:** name a session by title or id alone, or by a phrase such as "your Mac session", "the ab12-03 chat" or "that chat".
   A chat is a session.
 
+- **Do:** before pushing a prose change, run `python3 scripts/check-bare-forge-refs.py`.
+  It fails on a bare `repo#N` or `owner/repo#N` on a line the branch adds to a `.md` file
+  ([ai-config#5132](https://github.com/Morrison-Lab/ai-config/issues/5132)).
+  CI runs it advisory only, because the corpus already holds many bare references.
+
 (Directive from the user, 2026-10-16: "anytime you mention a session, you must provide a link".
 Reaffirmed 2026-10-22: "always hyperlink when you mention other sessions".
 Tracked in [ai-config#4570](https://github.com/Morrison-Lab/ai-config/issues/4570).)
+
+- **Do:** in a chat reply, link every `repo#N` as `[psw#542](https://github.com/Morrison-Lab/psw/pull/542)`, checking pull versus issue.
+  `hooks/no-bare-repo-ref.py` denies a bare one in a hearthbot reply (Ezra, 2026-11-09, [ai-config#5164](https://github.com/Morrison-Lab/ai-config/issues/5164)).

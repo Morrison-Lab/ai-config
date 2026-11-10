@@ -184,10 +184,10 @@ def test_too_few_units_fails_loudly() -> None:
 def test_all_alias_corpus_calibrates_without_crashing() -> None:
     """>= 2 units, every pair suppressed: the empty-`vals` case review found.
 
-    `skills/ad*/SKILL.md` is adr/adri/adria, all alias stubs, so with the
+    `skills/adr*/SKILL.md` is adr/adri/adria, all alias stubs, so with the
     default `--include-aliases` off there is nothing to calibrate over.
     """
-    r = _run("--corpus", "skills/ad*/SKILL.md", "--calibrate")
+    r = _run("--corpus", "skills/adr*/SKILL.md", "--calibrate")
     check("does not traceback on an all-alias corpus", "Traceback" not in r.stderr, r.stderr[-200:])
     check("exits 0", r.returncode == 0, f"rc={r.returncode}")
     check("says why there is nothing to calibrate", "no reportable pairs" in r.stdout, r.stdout[-200:])

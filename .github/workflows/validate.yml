@@ -53,6 +53,19 @@ jobs:
       - name: Run check-dynamic-note-expiry tests
         # ai-config#5018: a memory note stating a changing condition carries `expires YYYY-MM-DD`.
         run: python3 scripts/test_check_dynamic_note_expiry.py
+      - name: Run find-quiet-announcing-threads tests
+        # ai-config#5054: the coordinator-side nudge flags a thread that announced work and went quiet.
+        run: python3 scripts/test_find_quiet_announcing_threads.py
+      - name: Run check-owed-mechanism tests
+        # ai-config#5049: a memory note that says a check or hook is owed links its issue.
+        run: python3 scripts/test_check_owed_mechanism.py
+      - name: Run check-stop-hook-shapes tests
+        # ai-config#5055: a Stop hook that reads the final message names its transcript shapes.
+        run: python3 scripts/test_check_stop_hook_shapes.py
+      - name: Check Stop hooks name the transcript shapes they read
+        # ai-config#5055. Exit 2 (unreadable hooks.json, or no Stop hook reads the
+        # final message) fails the job too, so the gate cannot pass without looking.
+        run: python3 scripts/check-stop-hook-shapes.py
       - name: Check mistake-pattern numbering
         # ai-config#2946: `## Pattern N:` headings unique and sequential; the
         # test below dogfoods the live file, so this step names the defect.
@@ -205,6 +218,8 @@ jobs:
         run: python3 scripts/test_sync_nlb_checker.py
       - name: Run memory-file-size check tests
         run: python3 scripts/test_check_memory_file_size.py
+      - name: Run sources-library audit tests
+        run: python3 scripts/test_check_sources_library.py
       - name: Run session-runtime check tests
         run: python3 scripts/test_check_session_runtime.py
       - name: Run tui-alloc README check tests
@@ -686,6 +701,17 @@ jobs:
         # a fragment once and then names it bare is the miss this corpus
         # states in prose and, before this step, had no instrument for.
         run: python3 scripts/check-bare-fragment-mentions.py
+      - name: Check bare repo#N references on added prose lines (advisory)
+        # ai-config#5132. Advisory because the corpus already holds many bare
+        # references (14 on the last 40 commits of main, 2026-11-09), so a gate
+        # would block unrelated PRs. Run the script without --advisory before
+        # pushing a prose change. Needs history to diff, so it fetches the base.
+        run: |
+          git fetch --quiet --unshallow origin || true
+          git fetch --quiet origin "${{ github.base_ref || github.event.repository.default_branch }}"
+          python3 scripts/check-bare-forge-refs.py --advisory FETCH_HEAD
+      - name: Run check-bare-forge-refs tests
+        run: python3 scripts/test_check_bare_forge_refs.py
       - name: Check shared files for new hardcoded machine names, paths and accounts
         # Step (b) of making ai-config usable by others: the maintainer's own
         # machines and accounts are moved into per-user configuration, and this
@@ -827,6 +853,21 @@ jobs:
         # Exit 2 (git diff failed, or no memory files) fails the job too, so the
         # gate cannot pass without having looked.
         run: python3 scripts/check-dynamic-note-expiry.py --base "${{ github.event.pull_request.base.sha }}"
+      - name: Check memory notes that say a check or hook is owed link its issue
+        # ai-config#5049. Diff mode: only a note unit the PR touches is checked.
+        # Exit 2 (git diff failed, or no memory files) fails the job too, so the
+        # gate cannot pass without having looked.
+        run: python3 scripts/check-owed-mechanism.py --base "${{ github.event.pull_request.base.sha }}"
+      - name: Check a PR that adds a check also adds a writer and a reviewer instruction
+        # ai-config#5174 (defense in depth, ai-config#5171). Diff mode against the
+        # base SHA; exit 2 (diff unreadable) fails the job, so the gate cannot
+        # pass without having looked. The self-test pins each branch, including
+        # that an empty diff passes only as "no check added".
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          python3 scripts/check-check-has-instructions.py --self-test
+          python3 scripts/check-check-has-instructions.py --base "${{ github.event.pull_request.base.sha }}"
       - name: Check added prose for unverifiable citations (advisory)
         # ai-config#3660. Rides this job for its full-history checkout and its
         # pull_request gate. Non-blocking: main() returns 0 whatever it finds,

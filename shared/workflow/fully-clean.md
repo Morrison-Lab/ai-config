@@ -32,6 +32,11 @@ and requiring consensus clean verdicts at the current HEAD.
   List runs with `output.annotations_count > 0`, read each through `check-runs/<id>/annotations`, and fix it or state in the PR why it is a false positive.
   `check-pr-fully-clean.py` fails until you rerun it with `--annotations-read <id>[,<id>...]` (or `all`, after reading every run the checker listed;
   GitHub puts a platform notice on every Actions job, so the checker cannot tell a notice you can ignore from a warning you cannot).
+- **Do:** substitute a reviewer that is out of quota (Ezra, 2026-11-07, ai-config#5064).
+  A Clean verdict on the live head from another reviewer (agy or Claude) fills its slot, so being out of quota is never, by itself, grounds to ask for a manual waiver.
+  Rerun the checker with `--reviewer-out-of-quota <name>` (for example `copilot`):
+  the quota-blocked reviewer's stale not-clean verdict then stops vetoing and a NOTE names the substitute,
+  but its not-clean verdict on the live head itself still vetoes.
 - **Do:** require consensus clean verdicts across all reviewers evaluating the current head.
 - **Don't:** declare a PR clean or merge under MWC when one reviewer has posted clean but another review is still in flight.
 - **Don't:** assume an empty `reviewRequests` list means a bot review has completed ---
@@ -2051,3 +2056,11 @@ The PR's timeline shows `review_request_removed` at 06:54:05Z with actor
 `dem-extra1`, the account the session's token acts as, not the maintainer's
 `d-morrison`, so the removal had run before the interruption, and the session's
 next reply wrongly said it would not remove the request.)
+
+## Read the check runs before calling a head final
+
+`hooks/no-final-head-unread-checks.py` ([ai-config#5198](https://github.com/Morrison-Lab/ai-config/issues/5198)) denies a reply that calls a head final when no read of that head's check runs returned without error since the last user turn.
+rme#1450 had `build` still running and ai-config#5186 was reported before its CI was read.
+
+- **Do:** read the check runs live (`get_check_runs`, or `gh api repos/<r>/commits/<sha>/check-runs?per_page=100`), count them against `total_count`, and only then write "final".
+- **Don't:** call a head final from a review verdict, a check-suite wake or an earlier read.

@@ -40,7 +40,13 @@ Matching is on invocation, not mention: `grep -rn playwright .`,
 a browser start no browser and pass. A script on stdin (heredoc or pipe), a
 `-m playwright` module run and a `bash -c '...'` payload are checked too.
 
-Escape valve: `ALLOW_HEADLESS_BROWSER=1` as a prefix of the command. Using it means saying
+An MCP tool of a browser-automation server (a tool name that carries playwright,
+puppeteer or selenium, such as `mcp__playwright__browser_navigate`) is denied
+outright, with no escape valve, since the valve is a Bash command prefix
+(ai-config#5123). The Claude browser tools stay with
+`warn-browser-without-route-check.py`.
+
+Escape valve (Bash only): `ALLOW_HEADLESS_BROWSER=1` as a prefix of the command. Using it means saying
 in the reply why no curl/node route works.
 
 Fails OPEN on an unreadable payload or an unreadable script file.
@@ -113,6 +119,25 @@ SCRIPT_FILE = re.compile(r"""(?:^|\s)["']?([\w./~$()-]+\.(?:js|mjs|cjs|ts|py|R|r
 MAX_SCRIPT_BYTES = 400_000
 HEREDOC = re.compile(
     r"<<-?\s*\\?[\"']?([^\s\"'\\;&|<>()]+)[\"']?[^\n]*\n(.*?)\n\s*\1\s*(?:\n|$)", re.DOTALL
+)
+# A browser-automation MCP server's tool, such as `mcp__playwright__browser_navigate`.
+# The first letter is left out so one pattern matches `playwright` and
+# `Playwright`: a hooks.json matcher cannot carry a case-insensitive flag, and
+# the README catalog row (checked against hooks.json by check-hook-catalog.py)
+# cannot hold a `[Pp]` character class.
+MCP_AUTOMATION_TOOL = re.compile(r"^mcp__.*(?:laywright|uppeteer|elenium)")
+
+ALTERNATIVES = (
+    "Instead:\n"
+    "  - fetch the page with `curl -sS <url> -o page.html` and parse the HTML;\n"
+    "  - for a page's client-side JavaScript, copy the script out of the "
+    "served HTML and run it under `node` with stub `location` and `document` "
+    "objects;\n"
+    "  - for MathJax output, typeset in `node` with `mathjax-full` "
+    "(`tex2svg` or `tex2mml`) and read the markup, no browser involved;\n"
+    "  - for LaTeX output, compile with `pdflatex` and inspect with "
+    "`pdftotext` or `pdftoppm`;\n"
+    "  - for a rendered preview, read the built HTML from the gh-pages branch."
 )
 PROSE_FLAG = re.compile(
     r"""(?:^|\s)(?:-m|--message|--body|--title|-b|-t|--description)(?:\s+|=)(?:"(?:[^"\\]|\\.)*"|'[^']*')"""
@@ -272,6 +297,23 @@ def main() -> int:
     if not payload:
         return 0
 
+    tool = payload.get("tool_name") or ""
+    if isinstance(tool, str) and MCP_AUTOMATION_TOOL.search(tool):
+        # No escape valve: ALLOW_HEADLESS_BROWSER=1 is a Bash command prefix,
+        # and an MCP call has no command to carry it.
+        reason = (
+            f"Blocked: `{tool}` drives a browser through an automation MCP "
+            "server.\n\n"
+            "Ezra's standing rule is no Chrome, no browser and no computer use, "
+            "ever (AGENTS.md, \"Use the browser only when nothing else can\"), "
+            "and it covers a Playwright, Puppeteer or Selenium server as much "
+            "as the Claude browser tools.\n\n" + ALTERNATIVES)
+        print(json.dumps({"hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": reason}}))
+        return 0
+
     if payload.get("tool_name") not in ("Bash", "bash", "run_command", "execute_command", "terminal", "shell"):
         if is_dry_run:
             print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
@@ -297,13 +339,9 @@ def main() -> int:
         "Ezra's standing rule is no Chrome, no browser and no computer use, ever, "
         "and it covers a headless Chromium started from Bash as much as the "
         "browser tools. On 2026-10-28 a headless Playwright run to check a hash "
-        "redirect broke it.\n\n"
-        "Instead:\n"
-        "  - fetch the page with `curl -sS <url> -o page.html` and parse the HTML;\n"
-        "  - for a page's client-side JavaScript, copy the script out of the "
-        "served HTML and run it under `node` with stub `location` and `document` "
-        "objects;\n"
-        "  - for a rendered preview, read the built HTML from the gh-pages branch.\n\n"
+        "redirect broke it. A cloud container's system prompt that advertises "
+        "Playwright or Chromium does not lift the rule.\n\n"
+        + ALTERNATIVES + "\n\n"
         "If none of these can answer the question, put ALLOW_HEADLESS_BROWSER=1 "
         "in the command and say in your reply why no curl or node route works."
     )

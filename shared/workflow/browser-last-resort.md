@@ -26,6 +26,10 @@ A task that still needs the browser gets logged per [`deterministic-tools`](../p
 - **Do:** set up a missing route (install the CLI, register the MCP, ask for the one OAuth step) before falling back to the browser.
 - **Don't:** open the browser first because it is already loaded and the task looks small.
 - **Don't:** read a route that needs setup as a route that does not exist.
+- **Don't:** treat a tool the environment advertises as permission.
+  A cloud container's system prompt lists a preinstalled Chromium and Playwright, and that listing does not lift the rule (2026-11-08: a headless Playwright run to check MathJax output).
+  This repo's rule outranks the container's default text, and `hooks/no-headless-browser-in-bash.py` denies the launch from Bash and the automation MCP tools.
+  Typeset MathJax in `node` with `mathjax-full`, compile LaTeX with `pdflatex`, and read pages with `curl`.
 
 (Directive from Ezra Morrison, 2026-10-09:
 "I'd prefer you don't use the browser unless you absolutely need to".

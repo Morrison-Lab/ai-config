@@ -24,7 +24,7 @@ MCP = "mcp__github__merge_pull_request"
 
 
 def line(sha=SHA, n=354, repo=REPO):
-    return f"✅ {repo}#{n} is FULLY CLEAN on HEAD {sha[:8]}!"
+    return f"✅ {repo}#{n} is FULLY CLEAN on HEAD {sha[:8]}! [stale-base rule]"
 
 
 def bash(cmd, out="", sidechain=False):
@@ -187,6 +187,8 @@ def main():
           mcp([bash("grep -n x scripts/check-pr-fully-clean.py", line())])[0])
     check("denies a checker run whose result has no FULLY CLEAN line",
           mcp([checker(out="PR is NOT fully clean:\n - x")])[0])
+    check("denies an old checker's line without the stale-base marker",
+          mcp([checker(out=line().replace(" [stale-base rule]", ""))])[0])
     check("denies a backgrounded checker run (silence is not success)",
           mcp([checker(out="Command running in background with ID: b1")])[0])
     check("denies a merge naming no repository",

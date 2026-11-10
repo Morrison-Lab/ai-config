@@ -143,13 +143,17 @@ GH_VALUE_FLAGS = frozenset({"-R", "--repo", "-t", "--subject", "-b", "--body",
                             "-A", "--author-email"})
 # Options of scripts/check-pr-fully-clean.py that take a separate value, from
 # its parse_args() (a test derives this set from the script and compares).
-INSTRUMENT_VALUE_FLAGS = frozenset({"--quorum", "--from-json", "-R", "--repo", "--annotations-read"})
+INSTRUMENT_VALUE_FLAGS = frozenset({"--quorum", "--from-json", "-R", "--repo", "--annotations-read", "--reviewer-out-of-quota"})
 RX_PR_NUM = re.compile(r"^\d+$")
 RX_PR_URL = re.compile(r"/pull/(\d+)(?:[/?#].*)?$")
-RX_CLEAN_LINE = re.compile(r"\bis FULLY CLEAN\b")
+# Only a line ending in the "[stale-base rule]" marker counts: a checker older
+# than ai-config#5144 prints the same line without it and lacks the stale-base
+# rule (ai-config#5146, ai-config#5148).
+RX_CLEAN_LINE = re.compile(r"\bis FULLY CLEAN\b[^\n]*\[stale-base rule\]")
 RX_NOT_CLEAN = re.compile(r"NOT fully clean", re.IGNORECASE)
-# The instrument prints "<owner>/<repo>#<N> is FULLY CLEAN on HEAD <sha>!".
-RX_ATTRIBUTED = re.compile(r"#(\d+) is FULLY CLEAN\b")
+# The instrument prints
+# "<owner>/<repo>#<N> is FULLY CLEAN on HEAD <sha>! [stale-base rule]".
+RX_ATTRIBUTED = re.compile(r"#(\d+) is FULLY CLEAN\b[^\n]*\[stale-base rule\]")
 RX_API_MERGE = re.compile(r"(?:^|/)repos/([^/]+/[^/]+)/pulls/(\d+)/merge/?(?:\?.*)?$")
 SHELL_OPS = frozenset("();|&")
 RX_AGY_BG_START = re.compile(

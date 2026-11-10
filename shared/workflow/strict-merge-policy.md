@@ -39,10 +39,9 @@ Full procedure: [`adversarial-self-review`](adversarial-self-review.md#waiver-wh
 ## Infrastructure PRs standing `mwc` grant
 
 Infrastructure PRs carry a standing `mwc` grant in every repo the user can push to.
-A PR whose diff is only infrastructure --- CI workflows, tooling and scripts, configuration,
-and recorded instructions and notes for AI and human developers
-(`CLAUDE.md`, `AGENTS.md`, `.github/`, `.claude/`, memories, skills, contributor docs, `tools/`) ---
-may be merged without asking once it is fully clean.
+A PR whose diff is only infrastructure --- CI workflows, tooling and scripts, configuration, and recorded instructions and notes for AI and human developers (`CLAUDE.md`, `AGENTS.md`, `.github/`, `.claude/`, memories, skills, contributor docs, checker scripts and their tests under `tools/`) --- may be merged without asking once it is fully clean.
+The exact path list the merge guard accepts is `INFRA_PATH_PATTERNS` in `hooks/no-unauthorized-merge.py`.
+It leaves the rest of `tools/` out, because figure and data generators there change what readers see.
 Every other rule in this section still binds, including the clean automated review on the current head,
 so a quota-skipped review still holds the merge.
 The test is effect rather than file type: infrastructure is whatever does not directly change the repo's consumer's experience.
@@ -50,7 +49,12 @@ Every PR in `Morrison-Lab/gha` or `Morrison-Lab/ai-config` counts as infrastruct
 Where `hooks/no-unauthorized-merge.py` is active, clear it with `ALLOW_MERGE=1` on that one merge command, and state in the reply why the PR qualified.
 Do not enable session-wide `/mwc` for it.
 
+- **Classify before asking.**
+  Before telling the user a PR waits on `mwc`, list its changed paths.
+  If every path matches `INFRA_PATH_PATTERNS` in `hooks/no-unauthorized-merge.py` (`.github/`, `.claude/`, `CLAUDE.md`/`AGENTS.md`, lint, spell and link-check configuration) or the repo is gha, macros or ai-config, report it as merging under the infra grant, not as waiting on the user (Ezra, 2026-11-07, about lds#2009: "it's infra and shouldn't need my word").
+  `hooks/no-mwc-ask-for-infra-pr.py` denies a reply that asks otherwise (ai-config#5097).
 - **Do:** merge a fully clean infrastructure PR without asking, and say in the same reply that you did and why it qualified.
+  In a project, an owner thread never merges: it sends the PR's final head to the coordinator, and the runner thread merges once the fully-clean checker exits 0 (ai-config#5111).
 - **Don't:** extend the grant to a PR that mixes infrastructure with content, or merge one whose review was skipped.
 
 See [`AGENTS.cases.md`](../../AGENTS.cases.md), "Strict Merge Control Policy" for the authentic user directives.

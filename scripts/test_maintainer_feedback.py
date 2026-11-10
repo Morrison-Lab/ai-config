@@ -212,6 +212,7 @@ class TestCheckerGate(unittest.TestCase):
                 patch.object(checker, "check_review_threads", return_value=(True, [])), \
                 patch.object(checker, "check_review_comments", return_value=(True, [])), \
                 patch.object(checker, "check_base_drift", return_value=(True, [])), \
+                patch.object(checker, "check_required_checks", return_value=(True, [])), \
                 contextlib.redirect_stdout(out):
             with self.assertRaises(SystemExit) as raised:
                 checker.main()

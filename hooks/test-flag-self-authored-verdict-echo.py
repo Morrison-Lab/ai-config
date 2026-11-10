@@ -750,6 +750,20 @@ LABEL_GAP_SPANS_NEWLINE = (
     ". Rebutted, for the reason set out below.\n"
 ) % NOT_CLEAN
 
+# It covers the FIRST label gap -- between the number and the range dash --
+# which `LABEL_GAP_SPANS_NEWLINE` above does not (ai-config#3982). Widening
+# slot 1 alone to a whitespace class flips the shipped answer here from False
+# to True. Slots 2 and 4 cannot be pinned by any body: what follows each gap
+# (`4. Rebutted`, `Rebutted`) is itself a valid line-start disposition, so
+# the hook answers True for it whether or not the gap crosses the newline,
+# and widening them changes no verdict.
+LABEL_RANGE_GAP_SPANS_NEWLINE = (
+    "## Round 2\n\n"
+    "The reviewer's call was **%s**, quoted here from its report.\n\n"
+    "3\n"
+    "-- 4. Rebutted, for the reason set out below.\n"
+) % NOT_CLEAN
+
 # Prose about the mechanism with no disposition vocabulary at all.
 DOCS_ABOUT_THE_RULE = (
     "The scanner reads a line-start verdict label as authored. A body stating\n"
@@ -1103,6 +1117,8 @@ def main():
     check("a clean disposition", mcp(CLEAN_DISPOSITION), False)
     check("an ARD label whose own gap spans a newline is not a disposition",
           mcp(LABEL_GAP_SPANS_NEWLINE), False)
+    check("a range label whose first gap spans a newline is not a disposition",
+          mcp(LABEL_RANGE_GAP_SPANS_NEWLINE), False)
     check("prose about the rule with no disposition vocabulary",
           mcp(DOCS_ABOUT_THE_RULE), False)
     check("an empty body", mcp(""), False)

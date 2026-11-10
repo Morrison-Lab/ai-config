@@ -49,6 +49,21 @@ def say_antigravity(text):
     }
 
 
+def tool(name, **inp):
+    return {
+        "type": "assistant",
+        "message": {"content": [{"type": "tool_use", "name": name, "input": inp}]},
+    }
+
+
+def post(text):
+    return tool("mcp__hearthbot__post_message", text=text)
+
+
+def end_turn():
+    return tool("mcp__hearthbot__no_reply_needed")
+
+
 def run(messages):
     with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False, encoding="utf-8") as fh:
         for m in messages:
@@ -185,6 +200,173 @@ def main():
         print(f"FAIL once-per-message: first={first} second={second}")
     else:
         print("PASS once-per-message")
+
+    # ai-config#5050: Projects threads reply through post_message tool calls.
+    posted_block = [
+        "Next I'm opening the first workflow PR.",
+        "Merged the first PR.\n\nNext, I'll file the second issue.",
+        "Done with CI.\n\nI'm now opening the follow-up PR.",
+        # agy review on #5052: work verbs and a closing "summarize" with
+        # nothing delivered are still unstarted announcements.
+        "Next, I'll review the PR.",
+        "Next, I'll add the unit tests.",
+        "Next, I'll summarize the findings.",
+        # Claude review on #5052: a colon with no delivered content.
+        "I read the PR. Next, I'll review: the file at src/a.py.",
+        "I read the PR. Next, I'll fix: the bug in the parser.",
+        "Looked at the issue. Next, I'll add:",
+        # agy review on #5052: the colon in "Next:" is not a delivery colon.
+        "Next: I'll open the first workflow PR and run the test suite.",
+        "Next up: I'm opening the first workflow PR and running the test suite.",
+    ]
+    posted_block += [
+        # Padding after a colon must not exempt (Claude review on #5052): no
+        # proxy for "delivers" is ungameable, so a colon never exempts. The
+        # cost is one block per message, answered by rewording.
+        "I read the PR. Next, I'll review: the file at src/a.py which has the "
+        "parser bug in it.",
+        "Looked at it. Next, I'll fix: the the the the the the the the.",
+        "I looked at the code. Next, I'll explain the key insight: the loop "
+        "never terminates because of an off-by-one error.",
+    ]
+    posted_block += [
+        # Claude review on #5052: immediate-future "I'm <adjective> to" forms
+        # that the gerund requirement dropped.
+        "I read the issue. Next, I'm about to fix the bug.",
+        "Next, I'm set to deploy the fix.",
+        "Next, I'm ready to deploy the fix.",
+        "Next, I'm due to start the migration.",
+    ]
+    posted_block += [
+        # Claude review on #5052: the open class of immediate-future phrasings.
+        "I read the issue. Next, I'm poised to fix the bug.",
+        "I read the issue. Next, I'm prepared to fix the bug.",
+        "I read the issue. Next, I'm slated to fix the bug.",
+        "I read the issue. Next, I'm scheduled to fix the bug.",
+        "I read the issue. Next, I'm committed to fixing the bug.",
+        "I read the issue. Next, I'm all set to fix the bug.",
+    ]
+    posted_block += [
+        # agy review on #5068: these verbs also announce real actions.
+        "I read the issue. Next, I'll pass --force-with-lease to git push.",
+        "I read the issue. Next, I'll pass the token to the script.",
+        "I read the issue. Next, I'll leave a comment on the PR.",
+        "I read the issue. Next, I'll leave a review note.",
+        "I read the issue. Next, I'll stop the background daemon.",
+        # Claude review on #5068: the other added words, with a real action in the clause.
+        "I read the issue. Next, I'll skip the linter and push directly to main.",
+        "I read the issue. Next, I'll defer the migration to next week and push this hotfix now.",
+        # Known misses under the positive verb list (#5071): the verb right
+        # after "Next, I'm" is "done", "finished" or "tired", not a work verb,
+        # so "Next, I'm done reviewing, let me merge the PR." is not flagged.
+        # The trade accepted in #5071: a missed edge case beats the
+        # whack-a-mole of the exclusion list.
+        "I read the issue. Next, I'll merge the PR.",
+        # Claude review on #5074: consonant-doubling gerunds.
+        "I read the issue. Next, I'm formatting the file now.",
+        "I read the issue. Next, I'm debugging the parser now.",
+        "I read the issue. Next, I'm grepping the logs now.",
+        "I read the issue. Next, I'm tagging the release now.",
+        "I read the issue. Next, I'm digging into the logs now.",
+        "I read the issue. Next, I'm rerunning the pipeline now.",
+        "I read the issue. Next, I'm beginning the migration now.",
+        "I read the issue. Next, I'm cancelling the stale runs now.",
+        "I read the issue. Next, I'm skipping the linter and pushing now.",
+        "I read the issue. Next, I'm stopping the daemon now.",
+        "I read the issue. Next, I'm pushing this straight to main.",
+    ]
+    posted_pass = [
+        # Claude review on #5052: declining, uncertainty and stative gerunds
+        # announce no work.
+        "I looked at the repo. Next, I'm not going to fix this now, since it's out of scope.",
+        "I checked the logs. Next, I'm uncertain whether this is worth pursuing.",
+        "I checked the logs. I'm now realizing this was a mistake.",
+        "Next, I'll not touch the config.",
+        # ai-config#5061: declining or stopping work announces no work.
+        "Next, I'll leave this alone for now.",
+        "Next, I'll skip this for now.",
+        "Next, I'll defer this to the backlog.",
+        "Next, I'll pass on this one.",
+        "Next, I'll stop here.",
+        "Next, I'm done for today.",
+        "Next, I'm finished with this task.",
+        "Next I'm opening the first workflow PR once the review lands.",
+        "Next I'll file it, but I'm blocked on the repo grant.",
+        "Next I'm waiting for the runner thread.",
+        "Next, I'll summarize the findings below.\n\nFinding 1 is fixed.\n\n"
+        "Finding 2 is filed as #12.",
+        "Opened the PR and filed the issue.",
+    ]
+    for text in posted_block:
+        clear_sentinels()
+        out = run([post(text), end_turn()])
+        if not out or json.loads(out).get("decision") != "block":
+            failures += 1
+            print(f"FAIL (post_message should block): {text!r}")
+        else:
+            print(f"PASS post_message block: {text.splitlines()[0][:50]!r}")
+    for text in posted_pass:
+        clear_sentinels()
+        out = run([post(text), end_turn()])
+        if out:
+            failures += 1
+            print(f"FAIL (post_message should pass): {text!r}")
+        else:
+            print(f"PASS post_message allow: {text[:50]!r}")
+
+    # Review finding on #5052: every user-visible reply tool is read.
+    for name in ("mcp__hearthbot__reply", "mcp__hearthbot__update_message"):
+        clear_sentinels()
+        out = run([tool(name, text="Next I'm opening the first workflow PR."), end_turn()])
+        if not out or json.loads(out).get("decision") != "block":
+            failures += 1
+            print(f"FAIL ({name} should block)")
+        else:
+            print(f"PASS {name} block")
+
+    # agy review on #5052: a trailing text block must not hide a sent
+    # announcement, and an empty-text reply call is not work.
+    for label, msgs in (
+        (
+            "trailing text block",
+            [
+                {
+                    "type": "assistant",
+                    "message": {
+                        "content": [
+                            {
+                                "type": "tool_use",
+                                "name": "mcp__hearthbot__post_message",
+                                "input": {"text": "Next I'm opening the first workflow PR."},
+                            },
+                            {"type": "text", "text": "Posted status update."},
+                        ]
+                    },
+                },
+                end_turn(),
+            ],
+        ),
+        (
+            "empty-text reply call",
+            [post("Next I'm opening the first workflow PR."), tool("reply"), end_turn()],
+        ),
+    ):
+        clear_sentinels()
+        out = run(msgs)
+        if not out or json.loads(out).get("decision") != "block":
+            failures += 1
+            print(f"FAIL ({label} should block)")
+        else:
+            print(f"PASS {label} block")
+
+    # Work after the announcement (any non-hearthbot tool call) clears it.
+    clear_sentinels()
+    out = run([post("Next I'm opening the first workflow PR."), tool("Bash"), end_turn()])
+    if out:
+        failures += 1
+        print(f"FAIL work after announcement should pass: out={out}")
+    else:
+        print("PASS work after announcement")
 
     print(f"\n{failures} failure(s)")
     return 1 if failures else 0

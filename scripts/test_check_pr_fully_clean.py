@@ -965,6 +965,82 @@ def main() -> int:
         ),
     )
 
+    # ai-config#5064: a reviewer out of quota cannot refresh a stale not-clean,
+    # so a clean substitute on the live head fills its slot; a not-clean on the
+    # live head itself, or no substitute, still vetoes.
+    HEAD = "abcdef1234567890abcdef1234567890abcdef12"
+    CLAUDE_CLEAR_HEAD = (
+        "**Claude finished** review\n\nReviewed `abcdef1`.\n\n### Verdict\n\n"
+        "**Ready for merge**"
+    )
+    stale_copilot = ("review", "2026-11-07T05:00:00Z", COPILOT_BLOCKS, "1111111aaaa", "",
+                     "copilot-pull-request-reviewer")
+    head_copilot = ("review", "2026-11-07T05:00:00Z", COPILOT_BLOCKS, HEAD, "",
+                    "copilot-pull-request-reviewer")
+    sub_clean = ("comment", "2026-11-07T07:00:00Z", CLAUDE_CLEAR_HEAD, "", "", "github-actions")
+    sub_stale = ("comment", "2026-11-07T07:00:00Z",
+                 CLAUDE_CLEAR_HEAD.replace("abcdef1", "9999999"), "", "", "github-actions")
+    q_ok, q_issues = checker.check_latest_verdict(
+        [stale_copilot, sub_clean], head_oid=HEAD, out_of_quota=["copilot"])
+    check(
+        "check_latest_verdict: out-of-quota reviewer's stale not-clean is replaced "
+        "by a clean substitute on the live head, with a NOTE (#5064)",
+        q_ok and any(i.startswith("NOTE: ") and "substitute reviewer" in i
+                     and "Copilot" in i and "Claude" in i for i in q_issues),
+    )
+    qh_ok, _qh = checker.check_latest_verdict(
+        [head_copilot, sub_clean], head_oid=HEAD, out_of_quota=["copilot"])
+    check("check_latest_verdict: out-of-quota reviewer's not-clean ON the live head still vetoes (#5064)",
+          not qh_ok)
+    qn_ok, _qn = checker.check_latest_verdict(
+        [stale_copilot], head_oid=HEAD, out_of_quota=["copilot"])
+    check("check_latest_verdict: out-of-quota with no substitute still vetoes (#5064)", not qn_ok)
+    qs_ok, _qs = checker.check_latest_verdict(
+        [stale_copilot, sub_stale], head_oid=HEAD, out_of_quota=["copilot"])
+    check("check_latest_verdict: a substitute clean on an older head does not count (#5064)", not qs_ok)
+    qd_ok, _qd = checker.check_latest_verdict([stale_copilot, sub_clean], head_oid=HEAD)
+    check("check_latest_verdict: without the out-of-quota flag the stale veto stands (#5064)",
+          not qd_ok)
+
+    # ai-config#5065: a repo with no CI workflows and no check suites has no
+    # check runs to find; a repo WITH workflows but no runs is a stalled CI.
+    import json as _json
+
+    class _NoRunsPR:
+        repo = "Morrison-Lab/stats-allowlist"
+        head_sha = "ebbb8d39" + "0" * 32
+
+        def get_check_runs(self):
+            return []
+
+    def _no_ci_score(workflows, suites):
+        replies = {
+            "/actions/workflows": workflows,
+            "/check-suites": suites,
+        }
+
+        def _fake_fetch(cmd):
+            for key, value in replies.items():
+                if key in cmd[-1]:
+                    if value is None:
+                        raise RuntimeError("HTTP 404")
+                    return _json.dumps({"total_count": value})
+            raise AssertionError(cmd)
+
+        with patch.object(checker, "fetch", side_effect=_fake_fetch):
+            return original_check_ci_runs(_NoRunsPR())
+
+    nc_ok, nc_issues = _no_ci_score(0, 0)
+    check("check_ci_runs: a repo with no workflows and no check suites passes with a NOTE (#5065)",
+          nc_ok and any(i.startswith("NOTE: ") and "no CI workflows" in i for i in nc_issues))
+    nw_ok, nw_issues = _no_ci_score(3, 0)
+    check("check_ci_runs: a repo with workflows but no check runs still fails (#5065)",
+          (not nw_ok) and any("No check runs found" in i for i in nw_issues))
+    ns_ok, _ns = _no_ci_score(0, 1)
+    check("check_ci_runs: no workflows but a check suite on the head still fails (#5065)", not ns_ok)
+    ne_ok, _ne = _no_ci_score(None, 0)
+    check("check_ci_runs: an unreadable workflow count keeps failing (#5065)", not ne_ok)
+
     items_same_reviewer = [
         (
             "comment",
@@ -9839,6 +9915,43 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
     )
 
 
+    # check_required_checks (ai-config#5143): a required check that never ran
+    # blocks the merge even though every check run that exists passed.
+    from types import SimpleNamespace
+
+    def required(rules, state, runs, status=None, pr_state="OPEN"):
+        pr = SimpleNamespace(state=pr_state, base_ref="main", head_sha="sha123",
+                             repo=TEST_REPO, pr_num="7",
+                             get_check_runs=lambda: [SimpleNamespace(name=n) for n in runs])
+
+        def fake_fetch(cmd):
+            path = cmd[2]
+            if "/rules/branches/" in path:
+                return json.dumps(rules)
+            if path.endswith("/pulls/7"):
+                return json.dumps({"mergeable_state": state})
+            return json.dumps({"statuses": status or []})
+
+        with patch.object(checker, "fetch", side_effect=fake_fetch):
+            return checker.check_required_checks(pr)
+
+    gate_rule = [{"type": "required_status_checks", "parameters": {
+        "required_status_checks": [{"context": "annotation-gate"}]}}]
+    ok, issues = required(gate_rule, "blocked", ["lint"])
+    check("check_required_checks: a required check with no run blocks (#5143)",
+          not ok and "annotation-gate" in issues[0])
+    ok, issues = required(gate_rule, "clean", ["lint", "annotation-gate"])
+    check("check_required_checks: a present required check is clean (#5143)",
+          ok and issues == [])
+    ok, issues = required(gate_rule, "clean", ["lint"], status=[{"context": "annotation-gate"}])
+    check("check_required_checks: a required commit status counts as present (#5143)",
+          ok and issues == [])
+    ok, issues = required([], "blocked", ["lint"])
+    check("check_required_checks: blocked with no missing check is still not clean (#5143)",
+          not ok and "'blocked'" in issues[0])
+    ok, issues = required(gate_rule, "blocked", ["lint"], pr_state="MERGED")
+    check("check_required_checks: a merged PR is skipped (#5143)", ok and issues == [])
+
     # check_base_drift (ai-config#2982): a head the base gained a workflow
     # change behind is not clean, since a check added there never ran on it.
     from types import SimpleNamespace
@@ -9923,8 +10036,20 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         ok, issues, _ = drift({"ahead_by": 1, "files": [
             {"filename": wf, "status": "modified", "patch": job_patch}]})
         check(f"check_base_drift: {label} still blocks (#4911)", not ok)
+    # ai-config#5099: a manual or reusable-call trigger cannot gate a PR.
+    for label, trig_patch in (
+            ("a new workflow_dispatch trigger", "@@ -1 +1,2 @@\n+  workflow_dispatch:\n"),
+            ("a workflow_call trigger edit", "@@ -1 +1 @@\n-  workflow_call:\n+  workflow_call: {}\n")):
+        ok, issues, _ = drift({"ahead_by": 1, "files": [
+            {"filename": wf, "status": "modified", "patch": trig_patch}]})
+        check(f"check_base_drift: {label} is a NOTE (#5099)",
+              ok and issues and issues[0].startswith("NOTE"))
+    ok, issues, _ = drift({"ahead_by": 1, "files": [
+        {"filename": wf, "status": "modified",
+         "patch": "@@ -1 +1,2 @@\n+  workflow_dispatch:\n+  pull_request:\n"}]})
+    check("check_base_drift: a dispatch trigger beside a pull_request trigger blocks (#5099)", not ok)
     for label, status, diff_text in (
-            ("a new workflow", "added", "@@ -0,0 +1 @@\n+name: x\n"),
+            ("a new workflow", "added","@@ -0,0 +1 @@\n+name: x\n"),
             ("a trigger edit", "modified", "@@ -1 +1 @@\n-  pull_request:\n+  push:\n"),
             ("a paths filter edit", "modified",
              "@@ -1 +1 @@\n-      paths: [a]\n+      paths: [b]\n"),

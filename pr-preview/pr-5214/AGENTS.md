@@ -271,13 +271,12 @@ When working in a consumer repo, check if the `.ai-config` submodule is outdated
 When a repository migrates to native AI agent plugins (Antigravity or Claude Code plugins), remove redundant git submodules that duplicated those configurations.
 See [`remove-redundant-plugin-submodules`](shared/workflow/remove-redundant-plugin-submodules.md).
 
-WIP cap: [no third open PR per repo](shared/workflow/wip-cap.md).
-
 ## Verify changes before pushing
 
 Always run relevant local linters, tests, and formatting checks before pushing commits to a remote branch.
 At minimum for `ai-config`: `python3 scripts/validate-skills.py`, `python3 scripts/check-links.py`, `python3 scripts/check-ascii-punctuation.py`.
 Run the full test suite (`python3 scripts/test_*.py`) when touching shared tools or scripts.
+Parse changed data files: [rule](shared/workflow/parse-data-files.md).
 
 ## Canonical sources vs generated output
 

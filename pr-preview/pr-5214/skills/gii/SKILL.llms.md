@@ -48,7 +48,7 @@ After ARDI completes clean on the current MR/PR:
 
 #### d. Check stopping conditions
 
-Stop the loop when: - No more open issues (backlog empty) - User interrupts or says “stop” / “that’s enough” - A configurable max is reached (default: 5 issues), which ends the current **wave**, not the session — see below - An issue is blocked and no other unblocked issues remain — otherwise **bypass** the blocked issue (surface it) and keep going with the rest
+Stop the loop when: - No more open issues (backlog empty) - User interrupts or says “stop” / “that’s enough” - A configurable max is reached (default: 5 issues), which ends the current **wave**, not the session — see below - Two open PRs of yours are in this repo (the [WIP cap](../../shared/workflow/wip-cap.md)), which is also a wave boundary - An issue is blocked and no other unblocked issues remain — otherwise **bypass** the blocked issue (surface it) and keep going with the rest
 
 Hitting the max is a **wave boundary**. Wrap up one wave of PRs before starting another: hold new issue grabs, babysit the wave’s open PRs to completion (merge-ready, and merged where a merge grant applies), then stop and ask whether to continue into the next wave or archive the session, giving a recommendation either way (user directive, 2026-08-28, ai-config#2549). A wave is “completely finished” only once every item in it has reached a terminal state; a PR still in CI/review is not a finished wave, and the check-in loop that drives it to green continues uninterrupted. [`finish-wave`](../../skills/finish-wave/SKILL.llms.md) (alias `fw`) is the procedure for that hold.
 

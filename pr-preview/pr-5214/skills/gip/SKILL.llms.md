@@ -49,7 +49,7 @@ If the independent set has **0 or 1** issues, there’s nothing to parallelize �
 
 ### 3. Pick the concurrency cap (orchestrator)
 
-Fan out **at most N at once** (default **N = 3**). Bound it because every subagent pushes commits, triggers a review workflow, and polls for the result — too many at once swamps shared CI runners and the review bot (the same runner-contention reason [`ardia`](../../skills/ardia/SKILL.llms.md) processes PRs one at a time). If the independent set is larger than N, run it in waves of N.
+Fan out **at most N at once** (default **N = 3**, and never more than the [WIP cap](../../shared/workflow/wip-cap.md) leaves room for: N = min(3, 2 minus your open PRs in that repo)). Bound it because every subagent pushes commits, triggers a review workflow, and polls for the result — too many at once swamps shared CI runners and the review bot (the same runner-contention reason [`ardia`](../../skills/ardia/SKILL.llms.md) processes PRs one at a time). If the independent set is larger than N, run it in waves of N.
 
 ### 4. Fan out — one worktree-isolated subagent per issue (concurrent)
 

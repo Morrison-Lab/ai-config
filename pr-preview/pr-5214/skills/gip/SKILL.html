@@ -427,7 +427,7 @@ cookieconsent.run({
 </section>
 <section id="pick-the-concurrency-cap-orchestrator" class="level3">
 <h3 class="anchored" data-anchor-id="pick-the-concurrency-cap-orchestrator">3. Pick the concurrency cap (orchestrator)</h3>
-<p>Fan out <strong>at most N at once</strong> (default <strong>N = 3</strong>). Bound it because every subagent pushes commits, triggers a review workflow, and polls for the result — too many at once swamps shared CI runners and the review bot (the same runner-contention reason <a href="../../skills/ardia/SKILL.html"><code>ardia</code></a> processes PRs one at a time). If the independent set is larger than N, run it in waves of N.</p>
+<p>Fan out <strong>at most N at once</strong> (default <strong>N = 3</strong>, and never more than the <a href="../../shared/workflow/wip-cap.md">WIP cap</a> leaves room for: N = min(3, 2 minus your open PRs in that repo)). Bound it because every subagent pushes commits, triggers a review workflow, and polls for the result — too many at once swamps shared CI runners and the review bot (the same runner-contention reason <a href="../../skills/ardia/SKILL.html"><code>ardia</code></a> processes PRs one at a time). If the independent set is larger than N, run it in waves of N.</p>
 </section>
 <section id="fan-out-one-worktree-isolated-subagent-per-issue-concurrent" class="level3">
 <h3 class="anchored" data-anchor-id="fan-out-one-worktree-isolated-subagent-per-issue-concurrent">4. Fan out — one worktree-isolated subagent per issue (concurrent)</h3>

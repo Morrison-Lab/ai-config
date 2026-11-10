@@ -1,8 +1,12 @@
 # User preferences (cross-workspace)
 
+- Choose explicitly whether to centralize or distribute work, within and across repos ([ai-config#5185](https://github.com/Morrison-Lab/ai-config/issues/5185)).
+  See [`centralize-or-distribute`](../shared/workflow/centralize-or-distribute.md).
 - NEVER assume; ALWAYS verify.
-  Ezra, 2026-11-09: "cai: never assume anything that could be checked empirically" ([`check-dont-assume`](../shared/workflow/check-dont-assume.md), ai-config#5215).
-  Before stating a status/fact/outcome (PR or issue state, merge status, CI/review verdict, branch position, file contents, or which TOOLS/MCP servers are actually available in the current session) or acting on one, confirm it with a tool call --- don't rely on what was true earlier in the session, what "should" be the case, or what memory/documentation says was true as of some earlier point.
+  Ezra, 2026-11-09: "cai: never assume anything that could be checked empirically" ([ai-config#5215](https://github.com/Morrison-Lab/ai-config/issues/5215)).
+  The coordinator had assumed lds needed up-to-date branches without reading the ruleset, which caused needless main merges.
+  No deny hook can tell a read setting from an unread one, so this stays prose.
+  Before stating a status/fact/outcome (PR or issue state, merge status, CI/review verdict, branch position, file contents, a repo setting such as a ruleset, branch protection, Actions variable, visibility or runner label, or which TOOLS/MCP servers are actually available in the current session) or acting on one, confirm it with a tool call --- don't rely on what was true earlier in the session, what "should" be the case, or what memory/documentation says was true as of some earlier point.
   State drifts between turns; tool availability drifts between sessions/environments.
   "It should be X" / "I left it as X" / "presumably X" / "no such tool exists" are all red flags; replace with a fresh check.
   Concretely: before querying CI or review for a PR, check its state first (`gh pr view <N> --json state`).

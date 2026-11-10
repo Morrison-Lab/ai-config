@@ -399,6 +399,7 @@ cookieconsent.run({
   <li><a href="#the-standing-infra-pr-grant" id="toc-the-standing-infra-pr-grant" class="nav-link" data-scroll-target="#the-standing-infra-pr-grant">The standing infra-PR grant</a></li>
   <li><a href="#session-lock-hook-integration" id="toc-session-lock-hook-integration" class="nav-link" data-scroll-target="#session-lock-hook-integration">Session Lock &amp; Hook Integration</a></li>
   <li><a href="#procedure-for-agents-handling-mwc" id="toc-procedure-for-agents-handling-mwc" class="nav-link" data-scroll-target="#procedure-for-agents-handling-mwc">Procedure for Agents Handling <code>/mwc</code></a></li>
+  <li><a href="#an-mwc-carries-to-a-new-head-only-for-a-named-pr" id="toc-an-mwc-carries-to-a-new-head-only-for-a-named-pr" class="nav-link" data-scroll-target="#an-mwc-carries-to-a-new-head-only-for-a-named-pr">An mwc carries to a new head only for a named PR</a></li>
   <li><a href="#what-a-re-grant-does-not-mean" id="toc-what-a-re-grant-does-not-mean" class="nav-link" data-scroll-target="#what-a-re-grant-does-not-mean">What a re-grant does NOT mean</a></li>
   <li><a href="#five-properties-of-the-guard-worth-knowing-before-you-trust-it" id="toc-five-properties-of-the-guard-worth-knowing-before-you-trust-it" class="nav-link" data-scroll-target="#five-properties-of-the-guard-worth-knowing-before-you-trust-it">Five properties of the guard worth knowing before you trust it</a></li>
   <li><a href="#quick-reference" id="toc-quick-reference" class="nav-link" data-scroll-target="#quick-reference">Quick Reference</a></li>
@@ -698,6 +699,14 @@ cookieconsent.run({
 </ul></li>
 <li>If the user revokes the grant, run <code>skills/session-lock/scripts/ai-session.sh disable-mwc</code> immediately.</li>
 </ol>
+</section>
+<section id="an-mwc-carries-to-a-new-head-only-for-a-named-pr" class="level2">
+<h2 class="anchored" data-anchor-id="an-mwc-carries-to-a-new-head-only-for-a-named-pr">An mwc carries to a new head only for a named PR</h2>
+<p>An mwc line covers the PRs it names. It carries to a new head of a named PR when the content is unchanged beyond a main merge. It never extends to a PR that no mwc line names, however unchanged that PR’s content is (the coordinator told the runner an earlier mwc covered an unnamed PR on 2026-11-10, ai-config#5275). No hook can enforce this: whether a line names a PR is a reading of Ezra’s wording. So cite the naming line when you report the merge.</p>
+<ul>
+<li><strong>Do:</strong> find the mwc line that names the PR before treating it as granted.</li>
+<li><strong>Don’t:</strong> infer a grant from unchanged content, a shared branch or a stack position.</li>
+</ul>
 </section>
 <section id="what-a-re-grant-does-not-mean" class="level2">
 <h2 class="anchored" data-anchor-id="what-a-re-grant-does-not-mean">What a re-grant does NOT mean</h2>

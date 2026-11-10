@@ -251,6 +251,13 @@ When the user gives an MWC grant (e.g. `/mwc` or “merge when confident”):
     - **Wrap up**: Verify the merge landed on GitHub/GitLab, verify CI passed on the merge commit itself (`scripts/check-merge-commit-ci.py`), and run the post-merge skill (`post-merge` / `ums`).
 4.  If the user revokes the grant, run `skills/session-lock/scripts/ai-session.sh disable-mwc` immediately.
 
+## An mwc carries to a new head only for a named PR
+
+An mwc line covers the PRs it names. It carries to a new head of a named PR when the content is unchanged beyond a main merge. It never extends to a PR that no mwc line names, however unchanged that PR’s content is (the coordinator told the runner an earlier mwc covered an unnamed PR on 2026-11-10, ai-config#5275). No hook can enforce this: whether a line names a PR is a reading of Ezra’s wording. So cite the naming line when you report the merge.
+
+- **Do:** find the mwc line that names the PR before treating it as granted.
+- **Don’t:** infer a grant from unchanged content, a shared branch or a stack position.
+
 ## What a re-grant does NOT mean
 
 The grant is **conditional**, and the condition is the Scope Limit above. Re-issuing a conditional permission does not make its condition true. That distinction collapses in one specific situation, so it is worth naming mechanically rather than trusting judgment in the moment: a merge command is blocked, you ask whether to retry, and the user answers with the keyword.

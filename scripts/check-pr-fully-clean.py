@@ -4290,6 +4290,30 @@ def _has_agent_reply_shape(body: str) -> bool:
 
 
 _HEX_TOKEN_RE = re.compile(r"(?<![0-9a-z])[0-9a-f]{7,40}(?![0-9a-z])", re.IGNORECASE)
+# The superseding status states its verdict on a line of its own.
+_STATUS_CLEAN_LINE_RE = re.compile(
+    r"^\s*\**\s*Verdict\s*:\s*\**\s*Clean\b.*$", re.IGNORECASE | re.MULTILINE
+)
+# Words a clean status must not carry outside its verdict line, since the
+# classifier reads "Blocking: the guard is missing." mid-body as neutral.
+_STATUS_OPEN_WORD_RE = re.compile(
+    _BARE_REJECTION
+    + r"|\b(?:needs\s+more\s+work|not\s+(?:clean|ready)|unresolved|still\s+open"
+    r"|defects?|broken|fail(?:s|ed|ing)?)\b",
+    re.IGNORECASE,
+)
+# A reply the status may supersede answers a finding in the agent's own
+# voice: it carries a disposition word.
+_REPLY_ANSWER_RE = re.compile(
+    r"\b(?:rebut\w*|defer\w*|declin\w*|address\w*|answer\w*)\b", re.IGNORECASE
+)
+# A comment naming another reviewer may be relaying that reviewer's verdict,
+# which only that reviewer's own later clean can clear (ai-config#2274).
+_RELAYED_REVIEWER_RE = re.compile(
+    r"\b(?:copilot|codex|gemini|antigravity|agy|opencode|open\s*code|cursor"
+    r"|kimi|glm|deepseek|qwen|coderabbit|relay\w*)\b",
+    re.IGNORECASE,
+)
 
 
 def _body_names_head(body: str, head_sha: str) -> bool:
@@ -4300,44 +4324,77 @@ def _body_names_head(body: str, head_sha: str) -> bool:
     )
 
 
+def _comment_time(c: dict) -> Optional[datetime]:
+    """The comment's createdAt as an aware datetime, or None when unreadable."""
+    raw = c.get("createdAt") or ""
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else None
+
+
+def _is_head_clean_status(body: str, login: str, head_sha: str) -> bool:
+    """True when *body* is an agent status that clears its own replies.
+
+    It has the agent-reply shape, names the current head on its first line,
+    states `Verdict: Clean` on a line of its own, names no other reviewer,
+    and with that verdict line removed holds nothing that reads as not-clean,
+    so "Blocking: X. Verdict: Clean on the rest." does not qualify.
+    """
+    if not _has_agent_reply_shape(body):
+        return False
+    first_line = next((ln for ln in body.splitlines() if ln.strip()), "")
+    if not _body_names_head(first_line, head_sha):
+        return False
+    if not _STATUS_CLEAN_LINE_RE.search(body) or _RELAYED_REVIEWER_RE.search(body):
+        return False
+    if classify_verdict(body, "", login) != "clean":
+        return False
+    remainder = _STATUS_CLEAN_LINE_RE.sub("", body)
+    if _STATUS_OPEN_WORD_RE.search(remainder):
+        return False
+    return classify_verdict(remainder, "", login) != "not-clean"
+
+
 def _superseded_agent_replies(comments: List[dict], head_sha: str) -> set:
-    """Indices of disclosed agent replies that a later disclosed clean supersedes.
+    """Indices of disclosed agent replies that a later head clean supersedes.
 
     An agent's reply under the maintainer's login can read as not-clean in
     its own words ("Rebuttal of the blocking finding", "**Blocking (wiring
     missing): ...**") without matching a disposition shape, and then it
     vetoed the gate as the maintainer's verdict until the agent edited its
-    own comment (ai-config#5283, gha#1826). A later comment from the same
-    login that also has the agent-reply shape, names the current head, and
-    reads as clean supersedes it.
+    own comment (ai-config#5283, gha#1826). A later status from the same
+    login that passes ``_is_head_clean_status`` supersedes it.
 
-    Only disclosed replies are superseded: a comment without the footer is
-    the maintainer's own, and a review-shaped one is a review, so neither
-    leaves the scan this way. The superseding comment is not admitted as a
+    Only the agent's own replies are superseded: the comment must have the
+    agent-reply shape, carry a disposition word, and name no other reviewer.
+    A comment without the footer is the maintainer's own, a review-shaped one
+    is a review, and one naming another reviewer may relay that reviewer's
+    verdict, so none of those leaves the scan this way. A comment whose time
+    cannot be read is never superseded. The status is not admitted as a
     review either, so it never counts toward quorum (#2308).
     """
-    clean_at: Dict[str, str] = {}
+    clean_at: Dict[str, datetime] = {}
     for c in comments:
         body = c.get("body", "")
         login = (c.get("author") or {}).get("login", "")
-        if (
-            login
-            and _has_agent_reply_shape(body)
-            and _body_names_head(body, head_sha)
-            and classify_verdict(body, "", login) == "clean"
-        ):
-            at = c.get("createdAt") or ""
-            if at > clean_at.get(login, ""):
+        at = _comment_time(c)
+        if login and at and _is_head_clean_status(body, login, head_sha):
+            if login not in clean_at or at > clean_at[login]:
                 clean_at[login] = at
     superseded = set()
     for idx, c in enumerate(comments):
         body = c.get("body", "")
         login = (c.get("author") or {}).get("login", "")
-        at = c.get("createdAt") or ""
+        at = _comment_time(c)
         if (
             login in clean_at
+            and at is not None
             and at < clean_at[login]
             and _has_agent_reply_shape(body)
+            and _REPLY_ANSWER_RE.search(body)
+            and not _RELAYED_REVIEWER_RE.search(body)
         ):
             superseded.add(idx)
     return superseded

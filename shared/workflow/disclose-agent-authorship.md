@@ -32,11 +32,19 @@ Each of those is short, conversational, and posted under a human login, which is
 
 **A disclosed reply can still read as a verdict.**
 `check-pr-fully-clean.py` drops a disclosed reply only when its rejection words sit in a recognized disposition line, so a rebuttal that labels a finding in its own words ("**Blocking (wiring missing):** ...") vetoes the merge as the maintainer's not-clean.
-A later disclosed comment from the same login that names the current head and reads as clean (a status ending `Verdict: Clean`) supersedes it;
-it never counts toward quorum, and it never supersedes a comment without the marker or a review that names its head (ai-config#5283).
+A later disclosed status from the same login supersedes such a reply (ai-config#5283) when the status:
 
-- **Writer:** label each finding in a reply with a disposition shape (`- **Blocking, path:line** -- rebutted.`), and after a reply that may read as not-clean, post a status naming the head with `Verdict: Clean` instead of editing the reply.
-- **Reviewer:** flag a reply that labels a finding with a rejection word outside a disposition shape and has no later clean status naming the head.
+- names the current head on its first line;
+- has a `Verdict: Clean` line;
+- carries no rejection or open-work word ("blocking", "needs more work", "broken") anywhere else;
+- names no other reviewer.
+
+The superseded reply must carry a disposition word (rebut, defer, decline, address, answer) and name no other reviewer, since a relayed verdict is cleared only by that reviewer's own later clean.
+The status never counts toward quorum, and never supersedes a comment without the marker, a review that names its head, or a formal review.
+
+- **Writer:** label each finding in a reply with a disposition shape (`- **Blocking, path:line** -- rebutted.`).
+  After a reply that may read as not-clean, post such a status instead of editing the reply.
+- **Reviewer:** flag a reply that labels a finding with a rejection word outside a disposition shape and has no later status of that shape.
 
 **A comment posted under a genuine BOT identity needs no marker.**
 The whole argument above is that the forge cannot report authorship when the token belongs to a person.

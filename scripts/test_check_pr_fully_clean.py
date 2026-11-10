@@ -4274,6 +4274,43 @@ def main() -> int:
          [relayed_named, status_clean, reply_bot], False),
         ("a disclosed clean alone never meets quorum (#2308 invariant)",
          [rebuttal, status_clean], False),
+        ("an unnamed relay of another reviewer's not-clean is not "
+         "superseded (negative control)",
+         [dict(rebuttal, body="Needs more work. Blocking: foo.py:3 drops "
+               "the guard, per Copilot; not answered yet." + footer),
+          status_clean, reply_bot], False),
+        ("the unnamed relay blocks on its own (baseline for the control "
+         "above)",
+         [dict(rebuttal, body="Needs more work. Blocking: foo.py:3 drops "
+               "the guard, per Copilot; not answered yet." + footer),
+          reply_bot], False),
+        ("a reply with no readable timestamp blocks on its own (baseline "
+         "for the control below)",
+         [dict(rebuttal, createdAt="not a time"), reply_bot], False),
+        ("a disclosed not-clean with no disposition word is not superseded "
+         "(negative control)",
+         [dict(rebuttal, body="Needs more work. Blocking: foo.py:3 drops "
+               "the guard." + footer), status_clean, reply_bot], False),
+        ("a reply with no readable timestamp is not superseded (negative "
+         "control)", [dict(rebuttal, createdAt="not a time"), status_clean, reply_bot],
+         False),
+        *[(f"a status that is not a clean head status does not supersede: "
+           f"{text!r} (negative control)",
+           [rebuttal, dict(status_clean, body=text + footer), reply_bot], False)
+          for text in (
+              "Status as of head bdb97ca.\nBlocking: the guard is missing.\n"
+              "Verdict: Clean",
+              "head bdb97ca. Blocking: the guard is missing in foo.py:3. "
+              "Verdict: Clean on everything else.",
+              "Status as of head bdb97ca.\nVerdict: Clean\n\nCopilot says: "
+              "Blocking: data loss at x.py:9",
+              "Status of the findings.\nCI passed on bdb97ca.\nVerdict: Clean",
+              "Status as of head bdb97ca. Blocking: the guard is missing in "
+              "foo.py:3.\nVerdict: Clean",
+              "Status as of head bdb97ca.\n- x: answered; the gate is still "
+              "broken in y.py.\nVerdict: Clean",
+              "Status as of head bdb97ca: every finding is answered.",
+          )],
     ):
         mock_sup = json.dumps({"comments": rounds, "reviews": []})
         with patch.object(checker, "run_cmd", return_value=mock_sup):

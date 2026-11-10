@@ -38,7 +38,9 @@ Run the full GI procedure:
 1. List open issues, triage, label, and prioritize candidate issues
 2. Select the highest-priority issue automatically from the triage signals,
    state which one and why, and proceed without pausing for confirmation
-3. Check history and research existing solutions (DRW check via [`prefer-upstream`](../prefer-upstream/SKILL.md))
+3. Check history and research existing solutions (DRW check via [`prefer-upstream`](../prefer-upstream/SKILL.md)),
+   and choose explicitly whether to centralize or distribute the work
+   ([`centralize-or-distribute`](../../shared/workflow/centralize-or-distribute.md))
 4. Claim the issue
 5. Create a branch
 6. Open the draft PR up front, from an empty commit, before implementing —

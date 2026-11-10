@@ -155,6 +155,8 @@ and the default branch for each issue:
 >    or upstream ecosystems like r-lib/tidyverse, PyPI, npm).
 >    Follow `prefer-upstream`.
 >    If custom implementation is required, note what was searched in the PR.
+>    Also choose explicitly whether to centralize or distribute the work,
+>    per `shared/workflow/centralize-or-distribute.md`, and state the choice in the PR.
 > 4. **Branch from current `<default-branch>`**:
 >    `git fetch origin <default-branch> -q && git checkout -b <slug> origin/<default-branch>`.
 >    Use a descriptive `<slug>`.

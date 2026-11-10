@@ -30,10 +30,22 @@ Its existence shows what someone typed once, not what Ezra wants.
 - **Don't:** copy a name, layout or wording from a neighbouring file because it is there.
 - **Don't:** write a rule line into memory or an instruction file without his quote or a source link.
 
+## Code style is decided in psc
+
+Ezra, 2026-11-10: "imitating existing code style is not ok;
+all style decisions must be made explicitly in psc".
+Code style comes only from [psc](https://morrison-lab.github.io/psc/) (or a repository instruction that cites it), never from the code around the edit.
+A style choice that psc does not state is a question for Ezra, raised as a psc issue with a recommendation.
+It is not copied from a neighbouring file.
+
+- **Do:** when psc is silent on a style choice, file a psc issue asking Ezra, and follow his answer once it is in psc.
+- **Don't:** match the surrounding code's naming, layout or idiom because the file already does it.
+
 ## Writer and reviewer instructions
 
 Writers follow the rule above.
 Reviewers flag any naming, structure, wording or workflow pattern in a diff that no instruction supports, and ask where it came from.
+Reviewers also flag code style that psc does not support, even when it matches the surrounding code.
 A pattern repeated across a diff without a source is a finding, however consistent it is.
 
 ## Why prose, and what enforces it

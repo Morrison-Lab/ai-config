@@ -366,6 +366,9 @@ Read the fragment's boundary with `dont-incur-technical-debt` before invoking it
 Never copy, standardize or record as a rule a choice made once for local convenience, in any repository and for any kind of choice, unless Ezra decided it or a sourced rule backs it (Ezra, 2026-11-10: "learn the broader rule about random decisions not turning into habits").
 Find a pattern's source before reusing it, ask once when there is none, and have reviewers flag an unsourced pattern.
 Existing code is not a source.
+Code style is decided explicitly in psc: "imitating existing code style is not ok;
+all style decisions must be made explicitly in psc" (Ezra, 2026-11-10).
+A style choice psc does not state is a psc question for Ezra, never copied from surrounding code, and reviewers flag style psc does not support.
 
 ## Issue or discussion? Pick the venue by best practice, not by precedent
 

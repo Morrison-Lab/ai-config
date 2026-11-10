@@ -276,6 +276,7 @@ See [`remove-redundant-plugin-submodules`](shared/workflow/remove-redundant-plug
 Always run relevant local linters, tests, and formatting checks before pushing commits to a remote branch.
 At minimum for `ai-config`: `python3 scripts/validate-skills.py`, `python3 scripts/check-links.py`, `python3 scripts/check-ascii-punctuation.py`.
 Run the full test suite (`python3 scripts/test_*.py`) when touching shared tools or scripts.
+Parse changed data files: [rule](shared/workflow/parse-data-files.md).
 
 ## Canonical sources vs generated output
 

@@ -1774,6 +1774,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-bare-repo-ref.py\"",
+            "timeout": 10,
+            "script": "no-bare-repo-ref.py",
+            "why": "ai-config#5164. Ezra, 2026-11-09: 'why didn't you hyperlink those PR mentions?' Every repo#N or owner/repo#N mention must be a markdown link to its GitHub URL. Denies a user-visible reply tool call (post_message, request_decision, reply, update_message, edit_message) in any session whose text holds such a token outside a markdown link, code span, fenced block or URL. A deny, not a reminder, because the failing shape is lexical and the CLAUDE.md prose rule was already missed (ai-config#4741). ALLOW_BARE_REPO_REF=1 overrides. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-merge-ask-in-post-message.py\"",
             "timeout": 10,
             "script": "no-merge-ask-in-post-message.py",

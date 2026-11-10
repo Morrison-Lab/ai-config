@@ -10,6 +10,9 @@ Not `--state open`: a closed issue for the same bug is the duplicate an open-onl
 It prompts the search;
 it does not judge the terms ([`grep-is-not-coverage`](grep-is-not-coverage.md)).
 
+Before filing an issue about a page or file, run `git fetch origin` and list that path on `origin/<default-branch>`, and say in the issue what the listing showed.
+A stale checkout filed ids#180 for a page already merged in ids#166, and `warn-stale-issue-edit.py` only fires at the first edit, after the issue exists ([ai-config#5225](https://github.com/Morrison-Lab/ai-config/issues/5225)).
+
 The issue is the durable record of intent, scope, and "done" criteria --- it gives reviewers context, lets the PR auto-close it via `Closes #N`, and keeps the work discoverable even if the PR stalls.
 Skip only when the task is already tracked by an open issue.
 A closed match is not a skip: surface it and confirm before re-doing the work.

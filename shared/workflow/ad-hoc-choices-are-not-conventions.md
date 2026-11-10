@@ -8,7 +8,7 @@ Ezra, 2026-11-10: "learn the broader rule about random decisions not turning int
 
 The `_py` and `_r` suffixes first appeared in lds commit a39e9c32 (2026-09-28) as a local choice: an R chunk holding results read from Python.
 Later chunks copied the pattern, [lds#2175](https://github.com/Morrison-Lab/lds/issues/2175) found "no decision behind the differences" and asked for uniformity, [lds#2176](https://github.com/Morrison-Lab/lds/pull/2176) made the suffixes uniform, and a project-memory line then recorded them as a rule.
-About 770 names across about 140 files carried the pattern when Ezra asked "why are you still putting _py and _R suffixes on objects in code".
+About 770 names across about 140 files carried the pattern when Ezra asked "why are you still putting `_py` and `_R` suffixes on objects in code".
 No step was a decision.
 Each step treated the previous one as one.
 

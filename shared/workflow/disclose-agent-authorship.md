@@ -35,11 +35,11 @@ Each of those is short, conversational, and posted under a human login, which is
 A later disclosed status from the same login supersedes such a reply (ai-config#5283) when the status:
 
 - names the current head on its first line;
-- has a `Verdict: Clean` line;
-- carries no rejection or open-work word ("blocking", "needs more work", "broken") anywhere else;
+- has a line starting `Verdict: Clean`;
+- carries no rejection or open-work word ("blocking", "needs more work", "broken", "except") anywhere else, the rest of the verdict line included;
 - names no other reviewer.
 
-The superseded reply must carry a disposition word (rebut, defer, decline, address, answer) and name no other reviewer, since a relayed verdict is cleared only by that reviewer's own later clean.
+The superseded reply must carry a disposition word (rebut, defer, decline) and name no other reviewer, since a relayed verdict is cleared only by that reviewer's own later clean.
 The status never counts toward quorum, and never supersedes a comment without the marker, a review that names its head, or a formal review.
 
 - **Writer:** label each finding in a reply with a disposition shape (`- **Blocking, path:line** -- rebutted.`).

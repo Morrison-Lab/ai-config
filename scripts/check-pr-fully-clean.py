@@ -4290,22 +4290,25 @@ def _has_agent_reply_shape(body: str) -> bool:
 
 
 _HEX_TOKEN_RE = re.compile(r"(?<![0-9a-z])[0-9a-f]{7,40}(?![0-9a-z])", re.IGNORECASE)
-# The superseding status states its verdict on a line of its own.
+# The superseding status states its verdict at the start of a line. Only
+# the label is removed before the open-word scan, so the rest of that line
+# ("Verdict: Clean, except the blocking finding stands.") is still read.
 _STATUS_CLEAN_LINE_RE = re.compile(
-    r"^\s*\**\s*Verdict\s*:\s*\**\s*Clean\b.*$", re.IGNORECASE | re.MULTILINE
+    r"^\s*\**\s*Verdict\s*:\s*\**\s*Clean\b", re.IGNORECASE | re.MULTILINE
 )
 # Words a clean status must not carry outside its verdict line, since the
 # classifier reads "Blocking: the guard is missing." mid-body as neutral.
 _STATUS_OPEN_WORD_RE = re.compile(
     _BARE_REJECTION
     + r"|\b(?:needs\s+more\s+work|not\s+(?:clean|ready)|unresolved|still\s+open"
-    r"|defects?|broken|fail(?:s|ed|ing)?)\b",
+    r"|defects?|broken|fail(?:s|ed|ing)?|bugs?|wrong|incorrect\w*|regress\w*"
+    r"|must|except\w*|stands?)\b",
     re.IGNORECASE,
 )
 # A reply the status may supersede answers a finding in the agent's own
 # voice: it carries a disposition word.
 _REPLY_ANSWER_RE = re.compile(
-    r"\b(?:rebut\w*|defer\w*|declin\w*|address\w*|answer\w*)\b", re.IGNORECASE
+    r"\b(?:rebut\w*|defer(?:s|red|ring)?|declin(?:e|es|ed|ing))\b", re.IGNORECASE
 )
 # A comment naming another reviewer may be relaying that reviewer's verdict,
 # which only that reviewer's own later clean can clear (ai-config#2274).

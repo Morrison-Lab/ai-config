@@ -4291,6 +4291,11 @@ def main() -> int:
          "(negative control)",
          [dict(rebuttal, body="Needs more work. Blocking: foo.py:3 drops "
                "the guard." + footer), status_clean, reply_bot], False),
+        ("a relay that only says 'please address' is not superseded "
+         "(negative control)",
+         [dict(rebuttal, body="Needs more work: please address the blocking "
+               "finding in foo.py:3." + footer), status_clean, reply_bot],
+         False),
         ("a reply with no readable timestamp is not superseded (negative "
          "control)", [dict(rebuttal, createdAt="not a time"), status_clean, reply_bot],
          False),
@@ -4309,6 +4314,10 @@ def main() -> int:
               "foo.py:3.\nVerdict: Clean",
               "Status as of head bdb97ca.\n- x: answered; the gate is still "
               "broken in y.py.\nVerdict: Clean",
+              "Status as of head bdb97ca.\n- x: answered.\nVerdict: Clean, "
+              "except the blocking finding in foo.py:3 stands.",
+              "Status as of head bdb97ca.\n- x: answered.\nVerdict: Clean, "
+              "but there is a bug in foo.py:3.",
               "Status as of head bdb97ca: every finding is answered.",
           )],
     ):

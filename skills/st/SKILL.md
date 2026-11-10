@@ -120,6 +120,14 @@ When the task naturally builds on an open issue or PR (it needs that work's code
   [`prefer-upstream`](../prefer-upstream/SKILL.md) and
   [`dont-reinvent-wheel`](../../shared/principles/dont-reinvent-wheel.md)
   before hand-rolling custom code.
+- Choose explicitly whether to centralize or distribute the content or other
+  work, both within the repo and across repos, and state the choice in the
+  issue or PR, per
+  [`centralize-or-distribute`](../../shared/workflow/centralize-or-distribute.md).
+  Ezra, 2026-11-09: "when planning and/or performing work, we
+  should choose explicitly whether to centralize vs distribute content or other
+  work, both within and across repos"
+  ([ai-config#5185](https://github.com/Morrison-Lab/ai-config/issues/5185)).
 
 ### 5. Branch → open draft PR → implement → ready → ARDI
 

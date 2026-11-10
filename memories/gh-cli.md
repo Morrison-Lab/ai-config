@@ -1086,3 +1086,9 @@ In Antigravity sessions, `gh pr merge` is governed by `plugins/ai-config/enforce
 which checks the raw command string against `CHAIN_CHARS` (`` (";", "&", "|", "\n", "$(", "`", "(") ``).
 Parentheses in `--subject` or `--body` trip this check;
 see [`antigravity.md`](antigravity.md).
+
+## The issue dependencies API rejects a PR with HTTP 422
+
+Adding a PR to an issue's blocked-by or blocking list answers `422`;
+the endpoints accept issues only.
+Record a PR's merge order in its body instead, per [`surface-merge-order`](../shared/workflow/surface-merge-order.md) ([ai-config#5227](https://github.com/Morrison-Lab/ai-config/issues/5227)).

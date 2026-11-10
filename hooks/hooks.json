@@ -1788,6 +1788,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-bare-for-now-limit.py\"",
+            "timeout": 10,
+            "script": "no-bare-for-now-limit.py",
+            "why": "ai-config#5160. Ezra, 2026-11-09: told 'used up for now', he asked to be told for how long. Denies a user-visible reply tool call (post_message, request_decision, reply, update_message, edit_message) in any session when one sentence pairs a limit word (used up, exhausted, paused, unavailable, quota, limit) with 'for now' and holds no duration, clock time, date, UTC, PST or reset in that sentence, and points at giving a reset time in PST or a duration. The denial text also says never to estimate a GitHub rate-limit reset: read the reset field of gh api rate_limit and quote it in PST (coordinator, 2026-11-09). A deny, not a reminder, because the failing shape is lexical (ai-config#4741). ALLOW_BARE_FOR_NOW=1 overrides. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-mwc-ask-in-other-thread-unread.py\"",
             "timeout": 10,
             "script": "no-mwc-ask-in-other-thread-unread.py",

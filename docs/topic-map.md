@@ -306,6 +306,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/challenge-the-assignment.md` | Question what you are asked to **do**, not only what you are told is **true**. |  |
 | `shared/workflow/challenge-unnecessary-complexity.md` | When reviewing prose, math, or code, check for unnecessary complexity --- not just correctness or clarity of meaning. Flag content that is harder to read, de... |  |
 | `shared/workflow/check-before-pushing.md` | Take a fresh reading of the remote branch **immediately** before every `git push`, and reconcile what it shows rather than overwriting it. Not at the start o... |  |
+| `shared/workflow/check-dont-assume.md` | Ezra, 2026-11-09: "cai: never assume anything that could be checked empirically" (ai-config#5215). |  |
 | `shared/workflow/check-open-prs-before-duplicating.md` | Before scaffolding a new AI tool  ---  a skill, an agent, or any other harness-registered file (`skills/<name>/SKILL.md`, `.claude/agents/<name>.md`, etc.)... |  |
 | `shared/workflow/check-purpose-before-reusing.md` | Never take shortcuts, and never copy-paste or pattern-match blindly. Before reusing a structure --- a template, a working script, a neighbouring file's shape... |  |
 | `shared/workflow/check-sources-over-recall.md` | When a source can be checked, check it before answering. Sources include books, repositories, documentation, APIs and files. Cite what you read (file and pag... |  |

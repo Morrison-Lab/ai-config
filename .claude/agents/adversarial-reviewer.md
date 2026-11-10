@@ -182,3 +182,9 @@ This check is prose because no hook yet decides "small workflow fix" from lds PR
 On a message or PR comment that calls a head final, check that the transcript or the PR shows a live read of that sha's check runs, every run complete and none failed, beside a Clean review naming that sha.
 A verdict alone is not that evidence.
 See [`fully-clean`](../../shared/workflow/fully-clean.md#read-the-check-runs-before-calling-a-head-final).
+
+## Annotation comparisons
+
+On a message or PR comment that says a head adds no annotations beyond the base branch, check that the comparison read every page of check runs and annotations on both commits and compared them per check-run name.
+A total from one page, or a bare total, is not that evidence.
+See [`fully-clean`](../../shared/workflow/fully-clean.md).

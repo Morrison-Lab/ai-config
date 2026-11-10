@@ -2064,3 +2064,7 @@ rme#1450 had `build` still running and ai-config#5186 was reported before its CI
 
 - **Do:** read the check runs live (`get_check_runs`, or `gh api repos/<r>/commits/<sha>/check-runs?per_page=100`), count them against `total_count`, and only then write "final".
 - **Don't:** call a head final from a review verdict, a check-suite wake or an earlier read.
+
+The merge-state read is already owed by the conflict bullets earlier in this file;
+ai-config#5246 skipped it and was reported final at 6c456cc9 while it conflicted with `main` (coordinator, 2026-11-10).
+No hook requires that read yet: extending the hook above to do so is tracked in [ai-config#5252](https://github.com/Morrison-Lab/ai-config/issues/5252).

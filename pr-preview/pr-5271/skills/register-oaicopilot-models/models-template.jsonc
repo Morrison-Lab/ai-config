@@ -1,0 +1,147 @@
+// Reference schema for the `oaicopilot.models` VS Code setting used by the
+// `johnny-zhao.oai-compatible-copilot` extension. See register-oaicopilot-models
+// SKILL.md. This is a SANITIZED template, not a live settings.json:
+//   - Replace <workspace-url> with your provider's base URL (e.g. a Databricks
+//     Model Serving workspace: https://dbc-XXXXXXXX-YYYY.cloud.databricks.com).
+//   - The provider API key is NOT stored here; the extension keeps it in VS Code
+//     secret storage (set via "OAICopilot: Set OAI Compatible Multi-Provider API Key").
+//   - Add/remove entries to match the models your endpoint actually serves; for a
+//     new model, copy the closest sibling in the same quota tier and change only
+//     `id` (and `family` where it encodes the version).
+//
+// Databricks pay-per-token limits and OAICopilot behavior were verified on
+// 2026-08-26. The context values below are operational quota-aware defaults,
+// not provider maximums. See WAI's tbl-databricks-oaicopilot-defaults:
+// https://github.com/Morrison-Lab/wai/blob/main/chapters/ai-tools/byok-vscode-databricks.qmd#tbl-databricks-oaicopilot-defaults
+// A 64000 context with 16000 output exposes about 48000 input tokens. If a large
+// agent harness cannot fit, reduce loaded tools/instructions or raise context only
+// after checking the workspace quota or provisioned-throughput capacity.
+//
+// One entry per served model. `id` == the served-endpoint name; `owned_by` groups
+// the provider API key (storage key: oaicopilot.apiKey.<owned_by lowercased>).
+[
+  // --- Claude family: chat models, apiMode "openai", vision true ---
+  {
+    "id": "databricks-claude-opus-5",
+    "owned_by": "databricks",
+    "family": "claude",
+    "context_length": 64000,
+    "max_tokens": 16000,
+    "delay": 15000,
+    "vision": true,
+    "baseUrl": "<workspace-url>/serving-endpoints",
+    "apiMode": "openai"
+  },
+  {
+    "id": "databricks-claude-sonnet-5",
+    "owned_by": "databricks",
+    "family": "claude",
+    "context_length": 64000,
+    "max_tokens": 16000,
+    "delay": 15000,
+    "vision": true,
+    // one model may set useForCommitGeneration: true for Git commit messages
+    "useForCommitGeneration": true,
+    "baseUrl": "<workspace-url>/serving-endpoints",
+    "apiMode": "openai"
+  },
+  {
+    // Older Claude lines share the same 200000 ITPM operational tier.
+    "id": "databricks-claude-opus-4-1",
+    "owned_by": "databricks",
+    "family": "claude",
+    "context_length": 64000,
+    "max_tokens": 16000,
+    "delay": 15000,
+    "vision": true,
+    "baseUrl": "<workspace-url>/serving-endpoints",
+    "apiMode": "openai"
+  },
+
+  // --- GPT-5 family: reasoning models. Databricks uses max_tokens with the
+  //     OpenAI-compatible endpoint. API mode is model-specific; the current
+  //     catalog requires "openai-responses" for GPT-5.5 and GPT-5.3 Codex. ---
+  {
+    "id": "databricks-gpt-5-6-sol",
+    "owned_by": "databricks",
+    "family": "gpt-5.6-sol",
+    "context_length": 400000,
+    "max_tokens": 16000,
+    "reasoning_effort": "medium",
+    "vision": true,
+    "baseUrl": "<workspace-url>/serving-endpoints",
+    "apiMode": "openai"
+  },
+  {
+    "id": "databricks-gpt-5-5",
+    "owned_by": "databricks",
+    "family": "gpt-5.5",
+    "context_length": 64000,
+    "max_tokens": 16000,
+    "delay": 15000,
+    "reasoning_effort": "medium",
+    "vision": true,
+    "baseUrl": "<workspace-url>/serving-endpoints",
+    "apiMode": "openai-responses"
+  },
+  {
+    "id": "databricks-gpt-5-3-codex",
+    "owned_by": "databricks",
+    "family": "gpt-5.3-codex",
+    "context_length": 64000,
+    "max_tokens": 16000,
+    "delay": 15000,
+    "reasoning_effort": "high",
+    "vision": true,
+    "baseUrl": "<workspace-url>/serving-endpoints",
+    "apiMode": "openai-responses"
+  },
+
+  // --- Gemini family: apiMode "openai", vision true ---
+  {
+    "id": "databricks-gemini-3-7-flash",
+    "owned_by": "databricks",
+    "family": "gemini",
+    "context_length": 64000,
+    "max_tokens": 16000,
+    "delay": 15000,
+    "vision": true,
+    "baseUrl": "<workspace-url>/serving-endpoints",
+    "apiMode": "openai"
+  },
+
+  // --- Open-weight families: higher workspace quota tiers ---
+  {
+    "id": "databricks-gpt-oss-120b",
+    "owned_by": "databricks",
+    "family": "gpt",
+    "context_length": 131072,
+    "max_tokens": 25000,
+    "reasoning_effort": "medium",
+    "baseUrl": "<workspace-url>/serving-endpoints",
+    "apiMode": "openai"
+  },
+  {
+    "id": "databricks-llama-4-maverick",
+    "owned_by": "databricks",
+    "family": "llama",
+    "context_length": 128000,
+    "max_tokens": 8192,
+    "vision": true,
+    "baseUrl": "<workspace-url>/serving-endpoints",
+    "apiMode": "openai"
+  },
+
+  // --- Inkling: 200000 ITPM / 10000 OTPM operational tier ---
+  {
+    "id": "databricks-inkling",
+    "owned_by": "databricks",
+    "family": "inkling",
+    "context_length": 64000,
+    "max_tokens": 8192,
+    "delay": 15000,
+    "vision": true,
+    "baseUrl": "<workspace-url>/serving-endpoints",
+    "apiMode": "openai"
+  }
+]

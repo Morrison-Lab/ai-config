@@ -2506,7 +2506,6 @@ NOT_CLEAN_NEGATION_PREFIX = re.compile(
 # broken.") and a contrast in the next paragraph ("None.\n\nBut X leaks."),
 # tracked in ai-config#5389; and a contrast more than 60 characters after the
 # negation, which callers cut off (ai-config#5401).
-# A line that opens a heading, blockquote or list item.
 _BLOCK_START = r"[ \t]*(?:#|>|[-*+][ \t]|\d+[.)][ \t])"
 _SENTENCE_CHAR = (
     r"(?:(?![.!?](?:\s|$))(?!\r?\n[ \t]*\r?\n)"
@@ -2525,6 +2524,7 @@ _CONTRAST_MARKERS = (
     r"|though|although|instead|otherwise|besides|apart\s+from|aside\s+from"
     r"|on\s+the\s+other\s+hand|that\s+being\s+said|having\s+said\s+that|regardless"
     r"|even\s+so|conversely|at\s+the\s+same\s+time|in\s+contrast|beyond\s+that"
+    r"|even\s+though|despite\s+this|unless"
 )
 # Words that are also ordinary words or identifiers ("No issues found while
 # reviewing", "None in bar.py", "uses a set instead of a list") count only
@@ -2544,10 +2544,9 @@ _MARKER_OPENERS = _HSPACE + r"*(?:[*_>\-(\[`\"']" + _HSPACE + r"*){0,4}"
 _OPENERS_ACROSS_LINE = (
     _MARKER_OPENERS + r"(?:\r?\n(?!" + _BLOCK_START + r")" + _MARKER_OPENERS + r")?"
 )
-# Word edges that also treat `_` as an edge, so "_but_" and "_However_"
-# (underscore emphasis) are read as words; `\b` sees `_` as a word char.
-_WORD_START = r"(?<![^\W_])"
-_WORD_END = r"(?![^\W_])"
+# Word edges that read "_but_" (emphasis) as a word but not handle_except_x.
+_WORD_START = r"(?<![^\W_])(?<![^\W_]_)"
+_WORD_END = r"(?![^\W_])(?!_[^\W_])"
 _CLAUSE_SEP = (
     r"(?:[,;]|(?<!" + _HSPACE + r")" + _HSPACE + r"+-{1,3}"
     r"|(?<!" + _HSPACE + r")" + _HSPACE + r"*["
@@ -2589,10 +2588,10 @@ NOT_CLEAN_NEGATION_SUFFIX = re.compile(
 # `none identified`) with a newline or blank line.
 FINDING_HEADING_NEGATION_SUFFIX = re.compile(
     r"^\s*(?:"
-    r"[*_:.\-]*\s*"
+    r"(?:[*_:.\-]+\s*)?"
     + _SAFE_NEGATION
     + r"|"
-    r"[:.\-]*\s*"
+    r"(?:[:.\-]+\s*)?"
     + _RISKY_NEGATION
     + r")",
     re.IGNORECASE,

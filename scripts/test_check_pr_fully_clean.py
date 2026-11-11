@@ -1536,6 +1536,7 @@ def main() -> int:
             "No issues in the try/except block.",
             "No issues in the minus-sign handling.",
             "No issues; it uses a set instead of a list.",
+            "No issues in handle_except_clause or is_yet_done.",
         ):
             _body = (
                 _heading + "\n\n" + _tail + "\n\n### Verdict: Ready for merge\n"
@@ -1569,6 +1570,7 @@ def main() -> int:
         "None. On the other hand, the cache leaks.",
         "None. That being said, the cache leaks.",
         "None. Even so, the cache leaks.",
+        "None. Even though, the cache leaks.",
         "None.\n**However**, the cache leaks.",
         "None, _but_ the cache leaks.",
         "None. _However_, the cache leaks.",

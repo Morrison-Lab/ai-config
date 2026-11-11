@@ -171,6 +171,24 @@ class Denies(unittest.TestCase):
     def test_default_nested_three_deep(self):
         self.assert_denied('chown -R me "${A:-${B:-${HOME}}}"')
 
+    def test_bare_brace_in_a_default_is_text(self):
+        # Bash nests only on `${`: `${D:-{}usr` with D=/ is `/usr`.
+        self.assert_denied('D=/; chmod -R 755 "${D:-{}usr"')
+        self.assert_denied('chmod -R 755 "${HOME:-a{b}"')
+        self.assert_denied("chmod -R 755 ${HOME:-x{}")
+
+    def test_sudo_attached_host(self):
+        # `-hhost` is one option; its `t` is not sudo's `-t`.
+        self.assert_denied("sudo -hhost chown -R me /etc")
+
+    def test_bsd_env_value_options(self):
+        self.assert_denied("env -U root chown -R me /etc")
+        self.assert_denied("env -L root chown -R me /etc")
+
+    def test_deep_nesting_does_not_crash_the_hook(self):
+        deep = "${A:-" * 600 + "/x" + "}" * 600
+        self.assert_denied(f'X="{deep}"; chown -R me /etc')
+
     def test_absolute_target_inside_a_nested_shell(self):
         self.assert_denied("cd /tmp && bash -c 'chmod -R 755 /usr'")
 
@@ -264,6 +282,8 @@ class Allows(unittest.TestCase):
         # `$WORKDIR/build` with WORKDIR unset is `/build`: not a reason to refuse.
         self.assert_allowed('chmod -R 755 "$WORKDIR/build"')
         self.assert_allowed('chmod -R 755 "${WORKDIR}/dist"')
+        # `${PWD}` is the working directory, so this is `<cwd>/dist`.
+        self.assert_allowed('chmod -R 755 "${PWD}/dist"')
 
     def test_user_managed_usr_local(self):
         self.assert_allowed("sudo chown -R me /usr/local/lib/node_modules")

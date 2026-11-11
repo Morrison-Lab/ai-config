@@ -85,7 +85,8 @@ WRAPPERS = (set(COMMAND_WRAPPERS) | {"setsid", "busybox", "pkexec"}
 WRAPPER_POSITIONALS = {"timeout": 1}
 # Each wrapper's short options that take the next word as their value; any
 # other option is a flag, so `sudo -E echo chown` runs echo, not chown.
-WRAPPER_VALUE_OPTIONS = {"sudo": set("acugpCUrtTDR"), "doas": set("auC"), "env": set("uCSP"),
+# Sources: sudo's src/parse_args.c and FreeBSD's env.c getopt strings.
+WRAPPER_VALUE_OPTIONS = {"sudo": set("acugpCUrtTDR"), "doas": set("auC"), "env": set("uCSPLU"),
                          "timeout": set("sk"), "nice": {"n"}, "ionice": set("cnp"),
                          "stdbuf": set("ioe")}
 WRAPPER_VALUE_LONG = {"--user", "--group", "--host", "--prompt", "--chdir", "--chroot",
@@ -93,6 +94,11 @@ WRAPPER_VALUE_LONG = {"--user", "--group", "--host", "--prompt", "--chdir", "--c
                       "--command-timeout", "--unset", "--split-string", "--signal",
                       "--kill-after", "--adjustment", "--class", "--classdata", "--pid",
                       "--input", "--output", "--error", "--auth-type", "--login-class"}
+# Options whose value is optional and only ever attached (sudo's `h::`):
+# the rest of the word is the value, and the next word is not.
+WRAPPER_OPTIONAL_VALUE = {"sudo": {"h"}}
+# How deep `${A:-${B:-...}}` defaults are expanded before giving up.
+MAX_NESTING = 32
 DECLARE_BUILTINS = ("export", "local", "declare", "readonly", "typeset")
 # chmod's own short options (GNU and BSD); any other `-w` or `-x` is a mode.
 CHMOD_OPTIONS = set("cfvRHLPh")
@@ -190,6 +196,8 @@ def _takes_next_word(wrapper, tok):
         return tok in WRAPPER_VALUE_LONG
     values = WRAPPER_VALUE_OPTIONS.get(wrapper, ())
     for j, letter in enumerate(tok[1:], 1):
+        if letter in WRAPPER_OPTIONAL_VALUE.get(wrapper, ()):
+            return False  # the rest of the word, if any, is its value
         if letter in values:
             return j == len(tok) - 1
     return False
@@ -249,8 +257,11 @@ def _targets(program, head):
     return operands if reference else operands[1:]
 
 
-def _expand(text, home, assigned, here):
+def _expand(text, home, assigned, here, depth=0):
     """`(TEXT expanded, weak)`, or `None` when a computed value makes it undecidable.
+
+    Defaults nested deeper than MAX_NESTING are undecidable too, so adversarial
+    input cannot exhaust the stack and crash the hook open.
 
     A variable set in this environment keeps its value, since the Bash call
     inherits it too; one that is unset here is taken as empty, and the result
@@ -284,7 +295,8 @@ def _expand(text, home, assigned, here):
             missing = not val
         default = re.match(r":?[-=]", rest)
         if default and not val:
-            fallback = _expand(rest[default.end():], home, assigned, here)
+            fallback = (None if depth >= MAX_NESTING
+                        else _expand(rest[default.end():], home, assigned, here, depth + 1))
             if fallback is None:
                 undecidable.append(name)
                 return ""
@@ -293,14 +305,14 @@ def _expand(text, home, assigned, here):
         guessed.append(missing)
         return val
 
-    pieces, pos = [], 0
+    pieces, pos, pairs = [], 0, _brace_pairs(text)
     for match in VARIABLE.finditer(text):
         if match.start() < pos:
             continue  # inside a braced default already expanded
         pieces.append(text[pos:match.start()])
         pos = match.end()
         if match.group(1):
-            close = _braced(text, match.end())
+            close = pairs.get(match.start() + 1)
             if close is None:  # no closing brace: leave the text as written
                 pieces.append(match.group(0))
                 continue
@@ -313,17 +325,22 @@ def _expand(text, home, assigned, here):
     return None if undecidable else (expanded, any(guessed))
 
 
-def _braced(text, start):
-    """Index of the `}` closing a `${` whose name ends at START, or None."""
-    depth = 1
-    for i in range(start, len(text)):
-        if text[i] == "{":
-            depth += 1
-        elif text[i] == "}":
-            depth -= 1
-            if depth == 0:
-                return i
-    return None
+def _brace_pairs(text):
+    """Map the index of each `${`'s brace to the index of its closing `}`.
+
+    Bash nests only on `${`, so a bare `{` in a default is text:
+    `${A:-{x}/etc}` is `{x/etc}`. One pass, so a long command stays linear.
+    """
+    pairs, stack, i = {}, [], 0
+    while i < len(text):
+        if text.startswith("${", i):
+            stack.append(i + 1)
+            i += 2
+            continue
+        if text[i] == "}" and stack:
+            pairs[stack.pop()] = i
+        i += 1
+    return pairs
 
 
 def _assignments(argv, store, visible, home, here):

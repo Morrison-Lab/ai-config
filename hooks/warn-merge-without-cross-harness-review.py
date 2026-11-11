@@ -32,8 +32,8 @@ before the gap was noticed.
              or a `curl` call with a data payload to `https://api.ollama.com/api/chat`
              (the Ollama Cloud route, ai-config#4849)
     AND NOT  the waiver's probe pass ran after the last push: each CLI in
-             `clis` attempted with any result, or shown absent by an errored
-             `command -v` / `which`; `opencode` attempted, never only probed.
+             `clis` attempted with any result, or shown absent by a lone
+             `command -v` / `which` call that exited 1; `opencode` attempted.
 
 A skill (`dtc`, `dto`, `adv`) is not credited by being loaded: loading one
 runs nothing. Its reviewer CLI call, which is a Bash call, is what counts.
@@ -126,11 +126,8 @@ CURL_VALUE_OPTS = frozenset({
     "--data-urlencode", "--form", "--form-string", "--json", "-H", "--header", "-e",
     "--referer", "-o", "--output", "-x", "--proxy", "-u", "--user",
 })
-# The probe word itself was missing (`which` not installed): no evidence.
-RX_PROBE_MISSING = re.compile(r"\b(?:which|command): (?:command )?not found|"
-                              r"not found: (?:which|command)\b|\bwhich: [^\n]*No such file")
-# An errored call that RAN; a refused one (hook, classifier, user) never says this.
-RX_RAN_FAILED = re.compile(r"^(?:\s|\\n)*(?:Exit code [1-9]|Command timed out)")
+RX_RAN_FAILED = re.compile(r"^(?:\s|\\n)*(?:Exit code [1-9]|Command timed out)")  # refusals never say this
+RX_EXIT_1 = re.compile(r"^(?:\s|\\n)*Exit code 1\b")  # a probe of a missing name (127: no probe)
 RX_AGY_TRANSCRIPT_PATH = re.compile(
     r"(?:^|/)(?:\.gemini/antigravity/|brain/[^/]+/\.system_generated/logs/transcript)")
 AGY_RECORD_TYPES = frozenset({
@@ -151,7 +148,7 @@ NOTE = (
     "model fallback per delegate-to-opencode) on the shipping head first. "
     "If no qualifying reviewer can run here (host blocked, backend down, "
     "CLI or credential absent), probe every route once: attempt each of "
-    "{clis} as a reviewer, or show it absent with `command -v <cli>`; "
+    "{clis} as a reviewer, or show it absent with `command -v <cli>` run alone; "
     "opencode needs an attempt (its CLI or the OpenCode Go curl). Then the "
     "gate is waived and this hook lets the merge through "
     "(Ezra, 2026-10-16; adversarial-self-review.md "
@@ -346,17 +343,17 @@ def _fresh(events):
 def _route_calls(sib, command, clis):
     """(routes attempted, names presence-probed) in *command*, any order."""
     attempts, probes = set(), []
-    for line in sib.shell_c_expansions(command):
-        for argv in sib.simple_commands(line) or []:
-            raw = list(argv)
-            while raw and ENV_ASSIGNMENT.match(raw[0]):
-                raw = raw[1:]
-            for rest in (sib.strip_env(argv)[1], raw):
-                route = _review_route(rest, clis)
-                if route:
-                    attempts.add(route)
-                probes.extend(_probed_names(rest))
-    return attempts, probes
+    argvs = [a for ln in sib.shell_c_expansions(command) for a in sib.simple_commands(ln) or []]
+    for argv in argvs:
+        raw = list(argv)
+        while raw and ENV_ASSIGNMENT.match(raw[0]):
+            raw = raw[1:]
+        for rest in (sib.strip_env(argv)[1], raw):
+            route = _review_route(rest, clis)
+            if route:
+                attempts.add(route)
+            probes.extend(_probed_names(rest))
+    return attempts, probes if len(argvs) == 1 else []  # a probe counts only alone
 
 
 def all_routes_probed(clis, cleared, last_push):
@@ -417,11 +414,11 @@ def scan(sib, path, clis, recs=None):
                 if review_seq is not None and not b.get("is_error"):
                     reviews.append(review_seq)
                 for route in attempts:
-                    cleared[route] = seq_call
-                valid = b.get("is_error") and not RX_PROBE_MISSING.search(text)  # exit 1 only
+                    cleared[route] = max(cleared.get(route, -1), seq_call)
+                valid = RX_EXIT_1.match(text)
                 for probed in probes if valid else []:
                     if probed in clis and _absent(probed, text):
-                        cleared["absent:" + probed] = seq_call
+                        cleared["absent:" + probed] = max(cleared.get("absent:" + probed, -1), seq_call)
     return last_push, reviews, cleared
 
 

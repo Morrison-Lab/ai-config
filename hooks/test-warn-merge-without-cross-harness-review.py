@@ -42,7 +42,7 @@ def transcript(steps):
                                          "input": s["input"]}]},
             }) + "\n")
             fh.write(json.dumps({
-                "type": "user",
+                "type": "user", **s.get("rec", {}),
                 "message": {"content": [{
                     "type": "tool_result", "tool_use_id": tid,
                     "is_error": s["is_error"],
@@ -383,9 +383,10 @@ def main():
         "command -v %s; gh pr merge 1" % clis4, "PreToolUse:Bash hook error: x")] + oc)[0] and run(
         MERGE, [probe("command -v " + clis4, "\\n\n Permission for this action was denied")] + oc)[0])
     check("warns when the opencode attempt was refused", run(MERGE, probe_all[:1] + [
-        dict(oc[0], out="The user doesn't want to proceed with this tool use")])[0])
-    check("silent when a missing CLI's 'command not found' shares the probe call", not run(
-        MERGE, [probe("codex x; command -v agy gemini cursor-agent", "Exit code 1\nbash: codex: command not found")] + oc)[0])
+        dict(oc[0], out="The user doesn't want to proceed with this tool use")])[0] and run(
+        MERGE, probe_all[:1] + [dict(oc[0], rec={"toolDenialKind": "automode-blocked"})])[0])
+    check("warns when the probe shares its call or exits other than 1", run(MERGE, [probe(
+        "cd /nope && command -v " + clis4)] + oc)[0] and run(MERGE, [probe("command -v " + clis4, "Exit code 2")] + oc)[0])
     check("silent when an installed CLI was attempted and errored", not run(
         MERGE, [probe("command -v agy gemini cursor-agent"),
                 probe("codex exec 'review the diff'", "Exit code 1\nbackend down")] + oc)[0])

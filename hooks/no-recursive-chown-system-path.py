@@ -89,7 +89,8 @@ change directory, assign or run chown, chmod or chgrp (those ways are then
 merged into one, with the directory unknown), a directory deeper than
 MAX_SCOPE subshells or longer than PATH_MAX (read as MAX_SCOPE deep, or
 unknown), PowerShell
-`icacls`/`Set-Acl`, Windows drive paths (`C:/Windows`), nested texts past
+`icacls`/`Set-Acl`, Windows drive paths (`C:/Windows`), a `#` right after a
+`$(...)` holding a `case` pattern (read as a comment), nested texts past
 MAX_DEPTH, a relative target, `$PWD`, or a name assigned from `$PWD`, after
 a `cd` this cannot resolve (`cd -` or `cd "$(git rev-parse
 --show-toplevel)"`, where `$PWD` is taken as empty; an absolute `cd`
@@ -828,7 +829,7 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
                 reading = got[operand - 1] if operand else None
                 looped_name = tok and any(
                     (m.group(1) or m.group(2)) in loop_names for m in VARIABLE.finditer(tok))
-                if lead[0] != "cd" or not here or not tok or SUB in tok or looped_name:
+                if lead[0] != "cd" or not tok or SUB in tok or looped_name:
                     pass  # no operand, or one this cannot read: as resolved above
                 elif reading and reading is not UNREAD and reading[0] == "":
                     # An unquoted empty `cd $D` goes home; quoted, it stays put.
@@ -837,12 +838,14 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
                         news, fork = [home], True
                     else:
                         news = [new]
-                elif reading and reading is not UNREAD and reading[1] and reading[0]:
+                elif reading and reading is not UNREAD and reading[1] and reading[0] and (
+                        here or reading[0].startswith("/")):
                     # `cd "$OUT/tmp"` with OUT unset is `cd /tmp`, and with it
                     # set goes somewhere this cannot name: the directory is weak
                     # in the first world and unknown in the second.
                     # When the `cd` may not run, the shell may also stay put.
-                    path = os.path.normpath(os.path.join(here, reading[0]))
+                    # From an unknown directory only an absolute value is read.
+                    path = os.path.normpath(os.path.join(here or "/", reading[0]))
                     path = path if len(path) <= PATH_MAX else None
                     fork, weak_here = True, True
                     if path == here:  # `cd "${OUT}."`: it stays, weakly, or moves

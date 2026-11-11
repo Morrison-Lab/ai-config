@@ -308,7 +308,10 @@ def _comment_free(command):
     The `)` that closes a `$(` ends a substitution inside a word, not the
     word: `$(git rev-parse HEAD)#L10` is one word, and reading its `#` as a
     comment hid every command after it. Unquoted parentheses are tracked to
-    tell that `)` from a subshell's.
+    tell that `)` from a subshell's; a `(` after `$`, `<`, `>` or `=` (a
+    substitution, a process substitution, an array) opens one inside a word.
+    A `case` pattern's `)` inside `$(...)` is read as closing it, so a `#`
+    right after that substitution is still taken as a comment.
     """
     single = double = False
     parens = []  # one entry per open unquoted `(`: True when it is `$(`
@@ -333,7 +336,7 @@ def _comment_free(command):
         elif single or double:
             pass
         elif ch == "(":
-            parens.append(i > 0 and command[i - 1] == "$")
+            parens.append(i > 0 and command[i - 1] in "$<>=")
             word_end = True
         elif ch == ")":
             word_end = not (parens and parens.pop())

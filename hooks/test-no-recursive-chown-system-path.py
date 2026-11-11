@@ -370,6 +370,13 @@ class Denies(unittest.TestCase):
                      "".join(f"if t{i}; then cd d{i}; fi; " for i in range(20))):
             self.assert_denied(lead + "cd /usr/local && sudo chown -R me .")
         self.assert_denied("cd - && cd ~ && chmod -R go-w .")
+        for cmd in ("cd - && cd $UNSET_D && chmod -R go-w .",
+                    'cd - && cd "$UNSET_D/etc" && chmod -R u+w .',
+                    'cd "$(git rev-parse --show-toplevel)" && cd "$UNSET_P/lib" && chmod -R u+w .',
+                    'cd - && cd "$UNSET_D"/usr && sudo chown -R me .',
+                    "diff <(ls)#x; chmod -R u+w /etc",
+                    "a=(x y)#z; chmod -R u+w /etc"):
+            self.assert_denied(cmd)
         self.assert_denied("".join(f"cd {'n' * 250}{i}; " for i in range(17))
                            + "cd /; chmod -R u+w .")
 
@@ -811,7 +818,8 @@ class Allows(unittest.TestCase):
         self.assertLessEqual(widest[0], guard.MAX_SCOPE + 1)
 
     def test_relative_cd_from_an_unknown_directory_stays_unknown(self):
-        for cmd in ("cd - && cd build && chmod -R u+w .", 'cd "$(x)" && cd .. && chmod -R u+w .'):
+        for cmd in ("cd - && cd build && chmod -R u+w .", 'cd "$(x)" && cd .. && chmod -R u+w .',
+                    'cd - && cd "${UNSET_D}etc" && chmod -R u+w .'):
             self.assert_allowed(cmd)
 
     def test_a_long_directory_under_an_unset_variable_is_unknown(self):

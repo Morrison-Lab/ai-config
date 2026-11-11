@@ -57,7 +57,8 @@ jobs:
           if [ -n "$ISSUE_CEILING" ]; then
             args+=(--ceiling "$ISSUE_CEILING")
           fi
-          # The plan and the label commands (stdout) go to the log. The summary
+          # The plan (stdout) goes to the log, with each label command after it
+          # on a dry run only: a real run prints no commands. The summary
           # (stderr) goes to a file first, so the next step can copy it into
           # the job summary whether this step passed or failed.
           rc=0

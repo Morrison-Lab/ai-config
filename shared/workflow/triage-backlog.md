@@ -53,7 +53,8 @@ In ai-config, `.github/workflows/triage-backlog.yml` runs this mode every Monday
 It calls the shared workflow [`triage-backlog.yml`](https://github.com/Morrison-Lab/gha/blob/v3/.github/workflows/triage-backlog.yml) in `Morrison-Lab/gha` ([gha#1900](https://github.com/Morrison-Lab/gha/issues/1900)), which runs gha's copy of the script.
 The workflow's `script-drift` job fails when that copy and `scripts/triage-backlog.py` differ, so a change to either one is ported to the other.
 That job also runs on a pull request that changes the script or the workflow file.
-It passes `--ceiling` only when the repository variable `ISSUE_CEILING` is set.
+The job reads gha at the `v3` tag, so change gha's copy first: merge the gha pull request, wait for the `v3` tag to move, then merge the same change here.
+The `label` job passes `--ceiling` only when the repository variable `ISSUE_CEILING` is set.
 The plan, one row per issue with its priority and reason, goes to the run's log, and the counts go to the run's job summary.
 A labelling step that fails before it counts puts its error in the job summary instead.
 A run that stops before the labelling step says so in the job summary, and its error is in the log.

@@ -1565,6 +1565,8 @@ def main() -> int:
         "None. Still, the cache leaks.",
         "No issues. That said, the cache leaks.",
         "None. On the other hand, the cache leaks.",
+        "None. That being said, the cache leaks.",
+        "None. Even so, the cache leaks.",
         "None.\n**However**, the cache leaks.",
         "None. (However, the loop leaks.)",
         "None. 'But' the loop leaks.",
@@ -1587,13 +1589,13 @@ def main() -> int:
         )
     # Long whitespace runs must not make the guard quadratic: before the
     # bounded openers, 20,000 spaces took about 6 s and " -" * 10,000 9 s.
-    import time as _time
-    _t0 = _time.monotonic()
-    for _text in ("None" + " " * 20000, "None" + " -" * 10000):
+    _t0 = time.monotonic()
+    for _run in (" ", " -", "\t", chr(0xA0), ", ", "\n", "\r\n", " ; *"):
+        _text = "None" + _run * (20000 // len(_run)) + "x"
         checker.NOT_CLEAN_NEGATION_SUFFIX.match(_text)
         checker.FINDING_HEADING_NEGATION_SUFFIX.match(_text)
     check("whitespace runs after a negation scan in under 2 s (#2359)",
-          _time.monotonic() - _t0 < 2.0)
+          time.monotonic() - _t0 < 2.0)
     # A sentence-opening contrast marker on the next line re-flags.
     check(
         "## Nits + 'None.' with a hard-wrapped sentence-opening 'But' re-flags (#2359)",

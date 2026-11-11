@@ -2521,7 +2521,8 @@ _CONTRAST_WORDS = (
 _CONTRAST_MARKERS = (
     r"however|but|yet|still|nonetheless|nevertheless|that\s+said|except"
     r"|though|although|instead|otherwise|besides|apart\s+from|aside\s+from"
-    r"|on\s+the\s+other\s+hand"
+    r"|on\s+the\s+other\s+hand|that\s+being\s+said|having\s+said\s+that|regardless"
+    r"|even\s+so|conversely|at\s+the\s+same\s+time|in\s+contrast|beyond\s+that"
 )
 # Words that are also ordinary words or identifiers ("No issues found while
 # reviewing", "None in bar.py", "uses a set instead of a list") count only

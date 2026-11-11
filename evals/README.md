@@ -33,8 +33,8 @@ Each case is `evals/<name>/prompt.md` (frontmatter plus prompt) and one or more 
 
 | Group | Cases | What it measures |
 |---|---|---|
-| `trigger` | `trigger-find-ai-tells` | The request loads the skill it should. |
-| `negative` | `no-trigger-find-ai-tells` | A nearby but out-of-scope request does not load the skill, and still gets answered. |
+| `trigger` | `trigger-ardi`, `trigger-find-ai-tells`, `trigger-memorize` | The request loads the skill it should. |
+| `negative` | `no-trigger-ardi`, `no-trigger-find-ai-tells` | A nearby but out-of-scope request does not load the skill, and still gets answered. |
 | `rule` | `authorship-marker` | An `AGENTS.md` rule shows up in the output. |
 
 ### First measurement
@@ -45,7 +45,9 @@ One run per arm, Sonnet, at the commit that added this suite (2026-11-11):
 |---|---|---|---|
 | `authorship-marker` | 1 | 0 | The rule changes behaviour. |
 | `trigger-find-ai-tells` | 1 | 0 | |
-| `no-trigger-find-ai-tells` | 1 | 1 | The base model already passes; this case guards against regressions. |
+| `trigger-ardi` | 0 | 0 | [ai-config#5331](https://github.com/Morrison-Lab/ai-config/issues/5331) |
+| `trigger-memorize` | 0 | 0 | [ai-config#5331](https://github.com/Morrison-Lab/ai-config/issues/5331) |
+| `no-trigger-*` | 1 | 1 | The base model already passes; these guard against regressions. |
 
 One run is a smoke check, not a measurement of rates;
 use `--runs 3` or more before drawing conclusions from a difference.

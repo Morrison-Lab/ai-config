@@ -1,8 +1,9 @@
 # Delivery paths: how ai-config reaches each harness
 
 This page names the one supported way the rules, skills and hooks reach each harness and session kind ([ai-config#5309](https://github.com/Morrison-Lab/ai-config/issues/5309), step 1).
-Anything else that delivers the same files is a leftover, listed under [Leftover paths](#leftover-paths).
-A leftover is worse than nothing: it runs older code than `main`, and nothing in a guard's output says which copy fired ([#3094](https://github.com/Morrison-Lab/ai-config/issues/3094), [#3590](https://github.com/Morrison-Lab/ai-config/issues/3590)).
+Anything else that delivers the same files is a leftover, listed under [Leftover paths](#leftover-paths), except a vendored `.ai-config` submodule, which [#2345](https://github.com/Morrison-Lab/ai-config/issues/2345) decides.
+A leftover adds nothing at best.
+At worst it runs older code than `main`, and nothing in a guard's output says which copy fired ([#3094](https://github.com/Morrison-Lab/ai-config/issues/3094), [#3590](https://github.com/Morrison-Lab/ai-config/issues/3590)).
 The README's section for each harness carries the setup steps.
 
 Status as of 2026-11-11.
@@ -20,7 +21,7 @@ Status as of 2026-11-11.
 | Gemini CLI and Antigravity | `bootstrap.sh`, which registers the checkout's `skills/` in `~/.gemini/config/skills.json` and stages a plugin under `~/.gemini/config/plugins/` that links into the checkout | `~/.gemini/GEMINI.md`, whose import block reads `~/.gemini/ai-config-AGENTS.md`, a link to the checkout's `AGENTS.md` | the checkout's `skills/` | Antigravity only: the staged plugin's `hooks.json`, which `bootstrap.sh` renders | none; `git pull` in the checkout updates it, and `bootstrap.sh` must be rerun after `hooks/hooks.json` changes |
 | Cursor | The Cursor plugin, [`.cursor-plugin/plugin.json`](../.cursor-plugin/plugin.json), installed from GitHub | `cursor-rules/`, the plugin's user-global rules | the plugin | only in an ai-config workspace, through [`.cursor/hooks.json`](../.cursor/hooks.json) | none |
 | opencode | `wire-user-config.py`, which adds the checkout's `AGENTS.md` to opencode's `instructions` | the `instructions` entry | by hand: a link from `~/.config/opencode/skills/`, as the README describes | not delivered on a machine with the Claude Code plugin (see the bullets that follow) | none; `git pull` in the checkout updates it |
-| Cloud agents of other repositories: Codex cloud, Copilot, Jules, Cursor background agents | [`scripts/wire-repo-config.py`](../scripts/wire-repo-config.py), which writes a pointer block into the repository's `AGENTS.md` | a pointer to ai-config's `AGENTS.md` on `main` | not delivered | not delivered | none needed: the pointer names `main` |
+| Cloud agents of other repositories: Codex cloud, Copilot, Jules, Cursor background agents | [`scripts/wire-repo-config.py`](../scripts/wire-repo-config.py), which writes a pointer block into the repository's `AGENTS.md`, and into a `CLAUDE.md` that does not import it; the plugin settings it also writes reach only Claude Code, covered by the rows above | a pointer to ai-config's `AGENTS.md` on `main` | not delivered | not delivered | none needed: the pointer names `main` |
 
 ## What each path cannot deliver
 

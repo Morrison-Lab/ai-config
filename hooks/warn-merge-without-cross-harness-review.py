@@ -126,8 +126,7 @@ CURL_VALUE_OPTS = frozenset({
     "--data-urlencode", "--form", "--form-string", "--json", "-H", "--header", "-e",
     "--referer", "-o", "--output", "-x", "--proxy", "-u", "--user",
 })
-# Claude Code's "Exit code N", or Antigravity's wrapper header. A refusal never says either.
-# An attempt counts at any exit, 127 too; a probe only at 1, a missing name (127: no probe ran).
+# Claude Code's "Exit code N" or Antigravity's header, never a refusal: an attempt at any exit, a probe at 1 only.
 RX_RAN_FAILED = re.compile(r"^(?:\s|\\n)*(?:Exit code [1-9]|Command timed out)|^(?:\w+ At: .*\n)*(?:the )?command exited with code [1-9]", re.I)
 RX_EXIT_1 = re.compile(r"^(?:\s|\\n)*Exit code 1\b|^(?:\w+ At: .*\n)*(?:the )?command exited with code 1\b", re.I)
 RX_AGY_TRANSCRIPT_PATH = re.compile(
@@ -236,13 +235,9 @@ def _curl_route(rest):
     for i, arg in enumerate(args):
         prev = args[i - 1] if i else ""
         # `-X GET`, `-XGET`, `--request=GET`, `-G` and `-I` are not a POST.
-        verb = None
-        if prev in ("-X", "--request"):
-            verb = arg
-        elif arg.startswith("--request="):
-            verb = arg.split("=", 1)[1]
-        elif arg.startswith("-X") and len(arg) > 2:
-            verb = arg[2:]
+        verb = arg if prev in ("-X", "--request") else None
+        if arg.startswith(("--request=", "-X")) and len(arg) > 2:
+            verb = arg.split("=", 1)[1] if arg.startswith("--request=") else arg[2:]
         if (verb is not None and verb.upper() != "POST") or arg in (
                 "-G", "--get", "-I", "--head"):
             return None
@@ -268,10 +263,7 @@ def _review_route(rest, clis):
         return None
     base = os.path.basename(rest[0])
     if len(rest) > 1 and base in clis:
-        if (rest[1] not in NON_REVIEW_ARGS
-                and not HELP_FLAGS.intersection(rest[1:])):
-            return base
-        return None
+        return base if rest[1] not in NON_REVIEW_ARGS and not HELP_FLAGS.intersection(rest[1:]) else None
     if base == "curl":
         route = _curl_route(rest)
         if route and (route[2] is None or route[2] in clis):

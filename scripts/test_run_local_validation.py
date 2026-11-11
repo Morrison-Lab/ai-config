@@ -489,7 +489,8 @@ def test_changed_end_to_end():
                        env=env)
         # Create a file and commit it
         (Path(tmp) / "test.md").write_text("x", encoding="utf-8")
-        subprocess.run(["git", "add", "test.md"], cwd=tmp, check=True,
+        (Path(tmp) / "keep.md").write_text("".join(f"line {i}\n" for i in range(40)), encoding="utf-8")
+        subprocess.run(["git", "add", "test.md", "keep.md"], cwd=tmp, check=True,
                        env=env)
         subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=tmp, check=True,
                        env=env)
@@ -510,6 +511,11 @@ def test_changed_end_to_end():
         # md file changed, lint-markdown should be RUN/PARTIAL/NOT RUN, not skipped
         check("lint-markdown is not skipped by file scope", "SKIP     [validate] lint-markdown: no scoped files changed" not in text)
         check("lint-qmd is skipped because no qmd file changed", "SKIP     [lint-qmd] lint-qmd: no scoped files changed" in text)
+        # ai-config#5087: a rename lists both sides, so a suite reading the old path is still selected.
+        subprocess.run(["git", "mv", "keep.md", "renamed.md"], cwd=tmp, check=True, env=env)
+        subprocess.run(["git", "commit", "-q", "-m", "rename"], cwd=tmp, check=True, env=env)
+        check("a rename lists both the old and the new path",
+              {"keep.md", "renamed.md"} <= set(rlv.changed_files(Path(tmp), "main") or []))
 
 
 SNAPSHOT_FIXTURE = """
@@ -596,7 +602,57 @@ def test_snapshot_sees_untracked_files():
               rc == 2 and "planted failure" in err.getvalue() and after == before)
 
 
+HANDOFF_FIXTURE = """
+jobs:
+  validate:
+    steps:
+      - name: Reads the changed list
+        run: grep -qx new.md "$RLV_CHANGED_FILES"
+"""
+
+NO_LIST_FIXTURE = """
+jobs:
+  validate:
+    steps:
+      - name: Gets no changed list
+        run: test -z "${RLV_CHANGED_FILES:-}"
+"""
+
+
+def test_changed_list_handoff():
+    """ai-config#5087: --changed hands each step its list; a plain run hands none."""
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+        env = {**os.environ, **GIT_IDENTITY}
+        repo = Path(tmp) / "repo"
+        repo.mkdir()
+        (repo / "README.md").write_text("x\n", encoding="utf-8")
+        for cmd in (["init", "-q", "-b", "main"], ["add", "README.md"], ["commit", "-q", "-m", "init"],
+                    ["checkout", "-q", "-b", "feature"]):
+            subprocess.run(["git", *cmd], cwd=repo, check=True, env=env)
+        (repo / "new.md").write_text("y\n", encoding="utf-8")
+        reads, none = Path(tmp) / "reads.yml", Path(tmp) / "none.yml"
+        reads.write_text(HANDOFF_FIXTURE, encoding="utf-8")
+        none.write_text(NO_LIST_FIXTURE, encoding="utf-8")
+
+        def run(wf, *extra):
+            with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                return rlv.main(["--workflow", str(wf), "--root", str(repo), "--no-other-workflows", *extra])
+
+        check("--changed hands a step the changed list", run(reads, "--changed", "--base", "main") == 0)
+        check("a plain run hands it no list (negative control)", run(reads) == 1)
+        old = os.environ.get("RLV_CHANGED_FILES")
+        os.environ["RLV_CHANGED_FILES"] = str(Path(tmp) / "inherited.txt")
+        try:
+            check("a plain run drops an inherited list", run(none) == 0)
+        finally:
+            os.environ.pop("RLV_CHANGED_FILES")
+            if old is not None:
+                os.environ["RLV_CHANGED_FILES"] = old
+
+
 def main():
+    print('running test_changed_list_handoff()', flush=True)
+    test_changed_list_handoff()
     print('running test_snapshot_sees_untracked_files()', flush=True)
     test_snapshot_sees_untracked_files()
     print('running test_expression_regex_edge_cases()', flush=True)

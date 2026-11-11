@@ -979,3 +979,12 @@ while a Linux CI checkout defaults to `core.ignorecase=false` and the same patte
 This is the shape that passes local testing and review and only fails once CI (or a Linux collaborator) checks it out.
 Verify with `git check-attr <attr> -- <path>` against the real filename's actual case rather than trusting a local merge/diff test.
 See [`configure-gitattributes`](../skills/configure-gitattributes/SKILL.md) step 3 for the full write-up.
+
+## `git grep` with a pathspec that matches nothing exits 1, not with an error
+
+A hardcoded directory list in a `git grep` recipe keeps working after one directory is removed: the missing pathspec reads as no match, exit 1, with no message.
+Measured on git 2.43.0 (2026-11-11): `git grep -n zzzqqq -- nonexistent-dir/` exits 1 and prints nothing, and a list mixing a real and a missing directory exits 0 on a hit.
+So a recipe cannot tell "nothing found" from "looked nowhere" by its exit status ([ai-config#3154](https://github.com/Morrison-Lab/ai-config/pull/3154) rebutted the opposite claim, 2026-09-03).
+
+- **Do:** check each pathspec exists (`git ls-files -- <dir> | head -1`) before trusting a zero from a fixed list.
+- **Don't:** expect `git grep` to fail on a directory that no longer exists.

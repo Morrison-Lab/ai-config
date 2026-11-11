@@ -25,7 +25,8 @@ Chose **`Morrison-Lab/ai-config`**:
 
 ## Continuity with 2026-09-02
 
-Yesterday's notebook (`memories/session-2026-09-02-gia-ai-config.md`) ran GIA over the same repo.
+Yesterday's notebook ran GIA over the same repo.
+It was folded into the topical memories under [ai-config#3782](https://github.com/Morrison-Lab/ai-config/issues/3782).
 Its Phase 1 outcome, in four groups.
 Merged: #3056, #3014, #3058, #3044.
 Pushed and awaiting review: #3023, #3024, #3070.

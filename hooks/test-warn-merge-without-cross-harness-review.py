@@ -404,6 +404,23 @@ def main():
     check("silent after a curl call to Ollama Cloud's chat API",
           not run(MERGE, [step("curl -sS https://api.ollama.com/api/chat"
                                " -d @req.json")])[0])
+    check("warns after an Ollama Cloud curl forced to GET",
+          run(MERGE, [step("curl -sS -X GET https://api.ollama.com/api/chat"
+                           " -d @req.json")])[0])
+    for form in ("-XGET", "--request=GET", "-G", "-I"):
+        check("warns after an Ollama Cloud curl with " + form,
+              run(MERGE, [step("curl -sS %s -d @req.json"
+                               " https://api.ollama.com/api/chat" % form)])[0])
+    check("warns when the Ollama URL is only the data payload",
+          run(MERGE, [step("curl -sS https://example.com"
+                           " -d https://api.ollama.com/api/chat")])[0])
+    check("silent after an explicit -X POST to Ollama Cloud",
+          not run(MERGE, [step("curl -sS -X POST https://api.ollama.com/api/chat"
+                               " -d @req.json")])[0])
+    check("warns when the probe word itself was not installed",
+          run(MERGE, [step("which codex agy gemini cursor-agent",
+                           out="bash: which: command not found",
+                           is_error=True)] + probe_all[1:])[0])
     check("warns after an Ollama Cloud curl with no payload",
           run(MERGE, [step("curl -sS https://api.ollama.com/api/tags")])[0])
 

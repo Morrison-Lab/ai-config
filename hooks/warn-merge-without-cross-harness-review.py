@@ -130,6 +130,14 @@ HTTP_ROUTES = (
 )
 # Presence probes, and the routes a presence probe alone cannot clear.
 PROBE_WORDS = frozenset({"which", "command"})
+# curl options whose next word is a value, never the request URL.
+CURL_VALUE_OPTS = frozenset({
+    "-d", "-F", "-sd", "-sF", "--data", "--data-binary", "--data-raw",
+    "--data-urlencode", "--form", "--json", "-H", "--header", "-e",
+    "--referer", "-o", "--output", "-x", "--proxy", "-u", "--user",
+})
+# The probe word itself was missing (`which` not installed): no evidence.
+RX_PROBE_MISSING = re.compile(r"\b(?:which|command)\b[^\n]*(?:not found|No such file)")
 NEEDS_ATTEMPT = frozenset({"opencode"})
 RX_AGY_TRANSCRIPT_PATH = re.compile(
     r"(?:^|/)(?:\.gemini/antigravity/|brain/[^/]+/\.system_generated/logs/transcript)")
@@ -233,8 +241,23 @@ def _curl_route(rest):
     )
     if not has_data:
         return None
-    for arg in rest[1:]:
-        if "://" not in arg:
+    args = rest[1:]
+    for i, arg in enumerate(args):
+        prev = args[i - 1] if i else ""
+        # `-X GET`, `-XGET`, `--request=GET`, `-G` and `-I` are not a POST.
+        verb = None
+        if prev in ("-X", "--request"):
+            verb = arg
+        elif arg.startswith("--request="):
+            verb = arg.split("=", 1)[1]
+        elif arg.startswith("-X") and len(arg) > 2:
+            verb = arg[2:]
+        if (verb is not None and verb.upper() != "POST") or arg in (
+                "-G", "--get", "-I", "--head"):
+            return None
+    for i, arg in enumerate(args):
+        # A URL that is an option's value (`-d 'https://...'`) is not the target.
+        if "://" not in arg or (i and args[i - 1] in CURL_VALUE_OPTS):
             continue
         try:
             parts = urllib.parse.urlsplit(arg)
@@ -417,7 +440,8 @@ def scan(sib, path, clis, recs=None):
                 # `command -v` and `which` exit non-zero when a name is
                 # missing; an exit-0 probe (or one masked by `|| true`)
                 # proves nothing absent.
-                for probed in probes if b.get("is_error") else []:
+                valid = b.get("is_error") and not RX_PROBE_MISSING.search(text)
+                for probed in probes if valid else []:
                     if probed in clis and _absent(probed, text):
                         cleared["absent:" + probed] = seq_call
     return last_push, reviews, cleared

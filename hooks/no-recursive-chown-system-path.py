@@ -120,7 +120,8 @@ interpreter's own `-c` (`python -c "os.system(...)"`), a substitution in an
 unquoted heredoc body (`<<EOF`, which bash does run), a glob in a directory
 component (`/*/lib`), a partial glob or brace expansion that names a
 protected path (`/et*`, `/{etc,usr}`), a wrapper that changes directory
-(`env -C /etc`, `sudo -D /etc`), more than MAX_WORLDS ways a command may
+(`env -C /etc`, `sudo -D /etc`, and `pkexec`, which goes to the target
+user's home unless given `--keep-cwd`), more than MAX_WORLDS ways a command may
 run (the directory is then unknown), the rest of a command once judging it
 in every way it may run would pass MAX_WORK words of commands that may
 change directory, assign or run chown, chmod or chgrp (those ways are then
@@ -142,7 +143,10 @@ assignment that may not run (`false && D=./x` or `if false; then :
 or a substitution, an assignment in a pipeline element (`echo x | :
 "${D:=./x}"`, read as made in the shell that follows), a `${D:=x}` read
 earlier in the same command than it assigns, and a bind-mounted path (the
-#39283 `/volumes/mail/` case) all pass. Fails open on parse trouble and when
+#39283 `/volumes/mail/` case) all pass. A `sh -c` text inside another
+program's arguments (`docker exec c sh -c`, `chroot /mnt sh -c`) passes
+when that program comes first, and is read, so may be refused, after a
+wrapper such as `sudo`. Fails open on parse trouble and when
 scripts/lib/shellcmd.py cannot be imported.
 """
 from __future__ import annotations
@@ -1052,7 +1056,7 @@ def _prefix_names(words, home, visible, here):
             break
         if ASSIGNMENT.match(word):
             name, _, val = word.partition("=")
-            if name in ("PWD", "OLDPWD"):
+            if name == "PWD":
                 continue  # a shell resets PWD to its real directory
             computed = "`" in val or SUB in val
             # In order: `D=/etc E=$D sh -c` sets E to /etc.

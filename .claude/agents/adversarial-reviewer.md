@@ -196,3 +196,11 @@ If it was, look for the user's answer to a start-now-or-file-for-later question 
 Read the linked issue or quoted request.
 Do not report the reminder hook's output as your finding.
 See [`start-or-file`](../../shared/workflow/start-or-file.md).
+
+## Recursive ownership and mode changes
+
+On a diff, script or command that runs `chown`, `chmod` or `chgrp` recursively, check that no target can reach `/`, a system directory such as `/usr`, `/etc` or `/var/lib`, or the home directory.
+Expand each variable as empty as well as set, since a variable from an earlier shell is empty in a new one, and `"$d/"` is then `/`.
+A fix for one permission error changes the one path that raised it.
+Read the diff; do not report `hooks/no-recursive-chown-system-path.py`'s verdict as your finding.
+See [`destructive-actions-catalog`](../../shared/workflow/destructive-actions-catalog.md#recursive-ownership-and-mode-changes).

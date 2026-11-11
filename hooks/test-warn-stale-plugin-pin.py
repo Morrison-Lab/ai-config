@@ -45,6 +45,8 @@ With a bare repository as the clone's `origin` (ai-config#5309 step 2):
   20. Clone at origin's tip, pin behind: warns with the count and does not
       say the clone lags.
   22. Pin that descends from origin's tip, clone behind origin: silent.
+  23. Case 10 with no time budget left (AI_CONFIG_REMOTE_BUDGET=0): origin
+      is not read, stderr says so, and the clone alone is compared.
   15. Origin unreachable: falls back to the clone, says so on stderr, and
       passes git's own error through.
   21. Origin unreachable and no applicable entry: origin is not read, so
@@ -101,7 +103,8 @@ def run(root, record, cwd, **extra):
         path.write_text(record if isinstance(record, str) else json.dumps(record), encoding="utf-8")
     env = {**os.environ, "AI_CONFIG_PLUGINS_DIR": str(root)}
     for name in ("CLAUDE_PROJECT_DIR", "CLAUDE_CODE_REMOTE",
-                 "AI_CONFIG_NO_REMOTE_CHECK"):
+                 "AI_CONFIG_NO_REMOTE_CHECK", "AI_CONFIG_NO_AUTO_REFRESH",
+                 "AI_CONFIG_REMOTE_BUDGET"):
         env.pop(name, None)
     env.update(extra)
     out = subprocess.run(
@@ -201,6 +204,11 @@ def main():
         rc, ctx, _ = run(root, record({"scope": "user", "gitCommitSha": shas[2]}), project,
                          CLAUDE_CODE_REMOTE="true")
         check("14 cloud session skips the remote read", rc == 0 and ctx == "", ctx)
+
+        rc, ctx, err = run(root, record({"scope": "user", "gitCommitSha": shas[2]}), project,
+                           AI_CONFIG_REMOTE_BUDGET="0")
+        check("23 spent budget skips the remote read",
+              rc == 0 and ctx == "" and "no time left to read origin" in err, err)
 
         rc, ctx, _ = run(root, record({"scope": "user", "gitCommitSha": shas[2]}), project,
                          CLAUDE_CODE_REMOTE="true", AI_CONFIG_NO_AUTO_REFRESH="1")

@@ -32,7 +32,8 @@ that matched it current. When origin answers, a pin that does not contain
 origin's tip is reported even when it matches the clone or is ahead of it.
 When origin does not answer in time (no network, no remote), the comparison
 falls back to the clone and says so on stderr. All origin reads together get
-at most REMOTE_BUDGET seconds, inside the hook's registered 10-second timeout.
+at most 6 seconds, inside the hook's registered 10-second timeout
+(AI_CONFIG_REMOTE_BUDGET overrides the 6, for tests).
 
 Origin is not read for a user-scope pin in a cloud session
 (CLAUDE_CODE_REMOTE=true) unless AI_CONFIG_NO_AUTO_REFRESH is set, because
@@ -62,7 +63,7 @@ import time
 from pathlib import Path
 
 PLUGIN = "ai-config"
-REMOTE_BUDGET = 6.0
+DEFAULT_REMOTE_BUDGET = 6.0
 _deadline: float | None = None
 
 
@@ -126,6 +127,18 @@ def behind(clone: Path, pin: str, head: str) -> str:
     return f"{count} commit(s)"
 
 
+def remote_budget() -> float:
+    raw = os.environ.get("AI_CONFIG_REMOTE_BUDGET")
+    if not raw:
+        return DEFAULT_REMOTE_BUDGET
+    try:
+        return float(raw)
+    except ValueError:
+        print(f"warn-stale-plugin-pin: AI_CONFIG_REMOTE_BUDGET={raw!r} is not "
+              f"a number; using {DEFAULT_REMOTE_BUDGET}", file=sys.stderr)
+        return DEFAULT_REMOTE_BUDGET
+
+
 def refresh_covers(entry: dict) -> bool:
     """True when the cloud refresh hook updates this pin at session start."""
     return (os.environ.get("CLAUDE_CODE_REMOTE") == "true"
@@ -137,7 +150,7 @@ def origin_tip(clone: Path) -> str | None:
     """The tip of origin's default branch, or None when it cannot be read."""
     global _deadline
     if _deadline is None:
-        _deadline = time.monotonic() + REMOTE_BUDGET
+        _deadline = time.monotonic() + remote_budget()
     remaining = min(5.0, _deadline - time.monotonic())
     if remaining <= 0.5:
         print(f"warn-stale-plugin-pin: no time left to read origin for "

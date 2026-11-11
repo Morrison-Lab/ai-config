@@ -86,7 +86,7 @@ def test_selector():
         check("a deletion not yet staged selects every suite", sel.needed(seeds, ["hooks/stale.py"]))
         check("an unrelated change does not select it (negative control)",
               not sel.needed(seeds, ["hooks/unrelated.py"]))
-        check("a name mentioned two levels down is not followed",
+        check("a name an imported (non-seed) module mentions is not followed",
               not sel.needed(seeds, ["hooks/other-tool.py"]))
         check("a markdown file naming the subject does not select it", not sel.needed(seeds, ["AGENTS.md"]))
         for shared in ("scripts/lib/shared.py", "hooks/hooks.json", "scripts/test_hooks.py",
@@ -98,8 +98,9 @@ def test_selector():
                   sel.needed(["hooks/broken.py"], ["hooks/unrelated.py"]) and "hooks/broken.py" in err.getvalue())
             check("so does a suite importing one", sel.needed(["hooks/uses_broken.py"], ["hooks/unrelated.py"]))
             check("a file with a NUL byte counts as unparsable", sel.needed(["hooks/nul.py"], ["hooks/unrelated.py"]))
-        check("a shell seed's mentions are read", sel.needed(["hooks/run.sh"], ["hooks/shellcfg.txt"]))
-        check("scripts/lib without its slash selects every suite", sel.needed(seeds, ["scripts/lib/"]))
+        check("a shell seed's mentions are read", sel.needed(["hooks/run.sh"], ["hooks/shellcfg.txt"])
+              and not sel.needed(["hooks/run.sh"], ["hooks/unrelated.py"]))
+        check("scripts/lib without its slash selects every suite", sel.needed(seeds, ["scripts/lib"]))
         for var in ("GIT_DIR", "GIT_COMMON_DIR"):
             old = os.environ.get(var)
             os.environ[var] = str(root / "no-such-git-dir")

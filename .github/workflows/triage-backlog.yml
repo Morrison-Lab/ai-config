@@ -1,0 +1,71 @@
+# The unattended half of the weekly backlog triage pass
+# (shared/workflow/triage-backlog.md, "The unattended half: labels only").
+#
+# Gives every open issue with no priority label one of P1, P2 or P3, and
+# closes nothing: a close stays with the attended `triage` skill, where a
+# reader reviews each one. Also reports the open count, against the ceiling in
+# the repository variable ISSUE_CEILING when that variable is set.
+#
+# This covers ai-config only. The reusable gha workflow that would give every
+# lab repo the same pass is ai-config#3147.
+name: Triage backlog (labels only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Print the label commands without running them.
+        type: boolean
+        default: false
+  schedule:
+    - cron: '0 7 * * 1' # Weekly on Monday at 07:00 UTC
+
+permissions: {}
+
+concurrency:
+  group: triage-backlog
+  cancel-in-progress: false
+
+jobs:
+  label:
+    name: Label unprioritized issues
+    runs-on: ubuntu-latest
+    if: github.repository == 'Morrison-Lab/ai-config'
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Label every open issue that has no priority
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          ISSUE_CEILING: ${{ vars.ISSUE_CEILING }}
+          DRY_RUN: ${{ inputs.dry-run }}
+        run: |
+          set -euo pipefail
+          args=(-R "$REPO" --apply --labels-only)
+          if [ "$DRY_RUN" = "true" ]; then
+            args+=(--dry-run)
+          fi
+          if [ -n "$ISSUE_CEILING" ]; then
+            args+=(--ceiling "$ISSUE_CEILING")
+          fi
+          # The plan goes to a file and the summary (stderr) to the log and the
+          # job summary, so the counts are readable without opening the log.
+          python3 scripts/triage-backlog.py "${args[@]}" \
+            > "$RUNNER_TEMP/triage-plan.txt" \
+            2> >(tee "$RUNNER_TEMP/triage-summary.txt" >&2)
+          {
+            echo '### Backlog triage (labels only)'
+            echo
+            echo '```text'
+            cat "$RUNNER_TEMP/triage-summary.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

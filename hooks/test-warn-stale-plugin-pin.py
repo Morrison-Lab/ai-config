@@ -188,9 +188,10 @@ def main():
         git(work, "push", "-q", "origin", "HEAD:main")
         tip = git(work, "rev-parse", "HEAD")
 
-        rc, ctx, _ = run(root, record({"scope": "user", "gitCommitSha": shas[2]}), project)
+        rc, ctx, err = run(root, record({"scope": "user", "gitCommitSha": shas[2]}), project)
         check("10 clone behind origin warns",
               rc == 0 and "has not been updated" in ctx and tip[:12] in ctx, ctx)
+        check("10 a tip missing from the clone prints no git error", err == "", err)
 
         rc, ctx, _ = run(root, record({"scope": "user", "gitCommitSha": tip}), project)
         check("11 pin at origin's tip is silent", rc == 0 and ctx == "", ctx)
@@ -199,13 +200,15 @@ def main():
         check("12 pin and clone both behind",
               "2 commit(s)" in ctx and "itself lags origin" in ctx, ctx)
 
-        rc, ctx, _ = run(root, record({"scope": "user", "gitCommitSha": shas[2]}), project,
-                         AI_CONFIG_NO_REMOTE_CHECK="1")
-        check("13 opt-out skips the remote read", rc == 0 and ctx == "", ctx)
+        rc, ctx, err = run(root, record({"scope": "user", "gitCommitSha": shas[2]}), project,
+                           AI_CONFIG_NO_REMOTE_CHECK="1")
+        check("13 opt-out skips the remote read", rc == 0 and ctx == "" and err == "",
+              ctx + err)
 
-        rc, ctx, _ = run(root, record({"scope": "user", "gitCommitSha": shas[2]}), project,
-                         CLAUDE_CODE_REMOTE="true")
-        check("14 cloud session skips the remote read", rc == 0 and ctx == "", ctx)
+        rc, ctx, err = run(root, record({"scope": "user", "gitCommitSha": shas[2]}), project,
+                           CLAUDE_CODE_REMOTE="true")
+        check("14 cloud session skips the remote read", rc == 0 and ctx == "" and err == "",
+              ctx + err)
 
         rc, ctx, err = run(root, record({"scope": "user", "gitCommitSha": shas[2]}), project,
                            AI_CONFIG_REMOTE_BUDGET="0")

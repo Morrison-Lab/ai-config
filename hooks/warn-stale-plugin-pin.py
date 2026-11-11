@@ -96,7 +96,12 @@ def applies(entry: dict, here: Path) -> bool:
 
 
 def git(clone: Path, *args: str, quiet: bool = False,
-        timeout: float = 5) -> str | None:
+        timeout: float = 5, silent_codes: tuple[int, ...] = ()) -> str | None:
+    """Run git in the clone; None on failure.
+
+    A failure is printed on stderr unless `quiet` is set or its exit code is
+    in `silent_codes` (an expected "no" answer, such as exit 1 from
+    `merge-base --is-ancestor`)."""
     try:
         out = subprocess.run(
             ["git", "-C", str(clone), *args],
@@ -108,7 +113,7 @@ def git(clone: Path, *args: str, quiet: bool = False,
               file=sys.stderr)
         return None
     if out.returncode != 0:
-        if not quiet:
+        if not quiet and out.returncode not in silent_codes:
             print(f"warn-stale-plugin-pin: git {' '.join(args)} in {clone}: "
                   f"{out.stderr.strip()}", file=sys.stderr)
         return None
@@ -166,8 +171,16 @@ def origin_tip(clone: Path) -> str | None:
 
 
 def is_ancestor(clone: Path, older: str, newer: str) -> bool:
+    """True when `older` is an ancestor of `newer` in the clone.
+
+    A commit the clone does not hold is not an ancestor of anything in it:
+    that is the expected case for origin's tip when the clone lags, so it
+    is answered False without a message. Any other git error is printed."""
+    for rev in (older, newer):
+        if git(clone, "cat-file", "-e", f"{rev}^{{commit}}", quiet=True) is None:
+            return False
     return git(clone, "merge-base", "--is-ancestor", older, newer,
-               quiet=True) is not None
+               silent_codes=(1,)) is not None
 
 
 def clone_lags(clone: Path, head: str, tip: str | None) -> bool:

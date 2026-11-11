@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""PreToolUse warning: a merge with no cross-harness reviewer run since the last push.
+"""PreToolUse deny: a merge with no cross-harness reviewer run since the last push.
+
+The file keeps its `warn-` name so existing references resolve; it has denied
+since ai-config#5290 (see "Why it denies" below).
 
 ## The failure this exists for
 
@@ -28,7 +31,16 @@ before the gap was noticed.
              first argument that is not a housekeeping one (NON_REVIEW_ARGS:
              `--version`, `--help`, `login`, `auth`, ...), or a `curl` call
              with a data payload to `https://opencode.ai/zen/go/v1/chat/completions`
-             (the cloud-session route when `opencode` qualifies per AGENTS.md policy).
+             (the cloud-session route when `opencode` qualifies per AGENTS.md policy),
+             or a `curl` call with a data payload to `https://api.ollama.com/api/chat`
+             (the Ollama Cloud route, ai-config#4849)
+    AND NOT  every route was probed after the last push (the waiver in
+             `adversarial-self-review.md`): each CLI in CROSS_HARNESS_CLIS,
+             minus this session's own harness, was invoked as a reviewer with
+             any result, error included, or a `command -v` / `which` probe
+             naming it printed no path for it. `opencode` needs an attempt
+             (its CLI or the OpenCode Go `curl`), never only a presence
+             probe, because its HTTP route needs no CLI.
 
 A skill (`dtc`, `dto`, `adv`) is not credited by being loaded: loading one
 runs nothing. Its reviewer CLI call, which is a Bash call, is what counts.
@@ -43,7 +55,17 @@ about what a merge or a push is. The sibling's strict `check && merge` chain
 discharge is deliberately NOT reused: passing the fully-clean instrument says
 nothing about who reviewed.
 
-## What it cannot see, and why it warns rather than denies
+## Why it denies
+
+It warned until 2026-11-11, and the warning arrived too late: a PreToolUse
+note rides on the merge call itself, so the agent read it only with the merge
+result (ai-config#4587; ai-config#5289 was merged before its cross-harness
+probe ran, ai-config#5290). Both discharges are visible tool calls, so a deny
+is decidable. A reviewer that is installed but down is discharged by its
+failed attempt, and one that is absent by a presence probe, so a deny costs
+at most the one probe pass the waiver asks for anyway.
+
+## What it cannot see
 
 * The INVOCATION is decidable; the VERDICT is not. A run that returned
   "needs more work" discharges this hook. It answers "was the gate even
@@ -67,8 +89,8 @@ nothing about who reviewed.
   ladder does not list them as active yet: a successful run of either in
   the transcript is itself the probe that ladder is waiting on.
 
-Each is a false-silence or a false-warning a deny would turn into an escape-
-variable reflex, so this warns, like its sibling. It never blocks, and fails
+A false deny from the script case is discharged by running the reviewer in the
+foreground, or by the probe pass. There is no escape variable. The hook fails
 open on any internal error.
 """
 import importlib.util
@@ -101,6 +123,14 @@ ENV_ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 # `enable_pull_request_auto_merge`. Match both, as no-unauthorized-merge.py does.
 RX_AUTO_MERGE_TOOL = re.compile(
     r"^mcp__github__enable_?(?:pull_?request_?|pr_)?auto_?merge$", re.I)
+# HTTP reviewer routes a `curl` POST can take: (host, path, CLI it stands for).
+HTTP_ROUTES = (
+    ("opencode.ai", "/zen/go/v1/chat/completions", "opencode"),
+    ("api.ollama.com", "/api/chat", None),
+)
+# Presence probes, and the routes a presence probe alone cannot clear.
+PROBE_WORDS = frozenset({"which", "command"})
+NEEDS_ATTEMPT = frozenset({"opencode"})
 RX_AGY_TRANSCRIPT_PATH = re.compile(
     r"(?:^|/)(?:\.gemini/antigravity/|brain/[^/]+/\.system_generated/logs/transcript)")
 AGY_RECORD_TYPES = frozenset({
@@ -110,8 +140,9 @@ AGY_RECORD_TYPES = frozenset({
 GATE = "shared/workflow/adversarial-self-review.md"
 
 NOTE = (
-    "[warn-merge-without-cross-harness-review] {target}: this session's "
-    "transcript shows no cross-harness reviewer run since the last push. "
+    "[warn-merge-without-cross-harness-review] Refused. {target}: this "
+    "session's transcript shows no cross-harness reviewer run since the last "
+    "push, and no probe of every route. "
     "The merge gate in " + GATE + " ('Cross-model and cross-harness reviews "
     "are required for merging') needs a verdict from a reviewer whose model "
     "AND harness both differ from this session's. An Agent subagent and the "
@@ -119,8 +150,11 @@ NOTE = (
     "of {clis} (or in cloud sessions, curl to opencode.ai with candidate "
     "model fallback per delegate-to-opencode) on the shipping head first. "
     "If no qualifying reviewer can run here (host blocked, backend down, "
-    "CLI or credential absent), enumerate every route and probe once, then "
-    "the gate is waived (Ezra, 2026-10-16; adversarial-self-review.md "
+    "CLI or credential absent), probe every route once: attempt each of "
+    "{clis} as a reviewer, or show it absent with `command -v <cli>`; "
+    "opencode needs an attempt (its CLI or the OpenCode Go curl). Then the "
+    "gate is waived and this hook lets the merge through "
+    "(Ezra, 2026-10-16; adversarial-self-review.md "
     "'Waiver when no cross-model reviewer can run'). The waiver grants no "
     "merge authority: the merge still needs mwc or an explicit instruction, "
     "a clean Claude review plus green CI, and a PR note that the review was "
@@ -187,9 +221,10 @@ def _peel_wrappers(rest):
     return rest
 
 
-def _is_opencode_curl(rest):
+def _curl_route(rest):
+    """The HTTP_ROUTES entry a `curl` POST in *rest* reaches, else None."""
     if HELP_FLAGS.intersection(rest[1:]):
-        return False
+        return None
     # A review requires a POST payload with the prompt; a smoke test does not qualify
     has_data = any(
         arg.startswith(("-d", "-F", "-sd", "-sF", "--data", "--form", "--json"))
@@ -197,31 +232,66 @@ def _is_opencode_curl(rest):
         for arg in rest[1:]
     )
     if not has_data:
-        return False
+        return None
     for arg in rest[1:]:
-        if "opencode.ai" not in arg.lower():
+        if "://" not in arg:
             continue
         try:
             parts = urllib.parse.urlsplit(arg)
         except Exception:
             continue
         host = parts.netloc.split(":")[0].lower()
-        if host == "opencode.ai" and parts.path.rstrip("/") == "/zen/go/v1/chat/completions":
-            return True
-    return False
+        for route in HTTP_ROUTES:
+            if host == route[0] and parts.path.rstrip("/") == route[1]:
+                return route
+    return None
+
+
+def _review_route(rest, clis):
+    """The route a reviewer call in *rest* takes: a CLI name, a host, or None."""
+    rest = _peel_wrappers(rest)
+    if not rest:
+        return None
+    base = os.path.basename(rest[0])
+    if len(rest) > 1 and base in clis:
+        if (rest[1] not in NON_REVIEW_ARGS
+                and not HELP_FLAGS.intersection(rest[1:])):
+            return base
+        return None
+    if base == "curl":
+        route = _curl_route(rest)
+        if route and (route[2] is None or route[2] in clis):
+            return route[2] or route[0]
+    return None
 
 
 def _is_reviewer(rest, clis):
+    return _review_route(rest, clis) is not None
+
+
+def _probed_names(rest):
+    """CLI names a `command -v` or `which` presence probe in *rest* asks about."""
     rest = _peel_wrappers(rest)
-    if not rest:
-        return False
-    base = os.path.basename(rest[0])
-    if len(rest) > 1 and base in clis:
-        return (rest[1] not in NON_REVIEW_ARGS
-                and not HELP_FLAGS.intersection(rest[1:]))
-    if base == "curl" and "opencode" in clis:
-        return _is_opencode_curl(rest)
-    return False
+    if not rest or os.path.basename(rest[0]) not in PROBE_WORDS:
+        return []
+    args = rest[1:]
+    # A redirect hides the paths that show a CLI is present.
+    if any(">" in a or "<" in a for a in args):
+        return []
+    if os.path.basename(rest[0]) == "command":
+        if not args or args[0] not in ("-v", "-V"):
+            return []
+        args = args[1:]
+    return [a for a in args if not a.startswith("-")]
+
+
+def _absent(name, text):
+    """True when probe output *text* printed no path or name for *name*."""
+    for line in (text or "").splitlines():
+        line = line.strip()
+        if line == name or line.endswith("/" + name):
+            return False
+    return True
 
 
 def _shell_events(sib, command, clis):
@@ -264,15 +334,48 @@ def _fresh(events):
     return all(p == last_piece and i < last_i for i, p in pushes)
 
 
+def _route_calls(sib, command, clis):
+    """(routes attempted, names presence-probed) in *command*, any order."""
+    attempts, probes = set(), []
+    for line in sib.shell_c_expansions(command):
+        for argv in sib.simple_commands(line) or []:
+            raw = list(argv)
+            while raw and ENV_ASSIGNMENT.match(raw[0]):
+                raw = raw[1:]
+            for rest in (sib.strip_env(argv)[1], raw):
+                route = _review_route(rest, clis)
+                if route:
+                    attempts.add(route)
+                probes.extend(_probed_names(rest))
+    return attempts, probes
+
+
+def all_routes_probed(clis, cleared, last_push):
+    """True when every route in *clis* was attempted, or found absent, after
+    the last push: the waiver's single probe pass."""
+    for cli in clis:
+        if cleared.get(cli, -1) > last_push:
+            continue
+        if cli not in NEEDS_ATTEMPT and cleared.get(
+                "absent:" + cli, -1) > last_push:
+            continue
+        return False
+    return True
+
+
 def scan(sib, path, clis, recs=None):
-    """Return (last_push_seq, [seq of successful reviewer calls]).
+    """Return (last_push_seq, [seq of successful reviewer calls], cleared).
 
     A push and a review in one command count the push at seq - 0.5, a review
     that `_fresh` places after every push at seq, and any other at seq - 1.
+    `cleared` maps each route to the seq of the last non-sidechain call that
+    cleared it for the waiver: an attempt with any result (key: the route),
+    or a presence probe that found a CLI absent (key: "absent:<cli>").
     """
     last_push = -1
     pending = {}
     reviews = []
+    cleared = {}
     stream = recs if recs is not None else sib.records(path)
     for seq, rec in enumerate(stream):
         for b in sib._blocks(rec):
@@ -290,16 +393,34 @@ def scan(sib, path, clis, recs=None):
                     kinds = [k for k, _p in events]
                     if "push" in kinds:
                         last_push = max(last_push, seq - 0.5)
-                    if "review" in kinds and not rec.get("isSidechain"):
-                        pending[b.get("id")] = (
-                            seq if _fresh(events) else seq - 1)
+                    if rec.get("isSidechain"):
+                        continue
+                    attempts, probes = _route_calls(sib, cmd, clis)
+                    review_seq = None
+                    if "review" in kinds:
+                        review_seq = seq if _fresh(events) else seq - 1
+                    if review_seq is not None or attempts or probes:
+                        # A probe sharing a call with a push may precede it.
+                        seq_call = seq - 1 if "push" in kinds else seq
+                        pending[b.get("id")] = (seq_call, review_seq,
+                                                attempts, probes)
                 except Exception:
                     continue
             elif kind == "tool_result" and b.get("tool_use_id") in pending:
-                seq_used = pending.pop(b["tool_use_id"])
-                if not b.get("is_error"):
-                    reviews.append(seq_used)
-    return last_push, reviews
+                seq_call, review_seq, attempts, probes = pending.pop(
+                    b["tool_use_id"])
+                if review_seq is not None and not b.get("is_error"):
+                    reviews.append(review_seq)
+                for route in attempts:
+                    cleared[route] = seq_call
+                text = sib._result_text(b)
+                # `command -v` and `which` exit non-zero when a name is
+                # missing; an exit-0 probe (or one masked by `|| true`)
+                # proves nothing absent.
+                for probed in probes if b.get("is_error") else []:
+                    if probed in clis and _absent(probed, text):
+                        cleared["absent:" + probed] = seq_call
+    return last_push, reviews, cleared
 
 
 def _shell_command(tool_input):
@@ -344,13 +465,14 @@ def main() -> int:
             return 0
         recs = list(sib.records(path))
         clis = CROSS_HARNESS_CLIS - own_harnesses(path, recs)
-        last_push, reviews = scan(sib, path, clis, recs=recs)
+        last_push, reviews, cleared = scan(sib, path, clis, recs=recs)
         if tool in sib.SHELL_TOOLS and sib._push_before_merge(
                 _shell_command(tool_input) or ""):
-            reviews = []
+            reviews, cleared = [], {}
+        probed = all_routes_probed(clis, cleared, last_push)
     except Exception:
         return 0
-    if any(seq > last_push for seq in reviews):
+    if probed or any(seq > last_push for seq in reviews):
         return 0
 
     nums = list(dict.fromkeys(
@@ -358,10 +480,11 @@ def main() -> int:
     target = "PR " + ", ".join(nums) if nums else "This merge"
     note = NOTE.format(target=target, clis=", ".join(sorted(clis)))
     out = {"hookSpecificOutput": {"hookEventName": "PreToolUse",
-                                  "additionalContext": note}}
+                                  "permissionDecision": "deny",
+                                  "permissionDecisionReason": note}}
     if not os.environ.get("ANTIGRAVITY_AGENT"):
         out["systemMessage"] = (
-            f"Merging (or arming auto-merge for) {target} with no "
+            f"Refused merging (or arming auto-merge for) {target} with no "
             f"cross-model, cross-harness review "
             f"since the last push ({GATE}).")
     print(json.dumps(out))

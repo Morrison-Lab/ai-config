@@ -126,6 +126,8 @@ This section is the exception that the other "required for merging" statements i
   A probe that decides a route is enough for that route (`opencode run -m <model> "ok"` under `timeout 60`, or a `curl` to the endpoint), and keep the output.
   A quota error reroutes to the next route first and counts as unrunnable only once every route has failed.
   After that single pass, do not retry in a loop or ask again: a retry loop is not a review.
+  `hooks/warn-merge-without-cross-harness-review.py` denies a merge until the transcript shows, after the last push, a reviewer call or this pass:
+  each reviewer CLI attempted, with any result, or shown absent by `command -v <cli>`, and `opencode` attempted through its CLI or the OpenCode Go `curl` ([ai-config#5290](https://github.com/Morrison-Lab/ai-config/issues/5290)).
 - **Unavailable is not "not-clean".**
   A reviewer that ran and returned Needs-more-work, or left an unresolved finding, still blocks until a re-dispatch returns all-clear.
   The waiver covers only a reviewer that could not produce any verdict.

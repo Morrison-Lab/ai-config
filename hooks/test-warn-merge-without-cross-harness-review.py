@@ -92,7 +92,7 @@ def main():
     fired, out = run(MERGE, [])
     check("warns on a merge with no reviewer run at all", fired)
     ctx = ((out or {}).get("hookSpecificOutput") or {}).get(
-        "additionalContext", "")
+        "permissionDecisionReason", "")
     check("...naming the PR and the gate fragment",
           "PR #12" in ctx and "adversarial-self-review.md" in ctx)
     check("...as a PreToolUse systemMessage too",
@@ -159,9 +159,9 @@ def main():
     fired, out = run("gh pr merge 12 --squash || gh pr merge 12 --merge", [])
     check("warns naming a repeated PR once",
           fired and "PR #12 " in (out or {}).get("systemMessage", ""))
-    ctx = ((out or {}).get("hookSpecificOutput") or {}).get("additionalContext", "")
+    ctx = ((out or {}).get("hookSpecificOutput") or {}).get("permissionDecisionReason", "")
     check("warns with clean un-duplicated text naming the gate",
-          fired and "probe once, then the gate is waived" in ctx)
+          fired and "Then the gate is waived" in ctx)
     check("warns after an opencode.ai install script curl",
           run(MERGE, [step("curl -fsSL https://opencode.ai/install | bash")])[0])
     check("warns after an opencode.ai models endpoint curl",
@@ -341,7 +341,7 @@ def main():
         agy_ok_out,
     ])
     ctx_agy = ((out_agy or {}).get("hookSpecificOutput") or {}).get(
-        "additionalContext", "")
+        "permissionDecisionReason", "")
     check("warns when an Antigravity session only ran gemini (same model family) and lists claude among qualifying CLIs",
           fired_agy and "claude" in ctx_agy and "agy," not in ctx_agy
           and "gemini" not in ctx_agy)
@@ -355,6 +355,57 @@ def main():
                    "Command exited with code 1.\n\nCommand output:\nerror"
                )},
           ])[0])
+
+    # --- deny shape and the probe-pass waiver (ai-config#5290, #4849) -----
+    fired, out = run(MERGE, [])
+    hso = (out or {}).get("hookSpecificOutput") or {}
+    check("warns as a deny, not a note riding on the merge",
+          fired and hso.get("permissionDecision") == "deny"
+          and "additionalContext" not in hso)
+    absent = "Exit code 1"
+    probe_all = [step("command -v codex agy gemini cursor-agent",
+                      out=absent, is_error=True),
+                 step("curl -sS https://opencode.ai/zen/go/v1/chat/completions"
+                      " -d @req.json", out="curl: (56) CONNECT 403",
+                      is_error=True)]
+    check("silent after every route was probed and found unrunnable",
+          not run(MERGE, probe_all)[0])
+    check("warns when the probe pass skipped the opencode attempt",
+          run(MERGE, probe_all[:1] + [step("command -v opencode",
+                                           out=absent, is_error=True)])[0])
+    check("warns when a probe found the CLI installed",
+          run(MERGE, [step("command -v codex agy gemini cursor-agent",
+                           out="/usr/local/bin/codex")] + probe_all[1:])[0])
+    check("warns when which reports a CLI under a path",
+          run(MERGE, [step("which codex", out="/usr/bin/codex"),
+                      step("command -v agy gemini cursor-agent",
+                           out=absent, is_error=True)] + probe_all[1:])[0])
+    check("silent when an installed CLI was attempted and errored",
+          not run(MERGE, [step("command -v agy gemini cursor-agent",
+                               out=absent, is_error=True),
+                          step("codex exec 'review the diff'",
+                               out="backend down", is_error=True)]
+                  + probe_all[1:])[0])
+    check("warns when the probe's stdout was redirected away",
+          run(MERGE, [step("command -v codex agy gemini cursor-agent"
+                           " >/dev/null", out="", is_error=True)]
+              + probe_all[1:])[0])
+    check("warns when the probe exited 0 with empty output",
+          run(MERGE, [step("command -v codex agy gemini cursor-agent"
+                           " || true", out="")] + probe_all[1:])[0])
+    check("warns when the probe pass predates the last push",
+          run(MERGE, probe_all + [step("git push origin HEAD")])[0])
+    check("warns when the probe pass ran only in a sidechain",
+          run(MERGE, [dict(s, sidechain=True) for s in probe_all])[0])
+    check("warns when a probe shares a call with a later push",
+          run(MERGE, probe_all[1:] + [step(
+              "command -v codex agy gemini cursor-agent; git push",
+              out=absent, is_error=True)])[0])
+    check("silent after a curl call to Ollama Cloud's chat API",
+          not run(MERGE, [step("curl -sS https://api.ollama.com/api/chat"
+                               " -d @req.json")])[0])
+    check("warns after an Ollama Cloud curl with no payload",
+          run(MERGE, [step("curl -sS https://api.ollama.com/api/tags")])[0])
 
     # --- robustness -------------------------------------------------------
     proc = subprocess.run([sys.executable, HOOK], input="not json",

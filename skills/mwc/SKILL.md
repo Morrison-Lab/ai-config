@@ -530,8 +530,13 @@ An infra PR is one where every changed path is tooling or agent configuration
 - `.claude/**`
 - `CLAUDE.md`, `AGENTS.md` and `GEMINI.md`, at any depth
 - `.lintr`, `.lintr.R`, `lychee.toml`, `_typos.toml` and `inst/WORDLIST`
+- `tools/check_*`, `tools/check-*` and `tools/tests/**`
+- preview and CI helpers under `tools/`, by name (`skip-pdf-in-previews`, `rerun_timed_out`): each changes only what a PR preview or a CI run does, never the published site (ai-config#5293)
 
 A top-level `scripts/` is deliberately absent, because in a content repository it can hold analysis code.
+So are the other `tools/` files: figure, data and content generators, and build steps that shape the published site.
+`scripts/merge-infra-pr` reads this same list from a fresh clone of ai-config's `main`, adding only `changelog.d/`.
+A change to the list therefore takes effect for the wrapper once it merges, not on its own PR.
 
 The grant is decided by what the PR changes,
 so the guard reads the PR's file list from GitHub (`gh api .../pulls/N/files`,

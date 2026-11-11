@@ -162,10 +162,11 @@ Learned over about 90 merges through `merge-infra-pr` and pinned `gh pr merge` i
   Ezra's mwc lines cited by the coordinator, or read back with `read_thread`, were denied "Merge Without Review" or "Auto-Mode Bypass" two to three times each.
   The identical command passed once his message arrived as a wake (psc "Sync site scaffolding" dispatch, pds#392, #406, #408).
   Try once after a cite, report the denial, and stop before a third attempt.
-- `merge-infra-pr` accepts a PR only when every changed file is under `.github/` or `changelog.d/`,
-  or is a `tools/check_*`, `tools/check-*` or `tools/tests/` checker,
-  or the repo is gha, macros, ai-config or teaching-tools (Ezra, 2026-11-10: "teaching-tools is infra").
-  A blanket `tools/` or `scripts/` is refused in any other repo, as in `hooks/no-unauthorized-merge.py`.
+- `merge-infra-pr` accepts a PR only when every changed path matches `INFRA_PATH_PATTERNS` in `hooks/no-unauthorized-merge.py` or is under `changelog.d/`, or the repo is gha, macros, ai-config or teaching-tools (Ezra, 2026-11-10: "teaching-tools is infra").
+  It reads that list from a fresh ai-config clone, so it covers agent configuration (`.claude/`, `CLAUDE.md`, `AGENTS.md`) in content repos too (Ezra, 2026-11-11: "the infra grant should cover agent-config files";
+  it had refused lds#2291, ai-config#5293).
+  A blanket `tools/` or `scripts/` is refused in any other repo;
+  only checkers, tests and named preview/CI helpers under `tools/` pass.
   One `_quarto.yml` or `canvas/` file in a content repo makes the PR content, which needs a typed mwc (mlg#330).
   Canvas writes still need Ezra's explicit ok, whatever repo the PR is in,
   and `merge-infra-pr` refuses any PR that touches a `canvas/` path.

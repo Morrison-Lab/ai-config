@@ -196,8 +196,7 @@ git checkout -b add-<concept>-macro
 ```
 
 Name the new macro for the concept it denotes, not for its typography, so it stays semantic.
-Drive the macro PR to fully clean, then ask the user to merge it, naming the PR.
-Its old standing grant is retired ([`irreversible-actions-need-authorization`](../../shared/workflow/irreversible-actions-need-authorization.md)).
+The macros repo carries a standing `mwc` grant, so merge the macro PR yourself once it is fully clean (see `STANDING_MERGE_GRANT_REPOS` in `hooks/no-unauthorized-merge.py`).
 Bump the submodule pointer in the manuscript repo once that macro PR merges.
 
 New macros always go in `Morrison-Lab/macros`, never in an applied repo.

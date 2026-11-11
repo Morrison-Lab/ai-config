@@ -339,7 +339,7 @@ def changed_from_env():
         # Repo-relative POSIX paths, whatever the producer wrote (./x, an absolute path).
         changed = [Path(os.path.relpath(os.path.join(ROOT, ln), ROOT)).as_posix() for ln in lines]
     except ValueError:  # an absolute path on another Windows drive
-        changed = [".."]
+        raise SystemExit(f"error: RLV_CHANGED_FILES lists a path outside the repo ({listing})")
     if not changed or any(c in (".", "..") or c.startswith("../") for c in changed):
         raise SystemExit(f"error: RLV_CHANGED_FILES lists nothing, or a path outside the repo ({listing})")
     return changed

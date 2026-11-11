@@ -640,11 +640,14 @@ def test_changed_list_handoff():
 
         check("--changed hands a step the changed list", run(reads, "--changed", "--base", "main") == 0)
         check("a plain run hands it no list (negative control)", run(reads) == 1)
+        old = os.environ.get("RLV_CHANGED_FILES")
         os.environ["RLV_CHANGED_FILES"] = str(Path(tmp) / "inherited.txt")
         try:
             check("a plain run drops an inherited list", run(none) == 0)
         finally:
-            del os.environ["RLV_CHANGED_FILES"]
+            os.environ.pop("RLV_CHANGED_FILES")
+            if old is not None:
+                os.environ["RLV_CHANGED_FILES"] = old
 
 
 def main():

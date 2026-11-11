@@ -48,6 +48,19 @@ A run over the ceiling still exits 0, so the report never stops the labelling.
 The count is the number of open issues the run read, before it closed any.
 A fetch that returns as many issues as `--limit` (1000 by default) stops the run, because `gh` truncates a longer list without saying so.
 
+In ai-config, `.github/workflows/triage-backlog.yml` runs this mode every Monday at 07:00 UTC, and on a manual dispatch.
+It passes `--ceiling` only when the repository variable `ISSUE_CEILING` is set.
+The plan, one row per issue with its priority and reason, goes to the run's log, and the counts go to the run's job summary.
+A labelling step that fails before it counts puts its error in the job summary instead.
+A run that stops before the labelling step says so in the job summary, and its error is in the log.
+A real run prints no label commands, only what `gh` prints for each edit.
+A manual dispatch with `dry-run` checked prints each label command in the log after the plan, without running it.
+A run over the ceiling stays green and carries a warning annotation with the ceiling line.
+The script prints the ceiling line after the edits, so a run whose edit fails carries neither the line nor the warning.
+The labels `P1`, `P2` and `P3` must already exist in the repository, because the script adds labels and creates none.
+The workflow checks for them first and stops before any edit when one is missing.
+Other repositories have no scheduled pass until the reusable workflow in [ai-config#3147](https://github.com/Morrison-Lab/ai-config/issues/3147) exists.
+
 - **Do:** pass `--labels-only` in any run that no reader reviews before it applies.
 - **Don't:** let a scheduled run close issues.
 
@@ -69,7 +82,8 @@ It is filed as an issue only when it names a concrete change.
 - **Do:** run the pass weekly, label every open issue, and close the bare, junk, and duplicate ones as not-planned with a one-line reason.
 - **Do:** append a new symptom to the owning tracking issue when one exists.
 - **Do:** read every P1 and every proposed close before applying the plan.
-- **Don't:** leave an open issue unlabelled after the pass.
+- **Don't:** leave an open issue unlabelled after the attended pass.
+  The scheduled run leaves only the proposed closes unlabelled.
 - **Don't:** close an actionable-but-unlikely item as not-planned.
   Label it P3 and leave the call to the maintainer.
 - **Don't:** file an aphorism as an issue; record it in memory.

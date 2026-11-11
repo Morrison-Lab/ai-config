@@ -2495,8 +2495,9 @@ NOT_CLEAN_NEGATION_PREFIX = re.compile(
 #   ("No issues. However, X is broken.", "None. Still, X leaks.").
 #
 # A sentence ends at [.!?] before whitespace, so a hard wrap, a dotted
-# token (`v1.2`) or an abbreviation ("e.g.", "vs.", "Fig.") does not end one. Later sentences are usually verification
-# prose ("0 findings. CI passes, though slowly.") and are not read. "None
+# token (`v1.2`) or an abbreviation ("e.g.", "vs.", "Fig.") does not end
+# one. Later sentences are usually verification prose ("0 findings. CI
+# passes, though slowly.") and are not read. "None
 # beyond the above." still re-flags, the accepted safe-direction cost. A
 # "yet" ending its sentence ("None yet.") is not a contrast. The scan stops
 # at a paragraph break (CRLF too) or a line opening a heading, list item or

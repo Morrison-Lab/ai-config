@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Tests for scripts/lib/changed_selection.py (ai-config#5087)."""
+"""Tests for scripts/lib/changed_selection.py and its use in scripts/test_hooks.py (ai-config#5087)."""
+import importlib.util
 import io
 import os
 import subprocess
 import sys
 import tempfile
-from contextlib import redirect_stderr
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -140,8 +141,57 @@ def test_live_tree():
           not sel.needed(seeds, ["hooks/no-fable-subagent.py"]))
 
 
+def _load(name, path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _run(script, listing, code=None):
+    env = {**os.environ, "RLV_CHANGED_FILES": str(listing)}
+    argv = [sys.executable, "-c", code] if code else [sys.executable, str(HERE / script)]
+    return subprocess.run(argv, env=env, cwd=HERE, capture_output=True, text=True)
+
+
+def test_test_hooks_selection():
+    """scripts/test_hooks.py's use of the selector, and its RLV_CHANGED_FILES entry point."""
+    th = _load("test_hooks_under_test", HERE / "test_hooks.py")
+    sys.modules.pop("test_hooks_under_test")
+    hooks = HERE.parent / "hooks"
+    runnable = [(str(t), str(hooks / (t.name[len("test-"):]))) for t in sorted(hooks.glob("test-*.py"))
+                if (hooks / t.name[len("test-"):]).is_file()]
+    out = io.StringIO()
+    with redirect_stdout(out):
+        kept = th.select_for_change(runnable, ["hooks/flag-cop-out-offer.py"])
+    names = {Path(t).name for t, _ in kept}
+    check("the changed hook's own suite is kept", "test-flag-cop-out-offer.py" in names)
+    check("a suite whose subject loads it by path is kept", "test-flag-tool-gap-handling.py" in names)
+    check("most suites are dropped and the count is printed",
+          len(kept) < len(runnable) / 2 and f"of {len(runnable)} hook suites" in out.getvalue())
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+        empty, listing = Path(tmp) / "empty.txt", Path(tmp) / "changed.txt"
+        empty.write_text("\n", encoding="utf-8")
+        refused = _run("test_hooks.py", empty)
+        check("an empty list is refused, not a vacuous pass",
+              refused.returncode != 0 and "lists nothing" in refused.stderr)
+        listing.write_text(f"./hooks/a.py\n{HERE.parent}/hooks/b.py\n", encoding="utf-8")
+        parsed = _run("-c", listing, "import test_hooks; print(test_hooks.changed_from_env())")
+        check("./ and absolute paths become repo-relative", "['hooks/a.py', 'hooks/b.py']" in parsed.stdout)
+        listing.write_text("hooks/flag-cop-out-offer.py\n", encoding="utf-8")
+        nested = _run("test_test_hooks.py", listing)
+        check("tests driving run_suites() do not inherit the list",
+              nested.returncode == 0 and "SELECTED:" not in nested.stdout)
+        listing.write_text("..\n", encoding="utf-8")
+        outside = _run("test_hooks.py", listing)
+        check("a path outside the repo is refused with the error, not a traceback",
+              outside.returncode != 0 and "outside the repo" in outside.stderr
+              and "Traceback" not in outside.stderr)
+
+
 def main():
-    for test in (test_selector, test_live_tree):
+    for test in (test_selector, test_live_tree, test_test_hooks_selection):
         print(f"running {test.__name__}()", flush=True)
         test()
     print(f"\n{passes} passed, {failures} failed")

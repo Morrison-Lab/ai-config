@@ -41,6 +41,14 @@ BASH_FIRES = [
     ("after &&", 'git status && gh issue create --title "t" --body "b"'),
     ("after a newline", 'set -e\ngh issue create --title "t" --body "b"'),
     ("env-assignment prefix", 'GH_TOKEN=x gh issue create --title "t"'),
+    ("unlabelled inside backticks, the labels on the next command",
+     'URL=' + chr(96) + 'gh issue create -t x' + chr(96) + '; gh pr create -l ai-authored,P2'),
+    ("unlabelled behind an environment assignment, the labels on the next command",
+     'GH_TOKEN=x gh issue create -t x; gh pr create -l ai-authored,P2'),
+    ("the labels belong to an issue edit before the create",
+     'gh issue edit 3 -l ai-authored,P2; gh issue create -t x'),
+    ("unlabelled glab create, the labels on the next command",
+     'glab issue create -t x; gh pr create -l ai-authored,P2'),
     ("unlabelled inside a double-quoted command substitution",
      'echo "$(gh issue create -t x)"'),
     ("the labels belong to an echo that only names the command",
@@ -139,6 +147,8 @@ BASH_QUIET = [
     ("unbalanced quoting with a glued short flag",
      'gh issue create -lai-authored -lP2 --title "t'),
     ("a glued short flag", 'gh issue create --title "t" -lai-authored -lP2'),
+    ("labelled, after an issue list that carries no labels",
+     'gh issue list --state all; gh issue create -t x -l ai-authored,P2'),
     ("labelled, after an empty quoted body",
      'gh issue create --title "t" --body "" --label ai-authored --label P2'),
     ("labelled, behind an environment assignment",
@@ -317,6 +327,21 @@ def main() -> int:
             failures += 1
         else:
             print(f"OK   one reminder (mcp): {label}")
+
+    # With the shared splitter missing, the hook reads label flags across the
+    # whole command: a labelled create stays quiet and a bare one still warns.
+    splitter = guard._simple_commands
+    guard._simple_commands = lambda _command: None
+    try:
+        degraded_quiet = guard.evaluate_bash('gh issue create -t x -l ai-authored,P2')
+        degraded_fires = guard.evaluate_bash('gh issue create -t x')
+    finally:
+        guard._simple_commands = splitter
+    if degraded_quiet is not None or degraded_fires is None:
+        print("::error::wrong verdict with the shared splitter missing", file=sys.stderr)
+        failures += 1
+    else:
+        print("OK   degrades to the whole-command read without the splitter")
 
     # The message must name both labels and the escape, or it teaches nothing.
     message = guard.evaluate_bash('gh issue create --title "t"')

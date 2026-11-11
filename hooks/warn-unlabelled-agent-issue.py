@@ -71,9 +71,9 @@ KNOWN LIMITS
 The splitter removes quotes before it looks for operators and comments, so
 three shapes cut the create's argument list short and can warn on a labelled
 create whose label flags come later: a quoted argument that is only an
-operator (`--title ";"`), an unquoted `$( )` argument, and a `#` in the
-middle of an unquoted word (`t#x`). Put the label flags first, or quote the
-word, to avoid the reminder (ai-config#5365).
+operator (`--title ";"`, or a lone quoted backtick), an unquoted `$( )`
+argument, and a `#` in the middle of an unquoted word (`t#x`). Put the label
+flags first, or quote the word, to avoid the reminder (ai-config#5365).
 
 WHY WARN RATHER THAN BLOCK
 --------------------------
@@ -314,8 +314,10 @@ def command_label_sets(command: str) -> list:
     """One label set per issue create in `command`.
 
     A backtick becomes `;` first, so a create inside backticks is split off
-    like one inside `$( )`. A backtick inside a quoted value stays inside
-    that value, where the extra `;` changes no label."""
+    like one inside `$( )`. A backtick inside a longer quoted value stays
+    inside that value, where the extra `;` changes no label. A quoted value
+    that is only a backtick becomes a lone `;`, the first shape under KNOWN
+    LIMITS in the module docstring."""
     commands = _simple_commands(command.replace("`", ";"))
     segments = create_segments(commands) if commands is not None else []
     if not segments:

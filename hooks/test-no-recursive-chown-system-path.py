@@ -370,19 +370,24 @@ class Denies(unittest.TestCase):
         for cmd in ("sudo PREFIX=/usr bash -c 'chown -R me \"$PREFIX\"'",
                     "env D=/etc bash -c 'chmod -R 755 $D'",
                     "sudo -u root env D=/etc bash -c 'chmod -R 755 $D'",
-                    "D=/usr sh -c 'chown -R u $D'"):
+                    "D=/usr sh -c 'chown -R u $D'",
+                    "D=/etc E=$D sh -c 'chmod -R 755 $E'"):
             self.assert_denied(cmd)
 
     def test_popd_returns_to_the_pushed_directory(self):
         for cmd in ("cd /usr && pushd build && make && popd && chown -R me .",
                     "cd /etc && pushd /tmp && popd && chmod -R 755 .",
                     "cd /etc; pushd a; pushd b; popd; popd; chmod -R 755 .",
-                    "cd /usr; popd; chmod -R u+w ."):
+                    "cd /usr; popd; chmod -R u+w .",
+                    "cd /usr && pushd build >/dev/null && make && popd >/dev/null && chown -R me .",
+                    "cd /usr && pushd build 2>/dev/null && make && popd && chown -R me .",
+                    "cd /etc && pushd /tmp > /dev/null && popd > /dev/null && chmod -R 755 ."):
             self.assert_denied(cmd)
 
     def test_long_options_of_the_new_wrappers(self):
         for cmd in ("flock --timeout 5 /tmp/l chown -R me /usr",
-                    "flock --wait 5 /tmp/l chown -R me /usr", "run0 --user root chown -R me /usr"):
+                    "flock --wait 5 /tmp/l chown -R me /usr", "run0 --user root chown -R me /usr",
+                    "run0 --area x chown -R me /usr", "run0 --lightweight yes chown -R me /usr"):
             self.assert_denied(cmd)
 
     def test_private_aliases_on_macos(self):

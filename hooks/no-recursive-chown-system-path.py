@@ -55,7 +55,9 @@ command is split, scanned as a command of its own, and taken as empty,
 except a bare `pwd`, read as `$PWD`. A `sh -c` text or a substitution is
 read where it appears, in the directory and with the names of each way the
 command may run up to there (a `sh -c` text also with the `NAME=value`
-words before its shell: `sudo D=/x sh -c`), to MAX_NESTED
+words before its shell: `sudo D=/x sh -c`; in a double-quoted text, which
+bash has already expanded with its own names, that reads too much, on the
+side of refusing), to MAX_NESTED
 levels, and deeper with no directory, to MAX_DEPTH. A `cd` up the tree
 repeated by a loop (`cd ..`) is judged in every directory above. An
 unquoted `cd $D` with D empty or unset goes home, and is judged both there
@@ -89,7 +91,8 @@ a command substitution's value (read as empty, both ways: it denies
 `/lib/node_modules`, where writing the path itself or the escape hatch is
 the remedy, and it passes `"$(brew --prefix)/share"`), `flock -c TEXT`, a
 named `coproc NAME { ...; }`, more than MAX_SCOPE `pushd`s in one command
-(`popd` then goes somewhere unknown), a
+(`popd` then goes somewhere unknown), a `popd` inside a command
+substitution (it starts with an empty stack), a
 `for` or `select` loop variable, `eval`, `su -c`, a heredoc piped to `sh`, an
 interpreter's own `-c` (`python -c "os.system(...)"`), a substitution in an
 unquoted heredoc body (`<<EOF`, which bash does run), a glob in a directory
@@ -196,7 +199,7 @@ WRAPPER_LONG = {
                "--close", "--verbose", "--help", "--version"}),
     "run0": ({"--user", "--group", "--nice", "--chdir", "--setenv", "--unit", "--property",
               "--description", "--slice", "--background", "--machine",
-              "--shell-prompt-prefix"},
+              "--shell-prompt-prefix", "--lightweight", "--area"},
              {"--slice-inherit", "--no-ask-password", "--pty", "--pipe", "--help",
               "--version"}),
 }
@@ -826,6 +829,7 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
         lead = words
         while lead and lead[0] in ("time", "-p", "command", "builtin"):
             lead = lead[1:]
+        lead = _without_redirects(lead)  # `pushd d >/dev/null` has one operand
         is_cd = bool(lead) and lead[0] in ("cd", "pushd", "popd")
         count = sum(w.count(SUB) for w in argv)
         shell_texts = _nested(words)
@@ -938,6 +942,22 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
     return None
 
 
+def _without_redirects(argv):
+    """ARGV without its redirections (`> f`, `2> f`, `<f`): split, each is an
+    operator word, its target, and any file-descriptor number before it."""
+    out, skip = [], False
+    for i, tok in enumerate(argv):
+        if skip:
+            skip = False
+        elif tok and set(tok) <= set("<>&"):
+            if out and out[-1].isdigit() and i and argv[i - 1] is out[-1]:
+                out.pop()
+            skip = True
+        else:
+            out.append(tok)
+    return out
+
+
 def _prefix_names(words, home, visible, here):
     """The `NAME=value` words before a shell's `-c` option (`D=/x sh -c`,
     `sudo D=/x sh -c`, `env D=/x sh -c`), as names its text starts with."""
@@ -948,7 +968,9 @@ def _prefix_names(words, home, visible, here):
         if ASSIGNMENT.match(word):
             name, _, val = word.partition("=")
             computed = "`" in val or SUB in val
-            names[name] = None if computed else _expand(val, home, visible, here)
+            # In order: `D=/etc E=$D sh -c` sets E to /etc.
+            names[name] = (None if computed
+                           else _expand(val, home, ChainMap(names, visible), here))
     return names
 
 

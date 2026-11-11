@@ -482,10 +482,11 @@ jobs:
         #
         # The byte budget then stayed advisory, on the argument that gating
         # the total risks flapping on legitimate doc changes (ai-config#695).
-        # It now runs under --strict (ai-config#4685). The advisory line was
-        # red on main for weeks -- "OVER BUDGET by 3,237 bytes" on 2026-10-22,
-        # 3,133 on 2026-11-11 -- and nothing reddened, so nobody acted until
-        # the CLI char gate below was 125 chars from failing. The budget
+        # It now runs under --strict (ai-config#4685). The advisory report sat
+        # over budget on main for weeks -- "OVER BUDGET by 3,237 bytes" on
+        # 2026-10-22, 3,133 on 2026-11-11 -- while CI stayed green, so
+        # nobody acted until the CLI char gate below was 125 chars from
+        # failing. The budget
         # mirrors that gate in bytes, which run ~3% above chars here, so it
         # now fails a PR a little before the CLI gate would, and so gives the
         # early warning the char gate lacks. Measured after ai-config#5354:

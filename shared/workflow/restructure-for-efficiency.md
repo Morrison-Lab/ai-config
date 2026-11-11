@@ -49,7 +49,7 @@ python3 scripts/check-context-closure.py
 
 Measured on `main` at 2026-08-22: 9 files, 243,069 bytes (~60,767 tokens at 4 B/token), which is **43,069 bytes over** the 200,000-byte budget.
 Nothing turned red then, deliberately: the script's comment said the budget "can stay advisory because crossing it is a prompt to decide what comes out".
-This repo's CI has failed on the budget since ai-config#4685, after the advisory line sat over on `main` for weeks;
+Since ai-config#4685, this repo's CI fails a PR that leaves the closure over the budget, after the advisory line sat over on `main` for weeks;
 a consumer measured without `--strict` still sees only the report.
 Read an over-budget line as the prompt it is, and act on it or route it to [#1138](https://github.com/Morrison-Lab/ai-config/issues/1138) rather than noting it and moving on.
 Re-run the checker rather than quoting that figure.

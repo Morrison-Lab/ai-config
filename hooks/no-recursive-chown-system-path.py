@@ -56,8 +56,10 @@ except a bare `pwd`, read as `$PWD`. A `sh -c` text or a substitution is
 read where it appears, in the directory and with the names of each way the
 command may run up to there (a `sh -c` text also with the `NAME=value`
 words before its shell, `sudo D=/x sh -c`, and, unless the text is written
-in single quotes, once without them, since bash expands a double-quoted text
-with the outer names; a bare `~` reads HOME as `$HOME` does), to MAX_NESTED
+in single quotes in the command itself with no `sudo`, `doas`, `pkexec` or
+`run0` before it, once without them, since bash expands a double-quoted text
+with the outer names and those wrappers may drop the names; a bare `~` reads
+HOME as `$HOME` does), to MAX_NESTED
 levels, and deeper with no directory, to MAX_DEPTH. A `cd` up the tree
 repeated by a loop (`cd ..`) is judged in every directory above. An
 unquoted `cd $D` with D empty or unset goes home, and is judged both there
@@ -870,12 +872,18 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
                 # the shell ran, a single-quoted one with these: unless it is
                 # written single-quoted, read it both ways.
                 readings = [assigned]
-                if prefix:
+                # Only a top-level text was quoted as written (an enclosing
+                # double-quoted text was expanded first), and sudo, doas,
+                # pkexec and run0 may drop the names given before them.
+                if prefix and level == 0 and not PRIVILEGED & {
+                        os.path.basename(w) for w in words}:
                     if piece not in ctx["flat"]:
                         ctx["flat"][piece] = _flat(piece)
                     flat = ctx["flat"][piece]
                     quoted = _flat(f"'{text}'") in flat and _flat(f'"{text}"') not in flat
                     readings = [ChainMap(prefix, assigned)] + ([] if quoted else [assigned])
+                elif prefix:
+                    readings = [ChainMap(prefix, assigned), assigned]
                 for names in readings:
                     hit = _nested_hit(text, None if over else here, home, names, level, ctx)
                     if hit:
@@ -979,6 +987,10 @@ def _without_redirects(argv):
         else:
             out.append(tok)
     return out
+
+
+# Wrappers that may run a shell with a reset environment.
+PRIVILEGED = {"sudo", "doas", "pkexec", "run0"}
 
 
 def _flat(text):

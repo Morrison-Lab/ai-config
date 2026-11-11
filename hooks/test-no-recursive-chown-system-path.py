@@ -380,6 +380,16 @@ class Denies(unittest.TestCase):
 
     def test_a_text_without_its_prefix_home(self):
         self.assert_denied("HOME=/tmp/h sh -c \"chown -R me $HOME\"")
+
+    def test_a_single_quoted_text_an_outer_shell_expanded(self):
+        for cmd in ("D=/etc; bash -c \"D=. sh -c 'chmod -R 755 $D'\"",
+                    "sudo bash -c \"HOME=/tmp/h sh -c 'chown -R root $HOME'\""):
+            self.assert_denied(cmd)
+
+    def test_names_a_privilege_wrapper_may_drop(self):
+        for cmd in ("D=/tmp/x sudo sh -c 'chown -R root \"${D:-/usr}\"'",
+                    "HOME=/tmp/h doas sh -c 'chown -R me \"$HOME\"'"):
+            self.assert_denied(cmd)
         self.assert_denied("D=/tmp/x sh -c 'chown -R me ~'")
 
     def test_a_double_quoted_text_sees_the_outer_names(self):

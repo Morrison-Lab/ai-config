@@ -31,7 +31,7 @@ Merging a Pull Request or Merge Request is strictly controlled across all agents
 ## Waiver of the cross-model review
 
 When no non-Claude model and harness can run (the network policy blocks the host, the backend is down, the CLI or credential is absent after enumerating every route), try each route once, then waive the cross-model review.
-The waiver grants no merge authority: the merge still needs `mwc` or an explicit instruction, a clean Claude review plus green CI, and a PR note that the review was waived, which reviewer was attempted, and the error.
+The waiver grants no merge authority: the merge still needs the user's instruction to merge that PR, a clean Claude review plus green CI, and a PR note that the review was waived, which reviewer was attempted, and the error.
 A reviewer that ran and returned not-clean is not unavailable and still vetoes the merge.
 The waiver removes only the cross-model requirement;
 authorization, [`fully-clean`](fully-clean.md), and the clean-on-head rules still bind.

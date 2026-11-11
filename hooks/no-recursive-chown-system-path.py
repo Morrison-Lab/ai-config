@@ -59,8 +59,11 @@ unquoted heredoc body (`<<EOF`, which bash does run), a glob in a directory
 component (`/*/lib`), a partial glob or brace expansion that names a
 protected path (`/et*`, `/{etc,usr}`), a wrapper that changes directory
 (`env -C /etc`, `sudo -D /etc`), PowerShell `icacls`/`Set-Acl`, Windows drive
-paths (`C:/Windows`), a `${D:=x}` inside single quotes (read as if it
-assigned), and a bind-mounted path (the #39283 `/volumes/mail/`
+paths (`C:/Windows`), a relative target after a `cd` this cannot
+resolve (`cd -`, `cd "$UNSET"`, or one that depends on a `${D:=x}`), a plain
+assignment that may not run (`false &&
+D=./x`, which is read as run), a `${D:=x}` assignment inside `sh -c` or a
+substitution, and a bind-mounted path (the #39283 `/volumes/mail/`
 case) all pass. Fails open on parse trouble and when scripts/lib/shellcmd.py cannot
 be imported.
 """
@@ -168,12 +171,17 @@ SUB = "__AICFG_CMDSUB__"  # a lifted command substitution (see `_lift`)
 VARIABLE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*|[0-9]+|[@*#?$!-])"
                       r"|\$([A-Za-z_][A-Za-z0-9_]*|[0-9]|[@*#?$!-])|" + SUB)
 # A positional parameter can hold anything: `set -- /etc`, a function's
-# arguments and `sh -c '...' _ /etc` all set one. So an operand that uses one
-# is refused, like an unread operator.
-POSITIONAL = re.compile(r"[1-9][0-9]*|[@*]")
-# The other special parameters are never empty in bash; any stand-in that is
-# not empty keeps `$HOME/$$` from reading as the home directory.
-SPECIAL = {"$": "1", "!": "1", "#": "0", "?": "0", "-": "hB", "0": "bash"}
+# arguments and `sh -c '...' /etc` (which sets `$0`) all set one. So can `$_`
+# (the last word of the previous command) and `$OLDPWD`. An operand that uses
+# any of these is refused, like an unread operator.
+POSITIONAL = re.compile(r"[0-9]+|[@*_]|OLDPWD")
+# These special parameters are never empty in bash; a stand-in that is not
+# empty keeps `$HOME/$$` from reading as the home directory. `$!` is empty
+# until a background job runs, so it is read like an unset variable.
+SPECIAL = {"$": "1", "#": "0", "?": "0", "-": "hB"}
+# Builtins that set a variable from input this guard cannot read. A name they
+# set is refused when an operand uses it.
+READ_BUILTINS = ("read", "mapfile", "readarray", "getopts")
 ALL_GLOB = re.compile(r"\A[*?.]*[*?][*?.]*\Z")
 
 DENY = (
@@ -469,6 +477,16 @@ def _assignments(argv, store, visible, home, here):
     Values go in STORE as `(value, weak)`, expanded against the names VISIBLE
     so far; a command substitution makes one `None`.
     """
+    if argv and argv[0] in READ_BUILTINS:
+        # Every bare name may be one it sets (options' values included).
+        for word in argv[1:]:
+            if NAME.fullmatch(word):
+                store[word] = visible[word] = UNREAD
+        return False
+    if argv and argv[0] == "printf" and "-v" in argv[1:-1]:
+        name = argv[argv.index("-v") + 1]
+        store[name] = visible[name] = UNREAD
+        return False
     words = argv
     if argv and argv[0] in DECLARE_BUILTINS:
         # Flags, and bare names (`export d=/etc PATH`), assign nothing new.
@@ -532,21 +550,31 @@ def _scan(piece, cwd, home, outer):
     cmds, inner = _split(piece)
     # A `cd` or assignment inside `( ... )` changes only that subshell, so each
     # is kept per scope and read through the scope's ancestors.
-    heres, assigns = {(0,): cwd}, {}
+    # A `${D:=x}` may sit in a word that never runs (`false && : "${D:=x}"`),
+    # so its assignment is only possible: an operand is judged both with and
+    # without the possible values, and refused if either reading is.
+    heres, assigns, maybes = {(0,): cwd}, {}, {}
     for scope, argv in cmds or []:
         here = next(heres[scope[:k]] for k in range(len(scope), 0, -1) if scope[:k] in heres)
-        if argv and argv[0] in ("cd", "pushd", "popd"):
-            moved = any(SUB in tok for tok in argv)
-            heres[scope] = None if moved else resolve_cd_target(argv, here)
-            continue
-        assigned = dict(outer)
+        assigned, maybe = dict(outer), {}
         for k in range(1, len(scope) + 1):
             assigned.update(assigns.get(scope[:k], {}))
+            maybe.update(maybes.get(scope[:k], {}))
         effects = {}
         for word in argv:
-            _expand(word, home, assigned, here, effects=effects)
-        assigns.setdefault(scope, {}).update(effects)
-        assigned.update(effects)
+            _expand(word, home, {**assigned, **maybe}, here, effects=effects)
+        maybes.setdefault(scope, {}).update(effects)
+        maybe.update(effects)
+        if argv and argv[0] in ("cd", "pushd", "popd"):
+            words = [argv[0]]
+            for tok in argv[1:]:
+                sure = _expand(tok, home, assigned, here)
+                got = _expand(tok, home, {**assigned, **maybe}, here)
+                known = got and got is not UNREAD and not got[1] and got == sure
+                words.append(got[0] if known else None)
+            moved = None in words or any(SUB in tok for tok in argv)
+            heres[scope] = None if moved else resolve_cd_target(words, here)
+            continue
         if _assignments(argv, assigns.setdefault(scope, {}), assigned, home, here):
             continue
         head, override = _program(argv)
@@ -554,12 +582,15 @@ def _scan(piece, cwd, home, outer):
             continue
         program = os.path.basename(head[0])
         for target in _targets(program, head):
-            expanded = _expand(target, home, assigned, here)
+            readings = [_expand(target, home, assigned, here)]
+            if maybe:
+                readings.append(_expand(target, home, {**assigned, **maybe}, here))
+            expanded = UNREAD if UNREAD in readings else readings
             if expanded is UNREAD:
                 shown = " ".join(argv).replace(SUB, "$(...)")
                 target = target.replace(SUB, "$(...)")
                 return (shown, program, target, None, UNREAD_WHY), inner, {}
-            for cand, weak in filter(None, [expanded]):
+            for cand, weak in filter(None, expanded):
                 if not cand:
                     continue  # an empty operand is an error, not the cwd
                 if not cand.startswith("/"):

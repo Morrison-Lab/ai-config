@@ -347,7 +347,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/keep-agent-on-backlog.md` | Keep at least one agent working while any project repo has an open issue backlog. |  |
 | `shared/workflow/keep-checkouts-fresh.md` | In every session --- at session start, and again periodically during long sessions --- refresh the local state that goes stale as PRs merge elsewhere: |  |
 | `shared/workflow/lab-operating-rules.md` | These rules came out of the coordinator's work with Ezra. Each was kept only in project memory until ai-config#4698, where Ezra asked that everything learned... |  |
-| `shared/workflow/label-agent-filed-issues.md` | The rule lives in `issue-first`'s "Label an agent-filed issue with its authorship and its model" section. This fragment carries the mechanics. It is linked r... |  |
+| `shared/workflow/label-agent-filed-issues.md` | The rule lives in `issue-first`'s "Label an agent-filed issue with its authorship and its model" section. This fragment carries the mechanics. Each creating... |  |
 | `shared/workflow/learn-from-review-findings.md` | A reviewer's valid finding is a mistake that reached the reviewer, so treat every one you accept as a first-push miss to learn from --- not merely an item to... |  |
 | `shared/workflow/live-state-over-notes.md` | A note records what was true when someone wrote it. Quota, availability, runner state, outages, CI state and a PR's state change. Decide such a condition fro... |  |
 | `shared/workflow/manage-quota.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |

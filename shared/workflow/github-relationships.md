@@ -18,3 +18,26 @@ Use the REST API, not GraphQL, which cloud sessions block.
 Mechanism: `hooks/flag-prose-relationship-without-link.py` blocks the stop once per turn when the turn created or edited an issue or PR whose body states one of these relationships in prose and no relationship call followed.
 It does not sweep existing issues.
 Related: [`issue-first`](issue-first.md), [`stack-prs`](../../skills/stack-prs/SKILL.md).
+
+## Link a branch to its issue when you create the branch
+
+Ezra, 2026-11-11 (`cai:`, ai-config#5299): "when you create a branch to address an issue, link that issue to that branch using the Development field ... also link the PR once it's created, but link the branch immediately."
+
+- **Do:** create the branch through GitHub, already linked, before the first commit lands on it: `gh issue develop <n> --repo <owner>/<repo> --name <branch> --base main`, or the GraphQL mutation `createLinkedBranch` (`issueId`, `oid`, `name`).
+  Then fetch the branch and push your commits onto it.
+- **Do:** link the PR once it exists, with a closing keyword (`Closes #N`) in its body.
+  A PR that must not close the issue can be linked only by hand in the issue's Development field;
+  say so in the thread.
+- **Don't:** create the branch with `git push` and plan to link it afterwards.
+  GitHub links a branch only when it creates it, and no mutation links an existing branch.
+  On an existing name, `createLinkedBranch` returns null and `gh issue develop --name` fails
+  (tested 2026-11-11, and [community discussion #155339](https://github.com/orgs/community/discussions/155339)).
+
+A branch already pushed unlinked and with no PR yet: read its head SHA, delete the remote branch, and recreate it at once with `createLinkedBranch` at that SHA, so no commit is lost.
+Leave a branch that already has a PR alone and link the PR instead.
+
+Cloud sessions get HTTP 403 on every GraphQL call, so they can do neither step themselves.
+Hand the branch creation (issue, repository, branch name, base or SHA) to a local runner, a Remote Control session on Ezra's machine, before the first push, and push onto the branch once it exists.
+If no local runner is reachable, say in the thread that the branch is unlinked and why, rather than skipping the step silently.
+
+No hook yet: a hook cannot tell from a push which issue a branch addresses, and a cloud session cannot query the link (ai-config#5303 tracks a mechanism).

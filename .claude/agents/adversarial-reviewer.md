@@ -196,3 +196,11 @@ If it was, look for the user's answer to a start-now-or-file-for-later question 
 Read the linked issue or quoted request.
 Do not report the reminder hook's output as your finding.
 See [`start-or-file`](../../shared/workflow/start-or-file.md).
+
+## History read from a shallow clone
+
+On a report, PR or command that deletes, force-pushes or recommends removing a ref, or that claims a branch is merged, unmerged, unrelated to `main`, or "first committed" on a date, check that the transcript shows the clone was confirmed complete (`git rev-parse --is-shallow-repository` printing `false`, or an unshallow fetch) before the read the claim rests on.
+A shallow clone gives a wrong answer with a real SHA and exit 0, so a plausible-looking result is not that evidence.
+Read the transcript and the claim;
+do not report a hook's refusal or silence as your finding.
+See [`no-history-reads-in-shallow-clones`](../../shared/workflow/no-history-reads-in-shallow-clones.md).

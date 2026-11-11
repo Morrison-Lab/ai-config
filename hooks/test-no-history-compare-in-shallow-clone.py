@@ -35,6 +35,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 
 HOOK = os.path.realpath(sys.argv[1]) if len(sys.argv) > 1 else os.path.join(
     os.path.dirname(os.path.realpath(__file__)), "no-history-compare-in-shallow-clone.py")
@@ -278,6 +279,24 @@ REFUSED_IN_SHALLOW = [
     "git push --mirror origin",
     "git push --mi origin",
     "git push --dry-run --no-dry-run origin :side",
+    # A cut-off commit's diff shows it adding every file.
+    "git log --oneline -n 2 --stat",
+    "git log -2 --word-diff",
+    "git log -1 --stat origin/main",
+    "git show --stat origin/main",
+    "git show origin/main",
+    "git whatchanged -1 origin/main",
+    # A head limit belongs to the read piped into head, not to other text.
+    "grep -rn 'git log' /dev/null | head -5; git log --oneline | wc -l",
+    "echo git log | head -5; git log --oneline | wc -l",
+    "git log --oneline | head -1; git log --oneline | wc -l",
+    # head after ';' reads its own input, not the log's output.
+    "git log --oneline; head -1",
+    "git log --oneline | head",
+    # mirror=false does not hide a deleting refspec after it.
+    "git -c remote.origin.mirror=false -c remote.origin.push=:refs/heads/side push origin",
+    # A variable can hold ":branch".
+    "git push -u origin $BRANCH",
     # Pushes whose deletion comes from config, xargs or a substitution.
     "git -c remote.origin.push=:refs/heads/side push origin",
     "git -c remote.origin.mirror=true push origin",
@@ -348,11 +367,20 @@ ALLOWED_IN_SHALLOW = [
     # cut-off c4, so two commits are exactly what the full history lists.
     "git log -1 --oneline",
     "git log -2 --oneline",
-    "git log --oneline -n 2 --stat",
+    "git log --oneline -n 1 --stat",
     # --pretty takes no separate value, so -2 is the limit.
     "git log --pretty -2",
-    "git log -2 --word-diff",
-    "git log -2 -U1 --oneline",
+    "git log -1 --word-diff",
+    "git log -1 -U1 --oneline",
+    # The cut-off commit listed last with no diff shown is right.
+    "git log -1 --oneline origin/main",
+    "git show -s origin/main",
+    "git show --no-patch --format=%s origin/main",
+    # The reflog is local.
+    "git log -g -3 --oneline",
+    # A quoted current-branch name cannot name a deletion.
+    'git push -u origin "$(git branch --show-current)"',
+    'git push origin "HEAD:$(git rev-parse --abbrev-ref HEAD)"',
     # Filtered reads whose answer is newer than every cut-off commit.
     "git log -1 -- local.txt",
     "git log -1 --format=%H -- local.txt",
@@ -452,6 +480,27 @@ def main():
             if decision != "deny" or "range" in reason or "endpoints" in reason:
                 failures.append(f"filtered read not refused as filtered: {cmd}: {reason}")
             expect(cmd, full, None, "refused in FULL clone (false positive)")
+
+        for cmd, want in (
+                ('for b in side; do echo "$(git rev-list --count origin/main..origin/side)"; done',
+                 "cut-off"),
+                ("git log --oneline | wc -l", "no limit"),
+                ("git show --stat origin/main", "adding every file"),
+                ("git log -1 --author=t -- f.txt", "filtered walk"),
+                ("git push origin :side", "can delete a remote ref"),
+                ("git rev-list --count origin/main..origin/side", "cut-off")):
+            checks += 1
+            decision, reason = run_full(cmd, shallow)
+            if decision != "deny" or want not in reason:
+                failures.append(f"refused for the wrong reason ({want!r}): {cmd}: {reason[:160]}")
+
+        # A long command line is evaluated quickly (a regex once took
+        # seconds here).
+        checks += 1
+        started = time.time()
+        run("echo " + "git log " * 5000, shallow)
+        if time.time() - started > 5:
+            failures.append("a 40k-character command took over 5 s")
 
         # An endpoint that git would read as an option is refused before any
         # query runs, so the guard's own git call cannot write a file.

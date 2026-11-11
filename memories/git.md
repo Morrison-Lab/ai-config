@@ -55,7 +55,7 @@ On 2026-11-11 a cloud session audited Morrison-Lab/lds's branches from a shallow
 It reported main's first commit as 2026-11-04 (it was 2026-09-04) and 23 branches as sharing no history with main.
 It came within seconds of deleting 41 branches, 12 of them holding unmerged work.
 `hooks/no-history-compare-in-shallow-clone.py` now refuses ancestry comparisons, first-commit reads and ref-deleting pushes in a shallow clone (ai-config#5323).
-It does not cover `blame` or `log -S`/`--follow`, so this section's rule still applies to those.
+It refuses `log -S`/`--follow` whenever their walk reaches the cut-off, but it does not cover `blame`, so this section's rule still applies there.
 
 - **Do:** `git fetch --unshallow` before deriving an "introduced in #N" claim.
 - **Don't:** read a plausible commit from `-S`/`--follow`/`blame` as evidence

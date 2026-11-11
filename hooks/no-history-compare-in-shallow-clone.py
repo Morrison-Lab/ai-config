@@ -78,7 +78,11 @@ assumes no skewed clocks, as rule 2 does. Any other option (`--skip`,
 `--topo-order`, `--graph`, `-S`, `--follow`) is not reproduced, so the whole
 walk is checked.
 
-`git whatchanged` walks as log does. `git show`, `format-patch`,
+`git whatchanged` walks as log does. A reflog walk (`-g`) is local and
+allowed. A diff option (`--stat`, `-p`, `--name-only`, ...) on a walk that
+lists a cut-off commit, and `git show` of a cut-off commit, are refused:
+with no parent, its diff shows it adding every file. A pipe credits `head`
+only when this read is the command piped into it. `git show`, `format-patch`,
 `cherry-pick` and `revert` with a range get the comparison check, and so
 does `format-patch U` (U..HEAD). `git diff A...B`, `git diff --merge-base`
 and `git rev-parse A...B` use a merge base, so they get it too.
@@ -117,7 +121,8 @@ guard can check:
     git push that can delete a ref       --delete, -d, :ref, +:ref, --prune,
                                          --mirror, or a prefix of one; a
                                          refspec from a substitution or from
-                                         xargs; a `-c` or configured
+                                         xargs (a quoted current-branch
+                                         substitution is allowed); a `-c` or configured
                                          remote.<name>.push starting with
                                          ':' or remote.<name>.mirror; a
                                          --dry-run (-n) push is allowed
@@ -134,10 +139,12 @@ A `cd` to a missing directory leaves the directory where it was, as the shell
 does after a failed `cd`. A move it cannot resolve (`cd -`, `cd $VAR`) leaves
 the directory unknown, and an unknown directory is skipped.
 `xargs ... git ...` is read as the git command it runs.
-A command inside `bash -c` or `sh -c`, or inside a `$(...)` or backtick
-substitution (quoted or not, but not inside single quotes, where it is
-text), is checked from the payload's `cwd`, and only when the outer command
-makes no `cd` move, since its starting directory is otherwise unknown
+A command inside a `$(...)` or backtick substitution (quoted or not, but
+not inside single quotes, where it is text) is checked too. One that
+`shellcmd` splits out (an unquoted one) follows the outer `cd` moves; one
+found inside a quoted word, and a command inside `bash -c` or `sh -c`, is
+checked from the payload's `cwd`, and only when the outer command makes no
+`cd` move, since its starting directory is otherwise unknown
 (`shell_c_expansions` says why). A revision built from a loop variable
 (`origin/$b`) does not resolve, so it is refused.
 
@@ -169,6 +176,7 @@ its shallowness cannot be read. A PreToolUse hook that raises blocks the call.
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 
@@ -178,7 +186,8 @@ try:
     if _LIB not in sys.path:
         sys.path.insert(0, _LIB)
     from shellcmd import (simple_commands_with_scope, strip_env, git_subcommand,
-                          resolve_cd_target, env_value, shell_c_expansions)
+                          resolve_cd_target, env_value, shell_c_expansions,
+                          _heredoc_free)
 except Exception as _exc:  # broken install: degrade, never block
     print(f"no-history-compare-in-shallow-clone: cannot load "
           f"scripts/lib/shellcmd.py ({_exc}); no guard will run", file=sys.stderr)
@@ -274,10 +283,33 @@ FILTER_OPTS = frozenset({
 # Commands that take a revision range and act on the commits in it.
 RANGE_CMDS = ("show", "format-patch", "cherry-pick", "revert")
 
-# `git log ... | head [-n N | -N | --lines=N]`: the pipe limits the read.
-RX_LOG_TO_HEAD = re.compile(
-    r"\bgit\b[^;&\n|]*\b(?:log|shortlog|rev-list)\b[^;&\n|]*"
-    r"\|\s*head(?:\s+(?:-n\s*|--lines=|-)(\d+))?\s*(?=$|[|;&)\n])")
+# Options that show each commit's diff. A cut-off commit has no parent, so its
+# diff is the whole tree: the clone says it added every file.
+DIFF_OPTS = frozenset({
+    "--stat", "-p", "-u", "--patch", "--name-only", "--name-status", "--raw",
+    "--numstat", "--shortstat", "--summary", "--compact-summary", "--dirstat",
+    "--word-diff", "--color-words", "--patch-with-stat", "--patch-with-raw",
+    "--unified", "--cc", "-m", "--diff-merges",
+})
+# Words a push may build at run time that cannot name a deletion: the current
+# branch's name, which can never contain ':'. Written inside double quotes, a
+# substitution reaches the guard as one word, as here.
+CURRENT_BRANCH_WORDS = frozenset({
+    "$(git branch --show-current)", "$(git rev-parse --abbrev-ref HEAD)",
+    "$(git symbolic-ref --short HEAD)",
+})
+
+DENY_PUSH = (
+    "Refused: `{segment}` can delete a remote ref, and the repository at "
+    "{repo} is a SHALLOW clone{why}. A decision to delete made from a shallow "
+    "clone is the decision that clone gets wrong: on 2026-11-11 one nearly "
+    "deleted 12 lds branches of unmerged work (ai-config#5323).\n\n"
+    "Fix: `git -C {repo} fetch --unshallow origin`, check again, then re-run. "
+    "To push the current branch by a computed name, quote it: "
+    "`git push -u origin \"$(git branch --show-current)\"`. "
+    "For a deliberate deletion, prefix that one command with "
+    "`ALLOW_SHALLOW_HISTORY=1`."
+)
 
 DENY = (
     "Refused: `{segment}` reads history that the repository at {repo} does "
@@ -429,7 +461,7 @@ def _plain_walk(sub, rest, repo):
     unknown   True when another option may make git walk past the limit or
               change its order (--skip, --topo-order, -S, --follow, ...)"""
     out = {"limit": None, "walk_opts": [], "revs": [], "filters": [],
-           "paths": [], "unknown": False}
+           "paths": [], "unknown": False, "diff": False}
     i = 0
     while i < len(rest):
         tok = rest[i]
@@ -448,6 +480,8 @@ def _plain_walk(sub, rest, repo):
             i += 1
         elif tok.startswith("--max-count="):
             num = tok.split("=", 1)[1]
+        if num is None and (head in DIFF_OPTS or re.fullmatch(r"-U\d*", tok)):
+            out["diff"] = True
         if num is not None:
             if num.isdigit():
                 out["limit"] = int(num)
@@ -498,7 +532,8 @@ def _push_can_delete(rest):
     if _is_dry_run(rest):
         return False
     for tok in rest:
-        if "$" in tok or "`" in tok:
+        bare = tok[len("HEAD:"):] if tok.startswith("HEAD:") else tok
+        if ("$" in tok or "`" in tok) and bare not in CURRENT_BRANCH_WORDS:
             return True  # a refspec built at run time
     for tok in rest:
         if tok == "--":
@@ -657,6 +692,8 @@ class _Repo:
             for n, sha in enumerate(x for x in lines if x):
                 if sha in cutoff and (limit is None or n < limit - 1):
                     return "the walk reaches the cut-off"
+                if sha in cutoff and walk.get("diff"):
+                    return "a cut-off commit's diff shows it adding every file"
             return None
         reach = _Repo._list(repo, ["--timestamp"] + tail)
         if reach is None:
@@ -697,6 +734,8 @@ def _verdict(sub, rest, repo, cutoff, head_limit, git_opts=(), via_xargs=False):
                 return "; a range with " + str(len(ends)) + " endpoints cannot be checked"
             why = walk(repo, ends[0], ends[1], cutoff)
             return "; " + why if why else None
+        if _flag(rest, "-g", "--walk-reflogs"):
+            return None  # the reflog is local and complete
         walk_ = _plain_walk(sub, rest, repo)
         limit = walk_["limit"]
         if (head_limit is not None and sub != "shortlog"
@@ -715,8 +754,24 @@ def _verdict(sub, rest, repo, cutoff, head_limit, git_opts=(), via_xargs=False):
         return "; " + why if why else None
     if sub == "whatchanged" or (sub in RANGE_CMDS and any(
             _is_range_word(tok, repo) for tok in _revisions(rest))):
-        # whatchanged walks as log does; the others act on a range.
-        return _verdict("log", rest, repo, cutoff, head_limit)
+        # whatchanged walks as log does, showing each diff (--raw); the
+        # others act on a range.
+        extra = ["--raw"] if sub == "whatchanged" else []
+        return _verdict("log", extra + rest, repo, cutoff, head_limit)
+    if sub == "show" and not _flag(rest, "-s", "--no-patch", "--quiet"):
+        # A cut-off commit's patch is the whole tree.
+        revs = [t for t in _revisions(rest) if not _is_path(t, repo)] or ["HEAD"]
+        for rev in revs:
+            try:
+                res = subprocess.run(
+                    ["git", "-C", repo, "rev-parse", "--verify", "-q",
+                     "--end-of-options", rev + "^{commit}"],
+                    capture_output=True, text=True, timeout=5)
+            except Exception:
+                return "; the commit could not be checked"
+            if res.stdout.strip() in cutoff:
+                return "; a cut-off commit's diff shows it adding every file"
+        return None
     if sub == "format-patch":
         revs = [t for t in _revisions(rest) if t != "--not"]
         if len(revs) == 1 and not _flag(rest, "--root"):
@@ -783,7 +838,8 @@ def _push_config_deletes(repo, rest, git_opts):
         key, _, value = opt.partition("=")
         key = key.lower()
         if key.startswith("remote.") and key.endswith(".mirror"):
-            return value.lower() not in ("false", "no", "off", "0")
+            if value.lower() not in ("false", "no", "off", "0"):
+                return True
         if key.startswith("remote.") and key.endswith(".push"):
             if value.lstrip("+").startswith(":"):
                 return True
@@ -832,15 +888,54 @@ def _git_parse(argv):
     return git_subcommand(unwrapped if unwrapped is not rest else argv)
 
 
+def _head_limits(command):
+    """{argv: N} for each simple command piped straight into `head`, read
+    from the parsed pipeline. An argv that also appears without such a pipe
+    gets no limit."""
+    try:
+        lex = shlex.shlex(_heredoc_free(command).replace("\n", ";"), posix=True,
+                          punctuation_chars=True)
+        lex.whitespace_split = True
+        toks = list(lex)
+    except Exception:
+        return {}
+    cmds, cur = [], []
+    for tok in toks:
+        if tok and set(tok) <= set("|&;()<>"):
+            cmds.append((tuple(cur), tok))
+            cur = []
+        else:
+            cur.append(tok)
+    cmds.append((tuple(cur), ""))
+    found = {}
+    for i, (argv, sep) in enumerate(cmds):
+        nxt = cmds[i + 1][0] if i + 1 < len(cmds) else ()
+        n = _head_count(nxt) if sep == "|" else None
+        found.setdefault(argv, []).append(n)
+    return {argv: min(ns) for argv, ns in found.items()
+            if argv and all(n is not None for n in ns)}
+
+
+def _head_count(argv):
+    """N for `head`, `head -N`, `head -n N`, `head -nN` or `head --lines=N`."""
+    if not argv or argv[0] != "head":
+        return None
+    args = list(argv[1:])
+    if not args:
+        return 10
+    if len(args) == 1:
+        m = re.fullmatch(r"-(?:n)?(\d+)|--lines=(\d+)", args[0])
+        return int(m.group(1) or m.group(2)) if m else None
+    if len(args) == 2 and args[0] in ("-n", "--lines") and args[1].isdigit():
+        return int(args[1])
+    return None
+
+
 def _evaluate_line(command, base_cwd, repos):
     cmds = simple_commands_with_scope(command)
     if cmds is None:
         return None
-    heads = RX_LOG_TO_HEAD.findall(command)
-    reads = [argv for _scope, argv in cmds
-             if (_git_parse(argv) or ("",))[0] in ("log", "rev-list", "shortlog")]
-    # Only an unambiguous pipe counts: one log read, piped straight to head.
-    head_limit = int(heads[0] or 10) if len(heads) == 1 and len(reads) == 1 else None
+    heads = _head_limits(command)
     dirs = {(): base_cwd}
     for scope, argv in cmds:
         for n in range(1, len(scope) + 1):
@@ -865,9 +960,11 @@ def _evaluate_line(command, base_cwd, repos):
             continue
         bare = strip_env(argv)[1]
         via_xargs = bool(bare) and _unwrap_xargs(bare) is not bare
-        why = _verdict(sub, sub_rest, repo, cutoff, head_limit, _git_opts(argv), via_xargs)
+        why = _verdict(sub, sub_rest, repo, cutoff, heads.get(tuple(argv)),
+                       _git_opts(argv), via_xargs)
         if why is not None:
-            return "deny", DENY.format(segment=" ".join(argv), repo=repo, why=why)
+            text = DENY_PUSH if sub == "push" else DENY
+            return "deny", text.format(segment=" ".join(argv), repo=repo, why=why)
     return None
 
 

@@ -436,6 +436,7 @@ cookieconsent.run({
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode sh code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> scripts/triage-backlog.py <span class="at">-R</span> <span class="op">&lt;</span>owner<span class="op">&gt;</span>/<span class="op">&lt;</span>repo<span class="op">&gt;</span> --override N=P ... <span class="at">--apply</span> <span class="at">--dry-run</span></span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">python3</span> scripts/triage-backlog.py <span class="at">-R</span> <span class="op">&lt;</span>owner<span class="op">&gt;</span>/<span class="op">&lt;</span>repo<span class="op">&gt;</span> --override N=P ... <span class="at">--apply</span>   <span class="co"># LABEL_ISSUE, CLOSE_ISSUE</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>Adding a label the repo lacks creates it with GitHub’s default colour.</p>
+<p>A run that nobody reviews first, such as a scheduled one, adds <code>--labels-only</code>: it applies the priority labels and leaves every proposed close for this attended pass. Add <code>--ceiling N</code> to any run to print the open count against the backlog’s ceiling.</p>
 </section>
 <section id="report" class="level3">
 <h3 class="anchored" data-anchor-id="report">4. Report</h3>

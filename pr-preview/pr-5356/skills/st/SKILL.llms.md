@@ -46,20 +46,20 @@ gh issue create --title "<concise title>" --body "<what & why>
 
 **Done when:** <acceptance criteria>
 <scope notes / out-of-scope>" \
-  --label ai-authored --label "model:<model-id>"   # CREATE_ISSUE
+  --label ai-authored --label "model:<model-id>" --label P2   # CREATE_ISSUE
 
 # GitLab
 glab issue create --title "<concise title>" --description "<what & why>
 
 **Done when:** <acceptance criteria>" \
-  --label "ai-authored,model:<model-id>"
+  --label "ai-authored,model:<model-id>,P2"
 ```
 
 - Keep scope tight — **one concern per issue** (see `split-concerns`). If the task is really several concerns, file several issues.
 
 - Capture acceptance criteria so “done” is unambiguous later.
 
-- The two labels above are not optional: every issue an agent files into a repo we administrate carries `ai-authored` and `model:<model-id>`, per [`issue-first`](../../shared/workflow/issue-first.md). Normalize the model id and create the labels where they are missing, per [`label-agent-filed-issues`](../../shared/workflow/label-agent-filed-issues.md).
+- The labels above are not optional: every issue an agent files into a repo we administrate carries `ai-authored`, `model:<model-id>` and one of `P1`, `P2` or `P3` (`P2` is the default), per [`issue-first`](../../shared/workflow/issue-first.md). Normalize the model id and create the labels where they are missing, per [`label-agent-filed-issues`](../../shared/workflow/label-agent-filed-issues.md).
 
 - Add any further labels the repo’s own taxonomy calls for.
 

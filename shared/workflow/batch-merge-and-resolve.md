@@ -563,7 +563,7 @@ Grepping a workflow for what enforces a threshold can therefore find the advisor
 [`review-verdict-pitfalls`](review-verdict-pitfalls.md) already owns the near half of this, in its case covering a check "designed to NEVER fail regardless of their own posted content, so their green color carries zero signal at all".
 What the capped-file case adds is that the signal is not merely absent but **misdirecting**: a second step enforces the same threshold, so the advisory label is accurate about its own step and false about the job.
 
-For the context-closure caps, `python3 scripts/check-context-closure.py --merge-result origin/main`, run on the PR branch after `git fetch origin main`, runs every gate on the tree the merge would land (ai-config#4234).
+For the context-closure caps, `python3 scripts/check-context-closure.py --merge-result origin/main`, run on the PR branch after `git fetch origin main`, runs the size caps and the import check on the tree the merge would land (ai-config#4234), though not the growth ratchet, which needs `--baseline`.
 It exits 2 on a conflict rather than measuring conflict markers.
 For any other capped file, `git merge-tree --write-tree` gives the projection directly, because it prints the merged tree's id on its first line.
 Both need git 2.38 or later and a freshly fetched base:

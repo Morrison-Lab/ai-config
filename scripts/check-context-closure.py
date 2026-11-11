@@ -606,6 +606,57 @@ def merge_result_tree(base: Path, ref: str) -> tuple[str | None, str]:
     return result.stdout.split("\n", 1)[0].strip(), ""
 
 
+def merge_tree_reader(base: Path, tree: str):
+    """Read paths from merge `tree`, descending into any gitlink in it.
+
+    `git show TREE:path` cannot see inside a submodule, so a consumer whose
+    root imports `@.ai-config/...` would read every such import as
+    dangling. A path under a gitlink is read instead from that submodule's
+    own checkout, at the commit the merge tree records for it -- the
+    `submodule_reader` pattern, with the pin taken from the merge rather
+    than from HEAD. Absolute and `~` imports come from disk, as in
+    `baseline_reader`, since no revision of this repo holds them.
+
+    Returns `(read, missing_pins)`. `missing_pins` starts empty and gains
+    an entry each time a read lands under a gitlink whose recorded commit
+    the submodule checkout does not have. The caller checks it after the
+    walk and treats a non-empty list as an error, rather than letting those
+    imports read as dangling. A gitlink the closure never reads, such as an
+    uninitialized submodule nothing imports, costs nothing.
+    """
+    listing = subprocess.run(
+        ["git", "-C", str(base), "ls-tree", "-r", tree],
+        capture_output=True,
+        text=True,
+    )
+    sub_readers = {}
+    for line in listing.stdout.splitlines():
+        meta, _, path = line.partition("\t")
+        mode, kind, sha = meta.split()
+        if mode != "160000" or kind != "commit":
+            continue
+        have = subprocess.run(
+            ["git", "-C", str(base / path), "cat-file", "-e", f"{sha}^{{commit}}"],
+            capture_output=True,
+        )
+        absent = None if have.returncode == 0 else f"{path} at {sha[:12]}"
+        sub_readers[path + "/"] = (git_reader(base / path, sha), absent)
+    outer = baseline_reader(base, tree)
+    missing_pins = []
+
+    def read(path: str) -> bytes | None:
+        for prefix, (sub, absent) in sub_readers.items():
+            if path.startswith(prefix):
+                if absent:
+                    if absent not in missing_pins:
+                        missing_pins.append(absent)
+                    return None
+                return sub(path[len(prefix) :])
+        return outer(path)
+
+    return read, missing_pins
+
+
 def gitlink_rev(base: Path, submodule: str) -> str | None:
     """The commit the parent repo RECORDS for `submodule`, or None.
 
@@ -1264,16 +1315,25 @@ def main(argv=None) -> int:
         if tree is None:
             print(f"error: --merge-result: {why}", file=sys.stderr)
             return 2
-        reader = baseline_reader(base, tree)
+        reader, missing_pins = merge_tree_reader(base, tree)
         measured = f"{base} merged with {args.merge_result} (tree {tree[:12]})"
     files, missing, inline, ambiguous = walk_closure(args.root, reader)
+    if args.merge_result and missing_pins:
+        print(
+            "error: --merge-result: the closure imports from submodule "
+            "commits this checkout does not have, so those imports cannot be "
+            "read: " + ", ".join(missing_pins) + ". Fetch them in the "
+            "submodule first.",
+            file=sys.stderr,
+        )
+        return 2
 
     if not files:
         # A closure that resolved nothing is not a small closure. Fail loudly
         # rather than printing "0 bytes, under budget", which is what an
         # unreadable root or a wrong --base would otherwise look like.
         print(
-            f"error: could not read {args.root} under {base}; nothing measured.",
+            f"error: could not read {args.root} under {measured}; nothing measured.",
             file=sys.stderr,
         )
         return 2
@@ -1285,13 +1345,20 @@ def main(argv=None) -> int:
         )
     )
 
-    root_blob = reader(args.root)
-    try:
-        root_chars = None if root_blob is None else cli_char_count(
-            root_blob.decode("utf-8")
-        )
-    except UnicodeDecodeError:
-        root_chars = None
+    if args.merge_result:
+        # The git-side counter, which decodes strictly. The walk above read
+        # the root, so None here means it is not UTF-8; the cap cannot be
+        # checked, and a gate that cannot check must not pass.
+        root_chars = root_char_count_at(base, args.root, tree)
+        if root_chars is None:
+            print(
+                f"error: {args.root} in the merge tree is not UTF-8, so the "
+                "character cap cannot be checked.",
+                file=sys.stderr,
+            )
+            return 2
+    else:
+        root_chars = root_char_count(base, args.root)
     root_over, root_text = render_root_chars(
         root_chars,
         args.root,

@@ -1473,5 +1473,78 @@ with tempfile.TemporaryDirectory() as tmp:
         ccc.main(common + ["--merge-result", "main"]) == 2,
     )
 
+# --- --merge-result: every gate reads the merge tree, not the working tree ---
+# Main alone grows the root and an imported fragment, so each gate below
+# passes on the branch and fails only if it measures the merge. Each check
+# fails if that gate's reader is pointed back at the working tree.
+
+with tempfile.TemporaryDirectory() as tmp:
+    base = Path(tmp)
+
+    def git(*a, cwd=None):
+        return subprocess.run(
+            ["git", "-c", "protocol.file.allow=always", *a],
+            cwd=cwd or base, check=True, capture_output=True, text=True,
+        ).stdout.strip()
+
+    def init(where):
+        git("init", "-q", "-b", "main", cwd=where)
+        git("config", "core.autocrlf", "false", cwd=where)
+        git("config", "user.email", "t@t.com", cwd=where)
+        git("config", "user.name", "t", cwd=where)
+
+    sub = base / "subsrc"
+    sub.mkdir()
+    init(sub)
+    (sub / "shared.md").write_text("from the submodule\n", encoding="utf-8")
+    git("add", "-A", cwd=sub)
+    git("commit", "-qm", "sub", cwd=sub)
+
+    repo = base / "repo"
+    repo.mkdir()
+    init(repo)
+    (repo / "CLAUDE.md").write_text("@frag.md\n@.ai-config/shared.md\n", encoding="utf-8")
+    (repo / "frag.md").write_text("f\n", encoding="utf-8")
+    (repo / "notes.md").write_text("n\n", encoding="utf-8")
+    git("submodule", "add", "-q", str(sub), ".ai-config", cwd=repo)
+    git("add", "-A", cwd=repo)
+    git("commit", "-qm", "start", cwd=repo)
+    git("checkout", "-qb", "branch", cwd=repo)
+    (repo / "notes.md").write_text("branch\n", encoding="utf-8")
+    git("commit", "-qam", "branch edits notes", cwd=repo)
+    git("checkout", "-q", "main", cwd=repo)
+    (repo / "CLAUDE.md").write_text(
+        "@frag.md\n@.ai-config/shared.md\n" + "r" * 200 + "\n", encoding="utf-8"
+    )
+    (repo / "frag.md").write_text("f" * 300 + "\n", encoding="utf-8")
+    git("commit", "-qam", "main grows the root and the fragment", cwd=repo)
+    git("checkout", "-q", "branch", cwd=repo)
+    loose = ["--base", str(repo), "--budget", "100000000"]
+    merged = ["--merge-result", "main"]
+    gates = [
+        ("the root character cap", ["--root-char-cap", "150"]),
+        ("the fragment cap", ["--fragment-cap", "200"]),
+        ("the CLI total limit", ["--total-char-limit", "400", "--repo-margin", "1"]),
+        ("the byte budget under --strict", ["--budget", "400", "--strict"]),
+    ]
+    for name, flags in gates:
+        check(
+            f"--merge-result: {name} passes on the branch alone",
+            ccc.main(loose + flags) == 0,
+        )
+        check(
+            f"--merge-result: {name} fails on the merge with main",
+            ccc.main(loose + flags + merged) == 1,
+        )
+    check(
+        "--merge-result: a submodule import resolves through the merge tree's gitlink",
+        ccc.main(loose + merged) == 0,
+    )
+    read, pins = ccc.merge_tree_reader(repo, ccc.merge_result_tree(repo, "main")[0])
+    check(
+        "--merge-result: merge_tree_reader reads the submodule file at its pin",
+        read(".ai-config/shared.md") == b"from the submodule\n" and pins == [],
+    )
+
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

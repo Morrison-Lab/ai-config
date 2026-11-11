@@ -151,19 +151,25 @@ go read the history first (step 2).
    operation.
    For each conflict hunk, write one row: what you kept from each side, what
    you dropped (from which side) and why, and what you modified and why.
-   Name each side by its branch, commit or stash entry, not as "ours" or
-   "theirs", since those flip in a rebase (see the warning below).
-   Deliver the table in the merge commit message.
-   For a rebase, cherry-pick, revert or stash pop, which leaves no merge
-   message, deliver it in the PR comment that announces the result, or, with
-   no PR, in your report to the user.
+   Write each side's real name, its branch, commit or stash entry, in place
+   of `<side A>` and `<side B>`, never "ours" or "theirs", since those flip
+   in a rebase (see the warning below).
+   For a merge, put the table in the merge commit message.
+   When the work is on a PR, also post it in the PR comment that announces
+   the result, since a squash merge discards the merge message and a rebase,
+   cherry-pick, revert or stash pop leaves none.
+   With no PR, put it in your report to the user.
    A reviewer can then check each choice against both sides without redoing
    the operation.
    In the table, `<n>` is the hunk's number within the file, counted from 1,
    and `<lines>` is a line range (`12-18`), never the text itself, which
    would break the table row.
    The range is in the resolved file, except under "Dropped", where it is in
-   the named side's version of the file:
+   the named side's version of the file.
+   Write one row per dropped range, so a hunk that drops lines from both
+   sides gets two rows.
+   For a conflict with no text hunks (delete/modify, rename, binary), write
+   `whole file` for `<n>` and `<lines>`:
 
    | File:hunk | Kept from `<side A>` | Kept from `<side B>` | Dropped (side, why) | Modified (why) |
    | --- | --- | --- | --- | --- |
@@ -253,9 +259,9 @@ Confirm which physical branch is "ours" before you reach for `--ours` /
   without confirming the dropped side had nothing worth keeping — the classic
   silent-data-loss move.
 - ❌ Resolving a hunk before understanding *why* each side changed it.
-- ❌ Finishing a merge, rebase or cherry-pick with no per-hunk keep/drop/modify
-  record (step 3), so
-  nobody can tell a deliberate drop from a lost line.
+- ❌ Finishing a merge, rebase, cherry-pick, revert or stash pop
+  with no per-hunk keep/drop/modify record (step 3),
+  so nobody can tell a deliberate drop from a lost line.
 - ❌ Carrying the wording from one conflicting hunk into a string that several
   consumers share, without reading main's version of each consumer.
 - ❌ Mixing up "ours"/"theirs" in a rebase (they're reversed vs a merge).

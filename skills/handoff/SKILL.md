@@ -55,6 +55,10 @@ Also note anything not visible to git: background tasks you launched (IDs +
 output paths), CI runs you're waiting on, archived/backup directories, and any
 **open decisions** the user still has to make.
 
+In an ephemeral container, a pause can outlive the container, and a quota limit can end the session with no clean exit.
+So before such a pause, push every worktree branch to `origin`, giving a dirty tree a `wip:` commit that names the interrupted step.
+Post each in-flight item's head SHA and last findings on its issue too, since `Workflow` journals die with the container ([ai-config#3203](https://github.com/Morrison-Lab/ai-config/issues/3203), 2026-09-03).
+
 ## Step 2 — Write (or update) the handoff memory
 
 This is the backup copy, and Step 3 posts the same content somewhere others can

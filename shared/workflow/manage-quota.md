@@ -50,6 +50,12 @@ So ask separately what a procedure costs *by construction*: always-loaded conten
 The deliverable is a change to the corpus --- fixed in stride when small, filed with its measurement when not, per `report-mistakes-proactively` --- never a quieter run of the same procedure.
 That last clause covers a loop you armed yourself: once repeated firings return the same reading, delete the routine rather than lengthening its interval.
 `python3 scripts/check-context-closure.py` is the built instrument for the always-loaded pool.
+
+**Parallel workflows share one session limit, and hitting it ends all of them at once.**
+On 2026-09-03 four `Workflow` runs in parallel spent the account's session limit within an hour, and the HTTP 429 ended every in-flight subagent and workflow agent together.
+The session then ran two at a time, and a later limit that evening again killed four running loops with no journal left on disk.
+A run resumes from its run id, with completed agents replayed from cache.
+When the tool refuses the persisted script path as unreadable, a copy under the scratchpad resumes with the same id ([ai-config#3203](https://github.com/Morrison-Lab/ai-config/issues/3203)).
 It fails CI once the closure passes the Claude Code CLI's own total instruction limit (less a margin for a repo `CLAUDE.md`), and this repo's CI also fails on its 100,000-byte budget, which mirrors in bytes the 100,000-character gate (that limit less the margin) and so fails first (`--strict`, ai-config#4685);
 for a consumer measured without `--strict`, read an over-budget line as the prompt it is.
 Two boundaries.

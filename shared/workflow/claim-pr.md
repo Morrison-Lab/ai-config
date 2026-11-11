@@ -68,6 +68,7 @@ PR is a stronger "in-flight" signal than a comment alone.
 PR/issue --- reassert it rather than resuming under a stale one.**
 A claim comment with no expiry binds the thread indefinitely: a crashed or abandoned session leaves its "hold off" standing forever, and a second session has no rule for when the claim stops blocking.
 So the convention is time-boxed and keyed to observable activity: a claim is **live for 2 hours from the most recent push or comment** on the PR/issue, and **expired** past that.
+So a claim comment needs no clock time typed into it: the forge's `created_at` is the record the expiry reads, and a hand-typed time can only disagree with it.
 
 The rule cuts both ways.
 

@@ -92,7 +92,8 @@ unknown), PowerShell
 `icacls`/`Set-Acl`, Windows drive paths (`C:/Windows`), nested texts past
 MAX_DEPTH, a relative target, `$PWD`, or a name assigned from `$PWD`, after
 a `cd` this cannot resolve (`cd -` or `cd "$(git rev-parse
---show-toplevel)"`, where `$PWD` is taken as empty), a `cd` into a
+--show-toplevel)"`, where `$PWD` is taken as empty; an absolute `cd`
+after it is followed), a `cd` into a
 subdirectory repeated by a loop (read as run once), a command before a `cd`
 in the same loop body (judged only where the loop starts), a `cd` that fails
 or follows `&&` or `||` (read as run), a quoted `cd "$D"` where an unquoted
@@ -813,9 +814,10 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
                 got = [_expand(tok, home, assigned, here) for tok in lead[1:]]
                 cd_words = [lead[0]] + [g[0] if g and g is not UNREAD and not g[1] else None
                                         for g in got]
-                unknown = None in cd_words or any(SUB in tok for tok in lead) or here is None
+                unknown = None in cd_words or any(SUB in tok for tok in lead)
                 new = None if unknown else resolve_cd_target(cd_words, here)
-                new = new if new and len(new) <= PATH_MAX else None
+                # From an unknown directory only an absolute target is known.
+                new = new if new and (here or os.path.isabs(new)) and len(new) <= PATH_MAX else None
                 news, fork, stay = [new], maybe, here
                 stay_weak = _here_weak(assigned)  # the world the `cd` leaves in place
                 operand = _cd_operand(lead)
@@ -841,6 +843,7 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
                     # in the first world and unknown in the second.
                     # When the `cd` may not run, the shell may also stay put.
                     path = os.path.normpath(os.path.join(here, reading[0]))
+                    path = path if len(path) <= PATH_MAX else None
                     fork, weak_here = True, True
                     if path == here:  # `cd "${OUT}."`: it stays, weakly, or moves
                         news, stay_weak = [None], stay_weak or not maybe

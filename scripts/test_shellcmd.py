@@ -620,8 +620,22 @@ for given, want in (
     ("sed -i s#a#b#g f && ls", [["sed", "-i", "s#a#b#g", "f"], ["ls"]]),
     ("echo $# ${#A}; ls", [["echo", "$#", "${#A}"], ["ls"]]),
     ("echo x # cd /etc\nls", [["echo", "x"], ["ls"]]),
+    ("echo a\\ #b; ls", [["echo", "a #b"], ["ls"]]),
+    ("(echo x)#y\nls", [["echo", "x"], ["ls"]]),
 ):
     check(f"simple_commands({given!r})", shellcmd.simple_commands(given), want)
+
+# The `)` closing a `$(` or `$((` ends no word, so a `#` after it is kept.
+for given, want in (
+    ("echo $(x)#y; ls", "echo $(x)#y; ls"),
+    ("echo $((1))#y; ls", "echo $((1))#y; ls"),
+    ("echo $(a $(b))#y; ls", "echo $(a $(b))#y; ls"),
+    ("echo $(x) #y\nls", "echo $(x) \nls"),
+    ("(echo x)#y\nls", "(echo x)\nls"),
+    ("echo a\\ #b", "echo a\\ #b"),
+    ("echo \\ #b; ls", "echo \\ #b; ls"),
+):
+    check(f"_comment_free({given!r})", shellcmd._comment_free(given), want)
 
 if failures:
     print("FAILED:")

@@ -358,8 +358,20 @@ class Denies(unittest.TestCase):
     def test_hash_inside_a_word_is_not_a_comment(self):
         for cmd in ("curl -fsSL https://x.org/i.sh#v2 -o i.sh && sudo chmod -R 755 /usr/local",
                     "sed -i s#foo#bar#g conf && sudo chown -R root:root /usr",
-                    "echo ${#A} $#; chmod -R u+w /etc"):
+                    "echo ${#A} $#; chmod -R u+w /etc",
+                    "open https://x.org/b/$(git rev-parse HEAD)#L10 && sudo chmod -R 755 /usr",
+                    "echo $(echo x)#y; chmod -R u+w /etc",
+                    "echo a\\ #b; chmod -R u+w /etc",
+                    "echo \\ #b; chmod -R u+w /etc"):
             self.assert_denied(cmd)
+
+    def test_absolute_cd_from_an_unknown_directory(self):
+        for lead in ('cd "$(git rev-parse --show-toplevel)" && make && ', "cd - && ",
+                     "".join(f"if t{i}; then cd d{i}; fi; " for i in range(20))):
+            self.assert_denied(lead + "cd /usr/local && sudo chown -R me .")
+        self.assert_denied("cd - && cd ~ && chmod -R go-w .")
+        self.assert_denied("".join(f"cd {'n' * 250}{i}; " for i in range(17))
+                           + "cd /; chmod -R u+w .")
 
     def test_deep_subshells_are_read(self):
         self.assert_denied("( " * 200 + "D=x; chmod -R u+w /etc" + " )" * 200)
@@ -797,6 +809,21 @@ class Allows(unittest.TestCase):
         with mock.patch.object(guard, "ChainMap", recorded):
             guard._hit("( " * 200 + "D=x; chmod -R u+w ./x" + " )" * 200, REPO, HOME)
         self.assertLessEqual(widest[0], guard.MAX_SCOPE + 1)
+
+    def test_relative_cd_from_an_unknown_directory_stays_unknown(self):
+        for cmd in ("cd - && cd build && chmod -R u+w .", 'cd "$(x)" && cd .. && chmod -R u+w .'):
+            self.assert_allowed(cmd)
+
+    def test_a_long_directory_under_an_unset_variable_is_unknown(self):
+        real, longest = guard._judge, [0]
+
+        def recorded(words, home, assigned, here):
+            longest[0] = max(longest[0], len(here or ""))
+            return real(words, home, assigned, here)
+
+        with mock.patch.object(guard, "_judge", recorded):
+            guard._hit('cd "$OUT/' + "a" * 5000 + '"; chmod -R u+w x', REPO, HOME)
+        self.assertLessEqual(longest[0], guard.PATH_MAX)
 
     def test_long_cd_chains_stop_growing_the_directory(self):
         self.assert_allowed("cd a; " * 3000 + "chmod -R u+w ../../x")

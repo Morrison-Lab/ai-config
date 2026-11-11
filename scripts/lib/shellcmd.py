@@ -275,8 +275,10 @@ def _comment_free(command):
     `simple_commands` turns a newline into `;` so a script's second line is
     seen as its own command. A `#` comment must therefore be removed BEFORE
     that rewrite: afterwards the comment's terminating newline is a `;`, and
-    `shlex` -- whose `commenters` is `#` -- discards everything from the `#`
-    to the end of the WHOLE input rather than to the end of its line.
+    `shlex` with its default `commenters` of `#` discarded everything from the
+    `#` to the end of the WHOLE input rather than to the end of its line.
+    (`simple_commands_with_scope` now turns shlex's comments off, so a `#`
+    this leaves in place stays part of its word.)
     Measured: `git commit -m x # note` followed by `git push` returned no
     commands past the comment, so the guard went silent on exactly the chain
     it exists to refuse.
@@ -300,9 +302,17 @@ def _comment_free(command):
     Backslash escapes the following character outside single quotes, so it
     consumes that character rather than only itself. Skipping just the
     backslash let `\"` toggle quote state, and an odd number of them before a
-    `#` corrupted the balance into the same fail-open deletion.
+    `#` corrupted the balance into the same fail-open deletion. An escaped
+    blank (`a\\ #b`) is part of its word, so a `#` after it starts nothing.
+
+    The `)` that closes a `$(` ends a substitution inside a word, not the
+    word: `$(git rev-parse HEAD)#L10` is one word, and reading its `#` as a
+    comment hid every command after it. Unquoted parentheses are tracked to
+    tell that `)` from a subshell's.
     """
     single = double = False
+    parens = []  # one entry per open unquoted `(`: True when it is `$(`
+    word_end = True  # whether a token may start at the next character
     out = []
     i = 0
     n = len(command)
@@ -312,14 +322,25 @@ def _comment_free(command):
             out.append(ch)
             out.append(command[i + 1])
             i += 2
+            word_end = False
             continue
+        starts = word_end
+        word_end = False
         if ch == "'" and not double:
             single = not single
         elif ch == '"' and not single:
             double = not double
-        elif ch == "#" and not single and not double:
-            prev = command[i - 1] if i else ""
-            if not prev or prev.isspace() or prev in _SHELL_OPS:
+        elif single or double:
+            pass
+        elif ch == "(":
+            parens.append(i > 0 and command[i - 1] == "$")
+            word_end = True
+        elif ch == ")":
+            word_end = not (parens and parens.pop())
+        elif ch.isspace() or ch in _SHELL_OPS:
+            word_end = True
+        elif ch == "#":
+            if starts:
                 j = command.find("\n", i)
                 if j == -1:
                     break

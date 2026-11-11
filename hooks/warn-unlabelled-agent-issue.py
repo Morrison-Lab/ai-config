@@ -1,10 +1,19 @@
 #!/usr/bin/env python3
-"""PreToolUse reminder: filing an issue without the `ai-authored` label.
+"""PreToolUse reminder: filing an issue without `ai-authored` or a priority.
 
 `shared/workflow/issue-first.md`'s "Label an agent-filed issue with its
 authorship and its model" section requires every issue an agent files into a
 repo we administrate to carry `ai-authored` and `model:<model-id>`, set in the
 creating command rather than as a follow-up edit.
+
+The same section's "Set the priority when you file" paragraph requires one of
+`P1`, `P2` or `P3` in the same creating command (Ezra, ai-config#3140: "when
+filing issues, assign priority level, task size, and all other applicable
+fields and labels"). An issue filed without one waits for the weekly triage
+pass, and a pass on 2026-11-11 found 190 open issues in ai-config with no
+priority label (ai-config#5306).
+Each missing label gets its own paragraph in the reminder, so a create that
+carries one of the two is told only about the other.
 
 WHY A HOOK RATHER THAN THE RULE ALONE
 -------------------------------------
@@ -24,10 +33,12 @@ maintainer typed --- which is the whole defect.
 THE CHECK
 ---------
 Bash: `gh issue create` / `glab issue create` at a COMMAND POSITION, with
-heredoc bodies stripped, and no `ai-authored` in a label flag's value.
+heredoc bodies stripped, and no `ai-authored`, or no `P1`/`P2`/`P3`, in a
+label flag's value.
 
 MCP: `mcp__github__issue_write` with `method` == "create" (and the legacy
-`mcp__github__create_issue`), with no `ai-authored` in its `labels`.
+`mcp__github__create_issue`), with no `ai-authored`, or no `P1`/`P2`/`P3`, in
+its `labels`.
 
 Command-position anchoring is load-bearing rather than tidiness, for the
 reason `warn-pr-create-without-dupe-check.py` records at length: this corpus
@@ -38,10 +49,35 @@ A heredoc body is prose, so it is stripped before matching; the opener line's
 tail is still shell and is kept, since `gh issue create --body-file -` behind
 a heredoc is the idiomatic way to file with a long body.
 
-The discharge splits that same heredoc-stripped text into shell tokens and
-reads a label flag's argument, covering `--label a --label b`, `--label a,b`,
-`--label=a`, `--labels`, and `-l a`. `ai-authored` quoted inside a title or a
+The discharge hands that same heredoc-stripped text to
+`scripts/lib/shellcmd.py`'s `simple_commands`, which returns one argument
+list per simple command, and reads a label flag's argument in the create's
+own list (so a label on another command in a chain, on the next line, or in
+a trailing comment, discharges nothing).
+The forms covered are `--label a --label b`, `--label a,b`, `--label=a`,
+`--labels`, and `-l a`. `ai-authored` quoted inside a title or a
 body sits at no argument position, so it does not discharge.
+
+A command is read whole by regex instead when the splitter returns no
+argument list that starts with the create. Three shapes do that: a create
+inside a double-quoted string (`echo "$(gh issue create ...)"`), which is one
+argument of another command; a create after a brace (`{ gh issue create ...;
+}`), where the brace is the first argument; and a command whose quoting does
+not balance. On that path a label flag anywhere in the command discharges
+the reminder, including one on a neighbouring command and one written inside
+a quoted title or body. A create in one of the first two shapes is also not
+examined when the same command holds a second create that the splitter does
+isolate. The path errs toward silence, because a reminder that cannot
+establish its precondition must not fire.
+
+KNOWN LIMITS
+------------
+The splitter removes quotes before it looks for operators and comments, so
+three shapes cut the create's argument list short and can warn on a labelled
+create whose label flags come later: a quoted argument that is only an
+operator (`--title ";"`, or a lone quoted backtick), an unquoted `$( )`
+argument, and a `#` in the middle of an unquoted word (`t#x`). Put the label
+flags first, or quote the word, to avoid the reminder (ai-config#5365).
 
 WHY WARN RATHER THAN BLOCK
 --------------------------
@@ -74,8 +110,8 @@ and bounded.
 from __future__ import annotations
 
 import json
+import os
 import re
-import shlex
 import sys
 
 # `gh issue create` / `glab issue create` at a command position. The separator
@@ -97,14 +133,27 @@ RX_HEREDOC = re.compile(
     re.DOTALL,
 )
 
+# An environment assignment before a command name: `GH_TOKEN=x`.
+RX_ASSIGNMENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=")
+
 AUTHORSHIP_LABEL = "ai-authored"
 
+# The three priority labels shared/workflow/triage-backlog.md defines.
+PRIORITY_LABELS = frozenset(("P1", "P2", "P3"))
 
-def carries_authorship(value: str) -> bool:
-    """True when a label VALUE (one flag argument, possibly comma-joined) carries
-    the authorship label as a whole token. A substring match would let
-    `ai-authored-improvement` or `model:not-ai-authored` discharge the reminder."""
-    return AUTHORSHIP_LABEL in [part.strip() for part in value.split(",")]
+
+def split_labels(value: str) -> set:
+    """The whole-token labels in one label VALUE (one flag argument, possibly
+    comma-joined). Whole tokens, because a substring match would let
+    `ai-authored-improvement`, `model:not-ai-authored` or `P10` discharge a
+    reminder."""
+    return {part.strip() for part in value.split(",")}
+
+
+def carries_priority(labels: set) -> bool:
+    """True when `labels` holds a priority label. GitHub matches a label name
+    without regard to case, so `p2` applies `P2` and discharges the reminder."""
+    return bool(PRIORITY_LABELS & {label.upper() for label in labels})
 
 
 # Inside single quotes nothing is a command: a commit message or echo that
@@ -120,15 +169,22 @@ def strip_single_quoted(command: str) -> str:
 
 LABEL_FLAGS = ("--label", "--labels", "-l")
 
-# Fallback for a command shlex cannot tokenize: the value of a `--label` /
-# `--labels` / `-l` flag, separated by `=` or whitespace, optionally quoted.
-RX_LABEL_FLAG = re.compile(r"(?:--labels?|(?<![-\w])-l)[=\s]+['\"]?([^'\"\s]+)")
+# Fallback for a command the splitter cannot isolate: the value of a `--label` /
+# `--labels` / `-l` flag, separated by `=` or whitespace. A quoted value runs to
+# its closing quote, so `"ai-authored, P2"` is read whole; a bare one runs to
+# the next space, closing parenthesis, backtick or control operator, so the
+# `)` that ends `$( ... -l P2)` is not read as part of the label.
+# The short flag also takes a glued value (`-lP2`), so its separator is
+# optional.
+RX_LABEL_FLAG = re.compile(
+    r"(?:--labels?[=\s]+|(?<![-\w])-l[=\s]*)(?:\"([^\"]*)\"|'([^']*)'|([^'\"\s)`;|&]+))"
+)
 
 BASH_TOOLS = ("Bash", "bash", "run_command", "execute_command", "terminal", "shell")
 
 MCP_ISSUE_CREATE_TOOLS = ("mcp__github__issue_write", "mcp__github__create_issue")
 
-NOTE = """\
+NOTE_AUTHORSHIP = """\
 This issue is being filed with no `ai-authored` label.
 
 `issue-first.md`, "Label an agent-filed issue with its authorship and its
@@ -153,40 +209,140 @@ administrate takes neither label, and a repo whose labels cannot be created
 still gets the issue. This is a reminder, not a refusal.
 """
 
+NOTE_PRIORITY = """\
+This issue is being filed with no priority label.
+
+`issue-first.md`, "Set the priority when you file": every issue an agent files
+into a repo we administrate carries one of `P1`, `P2` or `P3` in the creating
+command (Ezra, ai-config#3140). `triage-backlog.md` defines the three:
+
+    P1  blocks work now, merged bad state, or hides a failure
+    P2  an actionable defect or improvement with a workaround (the default)
+    P3  a directive with no acceptance criterion, a question, a nice-to-have
+
+    gh issue create ... --label P2
+    glab issue create ... --label P2
+
+Before filing at all, search for the tracking issue of the defect family this
+belongs to: a new symptom of a tracked family is a comment on its tracker, not
+a new issue.
+
+Carry on if this is deliberate: an issue filed into a repo we do NOT
+administrate takes no priority label, and a repo that lacks the labels still
+gets the issue. This is a reminder, not a refusal.
+"""
+
+
+def build_note(labels: set) -> str | None:
+    """The reminder for a create carrying `labels`, or None when it has both an
+    authorship label and a priority label. Both are matched without regard to
+    case, as GitHub matches label names."""
+    parts = []
+    if AUTHORSHIP_LABEL not in {label.lower() for label in labels}:
+        parts.append(NOTE_AUTHORSHIP)
+    if not carries_priority(labels):
+        parts.append(NOTE_PRIORITY)
+    if not parts:
+        return None
+    return "\n".join(parts)
+
 
 def strip_heredocs(command: str) -> str:
     """Remove heredoc BODIES, keeping the rest of the opener line."""
     return RX_HEREDOC.sub(lambda m: m.group(2), command)
 
 
-def labels_authorship(command: str) -> bool:
-    """True when a label flag's ARGUMENT carries the authorship label."""
-    try:
-        tokens = shlex.split(command)
-    except ValueError:
-        return any(carries_authorship(v) for v in RX_LABEL_FLAG.findall(command))
+try:
+    _LIB = os.path.join(os.path.dirname(os.path.dirname(
+        os.path.realpath(__file__))), "scripts", "lib")
+    if _LIB not in sys.path:
+        sys.path.insert(0, _LIB)
+    from shellcmd import simple_commands as _simple_commands
+except Exception as _exc:  # broken install: degrade, never block
+    print(f"warn-unlabelled-agent-issue: cannot load "
+          f"scripts/lib/shellcmd.py ({_exc}); "
+          "label flags are read across the whole command", file=sys.stderr)
+
+    def _simple_commands(_cmd):
+        """Parse nothing when the shared splitter is missing."""
+        return None
+
+
+def create_segments(commands: list) -> list:
+    """The argument tokens of each issue create among `commands`, the argv
+    lists `shellcmd.simple_commands` returns, one list per create. Each argv
+    is one simple command, so a label flag on another command in the chain
+    (`gh pr create --label P2 && gh issue create ...`) is in another list and
+    does not discharge the reminder. The create is at the command position,
+    after any environment assignments (`GH_TOKEN=x gh issue create ...`), so
+    `echo gh issue create --label P2` is not a create."""
+    segments = []
+    for argv in commands:
+        start = 0
+        while start < len(argv) and RX_ASSIGNMENT.match(argv[start]):
+            start += 1
+        if argv[start:start + 1] in (["gh"], ["glab"]) and argv[start + 1:start + 3] == ["issue", "create"]:
+            segments.append(argv[start + 3:])
+    return segments
+
+
+def token_labels(tokens: list) -> set:
+    """Every label named in a label flag's ARGUMENT among `tokens`."""
+    values = []
     for index, token in enumerate(tokens):
         for flag in LABEL_FLAGS:
-            if token == flag:
-                following = tokens[index + 1] if index + 1 < len(tokens) else ""
-                if carries_authorship(following):
-                    return True
+            if token == flag and index + 1 < len(tokens):
+                values.append(tokens[index + 1])
             elif token.startswith(flag + "="):
-                if carries_authorship(token[len(flag) + 1:]):
-                    return True
-    return False
+                values.append(token[len(flag) + 1:])
+        # The short flag also takes a glued value: `-lP2`.
+        if token.startswith("-l") and len(token) > 2 and token[2] != "=":
+            values.append(token[2:])
+    labels = set()
+    for value in values:
+        labels |= split_labels(value)
+    return labels
+
+
+def fallback_labels(command: str) -> set:
+    """Labels read by regex across the whole of `command`. This path cannot
+    tell one command in a chain from the next, or a flag from the same text
+    inside a quoted title."""
+    labels = set()
+    for groups in RX_LABEL_FLAG.findall(command):
+        labels |= split_labels("".join(groups))
+    return labels
+
+
+def command_label_sets(command: str) -> list:
+    """One label set per issue create in `command`.
+
+    A backtick becomes `;` first, so a create inside backticks is split off
+    like one inside `$( )`. A backtick inside a longer quoted value stays
+    inside that value, where the extra `;` changes no label. A quoted value
+    that is only a backtick becomes a lone `;`, the first shape under KNOWN
+    LIMITS in the module docstring."""
+    commands = _simple_commands(command.replace("`", ";"))
+    segments = create_segments(commands) if commands is not None else []
+    if not segments:
+        # The quoting does not balance, or the create sits inside a quoted
+        # string, where it is part of one token. Read the whole command.
+        return [fallback_labels(command)]
+    return [token_labels(segment) for segment in segments]
 
 
 def evaluate_bash(command: str) -> str | None:
-    """Return warning text when a Bash issue create carries no authorship label."""
+    """Return warning text when a Bash issue create lacks a required label."""
     if not command:
         return None
     stripped = strip_heredocs(command)
     if not RX_ISSUE_CREATE.search(strip_single_quoted(stripped)):
         return None
-    if labels_authorship(stripped):
-        return None
-    return NOTE
+    for labels in command_label_sets(stripped):
+        note = build_note(labels)
+        if note:
+            return note
+    return None
 
 
 def _label_values(tool_input: dict) -> list:
@@ -194,12 +350,17 @@ def _label_values(tool_input: dict) -> list:
     if isinstance(labels, str):
         return [labels]
     if isinstance(labels, (list, tuple)):
-        return [str(item) for item in labels]
+        # A label may arrive as an object with a `name`, the shape the REST
+        # API returns, as well as a bare string.
+        return [
+            str(item.get("name", "")) if isinstance(item, dict) else str(item)
+            for item in labels
+        ]
     return []
 
 
 def evaluate_mcp(tool_name: str, tool_input: dict) -> str | None:
-    """Return warning text when an MCP issue create carries no authorship label."""
+    """Return warning text when an MCP issue create lacks a required label."""
     if tool_name not in MCP_ISSUE_CREATE_TOOLS:
         return None
     # issue_write also updates and closes; only a create is in scope. The
@@ -208,9 +369,10 @@ def evaluate_mcp(tool_name: str, tool_input: dict) -> str | None:
     method = tool_input.get("method")
     if tool_name == "mcp__github__issue_write" and method != "create":
         return None
-    if any(carries_authorship(value) for value in _label_values(tool_input)):
-        return None
-    return NOTE
+    labels = set()
+    for value in _label_values(tool_input):
+        labels |= split_labels(value)
+    return build_note(labels)
 
 
 def _emit(note: str) -> None:

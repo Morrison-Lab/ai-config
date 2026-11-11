@@ -25,7 +25,6 @@ Measured 2026-08-23/24:
 - **It is not a permission problem.**
   On 2026-08-22 the global and project opencode configs both already allowed all bash and external directories.
   The stops traced to this bug, one manual reject and user interrupts.
-  That session was working [ai-config#1953](https://github.com/Morrison-Lab/ai-config/issues/1953), which does not itself record this finding.
 
 ## The PowerShell-5.1 layer
 

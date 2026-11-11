@@ -91,12 +91,30 @@ WRAPPER_VALUE_OPTIONS = {"sudo": set("acugpCUrtTDR"), "doas": set("auC"),
                          "env": set("auCSPLU"),
                          "timeout": set("sk"), "nice": {"n"}, "ionice": set("cnp"),
                          "stdbuf": set("ioe")}
-WRAPPER_VALUE_LONG = {"--user", "--group", "--host", "--prompt", "--chdir", "--chroot",
-                      "--close-from", "--other-user", "--role", "--type",
-                      "--command-timeout", "--unset", "--split-string", "--signal",
-                      "--kill-after", "--adjustment", "--class", "--classdata", "--pid",
-                      "--input", "--output", "--error", "--auth-type", "--login-class",
-                      "--argv0"}
+# Each wrapper's long options, as (those taking the next word, flags).
+# getopt_long takes an exact name first, then a unique prefix (`--us` is
+# `--user`), so a flag such as sudo's `--login`, a prefix of `--login-class`,
+# has to be listed for its exact match to win. An option with an optional
+# value (`--preserve-env[=list]`) takes it only attached, so it is a flag here.
+WRAPPER_LONG = {
+    "sudo": ({"--auth-type", "--chdir", "--chroot", "--close-from", "--command-timeout",
+              "--group", "--host", "--login-class", "--other-user", "--prompt", "--role",
+              "--type", "--user"},
+             {"--askpass", "--background", "--bell", "--edit", "--help", "--list",
+              "--login", "--non-interactive", "--preserve-env", "--preserve-groups",
+              "--remove-timestamp", "--reset-timestamp", "--set-home", "--shell",
+              "--stdin", "--validate", "--version"}),
+    "env": ({"--argv0", "--chdir", "--split-string", "--unset"},
+            {"--block-signal", "--debug", "--default-signal", "--help",
+             "--ignore-environment", "--ignore-signal", "--list-signal-handling",
+             "--null", "--version"}),
+    "timeout": ({"--kill-after", "--signal"},
+                {"--foreground", "--help", "--preserve-status", "--verbose", "--version"}),
+    "nice": ({"--adjustment"}, {"--help", "--version"}),
+    "ionice": ({"--class", "--classdata", "--pgid", "--pid", "--uid"},
+               {"--help", "--ignore", "--version"}),
+    "stdbuf": ({"--error", "--input", "--output"}, {"--help", "--version"}),
+}
 # Options with an optional value (sudo's `h::`). Attached (`-hhost`), the rest
 # of the word is the value. Alone as `-h`, sudo takes the next word as the
 # host when it is not an option or an assignment (src/parse_args.c). Inside a
@@ -104,6 +122,8 @@ WRAPPER_VALUE_LONG = {"--user", "--group", "--host", "--prompt", "--chdir", "--c
 WRAPPER_OPTIONAL_VALUE = {"sudo": {"h"}}
 # How deep `${A:-${B:-...}}` defaults are expanded before giving up.
 MAX_NESTING = 32
+# What `_expand` returns past MAX_NESTING: the root, which is always refused.
+CAPPED = ("/", False)
 DECLARE_BUILTINS = ("export", "local", "declare", "readonly", "typeset")
 # chmod's own short options (GNU and BSD); any other `-w` or `-x` is a mode.
 CHMOD_OPTIONS = set("cfvRHLPh")
@@ -201,8 +221,11 @@ def _takes_next_word(wrapper, tok, following):
     if tok.startswith("--"):
         if "=" in tok:
             return False
-        return tok in WRAPPER_VALUE_LONG or (
-            len(tok) > 3 and any(opt.startswith(tok) for opt in WRAPPER_VALUE_LONG))
+        takes, flags = WRAPPER_LONG.get(wrapper, (set(), set()))
+        if tok in takes or tok in flags:
+            return tok in takes
+        matches = [opt for opt in takes | flags if opt.startswith(tok)]
+        return len(matches) == 1 and matches[0] in takes  # ambiguous: a usage error
     values = WRAPPER_VALUE_OPTIONS.get(wrapper, ())
     optional = WRAPPER_OPTIONAL_VALUE.get(wrapper, ())
     if len(tok) == 2 and tok[1] in optional:
@@ -274,9 +297,11 @@ def _targets(program, head):
 def _expand(text, home, assigned, here, depth=0):
     """`(TEXT expanded, weak)`, or `None` when a computed value makes it undecidable.
 
-    A default nested deeper than MAX_NESTING is read as `/`, so adversarial
-    input can neither exhaust the stack and crash the hook open nor hide a
-    protected path behind the cutoff.
+    A default nested deeper than MAX_NESTING makes the whole text CAPPED,
+    read as `/`, so adversarial input can neither exhaust the stack and crash
+    the hook open nor hide a protected path behind the cutoff, even with text
+    around the nest (`/e${A:-...tc}`). That refuses a deep nest around a
+    harmless path too, which no real command writes.
 
     A variable set in this environment keeps its value, since the Bash call
     inherits it too; one that is unset here is taken as empty, and the result
@@ -288,7 +313,7 @@ def _expand(text, home, assigned, here, depth=0):
     text = re.sub(r"\A~([A-Za-z0-9_.-]*)(?=/|\Z)",
                   lambda m: os.path.expanduser("~" + m.group(1)) if m.group(1) else home,
                   text)
-    guessed, undecidable = [], []
+    guessed, undecidable, capped = [], [], []
 
     def value(name, rest):
         if name is None:  # a lifted substitution
@@ -298,6 +323,9 @@ def _expand(text, home, assigned, here, depth=0):
         if name in assigned:
             if assigned[name] is None:
                 undecidable.append(name)
+                return ""
+            if assigned[name] is CAPPED:
+                capped.append(name)
                 return ""
             val, weak = assigned[name]
             guessed.append(weak)
@@ -310,10 +338,11 @@ def _expand(text, home, assigned, here, depth=0):
             missing = not val
         default = re.match(r":?[-=]", rest)
         if default and not val:
-            # Past MAX_NESTING the default counts as `/`, so a deep nest
-            # around a protected path is refused rather than waved through.
-            fallback = (("/", False) if depth >= MAX_NESTING
+            fallback = (CAPPED if depth >= MAX_NESTING
                         else _expand(rest[default.end():], home, assigned, here, depth + 1))
+            if fallback is CAPPED:
+                capped.append(name)
+                return ""
             if fallback is None:
                 undecidable.append(name)
                 return ""
@@ -339,6 +368,8 @@ def _expand(text, home, assigned, here, depth=0):
             pieces.append(value(match.group(2), ""))
     pieces.append(text[pos:])
     expanded = "".join(pieces)
+    if capped:
+        return CAPPED
     return None if undecidable else (expanded, any(guessed))
 
 

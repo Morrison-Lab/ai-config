@@ -159,6 +159,10 @@ class Denies(unittest.TestCase):
         self.assert_denied("sudo -h -u root chown -R me /etc")
         # getopt_long accepts an unambiguous prefix: `--us` is `--user`.
         self.assert_denied("sudo --us root chown -R me /etc")
+        self.assert_denied("sudo --u root chown -R me /etc")
+        self.assert_denied("timeout --s KILL 60 chown -R me /etc")
+        # An exact flag beats a longer option it prefixes (`--login-class`).
+        self.assert_denied("sudo --login chown -R me /etc")
         self.assert_denied("env -a x chown -R me /etc")
         self.assert_denied("env --argv0 x chown -R me /etc")
         # In each bundle the first value-taking letter takes the rest, `u`.
@@ -195,6 +199,13 @@ class Denies(unittest.TestCase):
             deep = "${A:-" * depth + "/etc" + "}" * depth
             self.assert_denied(f'chown -R me "{deep}"')
             self.assert_denied(f'X="{deep}"; chown -R me "$X"')
+            # Text around the nest cannot hide the path either.
+            split = "/e" + "${A:-" * depth + "tc" + "}" * depth
+            self.assert_denied(f'chown -R me "{split}"')
+            self.assert_denied(f'X="{split}"; chown -R me "$X"')
+        # Below the cutoff the nest is expanded and judged on its value.
+        shallow = "${A:-" * 30 + "./build" + "}" * 30
+        self.assertIsNone(run(f'chown -R me "{shallow}"'))
 
     def test_deep_nesting_does_not_crash_the_hook(self):
         deep = "${A:-" * 600 + "/x" + "}" * 600
@@ -207,6 +218,10 @@ class Denies(unittest.TestCase):
 class Allows(unittest.TestCase):
     def assert_allowed(self, command, **kw):
         self.assertIsNone(run(command, **kw), f"expected no deny for: {command}")
+
+    def test_sudo_lone_h_takes_the_next_word_as_host(self):
+        # sudo reads `chown` as the host and `-R me` as the chroot, then runs /etc.
+        self.assert_allowed("sudo -h chown -R me /etc")
 
     def test_project_paths(self):
         self.assert_allowed("chmod -R u+w .")

@@ -5,7 +5,7 @@ Step 3 of ai-config#5309; docs/delivery-paths.md lists the leftovers. A plain ru
 only reports. `--retire` reports, then moves each `retire` path into
 ~/.claude/ai-config-leftovers/<UTC time>/, and removes the settings.json hook
 entries that run catalog hooks from ~/.claude/hooks after copying the old file
-there; moving them back undoes it. `keep` items need a person and are never
+there; moving them back undoes it, even after a failed move. `keep` items need a person and are never
 touched. It reuses doctor.py's leftover tests and wire-user-config.py's hook-entry
 test. It sweeps nothing when no settings file enables the plugin (exit 0), since
 a ~/.claude copy may then be the only install.
@@ -107,7 +107,8 @@ def main(argv: list[str] | None = None) -> int:
     settings_path = home / "settings.json"
     settings = wire.load_json(settings_path)
     if error is not None or settings is None:
-        print(f"Not swept: {source if error else settings_path} is not readable as plain JSON.")
+        bad = source if error else settings_path  # the settings file that failed to parse
+        print(f"Not swept: {bad} is not readable as plain JSON.")
         return 2
     if not enabled:
         print("Not swept: no settings file enables the ai-config plugin, so ~/.claude may hold the only install.")

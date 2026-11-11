@@ -1624,6 +1624,61 @@ def main() -> int:
         checker.FINDING_HEADING_NEGATION_SUFFIX.match(_text)
     check("whitespace runs after a negation scan in under 2 s (#2359)",
           time.monotonic() - _t0 < 2.0)
+    # _negation_suffix bounds each match's scan (ai-config#5401): it keeps the
+    # blank line between a heading and its "None.", stops at the next
+    # paragraph break, and caps a paragraph with no break.
+    check(
+        "_negation_suffix keeps a heading's blank line and stops at the next break",
+        checker._negation_suffix("## Nits\n\nNone.\n\nNext.", 7) == "\n\nNone.",
+    )
+    check(
+        "_negation_suffix stops at a CRLF paragraph break",
+        checker._negation_suffix("## Nits\r\n\r\nNone.\r\n\r\nNext.", 7)
+        == "\r\n\r\nNone.",
+    )
+    check(
+        "_negation_suffix caps a paragraph with no break",
+        len(checker._negation_suffix("x" + "y" * 5000, 1))
+        == checker.NEGATION_SUFFIX_CAP,
+    )
+    # A contrast past the old 60-character slice is now seen, on the
+    # `## Nits` path and the `Needs more work` path alike (#5401).
+    _late = ("None in the parser module, the lexer module or any of their many"
+             " unit tests, but the lexer leaks.")
+    check(
+        "## Nits + a contrast past 60 characters is a finding (#5401)",
+        checker._unresolved_finding_pattern("## Nits\n\n" + _late + "\n")
+        is not None,
+    )
+    check(
+        "classify_verdict: 'Needs more work:' + a late contrast stays not-clean (#5401)",
+        checker.classify_verdict("### Verdict\nNeeds more work: " + _late + "\n")
+        == "not-clean",
+    )
+    # Pin the cap residual (ai-config#5389): a contrast inside the cap is
+    # seen, one beyond it is not. Moving the cap must move this test.
+    _pad = "x " * ((checker.NEGATION_SUFFIX_CAP - 200) // 2)
+    check(
+        "a contrast inside NEGATION_SUFFIX_CAP is seen (#5401)",
+        checker._unresolved_finding_pattern(
+            "## Nits\n\nNone in " + _pad + "but the login flow is broken.\n"
+        ) is not None,
+    )
+    _pad = "x " * (checker.NEGATION_SUFFIX_CAP // 2 + 100)
+    check(
+        "a contrast beyond NEGATION_SUFFIX_CAP is a known residual (#5389)",
+        checker._unresolved_finding_pattern(
+            "## Nits\n\nNone in " + _pad + "but the login flow is broken.\n"
+        ) is None,
+    )
+    # Many negated headings in one long paragraph must stay linear: an
+    # unbounded suffix took 4.5 s on a 62 KB body, the capped one 0.5 s.
+    _t0 = time.monotonic()
+    checker._unresolved_finding_pattern("### Issues: None\nall good here\n" * 4000)
+    check(
+        "a 124 KB paragraph of negated headings is scanned in under 6 s (#5401)",
+        time.monotonic() - _t0 < 6.0,
+    )
     unbolded_nwn = "### Verdict\nNeeds more work\n\nNone are blocked.\n"
     check(
         "classify_verdict: unbolded next-paragraph 'None are blocked.' does NOT blank not-clean verdict (#3937)",

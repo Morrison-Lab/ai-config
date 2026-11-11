@@ -331,6 +331,26 @@ class Denies(unittest.TestCase):
             self.assert_denied(cmd, cwd=HOME + "/proj")
         # From home, either way it stays home.
         self.assert_denied('cd "$UNSET_D"; X=$PWD; chown -R me "$X"', cwd=HOME)
+        # Options before the operand, and a name set empty, go home too.
+        for cmd in ("cd -P $UNSET_D && chown -R me .", "cd -- $UNSET_D && chown -R me .",
+                    "D=; cd $D && chown -R me ."):
+            self.assert_denied(cmd, cwd=HOME + "/proj")
+
+    def test_cd_to_an_unset_variable_then_slash_is_root(self):
+        self.assert_denied('cd "$UNSET_D/" && chown -R me .', cwd=HOME + "/proj")
+
+    def test_nested_texts_at_each_depth(self):
+        for cmd in ('X=$(sh -c "chown -R me /etc")',
+                    "echo $(echo $(chown -R me /etc))",
+                    "sudo sh -c \"bash -c 'chown -R me /etc'\"",
+                    "sh -c 'echo $(echo $(echo $(chown -R me /etc)))'"):
+            self.assert_denied(cmd)
+
+    def test_nested_texts_past_max_nested_are_read_with_no_directory(self):
+        deep = "chown -R me /etc"
+        for _ in range(guard.MAX_NESTED + 2):
+            deep = f"echo $({deep})"
+        self.assert_denied(deep)
 
     def test_pwd_name_used_with_a_suffix(self):
         for cmd in ('if [ -d sub ]; then cd sub; fi; X=$PWD; chown -R me "$X/.."',
@@ -649,6 +669,27 @@ class Allows(unittest.TestCase):
 
     def test_empty_operand(self):
         self.assert_allowed('chmod -R 755 "$UNSET_DIR"')
+
+    def test_cd_to_a_loop_variable_or_set_name_stays_in_the_project(self):
+        for cmd in ('for d in */; do (cd "$d" && chmod -R u+w .); done',
+                    'for d in */; do cd "$d"; chmod -R u+w .; cd ..; done',
+                    'cd "$PROJECT_ROOT" && chmod -R u+w .',
+                    'cd "$OUT/build" && chmod -R u+w .'):
+            self.assert_allowed(cmd, cwd=HOME + "/work/lds")
+
+    def test_nested_texts_past_max_depth_are_not_read(self):
+        deep = "chown -R me /etc"
+        for _ in range(guard.MAX_DEPTH + 1):
+            deep = f"echo $({deep})"
+        self.assert_allowed(deep)
+
+    def test_one_nested_text_repeated_in_many_directories_is_read_once_each(self):
+        guards = "".join(f"if {c}; then cd {c}; fi; " for c in "abcd")
+        words = " ".join(f"w{i}" for i in range(1000))
+        text = f'sh -c "chmod -R u+w ./x {words}"'
+        start = time.monotonic()
+        self.assert_allowed(guards + "; ".join([text] * 200))
+        self.assertLess(time.monotonic() - start, 5)
 
     def test_override(self):
         self.assert_allowed("ALLOW_RECURSIVE_SYSTEM_CHOWN=1 chown -R me /usr/local/share")

@@ -54,9 +54,11 @@ comments is lifted out before the command is split, scanned as a command of
 its own, and taken as empty, except a bare `pwd`, read as `$PWD`. A `sh -c`
 text or a substitution is read where it appears, in the directory and with
 the names of each way the command may run up to there, to MAX_NESTED
-levels. A `cd` up the tree repeated by a loop (`cd ..`) is judged in every
-directory above, and `cd $UNSET` both where it is and at home (bash goes home
-when the variable is unquoted).
+levels, and deeper with no directory, to MAX_DEPTH. A `cd` up the tree
+repeated by a loop (`cd ..`) is judged in every directory above. An
+unquoted `cd $D` with D empty or unset goes home, and is judged both there
+and where it is; `cd "$UNSET/"` is judged at `/` too (a value taken as
+empty counts only where it reaches the root, a system tree or home).
 
 A deny, not a warning: the remedy (fix the one path that raised the error, as
 your own user) is always available, and the damage is unrecoverable without a
@@ -79,8 +81,9 @@ component (`/*/lib`), a partial glob or brace expansion that names a
 protected path (`/et*`, `/{etc,usr}`), a wrapper that changes directory
 (`env -C /etc`, `sudo -D /etc`), more than MAX_WORLDS ways a command may
 run (the directory is then unknown), a nested text read after MAX_WORK
-commands (read once, with no directory), PowerShell `icacls`/`Set-Acl`, Windows drive
-paths (`C:/Windows`), a relative target, `$PWD`, or a name assigned from
+words (read once, with no directory), PowerShell `icacls`/`Set-Acl`, Windows drive
+paths (`C:/Windows`), nested texts past MAX_DEPTH, a relative target,
+`$PWD`, or a name assigned from
 `$PWD`, after a `cd` this cannot resolve (`cd -` or `cd "$(git rev-parse
 --show-toplevel)"`, where `$PWD` is taken as empty), a `cd` into a subdirectory repeated by a loop
 (read as run once), a command before a `cd` in the same loop body (judged
@@ -116,6 +119,9 @@ except Exception as _exc:  # broken install: say so, then allow
 
 OVERRIDE = "ALLOW_RECURSIVE_SYSTEM_CHOWN=1"
 PROGRAMS = {"chown", "chmod", "chgrp"}
+# A text that never names one of PROGRAMS cannot run one (the program is read
+# only as a literal word, see `_program`), so it is not read further.
+PROGRAM_TEXT = re.compile(r"ch(?:own|mod|grp)")
 WRAPPERS = (set(COMMAND_WRAPPERS) | {"setsid", "busybox", "pkexec"}
             if simple_commands_with_scope else set())
 # Wrappers that take positional words before the program (`timeout 60 chmod`).
@@ -220,10 +226,12 @@ READ_BUILTINS = ("read", "mapfile", "readarray", "getopts")
 PWD_SUB = "__AICFG_PWDSUB__"
 # How many ways a command may run (see `_scan`) are judged one by one.
 MAX_WORLDS = 16
-# How deep `sh -c` texts and substitutions inside one another are read.
+# How deep `sh -c` texts and substitutions inside one another are read in
+# each directory; deeper ones are read with no directory, to MAX_DEPTH.
 MAX_NESTED = 3
-# Past this many commands read, a nested text is read once, with no directory.
-MAX_WORK = 2000
+MAX_DEPTH = 32
+# Past this many words read, a nested text is read once, with no directory.
+MAX_WORK = 20000
 ALL_GLOB = re.compile(r"\A[*?.]*[*?][*?.]*\Z")
 
 DENY = (
@@ -646,6 +654,26 @@ def _ancestors(path):
     return out
 
 
+def _cd_operand(lead):
+    """The index in LEAD of `cd`'s directory operand, after its options, or None."""
+    i = 1
+    while i < len(lead) and lead[i] in ("-L", "-P", "-e", "-@", "-LP", "-PL", "-Pe"):
+        i += 1
+    if i < len(lead) and lead[i] == "--":
+        i += 1
+    return i if i < len(lead) else None
+
+
+def _bare(piece, tok):
+    """Whether TOK appears in PIECE outside quotes, as a word of its own."""
+    for match in re.finditer(re.escape(tok), piece):
+        before = piece[match.start() - 1] if match.start() else " "
+        after = piece[match.end()] if match.end() < len(piece) else " "
+        if before in " \t" and after in " \t;&|)\n":
+            return True
+    return False
+
+
 def _nested(words):
     """The `sh -c` texts WORDS starts, in order (`sudo sh -c '...'` too)."""
     try:
@@ -665,10 +693,14 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
 
     CTX is shared by the whole command: a nested text already read in the
     same directory with the same names is not read again, and past
-    MAX_WORK commands read, a nested text is read once, with no directory.
+    MAX_WORK words read, a nested text is read once, with no directory.
     """
-    ctx = {"seen": set(), "work": 0} if ctx is None else ctx
-    cmds, inner = _split(piece)
+    ctx = {"seen": set(), "work": 0, "split": {}} if ctx is None else ctx
+    if not PROGRAM_TEXT.search(re.sub(r"[\\'\"]", "", piece)):
+        return None  # no chown, chmod or chgrp anywhere in it, quotes aside
+    if piece not in ctx["split"]:
+        ctx["split"][piece] = _split(piece)
+    cmds, inner = ctx["split"][piece]
     # A WORLD is one way the command may run: for each scope, the directory
     # the shell is in (`None` when this cannot name it) and the names
     # assigned there. A `cd` or assignment inside `( ... )` changes only that
@@ -693,11 +725,13 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
             hit = _nested_hit(text, None, home, outer, level, ctx)
             if hit:
                 return hit
-    worlds, blocks, taken = [({(0,): cwd}, {})], [], 0
+    worlds, blocks, taken, loop_names = [({(0,): cwd}, {})], [], 0, set()
     for scope, argv in cmds or []:
         # `then cd /etc`, `{ cd /usr; }`: a keyword ends the command before.
         words, opened = argv, None
         while words and words[0] in SHELL_KEYWORDS:
+            if words[0] in ("for", "select") and len(words) > 1:
+                loop_names.add(words[1])
             if words[0] in BLOCK_OPEN:
                 blocks.append(words[0])
                 opened = words[0]
@@ -720,7 +754,7 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
             assigned = dict(outer)
             for k in range(1, len(scope) + 1):
                 assigned.update(assigns.get(scope[:k], {}))
-            ctx["work"] += 1
+            ctx["work"] += len(argv)
             over = ctx["work"] > MAX_WORK
             for text in texts:
                 hit = _nested_hit(text, None if over else here, home,
@@ -735,12 +769,27 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
                                         for g in got]
                 unknown = None in cd_words or any(SUB in tok for tok in lead) or here is None
                 new = None if unknown else resolve_cd_target(cd_words, here)
-                news, fork = [new], maybe
-                if lead[0] == "cd" and here and got == [("", True)] and SUB not in lead[1]:
-                    # `cd $UNSET` goes home unquoted and stays put quoted, and
-                    # the quotes are gone by now: both may happen.
-                    news, fork, new = [home], True, here
-                elif looped and new and here and _above(new, here):
+                news, fork, stay = [new], maybe, here
+                operand = _cd_operand(lead)
+                tok = lead[operand] if operand else None
+                reading = got[operand - 1] if operand else None
+                looped_name = tok and any(
+                    (m.group(1) or m.group(2)) in loop_names for m in VARIABLE.finditer(tok))
+                if lead[0] != "cd" or not here or not tok or SUB in tok or looped_name:
+                    pass  # no operand, or one this cannot read: as resolved above
+                elif reading and reading is not UNREAD and reading[0] == "":
+                    # An unquoted empty `cd $D` goes home; quoted, it stays put.
+                    new = here
+                    if _bare(piece, tok):
+                        news, fork = [home], True
+                    else:
+                        news = [new]
+                elif reading and reading is not UNREAD and reading[1] and reading[0]:
+                    # `cd "$UNSET/"` is `cd /`: judged there when that is protected.
+                    path = os.path.normpath(os.path.join(here, reading[0]))
+                    if _why(path, home, True):
+                        news, fork, stay = [path], True, None
+                if looped and new and here and _above(new, here):
                     # Repeated, an up-move may reach every directory above.
                     news, fork = _ancestors(here)[::-1], True
                 news = [n for n in news if n != here]
@@ -750,7 +799,8 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
                     forked.extend(({**heres, scope: n},
                                    {k: dict(v) for k, v in assigns.items()})
                                   for n in news[:room])
-                    continue  # this world keeps the directory before the `cd`
+                    heres[scope] = stay  # where this world is if the `cd` did not move it
+                    continue
                 heres[scope] = None if fork and news else new
                 continue
             if _assignments(words, store, assigned, home, here):
@@ -763,9 +813,11 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
 
 
 def _nested_hit(text, here, home, names, level, ctx):
-    """`_scan` of a nested TEXT, unless it is too deep or read already."""
+    """`_scan` of a nested TEXT, unless it is past MAX_DEPTH or read already."""
+    if level >= MAX_NESTED:
+        here = None  # deeper texts are read once, with no directory
     key = (text, here, repr(sorted(names.items(), key=lambda kv: kv[0])))
-    if level >= MAX_NESTED or key in ctx["seen"]:
+    if level >= MAX_DEPTH or key in ctx["seen"]:
         return None
     ctx["seen"].add(key)
     return _scan(text, here, home, names, level + 1, ctx)
@@ -824,7 +876,7 @@ def main() -> int:
     if not hit:
         return 0
     segment, program, target, path, why = hit
-    where = why if path is None else f"which resolves to `{path}`, {why}"
+    where = why if path is None else f"which can resolve to `{path}`, {why}"
     print(json.dumps({"hookSpecificOutput": {
         "hookEventName": "PreToolUse",
         "permissionDecision": "deny",

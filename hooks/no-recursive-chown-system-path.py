@@ -53,8 +53,8 @@ empty. A command substitution outside single quotes, heredoc bodies and
 comments is lifted out before the command is split, scanned as a command of
 its own, and taken as empty, except a bare `pwd`, read as `$PWD`. A `sh -c`
 text or a substitution runs in the caller's directory, the hook's `cwd`
-while no `cd` appears before it; after one, its directory is unknown, so only
-absolute targets are judged there. After a `cd` this cannot resolve (`cd -`,
+while no `cd` appears before it in its scope; after one, its directory is
+unknown, so only absolute targets are judged there. After a `cd` this cannot resolve (`cd -`,
 `cd "$UNSET"`), `$PWD` is taken as empty, and an operand left empty by it
 (`"$PWD"`, or `X=$PWD` then `"$X"`) is refused.
 
@@ -424,6 +424,9 @@ def _expand(text, home, assigned, here, depth=0, effects=None):
     guessed, undecidable, capped, unknown = [], [], [], []
 
     def value(name, rest):
+        if name in ("!", "#") and rest:  # `${!P}`, `${!?}`, `${#P}`
+            capped.append(name)
+            return ""
         if name is None:  # a lifted substitution
             guessed.append(True)
             return ""
@@ -621,13 +624,18 @@ def _shown(text):
     return text.replace(SUB, "$(...)").replace(PWD_SUB, "$(pwd)")
 
 
+def _starts_nested(words):
+    """Whether WORDS holds a lifted substitution or a shell's `-c` flag."""
+    return any(SUB in w or re.fullmatch(r"-[A-Za-z]*c[A-Za-z]*", w) for w in words)
+
+
 def _scan(piece, cwd, home, outer):
     """`(hit or None, [inner substitutions], names assigned, moved)` for one text.
 
     OUTER holds names an enclosing text assigned: a `sh -c` body or a
     substitution sees them, through the outer shell's own expansion of a
-    double-quoted body or through the environment. MOVED says whether any
-    `cd`, `pushd` or `popd` appears in the text.
+    double-quoted body or through the environment. MOVED says whether a
+    `cd`, `pushd` or `popd` comes before a command that starts a nested text.
     """
     cmds, inner = _split(piece)
     # A WORLD is one way the command may run: for each scope, the directory
@@ -643,7 +651,9 @@ def _scan(piece, cwd, home, outer):
     # DEPTH counts the `if`, loop and `case` commands open here: any `cd`
     # inside one may not run, except in the condition of the one it opens
     # (`if cd x; then`, `while ! cd x`). A `{ ... }` group runs.
-    worlds, depth, moved_any = [({(0,): cwd}, {})], 0, False
+    # MOVED: a `cd` came before a command that starts a nested text (a
+    # substitution or a shell's `-c`), in that command's scope or above it.
+    worlds, depth, moved_any, cd_scopes = [({(0,): cwd}, {})], 0, False, []
     for scope, argv in cmds or []:
         # `then cd /etc`, `{ cd /usr; }`: a keyword ends the command before.
         words, opened = argv, None
@@ -656,7 +666,10 @@ def _scan(piece, cwd, home, outer):
         while lead and lead[0] in ("time", "-p", "command", "builtin"):
             lead = lead[1:]
         is_cd = bool(lead) and lead[0] in ("cd", "pushd", "popd")
-        moved_any = moved_any or is_cd
+        if is_cd:
+            cd_scopes.append(scope)
+        elif _starts_nested(words) and any(scope[:len(c)] == c for c in cd_scopes):
+            moved_any = True
         forked = []
         for heres, assigns in worlds:
             here = next(heres[scope[:k]] for k in range(len(scope), 0, -1)
@@ -721,8 +734,9 @@ def _hit(command, cwd, home):
     """`(segment, program, target, path, why)` for the first protected target.
 
     A `sh -c` text or a substitution runs in the directory of the shell that
-    starts it. That is CWD while no text read so far has a `cd`; after one,
-    it is `None`, and relative targets there are left alone.
+    starts it. That is CWD until a text read so far has a `cd` before a
+    command that starts one; after that it is `None`, and relative targets
+    there are left alone.
     """
     pending = list(shell_c_expansions(command))
     known = {}  # every name assigned so far, over-approximating its scope

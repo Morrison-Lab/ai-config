@@ -320,6 +320,13 @@ class Denies(unittest.TestCase):
                     "sudo sh -c 'chown -R me .'"):
             self.assert_denied(cmd, cwd=HOME)
         self.assert_denied("if a; then cd /; fi; if b; then cd y; fi; chown -R me .")
+        # A `cd` after the nested text, or in another subshell, does not move it.
+        for cmd in ("sh -c 'chown -R me .'; cd /tmp", 'echo "$(chown -R me .)"; cd /tmp',
+                    "(cd /tmp && ls); sh -c 'chown -R me .'"):
+            self.assert_denied(cmd, cwd=HOME)
+
+    def test_indirection_with_a_check(self):
+        self.assert_denied('chown -R me "${!?}"')
 
     def test_refusal_quotes_pwd_substitution_as_written(self):
         reason = run('sudo chown -R "$USER" "$(pwd)"', cwd=HOME)["permissionDecisionReason"]

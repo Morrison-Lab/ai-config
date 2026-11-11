@@ -252,7 +252,7 @@ its description does not use (ai-config#949).
 | `shared/coding/errexit-is-not-uniform.md` | `set -e` does not apply everywhere, and the places it stops applying are not obvious. A failing command aborts the script in most positions, but bash suppres... |  |
 | `shared/coding/fact-check-code-logic.md` | When reviewing code that implements an algorithm, computation, math, or statistics, check whether it's *right* --- not just styled well. Use domain knowledge... |  |
 | `shared/coding/function-signature-style.md` | When an R function signature doesn't fit on one line, format the argument list with **single-indent** style: nothing after `function(`, each argument on its... |  |
-| `shared/coding/heredoc-backslash-collapse.md` | Moved out of the auto-loaded `CLAUDE.md` (ai-config#3568), which keeps the rule and its pattern/anti-pattern pairs and links here for the mechanics, the repr... |  |
+| `shared/coding/heredoc-backslash-collapse.md` | Moved out of the auto-loaded `CLAUDE.md` (ai-config#3568), which keeps a short summary of the rule and links here for the pattern/anti-pattern pairs, the mec... |  |
 | `shared/coding/least-flexible-tool.md` | Use the least-flexible construct that does the job. When two constructs both work, prefer the one that can do less, because a narrower construct announces it... |  |
 | `shared/coding/loop-hygiene.md` | When a `for` loop really is the right construct --- see `least-flexible-tool` for when it is not --- three checks apply. Each is mechanical, greppable, and c... |  |
 | `shared/coding/one-function-per-file.md` | When adding a new function to a codebase, give it its own file rather than bundling it into a file that already holds other functions --- unless the function... |  |
@@ -408,7 +408,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/surface-merge-order.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/workflow/sync-with-main.md` | Whenever `main` has moved ahead of a PR branch you're working on, **merge `main` into the PR branch** before the next push or review trigger. Don't wait for... |  |
 | `shared/workflow/terminate-superseded-tasks.md` | When background tasks, asynchronous command executions, monitors, or subagents are dispatched to inspect, search, or diagnose an issue, actively terminate th... |  |
-| `shared/workflow/timestamp-local-recaps.md` | Moved out of the auto-loaded `CLAUDE.md` (ai-config#3568), which keeps the rule and its pattern/anti-pattern pairs and links here for the platform mechanics,... |  |
+| `shared/workflow/timestamp-local-recaps.md` | Moved out of the auto-loaded `CLAUDE.md` (ai-config#3568), which keeps a short summary of the rule, one pattern/anti-pattern pair, and a link here for the fu... |  |
 | `shared/workflow/track-useful-resources.md` | A notes repo is a site listed in `course-sequence` or in the notes repository registry of `send-notes`. Track every useful resource (textbooks, articles, sof... |  |
 | `shared/workflow/triage-backlog.md` | Triage the issue backlog on a fixed cadence, and treat closing an issue as not-planned as a normal outcome of that pass rather than as a failure to do the work. |  |
 | `shared/workflow/triage-new-asks.md` | Triage a new ask against the current backlogs before acting on it, so it joins the work that already owns it instead of spawning parallel work. |  |

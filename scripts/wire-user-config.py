@@ -101,6 +101,17 @@ def catalog_scripts() -> set[str]:
     }
 
 
+def leftover_hook(hook: object, scripts: set[str]) -> bool:
+    """True when one settings.json hook entry runs a catalog hook from ~/.claude/hooks."""
+    command = hook.get("command", "") if isinstance(hook, dict) else ""
+    if not isinstance(command, str) or "CLAUDE_PLUGIN_ROOT" in command:
+        return False
+    # install-hooks.py writes `$HOME/.claude/hooks/<name>`, or a
+    # literal CLAUDE_HOME path, with either separator.
+    return any(re.search(r"[\\/]hooks[\\/]" + re.escape(name) + r"(?![\w.-])", command)
+               for name in scripts)
+
+
 def non_plugin_hooks_registered(settings: dict) -> bool:
     """True when settings.json runs catalog hooks from ~/.claude/hooks."""
     scripts = catalog_scripts()
@@ -111,15 +122,7 @@ def non_plugin_hooks_registered(settings: dict) -> bool:
         for group in groups if isinstance(groups, list) else []:
             entries = group.get("hooks") if isinstance(group, dict) else None
             for hook in entries if isinstance(entries, list) else []:
-                command = hook.get("command", "") if isinstance(hook, dict) else ""
-                if not isinstance(command, str):
-                    continue
-                if "CLAUDE_PLUGIN_ROOT" in command:
-                    continue
-                # install-hooks.py writes `$HOME/.claude/hooks/<name>`, or a
-                # literal CLAUDE_HOME path, with either separator.
-                if any(re.search(r"[\\/]hooks[\\/]" + re.escape(name) + r"\b", command)
-                       for name in scripts):
+                if leftover_hook(hook, scripts):
                     return True
     return False
 

@@ -21,40 +21,10 @@ Builds a fake `~/.claude/plugins` (a three-commit marketplace clone plus an
      names the file.
   9. No marketplace clone: exit 0, nothing on stdout, stderr says so.
 
-With a bare repository as the clone's `origin` (ai-config#5309 step 2):
-
-  10. Origin ahead of the clone, pin at the clone's HEAD: warns that the
-      clone has not been updated, naming origin's tip.
-  11. Pin at origin's tip, clone behind it: silent.
-  12. Pin behind the clone, clone behind origin: warns with the count and
-      says the clone itself lags origin.
-  13. Case 10 with AI_CONFIG_NO_REMOTE_CHECK=1: silent.
-  14. Case 10 with CLAUDE_CODE_REMOTE=true: silent, since the cloud
-      refresh hook updates the user-scope pin.
-  14b. Case 14 with AI_CONFIG_NO_AUTO_REFRESH=1: warns, since nothing
-      refreshes the pin.
-  14c. Case 16's project pin with CLAUDE_CODE_REMOTE=true: warns, since the
-      refresh hook leaves project pins alone.
-  16. Project-scope pin at the clone's HEAD, clone behind origin: warns
-      with --scope project.
-  17. No recorded commit, clone behind origin: warns.
-  18. Pin ahead of a clone that lags origin: says "ahead of", not
-      "matching".
-  19. Clone ahead of origin (origin's tip is its ancestor), pin at HEAD:
-      silent.
-  19b. Same clone, pin at origin's tip: warns that the pin is one commit
-      behind the clone, although it contains origin's tip.
-  20. Clone at origin's tip, pin behind: warns with the count and does not
-      say the clone lags.
-  22. Pin that descends from origin's tip, clone behind origin: silent.
-  22b. The same pin with the clone's HEAD diverged from it: warns, since
-      the pin does not contain the clone's HEAD.
-  23. Case 10 with no time budget left (AI_CONFIG_REMOTE_BUDGET=0): origin
-      is not read, stderr says so, and the clone alone is compared.
-  15. Origin unreachable: falls back to the clone, says so on stderr, and
-      passes git's own error through.
-  21. Origin unreachable and no applicable entry: origin is not read, so
-      stderr is empty.
+With a bare repository as the clone's `origin` (ai-config#5309 step 2),
+cases 10 to 23 cover the pin, clone and origin relations, the opt-outs,
+the cloud carve-outs, the time budget and an unreachable origin. Each
+check's name states its case.
 """
 import json
 import os

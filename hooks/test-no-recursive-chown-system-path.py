@@ -339,6 +339,25 @@ class Denies(unittest.TestCase):
     def test_cd_to_an_unset_variable_then_slash_is_root(self):
         self.assert_denied('cd "$UNSET_D/" && chown -R me .', cwd=HOME + "/proj")
 
+    def test_cd_to_an_unset_variable_unquoted_in_other_spellings(self):
+        for cmd in ("cd $UNSET_D>/dev/null; chown -R me .", "(cd $UNSET_D && chown -R me .)",
+                    "cd -eP $UNSET_D; chown -R me .", "cd -LPe $UNSET_D; chown -R me ."):
+            self.assert_denied(cmd, cwd=HOME + "/proj")
+
+    def test_climb_from_a_directory_under_an_unset_variable(self):
+        # With OUT unset, `cd "$OUT/tmp"` is `cd /tmp`, and `..` is `/`.
+        for cmd in ('cd "$OUT/tmp" && chown -R me ..',
+                    'cd "$OUT/var/lib/myapp" && chown -R me ..',
+                    'cd "$OUT/x" && cd sub && chmod -R u+w ../..'):
+            self.assert_denied(cmd, cwd=HOME + "/proj")
+
+    def test_names_survive_past_the_work_budget(self):
+        forks = "".join(f"if t{i}; then cd d{i}; fi; " for i in range(4))
+        files = " ".join(f"f{i}" for i in range(guard.MAX_WORK // 8))
+        for tail in ('sh -c "chown -R me $D"', 'X=$(chown -R me "$D")'):
+            # `a=b` keeps the `ls` from being skipped, so it spends the budget.
+            self.assert_denied(f"{forks}D=/etc; ls a=b {files}; {tail}", cwd=HOME + "/proj")
+
     def test_nested_texts_at_each_depth(self):
         for cmd in ('X=$(sh -c "chown -R me /etc")',
                     "echo $(echo $(chown -R me /etc))",
@@ -674,8 +693,40 @@ class Allows(unittest.TestCase):
         for cmd in ('for d in */; do (cd "$d" && chmod -R u+w .); done',
                     'for d in */; do cd "$d"; chmod -R u+w .; cd ..; done',
                     'cd "$PROJECT_ROOT" && chmod -R u+w .',
-                    'cd "$OUT/build" && chmod -R u+w .'):
+                    'cd "$OUT/build" && chmod -R u+w .',
+                    "for d in */; do cd $d; chmod -R u+w .; cd ..; done",
+                    'cd "$WORKDIR" && chmod -R u+w . && echo done in $WORKDIR'):
             self.assert_allowed(cmd, cwd=HOME + "/work/lds")
+
+    def test_directory_under_an_unset_variable_is_judged_weakly(self):
+        # With OUT set, the `cd` goes somewhere this cannot name, so home and
+        # a top-level name reached through an empty value are no reason to refuse.
+        for cmd in ('cd "$OUT/build" && chmod -R u+w .', 'cd "$OUT/opt" && chmod -R u+w .',
+                    'cd "$OUT/build" && chmod -R u+w "$PWD"'):
+            self.assert_allowed(cmd, cwd=HOME)
+
+    def count_calls(self, name, command):
+        real, calls = getattr(guard, name), []
+
+        def counted(*args, **kwargs):
+            calls.append(args)
+            return real(*args, **kwargs)
+
+        with mock.patch.object(guard, name, counted):
+            guard._hit(command, REPO, HOME)
+        return len(calls)
+
+    def test_text_without_a_program_name_is_not_parsed(self):
+        self.assertEqual(self.count_calls("_split", "ls; echo 'ch' own; cd /usr"), 0)
+
+    def test_nested_text_is_parsed_once(self):
+        guards = "".join(f"if {c}; then cd {c}; fi; " for c in "abcd")
+        self.assertEqual(self.count_calls("_split", guards + 'sh -c "chmod -R u+w ./x"'), 2)
+
+    def test_commands_that_change_nothing_are_not_read_per_world(self):
+        guards = "".join(f"if {c}; then cd {c}; fi; " for c in "abcd")
+        command = guards + "".join(f"ls x{k}; " for k in range(1000)) + "chmod -R u+w ./x"
+        self.assertLess(self.count_calls("_assignments", command), 100)
 
     def test_nested_texts_past_max_depth_are_not_read(self):
         deep = "chown -R me /etc"

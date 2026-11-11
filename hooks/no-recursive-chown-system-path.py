@@ -57,8 +57,11 @@ the names of each way the command may run up to there, to MAX_NESTED
 levels, and deeper with no directory, to MAX_DEPTH. A `cd` up the tree
 repeated by a loop (`cd ..`) is judged in every directory above. An
 unquoted `cd $D` with D empty or unset goes home, and is judged both there
-and where it is; `cd "$UNSET/"` is judged at `/` too (a value taken as
-empty counts only where it reaches the root, a system tree or home).
+and where it is. `cd "$OUT/tmp"` with OUT unset goes to `/tmp`: the rest is
+judged there, with `.`, a relative target and `$PWD` read as values taken as
+empty, and once more with the directory unknown, for when OUT is set (a
+value taken as empty counts only where it reaches the root, a system tree
+or home).
 
 A deny, not a warning: the remedy (fix the one path that raised the error, as
 your own user) is always available, and the damage is unrecoverable without a
@@ -81,14 +84,14 @@ component (`/*/lib`), a partial glob or brace expansion that names a
 protected path (`/et*`, `/{etc,usr}`), a wrapper that changes directory
 (`env -C /etc`, `sudo -D /etc`), more than MAX_WORLDS ways a command may
 run (the directory is then unknown), a nested text read after MAX_WORK
-words (read once, with no directory), PowerShell `icacls`/`Set-Acl`, Windows drive
-paths (`C:/Windows`), nested texts past MAX_DEPTH, a relative target,
-`$PWD`, or a name assigned from
-`$PWD`, after a `cd` this cannot resolve (`cd -` or `cd "$(git rev-parse
---show-toplevel)"`, where `$PWD` is taken as empty), a `cd` into a subdirectory repeated by a loop
-(read as run once), a command before a `cd` in the same loop body (judged
-only where the loop starts), a `cd` that fails or follows `&&` or
-`||` (read as run), an assignment that may not run
+words of commands that may assign or change directory (read once, with no
+directory), PowerShell `icacls`/`Set-Acl`, Windows drive paths
+(`C:/Windows`), nested texts past MAX_DEPTH, a relative target, `$PWD`, or
+a name assigned from `$PWD`, after a `cd` this cannot resolve (`cd -` or
+`cd "$(git rev-parse --show-toplevel)"`, where `$PWD` is taken as empty), a
+`cd` into a subdirectory repeated by a loop (read as run once), a command
+before a `cd` in the same loop body (judged only where the loop starts), a
+`cd` that fails or follows `&&` or `||` (read as run), an assignment that may not run
 (`false && D=./x` or `if false; then : "${D:=./x}"; fi`, each read as run), a
 `${D:=x}` assignment inside `sh -c` or a substitution, an assignment in a
 pipeline element (`echo x | : "${D:=./x}"`, read as made in the shell that
@@ -222,8 +225,11 @@ SPECIAL = {"$": "1", "#": "0", "?": "0", "-": "hB"}
 # Builtins that set a variable from input this guard cannot read. A name they
 # set is refused when an operand uses it.
 READ_BUILTINS = ("read", "mapfile", "readarray", "getopts")
+NAME_SETTERS = READ_BUILTINS + DECLARE_BUILTINS + ("printf",)
 # A lifted `$(pwd)`, read as `${PWD}` and shown as written.
 PWD_SUB = "__AICFG_PWDSUB__"
+# Kept with a scope's names: whether its directory is weak (see `_here_weak`).
+WEAK_PWD = "__AICFG_WEAK_PWD__"
 # How many ways a command may run (see `_scan`) are judged one by one.
 MAX_WORLDS = 16
 # How deep `sh -c` texts and substitutions inside one another are read in
@@ -233,6 +239,11 @@ MAX_DEPTH = 32
 # Past this many words read, a nested text is read once, with no directory.
 MAX_WORK = 20000
 ALL_GLOB = re.compile(r"\A[*?.]*[*?][*?.]*\Z")
+CD_OPTION = re.compile(r"-[LPe@]+")
+# A `cd` operand written unquoted, after any options: `cd $D`, `(cd -P $D)`,
+# `cd $D>/dev/null`. An unquoted empty one sends bash home.
+BARE_CD = re.compile(r"(?:^|[\s;&|(){}])cd(?:[ \t]+-[LPe@]+)*(?:[ \t]+--)?[ \t]+"
+                     r"([^\s;&|()<>'\"\\]+)(?=[\s;&|()<>]|$)")
 
 DENY = (
     "Refused: `{segment}` runs `{program} -R` on `{target}`, {where}. "
@@ -473,8 +484,8 @@ def _expand(text, home, assigned, here, depth=0, effects=None):
             val = home
         elif name == "PWD":
             # After a `cd` this cannot resolve, `$PWD` is taken as empty, like
-            # an unset variable (see Limits).
-            val, missing = here or "", here is None
+            # an unset variable (see Limits); after `cd "$UNSET/x"` it is weak.
+            val, missing = here or "", here is None or _here_weak(assigned)
         else:
             val = os.environ.get(name, "")
             missing, is_set = not val, name in os.environ
@@ -630,7 +641,8 @@ def _defaults(argv, home, store, visible, here):
     """Record in STORE and VISIBLE what each `${D:=x}` in ARGV assigns."""
     effects = {}
     for word in argv:
-        _expand(word, home, visible, here, effects=effects)
+        if "${" in word:
+            _expand(word, home, visible, here, effects=effects)
     store.update(effects)
     visible.update(effects)
 
@@ -654,24 +666,31 @@ def _ancestors(path):
     return out
 
 
+def _may_matter(words):
+    """Whether a command that is not a `cd` and holds no nested text may
+    assign a name or run chown, chmod or chgrp."""
+    return any("=" in w or "${" in w or w in NAME_SETTERS for w in words) or bool(
+        PROGRAM_TEXT.search(" ".join(words)))
+
+
+def _here_weak(assigned):
+    """Whether the directory was reached through a value taken as empty."""
+    return assigned.get(WEAK_PWD, False)
+
+
 def _cd_operand(lead):
     """The index in LEAD of `cd`'s directory operand, after its options, or None."""
     i = 1
-    while i < len(lead) and lead[i] in ("-L", "-P", "-e", "-@", "-LP", "-PL", "-Pe"):
+    while i < len(lead) and CD_OPTION.fullmatch(lead[i]):
         i += 1
     if i < len(lead) and lead[i] == "--":
         i += 1
     return i if i < len(lead) else None
 
 
-def _bare(piece, tok):
-    """Whether TOK appears in PIECE outside quotes, as a word of its own."""
-    for match in re.finditer(re.escape(tok), piece):
-        before = piece[match.start() - 1] if match.start() else " "
-        after = piece[match.end()] if match.end() < len(piece) else " "
-        if before in " \t" and after in " \t;&|)\n":
-            return True
-    return False
+def _bare_cd_operands(piece):
+    """The operands of `cd` in PIECE written unquoted, as whole words."""
+    return {m.group(1) for m in BARE_CD.finditer(piece)}
 
 
 def _nested(words):
@@ -693,14 +712,15 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
 
     CTX is shared by the whole command: a nested text already read in the
     same directory with the same names is not read again, and past
-    MAX_WORK words read, a nested text is read once, with no directory.
+    MAX_WORK words read, a nested text is read once, with no directory but
+    with the names assigned so far.
     """
     ctx = {"seen": set(), "work": 0, "split": {}} if ctx is None else ctx
     if not PROGRAM_TEXT.search(re.sub(r"[\\'\"]", "", piece)):
         return None  # no chown, chmod or chgrp anywhere in it, quotes aside
     if piece not in ctx["split"]:
-        ctx["split"][piece] = _split(piece)
-    cmds, inner = ctx["split"][piece]
+        ctx["split"][piece] = _split(piece), _bare_cd_operands(piece)
+    (cmds, inner), bare = ctx["split"][piece]
     # A WORLD is one way the command may run: for each scope, the directory
     # the shell is in (`None` when this cannot name it) and the names
     # assigned there. A `cd` or assignment inside `( ... )` changes only that
@@ -747,6 +767,8 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
         count = sum(w.count(SUB) for w in argv)
         texts = (inner[taken:taken + count] if aligned else []) + _nested(words)
         taken += count
+        if not (is_cd or texts or _may_matter(words)):
+            continue  # it neither moves, assigns nor runs chown, chmod or chgrp
         forked = []
         for heres, assigns in worlds:
             here = next(heres[scope[:k]] for k in range(len(scope), 0, -1)
@@ -757,8 +779,8 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
             ctx["work"] += len(argv)
             over = ctx["work"] > MAX_WORK
             for text in texts:
-                hit = _nested_hit(text, None if over else here, home,
-                                  outer if over else assigned, level, ctx)
+                hit = _nested_hit(text, None if over else here, home, assigned,
+                                  level, ctx)
                 if hit:
                     return hit
             store = assigns.setdefault(scope, {})
@@ -771,6 +793,9 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
                 new = None if unknown else resolve_cd_target(cd_words, here)
                 news, fork, stay = [new], maybe, here
                 operand = _cd_operand(lead)
+                # A relative `cd` from a weak directory stays weak.
+                weak_here = bool(_here_weak(assigned)) and not (
+                    operand and cd_words[operand] and cd_words[operand].startswith("/"))
                 tok = lead[operand] if operand else None
                 reading = got[operand - 1] if operand else None
                 looped_name = tok and any(
@@ -780,28 +805,31 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
                 elif reading and reading is not UNREAD and reading[0] == "":
                     # An unquoted empty `cd $D` goes home; quoted, it stays put.
                     new = here
-                    if _bare(piece, tok):
+                    if tok in bare:
                         news, fork = [home], True
                     else:
                         news = [new]
                 elif reading and reading is not UNREAD and reading[1] and reading[0]:
-                    # `cd "$UNSET/"` is `cd /`: judged there when that is protected.
+                    # `cd "$OUT/tmp"` with OUT unset is `cd /tmp`, and with it
+                    # set goes somewhere this cannot name: the directory is weak
+                    # in the first world and unknown in the second.
                     path = os.path.normpath(os.path.join(here, reading[0]))
-                    if _why(path, home, True):
-                        news, fork, stay = [path], True, None
+                    news, fork, stay, weak_here = [path], True, None, True
                 if looped and new and here and _above(new, here):
                     # Repeated, an up-move may reach every directory above.
                     news, fork = _ancestors(here)[::-1], True
                 news = [n for n in news if n != here]
                 room = MAX_WORLDS - len(worlds) - len(forked)
+                # Past the budget, the farthest directories above are kept.
+                for n in news[:room] if fork and news and room > 0 else []:
+                    moved = {k: dict(v) for k, v in assigns.items()}
+                    moved.setdefault(scope, {})[WEAK_PWD] = weak_here
+                    forked.append(({**heres, scope: n}, moved))
                 if fork and news and room > 0:
-                    # Past the budget, the farthest directories above are kept.
-                    forked.extend(({**heres, scope: n},
-                                   {k: dict(v) for k, v in assigns.items()})
-                                  for n in news[:room])
                     heres[scope] = stay  # where this world is if the `cd` did not move it
-                    continue
-                heres[scope] = None if fork and news else new
+                else:
+                    heres[scope] = None if fork and news else new
+                store[WEAK_PWD] = weak_here and heres[scope] is not None
                 continue
             if _assignments(words, store, assigned, home, here):
                 continue
@@ -839,7 +867,7 @@ def _judge(words, home, assigned, here):
             if not cand.startswith("/"):
                 if here is None:
                     continue
-                cand = os.path.join(here, cand)
+                cand, weak = os.path.join(here, cand), weak or _here_weak(assigned)
             path = os.path.normpath(cand).replace("//", "/")
             if ALL_GLOB.match(os.path.basename(path)):
                 path = os.path.dirname(path)

@@ -713,6 +713,9 @@ for argv, is_push in (
     idx = _unreviewed._git_subcommand_index(argv)
     check(f"no-unreviewed-pr reads {argv} as a push",
           idx is not None and argv[idx] == "push", is_push)
+    # No case pushes with --dry-run or --delete, so _argv_push agrees too.
+    check(f"no-unreviewed-pr's _argv_push reads {argv} as a push",
+          _unreviewed._argv_push(argv), is_push)
 
 if failures:
     print("FAILED:")

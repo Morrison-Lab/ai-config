@@ -186,8 +186,8 @@ _SHELL_OPS = set("();|&")
 # the path and exits, so `git --exec-path /x push` pushes nothing.
 # `--config-env k=ENV` does take a separated value. Both measured on git 2.43
 # (ai-config#5391).
-GIT_VALUE_OPTS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace",
-                  "--config-env"}
+GIT_VALUE_OPTS = frozenset({"-C", "-c", "--git-dir", "--work-tree",
+                            "--namespace", "--config-env"})
 
 
 def _heredoc_free(command):

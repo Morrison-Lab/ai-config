@@ -2425,6 +2425,9 @@ def verdict_map_cases() -> tuple[int, int]:
           PUSH, verdicts((nmw, HEAD), (clean, HEAD)), False)
     check("a later clean verdict naming another repository's commit is skipped",
           PUSH, verdicts((clean, HEAD), (clean, OTHER_HEAD)), False)
+    mixed = reviewed(body(commit=HEAD) + f"\nReviewed-Commit: {'d' * 40}")
+    check("a clean report mixing a real and an invented fingerprint binds nothing",
+          PUSH, verdicts((clean, FEATURE)) + mixed, True)
     check("a later blocking verdict naming no commit here vetoes",
           PUSH, verdicts((clean, HEAD), (nmw, OTHER_HEAD)), True)
     nmw_bare = reviewed(body(verdict=nmw, fingerprint=False))

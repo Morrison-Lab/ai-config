@@ -2914,9 +2914,10 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
     commit that resolves here: a foreign fingerprint cannot be told from a
     fabricated one, so a blocking verdict that binds to nothing here binds
     to everything before it; an unparsed report counts as blocking. A clean
-    report binding to nothing here adds no evidence either way and is
-    skipped, so its fabricated-fingerprint refusal is not raised when an
-    earlier verdict covers the push. When nothing covers the push, the
+    report with ANY fingerprint that does not resolve here binds nothing (a
+    multi-repository report is refused, as before), and is skipped, so its
+    fabricated-fingerprint refusal is not raised when an earlier verdict
+    covers the push. When nothing covers the push, the
     caller's latest-verdict checks run as before, with their messages. Any
     doubt (a timeout, an unknown payload, a ref deletion) returns "".
     """
@@ -2929,15 +2930,16 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
         latest: dict[str, str] = {}
         resolved_cache: dict[str, str | None] = {}
         for found, shas in history:
-            bound = False
             for sha in shas:
                 if sha not in resolved_cache:
                     resolved_cache[sha] = _rev_parse(
                         directory, env, f"{sha}^{{commit}}")
-                if resolved_cache[sha]:
-                    latest[resolved_cache[sha]] = found
-                    bound = True
-            if found != "clean" and not bound:
+            hits = [resolved_cache[s] for s in shas if resolved_cache[s]]
+            if found == "clean" and len(hits) < len(shas):
+                continue  # any unresolvable fingerprint voids a clean report
+            for hit in hits:
+                latest[hit] = found
+            if found != "clean" and not hits:
                 latest.clear()  # an unbound blocking verdict vetoes all before it
     except TimeoutError:
         return ""

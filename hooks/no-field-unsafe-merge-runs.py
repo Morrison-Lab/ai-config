@@ -47,7 +47,7 @@ import os
 import re
 import sys
 
-_HERE = os.path.dirname(os.path.abspath(__file__))
+_HERE = os.path.dirname(os.path.realpath(__file__))
 try:
     _LIB = os.path.join(os.path.dirname(_HERE), "scripts", "lib")
     if _LIB not in sys.path:

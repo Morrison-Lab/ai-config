@@ -315,3 +315,15 @@ The change was still right, so only the stated reason had to go.
 
 - **Do:** check a reviewer's stated reason on its own before writing it into a commit message, PR body or memory.
 - **Don't:** carry a reviewer's justification over as fact because the change it came with was correct.
+
+## A hedge that denies its own claim is a contradiction, not a qualification
+
+A block of text on [ai-config#3024](https://github.com/Morrison-Lab/ai-config/pull/3024) said the exit status of a chain ending in a review request "belongs to that later command" (2026-09-02).
+Two sentences later, it said a `&&` chain may have stopped before the request ran.
+Both cannot be true, and only the negative claim holds: the combined status cannot be attributed to the request.
+The overclaim survived three review rounds, because each round read the hedge as a qualification.
+The first fix then corrected that paragraph and left a second paragraph making the same claim.
+A test that pins the claim in one paragraph passes while another paragraph still makes it.
+
+- **Do:** when a hedge contradicts the sentence it follows, drop the unconditional claim, and pin the corrected claim in every paragraph that can carry it.
+- **Don't:** treat a later hedge as a qualification that rescues an earlier unconditional claim.

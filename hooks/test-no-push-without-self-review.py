@@ -2435,6 +2435,9 @@ def verdict_map_cases() -> tuple[int, int]:
           + verdicts((clean, HEAD), (clean, FEATURE)), False)
     check("no verdict naming the shipped commit still refuses",
           PUSH, verdicts((clean, FEATURE), (clean, OTHER_HEAD)), True)
+    check("an unparsed report between clean ones still vetoes its commit",
+          PUSH, verdicts((clean, HEAD), ("Looks bad, do not ship", HEAD),
+                         (clean, FEATURE)), True)
     check("a later unparsed report still fails closed",
           PUSH, verdicts((clean, HEAD), (clean, FEATURE), ("Looks fine", FEATURE)),
           True)

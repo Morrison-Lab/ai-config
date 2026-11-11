@@ -2605,6 +2605,8 @@ def read_latest_review_with_unparsed(
 
     `history`, when given, receives every admitted `(verdict, shas)` in
     transcript order, so a caller can key verdicts by commit (ai-config#4006).
+    An unparsed report enters it as `"unparsed"`, which blocks like
+    `needs_work` wherever it sits.
     """
     reviewer_call_ids: set[str] = set()
     reviewer_task_ids: set[str] = set()
@@ -2630,6 +2632,8 @@ def read_latest_review_with_unparsed(
             return True
         cand_shas = _unparsed_report_shas(text)
         if cand_shas is not None:
+            if history is not None:
+                history.append(("unparsed", cand_shas))  # blocks, like needs_work
             saw_unparsed_later = True
             unparsed_later_shas = cand_shas
         return False
@@ -2909,8 +2913,10 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
     same commit still vetoes, and so does a later `needs_work` naming no
     commit that resolves here: a foreign fingerprint cannot be told from a
     fabricated one, so a blocking verdict that binds to nothing here binds
-    to everything before it. A clean report binding to nothing here adds no
-    evidence either way and is skipped. When nothing covers the push, the
+    to everything before it; an unparsed report counts as blocking. A clean
+    report binding to nothing here adds no evidence either way and is
+    skipped, so its fabricated-fingerprint refusal is not raised when an
+    earlier verdict covers the push. When nothing covers the push, the
     caller's latest-verdict checks run as before, with their messages. Any
     doubt (a timeout, an unknown payload, a ref deletion) returns "".
     """

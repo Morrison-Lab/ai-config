@@ -11,19 +11,13 @@ HOME = tempfile.mkdtemp()
 ENV = dict(os.environ, HOME=HOME)
 
 
-def run(tool, tool_input):
-    payload = json.dumps({"tool_name": tool, "tool_input": tool_input,
-                          "cwd": HOME})
+def run(tool, inp):
+    payload = json.dumps({"tool_name": tool, "tool_input": inp, "cwd": HOME})
     proc = subprocess.run([sys.executable, SUBJECT], input=payload,
                           capture_output=True, text=True, env=ENV, check=False)
     assert proc.returncode == 0, proc.stderr
-    if not proc.stdout.strip():
-        return None
-    return json.loads(proc.stdout)["hookSpecificOutput"]["permissionDecision"]
-
-
-def bash(command):
-    return run("Bash", {"command": command})
+    out = proc.stdout.strip() and json.loads(proc.stdout)
+    return out and out["hookSpecificOutput"]["permissionDecision"] or None
 
 
 DENIED = [
@@ -55,10 +49,10 @@ ALLOWED = [
     "cat ~/.config/myapp/secret.py",
 ]
 
-for command in DENIED:
-    assert bash(command) == "deny", f"not denied: {command}"
-for command in ALLOWED:
-    assert bash(command) is None, f"wrongly denied: {command}"
+for c in DENIED:
+    assert run("Bash", {"command": c}) == "deny", f"not denied: {c}"
+for c in ALLOWED:
+    assert run("Bash", {"command": c}) is None, f"wrongly denied: {c}"
 
 home_token = os.path.join(HOME, ".config", "canvas", "token")
 assert run("Read", {"file_path": home_token}) == "deny"
@@ -69,6 +63,4 @@ proc = subprocess.run([sys.executable, SUBJECT], input="not json",
                       capture_output=True, text=True, env=ENV, check=False)
 assert proc.returncode == 0 and not proc.stdout.strip()
 
-print(f"PASS: {len(DENIED)} credential reads denied, {len(ALLOWED)} "
-      "non-printing or ordinary reads allowed, Read tool covered, bad input "
-      "fails open")
+print(f"PASS: {len(DENIED)} denied, {len(ALLOWED)} allowed, Read, bad input")

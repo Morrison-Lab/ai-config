@@ -175,14 +175,11 @@ def evaluate(payload):
         return None
     return (
         f"Refused: this would print the credential file `{hit}` into the "
-        "transcript, where the secret is kept and can be relayed "
-        "(ai-config#4780: a Canvas token leaked this way on 2026-10-27).\n\n"
-        "Pass the file to the program that needs it without printing it, "
-        "for example `curl -H \"Authorization: Bearer $(cat <path>)\" ...`, "
-        "or check that it exists with `test -s <path>`.\n"
+        "transcript (ai-config#4780: a Canvas token leaked this way).\n\n"
+        "Pass it to the program that needs it, as in `curl -H \"Authorization:"
+        " Bearer $(cat <path>)\" ...`, or check it with `test -s <path>`.\n"
         f"If the user approved this exact read, prefix the command with "
-        f"`{OVERRIDE}`."
-    )
+        f"`{OVERRIDE}`.")
 
 
 def main() -> int:

@@ -146,6 +146,24 @@ go read the history first (step 2).
    (`<<<<<<<`, `=======`, `>>>>>>>`). Take one side wholesale only when you've
    confirmed the other side has nothing worth keeping — and note that you did.
 
+   **Record a decision for every hunk before you finish the operation.**
+   For each conflict hunk, write one row: what you kept from each side, what
+   you dropped and why, and what you modified and why.
+   Put the table in the merge commit message (or, for a rebase or
+   cherry-pick, in the PR comment that reports the sync), so a reviewer can
+   check each choice against `:1:`/`:2:`/`:3:` without redoing the merge:
+
+   | File:hunk | Kept from ours | Kept from theirs | Dropped (why) | Modified (why) |
+   | --- | --- | --- | --- | --- |
+   | `<path>`:`<n>` | `<lines or "none">` | `<lines or "none">` | `<lines>` (`<reason>`) | `<lines>` (`<reason>`) |
+
+   A row with something in "Dropped" and no reason is the defect this table
+   exists to expose: content either side added is lost only by a decision you
+   can state.
+   Ezra asked for this on 2026-10-23: agents should decide, for each hunk,
+   what to keep from each side, what to drop, and what to modify
+   (ai-config#4716).
+
    **Also check whether the merged result duplicates content that already
    exists elsewhere in the file — a separate problem from the textual
    conflict itself.** This can arise two ways: a single incoming PR may
@@ -226,6 +244,8 @@ Confirm which physical branch is "ours" before you reach for `--ours` /
   without confirming the dropped side had nothing worth keeping — the classic
   silent-data-loss move.
 - ❌ Resolving a hunk before understanding *why* each side changed it.
+- ❌ Finishing a merge with no per-hunk keep/drop/modify record (step 3), so
+  nobody can tell a deliberate drop from a lost line.
 - ❌ Carrying the wording from one conflicting hunk into a string that several
   consumers share, without reading main's version of each consumer.
 - ❌ Mixing up "ours"/"theirs" in a rebase (they're reversed vs a merge).

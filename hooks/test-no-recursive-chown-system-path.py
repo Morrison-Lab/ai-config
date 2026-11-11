@@ -366,6 +366,17 @@ class Denies(unittest.TestCase):
                     "tee >(chmod -R u+w /etc) < f"):
             self.assert_denied(cmd)
 
+    def test_a_variable_holding_several_paths(self):
+        for cmd in ('DIRS="/usr /etc"; sudo chown -R root:root $DIRS',
+                    'DIRS="/usr/local/bin /usr/local/lib"; sudo chown -R $USER $DIRS',
+                    'DIRS="build /etc"; chmod -R u+w $DIRS'):
+            self.assert_denied(cmd)
+
+    def test_a_double_quoted_text_sees_the_outer_names(self):
+        for cmd in ('D=/etc; D=./build sh -c "chmod -R 755 $D"',
+                    'D=/usr; sudo D=. sh -c "chown -R me $D"'):
+            self.assert_denied(cmd)
+
     def test_names_before_a_shell_reach_its_text(self):
         for cmd in ("sudo PREFIX=/usr bash -c 'chown -R me \"$PREFIX\"'",
                     "env D=/etc bash -c 'chmod -R 755 $D'",

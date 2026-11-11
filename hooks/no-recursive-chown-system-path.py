@@ -55,9 +55,8 @@ command is split, scanned as a command of its own, and taken as empty,
 except a bare `pwd`, read as `$PWD`. A `sh -c` text or a substitution is
 read where it appears, in the directory and with the names of each way the
 command may run up to there (a `sh -c` text also with the `NAME=value`
-words before its shell: `sudo D=/x sh -c`; in a double-quoted text, which
-bash has already expanded with its own names, that reads too much, on the
-side of refusing), to MAX_NESTED
+words before its shell, `sudo D=/x sh -c`, and once without them, since
+bash expands a double-quoted text with the outer names), to MAX_NESTED
 levels, and deeper with no directory, to MAX_DEPTH. A `cd` up the tree
 repeated by a loop (`cd ..`) is judged in every directory above. An
 unquoted `cd $D` with D empty or unset goes home, and is judged both there
@@ -92,7 +91,10 @@ a command substitution's value (read as empty, both ways: it denies
 the remedy, and it passes `"$(brew --prefix)/share"`), `flock -c TEXT`, a
 named `coproc NAME { ...; }`, more than MAX_SCOPE `pushd`s in one command
 (`popd` then goes somewhere unknown), a `popd` inside a command
-substitution (it starts with an empty stack), a
+substitution (read with an empty stack; bash's inherits the outer one), a
+`cd` and a `cd ..` in one conditional body (each read as maybe run on its
+own, which can refuse the directory above: `if [ -d sub ]; then cd sub;
+make; cd ..; fi; chmod -R u+w .` is judged in the parent too), a
 `for` or `select` loop variable, `eval`, `su -c`, a heredoc piped to `sh`, an
 interpreter's own `-c` (`python -c "os.system(...)"`), a substitution in an
 unquoted heredoc body (`<<EOF`, which bash does run), a glob in a directory
@@ -852,11 +854,13 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
             for k, text in enumerate(texts):
                 # Past the budget, even within one command, with no directory.
                 over = ctx["work"] > MAX_WORK
-                names = (ChainMap(_prefix_names(words, home, assigned, here), assigned)
-                         if k >= first_shell else assigned)
-                hit = _nested_hit(text, None if over else here, home, names, level, ctx)
-                if hit:
-                    return hit
+                prefix = _prefix_names(words, home, assigned, here) if k >= first_shell else {}
+                # A double-quoted text was expanded with the outer names before
+                # the shell ran, a single-quoted one with these: read it both ways.
+                for names in ([ChainMap(prefix, assigned), assigned] if prefix else [assigned]):
+                    hit = _nested_hit(text, None if over else here, home, names, level, ctx)
+                    if hit:
+                        return hit
             _defaults(argv, home, store, assigned, here)
             if is_cd:
                 got = [_expand(tok, home, assigned, here) for tok in lead[1:]]
@@ -999,7 +1003,12 @@ def _judge(words, home, assigned, here):
         expanded = _expand(target, home, assigned, here)
         if expanded is UNREAD:
             return _shown(" ".join(words)), program, _shown(target), None, UNREAD_WHY
-        for cand, weak in filter(None, [expanded]):
+        candidates = [expanded]
+        if expanded and "$" in target and len(expanded[0].split()) > 1:
+            # Unquoted, bash splits `$DIRS` into words; quotes are gone by now,
+            # so the value is judged whole and word by word.
+            candidates += [(field, expanded[1]) for field in expanded[0].split()]
+        for cand, weak in filter(None, candidates):
             if not cand:
                 continue  # an empty operand is an error, not the cwd
             if not cand.startswith("/"):

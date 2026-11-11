@@ -34,14 +34,14 @@ class RetireLeftoverPaths(unittest.TestCase):
         project = root / "project"
         for d in (self.home, self.checkout / ".git", self.checkout / "hooks", self.checkout / "skills" / "ums", project):
             d.mkdir(parents=True)
-        (self.checkout / "CLAUDE.md").write_text("")
-        (self.checkout / "hooks" / "hooks.json").write_text("{}")
+        (self.checkout / "CLAUDE.md").write_text("", encoding="utf-8")
+        (self.checkout / "hooks" / "hooks.json").write_text("{}", encoding="utf-8")
         env = {"CLAUDE_HOME": str(self.home), "HOME": str(root), "CLAUDE_PROJECT_DIR": str(project)}
         self.enterContext(patch.dict(os.environ, env))
 
     def write_settings(self, enabled=True, hooks=None):
         settings = {"enabledPlugins": {"ai-config@Morrison-Lab": enabled}, "hooks": hooks or {}}
-        (self.home / "settings.json").write_text(json.dumps(settings))
+        (self.home / "settings.json").write_text(json.dumps(settings), encoding="utf-8")
 
     def run_main(self, *argv):
         out = io.StringIO()
@@ -54,7 +54,7 @@ class RetireLeftoverPaths(unittest.TestCase):
         self.write_settings(hooks={"PreToolUse": [{"matcher": "Bash", "hooks": [catalog, OWN_HOOK, CLONE_HOOK]}],
                                    "Stop": [{"hooks": [catalog]}]})
         (self.home / "hooks").mkdir()
-        (self.home / "hooks" / CATALOG_HOOK).write_text("old copy")
+        (self.home / "hooks" / CATALOG_HOOK).write_text("old copy", encoding="utf-8")
         (self.home / "shared").symlink_to(self.checkout / "hooks")
         (self.home / "memories").symlink_to(self.checkout / "hooks")
         (self.home / "skills" / REPO_SKILL).mkdir(parents=True)
@@ -72,7 +72,7 @@ class RetireLeftoverPaths(unittest.TestCase):
 
     def test_report_only_changes_nothing(self):
         self.plant_leftovers()
-        before = (self.home / "settings.json").read_text()
+        before = (self.home / "settings.json").read_text(encoding="utf-8")
         code, out = self.run_main()
         self.assertEqual(code, 1)
         for expected in (f"retire {self.home / 'hooks'}", f"keep   {self.home / 'memories'}",
@@ -80,7 +80,7 @@ class RetireLeftoverPaths(unittest.TestCase):
                          f"hook entry: python3 $HOME/.claude/hooks/{CATALOG_HOOK}"):
             self.assertIn(expected, out)
         self.assertNotIn(f"{self.home / 'shared'}:", out)
-        self.assertEqual((self.home / "settings.json").read_text(), before)
+        self.assertEqual((self.home / "settings.json").read_text(encoding="utf-8"), before)
         self.assertFalse((self.home / "ai-config-leftovers").exists())
 
     def test_retire_moves_aside_and_keeps_the_rest(self):
@@ -88,37 +88,37 @@ class RetireLeftoverPaths(unittest.TestCase):
         code, _ = self.run_main("--retire")
         self.assertEqual(code, 1)
         [backup] = (self.home / "ai-config-leftovers").iterdir()
-        self.assertEqual((backup / "hooks" / CATALOG_HOOK).read_text(), "old copy")
+        self.assertEqual((backup / "hooks" / CATALOG_HOOK).read_text(encoding="utf-8"), "old copy")
         self.assertTrue((backup / "skills" / "ums").is_symlink())
         for gone in ("hooks", "skills/ums"):
             self.assertFalse((self.home / gone).exists(), gone)
         self.assertTrue((self.home / "skills" / REPO_SKILL).is_dir())
         self.assertTrue((self.home / "shared").is_symlink() and (self.home / "memories").is_symlink())
-        settings = json.loads((self.home / "settings.json").read_text())
+        settings = json.loads((self.home / "settings.json").read_text(encoding="utf-8"))
         self.assertEqual(settings["hooks"], {"PreToolUse": [{"matcher": "Bash", "hooks": [OWN_HOOK, CLONE_HOOK]}]})
         self.assertEqual(settings["enabledPlugins"], {"ai-config@Morrison-Lab": True})
-        self.assertIn(CATALOG_HOOK, (backup / "settings.json").read_text())
+        self.assertIn(CATALOG_HOOK, (backup / "settings.json").read_text(encoding="utf-8"))
 
     def test_unproven_copies_and_jsonc_settings_are_left_alone(self):
         self.write_settings()
         (self.home / "shared").mkdir()
         (self.home / "memories").mkdir()
         (self.home / "hooks").mkdir()
-        (self.home / "hooks" / "mine.py").write_text("")
+        (self.home / "hooks" / "mine.py").write_text("", encoding="utf-8")
         code, out = self.run_main("--retire")
         self.assertEqual(code, 1)
         self.assertIn(f"keep   {self.home / 'shared'}: a copy", out)
         self.assertIn(f"keep   {self.home / 'hooks'}: not provably", out)
         self.assertIn(f"keep   {self.home / 'memories'}: not provably", out)
         self.assertTrue((self.home / "shared").is_dir())
-        (self.home / "settings.json").write_text('// comment' + chr(10) + '{}')
+        (self.home / "settings.json").write_text('// comment' + chr(10) + '{}', encoding="utf-8")
         code, out = self.run_main("--retire")
         self.assertEqual((code, out.startswith("Not swept")), (2, True))
         self.assertTrue((self.home / "hooks" / "mine.py").exists())
 
     def test_symlinked_settings_are_not_rewritten(self):
         self.plant_leftovers()
-        (self.home / "real.json").write_text((self.home / "settings.json").read_text())
+        (self.home / "real.json").write_text((self.home / "settings.json").read_text(encoding="utf-8"), encoding="utf-8")
         (self.home / "settings.json").unlink()
         (self.home / "settings.json").symlink_to(self.home / "real.json")
         self.assertEqual(self.run_main("--retire")[0], 2)
@@ -134,7 +134,7 @@ class RetireLeftoverPaths(unittest.TestCase):
     def test_retiring_everything_exits_zero(self):
         self.write_settings()
         (self.home / "hooks").mkdir()
-        (self.home / "hooks" / CATALOG_HOOK).write_text("old copy")
+        (self.home / "hooks" / CATALOG_HOOK).write_text("old copy", encoding="utf-8")
         self.assertEqual(self.run_main("--retire")[0], 0)
         self.assertEqual(self.run_main(), (0, f"No leftover delivery paths under {self.home}." + chr(10)))
 

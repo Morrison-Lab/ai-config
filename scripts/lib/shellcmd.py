@@ -181,9 +181,15 @@ _SHELL_OPS = set("();|&")
 # `git`'s own global options that consume the FOLLOWING token, skipped before
 # the subcommand is read so `git -C /repo commit` classifies as `commit`. The
 # `--opt=value` inline spellings need no entry: they are one token, and the
-# generic single-step branch handles them.
-GIT_VALUE_OPTS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace",
-                  "--exec-path"}
+# generic single-step branch handles them. `--exec-path` is NOT here: its
+# value is optional and only ever attached, and a bare `--exec-path` prints
+# the path and exits, so `git --exec-path /x push` pushes nothing.
+# `--config-env k=ENV` and `--attr-source <tree-ish>` do take a separated
+# value. `--exec-path`, `--config-env` and `--attr-source` were measured on
+# git 2.43 (ai-config#5391, #5392), where `--super-prefix` is an unknown
+# option.
+GIT_VALUE_OPTS = frozenset({"-C", "-c", "--git-dir", "--work-tree",
+                            "--namespace", "--config-env", "--attr-source"})
 
 
 def _heredoc_free(command):
@@ -594,14 +600,9 @@ def resolve_cd_target(rest: list[str], cur_dir: str | None) -> str | None:
     simulate, and a `$VAR` target expands at runtime -- so a caller must
     treat `None` as "somewhere I cannot name", never as "unchanged".
 
-    Adapted verbatim from `hooks/no-push-without-self-review.py`'s
-    `_resolve_cd_target`, which is the tested in-repo implementation. This is
-    a COPY and not a move: that guard still holds its own, because it can
-    refuse a push and migrating a deny-capable guard is its own change with
-    its own review --- as the refusing `_simple_commands` copies did under
-    ai-config#3178. The duplication that leaves is tracked as ai-config#3177,
-    not by the closed ai-config#2993, whose scope is `_simple_commands` and
-    `_strip_env`. New callers import from here.
+    Moved here from `hooks/no-push-without-self-review.py`, which now
+    imports it, so one implementation serves every caller
+    (ai-config#3177).
     """
     cmd_name = rest[0]
     if cmd_name == "popd":

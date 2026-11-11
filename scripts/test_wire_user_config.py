@@ -164,6 +164,11 @@ class WireUserConfig(unittest.TestCase):
         _, out = self.run_main()
         self.assertIn("fire every hook twice", line(out, "Claude Code"))
 
+    def test_backup_copy_of_a_hook_is_not_a_registration(self):
+        for suffix in (".bak", "~"):
+            self.assertFalse(wire.leftover_hook(
+                {"command": f"python3 /x/claude/hooks/no-placeholder-reply.py{suffix}"}, {"no-placeholder-reply.py"}))
+
     def test_foreign_codex_file_is_left_alone(self):
         codex = self.home / ".codex/AGENTS.md"
         codex.parent.mkdir(parents=True)

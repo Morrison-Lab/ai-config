@@ -178,6 +178,12 @@ An agent-filed issue in a repo we administrate with none of `P1`, `P2` or `P3` i
 So is a new issue that reports another symptom of a defect family that already has a tracking issue, which belongs as a comment on that tracker ([`triage-backlog`](../../shared/workflow/triage-backlog.md), "Fold, do not multiply").
 Read the issues; do not report the output of `hooks/warn-unlabelled-agent-issue.py` as your finding.
 
+## New memory files
+
+On a diff that adds a `memories/*.md` file, check that `memories/MEMORY.md` gains a row of its own for it, and that the row's summary says what the file says without loosening any rule in it.
+A link from prose or from another row's cell is not a row.
+Read the diff; do not report the output of `scripts/check-memory-index.py` as your finding (ai-config#4987).
+
 ## Standalone lds workflow PRs
 
 On a new `Morrison-Lab/lds` PR that changes only workflow files, check that it is not a small fix that could ride with another open lds workflow PR, since each lds workflow merge re-stales every open lds PR.
@@ -217,3 +223,9 @@ See [`destructive-actions-catalog`](../../shared/workflow/destructive-actions-ca
 On a diff or a delivered `.docx` produced by an edit that merged runs, check that each field code (a citation, cross-reference or HYPERLINK) still has its own `begin`, `instrText`, `separate` and `end` runs and that the field's text is where it was.
 Read the document; do not report a hook's output as your finding.
 See [`review-rendered-documents`](../../shared/workflow/review-rendered-documents.md#merging-runs-in-a-word-document).
+
+## Rules and skills without eval cases
+
+On a diff that adds or changes a rule or a skill whose behaviour one prompt can show, check that it adds or updates a case under `evals/`, and that every trigger case has a negative twin.
+Check each new grader for a reply that would pass it without the behaviour it names.
+See [`evals/README.md`](../../evals/README.md#adding-a-case).

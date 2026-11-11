@@ -23,7 +23,7 @@
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-stale-plugin-pin.py\"'",
             "timeout": 10,
             "script": "warn-stale-plugin-pin.py",
-            "why": "ai-config#2439 -- the plugin cache pin that runs hooks does not advance when the marketplace clone updates, so merged hook fixes went unrun for weeks with nothing saying so. At session start, compares each applicable ai-config pin in installed_plugins.json against the local marketplace clone's HEAD and, when it lags, names the commit count and the per-scope update commands."
+            "why": "ai-config#2439 -- the plugin cache pin that runs hooks does not advance when the marketplace clone updates, so merged hook fixes went unrun for weeks with nothing saying so. At session start, compares each applicable ai-config pin in installed_plugins.json against the local marketplace clone's HEAD and the tip of the clone's origin (one git ls-remote, no fetch; ai-config#5309) and, when it lags either, says which it lags (with the commit count behind the clone, where the clone holds the pin) and gives the per-scope update commands."
           },
           {
             "type": "command",

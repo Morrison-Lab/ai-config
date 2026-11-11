@@ -7,111 +7,86 @@
 # reader reviews each close. Also reports the open count, against the ceiling
 # in the repository variable ISSUE_CEILING when that variable is set.
 #
-# This covers ai-config only. The reusable gha workflow that would give every
-# lab repo the same pass is ai-config#3147.
+# The `label` job calls the shared workflow in Morrison-Lab/gha (gha#1900),
+# which runs gha's copy of scripts/triage-backlog.py.
+# The `script-drift` job fails when that copy and this repository's differ.
 name: Triage backlog (labels only)
 
 on:
   workflow_dispatch:
     inputs:
       dry-run:
-        description: Print the label commands without running them.
+        description: Print each label command without running it.
         type: boolean
-        default: false
+        default: true
   schedule:
     - cron: '0 7 * * 1' # Weekly on Monday at 07:00 UTC
+  # A pull request that changes the script or this file runs `script-drift`
+  # only, so a change that is not ported to gha fails before it merges.
+  # The check reads gha at the v3 tag, so gha's copy changes first: its pull
+  # request merges and v3 moves before the same change can pass here.
+  pull_request:
+    paths:
+      - scripts/triage-backlog.py
+      - .github/workflows/triage-backlog.yml
 
 permissions: {}
-
-concurrency:
-  group: triage-backlog
-  cancel-in-progress: false
 
 jobs:
   label:
     name: Label unprioritized issues
-    runs-on: ubuntu-latest
+    if: github.repository == 'Morrison-Lab/ai-config' && github.event_name != 'pull_request'
+    permissions:
+      issues: write
+    # On the job, not the workflow, so a pull request's drift check never
+    # waits behind a labelling run. The called workflow sets no group.
+    concurrency:
+      group: triage-backlog
+      cancel-in-progress: false
+    uses: Morrison-Lab/gha/.github/workflows/triage-backlog.yml@v3
+    with:
+      # false on the schedule, the ticked box on a manual run,
+      # and true on any other trigger added later.
+      dry-run: ${{ github.event_name != 'schedule' && (github.event_name != 'workflow_dispatch' || inputs.dry-run) }}
+      ceiling: ${{ vars.ISSUE_CEILING }}
+
+  script-drift:
+    name: Compare the script with gha's copy
     if: github.repository == 'Morrison-Lab/ai-config'
-    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read
-      issues: write
     steps:
-      - name: Check out repository
+      - name: Check out this repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Check that the priority labels exist
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
+      - name: Check out gha at the tag the label job runs
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          repository: Morrison-Lab/gha
+          ref: v3
+          path: gha
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: triage-backlog
+
+      - name: Fail when the two copies differ
         run: |
           set -euo pipefail
-          # The script adds labels and creates none, so a missing label would
-          # stop the run part-way through the edits.
-          for label in P1 P2 P3; do
-            if ! gh api "repos/$REPO/labels/$label" --silent; then
-              echo "::error::The label $label is missing from $REPO, or could not be read. Create it, then run this again."
+          ours=scripts/triage-backlog.py
+          theirs=gha/triage-backlog/triage-backlog.py
+          for copy in "$ours" "$theirs"; do
+            if [ ! -s "$copy" ]; then
+              echo "::error::$copy is missing or empty, so the copies were not compared."
               exit 1
             fi
           done
-
-      - name: Label the open issues the plan gives a priority
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          ISSUE_CEILING: ${{ vars.ISSUE_CEILING }}
-          DRY_RUN: ${{ inputs.dry-run }}
-        run: |
-          set -euo pipefail
-          # --dry-run only has an effect together with --apply: apply_plan()
-          # in scripts/triage-backlog.py prints each command in place of
-          # running it. So a dry run passes both flags.
-          args=(-R "$REPO" --apply --labels-only)
-          if [ "$DRY_RUN" = "true" ]; then
-            args+=(--dry-run)
+          if ! diff -u "$ours" "$theirs"; then
+            echo "::error::scripts/triage-backlog.py differs from Morrison-Lab/gha's triage-backlog/triage-backlog.py at v3. Port the change to the other repository."
+            exit 1
           fi
-          if [ -n "$ISSUE_CEILING" ]; then
-            args+=(--ceiling "$ISSUE_CEILING")
-          fi
-          # The plan (stdout) goes to the log, with each label command after it
-          # on a dry run only: a real run prints no commands, only what `gh`
-          # prints for each edit. The summary
-          # (stderr) goes to a file first, so the next step can copy it into
-          # the job summary whether this step passed or failed.
-          rc=0
-          python3 scripts/triage-backlog.py "${args[@]}" \
-            2> "$RUNNER_TEMP/triage-summary.txt" || rc=$?
-          cat "$RUNNER_TEMP/triage-summary.txt" >&2
-          exit "$rc"
-
-      - name: Copy the summary into the job summary
-        if: always()
-        run: |
-          set -euo pipefail
-          summary="$RUNNER_TEMP/triage-summary.txt"
-          if [ ! -s "$summary" ]; then
-            # An earlier step failed, or the labelling step wrote nothing.
-            echo "No summary was written."
-            {
-              echo '### Backlog triage (labels only)'
-              echo
-              echo 'The run stopped before the labelling step wrote a summary. Read the log for the error.'
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          {
-            echo '### Backlog triage (labels only)'
-            echo
-            echo '```text'
-            cat "$summary"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-          # A run over the ceiling still passes, so say so where a reader of
-          # the run list sees it.
-          over=$(grep -m 1 'over the ceiling of' "$summary" || true)
-          if [ -n "$over" ]; then
-            echo "::warning::$over"
-          fi
+          echo "The two copies are identical."

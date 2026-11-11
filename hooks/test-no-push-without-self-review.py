@@ -1549,7 +1549,11 @@ def msys_path_cases() -> tuple[int, int]:
     # the hint merge both ran on the raw `/c/...` form, and on Python 3.13
     # `isabs` calls it relative, so `cd /c/Users/x && git push` resolved to a
     # drive-less `\\c\\Users\\x` that `_run_git` could no longer repair.
+    # `cd` resolves inside shellcmd (ai-config#3177), so patch it there too.
+    shellcmd = sys.modules["shellcmd"]
+    lib_native = shellcmd.native_path
     mod._native_path = lambda path, is_windows=None: real_native(path, True)
+    shellcmd.native_path = lambda path, is_windows=None: lib_native(path, True)
     try:
         def directory_of(command):
             pushes = list(mod.iter_pushes(command))
@@ -1561,6 +1565,7 @@ def msys_path_cases() -> tuple[int, int]:
         both = directory_of("cd /c/Users/x && git -C sub push origin main")
     finally:
         mod._native_path = real_native
+        shellcmd.native_path = lib_native
     check(f"`cd /c/...` resolves to a native directory (got {by_cd!r})",
           by_cd == "C:/Users/x")
     check(f"`-C /c/...` resolves to a native directory (got {by_c!r})",

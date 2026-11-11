@@ -2480,14 +2480,108 @@ NOT_CLEAN_NEGATION_PREFIX = re.compile(
 # (ai-config#3937): a next paragraph opening with "None are deferred..." or
 # "None are blocked." is ordinary review or ARD disposition prose, not a
 # same-line negation of a preceding "Needs more work" verdict.
+#
+# Both alternation groups also need a guard against a contrast that follows
+# the negator (ai-config#2359). "Nothing major, but the retry loop leaks",
+# "No issues, however the login flow is broken", "None, but the handle leaks"
+# and "0-day exploit possible" each open with a negator and carry a real
+# finding. So a `0` joined to a hyphenated word never counts, and a negation
+# does not count when either of two contrasts follows it:
+#
+# - a contrast word anywhere in the negation's own sentence
+#   ("Nothing major, but X", "No issues other than X"), or one of the
+#   _COMMA_CONTRAST_WORDS right after a comma ("None, only X leaks");
+# - a sentence-opening contrast marker at the start of the next sentence
+#   ("No issues. However, X is broken.", "None. Still, X leaks.").
+#
+# A sentence ends at [.!?] before whitespace, so a hard wrap, a dotted
+# token (`v1.2`) or an abbreviation ("e.g.", "vs.", "Fig.") does not end
+# one. Later sentences are usually verification prose ("0 findings. CI
+# passes, though slowly.") and are not read. "None
+# beyond the above." still re-flags, the accepted safe-direction cost. A
+# "yet" ending its sentence ("None yet.") is not a contrast. The scan stops
+# at a paragraph break (CRLF too) or a line opening a heading, list item or
+# blockquote, which is often the next section.
+#
+# Known residuals: a finding stated with no contrast ("None. The lexer is
+# broken.") and a contrast in the next paragraph ("None.\n\nBut X leaks."),
+# tracked in ai-config#5389; and a contrast more than 60 characters after the
+# negation, which callers cut off (ai-config#5401).
+_BLOCK_START = r"[ \t]*(?:#|>|[-*+][ \t]|\d+[.)][ \t])"
+_SENTENCE_CHAR = (
+    r"(?:(?!(?<!\b[A-Za-z])(?<!\b(?:vs|cf|al))(?<!\b[Ff]ig)[.!?](?:\s|$))"
+    r"(?!\r?\n[ \t]*\r?\n)"
+    r"(?!\r?\n" + _BLOCK_START + r")[\s\S])"
+)
+_CONTRAST_WORDS = (
+    r"but|however|(?<!/)except|excepting|excluding|although|though|albeit"
+    r"|unless|whereas|besides|beyond|barring"
+    r"|notwithstanding|nonetheless|nevertheless|rather|otherwise"
+    r"|save\s+for|apart\s+from|aside\s+from|other\s+than|outside\s+of"
+    r"|short\s+of|that\s+said|with\s+(?!no\b)(?:\w+\s+){0,2}exceptions?"
+    r"|yet(?![ \t]*(?:[.!?;)]|\r?\n[ \t]*(?:\r?\n|$)|$))"
+)
+_CONTRAST_MARKERS = (
+    r"however|but|yet|still|nonetheless|nevertheless|that\s+said|except"
+    r"|though|although|instead|otherwise|besides|apart\s+from|aside\s+from"
+    r"|on\s+the\s+other\s+hand|that\s+being\s+said|having\s+said\s+that|regardless"
+    r"|even\s+so|conversely|at\s+the\s+same\s+time|in\s+contrast|beyond\s+that"
+    r"|even\s+though|despite\s+th(?:is|at)|unless|whereas|rather|albeit"
+    r"|all\s+the\s+same|with\s+that\s+said|then\s+again"
+)
+# Words that are also ordinary words or identifiers ("No issues found while
+# reviewing", "None in bar.py", "uses a set instead of a list") count only
+# after a comma, semicolon or spaced dash ("None, only X leaks"). "except"
+# does not count after "/" ("try/except"). A clean "None found; only CI is
+# pending." re-flags, the accepted safe-direction cost.
+_COMMA_CONTRAST_WORDS = r"while|whilst|still|only|just|instead|save|bar|minus"
+# Horizontal space, including the no-break space pasted text often carries.
+_HSPACE = r"[ \t" + chr(0xA0) + r"]"
+# Up to four opener marks (emphasis, blockquote, dash, bracket, backtick,
+# quote) before a comma word or marker, optionally across one line break.
+# Paired double-quoted spans are already blanked as quotation. Every
+# whitespace run has one quantifier and the marks are bounded, so a long
+# run of spaces or " - - -" cannot make the lazy scan quadratic; for the
+# same reason a spaced separator may only start at the start of a run.
+_MARKER_OPENERS = _HSPACE + r"*(?:[*_>\-(\[`\"']" + _HSPACE + r"*){0,4}"
+_OPENERS_ACROSS_LINE = (
+    _MARKER_OPENERS + r"(?:\r?\n(?!" + _BLOCK_START + r")" + _MARKER_OPENERS + r")?"
+)
+# Word edges that read "_but_" (emphasis) as a word but not handle_except_x.
+_WORD_START = r"(?<![^\W_])(?<![^\W_]_)"
+_WORD_END = r"(?![^\W_])(?!_[^\W_])"
+_CLAUSE_SEP = (
+    r"(?:[,;]|(?<!" + _HSPACE + r")" + _HSPACE + r"+-{1,3}"
+    r"|(?<!" + _HSPACE + r")" + _HSPACE + r"*["
+    + chr(0x2013) + chr(0x2014) + r"])"
+)
+_CONTRAST_GUARD = (
+    r"(?!" + _SENTENCE_CHAR + r"*?(?:" + _WORD_START + r"(?:"
+    + _CONTRAST_WORDS + r")|" + _CLAUSE_SEP + _OPENERS_ACROSS_LINE
+    + r"(?:" + _COMMA_CONTRAST_WORDS + r"))" + _WORD_END + r")"
+    r"(?!" + _SENTENCE_CHAR + r"*[.!?]" + _OPENERS_ACROSS_LINE
+    + r"(?:" + _CONTRAST_MARKERS + r")" + _WORD_END + r")"
+)
+_SAFE_NEGATION = (
+    r"(?:none\b(?!\s+of\b)|n/a\b|none\s+identified\b|none\s+remaining\b)"
+    + _CONTRAST_GUARD
+)
+# A `0` that is part of a larger token is not a count of zero: one joined to
+# a hyphen or dash ("0-day", or U+2010 to U+2015), a decimal ("0.5s"), or a
+# ratio ("0/5"). A bare "0 tests cover X" has no contrast word (#5389).
+_RISKY_NEGATION = (
+    r"(?:nothing\b|0\b(?![.,]\d|/|[-\u2010-\u2015])"
+    r"|no\s+(?:\w+\s+){0,3}(?:findings|issues|bugs|violations|blockers)|no\s+new\b)"
+    + _CONTRAST_GUARD
+)
 NOT_CLEAN_NEGATION_SUFFIX = re.compile(
     r"^(?:"
     r"[ \t*_:.\-]*(?:\r?\n[ \t*_:.\-]*)?"
-    r"(?:none\b(?!\s+of\b)|n/a\b|none\s+identified\b|none\s+remaining\b)"
-    r"|"
+    + _SAFE_NEGATION
+    + r"|"
     r"[ \t:.\-]*(?:\r?\n[ \t:.\-]*)?"
-    r"(?:nothing\b|0\b|no\s+(?:\w+\s+){0,3}(?:findings|issues|bugs|violations|blockers)|no\s+new\b)"
-    r")",
+    + _RISKY_NEGATION
+    + r")",
     re.IGNORECASE,
 )
 
@@ -2497,10 +2591,12 @@ NOT_CLEAN_NEGATION_SUFFIX = re.compile(
 # `none identified`) with a newline or blank line.
 FINDING_HEADING_NEGATION_SUFFIX = re.compile(
     r"^\s*(?:"
-    r"[*_:.\-]*\s*(?:none\b(?!\s+of\b)|n/a\b|none\s+identified\b|none\s+remaining\b)"
-    r"|"
-    r"[:.\-]*\s*(?:nothing\b|0\b|no\s+(?:\w+\s+){0,3}(?:findings|issues|bugs|violations|blockers)|no\s+new\b)"
-    r")",
+    r"(?:[*_:.\-]+\s*)?"
+    + _SAFE_NEGATION
+    + r"|"
+    r"(?:[:.\-]+\s*)?"
+    + _RISKY_NEGATION
+    + r")",
     re.IGNORECASE,
 )
 

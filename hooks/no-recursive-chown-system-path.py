@@ -76,8 +76,8 @@ resolve (`cd -` or `cd "$UNSET"`), an assignment that may not run
 `${D:=x}` assignment inside `sh -c` or a substitution, an assignment in a
 pipeline element (`echo x | : "${D:=./x}"`, read as made in the shell that
 follows), a `${D:=x}` read earlier in the same command than it assigns, and
-a bind-mounted path (the #39283 `/volumes/mail/` case) all pass. Fails open on parse trouble
-and when scripts/lib/shellcmd.py cannot be imported.
+a bind-mounted path (the #39283 `/volumes/mail/` case) all pass. Fails open
+on parse trouble and when scripts/lib/shellcmd.py cannot be imported.
 """
 from __future__ import annotations
 
@@ -495,13 +495,14 @@ def _assignments(argv, store, visible, home, here):
         argv = argv[1:]
     lead = 0
     while lead < len(argv) and (ASSIGNMENT.match(argv[lead])
-                                or argv[lead] in ("command", "builtin")):
-        lead += 1  # `IFS= read -r D`, `command read -r D`
+                                or argv[lead] in ("command", "builtin", "time", "-p")):
+        lead += 1  # `IFS= read -r D`, `command read -r D`, `time read -r D`
     rest = argv[lead + 1:]
     if lead < len(argv) and argv[lead] in READ_BUILTINS:
         # Every bare name may be one it sets (options' values included), and
-        # with none, read sets REPLY and mapfile sets MAPFILE.
-        for word in [*rest, "REPLY", "MAPFILE"]:
+        # with none, read sets REPLY and mapfile sets MAPFILE; getopts also
+        # sets OPTARG.
+        for word in [*rest, "REPLY", "MAPFILE", "OPTARG"]:
             if NAME.fullmatch(word):
                 store[word] = visible[word] = UNREAD
         return False
@@ -591,6 +592,9 @@ def _scan(piece, cwd, home, outer):
             _expand(word, home, assigned, here, effects=effects)
         assigns.setdefault(scope, {}).update(effects)
         assigned.update(effects)
+        # `if cd /etc; then`, `{ cd /usr; }`: a keyword ends the command before.
+        while argv and argv[0] in SHELL_KEYWORDS:
+            argv = argv[1:]
         if argv and argv[0] in ("cd", "pushd", "popd"):
             words = [argv[0]]
             for tok in argv[1:]:

@@ -276,6 +276,18 @@ class Denies(unittest.TestCase):
                     'printf -vD %s /etc; chown -R me "$D"'):
             self.assert_denied(cmd)
 
+    def test_cd_after_a_shell_keyword(self):
+        for cmd in ("if cd /etc; then chown -R me .; fi",
+                    "if true; then cd /etc; chown -R me .; fi",
+                    "{ cd /usr; }; chown -R me .",
+                    "for d in a; do cd /usr/lib; done; chown -R me .",
+                    "if true; then pushd /etc; fi; chown -R me ."):
+            self.assert_denied(cmd)
+
+    def test_names_set_by_getopts_and_time_read(self):
+        self.assert_denied('set -- -d /etc; getopts d: o; chown -R me "$OPTARG"')
+        self.assert_denied('time read -r D <<< /etc; chown -R me "$D"')
+
     def test_literal_root_gives_the_root_reason(self):
         reason = self.assert_denied("chown -R root /")
         self.assertIn("the filesystem root", reason)
@@ -365,7 +377,8 @@ class Allows(unittest.TestCase):
 
     def test_assignment_after_a_shell_keyword_then_a_trailing_slash(self):
         self.assert_allowed('if true; then D=./build; fi; chown -R me "$D/"')
-        self.assert_allowed('printf -- -v x; chown -R me ./build')
+        # After `--`, `-v x` is the format and its argument: x keeps its value.
+        self.assert_allowed('x=./build; printf -- -v x; chown -R me "$x"')
 
     def test_assigning_default_then_a_trailing_slash(self):
         self.assert_allowed(': "${D:=./build}"; chown -R me "${D:-./out}"')

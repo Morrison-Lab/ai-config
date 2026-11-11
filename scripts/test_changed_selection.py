@@ -36,16 +36,19 @@ def check(name, cond):
 
 
 FILES = {
-    "hooks/guard.py": "import helper\nCONFIG = 'rules.json'\nSIBLING = 'sibling.py'\n",
-    "hooks/test-guard.py": "# runs hooks/guard.py and reads notes.txt.\n",
+    "hooks/guard.py": "import helper, pkg\nCONFIG = 'rules.json'\nSIBLING = 'sibling.py'\n",
+    "hooks/test-guard.py": "# runs hooks/guard.py and reads notes.txt.\n# reads .guardrc\n",
     "hooks/sibling.py": "FAR = 'hooks/far.py'  # a sibling loaded by path, as _sibling() does\n",
     "hooks/far.py": "\n",
     "hooks/notes.txt": "\n",
+    "hooks/.guardrc": "\n",
+    "hooks/pkg/__init__.py": "\n",
     "hooks/helper.py": "import deep_helper\n",
     "hooks/deep_helper.py": "# imports nothing; names other-tool.py in a comment\n",
     "hooks/other-tool.py": "# never imported\n",
     "hooks/rules.json": "{}\n",
     "hooks/unrelated.py": "\n",
+    "hooks/stale.py": "\n",
     "scripts/lib/shared.py": "\n",
     "AGENTS.md": "# names guard.py, which a markdown file cannot pull in\n",
 }
@@ -59,6 +62,7 @@ def _repo(tmp):
     subprocess.run(["git", "init", "-q", "-b", "main"], cwd=root, check=True)
     subprocess.run(["git", "add", "-A"], cwd=root, check=True)
     (root / "hooks" / "brand-new.py").write_text("\n", encoding="utf-8")  # untracked
+    (root / "hooks" / "stale.py").unlink()  # tracked, deleted without git rm
     return root
 
 
@@ -70,10 +74,13 @@ def test_selector():
         check("a change to the subject selects the suite", sel.needed(seeds, ["hooks/guard.py"]))
         check("a change to an imported module selects it", sel.needed(seeds, ["hooks/helper.py"]))
         check("imports are followed transitively", sel.needed(seeds, ["hooks/deep_helper.py"]))
+        check("an imported package's __init__.py selects it", sel.needed(seeds, ["hooks/pkg/__init__.py"]))
         check("a data file the subject names selects it", sel.needed(seeds, ["hooks/rules.json"]))
         check("a name ending a sentence still matches", sel.needed(seeds, ["hooks/notes.txt"]))
+        check("a dotfile name matches", sel.needed(seeds, ["hooks/.guardrc"]))
         check("siblings loaded by path are followed like imports", sel.needed(seeds, ["hooks/far.py"]))
         check("a deleted path selects every suite", sel.needed(seeds, ["hooks/gone.py"]))
+        check("a deletion not yet staged selects every suite", sel.needed(seeds, ["hooks/stale.py"]))
         check("an unrelated change does not select it (negative control)",
               not sel.needed(seeds, ["hooks/unrelated.py"]))
         check("a name mentioned two levels down is not followed",
@@ -84,37 +91,34 @@ def test_selector():
 
 
 def test_test_hooks_selection():
-    """Dogfood on the live tree: one hook's change keeps its own suite and drops most others."""
+    """Dogfood on the live tree, and the RLV_CHANGED_FILES entry point in a child process."""
     th = _load("test_hooks_under_test", HERE / "test_hooks.py")
+    sys.modules.pop("test_hooks_under_test")
     hooks = HERE.parent / "hooks"
     runnable = [(str(t), str(hooks / (t.name[len("test-"):]))) for t in sorted(hooks.glob("test-*.py"))
                 if (hooks / t.name[len("test-"):]).is_file()]
-    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
-        listing = Path(tmp) / "changed.txt"
-        listing.write_text("hooks/flag-cop-out-offer.py\n", encoding="utf-8")
-        before = os.environ.get("RLV_CHANGED_FILES")
-        os.environ["RLV_CHANGED_FILES"] = str(listing)
-        try:
-            out = io.StringIO()
-            with redirect_stdout(out):
-                kept = th.select_for_change(runnable)
-            selected, th._SELECTED = th._SELECTED, None
-            del os.environ["RLV_CHANGED_FILES"]
-            every = th.select_for_change(runnable)
-        finally:
-            _restore(before)
+    out = io.StringIO()
+    with redirect_stdout(out):
+        kept = th.select_for_change(runnable, ["hooks/flag-cop-out-offer.py"])
     names = {Path(t).name for t, _ in kept}
     check("the changed hook's own suite is kept", "test-flag-cop-out-offer.py" in names)
+    check("a suite whose subject loads it by path is kept", "test-flag-tool-gap-handling.py" in names)
     check("most suites are dropped and the count is printed",
-          len(kept) < len(runnable) / 2 and f"of {len(runnable)} hook suites" in out.getvalue()
-          and selected == len(kept))
-    check("without RLV_CHANGED_FILES every suite runs", every == runnable and th._SELECTED is None)
+          len(kept) < len(runnable) / 2 and f"of {len(runnable)} hook suites" in out.getvalue())
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+        empty, listing = Path(tmp) / "empty.txt", Path(tmp) / "changed.txt"
+        empty.write_text("\n", encoding="utf-8")
+        listing.write_text("hooks/flag-cop-out-offer.py\n", encoding="utf-8")
+        refused = _run("test_hooks.py", empty)
+        check("an empty list is refused, not a vacuous pass",
+              refused.returncode != 0 and "empty list" in refused.stderr)
+        check("tests driving run_suites() do not inherit the list",
+              _run("test_test_hooks.py", listing).returncode == 0)
 
 
-def _restore(value):
-    os.environ.pop("RLV_CHANGED_FILES", None)
-    if value is not None:
-        os.environ["RLV_CHANGED_FILES"] = value
+def _run(script, listing):
+    env = {**os.environ, "RLV_CHANGED_FILES": str(listing)}
+    return subprocess.run([sys.executable, str(HERE / script)], env=env, capture_output=True, text=True)
 
 
 def main():

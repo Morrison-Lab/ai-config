@@ -7,20 +7,22 @@ literal `x.py` path, transitively. Other mentions are followed one level only:
 followed further, comments naming other scripts pulled a median of 1127 of 1647
 files into every suite (2026-11-11). A computed path is invisible here, so a
 change under ALWAYS_RUN, or a deleted path, selects every suite; CI runs all.
+The changed list must name both sides of a rename (`git diff --no-renames`).
 """
 from __future__ import annotations
 
 import ast
+import os
 import re
 import subprocess
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Set
+from typing import Dict, Iterable, List, Set
 
 # A change under one of these selects every suite: shared code reached by
 # path arithmetic, the hook registry, and the runners themselves.
 ALWAYS_RUN = ("scripts/lib/", "hooks/hooks.json", "scripts/test_hooks.py",
               "scripts/run-local-validation.py", ".github/workflows/validate.yml")
-_TOKEN = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]*")
+_TOKEN = re.compile(r"[A-Za-z0-9_.][A-Za-z0-9_.-]*")
 _MODULE_FILE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\.py")
 _MODULE_PATH = re.compile(r"[A-Za-z0-9_./-]*[A-Za-z0-9_-]\.py")
 _TEXT_SUFFIXES = {".py", ".sh"}
@@ -36,18 +38,19 @@ def tree_files(root: Path) -> List[str]:
 class Selector:
     """Name and import index over a tree, built once per run."""
 
-    def __init__(self, root: Path, files: Optional[Iterable[str]] = None):
+    def __init__(self, root: Path):
         self.root = root
-        self.files = list(files) if files is not None else tree_files(root)
-        self._present = set(self.files)
+        self.files = tree_files(root)
         self.by_token: Dict[str, Set[str]] = {}
         self.by_module: Dict[str, Set[str]] = {}
         for path in self.files:
             name = path.rsplit("/", 1)[-1]
             self.by_token.setdefault(name, set()).add(path)
             if _MODULE_FILE.fullmatch(name):
-                self.by_token.setdefault(name[:-3], set()).add(path)
-                self.by_module.setdefault(name[:-3], set()).add(path)
+                # A package's __init__.py is the module named by its directory.
+                module = path.rsplit("/", 2)[-2] if name == "__init__.py" and "/" in path else name[:-3]
+                self.by_token.setdefault(module, set()).add(path)
+                self.by_module.setdefault(module, set()).add(path)
         self._text: Dict[str, str] = {}
         self._imports: Dict[str, Set[str]] = {}
 
@@ -99,12 +102,9 @@ class Selector:
 
     def needed(self, seeds: Iterable[str], changed: Iterable[str]) -> bool:
         changed = list(changed)
-        # A deleted path is in no index, so nothing can say what read it: run everything.
-        if any(c.startswith(ALWAYS_RUN) or c not in self._present for c in changed):
+        # A path gone from the working tree (deleted, or the old side of a rename)
+        # cannot be matched against what reads it, so it runs everything.
+        if any(c.startswith(ALWAYS_RUN) or not os.path.lexists(self.root / c) for c in changed):
             return True
         inputs = self.inputs(seeds)
         return any(c in inputs for c in changed)
-
-
-def read_changed_list(path: str) -> List[str]:
-    return [ln.strip() for ln in Path(path).read_text(encoding="utf-8").splitlines() if ln.strip()]

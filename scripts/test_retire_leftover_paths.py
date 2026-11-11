@@ -19,6 +19,7 @@ retire = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(retire)
 
 CATALOG_HOOK = sorted(retire.wire.catalog_scripts())[0]
+BACKSLASH = "\\"  # the Windows path separator
 REPO_SKILL = sorted(p.name for p in (SCRIPTS.parent / "skills").iterdir() if p.is_dir())[0]
 OWN_HOOK = {"type": "command", "command": "python3 /opt/my-own-hook.py"}
 CLONE_HOOK = {"type": "command", "command": f"python3 /src/ai-config/hooks/{CATALOG_HOOK}"}
@@ -126,11 +127,12 @@ class RetireLeftoverPaths(unittest.TestCase):
         self.assertFalse((self.home / "ai-config-leftovers").exists())
 
     def test_hook_entries_match_only_the_claude_home_hooks_dir(self):
-        backslashed = str(self.home / "hooks").replace("/", chr(92))  # a Windows-style command path
-        dirs = ("~/.claude/hooks", "${HOME}/.claude/hooks", backslashed)
-        hooks = [{"command": f"python3 {d}{chr(92)}{CATALOG_HOOK}"} for d in dirs]
+        windows_style = str(self.home / "hooks").replace("/", BACKSLASH) + BACKSLASH + CATALOG_HOOK
+        commands = [f"python3 {d}/{CATALOG_HOOK}" for d in ("~/.claude/hooks", "$HOME/.claude/hooks",
+                                                              "${HOME}/.claude/hooks", str(self.home / "hooks"))]
+        hooks = [{"command": c} for c in commands + [f"python3 {windows_style}"]]
         settings = {"hooks": {"Stop": [{"hooks": hooks}]}}
-        self.assertEqual(len(retire.strip_leftover_hooks(settings, self.home / "hooks")[1]), 3)
+        self.assertEqual(len(retire.strip_leftover_hooks(settings, self.home / "hooks")[1]), 5)
         self.assertEqual(retire.strip_leftover_hooks(settings, Path("/elsewhere/hooks"))[1], [])
 
     def test_retiring_everything_exits_zero(self):

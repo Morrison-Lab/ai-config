@@ -76,7 +76,7 @@ def strip_leftover_hooks(settings: dict, hooks_dir: Path) -> tuple[dict, list[st
                          + "|".join(map(re.escape, scripts)) + r")(?![\w.~-])")
 
     def leftover(hook):
-        return wire.leftover_hook(hook, scripts) and bool(pattern.search(hook["command"].replace(chr(92), "/")))
+        return wire.leftover_hook(hook, scripts) and bool(pattern.search(hook["command"].replace("\\", "/")))
 
     removed, kept_events = [], {}
     for event, groups in settings["hooks"].items():

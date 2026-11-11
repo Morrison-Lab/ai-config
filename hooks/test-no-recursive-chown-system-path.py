@@ -388,8 +388,16 @@ class Denies(unittest.TestCase):
 
     def test_names_a_privilege_wrapper_may_drop(self):
         for cmd in ("D=/tmp/x sudo sh -c 'chown -R root \"${D:-/usr}\"'",
-                    "HOME=/tmp/h doas sh -c 'chown -R me \"$HOME\"'"):
+                    "HOME=/tmp/h doas sh -c 'chown -R me \"$HOME\"'",
+                    "D=/tmp/x env -i sh -c 'chmod -R u+w \"$D/\"'",
+                    "D=/tmp/x env -u D sh -c 'chmod -R u+w \"$D/\"'",
+                    "D=/tmp/x env --unset=D sh -c 'chmod -R u+w \"$D/\"'",
+                    "D=/tmp/x env --ignore-environment sh -c 'chmod -R u+w \"$D/\"'",
+                    "D=/tmp/x exec -c sh -c 'chmod -R u+w \"$D/\"'"):
             self.assert_denied(cmd)
+
+    def test_the_nginx_web_root(self):
+        self.assert_denied("sudo chown -R www-data /usr/share")
         self.assert_denied("D=/tmp/x sh -c 'chown -R me ~'")
 
     def test_a_double_quoted_text_sees_the_outer_names(self):
@@ -618,6 +626,12 @@ class Allows(unittest.TestCase):
                     "env HOME=/tmp/h sh -c 'chown -R me ~'",
                     "HOME=/tmp/h bash -c '\n  mkdir -p \"$HOME\"\n  chmod -R 700 \"$HOME\"\n'",
                     "D=/etc; D=./build sh -c '\ncd \"$D\"; \\\n  chmod -R 755 .\n'"):
+            self.assert_allowed(cmd)
+
+    def test_the_nginx_web_root(self):
+        for cmd in ("sudo chmod -R 755 /usr/share/nginx/html",
+                    "chown -R nginx:nginx /usr/share/nginx/html",
+                    "D=/tmp/x env FOO=1 sh -c 'chmod -R u+w \"$D\"'"):
             self.assert_allowed(cmd)
 
     def test_sudo_lone_h_takes_the_next_word_as_host(self):

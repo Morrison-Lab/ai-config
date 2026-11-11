@@ -22,6 +22,7 @@ when a target is:
     (`/usr/local/lib/node_modules` and `/usr/local/Cellar` pass), and below
     `/var/lib`, `/var/log` and `/var/spool` only the tree itself and the
     package and auth state in `VAR_CORE` are (`/var/lib/postgresql` passes);
+    `/usr/share/nginx`, nginx's own web root, is not refused at all;
   * the home directory, or a directory that contains it.
 
 A target is read with `~`, `~user`, `$HOME`, and `~+`, `$(pwd)` and `$PWD`
@@ -56,11 +57,12 @@ except a bare `pwd`, read as `$PWD`. A `sh -c` text or a substitution is
 read where it appears, in the directory and with the names of each way the
 command may run up to there (a `sh -c` text also with the `NAME=value`
 words before its shell, `sudo D=/x sh -c`, and, unless the text is written
-in single quotes in the command itself with no `sudo`, `doas`, `pkexec` or
-`run0` before it, once without them, since bash expands a double-quoted text
-with the outer names and those wrappers may drop the names; a bare `~` reads
-HOME as `$HOME` does), to MAX_NESTED
-levels, and deeper with no directory, to MAX_DEPTH. A `cd` up the tree
+in single quotes in the command itself and no word of that command is
+`sudo`, `doas`, `pkexec`, `run0`, `exec`, or `env -i`, once without them,
+since bash expands a double-quoted text with the outer names and those
+wrappers may drop the names; `env -u D` drops D from them, and a bare `~`
+reads HOME as `$HOME` does), to MAX_NESTED levels, and deeper with no
+directory, to MAX_DEPTH. A `cd` up the tree
 repeated by a loop (`cd ..`) is judged in every directory above. An
 unquoted `cd $D` with D empty or unset goes home, and is judged both there
 and where it is. `pushd` moves as `cd` does, and `popd` returns to the
@@ -102,7 +104,12 @@ make; cd ..; fi; chmod -R u+w .` is judged in the parent too), a quoted
 at `/`), a top-level directory written in a value beside an unset name
 (`DIRS="$X /opt"` splits to a `/opt` read as taken as empty, which a system
 tree or home is not), a `-R` held in a variable (`chown $FLAGS root /usr`
-is not seen as recursive), a `~` in a double-quoted `sh -c` text (read
+is not seen as recursive), a name assigned earlier in the command and not
+exported, which a `sh -c` text is read with though its shell does not see
+it (`D=/x; bash -c 'chmod -R 755 "$D/"'` runs on `/`), a single-quoted
+`sh -c` text inside a substitution or holding `'\\''`, read as
+double-quoted too, which can refuse more than bash runs, a `~` in a
+double-quoted `sh -c` text (read
 with the outer HOME too, which bash leaves to the inner shell, so
 `HOME=/tmp/h bash -c "cd ~ && chmod -R u+w ."` is refused), a `cd` that
 goes home (a bare `cd`, or an unquoted empty `cd $D`), which reads this
@@ -251,6 +258,7 @@ SYSTEM_TREES = ("/usr", "/etc", "/bin", "/sbin", "/lib", "/lib32", "/lib64",
                 "/System", "/Library", "/var/db")
 USR_LOCAL_CORE = {"bin", "sbin", "etc", "lib", "libexec", "include", "share"}
 APP_TREES = ("/var/lib", "/var/log", "/var/spool")
+WEB_ROOTS = ("/usr/share/nginx",)
 VAR_CORE = {"dpkg", "apt", "rpm", "dnf", "yum", "pacman", "systemd", "sudo",
             "polkit-1", "PackageKit", "ucf"}
 ASSIGNMENT = re.compile(r"\A[A-Za-z_][A-Za-z0-9_]*=")
@@ -676,6 +684,8 @@ def _why(path, home, weak):
     parts = path.split("/")
     if path.startswith("/usr/local/") and (len(parts) > 4 or parts[3] not in USR_LOCAL_CORE):
         return None
+    if any(path == root or path.startswith(root + "/") for root in WEB_ROOTS):
+        return None
     for tree in APP_TREES:
         depth = tree.count("/") + 1
         if path.startswith(tree + "/") and parts[depth] not in VAR_CORE:
@@ -875,8 +885,7 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
                 # Only a top-level text was quoted as written (an enclosing
                 # double-quoted text was expanded first), and sudo, doas,
                 # pkexec and run0 may drop the names given before them.
-                if prefix and level == 0 and not PRIVILEGED & {
-                        os.path.basename(w) for w in words}:
+                if prefix and level == 0 and not _may_drop_names(words):
                     if piece not in ctx["flat"]:
                         ctx["flat"][piece] = _flat(piece)
                     flat = ctx["flat"][piece]
@@ -991,6 +1000,17 @@ def _without_redirects(argv):
 
 # Wrappers that may run a shell with a reset environment.
 PRIVILEGED = {"sudo", "doas", "pkexec", "run0"}
+# `env` options that clear the names given before them.
+ENV_CLEARING = re.compile(r"\A(?:-|-[a-zA-Z]*i[a-zA-Z]*|--ignore-environment)\Z")
+
+
+def _may_drop_names(words):
+    """Whether a word of WORDS may run its shell without the `NAME=value`
+    words given before it: a privilege wrapper, `env -i`, or `exec`, whose
+    `-c` clears the environment."""
+    names = {os.path.basename(w) for w in words}
+    return bool(PRIVILEGED & names or "exec" in names
+                or ("env" in names and any(ENV_CLEARING.match(w) for w in words)))
 
 
 def _flat(text):
@@ -1002,8 +1022,18 @@ def _flat(text):
 def _prefix_names(words, home, visible, here):
     """The `NAME=value` words before a shell's `-c` option (`D=/x sh -c`,
     `sudo D=/x sh -c`, `env D=/x sh -c`), as names its text starts with."""
-    names = {}
+    names, unset = {}, False
     for word in words:
+        if unset:  # `env -u D` removes D
+            names.pop(word, None)
+            unset = False
+            continue
+        if word in ("-u", "--unset"):
+            unset = True
+            continue
+        if word.startswith(("--unset=", "-u")) and word not in ("-u", "--unset="):
+            names.pop(word.split("=", 1)[1] if "=" in word else word[2:], None)
+            continue
         if word.startswith("-") and not word.startswith("--") and "c" in word:
             break
         if ASSIGNMENT.match(word):

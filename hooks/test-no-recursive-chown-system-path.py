@@ -346,6 +346,21 @@ class Denies(unittest.TestCase):
 
     def test_cd_to_an_unset_variable_then_dot_stays_weakly(self):
         self.assert_denied('cd "${OUT}." && chown -R me .', cwd=HOME)
+        self.assert_denied('cd "$HOME/$PROJECT" && chmod -R u+w .', cwd=HOME)
+        self.assert_denied('cd "$OUT/tmp" && chown -R me ..', cwd="/tmp")
+
+    def test_cd_under_an_unset_variable_that_may_not_run(self):
+        # Where the `cd` did not run, the shell is still in the project.
+        for cmd in ('if [ -n "$X" ]; then cd "$OUT/a/b/c"; fi; chown -R me ..',
+                    'while read -r f; do cd "$OUT/a/b"; done; chmod -R u+w ..'):
+            self.assert_denied(cmd, cwd=HOME + "/proj")
+
+    def test_absolute_cd_leaves_a_weak_directory(self):
+        self.assert_denied('cd "$OUT/x"; cd /; chmod -R u+w opt', cwd=HOME + "/proj")
+
+    def test_weak_flag_is_out_of_reach_of_names(self):
+        self.assert_denied('cd x; chmod -R u+w "$__AICFG_WEAK_PWD__/etc"')
+        self.assert_denied('cd x; chmod -R u+w "${weak PWD}/etc"')
 
     def test_climb_from_a_directory_under_an_unset_variable(self):
         # With OUT unset, `cd "$OUT/tmp"` is `cd /tmp`, and `..` is `/`.
@@ -707,6 +722,16 @@ class Allows(unittest.TestCase):
         for cmd in ('cd "$OUT/build" && chmod -R u+w .', 'cd "$OUT/opt" && chmod -R u+w .',
                     'cd "$OUT/build" && chmod -R u+w "$PWD"'):
             self.assert_allowed(cmd, cwd=HOME)
+        # `$PWD` and a relative `cd` there stay weak.
+        for cmd in ('cd "$OUT/opt" && chmod -R u+w "$PWD"',
+                    'cd "$OUT/x" && cd .. && chmod -R u+w ./opt',
+                    'if [ -n "$X" ]; then cd "$OUT/build"; fi; chmod -R u+w .',
+                    # Where the second `cd` did not run, `/opt` is still weak.
+                    f'cd "$OUT/opt"; if t; then cd {HOME}/proj; fi; chmod -R u+w .'):
+            self.assert_allowed(cmd, cwd=HOME + "/proj")
+
+    def test_cd_in_a_comment_is_not_a_cd(self):
+        self.assert_allowed('echo x # cd $D\ncd "$D"; chmod -R u+w .', cwd=HOME + "/proj")
 
     def count_calls(self, name, command):
         real, calls = getattr(guard, name), []
@@ -725,6 +750,16 @@ class Allows(unittest.TestCase):
     def test_nested_text_is_parsed_once(self):
         guards = "".join(f"if {c}; then cd {c}; fi; " for c in "abcd")
         self.assertEqual(self.count_calls("_split", guards + 'sh -c "chmod -R u+w ./x"'), 2)
+
+    def test_only_words_with_a_default_are_expanded_for_one(self):
+        # `a=b` keeps the `echo` from being skipped as changing nothing.
+        command = "echo a=b " + " ".join(f"w{i}" for i in range(500)) + "; chmod -R u+w ./x"
+        self.assertLess(self.count_calls("_expand", command), 50)
+
+    def test_past_the_work_budget_the_rest_is_read_once(self):
+        guards = "".join(f"if {c}; then cd {c}; fi; " for c in "abcd")
+        command = guards + "echo ${A}; " * 5000 + "chmod -R u+w ./x"
+        self.assertLess(self.count_calls("_judge", command), 4 * 5000)
 
     def test_commands_that_change_nothing_are_not_read_per_world(self):
         guards = "".join(f"if {c}; then cd {c}; fi; " for c in "abcd")

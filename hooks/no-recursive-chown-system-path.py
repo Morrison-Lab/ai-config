@@ -83,27 +83,29 @@ unquoted heredoc body (`<<EOF`, which bash does run), a glob in a directory
 component (`/*/lib`), a partial glob or brace expansion that names a
 protected path (`/et*`, `/{etc,usr}`), a wrapper that changes directory
 (`env -C /etc`, `sudo -D /etc`), more than MAX_WORLDS ways a command may
-run (the directory is then unknown), a nested text read after MAX_WORK
-words of commands that may assign or change directory (read once, with no
-directory), PowerShell `icacls`/`Set-Acl`, Windows drive paths
-(`C:/Windows`), nested texts past MAX_DEPTH, a relative target, `$PWD`, or
-a name assigned from `$PWD`, after a `cd` this cannot resolve (`cd -` or
-`cd "$(git rev-parse --show-toplevel)"`, where `$PWD` is taken as empty), a
-`cd` into a subdirectory repeated by a loop (read as run once), a command
-before a `cd` in the same loop body (judged only where the loop starts), a
-`cd` that fails or follows `&&` or `||` (read as run), a quoted `cd "$D"`
-where an unquoted `cd $D` appears elsewhere in the same text (both read as
-going home), an assignment that may not run
-(`false && D=./x` or `if false; then : "${D:=./x}"; fi`, each read as run), a
-`${D:=x}` assignment inside `sh -c` or a substitution, an assignment in a
-pipeline element (`echo x | : "${D:=./x}"`, read as made in the shell that
-follows), a `${D:=x}` read earlier in the same command than it assigns, and
-a bind-mounted path (the #39283 `/volumes/mail/` case) all pass. Fails open
-on parse trouble and when scripts/lib/shellcmd.py cannot be imported.
+run (the directory is then unknown), the rest of a command after MAX_WORK
+words of commands that may change directory, assign or run chown, chmod or
+chgrp (read in one way it may run, with the directory unknown), PowerShell
+`icacls`/`Set-Acl`, Windows drive paths (`C:/Windows`), nested texts past
+MAX_DEPTH, a relative target, `$PWD`, or a name assigned from `$PWD`, after
+a `cd` this cannot resolve (`cd -` or `cd "$(git rev-parse
+--show-toplevel)"`, where `$PWD` is taken as empty), a `cd` into a
+subdirectory repeated by a loop (read as run once), a command before a `cd`
+in the same loop body (judged only where the loop starts), a `cd` that fails
+or follows `&&` or `||` (read as run), a quoted `cd "$D"` where an unquoted
+`cd $D` appears elsewhere in the same text (both read as going home), an
+assignment that may not run (`false && D=./x` or `if false; then :
+"${D:=./x}"; fi`, each read as run), a `${D:=x}` assignment inside `sh -c`
+or a substitution, an assignment in a pipeline element (`echo x | :
+"${D:=./x}"`, read as made in the shell that follows), a `${D:=x}` read
+earlier in the same command than it assigns, and a bind-mounted path (the
+#39283 `/volumes/mail/` case) all pass. Fails open on parse trouble and when
+scripts/lib/shellcmd.py cannot be imported.
 """
 from __future__ import annotations
 
 import json
+from collections import ChainMap
 import os
 import re
 import shlex
@@ -230,15 +232,17 @@ READ_BUILTINS = ("read", "mapfile", "readarray", "getopts")
 NAME_SETTERS = READ_BUILTINS + DECLARE_BUILTINS + ("printf",)
 # A lifted `$(pwd)`, read as `${PWD}` and shown as written.
 PWD_SUB = "__AICFG_PWDSUB__"
-# Kept with a scope's names: whether its directory is weak (see `_here_weak`).
-WEAK_PWD = "__AICFG_WEAK_PWD__"
+# Kept with a scope's names under a key no `$NAME` can reach: whether its
+# directory is weak (see `_here_weak`).
+WEAK_PWD = "weak PWD"
 # How many ways a command may run (see `_scan`) are judged one by one.
 MAX_WORLDS = 16
 # How deep `sh -c` texts and substitutions inside one another are read in
 # each directory; deeper ones are read with no directory, to MAX_DEPTH.
 MAX_NESTED = 3
 MAX_DEPTH = 32
-# Past this many words read, a nested text is read once, with no directory.
+# Past this many words read, the rest of the command is read in one way it
+# may run, with the directory unknown.
 MAX_WORK = 20000
 ALL_GLOB = re.compile(r"\A[*?.]*[*?][*?.]*\Z")
 CD_OPTION = re.compile(r"-[LPe@]+")
@@ -713,15 +717,17 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
     shell's expansion of a double-quoted text or through the environment.
 
     CTX is shared by the whole command: a nested text already read in the
-    same directory with the same names is not read again, and past
-    MAX_WORK words read, a nested text is read once, with no directory but
-    with the names assigned so far.
+    same directory with the same names it uses is not read again, and past
+    MAX_WORK words read, a nested text is read with no directory, and after
+    the command holding it the rest is read in one way the command may run,
+    with the directory unknown and that way's names.
     """
-    ctx = {"seen": set(), "work": 0, "split": {}} if ctx is None else ctx
+    ctx = {"seen": set(), "work": 0, "split": {}, "uses": {}} if ctx is None else ctx
     if not PROGRAM_TEXT.search(re.sub(r"[\\'\"]", "", piece)):
         return None  # no chown, chmod or chgrp anywhere in it, quotes aside
     if piece not in ctx["split"]:
-        ctx["split"][piece] = _split(piece), _bare_cd_operands(piece)
+        ctx["split"][piece] = (_split(piece),
+                               _bare_cd_operands(_comment_free(_heredoc_free(piece))))
     (cmds, inner), bare = ctx["split"][piece]
     # A WORLD is one way the command may run: for each scope, the directory
     # the shell is in (`None` when this cannot name it) and the names
@@ -775,17 +781,17 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
         for heres, assigns in worlds:
             here = next(heres[scope[:k]] for k in range(len(scope), 0, -1)
                         if scope[:k] in heres)
-            assigned = dict(outer)
-            for k in range(1, len(scope) + 1):
-                assigned.update(assigns.get(scope[:k], {}))
+            # Innermost scope first; a write lands in this scope's own names.
+            store = assigns.setdefault(scope, {})
+            assigned = ChainMap(store, *(assigns.get(scope[:k], {})
+                                         for k in range(len(scope) - 1, 0, -1)), outer)
             ctx["work"] += len(argv)
-            over = ctx["work"] > MAX_WORK
             for text in texts:
-                hit = _nested_hit(text, None if over else here, home, assigned,
-                                  level, ctx)
+                # Past the budget, even within one command, with no directory.
+                over = ctx["work"] > MAX_WORK
+                hit = _nested_hit(text, None if over else here, home, assigned, level, ctx)
                 if hit:
                     return hit
-            store = assigns.setdefault(scope, {})
             _defaults(argv, home, store, assigned, here)
             if is_cd:
                 got = [_expand(tok, home, assigned, here) for tok in lead[1:]]
@@ -794,9 +800,10 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
                 unknown = None in cd_words or any(SUB in tok for tok in lead) or here is None
                 new = None if unknown else resolve_cd_target(cd_words, here)
                 news, fork, stay = [new], maybe, here
+                stay_weak = _here_weak(assigned)  # the world the `cd` leaves in place
                 operand = _cd_operand(lead)
                 # A relative `cd` from a weak directory stays weak.
-                weak_here = bool(_here_weak(assigned)) and not (
+                weak_here = stay_weak and not (
                     operand and cd_words[operand] and cd_words[operand].startswith("/"))
                 tok = lead[operand] if operand else None
                 reading = got[operand - 1] if operand else None
@@ -815,10 +822,15 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
                     # `cd "$OUT/tmp"` with OUT unset is `cd /tmp`, and with it
                     # set goes somewhere this cannot name: the directory is weak
                     # in the first world and unknown in the second.
+                    # When the `cd` may not run, the shell may also stay put.
                     path = os.path.normpath(os.path.join(here, reading[0]))
-                    news, fork, stay, weak_here = [path], True, None, True
+                    fork, weak_here = True, True
                     if path == here:  # `cd "${OUT}."`: it stays, weakly, or moves
-                        news, stay = [None], here
+                        news, stay, stay_weak = [None], here, stay_weak or not maybe
+                    elif maybe:
+                        news, stay = [path, None], here
+                    else:
+                        news, stay = [path], None
                 if looped and new and here and _above(new, here):
                     # Repeated, an up-move may reach every directory above.
                     news, fork = _ancestors(here)[::-1], True
@@ -831,9 +843,10 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
                     forked.append(({**heres, scope: n}, moved))
                 if fork and news and room > 0:
                     heres[scope] = stay  # where this world is if the `cd` did not move it
+                    store[WEAK_PWD] = stay_weak
                 else:
                     heres[scope] = None if fork and news else new
-                store[WEAK_PWD] = weak_here and heres[scope] is not None
+                    store[WEAK_PWD] = weak_here
                 continue
             if _assignments(words, store, assigned, home, here):
                 continue
@@ -841,6 +854,9 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
             if hit:
                 return hit
         worlds.extend(forked)
+        if ctx["work"] > MAX_WORK and len(worlds) > 1:
+            heres, assigns = worlds[0]
+            worlds = [({k: None for k in heres}, assigns)]
     return None
 
 
@@ -848,7 +864,11 @@ def _nested_hit(text, here, home, names, level, ctx):
     """`_scan` of a nested TEXT, unless it is past MAX_DEPTH or read already."""
     if level >= MAX_NESTED:
         here = None  # deeper texts are read once, with no directory
-    key = (text, here, repr(sorted(names.items(), key=lambda kv: kv[0])))
+    if text not in ctx["uses"]:
+        ctx["uses"][text] = sorted({m.group(1) or m.group(2) for m in VARIABLE.finditer(text)
+                                    if m.group(1) or m.group(2)} | {WEAK_PWD})
+    names = {k: names[k] for k in ctx["uses"][text] if k in names}
+    key = (text, here, repr(sorted(names.items())))
     if level >= MAX_DEPTH or key in ctx["seen"]:
         return None
     ctx["seen"].add(key)

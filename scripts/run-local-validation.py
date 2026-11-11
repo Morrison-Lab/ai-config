@@ -36,12 +36,16 @@ What it runs, in order:
 
 Which gates apply to which files is derived, not recalled (#3120). Each
 `uses:` job declares its own file scope in the workflow (`with: globs` and
-`with: paths-ignore`), so --changed intersects that scope with
-`git diff --name-only <base>...HEAD` and reports every gate as SELECTED or
-SKIPPED with the reason. The `validate` job declares no path filter in
-validate.yml, so its steps are repo-wide and always selected -- which is what
-CI does too. A gate is never dropped silently: a run that selected two gates
-and a run that selected five print different plans.
+`with: paths-ignore`), so --changed intersects that scope with the files
+changed since the merge base and reports every gate as SELECTED or SKIPPED
+with the reason. The `validate` job declares no path filter, so its checkers
+are repo-wide and always selected. Its test suites are not: under --changed,
+a `python3 scripts/test_<name>.py` step whose inputs (derived by
+scripts/lib/changed_selection.py from the names and imports in its code) hold
+no changed file is skipped, and scripts/test_hooks.py runs only the hook
+suites the change can affect, reading the list from RLV_CHANGED_FILES
+(#5087). CI always runs everything. A gate is never dropped silently: a run
+that selected two gates and a run that selected five print different plans.
 
 Steps whose name matches --skip (default: the dependency install, which needs
 the network and is already satisfied locally) are skipped and counted.
@@ -445,13 +449,40 @@ def load_workflow(path: Path) -> Dict[str, Any]:
     return doc
 
 
-def run_step(step: Step, root: Path, timeout: Optional[float], tmpdir: Optional[str] = None) -> int:
+SUITE_COMMAND = re.compile(r"python3 (scripts/test_[A-Za-z0-9_]+\.py)")
+_SELECTORS: Dict[str, Any] = {}
+
+
+def suite_needed(step: Step, root: Path, changed: List[str]) -> bool:
+    """False only for a one-suite step none of whose inputs changed (#5087).
+
+    A step that is not exactly `python3 scripts/test_<name>.py` is always
+    needed; scripts/test_hooks.py selects its own suites from
+    RLV_CHANGED_FILES instead, so the step itself always runs.
+    """
+    match = SUITE_COMMAND.fullmatch(step.command.strip())
+    if match is None or SLOW_COMMAND.search(step.command):
+        return True
+    if str(root) not in _SELECTORS:
+        sys.path.insert(0, str(ROOT / "scripts"))
+        from lib.changed_selection import Selector
+        _SELECTORS[str(root)] = Selector(root)
+    return _SELECTORS[str(root)].needed([match.group(1)], changed)
+
+
+def run_step(step: Step, root: Path, timeout: Optional[float], tmpdir: Optional[str] = None,
+             changed_listing: Optional[str] = None) -> int:
     env = dict(os.environ)
     # The run's own empty temp directory, as a CI runner starts with one
     # (#4806); a step that sets TMPDIR, TEMP or TMP itself still wins.
     if tmpdir:
         for name in ("TMPDIR", "TEMP", "TMP"):
             env[name] = tmpdir
+    # --changed hands its file list to suites that select their own cases
+    # (scripts/test_hooks.py); CI never sets it, so CI runs everything.
+    env.pop("RLV_CHANGED_FILES", None)
+    if changed_listing:
+        env["RLV_CHANGED_FILES"] = changed_listing
     env.update(step.env)
     cwd = root / step.cwd if step.cwd else root
     proc = subprocess.run(
@@ -628,6 +659,9 @@ def main(argv: Optional[List[str]] = None) -> int:
             if s.globs and not any(matches_scope(f, s.globs, s.paths_ignore) for f in changed):
                 skipped = True
                 reason = "no scoped files changed"
+            elif not suite_needed(s, root, changed):
+                skipped = True
+                reason = "none of the suite's inputs changed (scripts/lib/changed_selection.py)"
 
         if not skipped and s.requires:
             if args.list:
@@ -678,14 +712,20 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     place = contextlib.nullcontext(root) if args.in_place else snapshot(root)
     try:
-        with place as run_root, tempfile.TemporaryDirectory(prefix="rlv-tmp-") as tmpdir:
-            return _execute(plan, run_root, tmpdir, args)
+        with place as run_root, \
+                tempfile.TemporaryDirectory(prefix="rlv-tmp-", ignore_cleanup_errors=True) as tmpdir, \
+                tempfile.TemporaryDirectory(prefix="rlv-changed-", ignore_cleanup_errors=True) as aside:
+            listing = None
+            if changed:
+                listing = str(Path(aside) / "changed-files.txt")
+                Path(listing).write_text("\n".join(changed) + "\n", encoding="utf-8")
+            return _execute(plan, run_root, tmpdir, listing, args)
     except SnapshotError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
 
-def _execute(plan, root: Path, tmpdir: str, args: argparse.Namespace) -> int:
+def _execute(plan, root: Path, tmpdir: str, listing: Optional[str], args: argparse.Namespace) -> int:
     print(f"info: running in {root}", file=sys.stderr)
     results = []
     for s, skipped, reason in plan:
@@ -701,7 +741,7 @@ def _execute(plan, root: Path, tmpdir: str, args: argparse.Namespace) -> int:
         print(f"==> [{s.source}] {s.name}", flush=True)
         t0 = time.monotonic()
         try:
-            rc = run_step(s, root, args.timeout, tmpdir)
+            rc = run_step(s, root, args.timeout, tmpdir, listing)
         except subprocess.TimeoutExpired:
             rc = "timeout"
         secs = time.monotonic() - t0

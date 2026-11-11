@@ -44,6 +44,7 @@ import os
 import subprocess
 import sys
 import threading
+from pathlib import Path
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HOOKS = os.path.join(ROOT, "hooks")
@@ -291,10 +292,39 @@ def run_suites(timeout=None):
             failures += 1
             continue
         runnable.append((test_path, present[0]))
+    runnable = select_for_change(runnable)
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
         futures = [pool.submit(run_one_suite, t, subj, timeout) for t, subj in runnable]
         failures += sum(f.result() for f in futures)
     return failures, len(tests)
+
+
+def select_for_change(runnable):
+    """Keep only the suites a change can affect, when RLV_CHANGED_FILES names one.
+
+    scripts/run-local-validation.py --changed writes the changed paths to a
+    file and names it in RLV_CHANGED_FILES (ai-config#5087). CI never sets it,
+    so CI always runs every suite. scripts/lib/changed_selection.py derives
+    each suite's inputs; every skipped suite is counted, never dropped silently.
+    """
+    listing = os.environ.get("RLV_CHANGED_FILES")
+    if not listing:
+        return runnable
+    sys.path.insert(0, os.path.join(ROOT, "scripts"))
+    from lib.changed_selection import Selector, read_changed_list
+    changed = read_changed_list(listing)
+    selector = Selector(Path(ROOT))
+    global _SELECTED
+    kept = [(t, subj) for t, subj in runnable
+            if selector.needed([os.path.relpath(t, ROOT), os.path.relpath(subj, ROOT)], changed)]
+    print(f"SELECTED: {len(kept)} of {len(runnable)} hook suites read a file among the "
+          f"{len(changed)} changed (RLV_CHANGED_FILES); CI runs all of them", flush=True)
+    _SELECTED = len(kept)
+    return kept
+
+
+# Suites select_for_change kept, or None when every suite ran.
+_SELECTED = None
 
 
 def check_coverage():
@@ -334,7 +364,9 @@ def main() -> int:
         return 1
     cov_failures, tested, total = check_coverage()
 
-    print(f"\n{n_suites - suite_failures}/{n_suites} hook test suites passed; "
+    ran = n_suites if _SELECTED is None else _SELECTED
+    scope = "" if _SELECTED is None else f" selected (of {n_suites})"
+    print(f"\n{ran - suite_failures}/{ran} hook test suites{scope} passed; "
           f"{tested}/{total} hooks have a test "
           f"({len(KNOWN_UNTESTED)} known untested)")
     return 1 if (suite_failures or cov_failures) else 0

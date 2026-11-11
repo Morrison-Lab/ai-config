@@ -10,10 +10,11 @@ This splitter was copied into EIGHT hooks before the module was written:
     hooks/flag-stale-adjacent-comment.py       hooks/no-unreviewed-pr.py
     hooks/remind-ci-crosscheck-sim-verdict.py  hooks/warn-nonglobal-substitution.py
 
-Derive that set from the CONSTANT, not from the function name:
+That set was derived from the CONSTANT, not from the function name; before
+the migration the two queries gave 8 files and 7:
 
-    grep -rlF '_SHELL_OPS = set("();|&")' hooks/   ->  8 files
-    grep -rl  "def _simple_commands"      hooks/   ->  7 files
+    grep -rlF '_SHELL_OPS = set("();|&")' hooks/
+    grep -rl  "def _simple_commands"      hooks/
 
 `remind-ci-crosscheck-sim-verdict.py` spells its copy `simple_commands`, so an
 identifier search misses it and a migration keyed on that search would leave
@@ -25,11 +26,11 @@ fixes below -- which is the argument for a module rather than a ninth copy.
 The six that only add context now import `simple_commands` from here
 (ai-config#3178). The two that can REFUSE (`no-clobbering-push.py` denies,
 `no-unreviewed-pr.py` blocks) need the operators between commands as well as
-the argv, so they walk `shell_tokens` themselves. The same grep also finds later
-copies outside the original eight (`guard-slide-major-tag.py`,
-`no-binary-file-read.py`, `no-interpreter-heredoc.py`), which belong to the
-same migration. This module is where the fix landed and where new callers
-import from.
+the argv, so they walk `shell_tokens` themselves. Three later copies
+(`guard-slide-major-tag.py`, `no-binary-file-read.py`,
+`no-interpreter-heredoc.py`) moved here too, so the first grep now finds only
+this file. This module is where the fix landed and where new callers import
+from.
 
 WHY AN ARGV SPLIT RATHER THAN A REGEX
 -------------------------------------

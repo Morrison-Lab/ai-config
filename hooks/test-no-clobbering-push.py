@@ -2174,6 +2174,7 @@ shutil.copy(HOOK, _broken_hook)
 for _cmd, _want in (("git push --force origin b", True),
                     ("git push -fu origin b", True),
                     ("git push origin b", False),
+                    ("ALLOW_FORCE_PUSH=1 git push -f origin b", False),
                     ("X=1 ALLOW_FORCE_PUSH=1 git push -f origin b", False),
                     ("git push -f origin b; ALLOW_FORCE_PUSH=1 true", True),
                     ("git commit -m 'push -f' && ls", False),

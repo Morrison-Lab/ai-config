@@ -487,8 +487,8 @@ jobs:
         # 3,133 on 2026-11-11 -- and nothing reddened, so nobody acted until
         # the CLI char gate below was 125 chars from failing. The budget
         # mirrors that gate in bytes, which run ~3% above chars here, so it
-        # now fails a PR a little before the CLI gate would, which is the
-        # approach warning the char gate lacks. Measured after ai-config#5354:
+        # now fails a PR a little before the CLI gate would, and so gives the
+        # early warning the char gate lacks. Measured after ai-config#5354:
         # 98,129 bytes, 1,871 under. A PR that crosses it trims or moves
         # text out of CLAUDE.md in the same PR.
         #

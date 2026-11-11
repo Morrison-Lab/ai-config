@@ -1572,6 +1572,7 @@ def main() -> int:
         "None. Even so, the cache leaks.",
         "None. Even though, the cache leaks.",
         "None.\n**However**, the cache leaks.",
+        "None.\nBut the cache leaks on retry.",
         "None, _but_ the cache leaks.",
         "None. _However_, the cache leaks.",
         "None. (However, the loop leaks.)",
@@ -1587,7 +1588,28 @@ def main() -> int:
         "No issues, with a few exceptions.",
         "No issues." + chr(0xA0) + "However, the cache leaks.",
         "No issues, except the leak in login.",
-    ):
+        "Nothing blocking yet the cache is never cleared.",
+        "Nothing besides the crash on empty input.",
+        "None beyond the leak in login.",
+        "No issues other than the crash.",
+        "Nothing apart from the leak in login.",
+        "No bugs, aside from the crash.",
+        "Nothing save for the crash.",
+        "Nothing unless the login flow counts.",
+        "Nothing in the parser, whereas the lexer is broken.",
+        # An abbreviation does not end the negation's sentence.
+        "None, i.e. nothing broken, but the cache leaks.",
+        "None, e.g. the parser, but the lexer leaks.",
+        "No issues (see Fig. 2), but the cache leaks.",
+        "Nothing major vs. the base, however the cache leaks.",
+        "No issues, cf. item 3, but the cache leaks.",
+    ) + tuple(f"None, {_w} the cache leak." for _w in (
+        "excepting", "excluding", "notwithstanding", "outside of", "whilst",
+    )) + tuple(f"None. {_m}, the cache leaks." for _m in (
+        "Conversely", "In contrast", "Despite this", "Despite that", "Rather",
+        "At the same time", "Having said that", "Whereas", "All the same",
+        "With that said", "Then again", "Albeit",
+    )):
         check(
             f"## Nits + {_tail!r} is a finding (#2359)",
             checker._unresolved_finding_pattern("## Nits\n\n" + _tail + "\n")
@@ -1602,13 +1624,6 @@ def main() -> int:
         checker.FINDING_HEADING_NEGATION_SUFFIX.match(_text)
     check("whitespace runs after a negation scan in under 2 s (#2359)",
           time.monotonic() - _t0 < 2.0)
-    # A sentence-opening contrast marker on the next line re-flags.
-    check(
-        "## Nits + 'None.' with a hard-wrapped sentence-opening 'But' re-flags (#2359)",
-        checker._unresolved_finding_pattern(
-            "## Nits\nNone.\nBut the cache leaks on retry.\n"
-        ) is not None,
-    )
     unbolded_nwn = "### Verdict\nNeeds more work\n\nNone are blocked.\n"
     check(
         "classify_verdict: unbolded next-paragraph 'None are blocked.' does NOT blank not-clean verdict (#3937)",
@@ -2850,24 +2865,6 @@ def main() -> int:
          "## Nits\n\nNone, but the retry loop leaks a handle.\n\n"),
         ("plain 'N/A, except...' real finding",
          "## Nits\n\nN/A, except the retry loop leaks.\n\n"),
-        ("'Nothing yet...' real finding",
-         "## Nits\n\nNothing blocking yet the cache is never cleared.\n\n"),
-        ("'Nothing besides...' real finding",
-         "## Nits\n\nNothing besides the crash on empty input.\n\n"),
-        ("'None beyond...' real finding",
-         "## Nits\n\nNone beyond the leak in login.\n\n"),
-        ("'No issues other than...' real finding",
-         "## Nits\n\nNo issues other than the crash.\n\n"),
-        ("'Nothing apart from...' real finding",
-         "## Nits\n\nNothing apart from the leak in login.\n\n"),
-        ("'No bugs, aside from...' real finding",
-         "## Nits\n\nNo bugs, aside from the crash.\n\n"),
-        ("'Nothing save for...' real finding",
-         "## Nits\n\nNothing save for the crash.\n\n"),
-        ("'Nothing unless...' real finding",
-         "## Nits\n\nNothing unless the login flow counts.\n\n"),
-        ("'Nothing whereas...' real finding",
-         "## Nits\n\nNothing in the parser, whereas the lexer is broken.\n\n"),
         ("'0' joined by a non-breaking hyphen",
          "## Nits\n\n0\u2011day exploit possible in the auth handler.\n\n"),
         ("'yet' at a hard wrap",

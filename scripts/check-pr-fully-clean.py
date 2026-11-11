@@ -2494,8 +2494,8 @@ NOT_CLEAN_NEGATION_PREFIX = re.compile(
 # - a sentence-opening contrast marker at the start of the next sentence
 #   ("No issues. However, X is broken.", "None. Still, X leaks.").
 #
-# A sentence ends at [.!?] before whitespace, so a hard wrap or a dotted
-# token (`v1.2`) does not end one. Later sentences are usually verification
+# A sentence ends at [.!?] before whitespace, so a hard wrap, a dotted
+# token (`v1.2`) or an abbreviation ("e.g.", "vs.", "Fig.") does not end one. Later sentences are usually verification
 # prose ("0 findings. CI passes, though slowly.") and are not read. "None
 # beyond the above." still re-flags, the accepted safe-direction cost. A
 # "yet" ending its sentence ("None yet.") is not a contrast. The scan stops
@@ -2508,7 +2508,8 @@ NOT_CLEAN_NEGATION_PREFIX = re.compile(
 # negation, which callers cut off (ai-config#5401).
 _BLOCK_START = r"[ \t]*(?:#|>|[-*+][ \t]|\d+[.)][ \t])"
 _SENTENCE_CHAR = (
-    r"(?:(?![.!?](?:\s|$))(?!\r?\n[ \t]*\r?\n)"
+    r"(?:(?!(?<!\b[A-Za-z])(?<!\b(?:vs|cf|al))(?<!\b[Ff]ig)[.!?](?:\s|$))"
+    r"(?!\r?\n[ \t]*\r?\n)"
     r"(?!\r?\n" + _BLOCK_START + r")[\s\S])"
 )
 _CONTRAST_WORDS = (
@@ -2524,7 +2525,8 @@ _CONTRAST_MARKERS = (
     r"|though|although|instead|otherwise|besides|apart\s+from|aside\s+from"
     r"|on\s+the\s+other\s+hand|that\s+being\s+said|having\s+said\s+that|regardless"
     r"|even\s+so|conversely|at\s+the\s+same\s+time|in\s+contrast|beyond\s+that"
-    r"|even\s+though|despite\s+this|unless"
+    r"|even\s+though|despite\s+th(?:is|at)|unless|whereas|rather|albeit"
+    r"|all\s+the\s+same|with\s+that\s+said|then\s+again"
 )
 # Words that are also ordinary words or identifiers ("No issues found while
 # reviewing", "None in bar.py", "uses a set instead of a list") count only

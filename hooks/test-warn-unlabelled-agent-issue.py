@@ -51,6 +51,9 @@ BASH_FIRES = [
      'gh issue edit 3 -l ai-authored,P2; gh issue create -t x'),
     ("unlabelled create first, a labelled create after it",
      'gh issue create -t y && gh issue create -t x -l ai-authored,P2'),
+    ("unlabelled create in a brace group", "{ gh issue create -t x; }"),
+    ("brace group, the title holds a word ending in -l and label names",
+     '{ gh issue create -t "a-l ai-authored,P2"; }'),
     ("unlabelled glab create, the labels on the next command",
      'glab issue create -t x; gh pr create -l ai-authored,P2'),
     ("unlabelled inside a double-quoted command substitution",
@@ -179,6 +182,12 @@ BASH_QUIET = [
     ("editing labels on an existing issue", 'gh issue edit 12 --add-label ai-authored'),
     ("a PR create", 'gh pr create --title "t" --body "b"'),
     ("no gh command at all", "git commit -F /tmp/msg.txt"),
+    ("labelled create in a brace group",
+     "{ gh issue create -t x -l ai-authored,P2; }"),
+    (
+        "a heredoc body line that opens with the command",
+        "cat > /tmp/note.md <<'EOF'\ngh issue create -t y\nEOF",
+    ),
     (
         "the phrase quoted inside a heredoc body",
         "cat > /tmp/note.md <<'EOF'\nRun gh issue create to file it.\nEOF",

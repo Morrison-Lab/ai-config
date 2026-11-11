@@ -303,6 +303,6 @@ Each of these was found by a reviewer or a hook, not by the author ([ai-config#5
   "The counts go to the job summary, on a failed run too" was written from one failure path and was false for a failure in an earlier step.
   - **Do:** list each step and each early exit, and test the sentence against each.
   - **Don't:** write "on a failed run too" from the one failure path that was tested.
-- **`scripts/check-github-actions-step-if.py` takes no workflow path.**
-  Given one, it checks that file for the memory bullet and reports "missing step-if bullet".
+- **`scripts/check-github-actions-step-if.py` takes an optional memory-file path, not a workflow path.**
+  Given a workflow file, it checks that file for the memory bullet and reports "missing step-if bullet".
   Run it with no argument.

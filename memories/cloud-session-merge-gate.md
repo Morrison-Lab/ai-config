@@ -145,20 +145,22 @@ Learned on [ai-config#5023](https://github.com/Morrison-Lab/ai-config/pull/5023)
 
 Added on 2026-11-11 ([ai-config#5359](https://github.com/Morrison-Lab/ai-config/issues/5359)), when the OpenCode Go route worked again:
 
-- Run the OpenCode Go review on the shipping head before the merge call, and write a waiver only after every route failed in this session.
-  A waiver copied from a note about an earlier outage was posted on [ai-config#5352](https://github.com/Morrison-Lab/ai-config/pull/5352) before any reviewer was tried.
-- A 403 with "error code: 1010" is the gateway refusing the client, not the reviewer being unavailable.
-  A Python `urllib` request with `User-Agent: curl/8.5.0` got answers that day.
-- An answer with reasoning and no text is no verdict.
-  `glm-5.3` returned that on three diffs in a row and `kimi-k3` answered most requests, so list first the model that last answered.
-- A reviewer that sees only the diff can quote code that is not in the file.
-  Check each quoted passage against the head, and run the failing command a finding claims, before you accept or rebut it.
-- Do not repeat a reviewer's not-clean verdict phrase in your own PR comment.
-  The fully-clean checker scores that comment as a standing not-clean verdict;
-  write "did not approve, N findings" instead.
-- `scripts/summarize-pr-annotations.sh` did not finish in a cloud session: it printed an HTTP 403 line about 1,500 times in five minutes.
-  Which call gets the 403 was not read.
-  Reading `commits/<sha>/check-runs` and each `check-runs/<id>/annotations` with `gh api` took under a minute.
+- **Do:** run the OpenCode Go review on the shipping head before the merge call, and write a waiver only after every route failed in this session.
+- **Don't:** copy a waiver from a note about an earlier outage.
+  One was posted on [ai-config#5352](https://github.com/Morrison-Lab/ai-config/pull/5352) before any reviewer was tried.
+- The header that worked for the `urllib` probe named above was `User-Agent: curl/8.5.0`.
+  A 403 with code 1010 is the gateway refusing the client, so it is not a failed route and does not count toward a waiver.
+- An answer with reasoning and no text is no verdict ([`ci-quirks`](ci-quirks.md), "Cross-harness review tooling").
+  `glm-5.3` returned that on three diffs in a row while `kimi-k3` answered, so list first the model that last answered.
+- **Do:** check each passage a diff-only reviewer quotes against the head, and run the failing command a finding claims, before you accept or rebut the finding.
+- **Don't:** accept or rebut from the reviewer's quotation alone.
+  A reviewer that sees only the diff can quote code that is not in the file.
+- **Do:** report an outside review in your own words, such as "did not approve, N findings".
+- **Don't:** repeat the reviewer's not-clean verdict phrase in your own PR comment.
+  `scripts/check-pr-fully-clean.py` treats an explicit not-clean verdict phrase in a comment on the current head as a standing verdict (criterion 4 in its module docstring).
+- `scripts/summarize-pr-annotations.sh` did not finish in a cloud session: it printed an HTTP 403 line about 1,500 times in five minutes ([ai-config#5377](https://github.com/Morrison-Lab/ai-config/issues/5377)).
+  Its header already pages by hand around one proxy 403 (gha#1432), and which call still gets the 403 was not read.
+  Until that issue is fixed, read `commits/<sha>/check-runs` and each `check-runs/<id>/annotations` with `gh api`, which took under a minute.
 
 ## The merge hook needs literal ids in the checker command
 

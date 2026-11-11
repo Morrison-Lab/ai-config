@@ -30,6 +30,8 @@ do them in minimal batches", and "every PR should be as small and focused as it 
 Learned while splitting the priority-label branch on 2026-11-11 ([ai-config#5359](https://github.com/Morrison-Lab/ai-config/issues/5359)).
 That branch reached 22 files and 488 lines over six self-review rounds before its first push was refused,
 so the split came after the review work.
+No hook warns at commit time or on a file checkout from another commit yet;
+that issue tracks both.
 
 - **Do:** run `git diff --shortstat origin/main...HEAD` after the first commit and after each fix round,
   and split a second concern out as soon as the branch nears the cap.

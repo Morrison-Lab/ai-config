@@ -26,9 +26,9 @@ when a target is:
 
 A target is read with `~`, `~user` and `$HOME` expanded, relative paths
 resolved against the hook's `cwd` and any `cd` earlier in the same shell (a
-`cd` inside `( ... )` moves only that subshell, and one inside a branch or
-loop body (`then` to `fi`, `do` to `done`, `case` to `esac`) may not run, so
-the directory before it is judged too, `$PWD` included),
+`cd` inside `( ... )` moves only that subshell, and one inside an `if`, a
+loop or a `case`, outside the condition that opens it, may not run, so the
+directory before it is judged too, `$PWD` included),
 and a basename made only of glob characters read as its directory (`/usr/*`
 touches `/usr`). Any other
 `$VAR` keeps its value in this environment, which the Bash call inherits; one
@@ -165,8 +165,10 @@ UNREAD_WHY = ("which uses a `${...}` operator this guard does not read, here or 
               "in an earlier assignment (anything but a `-`/`=` default or a `?` "
               f"check, or defaults nested deeper than {MAX_NESTING}); write the path out")
 # Words that open and close a compound command, for `_scan`'s DEPTH.
-BLOCK_OPEN = {"then", "do", "case"}
+BLOCK_OPEN = {"if", "while", "until", "for", "select", "case"}
 BLOCK_CLOSE = {"fi", "done", "esac"}
+# Keywords whose own condition always runs (`if cd x; then`).
+CONDITION_OPEN = {"if", "while", "until"}
 DECLARE_BUILTINS = ("export", "local", "declare", "readonly", "typeset")
 # chmod's own short options (GNU and BSD); any other `-w` or `-x` is a mode.
 CHMOD_OPTIONS = set("cfvRHLPh")
@@ -201,6 +203,7 @@ SPECIAL = {"$": "1", "#": "0", "?": "0", "-": "hB"}
 # Builtins that set a variable from input this guard cannot read. A name they
 # set is refused when an operand uses it.
 READ_BUILTINS = ("read", "mapfile", "readarray", "getopts")
+PWD_USE = re.compile(r"\$\{?PWD(?![A-Za-z0-9_])")
 ALL_GLOB = re.compile(r"\A[*?.]*[*?][*?.]*\Z")
 
 DENY = (
@@ -514,14 +517,14 @@ def _assignments(argv, store, visible, home, here):
                 store[word] = visible[word] = UNREAD
         return False
     if lead < len(argv) and argv[lead] == "printf":
-        for i, word in enumerate(rest):
-            if word == "--" or not word.startswith("-"):
-                break
-            name = word[2:] if word.startswith("-v") and len(word) > 2 else None
-            if word == "-v" and i + 1 < len(rest):
-                name = rest[i + 1]
+        i = 0
+        while i < len(rest) and rest[i] != "--" and rest[i].startswith("-"):
+            name = rest[i][2:] if rest[i].startswith("-v") else None
+            if rest[i] == "-v":
+                name, i = (rest[i + 1] if i + 1 < len(rest) else None), i + 1
             if name:
                 store[name] = visible[name] = UNREAD
+            i += 1
         return False
     words = argv
     if argv and argv[0] in DECLARE_BUILTINS:
@@ -591,9 +594,9 @@ def _scan(piece, cwd, home, outer):
     # Each scope keeps every directory the shell may be in: a `cd` after a
     # keyword (`if [ -d x ]; then cd x; fi`) may not run, so the directory
     # before it stays possible. `None` is a directory this cannot name.
-    # DEPTH counts the branch and loop bodies open here (`then` to `fi`, `do`
-    # to `done`, `case` to `esac`): any `cd` inside one may not run. A `cd`
-    # in a condition (`if cd x; then`) or a `{ ... }` group runs.
+    # DEPTH counts the `if`, loop and `case` commands open here: any `cd`
+    # inside one may not run, except in the condition of the one it opens
+    # (`if cd x; then`, `while ! cd x`). A `{ ... }` group runs.
     heres, assigns, depth = {(0,): (cwd,)}, {}, 0
     for scope, argv in cmds or []:
         dirs = next(heres[scope[:k]] for k in range(len(scope), 0, -1) if scope[:k] in heres)
@@ -608,10 +611,12 @@ def _scan(piece, cwd, home, outer):
         assigns.setdefault(scope, {}).update(effects)
         assigned.update(effects)
         # `then cd /etc`, `{ cd /usr; }`: a keyword ends the command before.
+        opened = None
         while argv and argv[0] in SHELL_KEYWORDS:
             depth += (argv[0] in BLOCK_OPEN) - (argv[0] in BLOCK_CLOSE)
+            opened = argv[0] if argv[0] in BLOCK_OPEN else opened
             argv = argv[1:]
-        maybe = depth > 0
+        maybe = depth - (opened in CONDITION_OPEN) > 0
         lead = argv
         while lead and lead[0] in ("time", "-p", "command", "builtin"):
             lead = lead[1:]
@@ -627,11 +632,16 @@ def _scan(piece, cwd, home, outer):
             continue
         only_assigns = _assignments(argv, assigns.setdefault(scope, {}), assigned, home, here)
         if here is None:
-            # `X=$PWD` after a `cd` that may not run: refuse X where it is used.
+            # `X=$PWD` after a `cd` that may not run: of the values X may get,
+            # keep one that is protected, so a later use of X is refused.
             for word in argv:
-                if ASSIGNMENT.match(word) and "PWD" in word:
-                    name = word.partition("=")[0]
-                    assigned[name] = assigns[scope][name] = UNREAD
+                name, _, val = word.partition("=")
+                if not ASSIGNMENT.match(word) or not PWD_USE.search(val):
+                    continue
+                readings = [_expand(val, home, assigned, d) for d in dirs]
+                worst = next((r for r in readings if r is UNREAD or r and r[0].startswith("/")
+                              and _why(os.path.normpath(r[0]), home, r[1])), readings[-1])
+                assigned[name] = assigns[scope][name] = worst
         if only_assigns:
             continue
         head, override = _program(argv)

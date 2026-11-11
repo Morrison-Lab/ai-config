@@ -273,7 +273,8 @@ class Denies(unittest.TestCase):
                     'read < f; chown -R me "$REPLY"',
                     'mapfile < f; chown -R me "$MAPFILE"',
                     'IFS= printf -v D %s /etc; chown -R me "$D"',
-                    'printf -vD %s /etc; chown -R me "$D"'):
+                    'printf -vD %s /etc; chown -R me "$D"',
+                    'printf -v A -v D %s /etc; chown -R me "$D"'):
             self.assert_denied(cmd)
 
     def test_cd_after_a_shell_keyword(self):
@@ -404,6 +405,15 @@ class Allows(unittest.TestCase):
                     "{ cd ~/proj; }; chown -R me .",
                     "while ! cd ~/proj; do sleep 1; done; chown -R me ."):
             self.assert_allowed(cmd, cwd=HOME)
+
+    def test_cd_after_an_if_with_elif(self):
+        self.assert_allowed("if [ -d a ]; then echo a; elif [ -d b ]; then echo b; fi; "
+                            "cd ~/proj; chmod -R u+w .", cwd=HOME)
+
+    def test_pwd_assignment_after_a_cd_that_may_not_run(self):
+        self.assert_allowed('if [ -d build ]; then cd build; fi; BUILD_DIR="$PWD/out"; '
+                            'chmod -R u+w "$BUILD_DIR"')
+        self.assert_allowed("if [ -d build ]; then cd build; fi; PWD_OK=1 chmod -R u+w ./dist")
 
     def test_guarded_cd_into_the_project(self):
         self.assert_allowed("if [ -d build ]; then cd build; fi; chmod -R u+w .")

@@ -385,6 +385,7 @@ def main():
     check("warns when which reports a CLI under a path", run(MERGE, [
         probe("which codex agy", "Exit code 1\n/usr/bin/codex"),
         probe("command -v agy gemini cursor-agent")] + oc)[0])
+    check("warns when a later probe finds a CLI shown absent earlier", run(MERGE, probe_all + [probe("command -v codex", "/usr/bin/codex", False)])[0])
     check("warns when the probe was refused and never ran", run(MERGE, [probe(
         "command -v %s; gh pr merge 1" % clis4, "PreToolUse:Bash hook error: x")] + oc)[0] and run(
         MERGE, [probe("command -v " + clis4, "\\n\n Permission for this action was denied")] + oc)[0])

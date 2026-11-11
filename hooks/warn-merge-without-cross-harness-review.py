@@ -408,10 +408,9 @@ def scan(sib, path, clis, recs=None):
                     reviews.append(review_seq)
                 for route in attempts:
                     cleared[route] = max(cleared.get(route, -1), seq_call)
-                valid = RX_EXIT_1.match(text)
-                for probed in probes if valid else []:
-                    if probed in clis and _absent(probed, text):
-                        cleared["absent:" + probed] = max(cleared.get("absent:" + probed, -1), seq_call)
+                for probed in [p for p in probes if p in clis]:  # a later sighting voids an earlier absence
+                    absent = RX_EXIT_1.match(text) and _absent(probed, text)
+                    cleared["absent:" + probed] = max(cleared.get("absent:" + probed, -1), seq_call) if absent else -1
     return last_push, reviews, cleared
 
 

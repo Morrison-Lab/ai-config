@@ -22,7 +22,7 @@ allowed-tools:
 > Tracked as ai-config#1776.
 
 Sets up or edits the Google Antigravity PR **review, security audit, and test generation** workflow ([antigravity-review.yml](../../.github/workflows/antigravity-review.yml)),
-which invokes the reusable [antigravity-code-review.yml](https://github.com/Morrison-Lab/gha/blob/v2/.github/workflows/antigravity-code-review.yml) workflow from `Morrison-Lab/gha`.
+which invokes the reusable [antigravity-code-review.yml](https://github.com/Morrison-Lab/gha/blob/v3/.github/workflows/antigravity-code-review.yml) workflow from `Morrison-Lab/gha`.
 
 Path: [.github/workflows/antigravity-review.yml](../../.github/workflows/antigravity-review.yml)
 
@@ -33,11 +33,11 @@ Path: [.github/workflows/antigravity-review.yml](../../.github/workflows/antigra
 ```yaml
 jobs:
   review:
-    uses: Morrison-Lab/gha/.github/workflows/antigravity-code-review.yml@v2
+    uses: Morrison-Lab/gha/.github/workflows/antigravity-code-review.yml@v3
 ```
 
 The workflow delegates execution to `Morrison-Lab/gha`'s reusable workflow,
-which executes `Morrison-Lab/gha/antigravity-review@v2`.
+which executes `Morrison-Lab/gha/antigravity-review@v3`.
 This ensures updates, safety checks, and runner handling in `gha` are automatically shared across repos.
 
 ### 2. Required permissions
@@ -97,7 +97,7 @@ with:
 
 ### 7. Fork & Dependabot safeguards
 
-The underlying action (`Morrison-Lab/gha/antigravity-review@v2`) enforces guards so draft PRs,
+The underlying action (`Morrison-Lab/gha/antigravity-review@v3`) enforces guards so draft PRs,
 cross-repository (fork) PRs, and `dependabot[bot]` runs do not leak secrets or execute untrusted code.
 
 ## Setting up in a new repo
@@ -144,7 +144,7 @@ jobs:
       issues: write
       id-token: write
       actions: read
-    uses: Morrison-Lab/gha/.github/workflows/antigravity-code-review.yml@v2
+    uses: Morrison-Lab/gha/.github/workflows/antigravity-code-review.yml@v3
     with:
       mode: ${{ inputs.mode || 'code-review' }}
       pr-number: ${{ github.event.pull_request.number || inputs.pr_number || '' }}

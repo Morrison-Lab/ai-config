@@ -366,9 +366,9 @@ touching prose the PR had never authored.)
 
 ## Label an agent-filed issue with its authorship and its model
 
-Every issue an agent files into a repo we administrate carries two labels: `ai-authored`, saying an AI wrote it, and `model:<model-id>`, naming which one.
+Every issue an agent files into a repo we administrate carries two disclosure labels: `ai-authored`, saying an AI wrote it, and `model:<model-id>`, naming which one.
 Add both in the command that creates the issue, not as a follow-up edit.
-The same command sets a priority label ("Set the priority when you file", in this section).
+The same command sets a third label, the priority ("Set the priority when you file", at the end of this section).
 
 The labels exist because the issue body cannot say it.
 [`disclose-agent-authorship`](disclose-agent-authorship.md) puts a marker line on every agent-posted forge *comment* and explicitly excludes an issue body, so an agent-filed issue discloses nothing at all.
@@ -378,6 +378,12 @@ The model label is separate because it makes a second sweep possible: which mode
 
 [`label-agent-filed-issues`](label-agent-filed-issues.md) carries the mechanics: the `gh`, `glab`, and MCP forms, how to normalize the model id, creating the labels in a repo that lacks them, and what to do where you cannot.
 `hooks/warn-unlabelled-agent-issue.py` warns (never blocks) when an issue is created with no `ai-authored` label, or with no priority label.
+
+- **Do:** pass `--label ai-authored --label "model:<model-id>"` in the creating command, beside the priority label.
+- **Do:** normalize the model id to its canonical form first, so one model maps to one label.
+- **Do:** file the issue and report the gap when the labels cannot be created.
+- **Don't:** put the disclosure in the issue body instead --- that is the one place [`disclose-agent-authorship`](disclose-agent-authorship.md) rules out.
+- **Don't:** collapse the two into one label --- a combined `ai-authored:<model-id>` answers the model question, but finding AI-authored issues at all then costs one query per model spelling.
 
 ### Set the priority when you file
 
@@ -393,9 +399,5 @@ A pass on 2026-11-11 found 190 open issues in this repo with no priority label (
 `hooks/warn-unlabelled-agent-issue.py` warns when a create carries none of the three priority labels.
 The reviewer layer is [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md)'s check of the issues a PR files.
 
-- **Do:** pass `--label ai-authored --label "model:<model-id>"` in the creating command, with one of `--label P1`, `--label P2` or `--label P3`.
+- **Do:** pass one of `--label P1`, `--label P2` or `--label P3` in the creating command.
 - **Don't:** file an issue with no priority and leave the choice to the weekly pass.
-- **Do:** normalize the model id to its canonical form first, so one model maps to one label.
-- **Do:** file the issue and report the gap when the labels cannot be created.
-- **Don't:** put the disclosure in the issue body instead --- that is the one place [`disclose-agent-authorship`](disclose-agent-authorship.md) rules out.
-- **Don't:** collapse the two into one label --- a combined `ai-authored:<model-id>` answers the model question, but finding AI-authored issues at all then costs one query per model spelling.

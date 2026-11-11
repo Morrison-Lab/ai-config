@@ -1346,6 +1346,7 @@ def symlinked_plugin_root_cases() -> tuple[int, int]:
     The layout below is the checkout's, in miniature:
 
         root/hooks/<guard>, <sibling>      the real files
+        root/scripts/lib/                  the shared splitter they import
         root/real/plug/                    the plugin directory
         root/dotclaude/skills -> ../real   the symlink the harness resolves
     """
@@ -1362,6 +1363,11 @@ def symlinked_plugin_root_cases() -> tuple[int, int]:
         shutil.copy(HOOK, hooks_dir)
         shutil.copy(os.path.join(os.path.dirname(HOOK), "no-unreviewed-pr.py"),
                     hooks_dir)
+        # The sibling's detector imports `scripts/lib/shellcmd.py`
+        # (ai-config#3178), which the checkout carries beside `hooks/`.
+        shutil.copytree(os.path.join(os.path.dirname(os.path.dirname(
+            os.path.realpath(HOOK))), "scripts", "lib"),
+            os.path.join(d, "scripts", "lib"))
         try:
             os.symlink(os.path.join("..", "real"),
                        os.path.join(dotclaude, "skills"))
@@ -1543,7 +1549,11 @@ def msys_path_cases() -> tuple[int, int]:
     # the hint merge both ran on the raw `/c/...` form, and on Python 3.13
     # `isabs` calls it relative, so `cd /c/Users/x && git push` resolved to a
     # drive-less `\\c\\Users\\x` that `_run_git` could no longer repair.
+    # `cd` resolves inside shellcmd (ai-config#3177), so patch it there too.
+    shellcmd = sys.modules["shellcmd"]
+    lib_native = shellcmd.native_path
     mod._native_path = lambda path, is_windows=None: real_native(path, True)
+    shellcmd.native_path = lambda path, is_windows=None: lib_native(path, True)
     try:
         def directory_of(command):
             pushes = list(mod.iter_pushes(command))
@@ -1555,6 +1565,7 @@ def msys_path_cases() -> tuple[int, int]:
         both = directory_of("cd /c/Users/x && git -C sub push origin main")
     finally:
         mod._native_path = real_native
+        shellcmd.native_path = lib_native
     check(f"`cd /c/...` resolves to a native directory (got {by_cd!r})",
           by_cd == "C:/Users/x")
     check(f"`-C /c/...` resolves to a native directory (got {by_c!r})",

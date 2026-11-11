@@ -32,7 +32,7 @@ only fires when the TARGET repo vendors a local copy of the checker
 (`scripts/vendor/gha-check-new-line-breaks.py` or
 `scripts/check-new-line-breaks.py`). A repo that consumes
 `Morrison-Lab/gha`'s `check-new-line-breaks` reusable workflow directly
-(`uses: Morrison-Lab/gha/.github/workflows/check-new-line-breaks.yml@v2`,
+(`uses: Morrison-Lab/gha/.github/workflows/check-new-line-breaks.yml@v3`,
 which is what `Morrison-Lab/qbt` calls, from a job named `check`, with no
 `scripts/` directory at all) without vendoring a local copy of the script
 gets NO local warning from either hook -- the incident above happened in

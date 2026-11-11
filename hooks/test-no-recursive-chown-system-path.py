@@ -124,6 +124,17 @@ class Denies(unittest.TestCase):
         self.assert_denied("x=$(printf ')'); chown -R me /etc")
         self.assert_denied('x=$(echo ")"); sudo chown -R me /usr')
 
+    def test_command_after_a_heredoc_with_a_redirect(self):
+        self.assert_denied("python3 - <<'EOF' 2>&1\nprint(1)\nEOF\nsudo chown -R me /usr")
+        self.assert_denied("tee <<EOF out.txt\nhi\nEOF\nsudo chown -R me /usr")
+
+    def test_assignments_are_scoped_to_their_subshell(self):
+        self.assert_denied("d=/usr; (d=/tmp/x); chown -R me $d")
+
+    def test_assigning_default(self):
+        self.assert_denied('chown -R me "${PREFIX:=/usr}"')
+        self.assert_denied('chown -R me "${PREFIX=/usr}"')
+
     def test_absolute_target_inside_a_nested_shell(self):
         self.assert_denied("cd /tmp && bash -c 'chmod -R 755 /usr'")
 
@@ -183,6 +194,13 @@ class Allows(unittest.TestCase):
 
     def test_pwd_after_an_unknown_cd(self):
         self.assert_allowed('cd "$BUILD" && chmod -R 755 "$PWD/dist"')
+
+    def test_variable_set_in_the_environment_keeps_its_value(self):
+        env = {"VIRTUAL_ENV": "/home/tester/p/.venv"}
+        self.assert_allowed('chmod -R +x "$VIRTUAL_ENV/bin"', env=env)
+
+    def test_subshell_assignment_does_not_leak(self):
+        self.assert_allowed('d=/tmp/x; (d=/usr; echo $d); chown -R me "$d"')
 
     def test_malformed_cwd(self):
         self.assertIsNone(run("chmod -R 755 build", cwd=["/"]))

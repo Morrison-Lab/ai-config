@@ -28,13 +28,14 @@ A target is read with `~`, `~user` and `$HOME` expanded, relative paths
 resolved against the hook's `cwd` and any `cd` earlier in the same shell (a
 `cd` inside `( ... )` moves only that subshell), and a basename made only of
 glob characters read as its directory (`/usr/*` touches `/usr`). Any other
-`$VAR` is tried both with its value in this environment and as empty,
-because a variable set by an earlier Bash call is empty in this one
-(anthropics/claude-code#75859): `chmod -R 755 "$d/"` is `/`. A path that
+`$VAR` keeps its value in this environment, which the Bash call inherits; one
+unset here is taken as empty, because a variable set by an earlier Bash call
+is empty in this one (anthropics/claude-code#75859): `chmod -R 755 "$d/"` is
+`/`. A path that
 exists only because something was taken as empty is refused for the root, a
 system tree or home, but not for a top-level directory: `$OUT/dist` with OUT
-unset is `/dist`. A command substitution that runs (not one in single
-quotes, a quoted heredoc body or a comment) is lifted out before the command
+unset is `/dist`. A command substitution outside single quotes, heredoc
+bodies and comments is lifted out before the command
 is split, scanned as a command of its own, and taken as empty. Inside `sh -c`
 or a substitution the working directory is unknown, so only absolute targets
 are judged there.
@@ -47,10 +48,13 @@ reason stated in the reply.
 
 Limits, deliberately unclosed: `find ... -exec chown`, `xargs chown`, a
 `for` loop variable, `eval`, `su -c`, a heredoc piped to `sh`, an
-interpreter's own `-c` (`python -c "os.system(...)"`), a glob in a directory
-component (`/*/lib`), PowerShell `icacls`/`Set-Acl`, Windows drive paths
-(`C:/Windows`), and a bind-mounted path (the #39283 `/volumes/mail/` case)
-all pass. Fails open on parse trouble and when scripts/lib/shellcmd.py cannot
+interpreter's own `-c` (`python -c "os.system(...)"`), a substitution in an
+unquoted heredoc body (`<<EOF`, which bash does run), a glob in a directory
+component (`/*/lib`), a partial glob or brace expansion that names a
+protected path (`/et*`, `/{etc,usr}`), a wrapper that changes directory
+(`env -C /etc`, `sudo -D /etc`), PowerShell `icacls`/`Set-Acl`, Windows drive
+paths (`C:/Windows`), and a bind-mounted path (the #39283 `/volumes/mail/`
+case) all pass. Fails open on parse trouble and when scripts/lib/shellcmd.py cannot
 be imported.
 """
 from __future__ import annotations
@@ -219,12 +223,13 @@ def _targets(program, head):
 
 
 def _candidates(target, home, assigned, here):
-    """`[(path, weak)]` for every path TARGET can expand to.
+    """`[(path, weak)]` for the path TARGET expands to, or `[]` if undecidable.
 
-    Each variable is tried with its value here and as empty; a `weak`
-    candidate holds something guessed to be empty. A variable ASSIGNED earlier
-    in the same command keeps its literal value, or makes the target
-    undecidable (`[]`) when that value is computed, as in `d=$(mktemp -d)`.
+    A variable set in this environment keeps its value, since the Bash call
+    inherits it too; one that is unset here is taken as empty, and the path
+    is then `weak`. A variable ASSIGNED earlier in the same command keeps its
+    literal value, or makes the target undecidable when that value is
+    computed, as in `d=$(mktemp -d)`.
     """
     target = re.sub(r"\A~([A-Za-z0-9_.-]*)(?=/|\Z)",
                     lambda m: os.path.expanduser("~" + m.group(1)) if m.group(1) else home,
@@ -234,7 +239,9 @@ def _candidates(target, home, assigned, here):
         if name in assigned and assigned[name] is None:
             return []
 
-    def value(match, empty, guessed):
+    guessed = []
+
+    def value(match):
         if match.group(0) == SUB:
             guessed.append(True)
             return ""
@@ -247,19 +254,15 @@ def _candidates(target, home, assigned, here):
             val = here or ""
             guessed.append(here is None)
         else:
-            val = "" if empty else os.environ.get(name, "")
+            val = os.environ.get(name, "")
             guessed.append(not val)
-        if rest.startswith((":-", "-")) and not val:
-            val = rest.split("-", 1)[1]
+        default = re.match(r":?[-=]", rest)
+        if default and not val:
+            val = rest[default.end():]
         return val
 
-    results = []
-    for empty in (False, True):
-        guessed = []
-        path = VARIABLE.sub(lambda m: value(m, empty, guessed), target)
-        if all(path != seen for seen, _ in results):
-            results.append((path, any(guessed)))
-    return results
+    path = VARIABLE.sub(value, target)
+    return [(path, any(guessed))]
 
 
 def _assignments(argv, assigned):
@@ -301,7 +304,10 @@ def _why(path, home, weak):
 
 def _split(piece):
     """`(scoped argvs, inner substitutions)`; `(None, [])` on a parse error."""
-    cleaned = _comment_free(_heredoc_free(piece))
+    # Drop the `<<` each blanked body leaves behind: the split blanks heredocs
+    # again, and would read the next word (`2>&1`) as a new delimiter whose
+    # body runs to the end, hiding every later command.
+    cleaned = _comment_free(_heredoc_free(piece)).replace(" << ", " ")
     lifted, inner = _lift(cleaned)
     cmds = simple_commands_with_scope(lifted)
     if cmds is None:  # lifting broke the parse: judge the text as written
@@ -312,15 +318,20 @@ def _split(piece):
 def _scan(piece, cwd, home):
     """`(hit or None, [inner command substitutions])` for one shell text."""
     cmds, inner = _split(piece)
-    heres, assigned = {(0,): cwd}, {}
+    # A `cd` or assignment inside `( ... )` changes only that subshell, so each
+    # is kept per scope and read through the scope's ancestors.
+    heres, assigns = {(0,): cwd}, {}
     for scope, argv in cmds or []:
         here = next(heres[scope[:k]] for k in range(len(scope), 0, -1) if scope[:k] in heres)
         if argv and argv[0] in ("cd", "pushd", "popd"):
             moved = any(SUB in tok for tok in argv)
             heres[scope] = None if moved else resolve_cd_target(argv, here)
             continue
-        if _assignments(argv, assigned):
+        if _assignments(argv, assigns.setdefault(scope, {})):
             continue
+        assigned = {}
+        for k in range(1, len(scope) + 1):
+            assigned.update(assigns.get(scope[:k], {}))
         head, override = _program(argv)
         if not head or override:
             continue

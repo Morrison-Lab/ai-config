@@ -220,8 +220,9 @@ class Denies(unittest.TestCase):
         self.assert_denied("d=$(echo x); chown -R me /e${d:0:0}tc")
 
     def test_indirection_and_length(self):
-        self.assert_denied('P=HOME; chown -R me "${!P}"')
-        self.assert_denied('chown -R me "/${#HOME}"')
+        # Under a harmless prefix, so only the operator rule can deny them.
+        self.assert_denied('P=HOME; chown -R me "./${!P}"')
+        self.assert_denied('chown -R me "/tmp/${#HOME}"')
 
     def test_command_after_a_tab_stripped_heredoc(self):
         self.assert_denied("cat <<-EOF\n\tx\n\tEOF\nchown -R me /etc")

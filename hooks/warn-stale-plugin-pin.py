@@ -170,15 +170,23 @@ def origin_tip(clone: Path) -> str | None:
     return out.split()[0]
 
 
+def has_commit(clone: Path, rev: str) -> bool:
+    """True when the clone holds `rev` as a commit."""
+    return git(clone, "cat-file", "-e", f"{rev}^{{commit}}",
+               quiet=True) is not None
+
+
 def is_ancestor(clone: Path, older: str, newer: str) -> bool:
     """True when `older` is an ancestor of `newer` in the clone.
 
     A commit the clone does not hold is not an ancestor of anything in it:
     that is the expected case for origin's tip when the clone lags, so it
-    is answered False without a message. Any other git error is printed."""
-    for rev in (older, newer):
-        if git(clone, "cat-file", "-e", f"{rev}^{{commit}}", quiet=True) is None:
-            return False
+    is answered False without a message. `git cat-file -e` gives a missing
+    commit and an unreadable one the same exit code, so both read as
+    missing. Once both commits are found, any merge-base error other than
+    its exit-1 "no" is printed."""
+    if not (has_commit(clone, older) and has_commit(clone, newer)):
+        return False
     return git(clone, "merge-base", "--is-ancestor", older, newer,
                silent_codes=(1,)) is not None
 
@@ -220,11 +228,10 @@ def stale_lines(record: dict, here: Path, root: Path) -> list[str]:
             pin = entry.get("gitCommitSha") or ""
             has_tip = bool(pin and tip) and (tip.startswith(pin)
                                              or is_ancestor(clone, tip, pin))
-            behind_clone = (bool(pin) and not head.startswith(pin)
-                            and is_ancestor(clone, pin, head))
-            if has_tip and not behind_clone:
-                continue
             current = bool(pin) and pin_is_current(clone, pin, head)
+            in_clone = bool(pin) and has_commit(clone, pin)
+            if has_tip and (current or not in_clone):
+                continue
             if current and not lagging:
                 continue
             scope = entry.get("scope", "?")

@@ -47,6 +47,8 @@ With a bare repository as the clone's `origin` (ai-config#5309 step 2):
   20. Clone at origin's tip, pin behind: warns with the count and does not
       say the clone lags.
   22. Pin that descends from origin's tip, clone behind origin: silent.
+  22b. The same pin with the clone's HEAD diverged from it: warns, since
+      the pin does not contain the clone's HEAD.
   23. Case 10 with no time budget left (AI_CONFIG_REMOTE_BUDGET=0): origin
       is not read, stderr says so, and the clone alone is compared.
   15. Origin unreachable: falls back to the clone, says so on stderr, and
@@ -259,6 +261,12 @@ def main():
         git(mkt, "reset", "-q", "--hard", shas[2])
         rc, ctx, _ = run(root, record({"scope": "user", "gitCommitSha": ahead}), project)
         check("22 pin descending from origin's tip is silent", rc == 0 and ctx == "", ctx)
+
+        (mkt / "f").write_text("5", encoding="utf-8")
+        git(mkt, "commit", "-q", "-am", "c5")
+        rc, ctx, _ = run(root, record({"scope": "user", "gitCommitSha": ahead}), project)
+        check("22b pin diverged from the clone warns", "STALE PLUGIN PIN" in ctx, ctx)
+        git(mkt, "reset", "-q", "--hard", shas[2])
 
         shutil.rmtree(origin)
         rc, ctx, err = run(root, record({"scope": "user", "gitCommitSha": shas[2]}), project)

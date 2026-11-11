@@ -21,19 +21,26 @@ on:
         default: true
   schedule:
     - cron: '0 7 * * 1' # Weekly on Monday at 07:00 UTC
+  # A pull request that changes the script or this file runs `script-drift`
+  # only, so a change that is not ported to gha fails before it merges.
+  pull_request:
+    paths:
+      - scripts/triage-backlog.py
+      - .github/workflows/triage-backlog.yml
 
 permissions: {}
-
-concurrency:
-  group: triage-backlog
-  cancel-in-progress: false
 
 jobs:
   label:
     name: Label unprioritized issues
-    if: github.repository == 'Morrison-Lab/ai-config'
+    if: github.repository == 'Morrison-Lab/ai-config' && github.event_name != 'pull_request'
     permissions:
       issues: write
+    # On the job, not the workflow, so a pull request's drift check never
+    # waits behind a labelling run. The called workflow sets no group.
+    concurrency:
+      group: triage-backlog
+      cancel-in-progress: false
     uses: Morrison-Lab/gha/.github/workflows/triage-backlog.yml@v3
     with:
       # false on the schedule, the ticked box on a manual run,

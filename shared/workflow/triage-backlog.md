@@ -50,8 +50,9 @@ The count is the number of open issues the run read, before it closed any.
 A fetch that returns as many issues as `--limit` (1000 by default) stops the run, because `gh` truncates a longer list without saying so.
 
 In ai-config, `.github/workflows/triage-backlog.yml` runs this mode every Monday at 07:00 UTC, and on a manual dispatch.
-It calls the shared workflow [`triage-backlog.yml`](https://github.com/Morrison-Lab/gha/blob/main/.github/workflows/triage-backlog.yml) in `Morrison-Lab/gha` ([gha#1900](https://github.com/Morrison-Lab/gha/issues/1900)), which runs gha's copy of the script.
+It calls the shared workflow [`triage-backlog.yml`](https://github.com/Morrison-Lab/gha/blob/v3/.github/workflows/triage-backlog.yml) in `Morrison-Lab/gha` ([gha#1900](https://github.com/Morrison-Lab/gha/issues/1900)), which runs gha's copy of the script.
 The workflow's `script-drift` job fails when that copy and `scripts/triage-backlog.py` differ, so a change to either one is ported to the other.
+That job also runs on a pull request that changes the script or the workflow file.
 It passes `--ceiling` only when the repository variable `ISSUE_CEILING` is set.
 The plan, one row per issue with its priority and reason, goes to the run's log, and the counts go to the run's job summary.
 A labelling step that fails before it counts puts its error in the job summary instead.
@@ -62,8 +63,9 @@ Clear the box to label for real.
 A run over the ceiling stays green and carries a warning annotation with the ceiling line.
 The script prints the ceiling line after the edits, so a run whose edit fails carries neither the line nor the warning.
 The labels `P1`, `P2` and `P3` must already exist in the repository, because the script adds labels and creates none.
-The workflow checks for them first and stops before any edit when one is missing.
-Another repository gets the same scheduled pass by copying gha's caller stub, [`examples/triage-backlog.yml`](https://github.com/Morrison-Lab/gha/blob/main/examples/triage-backlog.yml).
+A real run checks for them first and stops before any edit when one is missing.
+A dry run does not check for them.
+Another repository gets the same scheduled pass by copying gha's caller stub, [`examples/triage-backlog.yml`](https://github.com/Morrison-Lab/gha/blob/v3/examples/triage-backlog.yml).
 
 - **Do:** pass `--labels-only` in any run that no reader reviews before it applies.
 - **Don't:** let a scheduled run close issues.

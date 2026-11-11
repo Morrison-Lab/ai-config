@@ -50,12 +50,6 @@ So ask separately what a procedure costs *by construction*: always-loaded conten
 The deliverable is a change to the corpus --- fixed in stride when small, filed with its measurement when not, per `report-mistakes-proactively` --- never a quieter run of the same procedure.
 That last clause covers a loop you armed yourself: once repeated firings return the same reading, delete the routine rather than lengthening its interval.
 `python3 scripts/check-context-closure.py` is the built instrument for the always-loaded pool.
-
-**Parallel workflows share one session limit, and hitting it ends all of them at once.**
-On 2026-09-03 four `Workflow` runs in parallel spent the account's session limit within an hour, and the HTTP 429 ended every in-flight subagent and workflow agent together.
-The session then ran two at a time, and a later limit that evening again killed four running loops with no journal left on disk.
-A run resumes from its run id, with completed agents replayed from cache.
-When the tool refuses the persisted script path as unreadable, a copy under the scratchpad resumes with the same id ([ai-config#3203](https://github.com/Morrison-Lab/ai-config/issues/3203)).
 It fails CI once the closure passes the Claude Code CLI's own total instruction limit (less a margin for a repo `CLAUDE.md`), and this repo's CI also fails on its 100,000-byte budget, which mirrors in bytes the 100,000-character gate (that limit less the margin) and so fails first (`--strict`, ai-config#4685);
 for a consumer measured without `--strict`, read an over-budget line as the prompt it is.
 Two boundaries.
@@ -74,3 +68,10 @@ Pick the rung from the cost of the mistake rather than the strength of the opini
 When several levers genuinely apply at once, do the self-directed ones first.
 Compress, compact, or file the structural finding before asking the user to act on a model change.
 Only the model change costs them a step.
+
+**Parallel workflows share one session limit, and hitting it ends all of them at once.**
+On 2026-09-03 four `Workflow` runs in parallel spent the account's session limit within an hour, and the HTTP 429 ended every in-flight subagent and workflow agent together.
+That session resumed with two runs at a time, then went back to four, and a second limit that evening killed all four.
+A run resumes from its run id, with completed agents replayed from cache, only while its journal is still on disk.
+The second time, none was, so the four loops were relaunched from their scripts with no record of what they had verified.
+When the tool refused a persisted script path as unreadable, a copy under the scratchpad resumed with the same id.

@@ -95,6 +95,10 @@ general form: a reviewer's enumeration is the extent of that reviewer's read
 and never the extent of the pattern, so derive your own site list rather than
 inheriting theirs.
 
+A fix to another defect in the same sentence is where one arrives.
+On [ai-config#3154](https://github.com/Morrison-Lab/ai-config/pull/3154), replacing a sentence's anchor noun while fixing something else left a pronoun pointing at the wrong noun (2026-09-03).
+After rewriting a sentence, re-read each pronoun in it against its new nearest antecedent.
+
 Nothing decides this mechanically.
 "Is the nearest antecedent the intended one" has no decidable condition, so it
 stays in the judgment residue

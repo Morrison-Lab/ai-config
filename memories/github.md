@@ -378,3 +378,11 @@ When scanning review bodies for verdict markers, headings, or section boundaries
 
 (Measured 2026-09-24 on [Morrison-Lab/ai-config#3906](https://github.com/Morrison-Lab/ai-config/pull/3906) Copilot review round 12.)
 
+
+## Read an MCP-created issue back from the response
+
+An `issue_write` create with a malformed `labels` parameter tag put the tag text into the issue's title, and the label was never applied ([ai-config#3203](https://github.com/Morrison-Lab/ai-config/issues/3203), 2026-09-04).
+The title read correctly in the call and wrong only in the response.
+
+- **Do:** read the title and labels back from the create response before moving on.
+- **Don't:** trust the call's own arguments as what the forge stored.

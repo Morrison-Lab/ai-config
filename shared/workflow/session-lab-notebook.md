@@ -16,6 +16,19 @@ Not every tool call --- that's noise --- but every step whose loss would cost re
 
 **What each entry carries.** Enough for a cold reader to resume without this conversation: what we're doing and why, what's done versus in flight (branches, open PRs/issues, running jobs and their ids), open questions and decisions, and the next concrete step.
 
+**The notebook is inside the gates.**
+A notebook reads as bookkeeping, but `memories/*.md` matches the same `*.md` globs as the corpus, and it is the hurried prose those gates exist for.
+On [ai-config#3093](https://github.com/Morrison-Lab/ai-config/pull/3093) the line-break checker passed three times on one branch while the notebook, on another branch, carried six violations (2026-09-03).
+
+- **Do:** run the repo's checkers once for each branch you are about to push, not once per editing session.
+- **Don't:** count a clean run on one branch as covering a file that lives on another.
+
+**Name the branch, not the SHA, while a commit is unpushed.**
+A reader with only the remote cannot look up a local SHA, and marking it "unpushed" fixes the honesty and not the lookup.
+
+- **Do:** name the branch and the change, and say what is holding the push.
+- **Don't:** write a bare local SHA into an entry a cold reader will check.
+
 **Relationship to the pause-time and context conventions.** The notebook is the *running recorder*; the others are point-in-time:
 
 - `handoff` writes a single snapshot *when you pause cleanly* --- the notebook is its always-current substrate, so a handoff can finalize or point at the notebook instead of rebuilding state from scratch.

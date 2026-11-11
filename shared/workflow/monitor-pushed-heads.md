@@ -10,6 +10,10 @@ Keep polling and address actionable failures or findings until all workflows and
 Once that commit is fully clean and green, stop the **intensive head poll** for it; don't restart that poll for the same commit unless something regresses.
 A later push creates a new head commit and starts a new monitoring cycle automatically.
 
+A push can start `validate` and no review run at all.
+So confirm a review run exists for the head (`actions/runs?head_sha=<sha>`) rather than waiting for one.
+On [ai-config#3251](https://github.com/Morrison-Lab/ai-config/pull/3251) none started, and dispatching `claude-review.yml` on the PR's branch started it (2026-09-04).
+
 **Ending the head poll does not end the PR watch.**
 The two run at different frequencies and answer different questions, and only the first one is finished when a head goes green:
 

@@ -996,6 +996,11 @@ it:
 
 Set out that way the gap is visible with no further checking, because the two
 sentences have different subjects.
+
+A flag added to fix a measured problem is such a neighbouring claim.
+On [ai-config#3154](https://github.com/Morrison-Lab/ai-config/pull/3154) `--exclude-dir=__pycache__` was added to a `grep` recipe after `.pyc` hits were measured.
+Measured against the `-I` already in place, it changed nothing: 99 files either way (2026-09-03).
+Measure each addition against the fix already present, not only against the problem.
 Composing them is cheap, and it is the whole of the remedy --- what defeats
 every other check here is that such a claim never presents itself as
 unsupported.
@@ -1493,6 +1498,11 @@ belongs here: filed as
 [`ai-config#3121`](https://github.com/Morrison-Lab/ai-config/issues/3121),
 with [`ucdavis/bcs#901`](https://github.com/ucdavis/bcs/issues/901) covering
 that repo's copy of the same wording.)
+
+The converse is a rule written wider than its scope.
+On [ai-config#3166](https://github.com/Morrison-Lab/ai-config/pull/3166) a bullet said to anchor on `^[+][+]` and "never `^+`", while two bullets earlier the same section recommended a three-dot diff, where `^+` is the right anchor (2026-09-03).
+A reader applying the "never" to that read would get the silent zero the section warns about.
+When a nearby bullet recommends a read where X is right, write "never X" with the read it applies to in the same clause.
 
 ## A story that fits the evidence is not a finding
 

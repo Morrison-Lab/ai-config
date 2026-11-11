@@ -12,3 +12,5 @@
 - **Don't:** keep a block-once marker beside the transcript.
 
 Read the nearest sibling hook before writing the new one, since the reviewer will compare them.
+
+A guard against a destructive command is tested only by feeding it a payload or inside a throwaway repository, never against a real checkout ([`destructive-actions-catalog`](destructive-actions-catalog.md)).

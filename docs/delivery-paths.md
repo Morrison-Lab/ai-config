@@ -2,7 +2,7 @@
 
 This page names the one supported way the rules, skills and hooks reach each harness and session kind, and the one fallback the cloud keeps ([ai-config#5309](https://github.com/Morrison-Lab/ai-config/issues/5309), step 1).
 Anything else that delivers the same files is a leftover, listed under [Leftover paths](#leftover-paths), except a vendored `.ai-config` submodule, which [#2345](https://github.com/Morrison-Lab/ai-config/issues/2345) decides.
-A leftover is never a supported path, even where it is the only one, as for opencode's hooks.
+A leftover is never a supported path, even where it is the only one, as for opencode's hooks on a machine with the Claude Code plugin.
 At worst it runs older code than `main`, and nothing in a guard's output says which copy fired ([#3094](https://github.com/Morrison-Lab/ai-config/issues/3094), [#3590](https://github.com/Morrison-Lab/ai-config/issues/3590)).
 The README's section for each harness carries the setup steps.
 

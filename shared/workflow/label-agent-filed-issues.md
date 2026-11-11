@@ -74,7 +74,7 @@ gh label create "model:<model-id>" --description "Filed by that model" --color E
 ```
 
 The priority labels `P1`, `P2` and `P3` need the same check in a repo that has never been triaged:
-`gh label list --json name --jq '.[].name' | grep -xE 'P[123]'` prints the ones that exist, and `gh label create P2` creates one.
+`gh label list --limit 1000 --json name --jq '.[].name' | grep -xE 'P[123]'` prints the ones that exist, and `gh label create P2` creates one.
 
 `GET_LABEL` in [`tool-mappings`](../../tool-mappings.md) records that **no MCP tool creates or updates a label**, so a remote session cannot run the block above at all.
 Two paths remain there: `gh api repos/<owner>/<repo>/labels` from a workflow, or the MCP silent-create described above --- the one place that behaviour is useful rather than hazardous, at the cost that the label's spelling is then whatever you typed.

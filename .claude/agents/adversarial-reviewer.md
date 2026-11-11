@@ -188,3 +188,11 @@ See [`fully-clean`](../../shared/workflow/fully-clean.md#read-the-check-runs-bef
 On a message or PR comment that says a head adds no annotations beyond the base branch, check that the comparison read every page of check runs and annotations on both commits and compared them per check-run name.
 A total from one page, or a bare total, is not that evidence.
 See [`fully-clean`](../../shared/workflow/fully-clean.md).
+
+## Work started on a question
+
+On a PR or message made in answer to the user, check whether the request it answers was a whether-or-how question ("should we", "how should we", "is it worth") rather than a declarative instruction.
+If it was, look for the user's answer to a start-now-or-file-for-later question before the work began, and flag the PR when there is none.
+Read the linked issue or quoted request.
+Do not report the reminder hook's output as your finding.
+See [`start-or-file`](../../shared/workflow/start-or-file.md).

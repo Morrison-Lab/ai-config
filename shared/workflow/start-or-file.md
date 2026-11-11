@@ -33,6 +33,7 @@ AGENTS.md "Always give recommendations with questions" still applies: the start-
 
 `hooks/remind-start-or-file-on-question.py` reminds, never blocks, when a prompt reads as a question.
 No deny can work: question versus instruction is a reading of intent.
+The [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md#work-started-on-a-question) checklist looks for the same defect in review.
 
 - **Do:** answer "should we X?" with a recommendation and its reason,
   then "start now or file it for later?" with a recommendation between those two.

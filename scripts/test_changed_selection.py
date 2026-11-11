@@ -1,25 +1,15 @@
 #!/usr/bin/env python3
-"""Tests for scripts/lib/changed_selection.py and its use in scripts/test_hooks.py (ai-config#5087)."""
-import importlib.util
+"""Tests for scripts/lib/changed_selection.py (ai-config#5087)."""
 import io
-import os
 import subprocess
 import sys
 import tempfile
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from lib.changed_selection import Selector  # noqa: E402
-
-
-def _load(name, path):
-    spec = importlib.util.spec_from_file_location(name, path)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
-    return module
 
 
 passes = failures = 0
@@ -49,7 +39,12 @@ FILES = {
     "hooks/rules.json": "{}\n",
     "hooks/unrelated.py": "\n",
     "hooks/stale.py": "\n",
+    "hooks/broken.py": "def (\n",
     "scripts/lib/shared.py": "\n",
+    "hooks/hooks.json": "{}\n",
+    "scripts/test_hooks.py": "\n",
+    "scripts/run-local-validation.py": "\n",
+    ".github/workflows/validate.yml": "\n",
     "AGENTS.md": "# names guard.py, which a markdown file cannot pull in\n",
 }
 
@@ -86,43 +81,34 @@ def test_selector():
         check("a name mentioned two levels down is not followed",
               not sel.needed(seeds, ["hooks/other-tool.py"]))
         check("a markdown file naming the subject does not select it", not sel.needed(seeds, ["AGENTS.md"]))
-        check("a change under scripts/lib/ selects every suite", sel.needed(seeds, ["scripts/lib/shared.py"]))
+        for shared in ("scripts/lib/shared.py", "hooks/hooks.json", "scripts/test_hooks.py",
+                       "scripts/run-local-validation.py", ".github/workflows/validate.yml"):
+            check(f"a change to {shared} selects every suite", sel.needed(seeds, [shared]))
+        with redirect_stderr(io.StringIO()):
+            check("a suite reaching an unparsable file always runs",
+                  sel.needed(["hooks/broken.py"], ["hooks/unrelated.py"]))
         check("untracked, non-ignored files are indexed", "hooks/brand-new.py" in sel.files)
+        check("./ and a/../ spellings are normalised", sel.needed(seeds, ["./hooks/x/../helper.py"])
+              and not sel.needed(seeds, ["./hooks/unrelated.py"]))
+        for outside in ("/etc/passwd", "../elsewhere.py"):
+            try:
+                sel.needed(seeds, [outside])
+                check(f"a path outside the repo is refused: {outside}", False)
+            except ValueError:
+                check(f"a path outside the repo is refused: {outside}", True)
 
 
-def test_test_hooks_selection():
-    """Dogfood on the live tree, and the RLV_CHANGED_FILES entry point in a child process."""
-    th = _load("test_hooks_under_test", HERE / "test_hooks.py")
-    sys.modules.pop("test_hooks_under_test")
-    hooks = HERE.parent / "hooks"
-    runnable = [(str(t), str(hooks / (t.name[len("test-"):]))) for t in sorted(hooks.glob("test-*.py"))
-                if (hooks / t.name[len("test-"):]).is_file()]
-    out = io.StringIO()
-    with redirect_stdout(out):
-        kept = th.select_for_change(runnable, ["hooks/flag-cop-out-offer.py"])
-    names = {Path(t).name for t, _ in kept}
-    check("the changed hook's own suite is kept", "test-flag-cop-out-offer.py" in names)
-    check("a suite whose subject loads it by path is kept", "test-flag-tool-gap-handling.py" in names)
-    check("most suites are dropped and the count is printed",
-          len(kept) < len(runnable) / 2 and f"of {len(runnable)} hook suites" in out.getvalue())
-    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
-        empty, listing = Path(tmp) / "empty.txt", Path(tmp) / "changed.txt"
-        empty.write_text("\n", encoding="utf-8")
-        listing.write_text("hooks/flag-cop-out-offer.py\n", encoding="utf-8")
-        refused = _run("test_hooks.py", empty)
-        check("an empty list is refused, not a vacuous pass",
-              refused.returncode != 0 and "empty list" in refused.stderr)
-        check("tests driving run_suites() do not inherit the list",
-              _run("test_test_hooks.py", listing).returncode == 0)
-
-
-def _run(script, listing):
-    env = {**os.environ, "RLV_CHANGED_FILES": str(listing)}
-    return subprocess.run([sys.executable, str(HERE / script)], env=env, capture_output=True, text=True)
+def test_live_tree():
+    """A hook two path-loads away from a suite's subject still selects it."""
+    sel = Selector(HERE.parent)
+    seeds = ["hooks/test-flag-blocker-without-retry.py", "hooks/flag-blocker-without-retry.py"]
+    check("live: a sibling's sibling selects the suite", sel.needed(seeds, ["hooks/no-unfiled-finding.py"]))
+    check("live: an unrelated hook does not (negative control)",
+          not sel.needed(seeds, ["hooks/no-fable-subagent.py"]))
 
 
 def main():
-    for test in (test_selector, test_test_hooks_selection):
+    for test in (test_selector, test_live_tree):
         print(f"running {test.__name__}()", flush=True)
         test()
     print(f"\n{passes} passed, {failures} failed")

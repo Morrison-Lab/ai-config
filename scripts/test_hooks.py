@@ -44,7 +44,6 @@ import os
 import subprocess
 import sys
 import threading
-from pathlib import Path
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HOOKS = os.path.join(ROOT, "hooks")
@@ -265,13 +264,8 @@ def run_one_suite(test_path, subject, timeout):
     return 1
 
 
-def run_suites(timeout=None, changed=None):
-    """Run each hooks/test-*.py against its subject. Returns failure count.
-
-    With `changed` (a list of paths), only the suites it can affect run.
-    """
-    global _SELECTED
-    _SELECTED = None
+def run_suites(timeout=None):
+    """Run each hooks/test-*.py against its subject. Returns failure count."""
     if timeout is None:
         timeout = suite_timeout_s()
     workers = jobs()
@@ -297,46 +291,10 @@ def run_suites(timeout=None, changed=None):
             failures += 1
             continue
         runnable.append((test_path, present[0]))
-    if changed is not None:
-        runnable = select_for_change(runnable, changed)
-        _SELECTED = len(runnable)
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
         futures = [pool.submit(run_one_suite, t, subj, timeout) for t, subj in runnable]
         failures += sum(f.result() for f in futures)
     return failures, len(tests)
-
-
-_SELECTED = None  # suites select_for_change kept; None when every suite ran
-
-
-def select_for_change(runnable, changed):
-    """The suites whose inputs (scripts/lib/changed_selection.py) hold a changed path."""
-    scripts = os.path.join(ROOT, "scripts")
-    if scripts not in sys.path:
-        sys.path.insert(0, scripts)
-    from lib.changed_selection import Selector
-    selector = Selector(Path(ROOT))
-    kept = [(t, subj) for t, subj in runnable
-            if selector.needed([Path(p).relative_to(ROOT).as_posix() for p in (t, subj)], changed)]
-    print(f"SELECTED: {len(kept)} of {len(runnable)} hook suites read a file among the "
-          f"{len(changed)} changed (RLV_CHANGED_FILES); CI runs all of them", flush=True)
-    return kept
-
-
-def changed_from_env():
-    """The paths listed in the file RLV_CHANGED_FILES names (ai-config#5087), or None.
-
-    Only main() reads it, so tests that drive run_suites() never inherit it.
-    An empty list is refused: it would select no suite and pass vacuously.
-    """
-    listing = os.environ.get("RLV_CHANGED_FILES")
-    if not listing:
-        return None
-    with open(listing, encoding="utf-8") as fh:
-        changed = [ln.strip() for ln in fh if ln.strip()]
-    if not changed:
-        raise SystemExit(f"error: RLV_CHANGED_FILES names an empty list ({listing})")
-    return changed
 
 
 def check_coverage():
@@ -370,17 +328,13 @@ def check_coverage():
 
 
 def main() -> int:
-    suite_failures, n_suites = run_suites(changed=changed_from_env())
+    suite_failures, n_suites = run_suites()
     if n_suites == 0:
         print("no hooks/test-*.py found -- nothing to run")
         return 1
     cov_failures, tested, total = check_coverage()
 
-    if _SELECTED is None:
-        tally = f"{n_suites - suite_failures}/{n_suites} hook test suites passed"
-    else:
-        tally = f"{_SELECTED} of {n_suites} hook test suites selected, {suite_failures} failed"
-    print(f"\n{tally}; "
+    print(f"\n{n_suites - suite_failures}/{n_suites} hook test suites passed; "
           f"{tested}/{total} hooks have a test "
           f"({len(KNOWN_UNTESTED)} known untested)")
     return 1 if (suite_failures or cov_failures) else 0

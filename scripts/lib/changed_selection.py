@@ -13,8 +13,10 @@ from __future__ import annotations
 
 import ast
 import os
+import posixpath
 import re
 import subprocess
+import sys
 from pathlib import Path
 from typing import Dict, Iterable, List, Set
 
@@ -53,6 +55,7 @@ class Selector:
                 self.by_module.setdefault(module, set()).add(path)
         self._text: Dict[str, str] = {}
         self._imports: Dict[str, Set[str]] = {}
+        self.unparsed: Set[str] = set()
 
     def _read(self, path: str) -> str:
         if path not in self._text:
@@ -68,7 +71,9 @@ class Selector:
             found: Set[str] = set()
             try:
                 tree = ast.parse(self._read(path))
-            except SyntaxError:
+            except SyntaxError:  # its imports are unknown, so any suite reaching it runs
+                print(f"warning: cannot parse {path}; selecting what reads it", file=sys.stderr)
+                self.unparsed.add(path)
                 tree = None
             for node in ast.walk(tree) if tree is not None else ():
                 names: List[str] = []
@@ -101,10 +106,14 @@ class Selector:
         return seen
 
     def needed(self, seeds: Iterable[str], changed: Iterable[str]) -> bool:
-        changed = list(changed)
+        """Whether a suite seeded by `seeds` reads a path in `changed` (repo-relative)."""
+        changed = [posixpath.normpath(c) for c in changed]  # ./x and a/../x match too
+        outside = [c for c in changed if posixpath.isabs(c) or c.split("/")[0] == ".."]
+        if outside:
+            raise ValueError(f"changed paths must be repo-relative: {outside}")
         # A path gone from the working tree (deleted, or the old side of a rename)
         # cannot be matched against what reads it, so it runs everything.
         if any(c.startswith(ALWAYS_RUN) or not os.path.lexists(self.root / c) for c in changed):
             return True
         inputs = self.inputs(seeds)
-        return any(c in inputs for c in changed)
+        return bool(inputs & self.unparsed) or any(c in inputs for c in changed)

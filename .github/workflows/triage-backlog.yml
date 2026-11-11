@@ -57,15 +57,28 @@ jobs:
           if [ -n "$ISSUE_CEILING" ]; then
             args+=(--ceiling "$ISSUE_CEILING")
           fi
-          # The plan goes to a file and the summary (stderr) to the log and the
-          # job summary, so the counts are readable without opening the log.
+          # The plan and the label commands (stdout) go to the log. The summary
+          # (stderr) goes to a file first, so the next step can copy it into
+          # the job summary whether this step passed or failed.
+          rc=0
           python3 scripts/triage-backlog.py "${args[@]}" \
-            > "$RUNNER_TEMP/triage-plan.txt" \
-            2> >(tee "$RUNNER_TEMP/triage-summary.txt" >&2)
+            2> "$RUNNER_TEMP/triage-summary.txt" || rc=$?
+          cat "$RUNNER_TEMP/triage-summary.txt" >&2
+          exit "$rc"
+
+      - name: Copy the summary into the job summary
+        if: always()
+        run: |
+          set -euo pipefail
+          summary="$RUNNER_TEMP/triage-summary.txt"
+          if [ ! -s "$summary" ]; then
+            echo "No summary was written."
+            exit 0
+          fi
           {
             echo '### Backlog triage (labels only)'
             echo
             echo '```text'
-            cat "$RUNNER_TEMP/triage-summary.txt"
+            cat "$summary"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"

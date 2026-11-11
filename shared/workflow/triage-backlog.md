@@ -49,8 +49,10 @@ The count is the number of open issues the run read, before it closed any.
 A fetch that returns as many issues as `--limit` (1000 by default) stops the run, because `gh` truncates a longer list without saying so.
 
 In ai-config, `.github/workflows/triage-backlog.yml` runs this mode every Monday at 07:00 UTC, and on a manual dispatch.
-It passes `--ceiling` only when the repository variable `ISSUE_CEILING` is set, and it writes the summary to the run's job summary.
-A manual dispatch with `dry-run` checked prints the label commands without running them.
+It passes `--ceiling` only when the repository variable `ISSUE_CEILING` is set.
+The plan and each label command go to the run's log, and the counts go to the run's job summary, on a failed run too.
+A manual dispatch with `dry-run` checked prints the label commands in the log without running them.
+The labels `P1`, `P2` and `P3` must already exist in the repository, because the script adds labels and creates none.
 Other repositories have no scheduled pass until the reusable workflow in ai-config#3147 exists.
 
 - **Do:** pass `--labels-only` in any run that no reader reviews before it applies.

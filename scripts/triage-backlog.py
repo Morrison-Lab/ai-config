@@ -22,6 +22,24 @@ Usage:
     python3 scripts/triage-backlog.py --override 2937=P3 --override 3099=P1
     python3 scripts/triage-backlog.py --json > plan.json
     python3 scripts/triage-backlog.py --apply           # label and close via gh
+    python3 scripts/triage-backlog.py --apply --labels-only   # label, never close
+    python3 scripts/triage-backlog.py --ceiling 600     # report the count against a ceiling
+
+--labels-only is the mode for an unattended, scheduled run (ai-config#3147).
+A wrong priority costs one label edit, so the heuristics may apply it with
+nobody reading; a close stays behind the read-every-close-row step in
+skills/triage/SKILL.md.  A row the plan would close is left exactly as it
+is, so the attended pass proposes the same close again.
+
+--ceiling N reports the open count against N, the bound the backlog is meant
+to stay under (ai-config#5306).  It has no default: the number is the
+maintainer's to choose.  Over the ceiling the run still exits 0, because the
+count is a measurement for a reader and labelling must not stop on it.  The
+count is taken when the issues are read, before this run closes any.
+
+The fetch asks gh for at most --limit issues (default 1000) and stops with an
+error when it gets exactly that many, because gh truncates silently and a
+truncated list would make the examined count and the ceiling report a floor.
 
 Input JSON is a list of objects carrying at least `number` and `title`;
 `labels` (a list of names or of {name} objects), `created_at`/`createdAt`,
@@ -164,25 +182,67 @@ def classify(issues: list[dict], overrides: dict[int, str]) -> list[dict]:
     return plan
 
 
-def fetch_open_issues(repo: str | None) -> list[dict]:
+DEFAULT_FETCH_LIMIT = 1000
+
+
+class TruncatedFetch(RuntimeError):
+    """gh returned as many issues as the limit, so more may exist."""
+
+
+def check_not_truncated(count: int, limit: int) -> None:
+    """Raise when a fetch filled its limit: gh truncates without saying so."""
+    if count >= limit:
+        raise TruncatedFetch(
+            f"gh returned {count} open issues, the --limit of {limit}; "
+            "the list may be truncated, so raise --limit and run again"
+        )
+
+
+def fetch_open_issues(repo: str | None, limit: int = DEFAULT_FETCH_LIMIT) -> list[dict]:
     cmd = [
-        "gh", "issue", "list", "--state", "open", "--limit", "1000",
+        "gh", "issue", "list", "--state", "open", "--limit", str(limit),
         "--json", "number,title,labels,createdAt,comments",
     ]
     if repo:
         cmd += ["-R", repo]
     out = subprocess.run(cmd, check=True, capture_output=True, text=True)
-    return json.loads(out.stdout)
+    issues = json.loads(out.stdout)
+    check_not_truncated(len(issues), limit)
+    return issues
 
 
-def apply_plan(plan: list[dict], repo: str | None, dry_run: bool) -> int:
-    """Perform the label and close operations.  Returns the count of gh calls."""
+CLOSE_DISPOSITIONS = ("not-planned", "duplicate")
+
+
+def ceiling_report(open_count: int, ceiling: int) -> str:
+    """One line stating the open count, as read before any close, against the
+    ceiling."""
+    if open_count > ceiling:
+        return (
+            f"open issues at the start of this run: {open_count}, "
+            f"over the ceiling of {ceiling} by {open_count - ceiling}"
+        )
+    return f"open issues at the start of this run: {open_count}, within the ceiling of {ceiling}"
+
+
+def apply_plan(
+    plan: list[dict],
+    repo: str | None,
+    dry_run: bool,
+    labels_only: bool = False,
+) -> int:
+    """Perform the label and close operations.  Returns the count of gh calls.
+
+    With `labels_only`, a row the plan would close is skipped: it is not closed
+    and its labels are not changed."""
     base = ["gh", "issue"]
     tail = ["-R", repo] if repo else []
     calls = 0
     for row in plan:
         n = str(row["number"])
         disp = row["disposition"]
+        if labels_only and disp in CLOSE_DISPOSITIONS:
+            continue
         if disp in PRIORITY_LABELS:
             if disp in row["labels"]:
                 continue
@@ -224,13 +284,29 @@ def main(argv=None) -> int:
     ap.add_argument("--json", action="store_true", help="emit the plan as JSON")
     ap.add_argument("--apply", action="store_true", help="perform the plan via gh")
     ap.add_argument("--dry-run", action="store_true", help="with --apply, print commands only")
+    ap.add_argument("--labels-only", action="store_true",
+                    help="with --apply, add priority labels and close nothing")
+    ap.add_argument("--limit", type=int, default=DEFAULT_FETCH_LIMIT, metavar="N",
+                    help="most issues to fetch via gh; the run stops if gh returns this many")
+    ap.add_argument("--ceiling", type=int, metavar="N",
+                    help="report the open count against a ceiling of N")
     args = ap.parse_args(argv)
+    if args.labels_only and not args.apply:
+        ap.error("--labels-only changes what --apply does; pass --apply with it")
+    if args.ceiling is not None and args.ceiling < 0:
+        ap.error("--ceiling must not be negative")
+    if args.limit < 1:
+        ap.error("--limit must be at least 1")
 
     if args.input:
         with open(args.input, encoding="utf-8") as fh:
             issues = json.load(fh)
     else:
-        issues = fetch_open_issues(args.repo)
+        try:
+            issues = fetch_open_issues(args.repo, args.limit)
+        except TruncatedFetch as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 2
     plan = classify(issues, dict(args.override))
 
     if args.json:
@@ -248,8 +324,13 @@ def main(argv=None) -> int:
         return 2
 
     if args.apply:
-        n = apply_plan(plan, args.repo, args.dry_run)
+        n = apply_plan(plan, args.repo, args.dry_run, args.labels_only)
         print(f"{'planned' if args.dry_run else 'performed'} {n} gh operations", file=sys.stderr)
+        if args.labels_only:
+            held = sum(1 for r in plan if r["disposition"] in CLOSE_DISPOSITIONS)
+            print(f"left {held} proposed closes for the attended pass", file=sys.stderr)
+    if args.ceiling is not None:
+        print(ceiling_report(len(plan), args.ceiling), file=sys.stderr)
     return 0
 
 

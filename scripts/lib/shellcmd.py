@@ -20,14 +20,16 @@ identifier search misses it and a migration keyed on that search would leave
 one behind. The loop variable differs between copies too (`t` in some, `tok`
 in others), which is why a use-site grep is the wrong query as well.
 
-The bodies are identical, and so is the heredoc defect `_heredoc_free` fixes
-below -- which is the argument for a module rather than a ninth copy. Those
-eight are NOT rewired here: migrating eight live guards, two of which can
-REFUSE (`no-clobbering-push.py` denies, `no-unreviewed-pr.py` blocks; the
-other six only add context), is its own change with its own review, tracked
-as ai-config#3178 --- not by the closed ai-config#2993, which reported the
-defect and shipped this module rather than the migration. This module
-is where the fix landed and where new callers import from.
+The bodies were identical, and so was the heredoc defect `_heredoc_free`
+fixes below -- which is the argument for a module rather than a ninth copy.
+The six that only add context now import `simple_commands` from here
+(ai-config#3178). The two that can REFUSE (`no-clobbering-push.py` denies,
+`no-unreviewed-pr.py` blocks) still carry their copies, and their migration
+is a separate review under the same issue. The same grep also finds later
+copies outside the original eight (`guard-slide-major-tag.py`,
+`no-binary-file-read.py`, `no-interpreter-heredoc.py`), which belong to the
+same migration. This module is where the fix landed and where new callers
+import from.
 
 WHY AN ARGV SPLIT RATHER THAN A REGEX
 -------------------------------------

@@ -31,7 +31,8 @@ Status as of 2026-11-11.
   Claude Code runs a plugin's hooks from the pinned cache snapshot it started with, so a refreshed pin takes effect only after a restart.
 - **The local freshness check warns but does not update.**
   `warn-stale-plugin-pin.py` compares the pin with the local marketplace clone and with the tip of origin's default branch, which it reads with `git ls-remote` rather than a fetch, since the clone can itself be weeks behind ([#3149](https://github.com/Morrison-Lab/ai-config/issues/3149), [#3437](https://github.com/Morrison-Lab/ai-config/issues/3437)).
-  It skips the origin read in a cloud container, where `refresh-stale-plugin-pin-cloud.py` updates the pin itself, and when `AI_CONFIG_NO_REMOTE_CHECK` is `1`.
+  In a cloud container it skips the origin read for the user-scope pin, which `refresh-stale-plugin-pin-cloud.py` updates itself unless `AI_CONFIG_NO_AUTO_REFRESH` is set.
+  It skips the read everywhere when `AI_CONFIG_NO_REMOTE_CHECK` is `1`.
   It does not see hook copies that a leftover path registers ([#3589](https://github.com/Morrison-Lab/ai-config/issues/3589)).
 - **A repository's own `SessionStart` hook does not run in a session that opens several repositories.**
   [#5280](https://github.com/Morrison-Lab/ai-config/issues/5280) measured this with lds's render-toolchain hook.

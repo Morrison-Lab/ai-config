@@ -28,16 +28,21 @@ It also reads the tip of origin's default branch with one `git ls-remote`
 in the clone (ai-config#5309 step 2; #3589, #3149). It does not fetch. The
 clone advances only when the marketplace is updated, so in #3149 it was 51
 commits behind origin, and a comparison with the clone alone called a pin
-that matched it current. When origin answers, a pin that is not origin's tip
-is reported even when it matches the clone. When origin does not answer within
-the timeout (no network, no remote), the comparison falls back to the clone
-and says so on stderr. The remote read is skipped in cloud sessions
-(CLAUDE_CODE_REMOTE=true), where `refresh-stale-plugin-pin-cloud.py` updates
-the marketplace and the pin at the same session start, and when
-AI_CONFIG_NO_REMOTE_CHECK=1.
+that matched it current. When origin answers, a pin that does not contain
+origin's tip is reported even when it matches the clone or is ahead of it.
+When origin does not answer in time (no network, no remote), the comparison
+falls back to the clone and says so on stderr. All origin reads together get
+at most REMOTE_BUDGET seconds, inside the hook's registered 10-second timeout.
 
-A pin that is AHEAD of the clone (the clone, not the pin, is behind) is
-not reported. A pin cannot warn about itself: this hook runs only from pins
+Origin is not read for a user-scope pin in a cloud session
+(CLAUDE_CODE_REMOTE=true) unless AI_CONFIG_NO_AUTO_REFRESH is set, because
+there `refresh-stale-plugin-pin-cloud.py` updates the marketplace and the
+user-scope pin at the same session start. That hook leaves project and local
+pins alone, so origin is still read for those. AI_CONFIG_NO_REMOTE_CHECK=1
+turns the origin read off everywhere.
+
+Without an origin reading, a pin that is AHEAD of the clone (the clone, not
+the pin, is behind) is not reported. A pin cannot warn about itself: this hook runs only from pins
 that already contain it, so a pin that predates it stays silent until it is
 updated once by hand.
 
@@ -53,9 +58,12 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 PLUGIN = "ai-config"
+REMOTE_BUDGET = 6.0
+_deadline: float | None = None
 
 
 def plugins_dir() -> Path:
@@ -86,11 +94,12 @@ def applies(entry: dict, here: Path) -> bool:
     return True
 
 
-def git(clone: Path, *args: str, quiet: bool = False) -> str | None:
+def git(clone: Path, *args: str, quiet: bool = False,
+        timeout: float = 5) -> str | None:
     try:
         out = subprocess.run(
             ["git", "-C", str(clone), *args],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True, text=True, timeout=timeout,
             env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
         )
     except (OSError, subprocess.TimeoutExpired) as err:
@@ -117,12 +126,24 @@ def behind(clone: Path, pin: str, head: str) -> str:
     return f"{count} commit(s)"
 
 
+def refresh_covers(entry: dict) -> bool:
+    """True when the cloud refresh hook updates this pin at session start."""
+    return (os.environ.get("CLAUDE_CODE_REMOTE") == "true"
+            and not os.environ.get("AI_CONFIG_NO_AUTO_REFRESH")
+            and entry.get("scope") == "user")
+
+
 def origin_tip(clone: Path) -> str | None:
     """The tip of origin's default branch, or None when it cannot be read."""
-    if (os.environ.get("CLAUDE_CODE_REMOTE") == "true"
-            or os.environ.get("AI_CONFIG_NO_REMOTE_CHECK") == "1"):
+    global _deadline
+    if _deadline is None:
+        _deadline = time.monotonic() + REMOTE_BUDGET
+    remaining = min(5.0, _deadline - time.monotonic())
+    if remaining <= 0.5:
+        print(f"warn-stale-plugin-pin: no time left to read origin for "
+              f"{clone}; compared with the local clone only", file=sys.stderr)
         return None
-    out = git(clone, "ls-remote", "origin", "HEAD")
+    out = git(clone, "ls-remote", "origin", "HEAD", timeout=remaining)
     if not out:
         print(f"warn-stale-plugin-pin: could not read origin's default branch "
               f"for {clone}; compared with the local clone only",
@@ -164,9 +185,12 @@ def stale_lines(record: dict, here: Path, root: Path) -> list[str]:
                 if isinstance(e, dict) and applies(e, here)]
         if not mine:
             continue
-        tip = origin_tip(clone)
-        lagging = clone_lags(clone, head, tip)
+        remote = os.environ.get("AI_CONFIG_NO_REMOTE_CHECK") != "1"
+        read = remote and not all(refresh_covers(e) for e in mine)
+        origin = origin_tip(clone) if read else None
         for entry in mine:
+            tip = None if refresh_covers(entry) else origin
+            lagging = clone_lags(clone, head, tip)
             pin = entry.get("gitCommitSha") or ""
             if pin and tip and (tip.startswith(pin)
                                 or is_ancestor(clone, tip, pin)):

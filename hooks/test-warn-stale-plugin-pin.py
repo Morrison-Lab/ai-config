@@ -29,7 +29,12 @@ With a bare repository as the clone's `origin` (ai-config#5309 step 2):
   12. Pin behind the clone, clone behind origin: warns with the count and
       says the clone itself lags origin.
   13. Case 10 with AI_CONFIG_NO_REMOTE_CHECK=1: silent.
-  14. Case 10 with CLAUDE_CODE_REMOTE=true: silent.
+  14. Case 10 with CLAUDE_CODE_REMOTE=true: silent, since the cloud
+      refresh hook updates the user-scope pin.
+  14b. Case 14 with AI_CONFIG_NO_AUTO_REFRESH=1: warns, since nothing
+      refreshes the pin.
+  14c. Case 16's project pin with CLAUDE_CODE_REMOTE=true: warns, since the
+      refresh hook leaves project pins alone.
   16. Project-scope pin at the clone's HEAD, clone behind origin: warns
       with --scope project.
   17. No recorded commit, clone behind origin: warns.
@@ -39,6 +44,7 @@ With a bare repository as the clone's `origin` (ai-config#5309 step 2):
       silent.
   20. Clone at origin's tip, pin behind: warns with the count and does not
       say the clone lags.
+  22. Pin that descends from origin's tip, clone behind origin: silent.
   15. Origin unreachable: falls back to the clone, says so on stderr, and
       passes git's own error through.
   21. Origin unreachable and no applicable entry: origin is not read, so
@@ -196,6 +202,16 @@ def main():
                          CLAUDE_CODE_REMOTE="true")
         check("14 cloud session skips the remote read", rc == 0 and ctx == "", ctx)
 
+        rc, ctx, _ = run(root, record({"scope": "user", "gitCommitSha": shas[2]}), project,
+                         CLAUDE_CODE_REMOTE="true", AI_CONFIG_NO_AUTO_REFRESH="1")
+        check("14b cloud without refresh reads origin", "has not been updated" in ctx, ctx)
+
+        rc, ctx, _ = run(root, record({"scope": "project", "projectPath": str(project),
+                                       "gitCommitSha": shas[2]}), project / "sub",
+                         CLAUDE_CODE_REMOTE="true")
+        check("14c cloud still reads origin for a project pin",
+              "--scope project" in ctx and "has not been updated" in ctx, ctx)
+
         rc, ctx, _ = run(root, record({"scope": "project", "projectPath": str(project),
                                        "gitCommitSha": shas[2]}), project / "sub")
         check("16 lagging clone warns a project pin",
@@ -222,7 +238,10 @@ def main():
         rc, ctx, _ = run(root, record({"scope": "user", "gitCommitSha": shas[2]}), project)
         check("20 clone at origin's tip, pin behind",
               "1 commit(s)" in ctx and "lags origin" not in ctx, ctx)
+
         git(mkt, "reset", "-q", "--hard", shas[2])
+        rc, ctx, _ = run(root, record({"scope": "user", "gitCommitSha": ahead}), project)
+        check("22 pin descending from origin's tip is silent", rc == 0 and ctx == "", ctx)
 
         shutil.rmtree(origin)
         rc, ctx, err = run(root, record({"scope": "user", "gitCommitSha": shas[2]}), project)

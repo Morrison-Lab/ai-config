@@ -520,8 +520,10 @@ jobs:
         run: test -n "$(git ls-files new.py)"
       - name: Starts with an empty TMPDIR
         run: test -z "$(ls -A "$TMPDIR")" && touch "$TMPDIR/sentinel"
-      - name: Starts with an empty TMPDIR again
-        run: test -z "$(ls -A "$TMPDIR")" && touch "$TMPDIR/sentinel"
+      - name: Shares the TMPDIR across steps, as a CI job does
+        run: test -e "$TMPDIR/sentinel"
+      - name: Runs at the root it was given
+        run: test "$(git rev-parse --show-prefix)" = "$EXPECT_PREFIX"
 """
 
 
@@ -538,15 +540,33 @@ def test_snapshot_sees_untracked_files():
             subprocess.run(["git", *cmd], cwd=repo, check=True, env=env)
         (repo / "new.py").write_text("print(1)\n", encoding="utf-8")
         args = ["--workflow", str(wf), "--root", str(repo), "--no-other-workflows"]
-        out = io.StringIO()
-        with redirect_stdout(out), redirect_stderr(io.StringIO()):
-            rc = rlv.main(args)
-        check("the snapshot run sees an untracked new file and passes", rc == 0 and "3 passed, 0 failed" in out.getvalue())
-        out = io.StringIO()
-        with redirect_stdout(out), redirect_stderr(io.StringIO()):
-            rc = rlv.main(args + ["--in-place"])
-        check("--in-place misses the untracked file (the #4910 false pass, negative control)",
-              rc == 1 and "FAILED: Sees the new file" in out.getvalue())
+        os.environ["EXPECT_PREFIX"] = ""
+        try:
+            out = io.StringIO()
+            with redirect_stdout(out), redirect_stderr(io.StringIO()):
+                rc = rlv.main(args)
+            check("the snapshot run sees an untracked new file and passes",
+                  rc == 0 and "4 passed, 0 failed" in out.getvalue())
+            out = io.StringIO()
+            with redirect_stdout(out), redirect_stderr(io.StringIO()):
+                rc = rlv.main(args + ["--in-place"])
+            check("--in-place misses the untracked file (the #4910 false pass, negative control), "
+                  "and a second run starts with an empty TMPDIR",
+                  rc == 1 and "3 passed, 1 failed" in out.getvalue()
+                  and "FAILED: Sees the new file" in out.getvalue())
+            (repo / "sub").mkdir()
+            (repo / "sub" / "new.py").write_text("print(2)\n", encoding="utf-8")
+            os.environ["EXPECT_PREFIX"] = "sub/"
+            out = io.StringIO()
+            with redirect_stdout(out), redirect_stderr(io.StringIO()):
+                rc = rlv.main(["--workflow", str(wf), "--root", str(repo / "sub"), "--no-other-workflows"])
+            check("a subdirectory root runs at that subdirectory inside the snapshot",
+                  rc == 0 and "4 passed, 0 failed" in out.getvalue())
+        finally:
+            del os.environ["EXPECT_PREFIX"]
+            (repo / "sub" / "new.py").unlink(missing_ok=True)
+            if (repo / "sub").is_dir():
+                (repo / "sub").rmdir()
         status = subprocess.run(["git", "status", "--porcelain"], cwd=repo, capture_output=True,
                                 text=True, check=True, env=env).stdout
         worktrees = subprocess.run(["git", "worktree", "list"], cwd=repo, capture_output=True,
@@ -555,6 +575,25 @@ def test_snapshot_sees_untracked_files():
               status == "?? new.py\n" and len(worktrees.splitlines()) == 1)
         changed = rlv.changed_files(repo, "main")
         check("--changed counts an untracked file as changed", changed == ["new.py"])
+
+        real_git = rlv._git
+
+        def failing_git(root, *git_args, env=None):
+            if git_args[:1] == ("write-tree",):
+                raise subprocess.CalledProcessError(128, ["git", *git_args], stderr="planted failure")
+            return real_git(root, *git_args, env=env)
+
+        before = set(Path(tempfile.gettempdir()).glob("rlv-snapshot-*"))
+        rlv._git = failing_git
+        try:
+            err = io.StringIO()
+            with redirect_stdout(io.StringIO()), redirect_stderr(err):
+                rc = rlv.main(args)
+        finally:
+            rlv._git = real_git
+        after = set(Path(tempfile.gettempdir()).glob("rlv-snapshot-*"))
+        check("a git failure building the snapshot exits 2 with the reason and leaves no temp dir",
+              rc == 2 and "planted failure" in err.getvalue() and after == before)
 
 
 def main():

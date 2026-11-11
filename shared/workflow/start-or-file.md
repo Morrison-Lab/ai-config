@@ -31,6 +31,9 @@ A whether-or-how question is not yet a request, so it implies no implementation;
 asking start-or-file is the answer it calls for, not a cop-out offer.
 AGENTS.md "Always give recommendations with questions" still applies: the start-or-file question carries its own recommendation.
 
+`hooks/remind-start-or-file-on-question.py` reminds, never blocks, when a prompt reads as a question.
+No deny can work: question versus instruction is a reading of intent.
+
 - **Do:** answer "should we X?" with a recommendation and its reason,
   then "start now or file it for later?" with a recommendation between those two.
 - **Do:** act at once on a declarative reply: "yes, do it" starts the work, and "file it" files the issue and stops.

@@ -44,10 +44,10 @@ a row says so where its source was not.
   A stash leaves ignored files behind, so read `git clean -n -x` before any `git clean -x`.
 - **Do:** leave changes you do not recognize as your own in place, and tell the user what they are.
   Another session may be working in this worktree, and stashing its changes breaks it as surely as a reset.
-- **Don't:** reach for `reset --hard`, `checkout -- .`, `restore`, `stash` or `clean -f` to clear a `git diff` that shows changes you did not make.
+- **Don't:** reach for `reset --hard`, `checkout -- .`, `restore`, `stash` or `clean -f` to clear changes you did not make, whether `git diff` or `git status` shows them.
 - **Do:** print the absolute path an `rm -rf` would delete in one Bash call, read it, and stop if it is `/`, the home directory or a repository root.
   Then run the `rm -rf` in a later call, on that literal path.
-- **Do:** guard any variable in a deletion path with `${VAR:?}`, which stops the command when the variable is empty.
+- **Do:** when a deletion path must use a variable, as in a loop or a script, guard it with `${VAR:?}`, which stops the command when the variable is unset or empty.
   It cannot stop a variable that falls back to a real value.
   `$HOME` in a fresh shell is the real home directory ([#75859](https://github.com/anthropics/claude-code/issues/75859)).
 - **Don't:** use a variable in a deletion path that an earlier Bash call set.

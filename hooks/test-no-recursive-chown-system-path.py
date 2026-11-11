@@ -10,7 +10,6 @@ import io
 import json
 import os
 import sys
-import time
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
@@ -355,6 +354,28 @@ class Denies(unittest.TestCase):
                     'while read -r f; do cd "$OUT/a/b"; done; chmod -R u+w ..'):
             self.assert_denied(cmd, cwd=HOME + "/proj")
 
+    def test_escaped_dollar_in_a_double_quoted_shell_text(self):
+        for cmd in ('sudo sh -c "chmod -R 755 \\"\\$PREFIX/\\""',
+                    'sudo sh -c "chown -R me \\"\\$PREFIX\\"/etc"',
+                    'sudo sh -c "cd / && chmod -R u+w \\"\\$PWD\\""',
+                    'sh -c "chmod -R u+w \\`echo /etc\\`; chmod -R u+w \\$X/"'):
+            self.assert_denied(cmd)
+
+    def test_process_substitution_is_read(self):
+        for cmd in ("cat <(chmod -R u+w /etc)", "diff <(sudo chown -R me /usr) x",
+                    "tee >(chmod -R u+w /etc) < f"):
+            self.assert_denied(cmd)
+
+    def test_pushd_under_an_unset_variable(self):
+        for cmd in ('pushd "$OUT/etc" && chmod -R u+w .', 'pushd "$OUT"/ && chmod -R u+w .'):
+            self.assert_denied(cmd)
+
+    def test_more_wrappers(self):
+        for cmd in ("run0 chown -R me /usr", "run0 -u root chmod -R 755 /etc",
+                    "coproc chmod -R 755 /usr", "flock /tmp/l chown -R me /usr",
+                    "flock -w 5 /tmp/l chmod -R 755 /etc", "chown -R me /var/db"):
+            self.assert_denied(cmd)
+
     def test_hash_inside_a_word_is_not_a_comment(self):
         for cmd in ("curl -fsSL https://x.org/i.sh#v2 -o i.sh && sudo chmod -R 755 /usr/local",
                     "sed -i s#foo#bar#g conf && sudo chown -R root:root /usr",
@@ -610,9 +631,13 @@ class Allows(unittest.TestCase):
         level2 = [guards + " ".join(f'echo "$({x})"' for x in level3[4 * i:4 * i + 4])
                   for i in range(4)]
         command = guards + " ".join(f'echo "$({x})"' for x in level2)
-        start = time.monotonic()
         self.assert_allowed(command + "; chmod -R u+w ./x")
-        self.assertLess(time.monotonic() - start, 5)
+        self.assertLess(self.count_calls("_scan", command + "; chmod -R u+w ./x"), 200)
+
+    def test_unclosed_substitutions_are_lifted_once(self):
+        command = "chmod -R u+w x; " + "echo $(" * 2000
+        self.assertLess(self.count_calls("_close", command), 10)
+        self.assertLess(self.count_calls("_close", "chmod -R u+w x " + "`a" * 2000), 10)
 
     def test_shell_c_in_a_project(self):
         self.assert_allowed("sudo sh -c 'chown -R me .'")
@@ -816,6 +841,9 @@ class Allows(unittest.TestCase):
         with mock.patch.object(guard, "ChainMap", recorded):
             guard._hit("( " * 200 + "D=x; chmod -R u+w ./x" + " )" * 200, REPO, HOME)
         self.assertLessEqual(widest[0], guard.MAX_SCOPE + 1)
+
+    def test_empty_pushd_does_not_go_home(self):
+        self.assert_allowed("pushd $UNSET_D && chmod -R go-w .")
 
     def test_relative_cd_from_an_unknown_directory_stays_unknown(self):
         for cmd in ("cd - && cd build && chmod -R u+w .", 'cd "$(x)" && cd .. && chmod -R u+w .',

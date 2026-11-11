@@ -77,6 +77,12 @@ honest command uses, refuses the operator and parameter forms it does not
 model, and names the rest here.
 
 Limits, deliberately unclosed: `find ... -exec chown`, `xargs chown`, a
+function body (judged where it is defined, not where it is called), an
+array assignment (`D=(/etc)`, read as empty), `systemd-run`, `chroot`,
+`$'...'` quoting, a program named by a substitution (`"$(which chown)"`),
+a command substitution's value (read as empty, so
+`"$(npm config get prefix)/lib/node_modules"` is judged at
+`/lib/node_modules`: write the path itself, or use the escape hatch), a
 `for` or `select` loop variable, `eval`, `su -c`, a heredoc piped to `sh`, an
 interpreter's own `-c` (`python -c "os.system(...)"`), a substitution in an
 unquoted heredoc body (`<<EOF`, which bash does run), a glob in a directory
@@ -134,10 +140,10 @@ PROGRAMS = {"chown", "chmod", "chgrp"}
 # A text that never names one of PROGRAMS cannot run one (the program is read
 # only as a literal word, see `_program`), so it is not read further.
 PROGRAM_TEXT = re.compile(r"ch(?:own|mod|grp)")
-WRAPPERS = (set(COMMAND_WRAPPERS) | {"setsid", "busybox", "pkexec"}
+WRAPPERS = (set(COMMAND_WRAPPERS) | {"setsid", "busybox", "pkexec", "run0", "coproc", "flock"}
             if simple_commands_with_scope else set())
 # Wrappers that take positional words before the program (`timeout 60 chmod`).
-WRAPPER_POSITIONALS = {"timeout": 1}
+WRAPPER_POSITIONALS = {"timeout": 1, "flock": 1}
 # Each wrapper's short options that take the next word as their value; any
 # other option is a flag, so `sudo -E echo chown` runs echo, not chown.
 # Sources: the getopt strings in sudo's src/parse_args.c, OpenBSD's doas.c,
@@ -146,7 +152,7 @@ WRAPPER_VALUE_OPTIONS = {"sudo": set("acugpCUrtTDR"), "doas": set("auC"),
                          "env": set("auCSPLU"),
                          "timeout": set("sk"), "nice": {"n"}, "ionice": set("cnp"),
                          "stdbuf": set("ioe"), "pkexec": {"u"}, "time": {"f", "o"},
-                         "exec": {"a"}}
+                         "exec": {"a"}, "run0": set("uDgS"), "flock": set("wE")}
 # Each wrapper's long options, as (those taking the next word, flags).
 # getopt_long takes an exact name first, then a unique prefix (`--us` is
 # `--user`), so a flag such as sudo's `--login`, a prefix of `--login-class`,
@@ -209,7 +215,7 @@ TOP_LEVEL = {"bin", "boot", "dev", "etc", "home", "lib", "lib32", "lib64", "libx
              "Volumes", "cores", "private"}
 SYSTEM_TREES = ("/usr", "/etc", "/bin", "/sbin", "/lib", "/lib32", "/lib64",
                 "/libx32", "/boot", "/var/lib", "/var/log", "/var/spool",
-                "/System", "/Library", "/private/etc", "/private/var/db")
+                "/System", "/Library", "/private/etc", "/private/var/db", "/var/db")
 USR_LOCAL_CORE = {"bin", "sbin", "etc", "lib", "libexec", "include", "share"}
 APP_TREES = ("/var/lib", "/var/log", "/var/spool")
 VAR_CORE = {"dpkg", "apt", "rpm", "dnf", "yum", "pacman", "systemd", "sudo",
@@ -291,7 +297,8 @@ def _close(text, start):
 
 
 def _lift(text):
-    """`(text with each running $(...) and `...` replaced by SUB, [inner texts])`.
+    """`(text with each running $(...), `...`, <(...) and >(...) replaced by SUB,
+    [inner texts])`.
 
     `shlex` splits an unquoted `$(id -gn)` into words of its own, so `chown -R
     $USER:$(id -gn) /usr` would otherwise lose its program. A substitution
@@ -308,14 +315,20 @@ def _lift(text):
             single = not single
         elif ch == '"' and not single:
             double = not double
-        elif not single and text.startswith("$(", i) and not text.startswith("$((", i):
+        elif not single and (text.startswith("$(", i) and not text.startswith("$((", i)
+                             or not double and text.startswith(("<(", ">("), i)):
             j = _close(text, i + 2)
-            if j is not None:
-                out.append(_lifted(text[i + 2:j], inner))
-                i = j + 1
-                continue
-        elif not single and ch == "`" and "`" in text[i + 1:]:
-            j = text.index("`", i + 1)
+            if j is None:  # unclosed: bash refuses the text; nothing later closes
+                out.append(text[i:])
+                break
+            out.append(_lifted(text[i + 2:j], inner))
+            i = j + 1
+            continue
+        elif not single and ch == "`":
+            j = text.find("`", i + 1)
+            if j == -1:
+                out.append(text[i:])
+                break
             out.append(_lifted(text[i + 1:j], inner))
             i = j + 1
             continue
@@ -717,9 +730,13 @@ def _bare_cd_operands(piece):
 def _nested(words):
     """The `sh -c` texts WORDS starts, in order (`sudo sh -c '...'` too)."""
     try:
-        return shell_c_expansions(shlex.join(words), max_depth=1)[1:]
+        texts = shell_c_expansions(shlex.join(words), max_depth=1)[1:]
     except Exception:  # a text this cannot rebuild starts nothing it can read
         return []
+    # Inside double quotes bash drops the backslash of `\$` and `\``, which
+    # shlex keeps; the quotes are gone by now, so both readings are scanned.
+    return texts + [t.replace("\\$", "$").replace("\\`", "`") for t in texts
+                    if "\\$" in t or "\\`" in t]
 
 
 def _scan(piece, cwd, home, outer, level=0, ctx=None):
@@ -829,9 +846,9 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
                 reading = got[operand - 1] if operand else None
                 looped_name = tok and any(
                     (m.group(1) or m.group(2)) in loop_names for m in VARIABLE.finditer(tok))
-                if lead[0] != "cd" or not tok or SUB in tok or looped_name:
+                if lead[0] not in ("cd", "pushd") or not tok or SUB in tok or looped_name:
                     pass  # no operand, or one this cannot read: as resolved above
-                elif reading and reading is not UNREAD and reading[0] == "":
+                elif lead[0] == "cd" and reading and reading is not UNREAD and reading[0] == "":
                     # An unquoted empty `cd $D` goes home; quoted, it stays put.
                     new = here
                     if tok in bare:

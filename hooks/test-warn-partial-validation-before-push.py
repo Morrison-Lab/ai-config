@@ -184,7 +184,8 @@ def main():
           silent(PUSH, ["git status", DERIVED]))
     check("silent after the recommended --changed spelling",
           silent(PUSH, ["python3 scripts/run-local-validation.py --changed"]))
-    for args in ("--changed 2>&1 | tail -40", "--only x", "--list"):
+    for args in ("--changed 2>&1 | tail -40", "--base origin/main --changed",
+                 "--only x", "--list"):
         check("a run with " + args + " counts as the sweep (#5428)",
               silent(PUSH, ["python3 scripts/run-local-validation.py " + args]))
     sweep = "python3 scripts/run-local-validation.py --changed"

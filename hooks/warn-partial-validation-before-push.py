@@ -105,7 +105,8 @@ Both notes name `--changed` and describe this repository's runner, though
 the hook fires in any repository that has a `scripts/run-local-validation.py`
 (only ai-config has one as of 2026-11-11).
 
-A sweep in the push's own command is credited wherever it sits, so
+A sweep the push's own command runs is credited whatever its order (one
+quoted in a heredoc body is not run, so not credited), so
 `git push && <sweep>` is silent although the sweep runs after the push:
 `scan` reads commands, not their order.
 

@@ -25,6 +25,27 @@ do them in minimal batches", and "every PR should be as small and focused as it 
 - Stacked PRs are fine: each layer is small, and each names the layer it needs.
 - Content and infrastructure stay in separate PRs, as before.
 
+## Measure early, and split by patch
+
+Learned while splitting the priority-label branch on 2026-11-11 ([ai-config#5359](https://github.com/Morrison-Lab/ai-config/issues/5359)).
+That branch reached 22 files and 488 lines over six self-review rounds before its first push was refused,
+so the split came after the review work.
+No hook warns at commit time or on a file checkout from another commit yet;
+that issue tracks both.
+
+- **Do:** run `git diff --shortstat origin/main...HEAD` after the first commit and after each fix round,
+  and split a second concern out as soon as the branch nears the cap.
+  Review fixes add tests, and tests alone carried a later branch from under the cap to 311 lines.
+- **Do:** carry a change onto a new base with `git diff <merge-base> <commit> -- <files> | git apply --index --3way`,
+  then compare `git diff --cached --numstat` with the original branch's numstat for those files.
+- **Do:** after a split, open each file a part cites at `origin/main` and confirm the cited rule is there.
+  A citation checked against the unsplit branch can point at text that only an unmerged sibling PR adds
+  ([ai-config#5369](https://github.com/Morrison-Lab/ai-config/pull/5369)).
+- **Don't:** leave the size check to the push.
+- **Don't:** run `git checkout <commit> -- <file>` to carry a change onto a newer base.
+  It carries the whole old file, so it silently reverts what `main` changed since the branch point
+  (`hooks/hooks.json` lost 12 lines that way, and nothing failed).
+
 ## The mechanisms
 
 - `hooks/no-oversized-pr-push.py` denies a `git push` of a branch over the cap, before CI is spent.

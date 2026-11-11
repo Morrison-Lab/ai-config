@@ -1346,6 +1346,7 @@ def symlinked_plugin_root_cases() -> tuple[int, int]:
     The layout below is the checkout's, in miniature:
 
         root/hooks/<guard>, <sibling>      the real files
+        root/scripts/lib/                  the shared splitter they import
         root/real/plug/                    the plugin directory
         root/dotclaude/skills -> ../real   the symlink the harness resolves
     """
@@ -1362,6 +1363,11 @@ def symlinked_plugin_root_cases() -> tuple[int, int]:
         shutil.copy(HOOK, hooks_dir)
         shutil.copy(os.path.join(os.path.dirname(HOOK), "no-unreviewed-pr.py"),
                     hooks_dir)
+        # The sibling's detector imports `scripts/lib/shellcmd.py`
+        # (ai-config#3178), which the checkout carries beside `hooks/`.
+        shutil.copytree(os.path.join(os.path.dirname(os.path.dirname(
+            os.path.realpath(HOOK))), "scripts", "lib"),
+            os.path.join(d, "scripts", "lib"))
         try:
             os.symlink(os.path.join("..", "real"),
                        os.path.join(dotclaude, "skills"))

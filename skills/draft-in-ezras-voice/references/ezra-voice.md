@@ -32,7 +32,7 @@ Keep it free of FERPA data and of agent-written text.
 
 ## Canvas announcements to students
 
-Learned from nine of his own announcements (2026-10-19 to 2026-11-05), plus his edit of one draft (2026-11-11), which each dated trait names.
+Learned from nine of his own announcements (2026-10-19 to 2026-11-05), plus his edit of one draft (2026-11-11).
 The sources are his bodies and edits only, never replies, student posts, or student data.
 
 - **Opening.**

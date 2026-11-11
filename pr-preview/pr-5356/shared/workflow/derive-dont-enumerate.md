@@ -481,6 +481,9 @@ for exactly this reason (ai-config#1940, ai-config#1262): it parses
 `validate.yml` and runs every step it finds, rather than a curated subset,
 and reports what it could not run locally and why, so a check it skipped is
 visible rather than silently absent.
+It runs the steps in a throwaway worktree holding the working tree as `git add -A` would stage it,
+so a checker that lists `git ls-files` sees a new, unstaged file as CI will (ai-config#4910);
+`--in-place` restores the old behaviour.
 
 ```bash
 python3 scripts/run-local-validation.py                # every derivable step

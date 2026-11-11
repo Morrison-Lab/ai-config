@@ -4,8 +4,8 @@
 The guard asks for two things on a create: the `ai-authored` label and one of
 the priority labels `P1`, `P2`, `P3`. The FIRES lists hold creates missing the
 authorship label, the ONE_MISSING lists pin that each label is asked for
-separately, and the QUIET lists hold creates carrying both, and commands that
-are not creates.
+separately. The QUIET lists hold creates carrying both labels, and commands
+that are not creates.
 
 The NEGATIVE cases carry the weight, in both directions. A guard that fired on
 prose quoting `gh issue create` would go off in every reply that cites the rule
@@ -20,8 +20,10 @@ from __future__ import annotations
 import importlib.util
 import json
 import pathlib
+import shutil
 import subprocess
 import sys
+import tempfile
 
 HERE = pathlib.Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location(
@@ -155,6 +157,14 @@ BASH_QUIET = [
      'GH_TOKEN=x gh issue create --title "t" -l ai-authored -l P2'),
     ("labelled inside a double-quoted command substitution, read by the fallback",
      'echo "$(gh issue create -t x -l ai-authored,P2)"'),
+    ("fallback: the bare label ends at a semicolon",
+     'echo "$(gh issue create -t x -l ai-authored,P2; true)"'),
+    ("fallback: the bare label ends at a pipe",
+     'echo "$(gh issue create -t x -l ai-authored,P2|cat)"'),
+    ("fallback: the bare label ends at an ampersand",
+     'echo "$(gh issue create -t x -l ai-authored,P2&& true)"'),
+    ("fallback: the bare label ends at a backtick",
+     'echo "' + chr(96) + 'gh issue create -t x -l ai-authored,P2' + chr(96) + '"'),
     ("labelled, with the label flags before a quoted operator title",
      'gh issue create -l ai-authored,P2 --title ";"'),
     ("unbalanced quoting with a comma-and-space value",
@@ -328,17 +338,35 @@ def main() -> int:
         else:
             print(f"OK   one reminder (mcp): {label}")
 
-    # With the shared splitter missing, the hook reads label flags across the
-    # whole command: a labelled create stays quiet and a bare one still warns.
-    splitter = guard._simple_commands
-    guard._simple_commands = lambda _command: None
-    try:
-        degraded_quiet = guard.evaluate_bash('gh issue create -t x -l ai-authored,P2')
-        degraded_fires = guard.evaluate_bash('gh issue create -t x')
-    finally:
-        guard._simple_commands = splitter
-    if degraded_quiet is not None or degraded_fires is None:
-        print("::error::wrong verdict with the shared splitter missing", file=sys.stderr)
+    # With scripts/lib/shellcmd.py missing, the hook says so on stderr and
+    # reads label flags across the whole command: a bare create still warns
+    # and a labelled one stays quiet. The copy sits in a directory tree that
+    # has no scripts/lib beside it.
+    with tempfile.TemporaryDirectory() as tree:
+        copy_dir = pathlib.Path(tree) / "hooks"
+        copy_dir.mkdir()
+        copy = copy_dir / "warn-unlabelled-agent-issue.py"
+        shutil.copy(HERE / "warn-unlabelled-agent-issue.py", copy)
+        runs = {}
+        for name, command in (
+            ("bare", "gh issue create -t x"),
+            ("labelled", "gh issue create -t x -l ai-authored,P2"),
+        ):
+            runs[name] = subprocess.run(
+                [sys.executable, str(copy)],
+                input=json.dumps({"tool_name": "Bash", "tool_input": {"command": command}}),
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+    if (
+        "cannot load scripts/lib/shellcmd.py" not in runs["bare"].stderr
+        or "ai-authored" not in runs["bare"].stdout
+        or runs["labelled"].stdout.strip()
+        or runs["bare"].returncode != 0
+        or runs["labelled"].returncode != 0
+    ):
+        print("::error::wrong behaviour with scripts/lib/shellcmd.py missing", file=sys.stderr)
         failures += 1
     else:
         print("OK   degrades to the whole-command read without the splitter")

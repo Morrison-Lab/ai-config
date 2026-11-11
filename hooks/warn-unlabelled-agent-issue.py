@@ -58,12 +58,16 @@ The forms covered are `--label a --label b`, `--label a,b`, `--label=a`,
 `--labels`, and `-l a`. `ai-authored` quoted inside a title or a
 body sits at no argument position, so it does not discharge.
 
-Two shapes are read across the whole command by regex instead: a create
+A command is read whole by regex instead when the splitter returns no
+argument list that starts with the create. Three shapes do that: a create
 inside a double-quoted string (`echo "$(gh issue create ...)"`), which is one
-argument of another command, and a command whose quoting does not balance.
-On that path a label flag anywhere in the command discharges the reminder,
-including one on a neighbouring command and one written inside a quoted
-title or body. The path errs toward silence, because a reminder that cannot
+argument of another command; a create after a brace (`{ gh issue create ...;
+}`), where the brace is the first argument; and a command whose quoting does
+not balance. On that path a label flag anywhere in the command discharges
+the reminder, including one on a neighbouring command and one written inside
+a quoted title or body. A create in one of the first two shapes is also not
+examined when the same command holds a second create that the splitter does
+isolate. The path errs toward silence, because a reminder that cannot
 establish its precondition must not fire.
 
 KNOWN LIMITS

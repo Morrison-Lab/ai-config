@@ -54,7 +54,7 @@ When you can’t use the native convert feature, create the new item by hand, pr
     - @<login>: <summary>'   # CREATE_ISSUE
     ```
 
-    In a remote/web session, use `mcp__github__issue_write` (`method: create`) with the same body instead of `gh`. Set the priority (`P2` is the default) per [`issue-first`](../../shared/workflow/issue-first.md); the issue quotes human content, so it takes no `ai-authored` or model label.
+    In a remote/web session, use `mcp__github__issue_write` (`method: create`) with the same body instead of `gh`. Set the priority (`P2` is the default) per [`issue-first`](../../shared/workflow/issue-first.md); the issue quotes human content, so it takes no `ai-authored` or model label. Where the repo has no `P2` label yet, create it first ([`label-agent-filed-issues`](../../shared/workflow/label-agent-filed-issues.md)).
 
 3.  Comment on the discussion pointing at the new issue, then close it:
 

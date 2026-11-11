@@ -698,7 +698,7 @@ for argv, is_push in (
     (["git", "--config-env", "user.name=NAME", "push"], True),
     (["git", "--exec-path=/x", "push"], True),
     (["git", "--exec-path", "/x", "push"], False),  # prints the path, exits
-    (["git", "--attr-source", "HEAD", "push", "--force"], True),
+    (["git", "--attr-source", "HEAD", "push"], True),
     (["git", "-C", "/repo", "-c", "k=v", "push"], True),
     (["git", "--work-tree=/r", "push"], True),
     (["git", "--config-env=k=v", "push"], True),

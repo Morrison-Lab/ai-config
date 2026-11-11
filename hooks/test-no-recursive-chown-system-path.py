@@ -393,11 +393,29 @@ class Denies(unittest.TestCase):
                     "D=/tmp/x env -u D sh -c 'chmod -R u+w \"$D/\"'",
                     "D=/tmp/x env --unset=D sh -c 'chmod -R u+w \"$D/\"'",
                     "D=/tmp/x env --ignore-environment sh -c 'chmod -R u+w \"$D/\"'",
-                    "D=/tmp/x exec -c sh -c 'chmod -R u+w \"$D/\"'"):
+                    "D=/tmp/x exec -c sh -c 'chmod -R u+w \"$D/\"'",
+                    "D=/tmp/x env -uD sh -c 'chmod -R u+w \"$D/\"'",
+                    "D=/tmp/x env - sh -c 'chmod -R u+w \"$D/\"'",
+                    "D=/tmp/x pkexec sh -c 'chmod -R u+w \"$D/\"'",
+                    "D=/tmp/x run0 sh -c 'chmod -R u+w \"$D/\"'"):
             self.assert_denied(cmd)
 
+    def test_a_shell_text_after_pkexec_run0_or_flock(self):
+        for cmd in ("pkexec sh -c 'chmod -R u+w /'",
+                    "run0 -u root bash -c 'chown -R root /usr'",
+                    "flock /tmp/l sh -c 'chmod -R 755 /etc'"):
+            self.assert_denied(cmd)
+
+    def test_a_shell_resets_a_prefix_pwd(self):
+        self.assert_denied("cd / && PWD=/tmp/x bash -c 'chmod -R u+w \"$PWD\"'")
+
     def test_the_nginx_web_root(self):
-        self.assert_denied("sudo chown -R www-data /usr/share")
+        for cmd in ("sudo chown -R www-data /usr/share",
+                    "sudo chown -R www-data /usr/share/nginx",
+                    "chown -R www-data /usr/share/nginx/modules-available"):
+            self.assert_denied(cmd)
+
+    def test_a_tilde_reads_the_hook_home_without_a_prefix_home(self):
         self.assert_denied("D=/tmp/x sh -c 'chown -R me ~'")
 
     def test_a_double_quoted_text_sees_the_outer_names(self):
@@ -630,9 +648,11 @@ class Allows(unittest.TestCase):
 
     def test_the_nginx_web_root(self):
         for cmd in ("sudo chmod -R 755 /usr/share/nginx/html",
-                    "chown -R nginx:nginx /usr/share/nginx/html",
-                    "D=/tmp/x env FOO=1 sh -c 'chmod -R u+w \"$D\"'"):
+                    "chown -R nginx:nginx /usr/share/nginx/html"):
             self.assert_allowed(cmd)
+
+    def test_an_env_that_keeps_the_environment(self):
+        self.assert_allowed("D=/tmp/x env FOO=1 sh -c 'chmod -R u+w \"$D\"'")
 
     def test_sudo_lone_h_takes_the_next_word_as_host(self):
         # sudo reads `chown` as the host and `-R me` as the chroot, then runs /etc.

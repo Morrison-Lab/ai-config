@@ -22,7 +22,7 @@ when a target is:
     (`/usr/local/lib/node_modules` and `/usr/local/Cellar` pass), and below
     `/var/lib`, `/var/log` and `/var/spool` only the tree itself and the
     package and auth state in `VAR_CORE` are (`/var/lib/postgresql` passes);
-    `/usr/share/nginx`, nginx's own web root, is not refused at all;
+    `/usr/share/nginx/html`, nginx's default web root, is not refused at all;
   * the home directory, or a directory that contains it.
 
 A target is read with `~`, `~user`, `$HOME`, and `~+`, `$(pwd)` and `$PWD`
@@ -100,7 +100,8 @@ substitution (read with an empty stack; bash's inherits the outer one), a
 `cd` and a `cd ..` in one conditional body (each read as maybe run on its
 own, which can refuse the directory above: `if [ -d sub ]; then cd sub;
 make; cd ..; fi; chmod -R u+w .` is judged in the parent too), a quoted
-`"$D"` holding spaces (also judged word by word, so `D="build /"` is refused
+operand whose value holds blanks, from the variable or written beside it
+(`"$X /etc"`), judged word by word too (so `D="build /"` in `"$D"` is refused
 at `/`), a top-level directory written in a value beside an unset name
 (`DIRS="$X /opt"` splits to a `/opt` read as taken as empty, which a system
 tree or home is not), a `-R` held in a variable (`chown $FLAGS root /usr`
@@ -258,7 +259,7 @@ SYSTEM_TREES = ("/usr", "/etc", "/bin", "/sbin", "/lib", "/lib32", "/lib64",
                 "/System", "/Library", "/var/db")
 USR_LOCAL_CORE = {"bin", "sbin", "etc", "lib", "libexec", "include", "share"}
 APP_TREES = ("/var/lib", "/var/log", "/var/spool")
-WEB_ROOTS = ("/usr/share/nginx",)
+WEB_ROOTS = ("/usr/share/nginx/html",)
 VAR_CORE = {"dpkg", "apt", "rpm", "dnf", "yum", "pacman", "systemd", "sudo",
             "polkit-1", "PackageKit", "ucf"}
 ASSIGNMENT = re.compile(r"\A[A-Za-z_][A-Za-z0-9_]*=")
@@ -426,7 +427,17 @@ def _takes_next_word(wrapper, tok, following):
 
 
 def _program(argv):
-    """`(argv from the program on, override present)`, peeling wrappers.
+    """`(argv from the program on, override present)`, peeling wrappers,
+    with the program chown, chmod or chgrp; `[]` for any other program."""
+    start, override = _peeled(argv)
+    if start is None or os.path.basename(argv[start]) not in PROGRAMS:
+        return [], override
+    return argv[start:], override
+
+
+def _peeled(argv):
+    """`(index of the program, override present)`, peeling wrappers, or
+    `(None, ...)` when ARGV runs none.
 
     After a wrapper, an option may be followed by its value (`sudo -u me`);
     the first other word is the program it runs, so `sudo docker run alpine
@@ -438,7 +449,7 @@ def _program(argv):
         if after_option:
             after_option = False  # the value of the option before it
         elif name in PROGRAMS:
-            return argv[i:], override
+            return i, override
         elif ASSIGNMENT.match(tok):
             override = override or tok == OVERRIDE
         elif name in WRAPPERS:
@@ -451,8 +462,8 @@ def _program(argv):
         elif wrapper and positionals:
             positionals -= 1
         else:
-            return [], override  # some other program runs here
-    return [], override
+            return i, override  # some other program runs here
+    return None, override
 
 
 def _targets(program, head):
@@ -778,8 +789,11 @@ def _bare_cd_operands(piece):
 def _nested(words):
     """The `sh -c` texts WORDS starts, in order (`sudo sh -c '...'` too),
     then a copy of each with `\\$` and `\\`` unescaped."""
+    start = _peeled(words)[0]
     try:
         texts = shell_c_expansions(shlex.join(words), max_depth=1)[1:]
+        if not texts and start:  # a wrapper the shared reader does not know
+            texts = shell_c_expansions(shlex.join(words[start:]), max_depth=1)[1:]
     except Exception:  # a text this cannot rebuild starts nothing it can read
         return []
     # Inside double quotes bash drops the backslash of `\$` and `\``, which
@@ -1038,6 +1052,8 @@ def _prefix_names(words, home, visible, here):
             break
         if ASSIGNMENT.match(word):
             name, _, val = word.partition("=")
+            if name in ("PWD", "OLDPWD"):
+                continue  # a shell resets PWD to its real directory
             computed = "`" in val or SUB in val
             # In order: `D=/etc E=$D sh -c` sets E to /etc.
             names[name] = (None if computed

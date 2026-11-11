@@ -385,6 +385,10 @@ def simple_commands_with_scope(command):
     try:
         lex = shlex.shlex(command, posix=True, punctuation_chars=True)
         lex.whitespace_split = True
+        # `_comment_free` removed every comment above; left to shlex, a `#`
+        # inside a word (`i.sh#v2`, `s#a#b#`, `$#`, `${#A}`) would end the
+        # command there and hide everything after it.
+        lex.commenters = ""
         toks = list(lex)
     except ValueError:
         return None

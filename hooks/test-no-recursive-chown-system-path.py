@@ -355,6 +355,16 @@ class Denies(unittest.TestCase):
                     'while read -r f; do cd "$OUT/a/b"; done; chmod -R u+w ..'):
             self.assert_denied(cmd, cwd=HOME + "/proj")
 
+    def test_hash_inside_a_word_is_not_a_comment(self):
+        for cmd in ("curl -fsSL https://x.org/i.sh#v2 -o i.sh && sudo chmod -R 755 /usr/local",
+                    "sed -i s#foo#bar#g conf && sudo chown -R root:root /usr",
+                    "echo ${#A} $#; chmod -R u+w /etc"):
+            self.assert_denied(cmd)
+
+    def test_deep_subshells_are_read(self):
+        self.assert_denied("( " * 200 + "D=x; chmod -R u+w /etc" + " )" * 200)
+        self.assert_denied("( " * 200 + "cd /; chmod -R u+w ." + " )" * 200)
+
     def test_absolute_cd_leaves_a_weak_directory(self):
         self.assert_denied('cd "$OUT/x"; cd /; chmod -R u+w opt', cwd=HOME + "/proj")
 
@@ -760,6 +770,45 @@ class Allows(unittest.TestCase):
         guards = "".join(f"if {c}; then cd {c}; fi; " for c in "abcd")
         command = guards + "echo ${A}; " * 5000 + "chmod -R u+w ./x"
         self.assertLess(self.count_calls("_judge", command), 4 * 5000)
+
+    def test_nested_text_is_keyed_by_the_names_it_uses(self):
+        guards = "".join(f"if {c}; then cd {c}; fi; " for c in "abcd")
+        command = guards + "".join(f'D{i}=x; sh -c "chmod -R u+w ./x"; ' for i in range(300))
+        self.assertLess(self.count_calls("_scan", command), 40)
+
+    def test_budget_is_checked_between_texts_of_one_command(self):
+        guards = "".join(f"if {c}; then cd {c}; fi; " for c in "abcd")
+        words = " ".join(f"w{i}" for i in range(1000))
+        command = guards + " ".join(f"echo $(chmod -R u+w ./x{k} {words})" for k in range(60))
+        self.assertLess(self.count_calls("_scan", command), 300)
+
+    def test_one_long_command_across_many_ways_is_read_once(self):
+        guards = "".join(f"if {c}; then cd {c}; fi; " for c in "abcd")
+        command = guards + "chmod -R u+w ./x " + "y " * (guard.MAX_WORK // 2)
+        self.assertLess(self.count_calls("_why", command), guard.MAX_WORK)
+
+    def test_deep_subshells_chain_at_most_max_scope_maps(self):
+        real, widest = guard.ChainMap, [0]
+
+        def recorded(*maps):
+            widest[0] = max(widest[0], len(maps))
+            return real(*maps)
+
+        with mock.patch.object(guard, "ChainMap", recorded):
+            guard._hit("( " * 200 + "D=x; chmod -R u+w ./x" + " )" * 200, REPO, HOME)
+        self.assertLessEqual(widest[0], guard.MAX_SCOPE + 1)
+
+    def test_long_cd_chains_stop_growing_the_directory(self):
+        self.assert_allowed("cd a; " * 3000 + "chmod -R u+w ../../x")
+        real, longest = guard.resolve_cd_target, [0]
+
+        def recorded(words, here):
+            longest[0] = max(longest[0], len(here or ""))
+            return real(words, here)
+
+        with mock.patch.object(guard, "resolve_cd_target", recorded):
+            guard._hit("cd a; " * 3000 + "chmod -R u+w ../../x", REPO, HOME)
+        self.assertLessEqual(longest[0], guard.PATH_MAX)
 
     def test_commands_that_change_nothing_are_not_read_per_world(self):
         guards = "".join(f"if {c}; then cd {c}; fi; " for c in "abcd")

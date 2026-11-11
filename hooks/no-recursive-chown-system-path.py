@@ -83,9 +83,12 @@ unquoted heredoc body (`<<EOF`, which bash does run), a glob in a directory
 component (`/*/lib`), a partial glob or brace expansion that names a
 protected path (`/et*`, `/{etc,usr}`), a wrapper that changes directory
 (`env -C /etc`, `sudo -D /etc`), more than MAX_WORLDS ways a command may
-run (the directory is then unknown), the rest of a command after MAX_WORK
-words of commands that may change directory, assign or run chown, chmod or
-chgrp (read in one way it may run, with the directory unknown), PowerShell
+run (the directory is then unknown), the rest of a command once judging it
+in every way it may run would pass MAX_WORK words of commands that may
+change directory, assign or run chown, chmod or chgrp (those ways are then
+merged into one, with the directory unknown), a directory deeper than
+MAX_SCOPE subshells or longer than PATH_MAX (read as MAX_SCOPE deep, or
+unknown), PowerShell
 `icacls`/`Set-Acl`, Windows drive paths (`C:/Windows`), nested texts past
 MAX_DEPTH, a relative target, `$PWD`, or a name assigned from `$PWD`, after
 a `cd` this cannot resolve (`cd -` or `cd "$(git rev-parse
@@ -244,6 +247,10 @@ MAX_DEPTH = 32
 # Past this many words read, the rest of the command is read in one way it
 # may run, with the directory unknown.
 MAX_WORK = 20000
+# Subshells deeper than this are read as this deep, and a directory longer
+# than PATH_MAX as unknown, so neither makes each command cost more.
+MAX_SCOPE = 64
+PATH_MAX = 4096
 ALL_GLOB = re.compile(r"\A[*?.]*[*?][*?.]*\Z")
 CD_OPTION = re.compile(r"-[LPe@]+")
 # A `cd` operand written unquoted, after any options: `cd $D`, `(cd -P $D)`,
@@ -679,6 +686,12 @@ def _may_matter(words):
         PROGRAM_TEXT.search(" ".join(words)))
 
 
+def _merged(worlds):
+    """WORLDS as one, the first's names, with every directory unknown."""
+    heres, assigns = worlds[0]
+    return [({k: None for k in heres}, assigns)]
+
+
 def _here_weak(assigned):
     """Whether the directory was reached through a value taken as empty."""
     return assigned.get(WEAK_PWD, False)
@@ -718,9 +731,9 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
 
     CTX is shared by the whole command: a nested text already read in the
     same directory with the same names it uses is not read again, and past
-    MAX_WORK words read, a nested text is read with no directory, and after
-    the command holding it the rest is read in one way the command may run,
-    with the directory unknown and that way's names.
+    MAX_WORK words read, a nested text is read with no directory, and the
+    ways the command may run are merged into one, with the directory unknown
+    and the first way's names.
     """
     ctx = {"seen": set(), "work": 0, "split": {}, "uses": {}} if ctx is None else ctx
     if not PROGRAM_TEXT.search(re.sub(r"[\\'\"]", "", piece)):
@@ -729,6 +742,7 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
         ctx["split"][piece] = (_split(piece),
                                _bare_cd_operands(_comment_free(_heredoc_free(piece))))
     (cmds, inner), bare = ctx["split"][piece]
+    cmds = cmds and [(scope[:MAX_SCOPE], argv) for scope, argv in cmds]
     # A WORLD is one way the command may run: for each scope, the directory
     # the shell is in (`None` when this cannot name it) and the names
     # assigned there. A `cd` or assignment inside `( ... )` changes only that
@@ -777,6 +791,8 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
         taken += count
         if not (is_cd or texts or _may_matter(words)):
             continue  # it neither moves, assigns nor runs chown, chmod or chgrp
+        if len(worlds) > 1 and ctx["work"] + len(argv) * len(worlds) > MAX_WORK:
+            worlds = _merged(worlds)
         forked = []
         for heres, assigns in worlds:
             here = next(heres[scope[:k]] for k in range(len(scope), 0, -1)
@@ -799,6 +815,7 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
                                         for g in got]
                 unknown = None in cd_words or any(SUB in tok for tok in lead) or here is None
                 new = None if unknown else resolve_cd_target(cd_words, here)
+                new = new if new and len(new) <= PATH_MAX else None
                 news, fork, stay = [new], maybe, here
                 stay_weak = _here_weak(assigned)  # the world the `cd` leaves in place
                 operand = _cd_operand(lead)
@@ -826,9 +843,9 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
                     path = os.path.normpath(os.path.join(here, reading[0]))
                     fork, weak_here = True, True
                     if path == here:  # `cd "${OUT}."`: it stays, weakly, or moves
-                        news, stay, stay_weak = [None], here, stay_weak or not maybe
+                        news, stay_weak = [None], stay_weak or not maybe
                     elif maybe:
-                        news, stay = [path, None], here
+                        news = [path, None]
                     else:
                         news, stay = [path], None
                 if looped and new and here and _above(new, here):
@@ -855,8 +872,7 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
                 return hit
         worlds.extend(forked)
         if ctx["work"] > MAX_WORK and len(worlds) > 1:
-            heres, assigns = worlds[0]
-            worlds = [({k: None for k in heres}, assigns)]
+            worlds = _merged(worlds)
     return None
 
 

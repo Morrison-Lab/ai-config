@@ -614,6 +614,15 @@ for given, want in (
 check("native_path leaves /c/... alone off Windows",
       shellcmd.native_path("/c/Users/x", False), "/c/Users/x")
 
+# A `#` inside a word starts no comment; one after a blank does.
+for given, want in (
+    ("echo x#y; chmod -R u+w /etc", [["echo", "x#y"], ["chmod", "-R", "u+w", "/etc"]]),
+    ("sed -i s#a#b#g f && ls", [["sed", "-i", "s#a#b#g", "f"], ["ls"]]),
+    ("echo $# ${#A}; ls", [["echo", "$#", "${#A}"], ["ls"]]),
+    ("echo x # cd /etc\nls", [["echo", "x"], ["ls"]]),
+):
+    check(f"simple_commands({given!r})", shellcmd.simple_commands(given), want)
+
 if failures:
     print("FAILED:")
     for line in failures:

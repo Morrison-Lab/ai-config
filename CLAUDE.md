@@ -341,7 +341,7 @@ Covers marketplace verification, permission review, avoiding redundant submodule
 
 Before branching, editing, or opening a PR for new work, search the tracker across all states (`gh issue list --state all --search`, `glab issue list --all --search`) and file an issue if none covers the task;
 surface a closed match and confirm rather than redoing the work.
-Label every agent-filed issue `ai-authored` and `model:<model-id>` in the creating command.
+Label every agent-filed issue `ai-authored`, `model:<model-id>` and one of `P1`, `P2` or `P3` in the creating command.
 The `st` (Start Task) skill operationalizes this; `gi` (Grab Issue) is the path when the issue already exists.
 
 Its last section is the mirror, and it covers requests that arrive rather than work you go looking for: a request the user makes mid-flight may be deferred on your own judgment when it would grow the change past what it set out to do, provided the deferred item is filed as an issue in the same reply and the reply says what was deferred and why.

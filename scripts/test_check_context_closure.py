@@ -1481,8 +1481,7 @@ with tempfile.TemporaryDirectory() as tmp:
 with tempfile.TemporaryDirectory() as tmp:
     base = Path(tmp)
 
-    def git(*a, cwd=None):
-        return git_in(cwd or base, *a)
+    git = lambda *a, cwd=None: git_in(cwd or base, *a)  # noqa: E731
 
     sub = base / "subsrc"
     sub.mkdir()
@@ -1541,12 +1540,13 @@ with tempfile.TemporaryDirectory() as tmp:
     git("update-index", "--cacheinfo", f"160000,{pin},.ai-config", cwd=repo)
     git("commit", "-qm", "pin it", cwd=repo)
     git("checkout", "-qb", "link", "main", cwd=repo)
-    (repo / "GEMINI.md").write_text("g" * 200, encoding="utf-8")
+    (base / "big.md").write_text("g" * 200, encoding="utf-8")  # outside the repo
+    (repo / "GEMINI.md").symlink_to("../big.md")  # so AGENTS.md -> GEMINI.md -> ../big.md
     (repo / "AGENTS.md").symlink_to("GEMINI.md")
     git("add", "AGENTS.md", "GEMINI.md", cwd=repo)
     git("commit", "-qm", "link", cwd=repo)
     git("checkout", "-q", "branch", cwd=repo)
-    check("--merge-result: a symlinked AGENTS.md is sized by its target",
+    check("--merge-result: a symlink chain out of the repo is sized by its target",
           ccc.main(loose + ["--agents-md-cap", "100", "--merge-result", "link"]) == 1)
     for name, ref in [("a non-UTF-8 root", "bad-root"), ("an unfetched submodule pin", "bad-pin")]:
         check(

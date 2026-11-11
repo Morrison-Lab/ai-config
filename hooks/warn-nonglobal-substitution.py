@@ -71,46 +71,29 @@ Fails OPEN on any parse trouble, same as every guard here.
 import json
 import os
 import re
-import shlex
 import sys
 
-RX_HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1.*?\n[ \t]*\2\b", re.S)
 
 ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 LEAD_WORDS = {"then", "do", "else", "!", "time", "sudo", "command", "exec",
               "nohup", "env"}
 
-_SHELL_OPS = set("();|&")
 
 
-def _simple_commands(cmd):
-    """Split a shell command into simple-command argv lists; None on error.
+try:
+    _LIB = os.path.join(os.path.dirname(os.path.dirname(
+        os.path.realpath(__file__))), "scripts", "lib")
+    if _LIB not in sys.path:
+        sys.path.insert(0, _LIB)
+    from shellcmd import simple_commands as _simple_commands
+except Exception as _exc:  # broken install: degrade, never block
+    print(f"warn-nonglobal-substitution: cannot load "
+          f"scripts/lib/shellcmd.py ({_exc}); "
+          "no command will be checked", file=sys.stderr)
 
-    Same construction as `flag-reset-hard-uncommitted-work.py`'s
-    `_simple_commands` (itself following `no-unreviewed-pr.py`'s pattern):
-    join `\\`-continued lines, blank heredoc bodies, turn unquoted newlines
-    into `;`, then let `shlex` (punctuation-aware) split and dequote.
-    """
-    cmd = re.sub(r"\\\r?\n", " ", cmd)
-    cmd = RX_HEREDOC.sub("<<", cmd)
-    cmd = cmd.replace("\n", ";")
-    try:
-        lex = shlex.shlex(cmd, posix=True, punctuation_chars=True)
-        lex.whitespace_split = True
-        toks = list(lex)
-    except ValueError:
+    def _simple_commands(_cmd):
+        """Parse nothing when the shared splitter is missing."""
         return None
-    cmds, cur = [], []
-    for t in toks:
-        if t and set(t) <= _SHELL_OPS:
-            if cur:
-                cmds.append(cur)
-                cur = []
-        else:
-            cur.append(t)
-    if cur:
-        cmds.append(cur)
-    return cmds
 
 
 # Perl's -i (in-place), bundled only among these NO-ARGUMENT flag letters, so

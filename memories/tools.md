@@ -1164,13 +1164,13 @@ Neither error leads to the other, and `ubuntu-latest` CI does not hit the panic,
   Returns exit code 0 only when fully clean.
   Must be executed synchronously in the foreground turn before declaring any ARDI loop complete or unclaiming a PR.
 
-## check-context-closure.py's byte budget is advisory; its test pins ai-config's own import count
+## check-context-closure.py's byte budget is advisory by default; its test pins ai-config's own import count
 
 - **Editing the `@`-import list in ai-config's own `CLAUDE.md` changes a number that [scripts/test_check_context_closure.py](../scripts/test_check_context_closure.py) asserts, so that edit must bump the pin and must be verified with the TEST, not the script.**
-  [scripts/check-context-closure.py](../scripts/check-context-closure.py) reports and exits 0 even while over its byte budget and even while reporting an unbalanced fence, deliberately (see its `validate.yml` step comment).
-  Its size gates (the CLI total limit, the root character cap, the fragment cap) do fail.
+  [scripts/check-context-closure.py](../scripts/check-context-closure.py) reports an unbalanced fence without ever failing on one, and exits 0 over its byte budget unless `--strict` is passed, which this repo's CI has passed since ai-config#4685.
+  Its size gates (the CLI total limit, the root character cap, the fragment cap, the `AGENTS.md` cap) fail with or without `--strict`.
   Its test file is a separate `validate` step in the same job, and that one hard-fails: it pins the exact number of anchored imports the repo's `CLAUDE.md` yields.
-  So adding one `@shared/...` line turns `validate` red with a message naming a count, and the advisory script says nothing about it either way.
+  So adding one `@shared/...` line turns `validate` red with a message naming a count, and the script itself says nothing about it either way.
   Bump the pin in the same commit, and record the bump in the annotation style the pin's own comment already uses (each past bump names the PR and the import that caused it).
   The pin is a magic number on purpose: deriving it from `CLAUDE.md` would make it agree with whatever the file says and stop guarding anything.
 - **This is the exact-count instance of the general rule in [ardi](../shared/workflow/ardi.md), "Running a script is not running its tests, and an 'advisory' check can have a hard-gating twin".**

@@ -30,6 +30,7 @@ In every session --- at session start, and again periodically during long sessio
    They install this repo as a native plugin, which auto-updates at session start (see README's *Verify the install*),
    so the freshness question moves from a symlinked copy to the pinned snapshot the plugin serves.
    That is a claim about what is **served**, and not about what is **left over**.
+   [`docs/delivery-paths.md`](../../docs/delivery-paths.md) lists the supported path for each harness and the leftover paths to look for.
 
    **The auto-update claim is narrower than it reads: it is a claim about the update *mechanism*, and says nothing about whether this session's already-cached snapshot is current.**
    `installed_plugins.json`'s `lastUpdated` field records when the pin was last written, not how far behind the pin currently sits, so confirming the plugin is enabled and not doubled tells you nothing about whether the cached snapshot it points at is stale.

@@ -2906,11 +2906,13 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
 
     The map is keyed by commit, so a verdict for another branch or another
     repository no longer erases this one's. A later `needs_work` naming the
-    same commit still vetoes. A fingerprint that does not resolve here
-    belongs to another repository and is skipped; when nothing covers the
-    push, the caller's latest-verdict checks run as before, and keep their
-    fabricated-fingerprint refusal. Any doubt (a timeout, an unknown
-    payload, a ref deletion) returns "" and leaves the decision to them.
+    same commit still vetoes, and so does a later `needs_work` naming no
+    commit that resolves here: a foreign fingerprint cannot be told from a
+    fabricated one, so a blocking verdict that binds to nothing here binds
+    to everything before it. A clean report binding to nothing here adds no
+    evidence either way and is skipped. When nothing covers the push, the
+    caller's latest-verdict checks run as before, with their messages. Any
+    doubt (a timeout, an unknown payload, a ref deletion) returns "".
     """
     if len(history) < 2:
         return ""  # one verdict: the latest-verdict path is the whole answer
@@ -2921,12 +2923,16 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
         latest: dict[str, str] = {}
         resolved_cache: dict[str, str | None] = {}
         for found, shas in history:
+            bound = False
             for sha in shas:
                 if sha not in resolved_cache:
                     resolved_cache[sha] = _rev_parse(
                         directory, env, f"{sha}^{{commit}}")
                 if resolved_cache[sha]:
                     latest[resolved_cache[sha]] = found
+                    bound = True
+            if found != "clean" and not bound:
+                latest.clear()  # an unbound blocking verdict vetoes all before it
     except TimeoutError:
         return ""
     if all(latest.get(c) == "clean" for c in commits):

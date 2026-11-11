@@ -2423,8 +2423,16 @@ def verdict_map_cases() -> tuple[int, int]:
           PUSH, verdicts((clean, HEAD), (nmw, HEAD)), True)
     check("a later clean verdict for the same commit clears it",
           PUSH, verdicts((nmw, HEAD), (clean, HEAD)), False)
-    check("a later verdict naming another repository's commit is skipped",
+    check("a later clean verdict naming another repository's commit is skipped",
           PUSH, verdicts((clean, HEAD), (clean, OTHER_HEAD)), False)
+    check("a later blocking verdict naming no commit here vetoes",
+          PUSH, verdicts((clean, HEAD), (nmw, OTHER_HEAD)), True)
+    nmw_bare = reviewed(body(verdict=nmw, fingerprint=False))
+    check("a later blocking verdict with no fingerprint vetoes",
+          PUSH, verdicts((clean, HEAD), (clean, FEATURE)) + nmw_bare, True)
+    check("a clean verdict after the unbound blocker clears its commit",
+          PUSH, verdicts((clean, FEATURE)) + nmw_bare
+          + verdicts((clean, HEAD), (clean, FEATURE)), False)
     check("no verdict naming the shipped commit still refuses",
           PUSH, verdicts((clean, FEATURE), (clean, OTHER_HEAD)), True)
     check("a later unparsed report still fails closed",

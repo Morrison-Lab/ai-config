@@ -280,7 +280,7 @@ def _probed_names(rest):
     if any("<" in a or ">" in a for a in args):
         return []
     if os.path.basename(rest[0]) == "command":
-        if not args or args[0] not in ("-v", "-V"):
+        if not args or args[0] != "-v":  # `-V` prints "name is aliased to"
             return []
         args = args[1:]
     return [] if any(a.startswith("-") for a in args) else args  # `which -s` prints nothing

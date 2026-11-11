@@ -50,9 +50,10 @@ So is one that uses a parameter this cannot know: a positional parameter
 `sh -c '...' /etc` sets), `$_`, `$OLDPWD` (and `~-`), or a name set by `read`,
 `mapfile`, `readarray`, `getopts` or `printf -v`. `$!` is read like an
 unset variable, and `$$`, `$#`, `$?` and `$-` as some value that is not
-empty. A command substitution (`$(...)`, a backtick pair, `<(...)` or `>(...)`)
-outside single quotes, heredoc bodies and comments is lifted out before the
-command is split, scanned as a command of its own, and taken as empty,
+empty. A command substitution (`$(...)` or a backtick pair) or a process
+substitution (`<(...)` or `>(...)`) outside single quotes, heredoc bodies
+and comments is lifted out before the command is split, scanned as a
+command of its own, and taken as empty,
 except a bare `pwd`, read as `$PWD`. A `sh -c` text or a substitution is
 read where it appears, in the directory and with the names of each way the
 command may run up to there (a `sh -c` text also with the `NAME=value`
@@ -247,7 +248,8 @@ UNREAD = ("/", False)
 UNREAD_WHY = ("whose value this guard does not read, here or in an earlier assignment: "
               "a `${...}` operator other than a `-`/`=` default or a `?` check, defaults "
               f"nested deeper than {MAX_NESTING}, a positional parameter, `$_`, `$OLDPWD`, "
-              "or a name set by `read`, `getopts` or `printf -v`; write the path out")
+              "or a name set by `read`, `mapfile`, `readarray`, `getopts` or `printf -v`; "
+              "write the path out")
 # Words that open and close a compound command, for `_scan`'s BLOCKS.
 BLOCK_OPEN = {"if", "while", "until", "for", "select", "case"}
 BLOCK_CLOSE = {"fi", "done", "esac"}
@@ -435,7 +437,8 @@ def _takes_next_word(wrapper, tok, following):
 
 def _program(argv):
     """`(argv from the program on, override present)`, peeling wrappers,
-    with the program chown, chmod or chgrp; `[]` for any other program."""
+    with the program chown, chmod or chgrp; an empty argv for any other
+    program."""
     start, override = _peeled(argv)
     if start is None or os.path.basename(argv[start]) not in PROGRAMS:
         return [], override

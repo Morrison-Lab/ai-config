@@ -63,7 +63,8 @@ class Denies(unittest.TestCase):
         self.assert_denied("chgrp -R staff /var/lib/dpkg")
 
     def test_home_and_its_parent(self):
-        for target in ("~", "~/", "$HOME", "${HOME}/", HOME, "/home/tester/*"):
+        for target in ("~", "~/", "$HOME", "${HOME}/", HOME, "/home/tester/*",
+                       "/home", "~/..", "$HOME/.."):
             self.assert_denied(f"chmod -R go-rwx {target}")
 
     def test_relative_paths_resolve(self):
@@ -417,7 +418,7 @@ class Denies(unittest.TestCase):
     def test_a_shell_resets_a_prefix_pwd(self):
         self.assert_denied("cd / && PWD=/tmp/x bash -c 'chmod -R u+w \"$PWD\"'")
 
-    def test_the_nginx_web_root(self):
+    def test_the_trees_around_the_nginx_web_root(self):
         for cmd in ("sudo chown -R www-data /usr/share",
                     "sudo chown -R www-data /usr/share/nginx",
                     "chown -R www-data /usr/share/nginx/modules-available"):

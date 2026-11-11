@@ -290,7 +290,7 @@ def _absent(name, text):
     """True when probe output *text* printed no path or name for *name*."""
     lines = [ln.strip() for ln in (text or "").splitlines()]
     return not any(ln == name or ln.endswith("/" + name)
-                   or ln.startswith("alias " + name + "=") for ln in lines)
+                   or ln.startswith(("alias " + name + "=", name + ":", name + " (")) for ln in lines)  # zsh: `name: aliased`
 
 
 def _shell_events(sib, command, clis):

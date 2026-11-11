@@ -379,10 +379,11 @@ def main():
     check("warns when the probe pass skipped the opencode attempt",
           run(MERGE, probe_all[:1] + [probe("command -v opencode")])[0])
     check("warns when a probe found the CLI installed", run(MERGE, [probe(
-        "command -v " + clis4, "/usr/local/bin/codex")] + oc)[0] and run(
-        MERGE, [probe("command -v " + clis4, "alias codex='npx codex'")] + oc)[0])
+        "command -v " + clis4, "Exit code 1\n/usr/local/bin/codex")] + oc)[0] and run(
+        MERGE, [probe("command -v " + clis4, "Exit code 1\nalias codex='npx codex'")] + oc)[0]
+          and all(run(MERGE, [probe("which " + clis4, o)] + oc)[0] for o in ("Exit code 1\ncodex: aliased to npx", "Exit code 1\ncodex () {", "Exit code 1\ncodex")))
     check("warns when which reports a CLI under a path", run(MERGE, [
-        probe("which codex agy", "/usr/bin/codex"),
+        probe("which codex agy", "Exit code 1\n/usr/bin/codex"),
         probe("command -v agy gemini cursor-agent")] + oc)[0])
     check("warns when the probe was refused and never ran", run(MERGE, [probe(
         "command -v %s; gh pr merge 1" % clis4, "PreToolUse:Bash hook error: x")] + oc)[0] and run(

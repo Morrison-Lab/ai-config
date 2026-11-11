@@ -23,7 +23,8 @@ Related: [`issue-first`](issue-first.md), [`stack-prs`](../../skills/stack-prs/S
 
 Ezra, 2026-11-11 (`cai:`, ai-config#5299): "when you create a branch to address an issue, link that issue to that branch using the Development field ... also link the PR once it's created, but link the branch immediately."
 
-- **Do:** create the branch through GitHub, already linked, before the first commit lands on it: `gh issue develop <n> --repo <owner>/<repo> --name <branch> --base main`, or the GraphQL mutation `createLinkedBranch` (`issueId`, `oid`, `name`).
+- **Do:** create the branch through GitHub, already linked, before the first commit lands on it: `gh issue develop <n> --repo <owner>/<repo> --name <branch> --base main`, or the GraphQL mutation `createLinkedBranch(input: {issueId, oid, name, repositoryId})`.
+  `repositoryId` is optional and defaults to the issue's repository.
   Then fetch the branch and push your commits onto it.
 - **Do:** link the PR once it exists, with a closing keyword (`Closes #N`) in its body.
   A PR that must not close the issue can be linked only by hand in the issue's Development field;
@@ -34,9 +35,11 @@ Ezra, 2026-11-11 (`cai:`, ai-config#5299): "when you create a branch to address 
   (tested 2026-11-11, and [community discussion #155339](https://github.com/orgs/community/discussions/155339)).
 
 A branch already pushed unlinked and with no PR yet: read its head SHA, delete the remote branch, and recreate it at once with `createLinkedBranch` at that SHA, so no commit is lost.
+The branch is briefly absent between the two calls, so do this only when no other session pushes to it.
 Leave a branch that already has a PR alone and link the PR instead.
 
-Cloud sessions get HTTP 403 on every GraphQL call, so they can do neither step themselves.
+Cloud sessions get HTTP 403 on every GraphQL call, so they cannot create a linked branch themselves;
+`Closes #N` in a PR body still works there.
 Hand the branch creation (issue, repository, branch name, base or SHA) to a local runner, a Remote Control session on Ezra's machine, before the first push, and push onto the branch once it exists.
 If no local runner is reachable, say in the thread that the branch is unlinked and why, rather than skipping the step silently.
 

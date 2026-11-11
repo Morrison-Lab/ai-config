@@ -321,6 +321,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/cursor-cloud-instructions.md` | This repo has no compiled app or long-running service. The "product" is three things: a Quarto documentation website, a suite of Python validators/tests unde... |  |
 | `shared/workflow/default-to-action-grants.md` | Detail for `AGENTS.md`'s "Default to action without asking", moved here to keep `AGENTS.md` under Codex's byte cap. |  |
 | `shared/workflow/derive-dont-enumerate.md` | A brief that enumerates work items is a snapshot. Before dispatching work scoped to a list --- PR numbers, issue numbers, files, hosts --- ask whether that s... |  |
+| `shared/workflow/destructive-actions-catalog.md` | Ezra, 2026-11-11, after a session nearly deleted `lds` branches it had misread from a shallow clone: "search online for common failure patterns and build gua... |  |
 | `shared/workflow/disclose-agent-authorship.md` | Every comment an agent posts to a forge --- GitHub, GitLab, or any other --- says, in the body, that an agent posted it. |  |
 | `shared/workflow/dont-get-sidetracked.md` | Ezra (d-morrison), 2026-10-13 (ai-config#4488): when you have a primary task, don't get sidetracked, including by the user's input; if a tangential or irrele... |  |
 | `shared/workflow/efficient-pr-babysitting.md` | When babysitting a PR (subscribed to its activity, driving ARDI, watching CI), default to the cheapest tool call and the smallest push that actually answers... |  |

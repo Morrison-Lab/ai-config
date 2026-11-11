@@ -4,7 +4,8 @@
 The guard asks for two things on a create: the `ai-authored` label and one of
 the priority labels `P1`, `P2`, `P3`. The FIRES lists hold creates missing the
 authorship label, the ONE_MISSING lists pin that each label is asked for
-separately, and the QUIET lists hold creates carrying both.
+separately, and the QUIET lists hold creates carrying both, and commands that
+are not creates.
 
 The NEGATIVE cases carry the weight, in both directions. A guard that fired on
 prose quoting `gh issue create` would go off in every reply that cites the rule
@@ -40,6 +41,10 @@ BASH_FIRES = [
     ("after &&", 'git status && gh issue create --title "t" --body "b"'),
     ("after a newline", 'set -e\ngh issue create --title "t" --body "b"'),
     ("env-assignment prefix", 'GH_TOKEN=x gh issue create --title "t"'),
+    ("unlabelled inside a double-quoted command substitution",
+     'echo "$(gh issue create -t x)"'),
+    ("the labels belong to an echo that only names the command",
+     'echo gh issue create -l ai-authored,P2; gh issue create --title "t"'),
     (
         "body-file behind a heredoc, unlabelled",
         "gh issue create --title 't' --body-file - <<'EOF'\nsome body\nEOF",
@@ -134,6 +139,14 @@ BASH_QUIET = [
     ("unbalanced quoting with a glued short flag",
      'gh issue create -lai-authored -lP2 --title "t'),
     ("a glued short flag", 'gh issue create --title "t" -lai-authored -lP2'),
+    ("labelled, after an empty quoted body",
+     'gh issue create --title "t" --body "" --label ai-authored --label P2'),
+    ("labelled, behind an environment assignment",
+     'GH_TOKEN=x gh issue create --title "t" -l ai-authored -l P2'),
+    ("labelled inside a double-quoted command substitution, read by the fallback",
+     'echo "$(gh issue create -t x -l ai-authored,P2)"'),
+    ("labelled, with the label flags before a quoted operator title",
+     'gh issue create -l ai-authored,P2 --title ";"'),
     ("unbalanced quoting with a comma-and-space value",
      'gh issue create --label "ai-authored, P2" --title "t'),
     ("unbalanced quoting with a single-quoted value",

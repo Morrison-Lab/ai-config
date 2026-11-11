@@ -2572,6 +2572,7 @@ def _unparsed_report_shas(text: str) -> list[str] | None:
 
 def read_latest_review_with_unparsed(
     transcript_path: str, _known_task_ids: frozenset[str] | None = None,
+    history: list[tuple[str, list[str]]] | None = None,
 ) -> tuple[str | None, list[str], bool, bool, list[str]]:
     """Return `(verdict, reviewed_commits, saw_reviewer_call,
     saw_unparsed_later, unparsed_later_shas)` from the transcript.
@@ -2601,6 +2602,9 @@ def read_latest_review_with_unparsed(
     hand-back delivery, where the dispatch's own result carries no report at
     all, only a pointer to a sibling subagent transcript (ai-config#3945,
     `_handback_report_text`).
+
+    `history`, when given, receives every admitted `(verdict, shas)` in
+    transcript order, so a caller can key verdicts by commit (ai-config#4006).
     """
     reviewer_call_ids: set[str] = set()
     reviewer_task_ids: set[str] = set()
@@ -2619,6 +2623,8 @@ def read_latest_review_with_unparsed(
         found, shas = parse_report_all(text)
         if found:
             verdict, reviewed_commits = found, shas
+            if history is not None:
+                history.append((found, shas))
             saw_unparsed_later = False
             unparsed_later_shas = []
             return True
@@ -2850,7 +2856,10 @@ def read_latest_review_with_unparsed(
                             saw_reviewer_call = True
 
     if unresolved_handback:
-        return read_latest_review_with_unparsed(transcript_path, frozenset(reviewer_task_ids))
+        if history is not None:
+            history.clear()  # the second pass re-reads every verdict
+        return read_latest_review_with_unparsed(
+            transcript_path, frozenset(reviewer_task_ids), history)
     return verdict, reviewed_commits, saw_reviewer_call, saw_unparsed_later, unparsed_later_shas
 
 
@@ -2889,6 +2898,43 @@ def _opencode_transcript_fallback(session_id) -> str:
     return os.path.join(base, "transcripts", f"{raw}.jsonl")
 
 
+def _verdict_map_covers(history: list[tuple[str, list[str]]],
+                        directory: str | None, argv: list[str],
+                        env: list[str]) -> str:
+    """A pass reason when every commit this push ships has a clean verdict
+    as the LATEST verdict naming it, else "" (ai-config#4006, #4237).
+
+    The map is keyed by commit, so a verdict for another branch or another
+    repository no longer erases this one's. A later `needs_work` naming the
+    same commit still vetoes. A fingerprint that does not resolve here
+    belongs to another repository and is skipped; when nothing covers the
+    push, the caller's latest-verdict checks run as before, and keep their
+    fabricated-fingerprint refusal. Any doubt (a timeout, an unknown
+    payload, a ref deletion) returns "" and leaves the decision to them.
+    """
+    if len(history) < 2:
+        return ""  # one verdict: the latest-verdict path is the whole answer
+    try:
+        commits, _why = shipped_commits(directory, argv, env)
+        if not commits:
+            return ""
+        latest: dict[str, str] = {}
+        resolved_cache: dict[str, str | None] = {}
+        for found, shas in history:
+            for sha in shas:
+                if sha not in resolved_cache:
+                    resolved_cache[sha] = _rev_parse(
+                        directory, env, f"{sha}^{{commit}}")
+                if resolved_cache[sha]:
+                    latest[resolved_cache[sha]] = found
+    except TimeoutError:
+        return ""
+    if all(latest.get(c) == "clean" for c in commits):
+        return ("Clean adversarial self-review verified at "
+                f"{', '.join(sorted(commits))} (latest verdict naming each).")
+    return ""
+
+
 def verify_review(transcript_path: str, directory: str | None,
                   argv: list[str], env: list[str]) -> tuple[bool, str]:
     """(is_clean, reason) -- is there a clean verdict for what this push ships?"""
@@ -2897,6 +2943,7 @@ def verify_review(transcript_path: str, directory: str | None,
     reviewed_commits: list[str] = []
     saw_unparsed_later = False
     unparsed_later_shas: list[str] = []
+    history: list[tuple[str, list[str]]] = []
 
     # `transcript_path and` stays here, unlike the two conjuncts removed below,
     # and the difference is not cosmetic. Those two restated a fact a preceding
@@ -2924,7 +2971,7 @@ def verify_review(transcript_path: str, directory: str | None,
                 saw_reviewer_call,
                 saw_unparsed_later,
                 unparsed_later_shas,
-            ) = read_latest_review_with_unparsed(transcript_path)
+            ) = read_latest_review_with_unparsed(transcript_path, None, history)
         except Exception as e:
             return False, f"Failed reading transcript: {e}"
 
@@ -2985,6 +3032,11 @@ def verify_review(transcript_path: str, directory: str | None,
             "returns as the tool result -- a background dispatch returns an agent id, "
             f"which carries no verdict, and an errored result carries none either.{unparsed_hint}"
         )
+
+    if not saw_unparsed_later:
+        mapped = _verdict_map_covers(history, directory, argv, env)
+        if mapped:
+            return True, mapped
 
     if verdict == "needs_work":
         return False, (

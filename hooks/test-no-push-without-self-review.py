@@ -2387,6 +2387,52 @@ def fingerprint_resolution_cases() -> tuple[int, int]:
     return failures, ran
 
 
+def verdict_map_cases() -> tuple[int, int]:
+    """Verdicts are keyed by commit, not one slot (ai-config#4006, #4237)."""
+    failures = 0
+    ran = 0
+    push_feature = f"git -C {REPO} push origin feature"
+
+    def verdicts(*pairs):
+        events = []
+        for verdict, commit in pairs:
+            events += reviewed(body(verdict=verdict, commit=commit))
+        return events
+
+    def check(label, cmd, events, want_block):
+        nonlocal failures, ran
+        ran += 1
+        rc, out = run_hook(cmd, events)
+        spec = out.get("hookSpecificOutput") or {}
+        blocked = spec.get("permissionDecision") == "deny"
+        if rc == 0 and blocked == want_block:
+            print(f"PASS: {label}")
+        else:
+            print(f"FAIL: {label} - {spec.get('permissionDecisionReason', '')[:160]}")
+            failures += 1
+
+    clean, nmw = "Ready for merge", "Needs more work"
+    both = verdicts((clean, HEAD), (clean, FEATURE))
+    check("branch A's clean verdict survives a later review of branch B",
+          PUSH, both, False)
+    check("branch B's own clean verdict still authorizes B",
+          push_feature, both, False)
+    check("a later blocking verdict for another commit does not veto this one",
+          PUSH, verdicts((clean, HEAD), (nmw, FEATURE)), False)
+    check("a later blocking verdict for the same commit vetoes it",
+          PUSH, verdicts((clean, HEAD), (nmw, HEAD)), True)
+    check("a later clean verdict for the same commit clears it",
+          PUSH, verdicts((nmw, HEAD), (clean, HEAD)), False)
+    check("a later verdict naming another repository's commit is skipped",
+          PUSH, verdicts((clean, HEAD), (clean, OTHER_HEAD)), False)
+    check("no verdict naming the shipped commit still refuses",
+          PUSH, verdicts((clean, FEATURE), (clean, OTHER_HEAD)), True)
+    check("a later unparsed report still fails closed",
+          PUSH, verdicts((clean, HEAD), (clean, FEATURE), ("Looks fine", FEATURE)),
+          True)
+    return failures, ran
+
+
 def fingerprint_guidance_cases() -> tuple[int, int]:
     """The refusal that asks for a fingerprint must not contradict the settled
     tail contract (ai-config#3050).
@@ -4455,7 +4501,7 @@ def main():
                    structured_payload_cases, transcript_scoping_cases,
                    cd_tracking_cases, fallback_cases,
                    fingerprint_guidance_cases, fingerprint_resolution_cases,
-                   omo_cases, handback_cases, subagent_push_cases,
+                   verdict_map_cases, omo_cases, handback_cases, subagent_push_cases,
                    codex_cases, external_reviewer_cases,
                    symlinked_plugin_root_cases, exempt_repo_cases,
                    alias_cases, deny_resilience_cases):

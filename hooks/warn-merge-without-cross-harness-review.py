@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""PreToolUse deny: a merge with no cross-harness reviewer run since the last push.
-
-The file keeps its `warn-` name so existing references resolve; it has denied
-since ai-config#5290 (see "Why it denies" below).
+"""PreToolUse deny (named `warn-` for its references): a merge with no cross-harness review since the last push.
 
 ## The failure this exists for
 
@@ -34,13 +31,9 @@ before the gap was noticed.
              (the cloud-session route when `opencode` qualifies per AGENTS.md policy),
              or a `curl` call with a data payload to `https://api.ollama.com/api/chat`
              (the Ollama Cloud route, ai-config#4849)
-    AND NOT  every route was probed after the last push (the waiver in
-             `adversarial-self-review.md`): each CLI in CROSS_HARNESS_CLIS,
-             minus this session's own harness, was invoked as a reviewer with
-             any result, error included, or a `command -v` / `which` probe
-             naming it printed no path for it. `opencode` needs an attempt
-             (its CLI or the OpenCode Go `curl`), never only a presence
-             probe, because its HTTP route needs no CLI.
+    AND NOT  the waiver's probe pass ran after the last push: each CLI in
+             `clis` attempted with any result, or shown absent by an errored
+             `command -v` / `which`; `opencode` attempted, never only probed.
 
 A skill (`dtc`, `dto`, `adv`) is not credited by being loaded: loading one
 runs nothing. Its reviewer CLI call, which is a Bash call, is what counts.
@@ -57,13 +50,9 @@ nothing about who reviewed.
 
 ## Why it denies
 
-It warned until 2026-11-11, and the warning arrived too late: a PreToolUse
-note rides on the merge call itself, so the agent read it only with the merge
-result (ai-config#4587; ai-config#5289 was merged before its cross-harness
-probe ran, ai-config#5290). Both discharges are visible tool calls, so a deny
-is decidable. A reviewer that is installed but down is discharged by its
-failed attempt, and one that is absent by a presence probe, so a deny costs
-at most the one probe pass the waiver asks for anyway.
+As a warning its note rode on the merge call and was read only with the
+merge result (ai-config#4587, ai-config#5290). Both discharges are visible
+tool calls, so a deny is decidable and costs at most the waiver's probe pass.
 
 ## What it cannot see
 
@@ -130,6 +119,7 @@ HTTP_ROUTES = (
 )
 # Presence probes, and the routes a presence probe alone cannot clear.
 PROBE_WORDS = frozenset({"which", "command"})
+NEEDS_ATTEMPT = frozenset({"opencode"})
 # curl options whose next word is a value, never the request URL.
 CURL_VALUE_OPTS = frozenset({
     "-d", "-F", "-sd", "-sF", "--data", "--data-binary", "--data-raw",
@@ -138,7 +128,6 @@ CURL_VALUE_OPTS = frozenset({
 })
 # The probe word itself was missing (`which` not installed): no evidence.
 RX_PROBE_MISSING = re.compile(r"\b(?:which|command)\b[^\n]*(?:not found|No such file)")
-NEEDS_ATTEMPT = frozenset({"opencode"})
 RX_AGY_TRANSCRIPT_PATH = re.compile(
     r"(?:^|/)(?:\.gemini/antigravity/|brain/[^/]+/\.system_generated/logs/transcript)")
 AGY_RECORD_TYPES = frozenset({

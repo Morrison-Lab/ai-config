@@ -362,37 +362,29 @@ def main():
     check("warns as a deny, not a note riding on the merge",
           fired and hso.get("permissionDecision") == "deny"
           and "additionalContext" not in hso)
-    absent = "Exit code 1"
-    probe_all = [step("command -v codex agy gemini cursor-agent",
-                      out=absent, is_error=True),
-                 step("curl -sS https://opencode.ai/zen/go/v1/chat/completions"
-                      " -d @req.json", out="curl: (56) CONNECT 403",
-                      is_error=True)]
+    clis4 = "codex agy gemini cursor-agent"
+
+    def probe(cmd, out="Exit code 1", err=True):
+        return step(cmd, out=out, is_error=err)
+    oc = [probe("curl -sS https://opencode.ai/zen/go/v1/chat/completions"
+                " -d @req.json", out="curl: (56) CONNECT 403")]
+    probe_all = [probe("command -v " + clis4)] + oc
     check("silent after every route was probed and found unrunnable",
           not run(MERGE, probe_all)[0])
     check("warns when the probe pass skipped the opencode attempt",
-          run(MERGE, probe_all[:1] + [step("command -v opencode",
-                                           out=absent, is_error=True)])[0])
-    check("warns when a probe found the CLI installed",
-          run(MERGE, [step("command -v codex agy gemini cursor-agent",
-                           out="/usr/local/bin/codex")] + probe_all[1:])[0])
-    check("warns when which reports a CLI under a path",
-          run(MERGE, [step("which codex", out="/usr/bin/codex"),
-                      step("command -v agy gemini cursor-agent",
-                           out=absent, is_error=True)] + probe_all[1:])[0])
-    check("silent when an installed CLI was attempted and errored",
-          not run(MERGE, [step("command -v agy gemini cursor-agent",
-                               out=absent, is_error=True),
-                          step("codex exec 'review the diff'",
-                               out="backend down", is_error=True)]
-                  + probe_all[1:])[0])
-    check("warns when the probe's stdout was redirected away",
-          run(MERGE, [step("command -v codex agy gemini cursor-agent"
-                           " >/dev/null", out="", is_error=True)]
-              + probe_all[1:])[0])
-    check("warns when the probe exited 0 with empty output",
-          run(MERGE, [step("command -v codex agy gemini cursor-agent"
-                           " || true", out="")] + probe_all[1:])[0])
+          run(MERGE, probe_all[:1] + [probe("command -v opencode")])[0])
+    check("warns when a probe found the CLI installed", run(MERGE, [probe(
+        "command -v " + clis4, "/usr/local/bin/codex", False)] + oc)[0])
+    check("warns when which reports a CLI under a path", run(MERGE, [
+        probe("which codex", "/usr/bin/codex", False),
+        probe("command -v agy gemini cursor-agent")] + oc)[0])
+    check("silent when an installed CLI was attempted and errored", not run(
+        MERGE, [probe("command -v agy gemini cursor-agent"),
+                probe("codex exec 'review the diff'", "backend down")] + oc)[0])
+    check("warns when the probe's stdout was redirected away", run(
+        MERGE, [probe("command -v %s >/dev/null" % clis4, "")] + oc)[0])
+    check("warns when the probe exited 0 with empty output", run(
+        MERGE, [probe("command -v %s || true" % clis4, "", False)] + oc)[0])
     check("warns when the probe pass predates the last push",
           run(MERGE, probe_all + [step("git push origin HEAD")])[0])
     check("warns when the probe pass ran only in a sidechain",
@@ -400,7 +392,7 @@ def main():
     check("warns when a probe shares a call with a later push",
           run(MERGE, probe_all[1:] + [step(
               "command -v codex agy gemini cursor-agent; git push",
-              out=absent, is_error=True)])[0])
+              out="Exit code 1", is_error=True)])[0])
     check("silent after a curl call to Ollama Cloud's chat API",
           not run(MERGE, [step("curl -sS https://api.ollama.com/api/chat"
                                " -d @req.json")])[0])

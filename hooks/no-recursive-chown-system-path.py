@@ -91,7 +91,9 @@ a name assigned from `$PWD`, after a `cd` this cannot resolve (`cd -` or
 `cd "$(git rev-parse --show-toplevel)"`, where `$PWD` is taken as empty), a
 `cd` into a subdirectory repeated by a loop (read as run once), a command
 before a `cd` in the same loop body (judged only where the loop starts), a
-`cd` that fails or follows `&&` or `||` (read as run), an assignment that may not run
+`cd` that fails or follows `&&` or `||` (read as run), a quoted `cd "$D"`
+where an unquoted `cd $D` appears elsewhere in the same text (both read as
+going home), an assignment that may not run
 (`false && D=./x` or `if false; then : "${D:=./x}"; fi`, each read as run), a
 `${D:=x}` assignment inside `sh -c` or a substitution, an assignment in a
 pipeline element (`echo x | : "${D:=./x}"`, read as made in the shell that
@@ -815,6 +817,8 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
                     # in the first world and unknown in the second.
                     path = os.path.normpath(os.path.join(here, reading[0]))
                     news, fork, stay, weak_here = [path], True, None, True
+                    if path == here:  # `cd "${OUT}."`: it stays, weakly, or moves
+                        news, stay = [None], here
                 if looped and new and here and _above(new, here):
                     # Repeated, an up-move may reach every directory above.
                     news, fork = _ancestors(here)[::-1], True

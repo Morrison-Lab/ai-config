@@ -344,6 +344,9 @@ class Denies(unittest.TestCase):
                     "cd -eP $UNSET_D; chown -R me .", "cd -LPe $UNSET_D; chown -R me ."):
             self.assert_denied(cmd, cwd=HOME + "/proj")
 
+    def test_cd_to_an_unset_variable_then_dot_stays_weakly(self):
+        self.assert_denied('cd "${OUT}." && chown -R me .', cwd=HOME)
+
     def test_climb_from_a_directory_under_an_unset_variable(self):
         # With OUT unset, `cd "$OUT/tmp"` is `cd /tmp`, and `..` is `/`.
         for cmd in ('cd "$OUT/tmp" && chown -R me ..',
@@ -738,9 +741,8 @@ class Allows(unittest.TestCase):
         guards = "".join(f"if {c}; then cd {c}; fi; " for c in "abcd")
         words = " ".join(f"w{i}" for i in range(1000))
         text = f'sh -c "chmod -R u+w ./x {words}"'
-        start = time.monotonic()
-        self.assert_allowed(guards + "; ".join([text] * 200))
-        self.assertLess(time.monotonic() - start, 5)
+        # Once in each of the 16 directories, not once per repeat.
+        self.assertLess(self.count_calls("_scan", guards + "; ".join([text] * 200)), 40)
 
     def test_override(self):
         self.assert_allowed("ALLOW_RECURSIVE_SYSTEM_CHOWN=1 chown -R me /usr/local/share")

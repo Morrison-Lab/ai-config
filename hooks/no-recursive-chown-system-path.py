@@ -49,15 +49,19 @@ So is one that uses a parameter this cannot know: a positional parameter
 `sh -c '...' /etc` sets), `$_`, `$OLDPWD` (and `~-`), or a name set by `read`,
 `mapfile`, `readarray`, `getopts` or `printf -v`. `$!` is read like an
 unset variable, and `$$`, `$#`, `$?` and `$-` as some value that is not
-empty. A command substitution outside single quotes, heredoc bodies and
-comments is lifted out before the command is split, scanned as a command of
-its own, and taken as empty, except a bare `pwd`, read as `$PWD`. A `sh -c`
-text or a substitution is read where it appears, in the directory and with
-the names of each way the command may run up to there, to MAX_NESTED
+empty. A command substitution (`$(...)`, a backtick pair, `<(...)` or `>(...)`)
+outside single quotes, heredoc bodies and comments is lifted out before the
+command is split, scanned as a command of its own, and taken as empty,
+except a bare `pwd`, read as `$PWD`. A `sh -c` text or a substitution is
+read where it appears, in the directory and with the names of each way the
+command may run up to there (a `sh -c` text also with the `NAME=value`
+words before its shell: `sudo D=/x sh -c`), to MAX_NESTED
 levels, and deeper with no directory, to MAX_DEPTH. A `cd` up the tree
 repeated by a loop (`cd ..`) is judged in every directory above. An
 unquoted `cd $D` with D empty or unset goes home, and is judged both there
-and where it is. `cd "$OUT/tmp"` with OUT unset goes to `/tmp`: the rest is
+and where it is. `pushd` moves as `cd` does, and `popd` returns to the
+directory the last `pushd` left. `cd "$OUT/tmp"` (or `pushd`) with OUT
+unset goes to `/tmp`: the rest is
 judged there, with `.`, a relative target and `$PWD` read as values taken as
 empty, and once more with the directory unknown, for when OUT is set (a
 value taken as empty counts only where it reaches the root, a system tree
@@ -80,9 +84,12 @@ Limits, deliberately unclosed: `find ... -exec chown`, `xargs chown`, a
 function body (judged where it is defined, not where it is called), an
 array assignment (`D=(/etc)`, read as empty), `systemd-run`, `chroot`,
 `$'...'` quoting, a program named by a substitution (`"$(which chown)"`),
-a command substitution's value (read as empty, so
-`"$(npm config get prefix)/lib/node_modules"` is judged at
-`/lib/node_modules`: write the path itself, or use the escape hatch), a
+a command substitution's value (read as empty, both ways: it denies
+`"$(npm config get prefix)/lib/node_modules"`, judged at
+`/lib/node_modules`, where writing the path itself or the escape hatch is
+the remedy, and it passes `"$(brew --prefix)/share"`), `flock -c TEXT`, a
+named `coproc NAME { ...; }`, more than MAX_SCOPE `pushd`s in one command
+(`popd` then goes somewhere unknown), a
 `for` or `select` loop variable, `eval`, `su -c`, a heredoc piped to `sh`, an
 interpreter's own `-c` (`python -c "os.system(...)"`), a substitution in an
 unquoted heredoc body (`<<EOF`, which bash does run), a glob in a directory
@@ -152,7 +159,7 @@ WRAPPER_VALUE_OPTIONS = {"sudo": set("acugpCUrtTDR"), "doas": set("auC"),
                          "env": set("auCSPLU"),
                          "timeout": set("sk"), "nice": {"n"}, "ionice": set("cnp"),
                          "stdbuf": set("ioe"), "pkexec": {"u"}, "time": {"f", "o"},
-                         "exec": {"a"}, "run0": set("uDgS"), "flock": set("wE")}
+                         "exec": {"a"}, "run0": set("uDg"), "flock": set("wE")}
 # Each wrapper's long options, as (those taking the next word, flags).
 # getopt_long takes an exact name first, then a unique prefix (`--us` is
 # `--user`), so a flag such as sudo's `--login`, a prefix of `--login-class`,
@@ -183,6 +190,15 @@ WRAPPER_LONG = {
     "pkexec": ({"--user"}, {"--disable-internal-agent", "--help", "--keep-cwd", "--version"}),
     "time": ({"--format", "--output"},
              {"--append", "--help", "--portability", "--quiet", "--verbose", "--version"}),
+    # Sources: flock(1) of util-linux, run0(1) of systemd.
+    "flock": ({"--wait", "--timeout", "--conflict-exit-code", "--command"},
+              {"--shared", "--exclusive", "--unlock", "--nonblock", "--nb", "--no-fork",
+               "--close", "--verbose", "--help", "--version"}),
+    "run0": ({"--user", "--group", "--nice", "--chdir", "--setenv", "--unit", "--property",
+              "--description", "--slice", "--background", "--machine",
+              "--shell-prompt-prefix"},
+             {"--slice-inherit", "--no-ask-password", "--pty", "--pipe", "--help",
+              "--version"}),
 }
 # Options with an optional value (sudo's `h::`). Attached (`-hhost`), the rest
 # of the word is the value. Alone as `-h`, sudo takes the next word as the
@@ -215,7 +231,7 @@ TOP_LEVEL = {"bin", "boot", "dev", "etc", "home", "lib", "lib32", "lib64", "libx
              "Volumes", "cores", "private"}
 SYSTEM_TREES = ("/usr", "/etc", "/bin", "/sbin", "/lib", "/lib32", "/lib64",
                 "/libx32", "/boot", "/var/lib", "/var/log", "/var/spool",
-                "/System", "/Library", "/private/etc", "/private/var/db", "/var/db")
+                "/System", "/Library", "/var/db")
 USR_LOCAL_CORE = {"bin", "sbin", "etc", "lib", "libexec", "include", "share"}
 APP_TREES = ("/var/lib", "/var/log", "/var/spool")
 VAR_CORE = {"dpkg", "apt", "rpm", "dnf", "yum", "pacman", "systemd", "sudo",
@@ -246,6 +262,9 @@ PWD_SUB = "__AICFG_PWDSUB__"
 # Kept with a scope's names under a key no `$NAME` can reach: whether its
 # directory is weak (see `_here_weak`).
 WEAK_PWD = "weak PWD"
+# Where `pushd` left the shell, innermost last, as `(directory, weak)`; under
+# a key no `$NAME` can reach. `None` once this cannot follow it.
+DIR_STACK = "dir stack"
 # How many ways a command may run (see `_scan`) are judged one by one.
 MAX_WORLDS = 16
 # How deep `sh -c` texts and substitutions inside one another are read in
@@ -635,6 +654,8 @@ def _why(path, home, weak):
     """
     if path == "/":
         return "the filesystem root"
+    # On macOS `/etc`, `/tmp` and `/var` are links into `/private`.
+    path = re.sub(r"\A/private(?=/(?:etc|tmp|var)(?:/|\Z))", "", path)
     parts = path.split("/")
     if path.startswith("/usr/local/") and (len(parts) > 4 or parts[3] not in USR_LOCAL_CORE):
         return None
@@ -728,7 +749,8 @@ def _bare_cd_operands(piece):
 
 
 def _nested(words):
-    """The `sh -c` texts WORDS starts, in order (`sudo sh -c '...'` too)."""
+    """The `sh -c` texts WORDS starts, in order (`sudo sh -c '...'` too),
+    then a copy of each with `\\$` and `\\`` unescaped."""
     try:
         texts = shell_c_expansions(shlex.join(words), max_depth=1)[1:]
     except Exception:  # a text this cannot rebuild starts nothing it can read
@@ -806,7 +828,8 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
             lead = lead[1:]
         is_cd = bool(lead) and lead[0] in ("cd", "pushd", "popd")
         count = sum(w.count(SUB) for w in argv)
-        texts = (inner[taken:taken + count] if aligned else []) + _nested(words)
+        shell_texts = _nested(words)
+        texts = (inner[taken:taken + count] if aligned else []) + shell_texts
         taken += count
         if not (is_cd or texts or _may_matter(words)):
             continue  # it neither moves, assigns nor runs chown, chmod or chgrp
@@ -821,10 +844,13 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
             assigned = ChainMap(store, *(assigns.get(scope[:k], {})
                                          for k in range(len(scope) - 1, 0, -1)), outer)
             ctx["work"] += len(argv)
-            for text in texts:
+            first_shell = len(texts) - len(shell_texts)
+            for k, text in enumerate(texts):
                 # Past the budget, even within one command, with no directory.
                 over = ctx["work"] > MAX_WORK
-                hit = _nested_hit(text, None if over else here, home, assigned, level, ctx)
+                names = (ChainMap(_prefix_names(words, home, assigned, here), assigned)
+                         if k >= first_shell else assigned)
+                hit = _nested_hit(text, None if over else here, home, names, level, ctx)
                 if hit:
                     return hit
             _defaults(argv, home, store, assigned, here)
@@ -842,6 +868,19 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
                 # A relative `cd` from a weak directory stays weak.
                 weak_here = stay_weak and not (
                     operand and cd_words[operand] and cd_words[operand].startswith("/"))
+                stack = assigned.get(DIR_STACK, ())
+                if lead[0] == "pushd":  # `pushd DIR` pushes where it was
+                    plain = len(lead) == 2 and not lead[1].startswith(("-", "+"))
+                    store[DIR_STACK] = (stack + ((here, stay_weak),)
+                                        if plain and stack is not None
+                                        and len(stack) < MAX_SCOPE else None)
+                elif lead[0] == "popd":  # `popd` returns there
+                    if stack and len(lead) == 1:
+                        (new, weak_here), store[DIR_STACK] = stack[-1], stack[:-1]
+                    elif stack is not None and len(lead) == 1:  # empty: it fails, stays
+                        new, weak_here = here, stay_weak
+                    else:
+                        store[DIR_STACK] = None
                 tok = lead[operand] if operand else None
                 reading = got[operand - 1] if operand else None
                 looped_name = tok and any(
@@ -897,6 +936,20 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
         if ctx["work"] > MAX_WORK and len(worlds) > 1:
             worlds = _merged(worlds)
     return None
+
+
+def _prefix_names(words, home, visible, here):
+    """The `NAME=value` words before a shell's `-c` option (`D=/x sh -c`,
+    `sudo D=/x sh -c`, `env D=/x sh -c`), as names its text starts with."""
+    names = {}
+    for word in words:
+        if word.startswith("-") and not word.startswith("--") and "c" in word:
+            break
+        if ASSIGNMENT.match(word):
+            name, _, val = word.partition("=")
+            computed = "`" in val or SUB in val
+            names[name] = None if computed else _expand(val, home, visible, here)
+    return names
 
 
 def _nested_hit(text, here, home, names, level, ctx):

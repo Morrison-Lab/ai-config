@@ -358,12 +358,36 @@ class Denies(unittest.TestCase):
         for cmd in ('sudo sh -c "chmod -R 755 \\"\\$PREFIX/\\""',
                     'sudo sh -c "chown -R me \\"\\$PREFIX\\"/etc"',
                     'sudo sh -c "cd / && chmod -R u+w \\"\\$PWD\\""',
-                    'sh -c "chmod -R u+w \\`echo /etc\\`; chmod -R u+w \\$X/"'):
+                    'sh -c "echo \\`chmod -R u+w /etc\\`"'):
             self.assert_denied(cmd)
 
     def test_process_substitution_is_read(self):
         for cmd in ("cat <(chmod -R u+w /etc)", "diff <(sudo chown -R me /usr) x",
                     "tee >(chmod -R u+w /etc) < f"):
+            self.assert_denied(cmd)
+
+    def test_names_before_a_shell_reach_its_text(self):
+        for cmd in ("sudo PREFIX=/usr bash -c 'chown -R me \"$PREFIX\"'",
+                    "env D=/etc bash -c 'chmod -R 755 $D'",
+                    "sudo -u root env D=/etc bash -c 'chmod -R 755 $D'",
+                    "D=/usr sh -c 'chown -R u $D'"):
+            self.assert_denied(cmd)
+
+    def test_popd_returns_to_the_pushed_directory(self):
+        for cmd in ("cd /usr && pushd build && make && popd && chown -R me .",
+                    "cd /etc && pushd /tmp && popd && chmod -R 755 .",
+                    "cd /etc; pushd a; pushd b; popd; popd; chmod -R 755 .",
+                    "cd /usr; popd; chmod -R u+w ."):
+            self.assert_denied(cmd)
+
+    def test_long_options_of_the_new_wrappers(self):
+        for cmd in ("flock --timeout 5 /tmp/l chown -R me /usr",
+                    "flock --wait 5 /tmp/l chown -R me /usr", "run0 --user root chown -R me /usr"):
+            self.assert_denied(cmd)
+
+    def test_private_aliases_on_macos(self):
+        for cmd in ("sudo chmod -R 755 /private/var", "sudo chmod -R 755 /private/etc/ssh",
+                    "chown -R me /private/tmp", "chown -R me /private/var/db/x"):
             self.assert_denied(cmd)
 
     def test_pushd_under_an_unset_variable(self):
@@ -841,6 +865,15 @@ class Allows(unittest.TestCase):
         with mock.patch.object(guard, "ChainMap", recorded):
             guard._hit("( " * 200 + "D=x; chmod -R u+w ./x" + " )" * 200, REPO, HOME)
         self.assertLessEqual(widest[0], guard.MAX_SCOPE + 1)
+
+    def test_an_unknown_stack_and_names_a_text_cannot_see(self):
+        for cmd in ("cd /usr && pushd -n x && popd && chmod -R u+w .",
+                    "D=/usr sh -c 'echo $D'; chmod -R u+w $D/x",
+                    "D=/usr echo $(chmod -R u+w $D)",
+                    "sh -c 'chmod -R u+w \"$D\"/x' D=/etc",
+                    "cd /etc; " + "pushd a; " * 70 + "popd; " * 70 + "chmod -R u+w .",
+                    "chmod -R u+w /private/var/folders/xy/T/build"):
+            self.assert_allowed(cmd)
 
     def test_empty_pushd_does_not_go_home(self):
         self.assert_allowed("pushd $UNSET_D && chmod -R go-w .")

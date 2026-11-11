@@ -108,6 +108,24 @@ class Denies(unittest.TestCase):
         self.assert_denied("setsid chmod -R 755 /usr")
         self.assert_denied("chmod -R 755 /usr/local")
         self.assert_denied("chmod -R 755 /usr/local/lib")
+        self.assert_denied("/usr/bin/sudo chown -R me /etc")
+        self.assert_denied("/usr/bin/env chown -R me /etc")
+        self.assert_denied("pkexec chown -R me /etc")
+        self.assert_denied("sudo -u root -g wheel -H -n -E -S -k -p x -C 3 chmod -R 755 /etc")
+        self.assert_denied("timeout -s KILL 60 chmod -R 755 /usr")
+        self.assert_denied("sudo chown -R postgres /var/lib/dpkg")
+        self.assert_denied("chmod -R 755 /var/log")
+
+    def test_bsd_chmod_options(self):
+        self.assert_denied("chmod -RH 755 /usr")
+        self.assert_denied("chmod -hR 755 /usr")
+
+    def test_quoted_parenthesis_inside_a_substitution(self):
+        self.assert_denied("x=$(printf ')'); chown -R me /etc")
+        self.assert_denied('x=$(echo ")"); sudo chown -R me /usr')
+
+    def test_absolute_target_inside_a_nested_shell(self):
+        self.assert_denied("cd /tmp && bash -c 'chmod -R 755 /usr'")
 
 
 class Allows(unittest.TestCase):
@@ -135,6 +153,39 @@ class Allows(unittest.TestCase):
     def test_variable_set_in_the_same_command(self):
         self.assert_allowed('d=$(mktemp -d) && chmod -R 755 "$d/"')
         self.assert_allowed('export OUT=build; chmod -R 755 "$OUT"')
+
+    def test_mentions_that_never_run(self):
+        self.assert_allowed("git commit -m 'never run `chmod -R 755 /etc`'")
+        self.assert_allowed("echo '$(chown -R me /usr)'")
+        self.assert_allowed("gh issue create --body-file - <<'EOF'\n"
+                            "The agent ran `sudo chown -R me /usr` and broke sudo.\n"
+                            "EOF")
+        self.assert_allowed("ls # see `chown -R me /etc`")
+
+    def test_partial_glob_is_not_its_directory(self):
+        self.assert_allowed("chmod -R u+w /tmp/build-*")
+        self.assert_allowed("chmod -R 755 ~/proj*")
+
+    def test_nested_shell_and_subshell_directories(self):
+        self.assert_allowed("cd proj && bash -c 'chmod -R u+w .'", cwd=HOME)
+        self.assert_allowed("(cd / && ls); chmod -R 755 build", cwd="/srv/app")
+
+    def test_application_and_container_directories(self):
+        self.assert_allowed("sudo chown -R postgres /var/lib/postgresql/data")
+        self.assert_allowed("sudo chown -R me /var/log/myapp")
+        self.assert_allowed("chmod -R u+w .", cwd="/app")
+
+    def test_program_run_by_another_program_under_sudo(self):
+        self.assert_allowed("sudo docker run --rm -v /srv/x:/work alpine chown -R 1000:1000 /work")
+
+    def test_reference_file_is_not_a_target(self):
+        self.assert_allowed("chmod -R --reference /etc/hosts mydir")
+
+    def test_pwd_after_an_unknown_cd(self):
+        self.assert_allowed('cd "$BUILD" && chmod -R 755 "$PWD/dist"')
+
+    def test_malformed_cwd(self):
+        self.assertIsNone(run("chmod -R 755 build", cwd=["/"]))
 
     def test_unset_variable_below_root(self):
         # `$OUT/dist` with OUT unset is `/dist`: not a reason to refuse.

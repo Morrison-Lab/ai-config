@@ -10,24 +10,34 @@ No ai-config hook covered either, and CC Safety Net (the open-source guard
 under evaluation in #5317) checks `chown` only for secret paths.
 
 DENIES `chown`, `chmod` or `chgrp` run with `-R`/`--recursive` (directly, under
-`sudo` or another wrapper, or inside `sh -c`) when a target is:
+`sudo` or another wrapper, inside `sh -c`, or inside a command substitution)
+when a target is:
 
-  * `/`, or any top-level directory (`/usr`, `/etc`, `/home`, `/mnt`, ...);
-  * anything inside a system tree (`SYSTEM_TREES`), except below `/usr/local`,
-    where only `/usr/local` and its `USR_LOCAL_CORE` children are refused
-    (`/usr/local/lib/node_modules` and `/usr/local/Cellar` are user-managed);
+  * `/`, or a standard top-level directory (`TOP_LEVEL`: `/usr`, `/etc`,
+    `/home`, `/opt`, ...). A project root such as a container's `/app` is
+    not one of them;
+  * anything inside a system tree (`SYSTEM_TREES`), with two carve-outs for
+    directories that hold one application's own files: below `/usr/local`,
+    only `/usr/local` and its `USR_LOCAL_CORE` children are refused
+    (`/usr/local/lib/node_modules` and `/usr/local/Cellar` pass), and below
+    `/var/lib`, `/var/log` and `/var/spool` only the tree itself and the
+    package and auth state in `VAR_CORE` are (`/var/lib/postgresql` passes);
   * the home directory, or a directory that contains it.
 
 A target is read with `~`, `~user` and `$HOME` expanded, relative paths
-resolved against the hook's `cwd` and any `cd` earlier in the same command,
-and a trailing glob read as its directory (`/usr/*` touches `/usr`). Any
-other `$VAR` is tried both with its value in this environment and as empty,
+resolved against the hook's `cwd` and any `cd` earlier in the same shell (a
+`cd` inside `( ... )` moves only that subshell), and a basename made only of
+glob characters read as its directory (`/usr/*` touches `/usr`). Any other
+`$VAR` is tried both with its value in this environment and as empty,
 because a variable set by an earlier Bash call is empty in this one
 (anthropics/claude-code#75859): `chmod -R 755 "$d/"` is `/`. A path that
-exists only because a variable was taken as empty is refused for the root,
-a system tree or home, but not for a top-level directory: `$OUT/dist` with
-OUT unset is `/dist`. A command substitution is lifted out before the
-command is split, scanned as a command of its own, and taken as empty.
+exists only because something was taken as empty is refused for the root, a
+system tree or home, but not for a top-level directory: `$OUT/dist` with OUT
+unset is `/dist`. A command substitution that runs (not one in single
+quotes, a quoted heredoc body or a comment) is lifted out before the command
+is split, scanned as a command of its own, and taken as empty. Inside `sh -c`
+or a substitution the working directory is unknown, so only absolute targets
+are judged there.
 
 A deny, not a warning: the remedy (fix the one path that raised the error, as
 your own user) is always available, and the damage is unrecoverable without a
@@ -37,10 +47,11 @@ reason stated in the reply.
 
 Limits, deliberately unclosed: `find ... -exec chown`, `xargs chown`, a
 `for` loop variable, `eval`, `su -c`, a heredoc piped to `sh`, an
-interpreter's own `-c` (`python -c "os.system(...)"`), PowerShell
-`icacls`/`Set-Acl`, Windows drive paths (`C:/Windows`), and a bind-mounted
-path (the #39283 `/volumes/mail/` case) all pass. Fails open on parse
-trouble and when scripts/lib/shellcmd.py cannot be imported.
+interpreter's own `-c` (`python -c "os.system(...)"`), a glob in a directory
+component (`/*/lib`), PowerShell `icacls`/`Set-Acl`, Windows drive paths
+(`C:/Windows`), and a bind-mounted path (the #39283 `/volumes/mail/` case)
+all pass. Fails open on parse trouble and when scripts/lib/shellcmd.py cannot
+be imported.
 """
 from __future__ import annotations
 
@@ -54,30 +65,38 @@ try:
                         "scripts", "lib")
     if _LIB not in sys.path:
         sys.path.insert(0, _LIB)
-    from shellcmd import (COMMAND_WRAPPERS, SHELL_KEYWORDS, WRAPPER_ARG_WINDOW,
-                          resolve_cd_target, shell_c_expansions, simple_commands)
+    from shellcmd import (COMMAND_WRAPPERS, SHELL_KEYWORDS, _comment_free,
+                          _heredoc_free, resolve_cd_target, shell_c_expansions,
+                          simple_commands_with_scope)
 except Exception as _exc:  # broken install: say so, then allow
     print(f"no-recursive-chown-system-path: cannot load scripts/lib/shellcmd.py "
           f"({_exc}); not evaluating", file=sys.stderr)
-    simple_commands = None
+    simple_commands_with_scope = None
 
 OVERRIDE = "ALLOW_RECURSIVE_SYSTEM_CHOWN=1"
 PROGRAMS = {"chown", "chmod", "chgrp"}
-WRAPPERS = set(COMMAND_WRAPPERS) | {"setsid", "busybox"} if simple_commands else set()
-WINDOW = 12  # `sudo -u a -g b -H -n -E -S chmod` needs more than shellcmd's 6
-CHMOD_OPTIONS = set("cfvR")  # chmod's own short options; `-w` or `-x` is a mode
+WRAPPERS = (set(COMMAND_WRAPPERS) | {"setsid", "busybox", "pkexec"}
+            if simple_commands_with_scope else set())
+# Wrappers that take positional words before the program (`timeout 60 chmod`).
+WRAPPER_POSITIONALS = {"timeout": 1}
+# chmod's own short options (GNU and BSD); any other `-w` or `-x` is a mode.
+CHMOD_OPTIONS = set("cfvRHLPh")
+TOP_LEVEL = {"bin", "boot", "dev", "etc", "home", "lib", "lib32", "lib64", "libx32",
+             "media", "mnt", "opt", "proc", "root", "run", "sbin", "srv", "sys",
+             "tmp", "usr", "var", "Applications", "Library", "System", "Users",
+             "Volumes", "cores", "private"}
 SYSTEM_TREES = ("/usr", "/etc", "/bin", "/sbin", "/lib", "/lib32", "/lib64",
                 "/libx32", "/boot", "/var/lib", "/var/log", "/var/spool",
                 "/System", "/Library", "/private/etc", "/private/var/db")
-# Below /usr/local, only these directories hold system-wide binaries and config;
-# `/usr/local/lib/node_modules` and `/usr/local/Cellar` are user-managed.
 USR_LOCAL_CORE = {"bin", "sbin", "etc", "lib", "libexec", "include", "share"}
+APP_TREES = ("/var/lib", "/var/log", "/var/spool")
+VAR_CORE = {"dpkg", "apt", "rpm", "dnf", "yum", "pacman", "systemd", "sudo",
+            "polkit-1", "PackageKit", "ucf"}
 ASSIGNMENT = re.compile(r"\A[A-Za-z_][A-Za-z0-9_]*=")
-# A command substitution, lifted out before splitting (see `_lift`).
-SUB = "__AICFG_CMDSUB__"
+SUB = "__AICFG_CMDSUB__"  # a lifted command substitution (see `_lift`)
 VARIABLE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)([^}]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)|"
                       + SUB)
-GLOB = re.compile(r"[*?\[]")
+ALL_GLOB = re.compile(r"\A[*?.]*[*?][*?.]*\Z")
 
 DENY = (
     "Refused: `{segment}` runs `{program} -R` on `{target}`, which resolves to "
@@ -89,64 +108,105 @@ DENY = (
 )
 
 
-def _lift(text):
-    """`(text with each $(...) and `...` replaced by SUB, [their inner texts])`.
+def _close(text, start):
+    """Index of the `)` closing a `$(` whose body starts at START, or `None`."""
+    depth, single, double, j = 1, False, False, start
+    while j < len(text):
+        ch = text[j]
+        if ch == "\\" and not single:
+            j += 2
+            continue
+        if ch == "'" and not double:
+            single = not single
+        elif ch == '"' and not single:
+            double = not double
+        elif not single and not double and ch in "()":
+            depth += 1 if ch == "(" else -1
+            if not depth:
+                return j
+        j += 1
+    return None
 
-    `simple_commands` splits an unquoted `$(id -gn)` into words of its own, so
-    `chown -R $USER:$(id -gn) /usr` would otherwise lose its program.
+
+def _lift(text):
+    """`(text with each running $(...) and `...` replaced by SUB, [inner texts])`.
+
+    `shlex` splits an unquoted `$(id -gn)` into words of its own, so `chown -R
+    $USER:$(id -gn) /usr` would otherwise lose its program. A substitution
+    inside single quotes does not run and stays as text.
     """
-    out, inner, i = [], [], 0
+    out, inner, single, double, i = [], [], False, False, 0
     while i < len(text):
-        if text.startswith("$(", i) and not text.startswith("$((", i):
-            depth, j = 1, i + 2
-            while j < len(text) and depth:
-                depth += {"(": 1, ")": -1}.get(text[j], 0)
-                j += 1
-            inner.append(text[i + 2:j - 1])
-            out.append(SUB)
-            i = j
-        elif text[i] == "`" and "`" in text[i + 1:]:
+        ch = text[i]
+        if ch == "\\" and not single:
+            out.append(text[i:i + 2])
+            i += 2
+            continue
+        if ch == "'" and not double:
+            single = not single
+        elif ch == '"' and not single:
+            double = not double
+        elif not single and text.startswith("$(", i) and not text.startswith("$((", i):
+            j = _close(text, i + 2)
+            if j is not None:
+                inner.append(text[i + 2:j])
+                out.append(SUB)
+                i = j + 1
+                continue
+        elif not single and ch == "`" and "`" in text[i + 1:]:
             j = text.index("`", i + 1)
             inner.append(text[i + 1:j])
             out.append(SUB)
             i = j + 1
-        else:
-            out.append(text[i])
-            i += 1
+            continue
+        out.append(ch)
+        i += 1
     return "".join(out), inner
 
 
 def _program(argv):
-    """`(argv from the program on, override present)`, peeling wrappers."""
-    override, since_wrapper = False, None
+    """`(argv from the program on, override present)`, peeling wrappers.
+
+    After a wrapper, an option may be followed by its value (`sudo -u me`);
+    the first other word is the program it runs, so `sudo docker run alpine
+    chown` runs docker, not chown.
+    """
+    override, wrapped, after_option, positionals = False, False, False, 0
     for i, tok in enumerate(argv):
-        if os.path.basename(tok) in PROGRAMS:
+        name = os.path.basename(tok)
+        if name in PROGRAMS:
             return argv[i:], override
         if ASSIGNMENT.match(tok):
             override = override or tok == OVERRIDE
-        elif tok in WRAPPERS:
-            since_wrapper = 0
+        elif name in WRAPPERS:
+            wrapped, after_option = True, False
+            positionals = WRAPPER_POSITIONALS.get(name, 0)
         elif tok in SHELL_KEYWORDS:
             continue
-        elif since_wrapper is None or since_wrapper >= WINDOW:
-            return [], override  # some other program runs here
+        elif wrapped and tok.startswith("-"):
+            after_option = True
+        elif wrapped and (after_option or positionals):
+            positionals -= 0 if after_option else 1
+            after_option = False
         else:
-            since_wrapper += 1  # a wrapper's own option or value (`sudo -u me`)
+            return [], override  # some other program runs here
     return [], override
 
 
 def _targets(program, head):
     """The file operands of a recursive invocation, or `[]` if not recursive."""
-    recursive, reference, operands, end = False, False, [], False
+    recursive, reference, operands, end, skip = False, False, [], False, False
     for tok in head[1:]:
-        if end or tok == "-" or not tok.startswith("-"):
+        if skip:
+            skip = False
+        elif end or tok == "-" or not tok.startswith("-"):
             operands.append(tok)
         elif tok == "--":
             end = True
         elif tok == "--recursive":
             recursive = True
         elif tok.startswith("--reference"):
-            reference = True
+            reference, skip = True, tok == "--reference"
         elif tok.startswith("--"):
             continue
         elif program == "chmod" and not set(tok[1:]) <= CHMOD_OPTIONS:
@@ -162,11 +222,9 @@ def _candidates(target, home, assigned, here):
     """`[(path, weak)]` for every path TARGET can expand to.
 
     Each variable is tried with its value here and as empty; a `weak`
-    candidate exists only because some variable was taken as empty. A
-    variable ASSIGNED earlier in the same command keeps its literal value, or
-    makes the target undecidable (`[]`) when that value is computed, as in
-    `d=$(mktemp -d)`. A command substitution is always unknown, so it is
-    taken as empty.
+    candidate holds something guessed to be empty. A variable ASSIGNED earlier
+    in the same command keeps its literal value, or makes the target
+    undecidable (`[]`) when that value is computed, as in `d=$(mktemp -d)`.
     """
     target = re.sub(r"\A~([A-Za-z0-9_.-]*)(?=/|\Z)",
                     lambda m: os.path.expanduser("~" + m.group(1)) if m.group(1) else home,
@@ -187,6 +245,7 @@ def _candidates(target, home, assigned, here):
             val = home
         elif name == "PWD":
             val = here or ""
+            guessed.append(here is None)
         else:
             val = "" if empty else os.environ.get(name, "")
             guessed.append(not val)
@@ -226,23 +285,39 @@ def _why(path, home, weak):
     parts = path.split("/")
     if path.startswith("/usr/local/") and (len(parts) > 4 or parts[3] not in USR_LOCAL_CORE):
         return None
+    for tree in APP_TREES:
+        depth = tree.count("/") + 1
+        if path.startswith(tree + "/") and parts[depth] not in VAR_CORE:
+            return None
     for tree in SYSTEM_TREES:
         if path == tree or path.startswith(tree + "/"):
             return f"inside the system tree `{tree}`"
     if home and (path == home or home.startswith(path + "/")):
         return "the home directory or a directory that contains it"
-    if path.count("/") == 1 and not weak:
+    if len(parts) == 2 and parts[1] in TOP_LEVEL and not weak:
         return "a top-level directory"
     return None
 
 
+def _split(piece):
+    """`(scoped argvs, inner substitutions)`; `(None, [])` on a parse error."""
+    cleaned = _comment_free(_heredoc_free(piece))
+    lifted, inner = _lift(cleaned)
+    cmds = simple_commands_with_scope(lifted)
+    if cmds is None:  # lifting broke the parse: judge the text as written
+        return simple_commands_with_scope(cleaned), []
+    return cmds, inner
+
+
 def _scan(piece, cwd, home):
     """`(hit or None, [inner command substitutions])` for one shell text."""
-    lifted, inner = _lift(piece)
-    here, assigned = cwd, {}
-    for argv in simple_commands(lifted) or []:
+    cmds, inner = _split(piece)
+    heres, assigned = {(0,): cwd}, {}
+    for scope, argv in cmds or []:
+        here = next(heres[scope[:k]] for k in range(len(scope), 0, -1) if scope[:k] in heres)
         if argv and argv[0] in ("cd", "pushd", "popd"):
-            here = resolve_cd_target(argv, here)
+            moved = any(SUB in tok for tok in argv)
+            heres[scope] = None if moved else resolve_cd_target(argv, here)
             continue
         if _assignments(argv, assigned):
             continue
@@ -259,7 +334,7 @@ def _scan(piece, cwd, home):
                         continue
                     cand = os.path.join(here, cand)
                 path = os.path.normpath(cand).replace("//", "/")
-                if GLOB.search(os.path.basename(path)):
+                if ALL_GLOB.match(os.path.basename(path)):
                     path = os.path.dirname(path)
                 why = _why(path, home, weak)
                 if why:
@@ -269,14 +344,20 @@ def _scan(piece, cwd, home):
 
 
 def _hit(command, cwd, home):
-    """`(segment, program, target, path, why)` for the first protected target."""
-    pending = list(shell_c_expansions(command))
+    """`(segment, program, target, path, why)` for the first protected target.
+
+    Only the command itself runs in CWD; a `sh -c` text or a substitution
+    gets `None`, so its relative targets are left alone.
+    """
+    pending = [(piece, cwd if n == 0 else None)
+               for n, piece in enumerate(shell_c_expansions(command))]
     while pending:
-        hit, inner = _scan(pending.pop(0), cwd, home)
+        piece, here = pending.pop(0)
+        hit, inner = _scan(piece, here, home)
         if hit:
             return hit
         for text in inner:
-            pending.extend(shell_c_expansions(text))
+            pending.extend((nested, None) for nested in shell_c_expansions(text))
     return None
 
 
@@ -286,7 +367,7 @@ def main() -> int:
     except Exception as exc:
         print(f"no-recursive-chown-system-path: unreadable hook input ({exc})", file=sys.stderr)
         return 0
-    if simple_commands is None or not isinstance(payload, dict):
+    if simple_commands_with_scope is None or not isinstance(payload, dict):
         return 0
     if payload.get("tool_name") not in ("Bash", "bash", "run_command", "execute_command",
                                         "terminal", "shell"):
@@ -295,8 +376,10 @@ def main() -> int:
     command = inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or ""
     if not isinstance(command, str):
         return 0
+    cwd = payload.get("cwd")
+    cwd = cwd if isinstance(cwd, str) and cwd else os.getcwd()
     home = os.path.normpath(os.path.expanduser("~"))
-    hit = _hit(command, payload.get("cwd") or os.getcwd(), home)
+    hit = _hit(command, cwd, home)
     if not hit:
         return 0
     segment, program, target, path, why = hit

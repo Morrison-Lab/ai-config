@@ -104,7 +104,7 @@ and structure of the three existing agents — they read almost as a template.
 - **Start a brief-only worker without the project instructions.**
   A custom subagent loads the user, project and local `CLAUDE.md` files, and any `AGENTS.md` loaded as project instructions, unless its definition sets `omitClaudeMd: true` ([Claude Code docs](https://code.claude.com/docs/en/sub-agents.md), "What loads at startup").
   The field needs Claude Code v2.1.271 or later.
-  With the field set, managed policy files still load, and so does a subdirectory's `CLAUDE.md` once the worker works with files there.
+  With the field set, managed policy files still load, and so do a subdirectory's `CLAUDE.md` and matching path-scoped rules once the worker works with files there.
   Set it when the agent's body and brief carry everything it needs, so it does not start with the conductor's whole preamble ([ai-config#1499](https://github.com/Morrison-Lab/ai-config/issues/1499)).
   `hooks/inject-subagent-rules.py` still gives it the core rules.
   Leave it off an agent that judges a repository by that repository's own conventions or documentation, such as `adversarial-reviewer`, `code-editor` and `prose-editor`, and `reproducibility-auditor` and `dependency-auditor`: the first reports undocumented prerequisites, and the second reports stale pins, and a project's `CLAUDE.md` is often where the prerequisites and the reasons for a pin are written down.

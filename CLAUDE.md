@@ -1497,12 +1497,10 @@ The Write tool passes bytes unchanged, and it cannot be silently skipped the way
   Merging a PR is strictly forbidden unless the user explicitly issues a merge instruction for that specific PR (e.g. `/merge-it` or "merge this PR").
   No session or standing grant substitutes, per `AGENTS.md`'s "Never take an irreversible action without direct, explicit authorization" ([`irreversible-actions-need-authorization`](shared/workflow/irreversible-actions-need-authorization.md)).
 - **Never merge over open review findings or treat skip notices as approval.**
-  Under `mwc`, a PR must be fully clean across CI and all review findings.
+  A PR must be fully clean across CI and all review findings.
   A reviewer skip notice (e.g. for workflow edits or quota limits) never clears or supersedes prior review findings.
   All findings across the PR history must be fully Addressed, Rebutted, or Deferred before merge.
-  A disagreement among reviews is not fully clean: any standing not-clean
-  --- nits included --- vetoes merge even with `mwc` active
-  (ai-config#2274).
+  A disagreement among reviews is not fully clean: any standing not-clean --- nits included --- vetoes merge even after the user says to merge (ai-config#2274).
 - **Another session's PR needs a second condition: clean, and clean for more than twenty minutes --- then warned.**
   Every other rule here settles *when* a PR may be merged;
   this one settles *whose*.

@@ -475,7 +475,7 @@ When you open, push to, or take over a PR, arm a persistent monitoring loop if o
 A one-shot poll or webhook subscription is not a loop;
 re-arm periodic check-ins using the session's wake mechanism.
 After every push, actively poll forge CI and review state with `gh` or `glab` until terminal.
-Baking a self-merge directive into the loop prompt is allowed only under a standing `mwc` grant.
+Never bake a self-merge directive into the loop prompt: each merge needs the user's word for that PR (ai-config#5326).
 See [`persistent-pr-loop`](shared/workflow/persistent-pr-loop.md).
 
 ## Monitor scoped open PRs and MRs

@@ -9,11 +9,11 @@ Merging a Pull Request or Merge Request is strictly controlled across all agents
   Merging a PR is strictly forbidden unless the user explicitly issues a merge instruction for that specific PR (e.g. `/merge-it` or "merge this PR").
   No session or standing grant substitutes ([`irreversible-actions-need-authorization`](irreversible-actions-need-authorization.md)).
 - **Never merge over open review findings or treat a reviewer skip notice as approval.**
-  Under `mwc`, a PR must be fully clean across CI and review (see [`fully-clean.md`](fully-clean.md)).
-  A clean automated review from every available provider evaluating the current HEAD commit is strictly required for merging with `mwc`.
-  A reviewer skip notice (e.g. for quota exhaustion or workflow edits) or a fallback self-review does NOT satisfy `mwc` or grant autonomous merge authority.
+  A PR must be fully clean across CI and review (see [`fully-clean.md`](fully-clean.md)).
+  A clean automated review from every available provider evaluating the current HEAD commit is strictly required before asking the user to merge.
+  A reviewer skip notice (e.g. for quota exhaustion or workflow edits) or a fallback self-review does NOT make a PR fully clean, and nothing grants autonomous merge authority.
   All findings across the PR history must be Addressed, Rebutted, or Deferred before merge.
-  A disagreement among reviews is not fully clean: any reviewer's standing not-clean --- nits included --- vetoes merge even with `mwc` active.
+  A disagreement among reviews is not fully clean: any reviewer's standing not-clean --- nits included --- vetoes merge even after the user says to merge.
   ARD every item from every review, then request fresh reviews.
 - **Never describe a PR as merge-ready without a clean review verdict on the latest commit.**
   GitHub's `mergeable` field is conflict existence (`MERGEABLE` / `CONFLICTING` / `UNKNOWN`).
@@ -41,10 +41,14 @@ Full procedure: [`adversarial-self-review`](adversarial-self-review.md#waiver-wh
 
 This file used to grant a standing `mwc` to infrastructure-only PRs and to every PR in `Morrison-Lab/ai-config`, `Morrison-Lab/gha` and `d-morrison/macros`.
 [`irreversible-actions-need-authorization`](irreversible-actions-need-authorization.md) retired both grants (Ezra, 2026-11-11, ai-config#5326).
-`hooks/no-unauthorized-merge.py` and `hooks/no-mwc-ask-for-infra-pr.py` still implement them until that issue's follow-up lands, so neither hook's verdict authorizes a merge.
+Until that issue's follow-up lands, these still implement the old grants, and none of their verdicts authorizes a merge:
+
+- `hooks/no-unauthorized-merge.py` lets a merge through under the repo and infra grants;
+- `hooks/grant-personal-permissions.py` removes the permission prompt for a bare `gh pr merge` and for `Skill(mwc)`;
+- `hooks/no-mwc-ask-for-infra-pr.py` and `hooks/no-merge-ask-in-post-message.py` deny some replies that ask the user to merge;
+- the `mwc`, `maw`, `gmd` and `merge-it` skills describe merging under a grant.
 
 - **Do:** drive an infrastructure PR to fully clean, then ask the user to merge it, naming the PR.
-- **Don't:** merge it because the merge hook allows it, or skip the question because the ask hook denies a reply that mentions `mwc`;
-  ask by naming the PR instead.
+- **Don't:** merge it because a hook allowed the command or removed the prompt.
 
 See [`AGENTS.cases.md`](../../AGENTS.cases.md), "Strict Merge Control Policy" for the authentic user directives.

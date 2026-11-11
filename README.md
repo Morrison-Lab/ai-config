@@ -46,6 +46,7 @@ Three mechanisms close that gap, one per place an agent can be configured:
 | each repository | [`scripts/wire-repo-config.py`](scripts/wire-repo-config.py) `<repo-dir>...` | an `AGENTS.md` block (and the same block in a `CLAUDE.md` that does not import `AGENTS.md`) pointing Codex cloud, Copilot, Jules, Cursor background agents and Claude Code at ai-config, plus the marketplace in `.claude/settings.json`, and, in an R package, anchored `.Rbuildignore` entries for those files so `R CMD check` raises no NOTE about them; `--enable-plugin` also enables the plugin there, only for repos whose sessions get it no other way, since a second copy fires every hook twice |
 
 Both scripts merge rather than replace, leave an explicit `ai-config@*` choice alone, and take `--check` to report without writing.
+[`docs/delivery-paths.md`](docs/delivery-paths.md) names the one supported path for each harness and session kind, what each cannot deliver, and the older paths that are leftovers.
 `wire-user-config.py` also refuses to enable the plugin on a machine that registered the hook catalog through `install-hooks.py --fix`, since the two paths together fire every hook twice.
 
 ### Antigravity & Gemini CLI

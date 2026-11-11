@@ -52,6 +52,7 @@ FILES = {
     "scripts/run-local-validation.py": "\n",
     ".github/workflows/validate.yml": "\n",
     "AGENTS.md": "# names guard.py, which a markdown file cannot pull in\n",
+    ".gitignore": "*.log\n",
 }
 
 
@@ -64,6 +65,7 @@ def _repo(tmp):
     subprocess.run(["git", "init", "-q", "-b", "main"], cwd=root, check=True, env=env)
     subprocess.run(["git", "add", "-A"], cwd=root, check=True, env=env)
     (root / "hooks" / "brand-new.py").write_text("\n", encoding="utf-8")  # untracked
+    (root / "hooks" / "ignored.log").write_text("\n", encoding="utf-8")  # untracked and ignored
     (root / "hooks" / "stale.py").unlink()  # tracked, deleted without git rm
     return root
 
@@ -111,6 +113,7 @@ def test_selector():
                 if old is not None:
                     os.environ[var] = old
         check("untracked, non-ignored files are indexed", "hooks/brand-new.py" in sel.files)
+        check("ignored files are not indexed", "hooks/ignored.log" not in sel.files)
         check("./ and a/../ spellings are normalised", sel.needed(seeds, ["./hooks/pkg/../helper.py"])
               and not sel.needed(seeds, ["./hooks/unrelated.py"]))
         check("one matching path among several selects it",

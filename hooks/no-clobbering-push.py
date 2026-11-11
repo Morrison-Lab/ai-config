@@ -322,7 +322,7 @@ try:
                           is_operator_token)
 except Exception as _exc:  # broken install: degrade, do not fail open further
     print(f"no-clobbering-push: cannot load scripts/lib/shellcmd.py ({_exc}); "
-          f"no push will be checked", file=sys.stderr)
+          f"a force push will be refused unchecked", file=sys.stderr)
     shell_c_expansions = nested_shell_commands = shell_tokens = None
     is_operator_token = None
     COMMAND_WRAPPERS = frozenset()
@@ -370,6 +370,26 @@ FORK_SEPS = {"&", "|"}
 # shape as `no-unauthorized-merge.py`'s `ALLOW_MERGE=1` anchor and for the
 # same reason: a guard that its own documentation disables is worthless.
 OVERRIDE = "ALLOW_FORCE_PUSH"
+
+# Degraded mode only (see `main`): a `git ... push` carrying `--force` or a
+# short-option cluster with `f`, within one simple command. Split first and
+# test each piece with single scans, so the check stays linear
+# on a long command (one regex spanning `git`, `push` and the flag measured
+# about a second on 5,000 repeated `push` words).
+RX_DEGRADED_SPLIT = re.compile(r"[\n;&|]")
+RX_DEGRADED_FLAG = re.compile(r"\s(?:--force(?![\w-])|-[A-Za-z0-9]*f)")
+
+
+def _degraded_force_push(command):
+    """Does some piece of `command` look like `git ... push ... -f`?"""
+    for piece in RX_DEGRADED_SPLIT.split(command):
+        words = piece.split()
+        if "git" not in words and not any(w.endswith("/git") for w in words):
+            continue
+        at = piece.find(" push")
+        if at != -1 and RX_DEGRADED_FLAG.search(piece, at + 5):
+            return True
+    return False
 
 # `git`'s own global options that consume the following token, skipped before
 # `push` is looked for so `git -C /repo push` matches.
@@ -1640,6 +1660,24 @@ def main() -> int:
     if not isinstance(command, str) or not command.strip():
         if is_dry_run:
             print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse"}}))
+        return 0
+
+    if shell_tokens is None:
+        # Broken install: `scripts/lib/shellcmd.py` did not load, so no
+        # command can be parsed. Rather than allow every force push silently,
+        # deny a command that LOOKS like one, saying the guard is broken ---
+        # the degraded mode `no-push-without-self-review.py` uses. It decides
+        # only whether to say so, never what a command does (ai-config#3178).
+        if _degraded_force_push(command) and OVERRIDE + "=1" not in command:
+            print(json.dumps({"hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "deny",
+                "permissionDecisionReason": (
+                    "no-clobbering-push could not load scripts/lib/shellcmd.py, "
+                    "so it cannot tell whether this force push is safe. Repair "
+                    "the install, or prefix the push with ALLOW_FORCE_PUSH=1 "
+                    "and say why."),
+            }}))
         return 0
 
     try:

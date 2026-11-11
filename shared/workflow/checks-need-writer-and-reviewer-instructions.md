@@ -33,7 +33,7 @@ The PR description names the three layers.
 
 ## Existing checks
 
-A check that lacks a writer or reviewer layer gets one issue naming the check and the missing layer, labeled `ai-authored`.
+A check that lacks a writer or reviewer layer gets one issue naming the check and the missing layer, labeled `ai-authored` with its model and priority labels.
 Do not fix them in one sweep.
 
 - **Do:** ship the writer and reviewer instruction in the PR that adds the check.

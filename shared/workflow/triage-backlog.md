@@ -2,6 +2,7 @@ Triage the issue backlog on a fixed cadence, and treat closing an issue as not-p
 
 Every open issue carries exactly one priority label, `P1`, `P2`, or `P3`, or is closed.
 An unlabelled open issue is untriaged, and untriaged is a state the weekly pass ends.
+An agent sets the priority when it files the issue ([`issue-first`](issue-first.md), "Set the priority when you file"), so the pass is the backstop for issues a person filed and for the ones an agent missed.
 
 ## Why a counterweight is needed
 

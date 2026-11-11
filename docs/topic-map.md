@@ -252,7 +252,7 @@ its description does not use (ai-config#949).
 | `shared/coding/errexit-is-not-uniform.md` | `set -e` does not apply everywhere, and the places it stops applying are not obvious. A failing command aborts the script in most positions, but bash suppres... |  |
 | `shared/coding/fact-check-code-logic.md` | When reviewing code that implements an algorithm, computation, math, or statistics, check whether it's *right* --- not just styled well. Use domain knowledge... |  |
 | `shared/coding/function-signature-style.md` | When an R function signature doesn't fit on one line, format the argument list with **single-indent** style: nothing after `function(`, each argument on its... |  |
-| `shared/coding/heredoc-backslash-collapse.md` | Moved out of the auto-loaded `CLAUDE.md` (ai-config#3568), which keeps the rule and its pattern/anti-pattern pairs and links here for the mechanics, the repr... |  |
+| `shared/coding/heredoc-backslash-collapse.md` | Moved out of the auto-loaded `CLAUDE.md` (ai-config#3568), which keeps a short summary of the rule and links here for the pattern/anti-pattern pairs, the mec... |  |
 | `shared/coding/least-flexible-tool.md` | Use the least-flexible construct that does the job. When two constructs both work, prefer the one that can do less, because a narrower construct announces it... |  |
 | `shared/coding/loop-hygiene.md` | When a `for` loop really is the right construct --- see `least-flexible-tool` for when it is not --- three checks apply. Each is mechanical, greppable, and c... |  |
 | `shared/coding/one-function-per-file.md` | When adding a new function to a codebase, give it its own file rather than bundling it into a file that already holds other functions --- unless the function... |  |
@@ -321,6 +321,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/cursor-cloud-instructions.md` | This repo has no compiled app or long-running service. The "product" is three things: a Quarto documentation website, a suite of Python validators/tests unde... |  |
 | `shared/workflow/default-to-action-grants.md` | Detail for `AGENTS.md`'s "Default to action without asking", moved here to keep `AGENTS.md` under Codex's byte cap. |  |
 | `shared/workflow/derive-dont-enumerate.md` | A brief that enumerates work items is a snapshot. Before dispatching work scoped to a list --- PR numbers, issue numbers, files, hosts --- ask whether that s... |  |
+| `shared/workflow/destructive-actions-catalog.md` | Ezra, 2026-11-11, after a session nearly deleted `lds` branches it had misread from a shallow clone: "search online for common failure patterns and build gua... |  |
 | `shared/workflow/disclose-agent-authorship.md` | Every comment an agent posts to a forge --- GitHub, GitLab, or any other --- says, in the body, that an agent posted it. |  |
 | `shared/workflow/dont-get-sidetracked.md` | Ezra (d-morrison), 2026-10-13 (ai-config#4488): when you have a primary task, don't get sidetracked, including by the user's input; if a tangential or irrele... |  |
 | `shared/workflow/efficient-pr-babysitting.md` | When babysitting a PR (subscribed to its activity, driving ARDI, watching CI), default to the cheapest tool call and the smallest push that actually answers... |  |
@@ -360,6 +361,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/no-cop-out-offers.md` | A **cop-out offer** is a sentence that converts work you have already been authorized to do back into a request for permission. |  |
 | `shared/workflow/no-empty-promises.md` | A promise about my own future behaviour is not work. It is a claim that work will happen later, made in a conversation that will not outlive it. |  |
 | `shared/workflow/no-fable-subagents.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
+| `shared/workflow/no-history-reads-in-shallow-clones.md` | A shallow clone answers history questions wrongly and exits 0. Its cut-off commits, listed in `<common-dir>/shallow`, look parentless, so a walk that reaches... |  |
 | `shared/workflow/no-sweeps-by-default.md` | Ezra, 2026-10-29 (ai-config#4829): "don't sweep new rules unless I explicitly tell you to sweep; by default, just fix incrementally when you are editing a pa... |  |
 | `shared/workflow/notes-pre-review-pass.md` | A notes PR (psw, rme, mds, lds, pds, sds, win, araomm) reaches the maintainer already checked against the notes rules, so he reviews the ideas and not the wo... |  |
 | `shared/workflow/parse-data-files.md` | Parse every data file a change touches with a real parser before calling a PR ready or reporting a head as final: a CSV with a CSV reader (every row's field... |  |
@@ -407,7 +409,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/surface-merge-order.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/workflow/sync-with-main.md` | Whenever `main` has moved ahead of a PR branch you're working on, **merge `main` into the PR branch** before the next push or review trigger. Don't wait for... |  |
 | `shared/workflow/terminate-superseded-tasks.md` | When background tasks, asynchronous command executions, monitors, or subagents are dispatched to inspect, search, or diagnose an issue, actively terminate th... |  |
-| `shared/workflow/timestamp-local-recaps.md` | Moved out of the auto-loaded `CLAUDE.md` (ai-config#3568), which keeps the rule and its pattern/anti-pattern pairs and links here for the platform mechanics,... |  |
+| `shared/workflow/timestamp-local-recaps.md` | Moved out of the auto-loaded `CLAUDE.md` (ai-config#3568), which keeps a short summary of the rule, one pattern/anti-pattern pair, and a link here for the fu... |  |
 | `shared/workflow/track-useful-resources.md` | A notes repo is a site listed in `course-sequence` or in the notes repository registry of `send-notes`. Track every useful resource (textbooks, articles, sof... |  |
 | `shared/workflow/triage-backlog.md` | Triage the issue backlog on a fixed cadence, and treat closing an issue as not-planned as a normal outcome of that pass rather than as a failure to do the work. |  |
 | `shared/workflow/triage-new-asks.md` | Triage a new ask against the current backlogs before acting on it, so it joins the work that already owns it instead of spawning parallel work. |  |

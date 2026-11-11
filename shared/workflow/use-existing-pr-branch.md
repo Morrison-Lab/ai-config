@@ -356,3 +356,16 @@ A cross-fork "sync upstream into main" PR --- opened by comparing `<upstream-own
 When that PR shows a real conflict (`mergeable_state: dirty`), the fork has no push access to the head branch at all, regardless of what the harness's own push-scope policy allows elsewhere in the session --- so the stacking preference above doesn't apply here;
 go straight to superseding.
 Fetch both remotes, merge upstream's branch into a fork-local branch off the fork's own `main`, resolve conflicts there, open a same-repo PR ("Supersedes #N" in the body), and close the original once the replacement merges.
+
+**When the thread's only designated branch holds an open PR and the next batch has nowhere to go, say so at once** (ai-config#5300, 2026-11-11).
+The mlg link-fix thread sat silent for 80 minutes in that state.
+The standing grant above comes first: open another branch and PR, stacked on the open one when the batch needs its code.
+When a real rejection leaves no branch to push to, the thread:
+
+- tells the coordinator right away, with the PR link, and asks for a merge or permission for another branch;
+- prepares the next batch as a local commit;
+- waits for the PR's merge event, keeping the existing watch on the occupying PR running
+  (the persistent loop in `AGENTS.md`), and arms no further timer for the blocked batch itself.
+
+- **Do:** message the coordinator the moment the branch is blocked, naming the PR.
+- **Don't:** sit idle while the only branch is occupied, or arm a second timer for the blocked batch on top of the occupying PR's watch.

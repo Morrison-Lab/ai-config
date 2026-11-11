@@ -544,7 +544,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-unlabelled-agent-issue.py\"",
             "timeout": 10,
             "script": "warn-unlabelled-agent-issue.py",
-            "why": "shared/workflow/issue-first.md, 'Label an agent-filed issue with its authorship and its model'. disclose-agent-authorship.md scopes its marker line to comment BODIES and excludes an issue body, so an agent-filed issue is the one artifact that discloses nothing -- it goes out under the account holder's login as type: User. The labels close that, and the rule is consulted at read time while the omission happens at composition time. WARNS, never blocks: an unlabelled issue is fixed by one `gh issue edit --add-label` while a blocked create loses the act that makes work visible (report-mistakes-proactively.md, 'filing is not gated on approval'), the rule is scoped to repos we administrate and this hook cannot tell which repo is ours (sup files upstream with neither label), and a repo whose labels cannot be created still gets the issue. Anchored on a command position with heredoc bodies stripped, for the reason warn-pr-create-without-dupe-check.py records: this corpus quotes `gh issue create` constantly. Fails open. Tracked as #3111."
+            "why": "shared/workflow/issue-first.md, 'Label an agent-filed issue with its authorship and its model'. disclose-agent-authorship.md scopes its marker line to comment BODIES and excludes an issue body, so an agent-filed issue is the one artifact that discloses nothing -- it goes out under the account holder's login as type: User. The labels close that, and the rule is consulted at read time while the omission happens at composition time. The same section's 'Set the priority when you file' (ai-config#3140) asks for one of P1, P2 or P3 in the creating command, and the hook reminds about each missing label separately. WARNS, never blocks: an unlabelled issue is fixed by one `gh issue edit --add-label` while a blocked create loses the act that makes work visible (report-mistakes-proactively.md, 'filing is not gated on approval'), the rule is scoped to repos we administrate and this hook cannot tell which repo is ours (sup files upstream with neither label), and a repo whose labels cannot be created still gets the issue. Anchored on a command position with heredoc bodies stripped, for the reason warn-pr-create-without-dupe-check.py records: this corpus quotes `gh issue create` constantly. Fails open. Tracked as #3111."
           },
           {
             "type": "command",
@@ -1234,7 +1234,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-unlabelled-agent-issue.py\"",
             "timeout": 10,
             "script": "warn-unlabelled-agent-issue.py",
-            "why": "shared/workflow/issue-first.md, 'Label an agent-filed issue with its authorship and its model'. disclose-agent-authorship.md scopes its marker line to comment BODIES and excludes an issue body, so an agent-filed issue is the one artifact that discloses nothing -- it goes out under the account holder's login as type: User. The labels close that, and the rule is consulted at read time while the omission happens at composition time. WARNS, never blocks: an unlabelled issue is fixed by one `gh issue edit --add-label` while a blocked create loses the act that makes work visible (report-mistakes-proactively.md, 'filing is not gated on approval'), the rule is scoped to repos we administrate and this hook cannot tell which repo is ours (sup files upstream with neither label), and a repo whose labels cannot be created still gets the issue. Anchored on a command position with heredoc bodies stripped, for the reason warn-pr-create-without-dupe-check.py records: this corpus quotes `gh issue create` constantly. Fails open. Tracked as #3111."
+            "why": "shared/workflow/issue-first.md, 'Label an agent-filed issue with its authorship and its model'. disclose-agent-authorship.md scopes its marker line to comment BODIES and excludes an issue body, so an agent-filed issue is the one artifact that discloses nothing -- it goes out under the account holder's login as type: User. The labels close that, and the rule is consulted at read time while the omission happens at composition time. The same section's 'Set the priority when you file' (ai-config#3140) asks for one of P1, P2 or P3 in the creating command, and the hook reminds about each missing label separately. WARNS, never blocks: an unlabelled issue is fixed by one `gh issue edit --add-label` while a blocked create loses the act that makes work visible (report-mistakes-proactively.md, 'filing is not gated on approval'), the rule is scoped to repos we administrate and this hook cannot tell which repo is ours (sup files upstream with neither label), and a repo whose labels cannot be created still gets the issue. Anchored on a command position with heredoc bodies stripped, for the reason warn-pr-create-without-dupe-check.py records: this corpus quotes `gh issue create` constantly. Fails open. Tracked as #3111."
           },
           {
             "type": "command",
@@ -1991,6 +1991,18 @@
             "timeout": 10,
             "script": "no-send-email.py",
             "why": "Denies sending email: a mail-sender command (sendmail, mail, mutt, msmtp, git send-email, smtp URLs) in Bash, or an MCP tool whose action is send/reply/forward on a mail account. Drafting stays allowed. User directive 2026-11-04: \"never send emails for me\". No override."
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-field-unsafe-merge-runs.py\"",
+            "timeout": 10,
+            "script": "no-field-unsafe-merge-runs.py",
+            "why": "ai-config#2918: the docx skill's merge_runs.py merges a field code's begin/instrText/separate/result/end runs into one run, which deletes or moves Zotero, Mendeley and EndNote citations, cross-references and HYPERLINK fields, and looks like the agent's own edit. Denies running it directly and names scripts/docx-merge-runs-field-safe.py, which runs the same script with field-marker runs kept apart. ALLOW_FIELD_UNSAFE_MERGE_RUNS=1 as a prefix allows the diagnostic run on a throwaway copy that memories/office-open-xml.md describes."
           }
         ]
       },

@@ -114,24 +114,13 @@ The fragment above carries the mechanics, the failure modes each check catches, 
 
 ## Timestamp recaps in local time
 
-[`shared/workflow/timestamp-local-recaps.md`](shared/workflow/timestamp-local-recaps.md)
-
-A status recap or summary carries a timestamp in the user's local zone, so "as of when" is unambiguous when they read it later.
-The rest of this section governs where the time comes from.
-Every clock time you write down --- that recap, a date typed into a file, a time stamped on a forge comment, a session-notebook heading --- comes from a reading taken **in that moment**, in the user's zone (`TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`).
-A reading expires immediately, and the thing that most reliably licenses an invented stamp later is the memory of having honestly measured one earlier: the clock keeps moving while a count of elapsed tool calls does not, so the two drift apart and the drift compounds across comments posted in sequence.
-
-**Print the reading.**
-A reading captured into a shell variable whose only destination is a heredoc never reaches the transcript, so the next stamp you type still comes from a sense of elapsed work --- a reading you cannot quote is not a reading.
-The fragment carries the platform mechanics (Git Bash silently falls back to GMT, so check the `%Z`, and use the PowerShell form when it does), every surface the drift reaches, and the measured cases.
+A status recap carries a timestamp in the user's local zone, and every clock time you write anywhere (a recap, a file, a forge comment, a notebook heading) comes from a reading taken in that moment and printed to the transcript: `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`.
 
 - **Do:** run the clock command on its own, immediately before typing a time anywhere, and quote what it returned.
-- **Do:** derive a time written into a file from a `date` read in the same command that writes it.
-- **Don't:** infer a clock time from how many tool calls or actions have happened since the last real reading.
-- **Don't:** treat an earlier honest measurement as still valid, or a reading the session never observed as one it did.
+- **Don't:** infer a clock time from elapsed tool calls, or treat an earlier reading as still valid.
 
-`hooks/no-unmeasured-clock-claim.py` reads the reply at `Stop` and `hooks/flag-unmeasured-timestamp.py` reads a comment body at `PreToolUse`;
-both warn, never block, when a Pacific clock time appears with no clock read in the transcript since the turn began (ai-config#2903).
+`hooks/no-unmeasured-clock-claim.py` and `hooks/flag-unmeasured-timestamp.py` warn on an unmeasured Pacific time (ai-config#2903).
+Detail, platform mechanics, and cases: [`shared/workflow/timestamp-local-recaps.md`](shared/workflow/timestamp-local-recaps.md).
 
 ## State the actual time when reporting a scheduled check-in
 
@@ -506,23 +495,10 @@ Whenever starting or working on a Pull Request:
 
 ## Check the remote immediately before every push
 
-[`shared/workflow/check-before-pushing.md`](shared/workflow/check-before-pushing.md)
-
-Take a fresh `git ls-remote` reading of the branch immediately before every `git push` --- not at the start of the round, not when you last synced, not when you opened the PR.
-Your own branch is the one you are least likely to check, and an earlier fetch expires like a clock reading.
-
-`--force-with-lease` alone is not the safe form: any background fetch silently satisfies the lease over the very commits it was protecting.
-Always pair it with `--force-if-includes` (Git 2.30.0 or later), and never pair `--force` with the lease, since `--force` disables the lease's checks.
-A `stale info` refusal is not a reason to force either.
-It never says why: the branch may have been deleted (after a squash-merge with auto-delete), a peer may have pushed, or you may never have fetched it.
-`git ls-remote --heads origin <branch>` settles existence and nothing further: empty means deleted.
-Non-empty means the branch is live, so compare its tip against the ref you are pushing before choosing a remedy --- an ancestor tip fast-forwards, and only a diverged one needs a reconcile.
-When it is empty, query `gh pr list --state all --head <branch>` before a plain push.
-MERGED means auto-delete, not a first publish: do not recreate
-(see [`check-before-pushing`](shared/workflow/check-before-pushing.md)).
-Otherwise a plain push is the fix.
-`ALLOW_FORCE_PUSH=1` is an escape valve for a case the guard did not foresee, and using it means stating why.
-`hooks/no-clobbering-push.py` is the mechanism: it refuses a bare force push, whose remedy costs one word, and only warns on a divergence, whose significance it cannot judge.
+Take a fresh `git ls-remote` reading of the branch immediately before every `git push`, and force only with `--force-with-lease --force-if-includes`, never bare `--force` and never as the answer to a `stale info` refusal.
+`hooks/no-clobbering-push.py` refuses a bare force push and warns on a divergence;
+its escape valve `ALLOW_FORCE_PUSH=1` means stating why.
+Detail, the `stale info` diagnosis, and cases: [`shared/workflow/check-before-pushing.md`](shared/workflow/check-before-pushing.md).
 
 ## Keep PR branches synced with main
 
@@ -701,36 +677,10 @@ rather than a fixed reserve.
 
 ## Checklists: Do-Confirm, Read-Do, pause points, killer items
 
-Where a check is mechanical but no instrument can decide it -- because it
-spans several unrelated observations at one moment, like a pre-push sweep --
-the instrument is a **checklist**, and the same discipline applies.
-
-Add one only where a failure is repeatable, expensive, and mechanically
-observable, then get four things right:
-
-- **Type.** *Do-Confirm* (work freely, then stop and confirm) is the default.
-  Use *Read-Do* (read each item and perform it in order) only when
-  reordering the steps changes the answer, or when a step cannot be undone --
-  a merge, a release, session-start freshness.
-- **Pause point.** State the moment it fires as an observable event ("before
-  `git push`", "before reporting the PR ready"), not a topic.
-  A checklist with no trigger is read only by whoever was already careful.
-- **Killer items.** Mark the one or two steps most often skipped and most
-  costly to skip, since a flat list gets triaged under pressure and the
-  dropped item is usually the one that looks like bookkeeping.
-  The known ones: the UMS pass ending `post-merge`/`ardi`, and `wrap-up`'s
-  state sweep.
-- **Length.** Five to nine items, action plus evidence.
-  Past that it has started teaching; move the explanation into the prose
-  above it.
-
-Treat every checklist as a draft until it has been run on real work, and
-treat UMS as its revision loop: when a checklist was followed and the failure
-happened anyway, the finding is about the checklist, not only the incident.
-Don't checklist-ize skills that are mostly design judgment, exploratory
-research, or one-off improvisation.
-
-[`shared/workflow/skill-checklists.md`](shared/workflow/skill-checklists.md)
+Where a check is mechanical but no instrument can decide it, because it spans several unrelated observations at one moment (a pre-push sweep), the instrument is a **checklist**.
+Add one only for a repeatable, expensive, observable failure, default to Do-Confirm (Read-Do only when order matters or a step is irreversible), fire it at an observable pause point, mark its killer items, and keep it to at most nine items.
+Treat UMS as its revision loop.
+Detail, rationale, and cases: [`shared/workflow/skill-checklists.md`](shared/workflow/skill-checklists.md).
 
 ## Never pattern-match blindly: check the purpose transfers
 
@@ -1467,28 +1417,12 @@ Detail, rationale, and cases: [`shared/coding/powershell-cli-safety.md`](shared/
 
 ## Tool transport collapses doubled backslashes
 
-[`shared/coding/heredoc-backslash-collapse.md`](shared/coding/heredoc-backslash-collapse.md)
-
-The sibling of the backtick hazard above, and the same class: content silently transformed between what you type and what the interpreter receives.
-On some transports a doubled `\\` inside a Bash-tool heredoc body arrives as a single `\`, **even with a quoted delimiter** that should make the body literal.
-
-It fails silently and plausibly: the worst case is not a failed assert but a corrupted regex with no syntax error and a green suite.
-
-**It is a property of the environment, not of heredocs**, so measure yours rather than trusting either answer --- it reproduced on Windows MINGW64, and did not reproduce either in a GitHub Actions Linux runner or in a Linux remote Claude Code container --- two different environments, and the second is where many sessions actually execute.
-Knowing the rule also does not stop you tripping it, since nothing about typing an escape sequence announces itself as the trigger.
-
-**So the default is not to carry content in a heredoc at all.**
-Write it with the Write tool (Edit for an existing file) to a uniquely named scratchpad file, and hand the command the path (`git commit -F`, `--body-file`, `python3 script.py`).
-The Write tool passes bytes unchanged, and it cannot be silently skipped the way a heredoc inside a hook-denied Bash call is.
-
-- **Do:** use Write or Edit for any content with a backslash, a backtick, code, or more than a few lines.
-- **Do:** where a heredoc is genuinely unavoidable, build the character with `chr(92)` or a placeholder token before it enters the body, and print `repr()` of the constructed string.
-- **Do:** parse-check or read back any file a heredoc just wrote with escapes in it.
-- **Don't:** embed a patch script, regex, commit message or PR body in a heredoc.
-- **Don't:** type a doubled backslash directly inside a heredoc body, quoted delimiter or not.
-- **Don't:** treat having read this rule as the check --- it was loaded, and the collapse happened anyway.
-
-`hooks/warn-heredoc-doubled-backslash.py` scans a command's heredoc bodies at `PreToolUse` and names the offending line (ai-config#1923, #3362).
+On some transports a doubled `\\` inside a Bash-tool heredoc arrives as a single `\`, even with a quoted delimiter, and it fails silently (a corrupted regex under a green suite).
+Write content with a backslash, backtick, code, or more than a few lines through the Write or Edit tool to a scratchpad file and pass the path;
+where a heredoc is unavoidable, build the character with `chr(92)` and print `repr()` of the result.
+The collapse is a property of the environment, so measure yours rather than assuming either answer.
+`hooks/warn-heredoc-doubled-backslash.py` names an offending line (ai-config#1923, #3362).
+Detail, environment measurements, and cases: [`shared/coding/heredoc-backslash-collapse.md`](shared/coding/heredoc-backslash-collapse.md).
 
 ## Strict Merge Control Policy
 

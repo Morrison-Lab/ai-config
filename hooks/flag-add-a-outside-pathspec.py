@@ -72,48 +72,30 @@ directory.
 import json
 import os
 import re
-import shlex
 import subprocess
 import sys
 
-RX_HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1.*?\n[ \t]*\2\b", re.S)
 
 ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 LEAD_WORDS = {"then", "do", "else", "!", "time", "sudo", "command", "exec",
               "nohup", "env"}
 
-_SHELL_OPS = set("();|&")
 
 
-def _simple_commands(cmd):
-    """Split a shell command into simple-command argv lists; None on error.
+try:
+    _LIB = os.path.join(os.path.dirname(os.path.dirname(
+        os.path.realpath(__file__))), "scripts", "lib")
+    if _LIB not in sys.path:
+        sys.path.insert(0, _LIB)
+    from shellcmd import simple_commands as _simple_commands
+except Exception as _exc:  # broken install: degrade, never block
+    print(f"flag-add-a-outside-pathspec: cannot load "
+          f"scripts/lib/shellcmd.py ({_exc}); "
+          "no command will be checked", file=sys.stderr)
 
-    Same construction as `no-unreviewed-pr.py`'s `_simple_commands`: join
-    `\\`-continued lines, blank heredoc bodies, turn unquoted newlines into
-    `;`, then let `shlex` (in punctuation-aware mode) do the real splitting
-    and dequoting -- so `':!inst/extdata'` arrives as the literal string
-    `:!inst/extdata`, not as an opaque blanked span.
-    """
-    cmd = re.sub(r"\\\r?\n", " ", cmd)
-    cmd = RX_HEREDOC.sub("<<", cmd)
-    cmd = cmd.replace("\n", ";")
-    try:
-        lex = shlex.shlex(cmd, posix=True, punctuation_chars=True)
-        lex.whitespace_split = True
-        toks = list(lex)
-    except ValueError:
+    def _simple_commands(_cmd):
+        """Parse nothing when the shared splitter is missing."""
         return None
-    cmds, cur = [], []
-    for t in toks:
-        if t and set(t) <= _SHELL_OPS:
-            if cur:
-                cmds.append(cur)
-                cur = []
-        else:
-            cur.append(t)
-    if cur:
-        cmds.append(cur)
-    return cmds
 
 
 def _pathspec_value(token):

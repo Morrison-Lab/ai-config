@@ -16,6 +16,7 @@ import argparse
 import datetime
 import importlib.util
 import re
+import shlex
 import shutil
 import sys
 from pathlib import Path
@@ -116,12 +117,12 @@ def plugin_items(home: Path) -> list[tuple[str, Path, str]]:
             if scope == "user":
                 continue
             project = record.get("projectPath")
-            if project:
-                fix = f"cd {project} && claude plugin uninstall {name} --scope {scope}"
+            if project and scope in ("project", "local"):  # the only scopes `uninstall --scope` takes besides user
+                fix = f"cd {shlex.quote(project)} && claude plugin uninstall {name} --scope {scope}"
                 items.append(("keep", Path(project), f"{name} installed at {scope} scope; {fix}"))
             else:
-                items.append(("keep", path, f"{name} installed at {scope} scope with no project path; "
-                                            "remove the record by hand"))
+                items.append(("keep", path, f"{name} installed at {scope} scope; "
+                                            "the CLI cannot remove it here, so remove the record by hand"))
     return items
 
 

@@ -75,12 +75,15 @@ class RetireLeftoverPaths(unittest.TestCase):
         plugins_dir.mkdir()
         record_file = plugins_dir / "installed_plugins.json"
         self.assertEqual(retire.plugin_items(self.home), [])
-        records = [{"scope": "user"}, {"scope": "project", "projectPath": "/old/worktree"}, {"scope": "local"}]
+        records = [{"scope": "user"}, {"scope": "project", "projectPath": "/old/work tree"}, {"scope": "local"},
+                   {"scope": "managed", "projectPath": "/managed"}]
         installed = {"version": 2, "plugins": {"ai-config@Morrison-Lab": records, "other@x": [{"scope": "project"}]}}
         record_file.write_text(json.dumps(installed), encoding="utf-8")
         items = retire.plugin_items(self.home)
-        self.assertEqual([(a, p) for a, p, _ in items], [("keep", Path("/old/worktree")), ("keep", record_file)])
-        self.assertIn("cd /old/worktree && claude plugin uninstall ai-config@Morrison-Lab --scope project", items[0][2])
+        self.assertEqual([(a, p) for a, p, _ in items],
+                         [("keep", Path("/old/work tree")), ("keep", record_file), ("keep", record_file)])
+        self.assertIn("cd '/old/work tree' && claude plugin uninstall ai-config@Morrison-Lab --scope project", items[0][2])
+        self.assertIn("by hand", items[2][2])
         self.write_settings()
         code, out = self.run_main("--retire")
         self.assertEqual(code, 1)

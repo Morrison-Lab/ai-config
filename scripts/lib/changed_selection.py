@@ -32,9 +32,12 @@ _TEXT_SUFFIXES = {".py", ".sh"}
 
 
 def tree_files(root: Path) -> List[str]:
-    """Tracked files plus untracked, non-ignored ones: what a commit of the tree would hold."""
+    """Tracked files plus untracked, non-ignored ones (git ls-files --cached --others)."""
+    # A caller's GIT_DIR, GIT_WORK_TREE or GIT_INDEX_FILE would point git at another tree.
+    env = {k: v for k, v in os.environ.items() if k not in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE")}
     out = subprocess.run(["git", "-C", str(root), "ls-files", "-z", "--cached", "--others",
-                          "--exclude-standard"], capture_output=True, text=True, check=True).stdout
+                          "--exclude-standard"], capture_output=True, check=True, env=env,
+                         encoding="utf-8", errors="surrogateescape").stdout
     return sorted({name for name in out.split("\0") if name})
 
 
@@ -72,7 +75,7 @@ class Selector:
             found: Set[str] = set()
             try:
                 tree = ast.parse(self._read(path))
-            except SyntaxError:  # its imports are unknown, so any suite reaching it runs
+            except (SyntaxError, ValueError, RecursionError):  # imports unknown: select what reads it
                 print(f"warning: cannot parse {path}; selecting what reads it", file=sys.stderr)
                 self.unparsed.add(path)
                 tree = None
@@ -107,14 +110,19 @@ class Selector:
         return seen
 
     def needed(self, seeds: Iterable[str], changed: Iterable[str]) -> bool:
-        """Whether a suite seeded by `seeds` reads a path in `changed` (repo-relative)."""
+        """Whether a suite seeded by `seeds` must run for `changed` (repo-relative paths).
+
+        True when a changed path is under ALWAYS_RUN, is missing from the working
+        tree, or is among the suite's inputs, or when an input cannot be parsed.
+        """
         changed = [posixpath.normpath(c) for c in changed]  # ./x and a/../x match too
         bad = [c for c in changed if posixpath.isabs(c) or c.split("/")[0] in ("..", ".")]
         if bad or not changed:  # an empty list would select nothing and pass vacuously
             raise ValueError(f"changed paths must be a non-empty list of repo-relative files: {bad}")
         # A path gone from the working tree (deleted, or the old side of a rename)
         # cannot be matched against what reads it, so it runs everything.
-        if any(c.startswith(ALWAYS_RUN) or not os.path.lexists(self.root / c) for c in changed):
+        # normpath drops a trailing slash, so compare "scripts/lib" as "scripts/lib/".
+        if any((c + "/").startswith(ALWAYS_RUN) or not os.path.lexists(self.root / c) for c in changed):
             return True
         inputs = self.inputs(seeds)
         return bool(inputs & self.unparsed) or any(c in inputs for c in changed)

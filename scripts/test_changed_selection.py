@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Tests for scripts/lib/changed_selection.py (ai-config#5087)."""
 import io
+import os
 import subprocess
 import sys
 import tempfile
@@ -41,6 +42,10 @@ FILES = {
     "hooks/unrelated.py": "\n",
     "hooks/stale.py": "\n",
     "hooks/broken.py": "def (\n",
+    "hooks/uses_broken.py": "import broken\n",
+    "hooks/nul.py": "x = 1\0\n",
+    "hooks/run.sh": "cat shellcfg.txt\n",
+    "hooks/shellcfg.txt": "\n",
     "scripts/lib/shared.py": "\n",
     "hooks/hooks.json": "{}\n",
     "scripts/test_hooks.py": "\n",
@@ -55,8 +60,9 @@ def _repo(tmp):
     for rel, text in FILES.items():
         (root / rel).parent.mkdir(parents=True, exist_ok=True)
         (root / rel).write_text(text, encoding="utf-8")
-    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=root, check=True)
-    subprocess.run(["git", "add", "-A"], cwd=root, check=True)
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}  # never an outer repo
+    subprocess.run(["git", "init", "-q"], cwd=root, check=True, env=env)
+    subprocess.run(["git", "add", "-A"], cwd=root, check=True, env=env)
     (root / "hooks" / "brand-new.py").write_text("\n", encoding="utf-8")  # untracked
     (root / "hooks" / "stale.py").unlink()  # tracked, deleted without git rm
     return root
@@ -89,6 +95,18 @@ def test_selector():
         with redirect_stderr(err):
             check("a suite reaching an unparsable file always runs, and says so",
                   sel.needed(["hooks/broken.py"], ["hooks/unrelated.py"]) and "hooks/broken.py" in err.getvalue())
+            check("so does a suite importing one", sel.needed(["hooks/uses_broken.py"], ["hooks/unrelated.py"]))
+            check("a file with a NUL byte counts as unparsable", sel.needed(["hooks/nul.py"], ["hooks/unrelated.py"]))
+        check("a shell seed's mentions are read", sel.needed(["hooks/run.sh"], ["hooks/shellcfg.txt"]))
+        check("scripts/lib without its slash selects every suite", sel.needed(seeds, ["scripts/lib/"]))
+        old = os.environ.get("GIT_DIR")
+        os.environ["GIT_DIR"] = str(root / "no-such-git-dir")
+        try:
+            check("a caller's GIT_DIR does not redirect git", "hooks/helper.py" in Selector(root).files)
+        finally:
+            os.environ.pop("GIT_DIR")
+            if old is not None:
+                os.environ["GIT_DIR"] = old
         check("untracked, non-ignored files are indexed", "hooks/brand-new.py" in sel.files)
         check("./ and a/../ spellings are normalised", sel.needed(seeds, ["./hooks/pkg/../helper.py"])
               and not sel.needed(seeds, ["./hooks/unrelated.py"]))

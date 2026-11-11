@@ -1,6 +1,6 @@
 # Tool transport collapses doubled backslashes
 
-Moved out of the auto-loaded `CLAUDE.md` (ai-config#3568), which keeps the rule and its pattern/anti-pattern pairs and links here for the mechanics, the reproducers, the platform measurements and the recurrence records.
+Moved out of the auto-loaded `CLAUDE.md` (ai-config#3568), which keeps a short summary of the rule and links here for the pattern/anti-pattern pairs, the mechanics, the reproducers, the platform measurements and the recurrence records (summary trimmed in ai-config#4685).
 The move changed three things and nothing else: two relative links were repointed for the new depth, every paragraph was reflowed by `scripts/semantic-line-breaks.py`, and the opening sentence's "above" was resolved to the section it used to sit below.
 
 The sibling of the backtick hazard that `CLAUDE.md`'s "PowerShell CLI Command Safety" section covers, and the same class: content silently transformed between what you type and what the interpreter receives.

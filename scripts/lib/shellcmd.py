@@ -20,14 +20,16 @@ identifier search misses it and a migration keyed on that search would leave
 one behind. The loop variable differs between copies too (`t` in some, `tok`
 in others), which is why a use-site grep is the wrong query as well.
 
-The bodies are identical, and so is the heredoc defect `_heredoc_free` fixes
-below -- which is the argument for a module rather than a ninth copy. Those
-eight are NOT rewired here: migrating eight live guards, two of which can
-REFUSE (`no-clobbering-push.py` denies, `no-unreviewed-pr.py` blocks; the
-other six only add context), is its own change with its own review, tracked
-as ai-config#3178 --- not by the closed ai-config#2993, which reported the
-defect and shipped this module rather than the migration. This module
-is where the fix landed and where new callers import from.
+The bodies were identical, and so was the heredoc defect `_heredoc_free`
+fixes below -- which is the argument for a module rather than a ninth copy.
+The six that only add context now import `simple_commands` from here
+(ai-config#3178). The two that can REFUSE (`no-clobbering-push.py` denies,
+`no-unreviewed-pr.py` blocks) still carry their copies, and their migration
+is a separate review under the same issue. The same grep also finds later
+copies outside the original eight (`guard-slide-major-tag.py`,
+`no-binary-file-read.py`, `no-interpreter-heredoc.py`), which belong to the
+same migration. This module is where the fix landed and where new callers
+import from.
 
 WHY AN ARGV SPLIT RATHER THAN A REGEX
 -------------------------------------
@@ -46,8 +48,8 @@ THREE LIMITS, ALL INHERITED FROM THE EIGHT COPIES
 The heredoc pre-pass and the newline rewrite run on RAW TEXT, ahead of `shlex`,
 so neither knows the quoting rules the paragraph above credits `shlex` with.
 State that here rather than letting the argv-split argument imply otherwise --
-this docstring is the contract ai-config#3178 will migrate eight live guards
-onto, two of which can refuse.
+this docstring is the contract ai-config#3178 migrates the copies onto,
+two of which can refuse.
 
   * `RX_HEREDOC_OPEN` is QUOTE-BLIND. A `<<` inside a quoted argument -- a commit
     message that mentions a heredoc, say -- can be treated as a real operator,
@@ -110,7 +112,7 @@ fails BOTH ways -- a phantom command and a hidden one -- and is stated
 separately for that reason. Fixing any of them
 means a quote-aware pre-scan, which is a real parser and out of scope for an
 extraction; ai-config#3178 is where that belongs, alongside migrating the
-eight copies.
+remaining copies.
 """
 from __future__ import annotations
 
@@ -187,7 +189,7 @@ def _heredoc_free(command):
     """Blank heredoc BODIES, leaving the surrounding shell intact.
 
     The substitution is `" << "`, with the spaces, and they are load-bearing.
-    Substituting a bare `"<<"` -- what all eight copies of this function do --
+    Substituting a bare `"<<"` -- what the eight former copies of it did --
     leaves `<<` flush against the newline that the caller then rewrites to `;`.
     `shlex` with `punctuation_chars=True` emits that run as the SINGLE token
     `<<;`, whose character set is not a subset of `_SHELL_OPS` (which has no
@@ -538,7 +540,7 @@ def resolve_cd_target(rest: list[str], cur_dir: str | None) -> str | None:
     `_resolve_cd_target`, which is the tested in-repo implementation. This is
     a COPY and not a move: that guard still holds its own, because it can
     refuse a push and migrating a deny-capable guard is its own change with
-    its own review --- the same call this module's header makes for the eight
+    its own review --- the same call this module's header makes for the two refusing
     `_simple_commands` copies. The duplication that leaves is tracked as
     ai-config#3177, not by the closed ai-config#2993, whose scope is
     `_simple_commands` and `_strip_env`. New callers import from here.

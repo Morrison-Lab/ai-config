@@ -572,7 +572,10 @@ def _post_method(argv):
     return False
 
 
-RX_SHORT_METHOD = re.compile(r"^-[A-Za-z]*X")
+# `gh api` shorthands that take a value (`gh api --help`): -X method,
+# -f/-F fields, -H header, -p preview, -q jq, -t template. `-i` is boolean.
+GH_API_SHORT_VALUE = "XfFHpqt"
+GH_API_FIELD_LONG = ("--field", "--raw-field")
 
 
 def _gh_api_post(argv):
@@ -583,18 +586,47 @@ def _gh_api_post(argv):
     (ai-config#1397). Any explicit method other than POST (a GET that checks
     who is requested, a DELETE that removes a reviewer) is not, which is why
     this does not reuse _mutating_api: that one counts a DELETE as a write.
+
+    gh parses flags with pflag, so this walks argv the same way: a flag's
+    value is consumed and never read as a flag (`-q -f` is a jq filter of
+    `-f`, not a field), a short-flag cluster such as `-iX GET` sets the
+    method, and the last method flag wins (`-X POST -X GET` is a GET).
     """
-    if _post_method(argv):
-        return True
-    for a in argv:
-        au = a.upper()
-        # A short-flag cluster such as `-iX GET` or `-iXDELETE` sets the
-        # method too (gh parses flags with pflag), so any single-dash token
-        # whose letters reach an X is an explicit method.
-        if au in ("-X", "--METHOD") or au.startswith("--METHOD=") \
-                or RX_SHORT_METHOD.match(a):
-            return False
-    return _has_flag(argv, "-f", "--raw-field", "-F", "--field")
+    method = None
+    has_field = False
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        i += 1
+        if a == "--":
+            break
+        if a.startswith("--"):
+            name, eq, val = a.partition("=")
+            if name in _API_VALUE_FLAGS and not eq and i < len(argv):
+                val = argv[i]
+                i += 1
+            if name == "--method":
+                method = val.upper()
+            elif name in GH_API_FIELD_LONG:
+                has_field = True
+            continue
+        if not a.startswith("-") or len(a) < 2:
+            continue
+        for j, c in enumerate(a[1:], start=1):
+            if c not in GH_API_SHORT_VALUE:
+                continue
+            val = a[j + 1:]
+            if not val and i < len(argv):
+                val = argv[i]
+                i += 1
+            if c == "X":
+                method = val.upper()
+            elif c in "fF":
+                has_field = True
+            break
+    if method is not None:
+        return method == "POST"
+    return has_field
 
 
 def _url_ident(url):

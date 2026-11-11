@@ -203,6 +203,19 @@ REQUEST_METHOD_CORPUS = [
     (REQ_PATH + " -iXDELETE" + REQ_FIELDS, False),
     (REQ_PATH + " -i" + REQ_FIELDS, True),
     (REQ_PATH, False),
+    # A flag's value is not a flag: here `-f` is the jq filter of `-q`, so
+    # no field is sent and gh issues a GET.
+    (REQ_PATH + " -q -f", False),
+    (REQ_PATH + " --jq -f", False),
+    # gh takes the last method flag.
+    (REQ_PATH + " -X POST -X GET" + REQ_FIELDS, False),
+    (REQ_PATH + " --method POST --method GET" + REQ_FIELDS, False),
+    (REQ_PATH + " -X GET --method POST" + REQ_FIELDS, True),
+    # A glued field value still sends a field.
+    (REQ_PATH + " -freviewers[]=x", True),
+    (REQ_PATH + " -if reviewers[]=x", True),
+    # After `--` every token is positional, so this `-f` sends no field.
+    (REQ_PATH + " -- -f x", False),
     ("curl -s https://api.github.com/repos/o/r/pulls/1038/requested_reviewers"
      " -f x", False),
 ]

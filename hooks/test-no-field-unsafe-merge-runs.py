@@ -36,7 +36,19 @@ for cmd in ["python3 /mnt/skills/public/docx/scripts/merge_runs.py doc.docx",
             "PYTHONPATH=x python3 merge_runs.py a.docx",
             "uv run merge_runs.py a.docx", "./merge_runs.py a.docx",
             "timeout 60 python3 merge_runs.py a.docx",
-            "python3 -c 'from merge_runs import merge_runs; merge_runs(\"u\")'"]:
+            "python3 -c 'from merge_runs import merge_runs; merge_runs(\"u\")'",
+            "for f in *.docx; do python3 merge_runs.py $f; done",
+            "if true; then python3 merge_runs.py a.docx; fi",
+            "bash -c 'python3 merge_runs.py a.docx'",
+            "python3 -m merge_runs a.docx", "python3 -Im merge_runs a.docx",
+            "python3 -c 'import os, merge_runs'",
+            "python3 - <<'EOF'\nimport merge_runs\nEOF",
+            "sudo -u bob python3 merge_runs.py a.docx",
+            "ls *.docx | xargs python3 merge_runs.py",
+            "python3 merge_runs.py a.docx ALLOW_FIELD_UNSAFE_MERGE_RUNS=1",
+            "python3 merge_runs.py a.docx # ALLOW_FIELD_UNSAFE_MERGE_RUNS=1",
+            "python3 merge_runs.py a.docx; ALLOW_FIELD_UNSAFE_MERGE_RUNS=1 python3 x.py",
+            "ALLOW_FIELD_UNSAFE_MERGE_RUNS=10 python3 merge_runs.py a.docx"]:
     check(f"denies {cmd}", denied(bash(cmd)))
 
 for cmd in ["python3 scripts/docx-merge-runs-field-safe.py doc.docx",
@@ -44,8 +56,14 @@ for cmd in ["python3 scripts/docx-merge-runs-field-safe.py doc.docx",
             "md5sum /mnt/skills/public/docx/scripts/merge_runs.py",
             "cat merge_runs.py", "git commit -m 'note merge_runs.py defect'",
             "python3 scripts/test_docx_merge_runs_field_safe.py",
-            "ALLOW_FIELD_UNSAFE_MERGE_RUNS=1 python3 merge_runs.py pristine.docx"]:
+            "ALLOW_FIELD_UNSAFE_MERGE_RUNS=1 python3 merge_runs.py pristine.docx",
+            "python3 -m pytest merge_runs.py", "python3 -c 'print(1)' merge_runs.py",
+            "python3 - <<'EOF'\nprint('merge_runs')\nEOF"]:
     check(f"allows {cmd}", not denied(bash(cmd)))
+res = subprocess.run([sys.executable, HOOK], input="not json",
+                     capture_output=True, encoding="utf-8")
+check("unreadable input says so on stderr and denies nothing",
+      res.returncode == 0 and not res.stdout.strip() and "unreadable" in res.stderr)
 check("ignores other tools",
       not denied({"tool_name": "Read", "tool_input": {"file_path": "merge_runs.py"}}))
 

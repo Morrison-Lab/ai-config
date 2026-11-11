@@ -14,8 +14,11 @@ prompting the reflex.
 
 A Bash command in which a Python interpreter (`python`, `python3`,
 `python3.12`, `py`, `uv run`) runs a script whose basename is
-`merge_runs.py`, the script is run directly (`./merge_runs.py`), or inline
-code imports `merge_runs`.  The deny names
+`merge_runs.py` (its first positional argument), runs the module
+`merge_runs` with `-m`, or reads code that imports `merge_runs` from `-c` or
+from stdin; or the script is run directly (`./merge_runs.py`).  Leading
+assignments, wrappers (`sudo -u x`, `timeout 60`, `xargs`), shell keywords
+(`do`, `then`, `{`) and a shell's `-c` string are looked through.  The deny names
 `scripts/docx-merge-runs-field-safe.py`, which takes the same arguments and
 keeps runs holding field markers apart, so a refusal is always satisfiable
 in one retry: on a document with no field codes the wrapper does exactly
@@ -23,12 +26,18 @@ what the skill's script does.
 
 The one reason to run the skill's script itself is the diagnostic recipe in
 `memories/office-open-xml.md`, which runs it on a throwaway copy to see
-whether it caused a scrambled document.  Prefix that command with
-`ALLOW_FIELD_UNSAFE_MERGE_RUNS=1`.
+whether it caused a scrambled document.  Put
+`ALLOW_FIELD_UNSAFE_MERGE_RUNS=1` among the leading assignments of that
+simple command; anywhere else (an argument, a comment, another command) it
+exempts nothing.
 
-Mentions pass: `grep merge_runs.py`, `cat .../merge_runs.py`, `md5sum`.
+Mentions pass: `grep merge_runs.py`, `cat .../merge_runs.py`, `md5sum`, and
+`merge_runs.py` as a later argument (`python3 -m pytest merge_runs.py`).
 
-Known gap: a script file of your own that imports `merge_runs` is not read.
+Known gaps: a script file of your own that imports `merge_runs` is not read,
+and neither is a copy of the skill's script under another name.
+If `scripts/lib/shellcmd.py` cannot load, the hook says so on stderr and
+gates nothing, as the other shellcmd-based hooks do.
 
 Run with `--dry-run '<command>'` to see the verdict without acting.
 """
@@ -42,53 +51,89 @@ try:
     _LIB = os.path.join(os.path.dirname(_HERE), "scripts", "lib")
     if _LIB not in sys.path:
         sys.path.insert(0, _LIB)
-    from shellcmd import simple_commands
+    from shellcmd import simple_commands, shell_c_expansions
 except Exception as _exc:
     print(f"no-field-unsafe-merge-runs: cannot load scripts/lib/shellcmd.py "
           f"({_exc}); not gating", file=sys.stderr)
-    simple_commands = None
+    simple_commands = shell_c_expansions = None
 
 TARGET = "merge_runs.py"
 SAFE = "scripts/docx-merge-runs-field-safe.py"
 PYTHON = re.compile(r"^(?:python(?:\d+(?:\.\d+)*)?|py|pypy\d*)$")
 ENV_ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
-WRAPPERS = {"sudo", "env", "command", "exec", "nohup", "time", "nice", "timeout"}
-ESCAPE = re.compile(r"(?:^|\s)ALLOW_FIELD_UNSAFE_MERGE_RUNS=1\s")
-IMPORT = re.compile(r"\b(?:import\s+merge_runs|from\s+merge_runs\s+import)\b")
+WRAPPERS = {"sudo", "doas", "env", "command", "exec", "nohup", "time", "nice",
+            "ionice", "stdbuf", "timeout", "xargs"}
+KEYWORDS = {"!", "{", "(", "if", "then", "elif", "else", "while", "until", "do"}
+LOOKAHEAD = 4
+ESCAPE = "ALLOW_FIELD_UNSAFE_MERGE_RUNS=1"
+USES = re.compile(r"\bimport\b[^\n;]*\bmerge_runs\b|\bfrom\s+merge_runs\s+import\b"
+                  r"|import_module\(\s*['\"]merge_runs['\"]")
+
+
+def _runs_something(tok):
+    name = os.path.basename(tok)
+    return bool(PYTHON.match(name)) or name in (TARGET, "uv")
 
 
 def _program(argv):
-    """ARGV with assignments and simple wrappers peeled off the front."""
-    rest, after_wrapper = list(argv), False
+    """(leading assignments, ARGV from its program token on)."""
+    rest, env = list(argv), []
     while rest:
         tok = rest[0]
-        if ENV_ASSIGNMENT.match(tok) or tok in WRAPPERS:
-            after_wrapper = after_wrapper or tok in WRAPPERS
-        elif not (after_wrapper and re.match(r"^(?:-|\d)", tok)):
+        if ENV_ASSIGNMENT.match(tok):
+            env.append(tok)
+        elif tok in WRAPPERS:
+            window = rest[1:1 + LOOKAHEAD]
+            hit = next((i for i, t in enumerate(window, 1) if _runs_something(t)), 1)
+            rest = rest[hit:]
+            continue
+        elif tok not in KEYWORDS:
             break
         rest = rest[1:]
     if rest and os.path.basename(rest[0]) == "uv" and rest[1:2] == ["run"]:
         rest = rest[2:]
-    return rest
+    return env, rest
+
+
+def _python_runs_it(args, command):
+    """True when an interpreter given ARGS runs or imports merge_runs."""
+    i = 0
+    while i < len(args):
+        tok = args[i]
+        if tok in ("-W", "-X", "-Q"):
+            i += 2
+            continue
+        if tok.startswith("-") and not tok.startswith("--") and len(tok) > 1:
+            flags = tok[1:]
+            pos = min((flags.find(f) for f in "cm" if f in flags), default=-1)
+            if pos >= 0:
+                value = flags[pos + 1:] or (args[i + 1] if i + 1 < len(args) else "")
+                if flags[pos] == "m":
+                    return value == "merge_runs"
+                return bool(USES.search(value))
+            i += 1
+            continue
+        if tok.startswith("--"):
+            i += 1
+            continue
+        if tok == "-":
+            break
+        return os.path.basename(tok) == TARGET
+    return bool(USES.search(command))  # code read from stdin, e.g. a heredoc
 
 
 def runs_merge_runs(command):
     """The offending simple command, joined, or None."""
-    if simple_commands is None or ESCAPE.search(command):
+    if simple_commands is None:
         return None
-    for argv in simple_commands(command) or []:
-        rest = _program(argv)
-        if not rest:
-            continue
-        prog = os.path.basename(rest[0])
-        if prog == TARGET:
-            return " ".join(argv)
-        if not PYTHON.match(prog):
-            continue
-        if any(os.path.basename(tok) == TARGET for tok in rest[1:]):
-            return " ".join(argv)
-        if any(IMPORT.search(tok) for tok in rest[1:]):
-            return " ".join(argv)
+    for piece in shell_c_expansions(command):
+        for argv in simple_commands(piece) or []:
+            env, rest = _program(argv)
+            if not rest or ESCAPE in env:
+                continue
+            prog = os.path.basename(rest[0])
+            if prog == TARGET or (PYTHON.match(prog) and _python_runs_it(rest[1:], piece)):
+                return " ".join(argv)
     return None
 
 

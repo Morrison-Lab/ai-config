@@ -158,7 +158,8 @@ The field's marker runs survive, the result runs between `separate` and `end` st
 Measured 2026-11-11 on the 2026-10-08 synthetic paragraph, with its result split into two runs: the wrapper kept all four marker runs, merged the result runs, and its pandoc conversion matched the original's (`scripts/test_docx_merge_runs_field_safe.py`, part 2).
 Rendering in Word was not checked.
 Before touching its input, the wrapper runs the patched script on a one-field paragraph of its own and exits 3 if the field's marker runs did not survive, which is how a change to the skill's script shows up.
-`hooks/no-field-unsafe-merge-runs.py` denies running the skill's script directly and names the wrapper.
+`hooks/no-field-unsafe-merge-runs.py` denies running the skill's script, as a script, a `-m` module or an import, and names the wrapper;
+its docstring lists what it cannot see, such as a renamed copy of the script.
 `ALLOW_FIELD_UNSAFE_MERGE_RUNS=1` as a prefix is only for the diagnostic recipe above, on a throwaway copy.
 
 - **Do:** merge runs with `scripts/docx-merge-runs-field-safe.py`, which takes the skill script's arguments, and re-run the recipe above with the wrapper in place of the skill's script before delivering: the diff should be empty.

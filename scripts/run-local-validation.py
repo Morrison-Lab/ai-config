@@ -483,8 +483,13 @@ def _populated_submodules(top: Path) -> List[str]:
     gitmodules = top / ".gitmodules"
     if not gitmodules.is_file():
         return []
-    out = _git(top, "config", "-f", str(gitmodules), "--get-regexp", r"^submodule\..*\.path$")
-    paths = [line.split(" ", 1)[1] for line in out.splitlines() if " " in line]
+    proc = subprocess.run(["git", "-C", str(top), "config", "-f", str(gitmodules), "--get-regexp",
+                           r"^submodule\..*\.path$"], capture_output=True, text=True)
+    if proc.returncode == 1:  # no entry matched: a .gitmodules naming no submodule
+        return []
+    if proc.returncode != 0:
+        raise subprocess.CalledProcessError(proc.returncode, proc.args, proc.stdout, proc.stderr)
+    paths = [line.split(" ", 1)[1] for line in proc.stdout.splitlines() if " " in line]
     return [p for p in paths if (top / p).is_dir() and any((top / p).iterdir())]
 
 
@@ -526,6 +531,8 @@ def snapshot(root: Path):
             # A new worktree leaves each submodule empty; link the checked-out ones.
             for path in _populated_submodules(top):
                 target = wt / path
+                if not target.parent.is_dir():
+                    continue  # the snapshot commit does not hold this submodule
                 if target.is_dir():
                     target.rmdir()
                 target.symlink_to(top / path, target_is_directory=True)
@@ -539,7 +546,8 @@ def snapshot(root: Path):
             proc = subprocess.run(["git", "-C", str(top), "worktree", "remove", "--force", str(wt)],
                                   capture_output=True, text=True)
             if proc.returncode != 0:
-                print(f"warning: could not remove snapshot worktree {wt}: {proc.stderr.strip()}",
+                print(f"warning: could not remove snapshot worktree {wt}: {proc.stderr.strip()}; "
+                      "`git worktree prune` clears its record once the directory is gone",
                       file=sys.stderr)
         shutil.rmtree(holder, ignore_errors=True)
 

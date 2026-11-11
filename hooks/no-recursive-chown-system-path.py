@@ -163,9 +163,11 @@ MAX_NESTING = 32
 # `${A%/}`), any of which can rebuild a protected path (`/e${HOME:+tc}` is
 # `/etc`). The operand is refused, with its own reason.
 UNREAD = ("/", False)
-UNREAD_WHY = ("which uses a `${...}` operator this guard does not read, here or "
-              "in an earlier assignment (anything but a `-`/`=` default or a `?` "
-              f"check, or defaults nested deeper than {MAX_NESTING}); write the path out")
+UNREAD_WHY = ("whose value this guard does not read, here or in an earlier assignment: "
+              "a `${...}` operator other than a `-`/`=` default or a `?` check, defaults "
+              f"nested deeper than {MAX_NESTING}, a positional parameter, `$_`, `$OLDPWD`, "
+              "a name set by `read`, `getopts` or `printf -v`, or a relative value from "
+              "`$PWD` after a `cd` that may not run; write the path out")
 # Words that open and close a compound command, for `_scan`'s DEPTH.
 BLOCK_OPEN = {"if", "while", "until", "for", "select", "case"}
 BLOCK_CLOSE = {"fi", "done", "esac"}
@@ -524,9 +526,10 @@ def _assignments(argv, store, visible, home, here):
     rest = argv[lead + 1:]
     if lead < len(argv) and argv[lead] in READ_BUILTINS:
         # Every bare name may be one it sets (options' values included), and
-        # with none, read sets REPLY and mapfile sets MAPFILE; getopts also
-        # sets OPTARG.
-        for word in [*rest, "REPLY", "MAPFILE", "OPTARG"]:
+        # with none, read sets REPLY and mapfile sets MAPFILE; getopts sets
+        # only the name after its option string, and OPTARG.
+        names = rest[1:2] if argv[lead] == "getopts" else rest
+        for word in [*names, "REPLY", "MAPFILE", "OPTARG"]:
             if NAME.fullmatch(word):
                 store[word] = visible[word] = UNREAD
         return False
@@ -608,7 +611,8 @@ def _per_dir(dirs, home, store, visible, step):
     With one directory this is a plain call. With several, `$PWD` differs
     between them (`if [ -d x ]; then cd x; fi; X=$PWD`), so each name STEP
     assigns keeps, of its readings, one that is protected or refused, else
-    the last; a later use of it is then judged as the worst case.
+    the last; a later use of it is then judged as the worst case. Relative
+    readings that differ are refused, since a later `cd` decides them.
     """
     if len(dirs) == 1:
         return step(store, visible, dirs[0])
@@ -618,6 +622,11 @@ def _per_dir(dirs, home, store, visible, step):
         runs.append((step(st, vis, d), st))
     for name in dict.fromkeys(n for _, st in runs for n in st):
         readings = [st[name] for _, st in runs if name in st]
+        relative = any(r and r is not UNREAD and not r[0].startswith("/") for r in readings)
+        if relative and len(set(readings)) > 1:
+            # Judged where it is used, against a directory not known here.
+            store[name] = visible[name] = UNREAD
+            continue
         store[name] = visible[name] = next(
             (r for r in readings if r is UNREAD or r and r[0].startswith("/")
              and _why(os.path.normpath(r[0]), home, r[1])), readings[-1])

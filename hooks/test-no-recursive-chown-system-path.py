@@ -301,6 +301,10 @@ class Denies(unittest.TestCase):
                     'if [ -d proj ]; then cd proj; fi; : "${ROOT:=$PWD}"; chown -R me "$ROOT"'):
             self.assert_denied(cmd, cwd=cwd)
 
+    def test_relative_pwd_value_after_a_cd_that_may_not_run(self):
+        self.assert_denied('if [ -d proj ]; then cd proj; fi; D="./$PWD/../.."; cd /tmp; '
+                           'chown -R me "$D"', cwd=HOME)
+
     def test_current_directory_named_another_way(self):
         for cmd in ('sudo chown -R "$USER" "$(pwd)"', 'X=$(pwd -P); chown -R me "$X"',
                     "chown -R me `pwd`", "chown -R me ~+"):
@@ -426,6 +430,9 @@ class Allows(unittest.TestCase):
         self.assert_allowed('if [ -d build ]; then cd build; fi; X=$PWD; chmod -R u+w "$X"')
         self.assert_allowed('if [ -d build ]; then cd build; fi; MYPWD=./x; chmod -R u+w "$MYPWD"')
         self.assert_allowed("bash -c 'd=$PWD/build; chmod -R u+w \"$d\"'")
+
+    def test_getopts_option_string_is_not_a_name(self):
+        self.assert_allowed('d=./build; while getopts d o; do :; done; chmod -R 755 "$d"')
 
     def test_current_directory_inside_a_project(self):
         for cmd in ('chmod -R u+w "$(pwd)/build"', "chmod -R u+w ~+/build",

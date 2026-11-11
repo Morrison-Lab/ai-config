@@ -50,7 +50,7 @@ So ask separately what a procedure costs *by construction*: always-loaded conten
 The deliverable is a change to the corpus --- fixed in stride when small, filed with its measurement when not, per `report-mistakes-proactively` --- never a quieter run of the same procedure.
 That last clause covers a loop you armed yourself: once repeated firings return the same reading, delete the routine rather than lengthening its interval.
 `python3 scripts/check-context-closure.py` is the built instrument for the always-loaded pool.
-It fails CI once the closure passes the Claude Code CLI's own total instruction limit (less a margin for a repo `CLAUDE.md`), and this repo's CI also fails on its 100,000-byte budget, the same number counted in bytes, which trips first (`--strict`, ai-config#4685);
+It fails CI once the closure passes the Claude Code CLI's own total instruction limit (less a margin for a repo `CLAUDE.md`), and this repo's CI also fails on its 100,000-byte budget, which mirrors that limit's 100,000 characters in bytes and so fails first (`--strict`, ai-config#4685);
 for a consumer measured without `--strict`, read an over-budget line as the prompt it is.
 Two boundaries.
 Efficiency never outranks correctness, so no saving is bought with a skipped check.

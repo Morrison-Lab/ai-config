@@ -89,7 +89,7 @@ line is a prompt to decide what comes out, not a defect that should block an
 unrelated PR. Under `--strict` in `--compare` mode, a bump that would cross
 the budget fails too, even while the current pin is under it.
 
-**The CLI's two limits are not advisory**, and neither is ours. The closure's
+**The CLI's two limits are not advisory.** The closure's
 total is gated against the CLI's own total limit (above). The root file
 also has the CLI's per-file limit, stated in CHARACTERS (`--root-char-cap`,
 default 150,000, the per-file limit on a 1M-context current model). Both

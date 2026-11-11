@@ -480,8 +480,9 @@ jobs:
         # against the then 200,000-byte budget (ai-config#2636); the default
         # is now 100,000, mirroring the CLI char gate below.
         #
-        # The byte budget then stayed advisory, on the argument that gating
-        # the total risks flapping on legitimate doc changes (ai-config#695).
+        # The byte budget then stayed advisory: crossing it was to be a
+        # prompt for pruning, not a defect that blocks an unrelated PR, the
+        # stance ai-config#695 settled for the memory-file check.
         # It now runs under --strict (ai-config#4685). The advisory report sat
         # over budget on main for weeks -- "OVER BUDGET by 3,237 bytes" on
         # 2026-10-22, 3,133 on 2026-11-11 -- while CI stayed green, so

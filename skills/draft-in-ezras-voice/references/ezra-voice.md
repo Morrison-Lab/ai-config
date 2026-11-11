@@ -32,8 +32,8 @@ Keep it free of FERPA data and of agent-written text.
 
 ## Canvas announcements to students
 
-Learned from nine of his own announcements (2026-10-19 to 2026-11-05).
-The sources are his bodies only, never replies, student posts, or student data.
+Learned from nine of his own announcements (2026-10-19 to 2026-11-05), plus his edit of one draft (2026-11-11), which each dated trait names.
+The sources are his bodies and edits only, never replies, student posts, or student data.
 
 - **Opening.**
   "Hi all," by default, "Hi folks," or "Hi again," for a same-day follow-up.

@@ -126,12 +126,11 @@ CURL_VALUE_OPTS = frozenset({
     "--data-urlencode", "--form", "--form-string", "--json", "-H", "--header", "-e",
     "--referer", "-o", "--output", "-x", "--proxy", "-u", "--user",
 })
-# The probe word itself was missing (`which` not installed), or the call never
-# ran (a hook, classifier or user refusal; no-stale-pr-status's RX_NEVER_RAN).
+# The probe word itself was missing (`which` not installed): no evidence.
 RX_PROBE_MISSING = re.compile(r"\b(?:which|command): (?:command )?not found|"
                               r"not found: (?:which|command)\b|\bwhich: [^\n]*No such file")
-RX_NEVER_RAN = re.compile(r"^\s*(?:PreToolUse:[^\n]*hook error:|Permission for this action"
-                          r" was denied|The user doesn't want to proceed)", re.I)
+# An errored call that RAN; a refused one (hook, classifier, user) never says this.
+RX_RAN_FAILED = re.compile(r"^(?:\s|\\n)*Exit code [1-9]")
 RX_AGY_TRANSCRIPT_PATH = re.compile(
     r"(?:^|/)(?:\.gemini/antigravity/|brain/[^/]+/\.system_generated/logs/transcript)")
 AGY_RECORD_TYPES = frozenset({
@@ -413,14 +412,13 @@ def scan(sib, path, clis, recs=None):
                 seq_call, review_seq, attempts, probes = pending.pop(
                     b["tool_use_id"])
                 text = sib._result_text(b)
-                if rec.get("toolDenialKind") or RX_NEVER_RAN.match(text):
+                if b.get("is_error") and not RX_RAN_FAILED.match(text):
                     continue  # a refused call ran nothing: no attempt, no probe
                 if review_seq is not None and not b.get("is_error"):
                     reviews.append(review_seq)
                 for route in attempts:
                     cleared[route] = seq_call
-                # Only an errored probe (exit 1) shows a name absent.
-                valid = b.get("is_error") and not RX_PROBE_MISSING.search(text)
+                valid = b.get("is_error") and not RX_PROBE_MISSING.search(text)  # exit 1 only
                 for probed in probes if valid else []:
                     if probed in clis and _absent(probed, text):
                         cleared["absent:" + probed] = seq_call

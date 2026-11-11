@@ -367,7 +367,7 @@ def main():
     def probe(cmd, out="Exit code 1", err=True):
         return step(cmd, out=out, is_error=err)
     oc = [probe("curl -sS https://opencode.ai/zen/go/v1/chat/completions"
-                " -d @req.json", out="curl: (56) CONNECT 403")]
+                " -d @req.json", out="Exit code 56\ncurl: (56) CONNECT 403")]
     probe_all = [probe("command -v " + clis4)] + oc
     check("silent after every route was probed and found unrunnable",
           not run(MERGE, probe_all)[0])
@@ -380,12 +380,15 @@ def main():
         probe("which codex agy", "/usr/bin/codex"),
         probe("command -v agy gemini cursor-agent")] + oc)[0])
     check("warns when the probe was refused and never ran", run(MERGE, [probe(
-        "command -v %s; gh pr merge 1" % clis4, "PreToolUse:Bash hook error: x")] + oc)[0])
+        "command -v %s; gh pr merge 1" % clis4, "PreToolUse:Bash hook error: x")] + oc)[0] and run(
+        MERGE, [probe("command -v " + clis4, "\\n\n Permission for this action was denied")] + oc)[0])
+    check("warns when the opencode attempt was refused", run(MERGE, probe_all[:1] + [
+        dict(oc[0], out="The user doesn't want to proceed with this tool use")])[0])
     check("silent when a missing CLI's 'command not found' shares the probe call", not run(
-        MERGE, [probe("codex x; command -v agy gemini cursor-agent", "bash: codex: command not found")] + oc)[0])
+        MERGE, [probe("codex x; command -v agy gemini cursor-agent", "Exit code 1\nbash: codex: command not found")] + oc)[0])
     check("silent when an installed CLI was attempted and errored", not run(
         MERGE, [probe("command -v agy gemini cursor-agent"),
-                probe("codex exec 'review the diff'", "backend down")] + oc)[0])
+                probe("codex exec 'review the diff'", "Exit code 1\nbackend down")] + oc)[0])
     check("warns when the probe's stdout was redirected away", run(
         MERGE, [probe("command -v %s >/dev/null" % clis4, "")] + oc)[0])
     check("warns when the probe exited 0 with empty output", run(
@@ -417,7 +420,7 @@ def main():
                                " -d @req.json")])[0])
     check("warns when the probe word itself was not installed",
           run(MERGE, [step("which codex agy gemini cursor-agent",
-                           out="bash: which: command not found",
+                           out="Exit code 127\nbash: which: command not found",
                            is_error=True)] + probe_all[1:])[0])
     check("warns after an Ollama Cloud curl with no payload",
           run(MERGE, [step("curl -sS https://api.ollama.com/api/chat")])[0])

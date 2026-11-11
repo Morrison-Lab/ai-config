@@ -398,6 +398,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/small-prs.md` | Ezra, 2026-10-23: "don't allow massive sweep PRs like pds#244 anymore; do them in minimal batches", and "every PR should be as small and focused as it can be... |  |
 | `shared/workflow/stack-dont-pause.md` | The clear-all family --- `ardia`, `gia`, `gii`, `gip`, and the `clear-all` alias --- clears a whole queue of PRs and issues in one run. Merging stays human-g... |  |
 | `shared/workflow/standing-habits-from-ezra.md` | Ezra (d-morrison) gave these rules in the DATA 571 project on 2026-10-02, except where a section says otherwise. They apply in every project, per the global-... |  |
+| `shared/workflow/start-or-file.md` | When the user asks whether to do something, or how to do it, answer with a recommendation and stop before implementing. End the answer with one question: sta... |  |
 | `shared/workflow/state-check-in-time.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/workflow/status-requests-act.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/workflow/strict-merge-policy.md` | Merging a Pull Request or Merge Request is strictly controlled across all agents and harnesses. |  |

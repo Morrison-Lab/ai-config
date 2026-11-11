@@ -108,6 +108,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-start-or-file-on-question.py\"",
+            "timeout": 10,
+            "script": "remind-start-or-file-on-question.py",
+            "why": "Ezra 2026-11-10 (ai-config#5287): a whether-or-how question gets a recommendation and a start-now-or-file-for-later ask; only a declarative instruction starts implementation. Injects, never blocks, on question-form prompts: question versus instruction is a reading of intent, so no deny can decide it (shared/workflow/start-or-file.md)."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-record-standing-guidance.py\"",
             "timeout": 10,
             "script": "remind-record-standing-guidance.py",

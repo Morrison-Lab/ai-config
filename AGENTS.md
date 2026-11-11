@@ -207,10 +207,10 @@ Detail: [`dont-get-sidetracked`](shared/workflow/dont-get-sidetracked.md).
 Whenever asking the user a question or presenting options for a genuine decision, always provide a clear, specific recommendation.
 Soft open-ended prompts that present choices count as decision points and must include a concrete recommendation.
 If an action is already authorized under standing rules, do the work and report in past tense per [`no-cop-out-offers`](shared/workflow/no-cop-out-offers.md).
-Repeat the recommendation in one line every time a decision item is restated in a status list.
+A user's whether-or-how question is not an instruction: recommend, then ask start now or file ([`start-or-file`](shared/workflow/start-or-file.md)).
+Repeat the recommendation in one line whenever a status list restates a decision item.
 See [`AGENTS.cases.md`](AGENTS.cases.md).
 
-- **Do:** state your specific recommendation alongside every question or choice presented to the user.
 - **Do:** write every pending-decision line as "decide X --- I recommend Y, because Z".
 - **Don't:** ask questions or present choices without declaring your recommended path.
 ## Run UMS when work is scrutinized

@@ -421,9 +421,10 @@ Learn it only from his own text, never FERPA data.
 
 ## Default to action without asking
 
-The owner grants standing permission for non-destructive steps (branch commits, pushes, opening/updating PRs, read commands, editing memory).
-Proceed with non-destructive steps and report in past tense;
-ask for [irreversible](shared/workflow/irreversible.md), high-impact, or blocking decisions.
+The owner grants standing permission for non-destructive steps (commits, pushes, PRs, reads, memory edits): act and report in past tense.
+Ask only for destructive, high-impact, or blocking decisions;
+never act [irreversibly](shared/workflow/irreversible.md) unasked.
+This grants no merge authority.
 See [`AGENTS.cases.md`](AGENTS.cases.md).
 
 The grant also covers installs and updates, `add_repo` (even to read), and posting reviews, without asking.

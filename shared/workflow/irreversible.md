@@ -9,7 +9,7 @@ The test is whether the state before the action can be restored, not whether the
 
 Irreversible, for example:
 
-- deleting a repository, or anything that has no other copy: an issue (GitHub cannot restore a deleted issue), a release asset, a wiki, data or files that are not in version control;
+- deleting a repository (GitHub can sometimes restore one within 90 days, but that is a support path, not an undo the agent controls), or anything that has no other copy: an issue (GitHub cannot restore a deleted issue), a release asset, a wiki, data or files that are not in version control;
 - force-pushing over, or otherwise discarding, commits that exist nowhere else;
 - sending or publishing outside the project: an email, a post, a package submission to CRAN or PyPI, a message to someone outside the lab.
 

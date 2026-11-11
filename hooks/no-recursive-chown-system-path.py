@@ -85,17 +85,22 @@ WRAPPERS = (set(COMMAND_WRAPPERS) | {"setsid", "busybox", "pkexec"}
 WRAPPER_POSITIONALS = {"timeout": 1}
 # Each wrapper's short options that take the next word as their value; any
 # other option is a flag, so `sudo -E echo chown` runs echo, not chown.
-# Sources: sudo's src/parse_args.c and FreeBSD's env.c getopt strings.
-WRAPPER_VALUE_OPTIONS = {"sudo": set("acugpCUrtTDR"), "doas": set("auC"), "env": set("uCSPLU"),
+# Sources: the getopt strings in sudo's src/parse_args.c, OpenBSD's doas.c,
+# and the env.c of GNU coreutils and FreeBSD.
+WRAPPER_VALUE_OPTIONS = {"sudo": set("acugpCUrtTDR"), "doas": set("auC"),
+                         "env": set("auCSPLU"),
                          "timeout": set("sk"), "nice": {"n"}, "ionice": set("cnp"),
                          "stdbuf": set("ioe")}
 WRAPPER_VALUE_LONG = {"--user", "--group", "--host", "--prompt", "--chdir", "--chroot",
                       "--close-from", "--other-user", "--role", "--type",
                       "--command-timeout", "--unset", "--split-string", "--signal",
                       "--kill-after", "--adjustment", "--class", "--classdata", "--pid",
-                      "--input", "--output", "--error", "--auth-type", "--login-class"}
-# Options whose value is optional and only ever attached (sudo's `h::`):
-# the rest of the word is the value, and the next word is not.
+                      "--input", "--output", "--error", "--auth-type", "--login-class",
+                      "--argv0"}
+# Options with an optional value (sudo's `h::`). Attached (`-hhost`), the rest
+# of the word is the value. Alone as `-h`, sudo takes the next word as the
+# host when it is not an option or an assignment (src/parse_args.c). Inside a
+# bundle (`-Eh`), it is help.
 WRAPPER_OPTIONAL_VALUE = {"sudo": {"h"}}
 # How deep `${A:-${B:-...}}` defaults are expanded before giving up.
 MAX_NESTING = 32
@@ -116,7 +121,7 @@ VAR_CORE = {"dpkg", "apt", "rpm", "dnf", "yum", "pacman", "systemd", "sudo",
 ASSIGNMENT = re.compile(r"\A[A-Za-z_][A-Za-z0-9_]*=")
 SUB = "__AICFG_CMDSUB__"  # a lifted command substitution (see `_lift`)
 # The start of a variable: `${NAME` (closed by its matching brace, found by
-# `_braced`), `$NAME`, or a lifted substitution.
+# `_brace_pairs`), `$NAME`, or a lifted substitution.
 VARIABLE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)|\$([A-Za-z_][A-Za-z0-9_]*)|" + SUB)
 ALL_GLOB = re.compile(r"\A[*?.]*[*?][*?.]*\Z")
 
@@ -186,18 +191,26 @@ def _lift(text):
     return "".join(out), inner
 
 
-def _takes_next_word(wrapper, tok):
-    """Whether a wrapper's option `tok` takes the next word as its value.
+def _takes_next_word(wrapper, tok, following):
+    """Whether a wrapper's option `tok` takes the next word, FOLLOWING, as its value.
 
     Short options may be bundled: in `sudo -Eu root`, `-u` is the last
     letter, so `root` is its value; in `sudo -uroot`, the value is attached.
+    getopt_long accepts an unambiguous prefix of a long option (`--us`).
     """
     if tok.startswith("--"):
-        return tok in WRAPPER_VALUE_LONG
+        if "=" in tok:
+            return False
+        return tok in WRAPPER_VALUE_LONG or (
+            len(tok) > 3 and any(opt.startswith(tok) for opt in WRAPPER_VALUE_LONG))
     values = WRAPPER_VALUE_OPTIONS.get(wrapper, ())
+    optional = WRAPPER_OPTIONAL_VALUE.get(wrapper, ())
+    if len(tok) == 2 and tok[1] in optional:
+        return (following is not None and not following.startswith("-")
+                and not ASSIGNMENT.match(following))
     for j, letter in enumerate(tok[1:], 1):
-        if letter in WRAPPER_OPTIONAL_VALUE.get(wrapper, ()):
-            return False  # the rest of the word, if any, is its value
+        if letter in optional:
+            return False  # help in a bundle, or the rest of the word is its value
         if letter in values:
             return j == len(tok) - 1
     return False
@@ -224,7 +237,8 @@ def _program(argv):
         elif tok in SHELL_KEYWORDS:
             continue
         elif wrapper and tok.startswith("-"):
-            after_option = _takes_next_word(wrapper, tok)
+            following = argv[i + 1] if i + 1 < len(argv) else None
+            after_option = _takes_next_word(wrapper, tok, following)
         elif wrapper and positionals:
             positionals -= 1
         else:
@@ -260,8 +274,9 @@ def _targets(program, head):
 def _expand(text, home, assigned, here, depth=0):
     """`(TEXT expanded, weak)`, or `None` when a computed value makes it undecidable.
 
-    Defaults nested deeper than MAX_NESTING are undecidable too, so adversarial
-    input cannot exhaust the stack and crash the hook open.
+    A default nested deeper than MAX_NESTING is read as `/`, so adversarial
+    input can neither exhaust the stack and crash the hook open nor hide a
+    protected path behind the cutoff.
 
     A variable set in this environment keeps its value, since the Bash call
     inherits it too; one that is unset here is taken as empty, and the result
@@ -295,7 +310,9 @@ def _expand(text, home, assigned, here, depth=0):
             missing = not val
         default = re.match(r":?[-=]", rest)
         if default and not val:
-            fallback = (None if depth >= MAX_NESTING
+            # Past MAX_NESTING the default counts as `/`, so a deep nest
+            # around a protected path is refused rather than waved through.
+            fallback = (("/", False) if depth >= MAX_NESTING
                         else _expand(rest[default.end():], home, assigned, here, depth + 1))
             if fallback is None:
                 undecidable.append(name)

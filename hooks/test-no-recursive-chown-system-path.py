@@ -154,8 +154,13 @@ class Denies(unittest.TestCase):
         self.assert_denied("sudo -Eu root chown -R me /etc")
         self.assert_denied("sudo -uroot chown -R me /etc")
         self.assert_denied("timeout -sKILL 60 chmod -R 755 /usr")
-        # sudo's `-h` takes a host only when attached (`-hhost`).
-        self.assert_denied("sudo -h chown -R me /etc")
+        # A lone `-h` takes the next non-option word as the host.
+        self.assert_denied("sudo -h host chown -R me /etc")
+        self.assert_denied("sudo -h -u root chown -R me /etc")
+        # getopt_long accepts an unambiguous prefix: `--us` is `--user`.
+        self.assert_denied("sudo --us root chown -R me /etc")
+        self.assert_denied("env -a x chown -R me /etc")
+        self.assert_denied("env --argv0 x chown -R me /etc")
         # In each bundle the first value-taking letter takes the rest, `u`.
         self.assert_denied("sudo -au chown -R me /etc")
         self.assert_denied("sudo -cu chown -R me /etc")
@@ -184,6 +189,12 @@ class Denies(unittest.TestCase):
     def test_bsd_env_value_options(self):
         self.assert_denied("env -U root chown -R me /etc")
         self.assert_denied("env -L root chown -R me /etc")
+
+    def test_nesting_past_the_cutoff_is_refused(self):
+        for depth in (33, 100, 600):
+            deep = "${A:-" * depth + "/etc" + "}" * depth
+            self.assert_denied(f'chown -R me "{deep}"')
+            self.assert_denied(f'X="{deep}"; chown -R me "$X"')
 
     def test_deep_nesting_does_not_crash_the_hook(self):
         deep = "${A:-" * 600 + "/x" + "}" * 600

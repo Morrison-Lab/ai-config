@@ -24,6 +24,7 @@ import importlib.util
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -176,6 +177,34 @@ PUSH_CORPUS = [
     ("git push --dry origin x", False),
     ("git push --del origin x", False),
     ("gh pr comment 1 --body 'git push'", False),
+]
+
+# `_argv_request`'s method test (ai-config#1397): `gh api` sends POST when a
+# field is given and no method is set, so a bare `-f` request discharges. Any
+# explicit method other than POST does not: a GET checks who is requested,
+# and a DELETE removes a reviewer. curl keeps the explicit-POST rule.
+REQ_FIELDS = " -f 'reviewers[]=copilot-pull-request-reviewer[bot]'"
+REQ_PATH = "gh api repos/o/r/pulls/1038/requested_reviewers"
+REQUEST_METHOD_CORPUS = [
+    (REQ_PATH + REQ_FIELDS, True),
+    (REQ_PATH + " -F 'reviewers[]=x'", True),
+    (REQ_PATH + " --raw-field 'reviewers[]=x'", True),
+    (REQ_PATH + " --field=reviewers[]=x", True),
+    (REQ_PATH + " -X POST" + REQ_FIELDS, True),
+    (REQ_PATH + " -XPOST" + REQ_FIELDS, True),
+    (REQ_PATH + " --method GET" + REQ_FIELDS, False),
+    (REQ_PATH + " -X GET" + REQ_FIELDS, False),
+    (REQ_PATH + " --method=GET" + REQ_FIELDS, False),
+    (REQ_PATH + " -XGET" + REQ_FIELDS, False),
+    (REQ_PATH + " -X DELETE" + REQ_FIELDS, False),
+    (REQ_PATH + " --method DELETE" + REQ_FIELDS, False),
+    # Short-flag clusters (`-i` is --include) carry the method too.
+    (REQ_PATH + " -iX GET" + REQ_FIELDS, False),
+    (REQ_PATH + " -iXDELETE" + REQ_FIELDS, False),
+    (REQ_PATH + " -i" + REQ_FIELDS, True),
+    (REQ_PATH, False),
+    ("curl -s https://api.github.com/repos/o/r/pulls/1038/requested_reviewers"
+     " -f x", False),
 ]
 
 # The issue's reproduction and its operator controls, one level below the
@@ -2855,6 +2884,14 @@ def main():
         else:
             failures += 1
             print(f"FAIL: _argv_push({cmd!r}) is {got}, want {want}")
+    for cmd, want in REQUEST_METHOD_CORPUS:
+        got = hookmod._argv_request(shlex.split(cmd))[0]
+        if got is want:
+            passes += 1
+            print(f"PASS: _argv_request({cmd!r}) is {want}")
+        else:
+            failures += 1
+            print(f"FAIL: _argv_request({cmd!r}) is {got}, want {want}")
     for cmd, want_last, want_flagged in OPERATOR_CORPUS:
         got_last = hookmod.request_ident(cmd)[3]
         got_flagged = bool(hookmod.undischargeable_requests(cmd))

@@ -572,6 +572,31 @@ def _post_method(argv):
     return False
 
 
+RX_SHORT_METHOD = re.compile(r"^-[A-Za-z]*X")
+
+
+def _gh_api_post(argv):
+    """True if a `gh api` argv sends a POST, explicitly or by implication.
+
+    `gh api --help`: the method "is `GET` normally and `POST` if any
+    parameters were added", so `-f`/`-F` with no method set is a POST
+    (ai-config#1397). Any explicit method other than POST (a GET that checks
+    who is requested, a DELETE that removes a reviewer) is not, which is why
+    this does not reuse _mutating_api: that one counts a DELETE as a write.
+    """
+    if _post_method(argv):
+        return True
+    for a in argv:
+        au = a.upper()
+        # A short-flag cluster such as `-iX GET` or `-iXDELETE` sets the
+        # method too (gh parses flags with pflag), so any single-dash token
+        # whose letters reach an X is an explicit method.
+        if au in ("-X", "--METHOD") or au.startswith("--METHOD=") \
+                or RX_SHORT_METHOD.match(a):
+            return False
+    return _has_flag(argv, "-f", "--raw-field", "-F", "--field")
+
+
 def _url_ident(url):
     """(num, repo) from a `repos/o/r/pulls/N/...` token; RX_CMD_API is below."""
     m = RX_CMD_API.search(url)
@@ -623,9 +648,9 @@ def _argv_request(argv):
     # prose quoted, discharging that PR without a reviewer ever being added
     # (ai-config#3086 review). So the candidates come from _api_path_tokens
     # and the pattern is `.match()`-anchored to the token start.
-    api = (a0 == "gh" and len(argv) >= 2 and argv[1] == "api") \
-        or a0 in ("curl", "wget")
-    if api and _post_method(argv):
+    gh_api = a0 == "gh" and len(argv) >= 2 and argv[1] == "api"
+    if (gh_api and _gh_api_post(argv)) \
+            or (a0 in ("curl", "wget") and _post_method(argv)):
         for t in _api_path_tokens(argv):
             m = RX_CMD_REVIEWERS.match(t)
             if m:

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PreToolUse guard: refuse history comparisons and branch deletions in a shallow clone.
+"""PreToolUse guard: refuse history reads that a shallow clone answers wrongly.
 
 ## The incident
 
@@ -23,77 +23,97 @@ never happen again" (ai-config#5323).
 
 ## Why a deny, not a warning
 
-The condition is exactly decidable before the command runs:
-`git rev-parse --is-shallow-repository` prints `true` or `false`. And the
-failure is silent. Every command above exits 0 and prints a plausible number,
-so nothing downstream can notice. A warning is context that a session reads
-past (ai-config#4741). This case gives no second signal, so the guard refuses.
+The failure is silent: every command above exits 0 and prints a plausible
+answer, so nothing downstream can notice. A warning is context that a session
+reads past (ai-config#4741). The guard refuses.
 
-## What it refuses
+## Exact where it can be
 
-Each `git` simple command in the Bash call whose repository is shallow, when
-the command is one of:
+A shallow clone is not wrong about everything. `git log origin/main..HEAD` is
+correct when the walk stays inside the fetched history, and routine skills
+run it in every cloud session. Refusing it would block ordinary work, so for
+a revision walk the guard asks git whether the walk reaches the cut-off:
 
-    git merge-base, git cherry           ancestry
-    git rev-list                         unless it is a bare `-n N` lookup
-                                         with no range, `--count`, `--reverse`
-                                         or `--max-parents`
-    git log with a range                 `A..B`, `A...B`, `^A`, `--not`
-    git log --reverse / --root / --max-parents=0
-                                         "first commit" reads
-    git log ... | tail                   the same read, spelled with tail
+    git rev-list --boundary A...B
+
+where A and B are the two commits the range names (`A..B`, `^A B` and
+`B --not A` all name A and B). The cut-off commits are listed in the
+repository's `shallow` file. The symmetric walk goes from each side down to
+their common ancestors, so it includes a cut-off commit exactly when either
+side runs out of history first: the positive side, which would undercount,
+or the excluded side, which would stop excluding and overcount. A cut-off
+commit that appears only as a boundary (`-<sha>`) is a common ancestor, so
+the answer is still right. When that query fails or times out, or the range
+names more than two commits, the guard refuses rather than guess.
+
+## What it refuses, in a shallow repository
+
+Walk-checked (refused only when the walk A...B includes a cut-off commit):
+
+    git log / rev-list with a range      A..B, A...B, ^A B, B --not A
+    git merge-base A B, git cherry U H
+
+Always refused, because the read is of the whole history or has no walk the
+guard can check:
+
+    git log --root / --max-parents       first-commit reads
+    git log / rev-list --reverse         unless -n N limits it first
+    git log ... | tail / tac / wc / sort the same reads, spelled with a pipe
+    git rev-list with no range           unless -n N limits it
+    git merge-base with other arguments  --octopus, --fork-point,
+                                         --independent, 3+ commits
+                                         (--is-ancestor and --all with two
+                                         commits are walk-checked)
     git branch / for-each-ref / tag      with --merged, --no-merged,
-                                         --contains, --no-contains, or an
-                                         unambiguous prefix such as --merg
+                                         --contains, --no-contains, or any
+                                         prefix git accepts as one of them
+    git for-each-ref %(ahead-behind:..)  ahead/behind counts
+    git show-branch, git range-diff      both exit 0 with no common commit
     git bundle create                    a backup missing the cut-off history
-    git push that can delete a ref       --delete, -d, `:ref`, `+:ref`,
-                                         --prune, --mirror
+    git push that can delete a ref       --delete, -d, :ref, +:ref, --prune,
+                                         --mirror, or a prefix of one;
+                                         a --dry-run push is allowed
 
-A plain `git log -5` or `git log -- ../file` is left alone. A recent-commits
-read is right in a shallow clone, as long as it is within the depth fetched.
+Remote deletion is refused in a shallow clone even when shallowness does not
+change what it deletes, because the decision to delete is what a shallow
+clone gets wrong. Unshallow first, then delete.
+
+A plain `git log -5` or `git log -- ../file` is left alone.
 
 ## Which repository
 
-The repository is the one the command runs in: `GIT_DIR=` or `--git-dir`,
-else `git -C <dir>`, else the `cd` moves earlier in the same call, starting
-from the hook payload's `cwd`. A `cd` to a directory that does not exist
-leaves the directory where it was, as the shell does after a failed `cd`.
-A move it cannot resolve (`cd -`, `cd $VAR`) leaves the directory unknown,
-and an unknown directory is skipped rather than guessed.
-
-A command inside `bash -c "..."` or `sh -c '...'` is checked too, from the
-payload's `cwd`, but only when the outer command makes no `cd` move, since
-the nested shell's starting directory is otherwise unknown
-(`scripts/lib/shellcmd.py`'s `shell_c_expansions` says why).
+`GIT_DIR=` or `--git-dir`, else `git -C <dir>`, else `env -C <dir>`, else the
+`cd` moves earlier in the same call, starting from the hook payload's `cwd`.
+A `cd` to a missing directory leaves the directory where it was, as the shell
+does after a failed `cd`. A move it cannot resolve (`cd -`, `cd $VAR`) leaves
+the directory unknown, and an unknown directory is skipped.
+`xargs ... git ...` is read as the git command it runs.
+A command inside `bash -c` or `sh -c` is checked from the payload's `cwd`,
+and only when the outer command makes no `cd` move, since the nested shell's
+starting directory is otherwise unknown (`shell_c_expansions` says why).
 
 ## The way out
 
-The deny names the fix: `git fetch --unshallow`, then run the command again.
-Some proxies refuse `--unshallow`. Then use a bounded deepen,
-`git fetch --depth=100000 origin`, which reaches the root of any repository
-this lab has. For a deliberate read of the shallow history, prefix the one
-command with `ALLOW_SHALLOW_HISTORY=1`. The prefix covers only the command it
-is written on.
+`git fetch --unshallow`, then run the command again. Where a proxy refuses
+that, `git fetch --depth=100000 origin`. For a deliberate read of the shallow
+history, prefix that one command with `ALLOW_SHALLOW_HISTORY=1`.
 
 ## Fails open
 
 The guard is silent when `shellcmd` cannot load, when the command does not
-parse, when `git` is missing, when the directory is not a repository, and
-when `rev-parse` fails or times out. A PreToolUse hook that raises blocks
-the call, which would make an outage of a history read.
+parse, when `git` is missing, and when the directory is not a repository or
+its shallowness cannot be read. A PreToolUse hook that raises blocks the call.
 
 ## Not covered
 
-- `eval "git ..."` and commands built from variables, which no argv split
-  can read.
-- `mcp__remote-devices__device_bash` runs on another machine whose
-  repository this hook cannot inspect.
-- `gh api -X DELETE repos/.../git/refs/...` deletes a ref through the API and
-  needs no local repository. The classification that justifies such a
-  deletion is what this guard stops, and it happens locally.
-- `git describe`, `git diff A...B`, `range-diff` and `show-branch` are
-  allowed: in a shallow clone they fail loudly ("no merge base") rather than
-  answer wrongly.
+- `eval "git ..."`, commands built from variables, and `git` reached through
+  a script file.
+- `git blame`, `git log -S` and `--follow`, which `memories/git.md` covers.
+- `git status -sb`, `git branch -vv` and `%(upstream:track)`, which compare
+  against an upstream and are routine; they are wrong only when the upstream
+  forked below the cut-off.
+- `mcp__remote-devices__device_bash` and `gh api -X DELETE .../git/refs/...`,
+  which act on another machine or through the API.
 """
 import json
 import os
@@ -117,18 +137,44 @@ SHELL_TOOLS = frozenset({"Bash", "bash", "run_command", "execute_command",
                          "terminal", "shell"})
 OVERRIDE = "ALLOW_SHALLOW_HISTORY"
 CD_WORDS = frozenset({"cd", "pushd", "popd"})
+WALK_TIMEOUT = 8
 
-# Ref filters of `git branch`, `for-each-ref` and `tag`. These commands use
-# git's parse-options, which accepts any unambiguous prefix of a long option,
-# so `--merg` is `--merged`. A prefix must be at least this long to count.
+# git's parse-options accepts any prefix of a long option that names exactly
+# one option. To decide "is this token one of the dangerous options", the
+# token must be a prefix of a dangerous name and of no other option the
+# command takes. These are the long options of each command (git 2.43).
 REF_FILTERS = ("--merged", "--no-merged", "--contains", "--no-contains")
-MIN_PREFIX = 5
-
-# `git push` options that can delete a remote ref, matched by prefix too.
+REF_CMD_OPTS = {
+    "branch": REF_FILTERS + (
+        "--abbrev", "--all", "--color", "--column", "--copy", "--create-reflog",
+        "--delete", "--edit-description", "--force", "--format", "--ignore-case",
+        "--list", "--move", "--no-abbrev", "--no-color", "--no-column",
+        "--no-track", "--omit-empty", "--points-at", "--quiet",
+        "--recurse-submodules", "--remotes", "--set-upstream-to",
+        "--show-current", "--sort", "--track", "--unset-upstream", "--verbose"),
+    "tag": REF_FILTERS + (
+        "--annotate", "--cleanup", "--color", "--column", "--create-reflog",
+        "--delete", "--edit", "--file", "--force", "--format", "--ignore-case",
+        "--list", "--local-user", "--message", "--no-column", "--no-sign",
+        "--omit-empty", "--points-at", "--sign", "--sort", "--trailer",
+        "--verify"),
+    "for-each-ref": REF_FILTERS + (
+        "--count", "--exclude", "--format", "--ignore-case",
+        "--include-root-refs", "--omit-empty", "--perl", "--points-at",
+        "--python", "--shell", "--sort", "--start-after", "--stdin", "--tcl"),
+}
 PUSH_DELETERS = ("--delete", "--prune", "--mirror")
+PUSH_OPTS = PUSH_DELETERS + (
+    "--all", "--branches", "--tags", "--dry-run", "--porcelain", "--force",
+    "--force-with-lease", "--force-if-includes", "--repo", "--set-upstream",
+    "--thin", "--no-thin", "--quiet", "--verbose", "--progress",
+    "--recurse-submodules", "--verify", "--no-verify", "--atomic",
+    "--push-option", "--signed", "--ipv4", "--ipv6", "--receive-pack",
+    "--exec", "--follow-tags", "--no-signed", "--no-atomic",
+)
 
-# `git log` / `rev-list` options whose value is a separate word, so the value
-# is never read as a revision range (`--author a..b`, `-S x..y`).
+# Options of log / rev-list whose value is a separate word, so the value is
+# never read as a revision (`--author a..b`, `-S x..y`).
 LOG_VALUE_OPTS = frozenset({
     "-n", "--max-count", "--skip", "--author", "--committer", "--grep",
     "-S", "-G", "--since", "--until", "--after", "--before", "--format",
@@ -136,16 +182,16 @@ LOG_VALUE_OPTS = frozenset({
     "--output", "--decorate-refs", "--decorate-refs-exclude", "--exclude",
     "--glob", "--branches", "--tags", "--remotes",
 })
-FIRST_COMMIT_FLAGS = ("--reverse", "--root")
 GIT_VALUE_OPTS = ("-c", "--namespace", "--exec-path", "--work-tree")
 
-RX_LOG_TO_TAIL = re.compile(r"\bgit\b[^|;&\n]*\blog\b[^|;&\n]*\|\s*tail\b")
+RX_LOG_PIPED_WHOLE = re.compile(
+    r"\bgit\b[^;&\n|]*\blog\b[^;&\n|]*(?:\|[^;&\n|]*)*"
+    r"\|\s*(?:tail|tac|wc|sort|sed\s+-n\s+['\"]?\$)")
 
 DENY = (
-    "Refused: `{segment}` compares or deletes history, and the repository at "
-    "{repo} is a SHALLOW clone. In a shallow clone, merge-base, rev-list, "
-    "--merged/--contains, log ranges and first-commit reads answer from the "
-    "truncated history and still exit 0. On 2026-11-11 this made 23 lds "
+    "Refused: `{segment}` reads history that the repository at {repo} does "
+    "not have: it is a SHALLOW clone{why}. Such a read still exits 0 and "
+    "prints a plausible, wrong answer. On 2026-11-11 one made 23 lds "
     "branches look unrelated to main and nearly deleted 12 branches of "
     "unmerged work (ai-config#5323).\n\n"
     "Fix: `git -C {repo} fetch --unshallow origin` (or, where a proxy refuses "
@@ -155,33 +201,62 @@ DENY = (
 )
 
 
-def _abbrev_of(tok, names, min_len=MIN_PREFIX):
-    """True when `tok` (or its part before `=`) is one of `names` or an
-    unambiguous-looking prefix of one, at least `min_len` characters long."""
+def _is_option(tok, targets, all_opts):
+    """True when `tok` names one of `targets`, in full or by a prefix that
+    git would accept (one that matches no other option in `all_opts`)."""
     head = tok.split("=", 1)[0]
-    if not head.startswith("--"):
+    if not head.startswith("--") or len(head) < 3:
         return False
-    for name in names:
-        if head == name:
-            return True
-        if len(head) >= min_len and name.startswith(head):
-            return True
-    return False
+    if head in targets:
+        return True
+    matches = {name for name in all_opts if name.startswith(head)}
+    return bool(matches) and matches <= set(targets)
+
+
+def _env_chdir(argv):
+    """The directory of an `env -C <dir>` / `env --chdir=<dir>` wrapper."""
+    if not argv or os.path.basename(argv[0]) != "env":
+        return None
+    i = 1
+    while i < len(argv) and argv[i] != "git":
+        tok = argv[i]
+        if tok in ("-C", "--chdir") and i + 1 < len(argv):
+            return argv[i + 1]
+        if tok.startswith("--chdir="):
+            return tok.split("=", 1)[1]
+        i += 1
+    return None
+
+
+def _unwrap_xargs(argv):
+    """`xargs [opts] git ...` -> `git ...`; anything else unchanged."""
+    if argv and os.path.basename(argv[0]) == "xargs" and "git" in argv:
+        return argv[argv.index("git"):]
+    return argv
+
+
+def _join(base, path):
+    path = os.path.expanduser(path)
+    if os.path.isabs(path):
+        return os.path.normpath(path)
+    if base is None:
+        return None
+    return os.path.normpath(os.path.join(base, path))
 
 
 def _repo_dir(argv, base):
     """The repository directory one git argv acts on, or None if unknown."""
-    env, rest = strip_env(argv)
+    chdir = _env_chdir(argv)
+    if chdir is not None:
+        base = _join(base, chdir)
+    env, rest = strip_env(_unwrap_xargs(argv))
     git_dir = env_value(env, "GIT_DIR")
     out = base
     i = 1
     while i < len(rest) and rest[i].startswith("-"):
         tok = rest[i]
         if tok == "-C" and i + 1 < len(rest):
-            target = os.path.expanduser(rest[i + 1])
-            if not os.path.isabs(target) and out is None:
-                return None
-            out = os.path.normpath(os.path.join(out or "/", target))
+            out = _join(out, rest[i + 1])
             i += 2
         elif tok == "--git-dir" and i + 1 < len(rest):
             git_dir = rest[i + 1]
@@ -194,86 +269,90 @@ def _repo_dir(argv, base):
         else:
             i += 1
     if git_dir:
-        git_dir = os.path.expanduser(git_dir)
-        if not os.path.isabs(git_dir):
-            if out is None:
-                return None
-            git_dir = os.path.join(out, git_dir)
-        return os.path.normpath(git_dir)
+        return _join(out, git_dir)
     return out
 
 
-def _positionals(rest):
-    """Non-option words of a log/rev-list argv, stopping at `--`, skipping the
-    separate values of value-taking options."""
+def _revisions(rest):
+    """The revision words of a log/rev-list/merge-base argv, in order, with
+    `--not` kept; stops at `--` and skips separate option values."""
     out = []
     i = 0
     while i < len(rest):
         tok = rest[i]
         if tok == "--":
             break
-        if tok.startswith("-"):
+        if tok == "--not":
+            out.append(tok)
+        elif tok.startswith("-"):
             if tok in LOG_VALUE_OPTS:
-                i += 2
-                continue
-            i += 1
-            continue
-        out.append(tok)
+                i += 1
+        else:
+            out.append(tok)
         i += 1
     return out
 
 
-def _is_range(tok, repo):
-    """True when a positional word is a revision range rather than a path."""
+def _is_range_word(tok, repo):
+    if tok == "--not":
+        return True
     if tok.startswith("^") and len(tok) > 1:
         return True
     if ".." not in tok:
         return False
-    if tok.startswith("../") or tok.startswith("./") or "/../" in tok or tok.endswith("/.."):
+    if tok.startswith(("../", "./")) or "/../" in tok or tok.endswith("/.."):
         return False
     if repo and os.path.exists(os.path.join(repo, tok)):
         return False
     return True
 
 
+def _endpoints(revs):
+    """The distinct commits a range names: `A..B`, `A...B`, `^A B` and
+    `B --not A` all give [A, B]. An empty side of `..` is HEAD."""
+    out = []
+    for tok in revs:
+        if tok == "--not":
+            continue
+        tok = tok[1:] if tok.startswith("^") else tok
+        sep = "..." if "..." in tok else (".." if ".." in tok else None)
+        parts = tok.split(sep, 1) if sep else [tok]
+        for part in parts:
+            part = part or "HEAD"
+            if part not in out:
+                out.append(part)
+    return out
+
+
 def _has_limit(rest):
-    """True when a rev-list/log argv caps its output with -n N, -N or --max-count."""
     for i, tok in enumerate(rest):
         if tok == "--":
             break
         if re.fullmatch(r"-\d+", tok) or re.fullmatch(r"-n\d+", tok):
             return True
-        if tok == "-n" and i + 1 < len(rest):
+        if tok in ("-n", "--max-count") and i + 1 < len(rest):
             return True
         if tok.startswith("--max-count="):
-            return True
-        if tok == "--max-count" and i + 1 < len(rest):
             return True
     return False
 
 
-def _range_like(rest, repo):
-    if any(tok == "--not" for tok in rest):
-        return True
-    return any(_is_range(tok, repo) for tok in _positionals(rest))
-
-
-def _first_commit_flag(rest):
+def _flag(rest, *names):
     for tok in rest:
         if tok == "--":
             break
-        if tok in FIRST_COMMIT_FLAGS:
-            return True
-        if tok.startswith("--max-parents"):
+        if tok.split("=", 1)[0] in names:
             return True
     return False
 
 
 def _push_can_delete(rest):
+    if _flag(rest, "--dry-run") or "-n" in rest:
+        return False
     for tok in rest:
         if tok == "--":
             continue
-        if tok == "-d" or _abbrev_of(tok, PUSH_DELETERS, min_len=5):
+        if _is_option(tok, PUSH_DELETERS, PUSH_OPTS):
             return True
         if (tok.startswith("-") and not tok.startswith("--")
                 and tok[1:].isalpha() and "d" in tok[1:]):
@@ -284,50 +363,111 @@ def _push_can_delete(rest):
     return False
 
 
-def _is_history_op(sub, rest, repo):
-    """True when `git <sub> <rest>` reads ancestry or can delete a remote ref."""
-    if sub in ("merge-base", "cherry"):
-        return True
-    if sub == "rev-list":
-        if any(tok == "--count" or tok == "--reverse" for tok in rest):
-            return True
-        if _first_commit_flag(rest):
-            return True
-        if not _has_limit(rest):
-            return True
-        return _range_like(rest, repo)
-    if sub == "log":
-        return _first_commit_flag(rest) or _range_like(rest, repo)
-    if sub in ("branch", "for-each-ref", "tag"):
-        return any(_abbrev_of(tok, REF_FILTERS) for tok in rest)
-    if sub == "bundle":
-        return bool(rest) and rest[0] == "create"
-    if sub == "push":
-        return _push_can_delete(rest)
-    return False
+class _Repo:
+    """Per-repository facts, each read once per hook run."""
 
-
-class _ShallowCache:
     def __init__(self):
-        self._seen = {}
+        self._shallow = {}
 
-    def __call__(self, repo):
-        if repo not in self._seen:
-            try:
-                res = subprocess.run(
-                    ["git", "-C", repo, "rev-parse", "--is-shallow-repository"],
-                    capture_output=True, text=True, timeout=5)
-                self._seen[repo] = (res.returncode == 0
-                                    and res.stdout.strip() == "true")
-            except Exception:
-                self._seen[repo] = False
-        return self._seen[repo]
+    def cutoff(self, repo):
+        """The set of cut-off commits, empty if the repo is not shallow,
+        or None if that cannot be read."""
+        if repo in self._shallow:
+            return self._shallow[repo]
+        result = None
+        try:
+            flag = subprocess.run(
+                ["git", "-C", repo, "rev-parse", "--is-shallow-repository",
+                 "--git-common-dir"],
+                capture_output=True, text=True, timeout=5)
+            if flag.returncode == 0:
+                lines = flag.stdout.split("\n")
+                if lines[0].strip() == "false":
+                    result = set()
+                elif lines[0].strip() == "true" and len(lines) > 1:
+                    common = _join(repo, lines[1].strip())
+                    with open(os.path.join(common, "shallow"), encoding="utf-8") as fh:
+                        result = {line.strip() for line in fh if line.strip()}
+                    if not result:
+                        result = None
+        except Exception:
+            result = None
+        self._shallow[repo] = result
+        return result
+
+    @staticmethod
+    def walk_hits_cutoff(repo, revisions, cutoff):
+        """True when `rev-list --boundary <revisions>` includes a cut-off
+        commit (not as a boundary), or when the query cannot answer."""
+        try:
+            res = subprocess.run(
+                ["git", "-C", repo, "rev-list", "--boundary", *revisions, "--"],
+                capture_output=True, text=True, timeout=WALK_TIMEOUT)
+        except Exception:
+            return True
+        if res.returncode != 0:
+            return True
+        for line in res.stdout.split("\n"):
+            sha = line.strip()
+            if sha and not sha.startswith("-") and sha in cutoff:
+                return True
+        return False
 
 
-def _evaluate_line(command, base_cwd, is_shallow, log_to_tail):
+def _verdict(sub, rest, repo, cutoff, piped_whole):
+    """A short reason string when this git command must be refused, else None."""
+    walk = _Repo.walk_hits_cutoff
+    if sub in ("log", "rev-list"):
+        revs = _revisions(rest)
+        limited = _has_limit(rest)
+        if _flag(rest, "--root", "--max-parents"):
+            return "; --root and --max-parents read the cut-off as the first commit"
+        if _flag(rest, "--reverse") and not limited:
+            return "; an unlimited --reverse reads the cut-off as the first commit"
+        if any(_is_range_word(tok, repo) for tok in revs):
+            ends = _endpoints(revs)
+            if len(ends) != 2:
+                return "; a range with " + str(len(ends)) + " endpoints cannot be checked"
+            if walk(repo, [ends[0] + "..." + ends[1]], cutoff):
+                return "; this range's walk reaches the cut-off"
+            return None
+        if sub == "rev-list" and not limited:
+            return "; an unlimited rev-list walks into the cut-off"
+        if sub == "log" and piped_whole and not limited:
+            return "; piping an unlimited log to tail/tac/wc/sort reads the cut-off"
+        return None
+    if sub in ("merge-base", "cherry"):
+        revs = [tok for tok in _revisions(rest) if tok != "--not"]
+        opts = [t for t in rest if t.startswith("--")]
+        if sub == "merge-base" and any(t not in ("--is-ancestor", "--all") for t in opts):
+            return "; merge-base " + " ".join(opts) + " cannot be checked"
+        if len(revs) == 1 and sub == "cherry":
+            revs = [revs[0], "HEAD"]
+        if len(revs) != 2:
+            return "; " + sub + " with " + str(len(revs)) + " commits"
+        if walk(repo, [revs[0] + "..." + revs[1]], cutoff):
+            return "; the walk between the two commits reaches the cut-off"
+        return None
+    if sub in ("branch", "for-each-ref", "tag"):
+        if any(_is_option(tok, REF_FILTERS, REF_CMD_OPTS[sub]) for tok in rest):
+            return "; --merged/--contains filters walk into the cut-off"
+        if sub == "for-each-ref" and any("ahead-behind" in tok for tok in rest):
+            return "; ahead-behind counts walk into the cut-off"
+        return None
+    if sub in ("show-branch", "range-diff"):
+        return "; " + sub + " exits 0 with no common commit"
+    if sub == "bundle" and rest and rest[0] == "create":
+        return "; the bundle would lack the cut-off history"
+    if sub == "push" and _push_can_delete(rest):
+        return "; deleting a remote ref is refused until the history is complete"
+    return None
+
+
+def _evaluate_line(command, base_cwd, repos):
     cmds = simple_commands_with_scope(command)
     if cmds is None:
         return None
+    piped_whole = bool(RX_LOG_PIPED_WHOLE.search(command))
     dirs = {(): base_cwd}
     for scope, argv in cmds:
         for n in range(1, len(scope) + 1):
@@ -337,30 +477,32 @@ def _evaluate_line(command, base_cwd, is_shallow, log_to_tail):
             target = resolve_cd_target(rest, dirs[scope])
             if target is None or os.path.isdir(target):
                 dirs[scope] = target
-            # A cd to a missing directory fails; the shell stays put.
             continue
-        parsed = git_subcommand(argv)
+        unwrapped = _unwrap_xargs(rest) if rest else rest
+        parsed = git_subcommand(unwrapped if unwrapped is not rest else argv)
         if parsed is None:
             continue
         sub, sub_rest, env = parsed
-        if env_value(env, OVERRIDE) == "1":
+        if env_value(env, OVERRIDE) == "1" or env_value(_env, OVERRIDE) == "1":
             continue
         repo = _repo_dir(argv, dirs[scope])
         if repo is None or not os.path.isdir(repo):
             continue
-        hit = _is_history_op(sub, sub_rest, repo)
-        if not hit and sub == "log" and log_to_tail and not _has_limit(sub_rest):
-            hit = True
-        if hit and is_shallow(repo):
-            return "deny", DENY.format(segment=" ".join(argv), repo=repo)
+        cutoff = repos.cutoff(repo)
+        if not cutoff:
+            continue
+        why = _verdict(sub, sub_rest, repo, cutoff, piped_whole)
+        if why is not None:
+            return "deny", DENY.format(segment=" ".join(argv), repo=repo, why=why)
     return None
 
 
 def _has_cd(command):
-    cmds = simple_commands_with_scope(command) or []
-    for _scope, argv in cmds:
+    for _scope, argv in simple_commands_with_scope(command) or []:
         _env, rest = strip_env(argv)
         if rest and rest[0] in CD_WORDS:
+            return True
+        if _env_chdir(argv) is not None:
             return True
     return False
 
@@ -369,16 +511,14 @@ def evaluate(command, base_cwd):
     """`('deny', reason)` or `None`."""
     if simple_commands_with_scope is None:
         return None
-    is_shallow = _ShallowCache()
-    log_to_tail = bool(RX_LOG_TO_TAIL.search(command))
-    verdict = _evaluate_line(command, base_cwd, is_shallow, log_to_tail)
+    repos = _Repo()
+    verdict = _evaluate_line(command, base_cwd, repos)
     if verdict:
         return verdict
     if _has_cd(command):
         return None
     for nested in list(shell_c_expansions(command))[1:]:
-        verdict = _evaluate_line(nested, base_cwd, is_shallow,
-                                 bool(RX_LOG_TO_TAIL.search(nested)))
+        verdict = _evaluate_line(nested, base_cwd, repos)
         if verdict:
             return verdict
     return None

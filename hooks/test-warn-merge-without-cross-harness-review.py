@@ -386,8 +386,8 @@ def main():
         probe("which codex agy", "Exit code 1\n/usr/bin/codex"),
         probe("command -v agy gemini cursor-agent")] + oc)[0])
     check("warns when a later probe finds a CLI shown absent earlier", run(MERGE, probe_all + [probe("command -v codex", "/usr/bin/codex", False)])[0])
-    check("warns when the probe was refused and never ran", run(MERGE, [probe(
-        "command -v %s; gh pr merge 1" % clis4, "PreToolUse:Bash hook error: x")] + oc)[0] and run(
+    check("warns when the probe was refused and never ran", run(MERGE, [dict(
+        probe("command -v " + clis4), rec={"toolDenialKind": "permission-rule"})] + oc)[0] and run(
         MERGE, [probe("command -v " + clis4, "\\n\n Permission for this action was denied")] + oc)[0])
     check("warns when the opencode attempt was refused", run(MERGE, probe_all[:1] + [
         dict(oc[0], out="The user doesn't want to proceed with this tool use")])[0] and run(
@@ -399,7 +399,7 @@ def main():
         MERGE, [probe("command -v agy gemini cursor-agent"),
                 probe("codex exec 'review the diff'", "Exit code 1\nbackend down")] + oc)[0])
     check("warns when the probe's stdout was redirected away", run(
-        MERGE, [probe("command -v %s >/dev/null" % clis4, "")] + oc)[0])
+        MERGE, [probe("command -v %s >/dev/null" % clis4)] + oc)[0])
     check("warns when the probe exited 0 with empty output", run(
         MERGE, [probe("command -v %s || true" % clis4, "", False)] + oc)[0])
     check("warns when the probe pass predates the last push",

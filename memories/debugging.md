@@ -290,8 +290,8 @@ but no test covered that path until the reviewer flagged it.
 ## Stub every syscall on the path, not only the one under study
 
 A test of `scripts/install-pr-monitor.py`'s stale-daemon stop stubbed only the liveness probe.
-The real `os.kill(SIGTERM)` still fired at a nonexistent pid, so a quiet no-op branch returned before the stub was reached, and the test passed without exercising it.
-The old test had hidden this, because its fake kill swallowed both calls.
+The real `os.kill(SIGTERM)` still fired at a nonexistent pid, raised `OSError`, and a no-op branch returned `None` before the stub was reached, so the test failed.
+The old test had stayed green over that path, because its catch-all fake kill swallowed both calls and never reached the branch.
 Source: ai-config#2082 (PR #2084, 2026-08-23), folded from that session's notebook.
 
 - **Do:** stub every system call the code path makes, then assert the stub you care about was reached.

@@ -48,7 +48,8 @@ Threshold rationale (`--total-char-limit` and `--repo-margin`):
 
 Threshold rationale (`--budget`, default below):
 
-  The advisory byte budget is the older, softer line, kept because the
+  The byte budget is the older, softer line (advisory by default; this
+  repo's CI passes `--strict`, ai-config#4685), kept because the
   pin-bump report (`--compare`) is denominated in bytes. Its default
   mirrors the character gate (the 120,000-char floor less the 20,000-char
   margin), since this corpus is nearly pure ASCII and bytes track
@@ -88,11 +89,12 @@ line is a prompt to decide what comes out, not a defect that should block an
 unrelated PR. Under `--strict` in `--compare` mode, a bump that would cross
 the budget fails too, even while the current pin is under it.
 
-**Two limits here are not advisory**, and neither is ours. The closure's
+**The CLI's two limits are not advisory.** The closure's
 total is gated against the CLI's own total limit (above). The root file
 also has the CLI's per-file limit, stated in CHARACTERS (`--root-char-cap`,
 default 150,000, the per-file limit on a 1M-context current model). Both
-fail regardless of `--strict`, like a dangling anchored import. The CLI
+fail regardless of `--strict`, like a dangling anchored import, as do
+the fragment cap, the AGENTS.md cap and the two growth gates. The CLI
 2.1.283 only WARNS past either limit and still loads the file (measured
 2026-09-28, ai-config#4061); earlier notes here said the file was not
 loaded whole, which that version does not do. The warning is still the
@@ -244,7 +246,8 @@ def cli_char_count(text: str) -> int:
 # On a 200k-context model the same limit is 40,000, which this corpus's root
 # file cannot meet, so the gate sits at the larger figure. It fails
 # regardless of `--strict`, like a dangling anchored import, rather than
-# joining the advisory budget (ai-config#897, #1258, #4061).
+# joining the budget, which is advisory by default (ai-config#897,
+# #1258, #4061).
 DEFAULT_ROOT_CHAR_CAP = 150_000
 
 # Measured 2026-08-07: at 153,217 raw characters the harness reported
@@ -280,7 +283,8 @@ DEFAULT_ROOT_CHAR_WARN_FRACTION = 0.90
 # ratchet that only warns is the advisory-check-nobody-reads failure
 # `shared/writing/semantic-line-breaks.md` records for `check-new-line-breaks`,
 # where a green job and a warned job look identical to anyone reading exit
-# codes. The budget can stay advisory because crossing it is a prompt to
+# codes. The budget is advisory by default (this repo's CI gates it under
+# --strict since ai-config#4685) because crossing it is a prompt to
 # decide what comes out; crossing this means one file grew past the largest
 # thing anyone had accepted, which is a decision someone should make on
 # purpose.

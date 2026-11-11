@@ -95,7 +95,7 @@ general form: a reviewer's enumeration is the extent of that reviewer's read
 and never the extent of the pattern, so derive your own site list rather than
 inheriting theirs.
 
-A fix to another defect in the same sentence is where one arrives.
+An ambiguous referent often arrives with a fix to another defect in the same sentence.
 On [ai-config#3154](https://github.com/Morrison-Lab/ai-config/pull/3154), replacing a sentence's anchor noun while fixing something else left a pronoun pointing at the wrong noun (2026-09-03).
 After rewriting a sentence, re-read each pronoun in it against its new nearest antecedent.
 

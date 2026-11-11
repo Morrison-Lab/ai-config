@@ -18,13 +18,15 @@ Not every tool call --- that's noise --- but every step whose loss would cost re
 
 **The notebook is inside the gates.**
 A notebook reads as bookkeeping, but `memories/*.md` matches the same `*.md` globs as the corpus, and it is the hurried prose those gates exist for.
-On [ai-config#3093](https://github.com/Morrison-Lab/ai-config/pull/3093) the line-break checker passed three times on one branch while the notebook, on another branch, carried six violations (2026-09-03).
+On [ai-config#3093](https://github.com/Morrison-Lab/ai-config/pull/3093) the line-break checker passed three times on other PRs' branches while the notebook, on its own branch, carried six violations (2026-09-03).
 
 - **Do:** run the repo's checkers once for each branch you are about to push, not once per editing session.
 - **Don't:** count a clean run on one branch as covering a file that lives on another.
 
 **Name the branch, not the SHA, while a commit is unpushed.**
 A reader with only the remote cannot look up a local SHA, and marking it "unpushed" fixes the honesty and not the lookup.
+Once a PR exists, cite it by PR number, as [`git.md`](../../memories/git.md#citing-evidence-that-lives-in-a-prs-own-superseded-commits) says.
+Before then, the branch name is what a reader can fetch.
 
 - **Do:** name the branch and the change, and say what is holding the push.
 - **Don't:** write a bare local SHA into an entry a cold reader will check.

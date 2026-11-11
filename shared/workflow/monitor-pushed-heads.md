@@ -11,8 +11,8 @@ Once that commit is fully clean and green, stop the **intensive head poll** for 
 A later push creates a new head commit and starts a new monitoring cycle automatically.
 
 A push can start `validate` and no review run at all.
-So confirm a review run exists for the head (`actions/runs?head_sha=<sha>`) rather than waiting for one.
-On [ai-config#3251](https://github.com/Morrison-Lab/ai-config/pull/3251) none started, and dispatching `claude-review.yml` on the PR's branch started it (2026-09-04).
+So confirm a review run exists for the head (`actions/runs?head_sha=<sha>`) rather than waiting for one, as on [ai-config#3251](https://github.com/Morrison-Lab/ai-config/pull/3251), where none started (2026-09-04).
+Start a missing one the way [`automated-review-before-human`](automated-review-before-human.md) step 1 says for the repo.
 
 **Ending the head poll does not end the PR watch.**
 The two run at different frequencies and answer different questions, and only the first one is finished when a head goes green:

@@ -99,8 +99,8 @@ truncated diff too, which weighs against it without settling it).
 ## A re-mention on a new head may return nothing
 
 On [ai-config#3222](https://github.com/Morrison-Lab/ai-config/pull/3222) and [ai-config#3234](https://github.com/Morrison-Lab/ai-config/pull/3234) a `@jules review` re-mention after a push ran and finished with no verdict and no status (2026-09-04).
-Jules also deduplicates re-mentions, so posting another does not start one.
-Both PRs were merged on Jules's approve of the previous head, which [`fully-clean`](../shared/workflow/fully-clean.md) does not allow: a verdict counts only on the head it names.
+Both PRs then merged on claude-review's Ready at the head, with Jules's last verdict an approve of the previous head.
+That approve says nothing about the head: under [`fully-clean`](../shared/workflow/fully-clean.md) a verdict counts only on the head it names.
 
-- **Do:** treat a Jules run with no verdict on the head as no Jules verdict, and clear the head with another reviewer.
-- **Don't:** carry an approve on the previous head forward on the reasoning that the delta is small.
+- **Do:** record a Jules run that ends with no verdict as no Jules verdict on that head, and name in the merge note which reviewers cleared the head itself.
+- **Don't:** count an approve of the previous head as Jules's verdict on the current one, however small the delta.

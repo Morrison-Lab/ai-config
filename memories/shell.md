@@ -153,7 +153,8 @@ git commit -F /tmp/msg.txt
 
 Never inline heredocs in chained commands.
 Applies to git commit messages, MR descriptions, and any other multi-line content passed to CLI tools.
-Write the message file before the gate chain that ends in the commit: when the write comes after the gates, a failing gate skips it and the commit then fails on a missing file ([ai-config#3154](https://github.com/Morrison-Lab/ai-config/pull/3154), 2026-09-03).
+Write the message file before the gate chain that ends in the commit.
+When the write sits after the gates, a failing gate skips it, and a later `git commit -F` run on its own then fails on the missing file ([ai-config#3154](https://github.com/Morrison-Lab/ai-config/pull/3154), 2026-09-03).
 (Learned during HACtions MR !37.)
 
 **A literal, predictable `/tmp/<name>.txt` like the one in the example above is not a safe destination for this, because `/tmp` is shared across every concurrent session on the machine.**

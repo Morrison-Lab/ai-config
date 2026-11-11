@@ -174,8 +174,9 @@ Re-run once, after the fix for the runner fault lands (2026-11-08: the 504s on [
 
 ## A hunk-scoped reviewer reports what your edit sits next to
 
-Copilot reviews whole hunks, so it flags pre-existing defects next to any line an edit touches, such as em dashes or two sentences on one line, that the added-line gates pass.
-On [ai-config#3154](https://github.com/Morrison-Lab/ai-config/pull/3154) that cost two extra rounds (2026-09-03).
+Copilot reviews whole hunks, so it flags pre-existing defects next to any line an edit touches, such as em dashes, that the added-line gates pass.
+It also asks for one clause per line on unchanged lines in the hunk.
+On [ai-config#3154](https://github.com/Morrison-Lab/ai-config/pull/3154) it raised pre-existing em dashes beside the edited lines in at least three separate rounds (2026-09-03).
 
 - **Do:** before the first push, sweep each touched hunk for the corpus's mechanical rules, not only the added lines.
 - **Don't:** take a green added-line gate as covering the lines a hunk reviewer will read.

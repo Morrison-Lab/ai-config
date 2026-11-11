@@ -107,6 +107,7 @@ See ai-config#694 for the precedent.
   about.
   Read the stored body back after any edit that adds a command, since the write
   call reports success either way.
+  Read a create back too: an `issue_write` with a malformed `labels` tag put the tag text into the title and applied no label ([ai-config#3203](https://github.com/Morrison-Lab/ai-config/issues/3203), 2026-09-04).
   (ai-config#1467, 2026-08-15: a merge-order paragraph documenting
   `git diff --name-only $(git merge-base origin/main PR_HEAD)...PR_HEAD` was
   first written with both operands in angle brackets and came back as

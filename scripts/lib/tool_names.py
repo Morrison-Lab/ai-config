@@ -9,9 +9,8 @@ cleared its reminder (ai-config#4266). New hooks import the sets from here;
 moving the existing copies here is ai-config#3740.
 
 Every set is lowercase; compare with `name.lower()`, or use the `is_*` helpers.
-Generic names some harnesses use for writes (`create`, `update`) are left out:
-in another harness they name something else, so only a hook that knows its
-harness should accept them.
+Generic write names (`create`, `update`) are left out: they mean other things
+in other harnesses, so only a hook that knows its harness should accept them.
 """
 from __future__ import annotations
 
@@ -24,9 +23,9 @@ SUBAGENT_TOOLS = frozenset({
     "spawn_agent", "collaboration.spawn_agent",
 })
 
-# Tools that write or edit a file.
+# Tools that write a file (`write_file`, `Path`: Antigravity, unmeasured).
 WRITE_TOOLS = frozenset({
-    "write", "edit", "multiedit", "notebookedit", "write_to_file",
+    "write", "edit", "multiedit", "notebookedit", "write_to_file", "write_file",
     "replace_file_content", "apply_diff", "strreplace", "editnotebook",
     "edit_file", "create_file", "apply_patch", "str_replace_editor",
 })
@@ -38,7 +37,7 @@ SHELL_TOOLS = frozenset({
 
 # Input keys that name a write tool's target file, in lookup order.
 WRITE_TARGET_KEYS = (
-    "file_path", "notebook_path", "path", "TargetFile", "target_file",
+    "file_path", "notebook_path", "path", "Path", "TargetFile", "target_file",
     "filePath", "target_notebook",
 )
 
@@ -96,8 +95,8 @@ def subagent_brief(inp) -> str:
     """Every piece of brief text a subagent launch carries, joined by spaces.
 
     Covers the single-agent form (`prompt`, `description`) and Antigravity's
-    `invoke_subagent` form, whose `Subagents` list may arrive as a list of
-    dicts, a list of strings, or a JSON string of either.
+    `invoke_subagent` form: a `Subagents` list (as flag-unassigned-worktree
+    reads it) of dicts or strings, or a JSON string of either.
     """
     if not isinstance(inp, dict):
         return ""
@@ -111,7 +110,7 @@ def subagent_brief(inp) -> str:
         if isinstance(parsed, (list, dict)):
             subagents = parsed
         else:
-            parts.append(subagents)
+            parts.append(parsed if isinstance(parsed, str) else subagents)
             subagents = None
     if isinstance(subagents, dict):
         subagents = [subagents]

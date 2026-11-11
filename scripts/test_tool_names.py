@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Tests for scripts/lib/tool_names.py.
 
-The module replaces per-hook copies of the tool-name alias lists
-(ai-config#4266), so each case pins one spelling or input shape a harness
-sends (`collaboration.spawn_agent` is still unmeasured, ai-config#3741). A
-spelling missing here is a tool call some hook silently ignores.
+Each case pins one tool spelling or input shape (ai-config#4266); a spelling
+missing here is a tool call some hook silently ignores. Unmeasured names are
+marked in the module.
 
 The last section runs each hook that imports the module from a directory
 without it, and pins what the hook still does on such a broken install.
@@ -39,7 +38,8 @@ for name in ("Agent", "Task", "invoke_subagent", "dispatch_agent",
              "run_agent", "spawn_agent", "collaboration.spawn_agent"):
     check(f"{name} launches a subagent", tool_names.is_subagent_tool(name), True)
 for name in ("Write", "Edit", "MultiEdit", "NotebookEdit", "write_to_file",
-             "replace_file_content", "apply_patch", "str_replace_editor"):
+             "write_file", "edit_file", "create_file", "replace_file_content",
+             "apply_patch", "str_replace_editor"):
     check(f"{name} writes a file", tool_names.is_write_tool(name), True)
 for name in ("Bash", "PowerShell", "run_command", "execute_command",
              "terminal", "shell"):
@@ -56,6 +56,7 @@ W, C, B = (tool_names.write_target, tool_names.shell_command,
 for label, fn, inp, want in (
     ("write target from file_path", W, {"file_path": "/a/b"}, "/a/b"),
     ("write target from Antigravity's TargetFile", W, {"TargetFile": "/c"}, "/c"),
+    ("write target from Path", W, {"Path": "/e"}, "/e"),
     ("write target from Cursor's filePath", W, {"filePath": "/d"}, "/d"),
     ("write target missing", W, {"content": "x"}, ""),
     ("write target of a non-dict", W, "x", ""),
@@ -72,7 +73,7 @@ for label, fn, inp, want in (
      {"Subagents": '{"Prompt": "run ums"}'}, "run ums"),
     ("brief from a Subagents dict", B, {"Subagents": {"Prompt": "run ums"}}, "run ums"),
     ("brief from a Subagents JSON string literal", B,
-     {"Subagents": '"run ums"'}, '"run ums"'),
+     {"Subagents": '"run ums"'}, "run ums"),
     ("brief from a Subagents string that is not JSON", B,
      {"Subagents": "run ums"}, "run ums"),
     ("brief from a Subagents string too deep to parse", B, {"Subagents": deep}, deep),

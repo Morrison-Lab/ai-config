@@ -59,7 +59,7 @@ A run over the ceiling stays green and carries a warning annotation with the cei
 The script prints the ceiling line after the edits, so a run whose edit fails carries neither the line nor the warning.
 The labels `P1`, `P2` and `P3` must already exist in the repository, because the script adds labels and creates none.
 The workflow checks for them first and stops before any edit when one is missing.
-Other repositories have no scheduled pass until the reusable workflow in ai-config#3147 exists.
+Other repositories have no scheduled pass until the reusable workflow in [ai-config#3147](https://github.com/Morrison-Lab/ai-config/issues/3147) exists.
 
 - **Do:** pass `--labels-only` in any run that no reader reviews before it applies.
 - **Don't:** let a scheduled run close issues.

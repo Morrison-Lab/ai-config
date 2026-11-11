@@ -23,6 +23,7 @@ Act on the clarification, and record the general lesson per [`encode-reusable-fe
 - **Do:** when the user has to add a clarification, fix the case and record the general inference you missed.
 - **Don't:** confine a correction to the case it mentioned, or drop a qualifier or "etc." when restating a request.
 - **Don't:** ask whether to do what a request plainly implies ("want the link?") instead of doing it.
+  A whether-or-how question is not a request; it gets a start-or-file ask ([`start-or-file`](start-or-file.md)).
 
 (Directives from the user, 2026-10-02: "assume that nothing I write is filler";
 after having to add "(that is, give me the link)" and "(always)" to a request for a referee report: "something I write to you parenthetically should be obvious to you", and "take it as a correction if it's not obvious".)

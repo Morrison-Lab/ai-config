@@ -492,8 +492,9 @@ jobs:
         # 98,129 bytes, 1,871 under. A PR that crosses it trims or moves
         # text out of CLAUDE.md in the same PR.
         #
-        # The three gates below fail without --strict, so a caller that drops
-        # the flag (a consumer measured with --base) still gets them.
+        # The gates below, and the AGENTS.md byte cap, fail without --strict,
+        # so a caller that drops the flag (a consumer measured with --base)
+        # still gets them.
         #
         # The root file's CHARACTER CAP gates without --strict
         # (ai-config#897, #1258). It is not our budget but the

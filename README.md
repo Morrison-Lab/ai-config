@@ -46,8 +46,8 @@ Three mechanisms close that gap, one per place an agent can be configured:
 | each repository | [`scripts/wire-repo-config.py`](scripts/wire-repo-config.py) `<repo-dir>...` | an `AGENTS.md` block (and the same block in a `CLAUDE.md` that does not import `AGENTS.md`) pointing Codex cloud, Copilot, Jules, Cursor background agents and Claude Code at ai-config, plus the marketplace in `.claude/settings.json`, and, in an R package, anchored `.Rbuildignore` entries for those files so `R CMD check` raises no NOTE about them; `--enable-plugin` also enables the plugin there, only for repos whose sessions get it no other way, since a second copy fires every hook twice |
 
 Both scripts merge rather than replace, leave an explicit `ai-config@*` choice alone, and take `--check` to report without writing.
-[`docs/delivery-paths.md`](docs/delivery-paths.md) names the one supported path for each harness and session kind, what each cannot deliver, and the older paths that are leftovers.
 `wire-user-config.py` also refuses to enable the plugin on a machine that registered the hook catalog through `install-hooks.py --fix`, since the two paths together fire every hook twice.
+[`docs/delivery-paths.md`](docs/delivery-paths.md) names the one supported path for each harness and session kind, what each cannot deliver, and the older paths that are leftovers.
 
 ### Antigravity & Gemini CLI
 
@@ -242,7 +242,8 @@ the container started with only the default marketplace registered,
 and `claude plugin install ai-config@Morrison-Lab` failed with
 "not found in marketplace" until the marketplace was added.
 The lab's cloud environment installs it when the container is built: the Setup script copied from [`references/cloud-setup/cloud-setup.sh`](references/cloud-setup/cloud-setup.sh) adds the marketplace and installs or updates the plugin ([`docs/delivery-paths.md`](docs/delivery-paths.md)).
-A repository's own `SessionStart` hook that does the same, such as [`Morrison-Lab/rme`'s `.claude/hooks/install-ai-config.sh`](https://github.com/Morrison-Lab/rme/blob/main/.claude/hooks/install-ai-config.sh) ([rme#1336](https://github.com/Morrison-Lab/rme/pull/1336)), does not run in a session that opens several repositories ([#5280](https://github.com/Morrison-Lab/ai-config/issues/5280)), so use one only in an environment whose Setup script does not install the plugin.
+A repository's own `SessionStart` hook that does the same, such as [`Morrison-Lab/rme`'s `.claude/hooks/install-ai-config.sh`](https://github.com/Morrison-Lab/rme/blob/main/.claude/hooks/install-ai-config.sh) ([rme#1336](https://github.com/Morrison-Lab/rme/pull/1336)), does not run in a session that opens several repositories ([#5280](https://github.com/Morrison-Lab/ai-config/issues/5280)), so use one only in an environment whose Setup script does not install the plugin, and only for a session that opens that one repository.
+Like the Setup script, such a hook needs network access to GitHub.
 Plugin skills are namespaced, e.g. `/ai-config:reprexes`,
 `/ai-config:grade-work`.
 

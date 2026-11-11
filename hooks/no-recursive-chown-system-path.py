@@ -52,6 +52,13 @@ console. Escape hatch for a case this did not foresee: a real leading
 `ALLOW_RECURSIVE_SYSTEM_CHOWN=1` assignment on the same command, with the
 reason stated in the reply.
 
+The guard is aimed at the mistakes in the incidents above (a wrong path, an
+unset variable, a "repair" of a system tree), not at a command built to get
+past it: no static reading of bash is complete, and an agent set on running
+a command can always run it some other way. So it reads the shell forms an
+honest command uses, refuses the operator and parameter forms it does not
+model, and names the rest here.
+
 Limits, deliberately unclosed: `find ... -exec chown`, `xargs chown`, a
 `for` loop variable, `eval`, `su -c`, a heredoc piped to `sh`, an
 interpreter's own `-c` (`python -c "os.system(...)"`), a substitution in an

@@ -4,15 +4,14 @@
 On 2026-10-27 a session ran `cat` on `~/.config/canvas/token` through a `sed`
 redaction that matched nothing, and the bare token landed in the transcript
 (ai-config#4780). The read is the leak, so this denies rather than warns.
-
 It fires on the Read tool, and on a Bash simple command whose program is a
 reader (`cat`, `sed`, `base64`, ...) naming a credential path. A reader inside
 `$(...)` is allowed, since its output feeds another program, unless the
 enclosing command is `echo` or `printf`. Wrappers (`bash -c`, `xargs`), `cd`
 and more stores are not yet covered (ai-config#5443).
 
-Fails open, saying so on stderr. Writer layer: improve-your-subagents.md;
-reviewer layer: adversarial-reviewer.md, both "Credential files printed".
+Fails open on stderr. Override: ALLOW_CREDENTIAL_READ=1. "Credential files
+printed" in improve-your-subagents.md and adversarial-reviewer.md: the layers.
 """
 
 from __future__ import annotations

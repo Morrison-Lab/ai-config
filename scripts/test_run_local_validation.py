@@ -489,7 +489,8 @@ def test_changed_end_to_end():
                        env=env)
         # Create a file and commit it
         (Path(tmp) / "test.md").write_text("x", encoding="utf-8")
-        subprocess.run(["git", "add", "test.md"], cwd=tmp, check=True,
+        (Path(tmp) / "keep.md").write_text("".join(f"line {i}\n" for i in range(40)), encoding="utf-8")
+        subprocess.run(["git", "add", "test.md", "keep.md"], cwd=tmp, check=True,
                        env=env)
         subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=tmp, check=True,
                        env=env)
@@ -510,6 +511,11 @@ def test_changed_end_to_end():
         # md file changed, lint-markdown should be RUN/PARTIAL/NOT RUN, not skipped
         check("lint-markdown is not skipped by file scope", "SKIP     [validate] lint-markdown: no scoped files changed" not in text)
         check("lint-qmd is skipped because no qmd file changed", "SKIP     [lint-qmd] lint-qmd: no scoped files changed" in text)
+        # ai-config#5087: a rename lists both sides, so a suite reading the old path is still selected.
+        subprocess.run(["git", "mv", "keep.md", "renamed.md"], cwd=tmp, check=True, env=env)
+        subprocess.run(["git", "commit", "-q", "-m", "rename"], cwd=tmp, check=True, env=env)
+        check("a rename lists both the old and the new path",
+              {"keep.md", "renamed.md"} <= set(rlv.changed_files(Path(tmp), "main") or []))
 
 
 SNAPSHOT_FIXTURE = """

@@ -209,3 +209,9 @@ See [`start-or-file`](../../shared/workflow/start-or-file.md).
 On a diff or a delivered `.docx` produced by an edit that merged runs, check that each field code (a citation, cross-reference or HYPERLINK) still has its own `begin`, `instrText`, `separate` and `end` runs and that the field's text is where it was.
 Read the document; do not report a hook's output as your finding.
 See [`review-rendered-documents`](../../shared/workflow/review-rendered-documents.md#merging-runs-in-a-word-document).
+
+## Rules and skills without eval cases
+
+On a diff that adds or changes a rule or a skill whose behaviour one prompt can show, check that it adds or updates a case under `evals/`, and that every trigger case has a negative twin.
+Check each new grader for a reply that would pass it without the behaviour it names.
+See [`evals/README.md`](../../evals/README.md#adding-a-case).

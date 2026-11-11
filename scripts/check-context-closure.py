@@ -48,7 +48,8 @@ Threshold rationale (`--total-char-limit` and `--repo-margin`):
 
 Threshold rationale (`--budget`, default below):
 
-  The advisory byte budget is the older, softer line, kept because the
+  The byte budget is the older, softer line (advisory by default; this
+  repo's CI passes `--strict`, ai-config#4685), kept because the
   pin-bump report (`--compare`) is denominated in bytes. Its default
   mirrors the character gate (the 120,000-char floor less the 20,000-char
   margin), since this corpus is nearly pure ASCII and bytes track
@@ -280,7 +281,8 @@ DEFAULT_ROOT_CHAR_WARN_FRACTION = 0.90
 # ratchet that only warns is the advisory-check-nobody-reads failure
 # `shared/writing/semantic-line-breaks.md` records for `check-new-line-breaks`,
 # where a green job and a warned job look identical to anyone reading exit
-# codes. The budget can stay advisory because crossing it is a prompt to
+# codes. The budget is advisory by default (this repo's CI gates it under
+# --strict since ai-config#4685) because crossing it is a prompt to
 # decide what comes out; crossing this means one file grew past the largest
 # thing anyone had accepted, which is a decision someone should make on
 # purpose.

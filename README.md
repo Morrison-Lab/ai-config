@@ -47,6 +47,7 @@ Three mechanisms close that gap, one per place an agent can be configured:
 
 Both scripts merge rather than replace, leave an explicit `ai-config@*` choice alone, and take `--check` to report without writing.
 `wire-user-config.py` also refuses to enable the plugin on a machine that registered the hook catalog through `install-hooks.py --fix`, since the two paths together fire every hook twice.
+[`docs/delivery-paths.md`](docs/delivery-paths.md) names the one supported path for each harness and session kind, what each cannot deliver, and the older paths that are leftovers.
 
 ### Antigravity & Gemini CLI
 
@@ -240,11 +241,9 @@ Observed 2026-10-15 in a Claude Code cloud session for `Morrison-Lab/rme`:
 the container started with only the default marketplace registered,
 and `claude plugin install ai-config@Morrison-Lab` failed with
 "not found in marketplace" until the marketplace was added.
-So also commit a `SessionStart` hook that adds the marketplace and installs
-the plugin when `CLAUDE_CODE_REMOTE` is `true`
-(needs network access to reach GitHub);
-[`Morrison-Lab/rme`'s `.claude/hooks/install-ai-config.sh`](https://github.com/Morrison-Lab/rme/blob/main/.claude/hooks/install-ai-config.sh)
-is a working example ([rme#1336](https://github.com/Morrison-Lab/rme/pull/1336)).
+The lab's cloud environment installs it when the container is built: the Setup script copied from [`references/cloud-setup/cloud-setup.sh`](references/cloud-setup/cloud-setup.sh) adds the marketplace and installs or updates the plugin ([`docs/delivery-paths.md`](docs/delivery-paths.md)).
+A repository's own `SessionStart` hook that does the same, such as [`Morrison-Lab/rme`'s `.claude/hooks/install-ai-config.sh`](https://github.com/Morrison-Lab/rme/blob/main/.claude/hooks/install-ai-config.sh) ([rme#1336](https://github.com/Morrison-Lab/rme/pull/1336)), does not run in a session that opens several repositories ([#5280](https://github.com/Morrison-Lab/ai-config/issues/5280)), so use one only in a cloud environment whose Setup script does not install the plugin, and only for a session that opens that one repository.
+Such a hook should act only when `CLAUDE_CODE_REMOTE` is `true`, so that it does nothing on a machine, and like the Setup script it needs network access to GitHub.
 Plugin skills are namespaced, e.g. `/ai-config:reprexes`,
 `/ai-config:grade-work`.
 

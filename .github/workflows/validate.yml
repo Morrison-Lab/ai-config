@@ -221,6 +221,10 @@ jobs:
         run: python3 scripts/test_sync_nlb_checker.py
       - name: Run memory-file-size check tests
         run: python3 scripts/test_check_memory_file_size.py
+      - name: Check every memory file has a row in memories/MEMORY.md
+        # ai-config#4987. The self-test fails an unregistered file first
+        # (the negative control), then checks this repo's memories.
+        run: python3 scripts/test_check_memory_index.py
       - name: Run sources-library audit tests
         run: python3 scripts/test_check_sources_library.py
       - name: Run session-runtime check tests

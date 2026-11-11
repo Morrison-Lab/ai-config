@@ -171,6 +171,13 @@ Look for a trigger written as "when no thread is working", "when idle" or "if an
 Read the diff; do not report the output of `scripts/check-unowned-issues.py` as your finding.
 See [`keep-agent-on-backlog`](../../shared/workflow/keep-agent-on-backlog.md#the-rule).
 
+## Filed issues with no priority
+
+When the change under review filed issues (its description or commits link them), read each one's labels.
+An agent-filed issue in a repo we administrate with none of `P1`, `P2` or `P3` is a finding: name the issue and the priority you would give it ([`issue-first`](../../shared/workflow/issue-first.md), "Set the priority when you file").
+So is a new issue that reports another symptom of a defect family that already has a tracking issue, which belongs as a comment on that tracker ([`triage-backlog`](../../shared/workflow/triage-backlog.md), "Fold, do not multiply").
+Read the issues; do not report the output of `hooks/warn-unlabelled-agent-issue.py` as your finding.
+
 ## Standalone lds workflow PRs
 
 On a new `Morrison-Lab/lds` PR that changes only workflow files, check that it is not a small fix that could ride with another open lds workflow PR, since each lds workflow merge re-stales every open lds PR.
@@ -204,3 +211,9 @@ Expand each variable as empty as well as set, since a variable from an earlier s
 A fix for one permission error changes the one path that raised it.
 Read the diff; do not report `hooks/no-recursive-chown-system-path.py`'s verdict as your finding.
 See [`destructive-actions-catalog`](../../shared/workflow/destructive-actions-catalog.md#recursive-ownership-and-mode-changes).
+
+## Word field codes
+
+On a diff or a delivered `.docx` produced by an edit that merged runs, check that each field code (a citation, cross-reference or HYPERLINK) still has its own `begin`, `instrText`, `separate` and `end` runs and that the field's text is where it was.
+Read the document; do not report a hook's output as your finding.
+See [`review-rendered-documents`](../../shared/workflow/review-rendered-documents.md#merging-runs-in-a-word-document).

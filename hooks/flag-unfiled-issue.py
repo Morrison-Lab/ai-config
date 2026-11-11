@@ -209,7 +209,8 @@ def main() -> int:
         "now (dupe-check with `gh issue list --state all --search`, then "
         "`gh issue create` / `mcp__github__issue_write`, labelled "
         "ai-authored and model:<id> per "
-        "shared/workflow/label-agent-filed-issues.md), or comment the new "
+        "shared/workflow/label-agent-filed-issues.md, and one of P1, P2 or "
+        "P3 per shared/workflow/issue-first.md), or comment the new "
         "evidence onto the issue that already covers it. If it is genuinely "
         "not yours to file -- out of scope for this repo -- say so instead "
         "of restating that it is unfiled.", "flag-unfiled-issue"))

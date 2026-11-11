@@ -51,7 +51,7 @@ When you notice any such pre-existing condition:
 - If it is outside your active task's scope,
   file a dedicated issue per [`defer-issue`](../../skills/defer-issue/SKILL.md) and [`issue-first`](issue-first.md).
 - Follow the issue-filing conventions in [`label-agent-filed-issues`](label-agent-filed-issues.md),
-  including labels `ai-authored` and `model:<model-id>`.
+  including labels `ai-authored` and `model:<model-id>` and a priority label.
 
 ## Summary rules
 

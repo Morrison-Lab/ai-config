@@ -143,6 +143,30 @@ Learned on [ai-config#5023](https://github.com/Morrison-Lab/ai-config/pull/5023)
   The merge hook does not credit a compound or piped run.
 - `validate` runs twice on one head (pull_request and push events), and the checker blocks until both finish.
 
+Added on 2026-11-11 ([ai-config#5359](https://github.com/Morrison-Lab/ai-config/issues/5359)), when the OpenCode Go route worked again:
+
+- **Do:** run the OpenCode Go review on the shipping head before the merge call, and write a waiver only after every route failed in this session.
+- **Do:** check each passage a diff-only reviewer quotes against the head, and run the failing command a finding claims, before you accept or rebut the finding.
+  A reviewer that sees only the diff can quote code that is not in the file.
+- **Do:** relay an outside review in your own words: say that it did not approve, list each finding, and address, rebut or defer each one on the PR before merging.
+- **Don't:** copy a waiver from a note about an earlier outage.
+  One was posted on [ai-config#5352](https://github.com/Morrison-Lab/ai-config/pull/5352) before any reviewer was tried.
+- **Don't:** accept or rebut from the reviewer's quotation alone.
+- **Don't:** paste the reviewer's verdict line into your relay comment.
+  `scripts/check-pr-fully-clean.py` then records the relay comment itself as a not-clean verdict from its author (criterion 4 in its module docstring), and only a later clean verdict from that same author clears it.
+  The findings still block the merge until each is answered.
+  The wording only keeps the relay from becoming a second verdict.
+
+Other notes from that day:
+
+- The header that worked for the `urllib` probe named above was `User-Agent: curl/8.5.0`.
+  A 403 with code 1010 is the gateway refusing the client, so it is not a failed route and does not count toward a waiver.
+- An answer with reasoning and no text is no verdict ([`ci-quirks`](ci-quirks.md), "Cross-harness review tooling").
+  `glm-5.3` returned that on three diffs in a row while `kimi-k3` answered, so list first the model that last answered.
+- `scripts/summarize-pr-annotations.sh` did not finish in a cloud session: it printed an HTTP 403 line about 1,500 times in five minutes ([ai-config#5377](https://github.com/Morrison-Lab/ai-config/issues/5377)).
+  Its header already pages by hand around one proxy 403 (gha#1432), and which call still gets the 403 was not read.
+  Until that issue is fixed, read `repos/<owner>/<repo>/commits/<sha>/check-runs` and each `repos/<owner>/<repo>/check-runs/<id>/annotations` with `gh api`, which took under a minute.
+
 ## The merge hook needs literal ids in the checker command
 
 - The merge hook reads the checker's result line from this transcript, and a run whose `--annotations-read` value is a shell variable (`"$IDS"`) did not satisfy it on mds#671 (2026-11-06).

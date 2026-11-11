@@ -369,7 +369,9 @@ def main() -> int:
         # 8f. Fail closed when PyYAML is unavailable: denies with explanation and PyYAML note.
         with open(HOOK, encoding="utf-8") as f:
             hook_src_no_yaml = f.read().replace("import yaml", "yaml = None # import yaml")
-        no_yaml_fd, no_yaml_path = tempfile.mkstemp(suffix=".py")
+        # beside the real hook, so it still finds scripts/lib (ai-config#3178)
+        no_yaml_fd, no_yaml_path = tempfile.mkstemp(
+            suffix=".py", dir=os.path.dirname(os.path.realpath(HOOK)))
         os.close(no_yaml_fd)
         _write_file(no_yaml_path, hook_src_no_yaml)
         try:

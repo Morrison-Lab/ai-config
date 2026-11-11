@@ -53,8 +53,8 @@ HOOKS = os.path.join(ROOT, "hooks")
 # whenever the suite grows rather than leaving a stale count behind: 32 cases
 # plus 17 mutation rounds finished in 178s on a Linux cloud runner
 # (2026-08-26), 64 cases plus 42 rounds finished in 159s on another one
-# (2026-09-04), and 91 cases plus 54 rounds finished in 225s in a Linux
-# container (2026-09-14). The unit is a test CASE, not a scratch repository:
+# (2026-09-04), 91 cases plus 54 rounds in 225s (2026-09-14), and
+# 91 cases plus 53 rounds in 255s (2026-11-11). Unit: a test CASE, not a repo:
 # every case
 # builds a working repo AND a bare origin, and several build a clone or a
 # worktree on top, so the repositories outnumber the cases at least two to
@@ -63,7 +63,7 @@ HOOKS = os.path.join(ROOT, "hooks")
 # Restating it is no longer left to whoever grows the suite:
 # `scripts/test_test_hooks.py` derives both counts and FAILs on a stale one,
 # because two reviews in a row found this comment stale anyway
-# (ai-config#2451). 900s is about 5x the slower reading, so a slow
+# (ai-config#2451). 900s is about 3.5x the slowest reading, so a slow
 # Windows box has headroom past the 420s kill of the hang that never
 # produced output (ai-config#2098) while still FAILing an infinite
 # stall. Override with HOOK_TEST_SUITE_TIMEOUT.

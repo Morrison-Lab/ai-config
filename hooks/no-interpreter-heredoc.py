@@ -77,7 +77,6 @@ import importlib.util
 import json
 import os
 import re
-import shlex
 import sys
 
 OVERRIDE = "ALLOW_INTERPRETER_HEREDOC"
@@ -103,12 +102,12 @@ def _load_heredoc_parser():
 try:
     if _LIB not in sys.path:
         sys.path.insert(0, _LIB)
-    from shellcmd import RX_HEREDOC_OPEN
+    from shellcmd import RX_HEREDOC_OPEN, shell_tokens, is_operator_token
     _PARSER = _load_heredoc_parser()
 except Exception as _exc:  # broken install; fail open and say so
     print(f"no-interpreter-heredoc: cannot load the heredoc parser "
           f"({_exc}); not evaluating", file=sys.stderr)
-    RX_HEREDOC_OPEN = None
+    RX_HEREDOC_OPEN = shell_tokens = is_operator_token = None
     _PARSER = None
 
 _INTERPRETER = re.compile(
@@ -125,30 +124,27 @@ _INTERPRETER_VALUE_OPTS = {"-W", "-X", "-Q", "--check-hash-based-pycs"}
 _DURATION = re.compile(r"^[0-9.]+[smhd]?$")
 _INFO_FLAGS = {"--version", "-V", "-h", "--help", "-version"}
 _ENV_ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
-_SHELL_OPS = set("();|&")
 
 
 def _segments(opener_line):
     """Simple commands on OPENER_LINE as argv lists, heredoc openers removed."""
     text = RX_HEREDOC_OPEN.sub(" ", opener_line)
-    lexer = shlex.shlex(text, posix=True, punctuation_chars=True)
-    lexer.whitespace_split = True
-    segments, current = [], []
-    try:
-        for token in lexer:
-            if token and all(ch in _SHELL_OPS for ch in token):
-                if current:
-                    segments.append(current)
-                current = []
-            else:
-                current.append(token)
-    except ValueError:
+    tokens = shell_tokens(text)
+    if tokens is None:
         # Unbalanced quote (the opener regex is quote-blind, so a stray
         # apostrophe earlier on the line lands here). Failing open would let
         # the command through, so fall back to a quote-stripped split.
         plain = text.replace("'", " ").replace('"', " ")
         return [seg.split() for seg in re.split(r"[;&|()]+", plain)
                 if seg.split()]
+    segments, current = [], []
+    for token in tokens:
+        if is_operator_token(token):
+            if current:
+                segments.append(current)
+            current = []
+        else:
+            current.append(token)
     if current:
         segments.append(current)
     return segments

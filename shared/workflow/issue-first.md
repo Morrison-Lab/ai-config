@@ -366,8 +366,9 @@ touching prose the PR had never authored.)
 
 ## Label an agent-filed issue with its authorship and its model
 
-Every issue an agent files into a repo we administrate carries two labels: `ai-authored`, saying an AI wrote it, and `model:<model-id>`, naming which one.
+Every issue an agent files into a repo we administrate carries two disclosure labels: `ai-authored`, saying an AI wrote it, and `model:<model-id>`, naming which one.
 Add both in the command that creates the issue, not as a follow-up edit.
+The same command sets a third label, the priority ("Set the priority when you file", at the end of this section).
 
 The labels exist because the issue body cannot say it.
 [`disclose-agent-authorship`](disclose-agent-authorship.md) puts a marker line on every agent-posted forge *comment* and explicitly excludes an issue body, so an agent-filed issue discloses nothing at all.
@@ -376,10 +377,27 @@ A label closes that without touching the body, and `gh issue list --state all --
 The model label is separate because it makes a second sweep possible: which model wrote an issue is what a later reader needs when one model turns out to have been systematically wrong about something.
 
 [`label-agent-filed-issues`](label-agent-filed-issues.md) carries the mechanics: the `gh`, `glab`, and MCP forms, how to normalize the model id, creating the labels in a repo that lacks them, and what to do where you cannot.
-`hooks/warn-unlabelled-agent-issue.py` warns (never blocks) when an issue is created with no `ai-authored` label.
+`hooks/warn-unlabelled-agent-issue.py` warns (never blocks) when an issue is created with no `ai-authored` label, or with no priority label.
 
-- **Do:** pass `--label ai-authored --label "model:<model-id>"` in the creating command.
+- **Do:** pass `--label ai-authored --label "model:<model-id>"` in the creating command, beside the priority label.
 - **Do:** normalize the model id to its canonical form first, so one model maps to one label.
 - **Do:** file the issue and report the gap when the labels cannot be created.
 - **Don't:** put the disclosure in the issue body instead --- that is the one place [`disclose-agent-authorship`](disclose-agent-authorship.md) rules out.
 - **Don't:** collapse the two into one label --- a combined `ai-authored:<model-id>` answers the model question, but finding AI-authored issues at all then costs one query per model spelling.
+
+### Set the priority when you file
+
+An agent-filed issue in a repo we administrate also carries one of `P1`, `P2` or `P3` in the creating command.
+Ezra, [ai-config#3140](https://github.com/Morrison-Lab/ai-config/issues/3140): "when filing issues, assign priority level, task size, and all other applicable fields and labels (in repos we're members of)".
+[`triage-backlog`](triage-backlog.md) defines the three priorities, and `P2` is the default.
+Set the issue type, the parent issue and any other field the repo uses in the same step.
+
+The filer knows why the issue matters, and the weekly triage pass has only its title to go on.
+An issue filed without a priority waits for that pass.
+A pass on 2026-11-11 found 190 open issues in this repo with no priority label ([ai-config#5306](https://github.com/Morrison-Lab/ai-config/issues/5306#issuecomment-6793833134)).
+
+`hooks/warn-unlabelled-agent-issue.py` warns when a create carries none of the three priority labels.
+The reviewer layer is [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md)'s check of the issues a PR files.
+
+- **Do:** pass one of `--label P1`, `--label P2` or `--label P3` in the creating command.
+- **Don't:** file an issue with no priority and leave the choice to the weekly pass.

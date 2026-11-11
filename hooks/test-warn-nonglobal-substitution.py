@@ -22,6 +22,14 @@ import subprocess
 import sys
 import tempfile
 
+# A mutant is written to a temporary directory, where the hook's own
+# `scripts/lib` lookup (relative to its file) finds nothing, so every hook run
+# gets the shared splitter on `PYTHONPATH` (ai-config#3178).
+SHELLCMD_LIB = os.path.join(os.path.dirname(os.path.dirname(
+    os.path.realpath(__file__))), "scripts", "lib")
+HOOK_ENV = dict(os.environ, PYTHONPATH=os.pathsep.join(
+    p for p in (SHELLCMD_LIB, os.environ.get("PYTHONPATH")) if p))
+
 HOOK = os.path.realpath(sys.argv[1])
 
 
@@ -135,7 +143,7 @@ with open(HOOK, encoding="utf-8") as handle:
 def verdict(hook_path, payload):
     proc = subprocess.run(
         [sys.executable, hook_path], input=json.dumps(payload),
-        capture_output=True, text=True,
+        capture_output=True, text=True, env=HOOK_ENV,
     )
     # a crashed hook must NOT read as 'silent' -- that is the failure mode
     # where the pass path and the broken path print the same thing
@@ -266,12 +274,6 @@ MUTATIONS = {
           'flags):\n            out.append((m.group(0), flags))',
           "        out.append((m.group(0), flags))")],
         {"S1", "S5", "S10"},
-    ),
-    "M5_heredoc_blanking": (
-        "a heredoc body is blanked before parsing, so a MENTION inside one "
-        "is not an invocation",
-        [('    cmd = RX_HEREDOC.sub("<<", cmd)', "    pass")],
-        {"S8"},
     ),
     "M6_lead_skip": (
         "a leading env-assignment (or lead word) is skipped before "

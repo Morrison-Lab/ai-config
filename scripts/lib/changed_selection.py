@@ -5,9 +5,9 @@ the seeds (a test and its subject), every file whose name or module stem they
 mention as a whole token, and every Python module those import or load by a
 literal `x.py` path, transitively. Other mentions are followed one level only:
 followed further, comments naming other scripts pulled a median of 1127 of 1647
-files into every suite (2026-11-11). A file reached only by a computed path or
-a directory scan is not selected, so shared code reached that way must live
-under ALWAYS_RUN; a deleted path selects every suite, and CI runs all of them.
+files into every suite (2026-11-11). A file that a non-seed module reaches only
+by a computed path, an importlib module name, or a directory scan is not
+selected, so shared code reached that way must live under ALWAYS_RUN; a deleted path selects every suite, and CI runs all of them.
 The changed list must name both sides of a rename (`git diff --no-renames`).
 """
 from __future__ import annotations
@@ -33,8 +33,9 @@ _TEXT_SUFFIXES = {".py", ".sh"}
 
 def tree_files(root: Path) -> List[str]:
     """Tracked files plus untracked, non-ignored ones (git ls-files --cached --others)."""
-    # A caller's GIT_DIR, GIT_WORK_TREE or GIT_INDEX_FILE would point git at another tree.
-    env = {k: v for k, v in os.environ.items() if k not in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE")}
+    # A caller's GIT_* variables, such as GIT_DIR or GIT_COMMON_DIR,
+    # could point git at another repository.
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
     out = subprocess.run(["git", "-C", str(root), "ls-files", "-z", "--cached", "--others",
                           "--exclude-standard"], capture_output=True, check=True, env=env,
                          encoding="utf-8", errors="surrogateescape").stdout

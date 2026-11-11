@@ -74,6 +74,7 @@ def test_selector():
         sel = Selector(root)
         seeds = ["hooks/test-guard.py", "hooks/guard.py"]
         check("a change to the subject selects the suite", sel.needed(seeds, ["hooks/guard.py"]))
+        check("a change to the test selects the suite", sel.needed(seeds, ["hooks/test-guard.py"]))
         check("a change to an imported module selects it", sel.needed(seeds, ["hooks/helper.py"]))
         check("imports are followed transitively", sel.needed(seeds, ["hooks/deeper.py"]))
         check("an imported package's __init__.py selects it", sel.needed(seeds, ["hooks/pkg/__init__.py"]))
@@ -99,14 +100,15 @@ def test_selector():
             check("a file with a NUL byte counts as unparsable", sel.needed(["hooks/nul.py"], ["hooks/unrelated.py"]))
         check("a shell seed's mentions are read", sel.needed(["hooks/run.sh"], ["hooks/shellcfg.txt"]))
         check("scripts/lib without its slash selects every suite", sel.needed(seeds, ["scripts/lib/"]))
-        old = os.environ.get("GIT_DIR")
-        os.environ["GIT_DIR"] = str(root / "no-such-git-dir")
-        try:
-            check("a caller's GIT_DIR does not redirect git", "hooks/helper.py" in Selector(root).files)
-        finally:
-            os.environ.pop("GIT_DIR")
-            if old is not None:
-                os.environ["GIT_DIR"] = old
+        for var in ("GIT_DIR", "GIT_COMMON_DIR"):
+            old = os.environ.get(var)
+            os.environ[var] = str(root / "no-such-git-dir")
+            try:
+                check(f"a caller's {var} does not redirect git", "hooks/helper.py" in Selector(root).files)
+            finally:
+                os.environ.pop(var)
+                if old is not None:
+                    os.environ[var] = old
         check("untracked, non-ignored files are indexed", "hooks/brand-new.py" in sel.files)
         check("./ and a/../ spellings are normalised", sel.needed(seeds, ["./hooks/pkg/../helper.py"])
               and not sel.needed(seeds, ["./hooks/unrelated.py"]))

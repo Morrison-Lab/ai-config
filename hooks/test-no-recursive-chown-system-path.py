@@ -305,10 +305,17 @@ class Denies(unittest.TestCase):
         self.assert_denied('if [ -d proj ]; then cd proj; fi; D="./$PWD/../.."; cd /tmp; '
                            'chown -R me "$D"', cwd=HOME)
 
-    def test_pwd_after_a_cd_this_cannot_resolve(self):
-        for cmd in ('cd "$UNSET_D"; X=$PWD; chown -R me "$X"', 'cd -; X=$PWD; chown -R me "$X"',
-                    'cd -; chown -R me "$PWD"', 'cd -; chown -R me "$(pwd)"'):
-            self.assert_denied(cmd, cwd=HOME)
+    def test_nested_text_after_a_maybe_cd_sees_every_world(self):
+        cwd = HOME + "/proj"
+        self.assert_denied('if [ -d sub ]; then cd sub; fi; X=$PWD; bash -c "chmod -R u+w $X/.."',
+                           cwd=cwd)
+        self.assert_denied('if [ -d sub ]; then cd sub; fi; X=$PWD; Y=$(chown -R me "$X/..")',
+                           cwd=cwd)
+
+    def test_cd_up_in_a_loop_reaches_every_ancestor(self):
+        self.assert_denied('while [ ! -d .git ] && [ "$PWD" != / ]; do cd ..; done; '
+                           'chmod -R u+w .')
+        self.assert_denied("until [ -d .git ]; do cd ../..; done; chown -R me .")
 
     def test_pwd_name_used_with_a_suffix(self):
         for cmd in ('if [ -d sub ]; then cd sub; fi; X=$PWD; chown -R me "$X/.."',
@@ -467,6 +474,23 @@ class Allows(unittest.TestCase):
         for cmd in ('chmod -R u+w "$(pwd)/build"', "chmod -R u+w ~+/build",
                     'chown -R me "$(pwd; echo)"'):
             self.assert_allowed(cmd, cwd=HOME)
+
+    def test_pwd_after_a_cd_this_cannot_resolve(self):
+        # Limit pins: `$PWD` there is read like `.` there, taken as empty.
+        for cmd in ('cd "$UNSET_D"; X=$PWD; chown -R me "$X"', 'cd -; chown -R me "$PWD"',
+                    'cd "$(git rev-parse --show-toplevel)" && chmod -R u+w "$PWD"',
+                    'cd "$(git rev-parse --show-toplevel)" && chmod -R u+w "$PWD/build"'):
+            self.assert_allowed(cmd, cwd=HOME)
+        self.assert_allowed("cd build && bash -c 'chmod -R u+w \"$PWD\"'")
+
+    def test_past_max_worlds_the_directory_is_unknown(self):
+        # Four guarded cds make 16 ways to run; the fifth leaves the directory
+        # unknown (a Limit pin: in bash `..` there may be /tmp).
+        guarded = "".join(f"if {c}; then cd {c}; fi; " for c in "abcd")
+        self.assert_allowed(guarded + "if e; then cd /tmp/a; fi; chown -R me ..")
+        # Under the cap, the same `cd` is judged both ways, and `..` is /tmp.
+        self.assertIsNotNone(run(guarded[len("if a; then cd a; fi; "):]
+                                 + "if e; then cd /tmp/a; fi; chown -R me .."))
 
     def test_shell_c_in_a_project(self):
         self.assert_allowed("sudo sh -c 'chown -R me .'")

@@ -54,9 +54,8 @@ comments is lifted out before the command is split, scanned as a command of
 its own, and taken as empty, except a bare `pwd`, read as `$PWD`. A `sh -c`
 text or a substitution runs in the caller's directory, the hook's `cwd`
 while no `cd` appears before it in its scope; after one, its directory is
-unknown, so only absolute targets are judged there. After a `cd` this cannot resolve (`cd -`,
-`cd "$UNSET"`), `$PWD` is taken as empty, and an operand left empty by it
-(`"$PWD"`, or `X=$PWD` then `"$X"`) is refused.
+unknown, so only absolute targets are judged there. A `cd ..` repeated by a loop is judged in
+every directory above.
 
 A deny, not a warning: the remedy (fix the one path that raised the error, as
 your own user) is always available, and the damage is unrecoverable without a
@@ -79,8 +78,10 @@ component (`/*/lib`), a partial glob or brace expansion that names a
 protected path (`/et*`, `/{etc,usr}`), a wrapper that changes directory
 (`env -C /etc`, `sudo -D /etc`), more than MAX_WORLDS ways a command may
 run (the directory is then unknown), PowerShell `icacls`/`Set-Acl`, Windows drive
-paths (`C:/Windows`), a relative target after a `cd` this cannot
-resolve (`cd -` or `cd "$UNSET"`), a `cd` that fails or follows `&&` or
+paths (`C:/Windows`), a relative target, `$PWD`, or a name assigned from
+`$PWD`, after a `cd` this cannot resolve (`cd -` or `cd "$UNSET"`, where
+`$PWD` is taken as empty), a `cd` into a subdirectory repeated by a loop
+(read as run once), a `cd` that fails or follows `&&` or
 `||` (read as run), an assignment that may not run
 (`false && D=./x` or `if false; then : "${D:=./x}"; fi`, each read as run), a
 `${D:=x}` assignment inside `sh -c` or a substitution, an assignment in a
@@ -170,13 +171,13 @@ UNREAD = ("/", False)
 UNREAD_WHY = ("whose value this guard does not read, here or in an earlier assignment: "
               "a `${...}` operator other than a `-`/`=` default or a `?` check, defaults "
               f"nested deeper than {MAX_NESTING}, a positional parameter, `$_`, `$OLDPWD`, "
-              "a name set by `read`, `getopts` or `printf -v`, or `$PWD` alone after a "
-              "`cd` this cannot resolve; write the path out")
-# Words that open and close a compound command, for `_scan`'s DEPTH.
+              "or a name set by `read`, `getopts` or `printf -v`; write the path out")
+# Words that open and close a compound command, for `_scan`'s BLOCKS.
 BLOCK_OPEN = {"if", "while", "until", "for", "select", "case"}
 BLOCK_CLOSE = {"fi", "done", "esac"}
 # Keywords whose own condition always runs (`if cd x; then`).
 CONDITION_OPEN = {"if", "while", "until"}
+LOOPS = {"while", "until", "for", "select"}
 DECLARE_BUILTINS = ("export", "local", "declare", "readonly", "typeset")
 # chmod's own short options (GNU and BSD); any other `-w` or `-x` is a mode.
 CHMOD_OPTIONS = set("cfvRHLPh")
@@ -421,7 +422,7 @@ def _expand(text, home, assigned, here, depth=0, effects=None):
     text = re.sub(r"\A~([A-Za-z0-9_.-]*)(?=/|\Z)",
                   lambda m: os.path.expanduser("~" + m.group(1)) if m.group(1) else home,
                   text)
-    guessed, undecidable, capped, unknown = [], [], [], []
+    guessed, undecidable, capped = [], [], []
 
     def value(name, rest):
         if name in ("!", "#") and rest:  # `${!P}`, `${!?}`, `${#P}`
@@ -456,9 +457,8 @@ def _expand(text, home, assigned, here, depth=0, effects=None):
             val = home
         elif name == "PWD":
             # After a `cd` this cannot resolve, `$PWD` is taken as empty, like
-            # an unset variable, unless nothing else is left (`"$PWD"`).
+            # an unset variable (see Limits).
             val, missing = here or "", here is None
-            unknown.append(missing)
         else:
             val = os.environ.get(name, "")
             missing, is_set = not val, name in os.environ
@@ -500,7 +500,7 @@ def _expand(text, home, assigned, here, depth=0, effects=None):
             pieces.append(value(match.group(2), ""))
     pieces.append(text[pos:])
     expanded = "".join(pieces)
-    if capped or any(unknown) and not expanded:
+    if capped:
         return UNREAD
     return None if undecidable else (expanded, any(guessed))
 
@@ -624,13 +624,28 @@ def _shown(text):
     return text.replace(SUB, "$(...)").replace(PWD_SUB, "$(pwd)")
 
 
+def _only_up(target):
+    """Whether TARGET is made only of `..` steps (`..`, `../..`)."""
+    parts = [p for p in target.split("/") if p]
+    return bool(parts) and all(p == ".." for p in parts)
+
+
+def _ancestors(path):
+    """Every directory above PATH, nearest first, up to `/`."""
+    out = []
+    while path not in ("/", ""):
+        path = os.path.dirname(path)
+        out.append(path)
+    return out
+
+
 def _starts_nested(words):
     """Whether WORDS holds a lifted substitution or a shell's `-c` flag."""
     return any(SUB in w or re.fullmatch(r"-[A-Za-z]*c[A-Za-z]*", w) for w in words)
 
 
 def _scan(piece, cwd, home, outer):
-    """`(hit or None, [inner substitutions], names assigned, moved)` for one text.
+    """`(hit or None, [inner substitutions], [names per world], moved)` for one text.
 
     OUTER holds names an enclosing text assigned: a `sh -c` body or a
     substitution sees them, through the outer shell's own expansion of a
@@ -648,20 +663,26 @@ def _scan(piece, cwd, home, outer):
     # one where it did not, so `$PWD`, a name assigned from it, and `.` are
     # each judged in every directory the shell may be in. Past MAX_WORLDS the
     # directory is no longer split, and becomes `None`.
-    # DEPTH counts the `if`, loop and `case` commands open here: any `cd`
+    # BLOCKS holds the `if`, loop and `case` commands open here: any `cd`
     # inside one may not run, except in the condition of the one it opens
     # (`if cd x; then`, `while ! cd x`). A `{ ... }` group runs.
     # MOVED: a `cd` came before a command that starts a nested text (a
     # substitution or a shell's `-c`), in that command's scope or above it.
-    worlds, depth, moved_any, cd_scopes = [({(0,): cwd}, {})], 0, False, []
+    # A loop runs its body and a `while`/`until` condition any number of
+    # times, so a `cd ..` there may reach every directory above.
+    worlds, blocks, moved_any, cd_scopes = [({(0,): cwd}, {})], [], False, []
     for scope, argv in cmds or []:
         # `then cd /etc`, `{ cd /usr; }`: a keyword ends the command before.
         words, opened = argv, None
         while words and words[0] in SHELL_KEYWORDS:
-            depth += (words[0] in BLOCK_OPEN) - (words[0] in BLOCK_CLOSE)
-            opened = words[0] if words[0] in BLOCK_OPEN else opened
+            if words[0] in BLOCK_OPEN:
+                blocks.append(words[0])
+                opened = words[0]
+            elif words[0] in BLOCK_CLOSE and blocks:
+                blocks.pop()
             words = words[1:]
-        maybe = depth - (opened in CONDITION_OPEN) > 0
+        maybe = len(blocks) - (opened in CONDITION_OPEN) > 0
+        looped = any(b in LOOPS for b in blocks)
         lead = words
         while lead and lead[0] in ("time", "-p", "command", "builtin"):
             lead = lead[1:]
@@ -685,22 +706,30 @@ def _scan(piece, cwd, home, outer):
                                         for g in got]
                 unknown = None in cd_words or any(SUB in tok for tok in lead) or here is None
                 new = None if unknown else resolve_cd_target(cd_words, here)
-                if maybe and new != here and len(worlds) + len(forked) < MAX_WORLDS:
-                    forked.append(({**heres, scope: new},
-                                   {k: dict(v) for k, v in assigns.items()}))
+                news = [new]
+                if looped and new and cd_words[1:] and _only_up(cd_words[-1]):
+                    news = _ancestors(here)
+                    maybe = True
+                news = [n for n in news if n != here]
+                room = MAX_WORLDS - len(worlds) - len(forked)
+                if maybe and news and len(news) <= room:
+                    forked.extend(({**heres, scope: n},
+                                   {k: dict(v) for k, v in assigns.items()}) for n in news)
                     continue  # this world keeps the directory before the `cd`
-                heres[scope] = None if maybe and new != here else new
+                heres[scope] = None if maybe and news else new
                 continue
             if _assignments(words, store, assigned, home, here):
                 continue
             hit = _judge(words, home, assigned, here)
             if hit:
-                return hit, inner, {}, moved_any
+                return hit, inner, [], moved_any
         worlds.extend(forked)
-    seen = dict(outer)
+    seen = []
     for _, assigns in worlds:
-        for names in assigns.values():
-            seen.update(names)
+        names = dict(outer)
+        for scoped in assigns.values():
+            names.update(scoped)
+        seen.append(names)
     return None, inner, seen, moved_any
 
 
@@ -739,15 +768,22 @@ def _hit(command, cwd, home):
     there are left alone.
     """
     pending = list(shell_c_expansions(command))
-    known = {}  # every name assigned so far, over-approximating its scope
+    # Names assigned so far, one set per way the texts read so far may have
+    # run, each over-approximating its scope; a later text is read once per set.
+    knowns = [{}]
     moved = False
     while pending:
         piece = pending.pop(0)
-        hit, inner, seen, moved_here = _scan(piece, None if moved else cwd, home, known)
-        if hit:
-            return hit
+        after, moved_here = [], False
+        for known in knowns:
+            hit, inner, seen, moved_one = _scan(piece, None if moved else cwd, home, known)
+            if hit:
+                return hit
+            after.extend(seen)
+            moved_here = moved_here or moved_one
         moved = moved or moved_here
-        known.update(seen)
+        knowns = list({repr(sorted(k.items(), key=lambda kv: kv[0])): k
+                       for k in after}.values())[:MAX_WORLDS]
         for text in inner:
             pending.extend(shell_c_expansions(text))
     return None

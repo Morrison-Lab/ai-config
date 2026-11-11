@@ -578,18 +578,13 @@ def git_reader(base: Path, rev: str):
 def merge_result_tree(base: Path, ref: str) -> tuple[str | None, str]:
     """The tree that merging `ref` into HEAD at `base` would produce.
 
-    Returns `(tree, "")`, or `(None, reason)` when there is no single tree to
-    measure. A PR's CI measures the merge with `main` as `main` stood when CI
-    ran, and other PRs can merge after that. On 2026-10-02 a branch held
-    AGENTS.md at 31,941 of Codex's 32,768-byte cap while its merge with
-    the then-current `main` measured 33,029 (ai-config#4213, #4234). This
-    tree is what the merge would land now.
-
-    `git merge-tree --write-tree` (git 2.38+) touches neither the index nor
-    the working tree. It exits 1 on a conflict, and the tree it writes
-    then holds conflict markers, so a conflict is an error here, not a
-    measurement of marker-laden files. It also exits 1 on a ref it cannot
-    resolve, so the ref is checked first, or a typo would read as a conflict.
+    Returns `(tree, "")`, or `(None, reason)`. CI measures the merge with
+    `main` as it stood when CI ran: on 2026-10-02 a branch held AGENTS.md at
+    31,941 of the 32,768-byte cap while its merge with a newer `main`
+    measured 33,029 (ai-config#4213, #4234). `git merge-tree --write-tree`
+    (git 2.38+) touches neither index nor working tree. It exits 1 on a
+    conflict, whose tree holds markers, and on an unknown ref, so the ref is
+    checked first and a conflict is an error, not a measurement.
     """
     known = subprocess.run(
         ["git", "-C", str(base), "rev-parse", "--verify", "--quiet",
@@ -618,20 +613,15 @@ def merge_result_tree(base: Path, ref: str) -> tuple[str | None, str]:
 def merge_tree_reader(base: Path, tree: str):
     """Read paths from merge `tree`, descending into any gitlink in it.
 
-    `git show TREE:path` cannot see inside a submodule, so a consumer whose
-    root imports `@.ai-config/...` would read every such import as
-    dangling. A path under a gitlink is read instead from that submodule's
-    own checkout, at the commit the merge tree records for it -- the
-    `submodule_reader` pattern, with the pin taken from the merge rather
-    than from HEAD. Absolute and `~` imports come from disk, as in
-    `baseline_reader`, since no revision of this repo holds them.
+    `git show TREE:path` cannot see inside a submodule, so a path under a
+    gitlink (a consumer's `@.ai-config/...`) is read from that submodule's
+    checkout at the commit the merge pins, as `submodule_reader` does.
+    Absolute and `~` imports come from disk, as in `baseline_reader`.
 
-    Returns `(read, missing_pins)`. `missing_pins` starts empty and gains
-    an entry each time a read lands under a gitlink whose recorded commit
-    the submodule checkout does not have. The caller checks it after the
-    walk and treats a non-empty list as an error, rather than letting those
-    imports read as dangling. A gitlink the closure never reads, such as an
-    uninitialized submodule nothing imports, costs nothing.
+    Returns `(read, missing_pins)`. `missing_pins` gains an entry when a
+    read lands under a gitlink whose pinned commit the submodule checkout
+    lacks; the caller fails on it rather than report those imports as
+    dangling. A gitlink nothing imports is never read, so costs nothing.
     """
     listing = subprocess.run(
         ["git", "-C", str(base), "ls-tree", "-r", tree],
@@ -1302,9 +1292,7 @@ def main(argv=None) -> int:
         )
         return 2
     if args.merge_result and (args.baseline or args.compare):
-        # Both modes compare a reference against the working tree; with the
-        # working tree swapped for a merge tree, neither delta means what its
-        # report says.
+        # Both compare against the working tree, which this mode replaces.
         print(
             "error: --merge-result measures one tree; it does not combine "
             "with --baseline or --compare.",

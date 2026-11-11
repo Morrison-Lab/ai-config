@@ -1408,18 +1408,27 @@ with tempfile.TemporaryDirectory() as tmp:
 # The branch and main each stay under the AGENTS.md cap alone, and only
 # their merge goes over -- the 2026-10-02 case the issue records.
 
+
+def git_in(where, *a):
+    return subprocess.run(
+        ["git", "-c", "protocol.file.allow=always", *a],
+        cwd=where, check=True, capture_output=True, text=True,
+    ).stdout.strip()
+
+
+def init_repo(where):
+    git_in(where, "init", "-q", "-b", "main")
+    for key, value in [("core.autocrlf", "false"), ("user.email", "t@t.com"), ("user.name", "t")]:
+        git_in(where, "config", key, value)
+
+
 with tempfile.TemporaryDirectory() as tmp:
     base = Path(tmp)
 
     def git(*a):
-        return subprocess.run(
-            ["git", *a], cwd=base, check=True, capture_output=True, text=True
-        ).stdout.strip()
+        return git_in(base, *a)
 
-    git("init", "-q", "-b", "main")
-    git("config", "core.autocrlf", "false")
-    git("config", "user.email", "t@t.com")
-    git("config", "user.name", "t")
+    init_repo(base)
     (base / "CLAUDE.md").write_text("intro\n", encoding="utf-8")
     (base / "AGENTS.md").write_text("a" * 60 + "\n", encoding="utf-8")
     (base / "notes.md").write_text("x\n", encoding="utf-8")
@@ -1482,27 +1491,18 @@ with tempfile.TemporaryDirectory() as tmp:
     base = Path(tmp)
 
     def git(*a, cwd=None):
-        return subprocess.run(
-            ["git", "-c", "protocol.file.allow=always", *a],
-            cwd=cwd or base, check=True, capture_output=True, text=True,
-        ).stdout.strip()
-
-    def init(where):
-        git("init", "-q", "-b", "main", cwd=where)
-        git("config", "core.autocrlf", "false", cwd=where)
-        git("config", "user.email", "t@t.com", cwd=where)
-        git("config", "user.name", "t", cwd=where)
+        return git_in(cwd or base, *a)
 
     sub = base / "subsrc"
     sub.mkdir()
-    init(sub)
+    init_repo(sub)
     (sub / "shared.md").write_text("from the submodule\n", encoding="utf-8")
     git("add", "-A", cwd=sub)
     git("commit", "-qm", "sub", cwd=sub)
 
     repo = base / "repo"
     repo.mkdir()
-    init(repo)
+    init_repo(repo)
     (repo / "CLAUDE.md").write_text("@frag.md\n@.ai-config/shared.md\n", encoding="utf-8")
     (repo / "frag.md").write_text("f\n", encoding="utf-8")
     (repo / "notes.md").write_text("n\n", encoding="utf-8")

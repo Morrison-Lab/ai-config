@@ -726,6 +726,14 @@ except Exception as exc:  # covered by orphan_cases() in
     _SIBLING = None
     _SIBLING_ERROR = str(exc)
 
+# The sibling's detector tokenizes through `scripts/lib/shellcmd.py`
+# (ai-config#3178). When that import failed, the sibling loads but sees no
+# command at all, which would turn every push into a silent allow. Treat it as
+# a missing sibling instead, so the degraded-mode deny below still fires.
+if _SIBLING is not None and getattr(_SIBLING, "SHELLCMD_ERROR", None):
+    _SIBLING_ERROR = _SIBLING.SHELLCMD_ERROR
+    _SIBLING = None
+
 # The walk over git's push-option grammar, its tables, and the abbreviation
 # resolver live in the sibling and are bound here rather than declared twice
 # (ai-config#1935, #1920): the sibling decides whether a command is a push at
@@ -777,28 +785,31 @@ except Exception:
     _extract_review_payload, _payload_is_blocking = None, None
 
 
-def _load_native_path():
-    """`scripts/lib/shellcmd.py`'s `native_path`, or the identity.
+def _load_shellcmd():
+    """`scripts/lib/shellcmd.py`'s `native_path` and `resolve_cd_target`.
 
     The Bash tool on Windows is Git Bash, so a `-C` or `cd` target arrives as
     `/c/Users/...`, which native `git.exe` cannot open ("cannot change to
     '/c/Users/...'"). Every git call here would then fail, and a cross-repo
     push with a clean verdict was refused as unresolvable. The identity
     fallback reproduces that refusal rather than an allow, so a broken install
-    fails in the safe direction.
+    fails in the safe direction. The `cd` fallback returns None ("somewhere I
+    cannot name"); a missing `shellcmd` also breaks the sibling, so the
+    degraded-mode deny in main() fires before either fallback is consulted
+    (ai-config#3177).
     """
     lib_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
                            "scripts", "lib")
     try:
         if lib_dir not in sys.path:
             sys.path.insert(0, lib_dir)
-        from shellcmd import native_path
-        return native_path
+        from shellcmd import native_path, resolve_cd_target
+        return native_path, resolve_cd_target
     except Exception:
-        return lambda path, is_windows=None: path
+        return (lambda path, is_windows=None: path), (lambda rest, cur_dir: None)
 
 
-_native_path = _load_native_path()
+_native_path, _resolve_cd_target = _load_shellcmd()
 
 
 ENV_ASSIGNMENT = re.compile(r"\A[A-Za-z_][A-Za-z0-9_]*=")
@@ -1008,85 +1019,6 @@ def _blank_shell_redirections(command: str) -> str:
             i += 1
         chars[start:i] = " " * (i - start)
     return "".join(chars)
-
-
-def _resolve_cd_target(rest: list[str], cur_dir: str | None) -> str | None:
-    """Resolve the directory after a `cd`, `pushd`, or `popd` command relative to `cur_dir`.
-
-    Returns the new effective directory, or None if cleared / indeterminate.
-    """
-    cmd_name = rest[0]
-    if cmd_name == "popd":
-        # `popd -n` suppresses the directory change, leaving cur_dir untouched.
-        if any(tok.startswith("-") and "n" in tok and tok != "-" for tok in rest[1:]):
-            return cur_dir
-        # Without a full dirstack simulation across commands, popd without -n clears the hint.
-        return None
-
-    # For `cd` and `pushd`: parse flags and positional directory target.
-    i = 1
-    target = None
-    suppress_chdir = False
-    while i < len(rest):
-        tok = rest[i]
-        if tok == "--":
-            # End of options; next token (if present) is the target directory.
-            if i + 1 < len(rest):
-                target = rest[i + 1]
-            break
-        if tok == "-":
-            # `cd -` switches to OLDPWD, which is indeterminate without shell state.
-            return None
-        if tok.startswith("+") or (tok.startswith("-") and tok[1:].isdigit()):
-            # `pushd +N` or `pushd -N` rotates the directory stack.
-            return None
-        if tok.startswith("-"):
-            # Flags like -P, -L, -e, -@ for cd, or -n for pushd
-            if cmd_name == "pushd" and "n" in tok:
-                suppress_chdir = True
-            i += 1
-            continue
-        target = tok
-        break
-
-    if cmd_name == "pushd" and suppress_chdir:
-        # `pushd -n <dir>` rotates/modifies stack without changing current working directory.
-        return cur_dir
-
-    if target is None:
-        # Bare `cd` or `cd -P` with no directory defaults to $HOME (~).
-        # For pushd with no args, it swaps top 2 stack entries (indeterminate -> None).
-        if cmd_name == "pushd":
-            return None
-        target = "~"
-
-    # Expand ~ and ~/path
-    if target == "~" or target.startswith("~/"):
-        target = os.path.expanduser(target)
-    elif target.startswith("$HOME/") or target == "$HOME" or target.startswith("${HOME}/") or target == "${HOME}":
-        home = os.path.expanduser("~")
-        if target in ("$HOME", "${HOME}"):
-            target = home
-        elif target.startswith("$HOME/"):
-            target = os.path.join(home, target[len("$HOME/"):])
-        elif target.startswith("${HOME}/"):
-            target = os.path.join(home, target[len("${HOME}/"):])
-    elif "$" in target or "`" in target:
-        # Unexpanded shell variables/substitutions cannot be resolved statically.
-        return None
-
-    # Before `isabs`: on Windows under Python 3.13, `isabs("/c/Users/x")` is
-    # False, so a Git Bash drive path was joined onto `cur_dir` and then
-    # normalized into a drive-less path nothing downstream could repair.
-    target = _native_path(target)
-    is_abs = os.path.isabs(target) or bool(re.match(r"^[A-Za-z]:[/\\]", target))
-    was_windows_drive_forward = bool(re.match(r"^[A-Za-z]:/", target or "")) or (
-        bool(re.match(r"^[A-Za-z]:/", cur_dir or "")) and not is_abs
-    )
-    resolved = os.path.normpath(target if is_abs or cur_dir is None else os.path.join(cur_dir, target))
-    if was_windows_drive_forward:
-        resolved = resolved.replace("\\", "/")
-    return resolved
 
 
 def _hints_by_position(command: str) -> list[str | None]:

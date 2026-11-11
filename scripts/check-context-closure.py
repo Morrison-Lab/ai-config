@@ -29,6 +29,8 @@ Two modes, from ai-config#1028:
      three days old, the same 33 imports had grown +62%, and nothing
      reported it -- the gitlink diff is one line.
 
+Later came `--baseline REV` and `--merge-result REF` (ai-config#4234).
+
 Per `shared/workflow/algorithmatize-checks.md`, "how many bytes does this
 repo load before it starts" is decidable over data already on disk, so it
 belongs in an instrument rather than in anyone's periodic judgment.
@@ -48,7 +50,8 @@ Threshold rationale (`--total-char-limit` and `--repo-margin`):
 
 Threshold rationale (`--budget`, default below):
 
-  The advisory byte budget is the older, softer line, kept because the
+  The byte budget is the older, softer line (advisory by default; this
+  repo's CI passes `--strict`, ai-config#4685), kept because the
   pin-bump report (`--compare`) is denominated in bytes. Its default
   mirrors the character gate (the 120,000-char floor less the 20,000-char
   margin), since this corpus is nearly pure ASCII and bytes track
@@ -88,11 +91,12 @@ line is a prompt to decide what comes out, not a defect that should block an
 unrelated PR. Under `--strict` in `--compare` mode, a bump that would cross
 the budget fails too, even while the current pin is under it.
 
-**Two limits here are not advisory**, and neither is ours. The closure's
+**The CLI's two limits are not advisory.** The closure's
 total is gated against the CLI's own total limit (above). The root file
 also has the CLI's per-file limit, stated in CHARACTERS (`--root-char-cap`,
 default 150,000, the per-file limit on a 1M-context current model). Both
-fail regardless of `--strict`, like a dangling anchored import. The CLI
+fail regardless of `--strict`, like a dangling anchored import, as do
+the fragment cap, the AGENTS.md cap and the two growth gates. The CLI
 2.1.283 only WARNS past either limit and still loads the file (measured
 2026-09-28, ai-config#4061); earlier notes here said the file was not
 loaded whole, which that version does not do. The warning is still the
@@ -244,7 +248,8 @@ def cli_char_count(text: str) -> int:
 # On a 200k-context model the same limit is 40,000, which this corpus's root
 # file cannot meet, so the gate sits at the larger figure. It fails
 # regardless of `--strict`, like a dangling anchored import, rather than
-# joining the advisory budget (ai-config#897, #1258, #4061).
+# joining the budget, which is advisory by default (ai-config#897,
+# #1258, #4061).
 DEFAULT_ROOT_CHAR_CAP = 150_000
 
 # Measured 2026-08-07: at 153,217 raw characters the harness reported
@@ -280,7 +285,8 @@ DEFAULT_ROOT_CHAR_WARN_FRACTION = 0.90
 # ratchet that only warns is the advisory-check-nobody-reads failure
 # `shared/writing/semantic-line-breaks.md` records for `check-new-line-breaks`,
 # where a green job and a warned job look identical to anyone reading exit
-# codes. The budget can stay advisory because crossing it is a prompt to
+# codes. The budget is advisory by default (this repo's CI gates it under
+# --strict since ai-config#4685) because crossing it is a prompt to
 # decide what comes out; crossing this means one file grew past the largest
 # thing anyone had accepted, which is a decision someone should make on
 # purpose.
@@ -565,6 +571,91 @@ def git_reader(base: Path, rev: str):
         return None if result.returncode else result.stdout
 
     return read
+
+
+def merge_result_tree(base: Path, ref: str) -> tuple[str | None, str]:
+    """The tree that merging `ref` into HEAD at `base` would produce.
+
+    Returns `(tree, "")`, or `(None, reason)`. CI measures the merge with
+    `main` as it stood when CI ran, which can be stale (ai-config#4213).
+    `git merge-tree --write-tree` (git 2.38+) leaves the checkout untouched. It exits 1 on a
+    conflict, whose tree holds markers, and on an unknown ref, so the ref is
+    checked first and a conflict is an error, not a measurement.
+    """
+    known = subprocess.run(
+        ["git", "-C", str(base), "rev-parse", "--verify", "--quiet",
+         f"{ref}^{{commit}}"],
+        capture_output=True,
+    )
+    if known.returncode:
+        return None, f"{ref} does not name a commit here; is it fetched?"
+    result = subprocess.run(
+        ["git", "-C", str(base), "merge-tree", "--write-tree", "HEAD", ref],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 1:
+        return None, f"merging {ref} into HEAD conflicts; resolve it first"
+    if result.returncode:
+        return None, result.stderr.strip() or f"git merge-tree failed on {ref}"
+    tree = result.stdout.split("\n", 1)[0].strip()
+    if not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", tree):
+        # An empty id would make every later `git show :path` read the
+        # INDEX, a measurement of something else that looks like a pass.
+        return None, f"git merge-tree printed no tree id ({tree!r})"
+    return tree, ""
+
+
+def merge_tree_reader(base: Path, tree: str):
+    """Read paths from merge `tree`, descending into any gitlink in it.
+
+    `git show TREE:path` cannot see inside a submodule, so a path under a
+    gitlink (a consumer's `@.ai-config/...`) is read from that submodule's
+    checkout at the commit the merge pins, as `submodule_reader` does.
+    Absolute and `~` imports, and `../` paths, come from disk.
+
+    Returns `(read, missing_pins)`. `missing_pins` gains an entry when a
+    read lands under a gitlink whose pinned commit the submodule checkout
+    lacks; the caller fails on it rather than report those imports as
+    dangling. A gitlink nothing imports cannot fail the run.
+    """
+    listing = subprocess.run(
+        ["git", "-C", str(base), "ls-tree", "-r", "-z", tree],
+        capture_output=True,
+        text=True,
+    )
+    sub_readers, links = {}, set()
+    for line in filter(None, listing.stdout.split("\0")):
+        meta, _, path = line.partition("\t")
+        mode, kind, sha = meta.split()
+        links.update([path] if mode == "120000" else [])
+        if mode != "160000" or kind != "commit":
+            continue
+        have = subprocess.run(
+            ["git", "-C", str(base / path), "cat-file", "-e", f"{sha}^{{commit}}"],
+            capture_output=True,
+        )
+        absent = None if have.returncode == 0 else f"{path} at {sha[:12]}"
+        sub_readers[path + "/"] = (git_reader(base / path, sha), absent)
+    outer = baseline_reader(base, tree)
+    missing_pins = []
+
+    def read(path: str, hops: int = 40) -> bytes | None:
+        if path.startswith("../"):  # outside the tree, so from disk
+            path = str((base / path).resolve())
+        for prefix, (sub, absent) in sub_readers.items():
+            if path.startswith(prefix):
+                if absent:
+                    if absent not in missing_pins:
+                        missing_pins.append(absent)
+                    return None
+                return sub(path[len(prefix) :])
+        if path in links:  # `git show` prints a symlink's target; a cycle reads as missing
+            target = posixpath.normpath(posixpath.join(posixpath.dirname(path), outer(path).decode()))
+            return read(target, hops - 1) if hops else None
+        return outer(path)
+
+    return read, missing_pins
 
 
 def gitlink_rev(base: Path, submodule: str) -> str | None:
@@ -1066,6 +1157,13 @@ def main(argv=None) -> int:
         "which needs a submodule gitlink and answers a different question.",
     )
     parser.add_argument(
+        "--merge-result",
+        metavar="REF",
+        help="measure the tree merging REF (e.g. origin/main) into HEAD would "
+        "produce, not the working tree, for the caps and the import check "
+        "(ai-config#4234). Excludes --baseline, --compare, --max-growth.",
+    )
+    parser.add_argument(
         "--max-growth",
         type=int,
         metavar="BYTES",
@@ -1192,6 +1290,10 @@ def main(argv=None) -> int:
             file=sys.stderr,
         )
         return 2
+    if args.merge_result and (args.baseline or args.compare or args.max_growth is not None):
+        print("error: --merge-result excludes --baseline, --compare, --max-growth.",
+              file=sys.stderr)
+        return 2
     if args.max_growth is not None and not args.baseline:
         # Otherwise the flag silently does nothing, which is the shape
         # `fail-fast.md` warns about: a guard whose pass path and whose
@@ -1200,14 +1302,27 @@ def main(argv=None) -> int:
         return 2
 
     base = Path(args.base).resolve()
-    files, missing, inline, ambiguous = walk_closure(args.root, local_reader(base))
+    reader = local_reader(base)
+    measured = str(base)
+    if args.merge_result:
+        tree, why = merge_result_tree(base, args.merge_result)
+        if tree is None:
+            print(f"error: --merge-result: {why}", file=sys.stderr)
+            return 2
+        reader, missing_pins = merge_tree_reader(base, tree)
+        measured = f"{base} merged with {args.merge_result} (tree {tree[:12]})"
+    files, missing, inline, ambiguous = walk_closure(args.root, reader)
+    if args.merge_result and missing_pins:
+        pins = ", ".join(missing_pins)
+        print(f"error: --merge-result: unfetched submodule pins: {pins}", file=sys.stderr)
+        return 2
 
     if not files:
         # A closure that resolved nothing is not a small closure. Fail loudly
         # rather than printing "0 bytes, under budget", which is what an
         # unreadable root or a wrong --base would otherwise look like.
         print(
-            f"error: could not read {args.root} under {base}; nothing measured.",
+            f"error: could not read {args.root} under {measured}; nothing measured.",
             file=sys.stderr,
         )
         return 2
@@ -1215,12 +1330,21 @@ def main(argv=None) -> int:
     print(
         render(
             files, missing, inline, ambiguous, args.budget,
-            args.bytes_per_token, str(base),
+            args.bytes_per_token, measured,
         )
     )
 
+    if args.merge_result:
+        # Count the file the walk read; an uncheckable cap must not pass.
+        try:
+            root_chars = cli_char_count(reader(args.root).decode("utf-8"))
+        except UnicodeDecodeError:
+            print(f"error: {args.root} is not UTF-8 under --merge-result", file=sys.stderr)
+            return 2
+    else:
+        root_chars = root_char_count(base, args.root)
     root_over, root_text = render_root_chars(
-        root_char_count(base, args.root),
+        root_chars,
         args.root,
         args.root_char_cap,
         args.root_char_warn_fraction,
@@ -1230,7 +1354,6 @@ def main(argv=None) -> int:
     frag_over, frag_text = render_fragment_caps(files, args.fragment_cap)
     print(frag_text)
 
-    reader = local_reader(base)
     total_over, total_text = render_total_chars(
         [
             (path, cli_char_count(reader(path).decode("utf-8", errors="replace")))
@@ -1243,8 +1366,11 @@ def main(argv=None) -> int:
 
     agents_over = False
     agents_path = base / "AGENTS.md"
-    if agents_path.is_file():
-        agents_size = agents_path.stat().st_size
+    agents_size = agents_path.stat().st_size if agents_path.is_file() else None
+    if args.merge_result:
+        agents_blob = reader("AGENTS.md")
+        agents_size = None if agents_blob is None else len(agents_blob)
+    if agents_size is not None:
         reported_over, agents_text = render_agents_md_cap(
             agents_size, args.agents_md_cap
         )

@@ -30,6 +30,7 @@ In every session --- at session start, and again periodically during long sessio
    They install this repo as a native plugin, which auto-updates at session start (see README's *Verify the install*),
    so the freshness question moves from a symlinked copy to the pinned snapshot the plugin serves.
    That is a claim about what is **served**, and not about what is **left over**.
+   [`docs/delivery-paths.md`](../../docs/delivery-paths.md) lists the supported path for each harness and the leftover paths to look for.
 
    **The auto-update claim is narrower than it reads: it is a claim about the update *mechanism*, and says nothing about whether this session's already-cached snapshot is current.**
    `installed_plugins.json`'s `lastUpdated` field records when the pin was last written, not how far behind the pin currently sits, so confirming the plugin is enabled and not doubled tells you nothing about whether the cached snapshot it points at is stale.
@@ -59,8 +60,8 @@ In every session --- at session start, and again periodically during long sessio
    the larger the count, the more fixes the session is running without.
 
    `claude plugin update <plugin>` (verified present in `claude plugin --help` output on this machine) is the remedy once staleness is confirmed --- run it per scope (`claude plugin update ai-config@Morrison-Lab`, and `claude plugin update --scope project ai-config@Morrison-Lab` from each affected project/worktree), then restart the session to pick up the refreshed cache path.
-   [`hooks/warn-stale-plugin-pin.py`](../../hooks/warn-stale-plugin-pin.py) runs this comparison at every session start, against the local marketplace clone rather than `origin/main` ([ai-config#2439](https://github.com/Morrison-Lab/ai-config/issues/2439)).
-   It does not fetch, so a clean start means the pin matches the local clone, and the manual count above is still the check against `origin/main`.
+   [`hooks/warn-stale-plugin-pin.py`](../../hooks/warn-stale-plugin-pin.py) runs this comparison at every session start, against the local marketplace clone and against the tip of its origin's default branch, which it reads with `git ls-remote` without fetching ([ai-config#2439](https://github.com/Morrison-Lab/ai-config/issues/2439), [ai-config#5309](https://github.com/Morrison-Lab/ai-config/issues/5309)).
+   When origin does not answer, it says so on stderr and compares with the clone alone, and the manual count above is then still the check against `origin/main`.
 
    **When a guard's refusal matches the shape of an already-fixed issue, check the installed build before treating it as a live bug or a classifier problem to work around.**
    Measured 2026-09-28 (Claude Code desktop, `Morrison-Lab/mln`): `hooks/no-push-without-self-review.py` refused a push after a foreground `adversarial-reviewer` had returned its CLEAN verdict via `SubagentHandback`, and `ALLOW_UNREVIEWED_PUSH=1` was then denied by the auto-mode classifier's `[Safety Bypass Flag]` --- the exact deadlock shape [`mistake-patterns.md`](../../memories/mistake-patterns.md) Pattern 43 already names.

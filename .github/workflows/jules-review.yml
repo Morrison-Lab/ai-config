@@ -70,10 +70,10 @@ jobs:
       # comment that merely *documents* this trigger -- or a "Quote reply" that
       # reproduces one -- does not fire a review (gha#342/#344). Hand-rolling
       # it here would repeat the mistake `claude-bot.yml`'s own `issues:
-      # [opened]` comment records (#682 -> #683). `bot-name` exists at `@v2`.
+      # [opened]` comment records (#682 -> #683). `bot-name` exists at `@v3`.
       - name: Detect an explicit "@jules review" request
         id: detect
-        uses: Morrison-Lab/gha/.github/actions/detect-review-request@v2
+        uses: Morrison-Lab/gha/.github/actions/detect-review-request@v3
         with:
           bot-name: '@jules'
           comment-body: ${{ github.event.comment.body }}

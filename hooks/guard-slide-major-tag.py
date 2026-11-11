@@ -45,7 +45,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import shlex
 import subprocess
 import sys
 
@@ -54,8 +53,20 @@ try:
 except ImportError:
     yaml = None
 
-RX_HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1.*?\n[ \t]*\2\b", re.S)
-_SHELL_OPS = set("();|&")
+# The shared splitter (ai-config#3178). A broken install fails open, saying so.
+try:
+    _LIB = os.path.join(os.path.dirname(os.path.dirname(
+        os.path.realpath(__file__))), "scripts", "lib")
+    if _LIB not in sys.path:
+        sys.path.insert(0, _LIB)
+    from shellcmd import simple_commands as _simple_commands
+except Exception as _exc:  # broken install: degrade, never block
+    print(f"guard-slide-major-tag: cannot load scripts/lib/shellcmd.py ({_exc}); "
+          "no command will be checked", file=sys.stderr)
+
+    def _simple_commands(_cmd):
+        """Parse nothing when the shared splitter is missing."""
+        return None
 ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 LEAD_WORDS = {
     "then", "do", "else", "elif", "!", "time", "sudo", "command",
@@ -234,30 +245,6 @@ def _git(args: list[str], cwd: str | None = None, timeout: int = 8) -> str | Non
     if res.returncode != 0:
         return None
     return res.stdout
-
-
-def _simple_commands(cmd: str) -> list[list[str]] | None:
-    """Split a shell command into simple command argv lists; None on parse error."""
-    cmd = re.sub(r"\\\r?\n", " ", cmd)
-    cmd = RX_HEREDOC.sub("<<", cmd)
-    cmd = cmd.replace("\n", ";")
-    try:
-        lex = shlex.shlex(cmd, posix=True, punctuation_chars=True)
-        lex.whitespace_split = True
-        toks = list(lex)
-    except ValueError:
-        return None
-    cmds, cur = [], []
-    for t in toks:
-        if t and set(t) <= _SHELL_OPS:
-            if cur:
-                cmds.append(cur)
-                cur = []
-        else:
-            cur.append(t)
-    if cur:
-        cmds.append(cur)
-    return cmds
 
 
 def _is_slide_dispatch(argv: list[str]) -> tuple[bool, bool]:

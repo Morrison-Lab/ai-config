@@ -512,7 +512,54 @@ def test_changed_end_to_end():
         check("lint-qmd is skipped because no qmd file changed", "SKIP     [lint-qmd] lint-qmd: no scoped files changed" in text)
 
 
+SNAPSHOT_FIXTURE = """
+jobs:
+  validate:
+    steps:
+      - name: Sees the new file
+        run: test -n "$(git ls-files new.py)"
+      - name: Starts with an empty TMPDIR
+        run: test -z "$(ls -A "$TMPDIR")" && touch "$TMPDIR/sentinel"
+      - name: Starts with an empty TMPDIR again
+        run: test -z "$(ls -A "$TMPDIR")" && touch "$TMPDIR/sentinel"
+"""
+
+
+def test_snapshot_sees_untracked_files():
+    """ai-config#4910: a checker listing `git ls-files` must see a new file, as CI does."""
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+        env = {**os.environ, **GIT_IDENTITY}
+        wf = Path(tmp) / "wf.yml"
+        wf.write_text(SNAPSHOT_FIXTURE, encoding="utf-8")
+        repo = Path(tmp) / "repo"
+        repo.mkdir()
+        (repo / "README.md").write_text("x\n", encoding="utf-8")
+        for cmd in (["init", "-q", "-b", "main"], ["add", "README.md"], ["commit", "-q", "-m", "init"]):
+            subprocess.run(["git", *cmd], cwd=repo, check=True, env=env)
+        (repo / "new.py").write_text("print(1)\n", encoding="utf-8")
+        args = ["--workflow", str(wf), "--root", str(repo), "--no-other-workflows"]
+        out = io.StringIO()
+        with redirect_stdout(out), redirect_stderr(io.StringIO()):
+            rc = rlv.main(args)
+        check("the snapshot run sees an untracked new file and passes", rc == 0 and "3 passed, 0 failed" in out.getvalue())
+        out = io.StringIO()
+        with redirect_stdout(out), redirect_stderr(io.StringIO()):
+            rc = rlv.main(args + ["--in-place"])
+        check("--in-place misses the untracked file (the #4910 false pass, negative control)",
+              rc == 1 and "FAILED: Sees the new file" in out.getvalue())
+        status = subprocess.run(["git", "status", "--porcelain"], cwd=repo, capture_output=True,
+                                text=True, check=True, env=env).stdout
+        worktrees = subprocess.run(["git", "worktree", "list"], cwd=repo, capture_output=True,
+                                   text=True, check=True, env=env).stdout
+        check("the snapshot leaves the index untouched and removes its worktree",
+              status == "?? new.py\n" and len(worktrees.splitlines()) == 1)
+        changed = rlv.changed_files(repo, "main")
+        check("--changed counts an untracked file as changed", changed == ["new.py"])
+
+
 def main():
+    print('running test_snapshot_sees_untracked_files()', flush=True)
+    test_snapshot_sees_untracked_files()
     print('running test_expression_regex_edge_cases()', flush=True)
     test_expression_regex_edge_cases()
     print('running test_other_workflow_files()', flush=True)

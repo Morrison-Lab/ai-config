@@ -50,6 +50,19 @@ A dirty working tree is reported before anything runs: a check measured
 against a tree an edit is about to change expires with the edit (#1262).
 --require-clean turns that report into exit 2.
 
+Steps run in a snapshot, not in the working tree (ai-config#4910). CI checks
+out a commit, so a checker that lists `git ls-files` sees every file the PR
+adds; run in place, the same checker never saw a new file that was not yet
+`git add`ed, and passed a tree CI then failed. The snapshot is a detached
+worktree at a throwaway commit holding the working tree as `git add -A` would
+stage it (tracked edits plus untracked, non-ignored files), so a step sees
+what CI will check out and nothing git ignores. Populated submodules are
+linked in. The index and branch are never written, and the worktree is
+removed afterwards. --in-place runs in the working tree instead; a root with
+no git commit runs in place and says so. Each step also gets its own empty
+TMPDIR (and TEMP, TMP), as a CI runner starts with one, so a sentinel an
+earlier run left behind cannot change a result (#4806).
+
 Exit codes:
   0  every step that ran passed
   1  at least one step failed (its exit code, or "timeout", is in the table;
@@ -71,8 +84,10 @@ import argparse
 import fnmatch
 import os
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -258,14 +273,18 @@ def matches_scope(path: str, globs: List[str], paths_ignore: List[str]) -> bool:
 
 
 def changed_files(root: Path, base: str) -> Optional[List[str]]:
-    """`git diff --name-only <base>...HEAD`, or None when it cannot be read.
+    """Files changed since the merge base with `base`, or None when unreadable.
+
+    The working tree is compared, not HEAD, and untracked non-ignored files
+    are added, so the set matches the snapshot the steps run in (#4910).
 
     None is not an empty diff. An empty list would select no scoped gate at
     all, which is the clean-verdict-over-an-empty-population failure
     (ai-config#3114); the caller reports the failure and selects everything."""
     try:
-        out = subprocess.run(["git", "diff", "--name-only", f"{base}...HEAD"],
-                             cwd=str(root), capture_output=True, text=True, check=True).stdout
+        merge_base = _git(root, "merge-base", base, "HEAD")
+        out = _git(root, "diff", "--name-only", merge_base) + "\n" + _git(
+            root, "ls-files", "--others", "--exclude-standard")
     except (subprocess.CalledProcessError, FileNotFoundError) as exc:
         print(f"warning: could not compute the changed-file list against {base} ({exc}); "
               "every gate is selected", file=sys.stderr)
@@ -427,11 +446,72 @@ def run_step(step: Step, root: Path, timeout: Optional[float]) -> int:
     env = dict(os.environ)
     env.update(step.env)
     cwd = root / step.cwd if step.cwd else root
-    proc = subprocess.run(
-        ["bash", "-e", "-o", "pipefail", "-c", step.command],
-        cwd=str(cwd), env=env, timeout=timeout,
-    )
+    # A fresh temp directory per step, as on a CI runner (#4806).
+    tmp = tempfile.mkdtemp(prefix="rlv-step-")
+    for name in ("TMPDIR", "TEMP", "TMP"):
+        env[name] = tmp
+    try:
+        proc = subprocess.run(
+            ["bash", "-e", "-o", "pipefail", "-c", step.command],
+            cwd=str(cwd), env=env, timeout=timeout,
+        )
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
     return proc.returncode
+
+
+def _git(root: Path, *args: str, env: Optional[Dict[str, str]] = None) -> str:
+    return subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True,
+                          check=True, env=env).stdout.strip()
+
+
+def snapshot_worktree(root: Path) -> Optional[Path]:
+    """A detached worktree of the working tree as `git add -A` would commit it.
+
+    Returns None, after saying why, when root has no commit to build on; the
+    caller then runs in place. The real index is never written: the commit is
+    built from a copy of it under a temporary GIT_INDEX_FILE (ai-config#4910).
+    """
+    try:
+        _git(root, "rev-parse", "--verify", "-q", "HEAD")
+        top = Path(_git(root, "rev-parse", "--show-toplevel"))
+    except (subprocess.CalledProcessError, FileNotFoundError) as exc:
+        print(f"info: {root} has no git commit to snapshot ({exc}); running in place",
+              file=sys.stderr)
+        return None
+    holder = Path(tempfile.mkdtemp(prefix="rlv-snapshot-"))
+    index = holder / "index"
+    real_index = Path(_git(top, "rev-parse", "--path-format=absolute", "--git-path", "index"))
+    if real_index.is_file():
+        shutil.copyfile(real_index, index)
+    env = {**os.environ, "GIT_INDEX_FILE": str(index),
+           "GIT_AUTHOR_NAME": "rlv", "GIT_AUTHOR_EMAIL": "rlv@localhost",
+           "GIT_COMMITTER_NAME": "rlv", "GIT_COMMITTER_EMAIL": "rlv@localhost"}
+    _git(top, "add", "-A", env=env)
+    tree = _git(top, "write-tree", env=env)
+    commit = _git(top, "commit-tree", tree, "-p", "HEAD", "-m", "run-local-validation snapshot", env=env)
+    wt = holder / "tree"
+    _git(top, "worktree", "add", "-q", "--detach", str(wt), commit)
+    # A new worktree leaves each submodule empty; link the populated ones.
+    for line in _git(top, "submodule", "status").splitlines():
+        fields = line[1:].split()
+        if line.startswith("-") or len(fields) < 2 or not any((top / fields[1]).iterdir()):
+            continue
+        target = wt / fields[1]
+        if target.is_dir():
+            target.rmdir()
+        target.symlink_to(top / fields[1], target_is_directory=True)
+    return wt
+
+
+def remove_snapshot(root: Path, wt: Path) -> None:
+    proc = subprocess.run(["git", "-C", str(root), "worktree", "remove", "--force", str(wt)],
+                          capture_output=True, text=True)
+    if proc.returncode != 0:
+        print(f"warning: could not remove snapshot worktree {wt}: {proc.stderr.strip()}",
+              file=sys.stderr)
+    shutil.rmtree(wt.parent, ignore_errors=True)
+    subprocess.run(["git", "-C", str(root), "worktree", "prune"], capture_output=True, text=True)
 
 
 def dirty_tree(root: Path) -> List[str]:
@@ -460,6 +540,8 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p.add_argument("--no-other-workflows", action="store_true", help="do not list the other workflow files as NOT RUN (#1881)")
     p.add_argument("--require-clean", action="store_true", help="exit 2 instead of warning when the working tree is dirty")
     p.add_argument("--timeout", type=float, default=None, help="per-step timeout in seconds")
+    p.add_argument("--in-place", action="store_true",
+                   help="run in the working tree, not a snapshot of it (#4910); misses files git does not track")
     p.add_argument("--root", default=str(ROOT), help=argparse.SUPPRESS)
     return p.parse_args(argv)
 
@@ -556,6 +638,16 @@ def main(argv: Optional[List[str]] = None) -> int:
             return 2
         print(f"warning: {msg}", file=sys.stderr)
 
+    wt = None if args.in_place else snapshot_worktree(root)
+    try:
+        return _execute(plan, wt or root, args)
+    finally:
+        if wt is not None:
+            remove_snapshot(root, wt)
+
+
+def _execute(plan, root: Path, args: argparse.Namespace) -> int:
+    print(f"info: running in {root}", file=sys.stderr)
     results = []
     for s, skipped, reason in plan:
         if skipped:

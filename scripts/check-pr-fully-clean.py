@@ -2506,9 +2506,11 @@ NOT_CLEAN_NEGATION_PREFIX = re.compile(
 # broken.") and a contrast in the next paragraph ("None.\n\nBut X leaks."),
 # tracked in ai-config#5389; and a contrast more than 60 characters after the
 # negation, which callers cut off (ai-config#5401).
+# A line that opens a heading, blockquote or list item.
+_BLOCK_START = r"[ \t]*(?:#|>|[-*+][ \t]|\d+[.)][ \t])"
 _SENTENCE_CHAR = (
     r"(?:(?![.!?](?:\s|$))(?!\r?\n[ \t]*\r?\n)"
-    r"(?!\r?\n[ \t]*(?:#|>|[-*+][ \t]|\d+[.)][ \t]))[\s\S])"
+    r"(?!\r?\n" + _BLOCK_START + r")[\s\S])"
 )
 _CONTRAST_WORDS = (
     r"but|however|(?<!/)except|excepting|excluding|although|though|albeit"
@@ -2539,18 +2541,24 @@ _HSPACE = r"[ \t" + chr(0xA0) + r"]"
 # run of spaces or " - - -" cannot make the lazy scan quadratic; for the
 # same reason a spaced separator may only start at the start of a run.
 _MARKER_OPENERS = _HSPACE + r"*(?:[*_>\-(\[`\"']" + _HSPACE + r"*){0,4}"
-_OPENERS_ACROSS_LINE = _MARKER_OPENERS + r"(?:\r?\n" + _MARKER_OPENERS + r")?"
+_OPENERS_ACROSS_LINE = (
+    _MARKER_OPENERS + r"(?:\r?\n(?!" + _BLOCK_START + r")" + _MARKER_OPENERS + r")?"
+)
+# Word edges that also treat `_` as an edge, so "_but_" and "_However_"
+# (underscore emphasis) are read as words; `\b` sees `_` as a word char.
+_WORD_START = r"(?<![^\W_])"
+_WORD_END = r"(?![^\W_])"
 _CLAUSE_SEP = (
     r"(?:[,;]|(?<!" + _HSPACE + r")" + _HSPACE + r"+-{1,3}"
     r"|(?<!" + _HSPACE + r")" + _HSPACE + r"*["
     + chr(0x2013) + chr(0x2014) + r"])"
 )
 _CONTRAST_GUARD = (
-    r"(?!" + _SENTENCE_CHAR + r"*?(?:\b(?:" + _CONTRAST_WORDS + r")"
-    r"|" + _CLAUSE_SEP + _OPENERS_ACROSS_LINE
-    + r"(?:" + _COMMA_CONTRAST_WORDS + r"))\b)"
+    r"(?!" + _SENTENCE_CHAR + r"*?(?:" + _WORD_START + r"(?:"
+    + _CONTRAST_WORDS + r")|" + _CLAUSE_SEP + _OPENERS_ACROSS_LINE
+    + r"(?:" + _COMMA_CONTRAST_WORDS + r"))" + _WORD_END + r")"
     r"(?!" + _SENTENCE_CHAR + r"*[.!?]" + _OPENERS_ACROSS_LINE
-    + r"(?:" + _CONTRAST_MARKERS + r")\b)"
+    + r"(?:" + _CONTRAST_MARKERS + r")" + _WORD_END + r")"
 )
 _SAFE_NEGATION = (
     r"(?:none\b(?!\s+of\b)|n/a\b|none\s+identified\b|none\s+remaining\b)"

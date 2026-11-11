@@ -20,14 +20,16 @@ identifier search misses it and a migration keyed on that search would leave
 one behind. The loop variable differs between copies too (`t` in some, `tok`
 in others), which is why a use-site grep is the wrong query as well.
 
-The bodies are identical, and so is the heredoc defect `_heredoc_free` fixes
-below -- which is the argument for a module rather than a ninth copy. Those
-eight are NOT rewired here: migrating eight live guards, two of which can
-REFUSE (`no-clobbering-push.py` denies, `no-unreviewed-pr.py` blocks; the
-other six only add context), is its own change with its own review, tracked
-as ai-config#3178 --- not by the closed ai-config#2993, which reported the
-defect and shipped this module rather than the migration. This module
-is where the fix landed and where new callers import from.
+The bodies were identical, and so was the heredoc defect `_heredoc_free`
+fixes below -- which is the argument for a module rather than a ninth copy.
+The six that only add context now import `simple_commands` from here
+(ai-config#3178). The two that can REFUSE (`no-clobbering-push.py` denies,
+`no-unreviewed-pr.py` blocks) need the operators between commands as well as
+the argv, so they walk `shell_tokens` themselves. The same grep also finds later
+copies outside the original eight (`guard-slide-major-tag.py`,
+`no-binary-file-read.py`, `no-interpreter-heredoc.py`), which belong to the
+same migration. This module is where the fix landed and where new callers
+import from.
 
 WHY AN ARGV SPLIT RATHER THAN A REGEX
 -------------------------------------
@@ -46,8 +48,8 @@ THREE LIMITS, ALL INHERITED FROM THE EIGHT COPIES
 The heredoc pre-pass and the newline rewrite run on RAW TEXT, ahead of `shlex`,
 so neither knows the quoting rules the paragraph above credits `shlex` with.
 State that here rather than letting the argv-split argument imply otherwise --
-this docstring is the contract ai-config#3178 will migrate eight live guards
-onto, two of which can refuse.
+this docstring is the contract ai-config#3178 migrates the copies onto,
+two of which can refuse.
 
   * `RX_HEREDOC_OPEN` is QUOTE-BLIND. A `<<` inside a quoted argument -- a commit
     message that mentions a heredoc, say -- can be treated as a real operator,
@@ -110,7 +112,7 @@ fails BOTH ways -- a phantom command and a hidden one -- and is stated
 separately for that reason. Fixing any of them
 means a quote-aware pre-scan, which is a real parser and out of scope for an
 extraction; ai-config#3178 is where that belongs, alongside migrating the
-eight copies.
+remaining copies.
 """
 from __future__ import annotations
 
@@ -187,7 +189,7 @@ def _heredoc_free(command):
     """Blank heredoc BODIES, leaving the surrounding shell intact.
 
     The substitution is `" << "`, with the spaces, and they are load-bearing.
-    Substituting a bare `"<<"` -- what all eight copies of this function do --
+    Substituting a bare `"<<"` -- what the eight former copies of it did --
     leaves `<<` flush against the newline that the caller then rewrites to `;`.
     `shlex` with `punctuation_chars=True` emits that run as the SINGLE token
     `<<;`, whose character set is not a subset of `_SHELL_OPS` (which has no
@@ -267,6 +269,13 @@ def _heredoc_free(command):
             if hit is None:
                 return "".join(out)
             pos = hit.end()
+        # Drop the terminator's newline: the opener's was kept, and a second
+        # becomes `;;` once newlines are `;`, which ends a `case` arm
+        # (ai-config#3178).
+        if command.startswith("\r\n", pos):
+            pos += 2
+        elif command.startswith("\n", pos):
+            pos += 1
 
 
 def _comment_free(command):
@@ -330,6 +339,43 @@ def _comment_free(command):
     return "".join(out)
 
 
+def shell_tokens(command):
+    """The dequoted `shlex` token stream of `command`; `None` on a parse error.
+
+    This is the shared front half of every split here: heredoc bodies
+    blanked, backslash-continued lines joined, unquoted `#` comments dropped,
+    unquoted newlines turned into `;`, then `shlex` in punctuation-aware mode.
+    A control-operator run arrives as one token whose characters are all in
+    `_SHELL_OPS` (`&&`, `);`, `)&&(`). A caller that needs more than an argv
+    per command (the operator before or after each one, the subshell it runs
+    in, a `case` pattern's `)`) walks these tokens itself rather than
+    repeating the preprocessing (ai-config#3178).
+    """
+    # ORDER MATTERS, and the natural order is wrong. Joining continuations
+    # first lets a heredoc BODY line ending in a backslash eat its own
+    # terminator, after which `_heredoc_free` closes at some later occurrence of
+    # the delimiter word -- or never -- and everything between is swallowed.
+    # Measured: `git commit -F - <<EOF / a \\ / EOF / git push` lost the push
+    # entirely, so the guard went silent. A heredoc body is literal text and a
+    # backslash in it continues nothing, so it must be removed BEFORE the
+    # continuation join runs over what remains.
+    command = _heredoc_free(command)
+    command = re.sub(r"\\\r?\n", " ", command)
+    command = _comment_free(command)
+    command = command.replace("\n", ";")
+    try:
+        lex = shlex.shlex(command, posix=True, punctuation_chars=True)
+        lex.whitespace_split = True
+        return list(lex)
+    except ValueError:
+        return None
+
+
+def is_operator_token(token):
+    """True when `token` is a control-operator run such as `&&` or `);`."""
+    return bool(token) and set(token) <= _SHELL_OPS
+
+
 def simple_commands(command):
     """Split `command` into simple-command argv lists; `None` on a parse error.
 
@@ -370,27 +416,12 @@ def simple_commands_with_scope(command):
     `{ ... }` grouping is NOT nesting for this purpose and is not counted: it
     runs in the current shell, so a `cd` inside one does move the caller.
     """
-    # ORDER MATTERS, and the natural order is wrong. Joining continuations
-    # first lets a heredoc BODY line ending in a backslash eat its own
-    # terminator, after which `_heredoc_free` closes at some later occurrence of
-    # the delimiter word -- or never -- and everything between is swallowed.
-    # Measured: `git commit -F - <<EOF / a \\ / EOF / git push` lost the push
-    # entirely, so the guard went silent. A heredoc body is literal text and a
-    # backslash in it continues nothing, so it must be removed BEFORE the
-    # continuation join runs over what remains.
-    command = _heredoc_free(command)
-    command = re.sub(r"\\\r?\n", " ", command)
-    command = _comment_free(command)
-    command = command.replace("\n", ";")
-    try:
-        lex = shlex.shlex(command, posix=True, punctuation_chars=True)
-        lex.whitespace_split = True
-        toks = list(lex)
-    except ValueError:
+    toks = shell_tokens(command)
+    if toks is None:
         return None
     cmds, cur, scope, cur_scope, opened = [], [], [0], (0,), 0
     for tok in toks:
-        if tok and set(tok) <= _SHELL_OPS:
+        if is_operator_token(tok):
             if cur:
                 cmds.append((cur_scope, cur))
                 cur = []
@@ -538,10 +569,10 @@ def resolve_cd_target(rest: list[str], cur_dir: str | None) -> str | None:
     `_resolve_cd_target`, which is the tested in-repo implementation. This is
     a COPY and not a move: that guard still holds its own, because it can
     refuse a push and migrating a deny-capable guard is its own change with
-    its own review --- the same call this module's header makes for the eight
-    `_simple_commands` copies. The duplication that leaves is tracked as
-    ai-config#3177, not by the closed ai-config#2993, whose scope is
-    `_simple_commands` and `_strip_env`. New callers import from here.
+    its own review --- as the refusing `_simple_commands` copies did under
+    ai-config#3178. The duplication that leaves is tracked as ai-config#3177,
+    not by the closed ai-config#2993, whose scope is `_simple_commands` and
+    `_strip_env`. New callers import from here.
     """
     cmd_name = rest[0]
     if cmd_name == "popd":

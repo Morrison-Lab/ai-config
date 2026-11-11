@@ -131,7 +131,7 @@ Deferred from <source: e.g., PR #42, commit abc1234, review on path/to/file.R:12
 ```sh
 gh issue create \
   --title "..." \
-  --label ai-authored --label "model:<model-id>" \
+  --label ai-authored --label "model:<model-id>" --label P2 \
   --body "$(cat <<'EOF'
 ...
 EOF
@@ -142,11 +142,12 @@ EOF
   `gh repo set-default`).
 - If filing into a different repo than the current one, pass
   `--repo <owner>/<repo>` and confirm with the user first.
-- `ai-authored` and `model:<model-id>` are mandatory on every issue an agent
+- `ai-authored`, `model:<model-id>` and one of `P1`, `P2` or `P3` (`P2` is
+  the default) are mandatory on every issue an agent
   files into a repo we administrate, per
   [`issue-first`](../../shared/workflow/issue-first.md);
   [`label-agent-filed-issues`](../../shared/workflow/label-agent-filed-issues.md)
-  covers normalizing the model id and creating the pair where it is missing.
+  covers normalizing the model id and creating the labels where they are missing.
 - Then check `gh label list` for an existing `followup`, `deferred`, or
   `tech-debt` label and add it with `--label` too.
   **Don't fabricate labels
@@ -159,7 +160,7 @@ EOF
 **GitLab:**
 
 ```sh
-glab issue create --title "..." --label "ai-authored,model:<model-id>" \
+glab issue create --title "..." --label "ai-authored,model:<model-id>,P2" \
   --description "$(cat <<'EOF'
 ...
 EOF

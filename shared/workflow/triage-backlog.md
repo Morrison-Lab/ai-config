@@ -2,6 +2,7 @@ Triage the issue backlog on a fixed cadence, and treat closing an issue as not-p
 
 Every open issue carries exactly one priority label, `P1`, `P2`, or `P3`, or is closed.
 An unlabelled open issue is untriaged, and untriaged is a state the weekly pass ends.
+An agent sets the priority when it files the issue ([`issue-first`](issue-first.md), "Set the priority when you file"), so the pass is the backstop for issues a person filed and for the ones an agent missed.
 
 ## Why a counterweight is needed
 
@@ -35,6 +36,35 @@ The heuristic is a proposal.
 Read the P1 and not-planned lists in full before applying, and correct them with `--override`.
 Reading all of P2 is not required: the default bucket is where a wrong guess costs least.
 
+## The unattended half: labels only
+
+`scripts/triage-backlog.py --apply --labels-only` adds priority labels and closes nothing ([ai-config#3147](https://github.com/Morrison-Lab/ai-config/issues/3147)).
+It is the mode for a scheduled run, where nobody reads the plan.
+A wrong priority costs one label edit, and a wrong close hides an issue.
+A row the plan would close is left exactly as it is, so the attended pass proposes the same close again and a reader decides it.
+
+`--ceiling N` adds one line to the summary that states the open count against `N`, the bound the backlog is meant to stay under ([ai-config#5306](https://github.com/Morrison-Lab/ai-config/issues/5306)).
+The option has no default, because the number is the maintainer's to choose.
+A run over the ceiling still exits 0, so the report never stops the labelling.
+The count is the number of open issues the run read, before it closed any.
+A fetch that returns as many issues as `--limit` (1000 by default) stops the run, because `gh` truncates a longer list without saying so.
+
+In ai-config, `.github/workflows/triage-backlog.yml` runs this mode every Monday at 07:00 UTC, and on a manual dispatch.
+It passes `--ceiling` only when the repository variable `ISSUE_CEILING` is set.
+The plan, one row per issue with its priority and reason, goes to the run's log, and the counts go to the run's job summary.
+A labelling step that fails before it counts puts its error in the job summary instead.
+A run that stops before the labelling step says so in the job summary, and its error is in the log.
+A real run prints no label commands, only what `gh` prints for each edit.
+A manual dispatch with `dry-run` checked prints each label command in the log after the plan, without running it.
+A run over the ceiling stays green and carries a warning annotation with the ceiling line.
+The script prints the ceiling line after the edits, so a run whose edit fails carries neither the line nor the warning.
+The labels `P1`, `P2` and `P3` must already exist in the repository, because the script adds labels and creates none.
+The workflow checks for them first and stops before any edit when one is missing.
+Other repositories have no scheduled pass until the reusable workflow in [ai-config#3147](https://github.com/Morrison-Lab/ai-config/issues/3147) exists.
+
+- **Do:** pass `--labels-only` in any run that no reader reviews before it applies.
+- **Don't:** let a scheduled run close issues.
+
 ## Closing as not-planned is licensed
 
 An issue closed as not-planned is still searchable, still cites its evidence, and can be reopened in one click.
@@ -53,7 +83,8 @@ It is filed as an issue only when it names a concrete change.
 - **Do:** run the pass weekly, label every open issue, and close the bare, junk, and duplicate ones as not-planned with a one-line reason.
 - **Do:** append a new symptom to the owning tracking issue when one exists.
 - **Do:** read every P1 and every proposed close before applying the plan.
-- **Don't:** leave an open issue unlabelled after the pass.
+- **Don't:** leave an open issue unlabelled after the attended pass.
+  The scheduled run leaves only the proposed closes unlabelled.
 - **Don't:** close an actionable-but-unlikely item as not-planned.
   Label it P3 and leave the call to the maintainer.
 - **Don't:** file an aphorism as an issue; record it in memory.

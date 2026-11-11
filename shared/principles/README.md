@@ -112,6 +112,8 @@ Also known as the single-source-of-truth rule.
 Operationalized by:
 [`challenge-redundant-content`](../workflow/challenge-redundant-content.md)
 (the review side),
+[`centralize-or-distribute`](../workflow/centralize-or-distribute.md)
+(the planning-side choice, within and across repos),
 [`reuse-docs-and-args`](../coding/reuse-docs-and-args.md),
 [`avoid-hardcoding-external-data`](../coding/avoid-hardcoding-external-data.md),
 and the `find-overlap` / `consolidate-skills` / `consolidate-memory`

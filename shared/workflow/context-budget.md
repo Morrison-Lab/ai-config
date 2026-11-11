@@ -2,7 +2,7 @@ Keep always-loaded instruction files (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`) com
 
 `AGENTS.md` is gated at 32 KiB (32,768 bytes) to fit within OpenAI Codex's `project_doc_max_bytes` default without truncation.
 
-The closure's total against the Claude Code CLI's instruction limit, the root file's character cap, a per-fragment cap, and a near-cap growth ratchet on the root file all gate CI (`scripts/check-context-closure.py`).
+The closure's total against the Claude Code CLI's instruction limit, the 100,000-byte closure budget (under `--strict`, ai-config#4685), the root file's character cap, a per-fragment cap, and a near-cap growth ratchet on the root file all gate CI (`scripts/check-context-closure.py`).
 
 **Measure `AGENTS.md` before committing an addition, not after.**
 Nothing warns at edit time ([ai-config#4684](https://github.com/Morrison-Lab/ai-config/issues/4684)).

@@ -46,6 +46,13 @@ import subprocess
 import sys
 import tempfile
 
+# A mutant is written to a temporary directory, where the hook's own
+# `scripts/lib` lookup (relative to its file) finds nothing, so every hook run
+# gets the shared splitter on `PYTHONPATH` (ai-config#3178).
+SHELLCMD_LIB = os.path.join(os.path.dirname(os.path.dirname(
+    os.path.realpath(__file__))), "scripts", "lib")
+HOOK_ENV = dict(os.environ, PYTHONPATH=SHELLCMD_LIB)
+
 HOOK = os.path.realpath(sys.argv[1])
 
 
@@ -241,7 +248,7 @@ def verdict(hook_path, repo, command, subdir):
     cwd = os.path.join(repo, subdir) if subdir else repo
     proc = subprocess.run(
         [sys.executable, hook_path], input=json.dumps(payload),
-        capture_output=True, text=True, cwd=cwd,
+        capture_output=True, text=True, cwd=cwd, env=HOOK_ENV,
     )
     if proc.returncode != 0:
         sys.exit(f"FATAL: hook exited {proc.returncode} on {command!r}\n"

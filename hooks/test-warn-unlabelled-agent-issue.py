@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """Tests for warn-unlabelled-agent-issue.py.
 
+The guard asks for two things on a create: the `ai-authored` label and one of
+the priority labels `P1`, `P2`, `P3`. The FIRES lists hold creates missing the
+authorship label, the ONE_MISSING lists pin that each label is asked for
+separately, and the QUIET lists hold creates carrying both.
+
 The NEGATIVE cases carry the weight, in both directions. A guard that fired on
 prose quoting `gh issue create` would go off in every reply that cites the rule
 it enforces --- this corpus quotes that command constantly --- and one that
@@ -67,15 +72,24 @@ BASH_FIRES = [
 ]
 
 BASH_QUIET = [
-    ("labelled, repeated flags", 'gh issue create --title "t" --label ai-authored --label "model:x"'),
-    ("labelled, comma-separated glab form", 'glab issue create --title "t" --label "ai-authored,model:x"'),
-    ("labelled with --label=", 'gh issue create --title "t" --label=ai-authored'),
-    ("labelled with -l", 'gh issue create --title "t" -l ai-authored'),
-    ("labelled with -l and a quoted pair", 'gh issue create -l "ai-authored,model:x"'),
-    ("labelled with --labels=", 'gh issue create --labels=ai-authored,model:x'),
-    ("unbalanced quoting falls back to the regex", 'gh issue create --label ai-authored --title "t'),
+    ("labelled, repeated flags", 'gh issue create --title "t" --label ai-authored --label "model:x" --label P2'),
+    ("labelled, comma-separated glab form", 'glab issue create --title "t" --label "ai-authored,model:x,P3"'),
+    ("labelled with --label=", 'gh issue create --title "t" --label=ai-authored --label=P1'),
+    ("labelled with -l", 'gh issue create --title "t" -l ai-authored -l P2'),
+    ("labelled with -l and a quoted pair", 'gh issue create -l "ai-authored,model:x,P2"'),
+    ("labelled with --labels=", 'gh issue create --labels=ai-authored,model:x,P2'),
+    ("unbalanced quoting falls back to the regex", 'gh issue create --label ai-authored --label P2 --title "t'),
     ("the command quoted inline-code-style inside single quotes",
      "git commit -m 'mentions of `gh issue create` in prose'"),
+    ("a lowercase priority, which GitHub resolves to the label",
+     'gh issue create --title "t" --label ai-authored --label p2'),
+    ("a mixed-case authorship label, which GitHub resolves to the label",
+     'gh issue create --title "t" --label AI-Authored --label P2'),
+    ("a glued short flag", 'gh issue create --title "t" -lai-authored -lP2'),
+    ("unbalanced quoting with a comma-and-space value",
+     'gh issue create --label "ai-authored, P2" --title "t'),
+    ("unbalanced quoting with a single-quoted value",
+     "gh issue create --label 'ai-authored,P2' --title \"t"),
     ("not a create at all", "gh issue list --state all --search 'x'"),
     ("editing labels on an existing issue", 'gh issue edit 12 --add-label ai-authored'),
     ("a PR create", 'gh pr create --title "t" --body "b"'),
@@ -87,6 +101,60 @@ BASH_QUIET = [
     (
         "the phrase mid-sentence in a commit message",
         'git commit -m "document the gh issue create workflow"',
+    ),
+]
+
+# (label, command, text the reminder must carry, text it must not carry)
+AUTHORSHIP_MARK = "no `ai-authored` label"
+PRIORITY_MARK = "no priority label"
+
+BASH_ONE_MISSING = [
+    (
+        "authorship present, priority missing",
+        'gh issue create --title "t" --label ai-authored --label "model:x"',
+        PRIORITY_MARK,
+        AUTHORSHIP_MARK,
+    ),
+    (
+        "priority present, authorship missing",
+        'gh issue create --title "t" --label P2',
+        AUTHORSHIP_MARK,
+        PRIORITY_MARK,
+    ),
+    (
+        "a label that only contains a priority label",
+        'gh issue create --title "t" --label ai-authored --label P10',
+        PRIORITY_MARK,
+        AUTHORSHIP_MARK,
+    ),
+    (
+        "unbalanced quoting, a spaced value missing the priority",
+        'gh issue create --label "ai-authored, model:x" --title "t',
+        PRIORITY_MARK,
+        AUTHORSHIP_MARK,
+    ),
+    (
+        "the priority named in the title, not in a flag",
+        'gh issue create --title "P1: the gate is open" --label ai-authored',
+        PRIORITY_MARK,
+        AUTHORSHIP_MARK,
+    ),
+]
+
+MCP_ONE_MISSING = [
+    (
+        "issue_write create, authorship present, priority missing",
+        "mcp__github__issue_write",
+        {"method": "create", "labels": ["ai-authored", "model:x"]},
+        PRIORITY_MARK,
+        AUTHORSHIP_MARK,
+    ),
+    (
+        "issue_write create, priority present, authorship missing",
+        "mcp__github__issue_write",
+        {"method": "create", "labels": ["bug", "P3"]},
+        AUTHORSHIP_MARK,
+        PRIORITY_MARK,
     ),
 ]
 
@@ -114,12 +182,17 @@ MCP_QUIET = [
     (
         "issue_write create, labelled",
         "mcp__github__issue_write",
-        {"method": "create", "labels": ["ai-authored", "model:x"]},
+        {"method": "create", "labels": ["ai-authored", "model:x", "P2"]},
     ),
     (
-        "issue_write create, labelled as a bare string",
+        "issue_write create, labelled as a bare comma-joined string",
         "mcp__github__issue_write",
-        {"method": "create", "labels": "ai-authored"},
+        {"method": "create", "labels": "ai-authored,P2"},
+    ),
+    (
+        "issue_write create, labels given as objects",
+        "mcp__github__issue_write",
+        {"method": "create", "labels": [{"name": "ai-authored"}, {"name": "p1"}]},
     ),
     (
         "issue_write update is not a create",
@@ -168,6 +241,22 @@ def main() -> int:
         else:
             print(f"OK   quiet (mcp): {label}")
 
+    for label, command, wanted, unwanted in BASH_ONE_MISSING:
+        result = guard.evaluate_bash(command) or ""
+        if wanted not in result or unwanted in result:
+            print(f"::error::wrong reminder: {label}\n    {command}", file=sys.stderr)
+            failures += 1
+        else:
+            print(f"OK   one reminder: {label}")
+
+    for label, tool, payload, wanted, unwanted in MCP_ONE_MISSING:
+        result = guard.evaluate_mcp(tool, payload) or ""
+        if wanted not in result or unwanted in result:
+            print(f"::error::wrong reminder (mcp): {label}", file=sys.stderr)
+            failures += 1
+        else:
+            print(f"OK   one reminder (mcp): {label}")
+
     # The message must name both labels and the escape, or it teaches nothing.
     message = guard.evaluate_bash('gh issue create --title "t"')
     for needed in (
@@ -175,6 +264,10 @@ def main() -> int:
         "model:<model-id>",
         "label-agent-filed-issues.md",
         "not a refusal",
+        AUTHORSHIP_MARK,
+        PRIORITY_MARK,
+        "`P1`, `P2` or `P3`",
+        "comment on its tracker",
     ):
         if needed not in message:
             print(f"::error::warning text omits {needed!r}", file=sys.stderr)
@@ -204,7 +297,10 @@ def main() -> int:
     else:
         print("OK   emits additionalContext")
 
-    total = len(BASH_FIRES) + len(BASH_QUIET) + len(MCP_FIRES) + len(MCP_QUIET)
+    total = (
+        len(BASH_FIRES) + len(BASH_QUIET) + len(MCP_FIRES) + len(MCP_QUIET)
+        + len(BASH_ONE_MISSING) + len(MCP_ONE_MISSING)
+    )
     if failures:
         print(f"::error::{failures} of {total} case(s) failed", file=sys.stderr)
         return 1

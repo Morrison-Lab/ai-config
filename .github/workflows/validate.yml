@@ -471,25 +471,35 @@ jobs:
         # of that claim must fail, or a green live-file run is not evidence
         # the predicate works.
         run: python3 scripts/test_adversarial_reviewer_readonly_hedge.py
-      - name: Measure the auto-loaded context closure (advisory) and gate its hard caps
-        # The BUDGET half reports rather than gates, and deliberately so:
-        # the original reasoning was that this repo sat far over the shipped
-        # budget (ai-config#897), so a blocking form would be red on every PR
-        # and would train everyone to ignore it -- the failure mode
-        # algorithmatize-checks warns about.
+      - name: Measure the auto-loaded context closure and gate its budget and hard caps
+        # The BUDGET half first reported rather than gated: this repo sat far
+        # over the shipped budget (ai-config#897), so a blocking form would
+        # have been red on every PR and trained everyone to ignore it -- the
+        # failure mode algorithmatize-checks warns about. That premise no
+        # longer held by 2026-08-31, when the closure measured 185,857 bytes
+        # against the then 200,000-byte budget (ai-config#2636); the default
+        # is now 100,000, mirroring the CLI char gate below.
         #
-        # That premise no longer holds. Measured 2026-08-31 PDT: the closure is
-        # 185,857 bytes across 6 files against the 200,000-byte budget, i.e. ~0.93x
-        # (ai-config#2636).
+        # The byte budget then stayed advisory: crossing it was to be a
+        # prompt for pruning, not a defect that blocks an unrelated PR, the
+        # stance ai-config#695 settled for the memory-file check.
+        # It now runs under --strict (ai-config#4685). The advisory report sat
+        # over budget on main for weeks -- "OVER BUDGET by 3,237 bytes" on
+        # 2026-10-22, 3,133 on 2026-11-11 -- while CI stayed green, so
+        # nobody acted until the CLI char gate below was 125 chars from
+        # failing. The budget
+        # mirrors that gate in bytes, which run ~3% above chars here, so it
+        # now fails a PR a little before the CLI gate would, and so gives the
+        # early warning the char gate lacks. Measured after ai-config#5354:
+        # 98,129 bytes, 1,871 under. A PR that crosses it trims or moves
+        # text out of CLAUDE.md in the same PR.
         #
-        # The check remains advisory: the closure sits within ~7% of the budget
-        # (14,143 bytes of headroom), so gating the total on every PR risks
-        # flapping on legitimate doc changes. Crossing the soft target is a
-        # prompt for pruning or architectural restructure (ai-config#695),
-        # not a broken build on an unrelated PR.
+        # The gates below, and the AGENTS.md byte cap, fail without --strict,
+        # so a caller that drops the flag (a consumer measured with --base)
+        # still gets them.
         #
-        # The root file's CHARACTER CAP is the exception, and gates without
-        # --strict (ai-config#897, #1258). It is not our budget but the
+        # The root file's CHARACTER CAP gates without --strict
+        # (ai-config#897, #1258). It is not our budget but the
         # CLI's per-file limit on the auto-loaded CLAUDE.md, past which it
         # warns at every launch (2.1.283 still loads the file whole;
         # ai-config#4061). The cry-wolf objection above does not transfer:
@@ -502,7 +512,7 @@ jobs:
         # line count cannot see a total and the gitlink diff of a pin bump is
         # one line. A trend line on every PR is what was missing.
         #
-        # The PER-FRAGMENT cap is the second exception, added in
+        # The PER-FRAGMENT cap is the second such gate, added in
         # ai-config#1398, and gates without --strict for the same reason as
         # the root cap: the budget above governs the closure's total and the
         # root cap governs one file, so nothing constrained an individual
@@ -512,7 +522,7 @@ jobs:
         # fragment currently reaches, and the run prints the examined count
         # and every breach's headroom on each PR.
         #
-        # The CLI TOTAL-LIMIT gate is the third exception (ai-config#4061).
+        # The CLI TOTAL-LIMIT gate is the third (ai-config#4061).
         # Claude Code warns at every launch once its instruction files pass
         # a total it derives from the model's context window, 120,000 chars
         # at the floor. The closure is gated, in the CLI's own character
@@ -524,7 +534,7 @@ jobs:
         # on its own line), which is a defect rather than a size finding.
         # An unresolved INLINE @token is reported but does not fail, since
         # most are prose -- see the script's docstring.
-        run: python3 scripts/check-context-closure.py
+        run: python3 scripts/check-context-closure.py --strict
       - name: Report this PR's context-closure delta; gate root-file growth near the cap
         # ai-config#1373. The step above reports the closure's LEVEL against a
         # budget; this reports what THIS branch did to it. Those are different
@@ -669,6 +679,10 @@ jobs:
         run: python3 scripts/test_check_rendered_page.py
       - name: Run docx tracked-change checker tests
         run: python3 scripts/test_check_docx_tracked_changes.py
+      - name: Run field-safe merge_runs wrapper tests
+        # ai-config#2918. Part 2 needs the docx skill, which CI does not have,
+        # and prints NOT RUN there; part 1 tests the wrapper's own decision.
+        run: python3 scripts/test_docx_merge_runs_field_safe.py
       - name: Check for stale and orphaned records (advisory)
         # ai-config#1544. Non-blocking, and for two separate reasons.
         #

@@ -35,6 +35,20 @@ The heuristic is a proposal.
 Read the P1 and not-planned lists in full before applying, and correct them with `--override`.
 Reading all of P2 is not required: the default bucket is where a wrong guess costs least.
 
+## The unattended half: labels only
+
+`scripts/triage-backlog.py --apply --labels-only` adds priority labels and closes nothing ([ai-config#3147](https://github.com/Morrison-Lab/ai-config/issues/3147)).
+It is the mode a scheduled run uses, with nobody reading the plan.
+A wrong priority costs one label edit, and a wrong close hides an issue.
+A row the plan would close is left with no label, so the attended pass still sees it as untriaged and a reader decides the close.
+
+`--ceiling N` adds one line to the summary that states the open count against `N`, the bound the backlog is meant to stay under ([ai-config#5306](https://github.com/Morrison-Lab/ai-config/issues/5306)).
+The option has no default, because the number is the maintainer's to choose.
+A run over the ceiling still exits 0, so the report never stops the labelling.
+
+- **Do:** pass `--labels-only` in any run that no reader reviews before it applies.
+- **Don't:** let a scheduled run close issues.
+
 ## Closing as not-planned is licensed
 
 An issue closed as not-planned is still searchable, still cites its evidence, and can be reopened in one click.

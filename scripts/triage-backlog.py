@@ -22,6 +22,19 @@ Usage:
     python3 scripts/triage-backlog.py --override 2937=P3 --override 3099=P1
     python3 scripts/triage-backlog.py --json > plan.json
     python3 scripts/triage-backlog.py --apply           # label and close via gh
+    python3 scripts/triage-backlog.py --apply --labels-only   # label, never close
+    python3 scripts/triage-backlog.py --ceiling 600     # report the count against a ceiling
+
+--labels-only is the mode an unattended, scheduled run uses (ai-config#3147).
+A wrong priority costs one label edit, so the heuristics may apply it with
+nobody reading; a close stays behind the read-every-close-row step in
+skills/triage/SKILL.md.  A row the plan would close is left untouched, with
+no label, so the attended pass still sees it as untriaged.
+
+--ceiling N reports the open count against N, the bound the backlog is meant
+to stay under (ai-config#5306).  It has no default: the number is the
+maintainer's to choose.  Over the ceiling the run still exits 0, because the
+count is a measurement for a reader and labelling must not stop on it.
 
 Input JSON is a list of objects carrying at least `number` and `title`;
 `labels` (a list of names or of {name} objects), `created_at`/`createdAt`,
@@ -175,14 +188,34 @@ def fetch_open_issues(repo: str | None) -> list[dict]:
     return json.loads(out.stdout)
 
 
-def apply_plan(plan: list[dict], repo: str | None, dry_run: bool) -> int:
-    """Perform the label and close operations.  Returns the count of gh calls."""
+CLOSE_DISPOSITIONS = ("not-planned", "duplicate")
+
+
+def ceiling_report(open_count: int, ceiling: int) -> str:
+    """One line stating the open count against the ceiling."""
+    if open_count > ceiling:
+        return f"open issues: {open_count}, over the ceiling of {ceiling} by {open_count - ceiling}"
+    return f"open issues: {open_count}, within the ceiling of {ceiling}"
+
+
+def apply_plan(
+    plan: list[dict],
+    repo: str | None,
+    dry_run: bool,
+    labels_only: bool = False,
+) -> int:
+    """Perform the label and close operations.  Returns the count of gh calls.
+
+    With `labels_only`, a row the plan would close is skipped: it is neither
+    closed nor labelled."""
     base = ["gh", "issue"]
     tail = ["-R", repo] if repo else []
     calls = 0
     for row in plan:
         n = str(row["number"])
         disp = row["disposition"]
+        if labels_only and disp in CLOSE_DISPOSITIONS:
+            continue
         if disp in PRIORITY_LABELS:
             if disp in row["labels"]:
                 continue
@@ -224,7 +257,15 @@ def main(argv=None) -> int:
     ap.add_argument("--json", action="store_true", help="emit the plan as JSON")
     ap.add_argument("--apply", action="store_true", help="perform the plan via gh")
     ap.add_argument("--dry-run", action="store_true", help="with --apply, print commands only")
+    ap.add_argument("--labels-only", action="store_true",
+                    help="with --apply, add priority labels and close nothing")
+    ap.add_argument("--ceiling", type=int, metavar="N",
+                    help="report the open count against a ceiling of N")
     args = ap.parse_args(argv)
+    if args.labels_only and not args.apply:
+        ap.error("--labels-only changes what --apply does; pass --apply with it")
+    if args.ceiling is not None and args.ceiling < 0:
+        ap.error("--ceiling must not be negative")
 
     if args.input:
         with open(args.input, encoding="utf-8") as fh:
@@ -248,8 +289,13 @@ def main(argv=None) -> int:
         return 2
 
     if args.apply:
-        n = apply_plan(plan, args.repo, args.dry_run)
+        n = apply_plan(plan, args.repo, args.dry_run, args.labels_only)
         print(f"{'planned' if args.dry_run else 'performed'} {n} gh operations", file=sys.stderr)
+        if args.labels_only:
+            held = sum(1 for r in plan if r["disposition"] in CLOSE_DISPOSITIONS)
+            print(f"left {held} proposed closes for the attended pass", file=sys.stderr)
+    if args.ceiling is not None:
+        print(ceiling_report(len(plan), args.ceiling), file=sys.stderr)
     return 0
 
 

@@ -84,6 +84,56 @@ check("dry-run call count skips the already-labelled rows", calls == len(plan) -
 check("not-planned close carries a reason comment",
       "close 1 --reason not planned --comment Closed by the triage pass: junk title." in buf.getvalue())
 
+# --labels-only: the close rows are skipped, neither closed nor labelled, and
+# every label row still runs.
+buf_lo = io.StringIO()
+with contextlib.redirect_stdout(buf_lo):
+    calls_lo = tb.apply_plan(plan, None, dry_run=True, labels_only=True)
+closes = sum(1 for r in plan if r["disposition"] in tb.CLOSE_DISPOSITIONS)
+check("the fixture holds both kinds of close row", closes == 2)
+check("labels-only drops exactly the close rows", calls_lo == calls - closes)
+check("labels-only issues no close command", " close " not in buf_lo.getvalue())
+check("labels-only leaves a close row unlabelled",
+      "edit 1 " not in buf_lo.getvalue() and "edit 8 " not in buf_lo.getvalue())
+check("labels-only still labels", "edit 2 --add-label P1" in buf_lo.getvalue())
+
+check("ceiling report over", tb.ceiling_report(889, 600) == "open issues: 889, over the ceiling of 600 by 289")
+check("ceiling report at the ceiling is within it",
+      tb.ceiling_report(600, 600) == "open issues: 600, within the ceiling of 600")
+
+# The command line: --labels-only without --apply is refused, and --ceiling
+# reports on stderr without changing the exit status.
+import json
+import subprocess
+import tempfile
+
+SCRIPT = str(Path(__file__).parent / "triage-backlog.py")
+with tempfile.TemporaryDirectory() as tmp:
+    fixture_path = str(Path(tmp) / "open.json")
+    with open(fixture_path, "w", encoding="utf-8") as fh:
+        json.dump(FIXTURE, fh)
+    run = subprocess.run(
+        [sys.executable, SCRIPT, "--input", fixture_path, "--labels-only"],
+        capture_output=True, text=True, timeout=30,
+    )
+    check("--labels-only without --apply is a usage error", run.returncode == 2)
+    run = subprocess.run(
+        [sys.executable, SCRIPT, "--input", fixture_path, "--ceiling", "5"],
+        capture_output=True, text=True, timeout=30,
+    )
+    check("--ceiling over the bound still exits 0", run.returncode == 0)
+    check("--ceiling reports the count on stderr",
+          f"open issues: {len(FIXTURE)}, over the ceiling of 5 by {len(FIXTURE) - 5}" in run.stderr)
+    run = subprocess.run(
+        [sys.executable, SCRIPT, "--input", fixture_path,
+         "--apply", "--dry-run", "--labels-only"],
+        capture_output=True, text=True, timeout=30,
+    )
+    check("--apply --dry-run --labels-only exits 0", run.returncode == 0)
+    check("it says how many closes it held back",
+          "left 2 proposed closes for the attended pass" in run.stderr)
+    check("and prints no close command", " close " not in run.stdout)
+
 check("comment count reads ints", tb.comment_count(3) == 3)
 check("comment count reads lists", tb.comment_count([{}, {}]) == 2)
 check("comment count reads gh totalCount objects", tb.comment_count({"totalCount": 4}) == 4)

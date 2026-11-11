@@ -61,7 +61,7 @@ def _repo(tmp):
         (root / rel).parent.mkdir(parents=True, exist_ok=True)
         (root / rel).write_text(text, encoding="utf-8")
     env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}  # never an outer repo
-    subprocess.run(["git", "init", "-q"], cwd=root, check=True, env=env)
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=root, check=True, env=env)
     subprocess.run(["git", "add", "-A"], cwd=root, check=True, env=env)
     (root / "hooks" / "brand-new.py").write_text("\n", encoding="utf-8")  # untracked
     (root / "hooks" / "stale.py").unlink()  # tracked, deleted without git rm

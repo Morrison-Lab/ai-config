@@ -12,6 +12,9 @@ From the repository root:
 claude plugin eval . --ablation with-without --model sonnet --trust-plugin --no-publish
 ```
 
+- `--trust-plugin` skips the first-run trust prompt.
+  Claude Code 2.1.322 accepts it and 2.1.261 rejects it as unknown (checked 2026-11-11);
+  on an older CLI, drop the flag and answer the prompt.
 - `--ablation with-without` also runs every case with no plugin loaded and reports the difference.
   A rule that scores the same with and without the plugin is not changing behaviour, whatever its text says.
 - `--runs 1` is enough for a smoke check.

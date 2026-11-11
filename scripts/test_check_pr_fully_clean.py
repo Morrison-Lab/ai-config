@@ -1514,7 +1514,7 @@ def main() -> int:
     # Verification prose in a later sentence of the same paragraph stays
     # clean: only the negation's own sentence and the opening of the next
     # one are read for a contrast.
-    for _heading in ("## Nits", "### Issues"):
+    for _heading in ("### Findings", "## Nits", "### Issues"):
         for _tail in (
             "None.\nChecked the parser and tests; they still pass.",
             "None.\nI only reviewed the changed files.",
@@ -1610,10 +1610,37 @@ def main() -> int:
         "At the same time", "Having said that", "Whereas", "All the same",
         "With that said", "Then again", "Albeit",
     )):
+        for _heading in ("## Nits", "### Findings"):
+            check(
+                f"{_heading} + {_tail!r} is a finding (#2359, #5402)",
+                checker._unresolved_finding_pattern(
+                    _heading + "\n\n" + _tail + "\n"
+                ) is not None,
+            )
+    # The `### Findings` heading also resolves through a heading trailer and
+    # a hard-wrapped first line; both share the guard (#5402).
+    for _label, _body in (
+        ("CRLF hard-wrapped 'However'",
+         "### Findings\n\nNo issues\r\nHowever, X is broken.\r\n"),
+        ("heading trailer 'none, but'",
+         "### Findings: none, but X leaks.\n\nMore text.\n"),
+        ("'0-day'", "### Findings\n\n0-day exploit possible\n"),
+    ):
         check(
-            f"## Nits + {_tail!r} is a finding (#2359)",
-            checker._unresolved_finding_pattern("## Nits\n\n" + _tail + "\n")
-            is not None,
+            f"### Findings + {_label} is a finding (#5402)",
+            checker._unresolved_finding_pattern(_body) is not None,
+        )
+    for _label, _body in (
+        ("'None.'", "### Findings\n\nNone.\n"),
+        ("'0 findings.'", "### Findings\n\n0 findings.\n"),
+        ("trailer 'none'", "### Findings: none\n\nSee the thread, but fine.\n"),
+        ("'None.' then a 'but' paragraph",
+         "### Findings\n\nNone.\n\nI checked the thread, but it is fine.\n"),
+        ("'- None.' bullet", "### Findings\n\n- None.\n"),
+    ):
+        check(
+            f"### Findings + {_label} stays clean (#5402 control)",
+            checker._unresolved_finding_pattern(_body) is None,
         )
     # Long whitespace runs must not make the guard quadratic: before the
     # bounded openers, 20,000 spaces took about 6 s and " -" * 10,000 9 s.

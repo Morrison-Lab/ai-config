@@ -3598,10 +3598,14 @@ def classify_verdict(body: str, state: str = "", author: str = "") -> str:
 
 _FINDINGS_TRAILER_SUFFIX = re.compile(
     r"^\s*(?:"
-    r"[*_:.\-]*\s*(?:none\b(?!\s+of\b)|n/a\b|none\s+identified\b|none\s+remaining\b)"
-    r"|"
-    r"[:.\-(]*\s*(?:non-blocking\b|nothing\b|0\b|no\s+(?:\w+\s+){0,3}(?:findings|issues|bugs|violations|blockers)|no\s+new\b)"
-    r")",
+    r"(?:[*_:.\-]+\s*)?"
+    + _SAFE_NEGATION
+    + r"|"
+    r"(?:[:.\-(]+\s*)?(?:non-blocking\b"
+    + _CONTRAST_GUARD
+    + r"|"
+    + _RISKY_NEGATION
+    + r"))",
     re.IGNORECASE,
 )
 
@@ -3617,7 +3621,10 @@ def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
     of body. The FIRST non-empty line must match the
     _FINDINGS_TRAILER_SUFFIX allowlist -- the same trigger the old 60-char
     suffix shortcut keyed on, made line-anchored -- and everything after it
-    must clear the item veto.
+    must clear the item veto. The allowlist match is tried on that line
+    joined to the rest of its paragraph (cut by _negation_suffix()), so the
+    #2359 contrast guard sees a hard-wrapped contrast in the line's own
+    sentence or opening the next one.
 
     A resolving line reached only AFTER other content (verification prose,
     alert blocks, items) never exempts: an untagged prose finding is
@@ -3627,8 +3634,8 @@ def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
     mirror direction shares the residual: untagged PLAIN PROSE after a
     resolving first line is also indistinguishable and is not vetoed --
     including finding prose packed onto the SAME physical line as the
-    resolving word, whether in the body or in a heading trailer -- the
-    same exposure the 60-char shortcut always had.
+    resolving word, whether in the body or in a heading trailer, unless
+    it carries a #2359 contrast (ai-config#5389 tracks the rest).
 
     No wider than the shortcut except one vetted way, still gated by the
     item veto: no 60-char cap on where the resolving line starts. The
@@ -3663,7 +3670,16 @@ def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
     lines = lead + [ln for ln in section.splitlines() if ln.strip()]
     if not lines:
         return False
-    if not _FINDINGS_TRAILER_SUFFIX.search(lines[0]):
+    # The first line is tested together with the rest of its paragraph, so
+    # the #2359 contrast guard sees a hard-wrapped "No issues\nHowever, X".
+    if lead:
+        after_first = section
+    else:
+        raw_lines = section.splitlines(keepends=True)
+        first = next(i for i, ln in enumerate(raw_lines) if ln.strip())
+        after_first = "".join(raw_lines[first + 1:])
+    probe = _negation_suffix(lines[0] + "\n" + after_first, 0)
+    if not _FINDINGS_TRAILER_SUFFIX.search(probe):
         return False
     return not _SECTION_FINDING_ITEM.search("\n".join(lines[1:]))
 

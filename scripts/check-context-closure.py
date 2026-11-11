@@ -29,9 +29,8 @@ Two modes, from ai-config#1028:
      three days old, the same 33 imports had grown +62%, and nothing
      reported it -- the gitlink diff is one line.
 
-Two more came later: `--baseline REV`, the per-PR delta of this repo's own
-closure, and `--merge-result REF`, which measures the tree that merging REF
-into HEAD would produce rather than the working tree (ai-config#4234).
+Later came `--baseline REV`, the per-PR delta, and `--merge-result REF`,
+which measures the tree merging REF into HEAD would produce (ai-config#4234).
 
 Per `shared/workflow/algorithmatize-checks.md`, "how many bytes does this
 repo load before it starts" is decidable over data already on disk, so it
@@ -1345,11 +1344,11 @@ def main(argv=None) -> int:
     )
 
     if args.merge_result:
-        # The git-side counter, which decodes strictly. The walk above read
-        # the root, so None here means it is not UTF-8; the cap cannot be
-        # checked, and a gate that cannot check must not pass.
-        root_chars = root_char_count_at(base, args.root, tree)
-        if root_chars is None:
+        # Count the file the walk read; a cap that cannot be checked must
+        # not pass, so a non-UTF-8 root is an error.
+        try:
+            root_chars = cli_char_count(reader(args.root).decode("utf-8"))
+        except UnicodeDecodeError:
             print(
                 f"error: {args.root} in the merge tree is not UTF-8, so the "
                 "character cap cannot be checked.",

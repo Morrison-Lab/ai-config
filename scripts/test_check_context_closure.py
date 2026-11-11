@@ -1459,12 +1459,9 @@ with tempfile.TemporaryDirectory() as tmp:
         ccc.main(common + ["--merge-result", "main", "--baseline", "main"]) == 2,
     )
     check(
-        "--merge-result: an unknown ref exits 2",
-        ccc.main(common + ["--merge-result", "no-such-ref-xyz"]) == 2,
-    )
-    check(
-        "--merge-result: an unknown ref is reported as unknown, not as a conflict",
-        "does not name a commit" in ccc.merge_result_tree(base, "no-such-ref-xyz")[1],
+        "--merge-result: an unknown ref exits 2, reported as unknown, not as a conflict",
+        ccc.main(common + ["--merge-result", "no-such-ref-xyz"]) == 2
+        and "does not name a commit" in ccc.merge_result_tree(base, "no-such-ref-xyz")[1],
     )
     git("checkout", "-q", "main")
     (base / "notes.md").write_text("main side\n", encoding="utf-8")
@@ -1540,11 +1537,21 @@ with tempfile.TemporaryDirectory() as tmp:
         "--merge-result: a submodule import resolves through the merge tree's gitlink",
         ccc.main(loose + merged) == 0,
     )
-    read, pins = ccc.merge_tree_reader(repo, ccc.merge_result_tree(repo, "main")[0])
-    check(
-        "--merge-result: merge_tree_reader reads the submodule file at its pin",
-        read(".ai-config/shared.md") == b"from the submodule\n" and pins == [],
-    )
+    git("checkout", "-qb", "bad-root", "main", cwd=repo)
+    (repo / "CLAUDE.md").write_bytes(b"@frag.md\n\xff\n")
+    git("commit", "-qam", "a root that is not UTF-8", cwd=repo)
+    git("checkout", "-qb", "bad-pin", "main", cwd=repo)
+    (sub / "shared.md").write_text("newer\n", encoding="utf-8")
+    git("commit", "-qam", "a commit the checkout never fetched", cwd=sub)
+    pin = git("rev-parse", "HEAD", cwd=sub)
+    git("update-index", "--cacheinfo", f"160000,{pin},.ai-config", cwd=repo)
+    git("commit", "-qm", "pin it", cwd=repo)
+    git("checkout", "-q", "branch", cwd=repo)
+    for name, ref in [("a non-UTF-8 root", "bad-root"), ("an unfetched submodule pin", "bad-pin")]:
+        check(
+            f"--merge-result: {name} in the merge exits 2, not a pass or a dangling import",
+            ccc.main(loose + ["--merge-result", ref]) == 2,
+        )
 
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

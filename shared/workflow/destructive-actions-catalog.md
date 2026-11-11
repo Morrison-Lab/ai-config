@@ -42,7 +42,8 @@ a row says so where its source was not.
 - **Do:** run `git stash push --include-untracked` before any command that discards working-tree state, and say so.
   A stash can be recovered and a reset cannot.
   A stash leaves ignored files behind, so read `git clean -n -x` before any `git clean -x`.
-- **Don't:** reach for `reset --hard`, `checkout -- .`, `restore` or `clean -f` to undo your own edit when `git diff` shows changes you did not make.
+- **Don't:** reach for `reset --hard`, `checkout -- .`, `restore` or `clean -f` to clear a `git diff` that shows changes you do not recognize as your own.
+  Stash them instead.
 - **Do:** guard a variable in a deletion path with `${VAR:?}`, so an empty variable stops the command instead of widening it.
 - **Don't:** use a variable in a deletion path that an earlier Bash call set.
   Each call starts a fresh shell.

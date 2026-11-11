@@ -56,7 +56,8 @@ def transcript(commands, sidechain=False, antigravity=False):
 def run(command, commands, sidechain=False, antigravity=False,
         transcript_path=None, cwd=REPO, env=None, tool_name="Bash",
         agent_id=None):
-    """Return (fired, payload_or_none). Raises on a crashed hook."""
+    """Return (partial_note_fired, payload_or_none); the no-run note does
+    not set the flag (use nudged()). Raises on a crashed hook."""
     path = transcript_path
     made = None
     if path is None:
@@ -206,6 +207,8 @@ def main():
           silent('git commit -m "please push later"', [CHECKER]))
     check("silent in a repo with no run-local-validation.py to point at",
           silent(PUSH, [CHECKER], cwd=tempfile.gettempdir()))
+    check("...and the no-run note stays silent there too",
+          silent(PUSH, [], cwd=tempfile.gettempdir()))
 
     # --- wrappers hiding the real program --------------------------------
     # Each of these is a GENUINE run of a checker. Missing one makes the hook
@@ -373,6 +376,10 @@ def main():
                          .get("additionalContext", "").strip()))
     check("...and systemMessage is omitted, which that harness requires",
           fired and "systemMessage" not in (out or {}))
+    _, out = run(PUSH, ["ls"], env={"ANTIGRAVITY_AGENT": "1"})
+    check("...and the no-run note keeps its context and drops systemMessage",
+          _context(out).startswith(NO_RUN_LEAD)
+          and "systemMessage" not in (out or {}))
 
     # --- the documented limit, pinned rather than discovered --------------
     # The FIRST version of this pin re-ran the same call as "silent once the

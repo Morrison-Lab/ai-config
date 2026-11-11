@@ -64,8 +64,9 @@ the defect this hook warns about.
 
 A session that ran no checker and no sweep gets a shorter note. It was
 silent while the only command to name was the full sweep (over ten minutes).
-Of the `validate` steps, `--changed` narrows only the slowest, the hook
-test suites, to those the branch reaches. Measured 2026-11-11 on a
+`--changed` narrows the slowest `validate` step, the hook test suites, to
+those the branch reaches, and skips a path-filtered job the branch does not
+touch. Measured 2026-11-11 on a
 one-hook change: 6 of 193 suites, and 188 s for the whole run. So both notes
 name it. Any run of the script counts as the sweep, `--only` and `--list`
 included (ai-config#5428), and so does one in the push's own command, which
@@ -163,9 +164,9 @@ NOTE = (
 NO_RUN_NOTE = (
     "This session has not run `scripts/{derived}`, which derives its checks "
     "from `.github/workflows/validate.yml`, before this push.\n"
-    "Of the `validate` steps, `--changed` narrows only the hook test "
-    "suites, the step that takes most of the run's time, to those "
-    "whose inputs this branch touched. Run it before the push, or say why "
+    "`--changed` narrows the hook test suites, the step that takes most "
+    "of the run's time, to those whose inputs this branch touched, and "
+    "skips a path-filtered job this branch does not touch. Run it before the push, or say why "
     "this push does not need it:\n\n"
     "    python3 scripts/{derived} --changed --base origin/main\n"
 )
@@ -454,7 +455,7 @@ def main() -> int:
     else:
         context = NO_RUN_NOTE.format(derived=DERIVED)
         message = (f"Pushing with no run of {DERIVED} this session; --changed "
-                   "narrows only the hook suites, to those this branch "
+                   "narrows the hook suites to those this branch "
                    "reaches.")
 
     out = {

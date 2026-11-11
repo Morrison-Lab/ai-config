@@ -62,6 +62,10 @@ Nothing else tells them the stretch has ended, and every later action keeps rais
 - **Don't:** end the turn after a denial without naming the mode switch, or offer only the `autoMode` configuration, which takes a settings change the user has to make.
 - **Don't:** retry a denied command more than once, or rephrase it.
 - **Don't:** route around a denial, or hand the user a script to run in place of the approval.
+- **Don't:** hand a denied action to another session or thread (a runner thread, the coordinator, a subagent) to run instead.
+  That is routing around the denial too.
+  Wait for the user's word, then run the action yourself
+  (2026-11-11: after the classifier denied a thread's merge of gha#1910, the coordinator declined to hand the merge to the runner thread and asked Ezra for mwc instead).
 - **Don't:** ask to leave auto mode for a hard-prohibited category, or for an action the user has not authorized.
 - **Do:** when `mcp__ccd_session_mgmt__set_session_permission_mode` is available, switch the session to `default` yourself and rerun the command once, so the user gets a real approval prompt;
   a switch to a lower mode shows no card.

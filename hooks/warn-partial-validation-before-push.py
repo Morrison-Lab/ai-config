@@ -167,7 +167,8 @@ NO_RUN_NOTE = (
     "from `.github/workflows/validate.yml`, before this push.\n"
     "`--changed` narrows the hook test suites, the step that takes most "
     "of the run's time, to those whose inputs this branch touched, and "
-    "skips a path-filtered job this branch does not touch. Run it before the push, or say why "
+    "skips a path-filtered job this branch does not touch. Run it "
+    "before the push, or say why "
     "this push does not need it:\n\n"
     "    python3 scripts/{derived} --changed --base origin/main\n"
 )

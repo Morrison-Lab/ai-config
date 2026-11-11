@@ -474,13 +474,14 @@ cookieconsent.run({
 <li><p>Create the issue, quoting the original and linking back so authorship and context aren’t lost:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> issue create <span class="dt">\</span></span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">--title</span> <span class="st">'&lt;original title&gt;'</span> <span class="dt">\</span></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--body</span> <span class="st">'Migrated from discussion &lt;url&gt; (opened by @&lt;author&gt;).</span></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="st">&lt;original body, quoted&gt;</span></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="st">Key points from the discussion thread:</span></span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="st">- @&lt;login&gt;: &lt;summary&gt;'</span>   <span class="co"># CREATE_ISSUE</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>In a remote/web session, use <code>mcp__github__issue_write</code> (<code>method: create</code>) with the same body instead of <code>gh</code>.</p></li>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">--label</span> P2 <span class="dt">\</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">--body</span> <span class="st">'Migrated from discussion &lt;url&gt; (opened by @&lt;author&gt;).</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="st">&lt;original body, quoted&gt;</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a><span class="st">Key points from the discussion thread:</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="st">- @&lt;login&gt;: &lt;summary&gt;'</span>   <span class="co"># CREATE_ISSUE</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>In a remote/web session, use <code>mcp__github__issue_write</code> (<code>method: create</code>) with the same body instead of <code>gh</code>. Set the priority (<code>P2</code> is the default) per <a href="../../shared/workflow/issue-first.md"><code>issue-first</code></a>; the issue quotes human content, so it takes no <code>ai-authored</code> or model label. Where the repo has no <code>P2</code> label yet, create it first (<a href="../../shared/workflow/label-agent-filed-issues.md"><code>label-agent-filed-issues</code></a>).</p></li>
 <li><p>Comment on the discussion pointing at the new issue, then close it:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">gh</span> api graphql <span class="at">-f</span> discussionId=<span class="st">'&lt;discussion-id&gt;'</span> <span class="at">-f</span> body=<span class="st">'Moved to &lt;issue-url&gt; to track the actionable work.</span></span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>

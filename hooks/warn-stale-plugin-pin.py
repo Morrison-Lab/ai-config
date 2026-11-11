@@ -107,10 +107,7 @@ def git(clone: Path, *args: str, quiet: bool = False) -> str | None:
 
 def pin_is_current(clone: Path, pin: str, head: str) -> bool:
     """True when the pin is HEAD, or HEAD is its ancestor (the clone lags)."""
-    if head.startswith(pin):
-        return True
-    return git(clone, "merge-base", "--is-ancestor", head, pin,
-               quiet=True) is not None
+    return head.startswith(pin) or is_ancestor(clone, head, pin)
 
 
 def behind(clone: Path, pin: str, head: str) -> str:
@@ -125,7 +122,7 @@ def origin_tip(clone: Path) -> str | None:
     if (os.environ.get("CLAUDE_CODE_REMOTE") == "true"
             or os.environ.get("AI_CONFIG_NO_REMOTE_CHECK") == "1"):
         return None
-    out = git(clone, "ls-remote", "origin", "HEAD", quiet=True)
+    out = git(clone, "ls-remote", "origin", "HEAD")
     if not out:
         print(f"warn-stale-plugin-pin: could not read origin's default branch "
               f"for {clone}; compared with the local clone only",
@@ -134,12 +131,16 @@ def origin_tip(clone: Path) -> str | None:
     return out.split()[0]
 
 
+def is_ancestor(clone: Path, older: str, newer: str) -> bool:
+    return git(clone, "merge-base", "--is-ancestor", older, newer,
+               quiet=True) is not None
+
+
 def clone_lags(clone: Path, head: str, tip: str | None) -> bool:
     """True when origin's tip is neither the clone's HEAD nor its ancestor."""
     if tip is None or head == tip:
         return False
-    return git(clone, "merge-base", "--is-ancestor", tip, head,
-               quiet=True) is None
+    return not is_ancestor(clone, tip, head)
 
 
 def stale_lines(record: dict, here: Path, root: Path) -> list[str]:
@@ -159,13 +160,16 @@ def stale_lines(record: dict, here: Path, root: Path) -> list[str]:
             print(f"warn-stale-plugin-pin: no git clone at {clone}; "
                   f"cannot compare {key}", file=sys.stderr)
             continue
+        mine = [e for e in entries
+                if isinstance(e, dict) and applies(e, here)]
+        if not mine:
+            continue
         tip = origin_tip(clone)
         lagging = clone_lags(clone, head, tip)
-        for entry in entries:
-            if not isinstance(entry, dict) or not applies(entry, here):
-                continue
+        for entry in mine:
             pin = entry.get("gitCommitSha") or ""
-            if pin and tip and tip.startswith(pin):
+            if pin and tip and (tip.startswith(pin)
+                                or is_ancestor(clone, tip, pin)):
                 continue
             current = bool(pin) and pin_is_current(clone, pin, head)
             if current and not lagging:
@@ -175,7 +179,9 @@ def stale_lines(record: dict, here: Path, root: Path) -> list[str]:
             where = entry.get("projectPath") or "user scope"
             shown = pin[:12] if pin else "no recorded commit"
             if current:
-                state = (f"matching the marketplace clone at {head[:12]}, "
+                relation = ("matching" if head.startswith(pin)
+                            else "ahead of")
+                state = (f"{relation} the marketplace clone at {head[:12]}, "
                          f"which has not been updated: origin's default "
                          f"branch is at {tip[:12]}. ")
             else:

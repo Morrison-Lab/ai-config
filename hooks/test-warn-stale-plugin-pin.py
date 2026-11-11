@@ -30,7 +30,19 @@ With a bare repository as the clone's `origin` (ai-config#5309 step 2):
       says the clone itself lags origin.
   13. Case 10 with AI_CONFIG_NO_REMOTE_CHECK=1: silent.
   14. Case 10 with CLAUDE_CODE_REMOTE=true: silent.
-  15. Origin unreachable: falls back to the clone, says so on stderr.
+  16. Project-scope pin at the clone's HEAD, clone behind origin: warns
+      with --scope project.
+  17. No recorded commit, clone behind origin: warns.
+  18. Pin ahead of a clone that lags origin: says "ahead of", not
+      "matching".
+  19. Clone ahead of origin (origin's tip is its ancestor), pin at HEAD:
+      silent.
+  20. Clone at origin's tip, pin behind: warns with the count and does not
+      say the clone lags.
+  15. Origin unreachable: falls back to the clone, says so on stderr, and
+      passes git's own error through.
+  21. Origin unreachable and no applicable entry: origin is not read, so
+      stderr is empty.
 """
 import json
 import os
@@ -154,11 +166,11 @@ def main():
 
         mkt = root / "marketplaces" / "Morrison-Lab"
         origin = tmp / "origin.git"
-        subprocess.run(["git", "clone", "-q", "--bare", str(mkt), str(origin)],
+        subprocess.run(["git", "clone", "-q", "--bare", "-b", "main", str(mkt), str(origin)],
                        check=True, capture_output=True)
         git(mkt, "remote", "add", "origin", str(origin))
         work = tmp / "work"
-        subprocess.run(["git", "clone", "-q", str(origin), str(work)],
+        subprocess.run(["git", "clone", "-q", "-b", "main", str(origin), str(work)],
                        check=True, capture_output=True)
         (work / "f").write_text("3", encoding="utf-8")
         git(work, "commit", "-q", "-am", "c3")
@@ -184,10 +196,43 @@ def main():
                          CLAUDE_CODE_REMOTE="true")
         check("14 cloud session skips the remote read", rc == 0 and ctx == "", ctx)
 
+        rc, ctx, _ = run(root, record({"scope": "project", "projectPath": str(project),
+                                       "gitCommitSha": shas[2]}), project / "sub")
+        check("16 lagging clone warns a project pin",
+              "--scope project" in ctx and "has not been updated" in ctx, ctx)
+
+        rc, ctx, _ = run(root, record({"scope": "user"}), project)
+        check("17 no recorded commit warns", "no recorded commit" in ctx, ctx)
+
+        git(mkt, "reset", "-q", "--hard", shas[1])
+        rc, ctx, _ = run(root, record({"scope": "user", "gitCommitSha": shas[2]}), project)
+        check("18 pin ahead of a lagging clone says so",
+              "ahead of the marketplace clone" in ctx and "matching" not in ctx, ctx)
+        git(mkt, "reset", "-q", "--hard", shas[2])
+
+        git(mkt, "fetch", "-q", "origin")
+        git(mkt, "reset", "-q", "--hard", tip)
+        (mkt / "f").write_text("4", encoding="utf-8")
+        git(mkt, "commit", "-q", "-am", "c4")
+        ahead = git(mkt, "rev-parse", "HEAD")
+        rc, ctx, _ = run(root, record({"scope": "user", "gitCommitSha": ahead}), project)
+        check("19 clone ahead of origin is silent", rc == 0 and ctx == "", ctx)
+
+        git(mkt, "reset", "-q", "--hard", tip)
+        rc, ctx, _ = run(root, record({"scope": "user", "gitCommitSha": shas[2]}), project)
+        check("20 clone at origin's tip, pin behind",
+              "1 commit(s)" in ctx and "lags origin" not in ctx, ctx)
+        git(mkt, "reset", "-q", "--hard", shas[2])
+
         shutil.rmtree(origin)
         rc, ctx, err = run(root, record({"scope": "user", "gitCommitSha": shas[2]}), project)
         check("15 unreachable origin falls back to the clone",
               rc == 0 and ctx == "" and "compared with the local clone only" in err, err)
+        check("15 passes git's error through", "git ls-remote origin HEAD" in err, err)
+
+        rc, ctx, err = run(root, record({"scope": "project", "projectPath": str(other),
+                                       "gitCommitSha": shas[0]}), project)
+        check("21 no applicable entry reads no origin", rc == 0 and ctx == "" and err == "", err)
 
         shutil.rmtree(root / "marketplaces")
         rc, ctx, err = run(root, record({"scope": "user", "gitCommitSha": shas[0]}), project)

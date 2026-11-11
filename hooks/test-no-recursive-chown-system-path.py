@@ -288,10 +288,15 @@ class Denies(unittest.TestCase):
         for cmd in ("cd /etc; if [ -d ~/proj ]; then cd ~/proj; fi; chown -R me .",
                     "cd /usr/lib; if [ -d build ]; then cd ~/proj; fi; chmod -R u+w .",
                     "cd /etc; while false; do cd ~/proj; done; chown -R me .",
-                    "cd /etc && { cd ~/proj || true; }; chown -R me .",
                     "cd /etc; if [ -d x ]; then echo; cd ~/proj; fi; chown -R me .",
                     "cd /etc; case $x in a) cd ~/proj;; esac; chown -R me ."):
             self.assert_denied(cmd)
+
+    def test_pwd_after_a_cd_that_may_not_run(self):
+        cwd = HOME
+        for cmd in ('if [ -d proj ]; then cd proj; fi; chown -R me "$PWD"',
+                    'if [ -d proj ]; then cd proj; fi; X=$PWD; chmod -R u+w "$X"'):
+            self.assert_denied(cmd, cwd=cwd)
 
     def test_cd_behind_time_or_command(self):
         for cmd in ("time cd /etc; chown -R me .", "command cd /etc; chown -R me .",
@@ -393,6 +398,12 @@ class Allows(unittest.TestCase):
         self.assert_allowed('if true; then D=./build; fi; chown -R me "$D/"')
         # After `--`, `-v x` is the format and its argument: x keeps its value.
         self.assert_allowed('x=./build; printf -- -v x; chown -R me "$x"')
+
+    def test_cd_in_a_condition_or_group_runs(self):
+        for cmd in ("if cd ~/proj; then chown -R me .; fi",
+                    "{ cd ~/proj; }; chown -R me .",
+                    "while ! cd ~/proj; do sleep 1; done; chown -R me ."):
+            self.assert_allowed(cmd, cwd=HOME)
 
     def test_guarded_cd_into_the_project(self):
         self.assert_allowed("if [ -d build ]; then cd build; fi; chmod -R u+w .")

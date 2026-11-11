@@ -26,8 +26,9 @@ when a target is:
 
 A target is read with `~`, `~user` and `$HOME` expanded, relative paths
 resolved against the hook's `cwd` and any `cd` earlier in the same shell (a
-`cd` inside `( ... )` moves only that subshell, and one after a keyword such
-as `then` or `do` may not run, so the directory before it is judged too),
+`cd` inside `( ... )` moves only that subshell, and one inside a branch or
+loop body (`then` to `fi`, `do` to `done`, `case` to `esac`) may not run, so
+the directory before it is judged too, `$PWD` included),
 and a basename made only of glob characters read as its directory (`/usr/*`
 touches `/usr`). Any other
 `$VAR` keeps its value in this environment, which the Bash call inherits; one
@@ -73,8 +74,8 @@ component (`/*/lib`), a partial glob or brace expansion that names a
 protected path (`/et*`, `/{etc,usr}`), a wrapper that changes directory
 (`env -C /etc`, `sudo -D /etc`), PowerShell `icacls`/`Set-Acl`, Windows drive
 paths (`C:/Windows`), a relative target after a `cd` this cannot
-resolve (`cd -` or `cd "$UNSET"`), a `cd` after `&&` or `||` (read as
-run), an assignment that may not run
+resolve (`cd -` or `cd "$UNSET"`), a `cd` that fails or follows `&&` or
+`||` (read as run), an assignment that may not run
 (`false && D=./x` or `if false; then : "${D:=./x}"; fi`, each read as run), a
 `${D:=x}` assignment inside `sh -c` or a substitution, an assignment in a
 pipeline element (`echo x | : "${D:=./x}"`, read as made in the shell that
@@ -164,8 +165,8 @@ UNREAD_WHY = ("which uses a `${...}` operator this guard does not read, here or 
               "in an earlier assignment (anything but a `-`/`=` default or a `?` "
               f"check, or defaults nested deeper than {MAX_NESTING}); write the path out")
 # Words that open and close a compound command, for `_scan`'s DEPTH.
-BLOCK_OPEN = {"if", "while", "until", "for", "select", "case", "{"}
-BLOCK_CLOSE = {"fi", "done", "esac", "}"}
+BLOCK_OPEN = {"then", "do", "case"}
+BLOCK_CLOSE = {"fi", "done", "esac"}
 DECLARE_BUILTINS = ("export", "local", "declare", "readonly", "typeset")
 # chmod's own short options (GNU and BSD); any other `-w` or `-x` is a mode.
 CHMOD_OPTIONS = set("cfvRHLPh")
@@ -590,12 +591,14 @@ def _scan(piece, cwd, home, outer):
     # Each scope keeps every directory the shell may be in: a `cd` after a
     # keyword (`if [ -d x ]; then cd x; fi`) may not run, so the directory
     # before it stays possible. `None` is a directory this cannot name.
-    # DEPTH counts the compound commands (`if`, loops, `case`, `{`) open here:
-    # any `cd` inside one, not only the first after its keyword, may not run.
+    # DEPTH counts the branch and loop bodies open here (`then` to `fi`, `do`
+    # to `done`, `case` to `esac`): any `cd` inside one may not run. A `cd`
+    # in a condition (`if cd x; then`) or a `{ ... }` group runs.
     heres, assigns, depth = {(0,): (cwd,)}, {}, 0
     for scope, argv in cmds or []:
         dirs = next(heres[scope[:k]] for k in range(len(scope), 0, -1) if scope[:k] in heres)
-        here = dirs[-1]
+        # With more than one possible directory, `$PWD` has no one value.
+        here = dirs[0] if len(dirs) == 1 else None
         assigned = dict(outer)
         for k in range(1, len(scope) + 1):
             assigned.update(assigns.get(scope[:k], {}))
@@ -604,12 +607,11 @@ def _scan(piece, cwd, home, outer):
             _expand(word, home, assigned, here, effects=effects)
         assigns.setdefault(scope, {}).update(effects)
         assigned.update(effects)
-        # `if cd /etc; then`, `{ cd /usr; }`: a keyword ends the command before.
-        maybe = bool(argv) and argv[0] in SHELL_KEYWORDS
+        # `then cd /etc`, `{ cd /usr; }`: a keyword ends the command before.
         while argv and argv[0] in SHELL_KEYWORDS:
             depth += (argv[0] in BLOCK_OPEN) - (argv[0] in BLOCK_CLOSE)
             argv = argv[1:]
-        maybe = maybe or depth > 0
+        maybe = depth > 0
         lead = argv
         while lead and lead[0] in ("time", "-p", "command", "builtin"):
             lead = lead[1:]
@@ -623,14 +625,22 @@ def _scan(piece, cwd, home, outer):
             new = tuple(None if moved else resolve_cd_target(words, d) for d in dirs)
             heres[scope] = tuple(dict.fromkeys((*dirs, *new) if maybe else new))
             continue
-        if _assignments(argv, assigns.setdefault(scope, {}), assigned, home, here):
+        only_assigns = _assignments(argv, assigns.setdefault(scope, {}), assigned, home, here)
+        if here is None:
+            # `X=$PWD` after a `cd` that may not run: refuse X where it is used.
+            for word in argv:
+                if ASSIGNMENT.match(word) and "PWD" in word:
+                    name = word.partition("=")[0]
+                    assigned[name] = assigns[scope][name] = UNREAD
+        if only_assigns:
             continue
         head, override = _program(argv)
         if not head or override:
             continue
         program = os.path.basename(head[0])
-        for target in _targets(program, head):
-            expanded = _expand(target, home, assigned, here)
+        for target, base in ((t, d) for t in _targets(program, head) for d in dirs):
+            # Judged once per possible directory, for `.` and `$PWD` alike.
+            expanded = _expand(target, home, assigned, base)
             if expanded is UNREAD:
                 shown = " ".join(argv).replace(SUB, "$(...)")
                 target = target.replace(SUB, "$(...)")
@@ -638,17 +648,18 @@ def _scan(piece, cwd, home, outer):
             for cand, weak in filter(None, [expanded]):
                 if not cand:
                     continue  # an empty operand is an error, not the cwd
-                bases = [None] if cand.startswith("/") else [d for d in dirs if d]
-                for base in bases:
-                    path = os.path.normpath(os.path.join(base, cand) if base else cand)
-                    path = path.replace("//", "/")
-                    if ALL_GLOB.match(os.path.basename(path)):
-                        path = os.path.dirname(path)
-                    why = _why(path, home, weak)
-                    if why:
-                        shown = " ".join(argv).replace(SUB, "$(...)")
-                        target = target.replace(SUB, "$(...)")
-                        return (shown, program, target, path, why), inner, {}
+                if not cand.startswith("/"):
+                    if base is None:
+                        continue
+                    cand = os.path.join(base, cand)
+                path = os.path.normpath(cand).replace("//", "/")
+                if ALL_GLOB.match(os.path.basename(path)):
+                    path = os.path.dirname(path)
+                why = _why(path, home, weak)
+                if why:
+                    shown = " ".join(argv).replace(SUB, "$(...)")
+                    target = target.replace(SUB, "$(...)")
+                    return (shown, program, target, path, why), inner, {}
     seen = dict(outer)
     for names in assigns.values():
         seen.update(names)

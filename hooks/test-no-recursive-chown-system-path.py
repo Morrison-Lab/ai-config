@@ -261,6 +261,21 @@ class Denies(unittest.TestCase):
                     'find / -maxdepth 1 | while IFS= read -r d; do chown -R me "$d"; done'):
             self.assert_denied(cmd)
 
+    def test_assignment_after_a_shell_keyword(self):
+        for cmd in ('if [ -z "$PREFIX" ]; then PREFIX=/usr/local; fi; chown -R me "$PREFIX"',
+                    '{ D=/etc; }; chown -R me "$D"',
+                    'for x in a; do D=/usr; done; chown -R me "$D"',
+                    'if true; then export D=/etc; fi; chown -R me "$D"'):
+            self.assert_denied(cmd)
+
+    def test_names_set_by_read_and_printf_forms(self):
+        for cmd in ('command read -r D <<< /etc; chown -R me "$D"',
+                    'read < f; chown -R me "$REPLY"',
+                    'mapfile < f; chown -R me "$MAPFILE"',
+                    'IFS= printf -v D %s /etc; chown -R me "$D"',
+                    'printf -vD %s /etc; chown -R me "$D"'):
+            self.assert_denied(cmd)
+
     def test_literal_root_gives_the_root_reason(self):
         reason = self.assert_denied("chown -R root /")
         self.assertIn("the filesystem root", reason)
@@ -347,6 +362,10 @@ class Allows(unittest.TestCase):
         for cmd in ('chmod -R 700 "$HOME/$$"', "chmod -R 700 ~/$$",
                     'chown -R me "${HOME}/${#}"'):
             self.assert_allowed(cmd)
+
+    def test_assignment_after_a_shell_keyword_then_a_trailing_slash(self):
+        self.assert_allowed('if true; then D=./build; fi; chown -R me "$D/"')
+        self.assert_allowed('printf -- -v x; chown -R me ./build')
 
     def test_assigning_default_then_a_trailing_slash(self):
         self.assert_allowed(': "${D:=./build}"; chown -R me "${D:-./out}"')

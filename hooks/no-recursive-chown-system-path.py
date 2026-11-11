@@ -40,12 +40,13 @@ built with any other operator (`${D:+x}`, `${D%/}`, `${!D}`, `${#D}`,
 `${D:0:3}`), there or in an assignment it uses, is refused wherever it
 points, since each can rebuild a protected path (`/e${HOME:+tc}` is `/etc`).
 So is one that uses a parameter this cannot know: a positional parameter
-(`$1`, `$@`), or `$0` (which `set --`, a function or `sh -c '...' /etc` can
-set), `$_`, `$OLDPWD`, or a name set by `read`, `mapfile`, `readarray`,
-`getopts` or `printf -v`. `$!` is read like an unset variable, and `$$`, `$#`,
-`$?` and `$-` as some value that is not empty. A command substitution outside single quotes, heredoc
-bodies and comments is lifted out before the command
-is split, scanned as a command of its own, and taken as empty. Inside `sh -c`
+(`$1`, `$@`, which `set --` or a function can set), `$0` (which
+`sh -c '...' /etc` sets), `$_`, `$OLDPWD`, or a name set by `read`,
+`mapfile`, `readarray`, `getopts` or `printf -v`. `$!` is read like an
+unset variable, and `$$`, `$#`, `$?` and `$-` as some value that is not
+empty. A command substitution outside single quotes, heredoc bodies and
+comments is lifted out before the command is split, scanned as a command of
+its own, and taken as empty. Inside `sh -c`
 or a substitution the working directory is unknown, so only absolute targets
 are judged there.
 
@@ -63,7 +64,7 @@ honest command uses, refuses the operator and parameter forms it does not
 model, and names the rest here.
 
 Limits, deliberately unclosed: `find ... -exec chown`, `xargs chown`, a
-`for` loop variable, `eval`, `su -c`, a heredoc piped to `sh`, an
+`for` or `select` loop variable, `eval`, `su -c`, a heredoc piped to `sh`, an
 interpreter's own `-c` (`python -c "os.system(...)"`), a substitution in an
 unquoted heredoc body (`<<EOF`, which bash does run), a glob in a directory
 component (`/*/lib`), a partial glob or brace expansion that names a
@@ -72,8 +73,10 @@ protected path (`/et*`, `/{etc,usr}`), a wrapper that changes directory
 paths (`C:/Windows`), a relative target after a `cd` this cannot
 resolve (`cd -` or `cd "$UNSET"`), an assignment that may not run
 (`false && D=./x` or `if false; then : "${D:=./x}"; fi`, each read as run), a
-`${D:=x}` assignment inside `sh -c` or a substitution, and a bind-mounted
-path (the #39283 `/volumes/mail/` case) all pass. Fails open on parse trouble
+`${D:=x}` assignment inside `sh -c` or a substitution, an assignment in a
+pipeline element (`echo x | : "${D:=./x}"`, read as made in the shell that
+follows), a `${D:=x}` read earlier in the same command than it assigns, and
+a bind-mounted path (the #39283 `/volumes/mail/` case) all pass. Fails open on parse trouble
 and when scripts/lib/shellcmd.py cannot be imported.
 """
 from __future__ import annotations
@@ -486,18 +489,31 @@ def _assignments(argv, store, visible, home, here):
     Values go in STORE as `(value, weak)`, expanded against the names VISIBLE
     so far; a command substitution makes one `None`.
     """
+    # `then D=/etc`, `{ D=/etc; }`, `do D=/usr`: a keyword ends the command
+    # before, so the rest still only assigns.
+    while argv and argv[0] in SHELL_KEYWORDS:
+        argv = argv[1:]
     lead = 0
-    while lead < len(argv) and (ASSIGNMENT.match(argv[lead]) or argv[lead] in SHELL_KEYWORDS):
-        lead += 1  # `IFS= read -r D`, `while read -r D`
+    while lead < len(argv) and (ASSIGNMENT.match(argv[lead])
+                                or argv[lead] in ("command", "builtin")):
+        lead += 1  # `IFS= read -r D`, `command read -r D`
+    rest = argv[lead + 1:]
     if lead < len(argv) and argv[lead] in READ_BUILTINS:
-        # Every bare name may be one it sets (options' values included).
-        for word in argv[lead + 1:]:
+        # Every bare name may be one it sets (options' values included), and
+        # with none, read sets REPLY and mapfile sets MAPFILE.
+        for word in [*rest, "REPLY", "MAPFILE"]:
             if NAME.fullmatch(word):
                 store[word] = visible[word] = UNREAD
         return False
-    if argv and argv[0] == "printf" and "-v" in argv[1:-1]:
-        name = argv[argv.index("-v") + 1]
-        store[name] = visible[name] = UNREAD
+    if lead < len(argv) and argv[lead] == "printf":
+        for i, word in enumerate(rest):
+            if word == "--" or not word.startswith("-"):
+                break
+            name = word[2:] if word.startswith("-v") and len(word) > 2 else None
+            if word == "-v" and i + 1 < len(rest):
+                name = rest[i + 1]
+            if name:
+                store[name] = visible[name] = UNREAD
         return False
     words = argv
     if argv and argv[0] in DECLARE_BUILTINS:

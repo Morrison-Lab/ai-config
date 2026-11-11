@@ -378,6 +378,14 @@ class Denies(unittest.TestCase):
                     'DIRS="$BUILD /usr"; sudo chmod -R u+w $DIRS'):
             self.assert_denied(cmd)
 
+    def test_a_single_quoted_text_is_read_without_its_prefix_too(self):
+        for cmd in ("HOME=/tmp/fakehome sh -c 'chmod -R u+w \"$HOME\"'",
+                    "D=/etc; D=./build sh -c 'chmod -R 755 $D'",
+                    "echo 'chmod -R 755 \"$D/\"'; D=/x sh -c \"chmod -R 755 \\\"$D/\\\"\"",
+                    "bash -uc 'chmod -R 755 \"$HOME\"' _ HOME=/x",
+                    "readonly D; D=/x sh -c 'chmod -R 755 \"$D/\"'"):
+            self.assert_denied(cmd)
+
     def test_a_text_without_its_prefix_home(self):
         self.assert_denied("HOME=/tmp/h sh -c \"chown -R me $HOME\"")
 
@@ -635,16 +643,6 @@ class Denies(unittest.TestCase):
 class Allows(unittest.TestCase):
     def assert_allowed(self, command, **kw):
         self.assertIsNone(run(command, **kw), f"expected no deny for: {command}")
-
-    def test_a_single_quoted_text_sees_its_prefix_names(self):
-        for cmd in ("HOME=/tmp/fakehome sh -c 'chmod -R u+w \"$HOME\"'",
-                    "HOME=\"$PWD/.home\" bash -c 'mkdir -p \"$HOME\" && chmod -R 700 \"$HOME\"'",
-                    "HOME=/tmp/h env -u X sh -c 'chmod -R u+w \"$HOME\"'",
-                    "D=/etc; D=./build sh -c 'chmod -R 755 $D'",
-                    "env HOME=/tmp/h sh -c 'chown -R me ~'",
-                    "HOME=/tmp/h bash -c '\n  mkdir -p \"$HOME\"\n  chmod -R 700 \"$HOME\"\n'",
-                    "D=/etc; D=./build sh -c '\ncd \"$D\"; \\\n  chmod -R 755 .\n'"):
-            self.assert_allowed(cmd)
 
     def test_the_nginx_web_root(self):
         for cmd in ("sudo chmod -R 755 /usr/share/nginx/html",

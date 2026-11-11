@@ -56,12 +56,10 @@ command is split, scanned as a command of its own, and taken as empty,
 except a bare `pwd`, read as `$PWD`. A `sh -c` text or a substitution is
 read where it appears, in the directory and with the names of each way the
 command may run up to there (a `sh -c` text also with the `NAME=value`
-words before its shell, `sudo D=/x sh -c`, and, unless the text is written
-in single quotes in the command itself and no word of that command is
-`sudo`, `doas`, `pkexec`, `run0`, `exec`, or `env -i`, once without them,
-since bash expands a double-quoted text with the outer names and those
-wrappers may drop the names; `env -u D` drops D from them, and a bare `~`
-reads HOME as `$HOME` does), to MAX_NESTED levels, and deeper with no
+words before its shell, `sudo D=/x sh -c`, and once without them, since
+bash expands a double-quoted text with the outer names and a wrapper such
+as `sudo` or `env -i` may drop them; a bare `~` reads HOME as `$HOME`
+does), to MAX_NESTED levels, and deeper with no
 directory, to MAX_DEPTH. A `cd` up the tree
 repeated by a loop (`cd ..`) is judged in every directory above. An
 unquoted `cd $D` with D empty or unset goes home, and is judged both there
@@ -93,7 +91,10 @@ array assignment (`D=(/etc)`, read as empty), `systemd-run`, `chroot`,
 a command substitution's value (read as empty, both ways: it denies
 `"$(npm config get prefix)/lib/node_modules"`, judged at
 `/lib/node_modules`, where writing the path itself or the escape hatch is
-the remedy, and it passes `"$(brew --prefix)/share"`), `flock -c TEXT`, a
+the remedy, and it passes `"$(brew --prefix)/share"`), a name assigned
+from a command substitution, here or before a `sh -c` (`ROOT=$(cmd);
+chmod -R u+w "$ROOT/"` passes wherever it points, as `d=$(mktemp -d)`
+must), `flock -c TEXT`, a
 named `coproc NAME { ...; }`, more than MAX_SCOPE `pushd`s in one command
 (`popd` then goes somewhere unknown), a `popd` inside a command
 substitution (read with an empty stack; bash's inherits the outer one), a
@@ -107,12 +108,10 @@ at `/`), a top-level directory written in a value beside an unset name
 tree or home is not), a `-R` held in a variable (`chown $FLAGS root /usr`
 is not seen as recursive), a name assigned earlier in the command and not
 exported, which a `sh -c` text is read with though its shell does not see
-it (`D=/x; bash -c 'chmod -R 755 "$D/"'` runs on `/`), a single-quoted
-`sh -c` text inside a substitution or holding `'\\''`, read as
-double-quoted too, which can refuse more than bash runs, a `~` in a
-double-quoted `sh -c` text (read
-with the outer HOME too, which bash leaves to the inner shell, so
-`HOME=/tmp/h bash -c "cd ~ && chmod -R u+w ."` is refused), a `cd` that
+it (`D=/x; bash -c 'chmod -R 755 "$D/"'` runs on `/`), a `sh -c` text
+after `NAME=value` words, read without them too, which refuses more than
+bash runs for a single-quoted text or a `~` (`HOME=/tmp/h sh -c 'chmod -R
+u+w "$HOME"'` is judged at the real home; write the path itself), a `cd` that
 goes home (a bare `cd`, or an unquoted empty `cd $D`), which reads this
 process's own home and not a HOME the command assigns, a
 `for` or `select` loop variable, `eval`, `su -c`, a heredoc piped to `sh`, an
@@ -821,8 +820,7 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
     ways the command may run are merged into one, with the directory unknown
     and the first way's names.
     """
-    ctx = ({"seen": set(), "work": 0, "split": {}, "uses": {}, "flat": {}}
-           if ctx is None else ctx)
+    ctx = {"seen": set(), "work": 0, "split": {}, "uses": {}} if ctx is None else ctx
     if not PROGRAM_TEXT.search(re.sub(r"[\\'\"]", "", piece)):
         return None  # no chown, chmod or chgrp anywhere in it, quotes aside
     if piece not in ctx["split"]:
@@ -897,21 +895,9 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
                 over = ctx["work"] > MAX_WORK
                 prefix = _prefix_names(words, home, assigned, here) if k >= first_shell else {}
                 # A double-quoted text was expanded with the outer names before
-                # the shell ran, a single-quoted one with these: unless it is
-                # written single-quoted, read it both ways.
-                readings = [assigned]
-                # Only a top-level text was quoted as written (an enclosing
-                # double-quoted text was expanded first), and sudo, doas,
-                # pkexec and run0 may drop the names given before them.
-                if prefix and level == 0 and not _may_drop_names(words):
-                    if piece not in ctx["flat"]:
-                        ctx["flat"][piece] = _flat(piece)
-                    flat = ctx["flat"][piece]
-                    quoted = _flat(f"'{text}'") in flat and _flat(f'"{text}"') not in flat
-                    readings = [ChainMap(prefix, assigned)] + ([] if quoted else [assigned])
-                elif prefix:
-                    readings = [ChainMap(prefix, assigned), assigned]
-                for names in readings:
+                # the shell ran, a single-quoted one with these, and a wrapper
+                # (`sudo`, `env -i`) may drop them: read it both ways.
+                for names in ([ChainMap(prefix, assigned), assigned] if prefix else [assigned]):
                     hit = _nested_hit(text, None if over else here, home, names, level, ctx)
                     if hit:
                         return hit
@@ -1016,42 +1002,11 @@ def _without_redirects(argv):
     return out
 
 
-# Wrappers that may run a shell with a reset environment.
-PRIVILEGED = {"sudo", "doas", "pkexec", "run0"}
-# `env` options that clear the names given before them.
-ENV_CLEARING = re.compile(r"\A(?:-|-[a-zA-Z]*i[a-zA-Z]*|--ignore-environment)\Z")
-
-
-def _may_drop_names(words):
-    """Whether a word of WORDS may run its shell without the `NAME=value`
-    words given before it: a privilege wrapper, `env -i`, or `exec`, whose
-    `-c` clears the environment."""
-    names = {os.path.basename(w) for w in words}
-    return bool(PRIVILEGED & names or "exec" in names
-                or ("env" in names and any(ENV_CLEARING.match(w) for w in words)))
-
-
-def _flat(text):
-    """TEXT with line continuations dropped and each run of blanks, newlines
-    and `;` made one space, as a `sh -c` text comes back from the split."""
-    return re.sub(r"[\s;]+", " ", text.replace("\\\n", ""))
-
-
 def _prefix_names(words, home, visible, here):
     """The `NAME=value` words before a shell's `-c` option (`D=/x sh -c`,
     `sudo D=/x sh -c`, `env D=/x sh -c`), as names its text starts with."""
-    names, unset = {}, False
+    names = {}
     for word in words:
-        if unset:  # `env -u D` removes D
-            names.pop(word, None)
-            unset = False
-            continue
-        if word in ("-u", "--unset"):
-            unset = True
-            continue
-        if word.startswith(("--unset=", "-u")) and word not in ("-u", "--unset="):
-            names.pop(word.split("=", 1)[1] if "=" in word else word[2:], None)
-            continue
         if word.startswith("-") and not word.startswith("--") and "c" in word:
             break
         if ASSIGNMENT.match(word):

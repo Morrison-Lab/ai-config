@@ -32,8 +32,8 @@ before the gap was noticed.
              or a `curl` call with a data payload to `https://api.ollama.com/api/chat`
              (the Ollama Cloud route, ai-config#4849)
     AND NOT  the waiver's probe pass ran after the last push: each CLI in
-             `clis` attempted with any result, or shown absent by a lone
-             `command -v` / `which` call that exited 1; `opencode` attempted.
+             `clis` attempted with any result, or shown absent by a lone,
+             unredirected `command -v` / `which` that exited 1; `opencode` attempted.
 
 A skill (`dtc`, `dto`, `adv`) is not credited by being loaded: loading one
 runs nothing. Its reviewer CLI call, which is a Bash call, is what counts.
@@ -148,7 +148,7 @@ NOTE = (
     "model fallback per delegate-to-opencode) on the shipping head first. "
     "If no qualifying reviewer can run here (host blocked, backend down, "
     "CLI or credential absent), probe every route once: attempt each of "
-    "{clis} as a reviewer, or show it absent with `command -v <cli>` or `which <cli>` alone (exit 1); "
+    "{clis} as a reviewer, or show it absent with `command -v <cli>` or `which <cli>` alone, unredirected (exit 1); "
     "opencode needs an attempt (its CLI or the OpenCode Go curl). Then the "
     "gate is waived and this hook lets the merge through "
     "(Ezra, 2026-10-16; adversarial-self-review.md "
@@ -282,8 +282,8 @@ def _probed_names(rest):
     rest = _peel_wrappers(rest)
     if not rest or os.path.basename(rest[0]) not in PROBE_WORDS:
         return []
-    args = re.sub(r"(?:^| )2 >>? [^ <>&]+(?= |$)", "", " ".join(rest[1:])).split()
-    if any("<" in a or ">" in a for a in args):  # stdout redirected: paths hidden
+    args = rest[1:]  # any redirect: the tokens cannot tell stderr from stdout
+    if any("<" in a or ">" in a for a in args):
         return []
     if os.path.basename(rest[0]) == "command":
         if not args or args[0] not in ("-v", "-V"):

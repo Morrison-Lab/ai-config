@@ -1225,3 +1225,23 @@ Pattern 34's `\u0061` example and this one's `\u0077` are the same trick.
 - **Do:** author multi-element negative control tests that verify split attributes across different items do not combine to pass.
 - **Don't:** union fields across elements in a list before evaluating multi-attribute predicates.
 
+## Pattern 63: Regex Text Classifiers Shipped Without Their Boundary Cases
+
+- **Mistake**: writing a regex that classifies prose (a sentence, a word, a contrast) and testing only the motivating phrases, so each boundary case surfaces in its own review round.
+- **Example**: see [`mistake-patterns.cases.md`](mistake-patterns.cases.md) Pattern 63 for the 2026-11-11 `check-pr-fully-clean.py` case (PRs #5409, #5416).
+- **Fix**: before the first push, run the boundary list below and mutation-check every alternate.
+- **Do:** exempt abbreviations and single letters when `[.!?]` plus whitespace ends a sentence, and test them.
+- **Do:** check that each word in an in-sentence list that can open a sentence is also in the sentence-opening list.
+- **Do:** give every alternate a test, for example with a loop that generates one case per word in the list.
+- **Do:** use `(?<![^\W_])(?<![^\W_]_)` and `(?![^\W_])(?!_[^\W_])` as word edges when `_emphasis_` must match but `snake_case` must not.
+- **Don't:** hand a regex a fixed-width slice of its input (`text[end:end + 60]`) when a structural break with a cap can bound it.
+- **Don't:** treat a reviewer's clean verdict on the motivating phrases as evidence about the boundaries.
+
+## Pattern 64: Rebutting a Reviewer With an Unmeasured Property
+
+- **Mistake**: answering a reviewer's note about a measurable property (a line length, a count, a runtime) from memory instead of measuring it.
+- **Example**: see [`mistake-patterns.cases.md`](mistake-patterns.cases.md) Pattern 64 for the 2026-11-11 case (PR #5409).
+- **Fix**: measure before replying and quote the output.
+  For line length, `git diff origin/main... | grep -E '^\+\s*#' | awk 'length - 1 > 79'` lists added lines that start with `#` and run past 79 characters.
+- **Do:** measure the property, then reply with the number.
+- **Don't:** decline or rebut a reviewer's length or count note without a command in the transcript that measured it.

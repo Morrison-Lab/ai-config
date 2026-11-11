@@ -19,7 +19,7 @@ claude plugin eval . --ablation with-without --model sonnet --trust-plugin --no-
   A rule that scores the same with and without the plugin is not changing behaviour, whatever its text says.
 - `--runs 1` is enough for a smoke check.
   Leave the default of 3 when comparing before and after an edit.
-- `--tag rule` runs one group from the table under Cases.
+- `--tag trigger` (or `negative`, `rule`) runs one group, and `--tag skill` runs the trigger and negative cases together.
 - `--case <glob>` takes one glob;
   repeating the flag keeps only the last one, so use a tag or a wider glob to run several cases.
 - Runs use the subscription the CLI is signed in with.
@@ -33,6 +33,8 @@ Each case is `evals/<name>/prompt.md` (frontmatter plus prompt) and one or more 
 
 | Group | Cases | What it measures |
 |---|---|---|
+| `trigger` | `trigger-find-ai-tells` | The request loads the skill it should. |
+| `negative` | `no-trigger-find-ai-tells` | A nearby but out-of-scope request does not load the skill, and still gets answered. |
 | `rule` | `authorship-marker` | An `AGENTS.md` rule shows up in the output. |
 | `skill` | `agent-builder-omit-claudemd`, `agent-builder-keep-claudemd` | `agent-builder` sets `omitClaudeMd: true` on a brief-only worker and leaves it off an agent that applies a repository's conventions. |
 
@@ -45,6 +47,8 @@ One run per arm, Sonnet, each row at the commit that added its case (all 2026-11
 | `authorship-marker` | 1 | 0 | The rule changes behaviour. |
 | `agent-builder-omit-claudemd` | 1 | 0 | The skill changes behaviour. |
 | `agent-builder-keep-claudemd` | 1 | 1 | Negative twin; with no plugin, nothing suggests the field at all. |
+| `trigger-find-ai-tells` | 1 | 0 | |
+| `no-trigger-find-ai-tells` | 1 | 1 | The base model already passes; this case guards against regressions. |
 
 One run is a smoke check, not a measurement of rates;
 use `--runs 3` or more before drawing conclusions from a difference.

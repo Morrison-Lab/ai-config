@@ -50,10 +50,13 @@ A fetch that returns as many issues as `--limit` (1000 by default) stops the run
 
 In ai-config, `.github/workflows/triage-backlog.yml` runs this mode every Monday at 07:00 UTC, and on a manual dispatch.
 It passes `--ceiling` only when the repository variable `ISSUE_CEILING` is set.
-The plan, one row per issue with its priority and reason, goes to the run's log, and the counts go to the run's job summary, on a failed run too.
-A real run prints no label commands.
+The plan, one row per issue with its priority and reason, goes to the run's log, and the counts go to the run's job summary.
+A run that fails before it counts puts its error in the job summary instead.
+A real run prints no label commands, only what `gh` prints for each edit.
 A manual dispatch with `dry-run` checked prints each label command in the log after the plan, without running it.
+A run over the ceiling stays green and carries a warning annotation with the ceiling line.
 The labels `P1`, `P2` and `P3` must already exist in the repository, because the script adds labels and creates none.
+The workflow checks for them first and stops before any edit when one is missing.
 Other repositories have no scheduled pass until the reusable workflow in ai-config#3147 exists.
 
 - **Do:** pass `--labels-only` in any run that no reader reviews before it applies.

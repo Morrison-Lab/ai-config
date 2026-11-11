@@ -1,6 +1,6 @@
 ---
 name: agent-builder-omit-claudemd
-tags: [skill]
+tags: [skill-output]
 max_turns: 12
 allowed_tools: [Read, Glob, Grep, Skill]
 ---

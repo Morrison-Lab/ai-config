@@ -1988,6 +1988,18 @@
         ]
       },
       {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-field-unsafe-merge-runs.py\"",
+            "timeout": 10,
+            "script": "no-field-unsafe-merge-runs.py",
+            "why": "ai-config#2918: the docx skill's merge_runs.py merges a field code's begin/instrText/separate/result/end runs into one run, which deletes or moves Zotero, Mendeley and EndNote citations, cross-references and HYPERLINK fields, and looks like the agent's own edit. Denies running it directly and names scripts/docx-merge-runs-field-safe.py, which runs the same script with field-marker runs kept apart. ALLOW_FIELD_UNSAFE_MERGE_RUNS=1 as a prefix allows the diagnostic run on a throwaway copy that memories/office-open-xml.md describes."
+          }
+        ]
+      },
+      {
         "matcher": "mcp__.*mail.*|mcp__.*Mail.*",
         "hooks": [
           {

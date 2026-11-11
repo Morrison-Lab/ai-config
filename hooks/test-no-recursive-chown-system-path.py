@@ -317,6 +317,20 @@ class Denies(unittest.TestCase):
         self.assert_denied('while [ ! -d .git ] && [ "$PWD" != / ]; do cd ..; done; '
                            'chmod -R u+w .')
         self.assert_denied("until [ -d .git ]; do cd ../..; done; chown -R me .")
+        self.assert_denied("until cd ..; do :; done; chmod -R u+w .", cwd=HOME + "/a/b")
+        for cmd in ('while [ ! -d .git ]; do cd "$PWD/.."; done; chmod -R u+w .',
+                    "while [ ! -d .git ]; do cd ./..; done; chmod -R u+w ."):
+            self.assert_denied(cmd, cwd=HOME + "/a/b")
+        # Outside home, only reaching / is protected; deep, past the budget.
+        self.assert_denied("while [ ! -d .git ]; do cd ..; done; chmod -R u+w .", cwd="/app/x")
+        self.assert_denied("while [ ! -d .git ]; do cd ..; done; chmod -R u+w .",
+                           cwd="/app/" + "/".join("abcdefghijklmnopqrst"))
+
+    def test_cd_to_an_unset_variable_may_go_home(self):
+        for cmd in ('cd $UNSET_D && chmod -R u+w "$PWD"', "cd $UNSET_D && chmod -R u+w ."):
+            self.assert_denied(cmd, cwd=HOME + "/proj")
+        # From home, either way it stays home.
+        self.assert_denied('cd "$UNSET_D"; X=$PWD; chown -R me "$X"', cwd=HOME)
 
     def test_pwd_name_used_with_a_suffix(self):
         for cmd in ('if [ -d sub ]; then cd sub; fi; X=$PWD; chown -R me "$X/.."',
@@ -333,11 +347,19 @@ class Denies(unittest.TestCase):
                     "(cd /tmp && ls); sh -c 'chown -R me .'",
                     "(cd /tmp && ls -c); sh -c 'chown -R me .'",
                     "(cd /tmp && echo $(true)); sh -c 'chown -R me .'",
-                    "cd proj; cd ..; sh -c 'chown -R me .'"):
+                    "cd proj; cd ..; sh -c 'chown -R me .'",
+                    "OUT=$(sudo chmod -R u+w . 2>&1); cd build; tar -czf a.tgz .",
+                    "X=$(chmod -R u+w .); cd /tmp; Y=$(date)",
+                    "sh -c 'cd /tmp; ls $(echo)'; sh -c 'chown -R me .'"):
             self.assert_denied(cmd, cwd=HOME)
 
     def test_indirection_with_a_check(self):
-        self.assert_denied('chown -R me "${!?}"')
+        for cmd in ('chown -R me "${!?}"', 'chown -R me "${#?}"', 'chown -R me "/${#-}"'):
+            self.assert_denied(cmd)
+
+    def test_nested_text_in_a_later_world(self):
+        self.assert_denied('if [ -d sub ]; then cd ..; fi; X=$PWD; bash -c "chmod -R u+w $X"',
+                           cwd=HOME + "/proj")
 
     def test_refusal_quotes_pwd_substitution_as_written(self):
         reason = run('sudo chown -R "$USER" "$(pwd)"', cwd=HOME)["permissionDecisionReason"]
@@ -481,7 +503,7 @@ class Allows(unittest.TestCase):
 
     def test_pwd_after_a_cd_this_cannot_resolve(self):
         # Limit pins: `$PWD` there is read like `.` there, taken as empty.
-        for cmd in ('cd "$UNSET_D"; X=$PWD; chown -R me "$X"', 'cd -; chown -R me "$PWD"',
+        for cmd in ('cd -; X=$PWD; chown -R me "$X"', 'cd -; chown -R me "$PWD"',
                     'cd "$(git rev-parse --show-toplevel)" && chmod -R u+w "$PWD"',
                     'cd "$(git rev-parse --show-toplevel)" && chmod -R u+w "$PWD/build"'):
             self.assert_allowed(cmd, cwd=HOME)

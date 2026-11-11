@@ -54,7 +54,9 @@ comments is lifted out before the command is split, scanned as a command of
 its own, and taken as empty, except a bare `pwd`, read as `$PWD`. A `sh -c`
 text or a substitution is read where it appears, in the directory and with
 the names of each way the command may run up to there, to MAX_NESTED
-levels. A `cd ..` repeated by a loop is judged in every directory above.
+levels. A `cd` up the tree repeated by a loop (`cd ..`) is judged in every
+directory above, and `cd $UNSET` both where it is and at home (bash goes home
+when the variable is unquoted).
 
 A deny, not a warning: the remedy (fix the one path that raised the error, as
 your own user) is always available, and the damage is unrecoverable without a
@@ -79,9 +81,10 @@ protected path (`/et*`, `/{etc,usr}`), a wrapper that changes directory
 run (the directory is then unknown), a nested text read after MAX_WORK
 commands (read once, with no directory), PowerShell `icacls`/`Set-Acl`, Windows drive
 paths (`C:/Windows`), a relative target, `$PWD`, or a name assigned from
-`$PWD`, after a `cd` this cannot resolve (`cd -` or `cd "$UNSET"`, where
-`$PWD` is taken as empty), a `cd` into a subdirectory repeated by a loop
-(read as run once), a `cd` that fails or follows `&&` or
+`$PWD`, after a `cd` this cannot resolve (`cd -` or `cd "$(git rev-parse
+--show-toplevel)"`, where `$PWD` is taken as empty), a `cd` into a subdirectory repeated by a loop
+(read as run once), a command before a `cd` in the same loop body (judged
+only where the loop starts), a `cd` that fails or follows `&&` or
 `||` (read as run), an assignment that may not run
 (`false && D=./x` or `if false; then : "${D:=./x}"; fi`, each read as run), a
 `${D:=x}` assignment inside `sh -c` or a substitution, an assignment in a
@@ -629,10 +632,9 @@ def _shown(text):
     return text.replace(SUB, "$(...)").replace(PWD_SUB, "$(pwd)")
 
 
-def _only_up(target):
-    """Whether TARGET is made only of `..` steps (`..`, `../..`)."""
-    parts = [p for p in target.split("/") if p]
-    return bool(parts) and all(p == ".." for p in parts)
+def _above(path, here):
+    """Whether PATH is a directory above HERE."""
+    return path != here and (path == "/" or here.startswith(path.rstrip("/") + "/"))
 
 
 def _ancestors(path):
@@ -734,13 +736,20 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
                 unknown = None in cd_words or any(SUB in tok for tok in lead) or here is None
                 new = None if unknown else resolve_cd_target(cd_words, here)
                 news, fork = [new], maybe
-                if looped and new and cd_words[1:] and _only_up(cd_words[-1]):
-                    news, fork = _ancestors(here), True
+                if lead[0] == "cd" and here and got == [("", True)] and SUB not in lead[1]:
+                    # `cd $UNSET` goes home unquoted and stays put quoted, and
+                    # the quotes are gone by now: both may happen.
+                    news, fork, new = [home], True, here
+                elif looped and new and here and _above(new, here):
+                    # Repeated, an up-move may reach every directory above.
+                    news, fork = _ancestors(here)[::-1], True
                 news = [n for n in news if n != here]
                 room = MAX_WORLDS - len(worlds) - len(forked)
-                if fork and news and len(news) <= room:
+                if fork and news and room > 0:
+                    # Past the budget, the farthest directories above are kept.
                     forked.extend(({**heres, scope: n},
-                                   {k: dict(v) for k, v in assigns.items()}) for n in news)
+                                   {k: dict(v) for k, v in assigns.items()})
+                                  for n in news[:room])
                     continue  # this world keeps the directory before the `cd`
                 heres[scope] = None if fork and news else new
                 continue

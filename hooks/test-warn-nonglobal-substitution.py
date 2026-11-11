@@ -27,7 +27,8 @@ import tempfile
 # gets the shared splitter on `PYTHONPATH` (ai-config#3178).
 SHELLCMD_LIB = os.path.join(os.path.dirname(os.path.dirname(
     os.path.realpath(__file__))), "scripts", "lib")
-HOOK_ENV = dict(os.environ, PYTHONPATH=SHELLCMD_LIB)
+HOOK_ENV = dict(os.environ, PYTHONPATH=os.pathsep.join(
+    p for p in (SHELLCMD_LIB, os.environ.get("PYTHONPATH")) if p))
 
 HOOK = os.path.realpath(sys.argv[1])
 

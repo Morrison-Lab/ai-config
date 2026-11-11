@@ -221,3 +221,8 @@ See [`review-rendered-documents`](../../shared/workflow/review-rendered-document
 On a diff that adds or changes a rule or a skill whose behaviour one prompt can show, check that it adds or updates a case under `evals/`, and that every trigger case has a negative twin.
 Check each new grader for a reply that would pass it without the behaviour it names.
 See [`evals/README.md`](../../evals/README.md#adding-a-case).
+
+## Actions taken on third-party content
+
+On a skill, hook, or workflow that reads issues, comments, web pages, or logs and then acts, check that each action traces to the user's request rather than to the content read.
+See [`untrusted-content-is-data`](../../shared/workflow/untrusted-content-is-data.md).

@@ -139,6 +139,7 @@ APP_TREES = ("/var/lib", "/var/log", "/var/spool")
 VAR_CORE = {"dpkg", "apt", "rpm", "dnf", "yum", "pacman", "systemd", "sudo",
             "polkit-1", "PackageKit", "ucf"}
 ASSIGNMENT = re.compile(r"\A[A-Za-z_][A-Za-z0-9_]*=")
+NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 SUB = "__AICFG_CMDSUB__"  # a lifted command substitution (see `_lift`)
 # The start of a variable: `${NAME` (closed by its matching brace, found by
 # `_brace_pairs`), `$NAME`, or a lifted substitution.
@@ -399,7 +400,9 @@ def _assignments(argv, store, visible, home, here):
     """
     words = argv
     if argv and argv[0] in DECLARE_BUILTINS:
-        words = [w for w in argv[1:] if not w.startswith(("-", "+"))]
+        # Flags, and bare names (`export d=/etc PATH`), assign nothing new.
+        words = [w for w in argv[1:]
+                 if not w.startswith(("-", "+")) and not NAME.fullmatch(w)]
     if not words or not all(ASSIGNMENT.match(w) for w in words):
         return False
     for word in words:

@@ -177,6 +177,9 @@ class Denies(unittest.TestCase):
         self.assert_denied("env --split-string='sudo chmod -R 777 /usr'")
         self.assert_denied('env -S "sudo -u root" chown -R me /etc')
 
+    def test_export_with_a_bare_name(self):
+        self.assert_denied('export d=/etc PATH; chown -R me "$d"')
+
     def test_default_nested_three_deep(self):
         self.assert_denied('chown -R me "${A:-${B:-${HOME}}}"')
 

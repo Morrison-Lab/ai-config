@@ -22,6 +22,9 @@ Measured 2026-08-23/24:
   The same command that failed twice bare ran to completion wrapped,
   repeatedly.
   A retry after a short wait also sometimes clears it.
+- **It is not a permission problem.**
+  On 2026-08-22 the global and project opencode configs both already allowed all bash and external directories.
+  The stops traced to this bug, one manual reject and user interrupts.
 
 ## The PowerShell-5.1 layer
 
@@ -41,6 +44,7 @@ Each observed once:
   cmd's quoting layer (`'###' is not recognized...`),
   so keep GitHub-body and jq payloads in temp files (`--body-file`) rather
   than inline strings.
+  The same goes for commit messages (`git commit -F <file>`).
 
 ## Do / Don't
 

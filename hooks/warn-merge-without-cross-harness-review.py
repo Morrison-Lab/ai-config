@@ -123,7 +123,7 @@ NEEDS_ATTEMPT = frozenset({"opencode"})
 # curl options whose next word is a value, never the request URL.
 CURL_VALUE_OPTS = frozenset({
     "-d", "-F", "-sd", "-sF", "--data", "--data-binary", "--data-raw",
-    "--data-urlencode", "--form", "--json", "-H", "--header", "-e",
+    "--data-urlencode", "--form", "--form-string", "--json", "-H", "--header", "-e",
     "--referer", "-o", "--output", "-x", "--proxy", "-u", "--user",
 })
 # The probe word itself was missing (`which` not installed): no evidence.
@@ -245,8 +245,8 @@ def _curl_route(rest):
                 "-G", "--get", "-I", "--head"):
             return None
     for i, arg in enumerate(args):
-        # A URL that is an option's value (`-d 'https://...'`) is not the target.
-        if "://" not in arg or (i and args[i - 1] in CURL_VALUE_OPTS):
+        # Only a bare URL word is the target, never an option value (`-d URL`, `--form-string URL`).
+        if not arg.lower().startswith(("http://", "https://")) or (i and args[i - 1] in CURL_VALUE_OPTS):
             continue
         try:
             parts = urllib.parse.urlsplit(arg)

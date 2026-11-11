@@ -405,7 +405,7 @@ def main():
                                " https://api.ollama.com/api/chat" % form)])[0])
     check("warns when the Ollama URL is only the data payload",
           run(MERGE, [step("curl -sS https://example.com"
-                           " -d https://api.ollama.com/api/chat")])[0])
+                           " -d https://api.ollama.com/api/chat")])[0] and run(MERGE, [step("curl --form-string https://api.ollama.com/api/chat https://example.com")])[0])
     check("silent after an explicit -X POST to Ollama Cloud",
           not run(MERGE, [step("curl -sS -X POST https://api.ollama.com/api/chat"
                                " -d @req.json")])[0])

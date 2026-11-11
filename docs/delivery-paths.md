@@ -29,9 +29,11 @@ Status as of 2026-11-11.
   A plugin has no slot for `AGENTS.md` or `CLAUDE.md`, which is why `inject-core-rules.py` names them at session start ([#4206](https://github.com/Morrison-Lab/ai-config/issues/4206)).
 - **A plugin update reaches the next session, not the running one.**
   Claude Code runs a plugin's hooks from the pinned cache snapshot it started with, so a refreshed pin takes effect only after a restart.
-- **The local freshness check does not fetch.**
-  `warn-stale-plugin-pin.py` compares the pin with the local marketplace clone, and the clone can itself be weeks behind `origin/main` ([#3149](https://github.com/Morrison-Lab/ai-config/issues/3149), [#3437](https://github.com/Morrison-Lab/ai-config/issues/3437)).
-  A check against `origin/main` is step 2 of #5309 ([#3589](https://github.com/Morrison-Lab/ai-config/issues/3589)).
+- **The local freshness check warns but does not update.**
+  `warn-stale-plugin-pin.py` compares the pin with the local marketplace clone and with the tip of origin's default branch, which it reads with `git ls-remote` rather than a fetch, since the clone can itself be weeks behind ([#3149](https://github.com/Morrison-Lab/ai-config/issues/3149), [#3437](https://github.com/Morrison-Lab/ai-config/issues/3437)).
+  In a cloud container it skips the origin read for the user-scope pin, which `refresh-stale-plugin-pin-cloud.py` updates itself unless `AI_CONFIG_NO_AUTO_REFRESH` is set.
+  It skips the read everywhere when `AI_CONFIG_NO_REMOTE_CHECK` is `1`.
+  It does not see hook copies that a leftover path registers ([#3589](https://github.com/Morrison-Lab/ai-config/issues/3589)).
 - **A repository's own `SessionStart` hook does not run in a session that opens several repositories.**
   [#5280](https://github.com/Morrison-Lab/ai-config/issues/5280) measured this with lds's render-toolchain hook.
   A repository hook that installs the plugin, such as rme's `install-ai-config.sh`, has the same limit, so the supported cloud path is the Setup script, which runs however many repositories a session opens, and such a hook is only its fallback.

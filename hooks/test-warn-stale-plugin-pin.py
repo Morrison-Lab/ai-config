@@ -20,6 +20,17 @@ Builds a fake `~/.claude/plugins` (a three-commit marketplace clone plus an
   8. Malformed installed_plugins.json: exit 0, nothing on stdout, stderr
      names the file.
   9. No marketplace clone: exit 0, nothing on stdout, stderr says so.
+
+With a bare repository as the clone's `origin` (ai-config#5309 step 2):
+
+  10. Origin ahead of the clone, pin at the clone's HEAD: warns that the
+      clone has not been updated, naming origin's tip.
+  11. Pin at origin's tip, clone behind it: silent.
+  12. Pin behind the clone, clone behind origin: warns with the count and
+      says the clone itself lags origin.
+  13. Case 10 with AI_CONFIG_NO_REMOTE_CHECK=1: silent.
+  14. Case 10 with CLAUDE_CODE_REMOTE=true: silent.
+  15. Origin unreachable: falls back to the clone, says so on stderr.
 """
 import json
 import os
@@ -66,12 +77,15 @@ def make_root(tmp):
     return root, shas
 
 
-def run(root, record, cwd):
+def run(root, record, cwd, **extra):
     if record is not None:
         path = root / "installed_plugins.json"
         path.write_text(record if isinstance(record, str) else json.dumps(record), encoding="utf-8")
     env = {**os.environ, "AI_CONFIG_PLUGINS_DIR": str(root)}
-    env.pop("CLAUDE_PROJECT_DIR", None)
+    for name in ("CLAUDE_PROJECT_DIR", "CLAUDE_CODE_REMOTE",
+                 "AI_CONFIG_NO_REMOTE_CHECK"):
+        env.pop(name, None)
+    env.update(extra)
     out = subprocess.run(
         [sys.executable, str(HOOK)], input=json.dumps({"cwd": str(cwd)}),
         capture_output=True, text=True, env=env,
@@ -137,6 +151,43 @@ def main():
         rc, ctx, err = run(root, "{not json", project)
         check("8 malformed record reports on stderr",
               rc == 0 and ctx == "" and "installed_plugins.json" in err, err)
+
+        mkt = root / "marketplaces" / "Morrison-Lab"
+        origin = tmp / "origin.git"
+        subprocess.run(["git", "clone", "-q", "--bare", str(mkt), str(origin)],
+                       check=True, capture_output=True)
+        git(mkt, "remote", "add", "origin", str(origin))
+        work = tmp / "work"
+        subprocess.run(["git", "clone", "-q", str(origin), str(work)],
+                       check=True, capture_output=True)
+        (work / "f").write_text("3", encoding="utf-8")
+        git(work, "commit", "-q", "-am", "c3")
+        git(work, "push", "-q", "origin", "HEAD:main")
+        tip = git(work, "rev-parse", "HEAD")
+
+        rc, ctx, _ = run(root, record({"scope": "user", "gitCommitSha": shas[2]}), project)
+        check("10 clone behind origin warns",
+              rc == 0 and "has not been updated" in ctx and tip[:12] in ctx, ctx)
+
+        rc, ctx, _ = run(root, record({"scope": "user", "gitCommitSha": tip}), project)
+        check("11 pin at origin's tip is silent", rc == 0 and ctx == "", ctx)
+
+        rc, ctx, _ = run(root, record({"scope": "user", "gitCommitSha": shas[0]}), project)
+        check("12 pin and clone both behind",
+              "2 commit(s)" in ctx and "itself lags origin" in ctx, ctx)
+
+        rc, ctx, _ = run(root, record({"scope": "user", "gitCommitSha": shas[2]}), project,
+                         AI_CONFIG_NO_REMOTE_CHECK="1")
+        check("13 opt-out skips the remote read", rc == 0 and ctx == "", ctx)
+
+        rc, ctx, _ = run(root, record({"scope": "user", "gitCommitSha": shas[2]}), project,
+                         CLAUDE_CODE_REMOTE="true")
+        check("14 cloud session skips the remote read", rc == 0 and ctx == "", ctx)
+
+        shutil.rmtree(origin)
+        rc, ctx, err = run(root, record({"scope": "user", "gitCommitSha": shas[2]}), project)
+        check("15 unreachable origin falls back to the clone",
+              rc == 0 and ctx == "" and "compared with the local clone only" in err, err)
 
         shutil.rmtree(root / "marketplaces")
         rc, ctx, err = run(root, record({"scope": "user", "gitCommitSha": shas[0]}), project)

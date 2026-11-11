@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SessionStart: warn when this session's ai-config plugin pin lags the marketplace clone.
+"""SessionStart: warn when this session's ai-config plugin pin lags the marketplace or origin.
 
 WHY THIS EXISTS (ai-config#2439)
 --------------------------------
@@ -24,10 +24,17 @@ Each `ai-config@<marketplace>` entry that applies to this session -- the
 session's directory or an ancestor of it -- against the HEAD of the local
 marketplace clone `~/.claude/plugins/marketplaces/<marketplace>`.
 
-It does not fetch. A session-start hook has a short timeout and may have no
-network, so the clone itself can lag origin; the warning says to update the
-marketplace first for that reason. A clean result therefore means "the pin
-matches the local clone", not "the pin matches origin/main".
+It also reads the tip of origin's default branch with one `git ls-remote`
+in the clone (ai-config#5309 step 2; #3589, #3149). It does not fetch. The
+clone advances only when the marketplace is updated, so in #3149 it was 51
+commits behind origin, and a comparison with the clone alone called a pin
+that matched it current. When origin answers, a pin that is not origin's tip
+is reported even when it matches the clone. When origin does not answer within
+the timeout (no network, no remote), the comparison falls back to the clone
+and says so on stderr. The remote read is skipped in cloud sessions
+(CLAUDE_CODE_REMOTE=true), where `refresh-stale-plugin-pin-cloud.py` updates
+the marketplace and the pin at the same session start, and when
+AI_CONFIG_NO_REMOTE_CHECK=1.
 
 A pin that is AHEAD of the clone (the clone, not the pin, is behind) is
 not reported. A pin cannot warn about itself: this hook runs only from pins
@@ -84,6 +91,7 @@ def git(clone: Path, *args: str, quiet: bool = False) -> str | None:
         out = subprocess.run(
             ["git", "-C", str(clone), *args],
             capture_output=True, text=True, timeout=5,
+            env={**os.environ, "GIT_TERMINAL_PROMPT": "0"},
         )
     except (OSError, subprocess.TimeoutExpired) as err:
         print(f"warn-stale-plugin-pin: git {' '.join(args)} in {clone}: {err}",
@@ -112,6 +120,28 @@ def behind(clone: Path, pin: str, head: str) -> str:
     return f"{count} commit(s)"
 
 
+def origin_tip(clone: Path) -> str | None:
+    """The tip of origin's default branch, or None when it cannot be read."""
+    if (os.environ.get("CLAUDE_CODE_REMOTE") == "true"
+            or os.environ.get("AI_CONFIG_NO_REMOTE_CHECK") == "1"):
+        return None
+    out = git(clone, "ls-remote", "origin", "HEAD", quiet=True)
+    if not out:
+        print(f"warn-stale-plugin-pin: could not read origin's default branch "
+              f"for {clone}; compared with the local clone only",
+              file=sys.stderr)
+        return None
+    return out.split()[0]
+
+
+def clone_lags(clone: Path, head: str, tip: str | None) -> bool:
+    """True when origin's tip is neither the clone's HEAD nor its ancestor."""
+    if tip is None or head == tip:
+        return False
+    return git(clone, "merge-base", "--is-ancestor", tip, head,
+               quiet=True) is None
+
+
 def stale_lines(record: dict, here: Path, root: Path) -> list[str]:
     lines = []
     plugins = record.get("plugins", {})
@@ -129,21 +159,36 @@ def stale_lines(record: dict, here: Path, root: Path) -> list[str]:
             print(f"warn-stale-plugin-pin: no git clone at {clone}; "
                   f"cannot compare {key}", file=sys.stderr)
             continue
+        tip = origin_tip(clone)
+        lagging = clone_lags(clone, head, tip)
         for entry in entries:
             if not isinstance(entry, dict) or not applies(entry, here):
                 continue
             pin = entry.get("gitCommitSha") or ""
-            if pin and pin_is_current(clone, pin, head):
+            if pin and tip and tip.startswith(pin):
+                continue
+            current = bool(pin) and pin_is_current(clone, pin, head)
+            if current and not lagging:
                 continue
             scope = entry.get("scope", "?")
             flag = "" if scope == "user" else f" --scope {scope}"
             where = entry.get("projectPath") or "user scope"
             shown = pin[:12] if pin else "no recorded commit"
+            if current:
+                state = (f"matching the marketplace clone at {head[:12]}, "
+                         f"which has not been updated: origin's default "
+                         f"branch is at {tip[:12]}. ")
+            else:
+                count = (behind(clone, pin, head) if pin
+                         else "an unknown number of commits")
+                state = (f"{count} behind the marketplace clone at "
+                         f"{head[:12]}"
+                         + (f", which itself lags origin at {tip[:12]}. "
+                            if lagging else ". "))
             lines.append(
                 f"- {key}, {scope} scope ({where}): pinned to {shown}, "
-                f"{behind(clone, pin, head) if pin else 'an unknown number of commits'} "
-                f"behind the marketplace clone at {head[:12]}. "
-                f"Run `claude plugin marketplace update {marketplace}`, then "
+                + state
+                + f"Run `claude plugin marketplace update {marketplace}`, then "
                 f"`claude plugin update {key}{flag}`"
                 + ("" if scope == "user" else " from that directory")
                 + "."
@@ -177,7 +222,8 @@ def main() -> int:
         return 0
     text = (
         "STALE PLUGIN PIN (ai-config#2439): this session runs ai-config hooks "
-        "from a cached snapshot older than the local marketplace clone, so "
+        "from a cached snapshot older than the marketplace clone or its "
+        "origin, so "
         "hook fixes merged since then are NOT running here. A guard that "
         "refuses something already fixed on main is most likely this, not a "
         "live bug.\n"

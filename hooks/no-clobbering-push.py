@@ -396,7 +396,8 @@ def _degraded_force_push(command):
 # GIT_VALUE_OPTS, shared with no-unreviewed-pr.py so the two push guards skip
 # the same words before looking for `push` (ai-config#1920).
 
-# The two of those that name a REPOSITORY rather than a directory, plus their
+# The two of those (`--git-dir`, `--work-tree`) that name a REPOSITORY
+# rather than a directory, plus their
 # env spellings. `HEAD` is per-repository as well as per-worktree, so either
 # one makes the directory an answer to the wrong question.
 GIT_REPO_OPTS = {"--git-dir", "--work-tree"}

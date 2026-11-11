@@ -184,10 +184,11 @@ _SHELL_OPS = set("();|&")
 # generic single-step branch handles them. `--exec-path` is NOT here: its
 # value is optional and only ever attached, and a bare `--exec-path` prints
 # the path and exits, so `git --exec-path /x push` pushes nothing.
-# `--config-env k=ENV` does take a separated value. Both measured on git 2.43
-# (ai-config#5391).
+# `--config-env k=ENV` and `--attr-source <tree-ish>` do take a separated
+# value. All three measured on git 2.43 (ai-config#5391, #5392), where
+# `--super-prefix` is an unknown option.
 GIT_VALUE_OPTS = frozenset({"-C", "-c", "--git-dir", "--work-tree",
-                            "--namespace", "--config-env"})
+                            "--namespace", "--config-env", "--attr-source"})
 
 
 def _heredoc_free(command):

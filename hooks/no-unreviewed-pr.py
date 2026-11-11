@@ -109,12 +109,13 @@ try:
         os.path.realpath(__file__))), "scripts", "lib")
     if _LIB not in sys.path:
         sys.path.insert(0, _LIB)
-    from shellcmd import shell_tokens, is_operator_token
+    from shellcmd import shell_tokens, is_operator_token, GIT_VALUE_OPTS
     SHELLCMD_ERROR = None
 except Exception as _exc:  # broken install: degrade, never block
     print(f"no-unreviewed-pr: cannot load scripts/lib/shellcmd.py ({_exc}); "
           "no command will be parsed", file=sys.stderr)
     shell_tokens = is_operator_token = None
+    GIT_VALUE_OPTS = frozenset()
     # `no-push-without-self-review.py` then treats this detector as missing.
     SHELLCMD_ERROR = f"cannot load scripts/lib/shellcmd.py ({_exc})"
 
@@ -984,7 +985,7 @@ def _argv_push(argv):
     i = 1
     while i < len(argv):                 # skip git's own global options
         a = argv[i]
-        if a in ("-C", "-c", "--git-dir", "--work-tree", "--namespace"):
+        if a in GIT_VALUE_OPTS:          # shared with no-clobbering-push
             i += 2
             continue
         if a.startswith("-"):
@@ -1032,7 +1033,7 @@ def _git_subcommand_index(argv):
     i = 1
     while i < len(argv):
         a = argv[i]
-        if a in ("-C", "-c", "--git-dir", "--work-tree", "--namespace"):
+        if a in GIT_VALUE_OPTS:          # shared with no-clobbering-push
             i += 2
             continue
         if a.startswith("-"):

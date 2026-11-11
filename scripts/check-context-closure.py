@@ -29,6 +29,10 @@ Two modes, from ai-config#1028:
      three days old, the same 33 imports had grown +62%, and nothing
      reported it -- the gitlink diff is one line.
 
+Two more came later: `--baseline REV`, the per-PR delta of this repo's own
+closure, and `--merge-result REF`, which measures the tree that merging REF
+into HEAD would produce rather than the working tree (ai-config#4234).
+
 Per `shared/workflow/algorithmatize-checks.md`, "how many bytes does this
 repo load before it starts" is decidable over data already on disk, so it
 belongs in an instrument rather than in anyone's periodic judgment.
@@ -603,7 +607,12 @@ def merge_result_tree(base: Path, ref: str) -> tuple[str | None, str]:
         return None, f"merging {ref} into HEAD conflicts; resolve it first"
     if result.returncode:
         return None, result.stderr.strip() or f"git merge-tree failed on {ref}"
-    return result.stdout.split("\n", 1)[0].strip(), ""
+    tree = result.stdout.split("\n", 1)[0].strip()
+    if not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", tree):
+        # An empty id would make every later `git show :path` read the
+        # INDEX, a measurement of something else that looks like a pass.
+        return None, f"git merge-tree printed no tree id ({tree!r})"
+    return tree, ""
 
 
 def merge_tree_reader(base: Path, tree: str):
@@ -1159,9 +1168,11 @@ def main(argv=None) -> int:
         "--merge-result",
         metavar="REF",
         help="measure the tree that merging REF (e.g. origin/main) into HEAD "
-        "would produce, instead of the working tree, so every gate sees what "
-        "the merge would land now (ai-config#4234). Uncommitted changes are "
-        "not part of that tree.",
+        "would produce, instead of the working tree, so the size caps and the "
+        "import check see what the merge would land now (ai-config#4234). "
+        "Uncommitted changes are not part of that tree; absolute and ~ "
+        "imports are still read from disk. Does not combine with --baseline "
+        "or --compare.",
     )
     parser.add_argument(
         "--max-growth",

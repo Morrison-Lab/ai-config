@@ -44,6 +44,7 @@ Each observed once:
   cmd's quoting layer (`'###' is not recognized...`),
   so keep GitHub-body and jq payloads in temp files (`--body-file`) rather
   than inline strings.
+  The same goes for commit messages (`git commit -F <file>`).
 
 ## Do / Don't
 

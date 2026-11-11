@@ -162,6 +162,12 @@ class Denies(unittest.TestCase):
         self.assert_denied("doas -au chown -R me /etc")
         self.assert_denied("env -Pu chown -R me /etc")
 
+    def test_env_split_string(self):
+        self.assert_denied('env -S "chown -R me /etc"')
+        self.assert_denied('env -iS "chown -R me /etc"')
+        self.assert_denied("env --split-string='sudo chmod -R 777 /usr'")
+        self.assert_denied('env -S "sudo -u root" chown -R me /etc')
+
     def test_default_nested_three_deep(self):
         self.assert_denied('chown -R me "${A:-${B:-${HOME}}}"')
 
@@ -240,6 +246,10 @@ class Allows(unittest.TestCase):
     def test_attached_wrapper_value_then_another_program(self):
         self.assert_allowed("sudo -uroot echo chown -R me /usr")
         self.assert_allowed("sudo -Eu root echo chown -R me /usr")
+
+    def test_env_split_string_runs_another_program(self):
+        self.assert_allowed('env -S "echo chown -R me /etc"')
+        self.assert_allowed('env -S "chown -R me build"')
 
     def test_unclosed_brace_is_left_as_written(self):
         self.assert_allowed('chmod -R 755 "build/${A:-x"')

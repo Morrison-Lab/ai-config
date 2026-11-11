@@ -496,7 +496,8 @@ Whenever starting or working on a Pull Request:
 ## Check the remote immediately before every push
 
 Take a fresh `git ls-remote` reading of the branch immediately before every `git push`, and force only with `--force-with-lease --force-if-includes`, never bare `--force` and never as the answer to a `stale info` refusal.
-`hooks/no-clobbering-push.py` refuses a bare force push and warns on a divergence.
+`hooks/no-clobbering-push.py` refuses a bare force push and warns on a divergence;
+its escape valve `ALLOW_FORCE_PUSH=1` means stating why.
 Detail, the `stale info` diagnosis, and cases: [`shared/workflow/check-before-pushing.md`](shared/workflow/check-before-pushing.md).
 
 ## Keep PR branches synced with main
@@ -676,7 +677,8 @@ rather than a fixed reserve.
 
 ## Checklists: Do-Confirm, Read-Do, pause points, killer items
 
-Where a check is mechanical but no instrument can decide it, the instrument is a **checklist**: add one only for a repeatable, expensive, observable failure, default to Do-Confirm (Read-Do only when order matters or a step is irreversible), fire it at an observable pause point, mark its killer items, and keep it to five to nine items.
+Where a check is mechanical but no instrument can decide it, because it spans several unrelated observations at one moment (a pre-push sweep), the instrument is a **checklist**.
+Add one only for a repeatable, expensive, observable failure, default to Do-Confirm (Read-Do only when order matters or a step is irreversible), fire it at an observable pause point, mark its killer items, and keep it to at most nine items.
 Treat UMS as its revision loop.
 Detail, rationale, and cases: [`shared/workflow/skill-checklists.md`](shared/workflow/skill-checklists.md).
 
@@ -1417,7 +1419,8 @@ Detail, rationale, and cases: [`shared/coding/powershell-cli-safety.md`](shared/
 
 On some transports a doubled `\\` inside a Bash-tool heredoc arrives as a single `\`, even with a quoted delimiter, and it fails silently (a corrupted regex under a green suite).
 Write content with a backslash, backtick, code, or more than a few lines through the Write or Edit tool to a scratchpad file and pass the path;
-where a heredoc is unavoidable, build the character with `chr(92)` and read the result back.
+where a heredoc is unavoidable, build the character with `chr(92)` and print `repr()` of the result.
+The collapse is a property of the environment, so measure yours rather than assuming either answer.
 `hooks/warn-heredoc-doubled-backslash.py` names an offending line (ai-config#1923, #3362).
 Detail, environment measurements, and cases: [`shared/coding/heredoc-backslash-collapse.md`](shared/coding/heredoc-backslash-collapse.md).
 

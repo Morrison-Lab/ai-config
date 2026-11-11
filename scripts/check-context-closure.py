@@ -651,8 +651,8 @@ def merge_tree_reader(base: Path, tree: str):
                     return None
                 return sub(path[len(prefix) :])
         if path in links:  # `git show` prints a symlink's target; follow it
-            target = posixpath.join(posixpath.dirname(path), outer(path).decode("utf-8"))
-            return read(posixpath.normpath(target))
+            target = posixpath.normpath(posixpath.join(posixpath.dirname(path), outer(path).decode()))
+            return read(str((base / target).resolve()) if target.startswith("../") else target)
         return outer(path)
 
     return read, missing_pins

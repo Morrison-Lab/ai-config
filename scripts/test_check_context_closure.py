@@ -1448,7 +1448,7 @@ with tempfile.TemporaryDirectory() as tmp:
     )
     check(
         "--merge-result: the merge with main is over it, and exits 1",
-        ccc.main(common + ["--merge-result", "main"]) == 1,
+        ccc.main(common + ["--merge-result", "main"]) == 1 and git("status", "--porcelain") == "",
     )
     check(
         "--merge-result does not combine with --baseline (exit 2)",

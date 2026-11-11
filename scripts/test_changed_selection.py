@@ -22,8 +22,7 @@ def _load(name, path):
     return module
 
 
-passes = 0
-failures = 0
+passes = failures = 0
 
 
 def check(name, cond):
@@ -103,35 +102,30 @@ def test_test_hooks_selection():
     check("without RLV_CHANGED_FILES every suite runs", th.select_for_change(runnable) == runnable)
 
 
-def test_runner_skips_unaffected_suite_steps():
+def test_runner_hands_over_the_list():
+    """run-local-validation --changed names the changed list to steps; a plain run does not."""
     rlv = _load("run_local_validation_under_test", HERE / "run-local-validation.py")
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         root = _repo(tmp)
-        (root / "scripts" / "test_guard.py").write_text("# checks hooks/guard.py\n", encoding="utf-8")
-        (root / "scripts" / "test_other.py").write_text("# checks hooks/unrelated.py\n", encoding="utf-8")
         wf = root / "wf.yml"
-        wf.write_text("jobs:\n  validate:\n    steps:\n"
-                      "      - name: Guard tests\n        run: python3 scripts/test_guard.py\n"
-                      "      - name: Other tests\n        run: python3 scripts/test_other.py\n"
-                      "      - name: Repo-wide check\n        run: 'true'\n", encoding="utf-8")
+        wf.write_text("jobs:\n  validate:\n    steps:\n      - name: Reads the list\n"
+                      "        run: grep -qx hooks/guard.py \"${RLV_CHANGED_FILES:-/dev/null}\"\n", encoding="utf-8")
         env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
                "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
         subprocess.run(["git", "add", "-A"], cwd=root, check=True)
         subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=root, check=True, env=env)
-        (root / "hooks" / "guard.py").write_text("import helper\n# edited\n", encoding="utf-8")
-        out = io.StringIO()
-        with redirect_stdout(out), redirect_stderr(io.StringIO()):
-            rc = rlv.main(["--workflow", str(wf), "--root", str(root), "--changed", "--base", "main",
-                           "--no-other-workflows", "--list"])
-        text = out.getvalue()
-        check("--changed keeps the suite whose subject changed", rc == 0 and "RUN      [validate] Guard tests" in text)
-        check("--changed skips a suite none of whose inputs changed, with the reason",
-              "SKIP     [validate] Other tests: none of the suite's inputs changed" in text)
-        check("a step that is not a single suite always runs", "RUN      [validate] Repo-wide check" in text)
+        (root / "hooks" / "guard.py").write_text("# edited\n", encoding="utf-8")
+        args = ["--workflow", str(wf), "--root", str(root), "--no-other-workflows"]
+        sink = io.StringIO()
+        with redirect_stdout(sink), redirect_stderr(sink):
+            with_list = rlv.main(args + ["--changed", "--base", "main"])
+            without = rlv.main(args)
+        check("--changed hands the changed list to each step", with_list == 0)
+        check("a run without --changed sets no list (negative control)", without == 1)
 
 
 def main():
-    for test in (test_selector, test_test_hooks_selection, test_runner_skips_unaffected_suite_steps):
+    for test in (test_selector, test_test_hooks_selection, test_runner_hands_over_the_list):
         print(f"running {test.__name__}()", flush=True)
         test()
     print(f"\n{passes} passed, {failures} failed")

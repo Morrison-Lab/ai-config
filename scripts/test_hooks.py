@@ -300,12 +300,9 @@ def run_suites(timeout=None):
 
 
 def select_for_change(runnable):
-    """Keep only the suites a change can affect, when RLV_CHANGED_FILES names one.
+    """Keep only the suites a change can affect, when RLV_CHANGED_FILES names a list.
 
-    scripts/run-local-validation.py --changed writes the changed paths to a
-    file and names it in RLV_CHANGED_FILES (ai-config#5087). CI never sets it,
-    so CI always runs every suite. scripts/lib/changed_selection.py derives
-    each suite's inputs; every skipped suite is counted, never dropped silently.
+    run-local-validation.py --changed sets it (ai-config#5087); CI never does.
     """
     listing = os.environ.get("RLV_CHANGED_FILES")
     if not listing:
@@ -322,9 +319,7 @@ def select_for_change(runnable):
     _SELECTED = len(kept)
     return kept
 
-
-# Suites select_for_change kept, or None when every suite ran.
-_SELECTED = None
+_SELECTED = None  # suites select_for_change kept; None when every suite ran
 
 
 def check_coverage():

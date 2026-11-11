@@ -36,16 +36,14 @@ What it runs, in order:
 
 Which gates apply to which files is derived, not recalled (#3120). Each
 `uses:` job declares its own file scope in the workflow (`with: globs` and
-`with: paths-ignore`), so --changed intersects that scope with the files
-changed since the merge base and reports every gate as SELECTED or SKIPPED
-with the reason. The `validate` job declares no path filter, so its checkers
-are repo-wide and always selected. Its test suites are not: under --changed,
-a `python3 scripts/test_<name>.py` step whose inputs (derived by
-scripts/lib/changed_selection.py from the names and imports in its code) hold
-no changed file is skipped, and scripts/test_hooks.py runs only the hook
-suites the change can affect, reading the list from RLV_CHANGED_FILES
-(#5087). CI always runs everything. A gate is never dropped silently: a run
-that selected two gates and a run that selected five print different plans.
+`with: paths-ignore`), so --changed intersects that scope with
+`git diff --name-only <base>...HEAD` and reports every gate as SELECTED or
+SKIPPED with the reason. The `validate` job declares no path filter in
+validate.yml, so its steps are repo-wide and always selected -- which is what
+CI does too. A gate is never dropped silently: a run that selected two gates
+and a run that selected five print different plans. Under --changed,
+scripts/test_hooks.py runs only the hook suites the change can affect, read
+from RLV_CHANGED_FILES (scripts/lib/changed_selection.py, #5087).
 
 Steps whose name matches --skip (default: the dependency install, which needs
 the network and is already satisfied locally) are skipped and counted.
@@ -449,27 +447,6 @@ def load_workflow(path: Path) -> Dict[str, Any]:
     return doc
 
 
-SUITE_COMMAND = re.compile(r"python3 (scripts/test_[A-Za-z0-9_]+\.py)")
-_SELECTORS: Dict[str, Any] = {}
-
-
-def suite_needed(step: Step, root: Path, changed: List[str]) -> bool:
-    """False only for a one-suite step none of whose inputs changed (#5087).
-
-    A step that is not exactly `python3 scripts/test_<name>.py` is always
-    needed; scripts/test_hooks.py selects its own suites from
-    RLV_CHANGED_FILES instead, so the step itself always runs.
-    """
-    match = SUITE_COMMAND.fullmatch(step.command.strip())
-    if match is None or SLOW_COMMAND.search(step.command):
-        return True
-    if str(root) not in _SELECTORS:
-        sys.path.insert(0, str(ROOT / "scripts"))
-        from lib.changed_selection import Selector
-        _SELECTORS[str(root)] = Selector(root)
-    return _SELECTORS[str(root)].needed([match.group(1)], changed)
-
-
 def run_step(step: Step, root: Path, timeout: Optional[float], tmpdir: Optional[str] = None,
              changed_listing: Optional[str] = None) -> int:
     env = dict(os.environ)
@@ -659,9 +636,6 @@ def main(argv: Optional[List[str]] = None) -> int:
             if s.globs and not any(matches_scope(f, s.globs, s.paths_ignore) for f in changed):
                 skipped = True
                 reason = "no scoped files changed"
-            elif not suite_needed(s, root, changed):
-                skipped = True
-                reason = "none of the suite's inputs changed (scripts/lib/changed_selection.py)"
 
         if not skipped and s.requires:
             if args.list:

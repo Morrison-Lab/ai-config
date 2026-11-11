@@ -1,25 +1,12 @@
-"""Decide whether a test suite needs to run, given the files a change touched.
+"""Decide whether a test suite needs to run, given the files a change touched (ai-config#5087).
 
-ai-config#5087: a pre-push run in a cloud container spent over 500 s on the
-hook suites whatever the diff touched. A suite has to run when a changed file
-is one of its inputs, and no suite declares its inputs (#3533), so they are
-derived from the code:
-
-1. the seeds (a test and its subject) and every file whose name they mention,
-   as a whole token: a file name such as `check-links.py` or `hooks.json`, or a
-   Python module's bare stem such as `agent_notice`;
-2. then every Python module those files import, followed transitively.
-
-Mentions are followed one level only. Followed further, comments that name
-other scripts pulled most of the tree into every suite (measured 2026-11-11:
-a median of 1127 of 1647 files, so a one-hook change selected 155 of 193
-suites); imports carry the real code dependencies and are followed all the
-way.
-
-What the derivation cannot see is a file reached by a computed path (a glob,
-a string built at run time). A change under ALWAYS_RUN selects every suite,
-and CI runs every suite regardless, so a selection made here only orders the
-local work; it never replaces the CI gate.
+A suite's inputs are derived from the code, since no suite declares them (#3533):
+the seeds (a test and its subject), every file whose name or module stem they
+mention as a whole token, and every Python module those import, transitively.
+Mentions are followed one level only: followed further, comments naming other
+scripts pulled a median of 1127 of 1647 files into every suite (2026-11-11).
+A file reached by a computed path is invisible here, so a change under
+ALWAYS_RUN selects every suite, and CI always runs every suite.
 """
 from __future__ import annotations
 
@@ -31,13 +18,8 @@ from typing import Dict, Iterable, List, Optional, Set
 
 # A change under one of these selects every suite: shared code reached by
 # path arithmetic, the hook registry, and the runners themselves.
-ALWAYS_RUN = (
-    "scripts/lib/",
-    "hooks/hooks.json",
-    "scripts/test_hooks.py",
-    "scripts/run-local-validation.py",
-    ".github/workflows/validate.yml",
-)
+ALWAYS_RUN = ("scripts/lib/", "hooks/hooks.json", "scripts/test_hooks.py",
+              "scripts/run-local-validation.py", ".github/workflows/validate.yml")
 _TOKEN = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]*")
 _MODULE_FILE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\.py")
 _TEXT_SUFFIXES = {".py", ".sh"}

@@ -69,6 +69,7 @@ description: <what it audits/detects/scouts>, what it lacks (Edit/Write/Bash)
 tools: Bash, Read, Grep, Glob, WebFetch    # comma-separated STRING, not a
                                             # YAML list (unlike skills'
                                             # `allowed-tools:`)
+omitClaudeMd: true           # for a worker that takes everything from its brief
 ---
 ```
 
@@ -100,6 +101,13 @@ and structure of the three existing agents — they read almost as a template.
   query, source priorities, output shape) inside the agent file itself, the
   same rule `skill-builder`'s subagent-fanning section states for inline
   prompts.
+- **Start a brief-only worker without `CLAUDE.md`.**
+  A subagent loads every `CLAUDE.md` the main session loads unless its definition sets `omitClaudeMd: true`
+  ([Claude Code docs](https://code.claude.com/docs/en/sub-agents.md), "What loads at startup"; needs v2.1.271 or later).
+  Set it on a worker whose prompt and brief carry everything it needs, as the read-only fan-out workers do,
+  so it does not start with the conductor's whole preamble ([ai-config#1499](https://github.com/Morrison-Lab/ai-config/issues/1499)).
+  `hooks/inject-subagent-rules.py` still gives it the core rules.
+  Leave it off an agent that applies a repository's conventions, such as `adversarial-reviewer`, `code-editor` and `prose-editor`.
 - **No registry to update.** Agents are auto-discovered from `.claude/agents/`
   (mirrors skills' auto-discovery from `skills/`) — adding the file is enough
   for the harness to expose it as a `subagent_type`. There is currently no

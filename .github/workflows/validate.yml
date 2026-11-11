@@ -760,7 +760,7 @@ jobs:
       - name: Run check-split-push-blocks tests
         run: python3 scripts/test_check_split_push_blocks.py
   lint-qmd:
-    uses: Morrison-Lab/gha/.github/workflows/lint-qmd.yml@v2
+    uses: Morrison-Lab/gha/.github/workflows/lint-qmd.yml@v3
 
   new-line-breaks:
     # Only a pull_request event supplies a base to diff against. On a push
@@ -884,7 +884,7 @@ jobs:
         continue-on-error: true
 
   lint-markdown:
-    uses: Morrison-Lab/gha/.github/workflows/lint-markdown.yml@v2
+    uses: Morrison-Lab/gha/.github/workflows/lint-markdown.yml@v3
     with:
       config-file: '.markdownlint-cli2.jsonc'
       globs: '*.md'

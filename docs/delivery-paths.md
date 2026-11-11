@@ -34,7 +34,7 @@ Status as of 2026-11-11.
   A check against `origin/main` is step 2 of #5309 ([#3589](https://github.com/Morrison-Lab/ai-config/issues/3589)).
 - **A repository's own `SessionStart` hook does not run in a session that opens several repositories.**
   [#5280](https://github.com/Morrison-Lab/ai-config/issues/5280) measured this with lds's render-toolchain hook.
-  A repository hook that installs the plugin, such as rme's `install-ai-config.sh`, has the same limit, so the cloud path is the Setup script, which runs however many repositories a session opens.
+  A repository hook that installs the plugin, such as rme's `install-ai-config.sh`, has the same limit, so the supported cloud path is the Setup script, which runs however many repositories a session opens, and such a hook is only its fallback.
   The Setup script runs once per container, and `refresh-stale-plugin-pin-cloud.py` keeps the plugin current in the sessions that reuse the container.
 - **The claude.ai account plugin sync has failed since 2026-09-02** ([#3948](https://github.com/Morrison-Lab/ai-config/issues/3948)).
   The cloud path does not depend on it, because the Setup script installs from the marketplace.

@@ -669,6 +669,46 @@ for given, want in (
 check("native_path leaves /c/... alone off Windows",
       shellcmd.native_path("/c/Users/x", False), "/c/Users/x")
 
+# Push-detector parity (ai-config#1920). no-clobbering-push and
+# no-unreviewed-pr each decide whether an argv is a `git push`, and a guard
+# that misses one stays silent. One corpus, three readers, one answer.
+import importlib.util  # noqa: E402
+
+
+def _load_hook(name):
+    path = os.path.join(os.path.dirname(HERE), "hooks", name + ".py")
+    spec = importlib.util.spec_from_file_location(name.replace("-", "_"), path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_clobber = _load_hook("no-clobbering-push")
+_unreviewed = _load_hook("no-unreviewed-pr")
+for argv in (
+    ["git", "push", "origin", "main"],
+    ["git", "-C", "/repo", "push"],
+    ["git", "-c", "push.default=current", "push"],
+    ["git", "--git-dir", "/r/.git", "push"],
+    ["git", "--git-dir=/r/.git", "push"],
+    ["git", "--work-tree", "/r", "push"],
+    ["git", "--namespace", "ns", "push"],
+    ["git", "--exec-path=/x", "push"],
+    ["git", "--no-pager", "push"],
+    ["git", "-C", "push", "status"],
+    ["git", "-c", "push"],
+    ["git", "status"],
+    ["git", "push-it"],
+    ["echo", "git", "push"],
+):
+    via_lib = shellcmd.git_subcommand(argv)
+    want = via_lib is not None and via_lib[0] == "push"
+    check(f"no-clobbering-push reads {argv} as a push",
+          _clobber._push_argv(argv)[0] is not None, want)
+    idx = _unreviewed._git_subcommand_index(argv)
+    check(f"no-unreviewed-pr reads {argv} as a push",
+          idx is not None and argv[idx] == "push", want)
+
 if failures:
     print("FAILED:")
     for line in failures:

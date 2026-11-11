@@ -319,13 +319,13 @@ try:
         sys.path.insert(0, _LIB)
     from shellcmd import (shell_c_expansions, nested_shell_commands,
                           COMMAND_WRAPPERS, native_path, shell_tokens,
-                          is_operator_token)
+                          is_operator_token, GIT_VALUE_OPTS)
 except Exception as _exc:  # broken install: degrade, do not fail open further
     print(f"no-clobbering-push: cannot load scripts/lib/shellcmd.py ({_exc}); "
           f"a force push will be refused unchecked", file=sys.stderr)
     shell_c_expansions = nested_shell_commands = shell_tokens = None
     is_operator_token = None
-    COMMAND_WRAPPERS = frozenset()
+    COMMAND_WRAPPERS = GIT_VALUE_OPTS = frozenset()
 
     def native_path(path, is_windows=None):
         return path  # the pre-helper behaviour: a /c/... path stays unreadable
@@ -392,10 +392,9 @@ def _degraded_force_push(command):
             return True
     return False
 
-# `git`'s own global options that consume the following token, skipped before
-# `push` is looked for so `git -C /repo push` matches.
-GIT_VALUE_OPTS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace",
-                  "--exec-path"}
+# `git`'s global options that consume the following token are shellcmd's
+# GIT_VALUE_OPTS, shared with no-unreviewed-pr.py so the two push guards skip
+# the same words before looking for `push` (ai-config#1920).
 
 # The two of those that name a REPOSITORY rather than a directory, plus their
 # env spellings. `HEAD` is per-repository as well as per-worktree, so either

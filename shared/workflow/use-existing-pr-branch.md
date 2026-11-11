@@ -364,7 +364,8 @@ When a real rejection leaves no branch to push to, the thread:
 
 - tells the coordinator right away, with the PR link, and asks for a merge or permission for another branch;
 - prepares the next batch as a local commit;
-- waits for the PR's merge event, and schedules no check-ins.
+- waits for the PR's merge event, keeping the existing watch on the occupying PR running
+  (the persistent loop in `AGENTS.md`), and arms no further timer for the blocked batch itself.
 
 - **Do:** message the coordinator the moment the branch is blocked, naming the PR.
-- **Don't:** sit idle, or poll on a timer, while the only branch is occupied.
+- **Don't:** sit idle while the only branch is occupied, or arm a second timer for the blocked batch on top of the occupying PR's watch.

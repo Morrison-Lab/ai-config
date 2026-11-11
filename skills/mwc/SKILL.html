@@ -622,8 +622,10 @@ cookieconsent.run({
 <li><code>.claude/**</code></li>
 <li><code>CLAUDE.md</code>, <code>AGENTS.md</code> and <code>GEMINI.md</code>, at any depth</li>
 <li><code>.lintr</code>, <code>.lintr.R</code>, <code>lychee.toml</code>, <code>_typos.toml</code> and <code>inst/WORDLIST</code></li>
+<li><code>tools/check_*</code>, <code>tools/check-*</code> and <code>tools/tests/**</code></li>
+<li>preview and CI helpers under <code>tools/</code>, by name (<code>skip-pdf-in-previews</code>, <code>rerun_timed_out</code>): each changes only what a PR preview or a CI run does, never the published site (ai-config#5293)</li>
 </ul>
-<p>A top-level <code>scripts/</code> is deliberately absent, because in a content repository it can hold analysis code.</p>
+<p>A top-level <code>scripts/</code> is deliberately absent, because in a content repository it can hold analysis code. So are the other <code>tools/</code> files: figure, data and content generators, and build steps that shape the published site. <code>scripts/merge-infra-pr</code> reads this same list from a fresh clone of ai-config’s <code>main</code>, adding only <code>changelog.d/</code>. A change to the list therefore takes effect for the wrapper once it merges, not on its own PR.</p>
 <p>The grant is decided by what the PR changes, so the guard reads the PR’s file list from GitHub (<code>gh api .../pulls/N/files</code>, or direct REST via <code>urllib</code> when <code>gh</code> is not on <code>PATH</code>). It checks every changed path, and a renamed file’s previous path as well, so moving a content file under <code>.github/</code> does not qualify. Every doubt denies:</p>
 <ul>
 <li>no single bare PR number in the command;</li>

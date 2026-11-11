@@ -306,21 +306,12 @@ Each of these was found by a reviewer or a hook, not by the author ([ai-config#5
 - **`scripts/check-github-actions-step-if.py` takes an optional memory-file path, not a workflow path.**
   Given a workflow file, it checks that file for the memory bullet and reports "missing step-if bullet".
   Run it with no argument.
-- **A claim that an edge case is untested is a claim to mutate, not to fix.**
-  A PR's own comment named two "untested edge cases" that the existing suite already caught, and the cases first added for them duplicated it (ai-config#3014, 2026-09-02).
-  - **Do:** mutate the code the claim names and see whether a case fails before adding one.
-  - **Don't:** add a regression case on the strength of a comment that says one is missing.
-- **When a claim appears in several paragraphs, pin it over every one.**
-  A block asserted an exit status "belongs to that later command" while a hedge two sentences later said a `&&` chain may have stopped first, and the overclaim survived three review rounds (ai-config#3024, 2026-09-02).
-  The fix touched one paragraph and left an always-rendered one asserting the same thing.
-  - **Do:** read an unconditional claim followed by a hedge that denies it as a contradiction, and make the test check every paragraph that can carry the claim.
-  - **Don't:** read the hedge as a qualification, or test only the paragraph you edited.
-- **A file-set collision check cannot see semantic supersession.**
-  A draft's `memories/git-worktrees.md` block, flagged only as a conflict risk, would have re-added a claim that a merged PR had refuted.
-  Merging `origin/main` is what showed it (ai-config#3023, 2026-09-02).
-  - **Do:** merge `main` into a long-lived branch and reread each block it adds against what `main` now says.
-  - **Don't:** treat a clean or conflict-only overlap report as evidence the content still holds.
-- **A draft's age says whether it is held or stalled.**
-  A draft read as "a peer is reworking it" had not moved in nine hours while its siblings had moved minutes earlier, so it was stalled and in scope to drive (ai-config#3023, 2026-09-02).
-  - **Do:** compare a draft's `updated_at` with its siblings' before leaving it to a peer.
-  - **Don't:** assume a draft is held because a peer session exists.
+
+## Check a reviewer's reason before repeating it
+
+A commit message on [ai-config#3044](https://github.com/Morrison-Lab/ai-config/pull/3044) kept a reviewer's suggested change and also restated its reason, that GitHub-flavoured Markdown would render the old text wrongly, as fact (2026-09-02).
+The reason was false: CommonMark turns a newline inside a code span into a space, which a CommonMark renderer confirmed.
+The change was still right, so only the stated reason had to go.
+
+- **Do:** check a reviewer's stated reason on its own before writing it into a commit message, PR body or memory.
+- **Don't:** carry a reviewer's justification over as fact because the change it came with was correct.

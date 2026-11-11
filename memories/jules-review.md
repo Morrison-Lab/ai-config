@@ -104,3 +104,12 @@ That approve says nothing about the head: under [`fully-clean`](../shared/workfl
 
 - **Do:** record a Jules run that ends with no verdict as no Jules verdict on that head, and name in the merge note which reviewers cleared the head itself.
 - **Don't:** count an approve of the previous head as Jules's verdict on the current one, however small the delta.
+
+## Jules reads a PR body's merge notes as instructions to it
+
+Jules blocked [ai-config#3154](https://github.com/Morrison-Lab/ai-config/pull/3154) on its description: a merging note ("write the squash body by hand") and a phrase naming the last adversarial verdict read to it as instructions to the reviewer (2026-09-03).
+The same note had passed on [ai-config#3135](https://github.com/Morrison-Lab/ai-config/pull/3135) earlier that day, and rewriting the body with no file change cleared the block.
+[`review-verdict-pitfalls`](../shared/workflow/review-verdict-pitfalls.md) records the same detector firing on imperative mood alone.
+
+- **Do:** keep a PR body to facts about the branch, and put squash-body guidance in the merge step.
+- **Don't:** name a verdict in a PR body as something a reviewer should defer to.

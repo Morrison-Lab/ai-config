@@ -7,8 +7,9 @@ that, so a review on ai-config#4985 caught an unregistered file by reading.
 Whether each file is linked from the index is decidable, so it is an
 instrument rather than a review item (`shared/workflow/algorithmatize-checks.md`).
 
-A file counts as registered when `MEMORY.md` links to it by its bare name,
-`[...](name.md)`. Exit 0 when every `memories/*.md` other than `MEMORY.md` is
+A file counts as registered when a table row of `MEMORY.md` links to it from
+its first cell, `| [...](name.md) |`; a link in prose or in another row's
+cell does not count. Exit 0 when every `memories/*.md` other than `MEMORY.md` is
 registered, 1 when one is not, 2 when the index is missing.
 """
 
@@ -20,12 +21,13 @@ import sys
 from pathlib import Path
 
 INDEX = "MEMORY.md"
-LINK = re.compile(r"\]\(\.?/?([^)#\s/]+\.md)(?:#[^)]*)?\)")
+ROW = re.compile(r"^\|\s*\[[^\]]*\]\(\.?/?([^)#\s/|]+\.md)(?:#[^)]*)?\)\s*\|")
 
 
 def unregistered(memories: Path) -> list[str]:
     """Names of memory files the index does not link to, sorted."""
-    linked = set(LINK.findall((memories / INDEX).read_text(encoding="utf-8")))
+    text = (memories / INDEX).read_text(encoding="utf-8")
+    linked = {m.group(1) for line in text.splitlines() if (m := ROW.match(line))}
     names = sorted(p.name for p in memories.glob("*.md") if p.name != INDEX)
     return [name for name in names if name not in linked]
 

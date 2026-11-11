@@ -29,19 +29,20 @@ def check(name: str, ok: bool) -> None:
 with tempfile.TemporaryDirectory() as tmp:
     mem = Path(tmp)
     (mem / "MEMORY.md").write_text(
-        "| [`a.md`](a.md) | A |\n| [b](./b.md#section) | B |\n", encoding="utf-8"
+        "| [`a.md`](a.md) | A |\n| [b](./b.md#section) | B, see [c](c.md) |\n",
+        encoding="utf-8",
     )
     for name in ["a.md", "b.md", "c.md"]:
         (mem / name).write_text("x\n", encoding="utf-8")
     check("an unregistered file fails", cmi.main(["--memories", tmp]) == 1)
-    check("only the unregistered file is named", cmi.unregistered(mem) == ["c.md"])
+    check("a link in another row's cell is not a row", cmi.unregistered(mem) == ["c.md"])
     (mem / "MEMORY.md").write_text(
         (mem / "MEMORY.md").read_text(encoding="utf-8") + "| [c](c.md) | C |\n",
         encoding="utf-8",
     )
     check("every file registered passes", cmi.main(["--memories", tmp]) == 0)
-    (mem / "MEMORY.md").write_text("mentions c.md in prose only\n", encoding="utf-8")
-    check("a bare mention is not a link", cmi.unregistered(mem) == ["a.md", "b.md", "c.md"])
+    (mem / "MEMORY.md").write_text("Prose links [a](a.md); c.md bare.\n", encoding="utf-8")
+    check("a prose link or bare mention is not a row", cmi.unregistered(mem) == ["a.md", "b.md", "c.md"])
     (mem / "MEMORY.md").unlink()
     check("a missing index exits 2", cmi.main(["--memories", tmp]) == 2)
 

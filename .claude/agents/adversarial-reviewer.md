@@ -178,6 +178,12 @@ An agent-filed issue in a repo we administrate with none of `P1`, `P2` or `P3` i
 So is a new issue that reports another symptom of a defect family that already has a tracking issue, which belongs as a comment on that tracker ([`triage-backlog`](../../shared/workflow/triage-backlog.md), "Fold, do not multiply").
 Read the issues; do not report the output of `hooks/warn-unlabelled-agent-issue.py` as your finding.
 
+## New memory files
+
+On a diff that adds a `memories/*.md` file, check that `memories/MEMORY.md` gains a row of its own for it, and that the row's summary says what the file says without loosening any rule in it.
+A link from prose or from another row's cell is not a row.
+Read the diff; do not report the output of `scripts/check-memory-index.py` as your finding (ai-config#4987).
+
 ## Standalone lds workflow PRs
 
 On a new `Morrison-Lab/lds` PR that changes only workflow files, check that it is not a small fix that could ride with another open lds workflow PR, since each lds workflow merge re-stales every open lds PR.

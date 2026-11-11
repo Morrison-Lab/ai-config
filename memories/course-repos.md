@@ -126,7 +126,7 @@ see [`grep-is-not-coverage.md`](../shared/workflow/grep-is-not-coverage.md)'s "A
 
 When a task needs a book, paper, or other reference that is not in `G:\My Drive\Texts 2` (confirmed by a real, non-truncated search --- see the section above and [`grep-is-not-coverage.md`](../shared/workflow/grep-is-not-coverage.md)'s timeout section before concluding absence), file an access-request issue in the reading-shelf repo (`Morrison-Lab/mlr`) rather than only mentioning the gap in chat.
 
-- **Do:** file one issue per reference, carrying the full citation, its DOI when it has one, where it was searched and when, and the likely access route (a library subscription, a publisher purchase, an author copy) --- labelled `ai-authored` and `model:<id>` per [`label-agent-filed-issues`](../shared/workflow/label-agent-filed-issues.md).
+- **Do:** file one issue per reference, carrying the full citation, its DOI when it has one, where it was searched and when, and the likely access route (a library subscription, a publisher purchase, an author copy) --- labelled `ai-authored`, `model:<id>` and a priority per [`label-agent-filed-issues`](../shared/workflow/label-agent-filed-issues.md).
 - **Don't:** mention the missing reference only in chat, or silently drop it from the task instead of filing it.
 
 (The Do side is the user's, 2026-09-28, verbatim: "whenever there are texts we should get access to, file issues (or other refs)";

@@ -85,7 +85,7 @@ WRAPPERS = (set(COMMAND_WRAPPERS) | {"setsid", "busybox", "pkexec"}
 WRAPPER_POSITIONALS = {"timeout": 1}
 # Each wrapper's short options that take the next word as their value; any
 # other option is a flag, so `sudo -E echo chown` runs echo, not chown.
-WRAPPER_VALUE_OPTIONS = {"sudo": set("ughpCUrtTDR"), "doas": set("uC"), "env": set("uCS"),
+WRAPPER_VALUE_OPTIONS = {"sudo": set("ugpCUrtTDR"), "doas": set("uC"), "env": set("uCS"),
                          "timeout": set("sk"), "nice": {"n"}, "ionice": set("cnp"),
                          "stdbuf": set("ioe")}
 WRAPPER_VALUE_LONG = {"--user", "--group", "--host", "--prompt", "--chdir", "--chroot",

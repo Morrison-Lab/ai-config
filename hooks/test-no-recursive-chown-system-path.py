@@ -154,6 +154,8 @@ class Denies(unittest.TestCase):
         self.assert_denied("sudo -Eu root chown -R me /etc")
         self.assert_denied("sudo -uroot chown -R me /etc")
         self.assert_denied("timeout -sKILL 60 chmod -R 755 /usr")
+        # sudo's `-h` takes a host only when attached (`-hhost`).
+        self.assert_denied("sudo -h chown -R me /etc")
 
     def test_absolute_target_inside_a_nested_shell(self):
         self.assert_denied("cd /tmp && bash -c 'chmod -R 755 /usr'")

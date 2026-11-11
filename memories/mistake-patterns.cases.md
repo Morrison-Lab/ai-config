@@ -302,3 +302,21 @@ So the blanket "do not make this unprompted" blocked a change measurement showed
   `write-all`'s floor equalled the rank scale's maximum, so after a `write-all` baseline no dict key could ever be flagged --- including `id-token: write`, which GitHub's workflow-syntax reference documents as accepting only `write` or `none` (never `read`), so `read-all` provably cannot grant it, and whether `write-all` covers it is documented nowhere.
   `write-all -> {id-token: write}` is a real escalation that the pre-floor code denied correctly and the floor silently allowed, caught by asking what the floor newly permitted rather than by re-running the false positive it was built to fix.
 
+## Pattern 63: Regex Text Classifiers Shipped Without Their Boundary Cases
+
+- **2026-11-11**, PRs [#5409](https://github.com/Morrison-Lab/ai-config/pull/5409) and [#5416](https://github.com/Morrison-Lab/ai-config/pull/5416) (`scripts/check-pr-fully-clean.py`, ai-config#2359, #5401, #5402).
+  Review rounds after the first push each found a boundary the first tests missed:
+  - an abbreviation ("e.g.", "vs.", "Fig.") ended a sentence early, so a later contrast went unread (fail-open, fixed in `6490307d`);
+  - a word in the in-sentence contrast list was missing from the sentence-opening list (fail-open);
+  - `\b` treats `_` as a word character, so `_but_` emphasis slipped past the guard (fail-open, fixed in `747e8727`);
+  - the edge fix then read `handle_except_x` as containing "except" (fail-closed: a clean review read as not clean, fixed in `672ee299`);
+  - the Findings-trailer lead branch had no test, so its mutant survived (fixed in `9bdc3776`);
+  - the callers cut the text 60 characters after the match (fail-open, ai-config#5401).
+
+## Pattern 64: Rebutting a Reviewer With an Unmeasured Property
+
+- **2026-11-11**, PR [#5409](https://github.com/Morrison-Lab/ai-config/pull/5409).
+  The review flagged an over-long comment line as a non-blocking note, and the reply left it as it was without measuring it (now struck through in [this comment](https://github.com/Morrison-Lab/ai-config/pull/5409#issuecomment-6805993548)).
+  The line was 118 characters: commit `6490307d` had joined two comment lines into one.
+  The reply was corrected in place.
+  No hook can tell from a reply's words whether a claim was measured, so ai-config#5411 tracks a length check over changed comment lines instead.

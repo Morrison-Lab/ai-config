@@ -287,6 +287,16 @@ case. Name each test to make the path explicit (e.g. `test_form_up_pre_faces_mar
 Hit on Lacaedemon/sparta#352: the pre-facing block ran for form-up drags too,
 but no test covered that path until the reviewer flagged it.
 
+## Stub every syscall on the path, not only the one under study
+
+A test of `scripts/install-pr-monitor.py`'s stale-daemon stop stubbed only the liveness probe.
+The real `os.kill(SIGTERM)` still fired at a nonexistent pid, so a quiet no-op branch returned before the stub was reached, and the test passed without exercising it.
+The old test had hidden this, because its fake kill swallowed both calls.
+Source: ai-config#2082 (PR #2084, 2026-08-23), folded from that session's notebook.
+
+- **Do:** stub every system call the code path makes, then assert the stub you care about was reached.
+- **Don't:** stub the one call you are studying and trust a green result.
+
 ## Appending to skill/memory files: grep for duplicate sections first
 Before adding a new `##` section to an existing skill or memory file, grep the
 file for the section heading. It's easy to append a section that already exists —

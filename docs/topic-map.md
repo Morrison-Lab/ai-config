@@ -361,6 +361,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/no-cop-out-offers.md` | A **cop-out offer** is a sentence that converts work you have already been authorized to do back into a request for permission. |  |
 | `shared/workflow/no-empty-promises.md` | A promise about my own future behaviour is not work. It is a claim that work will happen later, made in a conversation that will not outlive it. |  |
 | `shared/workflow/no-fable-subagents.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
+| `shared/workflow/no-history-reads-in-shallow-clones.md` | A shallow clone answers history questions wrongly and exits 0. Its cut-off commits, listed in `<common-dir>/shallow`, look parentless, so a walk that reaches... |  |
 | `shared/workflow/no-sweeps-by-default.md` | Ezra, 2026-10-29 (ai-config#4829): "don't sweep new rules unless I explicitly tell you to sweep; by default, just fix incrementally when you are editing a pa... |  |
 | `shared/workflow/notes-pre-review-pass.md` | A notes PR (psw, rme, mds, lds, pds, sds, win, araomm) reaches the maintainer already checked against the notes rules, so he reviews the ideas and not the wo... |  |
 | `shared/workflow/parse-data-files.md` | Parse every data file a change touches with a real parser before calling a PR ready or reporting a head as final: a CSV with a CSV reader (every row's field... |  |

@@ -209,3 +209,11 @@ See [`start-or-file`](../../shared/workflow/start-or-file.md).
 On a diff or a delivered `.docx` produced by an edit that merged runs, check that each field code (a citation, cross-reference or HYPERLINK) still has its own `begin`, `instrText`, `separate` and `end` runs and that the field's text is where it was.
 Read the document; do not report a hook's output as your finding.
 See [`review-rendered-documents`](../../shared/workflow/review-rendered-documents.md#merging-runs-in-a-word-document).
+
+## History read from a shallow clone
+
+On a report, PR or command that deletes, force-pushes or recommends removing a ref, or that claims a branch is merged, unmerged, unrelated to `main`, or "first committed" on a date, check that the transcript shows the clone was confirmed complete (`git rev-parse --is-shallow-repository` printing `false`, or an unshallow fetch) before the read the claim rests on.
+A shallow clone gives a wrong answer with a real SHA and exit 0, so a plausible-looking result is not that evidence.
+Read the transcript and the claim;
+do not report a hook's refusal or silence as your finding.
+See [`no-history-reads-in-shallow-clones`](../../shared/workflow/no-history-reads-in-shallow-clones.md).

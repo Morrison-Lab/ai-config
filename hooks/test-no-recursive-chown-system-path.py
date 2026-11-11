@@ -90,7 +90,24 @@ class Denies(unittest.TestCase):
     def test_variable_set_to_a_system_path(self):
         self.assert_denied('chown -R me "$PREFIX"', env={"PREFIX": "/usr"})
         self.assert_denied('d=/etc; chown -R me "$d"')
-        self.assert_denied('chmod -R 755 "$WORKDIR/build"')  # unset: `/build`
+        self.assert_denied('chown -R me "${PREFIX:-/usr}"')
+
+    def test_command_substitution_unquoted(self):
+        self.assert_denied("sudo chown -R $USER:$(id -gn) /usr")
+        self.assert_denied("chown -R `whoami` /etc")
+        self.assert_denied("echo $(chown -R me /etc)")
+
+    def test_chmod_mode_that_looks_like_an_option(self):
+        self.assert_denied("chmod -R -w /usr")
+        self.assert_denied("chmod -R -x /etc")
+
+    def test_more_system_trees_and_wrappers(self):
+        self.assert_denied("chown -R me /var/log")
+        self.assert_denied("chown -R me ~root")
+        self.assert_denied("sudo -u root -g wheel -H -n -E chown -R me /etc")
+        self.assert_denied("setsid chmod -R 755 /usr")
+        self.assert_denied("chmod -R 755 /usr/local")
+        self.assert_denied("chmod -R 755 /usr/local/lib")
 
 
 class Allows(unittest.TestCase):
@@ -118,6 +135,23 @@ class Allows(unittest.TestCase):
     def test_variable_set_in_the_same_command(self):
         self.assert_allowed('d=$(mktemp -d) && chmod -R 755 "$d/"')
         self.assert_allowed('export OUT=build; chmod -R 755 "$OUT"')
+
+    def test_unset_variable_below_root(self):
+        # `$OUT/dist` with OUT unset is `/dist`: not a reason to refuse.
+        self.assert_allowed('chmod -R 755 "$WORKDIR/build"')
+        self.assert_allowed('chmod -R 755 "${PWD}/dist"')
+
+    def test_user_managed_usr_local(self):
+        self.assert_allowed("sudo chown -R me /usr/local/lib/node_modules")
+        self.assert_allowed("sudo chown -R me /usr/local/Cellar")
+
+    def test_non_string_command(self):
+        buf = io.StringIO()
+        payload = {"tool_name": "Bash", "tool_input": {"command": ["chown", "-R", "/usr"]}}
+        with mock.patch.object(sys, "stdin", io.StringIO(json.dumps(payload))), \
+                redirect_stdout(buf):
+            guard.main()
+        self.assertEqual(buf.getvalue(), "")
 
     def test_empty_operand(self):
         self.assert_allowed('chmod -R 755 "$UNSET_DIR"')

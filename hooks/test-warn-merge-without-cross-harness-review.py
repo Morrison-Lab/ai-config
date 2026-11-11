@@ -369,8 +369,8 @@ def main():
     oc = [probe("curl -sS https://opencode.ai/zen/go/v1/chat/completions"
                 " -d @req.json", out="Exit code 56\ncurl: (56) CONNECT 403")]
     probe_all = [probe("command -v " + clis4)] + oc
-    check("silent after every route was probed and found unrunnable",
-          not run(MERGE, probe_all)[0])
+    check("silent after every route was probed and found unrunnable", not run(MERGE, probe_all)[0]
+          and not run(MERGE, [probe("command -v " + clis4, "\\nExit code 1"), dict(oc[0], out="Command timed out after 2m")])[0])
     check("warns when the probe pass skipped the opencode attempt",
           run(MERGE, probe_all[:1] + [probe("command -v opencode")])[0])
     check("warns when a probe found the CLI installed", run(MERGE, [probe(

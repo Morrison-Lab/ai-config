@@ -49,6 +49,8 @@ BASH_FIRES = [
      'GH_TOKEN=x gh issue create -t x; gh pr create -l ai-authored,P2'),
     ("the labels belong to an issue edit before the create",
      'gh issue edit 3 -l ai-authored,P2; gh issue create -t x'),
+    ("unlabelled create first, a labelled create after it",
+     'gh issue create -t y && gh issue create -t x -l ai-authored,P2'),
     ("unlabelled glab create, the labels on the next command",
      'glab issue create -t x; gh pr create -l ai-authored,P2'),
     ("unlabelled inside a double-quoted command substitution",
@@ -171,6 +173,8 @@ BASH_QUIET = [
      'gh issue create --label "ai-authored, P2" --title "t'),
     ("unbalanced quoting with a single-quoted value",
      "gh issue create --label 'ai-authored,P2' --title \"t"),
+    ("labelled issue create, then a pull request create without labels",
+     'gh issue create -t x -l ai-authored,P2; gh pr create -t y'),
     ("not a create at all", "gh issue list --state all --search 'x'"),
     ("editing labels on an existing issue", 'gh issue edit 12 --add-label ai-authored'),
     ("a PR create", 'gh pr create --title "t" --body "b"'),
@@ -370,6 +374,31 @@ def main() -> int:
         failures += 1
     else:
         print("OK   degrades to the whole-command read without the splitter")
+
+    # Reached through a symbolic link, the hook still finds scripts/lib beside
+    # the real file: it prints no load warning, and it warns for a create
+    # whose labels sit on the next command, which only the splitter can tell.
+    with tempfile.TemporaryDirectory() as tree:
+        link = pathlib.Path(tree) / "warn-unlabelled-agent-issue.py"
+        link.symlink_to(HERE / "warn-unlabelled-agent-issue.py")
+        linked = subprocess.run(
+            [sys.executable, str(link)],
+            input=json.dumps({"tool_name": "Bash", "tool_input": {
+                "command": "gh issue create -t x; gh pr edit 1 --add-label ai-authored,P2"}}),
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    if (
+        "cannot load" in linked.stderr
+        or "ai-authored" not in linked.stdout
+        or linked.returncode != 0
+    ):
+        print("::error::the hook does not load the splitter through a symbolic link",
+              file=sys.stderr)
+        failures += 1
+    else:
+        print("OK   loads the splitter through a symbolic link")
 
     # The message must name both labels and the escape, or it teaches nothing.
     message = guard.evaluate_bash('gh issue create --title "t"')

@@ -82,8 +82,9 @@ those forms — this skill is what it hands off to once memory is the answer.
      it is the registry, so naming the files here too would only go stale.
      When you add a *new* file here (not just a bullet to an existing one),
      register it in `memories/MEMORY.md` as an index entry: a table row of
-     its own whose first cell links to it. `scripts/check-memory-index.py`
-     fails CI on a file with no such row (ai-config#4987).
+     its own whose first cell links to it.
+     `scripts/check-memory-index.py` fails CI on a file with no such row
+     (ai-config#4987).
    - **Conversation-only** → `/memories/session/`
    - When ambiguous between project and general, judge by relevance; default
      to general.

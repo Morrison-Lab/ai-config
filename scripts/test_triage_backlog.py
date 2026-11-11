@@ -46,6 +46,7 @@ FIXTURE = [
     {"number": 12, "title": "Fix bug", "labels": []},
     {"number": 13, "title": "no sacred cows", "labels": []},
     {"number": 14, "title": "ping", "labels": ["P1"]},
+    {"number": 15, "title": "Fix bug", "labels": ["P3"]},
 ]
 
 plan = tb.classify(FIXTURE, {})
@@ -81,6 +82,8 @@ buf = io.StringIO()
 with contextlib.redirect_stdout(buf):
     calls = tb.apply_plan(plan, None, dry_run=True)
 check("dry-run call count skips the already-labelled rows", calls == len(plan) - 2)
+check("a labelled issue with an older title twin is still a duplicate",
+      by[15]["disposition"] == "duplicate" and by[15]["labels"] == ["P3"])
 check("not-planned close carries a reason comment",
       "close 1 --reason not planned --comment Closed by the triage pass: junk title." in buf.getvalue())
 
@@ -90,16 +93,36 @@ buf_lo = io.StringIO()
 with contextlib.redirect_stdout(buf_lo):
     calls_lo = tb.apply_plan(plan, None, dry_run=True, labels_only=True)
 closes = sum(1 for r in plan if r["disposition"] in tb.CLOSE_DISPOSITIONS)
-check("the fixture holds both kinds of close row", closes == 2)
+check("the fixture holds both kinds of close row", closes == 3)
 check("labels-only drops exactly the close rows", calls_lo == calls - closes)
 check("labels-only issues no close command", " close " not in buf_lo.getvalue())
-check("labels-only leaves a close row unlabelled",
-      "edit 1 " not in buf_lo.getvalue() and "edit 8 " not in buf_lo.getvalue())
+close_numbers = [r["number"] for r in plan if r["disposition"] in tb.CLOSE_DISPOSITIONS]
+lo_lines = buf_lo.getvalue().splitlines()
+check("labels-only issues no command for a close row, labelled or not",
+      not any(f" issue edit {n} " in line or f" issue close {n} " in line
+              for n in close_numbers for line in lo_lines))
 check("labels-only still labels", "edit 2 --add-label P1" in buf_lo.getvalue())
 
-check("ceiling report over", tb.ceiling_report(889, 600) == "open issues: 889, over the ceiling of 600 by 289")
+check("ceiling report over",
+      tb.ceiling_report(889, 600)
+      == "open issues at the start of this run: 889, over the ceiling of 600 by 289")
 check("ceiling report at the ceiling is within it",
-      tb.ceiling_report(600, 600) == "open issues: 600, within the ceiling of 600")
+      tb.ceiling_report(600, 600)
+      == "open issues at the start of this run: 600, within the ceiling of 600")
+check("a ceiling of zero is over as soon as one issue is open",
+      "over the ceiling of 0 by 1" in tb.ceiling_report(1, 0))
+
+# A fetch that fills its limit may be truncated, and must not pass as a count.
+try:
+    tb.check_not_truncated(1000, 1000)
+    check("a fetch that fills its limit is refused", False)
+except tb.TruncatedFetch:
+    check("a fetch that fills its limit is refused", True)
+try:
+    tb.check_not_truncated(999, 1000)
+    check("a fetch under its limit passes", True)
+except tb.TruncatedFetch:
+    check("a fetch under its limit passes", False)
 
 # The command line: --labels-only without --apply is refused, and --ceiling
 # reports on stderr without changing the exit status.
@@ -123,7 +146,17 @@ with tempfile.TemporaryDirectory() as tmp:
     )
     check("--ceiling over the bound still exits 0", run.returncode == 0)
     check("--ceiling reports the count on stderr",
-          f"open issues: {len(FIXTURE)}, over the ceiling of 5 by {len(FIXTURE) - 5}" in run.stderr)
+          f"this run: {len(FIXTURE)}, over the ceiling of 5 by {len(FIXTURE) - 5}" in run.stderr)
+    run = subprocess.run(
+        [sys.executable, SCRIPT, "--input", fixture_path, "--ceiling", "-1"],
+        capture_output=True, text=True, timeout=30,
+    )
+    check("a negative --ceiling is a usage error", run.returncode == 2)
+    run = subprocess.run(
+        [sys.executable, SCRIPT, "--input", fixture_path, "--limit", "0"],
+        capture_output=True, text=True, timeout=30,
+    )
+    check("a --limit below 1 is a usage error", run.returncode == 2)
     run = subprocess.run(
         [sys.executable, SCRIPT, "--input", fixture_path,
          "--apply", "--dry-run", "--labels-only"],
@@ -131,7 +164,7 @@ with tempfile.TemporaryDirectory() as tmp:
     )
     check("--apply --dry-run --labels-only exits 0", run.returncode == 0)
     check("it says how many closes it held back",
-          "left 2 proposed closes for the attended pass" in run.stderr)
+          "left 3 proposed closes for the attended pass" in run.stderr)
     check("and prints no close command", " close " not in run.stdout)
 
 check("comment count reads ints", tb.comment_count(3) == 3)

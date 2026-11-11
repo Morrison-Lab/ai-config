@@ -9,6 +9,9 @@ Measured 2026-10-26 13:55 PDT on `cf463-02`: `agy` 1.4.7 at `~/.local/bin/agy`, 
 The XPS also runs it (Argon).
 A cloud session has no `agy`; use `delegate-to-opencode` there.
 `agy` exposes no quota figure (its log has a `quota_manager` but prints no numbers, 2026-10-26), so treat an unexplained failure on every item as possible exhaustion and fall back to Claude, never to a metered API.
+Argon and Gemini 3.8 Flash have separate quotas (Ezra, 2026-11-11: "agy has separate quotas for argon and flash 3.8", [ai-config#5291](https://github.com/Morrison-Lab/ai-config/issues/5291)).
+When Argon returns `RESOURCE_EXHAUSTED`, rerun the same work with `gemini-3.8-flash-medium` through `agy` before calling `agy` unavailable;
+`rf.sh` tries Flash second for this reason.
 
 ## Routing table
 

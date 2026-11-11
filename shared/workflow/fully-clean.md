@@ -32,8 +32,13 @@ and requiring consensus clean verdicts at the current HEAD.
   List runs with `output.annotations_count > 0`, read each through `check-runs/<id>/annotations`, and fix it or state in the PR why it is a false positive.
   `check-pr-fully-clean.py` fails until you rerun it with `--annotations-read <id>[,<id>...]` (or `all`, after reading every run the checker listed;
   GitHub puts a platform notice on every Actions job, so the checker cannot tell a notice you can ignore from a warning you cannot).
+- **Do:** when you compare a head's annotations with the base branch's tip, run `scripts/diff-annotations-vs-base.py --repo <owner/repo> --base <sha> --head <sha>` (ai-config#5281).
+  It reads every page of check runs and annotations on both commits, compares per check-run name after normalizing temp paths, shas and run ids, exits 1 on any difference you have not traced and named with `--explained <run name>`, and exits 2 until every run on both commits has finished.
+- **Don't:** report a bare annotation total, or a total from the first page of `commits/<sha>/check-runs`, as evidence that a head adds nothing (gha#1825 counted 174 against 168 that way, but over every page both had 249).
 - **Do:** substitute a reviewer that is out of quota (Ezra, 2026-11-07, ai-config#5064).
   A Clean verdict on the live head from another reviewer (agy or Claude) fills its slot, so being out of quota is never, by itself, grounds to ask for a manual waiver.
+  Argon's quota is not agy's: Gemini 3.8 Flash has its own (Ezra, 2026-11-11, ai-config#5291),
+  so an Argon `RESOURCE_EXHAUSTED` means rerunning the agy review on Flash, not marking agy out of quota.
   Rerun the checker with `--reviewer-out-of-quota <name>` (for example `copilot`):
   the quota-blocked reviewer's stale not-clean verdict then stops vetoing and a NOTE names the substitute,
   but its not-clean verdict on the live head itself still vetoes.
@@ -2056,3 +2061,15 @@ The PR's timeline shows `review_request_removed` at 06:54:05Z with actor
 `dem-extra1`, the account the session's token acts as, not the maintainer's
 `d-morrison`, so the removal had run before the interruption, and the session's
 next reply wrongly said it would not remove the request.)
+
+## Read the check runs before calling a head final
+
+`hooks/no-final-head-unread-checks.py` ([ai-config#5198](https://github.com/Morrison-Lab/ai-config/issues/5198)) denies a reply that calls a head final when no read of that head's check runs returned without error since the last user turn.
+rme#1450 had `build` still running and ai-config#5186 was reported before its CI was read.
+
+- **Do:** read the check runs live (`get_check_runs`, or `gh api repos/<r>/commits/<sha>/check-runs?per_page=100`), count them against `total_count`, and only then write "final".
+- **Don't:** call a head final from a review verdict, a check-suite wake or an earlier read.
+
+The merge-state read is already owed by the conflict bullets earlier in this file;
+ai-config#5246 skipped it and was reported final at 6c456cc9 while it conflicted with `main` (coordinator, 2026-11-10).
+No hook requires that read yet: extending the hook above to do so is tracked in [ai-config#5252](https://github.com/Morrison-Lab/ai-config/issues/5252).

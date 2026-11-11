@@ -66,3 +66,12 @@ An item that fails on one div is checked on every div of the PR, per the sweep a
 Recurrence: sds#268 (2026-10-17) drew an inline definition at least five times after the first correction, which is why item 5 now names the pattern.
 mds#422 (2026-10-19) stripped `@def-` links and added `<!-- check-term-links: allow -->` to silence `build_dependency_graph.py` forward-reference findings and moved `@def-interval` after its special-case interval definitions instead of reordering the content and defining bounds first.
 [`Morrison-Lab/lds#1237`](https://github.com/Morrison-Lab/lds/pull/1237) (2026-10-20, recorded 2026-10-27 in [`Morrison-Lab/ai-config#4769`](https://github.com/Morrison-Lab/ai-config/issues/4769)) bundled `#def-noise-model`, `#rem-noise-draws`, and `#rem-noise-model` into a single `_def-noise-model.qmd` subfile and pushed with `unlinked-first-use` findings in the diff before a local `check-term-links.py --diff` pass ran.
+
+## Read the psw chapters before editing a page
+
+`hooks/require-psw-rules.py` ([ai-config#5166](https://github.com/Morrison-Lab/ai-config/issues/5166)) denies a write to a notes `.qmd` page until the transcript shows a read of psw's `defining-terms`, `conciseness` and `grammar/relative-pronouns` chapters.
+The reviewer's matching item is in [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md).
+
+- **Do:** read those three chapters before the first edit of a page, so the rules shape the draft.
+- **Don't:** rely on the hook to teach the rules.
+  It only checks that the chapters were opened.

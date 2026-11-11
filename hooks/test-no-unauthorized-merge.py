@@ -1410,6 +1410,17 @@ _infra_case("a rename whose previous path is content", "BLOCK",
 _infra_case("tools/ checkers and their tests are infra", "allow",
             ["tools/check_site.py", "tools/check-links.sh", "tools/tests/test_check_site.py"],
             f"gh pr merge 15 -R Morrison-Lab/pds --match-head-commit {TEST_HEAD_SHA}")
+_infra_case("preview and CI helpers under tools/ are infra", "allow",
+            ["tools/skip-pdf-in-previews.py", "tools/skip_pdf_in_previews.py",
+             "tools/rerun_timed_out.py", "tools/tests/test_skip_pdf_in_previews.py"],
+            f"gh pr merge 15 -R Morrison-Lab/pds --match-head-commit {TEST_HEAD_SHA}")
+_infra_case("a build step that shapes the published site is not infra", "BLOCK",
+            ["tools/build_math_macros.py"], f"gh pr merge 15 -R Morrison-Lab/pds --match-head-commit {TEST_HEAD_SHA}")
+_infra_case("a mixed-separator or nested helper name is not infra", "BLOCK",
+            ["tools/skip_pdf-in_previews.py", "tools/x/rerun_timed_out.py"],
+            f"gh pr merge 15 -R Morrison-Lab/pds --match-head-commit {TEST_HEAD_SHA}")
+_infra_case("agent notes under .claude/ are infra", "allow",
+            [".claude/ci-workflows.md"], f"gh pr merge 15 -R Morrison-Lab/pds --match-head-commit {TEST_HEAD_SHA}")
 _infra_case("a tools/ figure generator is not infra", "BLOCK",
             ["tools/make_figures.py"], f"gh pr merge 15 -R Morrison-Lab/pds --match-head-commit {TEST_HEAD_SHA}")
 _infra_case("a path only resembling a tools/ checker is not infra", "BLOCK",

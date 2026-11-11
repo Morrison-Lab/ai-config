@@ -51,11 +51,29 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
    - Tests covering new branches, error paths, and edge cases --- and whether a passing test would still pass if the code under it were broken.
    - Documentation, manifests, and catalogs still in sync with the implementation.
    - Duplication of something the repo (or a trustworthy upstream) already provides.
+   - Removed content: for each block the diff deletes from a page, find where it reappears (quote the added lines) or the reason the PR states.
+     A removal with neither is a finding, whether or not the content-preservation check passed ([`reorganize-prose`](../../shared/writing/reorganize-prose.md#removed-content-lands-elsewhere-or-is-justified)).
+   - A new algorithmic check (hook, `scripts/check-*.py`, gha workflow) added without a writer instruction and a reviewer instruction for the defect it catches, or one whose instruction only restates the check's name;
+     `scripts/check-check-has-instructions.py` sees added files only, so read the diff for the rest ([`checks-need-writer-and-reviewer-instructions`](../../shared/workflow/checks-need-writer-and-reviewer-instructions.md)).
    - In prose with definition divs, every term or symbol the text gives a meaning to, whether bolded, italicised, or introduced by a "let X be" clause, has its own definition div ([`informal-definitions`](../../shared/writing/informal-definitions.md)).
      Judge by content, not formatting.
      Each definition div defines one quantity,
      and its display shows that quantity rather than a use of it.
      The div and its Source callout hold no example, usage rule or rationale ([`the display must define the term`](../../shared/writing/informal-definitions.md#the-display-must-define-the-term-and-only-the-term)).
+   - In lecture and notes pages (`.qmd` with exercise, definition and result divs), read the diff for these structural defects, whether or not the gha structure checks ran ([`checks-need-writer-and-reviewer-instructions`](../../shared/workflow/checks-need-writer-and-reviewer-instructions.md), [ai-config#5181](https://github.com/Morrison-Lab/ai-config/issues/5181)):
+     - an exercise that has several parts, or that does not end in a question or an instruction;
+     - an exercise instruction that opens with "Write" where the task is to derive, express or show, so two readers answer different questions ([ai-config#5232](https://github.com/Morrison-Lab/ai-config/issues/5232));
+     - a theorem, lemma, corollary or proposition stated in a remark div, or commentary, an example or a usage rule inside a definition div;
+     - a second new term defined inside one definition div, or a term used before its div;
+     - a definition of a term that a site earlier in the course sequence (mcs, mds, pds, sds) already defines, where the page should link that definition instead, so the same term has two statements that can drift apart ([ai-config#5242](https://github.com/Morrison-Lab/ai-config/issues/5242)).
+   - In the same pages, read the diff for these defects in the families the gha checks leave uncovered or unwired ([ai-config#5181](https://github.com/Morrison-Lab/ai-config/issues/5181)):
+     - math written with raw LaTeX where a shared macro names the concept, or a bare `\exp` where the macros redefine it;
+     - a figure with no real `fig-alt`, a matplotlib call without a trailing `;`, or `code-fold: false` on a chunk whose output is the point;
+     - a bracketed citation that should be bare, or the reverse, where the author is not the sentence's subject;
+     - three or more parallel items in running prose instead of a bullet list, or `---` where `{{< slidebreak >}}` belongs;
+     - output typed or pasted into a page instead of produced by a chunk, such as a `# ->` comment under code or a computed number written into a sentence by hand ([ai-config#5241](https://github.com/Morrison-Lab/ai-config/issues/5241));
+     - a worked solution or exercise that reveals an answer to a graded item in the course's assessment repository, even with different numbers;
+     - a Quarto site whose search `keyboard-shortcut` includes a key a browser uses with Ctrl or Cmd, such as `f` for find or `s` for save, so the search box opens over the reader's own command ([ai-config#5238](https://github.com/Morrison-Lab/ai-config/issues/5238)).
    - When you suggest a fix, suggest only fixes that meet the rule behind the finding.
      Never offer a cosmetic option, such as dropping the bold from a hidden definition, as an acceptable alternative ([`no-cheap-fixes`](../../shared/principles/no-cheap-fixes.md)).
 
@@ -91,6 +109,7 @@ Given a review target (typically the branch diff `git diff origin/<default-branc
 
    (For a not-clean verdict, set "verdict": "NOT_CLEAN" and give "findings" one object per finding, each with exactly these four keys: {"file": "<repo-relative path>", "line": <1-indexed int>, "category": "<kebab-case slug>", "message": "<one sentence stating the defect>"}.
    Use those key names literally -- a consumer that cannot find them reports the finding as "structured finding in unknown: ", which names nothing.
+   A finding's line must exist in its file at the reviewed commit: check it against `wc -l` before you report it, since a line past the end quotes nothing ([`quotable-findings`](../../shared/workflow/quotable-findings.md)).
    Any finding listed here blocks, whatever the "verdict" string says, and a CLEAN payload requires an explicit empty "findings" array -- omitting the key does not clear.)
 
    Read that sha yourself rather than taking it from the brief: run `git rev-parse HEAD` in your own worktree, and confirm it resolves with `git rev-parse --verify --quiet <sha>^{commit}` before writing the line.
@@ -137,3 +156,43 @@ Do not run anything that writes, moves, or deletes a file, pushes, or posts.
 Staying read-only is backed by instruction-level discipline and by mechanical PreToolUse hook enforcement (`hooks/no-mutation-in-read-only-reviewer.py`, ai-config#3612).
 Mutating git commands (`checkout`, `commit`, `stash`, `merge`, `reset`, `rebase`, `branch`, etc.) and file write tools are mechanically blocked.
 Report; the authoring session Addresses, Rebuts, or Defers each finding.
+
+## Notes-page prose
+
+On a diff that edits a notes `.qmd` page, check the prose against psw's `defining-terms`, `conciseness` and `relative-pronouns` chapters, even when the hook that requires reading them is absent.
+Look for an unlinked term at first use, filler that adds nothing, and a dropped "that" before a relative clause.
+Read the diff; do not report a script's output as your finding.
+See [`notes-pre-review-pass`](../../shared/workflow/notes-pre-review-pass.md#read-the-psw-chapters-before-editing-a-page).
+
+## Filed issues with no owner
+
+On a diff that adds or changes a rule about who works filed issues, check that no condition lets an unowned P1 or owed follow-up issue wait because some other agent is busy.
+Look for a trigger written as "when no thread is working", "when idle" or "if any agent is active", and ask what happens to a P1 issue filed while a thread is busy.
+Read the diff; do not report the output of `scripts/check-unowned-issues.py` as your finding.
+See [`keep-agent-on-backlog`](../../shared/workflow/keep-agent-on-backlog.md#the-rule).
+
+## Standalone lds workflow PRs
+
+On a new `Morrison-Lab/lds` PR that changes only workflow files, check that it is not a small fix that could ride with another open lds workflow PR, since each lds workflow merge re-stales every open lds PR.
+See [`sync-with-main`](../../shared/workflow/sync-with-main.md).
+This check is prose because no hook yet decides "small workflow fix" from lds PR file lists.
+
+## Final-head claims
+
+On a message or PR comment that calls a head final, check that the transcript or the PR shows a live read of that sha's check runs, every run complete and none failed, beside a Clean review naming that sha.
+A verdict alone is not that evidence.
+See [`fully-clean`](../../shared/workflow/fully-clean.md#read-the-check-runs-before-calling-a-head-final).
+
+## Annotation comparisons
+
+On a message or PR comment that says a head adds no annotations beyond the base branch, check that the comparison read every page of check runs and annotations on both commits and compared them per check-run name.
+A total from one page, or a bare total, is not that evidence.
+See [`fully-clean`](../../shared/workflow/fully-clean.md).
+
+## Work started on a question
+
+On a PR or message made in answer to the user, check whether the request it answers was a whether-or-how question ("should we", "how should we", "is it worth") rather than a declarative instruction.
+If it was, look for the user's answer to a start-now-or-file-for-later question before the work began, and flag the PR when there is none.
+Read the linked issue or quoted request.
+Do not report the reminder hook's output as your finding.
+See [`start-or-file`](../../shared/workflow/start-or-file.md).

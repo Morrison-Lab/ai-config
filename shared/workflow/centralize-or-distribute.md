@@ -16,7 +16,7 @@ Distributing means a copy in each place that uses it.
 Neither is the default: a copy that is never reconciled drifts, and a shared copy adds a dependency and a release step.
 
 - **Do:** before copying a file, a workflow, a script, or a passage into a second place, name where the single copy could live, and say in the issue or PR which you chose and why.
-- **Do:** when you find an existing duplicate, file an issue for centralizing it, as the [`gha`](https://github.com/Morrison-Lab/gha) duplication issues did.
+- **Do:** when you find an existing duplicate, file an issue for centralizing it, as [gha#1796](https://github.com/Morrison-Lab/gha/issues/1796), [gha#1797](https://github.com/Morrison-Lab/gha/issues/1797), [gha#1798](https://github.com/Morrison-Lab/gha/issues/1798) and [gha#1799](https://github.com/Morrison-Lab/gha/issues/1799) did.
 - **Don't:** copy by default because copying is the quickest step.
 - **Don't:** centralize by default when the copies must differ per place.
 

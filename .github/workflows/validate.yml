@@ -108,6 +108,9 @@ jobs:
         run: python3 scripts/test_check_unpinned_git_fixtures.py
       - name: Run check-pr-fully-clean tests
         run: python3 scripts/test_check_pr_fully_clean.py
+      - name: Run diff-annotations-vs-base tests
+        # ai-config#5281: per-name annotation diff over every page.
+        run: python3 scripts/test_diff_annotations_vs_base.py
       - name: Run check-mr-fully-clean tests
         # ai-config#3021: GitLab's equivalent fully-clean merge gate.
         run: python3 scripts/test_check_mr_fully_clean.py
@@ -642,6 +645,9 @@ jobs:
         run: python3 scripts/check-memory-file-size.py --strict
       - name: Run stale-record check tests
         run: python3 scripts/test_check_stale_records.py
+      - name: Run unowned-issue check tests
+        # ai-config#5056: the negative control reports a known unowned P1.
+        run: python3 scripts/test_check_unowned_issues.py
       - name: Run bare-fragment-mention check tests
         # ai-config#3034. The negative control: until the detector has been
         # seen to produce a non-zero, a zero from the corpus scan below is not
@@ -855,6 +861,16 @@ jobs:
         # Exit 2 (git diff failed, or no memory files) fails the job too, so the
         # gate cannot pass without having looked.
         run: python3 scripts/check-owed-mechanism.py --base "${{ github.event.pull_request.base.sha }}"
+      - name: Check a PR that adds a check also adds a writer and a reviewer instruction
+        # ai-config#5174 (defense in depth, ai-config#5171). Diff mode against the
+        # base SHA; exit 2 (diff unreadable) fails the job, so the gate cannot
+        # pass without having looked. The self-test pins each branch, including
+        # that an empty diff passes only as "no check added".
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          python3 scripts/check-check-has-instructions.py --self-test
+          python3 scripts/check-check-has-instructions.py --base "${{ github.event.pull_request.base.sha }}"
       - name: Check added prose for unverifiable citations (advisory)
         # ai-config#3660. Rides this job for its full-history checkout and its
         # pull_request gate. Non-blocking: main() returns 0 whatever it finds,

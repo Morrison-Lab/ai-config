@@ -58,6 +58,19 @@ It missed UC Davis, Kristen Aiemjoy, two cited books, Quarto, GitHub Actions, an
 - **Do:** open each new target URL and confirm it names the entity before linking it.
 - **Don't:** search only for other mentions of the term the user named and report the page done.
 
+## Link the maximal phrase
+
+When a link explains or supports a claim, make the whole claim the link text, not one word of it and not a trailing pointer (Ezra, 2026-11-10: "as always, link the maximal phrase").
+The maximal phrase is the longest clause or sentence that the target actually explains.
+Links cannot nest, so term links inside the claim are dropped in favor of the one link on the claim.
+
+- **Do:** link `[it measures the average number of bits per symbol needed to encode a source with a code designed for another distribution](https://morrison-lab.github.io/ids/source-coding.html#thm-wrong-code)`, the whole claim the page explains.
+- **Don't:** link one word of that clause, or leave the claim unlinked and add "The coding theorems behind these statements are in Source Coding" two paragraphs later.
+
+Observed on a private `Morrison-Lab/lds` chapter, `_cross-entropy-origin.qmd`, 2026-11-10 ([Morrison-Lab/lds#2271](https://github.com/Morrison-Lab/lds/issues/2271)).
+No mechanism can decide which clause a target explains, so this is a writer and reviewer instruction only:
+a writer links the whole claim, and a reviewer checks each link text against the claim it supports.
+
 ## Link a term where the sentence names it, not in a trailing parenthetical
 
 A list of definition links after the sentence --- "(definitions: bias, variance, irreducible error)" --- makes the reader find each term twice, once in the sentence and once in the list.

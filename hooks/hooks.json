@@ -108,6 +108,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-start-or-file-on-question.py\"",
+            "timeout": 10,
+            "script": "remind-start-or-file-on-question.py",
+            "why": "Ezra 2026-11-10 (ai-config#5287): a whether-or-how question gets a recommendation and a start-now-or-file-for-later ask; only a declarative instruction starts implementation. Injects, never blocks, on question-form prompts: question versus instruction is a reading of intent, so no deny can decide it (shared/workflow/start-or-file.md)."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-record-standing-guidance.py\"",
             "timeout": 10,
             "script": "remind-record-standing-guidance.py",
@@ -1299,6 +1306,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/require-psw-rules.py\"",
+            "timeout": 10,
+            "script": "require-psw-rules.py",
+            "why": "ai-config#5166. Ezra, 2026-11-09: content sessions and the Claude CI review must load the psw writing rules (the Classification thread missed psw rules the same day; the CLAUDE.md prose telling sessions to read psw first was already missed). DENIES a Write, Edit or MultiEdit on a .qmd under chapters/ or _subfiles/ until the transcript holds a read of psw's defining-terms, conciseness and grammar/relative-pronouns chapters (a Read, or a Bash/WebFetch naming them under psw); the deny reason lists the paths and URLs. Exempts hooks/, memories/, shared/ and outtakes/. No override variable. Fails open and silent on any parse or transcript trouble. The gha companion for the CI review prompt is a separate issue."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unexplained-analysis-choice.py\"",
             "timeout": 10,
             "script": "no-unexplained-analysis-choice.py",
@@ -1774,6 +1788,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-bare-repo-ref.py\"",
+            "timeout": 10,
+            "script": "no-bare-repo-ref.py",
+            "why": "ai-config#5164. Ezra, 2026-11-09: 'why didn't you hyperlink those PR mentions?' Every repo#N or owner/repo#N mention must be a markdown link to its GitHub URL. Denies a user-visible reply tool call (post_message, request_decision, reply, update_message, edit_message) in any session whose text holds such a token outside a markdown link, code span, fenced block or URL. A deny, not a reminder, because the failing shape is lexical and the CLAUDE.md prose rule was already missed (ai-config#4741). ALLOW_BARE_REPO_REF=1 overrides. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-merge-ask-in-post-message.py\"",
             "timeout": 10,
             "script": "no-merge-ask-in-post-message.py",
@@ -1792,6 +1813,13 @@
             "timeout": 10,
             "script": "no-mwc-ask-in-other-thread-unread.py",
             "why": "ai-config#5013. On 2026-11-05 a thread asked Ezra twice to type mwc in another thread for lds#1868, a PR that thread owned; he had typed it there at 22:04Z. Whether the other thread already holds a merge word is answered by a read, so this denies a user-visible reply tool call that asks for a merge word in another thread (a #cmsg_ link or 'in the ... thread' in the same sentence) when no hearthbot thread read (read_thread, read_messages_by_id, read_project_chat, list_threads) ran since the last user turn. Fails open on any parse trouble."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-final-head-unread-checks.py\"",
+            "timeout": 10,
+            "script": "no-final-head-unread-checks.py",
+            "why": "ai-config#5198. Coordinator, 2026-11-09: owners keep calling a head final while CI is still running (rme#1450 had build running; ai-config#5186 was reported before its CI was read). Denies a user-visible hearthbot reply (post_message, message_coordinator, message_thread, edit_message) that calls a head final ('final head', 'is final', 'now final') and cites a pull request when no check-runs read (get_check_runs, get_check_run, a Bash check-runs or check-pr-fully-clean command) returned without error since the last user turn. A sentence that negates the claim is left alone. A deny, not a reminder, because the failing shape is lexical (ai-config#4741). ALLOW_FINAL_HEAD=1 overrides. Fails open on parse trouble."
           },
           {
             "type": "command",

@@ -17,6 +17,9 @@ Worked-example case records for the rules below live in
 what other sessions check. The authoritative in-flight signal is the issue's
 cross-referenced **open PRs** --- the check `gi` runs before grabbing an issue.
 
+**Check the [WIP cap](wip-cap.md) first**: with three of your PRs already open in this repo, open no fourth.
+`gi`, `gii`, `gip` and `st` all open their PR through these mechanics.
+
 **Mechanics.** Branch, then open the PR against an empty commit:
 
 ```bash

@@ -236,6 +236,25 @@ env_tl = json.load(open(os.path.join(LOG, "check-term-links.py.env"), encoding="
 expect("T39 a literal terms-from overrides the default",
        env_tl.get("TERM_LINKS_TERMS_DIRS"), os.path.join(terms_root, "pds"))
 
+# A moved tag (gha slides v3) must reach the cache on the next push, inside the daily window.
+origin = tempfile.mkdtemp(prefix="npc-gha-origin-")
+git(origin, "init", "-q", "-b", "main")
+open(os.path.join(origin, "f"), "w", encoding="utf-8").write("a\n")
+git(origin, "add", "-A"); git(origin, "commit", "-qm", "a"); git(origin, "tag", "v3")
+hook.GHA_URL = origin
+hook.CACHE_ROOT = tempfile.mkdtemp(prefix="npc-cache-")
+first = hook.ensure_gha("v3")
+old_sha = git(first, "rev-parse", "HEAD")
+open(os.path.join(origin, "f"), "w", encoding="utf-8").write("b\n")
+git(origin, "commit", "-qam", "b"); git(origin, "tag", "-f", "v3")
+new_sha = git(origin, "rev-parse", "HEAD")
+open(os.path.join(first, ".git", "refreshed"), "w", encoding="utf-8").write(str(__import__("time").time()))
+expect("T40 the cache starts at the tag's first commit", old_sha != new_sha, True)
+expect("T41 a tag moved after a fresh stamp is refetched", git(hook.ensure_gha("v3"), "rev-parse", "HEAD"), new_sha)
+expect("T42 an unchanged tag reports not moved", hook.remote_moved(first, "v3"), False)
+git(first, "remote", "set-url", "origin", "/nonexistent-origin")
+expect("T43 an unreadable remote falls back to the stamp", hook.remote_moved(first, "v3"), None)
+
 real = os.environ.get("GHA_REAL_DIR")
 if real:
     r = make_repo({"check-new-line-breaks.yml": NLB})

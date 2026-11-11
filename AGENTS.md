@@ -111,17 +111,16 @@ When addressing a defect, failure, edge case, or recurring mistake, prefer syste
 Fix the underlying mechanism that allowed the error to occur, install an automated guard or architectural invariant preventing the defect class from recurring, and audit the repo for other instances in the same turn.
 See [`prefer-systemic-solutions-over-one-off-fixes`](shared/principles/prefer-systemic-solutions-over-one-off-fixes.md).
 
-- **Do:** diagnose root causes, fix underlying mechanisms, and install automated guards or structural invariants.
-- **Don't:** settle for a one-off patch that leaves the defect class open to recur elsewhere.
-
 ## No cheap fixes
 
 A fix is done when the rule behind the finding is met, not when the finding stops matching.
 Name that rule, check the fixed state against it, and when a reviewer offers several fixes, take the one that meets it.
 See [`no-cheap-fixes`](shared/principles/no-cheap-fixes.md).
 
-- **Do:** check each fix against the rule behind the finding, not the finding's wording.
-- **Don't:** take a fix because it silences a check, such as un-bolding a definition hidden in another div instead of giving it its own.
+## Give every algorithmic check a writer and a reviewer instruction
+
+Every algorithmic check (hook, script, `gha` workflow) also gets a writer instruction that prevents the defect and a reviewer instruction that looks for it (Ezra, 2026-11-09).
+See [`checks-need-writer-and-reviewer-instructions`](shared/workflow/checks-need-writer-and-reviewer-instructions.md).
 
 ## Research existing solutions before implementing (DRW)
 
@@ -208,10 +207,10 @@ Detail: [`dont-get-sidetracked`](shared/workflow/dont-get-sidetracked.md).
 Whenever asking the user a question or presenting options for a genuine decision, always provide a clear, specific recommendation.
 Soft open-ended prompts that present choices count as decision points and must include a concrete recommendation.
 If an action is already authorized under standing rules, do the work and report in past tense per [`no-cop-out-offers`](shared/workflow/no-cop-out-offers.md).
-Repeat the recommendation in one line every time a decision item is restated in a status list.
+A user's whether-or-how question is not an instruction: recommend, then ask start now or file ([`start-or-file`](shared/workflow/start-or-file.md)).
+Repeat the recommendation in one line whenever a status list restates a decision item.
 See [`AGENTS.cases.md`](AGENTS.cases.md).
 
-- **Do:** state your specific recommendation alongside every question or choice presented to the user.
 - **Do:** write every pending-decision line as "decide X --- I recommend Y, because Z".
 - **Don't:** ask questions or present choices without declaring your recommended path.
 ## Run UMS when work is scrutinized
@@ -269,14 +268,18 @@ When working in a consumer repo, check if the `.ai-config` submodule is outdated
 
 ## Remove redundant submodules when using native plugins
 
-When a repository migrates to native AI agent plugins (Antigravity or Claude Code plugins), remove redundant git submodules that duplicated those configurations.
-See [`remove-redundant-plugin-submodules`](shared/workflow/remove-redundant-plugin-submodules.md).
+On moving to native agent plugins, [remove submodules that duplicated them](shared/workflow/remove-redundant-plugin-submodules.md).
+
+## WIP cap
+
+At three open PRs per repo, open no fourth ([`wip-cap`](shared/workflow/wip-cap.md)).
 
 ## Verify changes before pushing
 
 Always run relevant local linters, tests, and formatting checks before pushing commits to a remote branch.
 At minimum for `ai-config`: `python3 scripts/validate-skills.py`, `python3 scripts/check-links.py`, `python3 scripts/check-ascii-punctuation.py`.
 Run the full test suite (`python3 scripts/test_*.py`) when touching shared tools or scripts.
+Parse changed data files: [rule](shared/workflow/parse-data-files.md).
 
 ## Canonical sources vs generated output
 

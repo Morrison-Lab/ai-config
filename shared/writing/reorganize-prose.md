@@ -39,6 +39,37 @@ that fact alone --- if it is more at home in a different document, moving it
 there is in scope for the same edit, not a separate restructuring project to
 propose first.
 
+## Removed content lands elsewhere or is justified
+
+Every sentence, definition, example, exercise, citation or figure a diff deletes from a page must reappear somewhere in the repo, or the PR must say why it is gone.
+Acceptable destinations are the surviving copy of a duplicate, the page it moved to, and an outtakes file.
+Acceptable reasons are that the content was wrong (say what was wrong), that it duplicates content that stays (name where), or that its owner asked for removal (cite the request).
+"Tidied", "simplified" and "shortened" are not reasons.
+
+This is the writer and reviewer layer behind the proposed content-preservation check ([gha#1791](https://github.com/Morrison-Lab/gha/issues/1791), in progress as [gha PR 1793](https://github.com/Morrison-Lab/gha/pull/1793)), which flags removed content that lands nowhere.
+The three layers are described in [`checks-need-writer-and-reviewer-instructions`](../workflow/checks-need-writer-and-reviewer-instructions.md).
+
+- **Writer:** before deleting a passage, decide its destination or its reason, and write it in the PR description.
+  A move is a deletion plus an addition, so name both ends.
+- **Reviewer:** for each deleted block in the diff, find where it reappears, quoting the added lines, or find the stated reason.
+  Search by a distinctive phrase, then by the idea, since a reworded move shares no phrase.
+  A deletion with neither is a finding, even when the check passed, because the check matches text and a reworded or half-moved passage can evade it.
+- **Do:** report a removal whose destination you cannot find as a finding that quotes the removed lines.
+- **Don't:** accept "consolidated" or "cleaned up" without finding the surviving text.
+- **Don't:** treat a passing content-preservation check as having verified this.
+
+An image belongs to its figure.
+When a diff removes the last reference to an image file, the image has no reader and no owner.
+It either moves to the outtakes file with its figure, or is deleted in the same PR with the reason in the description.
+A file left in the image directory with no reference hides the loss, because nothing renders it and nothing fails.
+
+- **Writer:** after removing a figure, search the repo for the image's file name.
+  If nothing else references it, move or delete it in the same PR and say which in the description.
+- **Reviewer:** for each figure the diff removes, find where its image file went, or find that another page still uses it.
+  Do this from the diff, not from the output of an orphaned-image check, since that check had no caller in the seven notes repos on 2026-11-09 ([#5233](https://github.com/Morrison-Lab/ai-config/issues/5233)).
+- **Don't:** leave an unreferenced image in the tree because deleting it feels risky.
+  Git history keeps it, and an outtakes file keeps it where a reader can see.
+
 ## What a move has to preserve
 
 Relocating prose is authorship, not a no-op, for exactly the reason
@@ -169,6 +200,14 @@ grants the move, it does not exempt it from what a move costs.
   grandfathering for content that merely changed address.
   Bring a moved block into compliance with both on the way, the same as any
   other line you add.
+- **An insertion can split a list item from its continuation.**
+  A bullet's later lines are indented under it, so a block added after the bullet's first lines, rather than after its last, leaves the remaining indented lines attached to the wrong item, and a reader's "neither" or "the check" loses its antecedent.
+  Read the lines that follow the insertion point before writing, and run `scripts/semantic-line-breaks.py` on the file without `--write` and read its diff, since the preview shows a stranded continuation line.
+  (Two insertions on 2026-11-09, [ai-config#5239](https://github.com/Morrison-Lab/ai-config/pull/5239) and [psw#553](https://github.com/Morrison-Lab/psw/pull/553), each stranded one;
+  a reviewer caught the first, the preview the second.)
+  - **Do:** insert after the last indented line of the item you are extending.
+  - **Don't:** treat a one-line summary from the formatter as the check.
+    Read the diff it prints.
 - **Referenced assets move with their content.**
   [`migrate-referenced-assets.md`](../workflow/migrate-referenced-assets.md)
   covers images, data files, and anything else a moved passage embeds by

@@ -14,6 +14,13 @@ Per [`algorithmatize-checks`](algorithmatize-checks.md), the cheap mechanical ch
 A finding about something **missing** -- an absent test, an uncited claim, a gap in coverage -- has no passage to quote by construction.
 The rule needs an explicit exception for absence findings, which instead should name the **location** where the missing thing belongs (the function that lacks a test, the section that never cites its source), so the finding stays checkable even without a quotable passage.
 
+## A cited line is part of the quote
+
+A finding that cites `path:line` can be checked before it is posted: the line has to exist in the file at the commit under review.
+A line number past the file's last line is a failed quote, so drop the finding or re-read the file and cite the real line.
+In [mlg#319](https://github.com/Morrison-Lab/mlg/pull/319) a review cited line 150 of a 53-line file ([ai-config#5254](https://github.com/Morrison-Lab/ai-config/issues/5254)).
+Cite a line of the file you read, not a line of the diff hunk or a count carried over from another file.
+
 ## Companion norm
 
 Attack the argument or the data, never the authors.
@@ -27,6 +34,7 @@ Wherever this corpus already produces or verifies review-shaped findings: `ard`/
 - **Do:** quote the exact passage a finding is about before posting it, or name the passage's location when the finding is about an absence.
 - **Do:** run this mechanical check before spending model calls on adversarial verification of the same finding.
 - **Do:** attack the argument or the data in a finding, never the author's standing.
+- **Do:** check that a cited line number is within the file's length at the reviewed commit.
 - **Don't:** post a finding about code or prose that does not exist in the diff or file under review.
 - **Don't:** require a quoted passage for an absence finding -- name the location it belongs at instead.
 

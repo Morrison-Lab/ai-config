@@ -32,8 +32,8 @@ Keep it free of FERPA data and of agent-written text.
 
 ## Canvas announcements to students
 
-Learned from nine of his own announcements (2026-10-19 to 2026-11-05).
-The sources are his bodies only, never replies, student posts, or student data.
+Learned from nine of his own announcements (2026-10-19 to 2026-11-05), plus his edit of one draft (2026-11-11).
+The sources are his bodies and edits only, never replies, student posts, or student data.
 
 - **Opening.**
   "Hi all," by default, "Hi folks," or "Hi again," for a same-day follow-up.
@@ -51,6 +51,11 @@ The sources are his bodies only, never replies, student posts, or student data.
   A list of items becomes one short sentence or paragraph per item.
 - **Order.**
   The reason first, then the changes, then what is not changing, then where to ask questions.
+- **What's new, not what was broken.**
+  An announcement about updated materials leads with what is new or useful for students, such as new figures, an HTML version or a note sheet.
+  It leaves out defects already fixed, such as code that leaked into a PDF or a corrected typo.
+  Ezra wrote, editing a Midterm 2 practice-materials draft (2026-11-11): "don't mention this issue".
+  He added: "the new figures and html version and the note sheet are what's important".
 - **Dates.**
   Weekday first, then the date in parentheses with an abbreviated month and no ordinal: "Wednesday (Nov 4)".
 - **Names.**

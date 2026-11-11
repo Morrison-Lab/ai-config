@@ -288,6 +288,7 @@ its description does not use (ai-config#949).
 | `shared/principles/teach-a-man-to-fish.md` | When an agent, subagent, or assistant produces defective, incomplete, or misaligned work, do not absorb the defect by quietly fixing it yourself. Help the ag... |  |
 | `shared/principles/think-outside-the-box.md` | Think outside the box. Do not make unnecessary assumptions about structural limitations; consider which limitations are real and which are artificial. |  |
 | `shared/principles/use-real-world-examples.md` | When we do or see something that would be a good example for general practice, use it. When authoring, reviewing, or observing work that exemplifies good gen... |  |
+| `shared/workflow/ad-hoc-choices-are-not-conventions.md` | An ad-hoc choice made once, for local convenience, is not a convention. Do not copy it, standardize it, or record it as a rule unless Ezra decided it or a so... |  |
 | `shared/workflow/address-every-comment.md` | When iterating on a PR with a reviewer, **address every in-scope flagged item**, regardless of severity label. The reviewer's "Informational", "Not a blocker... |  |
 | `shared/workflow/adversarial-self-review.md` | Every self-review is an **adversarial review by a separate subagent**. Whenever this corpus calls for reviewing your own work --- before a push, as the fallb... |  |
 | `shared/workflow/agent-teams.md` | Agent teams are a third way Claude Code parallelizes work, and the corpus's job is to know when to *recommend* one --- not to reach for it, because unlike th... |  |
@@ -300,6 +301,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/avoid-false-dichotomies.md` | Avoid false dichotomies. When laying out alternatives --- in a question to the user, a design note, a PR description --- test whether they are actually exclu... |  |
 | `shared/workflow/batch-merge-and-resolve.md` | When several open PRs need syncing or conflict resolution, do them **together in one pass**, not one at a time as each conflict flag appears. Batch merge and... |  |
 | `shared/workflow/browser-last-resort.md` | Driving a browser, whether the built-in browser pane, Claude in Chrome, or computer use against a web page, is a last resort. Before opening one for a task,... |  |
+| `shared/workflow/build-replacement-under-temporary-name.md` | When a repository's replacement is a history-free snapshot (a public release, a purge of history), build the new version under a *temporary name* and swap na... |  |
 | `shared/workflow/centralize-or-distribute.md` | Choose explicitly whether to centralize or distribute. |  |
 | `shared/workflow/challenge-ambiguous-terminology.md` | When reviewing code or prose, challenge ambiguous phrasing and terminology instead of silently accepting it. Flag a term or phrase when its meaning depends o... |  |
 | `shared/workflow/challenge-redundant-content.md` | When reviewing code or prose --- including mathematical content (derivations, proofs, restated formulas) --- check for redundant content that could be consol... |  |
@@ -311,6 +313,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/check-sources-over-recall.md` | When a source can be checked, check it before answering. Sources include books, repositories, documentation, APIs and files. Cite what you read (file and pag... |  |
 | `shared/workflow/check-the-renders.md` | In a repo that publishes a website or a book, the deliverable is the rendered page. A `.qmd` or `.md` diff can be entirely correct while the published page i... |  |
 | `shared/workflow/check-tools-before-saying-cant.md` | Before a reply says "I can't", "I'm unable to" or "only you can", check the tools you have, deferred ones included. |  |
+| `shared/workflow/checks-need-writer-and-reviewer-instructions.md` | Every algorithmic check has two companions: an instruction to the writer that prevents the defect, and an instruction to the reviewer agent that looks for it... |  |
 | `shared/workflow/choose-issue-or-discussion.md` | `issue-first` governs *whether* something is tracked before work starts. It does not settle *where*, and defaulting everything to the issue tracker misfiles... |  |
 | `shared/workflow/claim-pr.md` | Before starting a work session on a GitHub PR or issue --- i.e. before fetching the branch, making edits, posting a review, or invoking an automated review c... |  |
 | `shared/workflow/commit-reusable-work.md` | Potentially-reusable work produced incidentally in any medium must be committed, pushed, and PRed into an owning repository. |  |
@@ -359,6 +362,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/no-fable-subagents.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/workflow/no-sweeps-by-default.md` | Ezra, 2026-10-29 (ai-config#4829): "don't sweep new rules unless I explicitly tell you to sweep; by default, just fix incrementally when you are editing a pa... |  |
 | `shared/workflow/notes-pre-review-pass.md` | A notes PR (psw, rme, mds, lds, pds, sds, win, araomm) reaches the maintainer already checked against the notes rules, so he reviews the ideas and not the wo... |  |
+| `shared/workflow/parse-data-files.md` | Parse every data file a change touches with a real parser before calling a PR ready or reporting a head as final: a CSV with a CSV reader (every row's field... |  |
 | `shared/workflow/persistent-pr-loop.md` | When you open, push to, or are handed a PR, arm a persistent monitoring loop if one is not already running. Keep it running until the PR merges, closes, or t... |  |
 | `shared/workflow/port-by-script.md` | When content moves from one repository to another, copy the source files with a script. Keep the ids, wording and citations. Edit only what the target reposi... |  |
 | `shared/workflow/post-feedback-to-pr.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
@@ -394,6 +398,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/small-prs.md` | Ezra, 2026-10-23: "don't allow massive sweep PRs like pds#244 anymore; do them in minimal batches", and "every PR should be as small and focused as it can be... |  |
 | `shared/workflow/stack-dont-pause.md` | The clear-all family --- `ardia`, `gia`, `gii`, `gip`, and the `clear-all` alias --- clears a whole queue of PRs and issues in one run. Merging stays human-g... |  |
 | `shared/workflow/standing-habits-from-ezra.md` | Ezra (d-morrison) gave these rules in the DATA 571 project on 2026-10-02, except where a section says otherwise. They apply in every project, per the global-... |  |
+| `shared/workflow/start-or-file.md` | When the user asks whether to do something, or how to do it, answer with a recommendation and stop before implementing. End the answer with one question: sta... |  |
 | `shared/workflow/state-check-in-time.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/workflow/status-requests-act.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/workflow/strict-merge-policy.md` | Merging a Pull Request or Merge Request is strictly controlled across all agents and harnesses. |  |
@@ -419,6 +424,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/verify-the-right-artifact.md` | Before reporting a finding, name the artifact the claim is about, and confirm that is the one you read. |  |
 | `shared/workflow/watch-and-ardi.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/workflow/when-to-orchestrate.md` | When a heavy skill runs, decide whether to fan the work out to a **Workflow** (multi-agent orchestration) instead of handling it inline. This is the shared d... |  |
+| `shared/workflow/wip-cap.md` | An owner thread with three or more open PRs in a repository opens no new PR in that repository (ai-config#5213, 2026-11-09). The number is 3 because the coor... |  |
 | `shared/workflow/wrap-up-merged-pr.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
 | `shared/writing/ai-tells.md` | Write plainly up front, then **scan the draft for AI tells before sending**. Before presenting non-trivial prose --- PR/issue descriptions, commit bodies, RE... |  |
 | `shared/writing/ambiguous-reference.md` | Avoid ambiguity in writing. A referring expression --- a pronoun, a demonstrative, a relative `which` --- must have exactly one reading, and the reading a re... |  |
@@ -427,6 +433,7 @@ its description does not use (ai-config#949).
 | `shared/writing/citations.md` | When explaining a concept or writing documentation, **cite claims to their primary or authoritative source, thoroughly and by default** --- not only when ask... |  |
 | `shared/writing/course-sequence.md` | The Morrison-Lab course sites form a prerequisite sequence. Place content, and direct links, according to it. |  |
 | `shared/writing/definition-crossrefs.md` | When reviewing prose that defines technical terms or named results via formal cross-reference divs --- Quarto's theorem-like div syntax (`::: {#def-...}`, `{... |  |
+| `shared/writing/dont-hedge-gratuitously.md` | Ezra, 2026-11-10: "cai: don't hedge gratuitously" (ai-config#5263). |  |
 | `shared/writing/examples-are-scanned.md` | An illustrative example sits inside the document, so a mechanical check that scans the document may scan the example too. When the document's subject *is* a... |  |
 | `shared/writing/explain-analysis-choices.md` | Ezra's rule (2026-11-03, ai-config#4905): every time you make an arbitrary analysis choice, explain the decision in detail in the prose next to it. |  |
 | `shared/writing/fact-check-prose.md` | When reviewing prose in a PR/MR --- documentation, lecture notes, a README, any non-code narrative content --- assess it for **accuracy and clarity**, not ju... |  |
@@ -443,7 +450,7 @@ its description does not use (ai-config#949).
 | `shared/writing/models-vs-inference.md` | Keep a model's structure and its estimation or inference method separate, in wording as well as in the exposition itself. |  |
 | `shared/writing/no-code-messages.md` | Code in the notes prints its output and no warning or non-output message (Ezra, 2026-10-26, Morrison-Lab/lds#1440). A reader should never see "`geom_smooth()... |  |
 | `shared/writing/no-rug-pulls.md` | Don't write "rug-pulls": present a model, claim, or picture, and then a sentence or two later retract or replace it. Every individual sentence in a rug-pull... |  |
-| `shared/writing/no-vague-attribution.md` | Name the real source of a claim, or write the claim as the author's own judgment, or cut it. Never invent a vague attribution to give a claim the look of sup... |  |
+| `shared/writing/no-vague-attribution.md` | Name the real source of a claim. When the draft has none, go and find one. That is the fix, not dropping the claim (Ezra, 2026-11-06). Never invent a vague a... |  |
 | `shared/writing/notes-content-rules.md` | Rules from Ezra, starting 2026-10-16. Each has a canonical prose rule in `psw`, possibly still in review. This fragment only points agents to it. |  |
 | `shared/writing/plain-prose.md` | Write user-facing prose in a plain, direct style. This applies to everything a reader sees --- PR/issue/commit text, docs, READMEs, code comments, release no... |  |
 | `shared/writing/quarto-divs-for-typed-content.md` | In Quarto lecture notes, books, and sites, put every block of content that has a type into a div or callout of that type. The box tells the reader what kind... |  |

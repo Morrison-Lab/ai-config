@@ -4272,6 +4272,137 @@ def _disposition_drops_line(m: re.Match, tail: str) -> bool:
     )
 
 
+def _has_agent_reply_shape(body: str) -> bool:
+    """True when *body* ends with the disclosure footer and has no review shape.
+
+    The review shapes are the ones this scan admits from a human login
+    (report structure, a named review head) and a review-data payload, so a
+    relayed or self-posted review keeps its verdict.
+    """
+    if not body or not _AGENT_REPLY_FOOTER_RE.search(body):
+        return False
+    return not (
+        _is_structured_review_body(body)
+        or _named_review_head(body)
+        or "review-data" in body.lower()
+        or extract_structured_review(body) is not None
+    )
+
+
+_HEX_TOKEN_RE = re.compile(r"(?<![0-9a-z])[0-9a-f]{7,40}(?![0-9a-z])", re.IGNORECASE)
+# The superseding status states its verdict at the start of a line. Only
+# the label is removed before the open-word scan, so the rest of that line
+# ("Verdict: Clean, except the blocking finding stands.") is still read.
+_STATUS_CLEAN_LINE_RE = re.compile(
+    r"^\s*\**\s*Verdict\s*:\s*\**\s*Clean\b", re.IGNORECASE | re.MULTILINE
+)
+# Words a clean status must not carry outside its verdict line, since the
+# classifier reads "Blocking: the guard is missing." mid-body as neutral.
+_STATUS_OPEN_WORD_RE = re.compile(
+    _BARE_REJECTION
+    + r"|\b(?:needs\s+more\s+work|not\s+(?:clean|ready)|unresolved|still\s+open"
+    r"|defects?|broken|fail(?:s|ed|ing)?|bugs?|wrong|incorrect\w*|regress\w*"
+    r"|must|except\w*|stands?)\b",
+    re.IGNORECASE,
+)
+# A reply the status may supersede answers a finding in the agent's own
+# voice: it carries a disposition word.
+_REPLY_ANSWER_RE = re.compile(
+    r"\b(?:rebut\w*|defer(?:s|red|ring)?|declin(?:e|es|ed|ing))\b", re.IGNORECASE
+)
+# A comment naming another reviewer may be relaying that reviewer's verdict,
+# which only that reviewer's own later clean can clear (ai-config#2274).
+_RELAYED_REVIEWER_RE = re.compile(
+    r"\b(?:copilot|codex|gemini|antigravity|agy|opencode|open\s*code|cursor"
+    r"|kimi|glm|deepseek|qwen|coderabbit|relay\w*)\b",
+    re.IGNORECASE,
+)
+
+
+def _body_names_head(body: str, head_sha: str) -> bool:
+    """True when *body* names *head_sha* by a prefix of 7 or more characters."""
+    head = (head_sha or "").lower()
+    return bool(head) and any(
+        head.startswith(tok.lower()) for tok in _HEX_TOKEN_RE.findall(body or "")
+    )
+
+
+def _comment_time(c: dict) -> Optional[datetime]:
+    """The comment's createdAt as an aware datetime, or None when unreadable."""
+    raw = c.get("createdAt") or ""
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else None
+
+
+def _is_head_clean_status(body: str, login: str, head_sha: str) -> bool:
+    """True when *body* is an agent status that clears its own replies.
+
+    It has the agent-reply shape, names the current head on its first line,
+    states `Verdict: Clean` on a line of its own, names no other reviewer,
+    and with that verdict line removed holds nothing that reads as not-clean,
+    so "Blocking: X. Verdict: Clean on the rest." does not qualify.
+    """
+    if not _has_agent_reply_shape(body):
+        return False
+    first_line = next((ln for ln in body.splitlines() if ln.strip()), "")
+    if not _body_names_head(first_line, head_sha):
+        return False
+    if not _STATUS_CLEAN_LINE_RE.search(body) or _RELAYED_REVIEWER_RE.search(body):
+        return False
+    if classify_verdict(body, "", login) != "clean":
+        return False
+    remainder = _STATUS_CLEAN_LINE_RE.sub("", body)
+    if _STATUS_OPEN_WORD_RE.search(remainder):
+        return False
+    return classify_verdict(remainder, "", login) != "not-clean"
+
+
+def _superseded_agent_replies(comments: List[dict], head_sha: str) -> set:
+    """Indices of disclosed agent replies that a later head clean supersedes.
+
+    An agent's reply under the maintainer's login can read as not-clean in
+    its own words ("Rebuttal of the blocking finding", "**Blocking (wiring
+    missing): ...**") without matching a disposition shape, and then it
+    vetoed the gate as the maintainer's verdict until the agent edited its
+    own comment (ai-config#5283, gha#1826). A later status from the same
+    login that passes ``_is_head_clean_status`` supersedes it.
+
+    Only the agent's own replies are superseded: the comment must have the
+    agent-reply shape, carry a disposition word, and name no other reviewer.
+    A comment without the footer is the maintainer's own, a review-shaped one
+    is a review, and one naming another reviewer may relay that reviewer's
+    verdict, so none of those leaves the scan this way. A comment whose time
+    cannot be read is never superseded. The status is not admitted as a
+    review either, so it never counts toward quorum (#2308).
+    """
+    clean_at: Dict[str, datetime] = {}
+    for c in comments:
+        body = c.get("body", "")
+        login = (c.get("author") or {}).get("login", "")
+        at = _comment_time(c)
+        if login and at and _is_head_clean_status(body, login, head_sha):
+            if login not in clean_at or at > clean_at[login]:
+                clean_at[login] = at
+    superseded = set()
+    for idx, c in enumerate(comments):
+        body = c.get("body", "")
+        login = (c.get("author") or {}).get("login", "")
+        at = _comment_time(c)
+        if (
+            login in clean_at
+            and at is not None
+            and at < clean_at[login]
+            and _has_agent_reply_shape(body)
+            and _REPLY_ANSWER_RE.search(body)
+            and not _RELAYED_REVIEWER_RE.search(body)
+        ):
+            superseded.add(idx)
+    return superseded
+
+
 def _is_agent_disclosed_reply(body: str) -> bool:
     """True when *body* is an agent's reply to a review, not a verdict.
 
@@ -4287,14 +4418,7 @@ def _is_agent_disclosed_reply(body: str) -> bool:
       as not-clean. The test runs on the whole remainder, not line by line,
       so a verdict spread over several lines still counts.
     """
-    if not body or not _AGENT_REPLY_FOOTER_RE.search(body):
-        return False
-    if (
-        _is_structured_review_body(body)
-        or _named_review_head(body)
-        or "review-data" in body.lower()
-        or extract_structured_review(body) is not None
-    ):
+    if not _has_agent_reply_shape(body):
         return False
     # A disposition line drops only its label and disposition; the text
     # after them stays in the scan, so "-- rebutted. A new blocking defect
@@ -4411,7 +4535,8 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
 
     # Collect automated review reports only (filtering out human/author disposition comments)
     all_items = []
-    for c in comments:
+    superseded_replies = _superseded_agent_replies(comments, sha)
+    for idx, c in enumerate(comments):
         body = c.get("body", "")
         author_login = (c.get("author") or {}).get("login", "")
 
@@ -4450,13 +4575,16 @@ def check_review_comments(pr, quorum: int = 1) -> Tuple[bool, List[str]]:
         # which casual prose does not carry (#1798's guard, restated).
         if is_bot_author:
             all_items.append(("comment", c["createdAt"], body, "", "COMMENT", author_login, True))
-        elif _is_agent_disclosed_reply(body):
+        elif idx in superseded_replies or _is_agent_disclosed_reply(body):
             # An agent's reply under the maintainer's login (an ARD
             # disposition, a rebuttal) is not the maintainer's verdict, even
             # when it quotes a reviewer's "Blocking" label. Without this skip
             # the quote vetoed the merge gate for good, and the only way out
             # was editing the agent's own comment (ai-config#4826). See
-            # _is_agent_disclosed_reply for the evidence a skip needs.
+            # _is_agent_disclosed_reply for the evidence a skip needs. A
+            # reply that reads as not-clean in its own words also leaves once
+            # a later disclosed clean naming the head supersedes it
+            # (ai-config#5283; see _superseded_agent_replies).
             continue
         elif verdict == "not-clean":
             all_items.append(("comment", c["createdAt"], body, "", "COMMENT", author_login, False))

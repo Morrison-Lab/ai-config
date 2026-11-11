@@ -359,6 +359,17 @@ Its last section is the mirror, and it covers requests that arrive rather than w
 The grant is latitude rather than an instruction, and the tracking issue is the whole of what licenses it --- an untracked deferral is a dropped request wearing the vocabulary of scope discipline.
 Read the fragment's boundary with `dont-incur-technical-debt` before invoking it, since a defect inside your own diff stays yours to fix now.
 
+## An ad-hoc choice is not a convention
+
+[shared/workflow/ad-hoc-choices-are-not-conventions.md](shared/workflow/ad-hoc-choices-are-not-conventions.md)
+
+Never copy, standardize or record as a rule a choice made once for local convenience, in any repository and for any kind of choice, unless Ezra decided it or a sourced rule backs it (Ezra, 2026-11-10: "learn the broader rule about random decisions not turning into habits").
+Find a pattern's source before reusing it, ask once when there is none, and have reviewers flag an unsourced pattern.
+Existing code is not a source.
+Style is decided explicitly in psc and psw: "imitating existing code style is not a good justification for style choices"
+and "all style decisions must be made explicitly by the repo maintainers and recorded in psc or psw" (Ezra, 2026-11-10).
+A style choice neither guide states is a question for Ezra on psc or psw, never copied from surrounding code or text, and reviewers flag style they do not support.
+
 ## Issue or discussion? Pick the venue by best practice, not by precedent
 
 [shared/workflow/choose-issue-or-discussion.md](shared/workflow/choose-issue-or-discussion.md)
@@ -498,14 +509,12 @@ Whenever starting or working on a Pull Request:
 [`shared/workflow/check-before-pushing.md`](shared/workflow/check-before-pushing.md)
 
 Take a fresh `git ls-remote` reading of the branch immediately before every `git push` --- not at the start of the round, not when you last synced, not when you opened the PR.
-The branch you cut and whose PR you opened is the one you are *least* likely to check, because ownership makes the check read as ceremony rather than as a question with an unknown answer.
-`claim-pr` records three ways it gains another agent's commits anyway (the `@claude` agent's `main`-sync, a second CLI session, a human), and every recovery procedure there runs *after* the collision.
-An earlier fetch is a measurement of a moment that has passed, and it expires exactly the way a clock reading does.
+Your own branch is the one you are least likely to check, and an earlier fetch expires like a clock reading.
 
-`--force-with-lease` alone is not the safe form, which no site in this corpus previously said: the lease compares against your remote-tracking ref, so any background fetch silently satisfies it over the very commits it was protecting.
-Always pair it with `--force-if-includes` (added in Git 2.30.0), and note that pairing `--force` *with* the lease is not a middle ground --- git documents `-f, --force` as one that "disables that check, the other safety checks in PUSH RULES below, and the checks in `--force-with-lease`".
+`--force-with-lease` alone is not the safe form: any background fetch silently satisfies the lease over the very commits it was protecting.
+Always pair it with `--force-if-includes` (Git 2.30.0 or later), and never pair `--force` with the lease, since `--force` disables the lease's checks.
 A `stale info` refusal is not a reason to force either.
-It reports only that your remote-tracking ref no longer matches the remote, and never why --- the branch may have been deleted (which recurs on this repo's flow, after a squash-merge with auto-delete), a peer may have pushed, or you may never have fetched it.
+It never says why: the branch may have been deleted (after a squash-merge with auto-delete), a peer may have pushed, or you may never have fetched it.
 `git ls-remote --heads origin <branch>` settles existence and nothing further: empty means deleted.
 Non-empty means the branch is live, so compare its tip against the ref you are pushing before choosing a remedy --- an ancestor tip fast-forwards, and only a diverged one needs a reconcile.
 When it is empty, query `gh pr list --state all --head <branch>` before a plain push.
@@ -636,20 +645,11 @@ read it before launching or proposing a workflow, and before choosing a dispatch
 
 ## Agent teams: a third parallelism primitive, human-gated and advisory
 
-The corpus governs two primitives a session invokes itself --- a single `Agent` call ("Use subagents when helpful", above) and the `Workflow` tool ("Auto-orchestration", just above).
-An **agent team** is the third: several separate Claude Code sessions (a lead plus teammates, each its own context window) that coordinate through a shared task list and a mailbox and **message each other directly**, rather than only reporting back.
-Unlike the other two, a session cannot form one on its own, so the corpus's role is only to *recommend* it.
-
-The discriminator across all three is one question: **do the workers need to communicate with each other, or does a human want to steer individual workers mid-run?**
-No to both --- a subagent or a `Workflow` sweep, per the rules above.
-Yes --- an agent team, and only if it is enabled.
-
-**Never assume a team is available, and never author a step that spawns one.**
-Agent teams are experimental and off by default (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`), and are spawned by the *user* in natural language and steered through an interactive agent panel --- not invoked by an autonomous or headless session.
-So a recommendation to the user is the only correct output; a skill or `Workflow` step that forms a team is a bug.
-The one concrete reuse angle: a `.claude/agents/<name>.md` subagent definition doubles as a teammate role (its `tools` and `model` apply, and its body is appended to the teammate's prompt), but its `skills`/`mcpServers` frontmatter is not applied to a teammate.
-
-[shared/workflow/agent-teams.md](shared/workflow/agent-teams.md)
+An **agent team** is several separate Claude Code sessions that message each other directly.
+When the workers need to communicate, or a human wants to steer one mid-run, recommend a team to the user;
+otherwise use a subagent or a `Workflow` sweep.
+Never assume a team is available and never author a step that spawns one: teams are experimental, off by default and spawned by the user.
+The discriminator, the enabling setting and the subagent-definition reuse angle are in [shared/workflow/agent-teams.md](shared/workflow/agent-teams.md).
 
 ## Algorithmatize checks: instruments over LLM reasoning
 
@@ -799,6 +799,20 @@ If the item cannot be checked from this session, say that plainly instead of gue
 - **Don't:** write "it is probably waiting on CI" when the check runs are one read away.
 
 `hooks/warn-hedged-checkable-claim.py` warns, never blocks, when a hedge shares a sentence with a PR or issue reference, a CI or check word, or merged, open or closed, in a reply or a GitHub comment.
+
+## Don't hedge gratuitously
+
+[`shared/writing/dont-hedge-gratuitously.md`](shared/writing/dont-hedge-gratuitously.md)
+
+The rule above covers a hedge about a state one call can read.
+This one covers a conditional, softener or escape-hatch offer that no uncertainty justifies, such as "ready, if you still want it" (Ezra, 2026-11-10: "cai: don't hedge gratuitously").
+Before writing one, name the uncertainty or risk it reflects: keep it and say what it is, or delete it.
+An honest flag of an unverified fact stays.
+
+- **Do:** write "mlg#330 is ready for your merge word".
+- **Don't:** write "mlg#330 is ready, if you still want it".
+
+No hook: whether a hedge is gratuitous is not lexically decidable.
 
 ## Question the assignment, not only the claims
 

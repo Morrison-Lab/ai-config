@@ -50,6 +50,10 @@ clean, and the content you missed has been on `main` for weeks.
 Fetch first, then search --- the same precondition
 [`sync-with-main`](sync-with-main.md) sets for any measurement taken against
 a moving base.
+In an audit that reads several repositories, fetch every one of them, not only the repository the session is working in: on 2026-11-09 a psw checkout 127 commits behind `origin/main` produced two gap issues ([#5234](https://github.com/Morrison-Lab/ai-config/issues/5234), [#5235](https://github.com/Morrison-Lab/ai-config/issues/5235)) for rules that psw already stated, found only when a writer-rule PR was started on a fresh branch.
+
+- **Do:** run `git fetch origin main` and compare `HEAD` with `origin/main` in each repository before filing a gap from a search of it.
+- **Don't:** file a gap from a read of a sibling repository's working tree.
 
 **Search by topic and filename, not only by phrase.**
 A fragment covering a concept in different words is invisible to a phrase

@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+# merge-infra-pr REPO PR [--annotations-read IDS] [--dry-run]
+#
+# The one sanctioned path for merging an INFRA pull request without Ezra's typed word
+# (Ezra, 2026-11-08: "do it"). Content PRs never go through this script.
+#
+# It merges only when ALL of these hold, and refuses (exit 2, nothing merged) otherwise:
+#   1. the repository is Morrison-Lab/gha, Morrison-Lab/macros, Morrison-Lab/ai-config or
+#      Morrison-Lab/teaching-tools (Ezra, 2026-11-10: "teaching-tools is infra"), OR every
+#      path the PR changes, and every renamed file's previous path, matches INFRA_PATH_PATTERNS in
+#      hooks/no-unauthorized-merge.py (read from a fresh ai-config clone) or is under changelog.d/.
+#      That list covers CI, agent configuration (.claude/, CLAUDE.md, AGENTS.md, GEMINI.md; Ezra,
+#      2026-11-11: "the infra grant should cover agent-config files"), lint/spell/link config,
+#      tools/ checkers and tests, and named preview/CI helpers (ai-config#5293). A blanket tools/ or
+#      scripts/ is not accepted: a content repository can keep figure and analysis code there.
+#      No PR that touches a canvas/ path is merged here, in any repository: Canvas writes need Ezra's explicit ok.
+#   2. the PR is open, targets the default branch, and is not a draft;
+#   3. scripts/check-pr-fully-clean.py exits 0 on the exact head SHA read in step 0
+#      (--annotations-read passes through only after the caller has read those annotations);
+#   4. the head SHA is unchanged after the checker ran.
+# Then it runs one pinned merge-commit merge: --match-head-commit <full 40-char SHA>, never --admin,
+# never --delete-branch, never --auto.
+set -u
+ORG=Morrison-Lab
+AI_CONFIG_CHECKOUT=${AI_CONFIG_CHECKOUT:-/home/morri313/Documents/GitHub/ai-config}
+usage() { echo "usage: merge-infra-pr REPO PR [--annotations-read IDS] [--dry-run]" >&2; exit 64; }
+refuse() { echo "REFUSED: $*" >&2; exit 2; }
+
+[ $# -ge 2 ] || usage
+repo=$1; pr=$2; shift 2
+case "$repo" in */*) repo=${repo##*/} ;; esac
+case "$repo" in *[!A-Za-z0-9._-]*|"") refuse "bad repository name" ;; esac
+case "$pr" in *[!0-9]*|"") refuse "PR must be a number" ;; esac
+ann=""; dry=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --annotations-read) [ $# -ge 2 ] || usage; ann=$2; shift 2 ;;
+    --dry-run) dry=1; shift ;;
+    *) usage ;;
+  esac
+done
+case "$ann" in *[!0-9,]*) refuse "--annotations-read takes comma-separated numeric ids" ;; esac
+
+# 0. read the PR once, and check condition 2 (open, not a draft, base is the default branch)
+info=$(gh pr view "$pr" -R "$ORG/$repo" --json state,isDraft,headRefOid,baseRefName -q '"\(.state) \(.isDraft) \(.headRefOid) \(.baseRefName)"') || refuse "cannot read $ORG/$repo#$pr"
+read -r state draft head base <<<"$info"
+[ "$state" = OPEN ] || refuse "PR is $state, not OPEN"
+[ "$draft" = false ] || refuse "PR is a draft"
+printf '%s' "$head" | grep -Eq '^[0-9a-f]{40}$' || refuse "head SHA is not 40 hex characters: $head"
+default=$(gh repo view "$ORG/$repo" --json defaultBranchRef -q .defaultBranchRef.name) || refuse "cannot read default branch"
+[ "$base" = "$default" ] || refuse "base is $base, not the default branch $default"
+
+# Use the checker and the path list from ai-config's default branch, not the local checkout
+# (which can be stale and lack flags such as --reviewer-out-of-quota).
+tmp=$(mktemp -d) || refuse "cannot make a temp directory"
+trap 'rm -rf "$tmp"' EXIT
+git clone --quiet --depth 1 "https://github.com/$ORG/ai-config.git" "$tmp/ai-config" || refuse "cannot clone ai-config main"
+
+# 1. scope: infra repo, or every changed path (and a renamed file's previous path) is infra
+files=$(gh api "repos/$ORG/$repo/pulls/$pr/files" --paginate --jq '.[] | .filename, (.previous_filename // empty)') || refuse "cannot list files"
+[ -n "$files" ] || refuse "PR has no files"
+# Canvas writes need Ezra's explicit ok in every repo, including the whole-repo infra ones.
+canvas=$(printf '%s\n' "$files" | grep -E '(^|/)canvas/' | head -3)
+[ -z "$canvas" ] || refuse "touches Canvas paths, which need Ezra's explicit ok: $(echo $canvas)"
+case "$repo" in
+  gha|macros|ai-config|teaching-tools) scope="infra repository $repo" ;;
+  *)
+    # One path list for the hook and this wrapper: INFRA_PATH_PATTERNS in hooks/no-unauthorized-merge.py
+    # (CI, agent configuration, lint/spell/link config, tools/ checkers and preview/CI helpers),
+    # plus changelog.d/ here (ai-config#5293).
+    bad=$(printf '%s\n' "$files" | python3 -I -c '
+import importlib.util, re, sys
+spec = importlib.util.spec_from_file_location("hook", sys.argv[1])
+hook = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(hook)
+patterns = hook.INFRA_PATH_PATTERNS + (re.compile("changelog[.]d/.+"),)
+for path in sys.stdin.read().splitlines():
+    if not any(p.fullmatch(path) for p in patterns):
+        print(path)
+' "$tmp/ai-config/hooks/no-unauthorized-merge.py") || refuse "cannot read INFRA_PATH_PATTERNS from the ai-config clone"
+    bad=$(printf '%s\n' "$bad" | grep -v '^$' | head -3)
+    [ -z "$bad" ] || refuse "not infra-only; first non-infra paths: $(echo $bad)"
+    scope="every changed path matches INFRA_PATH_PATTERNS or changelog.d/" ;;
+esac
+
+# 3. the fully-clean checker, on this head
+args=(--reviewer-out-of-quota agy)
+[ -z "$ann" ] || args+=(--annotations-read "$ann")
+CHECKER="$tmp/ai-config/scripts/check-pr-fully-clean.py"
+[ -f "$CHECKER" ] || refuse "no checker in the ai-config clone"
+out=$(python3 "$CHECKER" "$pr" -R "$ORG/$repo" "${args[@]}" 2>&1); rc=$?
+[ $rc -eq 0 ] || { echo "$out" | grep -E '^  - ' | grep -v NOTE | cut -c1-240 | head -8 >&2; refuse "check-pr-fully-clean.py exited $rc"; }
+echo "checker: exit 0 on $head ($scope)"
+
+# 4. head unchanged
+now=$(gh pr view "$pr" -R "$ORG/$repo" --json headRefOid -q .headRefOid)
+[ "$now" = "$head" ] || refuse "head moved from $head to $now while checking"
+
+if [ $dry -eq 1 ]; then echo "dry run: would merge $ORG/$repo#$pr at $head with a merge commit"; exit 0; fi
+
+# the pinned merge
+cd "$AI_CONFIG_CHECKOUT" || refuse "no ai-config checkout"
+ALLOW_MERGE=1 gh pr merge "$pr" -R "$ORG/$repo" --merge --match-head-commit "$head" || exit $?
+gh pr view "$pr" -R "$ORG/$repo" --json state,mergeCommit -q '"merged: \(.state) \(.mergeCommit.oid)"'

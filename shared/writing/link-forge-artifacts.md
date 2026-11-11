@@ -100,3 +100,6 @@ Write `[session](https://claude.ai/code/session_…)` for a Claude Code session,
 (Directive from the user, 2026-10-16: "anytime you mention a session, you must provide a link".
 Reaffirmed 2026-10-22: "always hyperlink when you mention other sessions".
 Tracked in [ai-config#4570](https://github.com/Morrison-Lab/ai-config/issues/4570).)
+
+- **Do:** in a chat reply, link every `repo#N` as `[psw#542](https://github.com/Morrison-Lab/psw/pull/542)`, checking pull versus issue.
+  `hooks/no-bare-repo-ref.py` denies a bare one in a hearthbot reply (Ezra, 2026-11-09, [ai-config#5164](https://github.com/Morrison-Lab/ai-config/issues/5164)).

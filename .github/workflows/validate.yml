@@ -266,6 +266,8 @@ jobs:
       - name: Run doctor tests
         # ai-config#2540: doctor.py install diagnostics and path checks.
         run: python3 scripts/test_doctor.py
+      - name: Run retire-leftover-paths tests (ai-config#5309 step 3)
+        run: python3 scripts/test_retire_leftover_paths.py
       - name: Run AI CLI helper and detection tests
         # ai-config#2543: scripts/lib/ai_cli.py tool availability detection.
         run: python3 scripts/test_ai_cli.py

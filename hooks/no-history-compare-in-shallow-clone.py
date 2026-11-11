@@ -27,28 +27,34 @@ The failure is silent: every command above exits 0 and prints a plausible
 answer, so nothing downstream can notice. A warning is context that a session
 reads past (ai-config#4741). The guard refuses.
 
-## Exact where it can be
+## Checking a walk instead of refusing every range
 
 A shallow clone is not wrong about everything. `git log origin/main..HEAD` is
-correct when the walk stays inside the fetched history, and routine skills
-run it in every cloud session. Refusing it would block ordinary work, so for
-a revision walk the guard asks git whether the walk reaches the cut-off:
+right when HEAD's new commits sit on top of the fetched main, and routine
+skills run it in every cloud session. So for a comparison of two commits A
+and B (`A..B`, `A...B`, `^A B`, `B --not A`, `merge-base A B`), the guard
+reads the fetched graph (`git rev-list --timestamp --parents A B`) and, in
+each direction, refuses when:
 
-    git rev-list --boundary A...B
+1. the commits one side has and the other lacks include a cut-off commit
+   (from the repository's `shallow` file): that side ran out of history; or
+2. the excluded side reaches a cut-off commit, and the commits listed as
+   "only on the other side" include one no newer than that cut-off, or a
+   parentless one. Such a commit may sit below the cut-off in the full
+   history, where the excluded side would have reached it. This is how a
+   branch fetched in full after a shallow clone of main makes main's old
+   commits look "ahead" (review of ai-config#5323).
 
-where A and B are the two commits the range names (`A..B`, `^A B` and
-`B --not A` all name A and B). The cut-off commits are listed in the
-repository's `shallow` file. The symmetric walk goes from each side down to
-their common ancestors, so it includes a cut-off commit exactly when either
-side runs out of history first: the positive side, which would undercount,
-or the excluded side, which would stop excluding and overcount. A cut-off
-commit that appears only as a boundary (`-<sha>`) is a common ancestor, so
-the answer is still right. When that query fails or times out, or the range
-names more than two commits, the guard refuses rather than guess.
+Nothing local can see an edge the clone never fetched, so rule 2 judges by
+committer date. It is sound unless committer clocks were skewed so that a
+commit is older than one of its ancestors. It refuses on a tie, and it
+refuses whenever the query fails, times out, or the range names more than
+two commits. It also refuses some answers that happen to be right; that is
+the conservative direction.
 
 ## What it refuses, in a shallow repository
 
-Walk-checked (refused only when the walk A...B includes a cut-off commit):
+Walk-checked (refused by the two rules above):
 
     git log / rev-list with a range      A..B, A...B, ^A B, B --not A
     git merge-base A B, git cherry U H
@@ -57,7 +63,9 @@ Always refused, because the read is of the whole history or has no walk the
 guard can check:
 
     git log --root / --max-parents       first-commit reads
-    git log / rev-list --reverse         unless -n N limits it first
+    git log / rev-list --reverse         unless -n N limits it first, or a
+                                         range that passes the walk check
+                                         bounds it
     git log ... | tail / tac / wc / sort the same reads, spelled with a pipe
     git rev-list with no range           unless -n N limits it
     git merge-base with other arguments  --octopus, --fork-point,
@@ -396,41 +404,93 @@ class _Repo:
         return result
 
     @staticmethod
-    def walk_hits_cutoff(repo, revisions, cutoff):
-        """True when `rev-list --boundary <revisions>` includes a cut-off
-        commit (not as a boundary), or when the query cannot answer."""
+    def pair_unsafe(repo, a, b, cutoff):
+        """Why comparing commits `a` and `b` may be wrong here, or None.
+
+        Reads the fetched graph once (`rev-list --timestamp --parents a b`)
+        and checks each direction, X excluded and Y included, with
+        OUT = reach(Y) - reach(X):
+
+        1. OUT holds a cut-off commit: Y's side ran out of history, so the
+           answer is missing whatever lies below it.
+        2. reach(X) holds a cut-off commit, and OUT holds a commit no newer
+           than the newest such cut-off, or a parentless commit: that commit
+           may be a hidden ancestor of X's cut-off, which X's side would have
+           excluded with full history. (A branch fetched in full after a
+           shallow clone of main brings main's old commits back through the
+           branch, and only their age can show they sit below main's cut-off.)
+
+        Rule 2 assumes a commit is not older than its ancestors, which holds
+        unless committer clocks were skewed. It refuses rather than allows when
+        the dates tie. Any failure of the query refuses.
+        """
         try:
+            ids = subprocess.run(
+                ["git", "-C", repo, "rev-parse", a + "^{commit}", b + "^{commit}"],
+                capture_output=True, text=True, timeout=5)
+            shas = ids.stdout.split()
+            if ids.returncode != 0 or len(shas) != 2:
+                return "the revisions could not be resolved, so the walk was not checked"
             res = subprocess.run(
-                ["git", "-C", repo, "rev-list", "--boundary", *revisions, "--"],
+                ["git", "-C", repo, "rev-list", "--timestamp", "--parents",
+                 shas[0], shas[1], "--"],
                 capture_output=True, text=True, timeout=WALK_TIMEOUT)
         except Exception:
-            return True
+            return "the walk query failed or timed out"
         if res.returncode != 0:
-            return True
+            return "the walk query failed"
+        when, parents = {}, {}
         for line in res.stdout.split("\n"):
-            sha = line.strip()
-            if sha and not sha.startswith("-") and sha in cutoff:
-                return True
-        return False
+            fields = line.split()
+            if len(fields) < 2:
+                continue
+            when[fields[1]] = int(fields[0])
+            parents[fields[1]] = fields[2:]
+
+        def reach(start):
+            seen, todo = set(), [start]
+            while todo:
+                sha = todo.pop()
+                if sha in seen or sha not in parents:
+                    continue
+                seen.add(sha)
+                todo.extend(parents[sha])
+            return seen
+
+        side = {shas[0]: reach(shas[0]), shas[1]: reach(shas[1])}
+        for x, y in ((shas[0], shas[1]), (shas[1], shas[0])):
+            out = side[y] - side[x]
+            if out & cutoff:
+                return "one side's walk runs into the cut-off"
+            cut_x = side[x] & cutoff
+            if not cut_x:
+                continue
+            newest = max(when[c] for c in cut_x)
+            for sha in out:
+                if when[sha] <= newest or not parents[sha]:
+                    return ("the walk lists commits as old as the cut-off, which "
+                            "may sit below it in the full history")
+        return None
 
 
 def _verdict(sub, rest, repo, cutoff, piped_whole):
     """A short reason string when this git command must be refused, else None."""
-    walk = _Repo.walk_hits_cutoff
+    walk = _Repo.pair_unsafe
     if sub in ("log", "rev-list"):
         revs = _revisions(rest)
         limited = _has_limit(rest)
+        if any(_is_range_word(tok, repo) for tok in revs):
+            # A range bounds the walk, so --reverse or --max-parents inside a
+            # range that checks out reads only fetched history.
+            ends = _endpoints(revs)
+            if len(ends) != 2:
+                return "; a range with " + str(len(ends)) + " endpoints cannot be checked"
+            why = walk(repo, ends[0], ends[1], cutoff)
+            return "; " + why if why else None
         if _flag(rest, "--root", "--max-parents"):
             return "; --root and --max-parents read the cut-off as the first commit"
         if _flag(rest, "--reverse") and not limited:
             return "; an unlimited --reverse reads the cut-off as the first commit"
-        if any(_is_range_word(tok, repo) for tok in revs):
-            ends = _endpoints(revs)
-            if len(ends) != 2:
-                return "; a range with " + str(len(ends)) + " endpoints cannot be checked"
-            if walk(repo, [ends[0] + "..." + ends[1]], cutoff):
-                return "; this range's walk reaches the cut-off"
-            return None
         if sub == "rev-list" and not limited:
             return "; an unlimited rev-list walks into the cut-off"
         if sub == "log" and piped_whole and not limited:
@@ -445,9 +505,8 @@ def _verdict(sub, rest, repo, cutoff, piped_whole):
             revs = [revs[0], "HEAD"]
         if len(revs) != 2:
             return "; " + sub + " with " + str(len(revs)) + " commits"
-        if walk(repo, [revs[0] + "..." + revs[1]], cutoff):
-            return "; the walk between the two commits reaches the cut-off"
-        return None
+        why = walk(repo, revs[0], revs[1], cutoff)
+        return "; " + why if why else None
     if sub in ("branch", "for-each-ref", "tag"):
         if any(_is_option(tok, REF_FILTERS, REF_CMD_OPTS[sub]) for tok in rest):
             return "; --merged/--contains filters walk into the cut-off"

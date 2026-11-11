@@ -14,6 +14,18 @@ fully merged into main: the true `origin/main..origin/side` is empty.
   but main's stops at c2, so `origin/main..origin/side` wrongly lists c1 and
   c0: the EXCLUDED side ran out of history. This is the case a check of the
   positive side alone would miss.
+- FETCHED: `--depth 1` of main, then `feat` (forked at c2, commit Y, main
+  merged in) fetched with no depth. main's old commits return through Y,
+  the edge below main's cut-off stays hidden, and `origin/main..origin/feat`
+  lists them as "ahead". No commit in that walk is a cut-off commit, so only
+  their age gives them away (third review of ai-config#5323). `late` (forked
+  at c3, commit Z, main merged in) is fetched too, which brings c3 back with
+  its parent c2.
+- BROKEN: `--depth 1` of main plus two local commits, the first of whose
+  objects is deleted, so revisions resolve but the walk fails.
+
+Commit dates rise one minute per commit, as real history does, except that
+c4 shares c3's date, so the age rule is tested on a tie.
 
 Run:  python3 hooks/test-no-history-compare-in-shallow-clone.py \\
           hooks/no-history-compare-in-shallow-clone.py
@@ -41,6 +53,21 @@ def write(path, text):
         fh.write(text)
 
 
+_CLOCK = [1_700_000_000]
+
+
+def commit(name, cwd, *extra, same_time=False):
+    """Commit with a committer date one minute after the last one, so commit
+    ages follow commit order as they do in real history. `same_time` reuses
+    the last date, as a scripted or rebased commit can."""
+    if not same_time:
+        _CLOCK[0] += 60
+    stamp = f"{_CLOCK[0]} +0000"
+    subprocess.run(["git", "commit", "-q", "-m", name, *extra], cwd=cwd, check=True,
+                   capture_output=True,
+                   env={**GIT_ENV, "GIT_AUTHOR_DATE": stamp, "GIT_COMMITTER_DATE": stamp})
+
+
 def build(root):
     origin = os.path.join(root, "origin")
     os.makedirs(origin)
@@ -48,23 +75,65 @@ def build(root):
     for i in range(5):
         write(os.path.join(origin, "f.txt"), str(i))
         git("add", "f.txt", cwd=origin)
-        git("commit", "-q", "-m", f"c{i}", cwd=origin)
+        # c4 shares c3's date, so the age rule is tested on a tie.
+        commit(f"c{i}", origin, same_time=(i == 4))
         if i == 1:
             git("branch", "side", cwd=origin)
+        if i == 2:
+            git("branch", "feat", cwd=origin)
+    # feat: forked at c2, one commit Y, then main merged into it.
+    git("checkout", "-q", "feat", cwd=origin)
+    write(os.path.join(origin, "y.txt"), "Y")
+    git("add", "y.txt", cwd=origin)
+    commit("Y", origin)
+    subprocess.run(["git", "merge", "-q", "--no-edit", "main"], cwd=origin, check=True,
+                   capture_output=True,
+                   env={**GIT_ENV, "GIT_AUTHOR_DATE": f"{_CLOCK[0] + 60} +0000",
+                        "GIT_COMMITTER_DATE": f"{_CLOCK[0] + 60} +0000"})
+    _CLOCK[0] += 60
+    # late: forked at c3, one commit Z, then main merged into it.
+    git("checkout", "-q", "-b", "late", "main~1", cwd=origin)
+    write(os.path.join(origin, "z.txt"), "Z")
+    git("add", "z.txt", cwd=origin)
+    commit("Z", origin)
+    subprocess.run(["git", "merge", "-q", "--no-edit", "main"], cwd=origin, check=True,
+                   capture_output=True,
+                   env={**GIT_ENV, "GIT_AUTHOR_DATE": f"{_CLOCK[0] + 60} +0000",
+                        "GIT_COMMITTER_DATE": f"{_CLOCK[0] + 60} +0000"})
+    _CLOCK[0] += 60
+    git("checkout", "-q", "main", cwd=origin)
     full = os.path.join(root, "full")
     shallow = os.path.join(root, "shallow")
     deep3 = os.path.join(root, "deep3")
+    fetched = os.path.join(root, "fetched")
     git("clone", "-q", "-b", "main", "--no-local", origin, full, cwd=root)
     git("clone", "-q", "-b", "main", "--depth", "1", "--no-single-branch",
         "file://" + origin, shallow, cwd=root)
     git("clone", "-q", "-b", "main", "--depth", "3", "--no-single-branch",
         "file://" + origin, deep3, cwd=root)
+    # A shallow clone of main, then feat fetched with no depth: feat brings
+    # main's old commits back through Y, but the edge below main's cut-off
+    # stays hidden.
+    git("clone", "-q", "-b", "main", "--depth", "1",
+        "file://" + origin, fetched, cwd=root)
+    git("fetch", "-q", "origin", "feat:refs/remotes/origin/feat", cwd=fetched)
+    git("fetch", "-q", "origin", "late:refs/remotes/origin/late", cwd=fetched)
+    # BROKEN: a shallow clone whose local history is missing a commit object,
+    # so the revisions resolve but the walk itself fails.
+    broken = os.path.join(root, "broken")
+    git("clone", "-q", "-b", "main", "--depth", "1", "file://" + origin, broken, cwd=root)
+    for name in ("L1", "L2"):
+        write(os.path.join(broken, name), name)
+        git("add", name, cwd=broken)
+        commit(name, broken)
+    gone = git("rev-parse", "HEAD~1", cwd=broken).strip()
+    os.remove(os.path.join(broken, ".git", "objects", gone[:2], gone[2:]))
     write(os.path.join(shallow, "local.txt"), "L")
     git("add", "local.txt", cwd=shallow)
-    git("commit", "-q", "-m", "L", cwd=shallow)
+    commit("L", shallow)
     os.makedirs(os.path.join(shallow, "sub"))
     write(os.path.join(shallow, "a..b.txt"), "a file whose name holds two dots")
-    return full, shallow, deep3
+    return full, shallow, deep3, fetched, broken
 
 
 def run(command, cwd):
@@ -151,6 +220,10 @@ ALLOWED_IN_SHALLOW = [
     "git rev-list --count origin/main..HEAD",
     "git log --oneline @{u}..HEAD",
     "git log --oneline origin/main...HEAD",
+    # --reverse and --max-parents inside a range that checks out.
+    "git log --reverse --oneline origin/main..HEAD",
+    "git rev-list --reverse origin/main..HEAD",
+    "git log --max-parents=0 origin/main..HEAD",
     "git merge-base HEAD origin/main",
     "git merge-base --is-ancestor origin/main HEAD",
     # An ambiguous prefix (--contains, --color, --column, --copy) is
@@ -198,14 +271,30 @@ def main():
     failures = []
     checks = 0
     with tempfile.TemporaryDirectory() as root:
-        full, shallow, deep3 = build(root)
-        for repo in (shallow, deep3):
+        full, shallow, deep3, fetched, broken = build(root)
+        for repo in (shallow, deep3, fetched, broken):
             flag = git("rev-parse", "--is-shallow-repository", cwd=repo).strip()
             assert flag == "true", f"fixture: {repo} is not shallow"
         # The fixture really answers wrongly where the test says it does.
-        assert git("rev-list", "--count", "origin/main..origin/side", cwd=full).strip() == "0"
-        assert git("rev-list", "--count", "origin/main..origin/side", cwd=shallow).strip() != "0"
-        assert git("rev-list", "--count", "origin/main..origin/side", cwd=deep3).strip() != "0"
+        count = "origin/main..origin/side"
+        assert git("rev-list", "--count", count, cwd=full).strip() == "0"
+        assert git("rev-list", "--count", count, cwd=shallow).strip() != "0"
+        assert git("rev-list", "--count", count, cwd=deep3).strip() != "0"
+        feat = "origin/main..origin/feat"
+        true_feat = git("rev-list", "--count", feat, cwd=full).strip()
+        assert true_feat == "2", true_feat
+        assert git("rev-list", "--count", feat, cwd=fetched).strip() != true_feat, \
+            "fixture: the fetched clone does not overcount"
+        # Each FETCHED case below answers wrongly, as the test claims.
+        for rng, true in (("origin/feat~1..origin/feat", "3"),
+                          ("origin/feat...origin/main", "2"),
+                          ("origin/feat..origin/late", "2")):
+            assert git("rev-list", "--count", rng, cwd=full).strip() == true, rng
+            assert git("rev-list", "--count", rng, cwd=fetched).strip() != true, \
+                f"fixture: the fetched clone answers {rng} rightly"
+        # c3 is in FETCHED (through late) and ties c4, the cut-off.
+        assert git("log", "-1", "--format=%ct", "origin/late~2", cwd=fetched) == \
+            git("log", "-1", "--format=%ct", "origin/main", cwd=fetched)
 
         def expect(cmd, cwd, want, label):
             nonlocal checks
@@ -225,6 +314,32 @@ def main():
                "deep3: truncated excluded side not refused")
         expect("git log --oneline origin/main..HEAD", deep3, None,
                "deep3: empty walk refused")
+        # Hidden edge: main's old commits came back through feat, and their
+        # age is the only local sign that they sit below main's cut-off.
+        expect("git rev-list --count origin/main..origin/feat", fetched, "deny",
+               "fetched: hidden-edge overcount not refused")
+        expect("git log --oneline origin/main..origin/feat", fetched, "deny",
+               "fetched: hidden-edge log not refused")
+        expect("git rev-list --count origin/main..origin/feat", full, None,
+               "full: feat range refused")
+        # The included side reaches main's cut-off and the excluded side does
+        # not: Y..feat misses c3, which lies below the cut-off. Only rule 1
+        # sees it, since no other walk reaches a cut-off.
+        expect("git rev-list --count origin/feat~1..origin/feat", fetched, "deny",
+               "fetched: walk into the included side's cut-off not refused")
+        # The hidden commits sit on the second endpoint's side only, so only
+        # the check with the endpoints swapped sees them.
+        expect("git rev-list --count origin/feat...origin/main", fetched, "deny",
+               "fetched: symmetric range with hidden commits on one side not refused")
+        # Both sides reach the same cut-off, and the hidden commit c3 has its
+        # parent: only its age, equal to the cut-off's, gives it away.
+        expect("git rev-list --count origin/feat..origin/late", fetched, "deny",
+               "fetched: hidden commit tying the cut-off's date not refused")
+        expect("git rev-list --count origin/feat..origin/late", full, None,
+               "full: late range refused")
+        # The revisions resolve but the walk fails: refused, not guessed.
+        expect("git log --oneline origin/main..HEAD", broken, "deny",
+               "broken: failed walk not refused")
 
         mb = "git merge-base origin/main origin/side"
         expect(f"git -C {shallow} {mb[4:]}", full, "deny", "git -C <shallow> not refused")

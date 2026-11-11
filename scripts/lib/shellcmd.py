@@ -566,14 +566,9 @@ def resolve_cd_target(rest: list[str], cur_dir: str | None) -> str | None:
     simulate, and a `$VAR` target expands at runtime -- so a caller must
     treat `None` as "somewhere I cannot name", never as "unchanged".
 
-    Adapted verbatim from `hooks/no-push-without-self-review.py`'s
-    `_resolve_cd_target`, which is the tested in-repo implementation. This is
-    a COPY and not a move: that guard still holds its own, because it can
-    refuse a push and migrating a deny-capable guard is its own change with
-    its own review --- as the refusing `_simple_commands` copies did under
-    ai-config#3178. The duplication that leaves is tracked as ai-config#3177,
-    not by the closed ai-config#2993, whose scope is `_simple_commands` and
-    `_strip_env`. New callers import from here.
+    Moved here from `hooks/no-push-without-self-review.py`, which now
+    imports it, so one implementation serves every caller
+    (ai-config#3177).
     """
     cmd_name = rest[0]
     if cmd_name == "popd":

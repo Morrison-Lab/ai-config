@@ -126,8 +126,10 @@ CURL_VALUE_OPTS = frozenset({
     "--data-urlencode", "--form", "--form-string", "--json", "-H", "--header", "-e",
     "--referer", "-o", "--output", "-x", "--proxy", "-u", "--user",
 })
-RX_RAN_FAILED = re.compile(r"^(?:\s|\\n)*(?:Exit code [1-9]|Command timed out)")  # refusals never say this
-RX_EXIT_1 = re.compile(r"^(?:\s|\\n)*Exit code 1\b")  # a probe of a missing name (127: no probe)
+# Claude Code's "Exit code N", or Antigravity's wrapper header. A refusal never says either.
+# An attempt counts at any exit, 127 too; a probe only at 1, a missing name (127: no probe ran).
+RX_RAN_FAILED = re.compile(r"^(?:\s|\\n)*(?:Exit code [1-9]|Command timed out)|^(?:\w+ At: .*\n)*(?:the )?command exited with code [1-9]", re.I)
+RX_EXIT_1 = re.compile(r"^(?:\s|\\n)*Exit code 1\b|^(?:\w+ At: .*\n)*(?:the )?command exited with code 1\b", re.I)
 RX_AGY_TRANSCRIPT_PATH = re.compile(
     r"(?:^|/)(?:\.gemini/antigravity/|brain/[^/]+/\.system_generated/logs/transcript)")
 AGY_RECORD_TYPES = frozenset({

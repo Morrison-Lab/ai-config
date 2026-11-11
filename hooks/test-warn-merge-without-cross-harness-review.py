@@ -302,6 +302,13 @@ def main():
                    "command exited with code 1 in earlier test"
                )},
           ])[0])
+    agy_out = lambda code: {"type": "GENERIC", "status": "DONE", "content": (
+        "Created At: 2026-11-11T10:00:00Z\nCommand exited with code %d.\n\nCommand output:\n" % code)}
+    agy_cmd = lambda c: {"type": "PLANNER_RESPONSE", "tool_calls": [
+        {"name": "run_command", "args": {"CommandLine": json.dumps(c)}}]}
+    agy_pass = [agy_cmd("command -v claude codex cursor-agent"), agy_out(1), agy_cmd("opencode run x"), agy_out(1)]
+    check("silent after an Antigravity probe pass (exit 1 probe, failed opencode attempt)",
+          not run_agy(agy_pass)[0] and run_agy(agy_pass[:1] + [agy_out(2)] + agy_pass[2:])[0])
     check("warns when out-of-order step_index has view_file succeed (step 8) and claude -p fail (step 9)",
           run_agy([
               {"step_index": 8, "type": "GENERIC", "status": "DONE",

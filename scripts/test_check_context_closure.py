@@ -1545,9 +1545,15 @@ with tempfile.TemporaryDirectory() as tmp:
     (repo / "AGENTS.md").symlink_to("GEMINI.md")
     git("add", "AGENTS.md", "GEMINI.md", cwd=repo)
     git("commit", "-qm", "link", cwd=repo)
+    git("checkout", "-qb", "loop", "main", cwd=repo)
+    (repo / "AGENTS.md").symlink_to("AGENTS.md")
+    git("add", "AGENTS.md", cwd=repo)
+    git("commit", "-qm", "loop", cwd=repo)
     git("checkout", "-q", "branch", cwd=repo)
     check("--merge-result: a symlink chain out of the repo is sized by its target",
           ccc.main(loose + ["--agents-md-cap", "100", "--merge-result", "link"]) == 1)
+    check("--merge-result: a symlink cycle reads as missing, not a crash",
+          ccc.main(loose + ["--agents-md-cap", "1", "--merge-result", "loop"]) == 0)
     for name, ref in [("a non-UTF-8 root", "bad-root"), ("an unfetched submodule pin", "bad-pin")]:
         check(
             f"--merge-result: {name} in the merge exits 2, not a pass or a dangling import",

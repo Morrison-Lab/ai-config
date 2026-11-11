@@ -577,10 +577,8 @@ def merge_result_tree(base: Path, ref: str) -> tuple[str | None, str]:
     """The tree that merging `ref` into HEAD at `base` would produce.
 
     Returns `(tree, "")`, or `(None, reason)`. CI measures the merge with
-    `main` as it stood when CI ran: on 2026-10-02 a branch held AGENTS.md at
-    31,941 of the 32,768-byte cap while its merge with a newer `main`
-    measured 33,029 (ai-config#4213, #4234). `git merge-tree --write-tree`
-    (git 2.38+) touches neither index nor working tree. It exits 1 on a
+    `main` as it stood when CI ran, which can be stale (ai-config#4213).
+    `git merge-tree --write-tree` (git 2.38+) leaves the checkout. It exits 1 on a
     conflict, whose tree holds markers, and on an unknown ref, so the ref is
     checked first and a conflict is an error, not a measurement.
     """
@@ -614,7 +612,7 @@ def merge_tree_reader(base: Path, tree: str):
     `git show TREE:path` cannot see inside a submodule, so a path under a
     gitlink (a consumer's `@.ai-config/...`) is read from that submodule's
     checkout at the commit the merge pins, as `submodule_reader` does.
-    Absolute and `~` imports come from disk, as in `baseline_reader`.
+    Absolute and `~` imports, and `../` paths, come from disk.
 
     Returns `(read, missing_pins)`. `missing_pins` gains an entry when a
     read lands under a gitlink whose pinned commit the submodule checkout
@@ -642,7 +640,9 @@ def merge_tree_reader(base: Path, tree: str):
     outer = baseline_reader(base, tree)
     missing_pins = []
 
-    def read(path: str) -> bytes | None:
+    def read(path: str, hops: int = 40) -> bytes | None:
+        if path.startswith("../"):  # outside the tree, so from disk
+            path = str((base / path).resolve())
         for prefix, (sub, absent) in sub_readers.items():
             if path.startswith(prefix):
                 if absent:
@@ -650,9 +650,9 @@ def merge_tree_reader(base: Path, tree: str):
                         missing_pins.append(absent)
                     return None
                 return sub(path[len(prefix) :])
-        if path in links:  # `git show` prints a symlink's target; follow it
+        if path in links:  # `git show` prints a symlink's target; a cycle reads as missing
             target = posixpath.normpath(posixpath.join(posixpath.dirname(path), outer(path).decode()))
-            return read(str((base / target).resolve()) if target.startswith("../") else target)
+            return read(target, hops - 1) if hops else None
         return outer(path)
 
     return read, missing_pins
@@ -1159,12 +1159,9 @@ def main(argv=None) -> int:
     parser.add_argument(
         "--merge-result",
         metavar="REF",
-        help="measure the tree that merging REF (e.g. origin/main) into HEAD "
-        "would produce, instead of the working tree, so the size caps and the "
-        "import check see what the merge would land now (ai-config#4234). "
-        "Uncommitted changes are not part of that tree; absolute and ~ "
-        "imports are still read from disk. Does not combine with --baseline "
-        "or --compare.",
+        help="measure the tree merging REF (e.g. origin/main) into HEAD would "
+        "produce, not the working tree, for the caps and the import check "
+        "(ai-config#4234). Excludes --baseline, --compare, --max-growth.",
     )
     parser.add_argument(
         "--max-growth",
@@ -1294,7 +1291,6 @@ def main(argv=None) -> int:
         )
         return 2
     if args.merge_result and (args.baseline or args.compare or args.max_growth is not None):
-        # Both compare against the working tree, which this mode replaces.
         print("error: --merge-result excludes --baseline, --compare, --max-growth.",
               file=sys.stderr)
         return 2
@@ -1339,8 +1335,7 @@ def main(argv=None) -> int:
     )
 
     if args.merge_result:
-        # Count the file the walk read; a cap that cannot be checked must
-        # not pass, so a non-UTF-8 root is an error.
+        # Count the file the walk read; an uncheckable cap must not pass.
         try:
             root_chars = cli_char_count(reader(args.root).decode("utf-8"))
         except UnicodeDecodeError:

@@ -2,8 +2,8 @@
 
 The rule lives in [`issue-first`](issue-first.md)'s "Label an agent-filed issue with its authorship and its model" section.
 This fragment carries the mechanics.
-Each command below also passes a priority label, per that section's "Set the priority when you file": `P2` is the default, so replace it with `P1` or `P3` where [`triage-backlog`](triage-backlog.md) says so.
-It is linked rather than `@`-imported, and so is `issue-first.md` itself, because the always-loaded pool is budgeted --- run `python3 scripts/check-context-closure.py` before `@`-importing anything into `CLAUDE.md`.
+Each creating command and tool call here also passes a priority label, per that section's "Set the priority when you file": `P2` is the default, so replace it with `P1` or `P3` where [`triage-backlog`](triage-backlog.md) says so.
+This fragment is linked rather than `@`-imported, and so is `issue-first.md` itself, because the always-loaded pool is budgeted --- run `python3 scripts/check-context-closure.py` before `@`-importing anything into `CLAUDE.md`.
 
 ## Scope
 
@@ -49,7 +49,7 @@ glab issue create --title "..." --description "..." \
   --label "ai-authored,model:<model-id>,P2"
 ```
 
-Whether `glab` rejects an unknown label or creates it is not established here, so create the pair on GitLab first rather than relying on either behaviour.
+Whether `glab` rejects an unknown label or creates it is not established here, so create the labels on GitLab first, the priority label included, rather than relying on either behaviour.
 
 ## The MCP path
 
@@ -65,8 +65,8 @@ A freshly created issue has no prior set, so nothing can be dropped at filing ti
 
 ## Creating the labels
 
-Neither label is guaranteed to exist.
-Checked against `Morrison-Lab/ai-config` on 2026-09-03, `ai-authored` returned `label 'ai-authored' not found`, so create the pair once per repo rather than assuming they are there:
+None of the labels is guaranteed to exist.
+Checked against `Morrison-Lab/ai-config` on 2026-09-03, `ai-authored` returned `label 'ai-authored' not found`, so create the authorship and model labels once per repo rather than assuming they are there:
 
 ```sh
 gh label create ai-authored --description "Filed by an AI agent" --color EDEDED
@@ -74,7 +74,7 @@ gh label create "model:<model-id>" --description "Filed by that model" --color E
 ```
 
 The priority labels `P1`, `P2` and `P3` need the same check in a repo that has never been triaged:
-`gh label list --search P` shows whether they exist, and `gh label create P2` creates one.
+`gh label list --json name --jq '.[].name' | grep -xE 'P[123]'` prints the ones that exist, and `gh label create P2` creates one.
 
 `GET_LABEL` in [`tool-mappings`](../../tool-mappings.md) records that **no MCP tool creates or updates a label**, so a remote session cannot run the block above at all.
 Two paths remain there: `gh api repos/<owner>/<repo>/labels` from a workflow, or the MCP silent-create described above --- the one place that behaviour is useful rather than hazardous, at the cost that the label's spelling is then whatever you typed.
@@ -95,7 +95,7 @@ gh issue list --state all --label "model:<model-id>"
 ```
 
 - **Do:** normalize the model id --- strip a context-window suffix, resolve an alias --- before forming the label.
-- **Do:** create the pair once per repo, and read the label back when the MCP path created it silently.
+- **Do:** create the labels once per repo, the priority labels included, and read the label back when the MCP path created it silently.
 - **Do:** pass `--state all` on both sweeps.
 - **Don't:** use a display or marketing name, or the `Co-Authored-By` trailer's spelling, as the label value.
 - **Don't:** carry the `LABEL_ISSUE` union warning onto a filing call --- a new issue has no prior label set to preserve.

@@ -147,7 +147,7 @@ EOF
   files into a repo we administrate, per
   [`issue-first`](../../shared/workflow/issue-first.md);
   [`label-agent-filed-issues`](../../shared/workflow/label-agent-filed-issues.md)
-  covers normalizing the model id and creating the pair where it is missing.
+  covers normalizing the model id and creating the labels where they are missing.
 - Then check `gh label list` for an existing `followup`, `deferred`, or
   `tech-debt` label and add it with `--label` too.
   **Don't fabricate labels

@@ -2505,8 +2505,8 @@ NOT_CLEAN_NEGATION_PREFIX = re.compile(
 #
 # Known residuals: a finding stated with no contrast ("None. The lexer is
 # broken.") and a contrast in the next paragraph ("None.\n\nBut X leaks."),
-# tracked in ai-config#5389; and a contrast more than 60 characters after the
-# negation, which callers cut off (ai-config#5401).
+# tracked in ai-config#5389; and a contrast more than NEGATION_SUFFIX_CAP
+# characters after the negation, which _negation_suffix() cuts off.
 _BLOCK_START = r"[ \t]*(?:#|>|[-*+][ \t]|\d+[.)][ \t])"
 _SENTENCE_CHAR = (
     r"(?:(?!(?<!\b[A-Za-z])(?<!\b(?:vs|cf|al))(?<!\b[Ff]ig)[.!?](?:\s|$))"
@@ -2599,6 +2599,29 @@ FINDING_HEADING_NEGATION_SUFFIX = re.compile(
     + r")",
     re.IGNORECASE,
 )
+
+# How far past a negation the suffix regexes may read (ai-config#5401). A
+# fixed 60-character slice cut "None in the parser module, the lexer module
+# or any of their many unit tests, but the lexer leaks." before its "but";
+# the paragraph is the natural bound, and the cap keeps a paragraph of many
+# negated headings linear.
+NEGATION_SUFFIX_CAP = 2000
+_PARAGRAPH_BREAK = re.compile(r"\r?\n[ \t]*\r?\n")
+_SUFFIX_LEAD = re.compile(r"[\s*_:.\-]*")
+
+
+def _negation_suffix(text: str, start: int) -> str:
+    """Return text[start:] cut at the end of the paragraph that follows.
+
+    Leading whitespace and markup are skipped first, so a heading separated
+    from its "None." by a blank line keeps that line. The cut is at the next
+    paragraph break, or NEGATION_SUFFIX_CAP characters on, whichever is first.
+    """
+    body_start = _SUFFIX_LEAD.match(text, start).end()
+    limit = body_start + NEGATION_SUFFIX_CAP
+    brk = _PARAGRAPH_BREAK.search(text, body_start, limit)
+    end = brk.start() if brk else min(len(text), limit)
+    return text[start:end]
 
 # Deliberately narrow. An over-broad CLEAN pattern is the dangerous direction:
 # it would let an incidental "looks ready" in a later chatty comment discharge a
@@ -3486,7 +3509,7 @@ def classify_verdict(body: str, state: str = "", author: str = "") -> str:
                 if _is_exempt_findings_heading(scan, match.start(), match.end()):
                     continue
             if pat == r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b":
-                suffix = scan[match.end():match.end() + 60]
+                suffix = _negation_suffix(scan, match.end())
                 if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
                     continue
             return "not-clean"
@@ -3575,10 +3598,14 @@ def classify_verdict(body: str, state: str = "", author: str = "") -> str:
 
 _FINDINGS_TRAILER_SUFFIX = re.compile(
     r"^\s*(?:"
-    r"[*_:.\-]*\s*(?:none\b(?!\s+of\b)|n/a\b|none\s+identified\b|none\s+remaining\b)"
-    r"|"
-    r"[:.\-(]*\s*(?:non-blocking\b|nothing\b|0\b|no\s+(?:\w+\s+){0,3}(?:findings|issues|bugs|violations|blockers)|no\s+new\b)"
-    r")",
+    r"(?:[*_:.\-]+\s*)?"
+    + _SAFE_NEGATION
+    + r"|"
+    r"(?:[:.\-(]+\s*)?(?:non-blocking\b"
+    + _CONTRAST_GUARD
+    + r"|"
+    + _RISKY_NEGATION
+    + r"))",
     re.IGNORECASE,
 )
 
@@ -3594,7 +3621,10 @@ def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
     of body. The FIRST non-empty line must match the
     _FINDINGS_TRAILER_SUFFIX allowlist -- the same trigger the old 60-char
     suffix shortcut keyed on, made line-anchored -- and everything after it
-    must clear the item veto.
+    must clear the item veto. The allowlist match is tried on that line
+    joined to the rest of its paragraph (cut by _negation_suffix()), so the
+    #2359 contrast guard sees a hard-wrapped contrast in the line's own
+    sentence or opening the next one.
 
     A resolving line reached only AFTER other content (verification prose,
     alert blocks, items) never exempts: an untagged prose finding is
@@ -3604,8 +3634,8 @@ def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
     mirror direction shares the residual: untagged PLAIN PROSE after a
     resolving first line is also indistinguishable and is not vetoed --
     including finding prose packed onto the SAME physical line as the
-    resolving word, whether in the body or in a heading trailer -- the
-    same exposure the 60-char shortcut always had.
+    resolving word, whether in the body or in a heading trailer, unless
+    it carries a #2359 contrast (ai-config#5389 tracks the rest).
 
     No wider than the shortcut except one vetted way, still gated by the
     item veto: no 60-char cap on where the resolving line starts. The
@@ -3640,7 +3670,16 @@ def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
     lines = lead + [ln for ln in section.splitlines() if ln.strip()]
     if not lines:
         return False
-    if not _FINDINGS_TRAILER_SUFFIX.search(lines[0]):
+    # The first line is tested together with the rest of its paragraph, so
+    # the #2359 contrast guard sees a hard-wrapped "No issues\nHowever, X".
+    if lead:
+        after_first = section
+    else:
+        raw_lines = section.splitlines(keepends=True)
+        first = next(i for i, ln in enumerate(raw_lines) if ln.strip())
+        after_first = "".join(raw_lines[first + 1:])
+    probe = _negation_suffix(lines[0] + "\n" + after_first, 0)
+    if not _FINDINGS_TRAILER_SUFFIX.search(probe):
         return False
     return not _SECTION_FINDING_ITEM.search("\n".join(lines[1:]))
 
@@ -3727,7 +3766,7 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
                 if _is_exempt_findings_heading(scan_body, match.start(), match.end()):
                     continue
             if pat == _FINDINGS_HEADING_PATTERN:
-                # The section-resolution check REPLACES the 60-char suffix
+                # The section-resolution check REPLACES the negation-suffix
                 # shortcut for this heading: the shortcut read "No new
                 # issues." directly under the heading as resolving the whole
                 # section, even when finding items followed it (ai-config
@@ -3741,7 +3780,7 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
             elif pat in FINDING_HEADING_PATTERNS:
                 if _is_exempt_findings_heading(scan_body, match.start(), match.end()):
                     continue
-                suffix = scan_body[match.end():match.end() + 60]
+                suffix = _negation_suffix(scan_body, match.end())
                 if pat == r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b":
                     if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
                         continue

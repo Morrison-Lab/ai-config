@@ -1514,7 +1514,7 @@ def main() -> int:
     # Verification prose in a later sentence of the same paragraph stays
     # clean: only the negation's own sentence and the opening of the next
     # one are read for a contrast.
-    for _heading in ("## Nits", "### Issues"):
+    for _heading in ("### Findings", "## Nits", "### Issues"):
         for _tail in (
             "None.\nChecked the parser and tests; they still pass.",
             "None.\nI only reviewed the changed files.",
@@ -1610,10 +1610,39 @@ def main() -> int:
         "At the same time", "Having said that", "Whereas", "All the same",
         "With that said", "Then again", "Albeit",
     )):
+        for _heading in ("## Nits", "### Findings"):
+            check(
+                f"{_heading} + {_tail!r} is a finding (#2359, #5402)",
+                checker._unresolved_finding_pattern(
+                    _heading + "\n\n" + _tail + "\n"
+                ) is not None,
+            )
+    # The `### Findings` heading also resolves through a heading trailer and
+    # a hard-wrapped first line; both share the guard (#5402).
+    for _label, _body in (
+        ("CRLF hard-wrapped 'However'",
+         "### Findings\n\nNo issues\r\nHowever, X is broken.\r\n"),
+        ("heading trailer 'none, but'",
+         "### Findings: none, but X leaks.\n\nMore text.\n"),
+        ("heading trailer then a next-line 'However'",
+         "### Findings: None\nHowever, the leak.\n"),
+        ("'0-day'", "### Findings\n\n0-day exploit possible\n"),
+    ):
         check(
-            f"## Nits + {_tail!r} is a finding (#2359)",
-            checker._unresolved_finding_pattern("## Nits\n\n" + _tail + "\n")
-            is not None,
+            f"### Findings + {_label} is a finding (#5402)",
+            checker._unresolved_finding_pattern(_body) is not None,
+        )
+    for _label, _body in (
+        ("'None.'", "### Findings\n\nNone.\n"),
+        ("'0 findings.'", "### Findings\n\n0 findings.\n"),
+        ("trailer 'none'", "### Findings: none\n\nSee the thread, but fine.\n"),
+        ("'None.' then a 'but' paragraph",
+         "### Findings\n\nNone.\n\nI checked the thread, but it is fine.\n"),
+        ("'- None.' bullet", "### Findings\n\n- None.\n"),
+    ):
+        check(
+            f"### Findings + {_label} stays clean (#5402 control)",
+            checker._unresolved_finding_pattern(_body) is None,
         )
     # Long whitespace runs must not make the guard quadratic: before the
     # bounded openers, 20,000 spaces took about 6 s and " -" * 10,000 9 s.
@@ -1624,6 +1653,61 @@ def main() -> int:
         checker.FINDING_HEADING_NEGATION_SUFFIX.match(_text)
     check("whitespace runs after a negation scan in under 2 s (#2359)",
           time.monotonic() - _t0 < 2.0)
+    # _negation_suffix bounds each match's scan (ai-config#5401): it keeps the
+    # blank line between a heading and its "None.", stops at the next
+    # paragraph break, and caps a paragraph with no break.
+    check(
+        "_negation_suffix keeps a heading's blank line and stops at the next break",
+        checker._negation_suffix("## Nits\n\nNone.\n\nNext.", 7) == "\n\nNone.",
+    )
+    check(
+        "_negation_suffix stops at a CRLF paragraph break",
+        checker._negation_suffix("## Nits\r\n\r\nNone.\r\n\r\nNext.", 7)
+        == "\r\n\r\nNone.",
+    )
+    check(
+        "_negation_suffix caps a paragraph with no break",
+        len(checker._negation_suffix("x" + "y" * 5000, 1))
+        == checker.NEGATION_SUFFIX_CAP,
+    )
+    # A contrast past the old 60-character slice is now seen, on the
+    # `## Nits` path and the `Needs more work` path alike (#5401).
+    _late = ("None in the parser module, the lexer module or any of their many"
+             " unit tests, but the lexer leaks.")
+    check(
+        "## Nits + a contrast past 60 characters is a finding (#5401)",
+        checker._unresolved_finding_pattern("## Nits\n\n" + _late + "\n")
+        is not None,
+    )
+    check(
+        "classify_verdict: 'Needs more work:' + a late contrast stays not-clean (#5401)",
+        checker.classify_verdict("### Verdict\nNeeds more work: " + _late + "\n")
+        == "not-clean",
+    )
+    # Pin the cap residual (ai-config#5389): a contrast inside the cap is
+    # seen, one beyond it is not. Moving the cap must move this test.
+    _pad = "x " * ((checker.NEGATION_SUFFIX_CAP - 200) // 2)
+    check(
+        "a contrast inside NEGATION_SUFFIX_CAP is seen (#5401)",
+        checker._unresolved_finding_pattern(
+            "## Nits\n\nNone in " + _pad + "but the login flow is broken.\n"
+        ) is not None,
+    )
+    _pad = "x " * (checker.NEGATION_SUFFIX_CAP // 2 + 100)
+    check(
+        "a contrast beyond NEGATION_SUFFIX_CAP is a known residual (#5389)",
+        checker._unresolved_finding_pattern(
+            "## Nits\n\nNone in " + _pad + "but the login flow is broken.\n"
+        ) is None,
+    )
+    # Many negated headings in one long paragraph must stay linear: an
+    # unbounded suffix took 4.5 s on a 62 KB body, the capped one 0.5 s.
+    _t0 = time.monotonic()
+    checker._unresolved_finding_pattern("### Issues: None\nall good here\n" * 4000)
+    check(
+        "a 124 KB paragraph of negated headings is scanned in under 6 s (#5401)",
+        time.monotonic() - _t0 < 6.0,
+    )
     unbolded_nwn = "### Verdict\nNeeds more work\n\nNone are blocked.\n"
     check(
         "classify_verdict: unbolded next-paragraph 'None are blocked.' does NOT blank not-clean verdict (#3937)",

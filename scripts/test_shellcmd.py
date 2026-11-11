@@ -685,29 +685,34 @@ def _load_hook(name):
 
 _clobber = _load_hook("no-clobbering-push")
 _unreviewed = _load_hook("no-unreviewed-pr")
-for argv in (
-    ["git", "push", "origin", "main"],
-    ["git", "-C", "/repo", "push"],
-    ["git", "-c", "push.default=current", "push"],
-    ["git", "--git-dir", "/r/.git", "push"],
-    ["git", "--git-dir=/r/.git", "push"],
-    ["git", "--work-tree", "/r", "push"],
-    ["git", "--namespace", "ns", "push"],
-    ["git", "--exec-path=/x", "push"],
-    ["git", "--no-pager", "push"],
-    ["git", "-C", "push", "status"],
-    ["git", "-c", "push"],
-    ["git", "status"],
-    ["git", "push-it"],
-    ["echo", "git", "push"],
+# Each argv carries git's own answer (checked on git 2.43), so the corpus
+# tests correctness as well as agreement.
+for argv, is_push in (
+    (["git", "push", "origin", "main"], True),
+    (["git", "-C", "/repo", "push"], True),
+    (["git", "-c", "push.default=current", "push"], True),
+    (["git", "--git-dir", "/r/.git", "push"], True),
+    (["git", "--git-dir=/r/.git", "push"], True),
+    (["git", "--work-tree", "/r", "push"], True),
+    (["git", "--namespace", "ns", "push"], True),
+    (["git", "--config-env", "user.name=NAME", "push"], True),
+    (["git", "--exec-path=/x", "push"], True),
+    (["git", "--exec-path", "/x", "push"], False),  # prints the path, exits
+    (["git", "--no-pager", "push"], True),
+    (["git", "-C", "push", "status"], False),
+    (["git", "-c", "push"], False),
+    (["git", "status"], False),
+    (["git", "push-it"], False),
+    (["echo", "git", "push"], False),
 ):
     via_lib = shellcmd.git_subcommand(argv)
-    want = via_lib is not None and via_lib[0] == "push"
+    check(f"shellcmd reads {argv} as a push",
+          via_lib is not None and via_lib[0] == "push", is_push)
     check(f"no-clobbering-push reads {argv} as a push",
-          _clobber._push_argv(argv)[0] is not None, want)
+          _clobber._push_argv(argv)[0] is not None, is_push)
     idx = _unreviewed._git_subcommand_index(argv)
     check(f"no-unreviewed-pr reads {argv} as a push",
-          idx is not None and argv[idx] == "push", want)
+          idx is not None and argv[idx] == "push", is_push)
 
 if failures:
     print("FAILED:")

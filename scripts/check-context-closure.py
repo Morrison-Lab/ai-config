@@ -29,8 +29,7 @@ Two modes, from ai-config#1028:
      three days old, the same 33 imports had grown +62%, and nothing
      reported it -- the gitlink diff is one line.
 
-Later came `--baseline REV`, the per-PR delta, and `--merge-result REF`,
-which measures the tree merging REF into HEAD would produce (ai-config#4234).
+Later came `--baseline REV` and `--merge-result REF` (ai-config#4234).
 
 Per `shared/workflow/algorithmatize-checks.md`, "how many bytes does this
 repo load before it starts" is decidable over data already on disk, so it
@@ -627,10 +626,11 @@ def merge_tree_reader(base: Path, tree: str):
         capture_output=True,
         text=True,
     )
-    sub_readers = {}
+    sub_readers, links = {}, set()
     for line in filter(None, listing.stdout.split("\0")):
         meta, _, path = line.partition("\t")
         mode, kind, sha = meta.split()
+        links.update([path] if mode == "120000" else [])
         if mode != "160000" or kind != "commit":
             continue
         have = subprocess.run(
@@ -650,6 +650,9 @@ def merge_tree_reader(base: Path, tree: str):
                         missing_pins.append(absent)
                     return None
                 return sub(path[len(prefix) :])
+        if path in links:  # `git show` prints a symlink's target; follow it
+            target = posixpath.join(posixpath.dirname(path), outer(path).decode("utf-8"))
+            return read(posixpath.normpath(target))
         return outer(path)
 
     return read, missing_pins

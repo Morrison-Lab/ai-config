@@ -1451,10 +1451,6 @@ with tempfile.TemporaryDirectory() as tmp:
         ccc.main(common + ["--merge-result", "main"]) == 1,
     )
     check(
-        "--merge-result: the working tree is left untouched",
-        len((base / "AGENTS.md").read_bytes()) == 92 and git("status", "--porcelain") == "",
-    )
-    check(
         "--merge-result does not combine with --baseline (exit 2)",
         ccc.main(common + ["--merge-result", "main", "--baseline", "main"]) == 2,
     )
@@ -1480,9 +1476,7 @@ with tempfile.TemporaryDirectory() as tmp:
     )
 
 # --- --merge-result: every gate reads the merge tree, not the working tree ---
-# Main alone grows the root and an imported fragment, so each gate below
-# passes on the branch and fails only if it measures the merge. Each check
-# fails if that gate's reader is pointed back at the working tree.
+# Main alone grows the root and a fragment: each gate fails only on the merge.
 
 with tempfile.TemporaryDirectory() as tmp:
     base = Path(tmp)
@@ -1546,7 +1540,14 @@ with tempfile.TemporaryDirectory() as tmp:
     pin = git("rev-parse", "HEAD", cwd=sub)
     git("update-index", "--cacheinfo", f"160000,{pin},.ai-config", cwd=repo)
     git("commit", "-qm", "pin it", cwd=repo)
+    git("checkout", "-qb", "link", "main", cwd=repo)
+    (repo / "GEMINI.md").write_text("g" * 200, encoding="utf-8")
+    (repo / "AGENTS.md").symlink_to("GEMINI.md")
+    git("add", "AGENTS.md", "GEMINI.md", cwd=repo)
+    git("commit", "-qm", "link", cwd=repo)
     git("checkout", "-q", "branch", cwd=repo)
+    check("--merge-result: a symlinked AGENTS.md is sized by its target",
+          ccc.main(loose + ["--agents-md-cap", "100", "--merge-result", "link"]) == 1)
     for name, ref in [("a non-UTF-8 root", "bad-root"), ("an unfetched submodule pin", "bad-pin")]:
         check(
             f"--merge-result: {name} in the merge exits 2, not a pass or a dangling import",

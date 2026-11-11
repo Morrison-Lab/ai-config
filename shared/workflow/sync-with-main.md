@@ -212,6 +212,10 @@ already existed on one side or the other.
 So after merging `main` into a prose branch, run the duplicate check against
 the branch's full current diff and the neighbouring corpus, not only against
 lines added by the merge commit.
+The same merge can also show that `main` now refutes a claim the branch adds.
+A block on [ai-config#3023](https://github.com/Morrison-Lab/ai-config/pull/3023) would have re-added a claim a merged PR had replaced (2026-09-02).
+A file-set overlap check had reported it only as a conflict risk.
+Reread each block the branch adds against what `main` now says.
 
 - **Do:** after a `main` merge, re-run a cross-file duplication check over the
   merged branch's whole prose diff.

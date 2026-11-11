@@ -217,6 +217,8 @@ LOCAL_EQUIVALENTS = {
     "preview.yml": lambda j, b: None,
     "quarto-publish": lambda j, b: None,
     "sync-shared-fragments": lambda j, b: None,
+    # Labels issues on GitHub on a schedule; nothing to run before a push.
+    "triage-backlog": lambda j, b: None,
 }
 
 

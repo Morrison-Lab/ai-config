@@ -113,6 +113,7 @@ See ai-config#694 for the precedent.
   `$(git merge-base origin/main )...` with the operands gone; the correction
   note naming them was then stripped in turn, and only a third edit describing
   the form rather than showing it survived.)
+  Read a create back too: an `issue_write` with a malformed `labels` tag put the tag text into the title and applied no label ([ai-config#3203](https://github.com/Morrison-Lab/ai-config/issues/3203), 2026-09-04).
 - **`mcp__github__actions_run_trigger` can't re-run CI jobs in these sessions —
   it 403s.** `method: rerun_failed_jobs` (and `rerun_workflow_run`, and
   `cancel_workflow_run` -- the whole `actions: write` family, so you can neither

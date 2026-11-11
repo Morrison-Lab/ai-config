@@ -52,22 +52,44 @@ refuses whenever the query fails, times out, or the range names more than
 two commits. It also refuses some answers that happen to be right; that is
 the conservative direction.
 
+## Checking a walk with no range
+
+A log, rev-list or shortlog with no range lists commits newest first until
+its limit. Only a cut-off commit has hidden parents, so no hidden commit can
+be listed before a cut-off commit is. The guard lists the same walk with
+`git rev-list --max-count=N` and refuses when a cut-off commit appears
+anywhere but last place of a full N: from there on, the clone lists fewer or
+different commits than the full history would. With no limit, any cut-off
+commit refuses. This rule does not depend on dates.
+
+The limit is `-N`, `-n N` or `--max-count=N`, or a pipe straight to
+`head [-n] N` when the read is newest first (not `--reverse`, `--count` or
+shortlog, where head sees a summary of the whole walk). Any option other
+than display options and `--first-parent`, and any path, can make git read
+past the limit (`--author`, `--no-merges`, `--skip`, `--topo-order`,
+`-- file`), so then the whole walk is checked. This refuses `git log -5`
+in a depth-1 clone, where it prints one commit and calls it five.
+
 ## What it refuses, in a shallow repository
 
-Walk-checked (refused by the two rules above):
+Walk-checked (refused by the two rules for comparisons):
 
     git log / rev-list with a range      A..B, A...B, ^A B, B --not A
     git merge-base A B, git cherry U H
 
+Walk-checked (refused by the rule for walks with no range):
+
+    git log / rev-list / shortlog        --reverse, --count, pipes to tail,
+                                         wc, awk, grep: each is refused when
+                                         its walk reaches the cut-off;
+                                         --root and --max-parents=0 always
+                                         check the whole walk
+
 Always refused, because the read is of the whole history or has no walk the
 guard can check:
 
-    git log --root / --max-parents       first-commit reads
-    git log / rev-list --reverse         unless -n N limits it first, or a
-                                         range that passes the walk check
-                                         bounds it
-    git log ... | tail / tac / wc / sort the same reads, spelled with a pipe
-    git rev-list with no range           unless -n N limits it
+    a range with --all, --branches, --tags, --remotes, --glob or --exclude,
+    or with an endpoint that starts with "-"
     git merge-base with other arguments  --octopus, --fork-point,
                                          --independent, 3+ commits
                                          (--is-ancestor and --all with two
@@ -85,8 +107,6 @@ guard can check:
 Remote deletion is refused in a shallow clone even when shallowness does not
 change what it deletes, because the decision to delete is what a shallow
 clone gets wrong. Unshallow first, then delete.
-
-A plain `git log -5` or `git log -- ../file` is left alone.
 
 ## Which repository
 
@@ -181,20 +201,43 @@ PUSH_OPTS = PUSH_DELETERS + (
     "--exec", "--follow-tags", "--no-signed", "--no-atomic",
 )
 
-# Options of log / rev-list whose value is a separate word, so the value is
-# never read as a revision (`--author a..b`, `-S x..y`).
+# Options of log / rev-list that take their value as the next word, so the
+# value is never read as a revision (`--author a..b`, `-S x..y`). Measured on
+# git 2.43: `--format`, `--pretty`, `--branches`, `--tags` and `--remotes`
+# take a value only after `=`, so they are not here (fourth review of
+# ai-config#5323).
 LOG_VALUE_OPTS = frozenset({
     "-n", "--max-count", "--skip", "--author", "--committer", "--grep",
-    "-S", "-G", "--since", "--until", "--after", "--before", "--format",
-    "--pretty", "--date", "--encoding", "-L", "-O", "--diff-filter",
-    "--output", "--decorate-refs", "--decorate-refs-exclude", "--exclude",
-    "--glob", "--branches", "--tags", "--remotes",
+    "-S", "-G", "--since", "--until", "--after", "--before", "--date",
+    "--encoding", "-L", "-O", "--diff-filter", "--output", "--decorate-refs",
+    "--decorate-refs-exclude", "--exclude", "--glob",
 })
 GIT_VALUE_OPTS = ("-c", "--namespace", "--exec-path", "--work-tree")
 
-RX_LOG_PIPED_WHOLE = re.compile(
-    r"\bgit\b[^;&\n|]*\blog\b[^;&\n|]*(?:\|[^;&\n|]*)*"
-    r"\|\s*(?:tail|tac|wc|sort|sed\s+-n\s+['\"]?\$)")
+# Options that add commits to the walk, as revisions do.
+REV_SET_OPTS = ("--all", "--branches", "--tags", "--remotes", "--glob", "--exclude")
+
+# Options that change only how each commit is shown, never which commits the
+# walk visits or their order. A limited log with only these (and
+# --first-parent) lists the same commits as `rev-list --max-count`. Any other
+# option (--author, --no-merges, --skip, --topo-order, a path) may make git
+# read past the limit, so the whole walk is checked instead.
+SHOW_ONLY_OPTS = frozenset({
+    "--oneline", "--format", "--pretty", "--abbrev-commit", "--no-abbrev-commit",
+    "--abbrev", "--no-abbrev", "--date", "--relative-date", "--decorate",
+    "--no-decorate", "--color", "--no-color", "--reverse", "--count",
+    "--timestamp", "--parents", "--children", "--stat", "--shortstat",
+    "--numstat", "--summary", "--name-only", "--name-status", "--raw",
+    "--patch", "--no-patch", "--no-renames", "--encoding", "--expand-tabs",
+    "--no-expand-tabs", "--log-size", "--mailmap", "--use-mailmap",
+    "--no-mailmap", "--notes", "--no-notes", "--show-signature", "--numbered",
+    "--email", "-p", "-u", "-s", "-z",
+})
+
+# `git log ... | head [-n N | -N | --lines=N]`: the pipe limits the read.
+RX_LOG_TO_HEAD = re.compile(
+    r"\bgit\b[^;&\n|]*\b(?:log|shortlog|rev-list)\b[^;&\n|]*"
+    r"\|\s*head(?:\s+(?:-n\s*|--lines=|-)(\d+))?\s*(?=$|[|;&)\n])")
 
 DENY = (
     "Refused: `{segment}` reads history that the repository at {repo} does "
@@ -308,11 +351,7 @@ def _is_range_word(tok, repo):
         return True
     if ".." not in tok:
         return False
-    if tok.startswith(("../", "./")) or "/../" in tok or tok.endswith("/.."):
-        return False
-    if repo and os.path.exists(os.path.join(repo, tok)):
-        return False
-    return True
+    return not _is_path(tok, repo)
 
 
 def _endpoints(revs):
@@ -332,17 +371,63 @@ def _endpoints(revs):
     return out
 
 
-def _has_limit(rest):
-    for i, tok in enumerate(rest):
+def _is_path(tok, repo):
+    """A word that names a path rather than a revision."""
+    if tok.startswith(("./", "../")) or "/../" in tok or tok.endswith("/.."):
+        return True
+    return bool(repo) and os.path.exists(os.path.join(repo, tok))
+
+
+def _plain_walk(sub, rest, repo):
+    """How a log / rev-list / shortlog with no range walks.
+
+    Returns (limit, walk_opts, revs, filtered): the commit limit or None,
+    the revision-set options and --first-parent to hand to rev-list, the
+    revision words, and whether anything else (a filter, an ordering option,
+    an unknown option, a path) may make git read past the limit."""
+    limit, walk_opts, revs, filtered = None, [], [], False
+    i = 0
+    while i < len(rest):
+        tok = rest[i]
+        nxt = rest[i + 1] if i + 1 < len(rest) else None
+        head = tok.split("=", 1)[0]
         if tok == "--":
+            filtered = filtered or i + 1 < len(rest)
             break
-        if re.fullmatch(r"-\d+", tok) or re.fullmatch(r"-n\d+", tok):
-            return True
-        if tok in ("-n", "--max-count") and i + 1 < len(rest):
-            return True
-        if tok.startswith("--max-count="):
-            return True
-    return False
+        num = None
+        if re.fullmatch(r"-\d+", tok):
+            num = tok[1:]
+        elif sub != "shortlog" and re.fullmatch(r"-n\d+", tok):
+            num = tok[2:]
+        elif (tok == "--max-count" or (tok == "-n" and sub != "shortlog")) and nxt is not None:
+            num = nxt
+            i += 1
+        elif tok.startswith("--max-count="):
+            num = tok.split("=", 1)[1]
+        if num is not None:
+            if num.isdigit():
+                limit = int(num)
+            else:
+                filtered = True
+        elif head in REV_SET_OPTS or tok == "--first-parent":
+            walk_opts.append(tok)
+            if tok in ("--glob", "--exclude") and nxt is not None:
+                walk_opts.append(nxt)
+                i += 1
+        elif head in SHOW_ONLY_OPTS or (
+                sub == "shortlog" and re.fullmatch(r"-[sneci]+|-w[0-9,]*", tok)):
+            if tok in LOG_VALUE_OPTS:
+                i += 1
+        elif tok.startswith("-"):
+            filtered = True
+            if tok in LOG_VALUE_OPTS:
+                i += 1
+        elif _is_path(tok, repo):
+            filtered = True
+        else:
+            revs.append(tok)
+        i += 1
+    return limit, walk_opts, revs, filtered
 
 
 def _flag(rest, *names):
@@ -355,7 +440,7 @@ def _flag(rest, *names):
 
 
 def _push_can_delete(rest):
-    if _flag(rest, "--dry-run") or "-n" in rest:
+    if (_flag(rest, "--dry-run") or "-n" in rest) and not _flag(rest, "--no-dry-run"):
         return False
     for tok in rest:
         if tok == "--":
@@ -424,6 +509,8 @@ class _Repo:
         unless committer clocks were skewed. It refuses rather than allows when
         the dates tie. Any failure of the query refuses.
         """
+        if a.startswith("-") or b.startswith("-"):
+            return "a revision that starts with '-' cannot be checked"
         try:
             ids = subprocess.run(
                 ["git", "-C", repo, "rev-parse", a + "^{commit}", b + "^{commit}"],
@@ -472,30 +559,62 @@ class _Repo:
                             "may sit below it in the full history")
         return None
 
+    @staticmethod
+    def walk_unsafe(repo, revs, walk_opts, limit, cutoff):
+        """Why a walk with no range may be wrong here, or None.
 
-def _verdict(sub, rest, repo, cutoff, piped_whole):
+        Lists the walk with `rev-list` (at most `limit` commits). Only a
+        cut-off commit has hidden parents, so no hidden commit can be listed
+        before a cut-off commit is. The walk is wrong when it lists a cut-off
+        commit anywhere but last place of a full `limit`: past that point the
+        clone lists fewer, or different, commits than the full history."""
+        if not revs and not any(o.split("=", 1)[0] in REV_SET_OPTS for o in walk_opts):
+            revs = ["HEAD"]
+        cmd = ["git", "-C", repo, "rev-list"]
+        if limit is not None:
+            cmd.append(f"--max-count={limit}")
+        cmd += walk_opts + ["--end-of-options"] + revs + ["--"]
+        try:
+            res = subprocess.run(cmd, capture_output=True, text=True,
+                                 timeout=WALK_TIMEOUT)
+        except Exception:
+            return "the walk query failed or timed out"
+        if res.returncode != 0:
+            return "the walk could not be checked"
+        for n, sha in enumerate(res.stdout.split()):
+            if sha in cutoff and (limit is None or n < limit - 1):
+                return "the walk reaches the cut-off"
+        return None
+
+
+def _verdict(sub, rest, repo, cutoff, head_limit):
     """A short reason string when this git command must be refused, else None."""
     walk = _Repo.pair_unsafe
-    if sub in ("log", "rev-list"):
+    if sub in ("log", "rev-list", "shortlog"):
         revs = _revisions(rest)
-        limited = _has_limit(rest)
         if any(_is_range_word(tok, repo) for tok in revs):
             # A range bounds the walk, so --reverse or --max-parents inside a
             # range that checks out reads only fetched history.
+            if _flag(rest, *REV_SET_OPTS):
+                return "; a range combined with --all/--branches/--tags/--remotes cannot be checked"
             ends = _endpoints(revs)
             if len(ends) != 2:
                 return "; a range with " + str(len(ends)) + " endpoints cannot be checked"
             why = walk(repo, ends[0], ends[1], cutoff)
             return "; " + why if why else None
-        if _flag(rest, "--root", "--max-parents"):
-            return "; --root and --max-parents read the cut-off as the first commit"
-        if _flag(rest, "--reverse") and not limited:
-            return "; an unlimited --reverse reads the cut-off as the first commit"
-        if sub == "rev-list" and not limited:
-            return "; an unlimited rev-list walks into the cut-off"
-        if sub == "log" and piped_whole and not limited:
-            return "; piping an unlimited log to tail/tac/wc/sort reads the cut-off"
-        return None
+        limit, walk_opts, wrevs, filtered = _plain_walk(sub, rest, repo)
+        if (head_limit is not None and sub != "shortlog"
+                and not _flag(rest, "--reverse", "--count")):
+            limit = head_limit if limit is None else min(limit, head_limit)
+        if filtered:
+            # A filter or path can make git read past the limit.
+            limit = None
+        why = _Repo.walk_unsafe(repo, wrevs, walk_opts, limit, cutoff)
+        if why and filtered:
+            why += " (a filter or path makes git walk past any limit)"
+        elif why and limit is None:
+            why += " (the read has no limit)"
+        return "; " + why if why else None
     if sub in ("merge-base", "cherry"):
         revs = [tok for tok in _revisions(rest) if tok != "--not"]
         opts = [t for t in rest if t.startswith("--")]
@@ -522,11 +641,22 @@ def _verdict(sub, rest, repo, cutoff, piped_whole):
     return None
 
 
+def _git_parse(argv):
+    """`git_subcommand` of one simple command, reading through `xargs`."""
+    _env, rest = strip_env(argv)
+    unwrapped = _unwrap_xargs(rest) if rest else rest
+    return git_subcommand(unwrapped if unwrapped is not rest else argv)
+
+
 def _evaluate_line(command, base_cwd, repos):
     cmds = simple_commands_with_scope(command)
     if cmds is None:
         return None
-    piped_whole = bool(RX_LOG_PIPED_WHOLE.search(command))
+    heads = RX_LOG_TO_HEAD.findall(command)
+    reads = [argv for _scope, argv in cmds
+             if (_git_parse(argv) or ("",))[0] in ("log", "rev-list", "shortlog")]
+    # Only an unambiguous pipe counts: one log read, piped straight to head.
+    head_limit = int(heads[0] or 10) if len(heads) == 1 and len(reads) == 1 else None
     dirs = {(): base_cwd}
     for scope, argv in cmds:
         for n in range(1, len(scope) + 1):
@@ -537,8 +667,7 @@ def _evaluate_line(command, base_cwd, repos):
             if target is None or os.path.isdir(target):
                 dirs[scope] = target
             continue
-        unwrapped = _unwrap_xargs(rest) if rest else rest
-        parsed = git_subcommand(unwrapped if unwrapped is not rest else argv)
+        parsed = _git_parse(argv)
         if parsed is None:
             continue
         sub, sub_rest, env = parsed
@@ -550,7 +679,7 @@ def _evaluate_line(command, base_cwd, repos):
         cutoff = repos.cutoff(repo)
         if not cutoff:
             continue
-        why = _verdict(sub, sub_rest, repo, cutoff, piped_whole)
+        why = _verdict(sub, sub_rest, repo, cutoff, head_limit)
         if why is not None:
             return "deny", DENY.format(segment=" ".join(argv), repo=repo, why=why)
     return None

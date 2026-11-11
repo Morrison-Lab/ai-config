@@ -36,7 +36,7 @@ import subprocess
 import sys
 import tempfile
 
-HOOK = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
+HOOK = os.path.realpath(sys.argv[1]) if len(sys.argv) > 1 else os.path.join(
     os.path.dirname(os.path.realpath(__file__)), "no-history-compare-in-shallow-clone.py")
 
 GIT_ENV = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
@@ -136,14 +136,20 @@ def build(root):
     return full, shallow, deep3, fetched, broken
 
 
-def run(command, cwd):
+def run_full(command, cwd):
+    """(decision, reason) for one command; (None, "") when the hook is silent."""
     payload = {"tool_name": "Bash", "tool_input": {"command": command}, "cwd": cwd}
     res = subprocess.run([sys.executable, HOOK], input=json.dumps(payload),
                          capture_output=True, text=True, timeout=60)
     assert res.returncode == 0, (command, res.returncode, res.stderr)
     if not res.stdout.strip():
-        return None
-    return json.loads(res.stdout)["hookSpecificOutput"].get("permissionDecision")
+        return None, ""
+    out = json.loads(res.stdout)["hookSpecificOutput"]
+    return out.get("permissionDecision"), out.get("permissionDecisionReason", "")
+
+
+def run(command, cwd):
+    return run_full(command, cwd)[0]
 
 
 # Each must be refused in SHALLOW and allowed in FULL.
@@ -167,9 +173,32 @@ REFUSED_IN_SHALLOW = [
     "git merge-base --octopus HEAD origin/main",
     # A range whose walk query fails is refused rather than guessed.
     "git log nosuchref..HEAD",
+    # Revision-set options are not option values: each read below lists
+    # main's old commits as only on the remotes (fourth review).
+    "git log --oneline --remotes ^origin/main",
+    "git log --oneline --remotes --not origin/main",
+    "git log --pretty origin/main..origin/side",
+    "git log --oneline --all origin/main..HEAD",
+    # Right here, but a range beside --remotes is refused unread.
+    "git log -1 --remotes ^origin/main",
+    # Two log reads and one head: the head limit is not credited to either.
+    "git log --oneline | head -2; git log --oneline | wc -l",
     "git branch -r | xargs -n1 git merge-base origin/main",
-    # First-commit and whole-history reads.
+    # First-commit and whole-history reads, and limited reads that run past
+    # the cut-off (here HEAD is L, then the cut-off c4).
     "git log --root --oneline",
+    "git log -5 --oneline",
+    "git log --oneline | head -3",
+    "git log --reverse -3 --format=%s",
+    "git log --reverse -n 100000 --format=%cs origin/main | head -1",
+    "git rev-list --count --max-count=100000 origin/main",
+    "git rev-list --count HEAD | head -1",
+    "git log --oneline origin/main | awk 'END{print NR}'",
+    "git log --oneline origin/main | grep -c .",
+    "git log --oneline | grep c0",
+    "git log --format=%cs origin/main",
+    "git shortlog -sn origin/main",
+    "git shortlog -sn HEAD | head -1",
     "git log --max-parents=0 origin/main",
     "git log --format=%cs origin/main | tail -1",
     "git log --oneline | wc -l",
@@ -201,6 +230,7 @@ REFUSED_IN_SHALLOW = [
     "git push --prune origin refs/heads/*:refs/heads/*",
     "git push --mirror origin",
     "git push --mi origin",
+    "git push --dry-run --no-dry-run origin :side",
     # Placement and wrapping.
     "echo start && git rev-list --count origin/main..origin/side",
     "bash -c 'git merge-base origin/main origin/side'",
@@ -214,6 +244,22 @@ REFUSED_IN_SHALLOW = [
 ]
 
 # Each must be allowed in SHALLOW (and so in FULL).
+# Each must be refused in SHALLOW because a path or filter makes git walk past
+# its limit, and allowed in FULL. The reason shows that the ".." in a path or
+# an option value was not read as a range.
+FILTERED_IN_SHALLOW = [
+    "git log -3 -- ../README.md",
+    "git log --oneline -5 ../other/file",
+    "git log -n 5 -- docs/a..b.md",
+    "git log -3 a..b.txt",
+    "git log -3 ./a..b",
+    "git log --author 'a..b' -3",
+    "git log -S 'x..y' -2",
+    "git log -G foo..bar -2",
+    "git log --since 2026-01-01.. -3",
+    "git log --no-merges -1",
+]
+
 ALLOWED_IN_SHALLOW = [
     # Ranges whose walk stays inside the fetched history.
     "git log --oneline origin/main..HEAD",
@@ -230,20 +276,18 @@ ALLOWED_IN_SHALLOW = [
     # rejected by git itself, so it is not a ref filter.
     "git branch --co",
     "git cherry origin/main HEAD",
-    # Limited reads, paths, and option values holding "..".
-    "git log -5 --oneline",
-    "git log --oneline | head -3",
-    "git log --reverse -3 --format=%s",
+    # Limited reads that stop at or before the cut-off: HEAD is L, then the
+    # cut-off c4, so two commits are exactly what the full history lists.
+    "git log -1 --oneline",
+    "git log -2 --oneline",
+    "git log --oneline -n 2 --stat",
+    # --pretty takes no separate value, so -2 is the limit.
+    "git log --pretty -2",
+    "git log --oneline | head -2",
+    "git log --oneline | head -n 1",
     "git log -1 --format=%H | tail -1",
-    "git log -3 -- ../README.md",
-    "git log --oneline -5 ../other/file",
-    "git log -n 5 -- docs/a..b.md",
-    "git log -3 a..b.txt",
-    "git log -3 ./a..b",
-    "git log --author 'a..b' -3",
-    "git log -S 'x..y' -2",
-    "git log -G foo..bar -2",
-    "git log --since 2026-01-01.. -3",
+    "git log --reverse -2 --format=%s",
+    "git rev-list --count -2 HEAD",
     "git rev-list -n1 HEAD",
     "git rev-list -1 HEAD",
     "git rev-list -n 1 HEAD",
@@ -308,6 +352,23 @@ def main():
         for cmd in ALLOWED_IN_SHALLOW:
             expect(cmd, shallow, None, "refused in shallow clone (false positive)")
             expect(cmd, full, None, "refused in FULL clone (false positive)")
+        for cmd in FILTERED_IN_SHALLOW:
+            checks += 1
+            decision, reason = run_full(cmd, shallow)
+            if decision != "deny" or "filter or path" not in reason:
+                failures.append(f"filtered read not refused as filtered: {cmd}: {reason}")
+            expect(cmd, full, None, "refused in FULL clone (false positive)")
+
+        # An endpoint that git would read as an option is refused before any
+        # query runs, so the guard's own git call cannot write a file.
+        victim = os.path.join(root, "victim")
+        write(victim + "^{commit}", "keep me")
+        expect(f"git log ^--output={victim} HEAD", shallow, "deny",
+               "option-shaped endpoint not refused")
+        with open(victim + "^{commit}", encoding="utf-8") as fh:
+            checks += 1
+            if fh.read() != "keep me":
+                failures.append("the guard's own query wrote to a file")
 
         # The excluded side ran out of history: refused.
         expect("git rev-list --count origin/main..origin/side", deep3, "deny",
@@ -340,6 +401,8 @@ def main():
         # The revisions resolve but the walk fails: refused, not guessed.
         expect("git log --oneline origin/main..HEAD", broken, "deny",
                "broken: failed walk not refused")
+        expect("git log -3 --oneline", broken, "deny",
+               "broken: failed plain walk not refused")
 
         mb = "git merge-base origin/main origin/side"
         expect(f"git -C {shallow} {mb[4:]}", full, "deny", "git -C <shallow> not refused")
@@ -364,7 +427,7 @@ def main():
                     '{"tool_name": "Bash", "tool_input": {"command": "git log \'"}}',
                     '{"tool_name": "Bash", "tool_input": {"command": "git log"}, "cwd": 5}'):
             checks += 1
-            res = subprocess.run([sys.executable, HOOK], input=raw,
+            res = subprocess.run([sys.executable, HOOK], input=raw, cwd=root,
                                  capture_output=True, text=True, timeout=30)
             if res.returncode != 0 or res.stdout.strip():
                 failures.append(f"malformed payload not silent: {raw}")

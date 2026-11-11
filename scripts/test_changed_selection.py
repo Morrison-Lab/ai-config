@@ -84,18 +84,24 @@ def test_selector():
         for shared in ("scripts/lib/shared.py", "hooks/hooks.json", "scripts/test_hooks.py",
                        "scripts/run-local-validation.py", ".github/workflows/validate.yml"):
             check(f"a change to {shared} selects every suite", sel.needed(seeds, [shared]))
-        with redirect_stderr(io.StringIO()):
-            check("a suite reaching an unparsable file always runs",
-                  sel.needed(["hooks/broken.py"], ["hooks/unrelated.py"]))
+        err = io.StringIO()
+        with redirect_stderr(err):
+            check("a suite reaching an unparsable file always runs, and says so",
+                  sel.needed(["hooks/broken.py"], ["hooks/unrelated.py"]) and "hooks/broken.py" in err.getvalue())
         check("untracked, non-ignored files are indexed", "hooks/brand-new.py" in sel.files)
         check("./ and a/../ spellings are normalised", sel.needed(seeds, ["./hooks/x/../helper.py"])
               and not sel.needed(seeds, ["./hooks/unrelated.py"]))
-        for outside in ("/etc/passwd", "../elsewhere.py"):
+        check("one matching path among several selects it",
+              sel.needed(seeds, ["hooks/unrelated.py", "hooks/helper.py"]))
+        check("one deleted path among several selects it", sel.needed(seeds, ["hooks/unrelated.py", "hooks/gone.py"]))
+        check("several unrelated paths do not (negative control)",
+              not sel.needed(seeds, ["hooks/unrelated.py", "AGENTS.md"]))
+        for bad in ([], [""], ["."], ["/etc/passwd"], ["../elsewhere.py"]):
             try:
-                sel.needed(seeds, [outside])
-                check(f"a path outside the repo is refused: {outside}", False)
+                sel.needed(seeds, bad)
+                check(f"a changed list of {bad} is refused", False)
             except ValueError:
-                check(f"a path outside the repo is refused: {outside}", True)
+                check(f"a changed list of {bad} is refused", True)
 
 
 def test_live_tree():

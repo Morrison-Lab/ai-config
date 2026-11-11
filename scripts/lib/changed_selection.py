@@ -5,8 +5,9 @@ the seeds (a test and its subject), every file whose name or module stem they
 mention as a whole token, and every Python module those import or load by a
 literal `x.py` path, transitively. Other mentions are followed one level only:
 followed further, comments naming other scripts pulled a median of 1127 of 1647
-files into every suite (2026-11-11). A computed path is invisible here, so a
-change under ALWAYS_RUN, or a deleted path, selects every suite; CI runs all.
+files into every suite (2026-11-11). A file reached only by a computed path or
+a directory scan is not selected, so shared code reached that way must live
+under ALWAYS_RUN; a deleted path selects every suite, and CI runs all of them.
 The changed list must name both sides of a rename (`git diff --no-renames`).
 """
 from __future__ import annotations
@@ -108,9 +109,9 @@ class Selector:
     def needed(self, seeds: Iterable[str], changed: Iterable[str]) -> bool:
         """Whether a suite seeded by `seeds` reads a path in `changed` (repo-relative)."""
         changed = [posixpath.normpath(c) for c in changed]  # ./x and a/../x match too
-        outside = [c for c in changed if posixpath.isabs(c) or c.split("/")[0] == ".."]
-        if outside:
-            raise ValueError(f"changed paths must be repo-relative: {outside}")
+        bad = [c for c in changed if posixpath.isabs(c) or c.split("/")[0] in ("..", ".")]
+        if bad or not changed:  # an empty list would select nothing and pass vacuously
+            raise ValueError(f"changed paths must be a non-empty list of repo-relative files: {bad}")
         # A path gone from the working tree (deleted, or the old side of a rename)
         # cannot be matched against what reads it, so it runs everything.
         if any(c.startswith(ALWAYS_RUN) or not os.path.lexists(self.root / c) for c in changed):

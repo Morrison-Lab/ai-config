@@ -93,7 +93,13 @@ jobs:
           set -euo pipefail
           summary="$RUNNER_TEMP/triage-summary.txt"
           if [ ! -s "$summary" ]; then
+            # An earlier step failed, or the labelling step wrote nothing.
             echo "No summary was written."
+            {
+              echo '### Backlog triage (labels only)'
+              echo
+              echo 'The run stopped before the labelling step wrote a summary. Read the log for the error.'
+            } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           {

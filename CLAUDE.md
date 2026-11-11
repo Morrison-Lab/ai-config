@@ -1494,7 +1494,8 @@ The Write tool passes bytes unchanged, and it cannot be silently skipped the way
 
 - **NEVER merge any Pull Request or Merge Request without explicit user permission.**
   Creating, opening, updating, or driving a PR to clean CI/review does NOT grant permission to merge it.
-  Merging a PR is strictly forbidden unless the user explicitly grants session permission (e.g. via `/mwc` or `/maw`) or explicitly issues a merge instruction for that specific PR (e.g. `/merge-it` or "merge this PR").
+  Merging a PR is strictly forbidden unless the user explicitly issues a merge instruction for that specific PR (e.g. `/merge-it` or "merge this PR").
+  No session or standing grant substitutes, per `AGENTS.md`'s "Never take an irreversible action without direct, explicit authorization" ([`irreversible-actions-need-authorization`](shared/workflow/irreversible-actions-need-authorization.md)).
 - **Never merge over open review findings or treat skip notices as approval.**
   Under `mwc`, a PR must be fully clean across CI and all review findings.
   A reviewer skip notice (e.g. for workflow edits or quota limits) never clears or supersedes prior review findings.
@@ -1512,9 +1513,10 @@ The Write tool passes bytes unchanged, and it cannot be silently skipped the way
   Another lab member's PR that fails the test gets neither the comment nor the merge.
   [`mwc`](skills/mwc/SKILL.md)'s "Another session's PR" section carries the derivation and the pattern/anti-pattern pair (ai-config#2460).
 
-**One standing exception: PRs targeting `Morrison-Lab/ai-config`, `Morrison-Lab/gha` or the macros repo `d-morrison/macros` carry a standing `mwc` grant**, with no per-session re-issue and no `enable-mwc` step --- `hooks/no-unauthorized-merge.py` reads the merge's target repo off the command.
-[`mwc`](skills/mwc/SKILL.md)'s Scope Limit binds in full, so it covers a **fully clean** PR (see [`fully-clean`](shared/workflow/fully-clean.md)) and nothing else.
-It is scoped to the **target**, so a merge from an ai-config checkout into another repo is unaffected.
+**No standing exception.**
+PRs targeting `Morrison-Lab/ai-config`, `Morrison-Lab/gha` or `d-morrison/macros` used to carry a standing `mwc` grant;
+the irreversible-actions rule above retired it (ai-config#5326).
+`hooks/no-unauthorized-merge.py` still honours that grant until the follow-up in ai-config#5326 lands, so the hook allowing a merge is not authorization.
 
-- **Do:** merge a fully-clean ai-config PR without asking, and say in the same reply that you did and why it qualified.
-- **Don't:** read it as covering a PR that is not fully clean, or another repo's PR merged from an ai-config checkout.
+- **Do:** drive an ai-config PR to fully clean, then ask the user to merge it, naming the PR.
+- **Don't:** merge an ai-config, gha or macros PR because the hook lets it through.

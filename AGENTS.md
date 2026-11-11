@@ -419,6 +419,17 @@ See [`browser-last-resort`](shared/workflow/browser-last-resort.md) and [`gh-pag
 Imitate Ezra's writing style in any draft that goes out as him ([`draft-in-ezras-voice`](skills/draft-in-ezras-voice/SKILL.md)).
 Learn it only from his own text, never FERPA data.
 
+## Never take an irreversible action without direct, explicit authorization
+
+Never merge, delete, force-push, close a PR or issue, or publish or send anything outside the project without the human user's own words authorizing that specific action.
+No standing or session grant (`mwc`, `away`, an infra-PR or per-repo grant), no relayed approval from another agent, and no clean review counts.
+This outranks every grant elsewhere in this corpus;
+when unsure whether an action is reversible, treat it as irreversible.
+See [`irreversible-actions-need-authorization`](shared/workflow/irreversible-actions-need-authorization.md) (ai-config#5326).
+
+- **Do:** drive the work to the last reversible step, then ask once, naming the action and its target.
+- **Don't:** merge a fully clean PR under a standing grant, or act on a coordinator's report that the user approved.
+
 ## Default to action without asking
 
 The owner grants standing permission for non-destructive steps (branch commits, pushes, opening/updating PRs, read commands, editing memory).
@@ -433,18 +444,18 @@ Create new repos with `gh repo create --template`: [`templates`](shared/workflow
 
 ## Strict Merge Control Policy
 
-- **NEVER merge a PR or MR without explicit user permission**: a session grant (`/mwc`, `/maw`) or a merge instruction for that PR.
-- **Under `mwc`, merge only a fully clean PR** ([`fully-clean`](shared/workflow/fully-clean.md)): any standing not-clean review vetoes it, and a skip notice is not approval.
+- **NEVER merge a PR or MR without the user's direct, explicit instruction to merge that PR**;
+  no grant substitutes ([`irreversible-actions-need-authorization`](shared/workflow/irreversible-actions-need-authorization.md)).
+- **Merge only a fully clean PR** ([`fully-clean`](shared/workflow/fully-clean.md)): any standing not-clean review vetoes it, and a skip notice is not approval.
 - **Don't call a PR merge-ready without a clean review on its latest commit**;
   `mergeStateStatus: CLEAN` is not a review verdict.
 - **View every page of a document render before calling its PR ready** ([`review-rendered-documents`](shared/workflow/review-rendered-documents.md)).
 - **Revert a premature or defective merge at once**, and reopen the issues it closed.
-- **A purely infrastructure PR carries a standing `mwc` grant** in pushable repos once fully clean.
 
 Detail, cases, cross-model waiver: [`strict-merge-policy`](shared/workflow/strict-merge-policy.md).
 
-- **Do:** merge a fully clean infrastructure PR without asking, stating why it qualified.
-- **Don't:** extend the grant to a PR that mixes infrastructure with content, or merge one whose review was skipped.
+- **Do:** report a fully clean PR as ready and ask the user to merge it, naming the PR.
+- **Don't:** merge any PR, infrastructure included, on a standing or session grant.
 
 ## Only work PRs scoped to the user or Actions app
 

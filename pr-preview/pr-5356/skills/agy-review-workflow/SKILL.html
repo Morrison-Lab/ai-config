@@ -417,7 +417,7 @@ cookieconsent.run({
 <blockquote class="blockquote">
 <p>[!IMPORTANT] <strong>This workflow’s <em>API-dispatch</em> route is still out of service, most recently confirmed 2026-09-01.</strong> The original 2026-08-20 run ended <code>request failed (code 429): Your prepayment credits are depleted</code> / <code>Execution failed: model unreachable</code>; a 2026-09-01 retest (<code>workflow_dispatch</code> run 33557587761) failed again with a different error: <code>Spend cap breached</code> (code 403) rather than the original 429. Two different failures a week apart both stop this dispatch path, so keep it disabled rather than re-running it on spec — do not dispatch the workflow. <strong>This is a separate claim from the <code>agy</code> CLI</strong>, which is confirmed working on Windows as of 2026-09-02 via a direct local install (see <code>memories/delegation.md</code>’s IMPORTANT banner and its “agy on Windows” section, pointed to from <code>memories/preferences.md</code>) — that CLI route does not go through this workflow file at all, so its recovery says nothing about whether the API dispatch here still fails. Prefer <a href="../../skills/delegate-to-codex/SKILL.html"><code>delegate-to-codex</code></a> (UCDH projects only) or a direct <code>agy --print</code> CLI dispatch (per <code>memories/delegation.md</code>) for a cross-vendor second opinion. Copilot stays requestable on the PR where the org’s licensing reaches it. Tracked as ai-config#1776.</p>
 </blockquote>
-<p>Sets up or edits the Google Antigravity PR <strong>review, security audit, and test generation</strong> workflow (<a href="../../.github/workflows/antigravity-review.yml">antigravity-review.yml</a>), which invokes the reusable <a href="https://github.com/Morrison-Lab/gha/blob/v2/.github/workflows/antigravity-code-review.yml">antigravity-code-review.yml</a> workflow from <code>Morrison-Lab/gha</code>.</p>
+<p>Sets up or edits the Google Antigravity PR <strong>review, security audit, and test generation</strong> workflow (<a href="../../.github/workflows/antigravity-review.yml">antigravity-review.yml</a>), which invokes the reusable <a href="https://github.com/Morrison-Lab/gha/blob/v3/.github/workflows/antigravity-code-review.yml">antigravity-code-review.yml</a> workflow from <code>Morrison-Lab/gha</code>.</p>
 <p>Path: <a href="../../.github/workflows/antigravity-review.yml">.github/workflows/antigravity-review.yml</a></p>
 <section id="load-bearing-pieces-dont-simplify-away" class="level2">
 <h2 class="anchored" data-anchor-id="load-bearing-pieces-dont-simplify-away">Load-bearing pieces (don’t “simplify” away)</h2>
@@ -425,8 +425,8 @@ cookieconsent.run({
 <h3 class="anchored" data-anchor-id="delegation-to-morrison-labgha-reusable-workflow">1. Delegation to <code>Morrison-Lab/gha</code> reusable workflow</h3>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb1"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">jobs</span><span class="kw">:</span></span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">review</span><span class="kw">:</span></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">uses</span><span class="kw">:</span><span class="at"> Morrison-Lab/gha/.github/workflows/antigravity-code-review.yml@v2</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<p>The workflow delegates execution to <code>Morrison-Lab/gha</code>’s reusable workflow, which executes <code>Morrison-Lab/gha/antigravity-review@v2</code>. This ensures updates, safety checks, and runner handling in <code>gha</code> are automatically shared across repos.</p>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">uses</span><span class="kw">:</span><span class="at"> Morrison-Lab/gha/.github/workflows/antigravity-code-review.yml@v3</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<p>The workflow delegates execution to <code>Morrison-Lab/gha</code>’s reusable workflow, which executes <code>Morrison-Lab/gha/antigravity-review@v3</code>. This ensures updates, safety checks, and runner handling in <code>gha</code> are automatically shared across repos.</p>
 </section>
 <section id="required-permissions" class="level3">
 <h3 class="anchored" data-anchor-id="required-permissions">2. Required permissions</h3>
@@ -472,7 +472,7 @@ cookieconsent.run({
 </section>
 <section id="fork-dependabot-safeguards" class="level3">
 <h3 class="anchored" data-anchor-id="fork-dependabot-safeguards">7. Fork &amp; Dependabot safeguards</h3>
-<p>The underlying action (<code>Morrison-Lab/gha/antigravity-review@v2</code>) enforces guards so draft PRs, cross-repository (fork) PRs, and <code>dependabot[bot]</code> runs do not leak secrets or execute untrusted code.</p>
+<p>The underlying action (<code>Morrison-Lab/gha/antigravity-review@v3</code>) enforces guards so draft PRs, cross-repository (fork) PRs, and <code>dependabot[bot]</code> runs do not leak secrets or execute untrusted code.</p>
 </section>
 </section>
 <section id="setting-up-in-a-new-repo" class="level2">
@@ -519,7 +519,7 @@ cookieconsent.run({
 <span id="cb6-33"><a href="#cb6-33" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">issues</span><span class="kw">:</span><span class="at"> write</span></span>
 <span id="cb6-34"><a href="#cb6-34" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">id-token</span><span class="kw">:</span><span class="at"> write</span></span>
 <span id="cb6-35"><a href="#cb6-35" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">actions</span><span class="kw">:</span><span class="at"> read</span></span>
-<span id="cb6-36"><a href="#cb6-36" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">uses</span><span class="kw">:</span><span class="at"> Morrison-Lab/gha/.github/workflows/antigravity-code-review.yml@v2</span></span>
+<span id="cb6-36"><a href="#cb6-36" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">uses</span><span class="kw">:</span><span class="at"> Morrison-Lab/gha/.github/workflows/antigravity-code-review.yml@v3</span></span>
 <span id="cb6-37"><a href="#cb6-37" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">with</span><span class="kw">:</span></span>
 <span id="cb6-38"><a href="#cb6-38" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">mode</span><span class="kw">:</span><span class="at"> ${{ inputs.mode || 'code-review' }}</span></span>
 <span id="cb6-39"><a href="#cb6-39" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">pr-number</span><span class="kw">:</span><span class="at"> ${{ github.event.pull_request.number || inputs.pr_number || '' }}</span></span>

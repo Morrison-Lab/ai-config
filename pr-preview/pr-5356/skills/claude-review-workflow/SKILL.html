@@ -404,7 +404,7 @@ cookieconsent.run({
 
 <section id="claude-review-workflow" class="level1">
 <h1>claude-review-workflow</h1>
-<p>Sets up or edits the Claude PR <strong>review</strong> workflow (<code>.github/workflows/claude-code-review.yml</code> or <code>.github/workflows/claude-review.yml</code>), which delegates to the reusable <a href="https://github.com/Morrison-Lab/gha/blob/v2/.github/workflows/claude-code-review.yml"><code>claude-code-review.yml</code></a> workflow from <code>Morrison-Lab/gha</code>. For the <strong>agent</strong> workflow that edits files in response to <code>@claude</code> mentions, use <a href="../../skills/claude-agent-workflow/SKILL.html"><code>claude-agent-workflow</code></a>.</p>
+<p>Sets up or edits the Claude PR <strong>review</strong> workflow (<code>.github/workflows/claude-code-review.yml</code> or <code>.github/workflows/claude-review.yml</code>), which delegates to the reusable <a href="https://github.com/Morrison-Lab/gha/blob/v3/.github/workflows/claude-code-review.yml"><code>claude-code-review.yml</code></a> workflow from <code>Morrison-Lab/gha</code>. For the <strong>agent</strong> workflow that edits files in response to <code>@claude</code> mentions, use <a href="../../skills/claude-agent-workflow/SKILL.html"><code>claude-agent-workflow</code></a>.</p>
 <p>Path: <code>.github/workflows/claude-code-review.yml</code> (or <code>.github/workflows/claude-review.yml</code>)</p>
 <section id="standard-caller-stub" class="level2">
 <h2 class="anchored" data-anchor-id="standard-caller-stub">Standard caller stub</h2>
@@ -452,7 +452,7 @@ cookieconsent.run({
 <span id="cb1-42"><a href="#cb1-42" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">issues</span><span class="kw">:</span><span class="at"> write</span></span>
 <span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">actions</span><span class="kw">:</span><span class="at"> read</span></span>
 <span id="cb1-44"><a href="#cb1-44" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">checks</span><span class="kw">:</span><span class="at"> read</span></span>
-<span id="cb1-45"><a href="#cb1-45" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">uses</span><span class="kw">:</span><span class="at"> Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2</span></span>
+<span id="cb1-45"><a href="#cb1-45" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">uses</span><span class="kw">:</span><span class="at"> Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v3</span></span>
 <span id="cb1-46"><a href="#cb1-46" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">secrets</span><span class="kw">:</span></span>
 <span id="cb1-47"><a href="#cb1-47" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">CLAUDE_CODE_OAUTH_TOKEN</span><span class="kw">:</span><span class="at"> ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}</span></span>
 <span id="cb1-48"><a href="#cb1-48" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">ANTHROPIC_API_KEY</span><span class="kw">:</span><span class="at"> ${{ secrets.ANTHROPIC_API_KEY }}</span></span>
@@ -462,7 +462,7 @@ cookieconsent.run({
 </section>
 <section id="load-bearing-pieces-managed-by-morrison-labgha" class="level2">
 <h2 class="anchored" data-anchor-id="load-bearing-pieces-managed-by-morrison-labgha">Load-bearing pieces (managed by <code>Morrison-Lab/gha</code>)</h2>
-<p>By delegating to <code>Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v2</code>, the consumer repo automatically inherits:</p>
+<p>By delegating to <code>Morrison-Lab/gha/.github/workflows/claude-code-review.yml@v3</code>, the consumer repo automatically inherits:</p>
 <ol type="1">
 <li><strong>History preservation</strong>: Fresh review comment posted per run without deleting prior review history.</li>
 <li><strong>Inline comment prompt</strong>: Pushes review findings toward line-anchored comments via <code>mcp__github_inline_comment__create_inline_comment</code>.</li>

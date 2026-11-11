@@ -404,7 +404,7 @@ cookieconsent.run({
 
 <section id="claude-agent-workflow" class="level1">
 <h1>claude-agent-workflow</h1>
-<p>Sets up or edits the <code>@claude</code> agent GitHub Actions workflow (<code>.github/workflows/claude.yml</code> or <code>.github/workflows/claude-bot.yml</code>), which delegates to the reusable <a href="https://github.com/Morrison-Lab/gha/blob/v2/.github/workflows/claude.yml"><code>claude.yml</code></a> workflow from <code>Morrison-Lab/gha</code>. For the read-only <strong>PR review</strong> workflow, use <a href="../../skills/claude-review-workflow/SKILL.html"><code>claude-review-workflow</code></a>.</p>
+<p>Sets up or edits the <code>@claude</code> agent GitHub Actions workflow (<code>.github/workflows/claude.yml</code> or <code>.github/workflows/claude-bot.yml</code>), which delegates to the reusable <a href="https://github.com/Morrison-Lab/gha/blob/v3/.github/workflows/claude.yml"><code>claude.yml</code></a> workflow from <code>Morrison-Lab/gha</code>. For the read-only <strong>PR review</strong> workflow, use <a href="../../skills/claude-review-workflow/SKILL.html"><code>claude-review-workflow</code></a>.</p>
 <p>Path: <code>.github/workflows/claude.yml</code> (or <code>.github/workflows/claude-bot.yml</code>)</p>
 <section id="standard-caller-stub" class="level2">
 <h2 class="anchored" data-anchor-id="standard-caller-stub">Standard caller stub</h2>
@@ -441,7 +441,7 @@ cookieconsent.run({
 <span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">issues</span><span class="kw">:</span><span class="at"> write</span></span>
 <span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">id-token</span><span class="kw">:</span><span class="at"> write</span></span>
 <span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">actions</span><span class="kw">:</span><span class="at"> write</span></span>
-<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">uses</span><span class="kw">:</span><span class="at"> Morrison-Lab/gha/.github/workflows/claude.yml@v2</span></span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">uses</span><span class="kw">:</span><span class="at"> Morrison-Lab/gha/.github/workflows/claude.yml@v3</span></span>
 <span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">secrets</span><span class="kw">:</span></span>
 <span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">CLAUDE_CODE_OAUTH_TOKEN</span><span class="kw">:</span><span class="at"> ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}</span></span>
 <span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">ANTHROPIC_API_KEY</span><span class="kw">:</span><span class="at"> ${{ secrets.ANTHROPIC_API_KEY }}</span></span>
@@ -454,7 +454,7 @@ cookieconsent.run({
 </section>
 <section id="load-bearing-pieces-managed-by-morrison-labgha" class="level2">
 <h2 class="anchored" data-anchor-id="load-bearing-pieces-managed-by-morrison-labgha">Load-bearing pieces (managed by <code>Morrison-Lab/gha</code>)</h2>
-<p>By delegating to <code>Morrison-Lab/gha/.github/workflows/claude.yml@v2</code>, the consumer repo automatically inherits:</p>
+<p>By delegating to <code>Morrison-Lab/gha/.github/workflows/claude.yml@v3</code>, the consumer repo automatically inherits:</p>
 <ol type="1">
 <li><strong>Bot-actor filtering</strong>: Evaluates mention triggers (<code>@claude</code>) on comments, reviews, and assigned issues while filtering out bot-generated loops.</li>
 <li><strong>Concurrency serialization</strong>: Per-issue/PR concurrency with <code>cancel-in-progress: false</code> to avoid clobbering concurrent in-flight agent pushes.</li>

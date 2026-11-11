@@ -374,11 +374,15 @@ def main():
     check("warns when the probe pass skipped the opencode attempt",
           run(MERGE, probe_all[:1] + [probe("command -v opencode")])[0])
     check("warns when a probe found the CLI installed", run(MERGE, [probe(
-        "command -v " + clis4, "/usr/local/bin/codex", False)] + oc)[0] and run(
+        "command -v " + clis4, "/usr/local/bin/codex")] + oc)[0] and run(
         MERGE, [probe("command -v " + clis4, "alias codex='npx codex'")] + oc)[0])
     check("warns when which reports a CLI under a path", run(MERGE, [
-        probe("which codex", "/usr/bin/codex", False),
+        probe("which codex agy", "/usr/bin/codex"),
         probe("command -v agy gemini cursor-agent")] + oc)[0])
+    check("warns when the probe was refused and never ran", run(MERGE, [probe(
+        "command -v %s; gh pr merge 1" % clis4, "PreToolUse:Bash hook error: x")] + oc)[0])
+    check("silent when a missing CLI's 'command not found' shares the probe call", not run(
+        MERGE, [probe("codex x; command -v agy gemini cursor-agent", "bash: codex: command not found")] + oc)[0])
     check("silent when an installed CLI was attempted and errored", not run(
         MERGE, [probe("command -v agy gemini cursor-agent"),
                 probe("codex exec 'review the diff'", "backend down")] + oc)[0])

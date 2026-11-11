@@ -126,8 +126,12 @@ CURL_VALUE_OPTS = frozenset({
     "--data-urlencode", "--form", "--form-string", "--json", "-H", "--header", "-e",
     "--referer", "-o", "--output", "-x", "--proxy", "-u", "--user",
 })
-# The probe word itself was missing (`which` not installed): no evidence.
-RX_PROBE_MISSING = re.compile(r"\b(?:which|command)\b[^\n]*(?:not found|No such file)")
+# The probe word itself was missing (`which` not installed), or the call never
+# ran (a hook, classifier or user refusal; no-stale-pr-status's RX_NEVER_RAN).
+RX_PROBE_MISSING = re.compile(r"\b(?:which|command): (?:command )?not found|"
+                              r"not found: (?:which|command)\b|\bwhich: [^\n]*No such file")
+RX_NEVER_RAN = re.compile(r"^\s*(?:PreToolUse:[^\n]*hook error:|Permission for this action"
+                          r" was denied|The user doesn't want to proceed)", re.I)
 RX_AGY_TRANSCRIPT_PATH = re.compile(
     r"(?:^|/)(?:\.gemini/antigravity/|brain/[^/]+/\.system_generated/logs/transcript)")
 AGY_RECORD_TYPES = frozenset({
@@ -295,11 +299,9 @@ def _probed_names(rest):
 
 def _absent(name, text):
     """True when probe output *text* printed no path or name for *name*."""
-    for line in (text or "").splitlines():
-        line = line.strip()
-        if line == name or line.endswith("/" + name) or line.startswith("alias " + name + "="):
-            return False
-    return True
+    lines = [ln.strip() for ln in (text or "").splitlines()]
+    return not any(ln == name or ln.endswith("/" + name)
+                   or ln.startswith("alias " + name + "=") for ln in lines)
 
 
 def _shell_events(sib, command, clis):
@@ -359,16 +361,9 @@ def _route_calls(sib, command, clis):
 
 
 def all_routes_probed(clis, cleared, last_push):
-    """True when every route in *clis* was attempted, or found absent, after
-    the last push: the waiver's single probe pass."""
-    for cli in clis:
-        if cleared.get(cli, -1) > last_push:
-            continue
-        if cli not in NEEDS_ATTEMPT and cleared.get(
-                "absent:" + cli, -1) > last_push:
-            continue
-        return False
-    return True
+    """True when each route in *clis* was attempted, or found absent, after the last push."""
+    return all(cleared.get(c, -1) > last_push or (c not in NEEDS_ATTEMPT and cleared.get(
+        "absent:" + c, -1) > last_push) for c in clis)
 
 
 def scan(sib, path, clis, recs=None):
@@ -417,14 +412,14 @@ def scan(sib, path, clis, recs=None):
             elif kind == "tool_result" and b.get("tool_use_id") in pending:
                 seq_call, review_seq, attempts, probes = pending.pop(
                     b["tool_use_id"])
+                text = sib._result_text(b)
+                if rec.get("toolDenialKind") or RX_NEVER_RAN.match(text):
+                    continue  # a refused call ran nothing: no attempt, no probe
                 if review_seq is not None and not b.get("is_error"):
                     reviews.append(review_seq)
                 for route in attempts:
                     cleared[route] = seq_call
-                text = sib._result_text(b)
-                # `command -v` and `which` exit non-zero when a name is
-                # missing; an exit-0 probe (or one masked by `|| true`)
-                # proves nothing absent.
+                # Only an errored probe (exit 1) shows a name absent.
                 valid = b.get("is_error") and not RX_PROBE_MISSING.search(text)
                 for probed in probes if valid else []:
                     if probed in clis and _absent(probed, text):

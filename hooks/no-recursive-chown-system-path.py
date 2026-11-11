@@ -109,7 +109,7 @@ VAR_CORE = {"dpkg", "apt", "rpm", "dnf", "yum", "pacman", "systemd", "sudo",
             "polkit-1", "PackageKit", "ucf"}
 ASSIGNMENT = re.compile(r"\A[A-Za-z_][A-Za-z0-9_]*=")
 SUB = "__AICFG_CMDSUB__"  # a lifted command substitution (see `_lift`)
-VARIABLE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)([^}]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)|"
+VARIABLE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)((?:[^{}]|\{[^{}]*\})*)\}|\$([A-Za-z_][A-Za-z0-9_]*)|"
                       + SUB)
 ALL_GLOB = re.compile(r"\A[*?.]*[*?][*?.]*\Z")
 
@@ -179,6 +179,21 @@ def _lift(text):
     return "".join(out), inner
 
 
+def _takes_next_word(wrapper, tok):
+    """Whether a wrapper's option `tok` takes the next word as its value.
+
+    Short options may be bundled: in `sudo -Eu root`, `-u` is the last
+    letter, so `root` is its value; in `sudo -uroot`, the value is attached.
+    """
+    if tok.startswith("--"):
+        return tok in WRAPPER_VALUE_LONG
+    values = WRAPPER_VALUE_OPTIONS.get(wrapper, ())
+    for j, letter in enumerate(tok[1:], 1):
+        if letter in values:
+            return j == len(tok) - 1
+    return False
+
+
 def _program(argv):
     """`(argv from the program on, override present)`, peeling wrappers.
 
@@ -200,8 +215,7 @@ def _program(argv):
         elif tok in SHELL_KEYWORDS:
             continue
         elif wrapper and tok.startswith("-"):
-            short = len(tok) == 2 and tok[1] in WRAPPER_VALUE_OPTIONS.get(wrapper, ())
-            after_option = short or tok in WRAPPER_VALUE_LONG
+            after_option = _takes_next_word(wrapper, tok)
         elif wrapper and positionals:
             positionals -= 1
         else:

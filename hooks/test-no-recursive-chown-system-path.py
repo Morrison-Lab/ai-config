@@ -139,6 +139,7 @@ class Denies(unittest.TestCase):
         self.assert_denied('chmod -R 755 "${PREFIX:-/var}"')
         self.assert_denied('chown -R me "${DIR:-$HOME}"')
         self.assert_denied('chown -R me "${DIR:-~}"')
+        self.assert_denied('chown -R me "${DIR:-${HOME}}"')
 
     def test_assignment_expands_home_and_unset_variables(self):
         self.assert_denied('d=~ && chmod -R 755 "$d"')
@@ -148,6 +149,11 @@ class Denies(unittest.TestCase):
     def test_wrapper_flag_then_value_option(self):
         self.assert_denied("sudo -E -u root chown -R me /etc")
         self.assert_denied("timeout -v 60 chmod -R 755 /usr")
+
+    def test_bundled_wrapper_flags(self):
+        self.assert_denied("sudo -Eu root chown -R me /etc")
+        self.assert_denied("sudo -uroot chown -R me /etc")
+        self.assert_denied("timeout -sKILL 60 chmod -R 755 /usr")
 
     def test_absolute_target_inside_a_nested_shell(self):
         self.assert_denied("cd /tmp && bash -c 'chmod -R 755 /usr'")
@@ -228,9 +234,9 @@ class Allows(unittest.TestCase):
         self.assertIsNone(run("chmod -R 755 build", cwd=["/"]))
 
     def test_unset_variable_below_root(self):
-        # `$OUT/dist` with OUT unset is `/dist`: not a reason to refuse.
+        # `$WORKDIR/build` with WORKDIR unset is `/build`: not a reason to refuse.
         self.assert_allowed('chmod -R 755 "$WORKDIR/build"')
-        self.assert_allowed('chmod -R 755 "${PWD}/dist"')
+        self.assert_allowed('chmod -R 755 "${WORKDIR}/dist"')
 
     def test_user_managed_usr_local(self):
         self.assert_allowed("sudo chown -R me /usr/local/lib/node_modules")

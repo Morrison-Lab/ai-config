@@ -11,8 +11,8 @@ reader (`cat`, `sed`, `base64`, ...) naming a credential path. A reader inside
 enclosing command is `echo` or `printf`. Wrappers (`bash -c`, `xargs`), `cd`
 and more stores are not yet covered (ai-config#5443).
 
-Fails open, saying so on stderr. For an approved read, prefix that one
-command with ALLOW_CREDENTIAL_READ=1.
+Fails open, saying so on stderr. Writer layer: improve-your-subagents.md;
+reviewer layer: adversarial-reviewer.md, both "Credential files printed".
 """
 
 from __future__ import annotations
@@ -26,8 +26,7 @@ import sys
 try:
     _LIB = os.path.join(os.path.dirname(os.path.dirname(
         os.path.realpath(__file__))), "scripts", "lib")
-    if _LIB not in sys.path:
-        sys.path.insert(0, _LIB)
+    sys.path.insert(0, _LIB)
     from shellcmd import is_operator_token, shell_tokens
 except Exception as _exc:  # broken install: degrade, never block
     print(f"no-credential-file-read: cannot load scripts/lib/shellcmd.py "
@@ -57,7 +56,6 @@ CODE_SUFFIXES = (".py", ".lua", ".js", ".ts", ".sh", ".md", ".vim", ".el")
 # Programs that print their arguments, so `echo $(cat token)` still prints.
 PRINTERS = {"echo", "printf", "print"}
 SUBSTITUTION = re.compile(r"\$\(([^()]*)\)")
-
 LEAD_WORDS = {"sudo", "command", "exec", "nohup", "time", "doas", "env"}
 
 
@@ -89,8 +87,7 @@ def is_credential_path(raw, cwd):
 
 
 def _printed_commands(tokens):
-    """Yield each simple command's argv whose output would be printed:
-    those outside `$( ... )`, and those inside one under a printer."""
+    """Yield each argv outside `$( ... )` or inside one under a printer."""
     frames = [{"argv": [], "printed": True}]
     prev = None
     for tok in tokens:
@@ -119,15 +116,11 @@ def _printed_commands(tokens):
             yield frame["argv"]
 
 
-def _is_assignment(token):
-    name, sep, _value = token.partition("=")
-    return bool(sep) and name.isidentifier()
-
-
 def _program(argv):
     """(program name, its arguments), skipping assignments and LEAD_WORDS."""
     i = 0
-    while i < len(argv) and (_is_assignment(argv[i]) or argv[i] in LEAD_WORDS):
+    while i < len(argv) and (argv[i] in LEAD_WORDS or (
+            "=" in argv[i] and argv[i].split("=", 1)[0].isidentifier())):
         i += 1
     if i >= len(argv):
         return None, []
@@ -136,12 +129,8 @@ def _program(argv):
 
 def offending_bash_path(command, cwd):
     """The credential path a reader in `command` would print, or None."""
-    if shell_tokens is None:
-        return None
-    tokens = shell_tokens(command)
-    if not tokens:
-        return None
-    for argv in _printed_commands(tokens):
+    tokens = shell_tokens(command) if shell_tokens else None
+    for argv in _printed_commands(tokens or []):
         name, args = _program(argv)
         if name in PRINTERS:  # a quoted "$(cat token)" stays one token
             for inner in SUBSTITUTION.findall(" ".join(args)):
@@ -171,15 +160,12 @@ def evaluate(payload):
         hit = offending_bash_path(command, cwd)
     else:
         return None
-    if not hit:
-        return None
-    return (
+    return hit and (
         f"Refused: this would print the credential file `{hit}` into the "
         "transcript (ai-config#4780: a Canvas token leaked this way).\n\n"
         "Pass it to the program that needs it, as in `curl -H \"Authorization:"
         " Bearer $(cat <path>)\" ...`, or check it with `test -s <path>`.\n"
-        f"If the user approved this exact read, prefix the command with "
-        f"`{OVERRIDE}`.")
+        f"For a read the user approved, prefix the command with `{OVERRIDE}`.")
 
 
 def main() -> int:

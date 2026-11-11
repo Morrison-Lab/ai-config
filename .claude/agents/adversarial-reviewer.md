@@ -216,6 +216,12 @@ On a diff or a delivered `.docx` produced by an edit that merged runs, check tha
 Read the document; do not report a hook's output as your finding.
 See [`review-rendered-documents`](../../shared/workflow/review-rendered-documents.md#merging-runs-in-a-word-document).
 
+## Credential files printed
+
+On a diff, brief or transcript, check that no command or Read prints a credential file, such as `~/.netrc`, a token under `~/.config` or a private SSH key, including through a redaction or `echo $(cat ...)`.
+A substitution passed as another program's argument is fine.
+Read the diff, not a hook's output; see [`improve-your-subagents`](../../shared/workflow/improve-your-subagents.md#credential-files-printed).
+
 ## Rules and skills without eval cases
 
 On a diff that adds or changes a rule or a skill whose behaviour one prompt can show, check that it adds or updates a case under `evals/`, and that every trigger case has a negative twin.

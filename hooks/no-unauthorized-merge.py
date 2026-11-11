@@ -1755,7 +1755,7 @@ INFRA_GRANT_OWNERS = frozenset({"morrison-lab"})
 
 # Matched with fullmatch against every changed path, and against a renamed
 # file's previous path too, so moving a content file under `.github/` is not
-# infra. The two groups are the ones the user chose:
+# infra. The groups are:
 #   - tooling: CI workflows, reusable actions and their scripts, dependabot,
 #     and lint, spell and link-check configuration;
 #   - agent configuration: CLAUDE.md, AGENTS.md and GEMINI.md at any depth,
@@ -1763,6 +1763,17 @@ INFRA_GRANT_OWNERS = frozenset({"morrison-lab"})
 #   - checkers: `tools/check_*` and `tools/check-*` scripts and `tools/tests/`.
 #     A blanket `tools/` is absent: lds keeps figure and data generators there,
 #     which change what readers see (ai-config#5102).
+#   - preview and CI helpers under `tools/`, by name: each one's job is what
+#     a PR preview or a CI run does, not what the published site shows
+#     (Ezra, 2026-11-11, of lds#2319: "the infra grant should cover this";
+#     ai-config#5293). `skip-pdf-in-previews` drops the PDF format from PR
+#     previews, and `rerun_timed_out` re-runs CI jobs killed by the time
+#     limit. Like a workflow file, a broken edit to one could still reach the
+#     publish build (skip-pdf runs as a pre-render step there too), which is
+#     why the fully-clean review gate still binds. Build steps that shape the published site (`build_math_macros`,
+#     `install-extensions`, `provision-python`, `set-mtimes-from-git`) stay
+#     out, like the figure and content generators: add a helper here by name
+#     only after checking that the published site cannot change with it.
 # A top-level `scripts/` is deliberately absent: in a content repository it
 # can hold analysis code, not tooling.
 INFRA_PATH_PATTERNS = tuple(re.compile(p) for p in (
@@ -1775,6 +1786,8 @@ INFRA_PATH_PATTERNS = tuple(re.compile(p) for p in (
     r"inst/WORDLIST",
     r"tools/check[_-][\w.-]+",
     r"tools/tests/.+",
+    r"tools/skip(?:-pdf-in-previews|_pdf_in_previews)\.py",
+    r"tools/rerun(?:-timed-out|_timed_out)\.py",
 ))
 
 # Setting this only ever DENIES (the infra grant stops firing), so unlike an

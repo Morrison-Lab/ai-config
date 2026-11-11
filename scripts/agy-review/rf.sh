@@ -1,7 +1,8 @@
 #!/bin/bash
 # usage: rf.sh owner/repo pr "extra prompt"
-# Tries agy models in order (Gemini Argon first now that its quota is back, then Opus, then GPT-OSS),
-# posts the first read that is a real review: a verdict as last line, no agy error, not a plan.
+# Tries agy models in order (Gemini Argon, then Gemini 3.8 Flash, then Opus, then GPT-OSS).
+# Argon and Flash 3.8 have separate quotas (Ezra, 2026-11-11, ai-config#5291), so an exhausted Argon falls to Flash.
+# It posts the first read that is a real review: a verdict as last line, no agy error, not a plan.
 d=$(cd "$(dirname "$0")" && pwd); cd "$d"
 slug=$1; pr=$2; extra=$3
 tail_note=" Do not write a plan, do not create artifacts, do not ask questions or request approval: answer in one pass with the review itself. List every finding, wording and style nits included, each in at most 3 lines with the quoted passage. Keep the answer under 3000 characters. The last line must be exactly VERDICT: FINDINGS if you list any finding at all, or exactly VERDICT: CLEAN if there is none (then say only that nothing was found)."
@@ -17,7 +18,7 @@ real_read() {
   case "$last" in "VERDICT: CLEAN"|"VERDICT: FINDINGS") return 0;; esac
   return 1
 }
-for spec in "gemini-4-argon-medium|Argon: Gemini 4 Argon (Medium) via Antigravity \`agy\` 1.3.5" "claude-opus-5-5-medium|Claude Opus 5.5 via Antigravity \`agy\` 1.3.5, standing in" "gpt-oss-120b-medium|GPT-OSS 120B via Antigravity \`agy\` 1.3.5"; do
+for spec in "gemini-4-argon-medium|Argon: Gemini 4 Argon (Medium) via Antigravity \`agy\` 1.3.5" "gemini-3.8-flash-medium|Gemini 3.8 Flash (Medium) via Antigravity \`agy\` 1.3.5, standing in" "claude-opus-5-5-medium|Claude Opus 5.5 via Antigravity \`agy\` 1.3.5, standing in" "gpt-oss-120b-medium|GPT-OSS 120B via Antigravity \`agy\` 1.3.5"; do
   model=${spec%%|*}; name=${spec#*|}
   MODEL=$model bash argon.sh "$slug" "$pr" "$extra$tail_note" >/dev/null 2>&1
   if real_read; then

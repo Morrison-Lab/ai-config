@@ -104,6 +104,17 @@ import sys
 import tempfile
 import time
 
+try:
+    _LIB = os.path.join(os.path.dirname(os.path.dirname(
+        os.path.realpath(__file__))), "scripts", "lib")
+    if _LIB not in sys.path:
+        sys.path.insert(0, _LIB)
+    from shellcmd import shell_tokens, is_operator_token
+except Exception as _exc:  # broken install: degrade, never block
+    print(f"no-unreviewed-pr: cannot load scripts/lib/shellcmd.py ({_exc}); "
+          "no reviewer request will be recognised", file=sys.stderr)
+    shell_tokens = is_operator_token = None
+
 NO_WINDOW = ({"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)}
              if sys.platform == "win32" else {})
 
@@ -445,7 +456,8 @@ def _scrub_all(cmd):
 # into two "commands", flipped its `last` flag to False, and left it permanently
 # undischargeable (a severe over-warn). A `>`/`<` token now falls through into
 # the current command's argv, where the request/draft detectors ignore it.
-_SHELL_OPS = set("();|&")
+# The set itself is `scripts/lib/shellcmd.py`'s `_SHELL_OPS`, read through
+# `is_operator_token`.
 
 
 def _split_commands(cmd):
@@ -460,9 +472,11 @@ def _split_commands(cmd):
     may have been short-circuited away by a SUCCEEDING left operand, leaving
     the call's status at 0 with the command never run (ai-config#3139).
 
-    Line-continuations are joined and heredoc bodies blanked first, so shlex
-    neither chokes on a heredoc body nor mis-splits a `\\`-continued request
-    (like the hook's own recovery command) into two commands.
+    The tokens come from `scripts/lib/shellcmd.py`'s `shell_tokens`, which
+    joins line-continuations, blanks heredoc bodies and drops comments first,
+    so shlex neither chokes on a heredoc body nor mis-splits a
+    `\\`-continued request (like the hook's own recovery command) into two
+    commands (ai-config#3178).
 
     An unescaped newline is a genuine command separator, but shlex treats it as
     whitespace and silently drops it -- which merged two commands on two lines
@@ -474,18 +488,14 @@ def _split_commands(cmd):
     separator -- so a multi-line `--body` is not split (and its contents are
     never argv the detectors read anyway).
     """
-    cmd = re.sub(r"\\\r?\n", " ", cmd)   # join `\`-continued lines
-    cmd = RX_HEREDOC.sub("<<", cmd)       # drop heredoc bodies
-    cmd = cmd.replace("\n", ";")          # unquoted newline -> separator
-    try:
-        lex = shlex.shlex(cmd, posix=True, punctuation_chars=True)
-        lex.whitespace_split = True
-        toks = list(lex)
-    except ValueError:
+    if shell_tokens is None:
+        return None
+    toks = shell_tokens(cmd)
+    if toks is None:
         return None                       # unbalanced quotes, etc.
     cmds, cur, ops = [], [], []
     for t in toks:
-        if t and set(t) <= _SHELL_OPS:    # a control-operator token (||, |, ;, &)
+        if is_operator_token(t):          # a control-operator run (||, |, ;, &)
             if cur:
                 cmds.append((ops, cur))
                 cur, ops = [], []

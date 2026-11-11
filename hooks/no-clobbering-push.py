@@ -318,18 +318,18 @@ try:
     if _LIB not in sys.path:
         sys.path.insert(0, _LIB)
     from shellcmd import (shell_c_expansions, nested_shell_commands,
-                          COMMAND_WRAPPERS, native_path)
+                          COMMAND_WRAPPERS, native_path, shell_tokens,
+                          is_operator_token)
 except Exception as _exc:  # broken install: degrade, do not fail open further
     print(f"no-clobbering-push: cannot load scripts/lib/shellcmd.py ({_exc}); "
-          f"a push wrapped in an interpreter's -c will not be seen",
-          file=sys.stderr)
-    shell_c_expansions = nested_shell_commands = None
+          f"no push will be checked", file=sys.stderr)
+    shell_c_expansions = nested_shell_commands = shell_tokens = None
+    is_operator_token = None
     COMMAND_WRAPPERS = frozenset()
 
     def native_path(path, is_windows=None):
         return path  # the pre-helper behaviour: a /c/... path stays unreadable
 
-RX_HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1.*?\n[ \t]*\2\b", re.S)
 
 ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 LEAD_WORDS = {"then", "do", "else", "elif", "!", "time", "sudo", "command",
@@ -364,8 +364,6 @@ BRANCH_SEPS = {"||", "|"}
 # The operator AFTER a `cd` that forks it into a subshell of its own. A fork is
 # invisible from the operator before, so both directions are read.
 FORK_SEPS = {"&", "|"}
-
-_SHELL_OPS = set("();|&")
 
 # `ALLOW_FORCE_PUSH=1` counts only as a real env assignment at the start of
 # the same simple command, never as a mention of the string elsewhere. Same
@@ -467,9 +465,10 @@ def _simple_commands(cmd):
     """Split a shell command into `(subshell path, argv, separator)` triples;
     None on error.
 
-    Same construction as `flag-reset-hard-uncommitted-work.py`'s
-    `_simple_commands`: join backslash-continued lines, blank heredoc bodies,
-    turn unquoted newlines into `;`, then let `shlex` split and dequote.
+    The tokens come from `scripts/lib/shellcmd.py`'s `shell_tokens`, which
+    blanks heredoc bodies, joins backslash-continued lines, drops comments and
+    turns unquoted newlines into `;` before `shlex` splits and dequotes
+    (ai-config#3178).
 
     The subshell path is this file's own addition, and it costs no second
     parser because `shlex` has already decided which parentheses are
@@ -514,14 +513,10 @@ def _simple_commands(cmd):
     AND-OR list before it rather than its own command alone: in
     `cd a && make & git push` the `cd` is forked too (measured 2026-09-04).
     """
-    cmd = re.sub(r"\\\r?\n", " ", cmd)
-    cmd = RX_HEREDOC.sub("<<", cmd)
-    cmd = cmd.replace("\n", ";")
-    try:
-        lex = shlex.shlex(cmd, posix=True, punctuation_chars=True)
-        lex.whitespace_split = True
-        toks = list(lex)
-    except ValueError:
+    if shell_tokens is None:
+        return None
+    toks = shell_tokens(cmd)
+    if toks is None:
         return None
     cmds, cur, scopes, opened, sep = [], [], [()], 0, ""
     # The `case` statements still open, innermost last. A case PATTERN closes
@@ -530,7 +525,7 @@ def _simple_commands(cmd):
     # pattern and read the push in the session's own repository.
     cases = []
     for t in toks:
-        if t and set(t) <= _SHELL_OPS:
+        if is_operator_token(t):
             trailing = ""
             for ch in t:
                 # Only the FIRST operator of a punctuation run is read. A

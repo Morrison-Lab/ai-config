@@ -2094,12 +2094,6 @@ MUTATIONS = {
           "        moved = False")],
         {"W8", "W9", "W11", "W12", "W13", "W14", "W15", "W16"},
     ),
-    "heredoc_blanking": (
-        "a heredoc body is blanked before parsing, so a mention inside one "
-        "is not an invocation",
-        [('    cmd = RX_HEREDOC.sub("<<", cmd)', "    pass")],
-        {"S9"},
-    ),
 }
 
 print("\nmutation tests (revert one clause, see which cases flip):")

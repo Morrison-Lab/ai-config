@@ -332,6 +332,43 @@ def _comment_free(command):
     return "".join(out)
 
 
+def shell_tokens(command):
+    """The dequoted `shlex` token stream of `command`; `None` on a parse error.
+
+    This is the shared front half of every split here: heredoc bodies
+    blanked, backslash-continued lines joined, unquoted `#` comments dropped,
+    unquoted newlines turned into `;`, then `shlex` in punctuation-aware mode.
+    A control-operator run arrives as one token whose characters are all in
+    `_SHELL_OPS` (`&&`, `);`, `)&&(`). A caller that needs more than an argv
+    per command (the operator before or after each one, the subshell it runs
+    in, a `case` pattern's `)`) walks these tokens itself rather than
+    repeating the preprocessing (ai-config#3178).
+    """
+    # ORDER MATTERS, and the natural order is wrong. Joining continuations
+    # first lets a heredoc BODY line ending in a backslash eat its own
+    # terminator, after which `_heredoc_free` closes at some later occurrence of
+    # the delimiter word -- or never -- and everything between is swallowed.
+    # Measured: `git commit -F - <<EOF / a \\ / EOF / git push` lost the push
+    # entirely, so the guard went silent. A heredoc body is literal text and a
+    # backslash in it continues nothing, so it must be removed BEFORE the
+    # continuation join runs over what remains.
+    command = _heredoc_free(command)
+    command = re.sub(r"\\\r?\n", " ", command)
+    command = _comment_free(command)
+    command = command.replace("\n", ";")
+    try:
+        lex = shlex.shlex(command, posix=True, punctuation_chars=True)
+        lex.whitespace_split = True
+        return list(lex)
+    except ValueError:
+        return None
+
+
+def is_operator_token(token):
+    """True when `token` is a control-operator run such as `&&` or `);`."""
+    return bool(token) and set(token) <= _SHELL_OPS
+
+
 def simple_commands(command):
     """Split `command` into simple-command argv lists; `None` on a parse error.
 
@@ -372,27 +409,12 @@ def simple_commands_with_scope(command):
     `{ ... }` grouping is NOT nesting for this purpose and is not counted: it
     runs in the current shell, so a `cd` inside one does move the caller.
     """
-    # ORDER MATTERS, and the natural order is wrong. Joining continuations
-    # first lets a heredoc BODY line ending in a backslash eat its own
-    # terminator, after which `_heredoc_free` closes at some later occurrence of
-    # the delimiter word -- or never -- and everything between is swallowed.
-    # Measured: `git commit -F - <<EOF / a \\ / EOF / git push` lost the push
-    # entirely, so the guard went silent. A heredoc body is literal text and a
-    # backslash in it continues nothing, so it must be removed BEFORE the
-    # continuation join runs over what remains.
-    command = _heredoc_free(command)
-    command = re.sub(r"\\\r?\n", " ", command)
-    command = _comment_free(command)
-    command = command.replace("\n", ";")
-    try:
-        lex = shlex.shlex(command, posix=True, punctuation_chars=True)
-        lex.whitespace_split = True
-        toks = list(lex)
-    except ValueError:
+    toks = shell_tokens(command)
+    if toks is None:
         return None
     cmds, cur, scope, cur_scope, opened = [], [], [0], (0,), 0
     for tok in toks:
-        if tok and set(tok) <= _SHELL_OPS:
+        if is_operator_token(tok):
             if cur:
                 cmds.append((cur_scope, cur))
                 cur = []

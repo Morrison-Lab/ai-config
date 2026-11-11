@@ -83,6 +83,17 @@ WRAPPERS = (set(COMMAND_WRAPPERS) | {"setsid", "busybox", "pkexec"}
             if simple_commands_with_scope else set())
 # Wrappers that take positional words before the program (`timeout 60 chmod`).
 WRAPPER_POSITIONALS = {"timeout": 1}
+# Each wrapper's short options that take the next word as their value; any
+# other option is a flag, so `sudo -E echo chown` runs echo, not chown.
+WRAPPER_VALUE_OPTIONS = {"sudo": set("ughpCUrtTDR"), "doas": set("uC"), "env": set("uCS"),
+                         "timeout": set("sk"), "nice": {"n"}, "ionice": set("cnp"),
+                         "stdbuf": set("ioe")}
+WRAPPER_VALUE_LONG = {"--user", "--group", "--host", "--prompt", "--chdir", "--chroot",
+                      "--close-from", "--other-user", "--role", "--type",
+                      "--command-timeout", "--unset", "--split-string", "--signal",
+                      "--kill-after", "--adjustment", "--class", "--classdata", "--pid",
+                      "--input", "--output", "--error"}
+DECLARE_BUILTINS = ("export", "local", "declare", "readonly", "typeset")
 # chmod's own short options (GNU and BSD); any other `-w` or `-x` is a mode.
 CHMOD_OPTIONS = set("cfvRHLPh")
 TOP_LEVEL = {"bin", "boot", "dev", "etc", "home", "lib", "lib32", "lib64", "libx32",
@@ -175,23 +186,24 @@ def _program(argv):
     the first other word is the program it runs, so `sudo docker run alpine
     chown` runs docker, not chown.
     """
-    override, wrapped, after_option, positionals = False, False, False, 0
+    override, wrapper, after_option, positionals = False, None, False, 0
     for i, tok in enumerate(argv):
         name = os.path.basename(tok)
-        if name in PROGRAMS:
+        if after_option:
+            after_option = False  # the value of the option before it
+        elif name in PROGRAMS:
             return argv[i:], override
-        if ASSIGNMENT.match(tok):
+        elif ASSIGNMENT.match(tok):
             override = override or tok == OVERRIDE
         elif name in WRAPPERS:
-            wrapped, after_option = True, False
-            positionals = WRAPPER_POSITIONALS.get(name, 0)
+            wrapper, positionals = name, WRAPPER_POSITIONALS.get(name, 0)
         elif tok in SHELL_KEYWORDS:
             continue
-        elif wrapped and tok.startswith("-"):
-            after_option = True
-        elif wrapped and (after_option or positionals):
-            positionals -= 0 if after_option else 1
-            after_option = False
+        elif wrapper and tok.startswith("-"):
+            short = len(tok) == 2 and tok[1] in WRAPPER_VALUE_OPTIONS.get(wrapper, ())
+            after_option = short or tok in WRAPPER_VALUE_LONG
+        elif wrapper and positionals:
+            positionals -= 1
         else:
             return [], override  # some other program runs here
     return [], override
@@ -222,58 +234,71 @@ def _targets(program, head):
     return operands if reference else operands[1:]
 
 
-def _candidates(target, home, assigned, here):
-    """`[(path, weak)]` for the path TARGET expands to, or `[]` if undecidable.
+def _expand(text, home, assigned, here):
+    """`(TEXT expanded, weak)`, or `None` when a computed value makes it undecidable.
 
     A variable set in this environment keeps its value, since the Bash call
-    inherits it too; one that is unset here is taken as empty, and the path
-    is then `weak`. A variable ASSIGNED earlier in the same command keeps its
-    literal value, or makes the target undecidable when that value is
-    computed, as in `d=$(mktemp -d)`.
+    inherits it too; one that is unset here is taken as empty, and the result
+    is then `weak`. A `${VAR:-default}` default is expanded the same way, and
+    is not a guess. ASSIGNED maps a name set earlier in the same command to
+    its `(value, weak)`, or to `None` when that value was computed, as in
+    `d=$(mktemp -d)`.
     """
-    target = re.sub(r"\A~([A-Za-z0-9_.-]*)(?=/|\Z)",
-                    lambda m: os.path.expanduser("~" + m.group(1)) if m.group(1) else home,
-                    target)
-    for match in VARIABLE.finditer(target):
-        name = match.group(1) or match.group(3)
-        if name in assigned and assigned[name] is None:
-            return []
-
-    guessed = []
+    text = re.sub(r"\A~([A-Za-z0-9_.-]*)(?=/|\Z)",
+                  lambda m: os.path.expanduser("~" + m.group(1)) if m.group(1) else home,
+                  text)
+    guessed, undecidable = [], []
 
     def value(match):
         if match.group(0) == SUB:
             guessed.append(True)
             return ""
         name, rest = match.group(1) or match.group(3), match.group(2) or ""
+        missing = False
         if name in assigned:
-            val = assigned[name]
+            if assigned[name] is None:
+                undecidable.append(name)
+                return ""
+            val, weak = assigned[name]
+            guessed.append(weak)
         elif name == "HOME":
             val = home
         elif name == "PWD":
-            val = here or ""
-            guessed.append(here is None)
+            val, missing = here or "", here is None
         else:
             val = os.environ.get(name, "")
-            guessed.append(not val)
+            missing = not val
         default = re.match(r":?[-=]", rest)
         if default and not val:
-            val = rest[default.end():]
+            fallback = _expand(rest[default.end():], home, assigned, here)
+            if fallback is None:
+                undecidable.append(name)
+                return ""
+            (val, weak), missing = fallback, False
+            guessed.append(weak)
+        guessed.append(missing)
         return val
 
-    path = VARIABLE.sub(value, target)
-    return [(path, any(guessed))]
+    expanded = VARIABLE.sub(value, text)
+    return None if undecidable else (expanded, any(guessed))
 
 
-def _assignments(argv, assigned):
-    """Record `NAME=value` from a simple command that only assigns."""
-    words = argv[1:] if argv and argv[0] in ("export", "local", "declare", "readonly") else argv
+def _assignments(argv, store, visible, home, here):
+    """Record `NAME=value` from a simple command that only assigns.
+
+    Values go in STORE as `(value, weak)`, expanded against the names VISIBLE
+    so far; a command substitution makes one `None`.
+    """
+    words = argv
+    if argv and argv[0] in DECLARE_BUILTINS:
+        words = [w for w in argv[1:] if not w.startswith(("-", "+"))]
     if not words or not all(ASSIGNMENT.match(w) for w in words):
         return False
     for word in words:
         name, _, val = word.partition("=")
-        computed = "$" in val or "`" in val or SUB in val
-        assigned[name] = None if computed else val
+        computed = "`" in val or SUB in val
+        store[name] = None if computed else _expand(val, home, visible, here)
+        visible[name] = store[name]
     return True
 
 
@@ -327,17 +352,17 @@ def _scan(piece, cwd, home):
             moved = any(SUB in tok for tok in argv)
             heres[scope] = None if moved else resolve_cd_target(argv, here)
             continue
-        if _assignments(argv, assigns.setdefault(scope, {})):
-            continue
         assigned = {}
         for k in range(1, len(scope) + 1):
             assigned.update(assigns.get(scope[:k], {}))
+        if _assignments(argv, assigns.setdefault(scope, {}), assigned, home, here):
+            continue
         head, override = _program(argv)
         if not head or override:
             continue
         program = os.path.basename(head[0])
         for target in _targets(program, head):
-            for cand, weak in _candidates(target, home, assigned, here):
+            for cand, weak in filter(None, [_expand(target, home, assigned, here)]):
                 if not cand:
                     continue  # an empty operand is an error, not the cwd
                 if not cand.startswith("/"):

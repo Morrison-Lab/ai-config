@@ -135,6 +135,20 @@ class Denies(unittest.TestCase):
         self.assert_denied('chown -R me "${PREFIX:=/usr}"')
         self.assert_denied('chown -R me "${PREFIX=/usr}"')
 
+    def test_literal_default_is_not_a_guess(self):
+        self.assert_denied('chmod -R 755 "${PREFIX:-/var}"')
+        self.assert_denied('chown -R me "${DIR:-$HOME}"')
+        self.assert_denied('chown -R me "${DIR:-~}"')
+
+    def test_assignment_expands_home_and_unset_variables(self):
+        self.assert_denied('d=~ && chmod -R 755 "$d"')
+        self.assert_denied('d=$HOME && chmod -R 755 "$d"')
+        self.assert_denied('d="$WORKDIR" && chmod -R 755 "$d/"')
+
+    def test_wrapper_flag_then_value_option(self):
+        self.assert_denied("sudo -E -u root chown -R me /etc")
+        self.assert_denied("timeout -v 60 chmod -R 755 /usr")
+
     def test_absolute_target_inside_a_nested_shell(self):
         self.assert_denied("cd /tmp && bash -c 'chmod -R 755 /usr'")
 
@@ -201,6 +215,14 @@ class Allows(unittest.TestCase):
 
     def test_subshell_assignment_does_not_leak(self):
         self.assert_allowed('d=/tmp/x; (d=/usr; echo $d); chown -R me "$d"')
+
+    def test_wrapper_flag_does_not_swallow_the_program(self):
+        self.assert_allowed("sudo -E echo chown -R me /usr")
+        self.assert_allowed("sudo -n git log -S chmod -R /etc")
+        self.assert_allowed("env -i myapp chmod -R 755 /usr")
+
+    def test_declare_with_flags(self):
+        self.assert_allowed('declare -x OUT=/tmp/build && chmod -R 755 "$OUT/"')
 
     def test_malformed_cwd(self):
         self.assertIsNone(run("chmod -R 755 build", cwd=["/"]))

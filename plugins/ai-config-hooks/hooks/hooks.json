@@ -442,6 +442,13 @@
           },
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-recursive-chown-system-path.py\"'",
+            "timeout": 10,
+            "script": "no-recursive-chown-system-path.py",
+            "why": "ai-config#5317, shared/workflow/destructive-actions-catalog.md: `sudo chown -R $USER:$(id -gn) /usr && sudo chmod -R u+w /usr` broke sudo (anthropics/claude-code#168), and an agent's `chown -R root:root /usr/` and `/etc/` repair cleared setuid bits on sudo and su (anthropics/claude-code#39283). DENIES chown, chmod or chgrp with -R/--recursive when a target resolves to /, a top-level directory, a path inside a system tree, or the home directory or a directory containing it, including a variable that an earlier Bash call set and is empty in this one. Clearable with ALLOW_RECURSIVE_SYSTEM_CHOWN=1 on the same command. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/flag-add-a-outside-pathspec.py\"'",
             "timeout": 10,
             "script": "flag-add-a-outside-pathspec.py",

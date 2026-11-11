@@ -85,14 +85,14 @@ WRAPPERS = (set(COMMAND_WRAPPERS) | {"setsid", "busybox", "pkexec"}
 WRAPPER_POSITIONALS = {"timeout": 1}
 # Each wrapper's short options that take the next word as their value; any
 # other option is a flag, so `sudo -E echo chown` runs echo, not chown.
-WRAPPER_VALUE_OPTIONS = {"sudo": set("ugpCUrtTDR"), "doas": set("uC"), "env": set("uCS"),
+WRAPPER_VALUE_OPTIONS = {"sudo": set("acugpCUrtTDR"), "doas": set("auC"), "env": set("uCSP"),
                          "timeout": set("sk"), "nice": {"n"}, "ionice": set("cnp"),
                          "stdbuf": set("ioe")}
 WRAPPER_VALUE_LONG = {"--user", "--group", "--host", "--prompt", "--chdir", "--chroot",
                       "--close-from", "--other-user", "--role", "--type",
                       "--command-timeout", "--unset", "--split-string", "--signal",
                       "--kill-after", "--adjustment", "--class", "--classdata", "--pid",
-                      "--input", "--output", "--error"}
+                      "--input", "--output", "--error", "--auth-type", "--login-class"}
 DECLARE_BUILTINS = ("export", "local", "declare", "readonly", "typeset")
 # chmod's own short options (GNU and BSD); any other `-w` or `-x` is a mode.
 CHMOD_OPTIONS = set("cfvRHLPh")
@@ -109,8 +109,9 @@ VAR_CORE = {"dpkg", "apt", "rpm", "dnf", "yum", "pacman", "systemd", "sudo",
             "polkit-1", "PackageKit", "ucf"}
 ASSIGNMENT = re.compile(r"\A[A-Za-z_][A-Za-z0-9_]*=")
 SUB = "__AICFG_CMDSUB__"  # a lifted command substitution (see `_lift`)
-VARIABLE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)((?:[^{}]|\{[^{}]*\})*)\}|\$([A-Za-z_][A-Za-z0-9_]*)|"
-                      + SUB)
+# The start of a variable: `${NAME` (closed by its matching brace, found by
+# `_braced`), `$NAME`, or a lifted substitution.
+VARIABLE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)|\$([A-Za-z_][A-Za-z0-9_]*)|" + SUB)
 ALL_GLOB = re.compile(r"\A[*?.]*[*?][*?.]*\Z")
 
 DENY = (
@@ -263,11 +264,10 @@ def _expand(text, home, assigned, here):
                   text)
     guessed, undecidable = [], []
 
-    def value(match):
-        if match.group(0) == SUB:
+    def value(name, rest):
+        if name is None:  # a lifted substitution
             guessed.append(True)
             return ""
-        name, rest = match.group(1) or match.group(3), match.group(2) or ""
         missing = False
         if name in assigned:
             if assigned[name] is None:
@@ -293,8 +293,37 @@ def _expand(text, home, assigned, here):
         guessed.append(missing)
         return val
 
-    expanded = VARIABLE.sub(value, text)
+    pieces, pos = [], 0
+    for match in VARIABLE.finditer(text):
+        if match.start() < pos:
+            continue  # inside a braced default already expanded
+        pieces.append(text[pos:match.start()])
+        pos = match.end()
+        if match.group(1):
+            close = _braced(text, match.end())
+            if close is None:  # no closing brace: leave the text as written
+                pieces.append(match.group(0))
+                continue
+            pieces.append(value(match.group(1), text[match.end():close]))
+            pos = close + 1
+        else:
+            pieces.append(value(match.group(2), ""))
+    pieces.append(text[pos:])
+    expanded = "".join(pieces)
     return None if undecidable else (expanded, any(guessed))
+
+
+def _braced(text, start):
+    """Index of the `}` closing a `${` whose name ends at START, or None."""
+    depth = 1
+    for i in range(start, len(text)):
+        if text[i] == "{":
+            depth += 1
+        elif text[i] == "}":
+            depth -= 1
+            if depth == 0:
+                return i
+    return None
 
 
 def _assignments(argv, store, visible, home, here):

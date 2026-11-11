@@ -156,6 +156,14 @@ class Denies(unittest.TestCase):
         self.assert_denied("timeout -sKILL 60 chmod -R 755 /usr")
         # sudo's `-h` takes a host only when attached (`-hhost`).
         self.assert_denied("sudo -h chown -R me /etc")
+        # In each bundle the first value-taking letter takes the rest, `u`.
+        self.assert_denied("sudo -au chown -R me /etc")
+        self.assert_denied("sudo -cu chown -R me /etc")
+        self.assert_denied("doas -au chown -R me /etc")
+        self.assert_denied("env -Pu chown -R me /etc")
+
+    def test_default_nested_three_deep(self):
+        self.assert_denied('chown -R me "${A:-${B:-${HOME}}}"')
 
     def test_absolute_target_inside_a_nested_shell(self):
         self.assert_denied("cd /tmp && bash -c 'chmod -R 755 /usr'")
@@ -228,6 +236,13 @@ class Allows(unittest.TestCase):
         self.assert_allowed("sudo -E echo chown -R me /usr")
         self.assert_allowed("sudo -n git log -S chmod -R /etc")
         self.assert_allowed("env -i myapp chmod -R 755 /usr")
+
+    def test_attached_wrapper_value_then_another_program(self):
+        self.assert_allowed("sudo -uroot echo chown -R me /usr")
+        self.assert_allowed("sudo -Eu root echo chown -R me /usr")
+
+    def test_unclosed_brace_is_left_as_written(self):
+        self.assert_allowed('chmod -R 755 "build/${A:-x"')
 
     def test_declare_with_flags(self):
         self.assert_allowed('declare -x OUT=/tmp/build && chmod -R 755 "$OUT/"')

@@ -26,8 +26,10 @@ when a target is:
 
 A target is read with `~`, `~user` and `$HOME` expanded, relative paths
 resolved against the hook's `cwd` and any `cd` earlier in the same shell (a
-`cd` inside `( ... )` moves only that subshell), and a basename made only of
-glob characters read as its directory (`/usr/*` touches `/usr`). Any other
+`cd` inside `( ... )` moves only that subshell, and one after a keyword such
+as `then` or `do` may not run, so the directory before it is judged too),
+and a basename made only of glob characters read as its directory (`/usr/*`
+touches `/usr`). Any other
 `$VAR` keeps its value in this environment, which the Bash call inherits; one
 unset here is taken as empty, because a variable set by an earlier Bash call
 is empty in this one (anthropics/claude-code#75859): `chmod -R 755 "$d/"` is
@@ -71,7 +73,8 @@ component (`/*/lib`), a partial glob or brace expansion that names a
 protected path (`/et*`, `/{etc,usr}`), a wrapper that changes directory
 (`env -C /etc`, `sudo -D /etc`), PowerShell `icacls`/`Set-Acl`, Windows drive
 paths (`C:/Windows`), a relative target after a `cd` this cannot
-resolve (`cd -` or `cd "$UNSET"`), an assignment that may not run
+resolve (`cd -` or `cd "$UNSET"`), a `cd` after `&&` or `||` (read as
+run), an assignment that may not run
 (`false && D=./x` or `if false; then : "${D:=./x}"; fi`, each read as run), a
 `${D:=x}` assignment inside `sh -c` or a substitution, an assignment in a
 pipeline element (`echo x | : "${D:=./x}"`, read as made in the shell that
@@ -581,9 +584,13 @@ def _scan(piece, cwd, home, outer):
     # is kept per scope and read through the scope's ancestors.
     # A `${D:=x}` default assigns D, and like a plain assignment it is read as
     # run (see Limits).
-    heres, assigns = {(0,): cwd}, {}
+    # Each scope keeps every directory the shell may be in: a `cd` after a
+    # keyword (`if [ -d x ]; then cd x; fi`) may not run, so the directory
+    # before it stays possible. `None` is a directory this cannot name.
+    heres, assigns = {(0,): (cwd,)}, {}
     for scope, argv in cmds or []:
-        here = next(heres[scope[:k]] for k in range(len(scope), 0, -1) if scope[:k] in heres)
+        dirs = next(heres[scope[:k]] for k in range(len(scope), 0, -1) if scope[:k] in heres)
+        here = dirs[-1]
         assigned = dict(outer)
         for k in range(1, len(scope) + 1):
             assigned.update(assigns.get(scope[:k], {}))
@@ -593,16 +600,21 @@ def _scan(piece, cwd, home, outer):
         assigns.setdefault(scope, {}).update(effects)
         assigned.update(effects)
         # `if cd /etc; then`, `{ cd /usr; }`: a keyword ends the command before.
+        maybe = bool(argv) and argv[0] in SHELL_KEYWORDS
         while argv and argv[0] in SHELL_KEYWORDS:
             argv = argv[1:]
-        if argv and argv[0] in ("cd", "pushd", "popd"):
-            words = [argv[0]]
-            for tok in argv[1:]:
+        lead = argv
+        while lead and lead[0] in ("time", "-p", "command", "builtin"):
+            lead = lead[1:]
+        if lead and lead[0] in ("cd", "pushd", "popd"):
+            words = [lead[0]]
+            for tok in lead[1:]:
                 got = _expand(tok, home, assigned, here)
                 known = got and got is not UNREAD and not got[1]
                 words.append(got[0] if known else None)
-            moved = None in words or any(SUB in tok for tok in argv)
-            heres[scope] = None if moved else resolve_cd_target(words, here)
+            moved = None in words or any(SUB in tok for tok in lead)
+            new = tuple(None if moved else resolve_cd_target(words, d) for d in dirs)
+            heres[scope] = tuple(dict.fromkeys((*dirs, *new) if maybe else new))
             continue
         if _assignments(argv, assigns.setdefault(scope, {}), assigned, home, here):
             continue
@@ -619,17 +631,17 @@ def _scan(piece, cwd, home, outer):
             for cand, weak in filter(None, [expanded]):
                 if not cand:
                     continue  # an empty operand is an error, not the cwd
-                if not cand.startswith("/"):
-                    if here is None:
-                        continue
-                    cand = os.path.join(here, cand)
-                path = os.path.normpath(cand).replace("//", "/")
-                if ALL_GLOB.match(os.path.basename(path)):
-                    path = os.path.dirname(path)
-                why = _why(path, home, weak)
-                if why:
-                    shown = " ".join(argv).replace(SUB, "$(...)")
-                    return (shown, program, target.replace(SUB, "$(...)"), path, why), inner, {}
+                bases = [None] if cand.startswith("/") else [d for d in dirs if d]
+                for base in bases:
+                    path = os.path.normpath(os.path.join(base, cand) if base else cand)
+                    path = path.replace("//", "/")
+                    if ALL_GLOB.match(os.path.basename(path)):
+                        path = os.path.dirname(path)
+                    why = _why(path, home, weak)
+                    if why:
+                        shown = " ".join(argv).replace(SUB, "$(...)")
+                        target = target.replace(SUB, "$(...)")
+                        return (shown, program, target, path, why), inner, {}
     seen = dict(outer)
     for names in assigns.values():
         seen.update(names)

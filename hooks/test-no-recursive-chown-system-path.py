@@ -284,6 +284,18 @@ class Denies(unittest.TestCase):
                     "if true; then pushd /etc; fi; chown -R me ."):
             self.assert_denied(cmd)
 
+    def test_cd_that_may_not_run_keeps_the_directory_before(self):
+        for cmd in ("cd /etc; if [ -d ~/proj ]; then cd ~/proj; fi; chown -R me .",
+                    "cd /usr/lib; if [ -d build ]; then cd ~/proj; fi; chmod -R u+w .",
+                    "cd /etc; while false; do cd ~/proj; done; chown -R me .",
+                    "cd /etc && { cd ~/proj || true; }; chown -R me ."):
+            self.assert_denied(cmd)
+
+    def test_cd_behind_time_or_command(self):
+        for cmd in ("time cd /etc; chown -R me .", "command cd /etc; chown -R me .",
+                    "builtin cd /etc; chown -R me ."):
+            self.assert_denied(cmd)
+
     def test_names_set_by_getopts_and_time_read(self):
         self.assert_denied('set -- -d /etc; getopts d: o; chown -R me "$OPTARG"')
         self.assert_denied('time read -r D <<< /etc; chown -R me "$D"')
@@ -379,6 +391,10 @@ class Allows(unittest.TestCase):
         self.assert_allowed('if true; then D=./build; fi; chown -R me "$D/"')
         # After `--`, `-v x` is the format and its argument: x keeps its value.
         self.assert_allowed('x=./build; printf -- -v x; chown -R me "$x"')
+
+    def test_guarded_cd_into_the_project(self):
+        self.assert_allowed("if [ -d build ]; then cd build; fi; chmod -R u+w .")
+        self.assert_allowed("cd ~/proj; if [ -d out ]; then cd out; fi; chown -R me .")
 
     def test_assigning_default_then_a_trailing_slash(self):
         self.assert_allowed(': "${D:=./build}"; chown -R me "${D:-./out}"')

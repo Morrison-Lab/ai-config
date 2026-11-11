@@ -69,7 +69,7 @@ description: <what it audits/detects/scouts>, what it lacks (Edit/Write/Bash)
 tools: Bash, Read, Grep, Glob, WebFetch    # comma-separated STRING, not a
                                             # YAML list (unlike skills'
                                             # `allowed-tools:`)
-omitClaudeMd: true           # for a worker that takes everything from its brief
+omitClaudeMd: true           # only when body and brief carry all it needs
 ---
 ```
 
@@ -101,13 +101,13 @@ and structure of the three existing agents — they read almost as a template.
   query, source priorities, output shape) inside the agent file itself, the
   same rule `skill-builder`'s subagent-fanning section states for inline
   prompts.
-- **Start a brief-only worker without `CLAUDE.md`.**
-  A subagent loads every `CLAUDE.md` the main session loads unless its definition sets `omitClaudeMd: true`
-  ([Claude Code docs](https://code.claude.com/docs/en/sub-agents.md), "What loads at startup"; needs v2.1.271 or later).
-  Set it on a worker whose prompt and brief carry everything it needs, as the read-only fan-out workers do,
-  so it does not start with the conductor's whole preamble ([ai-config#1499](https://github.com/Morrison-Lab/ai-config/issues/1499)).
+- **Start a brief-only worker without the project instructions.**
+  A custom subagent loads the user, project and local `CLAUDE.md` files, and any `AGENTS.md` loaded as project instructions, unless its definition sets `omitClaudeMd: true` ([Claude Code docs](https://code.claude.com/docs/en/sub-agents.md), "What loads at startup").
+  The field needs Claude Code v2.1.271 or later.
+  With the field set, managed policy files still load, and so does a subdirectory's `CLAUDE.md` once the worker works with files there.
+  Set it when the agent's body and brief carry everything it needs, so it does not start with the conductor's whole preamble ([ai-config#1499](https://github.com/Morrison-Lab/ai-config/issues/1499)).
   `hooks/inject-subagent-rules.py` still gives it the core rules.
-  Leave it off an agent that applies a repository's conventions, such as `adversarial-reviewer`, `code-editor` and `prose-editor`.
+  Leave it off an agent that judges a repository by that repository's own conventions or documentation, such as `adversarial-reviewer`, `code-editor` and `prose-editor`, and `reproducibility-auditor` and `dependency-auditor`, whose "undocumented" and "deliberately pinned" calls rest on what a project's `CLAUDE.md` records.
 - **No registry to update.** Agents are auto-discovered from `.claude/agents/`
   (mirrors skills' auto-discovery from `skills/`) — adding the file is enough
   for the harness to expose it as a `subagent_type`. There is currently no

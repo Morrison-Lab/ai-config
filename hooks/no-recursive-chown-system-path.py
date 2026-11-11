@@ -55,8 +55,9 @@ command is split, scanned as a command of its own, and taken as empty,
 except a bare `pwd`, read as `$PWD`. A `sh -c` text or a substitution is
 read where it appears, in the directory and with the names of each way the
 command may run up to there (a `sh -c` text also with the `NAME=value`
-words before its shell, `sudo D=/x sh -c`, and once without them, since
-bash expands a double-quoted text with the outer names), to MAX_NESTED
+words before its shell, `sudo D=/x sh -c`, and, unless the text is written
+in single quotes, once without them, since bash expands a double-quoted text
+with the outer names; `~` reads HOME the same way), to MAX_NESTED
 levels, and deeper with no directory, to MAX_DEPTH. A `cd` up the tree
 repeated by a loop (`cd ..`) is judged in every directory above. An
 unquoted `cd $D` with D empty or unset goes home, and is judged both there
@@ -94,7 +95,12 @@ named `coproc NAME { ...; }`, more than MAX_SCOPE `pushd`s in one command
 substitution (read with an empty stack; bash's inherits the outer one), a
 `cd` and a `cd ..` in one conditional body (each read as maybe run on its
 own, which can refuse the directory above: `if [ -d sub ]; then cd sub;
-make; cd ..; fi; chmod -R u+w .` is judged in the parent too), a
+make; cd ..; fi; chmod -R u+w .` is judged in the parent too), a quoted
+`"$D"` holding spaces (also judged word by word, so `D="build /"` is refused
+at `/`), a top-level directory written in a value beside an unset name
+(`DIRS="$X /opt"` splits to a `/opt` read as taken as empty, which a system
+tree or home is not), a `-R` held in a variable (`chown $FLAGS root /usr`
+is not seen as recursive), a
 `for` or `select` loop variable, `eval`, `su -c`, a heredoc piped to `sh`, an
 interpreter's own `-c` (`python -c "os.system(...)"`), a substitution in an
 unquoted heredoc body (`<<EOF`, which bash does run), a glob in a directory
@@ -499,7 +505,7 @@ def _expand(text, home, assigned, here, depth=0, effects=None):
     text = re.sub(r"\A~([+-])(?=/|\Z)",
                   lambda m: "${PWD}" if m.group(1) == "+" else "${OLDPWD}", text)
     text = re.sub(r"\A~([A-Za-z0-9_.-]*)(?=/|\Z)",
-                  lambda m: os.path.expanduser("~" + m.group(1)) if m.group(1) else home,
+                  lambda m: os.path.expanduser("~" + m.group(1)) if m.group(1) else "${HOME}",
                   text)
     guessed, undecidable, capped = [], [], []
 
@@ -856,8 +862,11 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
                 over = ctx["work"] > MAX_WORK
                 prefix = _prefix_names(words, home, assigned, here) if k >= first_shell else {}
                 # A double-quoted text was expanded with the outer names before
-                # the shell ran, a single-quoted one with these: read it both ways.
-                for names in ([ChainMap(prefix, assigned), assigned] if prefix else [assigned]):
+                # the shell ran, a single-quoted one with these: unless it is
+                # written single-quoted, read it both ways.
+                quoted = f"'{text}'" in piece and f'"{text}"' not in piece
+                readings = [ChainMap(prefix, assigned)] + ([] if quoted else [assigned])
+                for names in (readings if prefix else [assigned]):
                     hit = _nested_hit(text, None if over else here, home, names, level, ctx)
                     if hit:
                         return hit
@@ -984,7 +993,8 @@ def _nested_hit(text, here, home, names, level, ctx):
         here = None  # deeper texts are read once, with no directory
     if text not in ctx["uses"]:
         ctx["uses"][text] = sorted({m.group(1) or m.group(2) for m in VARIABLE.finditer(text)
-                                    if m.group(1) or m.group(2)} | {WEAK_PWD})
+                                    if m.group(1) or m.group(2)}
+                                   | {WEAK_PWD} | ({"HOME"} if "~" in text else set()))
     names = {k: names[k] for k in ctx["uses"][text] if k in names}
     key = (text, here, repr(sorted(names.items())))
     if level >= MAX_DEPTH or key in ctx["seen"]:
@@ -1004,9 +1014,10 @@ def _judge(words, home, assigned, here):
         if expanded is UNREAD:
             return _shown(" ".join(words)), program, _shown(target), None, UNREAD_WHY
         candidates = [expanded]
-        if expanded and "$" in target and len(expanded[0].split()) > 1:
-            # Unquoted, bash splits `$DIRS` into words; quotes are gone by now,
-            # so the value is judged whole and word by word.
+        if expanded and "$" in target and expanded[0].split() != [expanded[0]]:
+            # Unquoted, bash splits `$DIRS` into words (`"$EXTRA /etc"` with
+            # EXTRA unset is ` /etc`); quotes are gone by now, so the value is
+            # judged whole and word by word.
             candidates += [(field, expanded[1]) for field in expanded[0].split()]
         for cand, weak in filter(None, candidates):
             if not cand:

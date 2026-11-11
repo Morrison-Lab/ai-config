@@ -372,9 +372,20 @@ class Denies(unittest.TestCase):
                     'DIRS="build /etc"; chmod -R u+w $DIRS'):
             self.assert_denied(cmd)
 
+    def test_an_unset_name_at_either_end_of_a_list(self):
+        for cmd in ('DIRS="$EXTRA /etc"; sudo chown -R root:root $DIRS',
+                    'DIRS="/usr/local/bin $EXTRA"; sudo chown -R $USER $DIRS',
+                    'DIRS="$BUILD /usr"; sudo chmod -R u+w $DIRS'):
+            self.assert_denied(cmd)
+
+    def test_a_text_without_its_prefix_home(self):
+        self.assert_denied("HOME=/tmp/h sh -c \"chown -R me $HOME\"")
+        self.assert_denied("D=/tmp/x sh -c 'chown -R me ~'")
+
     def test_a_double_quoted_text_sees_the_outer_names(self):
         for cmd in ('D=/etc; D=./build sh -c "chmod -R 755 $D"',
-                    'D=/usr; sudo D=. sh -c "chown -R me $D"'):
+                    'D=/usr; sudo D=. sh -c "chown -R me $D"',
+                    'D=/etc; D=. sh -c "chmod -R 755 $D"; D=. sh -c \'chmod -R 755 $D\''):
             self.assert_denied(cmd)
 
     def test_names_before_a_shell_reach_its_text(self):
@@ -588,6 +599,14 @@ class Denies(unittest.TestCase):
 class Allows(unittest.TestCase):
     def assert_allowed(self, command, **kw):
         self.assertIsNone(run(command, **kw), f"expected no deny for: {command}")
+
+    def test_a_single_quoted_text_sees_its_prefix_names(self):
+        for cmd in ("HOME=/tmp/fakehome sh -c 'chmod -R u+w \"$HOME\"'",
+                    "HOME=\"$PWD/.home\" bash -c 'mkdir -p \"$HOME\" && chmod -R 700 \"$HOME\"'",
+                    "HOME=/tmp/h env -u X sh -c 'chmod -R u+w \"$HOME\"'",
+                    "D=/etc; D=./build sh -c 'chmod -R 755 $D'",
+                    "env HOME=/tmp/h sh -c 'chown -R me ~'"):
+            self.assert_allowed(cmd)
 
     def test_sudo_lone_h_takes_the_next_word_as_host(self):
         # sudo reads `chown` as the host and `-R me` as the chroot, then runs /etc.

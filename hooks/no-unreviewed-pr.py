@@ -115,8 +115,7 @@ except Exception as _exc:  # broken install: degrade, never block
     print(f"no-unreviewed-pr: cannot load scripts/lib/shellcmd.py ({_exc}); "
           "no command will be parsed", file=sys.stderr)
     shell_tokens = is_operator_token = None
-    # Read by `no-push-without-self-review.py`, which borrows this file's
-    # push detector and must treat a detector with no splitter as missing.
+    # `no-push-without-self-review.py` then treats this detector as missing.
     SHELLCMD_ERROR = f"cannot load scripts/lib/shellcmd.py ({_exc})"
 
 NO_WINDOW = ({"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)}

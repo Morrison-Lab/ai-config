@@ -2164,9 +2164,8 @@ print(f"{'ok  ' if expand_ok else 'WRONG'} _shell_expand hands on a native path 
       f"for a Git Bash target (got {expanded!r})")
 wrong += (not msys_ok) + (not expand_ok)
 
-# A broken install (no `scripts/lib` beside `hooks/`) cannot parse anything,
-# so the hook denies only a force-push-shaped command, saying it is broken,
-# and allows the rest (ai-config#3178).
+# Broken install (no `scripts/lib`): deny only force-push-shaped commands
+# and allow the rest (ai-config#3178).
 _broken = tempfile.mkdtemp()
 _TMPDIRS.append(_broken)
 os.makedirs(os.path.join(_broken, "hooks"))
@@ -2175,7 +2174,8 @@ shutil.copy(HOOK, _broken_hook)
 for _cmd, _want in (("git push --force origin b", True),
                     ("git push -fu origin b", True),
                     ("git push origin b", False),
-                    ("ALLOW_FORCE_PUSH=1 git push -f origin b", False),
+                    ("X=1 ALLOW_FORCE_PUSH=1 git push -f origin b", False),
+                    ("git push -f origin b; ALLOW_FORCE_PUSH=1 true", True),
                     ("git commit -m 'push -f' && ls", False),
                     ("git\tpush --force origin b", True),
                     ("git push --force # ALLOW_FORCE_PUSH=1", True)):

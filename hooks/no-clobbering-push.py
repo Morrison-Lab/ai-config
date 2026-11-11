@@ -372,14 +372,12 @@ FORK_SEPS = {"&", "|"}
 OVERRIDE = "ALLOW_FORCE_PUSH"
 
 # Degraded mode only (see `main`). Pieces are split first so each scan stays
-# linear: one regex spanning `git`, `push` and the flag took ~1s on 5,000
-# repeated `push` words.
+# linear (one regex spanning all three took ~1s on 5,000 `push` words).
 RX_DEGRADED_SPLIT = re.compile(r"[\n;&|]")
 RX_DEGRADED_FLAG = re.compile(r"\s(?:--force(?![\w-])|-[A-Za-z0-9]*f)")
-RX_DEGRADED_PUSH = re.compile(r"\spush\b")
-# The override counts only at the start of a piece, as an env assignment, so
-# a comment or an argument mentioning it does not wave a force push through.
-RX_DEGRADED_OVERRIDE = re.compile(r"(?:^|[\n;&|])[ \t]*" + OVERRIDE + r"=1\s")
+RX_DEGRADED_PUSH = re.compile(r"[ \t]push\b")
+# The override counts only in the assignment run heading the push's own piece.
+RX_DEGRADED_OVERRIDE = re.compile(r"[ \t]*(?:\w+=\S*[ \t]+)*" + OVERRIDE + r"=1[ \t]")
 
 
 def _degraded_force_push(command):
@@ -389,7 +387,8 @@ def _degraded_force_push(command):
         if "git" not in words and not any(w.endswith("/git") for w in words):
             continue
         push = RX_DEGRADED_PUSH.search(piece)
-        if push and RX_DEGRADED_FLAG.search(piece, push.end()):
+        if (push and RX_DEGRADED_FLAG.search(piece, push.end())
+                and not RX_DEGRADED_OVERRIDE.match(piece)):
             return True
     return False
 
@@ -1668,8 +1667,7 @@ def main() -> int:
         # Broken install: nothing can be parsed, so deny what LOOKS like a
         # force push and say why, as `no-push-without-self-review.py` does
         # (ai-config#3178).
-        if (_degraded_force_push(command)
-                and not RX_DEGRADED_OVERRIDE.search(command)):
+        if _degraded_force_push(command):
             print(json.dumps({"hookSpecificOutput": {
                 "hookEventName": "PreToolUse",
                 "permissionDecision": "deny",

@@ -269,11 +269,8 @@ def _heredoc_free(command):
             if hit is None:
                 return "".join(out)
             pos = hit.end()
-        # The opener line's newline was emitted above, so the terminator
-        # line's own newline is the same separator, not a second one. Keeping
-        # both put an empty command between them, which reads as `;;` once
-        # newlines become `;`, and inside a `case` arm a `;;` ends the arm:
-        # a caller tracking `case` patterns then misread the next `)`
+        # Drop the terminator's newline: the opener's was kept, and a second
+        # becomes `;;` once newlines are `;`, which ends a `case` arm
         # (ai-config#3178).
         if command.startswith("\r\n", pos):
             pos += 2

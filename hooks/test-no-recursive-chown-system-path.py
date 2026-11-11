@@ -305,6 +305,27 @@ class Denies(unittest.TestCase):
         self.assert_denied('if [ -d proj ]; then cd proj; fi; D="./$PWD/../.."; cd /tmp; '
                            'chown -R me "$D"', cwd=HOME)
 
+    def test_pwd_after_a_cd_this_cannot_resolve(self):
+        for cmd in ('cd "$UNSET_D"; X=$PWD; chown -R me "$X"', 'cd -; X=$PWD; chown -R me "$X"',
+                    'cd -; chown -R me "$PWD"', 'cd -; chown -R me "$(pwd)"'):
+            self.assert_denied(cmd, cwd=HOME)
+
+    def test_pwd_name_used_with_a_suffix(self):
+        for cmd in ('if [ -d sub ]; then cd sub; fi; X=$PWD; chown -R me "$X/.."',
+                    'if [ -d sub ]; then cd sub; fi; X=$PWD; chown -R me "$X"/../'):
+            self.assert_denied(cmd, cwd=HOME + "/proj")
+
+    def test_shell_c_runs_in_the_callers_directory(self):
+        for cmd in ('sudo sh -c "chown -R me $PWD"', 'sudo sh -c "chown -R me ."',
+                    "sudo sh -c 'chown -R me .'"):
+            self.assert_denied(cmd, cwd=HOME)
+        self.assert_denied("if a; then cd /; fi; if b; then cd y; fi; chown -R me .")
+
+    def test_refusal_quotes_pwd_substitution_as_written(self):
+        reason = run('sudo chown -R "$USER" "$(pwd)"', cwd=HOME)["permissionDecisionReason"]
+        self.assertIn("$(pwd)", reason)
+        self.assertNotIn("${PWD}", reason)
+
     def test_current_directory_named_another_way(self):
         for cmd in ('sudo chown -R "$USER" "$(pwd)"', 'X=$(pwd -P); chown -R me "$X"',
                     "chown -R me `pwd`", "chown -R me ~+"):
@@ -434,10 +455,17 @@ class Allows(unittest.TestCase):
     def test_getopts_option_string_is_not_a_name(self):
         self.assert_allowed('d=./build; while getopts d o; do :; done; chmod -R 755 "$d"')
 
-    def test_current_directory_inside_a_project(self):
+    def test_below_the_current_directory(self):
+        # From $HOME, so reading these as the current directory itself would deny.
         for cmd in ('chmod -R u+w "$(pwd)/build"', "chmod -R u+w ~+/build",
                     'chown -R me "$(pwd; echo)"'):
-            self.assert_allowed(cmd)
+            self.assert_allowed(cmd, cwd=HOME)
+
+    def test_shell_c_in_a_project(self):
+        self.assert_allowed("sudo sh -c 'chown -R me .'")
+        self.assert_allowed("cd build && sh -c 'chmod -R u+w .'")
+        self.assert_allowed("if a; then cd x; fi; if b; then cd y; fi; if c; then cd z; fi; "
+                            "chmod -R u+w ./q")
 
     def test_guarded_cd_into_the_project(self):
         self.assert_allowed("if [ -d build ]; then cd build; fi; chmod -R u+w .")

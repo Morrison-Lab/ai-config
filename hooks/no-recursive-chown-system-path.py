@@ -29,8 +29,8 @@ A target is read with `~`, `~user`, `$HOME`, and `~+`, `$(pwd)` and `$PWD`
 resolved against the hook's `cwd` and any `cd` earlier in the same shell (a
 `cd` inside `( ... )` moves only that subshell, and one inside an `if`, a
 loop or a `case`, outside the condition that opens it, may not run, so the
-directory before it is judged too, `$PWD` included; a name assigned from
-`$PWD` there keeps the worst of its values),
+rest of the command is judged once with the `cd` and once without, `$PWD`
+and names assigned from it included),
 and a basename made only of glob characters read as its directory (`/usr/*`
 touches `/usr`). Any other
 `$VAR` keeps its value in this environment, which the Bash call inherits; one
@@ -51,9 +51,12 @@ So is one that uses a parameter this cannot know: a positional parameter
 unset variable, and `$$`, `$#`, `$?` and `$-` as some value that is not
 empty. A command substitution outside single quotes, heredoc bodies and
 comments is lifted out before the command is split, scanned as a command of
-its own, and taken as empty, except a bare `pwd`, read as `$PWD`. Inside `sh -c`
-or a substitution the working directory is unknown, so only absolute targets
-are judged there.
+its own, and taken as empty, except a bare `pwd`, read as `$PWD`. A `sh -c`
+text or a substitution runs in the caller's directory, the hook's `cwd`
+while no `cd` appears before it; after one, its directory is unknown, so only
+absolute targets are judged there. After a `cd` this cannot resolve (`cd -`,
+`cd "$UNSET"`), `$PWD` is taken as empty, and an operand left empty by it
+(`"$PWD"`, or `X=$PWD` then `"$X"`) is refused.
 
 A deny, not a warning: the remedy (fix the one path that raised the error, as
 your own user) is always available, and the damage is unrecoverable without a
@@ -74,7 +77,8 @@ interpreter's own `-c` (`python -c "os.system(...)"`), a substitution in an
 unquoted heredoc body (`<<EOF`, which bash does run), a glob in a directory
 component (`/*/lib`), a partial glob or brace expansion that names a
 protected path (`/et*`, `/{etc,usr}`), a wrapper that changes directory
-(`env -C /etc`, `sudo -D /etc`), PowerShell `icacls`/`Set-Acl`, Windows drive
+(`env -C /etc`, `sudo -D /etc`), more than MAX_WORLDS ways a command may
+run (the directory is then unknown), PowerShell `icacls`/`Set-Acl`, Windows drive
 paths (`C:/Windows`), a relative target after a `cd` this cannot
 resolve (`cd -` or `cd "$UNSET"`), a `cd` that fails or follows `&&` or
 `||` (read as run), an assignment that may not run
@@ -166,8 +170,8 @@ UNREAD = ("/", False)
 UNREAD_WHY = ("whose value this guard does not read, here or in an earlier assignment: "
               "a `${...}` operator other than a `-`/`=` default or a `?` check, defaults "
               f"nested deeper than {MAX_NESTING}, a positional parameter, `$_`, `$OLDPWD`, "
-              "a name set by `read`, `getopts` or `printf -v`, or a relative value from "
-              "`$PWD` after a `cd` that may not run; write the path out")
+              "a name set by `read`, `getopts` or `printf -v`, or `$PWD` alone after a "
+              "`cd` this cannot resolve; write the path out")
 # Words that open and close a compound command, for `_scan`'s DEPTH.
 BLOCK_OPEN = {"if", "while", "until", "for", "select", "case"}
 BLOCK_CLOSE = {"fi", "done", "esac"}
@@ -207,8 +211,10 @@ SPECIAL = {"$": "1", "#": "0", "?": "0", "-": "hB"}
 # Builtins that set a variable from input this guard cannot read. A name they
 # set is refused when an operand uses it.
 READ_BUILTINS = ("read", "mapfile", "readarray", "getopts")
-PWD_COMMAND = re.compile(r"pwd(\s+-[LP]+)*")
-PWD_USE = re.compile(r"\$\{?PWD(?![A-Za-z0-9_])")
+# A lifted `$(pwd)`, read as `${PWD}` and shown as written.
+PWD_SUB = "__AICFG_PWDSUB__"
+# How many ways a command may run (see `_scan`) are judged one by one.
+MAX_WORLDS = 16
 ALL_GLOB = re.compile(r"\A[*?.]*[*?][*?.]*\Z")
 
 DENY = (
@@ -276,12 +282,13 @@ def _lift(text):
 
 
 def _lifted(body, inner):
-    """What a substitution of BODY stands for: `${PWD}` for `pwd`, else SUB.
+    """What a substitution of BODY stands for: PWD_SUB for `pwd`, else SUB.
 
     Any other body goes in INNER, to be checked as a command of its own.
     """
-    if PWD_COMMAND.fullmatch(body.strip()):
-        return "${PWD}"
+    words = body.split()
+    if words[:1] == ["pwd"] and all(w in ("-L", "-P", "-LP", "-PL") for w in words[1:]):
+        return PWD_SUB
     inner.append(body)
     return SUB
 
@@ -408,12 +415,13 @@ def _expand(text, home, assigned, here, depth=0, effects=None):
     one, only when the name is unset (`D=; ${D-/x}` is empty). A `=` default
     also assigns, and the assignment goes in EFFECTS when it is given.
     """
+    text = text.replace(PWD_SUB, "${PWD}")
     text = re.sub(r"\A~([+-])(?=/|\Z)",
                   lambda m: "${PWD}" if m.group(1) == "+" else "${OLDPWD}", text)
     text = re.sub(r"\A~([A-Za-z0-9_.-]*)(?=/|\Z)",
                   lambda m: os.path.expanduser("~" + m.group(1)) if m.group(1) else home,
                   text)
-    guessed, undecidable, capped = [], [], []
+    guessed, undecidable, capped, unknown = [], [], [], []
 
     def value(name, rest):
         if name is None:  # a lifted substitution
@@ -444,7 +452,10 @@ def _expand(text, home, assigned, here, depth=0, effects=None):
         elif name == "HOME":
             val = home
         elif name == "PWD":
+            # After a `cd` this cannot resolve, `$PWD` is taken as empty, like
+            # an unset variable, unless nothing else is left (`"$PWD"`).
             val, missing = here or "", here is None
+            unknown.append(missing)
         else:
             val = os.environ.get(name, "")
             missing, is_set = not val, name in os.environ
@@ -486,7 +497,7 @@ def _expand(text, home, assigned, here, depth=0, effects=None):
             pieces.append(value(match.group(2), ""))
     pieces.append(text[pos:])
     expanded = "".join(pieces)
-    if capped:
+    if capped or any(unknown) and not expanded:
         return UNREAD
     return None if undecidable else (expanded, any(guessed))
 
@@ -605,135 +616,126 @@ def _defaults(argv, home, store, visible, here):
     visible.update(effects)
 
 
-def _per_dir(dirs, home, store, visible, step):
-    """Run STEP(store, visible, directory) once for each of DIRS; its result.
-
-    With one directory this is a plain call. With several, `$PWD` differs
-    between them (`if [ -d x ]; then cd x; fi; X=$PWD`), so each name STEP
-    assigns keeps, of its readings, one that is protected or refused, else
-    the last; a later use of it is then judged as the worst case. Relative
-    readings that differ are refused, since a later `cd` decides them.
-    """
-    if len(dirs) == 1:
-        return step(store, visible, dirs[0])
-    runs = []
-    for d in dirs:
-        st, vis = {}, dict(visible)
-        runs.append((step(st, vis, d), st))
-    for name in dict.fromkeys(n for _, st in runs for n in st):
-        readings = [st[name] for _, st in runs if name in st]
-        relative = any(r and r is not UNREAD and not r[0].startswith("/") for r in readings)
-        if relative and len(set(readings)) > 1:
-            # Judged where it is used, against a directory not known here.
-            store[name] = visible[name] = UNREAD
-            continue
-        store[name] = visible[name] = next(
-            (r for r in readings if r is UNREAD or r and r[0].startswith("/")
-             and _why(os.path.normpath(r[0]), home, r[1])), readings[-1])
-    return runs[-1][0]
+def _shown(text):
+    """TEXT as the agent wrote it, with each lifted substitution put back."""
+    return text.replace(SUB, "$(...)").replace(PWD_SUB, "$(pwd)")
 
 
 def _scan(piece, cwd, home, outer):
-    """`(hit or None, [inner command substitutions], names assigned)` for one text.
+    """`(hit or None, [inner substitutions], names assigned, moved)` for one text.
 
     OUTER holds names an enclosing text assigned: a `sh -c` body or a
     substitution sees them, through the outer shell's own expansion of a
-    double-quoted body or through the environment.
+    double-quoted body or through the environment. MOVED says whether any
+    `cd`, `pushd` or `popd` appears in the text.
     """
     cmds, inner = _split(piece)
-    # A `cd` or assignment inside `( ... )` changes only that subshell, so each
-    # is kept per scope and read through the scope's ancestors.
-    # A `${D:=x}` default assigns D, and like a plain assignment it is read as
-    # run (see Limits).
-    # Each scope keeps every directory the shell may be in: a `cd` after a
-    # keyword (`if [ -d x ]; then cd x; fi`) may not run, so the directory
-    # before it stays possible. `None` is a directory this cannot name.
+    # A WORLD is one way the command may run: for each scope, the directory
+    # the shell is in (`None` when this cannot name it) and the names
+    # assigned there. A `cd` or assignment inside `( ... )` changes only that
+    # subshell, so each is kept per scope and read through the scope's
+    # ancestors. A `${D:=x}` default assigns D, and like a plain assignment it
+    # is read as run (see Limits).
+    # A `cd` that may not run forks every world in two, one where it ran and
+    # one where it did not, so `$PWD`, a name assigned from it, and `.` are
+    # each judged in every directory the shell may be in. Past MAX_WORLDS the
+    # directory is no longer split, and becomes `None`.
     # DEPTH counts the `if`, loop and `case` commands open here: any `cd`
     # inside one may not run, except in the condition of the one it opens
     # (`if cd x; then`, `while ! cd x`). A `{ ... }` group runs.
-    heres, assigns, depth = {(0,): (cwd,)}, {}, 0
+    worlds, depth, moved_any = [({(0,): cwd}, {})], 0, False
     for scope, argv in cmds or []:
-        dirs = next(heres[scope[:k]] for k in range(len(scope), 0, -1) if scope[:k] in heres)
-        # With more than one possible directory, `$PWD` has no one value.
-        here = dirs[0] if len(dirs) == 1 else None
-        assigned = dict(outer)
-        for k in range(1, len(scope) + 1):
-            assigned.update(assigns.get(scope[:k], {}))
-        store = assigns.setdefault(scope, {})
-        _per_dir(dirs, home, store, assigned,
-                 lambda st, vis, d: _defaults(argv, home, st, vis, d))
         # `then cd /etc`, `{ cd /usr; }`: a keyword ends the command before.
-        opened = None
-        while argv and argv[0] in SHELL_KEYWORDS:
-            depth += (argv[0] in BLOCK_OPEN) - (argv[0] in BLOCK_CLOSE)
-            opened = argv[0] if argv[0] in BLOCK_OPEN else opened
-            argv = argv[1:]
+        words, opened = argv, None
+        while words and words[0] in SHELL_KEYWORDS:
+            depth += (words[0] in BLOCK_OPEN) - (words[0] in BLOCK_CLOSE)
+            opened = words[0] if words[0] in BLOCK_OPEN else opened
+            words = words[1:]
         maybe = depth - (opened in CONDITION_OPEN) > 0
-        lead = argv
+        lead = words
         while lead and lead[0] in ("time", "-p", "command", "builtin"):
             lead = lead[1:]
-        if lead and lead[0] in ("cd", "pushd", "popd"):
-            words = [lead[0]]
-            for tok in lead[1:]:
-                got = _expand(tok, home, assigned, here)
-                known = got and got is not UNREAD and not got[1]
-                words.append(got[0] if known else None)
-            moved = None in words or any(SUB in tok for tok in lead)
-            new = tuple(None if moved else resolve_cd_target(words, d) for d in dirs)
-            heres[scope] = tuple(dict.fromkeys((*dirs, *new) if maybe else new))
-            continue
-        if _per_dir(dirs, home, store, assigned, lambda st, vis, d: _assignments(
-                argv, st, vis, home, d)):
-            continue
-        head, override = _program(argv)
-        if not head or override:
-            continue
-        program = os.path.basename(head[0])
-        for target, base in ((t, d) for t in _targets(program, head) for d in dirs):
-            # Judged once per possible directory, for `.` and `$PWD` alike.
-            expanded = _expand(target, home, assigned, base)
-            if expanded is UNREAD:
-                shown = " ".join(argv).replace(SUB, "$(...)")
-                target = target.replace(SUB, "$(...)")
-                return (shown, program, target, None, UNREAD_WHY), inner, {}
-            for cand, weak in filter(None, [expanded]):
-                if not cand:
-                    continue  # an empty operand is an error, not the cwd
-                if not cand.startswith("/"):
-                    if base is None:
-                        continue
-                    cand = os.path.join(base, cand)
-                path = os.path.normpath(cand).replace("//", "/")
-                if ALL_GLOB.match(os.path.basename(path)):
-                    path = os.path.dirname(path)
-                why = _why(path, home, weak)
-                if why:
-                    shown = " ".join(argv).replace(SUB, "$(...)")
-                    target = target.replace(SUB, "$(...)")
-                    return (shown, program, target, path, why), inner, {}
+        is_cd = bool(lead) and lead[0] in ("cd", "pushd", "popd")
+        moved_any = moved_any or is_cd
+        forked = []
+        for heres, assigns in worlds:
+            here = next(heres[scope[:k]] for k in range(len(scope), 0, -1)
+                        if scope[:k] in heres)
+            assigned = dict(outer)
+            for k in range(1, len(scope) + 1):
+                assigned.update(assigns.get(scope[:k], {}))
+            store = assigns.setdefault(scope, {})
+            _defaults(argv, home, store, assigned, here)
+            if is_cd:
+                got = [_expand(tok, home, assigned, here) for tok in lead[1:]]
+                cd_words = [lead[0]] + [g[0] if g and g is not UNREAD and not g[1] else None
+                                        for g in got]
+                unknown = None in cd_words or any(SUB in tok for tok in lead) or here is None
+                new = None if unknown else resolve_cd_target(cd_words, here)
+                if maybe and new != here and len(worlds) + len(forked) < MAX_WORLDS:
+                    forked.append(({**heres, scope: new},
+                                   {k: dict(v) for k, v in assigns.items()}))
+                    continue  # this world keeps the directory before the `cd`
+                heres[scope] = None if maybe and new != here else new
+                continue
+            if _assignments(words, store, assigned, home, here):
+                continue
+            hit = _judge(words, home, assigned, here)
+            if hit:
+                return hit, inner, {}, moved_any
+        worlds.extend(forked)
     seen = dict(outer)
-    for names in assigns.values():
-        seen.update(names)
-    return None, inner, seen
+    for _, assigns in worlds:
+        for names in assigns.values():
+            seen.update(names)
+    return None, inner, seen, moved_any
+
+
+def _judge(words, home, assigned, here):
+    """`(segment, program, target, path, why)` when WORDS hits a protected path."""
+    head, override = _program(words)
+    if not head or override:
+        return None
+    program = os.path.basename(head[0])
+    for target in _targets(program, head):
+        expanded = _expand(target, home, assigned, here)
+        if expanded is UNREAD:
+            return _shown(" ".join(words)), program, _shown(target), None, UNREAD_WHY
+        for cand, weak in filter(None, [expanded]):
+            if not cand:
+                continue  # an empty operand is an error, not the cwd
+            if not cand.startswith("/"):
+                if here is None:
+                    continue
+                cand = os.path.join(here, cand)
+            path = os.path.normpath(cand).replace("//", "/")
+            if ALL_GLOB.match(os.path.basename(path)):
+                path = os.path.dirname(path)
+            why = _why(path, home, weak)
+            if why:
+                return _shown(" ".join(words)), program, _shown(target), path, why
+    return None
 
 
 def _hit(command, cwd, home):
     """`(segment, program, target, path, why)` for the first protected target.
 
-    Only the command itself runs in CWD; a `sh -c` text or a substitution
-    gets `None`, so its relative targets are left alone.
+    A `sh -c` text or a substitution runs in the directory of the shell that
+    starts it. That is CWD while no text read so far has a `cd`; after one,
+    it is `None`, and relative targets there are left alone.
     """
-    pending = [(piece, cwd if n == 0 else None)
-               for n, piece in enumerate(shell_c_expansions(command))]
+    pending = list(shell_c_expansions(command))
     known = {}  # every name assigned so far, over-approximating its scope
+    moved = False
     while pending:
-        piece, here = pending.pop(0)
-        hit, inner, seen = _scan(piece, here, home, known)
+        piece = pending.pop(0)
+        hit, inner, seen, moved_here = _scan(piece, None if moved else cwd, home, known)
         if hit:
             return hit
+        moved = moved or moved_here
         known.update(seen)
         for text in inner:
-            pending.extend((nested, None) for nested in shell_c_expansions(text))
+            pending.extend(shell_c_expansions(text))
     return None
 
 

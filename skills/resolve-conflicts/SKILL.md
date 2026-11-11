@@ -146,20 +146,28 @@ go read the history first (step 2).
    (`<<<<<<<`, `=======`, `>>>>>>>`). Take one side wholesale only when you've
    confirmed the other side has nothing worth keeping — and note that you did.
 
-   **Record a decision for every hunk before you finish the operation.**
+   **Record a decision for every hunk.**
+   Draft the table while you resolve, and finish it before you finish the
+   operation.
    For each conflict hunk, write one row: what you kept from each side, what
-   you dropped and why, and what you modified and why.
-   Name each side by its branch or commit, not as "ours" or "theirs", since
-   those flip in a rebase (see the warning below).
-   Put the table in the merge commit message; for a rebase, cherry-pick,
-   revert or stash pop, put it in the PR comment or report that announces the
-   result.
-   A reviewer can then check each choice against the merge base and both
-   parents without redoing the merge:
+   you dropped (from which side) and why, and what you modified and why.
+   Name each side by its branch, commit or stash entry, not as "ours" or
+   "theirs", since those flip in a rebase (see the warning below).
+   Deliver the table in the merge commit message.
+   For a rebase, cherry-pick, revert or stash pop, which leaves no merge
+   message, deliver it in the PR comment that announces the result, or, with
+   no PR, in your report to the user.
+   A reviewer can then check each choice against both sides without redoing
+   the operation.
+   In the table, `<n>` is the hunk's number within the file, counted from 1,
+   and `<lines>` is a line range (`12-18`), never the text itself, which
+   would break the table row.
+   The range is in the resolved file, except under "Dropped", where it is in
+   the named side's version of the file:
 
-   | File:hunk | Kept from `<branch A>` | Kept from `<branch B>` | Dropped (why) | Modified (why) |
+   | File:hunk | Kept from `<side A>` | Kept from `<side B>` | Dropped (side, why) | Modified (why) |
    | --- | --- | --- | --- | --- |
-   | `<path>`:`<n>` | `<lines or "none">` | `<lines or "none">` | `<lines>` (`<reason>`) | `<lines>` (`<reason>`) |
+   | `<path>`:`<n>` | `<lines or "none">` | `<lines or "none">` | `<lines>` (`<side>`, `<reason>`) | `<lines>` (`<reason>`) |
 
    A row with something in "Dropped" and no reason is the defect this table
    exists to expose: content that either side added may be dropped only by a

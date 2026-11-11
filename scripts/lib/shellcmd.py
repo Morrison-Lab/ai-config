@@ -275,7 +275,9 @@ def _heredoc_free(command):
         # newlines become `;`, and inside a `case` arm a `;;` ends the arm:
         # a caller tracking `case` patterns then misread the next `)`
         # (ai-config#3178).
-        if command.startswith("\n", pos):
+        if command.startswith("\r\n", pos):
+            pos += 2
+        elif command.startswith("\n", pos):
             pos += 1
 
 

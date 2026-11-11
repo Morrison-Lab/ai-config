@@ -168,7 +168,7 @@ check("mutation: without heredoc blanking the body's push is a command",
                                 "", HEREDOC_CASE) or []),
       True)
 check("mutation: keeping the terminator's newline reintroduces `;;`",
-      ";;" in (_mutant_tokens('        if command.startswith("\\n", pos):\n'
+      ";;" in (_mutant_tokens('        elif command.startswith("\\n", pos):\n'
                               "            pos += 1\n", "",
                               HEREDOC_CASE) or []),
       True)

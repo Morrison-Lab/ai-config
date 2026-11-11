@@ -2176,7 +2176,9 @@ for _cmd, _want in (("git push --force origin b", True),
                     ("git push -fu origin b", True),
                     ("git push origin b", False),
                     ("ALLOW_FORCE_PUSH=1 git push -f origin b", False),
-                    ("git commit -m 'push -f' && ls", False)):
+                    ("git commit -m 'push -f' && ls", False),
+                    ("git\tpush --force origin b", True),
+                    ("git push --force # ALLOW_FORCE_PUSH=1", True)):
     _env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
     _proc = subprocess.run(
         [sys.executable, _broken_hook],

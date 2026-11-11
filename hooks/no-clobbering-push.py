@@ -371,13 +371,15 @@ FORK_SEPS = {"&", "|"}
 # same reason: a guard that its own documentation disables is worthless.
 OVERRIDE = "ALLOW_FORCE_PUSH"
 
-# Degraded mode only (see `main`): a `git ... push` carrying `--force` or a
-# short-option cluster with `f`, within one simple command. Split first and
-# test each piece with single scans, so the check stays linear
-# on a long command (one regex spanning `git`, `push` and the flag measured
-# about a second on 5,000 repeated `push` words).
+# Degraded mode only (see `main`). Pieces are split first so each scan stays
+# linear: one regex spanning `git`, `push` and the flag took ~1s on 5,000
+# repeated `push` words.
 RX_DEGRADED_SPLIT = re.compile(r"[\n;&|]")
 RX_DEGRADED_FLAG = re.compile(r"\s(?:--force(?![\w-])|-[A-Za-z0-9]*f)")
+RX_DEGRADED_PUSH = re.compile(r"\spush\b")
+# The override counts only at the start of a piece, as an env assignment, so
+# a comment or an argument mentioning it does not wave a force push through.
+RX_DEGRADED_OVERRIDE = re.compile(r"(?:^|[\n;&|])[ \t]*" + OVERRIDE + r"=1\s")
 
 
 def _degraded_force_push(command):
@@ -386,8 +388,8 @@ def _degraded_force_push(command):
         words = piece.split()
         if "git" not in words and not any(w.endswith("/git") for w in words):
             continue
-        at = piece.find(" push")
-        if at != -1 and RX_DEGRADED_FLAG.search(piece, at + 5):
+        push = RX_DEGRADED_PUSH.search(piece)
+        if push and RX_DEGRADED_FLAG.search(piece, push.end()):
             return True
     return False
 
@@ -1663,12 +1665,11 @@ def main() -> int:
         return 0
 
     if shell_tokens is None:
-        # Broken install: `scripts/lib/shellcmd.py` did not load, so no
-        # command can be parsed. Rather than allow every force push silently,
-        # deny a command that LOOKS like one, saying the guard is broken ---
-        # the degraded mode `no-push-without-self-review.py` uses. It decides
-        # only whether to say so, never what a command does (ai-config#3178).
-        if _degraded_force_push(command) and OVERRIDE + "=1" not in command:
+        # Broken install: nothing can be parsed, so deny what LOOKS like a
+        # force push and say why, as `no-push-without-self-review.py` does
+        # (ai-config#3178).
+        if (_degraded_force_push(command)
+                and not RX_DEGRADED_OVERRIDE.search(command)):
             print(json.dumps({"hookSpecificOutput": {
                 "hookEventName": "PreToolUse",
                 "permissionDecision": "deny",

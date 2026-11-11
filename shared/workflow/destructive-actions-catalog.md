@@ -33,7 +33,7 @@ a row says so where its source was not.
 | Worktree force-removed with uncommitted work | blanket `git worktree remove --force` fallback (ai-config, 2026-09-10) | `warn-blanket-worktree-force-remove.py` (warns) |
 | Gitignored render intermediate deleted under a live render | ai-config, 2026-09-24 | `no-rm-live-render-intermediate.py` (denies) |
 | Live config deleted as "orphaned" | [ai-config#3096](https://github.com/Morrison-Lab/ai-config/issues/3096) | `flag-config-deletion-without-ref-check.py` warns at `Stop` on a reply that recommends the deletion; nothing intercepts the command |
-| `chown -R` or `chmod -R` on system directories | `sudo chown -R $USER:$(id -gn) /usr && sudo chmod -R u+w /usr` broke `sudo` ([#168](https://github.com/anthropics/claude-code/issues/168)); a background agent with `sudo` left `/etc` owned by UID 100000, then ran `chown -R root:root /usr/` and `/etc/` as a repair, clearing setuid bits on `sudo` and `su` ([#39283](https://github.com/anthropics/claude-code/issues/39283)) | none |
+| `chown -R` or `chmod -R` on system directories | `sudo chown -R $USER:$(id -gn) /usr && sudo chmod -R u+w /usr` broke `sudo` ([#168](https://github.com/anthropics/claude-code/issues/168)); a background agent with `sudo` left `/etc` owned by UID 100000, then ran `chown -R root:root /usr/` and `/etc/` as a repair, clearing setuid bits on `sudo` and `su` ([#39283](https://github.com/anthropics/claude-code/issues/39283)) | `no-recursive-chown-system-path.py` denies it; see [below](#recursive-ownership-and-mode-changes) |
 | Moving files into a directory that a failed `mkdir` never made | Gemini CLI, July 2025, per [Ars Technica](https://arstechnica.com/information-technology/2025/07/ai-coding-assistants-chase-phantoms-destroy-real-user-data/) (not read: the host refused this session's fetch) | none; the rule below is prose |
 | Production database or infrastructure destroyed | a Replit agent deleted a production database during a code freeze, July 2025; `terraform destroy` ran against a stale state file, February 2026 ([Alexey Grigorev](https://alexeyondata.substack.com/p/how-i-dropped-our-production-database)); neither source was reachable from this session | none; the lab runs no production database |
 
@@ -50,7 +50,15 @@ a row says so where its source was not.
 - **Do:** check that a directory exists after creating it, before moving anything into it.
 - **Don't:** answer a refused `--force-with-lease` with a plain `--force`.
   Read the remote branch first ([`check-before-pushing`](check-before-pushing.md)).
-- **Do:** fix a permission error on the one path that raised it, as your own user.
-- **Don't:** run `chown -R` or `chmod -R` on `/`, `/usr`, `/etc`, a home directory or anything mounted into a container, with or without `sudo`.
 - **Do:** treat any command that touches a production database, a cloud account or infrastructure state as needing Ezra's own words naming that action.
 - **Don't:** run `terraform destroy`, a database drop or a schema reset that a person did not ask for by name.
+
+## Recursive ownership and mode changes
+
+A recursive `chown` or `chmod` over a system directory clears the setuid bits that `sudo`, `su` and `passwd` need, and undoing it takes a console.
+
+- **Do:** fix a permission error on the one path that raised it, as your own user.
+- **Don't:** run `chown -R`, `chmod -R` or `chgrp -R` on `/`, `/usr`, `/etc`, `/var/lib`, a home directory or anything mounted into a container, with or without `sudo`.
+  A variable an earlier Bash call set is empty in this one, so `chmod -R 755 "$d/"` is `chmod -R 755 /`.
+
+[`hooks/no-recursive-chown-system-path.py`](../../hooks/no-recursive-chown-system-path.py) denies the command, and [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md#recursive-ownership-and-mode-changes) looks for it in a diff.

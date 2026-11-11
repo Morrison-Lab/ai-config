@@ -40,4 +40,4 @@ Cloud sessions get HTTP 403 on every GraphQL call, so they can do neither step t
 Hand the branch creation (issue, repository, branch name, base or SHA) to a local runner, a Remote Control session on Ezra's machine, before the first push, and push onto the branch once it exists.
 If no local runner is reachable, say in the thread that the branch is unlinked and why, rather than skipping the step silently.
 
-No hook yet: a hook cannot tell from a push which issue a branch addresses, and a cloud session cannot query the link (ai-config#5299 tracks a mechanism).
+No hook yet: a hook cannot tell from a push which issue a branch addresses, and a cloud session cannot query the link (ai-config#5303 tracks a mechanism).

@@ -364,7 +364,7 @@ These gate too, all without `--strict`.
 The root file's character cap (`--root-char-cap`, 150,000 -- the CLI's per-file limit on a 1M-context model), the per-fragment byte cap (`--fragment-cap`), and the `AGENTS.md` byte cap (`--agents-md-cap`, 32,768, Codex's default, checked when `AGENTS.md` exists and off under `--no-agents-md-gate`) fail on the level.
 `--max-growth BYTES`, with `--baseline`, fails when the closure grew by more than `BYTES`, and is unset by default.
 `--merge-result REF` measures the tree that merging `REF` (such as `origin/main`) into `HEAD` would produce, instead of the working tree, so a PR's headroom is measured against `main` as it stands now rather than as it stood when CI ran (ai-config#4234).
-The caps, the CLI total limit and dangling imports are checked on that tree, with a submodule read at its merged pin; the growth gates, which need `--baseline`, do not run.
+The caps, the CLI total limit and dangling imports are checked on that tree, with a submodule read at its merged pin, though the growth gates, which need `--baseline`, do not run.
 The **growth ratchet** fails on the delta: under `--baseline REV`, once the root file sits at or above `--root-growth-gate-fraction` of its cap (0.90 by default), the branch may not grow it at all.
 Below that line the ratchet is inactive and reports so;
 `--no-root-growth-gate` turns it off for a caller whose baseline is not a merge base.

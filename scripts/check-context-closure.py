@@ -578,7 +578,7 @@ def merge_result_tree(base: Path, ref: str) -> tuple[str | None, str]:
 
     Returns `(tree, "")`, or `(None, reason)`. CI measures the merge with
     `main` as it stood when CI ran, which can be stale (ai-config#4213).
-    `git merge-tree --write-tree` (git 2.38+) leaves the checkout. It exits 1 on a
+    `git merge-tree --write-tree` (git 2.38+) leaves the checkout untouched. It exits 1 on a
     conflict, whose tree holds markers, and on an unknown ref, so the ref is
     checked first and a conflict is an error, not a measurement.
     """

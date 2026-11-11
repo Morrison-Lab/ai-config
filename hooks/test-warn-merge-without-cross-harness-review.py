@@ -386,7 +386,8 @@ def main():
         dict(oc[0], out="The user doesn't want to proceed with this tool use")])[0] and run(
         MERGE, probe_all[:1] + [dict(oc[0], rec={"toolDenialKind": "automode-blocked"})])[0])
     check("warns when the probe shares its call or exits other than 1", run(MERGE, [probe(
-        "cd /nope && command -v " + clis4)] + oc)[0] and run(MERGE, [probe("command -v " + clis4, "Exit code 2")] + oc)[0])
+        "cd /nope && command -v " + clis4)] + oc)[0] and run(MERGE, [probe("command -v " + clis4, "Exit code 2")] + oc)[0]
+          and run(MERGE, [probe("which -s " + clis4)] + oc)[0] and not run(MERGE, [probe("which %s 2>/dev/null" % clis4)] + oc)[0])
     check("silent when an installed CLI was attempted and errored", not run(
         MERGE, [probe("command -v agy gemini cursor-agent"),
                 probe("codex exec 'review the diff'", "Exit code 1\nbackend down")] + oc)[0])

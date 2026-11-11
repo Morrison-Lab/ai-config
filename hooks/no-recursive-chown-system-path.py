@@ -113,8 +113,9 @@ it (`D=/x; bash -c 'chmod -R 755 "$D/"'` runs on `/`), a `sh -c` text
 after `NAME=value` words, read without them too, which refuses more than
 bash runs for a single-quoted text or a `~` (`HOME=/tmp/h sh -c 'chmod -R
 u+w "$HOME"'` and `HOME=/tmp/h; chmod -R u+w ~` are judged at the real
-home; write the path itself), a `~` inside a path (`a:~/b`) or after a
-`cd`, read as this process's home only, a `cd` that
+home; write the path itself), a `~` inside a path (`a:~/b`), after a
+`cd`, in an assignment value or in a `${D:-~/x}` default, read as this
+process's home only, a `cd` that
 goes home (a bare `cd`, or an unquoted empty `cd $D`), which reads this
 process's own home and not a HOME the command assigns, a
 `for` or `select` loop variable, `eval`, `su -c`, a heredoc piped to `sh`, an
@@ -145,11 +146,11 @@ assignment that may not run (`false && D=./x` or `if false; then :
 or a substitution, an assignment in a pipeline element (`echo x | :
 "${D:=./x}"`, read as made in the shell that follows), a `${D:=x}` read
 earlier in the same command than it assigns, and a bind-mounted path (the
-#39283 `/volumes/mail/` case) all pass. A `sh -c` text inside another
-program's arguments (`docker exec c sh -c`, `chroot /mnt sh -c`) passes
-when that program comes first, and is read, so may be refused, after a
-wrapper such as `sudo`. Fails open on parse trouble and when
-scripts/lib/shellcmd.py cannot be imported.
+#39283 `/volumes/mail/` case) pass, or are refused where noted. A `sh -c`
+text inside another program's arguments (`docker exec c sh -c`, `chroot
+/mnt sh -c`) passes when that program comes first, and is read, so may be
+refused, after a wrapper the shared reader knows, such as `sudo`. Fails open on parse trouble
+and when scripts/lib/shellcmd.py cannot be imported.
 """
 from __future__ import annotations
 

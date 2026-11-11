@@ -246,7 +246,8 @@ def cli_char_count(text: str) -> int:
 # On a 200k-context model the same limit is 40,000, which this corpus's root
 # file cannot meet, so the gate sits at the larger figure. It fails
 # regardless of `--strict`, like a dangling anchored import, rather than
-# joining the advisory budget (ai-config#897, #1258, #4061).
+# joining the budget, which is advisory by default (ai-config#897,
+# #1258, #4061).
 DEFAULT_ROOT_CHAR_CAP = 150_000
 
 # Measured 2026-08-07: at 153,217 raw characters the harness reported

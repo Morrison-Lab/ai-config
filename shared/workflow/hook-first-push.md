@@ -13,4 +13,7 @@
 
 Read the nearest sibling hook before writing the new one, since the reviewer will compare them.
 
-A guard against a destructive command is tested only by feeding it a payload or inside a throwaway repository, never against a real checkout ([`destructive-actions-catalog`](destructive-actions-catalog.md)).
+For a guard against a destructive command ([`destructive-actions-catalog`](destructive-actions-catalog.md)):
+
+- **Do:** test it by feeding the hook a payload, or inside a throwaway repository made for that test.
+- **Don't:** run the command it guards against in a real checkout, even one you expect the hook to refuse.

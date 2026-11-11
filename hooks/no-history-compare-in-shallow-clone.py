@@ -64,11 +64,24 @@ commit refuses. This rule does not depend on dates.
 
 The limit is `-N`, `-n N` or `--max-count=N`, or a pipe straight to
 `head [-n] N` when the read is newest first (not `--reverse`, `--count` or
-shortlog, where head sees a summary of the whole walk). Any option other
-than display options and `--first-parent`, and any path, can make git read
-past the limit (`--author`, `--no-merges`, `--skip`, `--topo-order`,
-`-- file`), so then the whole walk is checked. This refuses `git log -5`
-in a depth-1 clone, where it prints one commit and calls it five.
+shortlog, where head sees a summary of the whole walk). This refuses
+`git log -5` in a depth-1 clone, where it prints one commit and calls it five.
+
+A commit filter or path (`--author`, `--grep`, `--since`, `--no-merges`,
+`-- file`, and the others in FILTER_OPTS) makes git read past the limit. The
+guard lists the same filtered walk and allows it only when it lists the full
+N commits, none of them a cut-off commit, and the last one is newer than
+every cut-off commit the walk can reach: a hidden commit is older than the
+cut-off commit above it, so it would come after. A cut-off commit lists as
+the last change to every file, which is why one may not appear. This rule
+assumes no skewed clocks, as rule 2 does. Any other option (`--skip`,
+`--topo-order`, `--graph`, `-S`, `--follow`) is not reproduced, so the whole
+walk is checked.
+
+`git whatchanged` walks as log does. `git show`, `format-patch`,
+`cherry-pick` and `revert` with a range get the comparison check, and so
+does `format-patch U` (U..HEAD). `git diff A...B`, `git diff --merge-base`
+and `git rev-parse A...B` use a merge base, so they get it too.
 
 ## What it refuses, in a shallow repository
 
@@ -89,7 +102,8 @@ Always refused, because the read is of the whole history or has no walk the
 guard can check:
 
     a range with --all, --branches, --tags, --remotes, --glob or --exclude,
-    or with an endpoint that starts with "-"
+    or with an endpoint that starts with "-" (git would read it as an
+    option, and so would the guard's own query)
     git merge-base with other arguments  --octopus, --fork-point,
                                          --independent, 3+ commits
                                          (--is-ancestor and --all with two
@@ -101,8 +115,12 @@ guard can check:
     git show-branch, git range-diff      both exit 0 with no common commit
     git bundle create                    a backup missing the cut-off history
     git push that can delete a ref       --delete, -d, :ref, +:ref, --prune,
-                                         --mirror, or a prefix of one;
-                                         a --dry-run push is allowed
+                                         --mirror, or a prefix of one; a
+                                         refspec from a substitution or from
+                                         xargs; a `-c` or configured
+                                         remote.<name>.push starting with
+                                         ':' or remote.<name>.mirror; a
+                                         --dry-run (-n) push is allowed
 
 Remote deletion is refused in a shallow clone even when shallowness does not
 change what it deletes, because the decision to delete is what a shallow
@@ -116,9 +134,12 @@ A `cd` to a missing directory leaves the directory where it was, as the shell
 does after a failed `cd`. A move it cannot resolve (`cd -`, `cd $VAR`) leaves
 the directory unknown, and an unknown directory is skipped.
 `xargs ... git ...` is read as the git command it runs.
-A command inside `bash -c` or `sh -c` is checked from the payload's `cwd`,
-and only when the outer command makes no `cd` move, since the nested shell's
-starting directory is otherwise unknown (`shell_c_expansions` says why).
+A command inside `bash -c` or `sh -c`, or inside a `$(...)` or backtick
+substitution (quoted or not, but not inside single quotes, where it is
+text), is checked from the payload's `cwd`, and only when the outer command
+makes no `cd` move, since its starting directory is otherwise unknown
+(`shell_c_expansions` says why). A revision built from a loop variable
+(`origin/$b`) does not resolve, so it is refused.
 
 ## The way out
 
@@ -136,7 +157,9 @@ its shallowness cannot be read. A PreToolUse hook that raises blocks the call.
 
 - `eval "git ..."`, commands built from variables, and `git` reached through
   a script file.
-- `git blame`, `git log -S` and `--follow`, which `memories/git.md` covers.
+- `git blame`, which `memories/git.md` covers.
+- `git format-patch -N` and `git rebase`, whose wrong answers are visible
+  (fewer patches, or extra commits to replay) rather than silent.
 - `git status -sb`, `git branch -vv` and `%(upstream:track)`, which compare
   against an upstream and are routine; they are wrong only when the upstream
   forked below the cut-off.
@@ -231,8 +254,25 @@ SHOW_ONLY_OPTS = frozenset({
     "--patch", "--no-patch", "--no-renames", "--encoding", "--expand-tabs",
     "--no-expand-tabs", "--log-size", "--mailmap", "--use-mailmap",
     "--no-mailmap", "--notes", "--no-notes", "--show-signature", "--numbered",
-    "--email", "-p", "-u", "-s", "-z",
+    "--email", "-p", "-u", "-s", "-z", "--word-diff", "--word-diff-regex",
+    "--color-words", "--unified", "--patch-with-stat", "--compact-summary",
+    "--dirstat", "--full-index", "--binary", "--no-ext-diff", "--ext-diff",
+    "--no-textconv", "--textconv",
 })
+
+# Commit filters that `git rev-list` takes too. A limited log filtered only by
+# these (and by paths) is checked by listing the same filtered walk; any other
+# option checks the whole walk.
+FILTER_OPTS = frozenset({
+    "--author", "--committer", "--grep", "--since", "--until", "--after",
+    "--before", "--no-merges", "--merges", "--regexp-ignore-case", "-i",
+    "--all-match", "--invert-grep", "--extended-regexp", "-E",
+    "--fixed-strings", "-F", "--perl-regexp", "-P", "--basic-regexp",
+    "--min-parents", "--max-parents", "--no-min-parents", "--no-max-parents",
+})
+
+# Commands that take a revision range and act on the commits in it.
+RANGE_CMDS = ("show", "format-patch", "cherry-pick", "revert")
 
 # `git log ... | head [-n N | -N | --lines=N]`: the pipe limits the read.
 RX_LOG_TO_HEAD = re.compile(
@@ -379,20 +419,24 @@ def _is_path(tok, repo):
 
 
 def _plain_walk(sub, rest, repo):
-    """How a log / rev-list / shortlog with no range walks.
+    """How a log / rev-list / shortlog with no range walks, as a dict:
 
-    Returns (limit, walk_opts, revs, filtered): the commit limit or None,
-    the revision-set options and --first-parent to hand to rev-list, the
-    revision words, and whether anything else (a filter, an ordering option,
-    an unknown option, a path) may make git read past the limit."""
-    limit, walk_opts, revs, filtered = None, [], [], False
+    limit     the commit limit, or None
+    walk_opts revision-set options and --first-parent, for rev-list
+    revs      the revision words
+    filters   commit filters rev-list takes, each as one `--opt=value` word
+    paths     pathspecs
+    unknown   True when another option may make git walk past the limit or
+              change its order (--skip, --topo-order, -S, --follow, ...)"""
+    out = {"limit": None, "walk_opts": [], "revs": [], "filters": [],
+           "paths": [], "unknown": False}
     i = 0
     while i < len(rest):
         tok = rest[i]
         nxt = rest[i + 1] if i + 1 < len(rest) else None
         head = tok.split("=", 1)[0]
         if tok == "--":
-            filtered = filtered or i + 1 < len(rest)
+            out["paths"] += rest[i + 1:]
             break
         num = None
         if re.fullmatch(r"-\d+", tok):
@@ -406,29 +450,34 @@ def _plain_walk(sub, rest, repo):
             num = tok.split("=", 1)[1]
         if num is not None:
             if num.isdigit():
-                limit = int(num)
+                out["limit"] = int(num)
             else:
-                filtered = True
+                out["unknown"] = True
         elif head in REV_SET_OPTS or tok == "--first-parent":
-            walk_opts.append(tok)
+            out["walk_opts"].append(tok)
             if tok in ("--glob", "--exclude") and nxt is not None:
-                walk_opts.append(nxt)
+                out["walk_opts"].append(nxt)
                 i += 1
-        elif head in SHOW_ONLY_OPTS or (
+        elif head in SHOW_ONLY_OPTS or re.fullmatch(r"-U\d*", tok) or (
                 sub == "shortlog" and re.fullmatch(r"-[sneci]+|-w[0-9,]*", tok)):
             if tok in LOG_VALUE_OPTS:
                 i += 1
+        elif head in FILTER_OPTS:
+            if tok in LOG_VALUE_OPTS and nxt is not None:
+                out["filters"].append(tok + "=" + nxt)
+                i += 1
+            else:
+                out["filters"].append(tok)
         elif tok.startswith("-"):
-            filtered = True
+            out["unknown"] = True
             if tok in LOG_VALUE_OPTS:
                 i += 1
         elif _is_path(tok, repo):
-            filtered = True
+            out["paths"].append(tok)
         else:
-            revs.append(tok)
+            out["revs"].append(tok)
         i += 1
-    return limit, walk_opts, revs, filtered
-
+    return out
 
 def _flag(rest, *names):
     for tok in rest:
@@ -439,9 +488,18 @@ def _flag(rest, *names):
     return False
 
 
+def _is_dry_run(rest):
+    short = any(re.fullmatch(r"-[a-zA-Z]*n[a-zA-Z]*", t) for t in rest if not t.startswith("--"))
+    return (_flag(rest, "--dry-run") or short) and not _flag(rest, "--no-dry-run")
+
+
 def _push_can_delete(rest):
-    if (_flag(rest, "--dry-run") or "-n" in rest) and not _flag(rest, "--no-dry-run"):
+    """True when a push can delete a remote ref, from its own words alone."""
+    if _is_dry_run(rest):
         return False
+    for tok in rest:
+        if "$" in tok or "`" in tok:
+            return True  # a refspec built at run time
     for tok in rest:
         if tok == "--":
             continue
@@ -560,34 +618,71 @@ class _Repo:
         return None
 
     @staticmethod
-    def walk_unsafe(repo, revs, walk_opts, limit, cutoff):
+    def _list(repo, args):
+        """`git rev-list <args>` as a list of lines, or None on any failure."""
+        try:
+            res = subprocess.run(["git", "-C", repo, "rev-list"] + args,
+                                 capture_output=True, text=True, timeout=WALK_TIMEOUT)
+        except Exception:
+            return None
+        return res.stdout.split("\n") if res.returncode == 0 else None
+
+    @staticmethod
+    def walk_unsafe(repo, walk, limit, cutoff):
         """Why a walk with no range may be wrong here, or None.
 
-        Lists the walk with `rev-list` (at most `limit` commits). Only a
-        cut-off commit has hidden parents, so no hidden commit can be listed
-        before a cut-off commit is. The walk is wrong when it lists a cut-off
-        commit anywhere but last place of a full `limit`: past that point the
-        clone lists fewer, or different, commits than the full history."""
-        if not revs and not any(o.split("=", 1)[0] in REV_SET_OPTS for o in walk_opts):
+        Unfiltered: lists the walk with `rev-list --max-count`. Only a cut-off
+        commit has hidden parents, so no hidden commit can be listed before a
+        cut-off commit is. The walk is wrong when it lists a cut-off commit
+        anywhere but last place of a full `limit`: past that point the clone
+        lists fewer, or different, commits than the full history.
+
+        Filtered (by FILTER_OPTS or paths): lists the same filtered walk. It
+        is right when it lists `limit` commits and the last is newer than
+        every cut-off commit the walk can reach (so none of them is one): a hidden
+        commit is older than the cut-off commit above it (unless clocks were
+        skewed), so it would come after the last one listed. A cut-off commit
+        lists as adding every file, which is why it may not appear at all."""
+        revs = walk["revs"]
+        opts = walk["walk_opts"]
+        if not revs and not any(o.split("=", 1)[0] in REV_SET_OPTS for o in opts):
             revs = ["HEAD"]
-        cmd = ["git", "-C", repo, "rev-list"]
-        if limit is not None:
-            cmd.append(f"--max-count={limit}")
-        cmd += walk_opts + ["--end-of-options"] + revs + ["--"]
-        try:
-            res = subprocess.run(cmd, capture_output=True, text=True,
-                                 timeout=WALK_TIMEOUT)
-        except Exception:
-            return "the walk query failed or timed out"
-        if res.returncode != 0:
+        tail = opts + ["--end-of-options"] + revs + ["--"]
+        filtered = bool(walk["filters"] or walk["paths"])
+        if not filtered:
+            head = [f"--max-count={limit}"] if limit is not None else []
+            lines = _Repo._list(repo, head + tail)
+            if lines is None:
+                return "the walk could not be checked"
+            for n, sha in enumerate(x for x in lines if x):
+                if sha in cutoff and (limit is None or n < limit - 1):
+                    return "the walk reaches the cut-off"
+            return None
+        reach = _Repo._list(repo, ["--timestamp"] + tail)
+        if reach is None:
             return "the walk could not be checked"
-        for n, sha in enumerate(res.stdout.split()):
-            if sha in cutoff and (limit is None or n < limit - 1):
-                return "the walk reaches the cut-off"
+        when = {}
+        for line in reach:
+            fields = line.split()
+            if len(fields) == 2:
+                when[fields[1]] = int(fields[0])
+        cut_when = [when[c] for c in cutoff if c in when]
+        if not cut_when:
+            return None
+        if limit is None:
+            return "the filtered walk reaches the cut-off and has no limit"
+        listed = _Repo._list(repo, [f"--max-count={limit}"] + walk["filters"]
+                             + tail + walk["paths"])
+        if listed is None:
+            return "the filtered walk could not be checked"
+        listed = [x for x in listed if x]
+        if len(listed) < limit:
+            return "the filtered walk runs out at the cut-off"
+        if listed[-1] not in when or when[listed[-1]] <= max(cut_when):
+            return "the filtered walk reaches commits as old as the cut-off"
         return None
 
-
-def _verdict(sub, rest, repo, cutoff, head_limit):
+def _verdict(sub, rest, repo, cutoff, head_limit, git_opts=(), via_xargs=False):
     """A short reason string when this git command must be refused, else None."""
     walk = _Repo.pair_unsafe
     if sub in ("log", "rev-list", "shortlog"):
@@ -602,19 +697,54 @@ def _verdict(sub, rest, repo, cutoff, head_limit):
                 return "; a range with " + str(len(ends)) + " endpoints cannot be checked"
             why = walk(repo, ends[0], ends[1], cutoff)
             return "; " + why if why else None
-        limit, walk_opts, wrevs, filtered = _plain_walk(sub, rest, repo)
+        walk_ = _plain_walk(sub, rest, repo)
+        limit = walk_["limit"]
         if (head_limit is not None and sub != "shortlog"
                 and not _flag(rest, "--reverse", "--count")):
             limit = head_limit if limit is None else min(limit, head_limit)
-        if filtered:
-            # A filter or path can make git read past the limit.
+        if walk_["unknown"]:
+            # An option the guard cannot reproduce may make git read past the
+            # limit, so the whole walk is checked.
             limit = None
-        why = _Repo.walk_unsafe(repo, wrevs, walk_opts, limit, cutoff)
-        if why and filtered:
-            why += " (a filter or path makes git walk past any limit)"
+            walk_ = dict(walk_, filters=[], paths=[])
+        why = _Repo.walk_unsafe(repo, walk_, limit, cutoff)
+        if why and _plain_walk(sub, rest, repo)["unknown"]:
+            why += " (an option makes git walk past any limit)"
         elif why and limit is None:
             why += " (the read has no limit)"
         return "; " + why if why else None
+    if sub == "whatchanged" or (sub in RANGE_CMDS and any(
+            _is_range_word(tok, repo) for tok in _revisions(rest))):
+        # whatchanged walks as log does; the others act on a range.
+        return _verdict("log", rest, repo, cutoff, head_limit)
+    if sub == "format-patch":
+        revs = [t for t in _revisions(rest) if t != "--not"]
+        if len(revs) == 1 and not _flag(rest, "--root"):
+            # `format-patch U` means U..HEAD.
+            why = walk(repo, revs[0], "HEAD", cutoff)
+            return "; " + why if why else None
+        if _flag(rest, "--root"):
+            return "; format-patch --root reads the cut-off as the first commit"
+        return None
+    if sub in ("diff", "rev-parse"):
+        # `A...B` (and `diff --merge-base A B`) uses the merge base, which a
+        # shallow clone can get wrong.
+        revs = [t for t in _revisions(rest) if not _is_path(t, repo)]
+        for tok in revs:
+            if "..." in tok:
+                ends = _endpoints([tok])
+                if len(ends) != 2:
+                    return "; a merge base of " + str(len(ends)) + " commits cannot be checked"
+                why = walk(repo, ends[0], ends[1], cutoff)
+                if why:
+                    return "; " + why
+        if sub == "diff" and _flag(rest, "--merge-base"):
+            ends = revs[:2] if len(revs) >= 2 else revs + ["HEAD"]
+            if len(ends) != 2:
+                return "; diff --merge-base cannot be checked"
+            why = walk(repo, ends[0], ends[1], cutoff)
+            return "; " + why if why else None
+        return None
     if sub in ("merge-base", "cherry"):
         revs = [tok for tok in _revisions(rest) if tok != "--not"]
         opts = [t for t in rest if t.startswith("--")]
@@ -636,9 +766,63 @@ def _verdict(sub, rest, repo, cutoff, head_limit):
         return "; " + sub + " exits 0 with no common commit"
     if sub == "bundle" and rest and rest[0] == "create":
         return "; the bundle would lack the cut-off history"
-    if sub == "push" and _push_can_delete(rest):
-        return "; deleting a remote ref is refused until the history is complete"
+    if sub == "push" and not _is_dry_run(rest):
+        if _push_can_delete(rest) or _push_config_deletes(repo, rest, git_opts):
+            return "; deleting a remote ref is refused until the history is complete"
+        if via_xargs:
+            return "; a push fed refspecs by xargs cannot be checked"
     return None
+
+
+def _push_config_deletes(repo, rest, git_opts):
+    """True when configuration makes this push delete: a `-c` or configured
+    `remote.<name>.push` refspec starting with ':' or '+:', or
+    `remote.<name>.mirror`. Configured refspecs apply only when the push
+    names none of its own."""
+    for opt in git_opts:
+        key, _, value = opt.partition("=")
+        key = key.lower()
+        if key.startswith("remote.") and key.endswith(".mirror"):
+            return value.lower() not in ("false", "no", "off", "0")
+        if key.startswith("remote.") and key.endswith(".push"):
+            if value.lstrip("+").startswith(":"):
+                return True
+    words = [t for t in rest if not t.startswith("-")]
+    if len(words) > 1:
+        return False
+    remote = words[0] if words else "origin"
+    for key in (f"remote.{remote}.push", f"remote.{remote}.mirror"):
+        try:
+            res = subprocess.run(["git", "-C", repo, "config", "--get-all", key],
+                                 capture_output=True, text=True, timeout=5)
+        except Exception:
+            return True
+        for value in res.stdout.split("\n"):
+            value = value.strip()
+            if key.endswith(".mirror") and value.lower() in ("true", "yes", "on", "1"):
+                return True
+            if key.endswith(".push") and value.lstrip("+").startswith(":"):
+                return True
+    return False
+
+
+def _git_opts(argv):
+    """The values of `git -c key=value` options before the subcommand."""
+    _env, rest = strip_env(_unwrap_xargs(argv))
+    rest = _unwrap_xargs(rest)
+    out = []
+    i = 1
+    while i < len(rest) and rest[i].startswith("-"):
+        if rest[i] == "-c" and i + 1 < len(rest):
+            out.append(rest[i + 1])
+            i += 2
+            continue
+        if rest[i].startswith("-c") and len(rest[i]) > 2:
+            out.append(rest[i][2:])
+        elif rest[i] in GIT_VALUE_OPTS or rest[i] in ("-C", "--git-dir"):
+            i += 1
+        i += 1
+    return out
 
 
 def _git_parse(argv):
@@ -679,7 +863,9 @@ def _evaluate_line(command, base_cwd, repos):
         cutoff = repos.cutoff(repo)
         if not cutoff:
             continue
-        why = _verdict(sub, sub_rest, repo, cutoff, head_limit)
+        bare = strip_env(argv)[1]
+        via_xargs = bool(bare) and _unwrap_xargs(bare) is not bare
+        why = _verdict(sub, sub_rest, repo, cutoff, head_limit, _git_opts(argv), via_xargs)
         if why is not None:
             return "deny", DENY.format(segment=" ".join(argv), repo=repo, why=why)
     return None
@@ -695,6 +881,46 @@ def _has_cd(command):
     return False
 
 
+def _substitutions(text):
+    """The bodies of `$(...)` and backtick substitutions in `text`, including
+    those inside double quotes, which `shlex` leaves inside a word. Single
+    quotes make them literal text, so those are skipped."""
+    out = []
+    i, n, sq = 0, len(text), False
+    while i < n:
+        ch = text[i]
+        if sq:
+            sq = ch != "'"
+            i += 1
+            continue
+        if ch == "\\":
+            i += 2
+            continue
+        if ch == "'":
+            sq = True
+        elif text.startswith("$((", i):
+            i += 3
+            continue
+        elif text.startswith("$(", i):
+            depth, j = 1, i + 2
+            while j < n and depth:
+                if text[j] == "(":
+                    depth += 1
+                elif text[j] == ")":
+                    depth -= 1
+                j += 1
+            out.append(text[i + 2:j - 1] if not depth else text[i + 2:])
+            i = j
+            continue
+        elif ch == "`":
+            j = text.find("`", i + 1)
+            out.append(text[i + 1:j] if j != -1 else text[i + 1:])
+            i = n if j == -1 else j + 1
+            continue
+        i += 1
+    return out
+
+
 def evaluate(command, base_cwd):
     """`('deny', reason)` or `None`."""
     if simple_commands_with_scope is None:
@@ -705,10 +931,23 @@ def evaluate(command, base_cwd):
         return verdict
     if _has_cd(command):
         return None
-    for nested in list(shell_c_expansions(command))[1:]:
-        verdict = _evaluate_line(nested, base_cwd, repos)
-        if verdict:
-            return verdict
+    # Nested shells and command substitutions start in the payload's cwd only
+    # when the outer command makes no cd move.
+    pieces = list(shell_c_expansions(command))
+    todo = [(p, 0) for p in pieces]
+    seen = set(pieces)
+    while todo:
+        text, depth = todo.pop(0)
+        if text != command:
+            verdict = _evaluate_line(text, base_cwd, repos)
+            if verdict:
+                return verdict
+        if depth >= 3:
+            continue
+        for body in _substitutions(text):
+            if body.strip() and body not in seen:
+                seen.add(body)
+                todo.append((body, depth + 1))
     return None
 
 

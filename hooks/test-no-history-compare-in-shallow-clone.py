@@ -75,6 +75,15 @@ def build(root):
     for i in range(5):
         write(os.path.join(origin, "f.txt"), str(i))
         git("add", "f.txt", cwd=origin)
+        if i == 0:
+            write(os.path.join(origin, "old.txt"), "old")
+            git("add", "old.txt", cwd=origin)
+        # mid.txt changes in c2 and c3 only: from feat in FETCHED, c3 is
+        # hidden and the cut-off c4 lists as its last change; from late, c3
+        # lists and ties c4's date.
+        if i in (2, 3):
+            write(os.path.join(origin, "mid.txt"), str(i))
+            git("add", "mid.txt", cwd=origin)
         # c4 shares c3's date, so the age rule is tested on a tie.
         commit(f"c{i}", origin, same_time=(i == 4))
         if i == 1:
@@ -133,7 +142,45 @@ def build(root):
     commit("L", shallow)
     os.makedirs(os.path.join(shallow, "sub"))
     write(os.path.join(shallow, "a..b.txt"), "a file whose name holds two dots")
-    return full, shallow, deep3, fetched, broken
+    skew = _build_skew(root)
+    return full, shallow, deep3, fetched, broken, skew
+
+
+def _build_skew(root):
+    """SKEWO: r0 and r1 carry dates a day AHEAD of r2, their child, as a
+    wrong clock gives. `b` forks at r1 (commit B), then merges r2. SKEW is a
+    depth-1 clone of main (cut-off r2) with b fetched in full: main..b lists
+    r1 and r0, which are newer than the cut-off, so only r0 having no parent
+    shows that they may sit below it."""
+    origin = os.path.join(root, "skewo")
+    os.makedirs(origin)
+    git("init", "-q", "-b", "main", cwd=origin)
+    ahead = _CLOCK[0] + 86400
+
+    def dated(name, stamp, *extra):
+        subprocess.run(["git", "commit", "-q", "--allow-empty", "-m", name, *extra],
+                       cwd=origin, check=True, capture_output=True,
+                       env={**GIT_ENV, "GIT_AUTHOR_DATE": f"{stamp} +0000",
+                            "GIT_COMMITTER_DATE": f"{stamp} +0000"})
+
+    dated("r0", ahead)
+    dated("r1", ahead + 60)
+    git("branch", "b", cwd=origin)
+    _CLOCK[0] += 60
+    dated("r2", _CLOCK[0])
+    git("checkout", "-q", "b", cwd=origin)
+    dated("B", ahead + 120)
+    subprocess.run(["git", "merge", "-q", "--no-edit", "main"], cwd=origin, check=True,
+                   capture_output=True,
+                   env={**GIT_ENV, "GIT_AUTHOR_DATE": f"{ahead + 180} +0000",
+                        "GIT_COMMITTER_DATE": f"{ahead + 180} +0000"})
+    git("checkout", "-q", "main", cwd=origin)
+    skew = os.path.join(root, "skew")
+    git("clone", "-q", "-b", "main", "--depth", "1", "file://" + origin, skew, cwd=root)
+    git("fetch", "-q", "origin", "b:refs/remotes/origin/b", cwd=skew)
+    skew_full = os.path.join(root, "skew_full")
+    git("clone", "-q", "-b", "main", "--no-local", origin, skew_full, cwd=root)
+    return skew, skew_full
 
 
 def run_full(command, cwd):
@@ -231,6 +278,27 @@ REFUSED_IN_SHALLOW = [
     "git push --mirror origin",
     "git push --mi origin",
     "git push --dry-run --no-dry-run origin :side",
+    # Pushes whose deletion comes from config, xargs or a substitution.
+    "git -c remote.origin.push=:refs/heads/side push origin",
+    "git -c remote.origin.mirror=true push origin",
+    "printf ':side ' | xargs git push origin",
+    "git push origin $(printf ':%s' side)",
+    # Ranges read by other commands, and merge bases used by diff/rev-parse.
+    "git show --oneline -s origin/main..origin/side",
+    "git whatchanged --oneline origin/main..origin/side",
+    "git format-patch origin/main..origin/side",
+    "git format-patch origin/side",
+    "git cherry-pick origin/main..origin/side",
+    "git diff --stat origin/main...origin/side",
+    "git diff --merge-base origin/main origin/side",
+    "git rev-parse origin/main...origin/side",
+    # Command substitutions, quoted or in backticks: how an audit loop is written.
+    'for b in side feat; do echo "$b $(git rev-list --count origin/main..origin/$b)"; done',
+    'echo "base=$(git merge-base origin/main origin/side)"',
+    "echo `git rev-list --count origin/main..origin/side`",
+    "X=`git merge-base origin/main origin/side`",
+    'echo "first: $(git log --reverse --format=%cs origin/main | head -1)"',
+    'echo "$(echo "$(git merge-base origin/main origin/side)")"',
     # Placement and wrapping.
     "echo start && git rev-list --count origin/main..origin/side",
     "bash -c 'git merge-base origin/main origin/side'",
@@ -243,10 +311,9 @@ REFUSED_IN_SHALLOW = [
     "(cd / && true); git merge-base origin/main origin/side",
 ]
 
-# Each must be allowed in SHALLOW (and so in FULL).
-# Each must be refused in SHALLOW because a path or filter makes git walk past
-# its limit, and allowed in FULL. The reason shows that the ".." in a path or
-# an option value was not read as a range.
+# Each must be refused in SHALLOW, where its filtered walk runs out at the
+# cut-off, and allowed in FULL. The reason shows that the ".." in a path or an
+# option value was not read as a range.
 FILTERED_IN_SHALLOW = [
     "git log -3 -- ../README.md",
     "git log --oneline -5 ../other/file",
@@ -257,9 +324,10 @@ FILTERED_IN_SHALLOW = [
     "git log -S 'x..y' -2",
     "git log -G foo..bar -2",
     "git log --since 2026-01-01.. -3",
-    "git log --no-merges -1",
+    "git log -1 -- f.txt",
 ]
 
+# Each must be allowed in SHALLOW (and so in FULL).
 ALLOWED_IN_SHALLOW = [
     # Ranges whose walk stays inside the fetched history.
     "git log --oneline origin/main..HEAD",
@@ -283,6 +351,14 @@ ALLOWED_IN_SHALLOW = [
     "git log --oneline -n 2 --stat",
     # --pretty takes no separate value, so -2 is the limit.
     "git log --pretty -2",
+    "git log -2 --word-diff",
+    "git log -2 -U1 --oneline",
+    # Filtered reads whose answer is newer than every cut-off commit.
+    "git log -1 -- local.txt",
+    "git log -1 --format=%H -- local.txt",
+    "git log --no-merges -1",
+    "git log -1 --author=t",
+    "git log -1 --author t",
     "git log --oneline | head -2",
     "git log --oneline | head -n 1",
     "git log -1 --format=%H | tail -1",
@@ -305,6 +381,14 @@ ALLOWED_IN_SHALLOW = [
     "git push --dry-run origin :side",
     "git push -n origin --delete side",
     "echo 'git merge-base a b'",
+    "echo '$(git merge-base origin/main origin/side)'",
+    'echo "$(git log -1 --format=%h)"',
+    "git diff origin/main...HEAD",
+    "git diff --stat origin/main",
+    "git show HEAD",
+    "git show --stat",
+    "git format-patch -1 HEAD",
+    "git push -nd origin side",
     "ALLOW_SHALLOW_HISTORY=1 git merge-base origin/main origin/side",
     # A nested shell after a cd starts somewhere unknown, so it is skipped.
     "cd sub; bash -c 'git merge-base origin/main origin/side'",
@@ -315,8 +399,8 @@ def main():
     failures = []
     checks = 0
     with tempfile.TemporaryDirectory() as root:
-        full, shallow, deep3, fetched, broken = build(root)
-        for repo in (shallow, deep3, fetched, broken):
+        full, shallow, deep3, fetched, broken, (skew, skew_full) = build(root)
+        for repo in (shallow, deep3, fetched, broken, skew):
             flag = git("rev-parse", "--is-shallow-repository", cwd=repo).strip()
             assert flag == "true", f"fixture: {repo} is not shallow"
         # The fixture really answers wrongly where the test says it does.
@@ -336,6 +420,16 @@ def main():
             assert git("rev-list", "--count", rng, cwd=full).strip() == true, rng
             assert git("rev-list", "--count", rng, cwd=fetched).strip() != true, \
                 f"fixture: the fetched clone answers {rng} rightly"
+        # FETCHED names the cut-off c4, not c3, as feat's last change to mid.txt.
+        last_mid = ["log", "-1", "--format=%s", "origin/feat", "--", "mid.txt"]
+        assert git(*last_mid, cwd=full).strip() == "c3"
+        assert git(*last_mid, cwd=fetched).strip() == "c4"
+        # SKEW overcounts main..b, and DEEP3 names the wrong last change to old.txt.
+        assert git("rev-list", "--count", "origin/main..origin/b", cwd=skew_full).strip() == "2"
+        assert git("rev-list", "--count", "origin/main..origin/b", cwd=skew).strip() != "2"
+        last_old = ["log", "-1", "--format=%s", "--", "old.txt"]
+        assert git(*last_old, cwd=full).strip() == "c0"
+        assert git(*last_old, cwd=deep3).strip() != "c0"
         # c3 is in FETCHED (through late) and ties c4, the cut-off.
         assert git("log", "-1", "--format=%ct", "origin/late~2", cwd=fetched) == \
             git("log", "-1", "--format=%ct", "origin/main", cwd=fetched)
@@ -355,7 +449,7 @@ def main():
         for cmd in FILTERED_IN_SHALLOW:
             checks += 1
             decision, reason = run_full(cmd, shallow)
-            if decision != "deny" or "filter or path" not in reason:
+            if decision != "deny" or "range" in reason or "endpoints" in reason:
                 failures.append(f"filtered read not refused as filtered: {cmd}: {reason}")
             expect(cmd, full, None, "refused in FULL clone (false positive)")
 
@@ -398,11 +492,38 @@ def main():
                "fetched: hidden commit tying the cut-off's date not refused")
         expect("git rev-list --count origin/feat..origin/late", full, None,
                "full: late range refused")
+        # A filtered read that lists the cut-off commit itself, and one whose
+        # last listed commit ties the cut-off's date.
+        expect("git log -1 --format=%s origin/feat -- mid.txt", fetched, "deny",
+               "fetched: filtered read listing the cut-off not refused")
+        expect("git log -1 --format=%s origin/late -- mid.txt", fetched, "deny",
+               "fetched: filtered read tying the cut-off not refused")
+        expect("git log -1 --format=%s origin/feat -- y.txt", fetched, None,
+               "fetched: filtered read newer than the cut-off refused")
+        # Only the parentless clause of rule 2 sees the skewed hidden commits.
+        expect("git rev-list --count origin/main..origin/b", skew, "deny",
+               "skew: hidden commits with skewed dates not refused")
+        expect("git rev-list --count origin/main..origin/b", skew_full, None,
+               "skew_full: range refused")
+        # The cut-off commit lists as the last change to every file.
+        expect("git log -1 --format=%s -- old.txt", deep3, "deny",
+               "deep3: last change to a file below the cut-off not refused")
+        expect("git log -1 --format=%s -- f.txt", deep3, None,
+               "deep3: last change above the cut-off refused")
+        # A configured deleting refspec applies to a bare push.
+        git("config", "remote.origin.push", ":refs/heads/side", cwd=shallow)
+        expect("git push origin", shallow, "deny", "configured deleting refspec not refused")
+        expect("git push", shallow, "deny", "configured deleting refspec not refused (bare)")
+        expect("git push origin HEAD:side", shallow, None, "explicit refspec refused")
+        git("config", "--unset", "remote.origin.push", cwd=shallow)
+        expect("git push origin", shallow, None, "plain push refused")
         # The revisions resolve but the walk fails: refused, not guessed.
         expect("git log --oneline origin/main..HEAD", broken, "deny",
                "broken: failed walk not refused")
         expect("git log -3 --oneline", broken, "deny",
                "broken: failed plain walk not refused")
+        expect("git log -1 --author=t", broken, "deny",
+               "broken: failed filtered walk not refused")
 
         mb = "git merge-base origin/main origin/side"
         expect(f"git -C {shallow} {mb[4:]}", full, "deny", "git -C <shallow> not refused")

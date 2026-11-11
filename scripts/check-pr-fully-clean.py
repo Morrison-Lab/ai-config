@@ -2480,14 +2480,105 @@ NOT_CLEAN_NEGATION_PREFIX = re.compile(
 # (ai-config#3937): a next paragraph opening with "None are deferred..." or
 # "None are blocked." is ordinary review or ARD disposition prose, not a
 # same-line negation of a preceding "Needs more work" verdict.
+#
+# Both alternation groups also need a guard against a contrast that follows
+# the negator (ai-config#2359). "Nothing major, but the retry loop leaks",
+# "No issues, however the login flow is broken", "None, but the handle leaks"
+# and "0-day exploit possible" each open with a negator and carry a real
+# finding. So a `0` joined to a hyphenated word never counts, and a negation
+# does not count when either of two contrasts follows it:
+#
+# - a contrast word anywhere in the negation's own sentence
+#   ("Nothing major, but X", "No issues other than X"), or one of the
+#   _COMMA_CONTRAST_WORDS right after a comma ("None, only X leaks");
+# - a sentence-opening contrast marker at the start of the next sentence
+#   ("No issues. However, X is broken.", "None. Still, X leaks.").
+#
+# A sentence ends at [.!?] followed by whitespace, so a hard wrap (semantic
+# line breaks) or a dotted token (`v1.2`) does not end one. Contrast words
+# deeper in later sentences are not read: those sentences are usually
+# verification prose ("None. I checked it while reading the diff.",
+# "0 findings. CI passes, though slowly."), and an earlier paragraph-wide
+# scan re-flagged them. Same-sentence phrases such as "None beyond the
+# above." still re-flag; that is the accepted safe-direction cost. A "yet"
+# that ends its sentence or paragraph ("None yet.") is not a contrast.
+#
+# Neither scan crosses a paragraph break (CRLF included, since review bodies
+# submitted from the GitHub web UI use it), or a line break that opens a
+# heading, list item or blockquote, because that is often the next section
+# or item ("## Nits\nNone\n## Verdict\nReady, but CI is pending" is clean).
+#
+# Known residuals: a finding stated with no contrast ("None. The lexer is
+# broken.") and a contrast in the next paragraph ("None.\n\nBut X leaks."),
+# tracked in ai-config#5389; and a contrast more than 60 characters after the
+# negation, which callers cut off (ai-config#5401).
+_SENTENCE_CHAR = (
+    r"(?:(?![.!?](?:\s|$))(?!\r?\n[ \t]*\r?\n)"
+    r"(?!\r?\n[ \t]*(?:#|>|[-*+][ \t]|\d+[.)][ \t]))[\s\S])"
+)
+_CONTRAST_WORDS = (
+    r"but|however|(?<!/)except|excepting|excluding|although|though|albeit"
+    r"|unless|whereas|besides|beyond|barring"
+    r"|notwithstanding|nonetheless|nevertheless|rather|otherwise"
+    r"|save\s+for|apart\s+from|aside\s+from|other\s+than|outside\s+of"
+    r"|short\s+of|that\s+said|with\s+(?!no\b)(?:\w+\s+){0,2}exceptions?"
+    r"|yet(?![ \t]*(?:[.!?;)]|\r?\n[ \t]*(?:\r?\n|$)|$))"
+)
+_CONTRAST_MARKERS = (
+    r"however|but|yet|still|nonetheless|nevertheless|that\s+said|except"
+    r"|though|although|instead|otherwise|besides|apart\s+from|aside\s+from"
+    r"|on\s+the\s+other\s+hand"
+)
+# Words that are contrasts only after a comma, semicolon or spaced dash
+# ("None, only X leaks", "No issues; just X", "None - bar the crash"),
+# since they are also ordinary words and
+# identifiers: "No issues found while reviewing", "No issues in just one
+# pass", "No issues in the save path", "None in bar.py", "uses a set
+# instead of a list". "except" is not a contrast after "/" ("try/except").
+# A clean "None found; only CI is pending." reads the same as "No issues;
+# only X leaks." and re-flags, the accepted safe-direction cost.
+_COMMA_CONTRAST_WORDS = (
+    r"while|whilst|still|only|just|instead|save|bar|minus"
+)
+# Openers a reviewer may put before a comma word or a next-sentence marker:
+# emphasis, blockquote, list dash, parenthesis, bracket, backtick, or a
+# quote. A paired double-quoted span (straight or curly) is blanked as
+# quotation before this regex runs.
+_MARKER_OPENERS = r"[*_>\-(\[` \t\"']*"
+# Horizontal space, including the no-break space pasted text often carries.
+_HSPACE = r"[ \t" + chr(0xA0) + r"]"
+# A comma, a semicolon, or a spaced hyphen, en dash or em dash.
+_CLAUSE_SEP = (
+    r"(?:[,;]|" + _HSPACE + r"+-{1,3}|" + _HSPACE + r"*["
+    + chr(0x2013) + chr(0x2014) + r"])"
+)
+_CONTRAST_GUARD = (
+    r"(?!" + _SENTENCE_CHAR + r"*?(?:\b(?:" + _CONTRAST_WORDS + r")"
+    r"|" + _CLAUSE_SEP + _HSPACE + r"*(?:\r?\n[ \t]*)?" + _MARKER_OPENERS
+    + r"(?:" + _COMMA_CONTRAST_WORDS + r"))\b)"
+    r"(?!" + _SENTENCE_CHAR + r"*[.!?]" + _HSPACE + r"*(?:\r?\n[ \t]*)?"
+    + _MARKER_OPENERS + r"(?:" + _CONTRAST_MARKERS + r")\b)"
+)
+_SAFE_NEGATION = (
+    r"(?:none\b(?!\s+of\b)|n/a\b|none\s+identified\b|none\s+remaining\b)"
+    + _CONTRAST_GUARD
+)
+# A `0` that is part of a larger token is not a count of zero: one joined to
+# a hyphen or dash ("0-day", or U+2010 to U+2015), a decimal ("0.5s"), or a
+# ratio ("0/5"). A bare "0 tests cover X" has no contrast word (#5389).
+_RISKY_NEGATION = (
+    r"(?:nothing\b|0\b(?![.,]\d|/|[-\u2010-\u2015])"
+    r"|no\s+(?:\w+\s+){0,3}(?:findings|issues|bugs|violations|blockers)|no\s+new\b)"
+    + _CONTRAST_GUARD
+)
 NOT_CLEAN_NEGATION_SUFFIX = re.compile(
     r"^(?:"
     r"[ \t*_:.\-]*(?:\r?\n[ \t*_:.\-]*)?"
-    r"(?:none\b(?!\s+of\b)|n/a\b|none\s+identified\b|none\s+remaining\b)"
-    r"|"
+    + _SAFE_NEGATION
+    + r"|"
     r"[ \t:.\-]*(?:\r?\n[ \t:.\-]*)?"
-    r"(?:nothing\b|0\b|no\s+(?:\w+\s+){0,3}(?:findings|issues|bugs|violations|blockers)|no\s+new\b)"
-    r")",
+    + _RISKY_NEGATION
+    + r")",
     re.IGNORECASE,
 )
 
@@ -2497,10 +2588,12 @@ NOT_CLEAN_NEGATION_SUFFIX = re.compile(
 # `none identified`) with a newline or blank line.
 FINDING_HEADING_NEGATION_SUFFIX = re.compile(
     r"^\s*(?:"
-    r"[*_:.\-]*\s*(?:none\b(?!\s+of\b)|n/a\b|none\s+identified\b|none\s+remaining\b)"
-    r"|"
-    r"[:.\-]*\s*(?:nothing\b|0\b|no\s+(?:\w+\s+){0,3}(?:findings|issues|bugs|violations|blockers)|no\s+new\b)"
-    r")",
+    r"[*_:.\-]*\s*"
+    + _SAFE_NEGATION
+    + r"|"
+    r"[:.\-]*\s*"
+    + _RISKY_NEGATION
+    + r")",
     re.IGNORECASE,
 )
 

@@ -1475,6 +1475,125 @@ def main() -> int:
         "classify_verdict: next-paragraph 'Nothing is deferred.' does NOT blank not-clean verdict (#3937)",
         checker.classify_verdict(base_nwn % "Nothing is deferred.") == "not-clean",
     )
+    # The `Needs ... work` path shares the #2359 contrast guard.
+    check(
+        "classify_verdict: 'Needs more work: none, but X' stays not-clean (#2359)",
+        checker.classify_verdict(
+            "### Verdict\nNeeds more work: none, but the login flow is broken.\n"
+        ) == "not-clean",
+    )
+    check(
+        "classify_verdict: 'Needs more work: nothing major, however X' stays not-clean (#2359)",
+        checker.classify_verdict(
+            "### Verdict\nNeeds more work: nothing major, however the cache leaks.\n"
+        ) == "not-clean",
+    )
+    check(
+        "classify_verdict: 'Needs more work: nothing' with a contrast on the next line stays not-clean (#2359)",
+        checker.classify_verdict(
+            "### Verdict\nNeeds more work: nothing major\nbesides the cache leak.\n"
+        ) == "not-clean",
+    )
+    for _nwn_tail in (
+        "none. Nonetheless the cache leaks.",
+        "none. Nevertheless the cache leaks.",
+        "none. That said, the cache leaks.",
+        "none, albeit the cache leaks.",
+        "none, with the exception of the cache leak.",
+        "none, short of the cache leak.",
+        "none. Yet, the cache leaks.",
+        "none\r\nbut the cache leaks.",
+        "0-day exploit in the auth handler.",
+    ):
+        check(
+            f"classify_verdict: 'Needs more work: {_nwn_tail!r}' stays not-clean (#2359)",
+            checker.classify_verdict(
+                "### Verdict\nNeeds more work: " + _nwn_tail + "\n"
+            ) == "not-clean",
+        )
+    # Verification prose in a later sentence of the same paragraph stays
+    # clean: only the negation's own sentence and the opening of the next
+    # one are read for a contrast.
+    for _heading in ("## Nits", "### Issues"):
+        for _tail in (
+            "None.\nChecked the parser and tests; they still pass.",
+            "None.\nI only reviewed the changed files.",
+            "None. I verified all claims while reading the diff.",
+            "No blockers. The author fixed it instead of deferring.",
+            "None. Ran the suite; all pass but one skipped.",
+            "0 findings. CI passes, though slowly.",
+            "0 issues.\nThe tests all pass, while the lint is slow.",
+            # while/still/only/just count only after a comma.
+            "No issues while reading.",
+            "No issues found while reviewing; checks pass.",
+            "No issues in just one pass.",
+            "No issues, with no exceptions.",
+            # Ordinary words and identifiers, not contrasts.
+            "No issues in the save path.",
+            "None in bar.py.",
+            "No issues found in foo/bar.",
+            "No issues with the progress bar.",
+            "No issues in the try/except block.",
+            "No issues in the minus-sign handling.",
+            "No issues; it uses a set instead of a list.",
+        ):
+            _body = (
+                _heading + "\n\n" + _tail + "\n\n### Verdict: Ready for merge\n"
+            )
+            check(
+                f"{_heading} verification prose {_tail!r} stays clean (#2359)",
+                checker._unresolved_finding_pattern(_body) is None,
+            )
+    # A heading, list item or blockquote on the next line ends the scan, so
+    # its prose is not read as the empty section's contrast.
+    for _body in (
+        "## Nits\nNone\n## Verdict\nReady for merge, but wait for CI.\n",
+        "## Nits\nNone\n- Checked the diff, but fine\n",
+        "## Nits\nNone\n> Quoted: but fine\n",
+        "## Nits\nNone\n1. Checked the diff, but fine\n",
+    ):
+        check(
+            f"next-line block {_body!r} stays clean (#2359)",
+            checker._unresolved_finding_pattern(_body) is None,
+        )
+    # In-scope contrasts in the negation's own sentence, or opening the next.
+    for _tail in (
+        "None, save one: foo leaks.",
+        "None, just the leak in foo.",
+        "No issues, just a nit: foo leaks.",
+        "None, only the cache leaks.",
+        "None. Still, the cache leaks.",
+        "No issues. That said, the cache leaks.",
+        "None. On the other hand, the cache leaks.",
+        "None.\n**However**, the cache leaks.",
+        "None. (However, the loop leaks.)",
+        "None. 'But' the loop leaks.",
+        "None. [However, the loop leaks.]",
+        "None, **only** the cache leaks.",
+        "None, (only the cache leaks).",
+        "None, bar the crash in login.",
+        "None, instead the cache leaks.",
+        "No issues; only the cache leaks.",
+        "No issues; just the cache leaks.",
+        "No issues - only the cache leaks.",
+        "No issues -- bar the crash.",
+        "No issues, with one exception: the cache leaks.",
+        "No issues, with a few exceptions.",
+        "No issues." + chr(0xA0) + "However, the cache leaks.",
+        "No issues, except the leak in login.",
+    ):
+        check(
+            f"## Nits + {_tail!r} is a finding (#2359)",
+            checker._unresolved_finding_pattern("## Nits\n\n" + _tail + "\n")
+            is not None,
+        )
+    # A sentence-opening contrast marker on the next line re-flags.
+    check(
+        "## Nits + 'None.' with a hard-wrapped sentence-opening 'But' re-flags (#2359)",
+        checker._unresolved_finding_pattern(
+            "## Nits\nNone.\nBut the cache leaks on retry.\n"
+        ) is not None,
+    )
     unbolded_nwn = "### Verdict\nNeeds more work\n\nNone are blocked.\n"
     check(
         "classify_verdict: unbolded next-paragraph 'None are blocked.' does NOT blank not-clean verdict (#3937)",
@@ -2655,6 +2774,19 @@ def main() -> int:
         ("'## Nits' + '**None.**'", "## Nits\n\n**None.**\n\n"),
         ("'## Nits' + '**None identified.**'", "## Nits\n\n**None identified.**\n\n"),
         ("'## Non-blocking' + '**None.**'", "## Non-blocking\n\n**None.**\n\n"),
+        # Plain-text clean forms the #2359 contrast guard must leave alone.
+        ("'## Nits' + 'Nothing.'", "## Nits\n\nNothing.\n\n"),
+        ("'## Nits' + 'No issues found.'", "## Nits\n\nNo issues found.\n\n"),
+        ("'## Nits' + '0 findings.'", "## Nits\n\n0 findings.\n\n"),
+        ("'## Nits' + 'No new issues.'", "## Nits\n\nNo new issues.\n\n"),
+        # The guard stops at a paragraph break, so a contrast in the next
+        # paragraph does not re-flag the empty section, with LF or CRLF.
+        ("'None.' then a 'but' paragraph",
+         "## Nits\n\nNone.\n\nSee the thread, but fine.\n\n"),
+        ("'None.' then a 'but' paragraph, CRLF",
+         "## Nits\r\n\r\nNone.\r\n\r\nSee the thread, but fine.\r\n\r\n"),
+        # A sentence-final "yet" is not a contrast.
+        ("'## Nits' + 'None yet.'", "## Nits\n\nNone yet.\n\n"),
     ):
         bold_none_at_head = {
             "createdAt": "2026-08-26T01:00:00Z",
@@ -2687,6 +2819,62 @@ def main() -> int:
          "## Nits\n\n**No issues, however the login flow is broken.**\n\n"),
         ("bold 'None of the tests...' real finding",
          "## Nits\n\n**None of the tests cover this path.**\n\n"),
+        # The same three in plain text (ai-config#2359).
+        ("plain 'Nothing major, but...' real finding",
+         "## Nits\n\nNothing major, but the retry loop leaks a file handle on timeout.\n\n"),
+        ("plain '0-day exploit...' real finding",
+         "## Nits\n\n0-day exploit possible in the auth handler.\n\n"),
+        ("plain 'No issues, however...' real finding",
+         "## Nits\n\nNo issues, however the login flow is broken.\n\n"),
+        # Guard boundaries from the #2359 adversarial review.
+        ("contrast after a hard line wrap",
+         "## Nits\n\nNo issues\nbut the login flow is broken.\n\n"),
+        ("contrast after a dotted token",
+         "## Nits\n\nNo issues in v1.2 but the login flow is broken.\n\n"),
+        ("contrast opening the next sentence",
+         "## Nits\n\nNo issues. However, the login flow is broken.\n\n"),
+        ("plain 'None, but...' real finding",
+         "## Nits\n\nNone, but the retry loop leaks a handle.\n\n"),
+        ("plain 'N/A, except...' real finding",
+         "## Nits\n\nN/A, except the retry loop leaks.\n\n"),
+        ("'Nothing yet...' real finding",
+         "## Nits\n\nNothing blocking yet the cache is never cleared.\n\n"),
+        ("'Nothing besides...' real finding",
+         "## Nits\n\nNothing besides the crash on empty input.\n\n"),
+        ("'None beyond...' real finding",
+         "## Nits\n\nNone beyond the leak in login.\n\n"),
+        ("'No issues other than...' real finding",
+         "## Nits\n\nNo issues other than the crash.\n\n"),
+        ("'Nothing apart from...' real finding",
+         "## Nits\n\nNothing apart from the leak in login.\n\n"),
+        ("'No bugs, aside from...' real finding",
+         "## Nits\n\nNo bugs, aside from the crash.\n\n"),
+        ("'Nothing save for...' real finding",
+         "## Nits\n\nNothing save for the crash.\n\n"),
+        ("'Nothing unless...' real finding",
+         "## Nits\n\nNothing unless the login flow counts.\n\n"),
+        ("'Nothing whereas...' real finding",
+         "## Nits\n\nNothing in the parser, whereas the lexer is broken.\n\n"),
+        ("'Nothing while...' real finding",
+         "## Nits\n\nNothing, while the login flow breaks.\n\n"),
+        ("'0' joined by a non-breaking hyphen",
+         "## Nits\n\n0\u2011day exploit possible in the auth handler.\n\n"),
+        ("'0' joined by an en dash",
+         "## Nits\n\n0\u2013day exploit possible in the auth handler.\n\n"),
+        ("'yet' at a hard wrap",
+         "## Nits\n\nNo issues, yet\nthe cache leaks.\n\n"),
+        ("'yet' at a CRLF hard wrap",
+         "## Nits\n\nNone yet\r\nthe cache leaks.\r\n\r\n"),
+        ("'0.5s' is not a zero count",
+         "## Nits\n\n0.5s slowdown on startup.\n\n"),
+        ("'0/5' is not a zero count",
+         "## Nits\n\n0/5 new branches are tested.\n\n"),
+        ("'whilst' contrast",
+         "## Nits\n\nNo issues, whilst the lexer breaks.\n\n"),
+        ("'bar' contrast",
+         "## Nits\n\nNo issues, bar the crash.\n\n"),
+        ("contrast inside a CRLF paragraph",
+         "## Nits\r\n\r\nNo issues\r\nbut the login flow is broken.\r\n\r\n"),
     ):
         bold_finding_at_head = {
             "createdAt": "2026-08-26T01:00:00Z",

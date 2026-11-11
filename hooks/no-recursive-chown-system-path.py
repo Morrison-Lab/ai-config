@@ -58,8 +58,9 @@ read where it appears, in the directory and with the names of each way the
 command may run up to there (a `sh -c` text also with the `NAME=value`
 words before its shell, `sudo D=/x sh -c`, and once without them, since
 bash expands a double-quoted text with the outer names and a wrapper such
-as `sudo` or `env -i` may drop them; a bare `~` reads HOME as `$HOME`
-does), to MAX_NESTED levels, and deeper with no
+as `sudo` or `env -i` may drop them; a target `~` is judged both as this
+process's home and as a HOME the command assigns), to MAX_NESTED levels,
+and deeper with no
 directory, to MAX_DEPTH. A `cd` up the tree
 repeated by a loop (`cd ..`) is judged in every directory above. An
 unquoted `cd $D` with D empty or unset goes home, and is judged both there
@@ -111,7 +112,9 @@ exported, which a `sh -c` text is read with though its shell does not see
 it (`D=/x; bash -c 'chmod -R 755 "$D/"'` runs on `/`), a `sh -c` text
 after `NAME=value` words, read without them too, which refuses more than
 bash runs for a single-quoted text or a `~` (`HOME=/tmp/h sh -c 'chmod -R
-u+w "$HOME"'` is judged at the real home; write the path itself), a `cd` that
+u+w "$HOME"'` and `HOME=/tmp/h; chmod -R u+w ~` are judged at the real
+home; write the path itself), a `~` inside a path (`a:~/b`) or after a
+`cd`, read as this process's home only, a `cd` that
 goes home (a bare `cd`, or an unquoted empty `cd $D`), which reads this
 process's own home and not a HOME the command assigns, a
 `for` or `select` loop variable, `eval`, `su -c`, a heredoc piped to `sh`, an
@@ -533,7 +536,7 @@ def _expand(text, home, assigned, here, depth=0, effects=None):
     text = re.sub(r"\A~([+-])(?=/|\Z)",
                   lambda m: "${PWD}" if m.group(1) == "+" else "${OLDPWD}", text)
     text = re.sub(r"\A~([A-Za-z0-9_.-]*)(?=/|\Z)",
-                  lambda m: os.path.expanduser("~" + m.group(1)) if m.group(1) else "${HOME}",
+                  lambda m: os.path.expanduser("~" + m.group(1)) if m.group(1) else home,
                   text)
     guessed, undecidable, capped = [], [], []
 
@@ -1011,8 +1014,6 @@ def _prefix_names(words, home, visible, here):
             break
         if ASSIGNMENT.match(word):
             name, _, val = word.partition("=")
-            if name == "PWD":
-                continue  # a shell resets PWD to its real directory
             computed = "`" in val or SUB in val
             # In order: `D=/etc E=$D sh -c` sets E to /etc.
             names[name] = (None if computed
@@ -1047,6 +1048,12 @@ def _judge(words, home, assigned, here):
         if expanded is UNREAD:
             return _shown(" ".join(words)), program, _shown(target), None, UNREAD_WHY
         candidates = [expanded]
+        if re.match(r"~(?:/|\Z)", target):
+            # `~` is this process's home, or a HOME the command assigned and
+            # a wrapper may reset: both are judged.
+            candidates.append(_expand("${HOME}" + target[1:], home, assigned, here))
+            if candidates[-1] is UNREAD:
+                return _shown(" ".join(words)), program, _shown(target), None, UNREAD_WHY
         if expanded and "$" in target and expanded[0].split() != [expanded[0]]:
             # Unquoted, bash splits `$DIRS` into words (`"$EXTRA /etc"` with
             # EXTRA unset is ` /etc`); quotes are gone by now, so the value is

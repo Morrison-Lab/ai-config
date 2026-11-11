@@ -426,6 +426,17 @@ class Denies(unittest.TestCase):
     def test_a_tilde_reads_the_hook_home_without_a_prefix_home(self):
         self.assert_denied("D=/tmp/x sh -c 'chown -R me ~'")
 
+    def test_a_tilde_reads_both_homes(self):
+        for cmd in ("HOME=/; chmod -R u+w ~/etc",
+                    "HOME=/tmp/h; sudo sh -c 'chmod -R u+w ~'",
+                    "HOME=/tmp/h; env -i sh -c 'chmod -R u+w ~'",
+                    "HOME=/tmp/h; chmod -R u+w ~",
+                    "HOME=/ sh -c 'chmod -R u+w ~/etc'"):
+            self.assert_denied(cmd)
+
+    def test_a_prefix_pwd_reaches_later_prefix_names(self):
+        self.assert_denied("PWD=/ D=$PWD sh -c 'chmod -R 755 \"$D\"'")
+
     def test_a_double_quoted_text_sees_the_outer_names(self):
         for cmd in ('D=/etc; D=./build sh -c "chmod -R 755 $D"',
                     'D=/usr; sudo D=. sh -c "chown -R me $D"',

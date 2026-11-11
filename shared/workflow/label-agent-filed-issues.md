@@ -2,6 +2,7 @@
 
 The rule lives in [`issue-first`](issue-first.md)'s "Label an agent-filed issue with its authorship and its model" section.
 This fragment carries the mechanics.
+Each command below also passes a priority label, per that section's "Set the priority when you file": `P2` is the default, so replace it with `P1` or `P3` where [`triage-backlog`](triage-backlog.md) says so.
 It is linked rather than `@`-imported, and so is `issue-first.md` itself, because the always-loaded pool is budgeted --- run `python3 scripts/check-context-closure.py` before `@`-importing anything into `CLAUDE.md`.
 
 ## Scope
@@ -12,6 +13,7 @@ Two adjacent cases sit outside it.
 A repo we do not administrate is governed by [`upstream-issues`](upstream-issues.md), which decides whether to file at all before any of this, and whose label taxonomy is not ours to extend --- so [`sup`](../../skills/sup/SKILL.md) files upstream without these labels.
 
 An issue whose body is quoted human content, such as the migration [`migrate-discussion`](../../skills/migrate-discussion/SKILL.md) performs, already states its provenance in the body, so the disclosure gap these labels close is not open there.
+That exemption covers the two disclosure labels only: a migrated issue still takes a priority label.
 
 An agent-created **discussion** body is neither covered nor exempt: `CREATE_DISCUSSION` in [`tool-mappings`](../../tool-mappings.md) carries no disclosure note where its `COMMENT_DISCUSSION` neighbour does, and [`choose-issue-or-discussion`](choose-issue-or-discussion.md) routes real work to that surface.
 It is out of scope here only because the rule was written for issues, not because the gap is closed.
@@ -31,7 +33,7 @@ Skipping it splits one model across two or three labels, and `gh issue list --st
 
 ```sh
 gh issue create --title "..." --body-file <file> \
-  --label ai-authored --label "model:<model-id>"   # CREATE_ISSUE
+  --label ai-authored --label "model:<model-id>" --label P2   # CREATE_ISSUE
 ```
 
 `gh issue create --label` rejects a label that does not exist, which is the useful failure: it says to create the label rather than filing an unlabelled issue.
@@ -44,14 +46,14 @@ the comma-separated form is used here:
 
 ```sh
 glab issue create --title "..." --description "..." \
-  --label "ai-authored,model:<model-id>"
+  --label "ai-authored,model:<model-id>,P2"
 ```
 
 Whether `glab` rejects an unknown label or creates it is not established here, so create the pair on GitLab first rather than relying on either behaviour.
 
 ## The MCP path
 
-Filing is `CREATE_ISSUE` in [`tool-mappings`](../../tool-mappings.md): `mcp__github__issue_write` with `method: create` and `labels: ["ai-authored", "model:<model-id>"]`.
+Filing is `CREATE_ISSUE` in [`tool-mappings`](../../tool-mappings.md): `mcp__github__issue_write` with `method: create` and `labels: ["ai-authored", "model:<model-id>", "P2"]`.
 That is the only filing path in a remote session, where `gh` is not on `PATH`.
 
 It **silently creates** an unknown label name instead of rejecting it, so a mistyped model id there produces a second near-identical label that no query will ever match.
@@ -70,6 +72,9 @@ Checked against `Morrison-Lab/ai-config` on 2026-09-03, `ai-authored` returned `
 gh label create ai-authored --description "Filed by an AI agent" --color EDEDED
 gh label create "model:<model-id>" --description "Filed by that model" --color EDEDED
 ```
+
+The priority labels `P1`, `P2` and `P3` need the same check in a repo that has never been triaged:
+`gh label list --search P` shows whether they exist, and `gh label create P2` creates one.
 
 `GET_LABEL` in [`tool-mappings`](../../tool-mappings.md) records that **no MCP tool creates or updates a label**, so a remote session cannot run the block above at all.
 Two paths remain there: `gh api repos/<owner>/<repo>/labels` from a workflow, or the MCP silent-create described above --- the one place that behaviour is useful rather than hazardous, at the cost that the label's spelling is then whatever you typed.

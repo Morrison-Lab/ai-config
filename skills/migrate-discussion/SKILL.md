@@ -74,6 +74,7 @@ this is outward-facing and hard to reverse.
    ```bash
    gh issue create \
      --title '<original title>' \
+     --label P2 \
      --body 'Migrated from discussion <url> (opened by @<author>).
 
    <original body, quoted>
@@ -84,6 +85,9 @@ this is outward-facing and hard to reverse.
 
    In a remote/web session, use `mcp__github__issue_write` (`method: create`)
    with the same body instead of `gh`.
+   Set the priority (`P2` is the default) per
+   [`issue-first`](../../shared/workflow/issue-first.md); the issue quotes
+   human content, so it takes no `ai-authored` or model label.
 3. Comment on the discussion pointing at the new issue, then close it:
 
    ```bash

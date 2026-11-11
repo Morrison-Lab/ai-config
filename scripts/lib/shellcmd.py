@@ -24,8 +24,8 @@ The bodies were identical, and so was the heredoc defect `_heredoc_free`
 fixes below -- which is the argument for a module rather than a ninth copy.
 The six that only add context now import `simple_commands` from here
 (ai-config#3178). The two that can REFUSE (`no-clobbering-push.py` denies,
-`no-unreviewed-pr.py` blocks) still carry their copies, and their migration
-is a separate review under the same issue. The same grep also finds later
+`no-unreviewed-pr.py` blocks) need the operators between commands as well as
+the argv, so they walk `shell_tokens` themselves. The same grep also finds later
 copies outside the original eight (`guard-slide-major-tag.py`,
 `no-binary-file-read.py`, `no-interpreter-heredoc.py`), which belong to the
 same migration. This module is where the fix landed and where new callers
@@ -562,7 +562,7 @@ def resolve_cd_target(rest: list[str], cur_dir: str | None) -> str | None:
     `_resolve_cd_target`, which is the tested in-repo implementation. This is
     a COPY and not a move: that guard still holds its own, because it can
     refuse a push and migrating a deny-capable guard is its own change with
-    its own review --- the same call this module's header makes for the two refusing
+    its own review --- the same call ai-config#3178 made for the refusing
     `_simple_commands` copies. The duplication that leaves is tracked as
     ai-config#3177, not by the closed ai-config#2993, whose scope is
     `_simple_commands` and `_strip_env`. New callers import from here.

@@ -126,6 +126,23 @@ check("and its remainder is not either",
       shellcmd.git_subcommand(["push", "--force"]), None)
 check("empty input", shellcmd.simple_commands(""), [])
 
+# The token stream the two refusing hooks walk themselves (ai-config#3178):
+# operators stay in it as runs, a heredoc body and a comment do not.
+check("shell_tokens keeps operator runs",
+      shellcmd.shell_tokens("(cd a && make) & git push"),
+      ["(", "cd", "a", "&&", "make", ")", "&", "git", "push"])
+check("shell_tokens blanks a heredoc and keeps the next command",
+      shellcmd.shell_tokens("git commit -F - <<'EOF'\ngit push\nEOF\nls"),
+      ["git", "commit", "-F", "-", "<<", ";;", "ls"])
+check("shell_tokens drops a comment",
+      shellcmd.shell_tokens("git status # git push\nls"),
+      ["git", "status", ";", "ls"])
+check("shell_tokens is None on a parse error",
+      shellcmd.shell_tokens("echo 'unclosed"), None)
+check("is_operator_token on a run",
+      [shellcmd.is_operator_token(t) for t in (")&&(", ";", "<<", "", "a")],
+      [True, True, False, False, False])
+
 # ------------------------------------------------------------- heredocs
 #
 # The substitution `" << "` rather than `"<<"` is the load-bearing detail, and

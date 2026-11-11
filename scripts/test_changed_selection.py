@@ -34,7 +34,8 @@ FILES = {
     "hooks/.guardrc": "\n",
     "hooks/pkg/__init__.py": "\n",
     "hooks/helper.py": "import deep_helper\n",
-    "hooks/deep_helper.py": "# imports nothing; names other-tool.py in a comment\n",
+    "hooks/deep_helper.py": "import deeper  # names other-tool.py in a comment\n",
+    "hooks/deeper.py": "\n",
     "hooks/other-tool.py": "# never imported\n",
     "hooks/rules.json": "{}\n",
     "hooks/unrelated.py": "\n",
@@ -68,7 +69,7 @@ def test_selector():
         seeds = ["hooks/test-guard.py", "hooks/guard.py"]
         check("a change to the subject selects the suite", sel.needed(seeds, ["hooks/guard.py"]))
         check("a change to an imported module selects it", sel.needed(seeds, ["hooks/helper.py"]))
-        check("imports are followed transitively", sel.needed(seeds, ["hooks/deep_helper.py"]))
+        check("imports are followed transitively", sel.needed(seeds, ["hooks/deeper.py"]))
         check("an imported package's __init__.py selects it", sel.needed(seeds, ["hooks/pkg/__init__.py"]))
         check("a data file the subject names selects it", sel.needed(seeds, ["hooks/rules.json"]))
         check("a name ending a sentence still matches", sel.needed(seeds, ["hooks/notes.txt"]))
@@ -89,7 +90,7 @@ def test_selector():
             check("a suite reaching an unparsable file always runs, and says so",
                   sel.needed(["hooks/broken.py"], ["hooks/unrelated.py"]) and "hooks/broken.py" in err.getvalue())
         check("untracked, non-ignored files are indexed", "hooks/brand-new.py" in sel.files)
-        check("./ and a/../ spellings are normalised", sel.needed(seeds, ["./hooks/x/../helper.py"])
+        check("./ and a/../ spellings are normalised", sel.needed(seeds, ["./hooks/pkg/../helper.py"])
               and not sel.needed(seeds, ["./hooks/unrelated.py"]))
         check("one matching path among several selects it",
               sel.needed(seeds, ["hooks/unrelated.py", "hooks/helper.py"]))
@@ -108,6 +109,8 @@ def test_live_tree():
     """A hook two path-loads away from a suite's subject still selects it."""
     sel = Selector(HERE.parent)
     seeds = ["hooks/test-flag-blocker-without-retry.py", "hooks/flag-blocker-without-retry.py"]
+    used = seeds + ["hooks/no-unfiled-finding.py", "hooks/no-fable-subagent.py"]
+    check("live: every path these checks use exists", set(used) <= set(sel.files))
     check("live: a sibling's sibling selects the suite", sel.needed(seeds, ["hooks/no-unfiled-finding.py"]))
     check("live: an unrelated hook does not (negative control)",
           not sel.needed(seeds, ["hooks/no-fable-subagent.py"]))

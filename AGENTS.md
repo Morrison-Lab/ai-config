@@ -326,7 +326,6 @@ See [`timestamp-local-recaps`](shared/workflow/timestamp-local-recaps.md).
 ## Record issue and PR relationships in GitHub's relationships field
 
 Record every parent, sub-issue, blocked-by, blocking and linked-PR relationship there, not only in prose.
-Link a branch made for an issue to that issue's Development field when you create the branch, and link its PR once it exists.
 See [`github-relationships`](shared/workflow/github-relationships.md).
 
 ## Summarize analysis effects in PR descriptions

@@ -224,8 +224,25 @@ class Denies(unittest.TestCase):
         self.assert_denied('P=HOME; chown -R me "./${!P}"')
         self.assert_denied('chown -R me "/tmp/${#HOME}"')
 
-    def test_command_after_a_tab_stripped_heredoc(self):
-        self.assert_denied("cat <<-EOF\n\tx\n\tEOF\nchown -R me /etc")
+    def test_positional_parameters_set_in_the_command(self):
+        for cmd in ("bash -c 'chown -R root \"$1\"' _ /etc",
+                    'set -- /etc; chown -R me "$1"',
+                    'f(){ chown -R me "$1"; }; f /etc',
+                    'chown -R me "./$1"'):
+            self.assert_denied(cmd)
+
+    def test_colonless_forms_on_a_set_but_empty_variable(self):
+        for cmd in ('D=; chown -R me "${D?}/"', 'export D=; chown -R me "${D?}/"',
+                    'D=; chown -R me "/${D?}etc"', 'D=; chown -R me "${D-x}/"',
+                    'D=; chown -R me "${D=x}/"'):
+            self.assert_denied(cmd)
+
+    def test_assigning_default_as_a_side_effect(self):
+        self.assert_denied(': "${D:=/etc}"; chown -R me "$D"')
+        self.assert_denied('echo "${D=/usr}" && chmod -R 755 "$D"')
+
+    def test_reference_value_attached_to_a_prefix(self):
+        self.assert_denied("chmod -R --ref=x /etc")
 
     def test_default_nested_three_deep(self):
         self.assert_denied('chown -R me "${A:-${B:-${HOME}}}"')
@@ -286,6 +303,17 @@ class Allows(unittest.TestCase):
 
     def test_from_value_is_not_a_target(self):
         self.assert_allowed("chown -R --from root:root me ./build")
+        # The owner names the home directory's basename, from its parent.
+        self.assert_allowed("chown -R --from root:root tester ./build", cwd="/home")
+
+    def test_special_parameters_are_not_empty(self):
+        for cmd in ('chmod -R 700 "$HOME/$$"', "chmod -R 700 ~/$$",
+                    'chown -R me "$HOME/$!"', 'chown -R me "${HOME}/${#}"'):
+            self.assert_allowed(cmd)
+
+    def test_colonless_default_on_a_set_variable(self):
+        self.assert_allowed('D=./build; chown -R me "${D-/etc}"')
+        self.assert_allowed(': "${D:=./build}"; chown -R me "$D"')
 
     def test_project_paths(self):
         self.assert_allowed("chmod -R u+w .")

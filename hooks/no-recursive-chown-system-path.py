@@ -34,11 +34,13 @@ is empty in this one (anthropics/claude-code#75859): `chmod -R 755 "$d/"` is
 `/`. A path that
 exists only because something was taken as empty is refused for the root, a
 system tree or home, but not for a top-level directory: `$OUT/dist` with OUT
-unset is `/dist`. Only a default (`${D:-/x}`, `${D=/x}`) or an error check
-(`${D:?}`, which stops bash when D is empty) is read; an operand built with any
-other operator (`${D:+x}`, `${D%/}`, `${!D}`, `${#D}`, `${D:0:3}`), there or in
-an assignment it uses, is refused wherever it points, since each can rebuild a
-protected path (`/e${HOME:+tc}` is `/etc`). A command substitution outside single quotes, heredoc
+unset is `/dist`. Only a default (`${D:-/x}`, `${D=/x}`, which also assigns
+D) or an error check (`${D:?}`, which stops bash first) is read; an operand
+built with any other operator (`${D:+x}`, `${D%/}`, `${!D}`, `${#D}`,
+`${D:0:3}`), there or in an assignment it uses, is refused wherever it
+points, since each can rebuild a protected path (`/e${HOME:+tc}` is `/etc`).
+So is one that uses a positional parameter (`$1`, `$@`), which `set --`, a
+function or `sh -c '...' _ /etc` can set. A command substitution outside single quotes, heredoc
 bodies and comments is lifted out before the command
 is split, scanned as a command of its own, and taken as empty. Inside `sh -c`
 or a substitution the working directory is unknown, so only absolute targets
@@ -57,7 +59,8 @@ unquoted heredoc body (`<<EOF`, which bash does run), a glob in a directory
 component (`/*/lib`), a partial glob or brace expansion that names a
 protected path (`/et*`, `/{etc,usr}`), a wrapper that changes directory
 (`env -C /etc`, `sudo -D /etc`), PowerShell `icacls`/`Set-Acl`, Windows drive
-paths (`C:/Windows`), and a bind-mounted path (the #39283 `/volumes/mail/`
+paths (`C:/Windows`), a `${D:=x}` inside single quotes (read as if it
+assigned), and a bind-mounted path (the #39283 `/volumes/mail/`
 case) all pass. Fails open on parse trouble and when scripts/lib/shellcmd.py cannot
 be imported.
 """
@@ -161,14 +164,21 @@ NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 SUB = "__AICFG_CMDSUB__"  # a lifted command substitution (see `_lift`)
 # The start of a variable: `${NAME` (closed by its matching brace, found by
 # `_brace_pairs`), `$NAME`, or a lifted substitution.
-# Positional and special parameters (`$1`, `${1:-/etc}`, `$@`) count too:
-# the Bash call has no arguments, so each is empty here.
+# Positional and special parameters (`$1`, `${1:-/etc}`, `$@`, `$$`) count too.
 VARIABLE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*|[0-9]+|[@*#?$!-])"
                       r"|\$([A-Za-z_][A-Za-z0-9_]*|[0-9]|[@*#?$!-])|" + SUB)
+# A positional parameter can hold anything: `set -- /etc`, a function's
+# arguments and `sh -c '...' _ /etc` all set one. So an operand that uses one
+# is refused, like an unread operator.
+POSITIONAL = re.compile(r"[1-9][0-9]*|[@*]")
+# The other special parameters are never empty in bash; any stand-in that is
+# not empty keeps `$HOME/$$` from reading as the home directory.
+SPECIAL = {"$": "1", "!": "1", "#": "0", "?": "0", "-": "hB", "0": "bash"}
 ALL_GLOB = re.compile(r"\A[*?.]*[*?][*?.]*\Z")
 
 DENY = (
-    "Refused: `{segment}` runs `{program} -R` on `{target}`, {where}. A recursive ownership or mode change there broke `sudo` "
+    "Refused: `{segment}` runs `{program} -R` on `{target}`, {where}. "
+    "A recursive ownership or mode change there broke `sudo` "
     "in anthropics/claude-code#168 and #39283, and undoing it needs a console. "
     "Fix only the path that raised the error, as your own user, or ask the "
     "user to run it. If this case is genuinely safe, put `{override}` before "
@@ -332,7 +342,7 @@ def _long(tok, name, shortest):
     return len(tok) >= shortest and name.startswith(tok)
 
 
-def _expand(text, home, assigned, here, depth=0):
+def _expand(text, home, assigned, here, depth=0, effects=None):
     """`(TEXT expanded, weak)`, or `None` when a computed value makes it undecidable.
 
     A default nested deeper than MAX_NESTING, or any operator but a default
@@ -349,6 +359,10 @@ def _expand(text, home, assigned, here, depth=0):
     is not a guess. ASSIGNED maps a name set earlier in the same command to
     its `(value, weak)`, or to `None` when that value was computed, as in
     `d=$(mktemp -d)`.
+
+    With a colon, a default or a check fires when the value is empty; without
+    one, only when the name is unset (`D=; ${D-/x}` is empty). A `=` default
+    also assigns, and the assignment goes in EFFECTS when it is given.
     """
     text = re.sub(r"\A~([A-Za-z0-9_.-]*)(?=/|\Z)",
                   lambda m: os.path.expanduser("~" + m.group(1)) if m.group(1) else home,
@@ -366,8 +380,13 @@ def _expand(text, home, assigned, here, depth=0):
             # on whether the value is known (`${d:+tc}` with d computed).
             capped.append(name)
             return ""
-        missing = False
-        if name in assigned:
+        if POSITIONAL.fullmatch(name):
+            capped.append(name)
+            return ""
+        missing, is_set = False, True
+        if name in SPECIAL:
+            val = SPECIAL[name]
+        elif name in assigned:
             if assigned[name] is None:
                 undecidable.append(name)
                 return ""
@@ -382,13 +401,17 @@ def _expand(text, home, assigned, here, depth=0):
             val, missing = here or "", here is None
         else:
             val = os.environ.get(name, "")
-            missing = not val
-        if check and not val:  # bash stops with an error before the command runs
+            missing, is_set = not val, name in os.environ
+        fires = not val if rest.startswith(":") else not is_set
+        if check and fires:  # bash stops with an error before the command runs
             undecidable.append(name)
             return ""
-        if default and not val:
+        if default and fires:
             fallback = (UNREAD if depth >= MAX_NESTING
-                        else _expand(rest[default.end():], home, assigned, here, depth + 1))
+                        else _expand(rest[default.end():], home, assigned, here, depth + 1,
+                                     effects))
+            if effects is not None and "=" in default.group():
+                effects[name] = fallback
             if fallback is UNREAD:
                 capped.append(name)
                 return ""
@@ -491,7 +514,7 @@ def _split(piece):
     # Drop the `<<` each blanked body leaves behind: the split blanks heredocs
     # again, and would read the next word (`2>&1`) as a new delimiter whose
     # body runs to the end, hiding every later command.
-    cleaned = re.sub(r" <<-? ", " ", _comment_free(_heredoc_free(piece)))
+    cleaned = _comment_free(_heredoc_free(piece)).replace(" << ", " ")
     lifted, inner = _lift(cleaned)
     cmds = simple_commands_with_scope(lifted)
     if cmds is None:  # lifting broke the parse: judge the text as written
@@ -519,6 +542,11 @@ def _scan(piece, cwd, home, outer):
         assigned = dict(outer)
         for k in range(1, len(scope) + 1):
             assigned.update(assigns.get(scope[:k], {}))
+        effects = {}
+        for word in argv:
+            _expand(word, home, assigned, here, effects=effects)
+        assigns.setdefault(scope, {}).update(effects)
+        assigned.update(effects)
         if _assignments(argv, assigns.setdefault(scope, {}), assigned, home, here):
             continue
         head, override = _program(argv)

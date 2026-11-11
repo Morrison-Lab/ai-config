@@ -360,8 +360,8 @@ The CLI warns at every launch once the files it loads pass `max(120,000, per-fil
 The gate is the 120,000 floor (`--total-char-limit`) less 20,000 reserved for the repo `CLAUDE.md` loaded alongside (`--repo-margin`, set to `0` when measuring a consumer's own file).
 The `--budget` byte total exits 0 over it unless `--strict` is passed, serving as a trend line, and its `--compare` form is the pin-bump report.
 This repo's CI passes `--strict`, so the 100,000-byte budget gates here and fails a PR shortly before the CLI char gate would (ai-config#4685).
-Three more things gate, all without `--strict`.
-The root file's character cap (`--root-char-cap`, 150,000 -- the CLI's per-file limit on a 1M-context model) and the per-fragment byte cap (`--fragment-cap`) both fail on the level.
+Four more things gate, all without `--strict`.
+The root file's character cap (`--root-char-cap`, 150,000 -- the CLI's per-file limit on a 1M-context model), the per-fragment byte cap (`--fragment-cap`), and the `AGENTS.md` byte cap (32,768, Codex's default, off under `--no-agents-md-gate`) fail on the level.
 The **growth ratchet** fails on the delta: under `--baseline REV`, once the root file sits at or above `--root-growth-gate-fraction` of its cap (0.90 by default), the branch may not grow it at all.
 Below that line the ratchet is inactive and reports so;
 `--no-root-growth-gate` turns it off for a caller whose baseline is not a merge base.

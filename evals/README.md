@@ -34,6 +34,7 @@ Each case is `evals/<name>/prompt.md` (frontmatter plus prompt) and one or more 
 | Group | Cases | What it measures |
 |---|---|---|
 | `rule` | `authorship-marker` | An `AGENTS.md` rule shows up in the output. |
+| `skill` | `agent-builder-omit-claudemd`, `agent-builder-keep-claudemd` | `agent-builder` sets `omitClaudeMd: true` on a brief-only worker and leaves it off an agent that applies a repository's conventions. |
 
 ### First measurement
 
@@ -42,6 +43,8 @@ One run per arm, Sonnet, at the commit that added this suite (2026-11-11):
 | Case | With plugin | Without | Note |
 |---|---|---|---|
 | `authorship-marker` | 1 | 0 | The rule changes behaviour. |
+| `agent-builder-omit-claudemd` | 1 | 0 | Added with the cases (2026-11-11); the skill changes behaviour. |
+| `agent-builder-keep-claudemd` | 1 | 1 | Negative twin; with no plugin, nothing suggests the field at all. |
 
 One run is a smoke check, not a measurement of rates;
 use `--runs 3` or more before drawing conclusions from a difference.

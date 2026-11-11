@@ -107,7 +107,7 @@ and structure of the three existing agents — they read almost as a template.
   With the field set, managed policy files still load, and so does a subdirectory's `CLAUDE.md` once the worker works with files there.
   Set it when the agent's body and brief carry everything it needs, so it does not start with the conductor's whole preamble ([ai-config#1499](https://github.com/Morrison-Lab/ai-config/issues/1499)).
   `hooks/inject-subagent-rules.py` still gives it the core rules.
-  Leave it off an agent that judges a repository by that repository's own conventions or documentation, such as `adversarial-reviewer`, `code-editor` and `prose-editor`, and `reproducibility-auditor` and `dependency-auditor`, whose "undocumented" and "deliberately pinned" calls rest on what a project's `CLAUDE.md` records.
+  Leave it off an agent that judges a repository by that repository's own conventions or documentation, such as `adversarial-reviewer`, `code-editor` and `prose-editor`, and `reproducibility-auditor` and `dependency-auditor`: the first reports undocumented prerequisites, and the second reports stale pins, and a project's `CLAUDE.md` is often where the prerequisites and the reasons for a pin are written down.
 - **No registry to update.** Agents are auto-discovered from `.claude/agents/`
   (mirrors skills' auto-discovery from `skills/`) — adding the file is enough
   for the harness to expose it as a `subagent_type`. There is currently no

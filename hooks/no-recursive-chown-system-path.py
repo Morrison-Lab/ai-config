@@ -90,7 +90,8 @@ WRAPPER_POSITIONALS = {"timeout": 1}
 WRAPPER_VALUE_OPTIONS = {"sudo": set("acugpCUrtTDR"), "doas": set("auC"),
                          "env": set("auCSPLU"),
                          "timeout": set("sk"), "nice": {"n"}, "ionice": set("cnp"),
-                         "stdbuf": set("ioe")}
+                         "stdbuf": set("ioe"), "pkexec": {"u"}, "time": {"f", "o"},
+                         "exec": {"a"}}
 # Each wrapper's long options, as (those taking the next word, flags).
 # getopt_long takes an exact name first, then a unique prefix (`--us` is
 # `--user`), so a flag such as sudo's `--login`, a prefix of `--login-class`,
@@ -101,10 +102,13 @@ WRAPPER_LONG = {
               "--group", "--host", "--login-class", "--other-user", "--prompt", "--role",
               "--type", "--user"},
              {"--askpass", "--background", "--bell", "--edit", "--help", "--list",
-              "--login", "--non-interactive", "--preserve-env", "--preserve-groups",
+              "--login", "--no-update", "--non-interactive", "--preserve-env",
+              "--preserve-groups",
               "--remove-timestamp", "--reset-timestamp", "--set-home", "--shell",
               "--stdin", "--validate", "--version"}),
-    "env": ({"--argv0", "--chdir", "--split-string", "--unset"},
+    # `--env0-from` is in coreutils 9.12; `--quoting-style` is not yet released.
+    "env": ({"--argv0", "--chdir", "--env0-from", "--quoting-style", "--split-string",
+             "--unset"},
             {"--block-signal", "--debug", "--default-signal", "--help",
              "--ignore-environment", "--ignore-signal", "--list-signal-handling",
              "--null", "--version"}),
@@ -114,7 +118,12 @@ WRAPPER_LONG = {
     "ionice": ({"--class", "--classdata", "--pgid", "--pid", "--uid"},
                {"--help", "--ignore", "--version"}),
     "stdbuf": ({"--error", "--input", "--output"}, {"--help", "--version"}),
+    "pkexec": ({"--user"}, {"--disable-internal-agent", "--help", "--keep-cwd", "--version"}),
+    "time": ({"--format", "--output"},
+             {"--append", "--help", "--portability", "--quiet", "--verbose", "--version"}),
 }
+# A wrapper with no table above: any of these long names takes the next word.
+ANY_TAKES = set().union(*(takes for takes, _ in WRAPPER_LONG.values()))
 # Options with an optional value (sudo's `h::`). Attached (`-hhost`), the rest
 # of the word is the value. Alone as `-h`, sudo takes the next word as the
 # host when it is not an option or an assignment (src/parse_args.c). Inside a
@@ -122,8 +131,14 @@ WRAPPER_LONG = {
 WRAPPER_OPTIONAL_VALUE = {"sudo": {"h"}}
 # How deep `${A:-${B:-...}}` defaults are expanded before giving up.
 MAX_NESTING = 32
-# What `_expand` returns past MAX_NESTING: the root, which is always refused.
-CAPPED = ("/", False)
+# What `_expand` returns for an operand it will not read: a default nested past
+# MAX_NESTING, or an operator other than a default (`${A:+tc}`, `${A:0:0}`,
+# `${A%/}`), any of which can rebuild a protected path (`/e${HOME:+tc}` is
+# `/etc`). The operand is refused, with its own reason.
+UNREAD = ("/", False)
+UNREAD_WHY = ("written with a `${...}` operator this guard does not read "
+              "(anything but a `:-`/`:=` default, or nesting deeper than "
+              f"{MAX_NESTING}); write the path out")
 DECLARE_BUILTINS = ("export", "local", "declare", "readonly", "typeset")
 # chmod's own short options (GNU and BSD); any other `-w` or `-x` is a mode.
 CHMOD_OPTIONS = set("cfvRHLPh")
@@ -222,7 +237,9 @@ def _takes_next_word(wrapper, tok, following):
     if tok.startswith("--"):
         if "=" in tok:
             return False
-        takes, flags = WRAPPER_LONG.get(wrapper, (set(), set()))
+        if wrapper not in WRAPPER_LONG:
+            return tok in ANY_TAKES
+        takes, flags = WRAPPER_LONG[wrapper]
         if tok in takes or tok in flags:
             return tok in takes
         matches = [opt for opt in takes | flags if opt.startswith(tok)]
@@ -298,11 +315,13 @@ def _targets(program, head):
 def _expand(text, home, assigned, here, depth=0):
     """`(TEXT expanded, weak)`, or `None` when a computed value makes it undecidable.
 
-    A default nested deeper than MAX_NESTING makes the whole text CAPPED,
-    read as `/`, so adversarial input can neither exhaust the stack and crash
-    the hook open nor hide a protected path behind the cutoff, even with text
-    around the nest (`/e${A:-...tc}`). That refuses a deep nest around a
-    harmless path too, which no real command writes.
+    A default nested deeper than MAX_NESTING, or any operator but a default
+    (`-`, `=`, with or without `:`) or an error check (`?`), makes the whole
+    text UNREAD, which is refused. So adversarial input can neither exhaust
+    the stack and crash the hook open nor rebuild a protected path out of
+    pieces (`/e${A:-...tc}`, `/e${HOME:+tc}`). That refuses such an operand
+    around a harmless path too (`"${DIR%/}/build"`), which the escape hatch
+    or a literal path settles.
 
     A variable set in this environment keeps its value, since the Bash call
     inherits it too; one that is unset here is taken as empty, and the result
@@ -325,7 +344,7 @@ def _expand(text, home, assigned, here, depth=0):
             if assigned[name] is None:
                 undecidable.append(name)
                 return ""
-            if assigned[name] is CAPPED:
+            if assigned[name] is UNREAD:
                 capped.append(name)
                 return ""
             val, weak = assigned[name]
@@ -338,10 +357,13 @@ def _expand(text, home, assigned, here, depth=0):
             val = os.environ.get(name, "")
             missing = not val
         default = re.match(r":?[-=]", rest)
+        if rest and not default and not re.match(r":?\?", rest):
+            capped.append(name)  # an operator this guard does not read
+            return ""
         if default and not val:
-            fallback = (CAPPED if depth >= MAX_NESTING
+            fallback = (UNREAD if depth >= MAX_NESTING
                         else _expand(rest[default.end():], home, assigned, here, depth + 1))
-            if fallback is CAPPED:
+            if fallback is UNREAD:
                 capped.append(name)
                 return ""
             if fallback is None:
@@ -370,7 +392,7 @@ def _expand(text, home, assigned, here, depth=0):
     pieces.append(text[pos:])
     expanded = "".join(pieces)
     if capped:
-        return CAPPED
+        return UNREAD
     return None if undecidable else (expanded, any(guessed))
 
 
@@ -473,7 +495,12 @@ def _scan(piece, cwd, home):
             continue
         program = os.path.basename(head[0])
         for target in _targets(program, head):
-            for cand, weak in filter(None, [_expand(target, home, assigned, here)]):
+            expanded = _expand(target, home, assigned, here)
+            if expanded is UNREAD:
+                shown = " ".join(argv).replace(SUB, "$(...)")
+                target = target.replace(SUB, "$(...)")
+                return (shown, program, target, target, UNREAD_WHY), inner
+            for cand, weak in filter(None, [expanded]):
                 if not cand:
                     continue  # an empty operand is an error, not the cwd
                 if not cand.startswith("/"):

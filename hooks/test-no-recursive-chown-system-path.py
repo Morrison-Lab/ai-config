@@ -163,6 +163,15 @@ class Denies(unittest.TestCase):
         self.assert_denied("timeout --s KILL 60 chown -R me /etc")
         # An exact flag beats a longer option it prefixes (`--login-class`).
         self.assert_denied("sudo --login chown -R me /etc")
+        self.assert_denied("sudo --user=root chown -R me /etc")
+        self.assert_denied("sudo -- chown -R me /etc")
+        self.assert_denied("nice -- chown -R me /etc")
+        self.assert_denied("env --env0-from vars chown -R me /etc")
+        self.assert_denied("pkexec --user root chown -R me /etc")
+        self.assert_denied("pkexec -u root chown -R me /etc")
+        self.assert_denied("/usr/bin/time --output log chown -R me /etc")
+        self.assert_denied("env time -o log chown -R me /etc")
+        self.assert_denied("exec -a x chmod -R 755 /usr")
         self.assert_denied("env -a x chown -R me /etc")
         self.assert_denied("env --argv0 x chown -R me /etc")
         # In each bundle the first value-taking letter takes the rest, `u`.
@@ -176,6 +185,12 @@ class Denies(unittest.TestCase):
         self.assert_denied('env -iS "chown -R me /etc"')
         self.assert_denied("env --split-string='sudo chmod -R 777 /usr'")
         self.assert_denied('env -S "sudo -u root" chown -R me /etc')
+
+    def test_operators_other_than_a_default_are_refused(self):
+        # Each rebuilds `/etc` in bash.
+        self.assert_denied("chown -R me /e${HOME:+tc}")
+        self.assert_denied("chown -R me /e${HOME:0:0}tc")
+        self.assert_denied('chmod -R 755 "${DIR%/}/build"')
 
     def test_export_with_a_bare_name(self):
         self.assert_denied('export d=/etc PATH; chown -R me "$d"')

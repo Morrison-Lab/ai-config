@@ -24,11 +24,13 @@ when a target is:
     package and auth state in `VAR_CORE` are (`/var/lib/postgresql` passes);
   * the home directory, or a directory that contains it.
 
-A target is read with `~`, `~user` and `$HOME` expanded, relative paths
+A target is read with `~`, `~user`, `$HOME`, and `~+`, `$(pwd)` and `$PWD`
+(the current directory) expanded, relative paths
 resolved against the hook's `cwd` and any `cd` earlier in the same shell (a
 `cd` inside `( ... )` moves only that subshell, and one inside an `if`, a
 loop or a `case`, outside the condition that opens it, may not run, so the
-directory before it is judged too, `$PWD` included),
+directory before it is judged too, `$PWD` included; a name assigned from
+`$PWD` there keeps the worst of its values),
 and a basename made only of glob characters read as its directory (`/usr/*`
 touches `/usr`). Any other
 `$VAR` keeps its value in this environment, which the Bash call inherits; one
@@ -44,12 +46,12 @@ built with any other operator (`${D:+x}`, `${D%/}`, `${!D}`, `${#D}`,
 points, since each can rebuild a protected path (`/e${HOME:+tc}` is `/etc`).
 So is one that uses a parameter this cannot know: a positional parameter
 (`$1`, `$@`, which `set --` or a function can set), `$0` (which
-`sh -c '...' /etc` sets), `$_`, `$OLDPWD`, or a name set by `read`,
+`sh -c '...' /etc` sets), `$_`, `$OLDPWD` (and `~-`), or a name set by `read`,
 `mapfile`, `readarray`, `getopts` or `printf -v`. `$!` is read like an
 unset variable, and `$$`, `$#`, `$?` and `$-` as some value that is not
 empty. A command substitution outside single quotes, heredoc bodies and
 comments is lifted out before the command is split, scanned as a command of
-its own, and taken as empty. Inside `sh -c`
+its own, and taken as empty, except a bare `pwd`, read as `$PWD`. Inside `sh -c`
 or a substitution the working directory is unknown, so only absolute targets
 are judged there.
 
@@ -203,6 +205,7 @@ SPECIAL = {"$": "1", "#": "0", "?": "0", "-": "hB"}
 # Builtins that set a variable from input this guard cannot read. A name they
 # set is refused when an operand uses it.
 READ_BUILTINS = ("read", "mapfile", "readarray", "getopts")
+PWD_COMMAND = re.compile(r"pwd(\s+-[LP]+)*")
 PWD_USE = re.compile(r"\$\{?PWD(?![A-Za-z0-9_])")
 ALL_GLOB = re.compile(r"\A[*?.]*[*?][*?.]*\Z")
 
@@ -257,19 +260,28 @@ def _lift(text):
         elif not single and text.startswith("$(", i) and not text.startswith("$((", i):
             j = _close(text, i + 2)
             if j is not None:
-                inner.append(text[i + 2:j])
-                out.append(SUB)
+                out.append(_lifted(text[i + 2:j], inner))
                 i = j + 1
                 continue
         elif not single and ch == "`" and "`" in text[i + 1:]:
             j = text.index("`", i + 1)
-            inner.append(text[i + 1:j])
-            out.append(SUB)
+            out.append(_lifted(text[i + 1:j], inner))
             i = j + 1
             continue
         out.append(ch)
         i += 1
     return "".join(out), inner
+
+
+def _lifted(body, inner):
+    """What a substitution of BODY stands for: `${PWD}` for `pwd`, else SUB.
+
+    Any other body goes in INNER, to be checked as a command of its own.
+    """
+    if PWD_COMMAND.fullmatch(body.strip()):
+        return "${PWD}"
+    inner.append(body)
+    return SUB
 
 
 def _takes_next_word(wrapper, tok, following):
@@ -394,6 +406,8 @@ def _expand(text, home, assigned, here, depth=0, effects=None):
     one, only when the name is unset (`D=; ${D-/x}` is empty). A `=` default
     also assigns, and the assignment goes in EFFECTS when it is given.
     """
+    text = re.sub(r"\A~([+-])(?=/|\Z)",
+                  lambda m: "${PWD}" if m.group(1) == "+" else "${OLDPWD}", text)
     text = re.sub(r"\A~([A-Za-z0-9_.-]*)(?=/|\Z)",
                   lambda m: os.path.expanduser("~" + m.group(1)) if m.group(1) else home,
                   text)
@@ -579,6 +593,37 @@ def _split(piece):
     return cmds, inner
 
 
+def _defaults(argv, home, store, visible, here):
+    """Record in STORE and VISIBLE what each `${D:=x}` in ARGV assigns."""
+    effects = {}
+    for word in argv:
+        _expand(word, home, visible, here, effects=effects)
+    store.update(effects)
+    visible.update(effects)
+
+
+def _per_dir(dirs, home, store, visible, step):
+    """Run STEP(store, visible, directory) once for each of DIRS; its result.
+
+    With one directory this is a plain call. With several, `$PWD` differs
+    between them (`if [ -d x ]; then cd x; fi; X=$PWD`), so each name STEP
+    assigns keeps, of its readings, one that is protected or refused, else
+    the last; a later use of it is then judged as the worst case.
+    """
+    if len(dirs) == 1:
+        return step(store, visible, dirs[0])
+    runs = []
+    for d in dirs:
+        st, vis = {}, dict(visible)
+        runs.append((step(st, vis, d), st))
+    for name in dict.fromkeys(n for _, st in runs for n in st):
+        readings = [st[name] for _, st in runs if name in st]
+        store[name] = visible[name] = next(
+            (r for r in readings if r is UNREAD or r and r[0].startswith("/")
+             and _why(os.path.normpath(r[0]), home, r[1])), readings[-1])
+    return runs[-1][0]
+
+
 def _scan(piece, cwd, home, outer):
     """`(hit or None, [inner command substitutions], names assigned)` for one text.
 
@@ -605,11 +650,9 @@ def _scan(piece, cwd, home, outer):
         assigned = dict(outer)
         for k in range(1, len(scope) + 1):
             assigned.update(assigns.get(scope[:k], {}))
-        effects = {}
-        for word in argv:
-            _expand(word, home, assigned, here, effects=effects)
-        assigns.setdefault(scope, {}).update(effects)
-        assigned.update(effects)
+        store = assigns.setdefault(scope, {})
+        _per_dir(dirs, home, store, assigned,
+                 lambda st, vis, d: _defaults(argv, home, st, vis, d))
         # `then cd /etc`, `{ cd /usr; }`: a keyword ends the command before.
         opened = None
         while argv and argv[0] in SHELL_KEYWORDS:
@@ -630,19 +673,8 @@ def _scan(piece, cwd, home, outer):
             new = tuple(None if moved else resolve_cd_target(words, d) for d in dirs)
             heres[scope] = tuple(dict.fromkeys((*dirs, *new) if maybe else new))
             continue
-        only_assigns = _assignments(argv, assigns.setdefault(scope, {}), assigned, home, here)
-        if here is None:
-            # `X=$PWD` after a `cd` that may not run: of the values X may get,
-            # keep one that is protected, so a later use of X is refused.
-            for word in argv:
-                name, _, val = word.partition("=")
-                if not ASSIGNMENT.match(word) or not PWD_USE.search(val):
-                    continue
-                readings = [_expand(val, home, assigned, d) for d in dirs]
-                worst = next((r for r in readings if r is UNREAD or r and r[0].startswith("/")
-                              and _why(os.path.normpath(r[0]), home, r[1])), readings[-1])
-                assigned[name] = assigns[scope][name] = worst
-        if only_assigns:
+        if _per_dir(dirs, home, store, assigned, lambda st, vis, d: _assignments(
+                argv, st, vis, home, d)):
             continue
         head, override = _program(argv)
         if not head or override:

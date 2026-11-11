@@ -296,8 +296,15 @@ class Denies(unittest.TestCase):
     def test_pwd_after_a_cd_that_may_not_run(self):
         cwd = HOME
         for cmd in ('if [ -d proj ]; then cd proj; fi; chown -R me "$PWD"',
-                    'if [ -d proj ]; then cd proj; fi; X=$PWD; chmod -R u+w "$X"'):
+                    'if [ -d proj ]; then cd proj; fi; X=$PWD; chmod -R u+w "$X"',
+                    'if [ -d proj ]; then cd proj; fi; ROOT=$PWD OUT=$ROOT; chown -R me "$OUT"',
+                    'if [ -d proj ]; then cd proj; fi; : "${ROOT:=$PWD}"; chown -R me "$ROOT"'):
             self.assert_denied(cmd, cwd=cwd)
+
+    def test_current_directory_named_another_way(self):
+        for cmd in ('sudo chown -R "$USER" "$(pwd)"', 'X=$(pwd -P); chown -R me "$X"',
+                    "chown -R me `pwd`", "chown -R me ~+"):
+            self.assert_denied(cmd, cwd=HOME)
 
     def test_cd_behind_time_or_command(self):
         for cmd in ("time cd /etc; chown -R me .", "command cd /etc; chown -R me .",
@@ -400,7 +407,9 @@ class Allows(unittest.TestCase):
         # After `--`, `-v x` is the format and its argument: x keeps its value.
         self.assert_allowed('x=./build; printf -- -v x; chown -R me "$x"')
 
-    def test_cd_in_a_condition_or_group_runs(self):
+    def test_cd_in_a_condition_or_group_is_read_as_run(self):
+        # The `{ ... }` case pins a Limit: a `cd` that fails (no ~/proj) is
+        # read as run, so this chowns $HOME then and is still allowed.
         for cmd in ("if cd ~/proj; then chown -R me .; fi",
                     "{ cd ~/proj; }; chown -R me .",
                     "while ! cd ~/proj; do sleep 1; done; chown -R me ."):
@@ -414,6 +423,14 @@ class Allows(unittest.TestCase):
         self.assert_allowed('if [ -d build ]; then cd build; fi; BUILD_DIR="$PWD/out"; '
                             'chmod -R u+w "$BUILD_DIR"')
         self.assert_allowed("if [ -d build ]; then cd build; fi; PWD_OK=1 chmod -R u+w ./dist")
+        self.assert_allowed('if [ -d build ]; then cd build; fi; X=$PWD; chmod -R u+w "$X"')
+        self.assert_allowed('if [ -d build ]; then cd build; fi; MYPWD=./x; chmod -R u+w "$MYPWD"')
+        self.assert_allowed("bash -c 'd=$PWD/build; chmod -R u+w \"$d\"'")
+
+    def test_current_directory_inside_a_project(self):
+        for cmd in ('chmod -R u+w "$(pwd)/build"', "chmod -R u+w ~+/build",
+                    'chown -R me "$(pwd; echo)"'):
+            self.assert_allowed(cmd)
 
     def test_guarded_cd_into_the_project(self):
         self.assert_allowed("if [ -d build ]; then cd build; fi; chmod -R u+w .")

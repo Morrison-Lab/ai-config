@@ -167,7 +167,9 @@ go read the history first (step 2).
    The range is in the resolved file, except under "Dropped", where it is in
    the named side's version of the file.
    Write one row per dropped range, so a hunk that drops lines from both
-   sides gets two rows.
+   sides gets two rows; repeat `<path>`:`<n>` in each row, and put the Kept
+   and Modified ranges on the first row only, with `none` in the others.
+   Write `none` in any empty cell.
    For a conflict with no text hunks (delete/modify, rename, binary), write
    `whole file` for `<n>` and `<lines>`:
 

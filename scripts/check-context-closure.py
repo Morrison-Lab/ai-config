@@ -1292,11 +1292,7 @@ def main(argv=None) -> int:
         return 2
     if args.merge_result and (args.baseline or args.compare):
         # Both compare against the working tree, which this mode replaces.
-        print(
-            "error: --merge-result measures one tree; it does not combine "
-            "with --baseline or --compare.",
-            file=sys.stderr,
-        )
+        print("error: --merge-result excludes --baseline and --compare.", file=sys.stderr)
         return 2
     if args.max_growth is not None and not args.baseline:
         # Otherwise the flag silently does nothing, which is the shape
@@ -1317,13 +1313,8 @@ def main(argv=None) -> int:
         measured = f"{base} merged with {args.merge_result} (tree {tree[:12]})"
     files, missing, inline, ambiguous = walk_closure(args.root, reader)
     if args.merge_result and missing_pins:
-        print(
-            "error: --merge-result: the closure imports from submodule "
-            "commits this checkout does not have, so those imports cannot be "
-            "read: " + ", ".join(missing_pins) + ". Fetch them in the "
-            "submodule first.",
-            file=sys.stderr,
-        )
+        pins = ", ".join(missing_pins)
+        print(f"error: --merge-result: unfetched submodule pins: {pins}", file=sys.stderr)
         return 2
 
     if not files:
@@ -1349,11 +1340,7 @@ def main(argv=None) -> int:
         try:
             root_chars = cli_char_count(reader(args.root).decode("utf-8"))
         except UnicodeDecodeError:
-            print(
-                f"error: {args.root} in the merge tree is not UTF-8, so the "
-                "character cap cannot be checked.",
-                file=sys.stderr,
-            )
+            print(f"error: {args.root} in the merge is not UTF-8", file=sys.stderr)
             return 2
     else:
         root_chars = root_char_count(base, args.root)

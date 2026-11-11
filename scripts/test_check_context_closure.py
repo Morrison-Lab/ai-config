@@ -1404,5 +1404,74 @@ with tempfile.TemporaryDirectory() as tmp:
         ccc.main(common + ["--agents-md-cap", "200"]) == 0,
     )
 
+# --- --merge-result: measure what the merge would land now (ai-config#4234) --
+# The branch and main each stay under the AGENTS.md cap alone, and only
+# their merge goes over -- the 2026-10-02 case the issue records.
+
+with tempfile.TemporaryDirectory() as tmp:
+    base = Path(tmp)
+
+    def git(*a):
+        return subprocess.run(
+            ["git", *a], cwd=base, check=True, capture_output=True, text=True
+        ).stdout.strip()
+
+    git("init", "-q", "-b", "main")
+    git("config", "core.autocrlf", "false")
+    git("config", "user.email", "t@t.com")
+    git("config", "user.name", "t")
+    (base / "CLAUDE.md").write_text("intro\n", encoding="utf-8")
+    (base / "AGENTS.md").write_text("a" * 60 + "\n", encoding="utf-8")
+    (base / "notes.md").write_text("x\n", encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-qm", "start")
+    git("checkout", "-qb", "branch")
+    (base / "AGENTS.md").write_text("a" * 60 + "\n" + "b" * 30 + "\n", encoding="utf-8")
+    git("commit", "-qam", "branch grows AGENTS.md")
+    git("checkout", "-q", "main")
+    (base / "AGENTS.md").write_text("c" * 30 + "\n" + "a" * 60 + "\n", encoding="utf-8")
+    git("commit", "-qam", "main grows AGENTS.md")
+    git("checkout", "-q", "branch")
+    common = ["--base", str(base), "--budget", "100000000", "--agents-md-cap", "110"]
+    check(
+        "--merge-result: the branch alone is under the AGENTS.md cap",
+        ccc.main(common) == 0,
+    )
+    check(
+        "--merge-result: the merge with main is over it, and exits 1",
+        ccc.main(common + ["--merge-result", "main"]) == 1,
+    )
+    check(
+        "--merge-result: the working tree is left untouched",
+        len((base / "AGENTS.md").read_bytes()) == 92 and git("status", "--porcelain") == "",
+    )
+    check(
+        "--merge-result does not combine with --baseline (exit 2)",
+        ccc.main(common + ["--merge-result", "main", "--baseline", "main"]) == 2,
+    )
+    check(
+        "--merge-result: an unknown ref exits 2",
+        ccc.main(common + ["--merge-result", "no-such-ref-xyz"]) == 2,
+    )
+    check(
+        "--merge-result: an unknown ref is reported as unknown, not as a conflict",
+        "does not name a commit" in ccc.merge_result_tree(base, "no-such-ref-xyz")[1],
+    )
+    git("checkout", "-q", "main")
+    (base / "notes.md").write_text("main side\n", encoding="utf-8")
+    git("commit", "-qam", "main edits notes")
+    git("checkout", "-q", "branch")
+    (base / "notes.md").write_text("branch side\n", encoding="utf-8")
+    git("commit", "-qam", "branch edits notes")
+    tree, why = ccc.merge_result_tree(base, "main")
+    check(
+        "--merge-result: a conflicting merge yields no tree, with a reason",
+        tree is None and "conflicts" in why,
+    )
+    check(
+        "--merge-result: a conflicting merge exits 2, not a marker-laden measurement",
+        ccc.main(common + ["--merge-result", "main"]) == 2,
+    )
+
 print(f"\n{passes} passed, {failures} failed")
 sys.exit(0 if failures == 0 else 1)

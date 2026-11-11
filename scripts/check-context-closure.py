@@ -571,6 +571,41 @@ def git_reader(base: Path, rev: str):
     return read
 
 
+def merge_result_tree(base: Path, ref: str) -> tuple[str | None, str]:
+    """The tree that merging `ref` into HEAD at `base` would produce.
+
+    Returns `(tree, "")`, or `(None, reason)` when there is no single tree to
+    measure. A PR's CI measures the merge with `main` as `main` stood when CI
+    ran, and other PRs can merge after that. On 2026-10-02 a branch held
+    AGENTS.md at 31,941 of Codex's 32,768-byte cap while its merge with
+    the then-current `main` measured 33,029 (ai-config#4213, #4234). This
+    tree is what the merge would land now.
+
+    `git merge-tree --write-tree` (git 2.38+) touches neither the index nor
+    the working tree. It exits 1 on a conflict, and the tree it writes
+    then holds conflict markers, so a conflict is an error here, not a
+    measurement of marker-laden files. It also exits 1 on a ref it cannot
+    resolve, so the ref is checked first, or a typo would read as a conflict.
+    """
+    known = subprocess.run(
+        ["git", "-C", str(base), "rev-parse", "--verify", "--quiet",
+         f"{ref}^{{commit}}"],
+        capture_output=True,
+    )
+    if known.returncode:
+        return None, f"{ref} does not name a commit here; is it fetched?"
+    result = subprocess.run(
+        ["git", "-C", str(base), "merge-tree", "--write-tree", "HEAD", ref],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 1:
+        return None, f"merging {ref} into HEAD conflicts; resolve it first"
+    if result.returncode:
+        return None, result.stderr.strip() or f"git merge-tree failed on {ref}"
+    return result.stdout.split("\n", 1)[0].strip(), ""
+
+
 def gitlink_rev(base: Path, submodule: str) -> str | None:
     """The commit the parent repo RECORDS for `submodule`, or None.
 
@@ -1070,6 +1105,14 @@ def main(argv=None) -> int:
         "which needs a submodule gitlink and answers a different question.",
     )
     parser.add_argument(
+        "--merge-result",
+        metavar="REF",
+        help="measure the tree that merging REF (e.g. origin/main) into HEAD "
+        "would produce, instead of the working tree, so every gate sees what "
+        "the merge would land now (ai-config#4234). Uncommitted changes are "
+        "not part of that tree.",
+    )
+    parser.add_argument(
         "--max-growth",
         type=int,
         metavar="BYTES",
@@ -1196,6 +1239,16 @@ def main(argv=None) -> int:
             file=sys.stderr,
         )
         return 2
+    if args.merge_result and (args.baseline or args.compare):
+        # Both modes compare a reference against the working tree; with the
+        # working tree swapped for a merge tree, neither delta means what its
+        # report says.
+        print(
+            "error: --merge-result measures one tree; it does not combine "
+            "with --baseline or --compare.",
+            file=sys.stderr,
+        )
+        return 2
     if args.max_growth is not None and not args.baseline:
         # Otherwise the flag silently does nothing, which is the shape
         # `fail-fast.md` warns about: a guard whose pass path and whose
@@ -1204,7 +1257,16 @@ def main(argv=None) -> int:
         return 2
 
     base = Path(args.base).resolve()
-    files, missing, inline, ambiguous = walk_closure(args.root, local_reader(base))
+    reader = local_reader(base)
+    measured = str(base)
+    if args.merge_result:
+        tree, why = merge_result_tree(base, args.merge_result)
+        if tree is None:
+            print(f"error: --merge-result: {why}", file=sys.stderr)
+            return 2
+        reader = baseline_reader(base, tree)
+        measured = f"{base} merged with {args.merge_result} (tree {tree[:12]})"
+    files, missing, inline, ambiguous = walk_closure(args.root, reader)
 
     if not files:
         # A closure that resolved nothing is not a small closure. Fail loudly
@@ -1219,12 +1281,19 @@ def main(argv=None) -> int:
     print(
         render(
             files, missing, inline, ambiguous, args.budget,
-            args.bytes_per_token, str(base),
+            args.bytes_per_token, measured,
         )
     )
 
+    root_blob = reader(args.root)
+    try:
+        root_chars = None if root_blob is None else cli_char_count(
+            root_blob.decode("utf-8")
+        )
+    except UnicodeDecodeError:
+        root_chars = None
     root_over, root_text = render_root_chars(
-        root_char_count(base, args.root),
+        root_chars,
         args.root,
         args.root_char_cap,
         args.root_char_warn_fraction,
@@ -1234,7 +1303,6 @@ def main(argv=None) -> int:
     frag_over, frag_text = render_fragment_caps(files, args.fragment_cap)
     print(frag_text)
 
-    reader = local_reader(base)
     total_over, total_text = render_total_chars(
         [
             (path, cli_char_count(reader(path).decode("utf-8", errors="replace")))
@@ -1246,9 +1314,9 @@ def main(argv=None) -> int:
     print(total_text)
 
     agents_over = False
-    agents_path = base / "AGENTS.md"
-    if agents_path.is_file():
-        agents_size = agents_path.stat().st_size
+    agents_blob = reader("AGENTS.md")
+    if agents_blob is not None:
+        agents_size = len(agents_blob)
         reported_over, agents_text = render_agents_md_cap(
             agents_size, args.agents_md_cap
         )

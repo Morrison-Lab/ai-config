@@ -669,6 +669,10 @@ jobs:
         run: python3 scripts/test_check_rendered_page.py
       - name: Run docx tracked-change checker tests
         run: python3 scripts/test_check_docx_tracked_changes.py
+      - name: Run field-safe merge_runs wrapper tests
+        # ai-config#2918. Part 2 needs the docx skill, which CI does not have,
+        # and prints NOT RUN there; part 1 tests the wrapper's own decision.
+        run: python3 scripts/test_docx_merge_runs_field_safe.py
       - name: Check for stale and orphaned records (advisory)
         # ai-config#1544. Non-blocking, and for two separate reasons.
         #

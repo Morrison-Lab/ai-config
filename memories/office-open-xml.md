@@ -152,14 +152,17 @@ Field codes are not rare.
 Zotero, Mendeley, and EndNote citations, cross-references, table-of-contents entries,
 and HYPERLINK fields are all field codes.
 
-- **Do:** edit the pristine XML on any document containing field codes,
-  and locate targets by walking `<w:r>` elements rather than merging runs first.
-- **Do:** when a document looks scrambled after an edit session,
-  run `merge_runs.py` on an untouched copy and diff that copy's
-  `pandoc -t plain --track-changes=accept` output against the original's,
-  per the recipe above.
-- **Don't:** run `merge_runs.py` as a reflexive first step
-  because the skill lists it in the standard edit recipe.
+`scripts/docx-merge-runs-field-safe.py` (ai-config#2918) avoids the measured failure.
+It runs the skill's own script with one change: a run holding a `fldChar`, `instrText` or `delInstrText` is never merged with a neighbour.
+The field's marker runs survive, the result runs between `separate` and `end` still merge, and the instruction text stays split across its runs.
+Measured 2026-11-11 on the 2026-10-08 synthetic paragraph, with its result split into two runs: the wrapper kept all four marker runs, merged the result runs, and its pandoc conversion matched the original's (`scripts/test_docx_merge_runs_field_safe.py`, part 2).
+Rendering in Word was not checked.
+Before touching its input, the wrapper runs the patched script on a one-field paragraph of its own and exits 3 if the field's marker runs did not survive, which is how a change to the skill's script shows up.
+
+- **Do:** merge runs with `scripts/docx-merge-runs-field-safe.py`, which takes the skill script's arguments, and re-run the recipe above with the wrapper in place of the skill's script before delivering: the diff should be empty.
+- **Do:** when no merge is needed, edit the pristine XML and locate targets by walking `<w:r>` elements.
+- **Do:** when a document looks scrambled after an edit session, run the skill's own `merge_runs.py` on an untouched copy and diff that copy's `pandoc -t plain --track-changes=accept` output against the original's, per the recipe above.
+- **Don't:** run the skill's `merge_runs.py` on a document you will deliver, even though the skill lists it in the standard edit recipe.
 
 ## Edit by run index, not by character span
 

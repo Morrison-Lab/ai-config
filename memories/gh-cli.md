@@ -325,6 +325,9 @@
   Pass it with `-F` (typed, integer), never `-f` (string) — `-f sub_issue_id=…` fails with `422 Invalid property /sub_issue_id: "…" is not of type integer`.
   Full call: `gh api repos/<o>/<r>/issues/<parent>/sub_issues -F sub_issue_id=<child_db_id>`.
   Verify with `gh api .../issues/<parent>/sub_issues --jq '.[] | "#\(.number) \(.title)"'`.
+  An issue takes one parent: adding a child that already has one fails with `Sub issue may only have one parent`.
+  Leave such a child under its existing parent and name it in the new parent's body, and pass `replace_parent` only when the user asks for the move (gha#1844, 2026-11-11).
+  Send MCP `sub_issue_write` calls in batches of nine or fewer: 24 parallel calls drew `too many requests`, and batches of eight or nine did not (same session).
 - **Backticks in a double-quoted `-m` / `--body` string get command-substituted by the shell.**
   In the Bash tool, `` git commit -m "... `origin` ..." `` or `` gh pr comment --body "use `foo`" `` makes the shell run `` `origin` ``/`` `foo` `` as a command and splice the (usually empty/erroring) output into the message — silently mangling it (seen on sparta 2026-06-30: a commit body's `` `origin` `` and `` `killer` `` vanished, with `origin: command not found` in stderr).
   For any message/body containing backticks, use a single-quoted **heredoc** (`` -m "$(cat <<'EOF' … EOF)" `` — the quoted `'EOF'` disables all expansion) or a `--body-file`, never a bare double-quoted string.

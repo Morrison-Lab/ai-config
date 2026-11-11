@@ -19,6 +19,32 @@ Mechanism: `hooks/flag-prose-relationship-without-link.py` blocks the stop once 
 It does not sweep existing issues.
 Related: [`issue-first`](issue-first.md), [`stack-prs`](../../skills/stack-prs/SKILL.md).
 
+## Attach sub-issues and set issue types in bulk
+
+Measured on 2026-11-11, when two planning threads each attached well over a hundred existing issues from cloud sessions.
+The sub-issue measurements are in [ai-config#5318](https://github.com/Morrison-Lab/ai-config/issues/5318).
+The issue-type measurements come from the rme triage, [rme#1459](https://github.com/Morrison-Lab/rme/issues/1459).
+In a cloud session the MCP tools are the only route, since `gh` there cannot write.
+
+Each successful `sub_issue_write` `add` call returns the whole parent issue, about 12 KB.
+An `issue_write` `update` that sets only `type` returns about 80 bytes and keeps the issue's labels.
+
+- **Do:** for more than about ten sub-issue links, write one line per link to a file and dispatch Haiku workers in batches of about 30, at most six at once.
+  Give each line the parent's number, the child's number and the child's numeric `id`, and name the columns in a header line.
+  The rme thread ran nine workers at once and saw "too many requests" on about 1 call in 10.
+  The ai-config thread ran six at once and saw none.
+- **Do:** verify the links afterwards with `gh api -X GET search/issues -f q='repo:OWNER/REPO is:issue is:open no:parent-issue' --paginate`, and intersect its numbers with the planned list.
+  An empty intersection means every link landed.
+- **Do:** read `get_parent` on an issue that refuses with "Sub issue may only have one parent", and leave the existing parent in place unless told to replace it.
+- **Do:** set issue types the same way, with workers that pass only `type` to `issue_write` `update`, 4 calls per message.
+  On rme, six workers set 298 types in about 2.5 minutes with no rate-limit error.
+- **Do:** verify types by summing the `type:<name>` search counts against the count of open issues.
+  Take the names from `list_issue_types`, so that no type is left out of the sum.
+- **Don't:** make bulk `sub_issue_write` calls in the conducting session: 179 links would put about 2 MB of JSON into its context.
+- **Don't:** trust a worker's success count.
+  Workers on rme reported success while two links were missing.
+- **Don't:** verify with `parent-issue:OWNER/REPO#N`, which returned 0 for a parent with 11 sub-issues, or with `no:type`, which returned all 310 open issues on rme after each had a type.
+
 ## Link a branch to its issue when you create the branch
 
 Ezra, 2026-11-11 (`cai:`, ai-config#5299): "when you create a branch to address an issue, link that issue to that branch using the Development field ... also link the PR once it's created, but link the branch immediately."

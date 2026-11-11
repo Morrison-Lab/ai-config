@@ -3,6 +3,9 @@ Choose explicitly whether to centralize or distribute.
 Ezra, 2026-11-09: "when planning and/or performing work, we should choose explicitly whether to centralize vs distribute content or other work, both within and across repos"
 ([ai-config#5185](https://github.com/Morrison-Lab/ai-config/issues/5185)).
 
+Extended rationale --- the survey evidence and the decision table ---
+lives in [`centralize-or-distribute.rationale.md`](centralize-or-distribute.rationale.md).
+
 The rule applies when planning work and again when performing it.
 It covers content and other work, such as code, scripts, workflows, and checks.
 It applies within a repository and across repositories.

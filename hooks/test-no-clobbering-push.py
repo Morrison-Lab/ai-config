@@ -2094,12 +2094,6 @@ MUTATIONS = {
           "        moved = False")],
         {"W8", "W9", "W11", "W12", "W13", "W14", "W15", "W16"},
     ),
-    "heredoc_blanking": (
-        "a heredoc body is blanked before parsing, so a mention inside one "
-        "is not an invocation",
-        [('    cmd = RX_HEREDOC.sub("<<", cmd)', "    pass")],
-        {"S9"},
-    ),
 }
 
 print("\nmutation tests (revert one clause, see which cases flip):")
@@ -2169,6 +2163,33 @@ expand_ok = expanded == "C:/Users/x/repo"
 print(f"{'ok  ' if expand_ok else 'WRONG'} _shell_expand hands on a native path "
       f"for a Git Bash target (got {expanded!r})")
 wrong += (not msys_ok) + (not expand_ok)
+
+# Broken install (no `scripts/lib`): deny only force-push-shaped commands
+# and allow the rest (ai-config#3178).
+_broken = tempfile.mkdtemp()
+_TMPDIRS.append(_broken)
+os.makedirs(os.path.join(_broken, "hooks"))
+_broken_hook = os.path.join(_broken, "hooks", os.path.basename(HOOK))
+shutil.copy(HOOK, _broken_hook)
+for _cmd, _want in (("git push --force origin b", True),
+                    ("git push -fu origin b", True),
+                    ("git push origin b", False),
+                    ("X=1 ALLOW_FORCE_PUSH=1 git push -f origin b", False),
+                    ("git push -f origin b; ALLOW_FORCE_PUSH=1 true", True),
+                    ("git commit -m 'push -f' && ls", False),
+                    ("git\tpush --force origin b", True),
+                    ("git push --force # ALLOW_FORCE_PUSH=1", True)):
+    _env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+    _proc = subprocess.run(
+        [sys.executable, _broken_hook],
+        input=json.dumps({"tool_name": "Bash",
+                          "tool_input": {"command": _cmd}}),
+        capture_output=True, text=True, env=_env)
+    _denied = '"deny"' in _proc.stdout
+    _ok = _proc.returncode == 0 and _denied == _want
+    print(f"{'ok  ' if _ok else 'WRONG'} broken install: {_cmd!r} "
+          f"{'denied' if _want else 'allowed'}")
+    wrong += not _ok
 
 for d in _TMPDIRS:
     shutil.rmtree(d, ignore_errors=True)

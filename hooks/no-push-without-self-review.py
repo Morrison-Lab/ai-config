@@ -726,6 +726,14 @@ except Exception as exc:  # covered by orphan_cases() in
     _SIBLING = None
     _SIBLING_ERROR = str(exc)
 
+# The sibling's detector tokenizes through `scripts/lib/shellcmd.py`
+# (ai-config#3178). When that import failed, the sibling loads but sees no
+# command at all, which would turn every push into a silent allow. Treat it as
+# a missing sibling instead, so the degraded-mode deny below still fires.
+if _SIBLING is not None and getattr(_SIBLING, "SHELLCMD_ERROR", None):
+    _SIBLING_ERROR = _SIBLING.SHELLCMD_ERROR
+    _SIBLING = None
+
 # The walk over git's push-option grammar, its tables, and the abbreviation
 # resolver live in the sibling and are bound here rather than declared twice
 # (ai-config#1935, #1920): the sibling decides whether a command is a push at

@@ -33,6 +33,11 @@ import sys
 import tempfile
 
 HOOK = sys.argv[1]
+# Mutants run from a temp directory, so the shared module goes on PYTHONPATH.
+SHELLCMD_LIB = os.path.join(os.path.dirname(os.path.dirname(
+    os.path.realpath(__file__))), "scripts", "lib")
+HOOK_ENV = dict(os.environ, PYTHONPATH=os.pathsep.join(
+    p for p in (SHELLCMD_LIB, os.environ.get("PYTHONPATH")) if p))
 
 # ---------------------------------------------------------------- the incident
 
@@ -74,6 +79,9 @@ SHOULD_WARN = [
      "nested blocks: the mutation is outside BOTH, so the outer guard is spent"),
     ("W8", bash("! git checkout main\ngit merge x"),
      "`!` inverts an exit status without making the switch conditional"),
+    ("W9", bash("bash -c 'git checkout feat/x; git merge origin/main'"),
+     "the same hazard inside a shell's -c, which shlex hands over as one "
+     "token (ai-config#3641)"),
 ]
 
 SHOULD_STAY_SILENT = [
@@ -145,7 +153,7 @@ def verdict(hook_path, payload):
     proc = subprocess.run(
         [sys.executable, hook_path],
         input=json.dumps(payload),
-        capture_output=True, text=True,
+        capture_output=True, text=True, env=HOOK_ENV,
     )
     # a crashed hook must NOT read as 'silent' -- that is the failure mode where
     # the pass path and the broken path print the same thing
@@ -268,6 +276,12 @@ MUTATIONS = {
         [("        if guard_block is not None and guard_block in scope_j:",
           "        if guard_block is not None:")],
         {"W5", "W6", "W7"},
+    ),
+    "C10": (
+        "a command line reached through a shell's -c is scanned too",
+        [("    for piece in shell_c_expansions(command):",
+          "    for piece in [command]:")],
+        {"W9"},
     ),
     "C7": (
         "a newline after `&&`/`||`/`|` separates nothing",

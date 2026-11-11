@@ -154,7 +154,8 @@ Added on 2026-11-11 ([ai-config#5359](https://github.com/Morrison-Lab/ai-config/
 - **Don't:** accept or rebut from the reviewer's quotation alone.
 - **Don't:** paste the reviewer's verdict line into your relay comment.
   `scripts/check-pr-fully-clean.py` then records the relay comment itself as a not-clean verdict from its author (criterion 4 in its module docstring), and only a later clean verdict from that same author clears it.
-  The findings still block the merge until each is answered; the wording only keeps the relay from becoming a second verdict.
+  The findings still block the merge until each is answered.
+  The wording only keeps the relay from becoming a second verdict.
 
 Other notes from that day:
 

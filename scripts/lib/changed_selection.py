@@ -2,11 +2,11 @@
 
 A suite's inputs are derived from the code, since no suite declares them (#3533):
 the seeds (a test and its subject), every file whose name or module stem they
-mention as a whole token, and every Python module those import, transitively.
-Mentions are followed one level only: followed further, comments naming other
-scripts pulled a median of 1127 of 1647 files into every suite (2026-11-11).
-A file reached by a computed path is invisible here, so a change under
-ALWAYS_RUN selects every suite, and CI always runs every suite.
+mention as a whole token, and every Python module those import or load by a
+literal `x.py` path, transitively. Other mentions are followed one level only:
+followed further, comments naming other scripts pulled a median of 1127 of 1647
+files into every suite (2026-11-11). A computed path is invisible here, so a
+change under ALWAYS_RUN, or a deleted path, selects every suite; CI runs all.
 """
 from __future__ import annotations
 
@@ -22,6 +22,7 @@ ALWAYS_RUN = ("scripts/lib/", "hooks/hooks.json", "scripts/test_hooks.py",
               "scripts/run-local-validation.py", ".github/workflows/validate.yml")
 _TOKEN = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]*")
 _MODULE_FILE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\.py")
+_MODULE_PATH = re.compile(r"[A-Za-z0-9_./-]*[A-Za-z0-9_-]\.py")
 _TEXT_SUFFIXES = {".py", ".sh"}
 
 
@@ -38,6 +39,7 @@ class Selector:
     def __init__(self, root: Path, files: Optional[Iterable[str]] = None):
         self.root = root
         self.files = list(files) if files is not None else tree_files(root)
+        self._present = set(self.files)
         self.by_token: Dict[str, Set[str]] = {}
         self.by_module: Dict[str, Set[str]] = {}
         for path in self.files:
@@ -71,6 +73,9 @@ class Selector:
                     names = [alias.name for alias in node.names]
                 elif isinstance(node, ast.ImportFrom):
                     names = [node.module or ""] + [alias.name for alias in node.names]
+                if isinstance(node, ast.Constant) and isinstance(node.value, str) \
+                        and _MODULE_PATH.fullmatch(node.value):  # a sibling loaded by path
+                    found |= self.by_token.get(node.value.rsplit("/", 1)[-1], set())
                 for dotted in names:
                     for part in dotted.split("."):
                         found |= self.by_module.get(part, set())
@@ -82,7 +87,7 @@ class Selector:
         named = set(seeds)
         for path in list(named):
             for token in set(_TOKEN.findall(self._read(path))):
-                named |= self.by_token.get(token, set())
+                named |= self.by_token.get(token.rstrip(".-"), set())
         seen = set(named)
         queue = [p for p in named if p.endswith(".py")]
         while queue:
@@ -94,7 +99,8 @@ class Selector:
 
     def needed(self, seeds: Iterable[str], changed: Iterable[str]) -> bool:
         changed = list(changed)
-        if any(c.startswith(ALWAYS_RUN) for c in changed):
+        # A deleted path is in no index, so nothing can say what read it: run everything.
+        if any(c.startswith(ALWAYS_RUN) or c not in self._present for c in changed):
             return True
         inputs = self.inputs(seeds)
         return any(c in inputs for c in changed)

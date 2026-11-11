@@ -41,9 +41,7 @@ Which gates apply to which files is derived, not recalled (#3120). Each
 SKIPPED with the reason. The `validate` job declares no path filter in
 validate.yml, so its steps are repo-wide and always selected -- which is what
 CI does too. A gate is never dropped silently: a run that selected two gates
-and a run that selected five print different plans. Under --changed,
-scripts/test_hooks.py runs only the hook suites the change can affect, read
-from RLV_CHANGED_FILES (scripts/lib/changed_selection.py, #5087).
+and a run that selected five print different plans.
 
 Steps whose name matches --skip (default: the dependency install, which needs
 the network and is already satisfied locally) are skipped and counted.
@@ -447,19 +445,13 @@ def load_workflow(path: Path) -> Dict[str, Any]:
     return doc
 
 
-def run_step(step: Step, root: Path, timeout: Optional[float], tmpdir: Optional[str] = None,
-             changed_listing: Optional[str] = None) -> int:
+def run_step(step: Step, root: Path, timeout: Optional[float], tmpdir: Optional[str] = None) -> int:
     env = dict(os.environ)
     # The run's own empty temp directory, as a CI runner starts with one
     # (#4806); a step that sets TMPDIR, TEMP or TMP itself still wins.
     if tmpdir:
         for name in ("TMPDIR", "TEMP", "TMP"):
             env[name] = tmpdir
-    # --changed hands its file list to suites that select their own cases
-    # (scripts/test_hooks.py); CI never sets it, so CI runs everything.
-    env.pop("RLV_CHANGED_FILES", None)
-    if changed_listing:
-        env["RLV_CHANGED_FILES"] = changed_listing
     env.update(step.env)
     cwd = root / step.cwd if step.cwd else root
     proc = subprocess.run(
@@ -686,20 +678,14 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     place = contextlib.nullcontext(root) if args.in_place else snapshot(root)
     try:
-        with place as run_root, \
-                tempfile.TemporaryDirectory(prefix="rlv-tmp-", ignore_cleanup_errors=True) as tmpdir, \
-                tempfile.TemporaryDirectory(prefix="rlv-changed-", ignore_cleanup_errors=True) as aside:
-            listing = None
-            if changed:
-                listing = str(Path(aside) / "changed-files.txt")
-                Path(listing).write_text("\n".join(changed) + "\n", encoding="utf-8")
-            return _execute(plan, run_root, tmpdir, listing, args)
+        with place as run_root, tempfile.TemporaryDirectory(prefix="rlv-tmp-") as tmpdir:
+            return _execute(plan, run_root, tmpdir, args)
     except SnapshotError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
 
-def _execute(plan, root: Path, tmpdir: str, listing: Optional[str], args: argparse.Namespace) -> int:
+def _execute(plan, root: Path, tmpdir: str, args: argparse.Namespace) -> int:
     print(f"info: running in {root}", file=sys.stderr)
     results = []
     for s, skipped, reason in plan:
@@ -715,7 +701,7 @@ def _execute(plan, root: Path, tmpdir: str, listing: Optional[str], args: argpar
         print(f"==> [{s.source}] {s.name}", flush=True)
         t0 = time.monotonic()
         try:
-            rc = run_step(s, root, args.timeout, tmpdir, listing)
+            rc = run_step(s, root, args.timeout, tmpdir)
         except subprocess.TimeoutExpired:
             rc = "timeout"
         secs = time.monotonic() - t0

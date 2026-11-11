@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Tests for scripts/lib/changed_selection.py and its two callers (ai-config#5087)."""
+"""Tests for scripts/lib/changed_selection.py and its use in scripts/test_hooks.py (ai-config#5087)."""
 import importlib.util
 import io
 import os
 import subprocess
 import sys
 import tempfile
-from contextlib import redirect_stderr, redirect_stdout
+from contextlib import redirect_stdout
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -36,8 +36,11 @@ def check(name, cond):
 
 
 FILES = {
-    "hooks/guard.py": "import helper\nCONFIG = 'rules.json'\n",
-    "hooks/test-guard.py": "# runs hooks/guard.py\n",
+    "hooks/guard.py": "import helper\nCONFIG = 'rules.json'\nSIBLING = 'sibling.py'\n",
+    "hooks/test-guard.py": "# runs hooks/guard.py and reads notes.txt.\n",
+    "hooks/sibling.py": "FAR = 'hooks/far.py'  # a sibling loaded by path, as _sibling() does\n",
+    "hooks/far.py": "\n",
+    "hooks/notes.txt": "\n",
     "hooks/helper.py": "import deep_helper\n",
     "hooks/deep_helper.py": "# imports nothing; names other-tool.py in a comment\n",
     "hooks/other-tool.py": "# never imported\n",
@@ -68,6 +71,9 @@ def test_selector():
         check("a change to an imported module selects it", sel.needed(seeds, ["hooks/helper.py"]))
         check("imports are followed transitively", sel.needed(seeds, ["hooks/deep_helper.py"]))
         check("a data file the subject names selects it", sel.needed(seeds, ["hooks/rules.json"]))
+        check("a name ending a sentence still matches", sel.needed(seeds, ["hooks/notes.txt"]))
+        check("siblings loaded by path are followed like imports", sel.needed(seeds, ["hooks/far.py"]))
+        check("a deleted path selects every suite", sel.needed(seeds, ["hooks/gone.py"]))
         check("an unrelated change does not select it (negative control)",
               not sel.needed(seeds, ["hooks/unrelated.py"]))
         check("a name mentioned two levels down is not followed",
@@ -86,46 +92,33 @@ def test_test_hooks_selection():
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         listing = Path(tmp) / "changed.txt"
         listing.write_text("hooks/flag-cop-out-offer.py\n", encoding="utf-8")
+        before = os.environ.get("RLV_CHANGED_FILES")
         os.environ["RLV_CHANGED_FILES"] = str(listing)
         try:
             out = io.StringIO()
             with redirect_stdout(out):
                 kept = th.select_for_change(runnable)
-        finally:
+            selected, th._SELECTED = th._SELECTED, None
             del os.environ["RLV_CHANGED_FILES"]
+            every = th.select_for_change(runnable)
+        finally:
+            _restore(before)
     names = {Path(t).name for t, _ in kept}
     check("the changed hook's own suite is kept", "test-flag-cop-out-offer.py" in names)
     check("most suites are dropped and the count is printed",
           len(kept) < len(runnable) / 2 and f"of {len(runnable)} hook suites" in out.getvalue()
-          and th._SELECTED == len(kept))
-    th._SELECTED = None
-    check("without RLV_CHANGED_FILES every suite runs", th.select_for_change(runnable) == runnable)
+          and selected == len(kept))
+    check("without RLV_CHANGED_FILES every suite runs", every == runnable and th._SELECTED is None)
 
 
-def test_runner_hands_over_the_list():
-    """run-local-validation --changed names the changed list to steps; a plain run does not."""
-    rlv = _load("run_local_validation_under_test", HERE / "run-local-validation.py")
-    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
-        root = _repo(tmp)
-        wf = root / "wf.yml"
-        wf.write_text("jobs:\n  validate:\n    steps:\n      - name: Reads the list\n"
-                      "        run: grep -qx hooks/guard.py \"${RLV_CHANGED_FILES:-/dev/null}\"\n", encoding="utf-8")
-        env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
-               "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
-        subprocess.run(["git", "add", "-A"], cwd=root, check=True)
-        subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=root, check=True, env=env)
-        (root / "hooks" / "guard.py").write_text("# edited\n", encoding="utf-8")
-        args = ["--workflow", str(wf), "--root", str(root), "--no-other-workflows"]
-        sink = io.StringIO()
-        with redirect_stdout(sink), redirect_stderr(sink):
-            with_list = rlv.main(args + ["--changed", "--base", "main"])
-            without = rlv.main(args)
-        check("--changed hands the changed list to each step", with_list == 0)
-        check("a run without --changed sets no list (negative control)", without == 1)
+def _restore(value):
+    os.environ.pop("RLV_CHANGED_FILES", None)
+    if value is not None:
+        os.environ["RLV_CHANGED_FILES"] = value
 
 
 def main():
-    for test in (test_selector, test_test_hooks_selection, test_runner_hands_over_the_list):
+    for test in (test_selector, test_test_hooks_selection):
         print(f"running {test.__name__}()", flush=True)
         test()
     print(f"\n{passes} passed, {failures} failed")

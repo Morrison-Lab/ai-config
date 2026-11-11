@@ -52,10 +52,9 @@ unset variable, and `$$`, `$#`, `$?` and `$-` as some value that is not
 empty. A command substitution outside single quotes, heredoc bodies and
 comments is lifted out before the command is split, scanned as a command of
 its own, and taken as empty, except a bare `pwd`, read as `$PWD`. A `sh -c`
-text or a substitution runs in the caller's directory, the hook's `cwd`
-while no `cd` appears before it in its scope; after one, its directory is
-unknown, so only absolute targets are judged there. A `cd ..` repeated by a loop is judged in
-every directory above.
+text or a substitution is read where it appears, in the directory and with
+the names of each way the command may run up to there, to MAX_NESTED
+levels. A `cd ..` repeated by a loop is judged in every directory above.
 
 A deny, not a warning: the remedy (fix the one path that raised the error, as
 your own user) is always available, and the damage is unrecoverable without a
@@ -77,7 +76,8 @@ unquoted heredoc body (`<<EOF`, which bash does run), a glob in a directory
 component (`/*/lib`), a partial glob or brace expansion that names a
 protected path (`/et*`, `/{etc,usr}`), a wrapper that changes directory
 (`env -C /etc`, `sudo -D /etc`), more than MAX_WORLDS ways a command may
-run (the directory is then unknown), PowerShell `icacls`/`Set-Acl`, Windows drive
+run (the directory is then unknown), a nested text read after MAX_WORK
+commands (read once, with no directory), PowerShell `icacls`/`Set-Acl`, Windows drive
 paths (`C:/Windows`), a relative target, `$PWD`, or a name assigned from
 `$PWD`, after a `cd` this cannot resolve (`cd -` or `cd "$UNSET"`, where
 `$PWD` is taken as empty), a `cd` into a subdirectory repeated by a loop
@@ -95,6 +95,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import sys
 
 try:
@@ -216,6 +217,10 @@ READ_BUILTINS = ("read", "mapfile", "readarray", "getopts")
 PWD_SUB = "__AICFG_PWDSUB__"
 # How many ways a command may run (see `_scan`) are judged one by one.
 MAX_WORLDS = 16
+# How deep `sh -c` texts and substitutions inside one another are read.
+MAX_NESTED = 3
+# Past this many commands read, a nested text is read once, with no directory.
+MAX_WORK = 2000
 ALL_GLOB = re.compile(r"\A[*?.]*[*?][*?.]*\Z")
 
 DENY = (
@@ -639,19 +644,28 @@ def _ancestors(path):
     return out
 
 
-def _starts_nested(words):
-    """Whether WORDS holds a lifted substitution or a shell's `-c` flag."""
-    return any(SUB in w or re.fullmatch(r"-[A-Za-z]*c[A-Za-z]*", w) for w in words)
+def _nested(words):
+    """The `sh -c` texts WORDS starts, in order (`sudo sh -c '...'` too)."""
+    try:
+        return shell_c_expansions(shlex.join(words), max_depth=1)[1:]
+    except Exception:  # a text this cannot rebuild starts nothing it can read
+        return []
 
 
-def _scan(piece, cwd, home, outer):
-    """`(hit or None, [inner substitutions], [names per world], moved)` for one text.
+def _scan(piece, cwd, home, outer, level=0, ctx=None):
+    """The first `(segment, program, target, path, why)` hit in PIECE, or None.
 
-    OUTER holds names an enclosing text assigned: a `sh -c` body or a
-    substitution sees them, through the outer shell's own expansion of a
-    double-quoted body or through the environment. MOVED says whether a
-    `cd`, `pushd` or `popd` comes before a command that starts a nested text.
+    OUTER holds the names visible where PIECE runs. A `sh -c` text or a
+    substitution is read where it appears, in each way the command may run
+    up to there, with that run's directory and names: it starts in the
+    directory of the shell that runs it, and sees its names through the outer
+    shell's expansion of a double-quoted text or through the environment.
+
+    CTX is shared by the whole command: a nested text already read in the
+    same directory with the same names is not read again, and past
+    MAX_WORK commands read, a nested text is read once, with no directory.
     """
+    ctx = {"seen": set(), "work": 0} if ctx is None else ctx
     cmds, inner = _split(piece)
     # A WORLD is one way the command may run: for each scope, the directory
     # the shell is in (`None` when this cannot name it) and the names
@@ -666,11 +680,18 @@ def _scan(piece, cwd, home, outer):
     # BLOCKS holds the `if`, loop and `case` commands open here: any `cd`
     # inside one may not run, except in the condition of the one it opens
     # (`if cd x; then`, `while ! cd x`). A `{ ... }` group runs.
-    # MOVED: a `cd` came before a command that starts a nested text (a
-    # substitution or a shell's `-c`), in that command's scope or above it.
     # A loop runs its body and a `while`/`until` condition any number of
     # times, so a `cd ..` there may reach every directory above.
-    worlds, blocks, moved_any, cd_scopes = [({(0,): cwd}, {})], [], False, []
+    # Each lifted substitution is matched to the command whose words hold its
+    # SUB, in order; when the counts disagree, each is read with no directory.
+    subs = sum(w.count(SUB) for _, argv in cmds or [] for w in argv)
+    aligned = subs == len(inner)
+    if not aligned:
+        for text in inner:
+            hit = _nested_hit(text, None, home, outer, level, ctx)
+            if hit:
+                return hit
+    worlds, blocks, taken = [({(0,): cwd}, {})], [], 0
     for scope, argv in cmds or []:
         # `then cd /etc`, `{ cd /usr; }`: a keyword ends the command before.
         words, opened = argv, None
@@ -687,10 +708,9 @@ def _scan(piece, cwd, home, outer):
         while lead and lead[0] in ("time", "-p", "command", "builtin"):
             lead = lead[1:]
         is_cd = bool(lead) and lead[0] in ("cd", "pushd", "popd")
-        if is_cd:
-            cd_scopes.append(scope)
-        elif _starts_nested(words) and any(scope[:len(c)] == c for c in cd_scopes):
-            moved_any = True
+        count = sum(w.count(SUB) for w in argv)
+        texts = (inner[taken:taken + count] if aligned else []) + _nested(words)
+        taken += count
         forked = []
         for heres, assigns in worlds:
             here = next(heres[scope[:k]] for k in range(len(scope), 0, -1)
@@ -698,6 +718,13 @@ def _scan(piece, cwd, home, outer):
             assigned = dict(outer)
             for k in range(1, len(scope) + 1):
                 assigned.update(assigns.get(scope[:k], {}))
+            ctx["work"] += 1
+            over = ctx["work"] > MAX_WORK
+            for text in texts:
+                hit = _nested_hit(text, None if over else here, home,
+                                  outer if over else assigned, level, ctx)
+                if hit:
+                    return hit
             store = assigns.setdefault(scope, {})
             _defaults(argv, home, store, assigned, here)
             if is_cd:
@@ -706,31 +733,33 @@ def _scan(piece, cwd, home, outer):
                                         for g in got]
                 unknown = None in cd_words or any(SUB in tok for tok in lead) or here is None
                 new = None if unknown else resolve_cd_target(cd_words, here)
-                news = [new]
+                news, fork = [new], maybe
                 if looped and new and cd_words[1:] and _only_up(cd_words[-1]):
-                    news = _ancestors(here)
-                    maybe = True
+                    news, fork = _ancestors(here), True
                 news = [n for n in news if n != here]
                 room = MAX_WORLDS - len(worlds) - len(forked)
-                if maybe and news and len(news) <= room:
+                if fork and news and len(news) <= room:
                     forked.extend(({**heres, scope: n},
                                    {k: dict(v) for k, v in assigns.items()}) for n in news)
                     continue  # this world keeps the directory before the `cd`
-                heres[scope] = None if maybe and news else new
+                heres[scope] = None if fork and news else new
                 continue
             if _assignments(words, store, assigned, home, here):
                 continue
             hit = _judge(words, home, assigned, here)
             if hit:
-                return hit, inner, [], moved_any
+                return hit
         worlds.extend(forked)
-    seen = []
-    for _, assigns in worlds:
-        names = dict(outer)
-        for scoped in assigns.values():
-            names.update(scoped)
-        seen.append(names)
-    return None, inner, seen, moved_any
+    return None
+
+
+def _nested_hit(text, here, home, names, level, ctx):
+    """`_scan` of a nested TEXT, unless it is too deep or read already."""
+    key = (text, here, repr(sorted(names.items(), key=lambda kv: kv[0])))
+    if level >= MAX_NESTED or key in ctx["seen"]:
+        return None
+    ctx["seen"].add(key)
+    return _scan(text, here, home, names, level + 1, ctx)
 
 
 def _judge(words, home, assigned, here):
@@ -760,33 +789,8 @@ def _judge(words, home, assigned, here):
 
 
 def _hit(command, cwd, home):
-    """`(segment, program, target, path, why)` for the first protected target.
-
-    A `sh -c` text or a substitution runs in the directory of the shell that
-    starts it. That is CWD until a text read so far has a `cd` before a
-    command that starts one; after that it is `None`, and relative targets
-    there are left alone.
-    """
-    pending = list(shell_c_expansions(command))
-    # Names assigned so far, one set per way the texts read so far may have
-    # run, each over-approximating its scope; a later text is read once per set.
-    knowns = [{}]
-    moved = False
-    while pending:
-        piece = pending.pop(0)
-        after, moved_here = [], False
-        for known in knowns:
-            hit, inner, seen, moved_one = _scan(piece, None if moved else cwd, home, known)
-            if hit:
-                return hit
-            after.extend(seen)
-            moved_here = moved_here or moved_one
-        moved = moved or moved_here
-        knowns = list({repr(sorted(k.items(), key=lambda kv: kv[0])): k
-                       for k in after}.values())[:MAX_WORLDS]
-        for text in inner:
-            pending.extend(shell_c_expansions(text))
-    return None
+    """`(segment, program, target, path, why)` for the first protected target."""
+    return _scan(command, cwd, home, {})
 
 
 def main() -> int:

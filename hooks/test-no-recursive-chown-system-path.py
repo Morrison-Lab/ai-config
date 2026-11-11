@@ -10,6 +10,7 @@ import io
 import json
 import os
 import sys
+import time
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
@@ -329,7 +330,10 @@ class Denies(unittest.TestCase):
         self.assert_denied("if a; then cd /; fi; if b; then cd y; fi; chown -R me .")
         # A `cd` after the nested text, or in another subshell, does not move it.
         for cmd in ("sh -c 'chown -R me .'; cd /tmp", 'echo "$(chown -R me .)"; cd /tmp',
-                    "(cd /tmp && ls); sh -c 'chown -R me .'"):
+                    "(cd /tmp && ls); sh -c 'chown -R me .'",
+                    "(cd /tmp && ls -c); sh -c 'chown -R me .'",
+                    "(cd /tmp && echo $(true)); sh -c 'chown -R me .'",
+                    "cd proj; cd ..; sh -c 'chown -R me .'"):
             self.assert_denied(cmd, cwd=HOME)
 
     def test_indirection_with_a_check(self):
@@ -491,6 +495,16 @@ class Allows(unittest.TestCase):
         # Under the cap, the same `cd` is judged both ways, and `..` is /tmp.
         self.assertIsNotNone(run(guarded[len("if a; then cd a; fi; "):]
                                  + "if e; then cd /tmp/a; fi; chown -R me .."))
+
+    def test_deeply_nested_command_is_read_quickly(self):
+        guards = "".join(f"if {c}; then cd {c}; fi; " for c in "abcd")
+        level3 = [guards + f"echo $(ls {n}a) $(ls {n}b); ls {n}" for n in range(16)]
+        level2 = [guards + " ".join(f'echo "$({x})"' for x in level3[4 * i:4 * i + 4])
+                  for i in range(4)]
+        command = guards + " ".join(f'echo "$({x})"' for x in level2)
+        start = time.monotonic()
+        self.assert_allowed(command + "; chmod -R u+w ./x")
+        self.assertLess(time.monotonic() - start, 5)
 
     def test_shell_c_in_a_project(self):
         self.assert_allowed("sudo sh -c 'chown -R me .'")

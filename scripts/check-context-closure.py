@@ -620,15 +620,15 @@ def merge_tree_reader(base: Path, tree: str):
     Returns `(read, missing_pins)`. `missing_pins` gains an entry when a
     read lands under a gitlink whose pinned commit the submodule checkout
     lacks; the caller fails on it rather than report those imports as
-    dangling. A gitlink nothing imports is never read, so costs nothing.
+    dangling. A gitlink nothing imports cannot fail the run.
     """
     listing = subprocess.run(
-        ["git", "-C", str(base), "ls-tree", "-r", tree],
+        ["git", "-C", str(base), "ls-tree", "-r", "-z", tree],
         capture_output=True,
         text=True,
     )
     sub_readers = {}
-    for line in listing.stdout.splitlines():
+    for line in filter(None, listing.stdout.split("\0")):
         meta, _, path = line.partition("\t")
         mode, kind, sha = meta.split()
         if mode != "160000" or kind != "commit":
@@ -1290,9 +1290,10 @@ def main(argv=None) -> int:
             file=sys.stderr,
         )
         return 2
-    if args.merge_result and (args.baseline or args.compare):
+    if args.merge_result and (args.baseline or args.compare or args.max_growth is not None):
         # Both compare against the working tree, which this mode replaces.
-        print("error: --merge-result excludes --baseline and --compare.", file=sys.stderr)
+        print("error: --merge-result excludes --baseline, --compare, --max-growth.",
+              file=sys.stderr)
         return 2
     if args.max_growth is not None and not args.baseline:
         # Otherwise the flag silently does nothing, which is the shape
@@ -1340,7 +1341,7 @@ def main(argv=None) -> int:
         try:
             root_chars = cli_char_count(reader(args.root).decode("utf-8"))
         except UnicodeDecodeError:
-            print(f"error: {args.root} in the merge is not UTF-8", file=sys.stderr)
+            print(f"error: {args.root} is not UTF-8 under --merge-result", file=sys.stderr)
             return 2
     else:
         root_chars = root_char_count(base, args.root)
@@ -1366,9 +1367,12 @@ def main(argv=None) -> int:
     print(total_text)
 
     agents_over = False
-    agents_blob = reader("AGENTS.md")
-    if agents_blob is not None:
-        agents_size = len(agents_blob)
+    agents_path = base / "AGENTS.md"
+    agents_size = agents_path.stat().st_size if agents_path.is_file() else None
+    if args.merge_result:
+        agents_blob = reader("AGENTS.md")
+        agents_size = None if agents_blob is None else len(agents_blob)
+    if agents_size is not None:
         reported_over, agents_text = render_agents_md_cap(
             agents_size, args.agents_md_cap
         )

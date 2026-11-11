@@ -39,12 +39,17 @@ a row says so where its source was not.
 
 ## Rules for the patterns no hook decides yet
 
-- **Do:** run `git stash push --include-untracked` before any command that discards working-tree state, and say so.
+- **Do:** run `git stash push --include-untracked` before any command that discards working-tree state in a worktree only you use, and say so.
   A stash can be recovered and a reset cannot.
   A stash leaves ignored files behind, so read `git clean -n -x` before any `git clean -x`.
-- **Don't:** reach for `reset --hard`, `checkout -- .`, `restore` or `clean -f` to clear a `git diff` that shows changes you do not recognize as your own.
-  Stash them instead.
-- **Do:** guard a variable in a deletion path with `${VAR:?}`, so an empty variable stops the command instead of widening it.
+- **Do:** leave changes you do not recognize as your own in place, and tell the user what they are.
+  Another session may be working in this worktree, and stashing its changes breaks that session's work as surely as a reset.
+- **Don't:** reach for `reset --hard`, `checkout -- .`, `restore`, `stash` or `clean -f` to clear changes you did not make, whether `git diff` or `git status` shows them.
+- **Do:** print the absolute path an `rm -rf` would delete in one Bash call, read it, and stop if it is `/`, the home directory or a repository root.
+  Then run the `rm -rf` in a later call, on that literal path.
+- **Do:** when a deletion path must use a variable, as in a loop or a script, guard it with `${VAR:?}`, which stops the command when the variable is unset or empty.
+  It does not stop the command when the variable falls back to a real value.
+  `$HOME` in a fresh shell is the real home directory ([#75859](https://github.com/anthropics/claude-code/issues/75859)).
 - **Don't:** use a variable in a deletion path that an earlier Bash call set.
   Each call starts a fresh shell.
 - **Do:** check that a directory exists after creating it, before moving anything into it.

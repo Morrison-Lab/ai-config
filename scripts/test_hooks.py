@@ -319,8 +319,8 @@ def select_for_change(runnable, changed):
     selector = module.Selector(Path(ROOT))
     kept = [(t, subj) for t, subj in runnable
             if selector.needed([Path(p).relative_to(ROOT).as_posix() for p in (t, subj)], changed)]
-    print(f"SELECTED: {len(kept)} of {len(runnable)} hook suites read a file among the "
-          f"{len(changed)} changed (RLV_CHANGED_FILES); CI runs all of them", flush=True)
+    print(f"SELECTED: {len(kept)} of {len(runnable)} hook suites read one of the "
+          f"{len(changed)} changed file(s) (RLV_CHANGED_FILES); CI runs all of them", flush=True)
     return kept
 
 
@@ -334,9 +334,12 @@ def changed_from_env():
     if not listing:
         return None
     with open(listing, encoding="utf-8") as fh:
+        lines = [ln.strip() for ln in fh if ln.strip()]
+    try:
         # Repo-relative POSIX paths, whatever the producer wrote (./x, an absolute path).
-        changed = [Path(os.path.relpath(os.path.join(ROOT, ln.strip()), ROOT)).as_posix()
-                   for ln in fh if ln.strip()]
+        changed = [Path(os.path.relpath(os.path.join(ROOT, ln), ROOT)).as_posix() for ln in lines]
+    except ValueError:  # an absolute path on another Windows drive
+        changed = [".."]
     if not changed or any(c in (".", "..") or c.startswith("../") for c in changed):
         raise SystemExit(f"error: RLV_CHANGED_FILES lists nothing, or a path outside the repo ({listing})")
     return changed

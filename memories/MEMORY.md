@@ -2,7 +2,8 @@
 
 Index of the cross-project memory files in this directory. When you add a
 *new* memory file, register it here so the corpus stays discoverable --- the
-`memorize` skill writes the file, then adds a row to the table below.
+`memorize` skill writes the file, then adds a row to the table below;
+`scripts/check-memory-index.py` fails CI on a file with no row.
 (Appending a bullet to an existing file needs no change here.)
 
 This index covers only the general, cross-project memories kept in the
@@ -107,3 +108,4 @@ index in that directory.
 | [`ci-quirks.md`](ci-quirks.md) | CI and reviewer quirks in the course repos | Instant zero-step Actions failures, `rerun_workflow_run` after a Claude quota failure, check-student-copy flakes, kimi/OpenCode limits, macros pin lag. |
 | [`cloud-session-toolchain-recipes.md`](cloud-session-toolchain-recipes.md) | Cloud-session toolchain recipes | Minimal render toolchain when the hook stalls, TinyTeX by hand, macros-repo checks (locale, DT), local line-break check, R restore pitfalls, reading a preview from `gh-pages`. |
 | [`project-thread-practices.md`](project-thread-practices.md) | Course-project thread practices | File follow-ups when noticed, paywalled content through a VPN session, track resources in every covering repo, the ai-config context gate. |
+| [`wwu-cs-it-instructions.md`](wwu-cs-it-instructions.md) | WWU CS IT's instructions for the lab's cluster use | The four instructions on record for CI jobs on the WWU CS clusters, recorded from Ezra's report rather than IT's exact words (read them rather than this summary): runners on the lab's own machines submit through HTCondor; none runs directly on the cluster's lab machines; jobs are batched; file transfer replaces home-directory I/O. Separately, route notes (not IT instructions) on the working HTCondor route and the known `condor-batch` deviation. `hooks/require-wwu-it-instructions.py` requires reading it first. |

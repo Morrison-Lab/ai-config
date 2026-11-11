@@ -2494,19 +2494,13 @@ NOT_CLEAN_NEGATION_PREFIX = re.compile(
 # - a sentence-opening contrast marker at the start of the next sentence
 #   ("No issues. However, X is broken.", "None. Still, X leaks.").
 #
-# A sentence ends at [.!?] followed by whitespace, so a hard wrap (semantic
-# line breaks) or a dotted token (`v1.2`) does not end one. Contrast words
-# deeper in later sentences are not read: those sentences are usually
-# verification prose ("None. I checked it while reading the diff.",
-# "0 findings. CI passes, though slowly."), and an earlier paragraph-wide
-# scan re-flagged them. Same-sentence phrases such as "None beyond the
-# above." still re-flag; that is the accepted safe-direction cost. A "yet"
-# that ends its sentence or paragraph ("None yet.") is not a contrast.
-#
-# Neither scan crosses a paragraph break (CRLF included, since review bodies
-# submitted from the GitHub web UI use it), or a line break that opens a
-# heading, list item or blockquote, because that is often the next section
-# or item ("## Nits\nNone\n## Verdict\nReady, but CI is pending" is clean).
+# A sentence ends at [.!?] before whitespace, so a hard wrap or a dotted
+# token (`v1.2`) does not end one. Later sentences are usually verification
+# prose ("0 findings. CI passes, though slowly.") and are not read. "None
+# beyond the above." still re-flags, the accepted safe-direction cost. A
+# "yet" ending its sentence ("None yet.") is not a contrast. The scan stops
+# at a paragraph break (CRLF too) or a line opening a heading, list item or
+# blockquote, which is often the next section.
 #
 # Known residuals: a finding stated with no contrast ("None. The lexer is
 # broken.") and a contrast in the next paragraph ("None.\n\nBut X leaks."),
@@ -2529,35 +2523,33 @@ _CONTRAST_MARKERS = (
     r"|though|although|instead|otherwise|besides|apart\s+from|aside\s+from"
     r"|on\s+the\s+other\s+hand"
 )
-# Words that are contrasts only after a comma, semicolon or spaced dash
-# ("None, only X leaks", "No issues; just X", "None - bar the crash"),
-# since they are also ordinary words and
-# identifiers: "No issues found while reviewing", "No issues in just one
-# pass", "No issues in the save path", "None in bar.py", "uses a set
-# instead of a list". "except" is not a contrast after "/" ("try/except").
-# A clean "None found; only CI is pending." reads the same as "No issues;
-# only X leaks." and re-flags, the accepted safe-direction cost.
-_COMMA_CONTRAST_WORDS = (
-    r"while|whilst|still|only|just|instead|save|bar|minus"
-)
-# Openers a reviewer may put before a comma word or a next-sentence marker:
-# emphasis, blockquote, list dash, parenthesis, bracket, backtick, or a
-# quote. A paired double-quoted span (straight or curly) is blanked as
-# quotation before this regex runs.
-_MARKER_OPENERS = r"[*_>\-(\[` \t\"']*"
+# Words that are also ordinary words or identifiers ("No issues found while
+# reviewing", "None in bar.py", "uses a set instead of a list") count only
+# after a comma, semicolon or spaced dash ("None, only X leaks"). "except"
+# does not count after "/" ("try/except"). A clean "None found; only CI is
+# pending." re-flags, the accepted safe-direction cost.
+_COMMA_CONTRAST_WORDS = r"while|whilst|still|only|just|instead|save|bar|minus"
 # Horizontal space, including the no-break space pasted text often carries.
 _HSPACE = r"[ \t" + chr(0xA0) + r"]"
-# A comma, a semicolon, or a spaced hyphen, en dash or em dash.
+# Up to four opener marks (emphasis, blockquote, dash, bracket, backtick,
+# quote) before a comma word or marker, optionally across one line break.
+# Paired double-quoted spans are already blanked as quotation. Every
+# whitespace run has one quantifier and the marks are bounded, so a long
+# run of spaces or " - - -" cannot make the lazy scan quadratic; for the
+# same reason a spaced separator may only start at the start of a run.
+_MARKER_OPENERS = _HSPACE + r"*(?:[*_>\-(\[`\"']" + _HSPACE + r"*){0,4}"
+_OPENERS_ACROSS_LINE = _MARKER_OPENERS + r"(?:\r?\n" + _MARKER_OPENERS + r")?"
 _CLAUSE_SEP = (
-    r"(?:[,;]|" + _HSPACE + r"+-{1,3}|" + _HSPACE + r"*["
+    r"(?:[,;]|(?<!" + _HSPACE + r")" + _HSPACE + r"+-{1,3}"
+    r"|(?<!" + _HSPACE + r")" + _HSPACE + r"*["
     + chr(0x2013) + chr(0x2014) + r"])"
 )
 _CONTRAST_GUARD = (
     r"(?!" + _SENTENCE_CHAR + r"*?(?:\b(?:" + _CONTRAST_WORDS + r")"
-    r"|" + _CLAUSE_SEP + _HSPACE + r"*(?:\r?\n[ \t]*)?" + _MARKER_OPENERS
+    r"|" + _CLAUSE_SEP + _OPENERS_ACROSS_LINE
     + r"(?:" + _COMMA_CONTRAST_WORDS + r"))\b)"
-    r"(?!" + _SENTENCE_CHAR + r"*[.!?]" + _HSPACE + r"*(?:\r?\n[ \t]*)?"
-    + _MARKER_OPENERS + r"(?:" + _CONTRAST_MARKERS + r")\b)"
+    r"(?!" + _SENTENCE_CHAR + r"*[.!?]" + _OPENERS_ACROSS_LINE
+    + r"(?:" + _CONTRAST_MARKERS + r")\b)"
 )
 _SAFE_NEGATION = (
     r"(?:none\b(?!\s+of\b)|n/a\b|none\s+identified\b|none\s+remaining\b)"

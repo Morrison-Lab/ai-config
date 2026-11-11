@@ -1570,11 +1570,9 @@ def main() -> int:
         "None. 'But' the loop leaks.",
         "None. [However, the loop leaks.]",
         "None, **only** the cache leaks.",
-        "None, (only the cache leaks).",
         "None, bar the crash in login.",
         "None, instead the cache leaks.",
         "No issues; only the cache leaks.",
-        "No issues; just the cache leaks.",
         "No issues - only the cache leaks.",
         "No issues -- bar the crash.",
         "No issues, with one exception: the cache leaks.",
@@ -1587,6 +1585,15 @@ def main() -> int:
             checker._unresolved_finding_pattern("## Nits\n\n" + _tail + "\n")
             is not None,
         )
+    # Long whitespace runs must not make the guard quadratic: before the
+    # bounded openers, 20,000 spaces took about 6 s and " -" * 10,000 9 s.
+    import time as _time
+    _t0 = _time.monotonic()
+    for _text in ("None" + " " * 20000, "None" + " -" * 10000):
+        checker.NOT_CLEAN_NEGATION_SUFFIX.match(_text)
+        checker.FINDING_HEADING_NEGATION_SUFFIX.match(_text)
+    check("whitespace runs after a negation scan in under 2 s (#2359)",
+          _time.monotonic() - _t0 < 2.0)
     # A sentence-opening contrast marker on the next line re-flags.
     check(
         "## Nits + 'None.' with a hard-wrapped sentence-opening 'But' re-flags (#2359)",

@@ -7,7 +7,7 @@ only reports. `--retire` reports, then moves each `retire` path into
 entries that run catalog hooks from ~/.claude/hooks after copying the old file
 there; moving them back undoes it, even after a failed move. `keep` items need a person and are never
 touched. It reuses doctor.py's leftover tests and wire-user-config.py's hook-entry
-test. It sweeps nothing when no settings file enables the plugin (exit 0), since
+test. It sweeps nothing when no settings file enables the plugin (exit 0, or 2 with --retire), since
 a ~/.claude copy may then be the only install.
 
 Exit status: 0 when nothing is left, 1 when an item remains, 2 when a file could
@@ -18,7 +18,6 @@ from __future__ import annotations
 import argparse
 import datetime
 import importlib.util
-import os
 import re
 import shutil
 import sys
@@ -70,14 +69,14 @@ def strip_leftover_hooks(settings: dict, hooks_dir: Path) -> tuple[dict, list[st
     if not isinstance(settings.get("hooks"), dict):
         return settings, []
     scripts = wire.catalog_scripts()
-    anchors = [str(hooks_dir)]
-    if hooks_dir == Path(os.environ.get("HOME", "~")) / ".claude" / "hooks":
+    anchors = [hooks_dir.as_posix()]  # commands are matched with backslashes turned into slashes
+    if hooks_dir == Path.home() / ".claude" / "hooks":  # Path.home() also works where HOME is unset (Windows)
         anchors += ["$HOME/.claude/hooks", "${HOME}/.claude/hooks", "~/.claude/hooks"]
-    pattern = re.compile("(?:" + "|".join(map(re.escape, anchors)) + r")[\\/](?:"
+    pattern = re.compile("(?:" + "|".join(map(re.escape, anchors)) + ")/(?:"
                          + "|".join(map(re.escape, scripts)) + r")(?![\w.~-])")
 
     def leftover(hook):
-        return wire.leftover_hook(hook, scripts) and bool(pattern.search(hook["command"]))
+        return wire.leftover_hook(hook, scripts) and bool(pattern.search(hook["command"].replace(chr(92), "/")))
 
     removed, kept_events = [], {}
     for event, groups in settings["hooks"].items():
@@ -136,7 +135,7 @@ def main(argv: list[str] | None = None) -> int:
     if commands:
         shutil.copy2(settings_path, backup / "settings.json")
         wire.write_json(settings_path, stripped)
-        print(f"edited {settings_path}: removed {len(commands)} hook entries; old file in {backup}")
+        print(f"edited {settings_path}: removed {len(commands)} hook {'entry' if len(commands) == 1 else 'entries'}; old file in {backup}")
     for action, path, _ in items:
         if action == "retire" and path != settings_path:
             target = backup / path.relative_to(home)

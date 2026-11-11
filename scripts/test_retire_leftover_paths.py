@@ -126,9 +126,11 @@ class RetireLeftoverPaths(unittest.TestCase):
         self.assertFalse((self.home / "ai-config-leftovers").exists())
 
     def test_hook_entries_match_only_the_claude_home_hooks_dir(self):
-        hooks = [{"command": f"python3 {d}/{CATALOG_HOOK}"} for d in ("~/.claude/hooks", "${HOME}/.claude/hooks")]
+        backslashed = str(self.home / "hooks").replace("/", chr(92))  # a Windows-style command path
+        dirs = ("~/.claude/hooks", "${HOME}/.claude/hooks", backslashed)
+        hooks = [{"command": f"python3 {d}{chr(92)}{CATALOG_HOOK}"} for d in dirs]
         settings = {"hooks": {"Stop": [{"hooks": hooks}]}}
-        self.assertEqual(len(retire.strip_leftover_hooks(settings, self.home / "hooks")[1]), 2)
+        self.assertEqual(len(retire.strip_leftover_hooks(settings, self.home / "hooks")[1]), 3)
         self.assertEqual(retire.strip_leftover_hooks(settings, Path("/elsewhere/hooks"))[1], [])
 
     def test_retiring_everything_exits_zero(self):

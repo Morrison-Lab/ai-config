@@ -248,12 +248,22 @@ class Denies(unittest.TestCase):
         self.assert_denied("bash -c 'chown -R root \"$0\"' /etc")
         self.assert_denied("sh -c 'chown -R root \"${0}/\"' /")
 
-    def test_assignment_that_may_not_run(self):
-        for cmd in ('false && : "${D:=./x}"; chown -R me "${D:-/etc}"',
-                    'if false; then : "${D:=./x}"; fi; chown -R me "${D:-/etc}"',
-                    'echo x | : "${D:=./ok}"; chown -R me "${D:-/etc}"',
-                    'f(){ : "${D:=./x}"; }; chown -R me "${D:-/etc}"'):
+    def test_assigning_default_flows_into_later_uses(self):
+        for cmd in (': "${PREFIX:=/usr}"; DEST="$PREFIX/share"; chown -R me "$DEST"',
+                    ': "${D:=/etc}"; E="$D"; chown -R me "$E"',
+                    ': "${D:=/etc}"; sudo sh -c "chown -R root $D"',
+                    ': "${D:=/usr}"; echo $(chown -R me "$D")'):
             self.assert_denied(cmd)
+
+    def test_read_after_an_assignment_or_keyword(self):
+        for cmd in ('IFS= read -r D <<< /etc; chown -R me "$D"',
+                    'while read -r D; do chown -R me "$D"; done <<< /etc',
+                    'find / -maxdepth 1 | while IFS= read -r d; do chown -R me "$d"; done'):
+            self.assert_denied(cmd)
+
+    def test_literal_root_gives_the_root_reason(self):
+        reason = self.assert_denied("chown -R root /")
+        self.assertIn("the filesystem root", reason)
 
     def test_assignment_in_a_cd_word(self):
         self.assert_denied('cd "${D:=/etc}" && chown -R me "$D"')
@@ -338,8 +348,10 @@ class Allows(unittest.TestCase):
                     'chown -R me "${HOME}/${#}"'):
             self.assert_allowed(cmd)
 
-    def test_maybe_assignment_keeps_the_unset_reading_safe(self):
+    def test_assigning_default_then_a_trailing_slash(self):
         self.assert_allowed(': "${D:=./build}"; chown -R me "${D:-./out}"')
+        self.assert_allowed(': "${OUT:=./dist}"; chmod -R a+rX "$OUT/"')
+        self.assert_allowed(': "${D:=build}"; chmod -R u+w "$D"/*')
 
     def test_colonless_default_on_a_set_variable(self):
         self.assert_allowed('D=./build; chown -R me "${D-/etc}"')

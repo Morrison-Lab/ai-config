@@ -39,8 +39,11 @@ D) or an error check (`${D:?}`, which stops bash first) is read; an operand
 built with any other operator (`${D:+x}`, `${D%/}`, `${!D}`, `${#D}`,
 `${D:0:3}`), there or in an assignment it uses, is refused wherever it
 points, since each can rebuild a protected path (`/e${HOME:+tc}` is `/etc`).
-So is one that uses a positional parameter (`$1`, `$@`), which `set --`, a
-function or `sh -c '...' _ /etc` can set. A command substitution outside single quotes, heredoc
+So is one that uses a parameter this cannot know: a positional parameter
+(`$1`, `$@`), or `$0` (which `set --`, a function or `sh -c '...' /etc` can
+set), `$_`, `$OLDPWD`, or a name set by `read`, `mapfile`, `readarray`,
+`getopts` or `printf -v`. `$!` is read like an unset variable, and `$$`, `$#`,
+`$?` and `$-` as some value that is not empty. A command substitution outside single quotes, heredoc
 bodies and comments is lifted out before the command
 is split, scanned as a command of its own, and taken as empty. Inside `sh -c`
 or a substitution the working directory is unknown, so only absolute targets
@@ -67,12 +70,11 @@ component (`/*/lib`), a partial glob or brace expansion that names a
 protected path (`/et*`, `/{etc,usr}`), a wrapper that changes directory
 (`env -C /etc`, `sudo -D /etc`), PowerShell `icacls`/`Set-Acl`, Windows drive
 paths (`C:/Windows`), a relative target after a `cd` this cannot
-resolve (`cd -`, `cd "$UNSET"`, or one that depends on a `${D:=x}`), a plain
-assignment that may not run (`false &&
-D=./x`, which is read as run), a `${D:=x}` assignment inside `sh -c` or a
-substitution, and a bind-mounted path (the #39283 `/volumes/mail/`
-case) all pass. Fails open on parse trouble and when scripts/lib/shellcmd.py cannot
-be imported.
+resolve (`cd -` or `cd "$UNSET"`), an assignment that may not run
+(`false && D=./x` or `if false; then : "${D:=./x}"; fi`, each read as run), a
+`${D:=x}` assignment inside `sh -c` or a substitution, and a bind-mounted
+path (the #39283 `/volumes/mail/` case) all pass. Fails open on parse trouble
+and when scripts/lib/shellcmd.py cannot be imported.
 """
 from __future__ import annotations
 
@@ -484,9 +486,12 @@ def _assignments(argv, store, visible, home, here):
     Values go in STORE as `(value, weak)`, expanded against the names VISIBLE
     so far; a command substitution makes one `None`.
     """
-    if argv and argv[0] in READ_BUILTINS:
+    lead = 0
+    while lead < len(argv) and (ASSIGNMENT.match(argv[lead]) or argv[lead] in SHELL_KEYWORDS):
+        lead += 1  # `IFS= read -r D`, `while read -r D`
+    if lead < len(argv) and argv[lead] in READ_BUILTINS:
         # Every bare name may be one it sets (options' values included).
-        for word in argv[1:]:
+        for word in argv[lead + 1:]:
             if NAME.fullmatch(word):
                 store[word] = visible[word] = UNREAD
         return False
@@ -557,27 +562,24 @@ def _scan(piece, cwd, home, outer):
     cmds, inner = _split(piece)
     # A `cd` or assignment inside `( ... )` changes only that subshell, so each
     # is kept per scope and read through the scope's ancestors.
-    # A `${D:=x}` may sit in a word that never runs (`false && : "${D:=x}"`),
-    # so its assignment is only possible: an operand is judged both with and
-    # without the possible values, and refused if either reading is.
-    heres, assigns, maybes = {(0,): cwd}, {}, {}
+    # A `${D:=x}` default assigns D, and like a plain assignment it is read as
+    # run (see Limits).
+    heres, assigns = {(0,): cwd}, {}
     for scope, argv in cmds or []:
         here = next(heres[scope[:k]] for k in range(len(scope), 0, -1) if scope[:k] in heres)
-        assigned, maybe = dict(outer), {}
+        assigned = dict(outer)
         for k in range(1, len(scope) + 1):
             assigned.update(assigns.get(scope[:k], {}))
-            maybe.update(maybes.get(scope[:k], {}))
         effects = {}
         for word in argv:
-            _expand(word, home, {**assigned, **maybe}, here, effects=effects)
-        maybes.setdefault(scope, {}).update(effects)
-        maybe.update(effects)
+            _expand(word, home, assigned, here, effects=effects)
+        assigns.setdefault(scope, {}).update(effects)
+        assigned.update(effects)
         if argv and argv[0] in ("cd", "pushd", "popd"):
             words = [argv[0]]
             for tok in argv[1:]:
-                sure = _expand(tok, home, assigned, here)
-                got = _expand(tok, home, {**assigned, **maybe}, here)
-                known = got and got is not UNREAD and not got[1] and got == sure
+                got = _expand(tok, home, assigned, here)
+                known = got and got is not UNREAD and not got[1]
                 words.append(got[0] if known else None)
             moved = None in words or any(SUB in tok for tok in argv)
             heres[scope] = None if moved else resolve_cd_target(words, here)
@@ -589,15 +591,12 @@ def _scan(piece, cwd, home, outer):
             continue
         program = os.path.basename(head[0])
         for target in _targets(program, head):
-            readings = [_expand(target, home, assigned, here)]
-            if maybe:
-                readings.append(_expand(target, home, {**assigned, **maybe}, here))
-            expanded = UNREAD if UNREAD in readings else readings
+            expanded = _expand(target, home, assigned, here)
             if expanded is UNREAD:
                 shown = " ".join(argv).replace(SUB, "$(...)")
                 target = target.replace(SUB, "$(...)")
                 return (shown, program, target, None, UNREAD_WHY), inner, {}
-            for cand, weak in filter(None, expanded):
+            for cand, weak in filter(None, [expanded]):
                 if not cand:
                     continue  # an empty operand is an error, not the cwd
                 if not cand.startswith("/"):

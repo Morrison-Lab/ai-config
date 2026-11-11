@@ -115,6 +115,11 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`, exce
 - **Do:** let local validation (`scripts/run-local-validation.py`) finish before the merge call.
 - **Don't:** treat the standing grant, a clean Claude review, or green CI as covering the cross-harness gate.
 - **Don't:** merge while the local validation run is still going, or while a step it skipped is unexplained.
+- **Do:** count a verdict as the cross-harness one only when its PR comment names the non-Claude model that produced it, such as Gemini Flash.
+- **Don't:** count a Claude read as cross-harness because a router or a subagent posted it, even when it answers a cross-harness request.
+  This clarifies the gate above; it adds no new requirement.
+- **Reason:** gha#1906 and gha#1911 merged on 2026-11-11 on CLEAN verdicts the router had produced with its own Claude read, while Flash was unavailable.
+  The coordinator clarified the gate the same day.
 - **Reason:** ai-config#4853 and ai-config#4854 (2026-10-30) were both merged before their Flash read.
   The coordinator's rule also requires local validation to finish first.
   `hooks/warn-merge-without-cross-harness-review.py` cannot stop the merge, and the agent sees its note only with the merge result.

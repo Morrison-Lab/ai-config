@@ -64,9 +64,8 @@ and re-arm it -- an ordinary sequence (dump, read CI, report the CI figure,
 dump again to keep investigating) that would then nag about a properly
 grounded number.
 
-Commands are split into simple commands with `shlex` before matching, the same
-construction `no-clobbering-push.py` and `flag-reset-hard-uncommitted-work.py`
-use. A free `search()` over the raw string reads inside quoted arguments, so
+Commands are split into simple commands before matching, by
+`scripts/lib/shellcmd.py`'s `simple_commands` (ai-config#3178). A free `search()` over the raw string reads inside quoted arguments, so
 `gh pr comment --body "...via gh run view 123..."` would discharge the guard
 without any CI read having happened -- the false-NEGATIVE direction, and the
 one this hook exists to prevent. That is the same failure class README names

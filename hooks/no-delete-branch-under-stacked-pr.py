@@ -106,8 +106,8 @@ import shutil
 import subprocess
 import sys
 
-# Segmentation borrowed verbatim in construction from `no-clobbering-push.py`
-# and `flag-reset-hard-uncommitted-work.py`. Matching the raw command string
+# Segmentation comes from `scripts/lib/shellcmd.py`'s `simple_commands`
+# (ai-config#3178). Matching the raw command string
 # is what the first draft did, and it produced a false positive on the most
 # routine sequence there is -- this repo's own `post-merge` cleanup:
 #

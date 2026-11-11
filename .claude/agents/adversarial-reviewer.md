@@ -196,3 +196,9 @@ If it was, look for the user's answer to a start-now-or-file-for-later question 
 Read the linked issue or quoted request.
 Do not report the reminder hook's output as your finding.
 See [`start-or-file`](../../shared/workflow/start-or-file.md).
+
+## Rules and skills without eval cases
+
+On a diff that adds or changes a rule or a skill whose behaviour one prompt can show, check that it adds or updates a case under `evals/`, and that every trigger case has a negative twin.
+Check each new grader for a reply that would pass it without the behaviour it names.
+See [`evals/README.md`](../../evals/README.md#adding-a-case).

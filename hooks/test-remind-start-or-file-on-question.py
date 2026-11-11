@@ -30,6 +30,12 @@ REMIND = [
     "Is it worth adding a check for this?",
     "What do you think about splitting the page?",
     "Can we make the slide automatic",
+    "Tell me whether we should use a hook here.",
+    "Should the hook warn on this?",
+    "How about we split the page?",
+    "Is it a good idea to merge these?",
+    "Do you recommend adding a check?",
+    "Fix the bug. What do you think happened?",
     "What's the best way to test this hook?",
 ]
 SILENT = [

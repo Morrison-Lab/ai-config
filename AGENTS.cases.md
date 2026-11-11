@@ -44,6 +44,7 @@ this is about shrinking an instruction inside the context it was given for.)
 
 (User directive, 2026-11-10, via `cai` in the Data 571 project, ai-config#5287:
 "when I ask you whether we should do something or how we should do something, etc, come up with a recommendation, but before implementing, ask me if you should start now or file it for later (with your recommendation). only start immediately if I give you a declarative instruction.")
+Mechanism: `hooks/remind-start-or-file-on-question.py`, a warn-only `UserPromptSubmit` reminder, since question versus instruction is a reading of intent no deny can decide.
 
 ## Search the tracker and AGENTS.md before building or denying a policy --- Open issues define scope
 

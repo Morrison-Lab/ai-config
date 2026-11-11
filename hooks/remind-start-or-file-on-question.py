@@ -29,8 +29,14 @@ QUESTION_RE = re.compile(
     | \bany\s+(ideas|suggestions|thoughts)\b
     | \bwhy\s+don'?t\s+we\b
     | \bdo\s+you\s+think\b
+    | \bwhether\s+(we|i|to)\b
+    | ^\s*should\b
+    | \bhow\s+about\b
+    | \bgood\s+idea\b
+    | \bdo\s+you\s+recommend\b
+    | \bwhy\s+not\b
     )""",
-    re.I | re.X,
+    re.I | re.X | re.M,
 )
 FENCE = re.compile(r"```.*?```", re.S)
 QUOTED = re.compile(r"^\s*>.*$", re.M)
@@ -57,8 +63,9 @@ def main() -> int:
             "If that is a whether-or-how question rather than a declarative "
             "instruction, research as needed, give a recommendation, and ask "
             "whether to start now or file it for later, recommending one. "
-            "Do not edit, commit, push, open a PR or file an issue until the "
-            "user answers. A declarative instruction in the same message "
+            "Do not edit, commit, push, open a PR or file an issue for the "
+            "question's work until the user answers. Any declarative "
+            "instruction in the same message (a `cai:` rule, \"fix X\") still "
             "starts at once (shared/workflow/start-or-file.md)."
         )
     return 0

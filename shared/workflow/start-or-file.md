@@ -33,7 +33,7 @@ AGENTS.md "Always give recommendations with questions" still applies: the start-
 
 - **Do:** answer "should we X?" with a recommendation and its reason,
   then "start now or file it for later?" with a recommendation between those two.
-- **Do:** start at once when the reply to that question, or the original message, is declarative ("yes, do it", "file it").
+- **Do:** act at once on a declarative reply: "yes, do it" starts the work, and "file it" files the issue and stops.
 - **Don't:** open a PR in answer to "how should we handle X?".
 - **Don't:** ask start-or-file after a declarative instruction.
 

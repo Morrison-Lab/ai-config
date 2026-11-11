@@ -17,7 +17,9 @@ lists these commands as anti-patterns:
   `revert`, `-s` is `--signoff`, so only `--strategy` counts there.
 
 Git accepts a unique prefix of a long option. `--our`, `--thei` and
-`--strategy-opt=ours` count. A prefix of `--strategy` itself also starts
+`--strategy-opt=ours` count, and so does `--t` on `restore` and
+`merge-file`, where nothing else starts with it. `checkout -2|-3` and
+`restore -2|-3` are the short forms of `--ours|--theirs`. A prefix of `--strategy` itself also starts
 `--strategy-option`, so git rejects it as ambiguous (`--strat=ours`).
 A command inside `bash -c '...'` (and `sh`, `zsh` and similar) is checked,
 up to MAX_DEPTH nested shells; one fed through `xargs` or `eval` is not.
@@ -51,17 +53,27 @@ PATH_SIDE_SUBCOMMANDS = ("checkout", "restore", "merge-file")
 MERGING_SUBCOMMANDS = ("merge", "rebase", "cherry-pick", "revert", "pull")
 STRATEGY_SHORT_SUBCOMMANDS = ("merge", "rebase", "pull")
 NO_RESOLUTION = ("--abort", "--quit")
-# Shortest unambiguous prefixes: `--o` also starts --orphan and --overlay,
-# and `--t` also starts --track.
-SIDE_PREFIX_MIN = {"--ours": "--ou", "--theirs": "--th"}
+# Shortest unambiguous prefix per subcommand, from each one's `-h` option
+# list: `--o` also starts --overlay (checkout, restore), --orphan (checkout)
+# and --object-id (merge-file); `--t` also starts --track on checkout only.
+SIDE_PREFIX_MIN = {
+    "checkout": {"--ours": "--ou", "--theirs": "--th"},
+    "restore": {"--ours": "--ou", "--theirs": "--t"},
+    "merge-file": {"--ours": "--ou", "--theirs": "--t"},
+}
+# checkout and restore also spell the sides as stage numbers.
+SIDE_SHORT = {"-2": "--ours", "-3": "--theirs"}
 # `--strategy-` already excludes `--strategy`, the only other `--strategy...`.
 LONG_PREFIX_MIN = {"--strategy-option": "--strategy-"}
 MAX_DEPTH = 3
 
 
-def _side_flag(arg: str) -> str | None:
-    """`--ours` or `--theirs` when ARG is that flag or a unique prefix of it."""
-    for flag, shortest in SIDE_PREFIX_MIN.items():
+def _side_flag(sub: str, arg: str) -> str | None:
+    """`--ours` or `--theirs` when ARG is that flag, a unique prefix of it on
+    SUB, or (checkout and restore) its `-2`/`-3` short form."""
+    if sub != "merge-file" and arg in SIDE_SHORT:
+        return SIDE_SHORT[arg]
+    for flag, shortest in SIDE_PREFIX_MIN[sub].items():
         if arg.startswith(shortest) and flag.startswith(arg):
             return flag
     return None
@@ -107,7 +119,7 @@ def one_sided(argv: list[str]) -> tuple[str, str] | None:
         for arg in rest:
             if arg == "--":
                 break
-            flag = _side_flag(arg)
+            flag = _side_flag(sub, arg)
             if flag:
                 return f"git {sub} {flag}", effect
         return None

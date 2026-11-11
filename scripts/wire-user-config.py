@@ -102,13 +102,16 @@ def catalog_scripts() -> set[str]:
 
 
 def leftover_hook(hook: object, scripts: set[str]) -> bool:
-    """True when one settings.json hook entry runs a catalog hook from ~/.claude/hooks."""
+    """True when one settings.json hook entry runs a catalog hook from a `hooks/` directory.
+
+    install-hooks.py writes `$HOME/.claude/hooks/<name>` or a literal CLAUDE_HOME
+    path, so the match is any `hooks/<name>`; a backup such as `<name>.bak` or
+    `<name>~` is not a registration.
+    """
     command = hook.get("command", "") if isinstance(hook, dict) else ""
     if not isinstance(command, str) or "CLAUDE_PLUGIN_ROOT" in command:
         return False
-    # install-hooks.py writes `$HOME/.claude/hooks/<name>`, or a
-    # literal CLAUDE_HOME path, with either separator.
-    return any(re.search(r"[\\/]hooks[\\/]" + re.escape(name) + r"(?![\w.-])", command)
+    return any(re.search(r"[\\/]hooks[\\/]" + re.escape(name) + r"(?![\w.~-])", command)
                for name in scripts)
 
 

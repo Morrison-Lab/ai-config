@@ -1624,6 +1624,8 @@ def main() -> int:
          "### Findings\n\nNo issues\r\nHowever, X is broken.\r\n"),
         ("heading trailer 'none, but'",
          "### Findings: none, but X leaks.\n\nMore text.\n"),
+        ("heading trailer then a next-line 'However'",
+         "### Findings: None\nHowever, the leak.\n"),
         ("'0-day'", "### Findings\n\n0-day exploit possible\n"),
     ):
         check(

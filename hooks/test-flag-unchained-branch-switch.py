@@ -139,6 +139,9 @@ SHOULD_STAY_SILENT = [
      "a `while` guard reaches its whole `do`/`done` body"),
     ("S20", bash("for b in a b; do git checkout $b && git merge origin/main; done"),
      "`for` opens a block too, so its `done` cannot underflow the stack"),
+    ("S21", bash("bash -c 'git checkout feat/x && git merge origin/main'"),
+     "a chained switch inside a shell's -c: the descent adds no false "
+     "positive (ai-config#3641)"),
 ]
 
 if not os.path.isfile(HOOK):
@@ -245,7 +248,7 @@ MUTATIONS = {
         # C7's and C9's cases are included by construction: with C4 gone, no
         # separator matters, so every case that is silent BECAUSE its commands
         # are chained flips. See the module docstring.
-        {"S1", "S2", "S13", "S16", "S20"},
+        {"S1", "S2", "S13", "S16", "S20", "S21"},
     ),
     "C5": (
         "heredoc bodies are stripped",

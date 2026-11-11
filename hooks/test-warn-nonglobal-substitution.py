@@ -71,13 +71,13 @@ SHOULD_WARN = [
      "slurp mode: -0 takes an octal argument, so -0777 is still the "
      "in-place flag -- and slurp plus non-global is the worst case of "
      "the bug this hook exists to catch"),
-    ("W14", "bash -c \"sed -i 's/a/b/' file.txt\"",
-     "wrapped in a shell's -c, which shlex hands over as one opaque token "
-     "(ai-config#3641)"),
     ("W13", "sed -i '1s/a/b/' file.txt",
      "a numeric line address before the `s`; a word boundary never fires "
      "between a digit and `s`, so this was missed while the equivalent "
      "regex-addressed form warned"),
+    ("W14", "bash -c \"sed -i 's/a/b/' file.txt\"",
+     "wrapped in a shell's -c, which shlex hands over as one opaque token "
+     "(ai-config#3641)"),
     ("W11", "sed -i 's/a#b/c/' file.txt",
      "a pattern containing ANOTHER delimiter character still matches -- the "
      "lookahead is keyed to the delimiter actually in use, so excluding "
@@ -113,6 +113,9 @@ SHOULD_STAY_SILENT = [
      "three delimiter-shaped characters (a genuine `s<delim>..<delim>.."
      "<delim>flags` shape once the `s`-prefix requirement is ignored) with "
      "no leading `s` anywhere nearby -- not a substitution"),
+    ("S12", "bash -c \"sed -i 's/a/b/g' file.txt\"",
+     "a global substitution inside a shell's -c: the descent adds no "
+     "false positive (ai-config#3641)"),
 ]
 
 # Two non-command payload shapes that must fail open silently, tested
@@ -276,7 +279,7 @@ MUTATIONS = {
         [('        if "g" not in flags and not any(c.isdigit() for c in '
           'flags):\n            out.append((m.group(0), flags))',
           "        out.append((m.group(0), flags))")],
-        {"S1", "S5", "S10"},
+        {"S1", "S5", "S10", "S12"},
     ),
     "M6_lead_skip": (
         "a leading env-assignment (or lead word) is skipped before "

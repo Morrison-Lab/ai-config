@@ -97,7 +97,7 @@ except Exception as _exc:  # broken install: degrade, never block
         return None
 
     def shell_c_expansions(command):
-        """No descent when the shared splitter is missing."""
+        """No shell -c descent when the shared module is missing."""
         return [command]
 
 

@@ -113,7 +113,7 @@ try:
     SHELLCMD_ERROR = None
 except Exception as _exc:  # broken install: degrade, never block
     print(f"no-unreviewed-pr: cannot load scripts/lib/shellcmd.py ({_exc}); "
-          "no reviewer request will be recognised", file=sys.stderr)
+          "no command will be parsed", file=sys.stderr)
     shell_tokens = is_operator_token = None
     # Read by `no-push-without-self-review.py`, which borrows this file's
     # push detector and must treat a detector with no splitter as missing.

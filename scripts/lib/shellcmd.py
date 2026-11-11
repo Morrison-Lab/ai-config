@@ -269,6 +269,14 @@ def _heredoc_free(command):
             if hit is None:
                 return "".join(out)
             pos = hit.end()
+        # The opener line's newline was emitted above, so the terminator
+        # line's own newline is the same separator, not a second one. Keeping
+        # both put an empty command between them, which reads as `;;` once
+        # newlines become `;`, and inside a `case` arm a `;;` ends the arm:
+        # a caller tracking `case` patterns then misread the next `)`
+        # (ai-config#3178).
+        if command.startswith("\n", pos):
+            pos += 1
 
 
 def _comment_free(command):
@@ -562,10 +570,10 @@ def resolve_cd_target(rest: list[str], cur_dir: str | None) -> str | None:
     `_resolve_cd_target`, which is the tested in-repo implementation. This is
     a COPY and not a move: that guard still holds its own, because it can
     refuse a push and migrating a deny-capable guard is its own change with
-    its own review --- the same call ai-config#3178 made for the refusing
-    `_simple_commands` copies. The duplication that leaves is tracked as
-    ai-config#3177, not by the closed ai-config#2993, whose scope is
-    `_simple_commands` and `_strip_env`. New callers import from here.
+    its own review --- as the refusing `_simple_commands` copies did under
+    ai-config#3178. The duplication that leaves is tracked as ai-config#3177,
+    not by the closed ai-config#2993, whose scope is `_simple_commands` and
+    `_strip_env`. New callers import from here.
     """
     cmd_name = rest[0]
     if cmd_name == "popd":

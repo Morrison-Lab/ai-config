@@ -133,7 +133,45 @@ check("shell_tokens keeps operator runs",
       ["(", "cd", "a", "&&", "make", ")", "&", "git", "push"])
 check("shell_tokens blanks a heredoc and keeps the next command",
       shellcmd.shell_tokens("git commit -F - <<'EOF'\ngit push\nEOF\nls"),
-      ["git", "commit", "-F", "-", "<<", ";;", "ls"])
+      ["git", "commit", "-F", "-", "<<", ";", "ls"])
+check("a blanked heredoc leaves ONE separator, so no `;;` ends a case arm",
+      shellcmd.shell_tokens("case x in a) git commit -F - <<EOF\nmsg\nEOF\n"
+                            "(cd wt && git push);; esac"),
+      ["case", "x", "in", "a", ")", "git", "commit", "-F", "-", "<<", ";(",
+       "cd", "wt", "&&", "git", "push", ");;", "esac"])
+check("two heredocs on one line still leave one separator",
+      shellcmd.shell_tokens("cat <<A > f1 && cat <<B > f2\na\nA\nb\nB\ngit push"),
+      ["cat", "<<", ">", "f1", "&&", "cat", "<<", ">", "f2", ";", "git",
+       "push"])
+
+
+def _mutant_tokens(find, replace, command):
+    """`shell_tokens(command)` from a copy of the module with one edit.
+
+    The hooks' own mutation harnesses rewrite only the hook file, so the
+    preprocessing that moved here gets its reversions here (ai-config#3178).
+    """
+    path = os.path.join(HERE, "lib", "shellcmd.py")
+    with open(path, encoding="utf-8") as handle:
+        source = handle.read()
+    if source.count(find) != 1:
+        failures.append(f"mutation anchor not present exactly once: {find!r}")
+        return None
+    namespace = {"__name__": "shellcmd_mutant"}
+    exec(compile(source.replace(find, replace), path, "exec"), namespace)
+    return namespace["shell_tokens"](command)
+
+
+HEREDOC_CASE = "git commit -F - <<'EOF'\ngit push\nEOF\nls"
+check("mutation: without heredoc blanking the body's push is a command",
+      "push" in (_mutant_tokens("    command = _heredoc_free(command)\n",
+                                "", HEREDOC_CASE) or []),
+      True)
+check("mutation: keeping the terminator's newline reintroduces `;;`",
+      ";;" in (_mutant_tokens('        if command.startswith("\\n", pos):\n'
+                              "            pos += 1\n", "",
+                              HEREDOC_CASE) or []),
+      True)
 check("shell_tokens drops a comment",
       shellcmd.shell_tokens("git status # git push\nls"),
       ["git", "status", ";", "ls"])

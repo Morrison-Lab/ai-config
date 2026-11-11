@@ -457,6 +457,35 @@ cookieconsent.run({
 <span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> show :3:<span class="op">&lt;</span>file<span class="op">&gt;</span>                    <span class="co"># THEIRS (incoming side)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>The <code>:1:</code>/<code>:2:</code>/<code>:3:</code> index stages work in any conflicted operation. <code>git log --merge</code> is merge-only; for the others, inspect the incoming side directly via the operation’s ref — <code>git show MERGE_HEAD</code> (merge), <code>REBASE_HEAD</code> (rebase), <code>CHERRY_PICK_HEAD</code> (cherry-pick), <code>REVERT_HEAD</code> (revert), or the kept <code>stash@{0}</code> entry for a stash pop (<code>git stash show -p stash@{0}</code>). Ask: what problem was each side solving? Different features? One refactor + one fix? A move/rename vs an in-place edit? The answer dictates the merge.</p></li>
 <li><p><strong>Consolidate.</strong> Edit the working file into a version that keeps the valuable change from <strong>both</strong> sides, then delete every conflict marker (<code>&lt;&lt;&lt;&lt;&lt;&lt;&lt;</code>, <code>=======</code>, <code>&gt;&gt;&gt;&gt;&gt;&gt;&gt;</code>). Take one side wholesale only when you’ve confirmed the other side has nothing worth keeping — and note that you did.</p>
+<p><strong>Record a decision for every hunk.</strong> Draft the table while you resolve, and finish it before you finish the operation. For each conflict hunk, write one row: what you kept from each side, what you dropped (from which side) and why, and what you modified and why. Write each side’s real name, its branch, commit or stash entry, in place of <code>&lt;side A&gt;</code> and <code>&lt;side B&gt;</code>, never “ours” or “theirs”, since those flip in a rebase (see the warning below). For a merge, put the table in the merge commit message. When the work is on a PR, also post it in the PR comment that announces the result, since a squash merge discards the merge message and a rebase, cherry-pick, revert or stash pop leaves none. With no PR, put it in your report to the user. A reviewer can then check each choice against both sides without redoing the operation. In the table, <code>&lt;n&gt;</code> is the hunk’s number within the file, counted from 1, and <code>&lt;lines&gt;</code> is a line range (<code>12-18</code>), never the text itself, which would break the table row. The range is in the resolved file, except under “Dropped”, where it is in the named side’s version of the file. Write one row per dropped range, so a hunk that drops lines from both sides gets two rows; repeat <code>&lt;path&gt;</code>:<code>&lt;n&gt;</code> in each row, and put the Kept and Modified ranges on the first row only, with <code>none</code> in the others. Write <code>none</code> in any empty cell. For a conflict with no text hunks (delete/modify, rename, binary), write <code>whole file</code> for <code>&lt;n&gt;</code> and <code>&lt;lines&gt;</code>:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+<col style="width: 20%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>File:hunk</th>
+<th>Kept from <code>&lt;side A&gt;</code></th>
+<th>Kept from <code>&lt;side B&gt;</code></th>
+<th>Dropped (side, why)</th>
+<th>Modified (why)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>&lt;path&gt;</code>:<code>&lt;n&gt;</code></td>
+<td><code>&lt;lines or "none"&gt;</code></td>
+<td><code>&lt;lines or "none"&gt;</code></td>
+<td><code>&lt;lines&gt;</code> (<code>&lt;side&gt;</code>, <code>&lt;reason&gt;</code>)</td>
+<td><code>&lt;lines&gt;</code> (<code>&lt;reason&gt;</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>A row with something in “Dropped” and no reason is the defect this table exists to expose: content that either side added may be dropped only by a decision you can state (Ezra, 2026-10-23, ai-config#4716).</p>
 <p><strong>Also check whether the merged result duplicates content that already exists elsewhere in the file — a separate problem from the textual conflict itself.</strong> This can arise two ways: a single incoming PR may internally copy a sentence into a new section (the merge is clean, but the result now says the same thing twice), or both branches may independently add equivalent sentences in different sections (a cross-branch variant with the same symptom). In both cases <code>git merge</code>/<code>merge-tree</code> reports zero conflicts even though the result contains duplication — sometimes with a pronoun or reference that only made sense in its original location. Grep the merged file for the distinctive phrase from each side’s addition before finishing; if it already appears elsewhere, keep one copy (usually the version with the clearer standalone referent) and drop the redundant one. (ai-config#446: the merge itself was clean, but the incoming PR’s own diff had separately duplicated a CLAUDE.md sentence verbatim into a different section, where “this policy” lost its antecedent — the intra-PR variant, caught by the <code>@claude</code> review bot as a distinct finding from the conflict resolution.)</p></li>
 <li><p><strong>Prove no markers (or whitespace damage) slipped through:</strong></p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb5"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> diff <span class="at">--check</span>                      <span class="co"># flags leftover markers + whitespace errors</span></span>
@@ -496,6 +525,7 @@ cookieconsent.run({
 <ul>
 <li>❌ Blind <code>git checkout --ours/--theirs &lt;file&gt;</code> (or <code>git merge -X ours/theirs</code>) without confirming the dropped side had nothing worth keeping — the classic silent-data-loss move.</li>
 <li>❌ Resolving a hunk before understanding <em>why</em> each side changed it.</li>
+<li>❌ Finishing a merge, rebase, cherry-pick, revert or stash pop with no per-hunk keep/drop/modify record (step 3), so nobody can tell a deliberate drop from a lost line.</li>
 <li>❌ Carrying the wording from one conflicting hunk into a string that several consumers share, without reading main’s version of each consumer.</li>
 <li>❌ Mixing up “ours”/“theirs” in a rebase (they’re reversed vs a merge).</li>
 <li>❌ Committing with conflict markers still in a file — always <code>git diff --check</code>.</li>

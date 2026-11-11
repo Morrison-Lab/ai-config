@@ -374,7 +374,8 @@ def main():
     check("warns when the probe pass skipped the opencode attempt",
           run(MERGE, probe_all[:1] + [probe("command -v opencode")])[0])
     check("warns when a probe found the CLI installed", run(MERGE, [probe(
-        "command -v " + clis4, "/usr/local/bin/codex", False)] + oc)[0])
+        "command -v " + clis4, "/usr/local/bin/codex", False)] + oc)[0] and run(
+        MERGE, [probe("command -v " + clis4, "alias codex='npx codex'")] + oc)[0])
     check("warns when which reports a CLI under a path", run(MERGE, [
         probe("which codex", "/usr/bin/codex", False),
         probe("command -v agy gemini cursor-agent")] + oc)[0])
@@ -394,7 +395,7 @@ def main():
               "command -v codex agy gemini cursor-agent; git push",
               out="Exit code 1", is_error=True)])[0])
     check("silent after a curl call to Ollama Cloud's chat API",
-          not run(MERGE, [step("curl -sS https://api.ollama.com/api/chat"
+          not run(MERGE, [step("curl -sS https://k:s@api.ollama.com/api/chat"
                                " -d @req.json")])[0])
     check("warns after an Ollama Cloud curl forced to GET",
           run(MERGE, [step("curl -sS -X GET https://api.ollama.com/api/chat"
@@ -405,7 +406,8 @@ def main():
                                " https://api.ollama.com/api/chat" % form)])[0])
     check("warns when the Ollama URL is only the data payload",
           run(MERGE, [step("curl -sS https://example.com"
-                           " -d https://api.ollama.com/api/chat")])[0] and run(MERGE, [step("curl --form-string https://api.ollama.com/api/chat https://example.com")])[0])
+                           " -d https://api.ollama.com/api/chat")])[0] and run(MERGE, [step("curl --form-string https://api.ollama.com/api/chat https://example.com")])[0]
+          and run(MERGE, [step("curl --data-ascii https://api.ollama.com/api/chat https://x.org")])[0])
     check("silent after an explicit -X POST to Ollama Cloud",
           not run(MERGE, [step("curl -sS -X POST https://api.ollama.com/api/chat"
                                " -d @req.json")])[0])
@@ -414,7 +416,7 @@ def main():
                            out="bash: which: command not found",
                            is_error=True)] + probe_all[1:])[0])
     check("warns after an Ollama Cloud curl with no payload",
-          run(MERGE, [step("curl -sS https://api.ollama.com/api/tags")])[0])
+          run(MERGE, [step("curl -sS https://api.ollama.com/api/chat")])[0])
 
     # --- robustness -------------------------------------------------------
     proc = subprocess.run([sys.executable, HOOK], input="not json",

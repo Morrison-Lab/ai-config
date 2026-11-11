@@ -122,7 +122,7 @@ PROBE_WORDS = frozenset({"which", "command"})
 NEEDS_ATTEMPT = frozenset({"opencode"})
 # curl options whose next word is a value, never the request URL.
 CURL_VALUE_OPTS = frozenset({
-    "-d", "-F", "-sd", "-sF", "--data", "--data-binary", "--data-raw",
+    "-d", "-F", "-sd", "-sF", "--data", "--data-ascii", "--data-binary", "--data-raw",
     "--data-urlencode", "--form", "--form-string", "--json", "-H", "--header", "-e",
     "--referer", "-o", "--output", "-x", "--proxy", "-u", "--user",
 })
@@ -252,7 +252,7 @@ def _curl_route(rest):
             parts = urllib.parse.urlsplit(arg)
         except Exception:
             continue
-        host = parts.netloc.split(":")[0].lower()
+        host = (parts.hostname or "").lower()
         for route in HTTP_ROUTES:
             if host == route[0] and parts.path.rstrip("/") == route[1]:
                 return route
@@ -277,10 +277,6 @@ def _review_route(rest, clis):
     return None
 
 
-def _is_reviewer(rest, clis):
-    return _review_route(rest, clis) is not None
-
-
 def _probed_names(rest):
     """CLI names a `command -v` or `which` presence probe in *rest* asks about."""
     rest = _peel_wrappers(rest)
@@ -301,7 +297,7 @@ def _absent(name, text):
     """True when probe output *text* printed no path or name for *name*."""
     for line in (text or "").splitlines():
         line = line.strip()
-        if line == name or line.endswith("/" + name):
+        if line == name or line.endswith("/" + name) or line.startswith("alias " + name + "="):
             return False
     return True
 
@@ -325,8 +321,8 @@ def _shell_events(sib, command, clis):
             raw = list(argv)
             while raw and ENV_ASSIGNMENT.match(raw[0]):
                 raw = raw[1:]
-            if (_is_reviewer(sib.strip_env(argv)[1], clis)
-                    or _is_reviewer(raw, clis)):
+            if (_review_route(sib.strip_env(argv)[1], clis)
+                    or _review_route(raw, clis)):
                 events.append(("review", piece))
     return events
 

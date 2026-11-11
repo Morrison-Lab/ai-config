@@ -57,7 +57,7 @@ read where it appears, in the directory and with the names of each way the
 command may run up to there (a `sh -c` text also with the `NAME=value`
 words before its shell, `sudo D=/x sh -c`, and, unless the text is written
 in single quotes, once without them, since bash expands a double-quoted text
-with the outer names; `~` reads HOME the same way), to MAX_NESTED
+with the outer names; a bare `~` reads HOME as `$HOME` does), to MAX_NESTED
 levels, and deeper with no directory, to MAX_DEPTH. A `cd` up the tree
 repeated by a loop (`cd ..`) is judged in every directory above. An
 unquoted `cd $D` with D empty or unset goes home, and is judged both there
@@ -100,7 +100,11 @@ make; cd ..; fi; chmod -R u+w .` is judged in the parent too), a quoted
 at `/`), a top-level directory written in a value beside an unset name
 (`DIRS="$X /opt"` splits to a `/opt` read as taken as empty, which a system
 tree or home is not), a `-R` held in a variable (`chown $FLAGS root /usr`
-is not seen as recursive), a
+is not seen as recursive), a `~` in a double-quoted `sh -c` text (read
+with the outer HOME too, which bash leaves to the inner shell, so
+`HOME=/tmp/h bash -c "cd ~ && chmod -R u+w ."` is refused), a `cd` that
+goes home (a bare `cd`, or an unquoted empty `cd $D`), which reads this
+process's own home and not a HOME the command assigns, a
 `for` or `select` loop variable, `eval`, `su -c`, a heredoc piped to `sh`, an
 interpreter's own `-c` (`python -c "os.system(...)"`), a substitution in an
 unquoted heredoc body (`<<EOF`, which bash does run), a glob in a directory
@@ -787,7 +791,8 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
     ways the command may run are merged into one, with the directory unknown
     and the first way's names.
     """
-    ctx = {"seen": set(), "work": 0, "split": {}, "uses": {}} if ctx is None else ctx
+    ctx = ({"seen": set(), "work": 0, "split": {}, "uses": {}, "flat": {}}
+           if ctx is None else ctx)
     if not PROGRAM_TEXT.search(re.sub(r"[\\'\"]", "", piece)):
         return None  # no chown, chmod or chgrp anywhere in it, quotes aside
     if piece not in ctx["split"]:
@@ -864,9 +869,14 @@ def _scan(piece, cwd, home, outer, level=0, ctx=None):
                 # A double-quoted text was expanded with the outer names before
                 # the shell ran, a single-quoted one with these: unless it is
                 # written single-quoted, read it both ways.
-                quoted = f"'{text}'" in piece and f'"{text}"' not in piece
-                readings = [ChainMap(prefix, assigned)] + ([] if quoted else [assigned])
-                for names in (readings if prefix else [assigned]):
+                readings = [assigned]
+                if prefix:
+                    if piece not in ctx["flat"]:
+                        ctx["flat"][piece] = _flat(piece)
+                    flat = ctx["flat"][piece]
+                    quoted = _flat(f"'{text}'") in flat and _flat(f'"{text}"') not in flat
+                    readings = [ChainMap(prefix, assigned)] + ([] if quoted else [assigned])
+                for names in readings:
                     hit = _nested_hit(text, None if over else here, home, names, level, ctx)
                     if hit:
                         return hit
@@ -969,6 +979,12 @@ def _without_redirects(argv):
         else:
             out.append(tok)
     return out
+
+
+def _flat(text):
+    """TEXT with line continuations dropped and each run of blanks, newlines
+    and `;` made one space, as a `sh -c` text comes back from the split."""
+    return re.sub(r"[\s;]+", " ", text.replace("\\\n", ""))
 
 
 def _prefix_names(words, home, visible, here):

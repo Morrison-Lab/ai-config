@@ -605,7 +605,9 @@ class Allows(unittest.TestCase):
                     "HOME=\"$PWD/.home\" bash -c 'mkdir -p \"$HOME\" && chmod -R 700 \"$HOME\"'",
                     "HOME=/tmp/h env -u X sh -c 'chmod -R u+w \"$HOME\"'",
                     "D=/etc; D=./build sh -c 'chmod -R 755 $D'",
-                    "env HOME=/tmp/h sh -c 'chown -R me ~'"):
+                    "env HOME=/tmp/h sh -c 'chown -R me ~'",
+                    "HOME=/tmp/h bash -c '\n  mkdir -p \"$HOME\"\n  chmod -R 700 \"$HOME\"\n'",
+                    "D=/etc; D=./build sh -c '\ncd \"$D\"; \\\n  chmod -R 755 .\n'"):
             self.assert_allowed(cmd)
 
     def test_sudo_lone_h_takes_the_next_word_as_host(self):

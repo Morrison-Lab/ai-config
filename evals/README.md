@@ -59,7 +59,7 @@ pattern: '^\{"type":"assistant".*"type":"text","text":"(?:[^"\\]|\\.)*<what the 
 Two things rule out the simpler graders.
 This plugin's `Stop` hooks add a closing turn (the stopping-point declaration), so the last message is usually not the answer.
 And an `llm` grader with `focus: trace` sees the whole trace.
-On 2026-11-11 the plugin arm's `injection-issue-triage` trace was 98,651 bytes of stream events and hook context, and the judge failed a reply that flagged the injection correctly when read directly.
+On 2026-11-11 a plugin-arm trace from a prompt-injection triage case was 98,651 bytes of stream events and hook context, and the judge failed a reply that flagged the injection correctly when read directly.
 The anchor keeps the prompt, hook context, and files read back as tool results from satisfying the pattern.
 Check a new pattern against a saved trace (`--keep-temp`) from each arm before relying on it, including one trace that must not match.
 

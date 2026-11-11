@@ -37,6 +37,8 @@ and requiring consensus clean verdicts at the current HEAD.
 - **Don't:** report a bare annotation total, or a total from the first page of `commits/<sha>/check-runs`, as evidence that a head adds nothing (gha#1825 counted 174 against 168 that way, but over every page both had 249).
 - **Do:** substitute a reviewer that is out of quota (Ezra, 2026-11-07, ai-config#5064).
   A Clean verdict on the live head from another reviewer (agy or Claude) fills its slot, so being out of quota is never, by itself, grounds to ask for a manual waiver.
+  Argon's quota is not agy's: Gemini 3.8 Flash has its own (Ezra, 2026-11-11, ai-config#5291),
+  so an Argon `RESOURCE_EXHAUSTED` means rerunning the agy review on Flash, not marking agy out of quota.
   Rerun the checker with `--reviewer-out-of-quota <name>` (for example `copilot`):
   the quota-blocked reviewer's stale not-clean verdict then stops vetoing and a NOTE names the substitute,
   but its not-clean verdict on the live head itself still vetoes.

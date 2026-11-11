@@ -205,8 +205,11 @@ def stale_lines(record: dict, here: Path, root: Path) -> list[str]:
             tip = None if refresh_covers(entry) else origin
             lagging = clone_lags(clone, head, tip)
             pin = entry.get("gitCommitSha") or ""
-            if pin and tip and (tip.startswith(pin)
-                                or is_ancestor(clone, tip, pin)):
+            has_tip = bool(pin and tip) and (tip.startswith(pin)
+                                             or is_ancestor(clone, tip, pin))
+            behind_clone = (bool(pin) and not head.startswith(pin)
+                            and is_ancestor(clone, pin, head))
+            if has_tip and not behind_clone:
                 continue
             current = bool(pin) and pin_is_current(clone, pin, head)
             if current and not lagging:

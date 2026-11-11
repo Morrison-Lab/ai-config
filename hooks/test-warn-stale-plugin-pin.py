@@ -42,6 +42,8 @@ With a bare repository as the clone's `origin` (ai-config#5309 step 2):
       "matching".
   19. Clone ahead of origin (origin's tip is its ancestor), pin at HEAD:
       silent.
+  19b. Same clone, pin at origin's tip: warns that the pin is one commit
+      behind the clone, although it contains origin's tip.
   20. Clone at origin's tip, pin behind: warns with the count and does not
       say the clone lags.
   22. Pin that descends from origin's tip, clone behind origin: silent.
@@ -241,6 +243,10 @@ def main():
         ahead = git(mkt, "rev-parse", "HEAD")
         rc, ctx, _ = run(root, record({"scope": "user", "gitCommitSha": ahead}), project)
         check("19 clone ahead of origin is silent", rc == 0 and ctx == "", ctx)
+
+        rc, ctx, _ = run(root, record({"scope": "user", "gitCommitSha": tip}), project)
+        check("19b pin at origin's tip, behind a clone ahead of origin, warns",
+              "1 commit(s) behind the marketplace clone" in ctx, ctx)
 
         git(mkt, "reset", "-q", "--hard", tip)
         rc, ctx, _ = run(root, record({"scope": "user", "gitCommitSha": shas[2]}), project)

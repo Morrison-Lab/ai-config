@@ -252,9 +252,9 @@ def main():
               "1 commit(s) behind the marketplace clone" in ctx, ctx)
 
         git(mkt, "reset", "-q", "--hard", tip)
-        rc, ctx, _ = run(root, record({"scope": "user", "gitCommitSha": shas[2]}), project)
+        rc, ctx, err = run(root, record({"scope": "user", "gitCommitSha": shas[2]}), project)
         check("20 clone at origin's tip, pin behind",
-              "1 commit(s)" in ctx and "lags origin" not in ctx, ctx)
+              "1 commit(s)" in ctx and "lags origin" not in ctx and err == "", ctx + err)
 
         git(mkt, "reset", "-q", "--hard", shas[2])
         rc, ctx, _ = run(root, record({"scope": "user", "gitCommitSha": ahead}), project)

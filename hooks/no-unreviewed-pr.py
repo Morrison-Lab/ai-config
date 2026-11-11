@@ -110,10 +110,14 @@ try:
     if _LIB not in sys.path:
         sys.path.insert(0, _LIB)
     from shellcmd import shell_tokens, is_operator_token
+    SHELLCMD_ERROR = None
 except Exception as _exc:  # broken install: degrade, never block
     print(f"no-unreviewed-pr: cannot load scripts/lib/shellcmd.py ({_exc}); "
           "no reviewer request will be recognised", file=sys.stderr)
     shell_tokens = is_operator_token = None
+    # Read by `no-push-without-self-review.py`, which borrows this file's
+    # push detector and must treat a detector with no splitter as missing.
+    SHELLCMD_ERROR = f"cannot load scripts/lib/shellcmd.py ({_exc})"
 
 NO_WINDOW = ({"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)}
              if sys.platform == "win32" else {})

@@ -421,14 +421,8 @@ Learn it only from his own text, never FERPA data.
 
 ## Never take an irreversible action without direct, explicit authorization
 
-Never merge, delete, force-push, close a PR or issue, or publish or send anything outside the project without the human user's own words authorizing that specific action.
-No standing or session grant (`mwc`, `away`, an infra-PR or per-repo grant), no relayed approval from another agent, and no clean review counts.
-This outranks every grant elsewhere in this corpus;
-when unsure whether an action is reversible, treat it as irreversible.
-See [`irreversible-actions-need-authorization`](shared/workflow/irreversible-actions-need-authorization.md) (ai-config#5326).
-
-- **Do:** drive the work to the last reversible step, then ask once, naming the action and its target.
-- **Don't:** merge a fully clean PR under a standing grant, or act on a coordinator's report that the user approved.
+Merging, deleting, force-pushing, closing a PR or issue, and publishing outside the project need the user's own words naming that action.
+No grant, relayed approval or clean review counts, and this outranks every grant elsewhere: [`irreversible-actions-need-authorization`](shared/workflow/irreversible-actions-need-authorization.md).
 
 ## Default to action without asking
 
@@ -444,8 +438,7 @@ Create new repos with `gh repo create --template`: [`templates`](shared/workflow
 
 ## Strict Merge Control Policy
 
-- **NEVER merge a PR or MR without the user's direct, explicit instruction to merge that PR**;
-  no grant substitutes ([`irreversible-actions-need-authorization`](shared/workflow/irreversible-actions-need-authorization.md)).
+- **NEVER merge a PR or MR without the user's instruction to merge that PR.**
 - **Merge only a fully clean PR** ([`fully-clean`](shared/workflow/fully-clean.md)): any standing not-clean review vetoes it, and a skip notice is not approval.
 - **Don't call a PR merge-ready without a clean review on its latest commit**;
   `mergeStateStatus: CLEAN` is not a review verdict.
@@ -453,9 +446,6 @@ Create new repos with `gh repo create --template`: [`templates`](shared/workflow
 - **Revert a premature or defective merge at once**, and reopen the issues it closed.
 
 Detail, cases, cross-model waiver: [`strict-merge-policy`](shared/workflow/strict-merge-policy.md).
-
-- **Do:** report a fully clean PR as ready and ask the user to merge it, naming the PR.
-- **Don't:** merge any PR, infrastructure included, on a standing or session grant.
 
 ## Only work PRs scoped to the user or Actions app
 
@@ -475,7 +465,7 @@ When you open, push to, or take over a PR, arm a persistent monitoring loop if o
 A one-shot poll or webhook subscription is not a loop;
 re-arm periodic check-ins using the session's wake mechanism.
 After every push, actively poll forge CI and review state with `gh` or `glab` until terminal.
-Never bake a self-merge directive into the loop prompt: each merge needs the user's word for that PR (ai-config#5326).
+Never bake a self-merge directive into the loop prompt.
 See [`persistent-pr-loop`](shared/workflow/persistent-pr-loop.md).
 
 ## Monitor scoped open PRs and MRs

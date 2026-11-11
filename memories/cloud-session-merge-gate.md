@@ -143,6 +143,23 @@ Learned on [ai-config#5023](https://github.com/Morrison-Lab/ai-config/pull/5023)
   The merge hook does not credit a compound or piped run.
 - `validate` runs twice on one head (pull_request and push events), and the checker blocks until both finish.
 
+Added on 2026-11-11 ([ai-config#5359](https://github.com/Morrison-Lab/ai-config/issues/5359)), when the OpenCode Go route worked again:
+
+- Run the OpenCode Go review on the shipping head before the merge call, and write a waiver only after every route failed in this session.
+  A waiver copied from a note about an earlier outage was posted on [ai-config#5352](https://github.com/Morrison-Lab/ai-config/pull/5352) before any reviewer was tried.
+- A 403 with "error code: 1010" is the gateway refusing the client, not the reviewer being unavailable.
+  A Python `urllib` request with `User-Agent: curl/8.5.0` got answers that day.
+- An answer with reasoning and no text is no verdict.
+  `glm-5.3` returned that on three diffs in a row and `kimi-k3` answered most requests, so list first the model that last answered.
+- A reviewer that sees only the diff can quote code that is not in the file.
+  Check each quoted passage against the head, and run the failing command a finding claims, before you accept or rebut it.
+- Do not repeat a reviewer's not-clean verdict phrase in your own PR comment.
+  The fully-clean checker scores that comment as a standing not-clean verdict;
+  write "did not approve, N findings" instead.
+- `scripts/summarize-pr-annotations.sh` did not finish in a cloud session: it printed an HTTP 403 line about 1,500 times in five minutes.
+  Which call gets the 403 was not read.
+  Reading `commits/<sha>/check-runs` and each `check-runs/<id>/annotations` with `gh api` took under a minute.
+
 ## The merge hook needs literal ids in the checker command
 
 - The merge hook reads the checker's result line from this transcript, and a run whose `--annotations-read` value is a shell variable (`"$IDS"`) did not satisfy it on mds#671 (2026-11-06).

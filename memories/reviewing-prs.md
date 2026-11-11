@@ -282,3 +282,27 @@ The fix's commit message and PR body named a different root cause, and nothing i
 - **Do:** test the author's stated root cause against the input that hung, rather than accepting it because the symptom stopped.
 - **Don't:** rate a fix ready because its output is byte-identical on inputs where the new skip does not fire.
 - **Don't:** treat "the hang is gone" as evidence of the cause the author named.
+
+## First-push misses on the priority-label PRs, 2026-11-11
+
+Each of these was found by a reviewer or a hook, not by the author ([ai-config#5359](https://github.com/Morrison-Lab/ai-config/issues/5359)).
+
+- **A truncated search is not an absence.**
+  A grep piped through `head` hid the matching lines, and a comment on [ai-config#5357](https://github.com/Morrison-Lab/ai-config/pull/5357) said they did not exist.
+  - **Do:** count matches with `grep -c`, or read the whole result, before writing "there is no X".
+  - **Don't:** assert an absence from output that `head` or `tail` cut.
+- **A rebuttal is itself a claim to check.**
+  A reply on [ai-config#5358](https://github.com/Morrison-Lab/ai-config/pull/5358) said a pin audit passed on the head when none had been run.
+  - **Do:** write only what a command in the same turn showed, and say "I did not check this" for the rest.
+  - **Don't:** close a reviewer's question with a check you assume exists.
+- **A test where the fallback agrees with the wrong answer is vacuous.**
+  Cases for `hooks/warn-unlabelled-agent-issue.py` passed whether the command was split or read whole, because the labels sat on the create itself.
+  - **Do:** before the first review, mutate each new condition, index and slice in the diff, and confirm a named case fails.
+  - **Don't:** count a case as coverage until a mutation of the code it names turns it red.
+- **A sentence about a workflow needs a check per step that can fail.**
+  "The counts go to the job summary, on a failed run too" was written from one failure path and was false for a failure in an earlier step.
+  - **Do:** list each step and each early exit, and test the sentence against each.
+  - **Don't:** write "on a failed run too" from the one failure path that was tested.
+- **`scripts/check-github-actions-step-if.py` takes no workflow path.**
+  Given one, it checks that file for the memory bullet and reports "missing step-if bullet".
+  Run it with no argument.

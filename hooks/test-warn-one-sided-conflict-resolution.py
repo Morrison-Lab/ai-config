@@ -11,8 +11,10 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
 
 if len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
     HOOK = os.path.realpath(sys.argv[1])
@@ -53,6 +55,8 @@ WARN = (
     "git revert --strategy ours abc123",
     "git rebase --strategy-option=theirs main",
     "git cherry-pick --strategy-option ours abc123",
+    "git merge --strategy-opt=ours main",
+    "git rebase --strategy- theirs main",
     "bash -c 'git merge -X ours main'",
     "sh -c \"git checkout --theirs a.txt\"",
     "bash -lc 'cd repo && git checkout --ours a.txt'",
@@ -88,6 +92,9 @@ SILENT = (
     "git merge-file --union a base b",
     "bash -c 'git status'",
     "git merge main -X",
+    "git merge --strat=ours main",
+    "git merge --strategy-opt=patience main",
+    "git merge --strategy-options=ours main",
     "git merge main -- -X ours",
     # Four nested shells is past MAX_DEPTH (3), so it is not unwrapped.
     "bash -c \"bash -c 'bash -c \\\"bash -c git\\\\ merge\\\\ -X\\\\ ours\\\"'\"",
@@ -124,7 +131,7 @@ def main() -> int:
             print(f"FAIL (warned): {command}")
     # The warning names the command form it found, and what it drops.
     for command, label, effect in (
-            ("git merge -s ours x", "`git merge -s ours`", "entirely"),
+            ("git merge -s ours x", "`git merge -s ours`", "other side's changes entirely"),
             ("git revert --strategy=ours a", "`git revert --strategy ours`", "entirely"),
             ("git checkout --our a", "`git checkout --ours`", "whole file"),
             ("git restore --theirs a", "`git restore --theirs`", "whole file"),
@@ -145,6 +152,32 @@ def main() -> int:
         if proc.stdout.strip() or proc.returncode != 0:
             failures += 1
             print(f"FAIL (non-Bash or bad input produced output): {raw}")
+    # Both fail-open paths exit 0 with no output and say why on stderr: a
+    # missing scripts/lib (broken install), and an exception while parsing.
+    stub_raises = "def simple_commands(c):\n    raise RuntimeError('boom')\n" \
+        "git_subcommand = nested_shell_commands = simple_commands\n"
+    for lib, note in ((None, "cannot load"), (stub_raises, "boom")):
+        total += 1
+        tmp = tempfile.mkdtemp()
+        try:
+            os.makedirs(os.path.join(tmp, "hooks"))
+            hook = os.path.join(tmp, "hooks", os.path.basename(HOOK))
+            shutil.copy(HOOK, hook)
+            if lib is not None:
+                os.makedirs(os.path.join(tmp, "scripts", "lib"))
+                with open(os.path.join(tmp, "scripts", "lib", "shellcmd.py"),
+                          "w", encoding="utf-8") as fh:
+                    fh.write(lib)
+            payload = {"tool_name": "Bash",
+                       "tool_input": {"command": "git checkout --ours a"}}
+            proc = subprocess.run([sys.executable, hook], input=json.dumps(payload),
+                                  capture_output=True, text=True, encoding="utf-8")
+        finally:
+            shutil.rmtree(tmp)
+        if proc.returncode != 0 or proc.stdout.strip() or note not in proc.stderr:
+            failures += 1
+            print(f"FAIL (fail-open {note!r}): rc={proc.returncode} "
+                  f"stdout={proc.stdout!r} stderr={proc.stderr!r}")
     print(f"\n{total - failures}/{total} tests passed")
     return 1 if failures else 0
 

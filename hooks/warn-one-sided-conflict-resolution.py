@@ -13,11 +13,12 @@ lists these commands as anti-patterns:
   or `pull`. Each keeps one side of every conflicting hunk without a
   per-hunk decision.
 - `-s ours` (also `-sours`, `--strategy[=]ours`), which drops the other
-  branch's changes entirely, conflicting or not. On `cherry-pick` and
+  side's changes entirely, conflicting or not. On `cherry-pick` and
   `revert`, `-s` is `--signoff`, so only `--strategy` counts there.
 
-Git accepts a unique prefix of a long option. `--our` and `--thei` count;
-prefixes of `--strategy` and `--strategy-option` (`--strat=ours`) do not.
+Git accepts a unique prefix of a long option. `--our`, `--thei` and
+`--strategy-opt=ours` count. A prefix of `--strategy` itself also starts
+`--strategy-option`, so git rejects it as ambiguous (`--strat=ours`).
 A command inside `bash -c '...'` (and `sh`, `zsh` and similar) is checked,
 up to MAX_DEPTH nested shells; one fed through `xargs` or `eval` is not.
 A run with `--abort` or `--quit` resolves nothing and stays silent.
@@ -53,6 +54,8 @@ NO_RESOLUTION = ("--abort", "--quit")
 # Shortest unambiguous prefixes: `--o` also starts --orphan and --overlay,
 # and `--t` also starts --track.
 SIDE_PREFIX_MIN = {"--ours": "--ou", "--theirs": "--th"}
+# `--strategy-` already excludes `--strategy`, the only other `--strategy...`.
+LONG_PREFIX_MIN = {"--strategy-option": "--strategy-"}
 MAX_DEPTH = 3
 
 
@@ -65,16 +68,22 @@ def _side_flag(arg: str) -> str | None:
 
 
 def _option_values(rest: list[str], short: str, long: str) -> list[str]:
-    """Values given to `short` (`-X v` or `-Xv`) or `long` (`--long v` or `--long=v`)."""
+    """Values given to `short` (`-X v` or `-Xv`) or `long` (`--long v` or `--long=v`).
+
+    `long` also matches a unique prefix of itself at least LONG_PREFIX_MIN long.
+    """
+    shortest = LONG_PREFIX_MIN.get(long, long)
     values = []
     for i, arg in enumerate(rest):
         if arg == "--":
             break
         nxt = rest[i + 1] if i + 1 < len(rest) else ""
-        if arg in (short, long):
+        name, eq, value = arg.partition("=")
+        is_long = name.startswith(shortest) and long.startswith(name)
+        if arg == short or (is_long and not eq):
             values.append(nxt)
-        elif arg.startswith(long + "="):
-            values.append(arg[len(long) + 1:])
+        elif is_long:
+            values.append(value)
         elif arg.startswith(short) and len(arg) > len(short):
             values.append(arg[len(short):])
     return values
@@ -113,7 +122,7 @@ def one_sided(argv: list[str]) -> tuple[str, str] | None:
             if value == "ours":
                 label = "-s ours" if short == "-s" else "--strategy ours"
                 return (f"git {sub} {label}",
-                        "drops the other branch's changes entirely, "
+                        "drops the other side's changes entirely, "
                         "conflicting or not")
     return None
 

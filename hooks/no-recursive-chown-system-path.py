@@ -163,6 +163,9 @@ UNREAD = ("/", False)
 UNREAD_WHY = ("which uses a `${...}` operator this guard does not read, here or "
               "in an earlier assignment (anything but a `-`/`=` default or a `?` "
               f"check, or defaults nested deeper than {MAX_NESTING}); write the path out")
+# Words that open and close a compound command, for `_scan`'s DEPTH.
+BLOCK_OPEN = {"if", "while", "until", "for", "select", "case", "{"}
+BLOCK_CLOSE = {"fi", "done", "esac", "}"}
 DECLARE_BUILTINS = ("export", "local", "declare", "readonly", "typeset")
 # chmod's own short options (GNU and BSD); any other `-w` or `-x` is a mode.
 CHMOD_OPTIONS = set("cfvRHLPh")
@@ -587,7 +590,9 @@ def _scan(piece, cwd, home, outer):
     # Each scope keeps every directory the shell may be in: a `cd` after a
     # keyword (`if [ -d x ]; then cd x; fi`) may not run, so the directory
     # before it stays possible. `None` is a directory this cannot name.
-    heres, assigns = {(0,): (cwd,)}, {}
+    # DEPTH counts the compound commands (`if`, loops, `case`, `{`) open here:
+    # any `cd` inside one, not only the first after its keyword, may not run.
+    heres, assigns, depth = {(0,): (cwd,)}, {}, 0
     for scope, argv in cmds or []:
         dirs = next(heres[scope[:k]] for k in range(len(scope), 0, -1) if scope[:k] in heres)
         here = dirs[-1]
@@ -602,7 +607,9 @@ def _scan(piece, cwd, home, outer):
         # `if cd /etc; then`, `{ cd /usr; }`: a keyword ends the command before.
         maybe = bool(argv) and argv[0] in SHELL_KEYWORDS
         while argv and argv[0] in SHELL_KEYWORDS:
+            depth += (argv[0] in BLOCK_OPEN) - (argv[0] in BLOCK_CLOSE)
             argv = argv[1:]
+        maybe = maybe or depth > 0
         lead = argv
         while lead and lead[0] in ("time", "-p", "command", "builtin"):
             lead = lead[1:]

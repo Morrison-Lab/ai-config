@@ -288,7 +288,9 @@ class Denies(unittest.TestCase):
         for cmd in ("cd /etc; if [ -d ~/proj ]; then cd ~/proj; fi; chown -R me .",
                     "cd /usr/lib; if [ -d build ]; then cd ~/proj; fi; chmod -R u+w .",
                     "cd /etc; while false; do cd ~/proj; done; chown -R me .",
-                    "cd /etc && { cd ~/proj || true; }; chown -R me ."):
+                    "cd /etc && { cd ~/proj || true; }; chown -R me .",
+                    "cd /etc; if [ -d x ]; then echo; cd ~/proj; fi; chown -R me .",
+                    "cd /etc; case $x in a) cd ~/proj;; esac; chown -R me ."):
             self.assert_denied(cmd)
 
     def test_cd_behind_time_or_command(self):

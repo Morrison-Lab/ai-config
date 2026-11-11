@@ -34,10 +34,11 @@ exempts nothing.
 Mentions pass: `grep merge_runs.py`, `cat .../merge_runs.py`, `md5sum`, and
 `merge_runs.py` as a later argument (`python3 -m pytest merge_runs.py`).
 
-Known gaps: a script file of your own that imports `merge_runs` is not read,
-and neither is a copy of the skill's script under another name.
-If `scripts/lib/shellcmd.py` cannot load, the hook says so on stderr and
-gates nothing, as the other shellcmd-based hooks do.
+Known gaps: your own script importing `merge_runs`, a renamed copy of the
+skill's script, and (stderr only) an unloadable `scripts/lib/shellcmd.py`.
+
+Writer and reviewer layers: `shared/workflow/review-rendered-documents.md`
+and `.claude/agents/adversarial-reviewer.md` ("Word field codes").
 
 Run with `--dry-run '<command>'` to see the verdict without acting.
 """

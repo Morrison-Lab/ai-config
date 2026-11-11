@@ -196,3 +196,9 @@ If it was, look for the user's answer to a start-now-or-file-for-later question 
 Read the linked issue or quoted request.
 Do not report the reminder hook's output as your finding.
 See [`start-or-file`](../../shared/workflow/start-or-file.md).
+
+## Word field codes
+
+On a diff or a delivered `.docx` produced by an edit that merged runs, check that each field code (a citation, cross-reference or HYPERLINK) still has its own `begin`, `instrText`, `separate` and `end` runs and that the field's text is where it was.
+Read the document; do not report a hook's output as your finding.
+See [`review-rendered-documents`](../../shared/workflow/review-rendered-documents.md#merging-runs-in-a-word-document).

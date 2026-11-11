@@ -86,6 +86,7 @@ try:
     if _LIB not in sys.path:
         sys.path.insert(0, _LIB)
     from shellcmd import simple_commands as _simple_commands
+    from shellcmd import shell_c_expansions
 except Exception as _exc:  # broken install: degrade, never block
     print(f"warn-nonglobal-substitution: cannot load "
           f"scripts/lib/shellcmd.py ({_exc}); "
@@ -94,6 +95,10 @@ except Exception as _exc:  # broken install: degrade, never block
     def _simple_commands(_cmd):
         """Parse nothing when the shared splitter is missing."""
         return None
+
+    def shell_c_expansions(command):
+        """No descent when the shared splitter is missing."""
+        return [command]
 
 
 # Perl's -i (in-place), bundled only among these NO-ARGUMENT flag letters, so
@@ -218,7 +223,20 @@ def _script_args(args):
 
 def find_offenses(command):
     """[(cmd_word, segment_text, matched_subst, flags), ...] for every
-    perl/sed -i invocation in COMMAND carrying a non-global substitution."""
+    perl/sed -i invocation in COMMAND carrying a non-global substitution.
+
+    Each command line a shell's `-c` reaches is scanned too, on its own, so
+    `bash -c "sed -i 's/a/b/' f"` warns like the bare `sed` (ai-config#3641).
+    The verdict reads only the command text, so it is sound for a nested
+    piece, whose working directory is unknown."""
+    out = []
+    for piece in shell_c_expansions(command):
+        out.extend(_piece_offenses(piece))
+    return out
+
+
+def _piece_offenses(command):
+    """`find_offenses` for one shell's command line, without descent."""
     cmds = _simple_commands(command)
     if cmds is None:
         return []

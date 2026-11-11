@@ -71,6 +71,9 @@ SHOULD_WARN = [
      "slurp mode: -0 takes an octal argument, so -0777 is still the "
      "in-place flag -- and slurp plus non-global is the worst case of "
      "the bug this hook exists to catch"),
+    ("W14", "bash -c \"sed -i 's/a/b/' file.txt\"",
+     "wrapped in a shell's -c, which shlex hands over as one opaque token "
+     "(ai-config#3641)"),
     ("W13", "sed -i '1s/a/b/' file.txt",
      "a numeric line address before the `s`; a word boundary never fires "
      "between a digit and `s`, so this was missed while the equivalent "
@@ -302,6 +305,12 @@ MUTATIONS = {
         "digit, so a numeric sed line address still reads as a substitution",
         [(r'r"(?<![A-Za-z_])s(?P<delim>["', r'r"\bs(?P<delim>["')],
         {"W13"},
+    ),
+    "M11_shell_c_descent": (
+        "a command line reached through a shell's -c is scanned too",
+        [("    for piece in shell_c_expansions(command):",
+          "    for piece in [command]:")],
+        {"W14"},
     ),
     "M9_perl_octal_zero_flag": (
         "perl's -0 takes an optional octal argument, so -0777 must still "

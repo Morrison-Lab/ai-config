@@ -34,7 +34,11 @@ is empty in this one (anthropics/claude-code#75859): `chmod -R 755 "$d/"` is
 `/`. A path that
 exists only because something was taken as empty is refused for the root, a
 system tree or home, but not for a top-level directory: `$OUT/dist` with OUT
-unset is `/dist`. A command substitution outside single quotes, heredoc
+unset is `/dist`. Only a default (`${D:-/x}`, `${D=/x}`) or an error check
+(`${D:?}`, which stops bash when D is empty) is read; an operand built with any
+other operator (`${D:+x}`, `${D%/}`, `${!D}`, `${#D}`, `${D:0:3}`), there or in
+an assignment it uses, is refused wherever it points, since each can rebuild a
+protected path (`/e${HOME:+tc}` is `/etc`). A command substitution outside single quotes, heredoc
 bodies and comments is lifted out before the command
 is split, scanned as a command of its own, and taken as empty. Inside `sh -c`
 or a substitution the working directory is unknown, so only absolute targets
@@ -106,7 +110,8 @@ WRAPPER_LONG = {
               "--preserve-groups",
               "--remove-timestamp", "--reset-timestamp", "--set-home", "--shell",
               "--stdin", "--validate", "--version"}),
-    # `--env0-from` is in coreutils 9.12; `--quoting-style` is not yet released.
+    # `--env0-from` and `--quoting-style` take a value (required_argument in
+    # coreutils master src/env.c, checked 2026-11-11).
     "env": ({"--argv0", "--chdir", "--env0-from", "--quoting-style", "--split-string",
              "--unset"},
             {"--block-signal", "--debug", "--default-signal", "--help",
@@ -122,8 +127,6 @@ WRAPPER_LONG = {
     "time": ({"--format", "--output"},
              {"--append", "--help", "--portability", "--quiet", "--verbose", "--version"}),
 }
-# A wrapper with no table above: any of these long names takes the next word.
-ANY_TAKES = set().union(*(takes for takes, _ in WRAPPER_LONG.values()))
 # Options with an optional value (sudo's `h::`). Attached (`-hhost`), the rest
 # of the word is the value. Alone as `-h`, sudo takes the next word as the
 # host when it is not an option or an assignment (src/parse_args.c). Inside a
@@ -136,9 +139,9 @@ MAX_NESTING = 32
 # `${A%/}`), any of which can rebuild a protected path (`/e${HOME:+tc}` is
 # `/etc`). The operand is refused, with its own reason.
 UNREAD = ("/", False)
-UNREAD_WHY = ("written with a `${...}` operator this guard does not read "
-              "(anything but a `:-`/`:=` default, or nesting deeper than "
-              f"{MAX_NESTING}); write the path out")
+UNREAD_WHY = ("which uses a `${...}` operator this guard does not read, here or "
+              "in an earlier assignment (anything but a `-`/`=` default or a `?` "
+              f"check, or defaults nested deeper than {MAX_NESTING}); write the path out")
 DECLARE_BUILTINS = ("export", "local", "declare", "readonly", "typeset")
 # chmod's own short options (GNU and BSD); any other `-w` or `-x` is a mode.
 CHMOD_OPTIONS = set("cfvRHLPh")
@@ -158,12 +161,14 @@ NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 SUB = "__AICFG_CMDSUB__"  # a lifted command substitution (see `_lift`)
 # The start of a variable: `${NAME` (closed by its matching brace, found by
 # `_brace_pairs`), `$NAME`, or a lifted substitution.
-VARIABLE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)|\$([A-Za-z_][A-Za-z0-9_]*)|" + SUB)
+# Positional and special parameters (`$1`, `${1:-/etc}`, `$@`) count too:
+# the Bash call has no arguments, so each is empty here.
+VARIABLE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*|[0-9]+|[@*#?$!-])"
+                      r"|\$([A-Za-z_][A-Za-z0-9_]*|[0-9]|[@*#?$!-])|" + SUB)
 ALL_GLOB = re.compile(r"\A[*?.]*[*?][*?.]*\Z")
 
 DENY = (
-    "Refused: `{segment}` runs `{program} -R` on `{target}`, which resolves to "
-    "`{path}`, {why}. A recursive ownership or mode change there broke `sudo` "
+    "Refused: `{segment}` runs `{program} -R` on `{target}`, {where}. A recursive ownership or mode change there broke `sudo` "
     "in anthropics/claude-code#168 and #39283, and undoing it needs a console. "
     "Fix only the path that raised the error, as your own user, or ask the "
     "user to run it. If this case is genuinely safe, put `{override}` before "
@@ -238,7 +243,9 @@ def _takes_next_word(wrapper, tok, following):
         if "=" in tok:
             return False
         if wrapper not in WRAPPER_LONG:
-            return tok in ANY_TAKES
+            # command, exec, builtin, nohup, doas and setsid take no long
+            # option with a value, so the next word is the program.
+            return False
         takes, flags = WRAPPER_LONG[wrapper]
         if tok in takes or tok in flags:
             return tok in takes
@@ -297,19 +304,32 @@ def _targets(program, head):
             operands.append(tok)
         elif tok == "--":
             end = True
-        elif tok == "--recursive":
+        elif _long(tok, "--recursive", 5):
             recursive = True
-        elif tok.startswith("--reference"):
-            reference, skip = True, tok == "--reference"
+        elif _long(tok.split("=", 1)[0], "--reference", 5):
+            reference, skip = True, "=" not in tok
+        elif _long(tok, "--from", 3):
+            skip = True  # `--from USER:GROUP` names owners, not files
         elif tok.startswith("--"):
             continue
-        elif program == "chmod" and not set(tok[1:]) <= CHMOD_OPTIONS:
-            operands.append(tok)  # a mode such as `-w` or `-x`
-        elif "R" in tok[1:]:
-            recursive = True
+        else:
+            # `-R` may share a word with other flags, and for chmod with a
+            # mode (`-Rw`), which is then also the mode operand.
+            recursive = recursive or "R" in tok[1:]
+            if program == "chmod" and not set(tok[1:]) <= CHMOD_OPTIONS:
+                operands.append(tok)
     if not recursive:
         return []
     return operands if reference else operands[1:]
+
+
+def _long(tok, name, shortest):
+    """Whether TOK is NAME or a prefix getopt_long accepts for it.
+
+    SHORTEST is the shortest prefix no other chown, chmod or chgrp long option
+    shares (`--rec` for `--recursive`, `--ref` for `--reference`).
+    """
+    return len(tok) >= shortest and name.startswith(tok)
 
 
 def _expand(text, home, assigned, here, depth=0):
@@ -339,6 +359,13 @@ def _expand(text, home, assigned, here, depth=0):
         if name is None:  # a lifted substitution
             guessed.append(True)
             return ""
+        default = re.match(r":?[-=]", rest)
+        check = re.match(r":?\?", rest)
+        if rest and not default and not check:
+            # An operator this guard does not read: its result does not depend
+            # on whether the value is known (`${d:+tc}` with d computed).
+            capped.append(name)
+            return ""
         missing = False
         if name in assigned:
             if assigned[name] is None:
@@ -356,9 +383,8 @@ def _expand(text, home, assigned, here, depth=0):
         else:
             val = os.environ.get(name, "")
             missing = not val
-        default = re.match(r":?[-=]", rest)
-        if rest and not default and not re.match(r":?\?", rest):
-            capped.append(name)  # an operator this guard does not read
+        if check and not val:  # bash stops with an error before the command runs
+            undecidable.append(name)
             return ""
         if default and not val:
             fallback = (UNREAD if depth >= MAX_NESTING
@@ -465,7 +491,7 @@ def _split(piece):
     # Drop the `<<` each blanked body leaves behind: the split blanks heredocs
     # again, and would read the next word (`2>&1`) as a new delimiter whose
     # body runs to the end, hiding every later command.
-    cleaned = _comment_free(_heredoc_free(piece)).replace(" << ", " ")
+    cleaned = re.sub(r" <<-? ", " ", _comment_free(_heredoc_free(piece)))
     lifted, inner = _lift(cleaned)
     cmds = simple_commands_with_scope(lifted)
     if cmds is None:  # lifting broke the parse: judge the text as written
@@ -473,8 +499,13 @@ def _split(piece):
     return cmds, inner
 
 
-def _scan(piece, cwd, home):
-    """`(hit or None, [inner command substitutions])` for one shell text."""
+def _scan(piece, cwd, home, outer):
+    """`(hit or None, [inner command substitutions], names assigned)` for one text.
+
+    OUTER holds names an enclosing text assigned: a `sh -c` body or a
+    substitution sees them, through the outer shell's own expansion of a
+    double-quoted body or through the environment.
+    """
     cmds, inner = _split(piece)
     # A `cd` or assignment inside `( ... )` changes only that subshell, so each
     # is kept per scope and read through the scope's ancestors.
@@ -485,7 +516,7 @@ def _scan(piece, cwd, home):
             moved = any(SUB in tok for tok in argv)
             heres[scope] = None if moved else resolve_cd_target(argv, here)
             continue
-        assigned = {}
+        assigned = dict(outer)
         for k in range(1, len(scope) + 1):
             assigned.update(assigns.get(scope[:k], {}))
         if _assignments(argv, assigns.setdefault(scope, {}), assigned, home, here):
@@ -499,7 +530,7 @@ def _scan(piece, cwd, home):
             if expanded is UNREAD:
                 shown = " ".join(argv).replace(SUB, "$(...)")
                 target = target.replace(SUB, "$(...)")
-                return (shown, program, target, target, UNREAD_WHY), inner
+                return (shown, program, target, None, UNREAD_WHY), inner, {}
             for cand, weak in filter(None, [expanded]):
                 if not cand:
                     continue  # an empty operand is an error, not the cwd
@@ -513,8 +544,11 @@ def _scan(piece, cwd, home):
                 why = _why(path, home, weak)
                 if why:
                     shown = " ".join(argv).replace(SUB, "$(...)")
-                    return (shown, program, target.replace(SUB, "$(...)"), path, why), inner
-    return None, inner
+                    return (shown, program, target.replace(SUB, "$(...)"), path, why), inner, {}
+    seen = dict(outer)
+    for names in assigns.values():
+        seen.update(names)
+    return None, inner, seen
 
 
 def _hit(command, cwd, home):
@@ -525,11 +559,13 @@ def _hit(command, cwd, home):
     """
     pending = [(piece, cwd if n == 0 else None)
                for n, piece in enumerate(shell_c_expansions(command))]
+    known = {}  # every name assigned so far, over-approximating its scope
     while pending:
         piece, here = pending.pop(0)
-        hit, inner = _scan(piece, here, home)
+        hit, inner, seen = _scan(piece, here, home, known)
         if hit:
             return hit
+        known.update(seen)
         for text in inner:
             pending.extend((nested, None) for nested in shell_c_expansions(text))
     return None
@@ -557,11 +593,12 @@ def main() -> int:
     if not hit:
         return 0
     segment, program, target, path, why = hit
+    where = why if path is None else f"which resolves to `{path}`, {why}"
     print(json.dumps({"hookSpecificOutput": {
         "hookEventName": "PreToolUse",
         "permissionDecision": "deny",
         "permissionDecisionReason": DENY.format(
-            segment=segment, program=program, target=target, path=path, why=why,
+            segment=segment, program=program, target=target, where=where,
             override=OVERRIDE),
     }}))
     return 0

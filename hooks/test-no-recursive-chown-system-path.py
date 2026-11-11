@@ -195,6 +195,37 @@ class Denies(unittest.TestCase):
     def test_export_with_a_bare_name(self):
         self.assert_denied('export d=/etc PATH; chown -R me "$d"')
 
+    def test_outer_assignment_inside_a_nested_shell(self):
+        self.assert_denied('d=/etc; bash -c "chown -R root:root $d"')
+        self.assert_denied('d=/etc; echo "$(chown -R me $d)"')
+
+    def test_chmod_mode_bundled_with_recursive(self):
+        for cmd in ("chmod -Rw /usr", "chmod -Rx /usr", "chmod -vRw /etc",
+                    "chmod -R-w /usr"):
+            self.assert_denied(cmd)
+
+    def test_positional_and_special_parameters(self):
+        for cmd in ('chown -R me "${1:-/etc}"', 'chmod -R 755 "$1/"',
+                    'chown -R me "$@/"'):
+            self.assert_denied(cmd)
+
+    def test_long_option_prefixes(self):
+        for cmd in ("chmod --recur 755 /etc", "chown --rec me /usr",
+                    "chown -R --from root:root me /etc",
+                    "chown -R --fr root:root me /etc"):
+            self.assert_denied(cmd)
+
+    def test_operator_on_a_computed_variable(self):
+        self.assert_denied("d=$(echo x); chown -R me /e${d:+tc}")
+        self.assert_denied("d=$(echo x); chown -R me /e${d:0:0}tc")
+
+    def test_indirection_and_length(self):
+        self.assert_denied('P=HOME; chown -R me "${!P}"')
+        self.assert_denied('chown -R me "/${#HOME}"')
+
+    def test_command_after_a_tab_stripped_heredoc(self):
+        self.assert_denied("cat <<-EOF\n\tx\n\tEOF\nchown -R me /etc")
+
     def test_default_nested_three_deep(self):
         self.assert_denied('chown -R me "${A:-${B:-${HOME}}}"')
 
@@ -240,6 +271,20 @@ class Allows(unittest.TestCase):
     def test_sudo_lone_h_takes_the_next_word_as_host(self):
         # sudo reads `chown` as the host and `-R me` as the chroot, then runs /etc.
         self.assert_allowed("sudo -h chown -R me /etc")
+
+    def test_error_check_on_a_project_path(self):
+        self.assert_allowed('chown -R me "${PROJ:?}/build"')
+        self.assert_allowed('chmod -R 755 "${BUILD_DIR:?unset}/"')
+
+    def test_operator_outside_a_recursive_call(self):
+        self.assert_allowed('chmod 755 "${D%/}/x"')
+        self.assert_allowed('echo "${D%/}"; chown -R me ./build')
+
+    def test_reference_prefix_takes_the_next_word(self):
+        self.assert_allowed("chmod -R --ref /etc/passwd ./build")
+
+    def test_from_value_is_not_a_target(self):
+        self.assert_allowed("chown -R --from root:root me ./build")
 
     def test_project_paths(self):
         self.assert_allowed("chmod -R u+w .")

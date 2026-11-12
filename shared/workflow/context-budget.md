@@ -25,7 +25,7 @@ Each change tightened or loosened a rule while the bullet still read as the same
 
 **A rule moved out of `AGENTS.md` reaches an agent only through a link.**
 No harness inlines fragments: opencode loads `AGENTS.md` alone, Codex and Gemini CLI add only a skill listing (`scripts/measure-session-start.py`), and `hooks/inject-core-rules.py` gives Claude Code an index of `AGENTS.md`'s headings.
-Slimming `AGENTS.md` for [#5310](https://github.com/Morrison-Lab/ai-config/issues/5310) step 2 on 2026-11-12 hit three variants of this.
+Slimming `AGENTS.md` for [#5310](https://github.com/Morrison-Lab/ai-config/issues/5310) step 2 on 2026-11-12 hit two variants of this, plus one rewording loss of the kind the section above describes.
 An adversarial self-review on [#5554](https://github.com/Morrison-Lab/ai-config/pull/5554) caught absolute rules leaving the file (no pay-per-use API, no PHI, reviewer independence, no bare `#NNN`).
 A cross-harness read on [#5548](https://github.com/Morrison-Lab/ai-config/pull/5548) flagged a partial summary in the pointer that dropped a qualifier from each item it named.
 An adversarial self-review on [#5551](https://github.com/Morrison-Lab/ai-config/pull/5551) caught a reworded reason that had lost its "can".

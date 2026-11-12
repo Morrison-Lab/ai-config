@@ -3,12 +3,11 @@
 
 Ezra, 2026-10-27, said twice: never post a class announcement without his
 review and approval of its exact text (ai-config#4780, from mlg#228).
-Detection fails closed on a discussion-topic write, `is_announcement`, the CLI
-or a Canvas MCP write, even in a git or grep command chained with others.
-Approval is a whole line of the user's latest typed message ("post the
-announcement"), and allows one write. Not seen: a posting script file, a URL
-built at run time, and whether the posted text is the text shown; the layers
-in draft-in-ezras-voice and adversarial-reviewer cover those.
+Fails closed on the CLI, `is_announcement`, a network command naming a topic or
+announcement (a plain `curl` read passes) and an MCP announcement write. The
+user's last message must be only "post the announcement" ("yes, post it",
+...); one write each. Gaps (script files, run-time URLs, exact-text binding)
+are ai-config#5453; draft-in-ezras-voice and adversarial-reviewer cover them.
 """
 import json
 import os
@@ -23,18 +22,17 @@ except Exception:  # detection still runs; a detected write is then denied
     is_real_user_turn = None
 
 CLI = re.compile(r"\bcanvas\s+announcements?\s+(create|post|update|edit|publish)\b", re.I)
-TOPIC = re.compile(r"discussion_topic", re.I)
-ANNOUNCE = re.compile(r"is_announcement|announcement.*\.(edit|update|post|put)\(", re.I | re.S)
-DECLINE = re.compile(r"\b(no|not|wait|hold|stop|cancel|later|actually)\b|n't\b", re.I)
-WRITE = re.compile(r"(\b|-X\s*)(POST|PUT)\b|['\"](?i:post|put)['\"]|create_discussion_topic|\.(edit|update|post|put)\(|"
-                   r"(^|\s)(-d|-F|-T|--data|--form|--json|--upload-file)")
+TOPIC = re.compile(r"discussion(_|%5f)?topic|announcement", re.I)
+ANNOUNCE = re.compile(r"is_announcement|announcement.*\.(edit|update|post|put|create\w*)\(", re.I | re.S)
+NET = re.compile(r"https?://|\b(curl|wget|http|https|requests|urllib|httpx|canvasapi|graphql|canvas\s+api)\b", re.I)
+WRITE = re.compile(r"(-X|--request)[\s=]*(?i:POST|PUT)|(^|\s)(-d|-F|-T|--data|--form|--json|--upload-file)")
 SAFE_FIRST = {"git", "gh", "grep", "egrep", "rg"}
 COMPOUND = re.compile(r"[;&|`\n<>]|\$\(|\bgh\s+api\b")
 MCP_READ = re.compile(r"^(get|list|search|read|find|fetch|show|count)", re.I)
-APPROVAL = re.compile(r"^\s*(yes|ok|okay|approved)?[,.!]?\s*(please\s+)?(go ahead and\s+)?"
+APPROVAL = re.compile(r"\s*((yes|ok|okay|approved|looks good|lgtm)[,.!]*\s*)?(please\s+)?(go ahead and\s+)?"
                       r"((post|publish)\s+(it|the announcement|this announcement|that announcement)"
-                      r"|send\s+(the|this|that)\s+announcement)(\s+now)?\s*[.!]*\s*$", re.I | re.M)
-TAG = re.compile(r"<(/?)([a-z][\w-]*)([^>]*)>")
+                      r"|send\s+(the|this|that)\s+announcement)(\s+(now|as written|please))*[\s.!]*", re.I)
+TAG = re.compile(r"<(/?)([a-z][\w-]*)([^>]*)>", re.I)
 
 
 def is_announcement_write(tool, inp):
@@ -43,15 +41,17 @@ def is_announcement_write(tool, inp):
         first = (cmd.split() or [""])[0].rsplit("/", 1)[-1]
         if first in SAFE_FIRST and not COMPOUND.search(cmd):  # one plain command
             return False
-        return bool(CLI.search(cmd) or ANNOUNCE.search(cmd) or (TOPIC.search(cmd) and WRITE.search(cmd)))
+        curl_read = first == "curl" and not WRITE.search(cmd) and not COMPOUND.search(cmd)
+        return bool(CLI.search(cmd) or ANNOUNCE.search(cmd) or (TOPIC.search(cmd) and NET.search(cmd) and not curl_read))
     name = tool.lower()
-    if not name.startswith("mcp__") or "canvas" not in name and "announc" not in name:
+    if not name.startswith("mcp__"):
         return False
     verb = name.split("__")[-1]
-    if any(w in verb for w in ("announc", "discussion", "topic")) and not MCP_READ.search(verb):
+    if ("announc" in verb or "github" not in name and ("discussion" in verb or "topic" in verb)) \
+            and not MCP_READ.search(verb):
         return True
     flat = json.dumps(inp).replace('\\"', '"')
-    return bool(TOPIC.search(flat) and re.search(r"is_announcement|\b(POST|PUT)\b", flat, re.I))
+    return "canvas" in name and bool(TOPIC.search(flat) and re.search(r"is_announcement|\b(POST|PUT)\b", flat, re.I))
 
 
 def user_words(text):
@@ -64,9 +64,9 @@ def user_words(text):
                    and set(path[1:-1]) <= {"project", "thread"})
         if not stack or (in_wake or path == ["coordinator-relay", "relay", "cited"]) and stack[-1][1]:
             out.append(text[pos:m.start()])
-        closing, tag, attrs = m.group(1), m.group(2), m.group(3)
+        closing, tag, attrs = m.group(1), m.group(2).lower(), m.group(3)
         if closing:
-            while stack and stack.pop()[0] != tag:
+            while tag in [t for t, _ in stack] and stack.pop()[0] != tag:  # stray: ignored
                 pass
         elif not attrs.rstrip().endswith("/"):
             ok = ('trust="principal"' in attrs if tag == "message"
@@ -82,6 +82,18 @@ def _blocks(entry):
     return content if isinstance(content, list) else [{"type": "text", "text": content or ""}]
 
 
+def _user_text(entry):
+    att = entry.get("attachment") or {}
+    if att.get("type") == "queued_command":
+        return str(att.get("prompt") or "")
+    if entry.get("type") == "queue-operation" and entry.get("operation") == "enqueue":
+        return str(entry.get("content") or "")
+    if is_real_user_turn(entry) and entry.get("promptSource") != "sdk":
+        return "\n".join(strip_injected_text(b.get("text") or "")
+                         for b in _blocks(entry) if b.get("type") == "text")
+    return None
+
+
 def verdict(path, tool, inp):
     """None to allow, or why the write is refused."""
     if is_real_user_turn is None:
@@ -91,19 +103,19 @@ def verdict(path, tool, inp):
             entries = [json.loads(line) for line in fh if line.strip()]
     except (OSError, ValueError, TypeError):
         return "the transcript could not be read"
+    answered = {b.get("tool_use_id") for e in entries for b in _blocks(e) if b.get("type") == "tool_result"}
     writes = []  # every write since the approval, failed ones included
     for entry in reversed(entries):
-        if is_real_user_turn(entry) and entry.get("promptSource") != "sdk":
-            text = "\n".join(strip_injected_text(b.get("text") or "")
-                             for b in _blocks(entry) if b.get("type") == "text")
-            last = (user_words(text) or [""])[-1]  # the user's last message only
-            if not APPROVAL.search(last) or DECLINE.search(last):
-                return "the user's latest message does not approve posting it"
-            if [tool, inp] in writes:  # the call being judged, already logged
-                writes.remove([tool, inp])
+        text = _user_text(entry)
+        if text is not None:
+            if not APPROVAL.fullmatch((user_words(text) or [""])[-1]):
+                return "the user's latest message is not only an approval of posting it"
+            now = [w for w in writes if w[:2] == [tool, inp] and w[2] not in answered]
+            if now:  # the call being judged, logged with no result yet
+                writes.remove(now[0])
             return "an announcement was already posted after that approval" if writes else None
         if entry.get("type") == "assistant":
-            writes += [[b.get("name"), b.get("input")] for b in _blocks(entry)
+            writes += [[b.get("name"), b.get("input"), b.get("id")] for b in _blocks(entry)
                        if b.get("type") == "tool_use"
                        and is_announcement_write(b.get("name") or "", b.get("input") or {})]
     return "no message from the user approves posting it"
@@ -134,7 +146,7 @@ def main() -> int:
                 f"Refused: this posts or edits a class announcement, and {why} "
                 "(Ezra, 2026-10-27, ai-config#4780: never post an announcement "
                 "without his review and approval of its exact text).\n\nShow "
-                "the exact text in chat and ask the user to reply with the line "
+                "the exact text in chat and ask the user to reply with only "
                 "\"post the announcement\"; then post that text once."),
         }}))
     return 0

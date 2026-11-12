@@ -29,6 +29,7 @@ from findbash import probe_bash  # noqa: E402
 WORKFLOW = Path(__file__).resolve().parent.parent / ".github/workflows/validate-duration.yml"
 TITLE = "validate job on main has slowed down"
 MARKER = "<!-- validate-duration-tracking -->"
+FLAGS = ["--noprofile", "--norc", "-eo", "pipefail", "-c"]  # what `shell: bash` runs
 
 
 def find_step_bash() -> str:
@@ -43,14 +44,14 @@ def find_step_bash() -> str:
         stub.write_text("#!/bin/bash\nexit 0\n", encoding="utf-8")
         stub.chmod(0o755)
         env = {**os.environ, "PATH": f"{tmp}{os.pathsep}{os.environ['PATH']}"}
-        found = probe_bash(("-c", "probe-stub && jq -n 1"), cwd=tmp, env=env)
+        found = probe_bash((*FLAGS, "probe-stub && jq -n 1"), cwd=tmp, env=env)
     if found is None:
         raise SystemExit("no bash ran a stub from PATH and jq; the steps need both")
     return found
 
 
 BASH = find_step_bash()
-SHELLS = {"bash": [BASH, "--noprofile", "--norc", "-eo", "pipefail", "-c"]}
+SHELLS = {"bash": [BASH, *FLAGS]}
 GH = """#!/bin/bash
 echo "$*" | tr '\\n' ' ' >> "$LOG"
 echo >> "$LOG"

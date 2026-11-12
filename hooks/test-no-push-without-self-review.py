@@ -2417,7 +2417,7 @@ def verdict_map_cases() -> tuple[int, int]:
           PUSH, both, False)
     check("branch B's own clean verdict still authorizes B",
           push_feature, both, False)
-    check("a later blocking verdict for another commit does not veto this one",
+    check("a later blocking verdict on a child does not veto its reviewed parent",
           PUSH, verdicts((clean, HEAD), (nmw, FEATURE)), False)
     check("a later blocking verdict for the same commit vetoes it",
           PUSH, verdicts((clean, HEAD), (nmw, HEAD)), True)
@@ -2458,10 +2458,25 @@ def verdict_map_cases() -> tuple[int, int]:
           push_feature, verdicts((nmw, HEAD), (clean, FEATURE), (clean, OTHER_HEAD)), False)
     check("a later clean report with no fingerprint vetoes",
           PUSH, verdicts((clean, HEAD)) + reviewed(body(fingerprint=False)), True)
-    out = run_hook(PUSH, verdicts((clean, FEATURE), (nmw, OTHER_HEAD), (clean, FEATURE)))[1]
-    ok = "but this push" in (out.get("hookSpecificOutput") or {}).get("permissionDecisionReason", "")
-    ran, failures = ran + 1, failures + (not ok)
-    print(f"{'PASS' if ok else 'FAIL'}: an unreviewed commit keeps the existing message")
+    for label, cmd, pairs, text, env in (
+            ("an unreviewed commit keeps the existing message", PUSH,
+             ((clean, FEATURE), (nmw, OTHER_HEAD), (clean, FEATURE)), "but this push", None),
+            ("the refusal names a blocking verdict on the base", push_feature,
+             ((clean, FEATURE), (nmw, HEAD), (clean, OTHER_HEAD)), f"names {HEAD[:12]}, an ancestor", None),
+            ("the refusal names the blocking verdict on the commit", PUSH,
+             ((clean, HEAD), (nmw, HEAD), (clean, FEATURE)), f"naming {HEAD[:12]} returned a blocking", None),
+            ("the refusal names an unparsed verdict on the commit", PUSH,
+             ((clean, HEAD), ("Looks bad", HEAD), (clean, FEATURE)), "cannot parse", None),
+            ("the refusal names the veto", PUSH,
+             ((clean, HEAD), (nmw, OTHER_HEAD), (clean, FEATURE)), f"clean verdict for {HEAD[:12]}", None),
+            ("a map that runs out of time still refuses", PUSH,
+             ((clean, FEATURE), (nmw, HEAD)), "blocking verdict", {"NPWSR_BUDGET_SECONDS": "0"})):
+        rc, out = run_hook(cmd, verdicts(*pairs), extra_env=env)
+        spec = out.get("hookSpecificOutput") or {}
+        ok = rc == 0 and spec.get("permissionDecision") == "deny" and text in spec.get(
+            "permissionDecisionReason", "")
+        ran, failures = ran + 1, failures + (not ok)
+        print(f"{'PASS' if ok else 'FAIL'}: {label}")
     check("a later unparsed report still fails closed",
           PUSH, verdicts((clean, HEAD), (clean, FEATURE), ("Looks fine", FEATURE)),
           True)

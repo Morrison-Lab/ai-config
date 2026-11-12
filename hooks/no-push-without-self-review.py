@@ -2904,31 +2904,34 @@ def _opencode_transcript_fallback(session_id) -> str:
 
 def _verdict_map_covers(history: list[tuple[str, list[str]]],
                         directory: str | None, argv: list[str],
-                        env: list[str]) -> str:
-    """A pass reason when every commit this push ships has a clean verdict
-    as the LATEST verdict naming it, else "" (ai-config#4006, #4237).
+                        env: list[str]) -> tuple[str, str]:
+    """(pass, block) from the LATEST verdict naming each shipped commit
+    (ai-config#4006, #4237); ("", "") leaves the decision, and its message,
+    to the caller's latest-verdict checks.
 
     The map is keyed by commit, so a verdict for another branch or another
     repository no longer erases this one's. A blocking verdict (an unparsed
-    report counts as one) vetoes every shipped commit it names or is an
+    report counts as one) blocks every shipped commit it names or is an
     ancestor of, unless a clean verdict for that commit came later: a stacked
-    branch ships its base's flagged code. A blocking verdict with ANY
-    fingerprint that does not resolve here, or with none, vetoes every verdict
-    before it, since a foreign fingerprint cannot be told from a fabricated
-    one; so does a clean report with no fingerprint. A clean report with a
-    fingerprint that does not resolve here binds nothing and is skipped, which
-    is what lets a review of another repository leave this one's verdict
-    standing. "" leaves the decision, and its message, to the caller's
-    latest-verdict checks, as does any doubt (a timeout, a git error, an
-    unknown payload, a ref deletion).
+    branch ships its base's flagged code. A blocking verdict on a descendant
+    does not block its reviewed ancestor, whose shipped code it did not judge.
+    A blocking verdict with ANY fingerprint that does not resolve here, or
+    with none, vetoes every verdict before it, since a foreign fingerprint
+    cannot be told from a fabricated one; so does a clean report with no
+    fingerprint. A clean report with a fingerprint that does not resolve here
+    binds nothing and is skipped, which is what lets a review of another
+    repository leave this one's verdict standing. A shipped commit no verdict
+    names, and any doubt (a timeout, a git error, an unknown payload, a ref
+    deletion), return ("", "").
     """
     if len(history) < 2:
-        return ""  # one verdict: the caller's checks decide, with their own messages
+        return "", ""  # one verdict: the map and the caller's checks agree
     try:
         commits, _why = shipped_commits(directory, argv, env)
         if not commits:
-            return ""
+            return "", ""
         latest: dict[str, tuple[str, int]] = {}
+        wiped: set[str] = set()
         resolved_cache: dict[str, str | None] = {}
         for seq, (found, shas) in enumerate(history):
             for sha in shas:
@@ -2939,22 +2942,38 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
             if found == "clean" and len(hits) < len(shas):
                 continue  # an unresolvable fingerprint voids a clean report
             if not hits or len(hits) < len(shas):
+                wiped |= {c for c, (f, _) in latest.items() if f == "clean"}
                 latest.clear()  # an unbound report vetoes all before it
             for hit in hits:
                 latest[hit] = (found, seq)
-        for c in commits:
-            if latest.get(c, ("", 0))[0] != "clean":
-                return ""
-            since = latest[c][1]
-            for sha, (found, seq) in latest.items():
-                if found != "clean" and seq > since and _run_git(
+        for c in sorted(commits):
+            found, since = latest.get(c, ("", 0))
+            if found == "unparsed":
+                return "", (f"The latest reviewer report naming {c[:12]} has a verdict "
+                            f"line this guard cannot parse; it accepts {ACCEPTED_VERDICT_PHRASES}.\n"
+                            "Re-dispatch the reviewer.")
+            if found == "needs_work":
+                return "", (f"The latest adversarial self-review naming {c[:12]} returned "
+                            "a blocking verdict.\nAddress, rebut, or defer every finding, "
+                            "commit, and re-dispatch the reviewer.")
+            for sha, (f, seq) in latest.items():
+                if f != "clean" and seq > since and found and _run_git(
                         directory, env, "merge-base", "--is-ancestor", sha, c,
                         unreadable_raises=True) is not None:
-                    return ""  # a later blocking verdict on an ancestor
-    except (TimeoutError, LookupError):
-        return ""
-    return ("Clean adversarial self-review verified at "
-            f"{', '.join(sorted(commits))} (latest verdict naming each).")
+                    return "", (f"A later blocking verdict names {sha[:12]}, an ancestor of "
+                                f"{c[:12]}, so this push ships code a review flagged.\n"
+                                "Address it, then re-dispatch the reviewer against what you push.")
+        missing = sorted(c for c in commits if c not in latest)
+        if not missing:
+            return ("Clean adversarial self-review verified at "
+                    f"{', '.join(sorted(commits))} (latest verdict naming each)."), ""
+        if set(missing) <= wiped:
+            return "", (f"A later blocking or unparsed report names a commit that does not "
+                        f"resolve here, which vetoes the clean verdict for {missing[0][:12]}.\n"
+                        "Re-dispatch the reviewer against what you push.")
+    except Exception as exc:  # the caller's stricter checks still decide
+        print(f"no-push-without-self-review: verdict map skipped ({exc})", file=sys.stderr)
+    return "", ""
 
 
 def verify_review(transcript_path: str, directory: str | None,
@@ -3056,9 +3075,11 @@ def verify_review(transcript_path: str, directory: str | None,
         )
 
     if not saw_unparsed_later:
-        mapped = _verdict_map_covers(history, directory, argv, env)
+        mapped, map_block = _verdict_map_covers(history, directory, argv, env)
         if mapped:
             return True, mapped
+        if map_block:
+            return False, map_block
 
     if verdict == "needs_work":
         return False, (

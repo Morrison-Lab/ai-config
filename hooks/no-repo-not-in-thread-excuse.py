@@ -1,19 +1,13 @@
 #!/usr/bin/env python3
 """PreToolUse: never say a repository isn't in this thread; attach it.
 
-Ezra, 2026-11-12: "cai: never say a repo isn't in a thread; add it". An mds
-thread told the coordinator "ai-config isn't in this thread's repos" when
-add_repo would have attached it (see no-cant-from-session-excuses.md).
-
-Scope: hearthbot messages to a person or session, in every session. Denies a
-sentence with a negated presence or access ("isn't in", "doesn't have",
-"can't reach", "outside", "has no X checkout"), a thread or session as the
-place, and a repository: the thread's repo list, or a repo word, owner/name
-or lab repo name as the subject just before the negation or as its object.
-A path (scripts/x.py) or code span (`pytest`) alone does not count. A report
-that I or we attached the one repository named passes, as does one saying
-add_repo or the attach was refused, failed or returned an error.
-
+Ezra, 2026-11-12: "cai: never say a repo isn't in a thread; add it" (see
+no-cant-from-session-excuses.md). Denies a hearthbot sentence that places a
+repository out of this thread, session or "here": the thread's repo list, or
+a repo word, owner/name or lab repo name as subject of "isn't in" and the
+like or object of "doesn't have" or "can't push to". A path or code span
+alone does not count. A report that I or we attached the one repository
+named passes, as does a reported add_repo or attach refusal or failure.
 A deny because the shape is lexical (ai-config#4741).
 `ALLOW_REPO_NOT_IN_THREAD=1` overrides. Fails open on any parse trouble.
 """
@@ -30,16 +24,15 @@ APOS = r"(?:'|\u2019)"
 NEG = (rf"(?:isn{APOS}t|is\s+not|aren{APOS}t|are\s+not|wasn{APOS}t|was\s+not|"
        rf"don{APOS}t|doesn{APOS}t|didn{APOS}t|do\s+not|does\s+not|did\s+not|"
        rf"can{APOS}t|cannot|can\s+not|couldn{APOS}t|no\s+longer|not)")
-PRESENCE = (r"(?:in|part\s+of|attached|among|one\s+of|within|available|include|"
-            r"includes|have|has|access|accessible|reach|reachable|checked\s+out|cloned|added|push|edit|"
-            r"write|commit|see|on)")
-NEG_PRESENCE = re.compile(
-    rf"\b{NEG}\s+(?:\w+\s+){{0,3}}?{PRESENCE}\b|\b(?:outside|unavailable|lacks?)\b"
-    rf"|\b(?:has|have)\s+no\b|\bthere(?:{APOS}s|\s+is|\s+are)\s+no\b",
-    re.I)
-PLACE = rf"(?:this|the|my|our|that|current)\s+(?:thread|session)"
-LOC = re.compile(rf"\b{PLACE}\b|\bmy\s+(?:repos|repositories)\b"
-                 r"|\b(?:attached|checked\s+out|cloned|available)\s+here\b", re.I)
+MODAL = rf"(?:can{APOS}t|cannot|can\s+not|couldn{APOS}t|unable\s+to|not\s+able\s+to)"
+# The subject form takes only a presence word, so "lds is not changed in" passes.
+SUBJ_NEG = re.compile(
+    rf"\b{NEG}\s+(?:(?:yet|currently|actually|even|already|really)\s+)?"
+    r"(?:in|part\s+of|attached|among|one\s+of|within|available|accessible|reachable|"
+    r"checked\s+out|cloned|added)\b|\b(?:outside|unavailable)\b", re.I)
+ANY_NEG = re.compile(rf"\b{NEG}\b|\b(?:outside|unavailable|lack\w*|no)\b", re.I)
+PLACE = rf"(?:this|the|my|our|that|current)\s+(?:project\s+)?(?:thread|session)"
+LOC = re.compile(rf"\b{PLACE}\b|\bmy\s+(?:repos|repositories)\b|\bhere\b", re.I)
 REPO_LIST = re.compile(
     rf"\b{PLACE}{APOS}s\s+(?:github\s+)?(?:repos|repositories|repo\s+scope)\b"
     r"(?![\w'\u2019])(?!\s+(?:checkout|clone|directory|folder|tree|root|branch|files?|of)\b)"
@@ -48,27 +41,30 @@ REPO_LIST = re.compile(
     re.I)
 LAB_REPOS = (r"ai-config|gha|macros|lds|mlg|mlr|mds|mcs|pds|sds|rme|psw|psc|qwt|qnp|"
              r"ids|dds|vds|ccds|cds|epi\d+|lds-site|mcsg|stats-allowlist|teaching-tools")
-REPO_NAME = re.compile(
-    rf"\b(?:repo|repos|repository|repositories)\b|\b[\w-]{{1,39}}/[\w-]{{1,100}}\b(?![/.]\w)"
-    rf"|\b(?:{LAB_REPOS})\b", re.I)
-SUBJECT = re.compile(rf"(?:{REPO_NAME.pattern})[\s`'\"\u2019]*(?:(?:is|are|was|were)\s+)?$", re.I)
 NAMED = re.compile(rf"\b[\w-]{{1,39}}/[\w-]{{1,100}}\b(?![/.]\w)|\b(?:{LAB_REPOS})\b", re.I)
+REPO_NAME = re.compile(rf"\b(?:repo|repos|repository|repositories)\b|{NAMED.pattern}", re.I)
+SUBJECT = re.compile(rf"(?:{REPO_NAME.pattern})[\s`'\"\u2019]*(?:(?:is|are|was|were)\s+)?$", re.I)
+# The object must end its phrase: "I don't have the lds preview URL" passes.
+DET = r"(?:(?:the|a|an|that|this|any)\s+)?"
+TOK = r"`?([\w-]{1,39}(?:/[\w-]{1,100})?)`?"
+END = r"(?=\s*(?:[.,;:!?)]|$|(?:in|on|from|here|to|into|within|checked|cloned|attached)\b))"
 OBJECT = re.compile(
-    rf"\b{NEG}\s+(?:\w+\s+){{0,2}}?"
-    r"(?:have|has|include|includes|access|reach|push|edit|write|commit)\s+"
-    r"(?:access\s+to\s+|to\s+|into\s+)?(?:(?:the|a|an|that|this)\s+)?(\S+)"
+    rf"\b{NEG}\s+(?:\w+\s+){{0,2}}?(?:have|has|include|includes|see)\s+(?:access\s+to\s+)?{DET}{TOK}{END}"
+    # Action verbs need a can't: "I did not push to lds in this session" passes.
+    rf"|\b{MODAL}\s+(?:\w+\s+)?(?:reach|access|push|edit|write|commit|clone|modify|open\s+a\s+PR\s+(?:on|in|against))"
+    rf"\s+(?:to\s+|into\s+)?{DET}{TOK}{END}"
     # "has no X" needs a checkout or access word: "we have no gha changes" passes.
     rf"|(?:\b(?:has|have)\s+no|\bthere(?:{APOS}s|\s+is|\s+are)\s+no)\s+"
-    r"(?:access\s+to\s+(?:the\s+)?(\S+)|(?:checkout|clone|copy)\s+of\s+(?:the\s+)?(\S+)"
-    r"|(?:the\s+)?(\S+)\s+(?:checkout|clone|copy|access|repo|repository)\b)"
-    r"|\black\w*\s+access\s+to\s+(?:the\s+)?(\S+)",
+    rf"(?:access\s+to\s+{DET}{TOK}|(?:checkout|clone|copy)\s+of\s+{DET}{TOK}"
+    rf"|{DET}{TOK}\s+(?:checkout|clone|copy|access|repo|repository)\b)"
+    rf"|\black\w*\s+access\s+to\s+{DET}{TOK}",
     re.I)
 ATTACHED = re.compile(
     rf"\b(?:I|we)\s+(?:have\s+|{APOS}ve\s+|just\s+|then\s+)?(?:added|attached|cloned)\s+(?:(?:the|a|an)\s+)?(\S+)", re.I)
 FAIL = r"(?:refused|denied|declined|failed|rejected|returned|errored)"
 TRIED = re.compile(
-    rf"\b(?:add_repo|attach|attaching)\b[^.!?]*\b{FAIL}\b|\b{FAIL}\b[^.!?]*\b(?:add_repo|attach|attaching)\b",
-    re.I)
+    r"\b(?:add_repo|attach|attaching)\b(?:\s+(?!has\b|had\b|would\b|will\b|may\b|might\b|could\b)\S+){0,2}?"
+    rf"\s+(?:was\s+|itself\s+)?{FAIL}\b", re.I)
 
 REASON = (
     '[hook: no-repo-not-in-thread-excuse] "{sentence}" says a repository is not in this '
@@ -82,17 +78,18 @@ REASON = (
 
 
 def message_text(tool_input: dict) -> str:
-    parts = [tool_input.get("text"), tool_input.get("question")]
+    parts = [tool_input.get(k) for k in ("text", "question", "reason")]
     for opt in tool_input.get("options") or []:
         if isinstance(opt, dict):
             parts += [opt.get("label"), opt.get("consequence")]
     return "\n".join(p for p in parts if isinstance(p, str))
 
 
-def names_repo(sentence: str, neg: re.Match) -> bool:
-    if REPO_LIST.search(sentence):
+def names_repo(sentence: str) -> bool:
+    if REPO_LIST.search(sentence) and ANY_NEG.search(sentence):
         return True
-    if SUBJECT.search(sentence[max(0, neg.start() - 200):neg.start()]):
+    if any(SUBJECT.search(sentence[max(0, m.start() - 200):m.start()])
+           for m in SUBJ_NEG.finditer(sentence)):
         return True
     obj = OBJECT.search(sentence)
     if not obj:
@@ -101,8 +98,7 @@ def names_repo(sentence: str, neg: re.Match) -> bool:
 
 
 def is_excuse(sentence: str) -> bool:
-    neg = NEG_PRESENCE.search(sentence)
-    if not neg or not LOC.search(sentence):
+    if not LOC.search(sentence):
         return False
     att = ATTACHED.search(sentence)
     named = {m.group(0).lower() for m in NAMED.finditer(sentence)}
@@ -110,7 +106,7 @@ def is_excuse(sentence: str) -> bool:
         return False
     if TRIED.search(sentence):
         return False
-    return names_repo(sentence, neg)
+    return names_repo(sentence)
 
 
 def excuse(text: str):

@@ -53,6 +53,10 @@ CASES = [
     ("returned 403", POST, "add_repo returned 403 Forbidden, so ai-config isn't in this thread.", False),
     ("scope", POST, "The issue is not in this thread's scope, so I left it.", False),
     ("lds status", POST, "The lds preview isn't in this thread yet.", False),
+    ("project thread", POST, "ai-config isn't in this project thread.", True),
+    ("failed before", POST, "add_repo has failed before, so ai-config is not in this thread.", True),
+    ("status edit", POST, "This thread does not edit lds; the change is in mds.", False),
+    ("lds preview URL", POST, "I don't have the lds preview URL in this thread yet.", False),
     # Passes.
     ("tried and refused", POST, "add_repo refused ai-config, so it is not in this session's repos.", False),
     ("attach failed", POST, "The attach failed with a 403, so ai-config is not in this thread's repos.", False),
@@ -65,10 +69,10 @@ CASES = [
 
 def decision_denied():
     os.environ.pop(hook.OVERRIDE, None)
-    return hook.denial({"tool_name": "mcp__hearthbot__request_decision", "tool_input": {
-        "question": "File it where?",
-        "options": [{"label": "Ask coordinator",
-                     "consequence": "ai-config isn't in this thread's repos."}]}}) is not None
+    bad = "ai-config isn't in this thread's repos."
+    return all(hook.denial({"tool_name": "mcp__hearthbot__request_decision", "tool_input": ti}) is not None
+               for ti in ({"question": "Where?", "options": [{"label": "a", "consequence": bad}]},
+                          {"question": "Where?", "reason": bad}))
 
 
 def denied(tool, text):
@@ -85,7 +89,7 @@ def main() -> int:
             print(f"FAIL {name}: want deny={want}, got {got}")
     if not decision_denied():
         failures += 1
-        print("FAIL request_decision option")
+        print("FAIL request_decision option or reason")
     os.environ[hook.OVERRIDE] = "1"
     if hook.denial({"tool_name": POST, "tool_input": {"text": CASES[0][2]}}) is not None:
         failures += 1

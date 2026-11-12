@@ -47,8 +47,9 @@ that flag exits before the sentinel, so it does not use up the one block.
 A project thread usually runs the pass and THEN reports the mistake in its
 reply, so UMS work earlier in the same turn (after the last real user turn,
 per scripts/lib/transcript_meta.py) discharges an admission too, but only one
-whose own text says it was recorded (`UMS_WORD` or `CITES_RECORD`). A second,
-different mistake admitted after the pass still owes one. A Bash redirect or `tee`
+whose own text names a file that turn wrote ("recorded in claude-app-projects.md").
+A keyword such as "UMS" is not enough: "I have not run UMS yet" names it too. A
+second, different mistake admitted after the pass still owes one. A Bash redirect or `tee`
 into a memory, skill or shared path, and a GitHub MCP file write to one,
 count as UMS work, since those are how a cloud session records a learning.
 `sed -i`, `cp` and `mv` into such a path are not recognized.
@@ -383,12 +384,14 @@ def shell_writes_ums_path(command):
     """True when `command` redirects or tees into a memory, skill or shared path."""
     bare = _QUOTED_ARG.sub(lambda m: m.group(0) if m.group(1) else " ", command)
     return bool(SHELL_UMS_WRITE.search(bare))
-# An admitting reply that says where the lesson went.
-CITES_RECORD = re.compile(
-    r"\b(?:recorded|saved|wrote|added|captured)\b[^.\n]{0,80}"
-    r"(?:memor|skill|ai-config|shared/|CLAUDE\.md|AGENTS\.md|fragment)",
-    re.I,
-)
+# A memory, skill or shared path named in a shell command, so its file name
+# can be matched against the reply that reports the pass.
+SHELL_UMS_TARGET = re.compile(r"[\w./~-]*(?:memories?/|skills/|shared/)[\w./-]+")
+
+
+def _names(paths):
+    """File names of the UMS paths among `paths`."""
+    return {os.path.basename(p.rstrip("/")) for p in paths if p and UMS_PATH.search(p)}
 GITHUB_FILE_WRITES = ("mcp__github__create_or_update_file", "mcp__github__push_files")
 
 
@@ -410,6 +413,7 @@ def scan(path):
     """
     admit_txt, admit_at, ums_at = None, -1, -1
     user_at, admit_turn, cites_pass = -1, -1, False
+    turn_names = set()  # file names of UMS writes since the last real user turn
 
     for i, m in enumerate(records(path)):
         # A subagent's own turns are not my outgoing message.
@@ -433,6 +437,7 @@ def scan(path):
         blocks = (m.get("message") or {}).get("content") or m.get("content") or []
         if is_real_user_turn(m):
             user_at = i
+            turn_names = set()
             continue
         if isinstance(blocks, list):
             for b in blocks:
@@ -480,7 +485,7 @@ def scan(path):
                 # Earlier same-turn work discharges only an admission whose
                 # own text says it was recorded, so a second, different
                 # mistake admitted after the pass still owes one.
-                cites_pass = bool(UMS_WORD.search(raw_text) or CITES_RECORD.search(raw_text))
+                cites_pass = any(n and n in raw_text for n in turn_names)
 
         for name, inp in tool_calls:
             if not isinstance(inp, dict):
@@ -493,11 +498,13 @@ def scan(path):
                     paths += [str(f.get("path") or "") for f in files if isinstance(f, dict)]
                 if any(UMS_PATH.search(p) for p in paths):
                     ums_at = i
+                    turn_names |= _names(paths)
                 continue
             if name in ("Write", "Edit", "NotebookEdit", "write", "edit", "write_to_file", "replace_file_content"):
                 blob = str(inp.get("file_path") or inp.get("path") or inp.get("TargetFile") or inp.get("target_file") or "")
                 if UMS_PATH.search(blob):
                     ums_at = i
+                    turn_names |= _names([blob])
                 continue
             if name in ("Task", "Agent", "invoke_subagent"):
                 ums_parts = [
@@ -526,6 +533,7 @@ def scan(path):
                 blob = str(inp.get("command") or inp.get("CommandLine") or inp.get("cmd") or "")
                 if shell_writes_ums_path(blob):
                     ums_at = i
+                    turn_names |= _names(SHELL_UMS_TARGET.findall(blob))
             elif name == "Skill":
                 blob = str(inp.get("skill", ""))
             if blob and UMS_WORD.search(blob):

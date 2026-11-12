@@ -52,9 +52,9 @@ LIST_NEG = re.compile(
 # "I attached it", "I added it" and "ran add_repo" report the fix; "the attached patch", a request, a negation does not.
 ATTACH_VERB = re.compile(rf"(?<!the\s)(?<!\ba\s)(?<!an\s)(?<!repos\s)(?<!repositories\s)\battach(?:ed|ing)\b"
     rf"(?=\s+(?:both\s+|the\s+)?(?:it|them|repo|repository|{NAMED.pattern})(?!\s+(?:is|was|would|will|should|needs?|requires?)\b)|(?:\s+both)?\s*(?:[.,;]|$)|\s+now\b)"
-    rf"|\badded\s+[\w/-]{{1,140}}\s+to\s+{PLACE}|\b(?:added|adding|cloned|cloning)\s+(?:it|them|the\s+repo(?:sitory)?|{NAMED.pattern})\b(?!\s+(?:to|in)\s+(?!{PLACE}|/))"
-    r"|\b(?:ran|running|called|calling|used|invoked|tried)\s+(?:the\s+)?add_repo\b|\badd_repo\s+(?:(?!(?:would|could|might|may|will|should|not|never)\b)\S+\s+){0,3}?(?:attached|added|cloned|fixed|succeeded|worked)\b"
-    r"|\b(?:fixed|attached|added|adding)\s+(?:\w+\s+){0,3}?(?:with|via|using)\s+add_repo\b", re.I)
+    rf"|\badded\s+[\w/-]{{1,140}}\s+to\s+{PLACE}|\b(?:added|cloned|(?<=m\s|e\s)(?:adding|cloning))\s+(?:it|them|the\s+repo(?:sitory)?|{NAMED.pattern})\b(?!\s+(?:to|in)\s+(?!{PLACE}|/))"
+    r"|\b(?:ran|called|used|invoked|tried|(?<=m\s|e\s)(?:running|calling))\s+(?:the\s+)?add_repo\b|\b(?:running|calling)\s+add_repo\s+now\b|\badd_repo\s+(?:(?!(?:would|could|might|may|will|should|not|never)\b)\S+\s+){0,3}?(?:attached|added|cloned|fixed|succeeded|worked)\b"
+    r"|\b(?:fixed|attached|added|(?<=m\s|e\s)adding)\s+(?:\w+\s+){0,3}?(?:with|via|using)\s+add_repo\b", re.I)
 OUTAGE = re.compile(r"\b(?:down|outage|offline|proxy|network|disk|quota|rate.limit\w*|timed?\s*out|DNS|SSL|TLS|[45]\d\d|[45]\d\ds)\b", re.I)
 OTHER_CAUSE = re.compile(rf"[^.;]{{0,200}}?\b(?:because|since|due\s+to|until|while)\b(?![^.;]{{0,300}}(?:\b(?:attach\w*|add_repo)\b"
                          rf"|\b{PLACE}\b))", re.I)  # "because it isn't in this thread's repos" is the excuse again

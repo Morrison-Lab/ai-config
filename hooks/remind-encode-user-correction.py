@@ -184,6 +184,13 @@ def typed_text(prompt: str) -> str:
 
 
 def main() -> int:
+    # Quoted prompt text can hold curly quotes, which a cp1252 console can
+    # neither read from a UTF-8 payload nor write for a UTF-8 reader
+    # (ai-config#5462). Read stdin and write stdout as UTF-8 whatever the
+    # console says.
+    for stream in (sys.stdin, sys.stdout):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     try:
         payload = json.load(sys.stdin)
     except (json.JSONDecodeError, ValueError):

@@ -76,10 +76,11 @@ checked = 0
 
 
 def loose(text: str) -> str:
-    """The letters, marks and digits of `text`, lowercased.
+    """The letters, marks, digits and letter-numbers of `text`, lowercased.
 
-    A GitHub slug keeps exactly these from a heading's text, plus hyphens and
-    underscores, so a fragment and the heading it names share this key.
+    A GitHub slug keeps these from a heading's text (letters and marks added
+    in Unicode 14 or later aside), plus hyphens and underscores, so a fragment
+    and the heading it names share this key.
     """
     return "".join(ch for ch in text.lower()
                    if unicodedata.category(ch)[0] in "LM" or unicodedata.category(ch) in NUMBERS)

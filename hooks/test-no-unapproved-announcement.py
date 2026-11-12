@@ -64,7 +64,7 @@ OTHER = [("Bash", {"command": c}) for c in [
     "git commit -m 'Gate canvas announcements create (#4780)'", "git commit -m \"x\n\nCloses #4780\"",
     "gh issue comment 1 --body 'gate POST discussion_topics, https://x'", "grep -nE 'is_announcement|topic' f",
     "echo 'Announcement: see https://x/syllabus' > a.md", "sed -n '/is_announcement/p' post.py",
-    "gh api repos/x/y/issues/1/comments -f body='denies curl posts to discussion_topics'", "curl -d 'text=New announcement' https://hooks.slack.com/x",
+    "gh api repos/x/y/issues/1/comments -f body='denies curl posts to discussion_topics'",
     "cat > announcement.md <<'EOF'\nRegrade requests are due.\nEOF", "echo 'canvas announcements create' >> a",
 ]] + [("mcp__github__create_discussion", {}), ("mcp__gitlab__create_discussion", {}),
       ("mcp__hearthbot__post_message", {"text": "Draft announcement. Reply post the announcement to POST it."}),

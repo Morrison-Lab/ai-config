@@ -200,7 +200,8 @@ When a PR changes an analysis or model, quantify differences in key outputs, est
 
 ## Every comment you post to a forge says an agent posted it
 
-End every comment an agent posts to any forge with the disclosure footer `_Posted by <Agent Name> (AI agent) --- not written by a human._`, never the robot emoji ([`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md), [`label-agent-filed-issues`](shared/workflow/label-agent-filed-issues.md)).
+End every comment an agent posts to any forge with the disclosure footer `_Posted by <Agent Name> (AI agent) --- not written by a human._` ([`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md), [`label-agent-filed-issues`](shared/workflow/label-agent-filed-issues.md)).
+Use no robot emoji anywhere in the footer, since review parsers read it as a verdict.
 
 ## File formatting & links
 

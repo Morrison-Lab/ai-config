@@ -105,6 +105,7 @@ See [`dmmhyh`](skills/dmmhyh/SKILL.md).
 `fw` ("finish the current wave but don't start a new one", longhand `finish-wave`) caps an orchestration run at the wave already in flight.
 It bounds *issue grabs* only, so the review rounds, fixes, and the owed UMS pass that finish the wave's PRs all run under it.
 See [`finish-wave`](skills/finish-wave/SKILL.md).
+No freeze stops filing, `fw` included ([`freezes-allow-filing`](shared/workflow/freezes-allow-filing.md)).
 
 - **Do:** read a bare "finish the current wave" as `fw`, hold every new grab, and drive the wave's open PRs to a terminal state.
 - **Don't:** read it as "open no more PRs" --- a UMS PR or a follow-up issue is not a grab from the backlog.

@@ -333,6 +333,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/fixtures-are-not-evidence.md` | A test fixture records what someone believed the real thing looks like. Reasoning from a fixture back to the real thing is circular, so a fixture -- or a tes... |  |
 | `shared/workflow/flag-practice-slippage.md` | Say so when a practice is slipping, not only when an artifact is wrong. |  |
 | `shared/workflow/flag-session-boundaries.md` | Proactively tell me --- don't wait to be asked --- when a session has grown long and hits a natural stopping point: a multi-step task or loop (GII/ARDIA/GIP,... |  |
+| `shared/workflow/freezes-allow-filing.md` | Ezra, 2026-11-12: "a freeze shouldn't prevent you from filing issues" (ai-config#5574). |  |
 | `shared/workflow/fully-clean.md` | "Fully clean" is the terminal state the ARDI review loop drives toward. A GitHub PR is **fully clean** when **both** of these hold, verified via `python3 scr... |  |
 | `shared/workflow/gate-external-communication.md` | Before sending any outward communication to a repository, positively verify that the user is a member of that specific repository. |  |
 | `shared/workflow/github-relationships.md` | Ezra, 2026-11-03 (`cai:`, ai-config#4907): use GitHub's relationships field for **every** relationship among issues and PRs. Prose such as "Blocked by #N", "... |  |

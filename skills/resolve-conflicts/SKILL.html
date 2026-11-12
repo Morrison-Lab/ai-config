@@ -523,7 +523,7 @@ cookieconsent.run({
 <section id="anti-patterns" class="level2">
 <h2 class="anchored" data-anchor-id="anti-patterns">Anti-patterns</h2>
 <ul>
-<li>❌ Blind <code>git checkout --ours/--theirs &lt;file&gt;</code> (or <code>git merge -X ours/theirs</code>) without confirming the dropped side had nothing worth keeping — the classic silent-data-loss move.</li>
+<li>❌ Blind <code>git checkout --ours/--theirs &lt;file&gt;</code> (or <code>git merge -X ours/theirs</code>) without confirming the dropped side had nothing worth keeping — the classic silent-data-loss move. The hook <code>hooks/warn-one-sided-conflict-resolution.py</code> warns on these commands (and on <code>restore</code>, <code>merge-file</code>, <code>rebase</code>, <code>cherry-pick</code>, <code>revert</code> and <code>pull</code> with the same options). It also warns on <code>git merge -s ours</code>, which drops the other branch’s changes entirely.</li>
 <li>❌ Resolving a hunk before understanding <em>why</em> each side changed it.</li>
 <li>❌ Finishing a merge, rebase, cherry-pick, revert or stash pop with no per-hunk keep/drop/modify record (step 3), so nobody can tell a deliberate drop from a lost line.</li>
 <li>❌ Carrying the wording from one conflicting hunk into a string that several consumers share, without reading main’s version of each consumer.</li>

@@ -116,7 +116,7 @@ Confirm which physical branch is “ours” before you reach for `--ours` / `--t
 
 ## Anti-patterns
 
-- ❌ Blind `git checkout --ours/--theirs <file>` (or `git merge -X ours/theirs`) without confirming the dropped side had nothing worth keeping — the classic silent-data-loss move.
+- ❌ Blind `git checkout --ours/--theirs <file>` (or `git merge -X ours/theirs`) without confirming the dropped side had nothing worth keeping — the classic silent-data-loss move. The hook `hooks/warn-one-sided-conflict-resolution.py` warns on these commands (and on `restore`, `merge-file`, `rebase`, `cherry-pick`, `revert` and `pull` with the same options). It also warns on `git merge -s ours`, which drops the other branch’s changes entirely.
 - ❌ Resolving a hunk before understanding *why* each side changed it.
 - ❌ Finishing a merge, rebase, cherry-pick, revert or stash pop with no per-hunk keep/drop/modify record (step 3), so nobody can tell a deliberate drop from a lost line.
 - ❌ Carrying the wording from one conflicting hunk into a string that several consumers share, without reading main’s version of each consumer.

@@ -296,7 +296,7 @@ The user then left auto mode, and the same merge went through the ordinary permi
 So under auto mode, `mwc` authorizes the merge but cannot carry it out.
 
 - **Do:** when auto mode refuses a merge the `mwc` gate passed, report the PR, its pinned SHA and the checker's verdict.
-  Ask the user to switch out of auto mode, since [`ask-for-manual-approval`](../shared/workflow/ask-for-manual-approval.md) never lets you switch yourself for a merge, and name an `autoMode` setting or a permission rule for `gh pr merge` as the lasting fix.
+  Ask the user to switch out of auto mode, since [`ask-for-manual-approval`](../shared/workflow/ask-for-manual-approval.md) never lets you switch yourself for a merge, and name an `autoMode` setting as the lasting fix.
 - **Do:** when the action is still refused after leaving auto mode, or the
   switch conditions in `ask-for-manual-approval` fail, follow that
   fragment's "When to switch or ask" for the case: report the refused

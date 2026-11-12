@@ -53,6 +53,7 @@ It does not lift the prohibited-action rules.
    `difm` covers one step, so the stretch that fragment's "Say when it is over" ends is that step alone.
    When that tool is not available, ask the user to switch out of auto mode,
    naming the refused command and its stated reason.
+   When you asked the user to switch, tell them right after the step that they can switch back.
    The self-switch, the stop conditions, and the managed-settings exception
    are in `ask-for-manual-approval`.
    How a standing grant interacts with a denial is in

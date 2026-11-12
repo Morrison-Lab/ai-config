@@ -1821,6 +1821,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-repo-not-in-thread-excuse.py\"",
+            "timeout": 10,
+            "script": "no-repo-not-in-thread-excuse.py",
+            "why": "Ezra, 2026-11-12: 'cai: never say a repo isn't in a thread; add it'. An mds thread told the coordinator 'ai-config isn't in this thread's repos, so could you route that as an issue?' when add_repo would have attached it. Denies a hearthbot message (post_message, reply, update_message, edit_message, request_decision, message_coordinator, message_thread) in any session whose sentence says a repository is not in, not part of, not attached to, not one of, or outside this thread's or session's repos or scope, and points at add_repo. A sentence that also says the attach was refused, denied, declined or failed passes. A deny, not a reminder, because the failing shape is lexical (ai-config#4741). ALLOW_REPO_NOT_IN_THREAD=1 overrides. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-merge-ask-in-post-message.py\"",
             "timeout": 10,
             "script": "no-merge-ask-in-post-message.py",

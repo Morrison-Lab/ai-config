@@ -31,6 +31,7 @@ DENIED = [
     "FOO=1 cat ~/.aws/credentials",
     "(cat ~/.git-credentials)",
     "echo $(cat ~/.netrc)",
+    "echo `cat ~/.netrc`",
     'printf "%s" "$(cat ~/.config/canvas/token)"',
     "echo ALLOW_CREDENTIAL_READ=1; cat ~/.netrc",
     "cat $XDG_CONFIG_HOME/canvas/token",
@@ -47,6 +48,7 @@ ALLOWED = [
     "echo 'cat ~/.netrc is forbidden'",
     "cat ~/.config/nvim/tokenize.lua",
     "cat ~/.config/myapp/secret.py",
+    "grep .netrc notes.md",  # a search pattern, not a path
 ]
 
 for c in DENIED:

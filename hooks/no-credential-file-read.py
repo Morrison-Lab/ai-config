@@ -23,24 +23,20 @@ import re
 import sys
 
 try:
-    _LIB = os.path.join(os.path.dirname(os.path.dirname(
-        os.path.realpath(__file__))), "scripts", "lib")
-    sys.path.insert(0, _LIB)
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(
+        os.path.realpath(__file__))), "scripts", "lib"))
     from shellcmd import is_operator_token, shell_tokens
 except Exception as _exc:  # broken install: degrade, never block
-    print(f"no-credential-file-read: cannot load scripts/lib/shellcmd.py "
-          f"({_exc}); no command will be checked", file=sys.stderr)
+    print(f"no-credential-file-read: no shellcmd ({_exc})", file=sys.stderr)
     shell_tokens = None
 
 OVERRIDE = "ALLOW_CREDENTIAL_READ=1"
-
 READERS = {
     "cat", "head", "tail", "less", "more", "sed", "awk", "grep", "egrep",
     "fgrep", "rg", "bat", "nl", "xxd", "od", "hexdump", "strings", "base64",
     "tac", "cut", "sort", "uniq", "diff", "jq", "yq", "type", "Get-Content",
 }
 
-# Paths relative to the home directory, matched with fnmatch.
 HOME_PATTERNS = (
     ".netrc", "_netrc", ".git-credentials", ".pgpass", ".npmrc", ".pypirc",
     ".aws/credentials", ".docker/config.json", ".kube/config",
@@ -56,18 +52,15 @@ CODE_SUFFIXES = (".py", ".lua", ".js", ".ts", ".sh", ".md", ".vim", ".el")
 PRINTERS = {"echo", "printf", "print"}
 SUBSTITUTION = re.compile(r"\$\(([^()]*)\)")
 LEAD_WORDS = {"sudo", "command", "exec", "nohup", "time", "doas", "env"}
+PATTERN_FIRST = {"grep", "egrep", "fgrep", "rg", "sed", "awk"}
 
 
 def is_credential_path(raw, cwd):
     """True when `raw` names a credential file under the home directory."""
     if not raw or raw.startswith("-"):
         return False
-    path = raw
-    for var, repl in (("$HOME", "~"), ("${HOME}", "~"),
-                      ("$XDG_CONFIG_HOME", "~/.config"),
-                      ("${XDG_CONFIG_HOME}", "~/.config")):
-        if path.startswith(var):
-            path = repl + path[len(var):]
+    path = re.sub(r"^\$\{?HOME\}?(?=/|$)", "~", raw)
+    path = re.sub(r"^\$\{?XDG_CONFIG_HOME\}?(?=/|$)", "~/.config", path)
     path = os.path.expanduser(path)
     if not os.path.isabs(path):
         path = os.path.join(cwd, path)
@@ -128,9 +121,13 @@ def _program(argv):
 
 def offending_bash_path(command, cwd):
     """The credential path a reader in `command` would print, or None."""
+    command = re.sub(r"`([^`]*)`", r"$(\1)", command)  # backticks as $( )
     tokens = shell_tokens(command) if shell_tokens else None
     for argv in _printed_commands(tokens or []):
         name, args = _program(argv)
+        pos = [k for k, a in enumerate(args) if not a.startswith("-")]
+        if name in PATTERN_FIRST and pos and not {"-e", "-f"} & set(args):
+            args = args[:pos[0]] + args[pos[0] + 1:]  # skip the search pattern
         if name in PRINTERS:  # a quoted "$(cat token)" stays one token
             for inner in SUBSTITUTION.findall(" ".join(args)):
                 hit = offending_bash_path(inner, cwd)
@@ -164,7 +161,7 @@ def evaluate(payload):
         "transcript (ai-config#4780: a Canvas token leaked this way).\n\n"
         "Pass it to the program that needs it, as in `curl -H \"Authorization:"
         " Bearer $(cat <path>)\" ...`, or check it with `test -s <path>`.\n"
-        f"For a read the user approved, prefix the command with `{OVERRIDE}`.")
+        f"For a read the user approved, run it in Bash prefixed `{OVERRIDE}`.")
 
 
 def main() -> int:

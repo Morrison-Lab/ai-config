@@ -150,7 +150,7 @@ NOTE = (
     "If no qualifying reviewer can run here (host blocked, backend down, "
     "CLI or credential absent), probe every route once: attempt each of "
     "{clis} as a reviewer, or show it absent with `command -v <cli>` or `which <cli>` alone, unredirected (exit 1); "
-    "opencode needs an attempt (its CLI or the OpenCode Go curl). Then the "
+    "opencode needs an attempt (its CLI or the OpenCode Go curl; an Ollama Cloud chat curl is a review too). Then the "
     "gate is waived and this hook lets the merge through "
     "(Ezra, 2026-10-16; adversarial-self-review.md "
     "'Waiver when no cross-model reviewer can run'). The waiver grants no "
@@ -392,7 +392,7 @@ def scan(sib, path, clis, recs=None):
                     if "review" in kinds:
                         review_seq = seq if _fresh(events) else seq - 1
                     if review_seq is not None or attempts or probes:
-                        # A probe sharing a call with a push may precede it.
+                        # An attempt sharing a call with a push may precede it (a probe never shares one).
                         seq_call = seq - 1 if "push" in kinds else seq
                         pending[b.get("id")] = (seq_call, review_seq,
                                                 attempts, probes)

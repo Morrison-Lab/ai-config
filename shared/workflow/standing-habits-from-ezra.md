@@ -118,7 +118,7 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`, exce
 - **Reason:** ai-config#4853 and ai-config#4854 (2026-10-30) were both merged before their Flash read.
   The coordinator's rule also requires local validation to finish first.
   `hooks/warn-merge-without-cross-harness-review.py` only warned then, and the agent saw its note only with the merge result;
-  it has denied such a merge since ai-config#5290.
+  that hook has denied such a merge since ai-config#5290.
   The project coordinator set this rule on 2026-10-30, in Ezra's DATA 571 project, after those two merges.
   Ezra has not restated it.
 

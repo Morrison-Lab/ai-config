@@ -11,12 +11,10 @@ import re
 import sys
 
 OVERRIDE = "ALLOW_REPO_NOT_IN_THREAD"
-TOOL = re.compile(
-    r"^mcp__hearthbot__(?:reply|post_message|update_message|edit_message|request_decision|message_coordinator|message_thread)$")
+TOOL = re.compile(r"^mcp__hearthbot__(?:reply|post_message|update_message|edit_message|request_decision|message_coordinator|message_thread)$")
 
 APOS = r"(?:'|\u2019)"
-NEG = (rf"(?:isn{APOS}t|is\s+not|aren{APOS}t|are\s+not|wasn{APOS}t|was\s+not|"
-       rf"don{APOS}t|doesn{APOS}t|didn{APOS}t|do\s+not|does\s+not|did\s+not|"
+NEG = (rf"(?:isn{APOS}t|is\s+not|aren{APOS}t|are\s+not|wasn{APOS}t|was\s+not|don{APOS}t|doesn{APOS}t|didn{APOS}t|do\s+not|does\s+not|did\s+not|"
        rf"hasn{APOS}t|haven{APOS}t|has\s+not|have\s+not|can{APOS}t|cannot|can\s+not|couldn{APOS}t|no\s+longer|not)")
 MODAL = rf"(?:can{APOS}t|cannot|can\s+not|couldn{APOS}t|unable\s+to|not\s+able\s+to)"
 PLACE = rf"(?:the\s+current|this|the|my|our|that|current)\s+(?:project\s+)?(?:thread|session)"
@@ -59,7 +57,11 @@ ATTACH_VERB = re.compile(
     rf"(?=\s+(?:both\s+|the\s+)?(?:it|them|repo|repository|{NAMED.pattern})(?!\s+(?:is|was|would|will|should|needs?|requires?)\b)|\s*(?:[.,;]|$)|\s+now\b)"
     rf"|\badded\s+[\w/-]{{1,140}}\s+to\s+{PLACE}|\b(?:added|cloned|cloning)\s+(?:it|them|the\s+repo(?:sitory)?|{NAMED.pattern})\b(?!\s+(?:to|in)\s+(?!{PLACE}|/))"
     r"|\b(?:ran|called|used|invoked|tried)\s+(?:the\s+)?add_repo\b|\badd_repo\s+(?:attached|added|cloned)\b", re.I)
-OTHER_CAUSE = re.compile(r"[^.;]{0,200}?\b(?:because|since|due\s+to)\b(?![^.;]{0,300}\b(?:attach\w*|add_repo|repos?|scope|thread|session)\b)", re.I)
+OTHER_CAUSE = re.compile(rf"[^.;]{{0,200}}?\b(?:because|since|due\s+to)\b(?![^.;]{{0,300}}(?:\b(?:attach\w*|add_repo|scope)\b"
+                         rf"|\b{NEG}\s+(?:\w+\s+)?(?:in|on|part\s+of|among|one\s+of|available)\b))", re.I)
+# The repo starts its clause: "The PR against lds isn't in this thread" and "Updating lds is not in" name lds as an object.
+CLAUSE_START = re.compile(rf"(?:^|[,;:(]\s*|\b(?:but|so|because|since|yet|while|although|though|that|as)\s+)"
+                          rf"(?:(?:the|our|my|this|that|both|and|either)\s+|(?:{REPO_NAME.pattern})[`'\"\s,]*(?:and\s+|or\s+)?)*$", re.I)
 NOT_YET = re.compile(rf"\b(?:{NEG}|never|nobody|nothing|no\s+one|once|when|until|unless|of|without|will|would|could|should|must|needs?|if|to|please|can|{APOS}ll)\s+(?:\w+\s+){{0,2}}$", re.I)
 FAIL = r"(?:refused|denied|declined|failed|rejected|errored|returned\s+(?:an?\s+)?(?:error|[45]\d\d))"
 TRIED = re.compile(
@@ -86,10 +88,8 @@ def message_text(tool_input: dict) -> str:
 
 def names_repo(sentence: str) -> bool:
     for m in SUBJ_NEG.finditer(sentence):
-        window = sentence[max(0, m.start() - 200):m.start()]
-        subj = SUBJECT.search(window)
-        # "The fix for lds isn't in" and "Updating lds is not in" name lds as an object, not the subject.
-        if subj and not re.search(r"\b(?:for|to|on|in|of|with|from|about|by|\w+ing)\s+(?:[\w-]+\s+){0,2}$", window[:subj.start()], re.I):
+        subj = SUBJECT.search(sentence[max(0, m.start() - 200):m.start()])
+        if subj and CLAUSE_START.search(subj.string[:subj.start()]):
             return True
     for rx in (OBJECT, LIST_NEG):
         obj = rx.search(sentence)

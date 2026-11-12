@@ -59,7 +59,7 @@ NODE = ("Node.js 20 is deprecated. The following actions target Node.js 20 "
 LEADIN = "lead-in says two but 3 item(s) follow"
 RUNS = {
     11: [ann(UBUNTU)] * 3,
-    12: [ann(NODE), ann(LEADIN, path="bad.md", line=5, level="failure")],
+    12: [ann(NODE, line=3), ann(LEADIN, path="bad.md", line=5, level="failure")],
     13: [ann("Skipping list-item merge splice check"),
          ann("examined 0 files -- the check did not run", level="failure"),
          ann("real problem here", level="warning")],

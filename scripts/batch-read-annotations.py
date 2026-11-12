@@ -19,10 +19,10 @@ PER_PAGE = 100
 
 # Each pattern matches "path:line: message" and cites where it is recorded.
 KNOWN = [
-    # Runner-wide notice on every Actions job (ai-config#5045): path .github, line 1.
-    ("ubuntu-latest migration notice", r'^\.github:1: "?The ubuntu-latest label will migrate to Ubuntu'),
+    # Runner-wide notices (ai-config#5045): path .github, at a line that varies by job.
+    ("ubuntu-latest migration notice", r'^\.github:\d+: "?The ubuntu-latest label will migrate to Ubuntu'),
     # .github/workflows/jules-review.yml, "Pin Node 24" step comment.
-    ("Node.js 20 deprecation", r"^\.github:1: Node\.js 20 is deprecated\. "),
+    ("Node.js 20 deprecation", r"^\.github:\d+: Node\.js 20 is deprecated\. "),
     # gha check-markdown splice check (memories/gha-reusable-workflows.md).
     ("list-item splice skip", r"Skipping list-item merge splice check"),
     # Negative controls in check-leadin-counts.py and check-reviewer-placeholders.py.

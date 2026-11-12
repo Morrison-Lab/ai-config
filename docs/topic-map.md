@@ -374,7 +374,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/put-prs-in-ready-mode.md` | A Pull Request that is ready for review must be in ready mode, not left in draft. |  |
 | `shared/workflow/quotable-findings.md` | Drop any review finding you are about to post if it cannot quote the passage it is about. |  |
 | `shared/workflow/read-canonical-doc-before-starting.md` | When a repo's own `CLAUDE.md` (or an equivalent short orientation file) names a fuller document as the actual authority --- `.github/copilot-instructions.md`... |  |
-| `shared/workflow/read-instructions-fully.md` | AGENTS.md's "Interpret instructions broadly" section sets the breadth of a reading. This fragment covers two habits that keep a reading complete, each one a... |  |
+| `shared/workflow/read-instructions-fully.md` | The "Interpret instructions broadly and maximize safe progress" bullet of AGENTS.md's "Act on the whole request, and decide rather than ask" section sets the... |  |
 | `shared/workflow/read-published-html-from-gh-pages.md` | Every Morrison-Lab notes repo (`lds`, `mds`, `pds`, `sds`, `rme` and the rest) publishes its rendered site to the `gh-pages` branch. Pull request previews si... |  |
 | `shared/workflow/recheck-review-findings.md` | Moved out of the auto-loaded `CLAUDE.md` (ai-config#3568), which keeps the rule and its pattern/anti-pattern pairs and links here for the queries, the login-... |  |
 | `shared/workflow/record-every-decision.md` | Ezra, 2026-10-22 (ai-config#4676): every decision gets documented somewhere outside the thread, typically in a repo file. |  |

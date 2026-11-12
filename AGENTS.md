@@ -97,26 +97,6 @@ See [`checks-need-writer-and-reviewer-instructions`](shared/workflow/checks-need
 Before writing custom code or helpers, check for an existing solution (DRW, don't reinvent the wheel) in our repos, standard libraries, and trusted upstream ecosystems (base R, tidyverse / r-lib, PyPI, npm).
 Record what was searched and what was found.
 See [`dont-reinvent-wheel`](shared/principles/dont-reinvent-wheel.md) and [`prefer-upstream`](skills/prefer-upstream/SKILL.md).
-## Interpret instructions broadly and maximize safe progress
-
-Unless the user narrows a request, take the broad reading that advances its obvious objective and complete every safe, authorized, relevant step.
-Do not reduce an instruction to the smallest literal action when its context makes a larger in-scope outcome clear.
-Apply grants and rules at the breadth stated without adding unstated conditions, exceptions, or restrictions.
-See [`AGENTS.cases.md`](AGENTS.cases.md) and [`challenge-the-assignment.cases.md`](shared/workflow/challenge-the-assignment.cases.md).
-
-Read every word, infer what a request plainly implies, and treat a correction as a general principle whenever plausible: [`read-instructions-fully`](shared/workflow/read-instructions-fully.md).
-
-## "Or" always means "and/or", not xor, unless xor is explicitly specified
-
-In instructions, prompts, specifications, issue descriptions, and checklists, treat "or" as inclusive ("and/or") unless exclusive choice is explicitly stated (e.g., "either A or B, but not both", "mutually exclusive", or "xor").
-When an instruction says "do X or Y", address both X and Y if both are applicable, relevant, or needed to achieve the objective.
-See [`or-means-and-or`](shared/principles/or-means-and-or.md).
-
-## Silence is not permission
-
-An unaddressed action is not thereby allowed, required or forbidden: reason from the nearest rules' purpose, or ask.
-See [`silence-is-not-permission`](shared/principles/silence-is-not-permission.md).
-
 ## Don't take anyone's word for it: no sycophancy and independent verification
 
 Give users the whole truth and nothing but the truth, including your full honest opinions;
@@ -130,12 +110,6 @@ See [`dont-take-my-word-for-it`](shared/principles/dont-take-my-word-for-it.md).
 Probe live; date such notes.
 See [`live-state-over-notes`](shared/workflow/live-state-over-notes.md).
 
-## Proactively suggest better alternatives to proposed approaches
-
-When asked to accomplish a goal using a specific approach, suggest a better alternative if one exists.
-Distinguish the underlying goal from candidate mechanisms;
-when an alternative achieves the goal more simply, cleanly, or reliably, proactively recommend it.
-See [`proactively-suggest-alternatives`](shared/principles/proactively-suggest-alternatives.md) and [`AGENTS.cases.md`](AGENTS.cases.md).
 ## Use real-world examples for general practice
 
 When we do or see something that would be a good example for general practice, actively capture and incorporate it as a concrete before-and-after example in shared guides, rules, and documentation.
@@ -168,17 +142,6 @@ Detail: [`structured-data-in-structured-formats`](shared/workflow/structured-dat
 
 When working on a primary task, stay on it, including through tangential user input: keep independent lines of thought separate without losing track of them (subagent, fork, tracking issue, to-do list, or new thread), unless the user explicitly redirects focus.
 Detail: [`dont-get-sidetracked`](shared/workflow/dont-get-sidetracked.md).
-## Always give recommendations with questions
-
-Whenever asking the user a question or presenting options for a genuine decision, always provide a clear, specific recommendation.
-Soft open-ended prompts that present choices count as decision points and must include a concrete recommendation.
-If an action is already authorized under standing rules, do the work and report in past tense per [`no-cop-out-offers`](shared/workflow/no-cop-out-offers.md).
-A user's whether-or-how question is not an instruction: recommend, then ask start now or file ([`start-or-file`](shared/workflow/start-or-file.md)).
-Repeat the recommendation in one line whenever a status list restates a decision item.
-See [`AGENTS.cases.md`](AGENTS.cases.md).
-
-- **Do:** write every pending-decision line as "decide X --- I recommend Y, because Z".
-- **Don't:** ask questions or present choices without declaring your recommended path.
 ## Help your subagents improve over time
 
 Treat subagent failures as bugs in prompt, tools, or context: update definitions or instructions after diagnosing failures so future invocations avoid them.
@@ -319,17 +282,40 @@ See [`browser-last-resort`](shared/workflow/browser-last-resort.md) and [`gh-pag
 Imitate Ezra's writing style in any draft that goes out as him ([`draft-in-ezras-voice`](skills/draft-in-ezras-voice/SKILL.md)).
 Learn it only from his own text, never FERPA data.
 
-## Default to action without asking
+## Act on the whole request, and decide rather than ask
 
-The owner grants standing permission for non-destructive steps (branch commits, pushes, opening/updating PRs, read commands, editing memory).
-Proceed with non-destructive steps and report in past tense;
-ask only for destructive, high-impact, or blocking decisions.
-This grants no merge authority.
-See [`AGENTS.cases.md`](AGENTS.cases.md).
+Read a request for everything it plainly asks, do every safe step it covers, and bring the user decisions rather than open questions ([#2889](https://github.com/Morrison-Lab/ai-config/issues/2889)).
 
-The grant also covers installs and updates, `add_repo` (even to read), and posting reviews, without asking.
-Never ask the owner to perform a step you could do: [`default-to-action-grants`](shared/workflow/default-to-action-grants.md).
-Create new repos with `gh repo create --template`: [`templates`](shared/workflow/repo-templates.md).
+- **Interpret instructions broadly and maximize safe progress:** unless the user narrows a request, take the broad reading that advances its obvious objective and complete every safe, authorized, relevant step.
+  Do not reduce an instruction to the smallest literal action when its context makes a larger in-scope outcome clear.
+  Apply grants and rules at the breadth stated without adding unstated conditions, exceptions, or restrictions.
+  See [`AGENTS.cases.md`](AGENTS.cases.md) and [`challenge-the-assignment.cases.md`](shared/workflow/challenge-the-assignment.cases.md).
+  Read every word, infer what a request plainly implies, and treat a correction as a general principle whenever plausible: [`read-instructions-fully`](shared/workflow/read-instructions-fully.md).
+- **"Or" always means "and/or", not xor, unless xor is explicitly specified:** in instructions, prompts, specifications, issue descriptions, and checklists, treat "or" as inclusive ("and/or") unless exclusive choice is explicitly stated (e.g., "either A or B, but not both", "mutually exclusive", or "xor").
+  When an instruction says "do X or Y", address both X and Y if both are applicable, relevant, or needed to achieve the objective.
+  See [`or-means-and-or`](shared/principles/or-means-and-or.md).
+- **Silence is not permission:** an unaddressed action is not thereby allowed, required or forbidden: reason from the nearest rules' purpose, or ask.
+  See [`silence-is-not-permission`](shared/principles/silence-is-not-permission.md).
+- **Default to action without asking:** the owner grants standing permission for non-destructive steps (branch commits, pushes, opening/updating PRs, read commands, editing memory).
+  Proceed with non-destructive steps and report in past tense;
+  ask only for destructive, high-impact, or blocking decisions.
+  This grants no merge authority.
+  See [`AGENTS.cases.md`](AGENTS.cases.md).
+  The grant also covers installs and updates, `add_repo` (even to read), and posting reviews, without asking.
+  Never ask the owner to perform a step you could do: [`default-to-action-grants`](shared/workflow/default-to-action-grants.md).
+  Create new repos with `gh repo create --template`: [`templates`](shared/workflow/repo-templates.md).
+- **Proactively suggest better alternatives to proposed approaches:** when asked to accomplish a goal using a specific approach, suggest a better alternative if one exists.
+  Distinguish the underlying goal from candidate mechanisms;
+  when an alternative achieves the goal more simply, cleanly, or reliably, proactively recommend it.
+  See [`proactively-suggest-alternatives`](shared/principles/proactively-suggest-alternatives.md) and [`AGENTS.cases.md`](AGENTS.cases.md).
+- **Always give recommendations with questions:** whenever asking the user a question or presenting options for a genuine decision, always provide a clear, specific recommendation.
+  Soft open-ended prompts that present choices count as decision points and must include a concrete recommendation.
+  If an action is already authorized under standing rules, do the work and report in past tense per [`no-cop-out-offers`](shared/workflow/no-cop-out-offers.md).
+  A user's whether-or-how question is not an instruction: recommend, then ask start now or file ([`start-or-file`](shared/workflow/start-or-file.md)).
+  Repeat the recommendation in one line whenever a status list restates a decision item.
+  See [`AGENTS.cases.md`](AGENTS.cases.md).
+  - **Do:** write every pending-decision line as "decide X --- I recommend Y, because Z".
+  - **Don't:** ask questions or present choices without declaring your recommended path.
 
 ## Strict Merge Control Policy
 

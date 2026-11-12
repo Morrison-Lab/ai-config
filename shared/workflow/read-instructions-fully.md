@@ -1,6 +1,6 @@
 # Read instructions fully: every word and the obvious implications
 
-AGENTS.md's "Interpret instructions broadly" section sets the breadth of a reading.
+The "Interpret instructions broadly and maximize safe progress" bullet of AGENTS.md's "Act on the whole request, and decide rather than ask" section sets the breadth of a reading.
 This fragment covers two habits that keep a reading complete, each one a step another agent could watch you take or skip.
 
 ## Every word carries meaning

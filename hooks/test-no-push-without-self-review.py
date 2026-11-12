@@ -2485,14 +2485,20 @@ def verdict_map_cases() -> tuple[int, int]:
             ("an unparsed base is not called flagged", push_feature,
              ((clean, FEATURE), ("Looks bad", HEAD), (clean, OTHER_HEAD)), "review this guard cannot read", None),
             ("a commit with no verdict still gets the ancestor refusal", push_feature,
-             ((nmw, HEAD), (clean, OTHER_HEAD)), f"No verdict names {FEATURE[:12]}, and a", None),
+             ((nmw, HEAD), (clean, OTHER_HEAD)), f"No verdict covers {FEATURE[:12]}, and a", None),
+            ("an ancestor refusal names the veto on the commit", push_feature,
+             ((clean, FEATURE), (nmw, OTHER_HEAD), (nmw, HEAD)),
+             f"No verdict covers {FEATURE[:12]} (a later blocking verdict naming", None),
+            ("a skipped clean report with a bad fingerprint is named", PUSH,
+             verdicts((clean, FEATURE)) + reviewed(body(commit=HEAD) + f"\nReviewed-Commit: {'d' * 40}"),
+             "copy each Reviewed-Commit verbatim", None),
             ("an unnamed commit is not blamed on another repository's review", PUSH,
              ((clean, FEATURE), (clean, OTHER_HEAD)), f"No verdict covers {HEAD[:12]}, but", None),
             ("an unnamed commit is not blamed on a descendant's blocking verdict", PUSH,
              ((clean, FEATURE), (nmw, FEATURE)), f"No verdict covers {HEAD[:12]}, but", None),
             ("a map that runs out of time still refuses", PUSH,
              ((clean, FEATURE), (nmw, HEAD)), "blocking verdict", {"NPWSR_BUDGET_SECONDS": "0"})):
-        rc, out = run_hook(cmd, verdicts(*pairs), extra_env=env)
+        rc, out = run_hook(cmd, pairs if isinstance(pairs, list) else verdicts(*pairs), extra_env=env)
         spec = out.get("hookSpecificOutput") or {}
         ok = rc == 0 and spec.get("permissionDecision") == "deny" and text in spec.get(
             "permissionDecisionReason", "")

@@ -2948,7 +2948,11 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
                         f"{sha}^{{commit}}", unreadable_raises=True) or "").lower() or None
             hits = [resolved_cache[s] for s in shas if resolved_cache[s]]
             if found == "clean" and len(hits) < len(shas):
-                continue  # an unresolvable fingerprint voids a clean report
+                for hit in hits:  # an unresolvable fingerprint voids a clean report
+                    vetoed[hit] = ("a clean report naming it also named a commit that "
+                                   "does not resolve here; the reviewer must copy each "
+                                   "Reviewed-Commit verbatim")
+                continue
             if not hits or len(hits) < len(shas):
                 cause = (f"a later {_VERDICT_WORDS[found]} with no Reviewed-Commit line"
                          if not shas else f"a later {_VERDICT_WORDS[found]} naming a "
@@ -2976,8 +2980,8 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
                     what = ("code a review flagged" if f == "needs_work" else
                             "code whose review this guard cannot read (it accepts "
                             f"{ACCEPTED_VERDICT_PHRASES})")
-                    own = (f"No verdict names {c[:12]}, and a" if since < 0
-                           else "A later")
+                    own = ("A later" if since >= 0 else f"No verdict covers {c[:12]}"
+                           + (f" ({vetoed[c]})" if c in vetoed else "") + ", and a")
                     return "", (f"{own} {_VERDICT_WORDS[f]} names {sha[:12]}, an ancestor of "
                                 f"{c[:12]}, so this push ships {what}.\n"
                                 "Address it, then re-dispatch the reviewer against what you push.")

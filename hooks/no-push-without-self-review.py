@@ -620,7 +620,7 @@ DEGRADED_OVERRIDE = re.compile(r"(?:^|[;&|`(\s])ALLOW_UNREVIEWED_PUSH=1\s")
 # lives in it: a push under this entry could weaken a guard with no LOCAL
 # self-review at all. What still stands between such a push and `main` is
 # the ordinary GitHub-side gate: a feature-branch push is a pull request,
-# and this repo's own CLAUDE.md scopes its standing `mwc` merge grant to a
+# and this repo's strict-merge-policy.md scopes its standing `mwc` merge grant to a
 # PR that is fully clean -- CI green and every review finding addressed --
 # so the automated reviewer (or a human) still reads the diff before it
 # merges. This entry removes the PRE-push check on ai-config pushes, not

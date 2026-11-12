@@ -3,14 +3,6 @@
 An instruction from the user applies to every project and repository unless the user explicitly limits it to one.
 "We are working on project X" is not a limit.
 
-## Every agent, not only the one speaking
-
-The same holds across agents: a Claude-only implementation is incomplete when Codex, Gemini, Antigravity, or another installed agent can encounter the same rule.
-
-- **Do:** update the shared source and every applicable agent-specific entry point;
-  prefer an agent-independent service for operational behavior.
-- **Don't:** treat the name of the agent currently speaking as an implicit scope restriction.
-
 ## Where to record it
 
 - Prose rules go in [`psw`](https://github.com/Morrison-Lab/psw/).

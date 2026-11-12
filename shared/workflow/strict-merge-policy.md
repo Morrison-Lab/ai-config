@@ -57,8 +57,9 @@ Every other rule in this section still binds, including the clean automated revi
 so a quota-skipped review still holds the merge.
 The test is effect rather than file type: infrastructure is whatever does not directly change the repo's consumer's experience.
 Every PR in `Morrison-Lab/gha`, `Morrison-Lab/ai-config` or the macros repo (`d-morrison/macros` or `Morrison-Lab/macros`) counts as infrastructure, as all three are infrastructure repos.
-The grant is scoped to the merge's **target** repo, which `hooks/no-unauthorized-merge.py` reads off the command, so a merge run from an ai-config checkout into another repo is unaffected.
-Where `hooks/no-unauthorized-merge.py` is active, clear it with `ALLOW_MERGE=1` on that one merge command, and state in the reply why the PR qualified.
+Their grant needs no per-session re-issue, no `enable-mwc` step and no `ALLOW_MERGE=1`: `hooks/no-unauthorized-merge.py` reads the merge's **target** repo off the command and allows these three by target.
+Because it is scoped to the target, a merge run from an ai-config checkout into another repo is unaffected.
+In any other repo, where `hooks/no-unauthorized-merge.py` is active, clear it with `ALLOW_MERGE=1` on that one merge command, and state in the reply why the PR qualified.
 Do not enable session-wide `/mwc` for it.
 
 - **Classify before asking.**

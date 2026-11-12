@@ -31,6 +31,24 @@ The fragment walks through the specific moments this gets skipped even by someon
 When a `cai` or `ums` entry records a correction, write both sides as a labelled pair: the behaviour to adopt (**Do**) and the specific near-miss to stop (**Don't**), each an action a later reader could observe.
 Detail, rationale, and cases: [`shared/writing/record-pattern-and-anti-pattern.md`](shared/writing/record-pattern-and-anti-pattern.md).
 
+## No empty promises
+
+A commitment about your own future behaviour ships an implemented mechanism in the same turn (a memory entry at minimum, a hook, a filed issue, or an armed wake for an owed action), or is not made;
+`hooks/no-empty-promise.py` guards it.
+Detail, rationale, and cases: [`shared/workflow/no-empty-promises.md`](shared/workflow/no-empty-promises.md).
+
+## Generalize instructions to every AI agent by default
+
+Unless the user explicitly scopes an instruction to one agent, project, or
+session, apply it to every available AI-agent configuration and shared
+automation surface. A Claude-only implementation is incomplete when Codex,
+Gemini, Antigravity, or another installed agent can encounter the same rule.
+
+- **Do:** update the shared source and every applicable agent-specific entry
+  point; prefer an agent-independent service for operational behavior.
+- **Don't:** treat the name of the agent currently speaking as an implicit
+  scope restriction.
+
 ## Status requests do not make issues report-only
 
 A request for status means examine the transcript to check if the agent got stuck, frozen, or dropped the ball, inspect live state, finish every safe, in-scope fix it reveals before reporting, resume stalled work immediately, and file every noticed issue, however small, in its owning tracker.
@@ -229,6 +247,23 @@ Detail, rationale, and cases: [`shared/workflow/monitor-pushed-heads.md`](shared
 [`shared/workflow/claim-pr.md`](shared/workflow/claim-pr.md)
 
 The `claim-pr` skill operationalizes this (the exact claim wording, when it applies, and the closing/unclaim comment).
+
+## Every comment you post to a forge says an agent posted it
+
+[shared/workflow/disclose-agent-authorship.md](shared/workflow/disclose-agent-authorship.md)
+
+A comment posted through `gh`/`glab` under the account holder's credentials carries **their** login and reads as `type: User`, so nothing in the API distinguishes it from a comment they typed --- `memories/gh-cli.md` records auditors mistaking exactly that.
+The forge cannot say it, so the body must: end every agent-posted comment with
+
+```
+_Posted by Claude Code (AI agent) --- not written by a human._
+```
+
+The marker deliberately avoids the robot emoji, which `scripts/check-pr-fully-clean.py` matches as a `REVIEW_BODY_MARKERS` entry --- a disclosed claim comment would otherwise scan as a finding-free **review**.
+The fragment carries the rest: the two exemptions, the comment-bodies-only scope, and the queries that verify a marker or a bot identity.
+
+- **Do:** append the marker to every claim, release, status, reply, and self-review comment, including ones whose prose already names the session.
+- **Don't:** use the robot emoji in it, or put it in a commit message, a title, an issue body, or a PR body.
 
 ## Read a repo's canonical contributor doc before starting work, not just before pushing
 

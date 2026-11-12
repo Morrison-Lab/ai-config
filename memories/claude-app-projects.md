@@ -80,6 +80,17 @@ Recorded from the Machine Learning course project (2026-10-12 to 2026-10-16, wit
   you should know the names of all the skills and commands in ai-config").
 - **A thread starts its own Remote Control sessions.**
   Where the user has granted a device, call `start_rc_session` yourself and never ask the user to start a session or run a terminal command.
+  The call takes only a message the user typed in the same thread
+  (seen 2026-11-11 on Morrison-Lab/rme#1460).
+  It refuses a decision-card tap, a message the coordinator relayed, and a project-chat message.
+  When a thread will need the device after the user approves, ask for a typed reply in the thread instead of a decision card,
+  so the approval also serves as the message the session starts from.
+- **Transfer GitHub issues from a device session.**
+  GitHub has no REST endpoint for an issue transfer: it needs the GraphQL `transferIssue` mutation,
+  and cloud sessions are refused GraphQL.
+  Run `gh issue transfer` on the user's device instead.
+  On the XPS the auto-mode check blocked it as an "External System Write" until the user typed approval in the thread.
+  A transferred issue keeps its sub-issue link to a parent in the original repository (rme#1460, 69 issues, 2026-11-11).
 - **Check a PR preview yourself.**
   Open the deployed preview in Playwright Chromium and confirm the change, rather than handing the check to the user.
   A local `file://` render can differ from the `https` preview.

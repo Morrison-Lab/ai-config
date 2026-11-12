@@ -47,21 +47,22 @@ REPO_LIST = re.compile(
     re.I)
 LAB_REPOS = (r"ai-config|gha|macros|lds|mlg|mlr|mds|mcs|pds|sds|rme|psw|psc|qwt|qnp|"
              r"ids|dds|vds|ccds|cds|epi\d+|lds-site|mcsg|stats-allowlist|teaching-tools")
+OWNERS = r"(?:morrison-lab|d-morrison|ucd-serg)/"
 REPO_NAME = re.compile(
-    rf"\b(?:repo|repos|repository|repositories)\b|`[^`]+`|\b[\w.-]+/[\w.-]+\b|\b(?:{LAB_REPOS})\b", re.I)
+    rf"\b(?:repo|repos|repository|repositories)\b|`(?:{OWNERS})?[\w-]+`|\b{OWNERS}[\w.-]+|\b(?:{LAB_REPOS})\b", re.I)
 OBJECT = re.compile(
     rf"\b{NEG}\s+(?:\w+\s+){{0,2}}?"
     r"(?:have|has|include|includes|access|reach|push|edit|write|commit)\s+"
-    r"(?:access\s+to\s+|to\s+|into\s+)?(?:the\s+)?(\S+)"
+    r"(?:access\s+to\s+|to\s+|into\s+)?(?:(?:the|a|an|that|this)\s+)?(\S+)"
     # "has no X" needs a checkout or access word: "we have no gha changes" passes.
     rf"|(?:\b(?:has|have)\s+no|\bthere(?:{APOS}s|\s+is|\s+are)\s+no)\s+"
     r"(?:access\s+to\s+(?:the\s+)?(\S+)|(?:the\s+)?(\S+)\s+(?:checkout|clone|copy|access|repo|repository)\b)",
     re.I)
 ATTACHED = re.compile(
-    rf"\b(?:I|we)\s+(?:have\s+|{APOS}ve\s+|just\s+|then\s+)?(?:added|attached|cloned)\b", re.I)
+    rf"\b(?:I|we)\s+(?:have\s+|{APOS}ve\s+|just\s+|then\s+)?(?:added|attached|cloned)\s+(?:the\s+)?(\S+)", re.I)
 FAIL = r"(?:refus\w*|denied|declin\w*|fail\w*|reject\w*)"
 TRIED = re.compile(
-    rf"\b(?:add_repo|attach\w*)\b[^.!?]*\b{FAIL}\b|\b{FAIL}\b[^.!?]*\b(?:add_repo|attach\w*)\b",
+    rf"\b(?:add_repo|attach|attaching)\b[^.!?]*\b{FAIL}\b|\b{FAIL}\b[^.!?]*\b(?:add_repo|attach|attaching)\b",
     re.I)
 
 REASON = (
@@ -98,7 +99,8 @@ def is_excuse(sentence: str) -> bool:
     neg = NEG_PRESENCE.search(sentence)
     if not neg or not LOC.search(sentence):
         return False
-    if ATTACHED.search(sentence) or TRIED.search(sentence):
+    att = ATTACHED.search(sentence)
+    if (att and REPO_NAME.search(att.group(1))) or TRIED.search(sentence):
         return False
     return names_repo(sentence, neg)
 

@@ -33,7 +33,13 @@ const d = require('fs').readFileSync(0, 'utf8');
 if (process.argv.slice(2).join(' ') !== 'hook --coding-cli') process.exit(9);
 if (process.env.CC_SAFETY_NET_NO_UPDATE_CHECK !== '1') process.exit(8);
 if (process.env.CC_SAFETY_NET_PROJECT_TIGHTEN_ONLY !== '1') process.exit(7);
-if (d.includes('DENYME')) {
+let cwd = null;
+try { cwd = JSON.parse(d).cwd; } catch (e) {}
+if (cwd === '') {
+  process.stdout.write(JSON.stringify({hookSpecificOutput: {
+    hookEventName: 'PreToolUse', permissionDecision: 'deny',
+    permissionDecisionReason: 'empty cwd'}}));
+} else if (d.includes('DENYME')) {
   process.stdout.write(JSON.stringify({hookSpecificOutput: {
     hookEventName: 'PreToolUse', permissionDecision: 'deny',
     permissionDecisionReason: 'fake deny'}}));
@@ -108,10 +114,10 @@ class Sandbox:
         (self.hook.parent / "cc-safety-net.pin.json").write_text(
             json.dumps(pin), encoding="utf-8")
 
-    def run(self, command="echo ok", session="s1", **env):
+    def run(self, command="echo ok", session="s1", cwd=None, **env):
         payload = {"session_id": session, "hook_event_name": "PreToolUse",
                    "tool_name": "Bash", "tool_input": {"command": command},
-                   "cwd": str(self.root)}
+                   "cwd": str(self.root) if cwd is None else cwd}
         environ = {"PATH": str(self.bin), "HOME": str(self.root),
                    "FAKE_NPM_LOG": str(self.log), "FAKE_TGZ": str(self.tgz),
                    "AI_CONFIG_CC_SAFETY_NET_CACHE": str(self.cache), **env}
@@ -149,6 +155,12 @@ class PassesTheGuardThrough(unittest.TestCase):
 
     def test_an_allow_prints_nothing(self):
         proc = self.box.run("echo ok")
+        self.assertEqual((proc.returncode, proc.stdout), (0, ""), proc.stderr)
+
+    def test_an_empty_cwd_is_filled_in(self):
+        # The real release fails closed on "cwd": "", which the Cursor
+        # adapter sends; the fake guard denies it the same way.
+        proc = self.box.run("echo ok", cwd="")
         self.assertEqual((proc.returncode, proc.stdout), (0, ""), proc.stderr)
 
     def test_an_exit_2_block_keeps_its_code_and_stderr(self):
@@ -323,11 +335,12 @@ class LivePinnedRelease(unittest.TestCase):
     def tearDownClass(cls):
         shutil.rmtree(cls.root, ignore_errors=True)
 
-    def decide(self, command, repo=None):
+    def decide(self, command, repo=None, cwd=None):
         repo = repo or self.repo
         payload = {"session_id": "live", "hook_event_name": "PreToolUse",
                    "tool_name": "Bash", "tool_input": {"command": command},
-                   "cwd": str(repo), "transcript_path": str(self.root / "t.jsonl")}
+                   "cwd": str(repo) if cwd is None else cwd,
+                   "transcript_path": str(self.root / "t.jsonl")}
         env = dict(os.environ, HOME=str(self.root),
                    AI_CONFIG_CC_SAFETY_NET_CACHE=str(self.root / "cache"))
         proc = subprocess.run([sys.executable, str(HOOK)], input=json.dumps(payload),
@@ -344,6 +357,11 @@ class LivePinnedRelease(unittest.TestCase):
         for command, want in LIVE_CASES:
             with self.subTest(command=command):
                 self.assertEqual(self.decide(command), want)
+
+    def test_an_empty_cwd_does_not_fail_closed(self):
+        # The Cursor adapter sends "cwd": "" when Cursor names no project.
+        self.assertEqual(self.decide("git status", cwd=""), "allow")
+        self.assertEqual(self.decide("git reset --hard HEAD~3", cwd=""), "deny")
 
     def test_a_repository_policy_cannot_turn_the_denies_off(self):
         loose = self.root / "loose"

@@ -260,10 +260,28 @@ def warn_once(session_id: str, why: str) -> None:
         "hookEventName": "PreToolUse", "additionalContext": message}}))
 
 
+def fill_empty_cwd(payload: bytes) -> bytes:
+    """Give a payload whose `cwd` is "" this process's working directory.
+
+    CC Safety Net 2.7.12 fails closed on `"cwd": ""`, denying even
+    `git status`, and the Cursor adapter sends that when Cursor names no
+    project directory. A missing `cwd` key it handles, so only "" changes.
+    """
+    try:
+        data = json.loads(payload)
+    except ValueError:
+        return payload
+    if not isinstance(data, dict) or data.get("cwd") != "":
+        return payload
+    data["cwd"] = os.getcwd()
+    return json.dumps(data).encode("utf-8")
+
+
 def main() -> int:
     payload = sys.stdin.buffer.read()
     if os.environ.get(OFF_VAR, "").lower() == "off":
         return 0
+    payload = fill_empty_cwd(payload)
     try:
         session_id = str(json.loads(payload or b"{}").get("session_id") or "unknown")
     except (ValueError, AttributeError):

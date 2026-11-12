@@ -5,19 +5,21 @@ Ezra, 2026-10-27, said twice: never post a class announcement without his
 review and approval of its exact text (ai-config#4780, from mlg#228). A post
 reaches every student at once and cannot be unsent, so this denies.
 
-It fires on a Bash command that creates or edits a Canvas announcement
-(`canvas announcements create`, or any command naming `discussion_topics`
-with `is_announcement`), and on a Canvas MCP tool whose name says
-announcement plus create, post or update, or whose input sets
-`is_announcement`. It allows the call only when the latest message the user
-typed approves posting an announcement ("post the announcement", "announcement
-approved"). Inside a relayed wake, only the user's own cited or principal
-messages count, never a coordinator's note. A script file that posts is not
-seen; the writer layer (step 3 of skills/draft-in-ezras-voice) and the
-reviewer layer (adversarial-reviewer.md) cover it.
+It fires on a Bash command that writes a Canvas discussion topic (the
+`canvas announcements` CLI, `canvasapi`'s `create_discussion_topic`, or a
+POST or PUT to `discussion_topics`), and on a Canvas MCP tool that creates or
+updates an announcement or discussion topic. It allows one such write after
+the latest message the user typed approves posting the announcement ("post
+the announcement"), and denies a second one in that turn. A negated,
+conditional or questioning sentence does not approve, nor does one that also
+asks for a draft, since the user has not yet seen the text. Agent-written
+turns (scheduled continuations, a coordinator's relay note) never count.
+A script file that posts is not seen; the writer layer (step 3 of
+skills/draft-in-ezras-voice) and the reviewer layer (adversarial-reviewer.md)
+cover it.
 
-Fails closed when the transcript cannot be read, since the post is the harm;
-fails open, saying so on stderr, on any other trouble.
+Detection needs nothing outside this file. Once a write is detected, any
+trouble reading the transcript denies, since the post is the harm.
 """
 from __future__ import annotations
 
@@ -30,93 +32,136 @@ try:
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(
         os.path.realpath(__file__))), "scripts", "lib"))
     from transcript_meta import is_real_user_turn, strip_injected_text
-except Exception as _exc:  # broken install: degrade, never block
-    print(f"no-unapproved-announcement: cannot load transcript_meta ({_exc})",
-          file=sys.stderr)
-    sys.exit(0)
+except Exception:  # detection still runs; a detected write is then denied
+    is_real_user_turn = None
 
-CLI_CREATE = re.compile(r"\bcanvas\s+announcements?\s+(create|post|update|edit)\b")
-API_WRITE = re.compile(r"discussion_topics.*is_announcement|is_announcement"
-                       r".*discussion_topics", re.S)
-MCP_NAME = re.compile(r"announcement.*(create|post|update|edit)|"
-                      r"(create|post|update|edit).*announcement")
-APPROVAL = re.compile(
-    r"\b(post|publish|send|go ahead and post)\b[^.!?\n]{0,40}\bannouncements?\b"
-    r"|\bannouncements?\b[^.!?\n]{0,40}\b(approved|is good to go|ok to post|"
-    r"okay to post|post it|send it)\b", re.I)
-# A relayed wake carries the user's own words in these elements only.
-USER_PARTS = re.compile(
-    r"<cited author=\"user\"[^>]*>(.*?)</cited>"
-    r"|<message[^>]*trust=\"principal\"[^>]*>(.*?)</message>", re.S)
+NOT_WRITERS = {"git", "grep", "egrep", "rg", "gh", "echo", "printf", "cat",
+               "less", "head", "tail", "sed", "awk", "diff"}
+CLI = re.compile(r"\bcanvas\s+announcements?\s+(create|post|update|edit)\b")
+TOPIC = re.compile(r"discussion_topic")
+WRITE = re.compile(r"is_announcement|create_discussion_topic|\.edit\(|"
+                   r"-x\s*['\"]?(post|put)|--request[ =]['\"]?(post|put)|"
+                   r"requests\.(post|put)|method['\"]?\s*[:=]\s*['\"]?(post|put)"
+                   r"|(^|\s)(-d|--data\S*|-f|--form)[\s=@]")
+MCP_WRITE = re.compile(r"(^|_)(create|post|update|edit|put)(_|$)")
+APPROVE = re.compile(r"\b(post|publish|send)\b[^.!?\n]{0,30}\bannouncements?\b"
+                     r"|\bannouncements?\b[^.!?\n]{0,30}\b(approved|post it|"
+                     r"send it|ok to post|okay to post)\b", re.I)
+SPOILER = re.compile(r"\b(don'?t|do not|never|not|before|until|unless|wait|"
+                     r"if|should|i'?ll|myself)\b|\?", re.I)
+DRAFTING = re.compile(r"\b(draft|write|compose)\b", re.I)
+TAG = re.compile(r"<(/?)([a-z][\w-]*)([^>]*)>")
 
 
 def is_announcement_write(tool, inp):
     if tool == "Bash":
-        cmd = (inp.get("command") or "").lower()
-        return bool(CLI_CREATE.search(cmd) or API_WRITE.search(cmd))
-    if "canvas" in tool.lower():
-        flat = json.dumps(inp).lower()
-        return bool(MCP_NAME.search(tool.lower())
-                    or re.search(r'"is_announcement": (true|"true"|1)', flat))
+        for seg in re.split(r"&&|\|\||[|;&\n]", (inp.get("command") or "").lower()):
+            words = seg.split()
+            if words and words[0].rsplit("/", 1)[-1] not in NOT_WRITERS and (
+                    CLI.search(seg) or (TOPIC.search(seg) and WRITE.search(seg))):
+                return True
+        return False
+    name = tool.lower()
+    if "canvas" not in name or not name.startswith("mcp__"):
+        return False
+    verb = name.split("__")[-1]
+    if MCP_WRITE.search(verb) and ("announcement" in verb or "discussion" in verb):
+        return True
+    flat = json.dumps(inp).lower().replace('\\"', '"')
+    return bool(TOPIC.search(flat) and WRITE.search(flat))
+
+
+def user_words(text):
+    """The user's own words: outside any wake, or in a principal message or
+    a cited user entry that sits directly in its wake or relay."""
+    if "<wake" not in text and "<coordinator-relay" not in text:
+        return text
+    out, stack, pos = [], [], 0
+    for m in TAG.finditer(text):
+        path = [t for t, _ in stack]
+        in_wake = (path[:1] == ["wake"] and path[-1:] == ["message"]
+                   and set(path[1:-1]) <= {"project", "thread"})
+        if (in_wake or path == ["coordinator-relay", "relay", "cited"]) \
+                and stack[-1][1]:
+            out.append(text[pos:m.start()])
+        closing, tag, attrs = m.group(1), m.group(2), m.group(3)
+        if closing:
+            while stack and stack.pop()[0] != tag:
+                pass
+        elif not attrs.rstrip().endswith("/"):
+            ok = ('trust="principal"' in attrs if tag == "message"
+                  else 'author="user"' in attrs if tag == "cited" else True)
+            stack.append((tag, ok and (not stack or stack[-1][1])))
+        pos = m.end()
+    return "\n".join(out)
+
+
+def approves(text):
+    for sentence in re.split(r"(?<=[.!?\n])", text):
+        if APPROVE.search(sentence) and not (SPOILER.search(sentence)
+                                             or DRAFTING.search(sentence)):
+            return True
     return False
 
 
-def _turn_text(entry):
+def _texts(entry):
     msg = entry.get("message")
     content = msg.get("content") if isinstance(msg, dict) else entry.get("content")
-    if isinstance(content, str):
-        return strip_injected_text(content)
-    return "\n".join(strip_injected_text(b.get("text") or "")
-                     for b in content or [] if isinstance(b, dict))
+    return content if isinstance(content, list) else [
+        {"type": "text", "text": content or ""}]
 
 
-def latest_user_text(path):
-    """The latest typed user turn, or None when the transcript is unreadable."""
+def verdict(path):
+    """None to allow, or why the write is refused."""
+    if is_real_user_turn is None:
+        return "scripts/lib/transcript_meta.py could not be loaded"
     try:
         with open(path, encoding="utf-8") as fh:
             entries = [json.loads(line) for line in fh if line.strip()]
     except (OSError, ValueError, TypeError):
-        return None
+        return "the transcript could not be read"
+    writes = 0
     for entry in reversed(entries):
-        if is_real_user_turn(entry):
-            text = _turn_text(entry)
-            parts = USER_PARTS.findall(text)
-            if parts or "<coordinator-relay" in text or "<wake" in text:
-                return "\n".join(a or b for a, b in parts)
-            return text
-    return ""
-
-
-def evaluate(payload):
-    tool = payload.get("tool_name") or ""
-    inp = payload.get("tool_input")
-    if not isinstance(inp, dict) or not is_announcement_write(tool, inp):
-        return None
-    text = latest_user_text(payload.get("transcript_path") or "")
-    if text and APPROVAL.search(text):
-        return None
-    why = ("the transcript could not be read to find it" if text is None
-           else "the user's latest message does not approve posting it")
-    return (
-        f"Refused: this posts or edits a class announcement, and {why} "
-        "(Ezra, 2026-10-27, ai-config#4780: never post an announcement "
-        "without his review and approval of its exact text).\n\n"
-        "Show the exact text in chat and wait for a message that approves "
-        "it, such as \"post the announcement\"; then run this again.")
+        if is_real_user_turn(entry) and entry.get("promptSource") != "sdk":
+            text = "\n".join(strip_injected_text(b.get("text") or "")
+                             for b in _texts(entry) if b.get("type") == "text")
+            if not approves(user_words(text)):
+                return "the user's latest message does not approve posting it"
+            if writes:
+                return "an announcement was already written after that approval"
+            return None
+        if entry.get("type") == "assistant":
+            writes += sum(1 for b in _texts(entry) if b.get("type") == "tool_use"
+                          and is_announcement_write(b.get("name") or "",
+                                                    b.get("input") or {}))
+    return "no message from the user approves posting it"
 
 
 def main() -> int:
     try:
-        reason = evaluate(json.load(sys.stdin))
-    except Exception as exc:  # fail open, saying so
+        payload = json.load(sys.stdin)
+        tool, inp = payload.get("tool_name") or "", payload.get("tool_input")
+        if not isinstance(inp, dict) or not is_announcement_write(tool, inp):
+            return 0
+    except Exception as exc:  # nothing detected: fail open, saying so
         print(f"no-unapproved-announcement: could not check call ({exc})",
               file=sys.stderr)
         return 0
-    if reason:
+    try:
+        why = verdict(payload.get("transcript_path") or "")
+    except Exception as exc:  # a detected write: fail closed
+        why = f"the check failed ({exc})"
+    if why:
         print(json.dumps({"hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "permissionDecision": "deny",
-            "permissionDecisionReason": reason,
+            "permissionDecisionReason": (
+                f"Refused: this posts or edits a class announcement, and {why} "
+                "(Ezra, 2026-10-27, ai-config#4780: never post an announcement "
+                "without his review and approval of its exact text).\n\n"
+                "Show the exact text in chat and wait for a message that "
+                "approves it, such as \"post the announcement\"; then post "
+                "that text once."),
         }}))
     return 0
 

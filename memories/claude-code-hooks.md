@@ -1244,11 +1244,3 @@ A missing `cwd` key is fine.
 
 - **Do:** run `python3 scripts/test_cursor_hook_adapter.py` locally before pushing any new PreToolUse hook, and test the hook on a payload with `"cwd": ""`.
 - **Don't:** treat a hook's own self-test passing as evidence that the adapters' payloads work.
-
-## A hook test's temp file: close the `mkstemp` descriptor before unlinking it
-
-Hook self-tests also run on Windows, where `os.unlink` refuses a file that is still open (`PermissionError: [WinError 32]`).
-`tempfile.mkstemp()` returns an open descriptor, so `tempfile.mkstemp(...)[1]` leaks it, and the test passes on Linux and crashes on Windows (ai-config#5531's Stop test, reproduced by the Flash read on the XPS, 2026-11-12).
-
-- **Do:** write `fd, path = tempfile.mkstemp(...)` and `os.close(fd)` before reopening or unlinking `path`.
-- **Don't:** index `mkstemp(...)[1]` and drop the descriptor.

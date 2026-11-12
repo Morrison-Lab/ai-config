@@ -39,8 +39,11 @@ It does not lift the prohibited-action rules.
    The mechanics and limits are in
    [`ask-for-manual-approval`](../../shared/workflow/ask-for-manual-approval.md):
    retry the identical command once, never rephrased.
-3. **If it is denied again, turn auto mode off for this step.**
-   Switch the session to `default` with `mcp__ccd_session_mgmt__set_session_permission_mode`,
+3. **If it is denied again, turn auto mode off for this step, when the switch conditions hold.**
+   Check the switch conditions in `ask-for-manual-approval`'s "When to switch or ask" first:
+   a dispatched subagent reports up its dispatch chain instead,
+   and in an `away` session, or a CI or `@claude` run, record a pending decision instead.
+   Otherwise switch the session to `default` with `mcp__ccd_session_mgmt__set_session_permission_mode`,
    run the command once, then restore the original mode
    even if the command failed or timed out.
    Read the original mode first with `mcp__ccd_session_mgmt__get_session`.

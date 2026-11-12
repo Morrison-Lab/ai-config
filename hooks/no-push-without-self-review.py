@@ -83,7 +83,7 @@ widens nothing about how strict one comparison is here. With two or more
 verdicts, the per-commit map in `_verdict_map_covers` (ai-config#4006) decides
 first, except after a trailing unparsed report or for a subagent's parent
 fallback (ai-config#5498); the map skips a clean report with an unresolvable
-fingerprint, which this refuses, so an earlier clean verdict can still count.
+fingerprint the latest-verdict check refuses, so an earlier clean verdict counts.
 
 CONSEQUENCES FOR HOW THE REVIEWER IS DISPATCHED
 ------------------------------------------------
@@ -2609,7 +2609,7 @@ def read_latest_review_with_unparsed(
 
     `history`, when given, receives every admitted `(verdict, shas)` in
     transcript order, so a caller can key verdicts by commit (ai-config#4006).
-    An unparsed report enters it as `"unparsed"`, which blocks like
+    An unparsed report naming a commit enters it as `"unparsed"`, blocking like
     `needs_work` the commits it names; as the LAST report it blocks every
     push that ships a commit, since it may supersede any earlier verdict
     (`saw_unparsed_later`).

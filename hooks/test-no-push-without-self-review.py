@@ -2420,15 +2420,13 @@ def verdict_map_cases() -> tuple[int, int]:
           PUSH, verdicts((clean, HEAD), (nmw, FEATURE)), False)
     check("a later blocking verdict for the same commit vetoes it", PUSH, verdicts((clean, HEAD), (nmw, HEAD)), True)
     check("a clean review of its base spares a stacked branch", push_feature, verdicts((clean, FEATURE), (clean, HEAD)), False)
-    check("a later clean verdict for the same commit clears it",
-          PUSH, verdicts((nmw, HEAD), (clean, HEAD)), False)
+    check("a later clean verdict for the same commit clears it", PUSH, verdicts((nmw, HEAD), (clean, HEAD)), False)
     check("a later clean verdict naming another repository's commit is skipped",
           PUSH, verdicts((clean, HEAD), (clean, OTHER_HEAD)), False)
     mixed = reviewed(body(commit=HEAD) + f"\nReviewed-Commit: {'d' * 40}")
     check("a clean report mixing a real and an invented fingerprint binds nothing",
           PUSH, verdicts((clean, FEATURE)) + mixed, True)
-    check("a voided clean report leaves an earlier clean verdict standing",
-          PUSH, verdicts((clean, HEAD)) + mixed, False)
+    check("a voided clean report leaves an earlier clean verdict standing", PUSH, verdicts((clean, HEAD)) + mixed, False)
     check("a later blocking verdict naming no commit here vetoes",
           PUSH, verdicts((clean, HEAD), (nmw, OTHER_HEAD)), True)
     nmw_bare = reviewed(body(verdict=nmw, fingerprint=False))
@@ -2448,8 +2446,7 @@ def verdict_map_cases() -> tuple[int, int]:
           PUSH, verdicts((clean, HEAD), ("Looks bad", OTHER_HEAD), (clean, FEATURE)), True)
     check("a later blocking verdict on the base vetoes a stacked branch",
           push_feature, verdicts((clean, FEATURE), (nmw, HEAD)), True)
-    check("a later blocking verdict on a parent vetoes its child",
-          PUSH, verdicts((clean, HEAD), (nmw, PREV)), True)
+    check("a later blocking verdict on a parent vetoes its child", PUSH, verdicts((clean, HEAD), (nmw, PREV)), True)
     check("a clean verdict on the fix clears an earlier blocking parent",
           push_feature, verdicts((nmw, HEAD), (clean, FEATURE), (clean, OTHER_HEAD)), False)
     for label, cmd, pairs, text, env in (
@@ -2495,6 +2492,8 @@ def verdict_map_cases() -> tuple[int, int]:
              ((clean, FEATURE), (clean, None)), "the reviewer must state `Reviewed-Commit", None),
             ("an uncovered commit names a corrupted fingerprint", PUSH,
              ((clean, FEATURE), (clean, "d" * 40)), "run `git rev-parse HEAD`", None),
+            ("a ref deletion defers to the latest blocking verdict", f"git -C {REPO} push origin :feature",
+             ((clean, FEATURE), (nmw, HEAD)), "blocking verdict", None),
             ("a map that runs out of time still refuses", PUSH,
              ((clean, FEATURE), (nmw, HEAD)), "blocking verdict", {"NPWSR_BUDGET_SECONDS": "0"})):
         rc, out = run_hook(cmd, pairs if isinstance(pairs, list) else verdicts(*pairs), extra_env=env)
@@ -2508,15 +2507,16 @@ def verdict_map_cases() -> tuple[int, int]:
           True)
     wrap = tempfile.mkdtemp(prefix="npwsr-git-")
     with open(os.path.join(wrap, "git"), "w", encoding="utf-8") as f:
-        f.write(f'#!/bin/sh\ncase " $* " in *" merge-base "*) exit 128;; esac\n'
+        f.write(f'#!/bin/sh\ncase " $* " in *" merge-base "*|*eeeeeeee*) exit 128;; esac\n'
                 f'exec {shutil.which("git")} "$@"\n')
     os.chmod(os.path.join(wrap, "git"), 0o755)
-    if os.name != "nt":  # a shell-script git stands in for a failing merge-base
-        out = run_hook(f"PATH={wrap}:{os.environ['PATH']} git -C {REPO} push origin feature",
-                       verdicts((clean, FEATURE), (nmw, HEAD), (clean, OTHER_HEAD)))[1]
-        ok = "verdict check could not run" in str(out.get("hookSpecificOutput"))  # only refusals say it
-        ran, failures = ran + 1, failures + (not ok)
-        print(f"{'PASS' if ok else 'FAIL'}: a git failure in the ancestor check defers, and says so")
+    if os.name != "nt":  # a shell-script git stands in for a failing merge-base or rev-parse
+        for step, events in (("ancestor", verdicts((clean, FEATURE), (nmw, HEAD), (clean, OTHER_HEAD))),
+                             ("fingerprint", verdicts((clean, FEATURE), (nmw, "e" * 40)))):
+            out = run_hook(f"PATH={wrap}:{os.environ['PATH']} git -C {REPO} push origin feature", events)[1]
+            ok = "verdict check could not run" in str(out.get("hookSpecificOutput"))  # only refusals say it
+            ran, failures = ran + 1, failures + (not ok)
+            print(f"{'PASS' if ok else 'FAIL'}: a git failure in the {step} check defers, and says so")
     shutil.rmtree(wrap, ignore_errors=True)
     return failures, ran
 

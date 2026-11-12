@@ -291,6 +291,10 @@ jobs:
         # ai-config#4266: scripts/lib/tool_names.py, the shared spellings of
         # the subagent, write and shell tools across harnesses.
         run: python3 scripts/test_tool_names.py
+      - name: Run sibling-loader tests
+        # ai-config#2018: scripts/lib/sibling.py, the one loader for a hook's
+        # hyphenated sibling module.
+        run: python3 scripts/test_sibling.py
       - name: Run check-rendered-references tests
         # ai-config#2879: verify broken rendered reference checking and footnote isolation.
         run: python3 scripts/test_check_rendered_references.py

@@ -23,8 +23,7 @@ import sys
 
 OVERRIDE = "ALLOW_REPO_NOT_IN_THREAD"
 TOOL = re.compile(
-    r"^mcp__hearthbot__(?:reply|post_message|update_message|edit_message|"
-    r"request_decision|message_coordinator|message_thread)$")
+    r"^mcp__hearthbot__(?:reply|post_message|update_message|edit_message|request_decision|message_coordinator|message_thread)$")
 
 APOS = r"(?:'|\u2019)"
 NEG = (rf"(?:isn{APOS}t|is\s+not|aren{APOS}t|are\s+not|wasn{APOS}t|was\s+not|"
@@ -38,10 +37,8 @@ NEG_PRESENCE = re.compile(
     rf"|\b(?:has|have)\s+no\b|\bthere(?:{APOS}s|\s+is|\s+are)\s+no\b",
     re.I)
 PLACE = rf"(?:this|the|my|our|that|current)\s+(?:thread|session)"
-LOC = re.compile(
-    rf"\b{PLACE}\b|\bmy\s+(?:repos|repositories)\b"
-    r"|\b(?:attached|checked\s+out|cloned|available)\s+here\b",
-    re.I)
+LOC = re.compile(rf"\b{PLACE}\b|\bmy\s+(?:repos|repositories)\b"
+                 r"|\b(?:attached|checked\s+out|cloned|available)\s+here\b", re.I)
 REPO_LIST = re.compile(
     rf"\b{PLACE}{APOS}s\s+(?:github\s+)?(?:repos|repositories|repo\s+scope|scope)\b"
     r"(?![\w'\u2019])(?!\s+(?:checkout|clone|directory|folder|tree|root|branch|files?|of)\b)"
@@ -51,16 +48,12 @@ REPO_LIST = re.compile(
 LAB_REPOS = (r"ai-config|gha|macros|lds|mlg|mlr|mds|mcs|pds|sds|rme|psw|psc|qwt|qnp|"
              r"ids|dds|vds|ccds|cds|epi\d+|lds-site|mcsg|stats-allowlist|teaching-tools")
 REPO_NAME = re.compile(
-    rf"\b(?:repo|repos|repository|repositories)\b|`[^`]+`|\b[\w.-]+/[\w.-]+\b"
-    rf"|\b(?:{LAB_REPOS})\b",
-    re.I)
+    rf"\b(?:repo|repos|repository|repositories)\b|`[^`]+`|\b[\w.-]+/[\w.-]+\b|\b(?:{LAB_REPOS})\b", re.I)
 OBJECT = re.compile(
     rf"\b{NEG}\s+(?:\w+\s+){{0,2}}?"
     r"(?:have|has|include|includes|access|reach|push|edit|write|commit)\s+"
     r"(?:access\s+to\s+|to\s+|into\s+)?(?:the\s+)?(\S+)"
-    # "has no X checkout", "there is no access to X": the bare "has no X"
-    # form ("we have no gha changes") is not an excuse, so a checkout or
-    # access word must come with it.
+    # "has no X" needs a checkout or access word: "we have no gha changes" passes.
     rf"|(?:\b(?:has|have)\s+no|\bthere(?:{APOS}s|\s+is|\s+are)\s+no)\s+"
     r"(?:access\s+to\s+(?:the\s+)?(\S+)|(?:the\s+)?(\S+)\s+(?:checkout|clone|copy|access|repo|repository)\b)",
     re.I)

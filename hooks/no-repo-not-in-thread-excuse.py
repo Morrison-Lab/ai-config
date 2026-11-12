@@ -64,9 +64,9 @@ CLAUSE_START = re.compile(rf"(?:^|[,;(]\s*|\b(?:but|so|because|since|yet|while|a
                           r"|(?<!for\s)(?<!in\s)(?<!on\s)(?<!of\s)(?<!to\s)(?<!by\s)(?<!about\s)(?<!against\s)(?<!with\s)(?<!from\s)\bthat\s+)"
                           rf"(?:(?:the|our|my|this|that|both|and|either)\s+|(?:{REPO_NAME.pattern})[`'\"\s,]*(?:and\s+|or\s+)?)*$", re.I)
 NOT_YET = re.compile(rf"\b(?:{NEG}|never|nobody|nothing|no\s+one|once|when|until|unless|of|without|will|would|could|should|must|needs?|if|to|please|can|{APOS}ll)\s+(?:\w+\s+){{0,2}}$", re.I)
-FAIL = r"(?:refused|denied|declined|failed|rejected|errored|returned\s+(?:an?\s+)?(?:error|[45]\d\d))"
+FAIL = r"(?:refused|denied|declined|failed|rejected|errored|(?:returned|responded\s+with|came\s+back\s+with)\s+(?:an?\s+)?(?:error|[45]\d\d))"
 TRIED = re.compile(
-    r"\b(?:add_repo|attach|attaching)\b(?:\s+(?!has\b|had\b|would\b|will\b|may\b|might\b|could\b)\S+){0,2}?"
+    r"\b(?:add_repo|attach|attaching)\b(?:\(\S{0,100}\))?(?:\s+(?!has\b|had\b|would\b|will\b|may\b|might\b|could\b)\S+){0,4}?"
     rf"\s+(?:was\s+|itself\s+)?{FAIL}\b|\b(?:attach|add_repo)\b[^.;]{{0,80}}?\b(?:(?:got|received)\s+[\"'\u2018\u201c]|(?:returned|responded|answered|said|replied)\b[^.;\"]{{0,40}}?[\"\u201c])"
     rf"|\b(?:tried|attempted)\s+(?:to\s+)?(?:attach|run\s+add_repo|add_repo)\b[^.;]{{0,80}}?\bbut\s+(?:it\s+|that\s+)?(?:was\s+)?{FAIL}", re.I)
 
@@ -103,7 +103,7 @@ def plain(sentence: str) -> str:
     """Read [text](url), **bold** and a one-word `code` as their text; drop a quoted `code phrase`."""
     sentence = re.sub(r"\[([^\]\[]{0,300})\]\([^)\s]{0,500}\)", r"\1", sentence)
     sentence = re.sub(r"`[^`\s]{1,200}`(?!`)", lambda m: m.group()[1:-1], sentence)
-    return re.sub(r"https?://[^\s)]*|\*\*|`", "", re.sub(r"`[^`]{0,500}`", "a quote", sentence))
+    return re.sub(r"https?://[^\s)]*|\*\*|`", "", re.sub(r"`[^`]{0,500}`", '"a quote"', sentence))  # a quote mark keeps a quoted refusal reason
 
 
 def attaches(sentence: str) -> bool:

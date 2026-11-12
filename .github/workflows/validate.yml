@@ -111,6 +111,9 @@ jobs:
       - name: Run check-validate-duration tests
         # ai-config#3384: the judge that flags a slower validate job on main.
         run: python3 scripts/test_check_validate_duration.py
+      - name: Run validate-duration workflow tests
+        # ai-config#3384: both steps of validate-duration.yml.
+        run: python3 scripts/test_validate_duration_workflow.py
       - name: Run diff-annotations-vs-base tests
         # ai-config#5281: per-name annotation diff over every page.
         run: python3 scripts/test_diff_annotations_vs_base.py

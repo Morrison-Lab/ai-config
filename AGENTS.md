@@ -148,7 +148,11 @@ On moving to native agent plugins, [remove submodules that duplicated them](shar
 ## WIP cap
 
 At three open PRs per repo, open no fourth ([`wip-cap`](shared/workflow/wip-cap.md)).
-This cap, a scope freeze or any other freeze stops new work, not issue filing: "a freeze shouldn't prevent you from filing issues" (Ezra, 2026-11-12, [`freezes-allow-filing`](shared/workflow/freezes-allow-filing.md)).
+
+## A freeze stops new work, not issue filing
+
+"a freeze shouldn't prevent you from filing issues" (Ezra, 2026-11-12).
+A scope freeze, the WIP cap, `finish-wave` or any other freeze stops grabbing and working issues, never filing them: file in the same turn and leave the issue unclaimed ([`freezes-allow-filing`](shared/workflow/freezes-allow-filing.md)).
 
 ## Canonical sources vs generated output
 

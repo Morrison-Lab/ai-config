@@ -542,5 +542,27 @@ with tempfile.TemporaryDirectory(prefix="hook-runner-") as tmp:
           repr({k: seen_env.get(k) for k in ("TMPDIR", "TEMP", "TMP")}))
 
 
+# --- Undecodable suite output does not abort the sweep (ai-config#1288) ---
+# A suite under a cp1252 console wrote byte 0x92, and decoding it as UTF-8
+# raised inside the runner, killing every suite after it.
+
+CP1252 = """\
+import sys
+sys.stdout.buffer.write(b"curly \\x92 quote\\n")
+"""
+
+with tempfile.TemporaryDirectory(prefix="hook-runner-") as tmp:
+    bad_test, bad_subj = _write_pair(Path(tmp), "cp1252", CP1252)
+    try:
+        rc, stdout, _ = _capture(
+            lambda: th.run_one_suite(bad_test, bad_subj, timeout=10))
+        crashed = ""
+    except UnicodeDecodeError as exc:
+        rc, stdout, crashed = None, "", repr(exc)
+    check("a suite printing a non-UTF-8 byte gets a verdict, not a crash",
+          not crashed and rc == 0 and "PASS:" in stdout,
+          crashed or repr(stdout))
+
+
 print(f"\n{passes}/{passes + failures} checks passed")
 sys.exit(1 if failures else 0)

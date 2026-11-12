@@ -31,7 +31,7 @@ REPO_LIST = re.compile(
     r"|\bmy\s+(?:repos|repositories)\b(?!['\u2019])|\bthe\s+(?:repos|repositories)\s+(?:attached|available|in|on|for)\b", re.I)
 # Not "ids", a plural; an owner/name needs a known owner, so "Quarto/pandoc" is no repository.
 LAB_REPOS = r"ai-config|gha|lds|mlg|mlr|mds|mcs|pds|sds|rme|psw|psc|qwt|qnp|dds|vds|ccds|cds|epi\d+|lds-site|mcsg|stats-allowlist|teaching-tools"
-NAMED = re.compile(rf"\b(?:Morrison-Lab|d-morrison|UCD-SERG|ucdavis)/[\w-]{{1,100}}\b(?![/.]\w)|\b(?:{LAB_REPOS})\b", re.I)
+NAMED = re.compile(rf"\b(?:Morrison-Lab|d-morrison|UCD-SERG|ucdavis)/[\w-]{{1,100}}\b(?![/.]\w)|(?-i:\b(?:{LAB_REPOS})\b)", re.I)  # "SDs" is no repo
 REPO_NAME = re.compile(rf"\b(?:repo|repos|repository|repositories)\b|{NAMED.pattern}", re.I)
 SUBJECT = re.compile(rf"(?:{REPO_NAME.pattern})[\s`'\"\u2019]*(?:(?:is|are|was|were)\s+)?$", re.I)
 DET, TOK = r"(?:(?:the|a|an|that|this|any)\s+)?", r"`?([\w-]{1,39}(?:/[\w-]{1,100})?)`?"
@@ -56,11 +56,11 @@ ATTACH_VERB = re.compile(rf"(?<!the\s)(?<!\ba\s)(?<!an\s)(?<!repos\s)(?<!reposit
     r"|\b(?:ran|called|used|invoked|tried)\s+(?:the\s+)?add_repo\b|\badd_repo\s+(?:attached|added|cloned|fixed)\b"
     r"|\b(?:fixed|attached|added)\s+(?:\w+\s+){0,3}?(?:with|via|using)\s+add_repo\b", re.I)
 OUTAGE = re.compile(r"\b(?:down|outage|offline|proxy|network|disk|quota|rate.limit\w*|timed?\s*out|DNS|SSL|TLS|[45]\d\d|[45]\d\ds)\b", re.I)
-OTHER_CAUSE = re.compile(rf"[^.;]{{0,200}}?\b(?:because|since|due\s+to)\b(?![^.;]{{0,300}}(?:\b(?:attach\w*|add_repo|scope)\b"
+OTHER_CAUSE = re.compile(rf"[^.;]{{0,200}}?\b(?:because|since|due\s+to|until|while)\b(?![^.;]{{0,300}}(?:\b(?:attach\w*|add_repo|scope)\b"
                          rf"|\b{NEG}\s+(?:\w+\s+)?(?:in|on|part\s+of|among|one\s+of|available)\b))", re.I)
 DONE = re.compile(r"\b(?:I|[Ww]e)\s+(?:(?:just|then|also|finally|now)\s+)?$")  # "until I attached it" is done
 # The repo starts its clause: "The PR against lds isn't in this thread" and "Updating lds is not in" name lds as an object.
-CLAUSE_START = re.compile(rf"(?:^|[,;:(]\s*|\b(?:but|so|because|since|yet|while|although|though)\s+"
+CLAUSE_START = re.compile(rf"(?:^|[,;(]\s*|\b(?:but|so|because|since|yet|while|although|though)\s+"
                           r"|(?<!for\s)(?<!in\s)(?<!on\s)(?<!of\s)(?<!to\s)(?<!by\s)(?<!about\s)(?<!against\s)(?<!with\s)(?<!from\s)\bthat\s+)"
                           rf"(?:(?:the|our|my|this|that|both|and|either)\s+|(?:{REPO_NAME.pattern})[`'\"\s,]*(?:and\s+|or\s+)?)*$", re.I)
 NOT_YET = re.compile(rf"\b(?:{NEG}|never|nobody|nothing|no\s+one|once|when|until|unless|of|without|will|would|could|should|must|needs?|if|to|please|can|{APOS}ll)\s+(?:\w+\s+){{0,2}}$", re.I)
@@ -112,8 +112,9 @@ def attaches(sentence: str) -> bool:
 
 
 def is_excuse(sentence: str) -> bool:
-    return (bool(LOC.search(sentence)) and not attaches(sentence) and names_repo(sentence)  # R's "attached" package:
-            and not re.search(r"\b(?:library|require)\(|\bR\s+session\b|\b(?:chunk|render\w*|knit\w*|package)\b", sentence, re.I))
+    return (bool(LOC.search(sentence)) and not attaches(sentence) and names_repo(sentence)  # R's attached package, ai-config's plugin
+            and not re.search(r"\b(?:library|require)\(|\bR\s+session\b|\b(?:chunk|render\w*|knit\w*|package|plugin|marketplace)\b",
+                              sentence, re.I))
 
 
 def excuse(text: str):

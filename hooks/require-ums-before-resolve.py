@@ -2,7 +2,7 @@
 """UMS is owed before a thread is resolved, and when its PR merges.
 
 Two entry points, one rule (AGENTS.md "Leave every pause honest and resumable",
-its "Run UMS" bullet; ai-config#4480):
+its two "Run UMS" bullets; ai-config#4480):
 
   * PreToolUse on `mcp__hearthbot__set_thread_resolved` with `resolved: true`.
     A resolved thread loses its message box, so the learnings from the thread
@@ -31,7 +31,6 @@ reason to stderr, and says so to the user and the model on each resolve and
 in the merge-event reminder, since stderr from a hook exiting 0 reaches nobody.
 """
 import hashlib
-import importlib.util
 import json
 import os
 import re
@@ -52,6 +51,13 @@ except Exception as _exc:  # broken install: degrade, never block
           f"a thread resolve will not be checked for UMS", file=sys.stderr)
     tool_names = None
 
+try:
+    from sibling import load_sibling
+except ImportError as _exc:
+    print(f"require-ums-before-resolve: cannot load scripts/lib/sibling.py "
+          f"({_exc}); its sibling hook will not load", file=sys.stderr)
+    load_sibling = None
+
 RESOLVE_TOOL = "set_thread_resolved"
 
 EVENT = re.compile(r"<event\b([^>]*\bsource=\"github\"[^>]*)>(.*?)</event>", re.DOTALL)
@@ -60,12 +66,15 @@ MERGED = re.compile(r"\bkind=\"[^\"]*merged[^\"]*\"|\"merged\"\s*:\s*true|\"stat
 UMS_PATH = re.compile(r"(?:^|/)(?:memories|shared)/|(?:^|/)(?:AGENTS|CLAUDE)\.md$|ai-config")
 
 
+def _load_ums_hook():
+    """Import `remind-ums-after-error.py` (scripts/lib/sibling.py); raises if it cannot load."""
+    if load_sibling is None:
+        raise ImportError("scripts/lib/sibling.py is not importable")
+    return load_sibling(__file__, "remind-ums-after-error.py", "ums_after_error", required=True)
+
+
 def load_ums_word():
-    spec = importlib.util.spec_from_file_location(
-        "ums_after_error", os.path.join(HERE, "remind-ums-after-error.py"))
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module.UMS_WORD
+    return _load_ums_hook().UMS_WORD
 
 
 def text_of(record):

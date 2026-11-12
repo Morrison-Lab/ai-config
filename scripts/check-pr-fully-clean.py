@@ -382,7 +382,7 @@ REVIEW_AGENT_MARKERS: Dict[str, str] = {
     "_posted by codex (ai agent)": "Codex",
     "_posted by opencode (ai agent)": "OpenCode",
     # Deliberately NOT here: the Claude Code disclosure footer
-    # (`_Posted by Claude Code (AI agent) ...`).  CLAUDE.md's
+    # (`_Posted by Claude Code (AI agent) ...`).  AGENTS.md's
     # "Every comment you post to a forge says an agent posted it" mandates that
     # footer on EVERY agent-posted comment -- claims, status updates, replies,
     # and the in-chat-feedback paraphrases -- not on reviews only.  Admitting it
@@ -1017,7 +1017,7 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
                 f"Check run '{name}'{where} passed but carries "
                 f"{cr['annotations_count']} annotation(s) not yet read: run "
                 f"`gh api repos/{repo}/check-runs/{cr.get('id')}/annotations` "
-                "(for many runs, scripts/summarize-pr-annotations.sh), "
+                f"(for many runs, `{BATCH_READ_CMD.format(repo=repo, sha=sha)}`), "
                 "fix each or report it as a false positive in the PR, then "
                 f"rerun with `--annotations-read {cr.get('id')}`")
         elif conclusion not in ("success", "neutral", "skipped"):
@@ -1040,7 +1040,28 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
                 f"Check run '{name}'{where} completed with conclusion "
                 f"'{conclusion}'")
 
+    unread = sum("annotation(s) not yet read" in i for i in issues)
+    if unread > UNREAD_RUNS_BUDGET_THRESHOLD:
+        issues.append(_core_budget_note(unread, repo, sha))
     return all(i.startswith("NOTE: ") for i in issues), issues
+
+
+# Above this many unread annotation runs, name the shared core budget (ai-config#5045).
+UNREAD_RUNS_BUDGET_THRESHOLD = 5
+BATCH_READ_CMD = "scripts/batch-read-annotations.py --repo {repo} --sha {sha}"
+
+
+def _core_budget_note(unread: int, repo: str, sha: str) -> str:
+    """A NOTE with the core budget from GET /rate_limit (free); a failed read is stated."""
+    try:
+        core = json.loads(fetch(["gh", "api", "rate_limit"]))["resources"]["core"]
+        reset = datetime.fromtimestamp(core["reset"], tz=timezone.utc)
+        budget = f"has {core['remaining']} request(s) left until {reset.strftime('%H:%M UTC')}"
+    except (RuntimeError, PayloadError, ValueError, KeyError, TypeError) as exc:
+        budget = f"could not be read ({type(exc).__name__}: {exc})"
+    return (f"NOTE: {unread} run(s) carry unread annotations, and the GitHub core budget every "
+            f"agent shares {budget}; read them with `{BATCH_READ_CMD.format(repo=repo, sha=sha)}`, "
+            "not one call per run (ai-config#5045)")
 
 
 WORKFLOW_DIR = ".github/workflows/"

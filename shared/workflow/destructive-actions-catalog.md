@@ -3,6 +3,7 @@
 Ezra, 2026-11-11, after a session nearly deleted `lds` branches it had misread from a shallow clone: "search online for common failure patterns and build guards against them, VERY CAREFULLY" ([ai-config#5317](https://github.com/Morrison-Lab/ai-config/issues/5317)).
 This fragment lists the reported ways coding agents have destroyed data, with a source for each, and names the ai-config hook that covers each one.
 A "none" in the guard column marks a gap that #5317 tracks.
+"CC Safety Net" in that column means the pinned base guard [described below](#the-base-guard-cc-safety-net) refused the incident's command when fed it as hook JSON.
 
 ## Test a guard only where it cannot do damage
 
@@ -19,23 +20,42 @@ Bare issue numbers below are in [`anthropics/claude-code`](https://github.com/an
 Each of those issues and the Docker post was read on 2026-11-11;
 a row says so where its source was not.
 
-| Pattern | Reported incident | ai-config guard (2026-11-11) |
+| Pattern | Reported incident | ai-config guard (2026-11-12) |
 | --- | --- | --- |
-| `rm -rf` with a stray home target | `rm -rf tests/ patches/ plan/ ~/` wiped a Mac home directory ([Docker, 2026-06-01](https://www.docker.com/blog/coding-agent-horror-stories-the-rm-rf-incident/)) | none |
-| `rm -rf "$VAR"` where the variable was set in an earlier Bash call | `rm -rf "$HOME"` ran against the real home directory after a temporary `$HOME` did not persist between tool calls ([#75859](https://github.com/anthropics/claude-code/issues/75859)) | none |
-| `git reset --hard` over uncommitted work | [#7232](https://github.com/anthropics/claude-code/issues/7232), [#17190](https://github.com/anthropics/claude-code/issues/17190), [#33850](https://github.com/anthropics/claude-code/issues/33850), and twice at session start in [#34327](https://github.com/anthropics/claude-code/issues/34327) | `flag-reset-hard-uncommitted-work.py` (warns) |
-| `git checkout -- .` or `git restore <path>` over uncommitted work | `git checkout HEAD -- .` ([#11821](https://github.com/anthropics/claude-code/issues/11821)); `git restore lib/` across 40 files ([#43591](https://github.com/anthropics/claude-code/issues/43591)) | `flag-reset-hard-uncommitted-work.py` (warns) |
-| `git clean -fd` deleting untracked or ignored files | [#45974](https://github.com/anthropics/claude-code/issues/45974); after `git rm -rf .` on a new orphan branch ([#29179](https://github.com/anthropics/claude-code/issues/29179)) | none outside render intermediates (`no-rm-live-render-intermediate.py`) |
-| Concurrent sessions resetting, stashing or cleaning one shared worktree | [#53819](https://github.com/anthropics/claude-code/issues/53819) | none; the worktree-isolation rule in `AGENTS.md` is prose |
-| Plain `--force` push after `--force-with-lease` was refused | [#70378](https://github.com/anthropics/claude-code/issues/70378) | `no-clobbering-push.py` (denies a bare force push) |
+| `rm -rf` with a stray home target | `rm -rf tests/ patches/ plan/ ~/` wiped a Mac home directory ([Docker, 2026-06-01](https://www.docker.com/blog/coding-agent-horror-stories-the-rm-rf-incident/)) | CC Safety Net (denies) |
+| `rm -rf "$VAR"` where the variable was set in an earlier Bash call | `rm -rf "$HOME"` ran against the real home directory after a temporary `$HOME` did not persist between tool calls ([#75859](https://github.com/anthropics/claude-code/issues/75859)) | none: CC Safety Net denies `rm -rf "$HOME"` but passes `rm -rf "$D/"` with `D` unset ([ai-config#5476](https://github.com/Morrison-Lab/ai-config/issues/5476)) |
+| `git reset --hard` over uncommitted work | [#7232](https://github.com/anthropics/claude-code/issues/7232), [#17190](https://github.com/anthropics/claude-code/issues/17190), [#33850](https://github.com/anthropics/claude-code/issues/33850), and twice at session start in [#34327](https://github.com/anthropics/claude-code/issues/34327) | CC Safety Net (denies); `flag-reset-hard-uncommitted-work.py` (warns) |
+| `git checkout -- .` or `git restore <path>` over uncommitted work | `git checkout HEAD -- .` ([#11821](https://github.com/anthropics/claude-code/issues/11821)); `git restore lib/` across 40 files ([#43591](https://github.com/anthropics/claude-code/issues/43591)) | CC Safety Net (denies); `flag-reset-hard-uncommitted-work.py` (warns) |
+| `git clean -fd` deleting untracked or ignored files | [#45974](https://github.com/anthropics/claude-code/issues/45974); after `git rm -rf .` on a new orphan branch ([#29179](https://github.com/anthropics/claude-code/issues/29179)) | CC Safety Net denies `git clean -fd` and `git rm -rf .`; `no-rm-live-render-intermediate.py` denies deleting render intermediates |
+| Concurrent sessions resetting, stashing or cleaning one shared worktree | [#53819](https://github.com/anthropics/claude-code/issues/53819) | CC Safety Net denies the reset, the clean and `git stash drop`, but not `git stash`; the worktree-isolation rule in `AGENTS.md` is prose |
+| Plain `--force` push after `--force-with-lease` was refused | [#70378](https://github.com/anthropics/claude-code/issues/70378) | CC Safety Net and `no-clobbering-push.py` (both deny a bare force push) |
 | Force push to a branch with an open PR | `git reset --hard HEAD~1` then `--force-with-lease` ([#85450](https://github.com/anthropics/claude-code/issues/85450)) | `no-clobbering-push.py` warns when the remote tip has diverged, without checking for an open PR |
-| Branch deleted with unmerged commits | worktree cleanup deleted the branch ([#38287](https://github.com/anthropics/claude-code/issues/38287)); branches misread from a shallow clone (`lds`, 2026-11-11) | none; a shallow-clone guard is in progress in another thread, and `no-delete-branch-under-stacked-pr.py` covers only a stacked PR's base deleted on merge |
-| Worktree force-removed with uncommitted work | blanket `git worktree remove --force` fallback (ai-config, 2026-09-10) | `warn-blanket-worktree-force-remove.py` (warns) |
+| Branch deleted with unmerged commits | worktree cleanup deleted the branch ([#38287](https://github.com/anthropics/claude-code/issues/38287)); branches misread from a shallow clone (`lds`, 2026-11-11) | CC Safety Net denies `git branch -D` and `git push --delete`; a shallow-clone guard is in progress in another thread, and `no-delete-branch-under-stacked-pr.py` covers only a stacked PR's base deleted on merge |
+| Worktree force-removed with uncommitted work | blanket `git worktree remove --force` fallback (ai-config, 2026-09-10) | CC Safety Net (denies); `warn-blanket-worktree-force-remove.py` (warns) |
 | Gitignored render intermediate deleted under a live render | ai-config, 2026-09-24 | `no-rm-live-render-intermediate.py` (denies) |
 | Live config deleted as "orphaned" | [ai-config#3096](https://github.com/Morrison-Lab/ai-config/issues/3096) | `flag-config-deletion-without-ref-check.py` warns at `Stop` on a reply that recommends the deletion; nothing intercepts the command |
 | `chown -R` or `chmod -R` on system directories | `sudo chown -R $USER:$(id -gn) /usr && sudo chmod -R u+w /usr` broke `sudo` ([#168](https://github.com/anthropics/claude-code/issues/168)); a background agent with `sudo` left `/etc` owned by UID 100000, then ran `chown -R root:root /usr/` and `/etc/` as a repair, clearing setuid bits on `sudo` and `su` ([#39283](https://github.com/anthropics/claude-code/issues/39283)) | `no-recursive-chown-system-path.py` denies it; see [below](#recursive-ownership-and-mode-changes) |
 | Moving files into a directory that a failed `mkdir` never made | Gemini CLI, July 2025, per [Ars Technica](https://arstechnica.com/information-technology/2025/07/ai-coding-assistants-chase-phantoms-destroy-real-user-data/) (not read: the host refused this session's fetch) | none; the rule below is prose |
-| Production database or infrastructure destroyed | a Replit agent deleted a production database during a code freeze, July 2025; `terraform destroy` ran against a stale state file, February 2026 ([Alexey Grigorev](https://alexeyondata.substack.com/p/how-i-dropped-our-production-database)); neither source was reachable from this session | none; the lab runs no production database |
+| Production database or infrastructure destroyed | a Replit agent deleted a production database during a code freeze, July 2025; `terraform destroy` ran against a stale state file, February 2026 ([Alexey Grigorev](https://alexeyondata.substack.com/p/how-i-dropped-our-production-database)); neither source was reachable from this session | none: CC Safety Net passes `terraform destroy` without its Terraform rulebook, and the lab runs no production database |
+
+## The base guard: CC Safety Net
+
+Ezra, 2026-11-12, chose to adopt [CC Safety Net](https://github.com/kenryu42/cc-safety-net) (MIT) as the base guard for every agent, pinned, with ai-config hooks only for the gaps it leaves ([ai-config#5474](https://github.com/Morrison-Lab/ai-config/issues/5474)).
+[`hooks/run-cc-safety-net.py`](../../hooks/run-cc-safety-net.py) runs the release [`hooks/cc-safety-net.pin.json`](../../hooks/cc-safety-net.pin.json) names, at its standard level, on every shell and file tool call.
+It fails open, with a notice once per session, where Node.js 22 or npm is missing, and after a failed fetch it waits an hour before fetching again.
+A `.cc-safety-net/policy.json` committed to a repository can add blocks but cannot turn any off.
+
+It runs at the standard level, not strict, because replaying the 797 distinct Bash commands of one ai-config session through each level (2026-11-12) gave:
+
+| Level | Commands refused | What it refused |
+| --- | --- | --- |
+| standard | 1 | `git checkout -- <file>` of a file the session had edited |
+| strict | 112 | 86 commands with a variable or loop in a path, such as `python3 $S/edit.py`, 18 heredocs, 4 it could not parse, 3 `curl` uploads, and the checkout |
+
+- **Do:** when it refuses a command, read the rule it names and narrow the command, as its message says.
+- **Don't:** route around a refusal with an equivalent command it does not recognize.
+  Ask Ezra instead, naming the rule.
+- **Do:** before moving the pin, run `CC_SAFETY_NET_LIVE=1 python3 hooks/test-run-cc-safety-net.py` and feed the new release the incident commands in the failure-pattern table above.
 
 ## Rules for the patterns no hook decides yet
 

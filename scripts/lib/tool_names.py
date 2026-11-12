@@ -121,3 +121,24 @@ def subagent_brief(inp) -> str:
             elif isinstance(entry, str):
                 parts.append(entry)
     return " ".join(parts)
+
+
+# Reply tools, keyed by the input field holding the text the user reads. A
+# Claude project thread replies only through these, not in `text` blocks.
+REPLY_TOOLS = {
+    "mcp__hearthbot__post_message": "text",
+    "mcp__hearthbot__edit_message": "text",
+    "mcp__hearthbot__reply": "text",
+    "mcp__hearthbot__update_message": "text",
+    "mcp__hearthbot__message_coordinator": "text",
+    "mcp__hearthbot__message_thread": "text",
+}
+
+
+def reply_text(name, inp) -> str:
+    """The reply text a reply tool's input carries, or ''."""
+    key = REPLY_TOOLS.get(name) if isinstance(name, str) else None
+    if not key or not isinstance(inp, dict):
+        return ""
+    value = inp.get(key)
+    return value if isinstance(value, str) else ""

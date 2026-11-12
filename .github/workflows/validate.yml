@@ -111,6 +111,9 @@ jobs:
       - name: Run diff-annotations-vs-base tests
         # ai-config#5281: per-name annotation diff over every page.
         run: python3 scripts/test_diff_annotations_vs_base.py
+      - name: Run batch-read-annotations tests
+        # ai-config#5045: annotation reads within the shared REST budget.
+        run: python3 scripts/test_batch_read_annotations.py
       - name: Run check-mr-fully-clean tests
         # ai-config#3021: GitLab's equivalent fully-clean merge gate.
         run: python3 scripts/test_check_mr_fully_clean.py
@@ -266,6 +269,8 @@ jobs:
       - name: Run doctor tests
         # ai-config#2540: doctor.py install diagnostics and path checks.
         run: python3 scripts/test_doctor.py
+      - name: Run retire-leftover-paths tests (ai-config#5309 step 3)
+        run: python3 scripts/test_retire_leftover_paths.py
       - name: Run AI CLI helper and detection tests
         # ai-config#2543: scripts/lib/ai_cli.py tool availability detection.
         run: python3 scripts/test_ai_cli.py
@@ -291,6 +296,10 @@ jobs:
         # ai-config#4266: scripts/lib/tool_names.py, the shared spellings of
         # the subagent, write and shell tools across harnesses.
         run: python3 scripts/test_tool_names.py
+      - name: Run sibling-loader tests
+        # ai-config#2018: scripts/lib/sibling.py, the one loader for a hook's
+        # hyphenated sibling module.
+        run: python3 scripts/test_sibling.py
       - name: Run check-rendered-references tests
         # ai-config#2879: verify broken rendered reference checking and footnote isolation.
         run: python3 scripts/test_check_rendered_references.py

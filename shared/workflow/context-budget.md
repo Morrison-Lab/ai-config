@@ -20,4 +20,5 @@ The removed headings also left ten citations by name in hooks, fragments, a skil
 Each change tightened or loosened a rule while the bullet still read as the same rule.
 
 - **Do:** before committing a condensed rule, list every clause of the original and point to where the condensed text keeps it, or to the fragment that carries it, and grep the repo for every removed heading's name.
+- **Do:** place a composed section after every section whose terms it uses, and lead each folded rule's bullet with its name in bold, so the SessionStart index in `hooks/inject-core-rules.py` still lists it.
 - **Don't:** condense several rules in one pass and leave the reviewers to find which conditions went missing.

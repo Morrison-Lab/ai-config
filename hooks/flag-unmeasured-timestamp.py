@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """PreToolUse guard: a clock time typed into a forge comment, session notebook, or memory file needs a reading.
 
-`CLAUDE.md`'s "Timestamp recaps in local time" requires running
+`shared/workflow/timestamp-local-recaps.md`, which `AGENTS.md`'s "Timestamp
+recaps in local time" links, requires running
 `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"` fresh before typing a
 Pacific clock time anywhere -- a chat recap, a file edit, a session notebook /
 memory file update, and (since ai-config#2900) a forge comment. The rule is
@@ -85,7 +86,6 @@ a retried identical command does not nag twice.
 See `hooks/test-flag-unmeasured-timestamp.py` for the fixtures.
 """
 import hashlib
-import importlib.util
 import json
 import os
 import re
@@ -95,20 +95,20 @@ import tempfile
 HERE = os.path.dirname(os.path.realpath(__file__))
 
 
-def _sibling(name, key):
-    """Import a hyphenated sibling module, or None if unavailable.
+_LIB = os.path.join(os.path.dirname(HERE), "scripts", "lib")
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+try:
+    from sibling import load_sibling
+except ImportError as _exc:
+    print(f"{os.path.basename(__file__)}: cannot load scripts/lib/sibling.py "
+          f"({_exc}); running without its sibling hooks", file=sys.stderr)
+    load_sibling = None
 
-    Same pattern `flag-uncounted-comment-claims.py` and `no-empty-promise.py`
-    use. Fails open, per the file-wide contract.
-    """
-    path = os.path.join(HERE, name)
-    try:
-        spec = importlib.util.spec_from_file_location(key, path)
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        return mod
-    except Exception:
-        return None
+
+def _sibling(name, key):
+    """Import a hyphenated sibling module, or None (scripts/lib/sibling.py)."""
+    return load_sibling(__file__, name, key) if load_sibling else None
 
 
 _clock = _sibling("no-unmeasured-clock-claim.py", "_sib_unmeasured_timestamp_clock")
@@ -235,7 +235,7 @@ UNREADABLE_NOTE = (
     "from an editor), and no clock read appears in this transcript since the "
     "current turn began. If the body states a Pacific clock time, run "
     "`{cmd}` now and restate the stamp from its output before posting. See "
-    "CLAUDE.md, \"Timestamp recaps in local time\"."
+    "AGENTS.md, \"Timestamp recaps in local time\"."
 )
 UNREADABLE_STAMP = "(body not readable)"
 UNREADABLE_DETAIL = (

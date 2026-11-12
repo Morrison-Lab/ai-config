@@ -197,7 +197,18 @@ Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402 
   - `iceman-contributor-free` gave a bare verdict on one review, and a reasoned one on another whose brief asked for reasons.
   - `longcat-2.5-free`'s one streamed review produced only reasoning and no answer.
 
+  Later on 2026-11-11, reviewing [#5472](https://github.com/Morrison-Lab/ai-config/pull/5472) and [#5486](https://github.com/Morrison-Lab/ai-config/pull/5486), `beam-free` returned empty content both streamed and not, which counts as no verdict.
+  `iceman-contributor-free`, not streamed, returned a bare `VERDICT: CLEAN` with no reasons.
+  One HTTP 502 from it cleared on retry.
+  The PR comments recording those merges ([#5472](https://github.com/Morrison-Lab/ai-config/pull/5472#issuecomment-6812712234), [#5486](https://github.com/Morrison-Lab/ai-config/pull/5486#issuecomment-6813363070)) relied on it only beside a reasoned Flash read and a clean Claude review.
+
   Check `/models` for the current free ids and try them before relying on this route.
+- **Make the request with `curl` itself if it is to satisfy the merge gate.**
+  `hooks/warn-merge-without-cross-harness-review.py` counts a Bash command whose command word is `curl`, with a data flag (`-d`, `--data-binary`, `--json` and the like) and a literal `https://opencode.ai/zen/go/v1/chat/completions` URL, that exits without error after the last push.
+  It never reads the response, and it does not see a request made from a script.
+  In a command that also runs `git push`, a `curl` counts only when every push in that command runs before it, at the same level: both on the top-level command line, or both inside one `bash -c` string.
+  A push in that same command at another level, such as `bash -c 'git push'; curl ...`, makes the review stale whichever runs first, because the hook cannot order the two.
+  In the session that merged #5486 (author's own observation, not recorded on the PR), the hook refused the merge after a review sent from a Python script and allowed it once the same request was sent with `curl`.
 - **A review through `cat-jam-free` and `longcat-2.5-preview-free` worked on 2026-10-16, while every Go model returned the weekly `GoUsageLimitError`** ([ai-config#4581](https://github.com/Morrison-Lab/ai-config/issues/4581)).
   Stream with `"stream": true` and `max_tokens` 30000, and assemble `delta.content`;
   the text comes only after 40,000 to 70,000 characters of `reasoning_content`, about five minutes.
@@ -305,6 +316,17 @@ rm -f "$PAYLOAD_FILE"
   the roughly 30-second gateway cutoff returns 502 or upstream request failure.
 - **Don't:** rely on `glm-5.3` for large prompts;
   it can stream megabytes of empty deltas or fail upstream.
+
+Measured in a claude.ai cloud session on 2026-11-12, while merging [ai-config#5482](https://github.com/Morrison-Lab/ai-config/pull/5482):
+- `hooks/warn-merge-without-cross-harness-review.py` did not recognise an OpenCode Go review whose `curl` ran inside a Python wrapper script.
+  The merge went through only after `curl -sS -N --max-time 1500 https://opencode.ai/zen/go/v1/chat/completions ... --data-binary @req.json -o out.sse` ran directly in a Bash call.
+- The same hook counts only a cross-harness review run in the merging session's own transcript, so a Gemini Flash read that another session posted on the PR did not satisfy it.
+- The merge gate that requires a `check-pr-fully-clean.py` pass did not accept a run whose output was filtered through `grep`, and accepted it once the output was unpiped.
+- With every Go model at its weekly `GoUsageLimitError`, `iceman-contributor-free` returned a bare `VERDICT: CLEAN`, `beam-free` returned no text, and `longcat-2.5-free` spent all 30,000 `max_tokens` on reasoning with no text.
+  Treat the bare verdict as weak evidence and the empty answers as no verdict.
+
+- **Do:** run the OpenCode `curl` directly in Bash, and run `check-pr-fully-clean.py` unpiped, before a merge.
+- **Don't:** wrap the `curl` in a script, or count another session's posted read, as the merge hook's cross-harness review.
 
 Reuse one UUID across the turns of a conversation.
 Prefer Go models for bulk and mechanical work while Claude quota is low.

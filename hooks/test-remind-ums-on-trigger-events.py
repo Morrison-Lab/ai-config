@@ -55,5 +55,13 @@ note = ups(relay("", "same note"))
 check("fires once per distinct note", run(note, tmp) != "" and run(note, tmp) == "")
 for raw in ("", "not json", "[1]"):
     check(f"malformed {raw!r} is silent", run(raw) == "")
+# A cp1252 console used to drop a note holding curly quotes: the hook read the
+# UTF-8 payload as cp1252 and stayed silent (ai-config#5462).
+curly = relay("", f"Don{chr(0x2019)}t defer {chr(0x201C)}this{chr(0x201D)} to CI.")
+fresh = tempfile.mkdtemp()  # all three, as scripts/test_hooks.py sets them
+p = subprocess.run([sys.executable, HOOK], capture_output=True, timeout=30,
+                   input=json.dumps(ups(curly), ensure_ascii=False).encode("utf-8"),
+                   env=dict(os.environ, PYTHONIOENCODING="cp1252", TMPDIR=fresh, TEMP=fresh, TMP=fresh))
+check("a curly-quoted note reminds under cp1252", p.returncode == 0 and b"coordinator" in p.stdout)
 print(f"\n{'FAILED' if failures else 'all passed'}: {failures} wrong")
 sys.exit(1 if failures else 0)

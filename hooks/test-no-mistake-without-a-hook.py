@@ -44,6 +44,11 @@ CASES = [
      "'my mistake' reminds"),
     ([say("Correcting myself: that regex never matched.")], True,
      "'correcting myself' reminds"),
+    ([{"type": "assistant", "message": {"content": [
+        {"type": "tool_use", "name": "mcp__hearthbot__post_message",
+         "input": {"text": "You're right, I was wrong on two counts."}}]}},
+      UNRELATED], True,
+     "an admission sent through post_message reminds (2026-11-12)"),
     ([say("I removed redundant prose because it repeated an existing rule."), UNRELATED], True,
      "recognizing redundant prose with no mechanism reminds"),
 

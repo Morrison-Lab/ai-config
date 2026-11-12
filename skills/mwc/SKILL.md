@@ -711,8 +711,8 @@ They differ in exactly the way that matters here: the hook reads a **marker
 file**, so re-asking cannot move it, while the classifier reads the
 **conversation**, so re-stating intent can.
 So a denial that clears on a retry was, by that fact, probably not this guard.
-Check registration rather than assuming, per `CLAUDE.md`'s
-"Keep ai-config and repo checkouts fresh":
+Check registration rather than assuming, per
+[`keep-checkouts-fresh`](../../shared/workflow/keep-checkouts-fresh.md):
 
 ```bash
 python3 <ai-config-checkout>/scripts/install-hooks.py   # report only; --fix binds

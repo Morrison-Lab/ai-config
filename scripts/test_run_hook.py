@@ -15,6 +15,16 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 RUNNER = ROOT / "plugins" / "ai-config-hooks" / "run-hook.sh"
 
+sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+from findbash import find_bash  # noqa: E402
+
+# A bare "bash" on Windows is the WSL launcher, which cannot run this
+# checkout's script (ai-config#5503), so probe for one that can.
+BASH = find_bash(RUNNER, probe_args=("true",))
+if BASH is None:
+    sys.exit("error: no bash here can run plugins/ai-config-hooks/run-hook.sh; "
+             "set AI_SESSION_BASH to one that can")
+
 passes = 0
 failures = 0
 
@@ -38,7 +48,7 @@ def run(home: Path, project: Path, *args: str, stdin: str = "") -> subprocess.Co
     env = {**os.environ, "HOME": str(home), "CLAUDE_PROJECT_DIR": str(project)}
     env.pop("CLAUDE_PLUGIN_ROOT", None)
     return subprocess.run(
-        ["bash", str(RUNNER), *args], input=stdin, capture_output=True,
+        [BASH, str(RUNNER), *args], input=stdin, capture_output=True,
         text=True, env=env, cwd=str(project),
     )
 

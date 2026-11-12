@@ -33,8 +33,12 @@ def find_bash(script, probe_args=("list",), cwd=None, timeout=60):
     return probe_bash((str(script), *probe_args), cwd=cwd, timeout=timeout)
 
 
-def probe_bash(args, cwd=None, timeout=60):
-    """Return the first candidate bash for which `bash *args` exits 0, or None."""
+def probe_bash(args, cwd=None, timeout=60, env=None):
+    """Return the first candidate bash for which `bash *args` exits 0, or None.
+
+    `env`, when given, is the probe's whole environment, so a caller can check
+    that a candidate sees a PATH it sets.
+    """
     tried = []
     for cand in (os.environ.get("AI_SESSION_BASH"), shutil.which("bash"), *CANDIDATES):
         if not cand or cand in tried:
@@ -43,7 +47,7 @@ def probe_bash(args, cwd=None, timeout=60):
         try:
             proc = subprocess.run(
                 [cand, *args],
-                capture_output=True, cwd=cwd, timeout=timeout)
+                capture_output=True, cwd=cwd, timeout=timeout, env=env)
         except (OSError, subprocess.SubprocessError):
             continue
         if proc.returncode == 0:

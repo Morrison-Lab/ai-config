@@ -29,11 +29,27 @@ from findbash import probe_bash  # noqa: E402
 WORKFLOW = Path(__file__).resolve().parent.parent / ".github/workflows/validate-duration.yml"
 TITLE = "validate job on main has slowed down"
 MARKER = "<!-- validate-duration-tracking -->"
-# On Windows the first bash on PATH can be the WSL launcher, which cannot see
-# this PATH or jq, so probe for a bash that runs jq (scripts/lib/findbash.py).
-BASH = probe_bash(("-c", "jq -n 1"))
-if BASH is None:
-    raise SystemExit("no bash that can run jq was found; the steps need both")
+
+
+def find_step_bash() -> str:
+    """Return a bash that runs a stub from a PATH set as run() sets it, and jq.
+
+    On Windows the first bash on PATH can be the WSL launcher, which does not
+    see a Windows PATH (scripts/lib/findbash.py), so the probe does what the
+    steps do: run a stub from a temporary directory put first on PATH, and jq.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        stub = Path(tmp) / "probe-stub"
+        stub.write_text("#!/bin/bash\nexit 0\n", encoding="utf-8")
+        stub.chmod(0o755)
+        env = {**os.environ, "PATH": f"{tmp}{os.pathsep}{os.environ['PATH']}"}
+        found = probe_bash(("-c", "probe-stub && jq -n 1"), cwd=tmp, env=env)
+    if found is None:
+        raise SystemExit("no bash ran a stub from PATH and jq; the steps need both")
+    return found
+
+
+BASH = find_step_bash()
 SHELLS = {"bash": [BASH, "--noprofile", "--norc", "-eo", "pipefail", "-c"]}
 GH = """#!/bin/bash
 echo "$*" | tr '\\n' ' ' >> "$LOG"

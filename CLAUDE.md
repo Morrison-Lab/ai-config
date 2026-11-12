@@ -82,16 +82,6 @@ Four freshness checks to run each session: the ai-config checkout itself (on `ma
 sweep for a leftover `~/.claude/skills` too, in symlink form as well as copy, whose symptom is a doubled skill listing rather than drift --- a symlink into the checkout diffs clean --- and which must not be deleted on presence or on a name match, with `install-hooks.py` answering only the registration half), the working repo's own `main` checkout, and (where a consumer repo vendors ai-config as a git submodule) the `.ai-config` pin.
 The fragment above carries the mechanics, the failure modes each check catches, and the case records.
 
-## Timestamp recaps in local time
-
-A status recap carries a timestamp in the user's local zone, and every clock time you write anywhere (a recap, a file, a forge comment, a notebook heading) comes from a reading taken in that moment and printed to the transcript: `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`.
-
-- **Do:** run the clock command on its own, immediately before typing a time anywhere, and quote what it returned.
-- **Don't:** infer a clock time from elapsed tool calls, or treat an earlier reading as still valid.
-
-`hooks/no-unmeasured-clock-claim.py` and `hooks/flag-unmeasured-timestamp.py` warn on an unmeasured Pacific time (ai-config#2903).
-Detail, platform mechanics, and cases: [`shared/workflow/timestamp-local-recaps.md`](shared/workflow/timestamp-local-recaps.md).
-
 ## State the actual time when reporting a scheduled check-in
 
 When reporting a scheduled wakeup or check-in, state the clock time it fires at in Pacific time ("I'll check back at 08:22 PT (~4 min)"), not only the delay.

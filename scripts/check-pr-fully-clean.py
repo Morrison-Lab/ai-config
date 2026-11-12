@@ -1230,8 +1230,9 @@ def check_required_checks(pr) -> Tuple[bool, List[str]]:
 
 
 def check_maintainer_feedback(pr) -> Tuple[bool, List[str]]:
-    """Fail when a maintainer comment, review or inline comment is newer than
-    the head commit: the merge hook denies the same state (ai-config#4611)."""
+    """Fail when a maintainer comment, review or inline comment has no later
+    agent reply: the merge hook denies the same state (ai-config#4611,
+    ai-config#5577)."""
     pr_data = dict(getattr(pr, "_data", {}) or {})
     inline_note = ""
     try:
@@ -1242,9 +1243,9 @@ def check_maintainer_feedback(pr) -> Tuple[bool, List[str]]:
         inline_note = " (inline comments not in the payload, so not checked)"
     unread = unread_maintainer_feedback(pr_data)
     if not unread:
-        print(f"✓ No maintainer feedback is newer than the head commit{inline_note}.")
+        print(f"✓ No maintainer feedback is unanswered by an agent reply{inline_note}.")
         return True, []
-    return False, [f"Maintainer feedback newer than the last push: {item}" for item in unread]
+    return False, [f"Maintainer feedback no agent reply has answered: {item}" for item in unread]
 
 
 def check_review_threads(pr) -> Tuple[bool, List[str]]:

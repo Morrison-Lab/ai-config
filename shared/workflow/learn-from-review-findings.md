@@ -591,7 +591,9 @@ The logins come from `MAINTAINER_LOGINS`, else the `maintainers` list in `~/.con
 It reminds and never blocks.
 Tracked in [#3465](https://github.com/Morrison-Lab/ai-config/issues/3465).
 
-A reminder does not stop a merge, so the merge gate backs it: `hooks/enforce-mwc-review-gate.py` re-lists the PR's comments, reviews and inline comments at the merge call and denies when any one by a `MAINTAINER_LOGINS` author is newer than the head commit, which closes the gap that let sds#278 merge with two suggestions unread.
+A reminder does not stop a merge, so the merge gate backs it: `hooks/enforce-mwc-review-gate.py` re-lists the PR's comments, reviews and inline comments at the merge call and denies when any one by a `MAINTAINER_LOGINS` author has no later agent reply, which closes the gap that let sds#278 merge with two suggestions unread.
+An agent reply is a later comment, review or inline comment under a maintainer login that carries the `Posted by ... (AI agent)` footer and is not a head review.
+A push alone answers nothing, since a merge of `main` is a push too, so a question holds the PR until an agent answers it ([#5577](https://github.com/Morrison-Lab/ai-config/issues/5577)).
 A bare merge grant or approval and a body carrying the agent-disclosure marker are not feedback.
 The same hook denies a merge while any inline review thread is unresolved and not outdated, whoever opened it, and denies when it cannot read the threads.
 `scripts/check-pr-fully-clean.py` fails on the same unread-feedback state, through the shared `scripts/lib/maintainer_feedback.py`, so the instrument and the hook agree.

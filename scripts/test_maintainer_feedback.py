@@ -78,17 +78,53 @@ BODIES = [
     "Please add an independent review of head bdb97ca.",
 ]
 
+# An agent's reply under the maintainer's login, which answers what came
+# before it (ai-config#5577).
+REPLY = "Done in abc1234.\n\n---\n_Posted by Claude Code (AI agent) --- not written by a human._"
+
 
 class TestLibrary(unittest.TestCase):
     def test_comment_after_push_is_reported(self):
         out = lib.unread_maintainer_feedback(pr_data([comment("Nit.")]))
         self.assertEqual(out, [f"comment by d-morrison at {LATER}"])
 
-    def test_item_at_or_before_push_is_not_reported(self):
+    def test_a_push_alone_does_not_answer(self):
+        # ai-config#5577: a merge of main is a push too, and answers nothing.
         for when in (EARLIER, PUSHED):
             with self.subTest(when=when):
                 self.assertEqual(
-                    lib.unread_maintainer_feedback(pr_data([comment("Nit.", when=when)])), [])
+                    lib.unread_maintainer_feedback(pr_data([comment("Why?", when=when)])),
+                    [f"comment by d-morrison at {when}"])
+
+    def test_a_later_agent_reply_answers(self):
+        for kind in ("comment", "review", "inline comment"):
+            with self.subTest(kind=kind):
+                question = comment("Why?", when=EARLIER)
+                answer = {"author": user("d-morrison"), "body": REPLY,
+                          "createdAt": PUSHED, "submittedAt": PUSHED}
+                data = pr_data([question])
+                key = {"comment": "comments", "review": "reviews",
+                       "inline comment": "reviewComments"}[kind]
+                data[key].append(answer)
+                self.assertEqual(lib.unread_maintainer_feedback(data), [])
+
+    def test_an_earlier_reply_does_not_answer_a_later_question(self):
+        data = pr_data([comment(REPLY, when=EARLIER), comment("Why?", when=LATER)])
+        self.assertEqual(lib.unread_maintainer_feedback(data),
+                         [f"comment by d-morrison at {LATER}"])
+
+    def test_automated_output_and_head_reviews_do_not_answer(self):
+        # The robot emoji and "Claude finished" mark CI review output, and a
+        # head review evaluates the code; neither answers the maintainer.
+        for body in ("\U0001f916 Generated review", "**Claude finished** the review",
+                     "Independent review of head bdb97ca:\n\n" + REPLY):
+            with self.subTest(body=body[:30]):
+                data = pr_data([comment("Why?", when=EARLIER), comment(body, when=LATER)])
+                self.assertEqual(len(lib.unread_maintainer_feedback(data)), 1)
+
+    def test_a_reply_from_another_login_does_not_answer(self):
+        data = pr_data([comment("Why?", when=EARLIER), comment(REPLY, login="someone")])
+        self.assertEqual(len(lib.unread_maintainer_feedback(data)), 1)
 
     def test_each_kind_is_reported_with_its_label(self):
         data = pr_data(
@@ -141,6 +177,7 @@ class TestParityWithTheHook(unittest.TestCase):
     def test_same_grant_pattern_and_marker_pattern(self):
         self.assertEqual(lib.EXEMPT_RE.pattern, hook.MAINTAINER_FEEDBACK_EXEMPT_RE.pattern)
         self.assertEqual(lib.AGENT_AUTHORSHIP_RE.pattern, hook.AGENT_AUTHORSHIP_RE.pattern)
+        self.assertEqual(lib.AGENT_REPLY_RE.pattern, hook.AGENT_REPLY_RE.pattern)
 
 
 class TestCheckerGate(unittest.TestCase):
@@ -150,8 +187,9 @@ class TestCheckerGate(unittest.TestCase):
             ok, issues = checker.check_maintainer_feedback(FakePR(data, list(review_comments)))
         return ok, issues, out.getvalue()
 
-    def test_clean_when_nothing_is_newer_than_the_push(self):
-        ok, issues, out = self.run_check(pr_data([comment("Nit.", when=EARLIER)]))
+    def test_clean_when_every_item_is_answered(self):
+        ok, issues, out = self.run_check(
+            pr_data([comment("Nit.", when=EARLIER), comment(REPLY)]))
         self.assertTrue(ok)
         self.assertEqual(issues, [])
         self.assertIn("No maintainer feedback", out)
@@ -160,7 +198,7 @@ class TestCheckerGate(unittest.TestCase):
         ok, issues, _ = self.run_check(pr_data([comment("Define this directly.")]))
         self.assertFalse(ok)
         self.assertEqual(len(issues), 1)
-        self.assertIn("Maintainer feedback newer than the last push", issues[0])
+        self.assertIn("Maintainer feedback no agent reply has answered", issues[0])
         self.assertFalse(issues[0].startswith("NOTE: "))
 
     def test_inline_comment_comes_from_review_comments_property(self):
@@ -221,10 +259,11 @@ class TestCheckerGate(unittest.TestCase):
     def test_main_exits_1_on_unread_feedback(self):
         code, text = self.run_main(pr_data([comment("Define this directly.")]))
         self.assertEqual(code, 1)
-        self.assertIn("Maintainer feedback newer than the last push", text)
+        self.assertIn("Maintainer feedback no agent reply has answered", text)
 
     def test_main_exits_0_when_feedback_is_answered(self):
-        code, text = self.run_main(pr_data([comment("Define this directly.", when=EARLIER)]))
+        code, text = self.run_main(
+            pr_data([comment("Define this directly.", when=EARLIER), comment(REPLY)]))
         self.assertEqual(code, 0)
         self.assertIn("FULLY CLEAN", text)
 

@@ -1,4 +1,4 @@
-"""Maintainer feedback that a push has not answered yet (ai-config#4611).
+"""Maintainer feedback that no agent reply has answered yet (ai-config#4611, #5577).
 
 A maintainer's comment, review or inline comment is feedback until a later
 push answers it. `check-pr-fully-clean.py` calls this; the merge hook
@@ -20,6 +20,12 @@ AGENT_AUTHORSHIP_RE = re.compile(
     r"posted by\b[^\n]*\(ai agent\)|\*\*claude finished|\U0001f916",
     re.IGNORECASE,
 )
+
+# The footer an agent puts on a reply it posts under the maintainer's login.
+# Such a reply answers the maintainer items before it (ai-config#5577).
+# Narrower than AGENT_AUTHORSHIP_RE: the robot emoji and "Claude finished" also
+# mark automated review output, which answers nothing.
+AGENT_REPLY_RE = re.compile(r"posted by\b[^\n]*\(ai agent\)", re.IGNORECASE)
 
 # A bare merge grant or approval, not a request for change. One optional
 # token, so no two quantifiers can match the same text.
@@ -78,21 +84,26 @@ def maintainer_logins() -> Set[str]:
 
 
 def unread_maintainer_feedback(pr_data: Dict[str, Any]) -> List[str]:
-    """Descriptions of maintainer items posted after the head commit.
+    """Descriptions of maintainer items that no agent reply has answered yet.
 
     Input: the PR as `gh pr view --json` returns it, plus `reviewComments`
     (`pulls/<n>/comments` entries with `createdAt`, `author`, `body`).
     Output: one `"<kind> by <login> at <timestamp>"` string per item, empty
-    when none. A payload without `commits` cannot name the head date and
-    reports nothing.
+    when none.
 
-    Skipped as not feedback: an item at or before the head commit, a blank
-    body (an Approve click with no text), a body with the agent-disclosure
-    marker, and a bare grant or approval.
+    An item is answered only by a later agent reply: an item under a
+    maintainer login whose body carries the agent footer (`AGENT_REPLY_RE`)
+    and is not itself a head review. A push answers nothing, since a merge of
+    the base branch is a push too (ai-config#5577; the rule before was "newer
+    than the head commit", ai-config#4611).
+
+    Skipped as not feedback: a blank body (an Approve click with no text), a
+    body with the agent-disclosure marker, a bare grant or approval, and an
+    agent's head review. A payload without `commits` reports nothing, as
+    before; the real fetch always supplies it.
     """
     commits = pr_data.get("commits") or []
-    head_date = (commits[-1].get("committedDate") or "") if commits else ""
-    if not head_date:
+    if not commits or not commits[-1].get("committedDate"):
         return []
     logins = maintainer_logins()
     items = (
@@ -103,11 +114,18 @@ def unread_maintainer_feedback(pr_data: Dict[str, Any]) -> List[str]:
         + [("inline comment", c.get("author"), c.get("createdAt"), c.get("body"))
            for c in pr_data.get("reviewComments") or []]
     )
-    found = []
+    mine = []
     for kind, author, when, body in items:
         login = ((author or {}).get("login") or "").lower().removesuffix("[bot]")
-        body = body or ""
-        if login not in logins or (when or "") <= head_date:
+        if login in logins:
+            mine.append((kind, login, when or "", body or ""))
+    last_reply = max(
+        (when for _, _, when, body in mine
+         if AGENT_REPLY_RE.search(body) and not REVIEW_COMMENT_RE.search(body)),
+        default="")
+    found = []
+    for kind, login, when, body in mine:
+        if when < last_reply:
             continue
         text = body.strip()
         if not text or AGENT_AUTHORSHIP_RE.search(body) or EXEMPT_RE.fullmatch(text) \

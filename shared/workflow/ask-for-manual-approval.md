@@ -30,8 +30,11 @@ Ask when both of these hold:
   An edit to the agent's own settings (`~/.claude/settings.json`) counts when the user authorized it, since that was the motivating case.
 - The denial comes from the classifier or approval mode, not from a managed-settings `permissions.deny` rule.
 
+When both hold and `mcp__ccd_session_mgmt__set_session_permission_mode` is available, switch the session yourself instead of asking (see the self-switch bullet under "Do and Don't").
+Otherwise ask the user to switch.
+
 A first denial can be a transient misfire (see [`claude-code-hooks`](../../memories/claude-code-hooks.md) on retrying an identical command once).
-Retry the identical command once at most, never rephrased, then ask.
+Retry the identical command once at most, never rephrased, then switch or ask.
 You cannot tell a `soft_deny` from a `hard_deny` block from inside the turn, so ask once and report the result.
 If the user switches modes and the action is still refused, report that and stop.
 A managed-settings `permissions.deny` denial applies in every mode, so report it as a denial and do not ask to switch.
@@ -57,27 +60,28 @@ Nothing else tells them the stretch has ended, and every later action keeps rais
 
 ## Do and Don't
 
-- **Do:** on a classifier denial of a needed, authorized action, name the refused command and its stated reason, and ask the user to switch out of auto mode so they can approve it.
+- **Do:** on a classifier denial of a needed, authorized action, name the refused command and its stated reason, and ask the user to switch out of auto mode so they can approve it, unless the self-switch below is available.
 - **Do:** batch the actions that need approval into one manual-mode stretch, then say plainly, "you can switch back to auto mode now".
 - **Don't:** end the turn after a denial without naming the mode switch, or offer only the `autoMode` configuration, which takes a settings change the user has to make.
 - **Don't:** retry a denied command more than once, or rephrase it.
+  A rerun through a real approval prompt, after the user's switch or the self-switch, is not a retry.
 - **Don't:** route around a denial, or hand the user a script to run in place of the approval.
 - **Don't:** hand a denied action to another session to run instead: a subagent, or in a Claude Project another thread or the coordinator ([`claude-app-projects`](../../memories/claude-app-projects.md)).
   That is routing around the denial too.
-  The one exception is a dispatched subagent returning its denied action to the caller that dispatched it, as the subagent bullet describes: the caller owns that action, so the return is not a handoff.
+  The one exception is a dispatched subagent returning its denied action up its own dispatch chain, as the subagent bullet describes: the dispatching session owns that action, so the return is not a handoff.
   (2026-11-11: after the classifier denied a thread's merge of [gha#1910](https://github.com/Morrison-Lab/gha/pull/1910), the coordinator declined to hand the merge to the project's runner thread.)
 - **Do:** after a classifier denial, keep the recovery in the session the classifier denied, unless that session is a dispatched subagent.
-  That session makes its one identical retry, follows "What to say", and then reruns the action only through the approval prompt that the mode switch brings up.
+  That session makes its one identical retry, switches modes itself or follows "What to say", and then reruns the action only through the approval prompt that the switch brings up.
   That approved run is not a second retry: the user approved it.
-- **Do:** when the denied session is a dispatched subagent, which cannot ask the user or switch modes, have it report the refused command and the stated reason to its caller.
-  The caller asks the user under "What to say" and runs the action itself, only through the approval prompt in its own session, never through any other subagent or session.
-  A caller that is itself a dispatched subagent reports to its own caller the same way.
+- **Do:** when the denied session is a dispatched subagent, which has no way to ask the user, have it report the refused command and the stated reason to its caller.
+  The report goes up the dispatch chain, each subagent passing it to the session that dispatched it, until it reaches the first session that can ask the user.
+  That session switches modes itself or asks under "What to say", and runs the action only through the approval prompt in its own session, never through a subagent or another session.
 - **Do:** in a Claude Project, when the user answers the coordinator instead of the denied thread, the coordinator tells that thread, with the user's message attached by id, to ask the user again in its own thread.
   The relayed message is not approval.
 - **Don't:** ask to leave auto mode for a hard-prohibited category, or for an action the user has not authorized.
-- **Do:** when `mcp__ccd_session_mgmt__set_session_permission_mode` is available and the action is authorized and outside the hard-prohibited categories, switch the session to `default` yourself and rerun the command once, so the user gets a real approval prompt;
+- **Do:** when `mcp__ccd_session_mgmt__set_session_permission_mode` is available, both conditions under "When to ask" hold, and the action is outside the hard-prohibited categories, switch the session to `default` yourself and rerun the command once, so the user gets a real approval prompt;
   a switch to a lower mode shows no card.
-  Then request `auto` again.
+  Once the actions that needed approval are done, switch back to `auto` with the same tool, or tell the user they can, as "Say when it is over" describes.
   (2026-10-22, `apply-all.sh --apply`: two classifier denials, labelled "Modify Shared Resources" then "Auto-Mode Bypass", despite the user's typed "go";
   after the user answered `daytb` to "disable auto?", the self-switch to `default` let the apply run.
   The user had been told to "approve the prompt" when none existed, and was asked "retry?" and "disable auto?" instead of being offered the switch.)

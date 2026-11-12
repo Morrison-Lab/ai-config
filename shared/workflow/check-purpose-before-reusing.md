@@ -147,6 +147,7 @@ it, one sentence each, and take the variant whose likelier error is the cheaper
 one.
 Where the helper runs upstream of the thing that would have caught the miss,
 the false negative is usually unrecoverable, which settles it.
+`hooks/no-thread-model-claim-without-get-session.py` first copied its siblings' inline-code masking, so a claim naming `claude-opus-5-5` in code font passed unseen (ai-config#5547, caught by a Flash review, 2026-11-12).
 
 - **Do:** state what a false positive and a false negative each cost the NEW
   consumer, and choose the variant from that comparison.

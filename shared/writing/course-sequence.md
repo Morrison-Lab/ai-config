@@ -56,7 +56,7 @@ mcs -> mds -> pds -> sds -+-> lds   (prediction-focused statistics)
 
 ## When a full render runs too long, consider splitting the repo
 
-Ezra, 2026-11-12 (`cai:`, ai-config#5568): "when full-repo renders in notes projects are taking excessively long, consider whether it's time to split the repo into multiple repos".
+Ezra, 2026-11-12 (`cai:`, [ai-config#5568](https://github.com/Morrison-Lab/ai-config/issues/5568)): "when full-repo renders in notes projects are taking excessively long, consider whether it's time to split the repo into multiple repos".
 
 When a notes repo's full render (the publish on `main`, or a full PR preview) takes excessively long,
 consider splitting the repo into several topic repos, and bring Ezra a recommendation.
@@ -66,9 +66,9 @@ The split itself is his decision.
   Find where the time goes before blaming the repo's size:
   the freeze cache, umbrella pages that re-render their children in every format, and the fixed cost of starting each page.
   Fix those first if they are the cause.
-  Morrison-Lab/mds#631 is the worked example:
+  [mds#631](https://github.com/Morrison-Lab/mds/issues/631) is the worked example:
   per-page timings showed that splitting optimization out of mds would save at most about 14% of its HTML render.
-- **Split along a topic seam**, not along a course syllabus (ai-config#5012),
+- **Split along a topic seam**, not along a course syllabus ([ai-config#5012](https://github.com/Morrison-Lab/ai-config/issues/5012)),
   and place the new repo in the sequence above.
 - **Count the cost of the split**:
   redirect stubs for every moved page and anchor, repointed links from the later sites,

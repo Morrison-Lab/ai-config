@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""PreToolUse guard: no class announcement without the user's approval (Ezra, 2026-10-27, ai-config#4780).
+"""PreToolUse guard: no class announcement without the user's approval.
 
-Denies the CLI, `is_announcement`, a Canvas network write naming a topic and an MCP announcement write unless
-the user's last message is only "post the announcement" ("yes, post it", ...); one write each. Gaps: #5453."""
+Ezra, 2026-10-27, said twice: never post a class announcement without his review and approval of its exact text
+(ai-config#4780). Denies the CLI, `is_announcement`, a network write naming a topic and an MCP announcement write
+unless the user's last message is only "post the announcement" ("yes, post it", ...); one write each. Gaps: #5453.
+"""
 import json
 import os
 import re
@@ -14,8 +16,6 @@ try:
 except Exception:  # detection still runs; a detected write is then denied
     is_real_user_turn = None
 
-CANVAS = re.compile(r"discussion|api/(v1|graphql)|instructure|canvas", re.I)
-OTHER_HOST = re.compile(r"https://(hooks\.slack\.com|slack\.com|api\.github\.com|discord(app)?\.com)/")  # not Canvas
 CLI = re.compile(r"\bcanvas\s+announcements?\s+(create|post|update|edit|publish)\b", re.I)
 CODE = re.compile(r"\b(python3?|node|ruby|perl|Rscript)\b\s+(-c|-e|-\s)|<<")
 QUOTED = re.compile(r"'[^']*'|\"(\\.|[^\"\\$`])*\"")  # a double-quoted span with $ or ` stays
@@ -29,7 +29,7 @@ COMPOUND = re.compile(r"[;&|`\n<>]|\$\(")
 MCP_READ = re.compile(r"^(get|list|search|read|find|fetch|show|count)", re.I)
 APPROVAL = re.compile(r"\s*((yes|ok|okay|approved|looks good|lgtm)[,.!]*\s*)?(please\s+)?(go ahead and\s+)?"
                       r"((post|publish)\s+(it|the announcement|this announcement|that announcement)"
-                      r"|send\s+(the|this|that)\s+announcement)( (now|as written|please))*[ .!]*", re.I)  # single-spaced
+                      r"|send\s+(the|this|that)\s+announcement)( (now|as written|please))*[ .!]*", re.I)  # matched against single-spaced words
 TAG = re.compile(r"<(/?)([a-z][\w-]*)([^>]*)>", re.I)
 ENVELOPE = {"wake", "project", "thread", "message", "relay", "cited", "note"}  # and every hyphenated tag
 
@@ -73,10 +73,9 @@ def is_announcement_write(tool, inp, cwd=""):
             return True
         net = NET.search(cmd) or first in ("http", "https", "xh")
         read = first == "curl" and not WRITE.search(cmd) and plain  # other reads deny: widening this failed open (#5453)
-        other_host = first == "curl" and OTHER_HOST.search(cmd) and not (CANVAS.search(cmd) or "$" in bare)  # Slack
         cli = CLI.search(bare) or re.search(r"\b(ba|z)?sh\s+-c\b", cmd) and CLI.search(cmd)
         return bool(cli or ANNOUNCE.search(cmd) and (net or CODE.search(cmd))
-                    or TOPIC.search(cmd) and not other_host and net and not read)
+                    or TOPIC.search(cmd) and net and not read)
     name = tool.lower()
     if not name.startswith("mcp__"):
         return False

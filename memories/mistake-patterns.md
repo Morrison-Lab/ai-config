@@ -58,8 +58,7 @@ When a new entry lands after `main` has appended one of its own, take the next n
   told user Morrison-Lab/ai-config#1677 was ready without checking that CI had failed
   (`new-line-breaks` check).
   See [`mistake-patterns.cases.md`](mistake-patterns.cases.md) for 2026-08-26, 2026-08-31, 2026-09-03, and 2026-10-07 case records.
-- **Canonical Rule**: `AGENTS.md` ("Get a clean automated review before asking a person to review"),
-  `fully-clean.md`, and `hooks/no-incomplete-check-enumeration.py`.
+- **Canonical Rule**: `AGENTS.md` ("Review your work before anyone sees it, and watch every PR you drive", "Get a clean automated review before asking a person to review" bullet), `fully-clean.md`, and `hooks/no-incomplete-check-enumeration.py`.
 - **Do:** Run `python3 scripts/check-pr-fully-clean.py <N> -R <owner>/<repo>`
   before a terminal clean / ready-to-merge claim.
   Read exit 0 as clean,
@@ -232,7 +231,7 @@ A clean automated review from every available provider evaluating the current HE
 - **Example**: 2026-08-26 session, on ai-config#2295: completed fixes, ran local verification, requested Claude review, but left the PR in draft mode.
   The user had to manually ask "why is 2295 still in draft mode".
   (The exchange happened in the CLI session, so the PR thread itself carries no trace of it.)
-- **Canonical Rule**: `AGENTS.md` ("Put PRs in ready mode when they are ready for review"): "What is not acceptable is leaving a review-ready PR in draft...
+- **Canonical Rule**: `AGENTS.md` ("Review your work before anyone sees it, and watch every PR you drive", "Put PRs in ready mode when they are ready for review" bullet) and [`put-prs-in-ready-mode`](../shared/workflow/put-prs-in-ready-mode.md): "Don't: leave a PR that is ready for review in draft...
   Do: un-draft an up-front empty PR once its implementation has landed on the branch head and the checks pass."
 - **Fix**: Once a push completes a PR's implementation, check its draft status (`gh pr view --json isDraft`) and mark it ready if it isn't (`gh pr ready`).
   Do this before dispatching review workflows or yielding to the user ---

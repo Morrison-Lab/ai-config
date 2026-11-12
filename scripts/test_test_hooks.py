@@ -517,7 +517,7 @@ try:
         check("the runner removes that directory afterwards",
               bool(used_dir) and not os.path.exists(used_dir), repr(stdout))
 finally:
-    shared_sentinel.unlink()
+    shared_sentinel.unlink(missing_ok=True)
 
 # TEMP and TMP are what Windows reads, so pin them too: on Linux and macOS
 # gettempdir() follows TMPDIR alone, and dropping the other two would pass.

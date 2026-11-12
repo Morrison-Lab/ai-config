@@ -227,6 +227,32 @@ def _pr_number(args, value_flags=GH_VALUE_FLAGS):
     return None
 
 
+# `gh pr merge` options that make the call merge nothing: `--disable-auto`
+# cancels an auto-merge, and `-h`/`--help` prints usage (ai-config#5406).
+NON_MERGE_FLAGS = frozenset({"--disable-auto", "-h", "--help"})
+
+
+def _merges_nothing(args, value_flags=GH_VALUE_FLAGS):
+    """True when *args* carry an option in NON_MERGE_FLAGS.
+
+    A flag's separate value (`--body --help`) and anything after `--` are
+    operands, not options, so they never count.
+    """
+    skip = False
+    for tok in args:
+        if skip:
+            skip = False
+            continue
+        if tok == "--":
+            return False
+        if tok in value_flags:
+            skip = True
+            continue
+        if tok in NON_MERGE_FLAGS:
+            return True
+    return False
+
+
 def _gh_merge(rest):
     """(number|None, repo|None) when argv `rest` is `gh pr merge ...`."""
     if not rest or _basename(rest[0]) != "gh":
@@ -239,6 +265,8 @@ def _gh_merge(rest):
     if rest[i:i + 2] != ["pr", "merge"]:
         return None
     args = rest[i + 2:]
+    if _merges_nothing(args) or _merges_nothing(rest[1:i]):
+        return None
     # gh also accepts -R/--repo before the subcommand (`gh -R o/r pr merge 12`).
     repo = (_flag_value(args, ("-R", "--repo"))
             or _flag_value(rest[1:i], ("-R", "--repo")))

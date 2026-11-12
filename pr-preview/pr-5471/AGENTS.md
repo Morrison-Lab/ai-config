@@ -68,54 +68,25 @@ What you say about the state you stop in must be true, and any work that remains
   answering with the corrected fact is not the pass ([`run-ums-proactively`](shared/workflow/run-ums-proactively.md)).
 - **Terminate superseded and abandoned background tasks** (commands, monitors, subagents dispatched to inspect, search, or diagnose) once their purpose is met, their findings are superseded, or the session moves on, and sweep them before declaring anything complete ([`terminate-superseded-tasks`](shared/workflow/terminate-superseded-tasks.md)).
 
-## Prefer optionality over removing functionality
+## Fix the cause, and look for what already exists
 
-Never remove existing functionality entirely when you can add optionality instead.
-When changing default behavior, fixing an issue, or refactoring a workflow, do not delete an existing capability or code path outright if it served a legitimate purpose;
-make the improved behavior the default and preserve the legacy or alternative behavior behind an explicit, documented opt-in parameter, environment variable, or configuration toggle.
-See [`prefer-optionality-over-removal`](shared/principles/prefer-optionality-over-removal.md).
+Meet the rule behind a finding at the mechanism that produced it, pair each algorithmic check with writer and reviewer instructions, look for an existing solution before building one, and keep a capability that still serves a purpose behind an option rather than deleting it ([#2889](https://github.com/Morrison-Lab/ai-config/issues/2889)).
 
-## Prefer systemic solutions over one-off fixes
-
-When addressing a defect, failure, edge case, or recurring mistake, prefer systemic, structural solutions over one-off, ad-hoc patches.
-Fix the underlying mechanism that allowed the error to occur, install an automated guard or architectural invariant preventing the defect class from recurring, and audit the repo for other instances in the same turn.
-See [`prefer-systemic-solutions-over-one-off-fixes`](shared/principles/prefer-systemic-solutions-over-one-off-fixes.md).
-
-## No cheap fixes
-
-A fix is done when the rule behind the finding is met, not when the finding stops matching.
-Name that rule, check the fixed state against it, and when a reviewer offers several fixes, take the one that meets it.
-See [`no-cheap-fixes`](shared/principles/no-cheap-fixes.md).
-
-## Give every algorithmic check a writer and a reviewer instruction
-
-Every algorithmic check (hook, script, `gha` workflow) also gets a writer instruction that prevents the defect and a reviewer instruction that looks for it (Ezra, 2026-11-09).
-See [`checks-need-writer-and-reviewer-instructions`](shared/workflow/checks-need-writer-and-reviewer-instructions.md).
-
-## Research existing solutions before implementing (DRW)
-
-Before writing custom code or helpers, check for an existing solution (DRW, don't reinvent the wheel) in our repos, standard libraries, and trusted upstream ecosystems (base R, tidyverse / r-lib, PyPI, npm).
-Record what was searched and what was found.
-See [`dont-reinvent-wheel`](shared/principles/dont-reinvent-wheel.md) and [`prefer-upstream`](skills/prefer-upstream/SKILL.md).
-## Interpret instructions broadly and maximize safe progress
-
-Unless the user narrows a request, take the broad reading that advances its obvious objective and complete every safe, authorized, relevant step.
-Do not reduce an instruction to the smallest literal action when its context makes a larger in-scope outcome clear.
-Apply grants and rules at the breadth stated without adding unstated conditions, exceptions, or restrictions.
-See [`AGENTS.cases.md`](AGENTS.cases.md) and [`challenge-the-assignment.cases.md`](shared/workflow/challenge-the-assignment.cases.md).
-
-Read every word, infer what a request plainly implies, and treat a correction as a general principle whenever plausible: [`read-instructions-fully`](shared/workflow/read-instructions-fully.md).
-
-## "Or" always means "and/or", not xor, unless xor is explicitly specified
-
-In instructions, prompts, specifications, issue descriptions, and checklists, treat "or" as inclusive ("and/or") unless exclusive choice is explicitly stated (e.g., "either A or B, but not both", "mutually exclusive", or "xor").
-When an instruction says "do X or Y", address both X and Y if both are applicable, relevant, or needed to achieve the objective.
-See [`or-means-and-or`](shared/principles/or-means-and-or.md).
-
-## Silence is not permission
-
-An unaddressed action is not thereby allowed, required or forbidden: reason from the nearest rules' purpose, or ask.
-See [`silence-is-not-permission`](shared/principles/silence-is-not-permission.md).
+- **Prefer optionality over removing functionality:** never remove existing functionality entirely when you can add optionality instead.
+  When changing default behavior, fixing an issue, or refactoring a workflow, do not delete an existing capability or code path outright if it served a legitimate purpose;
+  make the improved behavior the default and preserve the legacy or alternative behavior behind an explicit, documented opt-in parameter, environment variable, or configuration toggle.
+  See [`prefer-optionality-over-removal`](shared/principles/prefer-optionality-over-removal.md).
+- **Prefer systemic solutions over one-off fixes:** when addressing a defect, failure, edge case, or recurring mistake, prefer systemic, structural solutions over one-off, ad-hoc patches.
+  Fix the underlying mechanism that allowed the error to occur, install an automated guard or architectural invariant preventing the defect class from recurring, and audit the repo for other instances in the same turn.
+  See [`prefer-systemic-solutions-over-one-off-fixes`](shared/principles/prefer-systemic-solutions-over-one-off-fixes.md).
+- **No cheap fixes:** a fix is done when the rule behind the finding is met, not when the finding stops matching.
+  Name that rule, check the fixed state against it, and when a reviewer offers several fixes, take the one that meets it.
+  See [`no-cheap-fixes`](shared/principles/no-cheap-fixes.md).
+- **Give every algorithmic check a writer and a reviewer instruction:** every algorithmic check (hook, script, `gha` workflow) also gets a writer instruction that prevents the defect and a reviewer instruction that looks for it (Ezra, 2026-11-09).
+  See [`checks-need-writer-and-reviewer-instructions`](shared/workflow/checks-need-writer-and-reviewer-instructions.md).
+- **Research existing solutions before implementing (DRW):** before writing custom code or helpers, check for an existing solution (DRW, don't reinvent the wheel) in our repos, standard libraries, and trusted upstream ecosystems (base R, tidyverse / r-lib, PyPI, npm).
+  Record what was searched and what was found.
+  See [`dont-reinvent-wheel`](shared/principles/dont-reinvent-wheel.md) and [`prefer-upstream`](skills/prefer-upstream/SKILL.md).
 
 ## Don't take anyone's word for it: no sycophancy and independent verification
 
@@ -130,12 +101,6 @@ See [`dont-take-my-word-for-it`](shared/principles/dont-take-my-word-for-it.md).
 Probe live; date such notes.
 See [`live-state-over-notes`](shared/workflow/live-state-over-notes.md).
 
-## Proactively suggest better alternatives to proposed approaches
-
-When asked to accomplish a goal using a specific approach, suggest a better alternative if one exists.
-Distinguish the underlying goal from candidate mechanisms;
-when an alternative achieves the goal more simply, cleanly, or reliably, proactively recommend it.
-See [`proactively-suggest-alternatives`](shared/principles/proactively-suggest-alternatives.md) and [`AGENTS.cases.md`](AGENTS.cases.md).
 ## Use real-world examples for general practice
 
 When we do or see something that would be a good example for general practice, actively capture and incorporate it as a concrete before-and-after example in shared guides, rules, and documentation.
@@ -168,17 +133,6 @@ Detail: [`structured-data-in-structured-formats`](shared/workflow/structured-dat
 
 When working on a primary task, stay on it, including through tangential user input: keep independent lines of thought separate without losing track of them (subagent, fork, tracking issue, to-do list, or new thread), unless the user explicitly redirects focus.
 Detail: [`dont-get-sidetracked`](shared/workflow/dont-get-sidetracked.md).
-## Always give recommendations with questions
-
-Whenever asking the user a question or presenting options for a genuine decision, always provide a clear, specific recommendation.
-Soft open-ended prompts that present choices count as decision points and must include a concrete recommendation.
-If an action is already authorized under standing rules, do the work and report in past tense per [`no-cop-out-offers`](shared/workflow/no-cop-out-offers.md).
-A user's whether-or-how question is not an instruction: recommend, then ask start now or file ([`start-or-file`](shared/workflow/start-or-file.md)).
-Repeat the recommendation in one line whenever a status list restates a decision item.
-See [`AGENTS.cases.md`](AGENTS.cases.md).
-
-- **Do:** write every pending-decision line as "decide X --- I recommend Y, because Z".
-- **Don't:** ask questions or present choices without declaring your recommended path.
 ## Help your subagents improve over time
 
 Treat subagent failures as bugs in prompt, tools, or context: update definitions or instructions after diagnosing failures so future invocations avoid them.
@@ -225,13 +179,6 @@ On moving to native agent plugins, [remove submodules that duplicated them](shar
 
 At three open PRs per repo, open no fourth ([`wip-cap`](shared/workflow/wip-cap.md)).
 
-## Verify changes before pushing
-
-Always run relevant local linters, tests, and formatting checks before pushing commits to a remote branch.
-At minimum for `ai-config`: `python3 scripts/validate-skills.py`, `python3 scripts/check-links.py`, `python3 scripts/check-ascii-punctuation.py`.
-Run the full test suite (`python3 scripts/test_*.py`) when touching shared tools or scripts.
-Parse changed data files: [rule](shared/workflow/parse-data-files.md).
-
 ## Canonical sources vs generated output
 
 Always edit canonical source files, never generated outputs (`.qmd`/`.R` vs `_site/`/`docs/`;
@@ -261,12 +208,6 @@ Fix a new rule's violations in passages you edit anyway.
 Sweep only if Ezra explicitly says "sweep" (`Sweep authorized:` in the PR body);
 checks default to changed lines.
 See [`no-sweeps-by-default`](shared/workflow/no-sweeps-by-default.md).
-
-## Check the remote immediately before every push
-
-Run `git ls-remote --heads origin <branch>` **immediately** before every `git push`, and reconcile what it shows rather than overwriting it.
-Never bare `git push --force`; always use `--force-with-lease --force-if-includes`.
-See [`check-before-pushing`](shared/workflow/check-before-pushing.md).
 
 ## Timestamp recaps in local time
 
@@ -305,19 +246,6 @@ See [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md) 
 
 - **Don't:** link a `#NNN` a passage is displaying rather than citing, or leave referenced tools, forge items or policies unlinked.
 
-## Deliver completed implementation work
-
-When asked to implement or write up changes on a feature branch, complete the full delivery cycle: tracking issue, scoped commits, adversarial self-review to clean verdict, push, open/update PR, request AI review, and drive to clean.
-This grants no merge authority: the strict merge policy below still applies.
-
-## Commit, push, and PR any potentially-reusable work you produce
-
-Potentially-reusable work produced incidentally in any medium (math derivations, comparisons, scripts, prose) must be committed, pushed, and PRed into an owning repository.
-Commit it when reproducing it costs more than a moment **and** something durable cites it, or will;
-re-check the committed form before publishing.
-See [`commit-reusable-work`](shared/workflow/commit-reusable-work.md) and [`AGENTS.cases.md`](AGENTS.cases.md).
-
-[Port content by script](shared/workflow/port-by-script.md).
 ## Never dispatch a worker on Fable without explicit, specific permission
 
 Workers without an explicit model inherit the conductor's: never dispatch a worker on Fable without explicit, specific permission.
@@ -345,17 +273,40 @@ See [`browser-last-resort`](shared/workflow/browser-last-resort.md) and [`gh-pag
 Imitate Ezra's writing style in any draft that goes out as him ([`draft-in-ezras-voice`](skills/draft-in-ezras-voice/SKILL.md)).
 Learn it only from his own text, never FERPA data.
 
-## Default to action without asking
+## Act on the whole request, and decide rather than ask
 
-The owner grants standing permission for non-destructive steps (branch commits, pushes, opening/updating PRs, read commands, editing memory).
-Proceed with non-destructive steps and report in past tense;
-ask only for destructive, high-impact, or blocking decisions.
-This grants no merge authority.
-See [`AGENTS.cases.md`](AGENTS.cases.md).
+Read a request for everything it plainly asks, do every safe step it covers, and bring the user decisions rather than open questions ([#2889](https://github.com/Morrison-Lab/ai-config/issues/2889)).
 
-The grant also covers installs and updates, `add_repo` (even to read), and posting reviews, without asking.
-Never ask the owner to perform a step you could do: [`default-to-action-grants`](shared/workflow/default-to-action-grants.md).
-Create new repos with `gh repo create --template`: [`templates`](shared/workflow/repo-templates.md).
+- **Interpret instructions broadly and maximize safe progress:** unless the user narrows a request, take the broad reading that advances its obvious objective and complete every safe, authorized, relevant step.
+  Do not reduce an instruction to the smallest literal action when its context makes a larger in-scope outcome clear.
+  Apply grants and rules at the breadth stated without adding unstated conditions, exceptions, or restrictions.
+  See [`AGENTS.cases.md`](AGENTS.cases.md) and [`challenge-the-assignment.cases.md`](shared/workflow/challenge-the-assignment.cases.md).
+  Read every word, infer what a request plainly implies, and treat a correction as a general principle whenever plausible: [`read-instructions-fully`](shared/workflow/read-instructions-fully.md).
+- **"Or" always means "and/or", not xor, unless xor is explicitly specified:** in instructions, prompts, specifications, issue descriptions, and checklists, treat "or" as inclusive ("and/or") unless exclusive choice is explicitly stated (e.g., "either A or B, but not both", "mutually exclusive", or "xor").
+  When an instruction says "do X or Y", address both X and Y if both are applicable, relevant, or needed to achieve the objective.
+  See [`or-means-and-or`](shared/principles/or-means-and-or.md).
+- **Silence is not permission:** an unaddressed action is not thereby allowed, required or forbidden: reason from the nearest rules' purpose, or ask.
+  See [`silence-is-not-permission`](shared/principles/silence-is-not-permission.md).
+- **Default to action without asking:** the owner grants standing permission for non-destructive steps (branch commits, pushes, opening/updating PRs, read commands, editing memory).
+  Proceed with non-destructive steps and report in past tense;
+  ask only for destructive, high-impact, or blocking decisions.
+  This grants no merge authority.
+  See [`AGENTS.cases.md`](AGENTS.cases.md).
+  The grant also covers installs and updates, `add_repo` (even to read), and posting reviews, without asking.
+  Never ask the owner to perform a step you could do: [`default-to-action-grants`](shared/workflow/default-to-action-grants.md).
+  Create new repos with `gh repo create --template`: [`templates`](shared/workflow/repo-templates.md).
+- **Proactively suggest better alternatives to proposed approaches:** when asked to accomplish a goal using a specific approach, suggest a better alternative if one exists.
+  Distinguish the underlying goal from candidate mechanisms;
+  when an alternative achieves the goal more simply, cleanly, or reliably, proactively recommend it.
+  See [`proactively-suggest-alternatives`](shared/principles/proactively-suggest-alternatives.md) and [`AGENTS.cases.md`](AGENTS.cases.md).
+- **Always give recommendations with questions:** whenever asking the user a question or presenting options for a genuine decision, always provide a clear, specific recommendation.
+  Soft open-ended prompts that present choices count as decision points and must include a concrete recommendation.
+  If an action is already authorized under standing rules, do the work and report in past tense per [`no-cop-out-offers`](shared/workflow/no-cop-out-offers.md).
+  A user's whether-or-how question is not an instruction: recommend, then ask start now or file ([`start-or-file`](shared/workflow/start-or-file.md)).
+  Repeat the recommendation in one line whenever a status list restates a decision item.
+  See [`AGENTS.cases.md`](AGENTS.cases.md).
+  - **Do:** write every pending-decision line as "decide X --- I recommend Y, because Z".
+  - **Don't:** ask questions or present choices without declaring your recommended path.
 
 ## Strict Merge Control Policy
 
@@ -398,6 +349,23 @@ Have your work reviewed independently before it ships or reaches a person, and k
   Baking a self-merge directive into the loop prompt is allowed only under a standing `mwc` grant ([`persistent-pr-loop`](shared/workflow/persistent-pr-loop.md)).
 - **Monitor scoped open PRs and MRs:** continuously derive and monitor them in the repositories you are actively working in, not in every accessible repository, and within them only the items passing the [PR scope test](shared/workflow/pr-scope.md), including items you opened, pushed to, or were handed to drive.
   Re-query that scoped set at every wake, inspecting mergeability, CI, and review state until each item merges, closes, or is released ([`monitor-scoped-open-prs`](shared/workflow/monitor-scoped-open-prs.md)).
+
+## Ship work through a verified push and a PR
+
+Verify every push first, and carry work worth keeping through to a PR ([#2889](https://github.com/Morrison-Lab/ai-config/issues/2889)).
+
+- **Commit, push, and PR any potentially-reusable work you produce:** potentially-reusable work produced incidentally in any medium (math derivations, comparisons, scripts, prose) must be committed, pushed, and PRed into an owning repository.
+  Commit it when reproducing it costs more than a moment **and** something durable cites it, or will;
+  re-check the committed form before publishing ([`commit-reusable-work`](shared/workflow/commit-reusable-work.md), [`AGENTS.cases.md`](AGENTS.cases.md)).
+  [Port content by script](shared/workflow/port-by-script.md).
+- **Deliver completed implementation work:** when asked to implement or write up changes on a feature branch, complete the full delivery cycle: tracking issue, scoped commits, adversarial self-review to a clean verdict, push, open or update the PR, request AI review, and drive to clean.
+  This grants no merge authority: the Strict Merge Control Policy still applies.
+- **Verify changes before pushing:** always run relevant local linters, tests, and formatting checks before pushing commits to a remote branch.
+  At minimum for `ai-config`: `python3 scripts/validate-skills.py`, `python3 scripts/check-links.py`, `python3 scripts/check-ascii-punctuation.py`.
+  Run the full test suite (`python3 scripts/test_*.py`) when touching shared tools or scripts.
+  Parse changed data files: [rule](shared/workflow/parse-data-files.md).
+- **Check the remote immediately before every push:** run `git ls-remote --heads origin <branch>` **immediately** before every `git push`, and reconcile what it shows rather than overwriting it.
+  Never bare `git push --force`; always use `--force-with-lease --force-if-includes` ([`check-before-pushing`](shared/workflow/check-before-pushing.md)).
 
 ## Cursor Cloud specific instructions
 

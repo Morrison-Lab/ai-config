@@ -231,8 +231,8 @@ A clean automated review from every available provider evaluating the current HE
 - **Example**: 2026-08-26 session, on ai-config#2295: completed fixes, ran local verification, requested Claude review, but left the PR in draft mode.
   The user had to manually ask "why is 2295 still in draft mode".
   (The exchange happened in the CLI session, so the PR thread itself carries no trace of it.)
-- **Canonical Rule**: `AGENTS.md` ("Review your work before anyone sees it, and watch every PR you drive", "Put PRs in ready mode when they are ready for review" bullet) and [`put-prs-in-ready-mode`](../shared/workflow/put-prs-in-ready-mode.md): "Don't: leave a PR that is ready for review in draft...
-  Do: un-draft an up-front empty PR once its implementation has landed on the branch head and the checks pass."
+- **Canonical Rule**: `AGENTS.md` ("Review your work before anyone sees it, and watch every PR you drive", "Put PRs in ready mode when they are ready for review" bullet).
+  Its fragment [`put-prs-in-ready-mode`](../shared/workflow/put-prs-in-ready-mode.md) says "**Don't:** leave a PR that is ready for review in draft" and "**Do:** un-draft an up-front empty PR once its implementation has landed on the branch head and the checks pass."
 - **Fix**: Once a push completes a PR's implementation, check its draft status (`gh pr view --json isDraft`) and mark it ready if it isn't (`gh pr ready`).
   Do this before dispatching review workflows or yielding to the user ---
   but mind the ready-transition timing in `pr-on-claim.md`:

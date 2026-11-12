@@ -86,6 +86,9 @@ def _load(name, filename):
 
 _REMIND = _load("_sib_retry", "remind-retry-before-declaring-blocked.py")
 _MERGE = _load("_sib_merge", "block-merge-without-clean-checker.py")
+if _REMIND is None or _MERGE is None:
+    print(f"{os.path.basename(__file__)}: a sibling hook is missing; not gating",
+          file=sys.stderr)
 try:
     from shellcmd import simple_commands, strip_env, shell_c_expansions
 except Exception as _exc:

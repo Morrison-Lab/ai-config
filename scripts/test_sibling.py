@@ -182,6 +182,8 @@ GUARDED = {
     "flag-self-authored-verdict-echo.py",
 }
 check("every GUARDED hook is in USERS", sorted(GUARDED - {h for h, _ in USERS}), [])
+# Deny hooks that stop gating when a sibling is missing, and must say so.
+NOT_GATING = {"block-redo-denied-write-via-other-tool.py"}
 GUARD_RE = re.compile(r"^try:\n    from sibling import load_sibling\n", re.M)
 for hook_name, sibs in USERS:
     # Siblings missing, loader present: each sibling attribute is None, and
@@ -193,6 +195,9 @@ for hook_name, sibs in USERS:
     check(f"missing siblings: {hook_name} names each one on stderr",
           [f"cannot load sibling {s}" in proc.stderr for s in sibs.values()],
           [True] * len(sibs))
+    if hook_name in NOT_GATING:
+        check(f"missing siblings: deny hook {hook_name} says it is not gating",
+              "not gating" in proc.stderr, True)
 
     # A broken install whose scripts/lib is empty, siblings present. A hook
     # that imports the loader in a try still imports, loads no sibling, and

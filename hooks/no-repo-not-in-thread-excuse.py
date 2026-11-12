@@ -20,21 +20,22 @@ NEG = (rf"(?:isn{APOS}t|is\s+not|aren{APOS}t|are\s+not|wasn{APOS}t|was\s+not|"
        rf"hasn{APOS}t|haven{APOS}t|has\s+not|have\s+not|can{APOS}t|cannot|can\s+not|couldn{APOS}t|no\s+longer|not)")
 MODAL = rf"(?:can{APOS}t|cannot|can\s+not|couldn{APOS}t|unable\s+to|not\s+able\s+to)"
 PLACE = rf"(?:the\s+current|this|the|my|our|that|current)\s+(?:project\s+)?(?:thread|session)"
-# The place is the thread itself or its repo list: "lds is not in this thread's queue" passes.
-TARGET = (rf"\s+(?:{PLACE}(?:{APOS}s\s+(?:github\s+)?(?:repos|repositories|repo\s+scope|repo\s+list|list\s+of\s+repos|scope(?!\s+of\b)))?"
-          rf"(?![\w'\u2019])|my\s+(?:repos|repositories)\b|the\s+(?:repos|repositories)\s+(?:attached|available|in|for)\b)")
+# The place is the thread itself or its repo list: "lds is not in this thread's queue" and "the session log" pass.
+TARGET = (rf"\s+(?:{PLACE}(?:{APOS}s\s+(?:github\s+)?(?:repos|repositories|repo\s+(?:scope|list|set)|list\s+of\s+repos|workspace))?"
+          r"(?![\w'\u2019])(?!\s+(?!(?:yet|now|so|and|but|or|because|since|anymore|at|as|which|that|until|unless|when|while|for|"
+          r"right|today|currently|either|even|i|we|it|you|is|was)\b)[a-z])|my\s+(?:repos|repositories)\b|the\s+(?:repos|repositories)\s+(?:attached|available|in|for)\b)")
 SUBJ_NEG = re.compile(
     rf"(?:\b{NEG}\s+(?:(?:yet|currently|actually|even|already|really|been)\s+){{0,2}}(?:in|on|within|part\s+of|among|one\s+of|"
-    rf"(?:attached|added|checked\s+out|cloned|available|accessible|reachable)(?:\s+(?:to|in|into|from|on|for))?)"
+    rf"(?:attached|added|checked\s+out|cloned|set\s+up|available|accessible|reachable)(?:\s+(?:to|in|into|from|on|for))?)"
     rf"|\b(?:outside|unavailable\s+(?:in|from|to)|missing\s+from)){TARGET}", re.I)
 LOC = re.compile(rf"\b{PLACE}\b|\bmy\s+(?:repos|repositories)\b", re.I)
 REPO_LIST = re.compile(
     rf"\b{PLACE}{APOS}s\s+(?:github\s+)?(?:repos|repositories|repo\s+scope|repo\s+list)\b"
     r"(?![\w'\u2019])(?!\s+(?:checkout|clone|directory|folder|tree|root|branch|files?|of)\b)"
     r"|\bmy\s+(?:repos|repositories)\b(?!['\u2019])|\bthe\s+(?:repos|repositories)\s+(?:attached|available|in|on|for)\b", re.I)
-LAB_REPOS = (r"ai-config|gha|lds|mlg|mlr|mds|mcs|pds|sds|rme|psw|psc|qwt|qnp|"
-             r"ids|dds|vds|ccds|cds|epi\d+|lds-site|mcsg|stats-allowlist|teaching-tools")
-NAMED = re.compile(rf"\b[\w-]{{1,39}}/[\w-]{{1,100}}\b(?![/.]\w)|\b(?:{LAB_REPOS})\b", re.I)
+# Not "ids", a plural; an owner/name needs a known owner, so "Quarto/pandoc" is no repository.
+LAB_REPOS = r"ai-config|gha|lds|mlg|mlr|mds|mcs|pds|sds|rme|psw|psc|qwt|qnp|dds|vds|ccds|cds|epi\d+|lds-site|mcsg|stats-allowlist|teaching-tools"
+NAMED = re.compile(rf"\b(?:Morrison-Lab|d-morrison|UCD-SERG|ucdavis)/[\w-]{{1,100}}\b(?![/.]\w)|\b(?:{LAB_REPOS})\b", re.I)
 REPO_NAME = re.compile(rf"\b(?:repo|repos|repository|repositories)\b|{NAMED.pattern}", re.I)
 SUBJECT = re.compile(rf"(?:{REPO_NAME.pattern})[\s`'\"\u2019]*(?:(?:is|are|was|were)\s+)?$", re.I)
 DET = r"(?:(?:the|a|an|that|this|any)\s+)?"
@@ -71,8 +72,7 @@ REASON = (
     "thread or session. Ezra, 2026-11-12: \"never say a repo isn't in a thread; add it\". Call "
     'mcp__claude-code-remote__add_repo (ToolSearch "select:mcp__claude-code-remote__add_repo"), clone it, '
     "do the work, and report it in the past tense. If add_repo itself refuses, say so in the same sentence "
-    "and quote its reason. shared/workflow/no-cant-from-session-excuses.md. "
-    "Set ALLOW_REPO_NOT_IN_THREAD=1 only when the user asked for this wording."
+    "and quote its reason. shared/workflow/no-cant-from-session-excuses.md. Set ALLOW_REPO_NOT_IN_THREAD=1 only when the user asked for this wording."
 )
 
 

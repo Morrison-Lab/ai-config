@@ -28,7 +28,9 @@ The Claude Code on the web harness injects a "Git Development Branch Requirement
 A real rejection --- a `403` from the proxy (see this file's push-scope "Exception" section) or a permission-classifier denial --- is the only thing that limits these standing grants, and it is reported to the user rather than worked around.
 The wording of the harness prompt never limits them.
 
-**When the auto-mode classifier refuses an action the user has authorized, suggest switching out of auto mode --- at once, unprompted, after at most one identical retry.**
+**When the auto-mode classifier refuses an action the user has authorized, follow [`ask-for-manual-approval`](ask-for-manual-approval.md) at once.**
+Under that fragment, the agent switches modes or asks the user, when its switch conditions hold, after at most one identical retry,
+and a dispatched subagent reports to its caller instead.
 The general rule, for every agent and every denied action, is [`ask-for-manual-approval`](ask-for-manual-approval.md);
 this section carries the 2026-09-28 measured case.
 A standing grant made earlier in the conversation does not clear the auto-mode classifier.
@@ -40,7 +42,7 @@ with the denial labels "Permission Grant" (attaching a repository with push acce
 and "Self-Modification" (editing `.claude/settings.json`),
 and each retry was refused the same way.
 Switching the session to manual (default) permission mode fixes it immediately: the same action then raises an ordinary permission prompt that the user approves.
-Once the blocked actions are done, the user can switch back to auto mode.
+Once the blocked actions are done, end the manual stretch (see that fragment's "Say when it is over").
 The durable fix is an `autoMode` block (`environment` and `allow` entries) in `~/.claude/settings.json` or in managed settings.
 The classifier ignores `autoMode` in a repository's `.claude/settings.json` and `.claude/settings.local.json`,
 so committing it to a repository does nothing.

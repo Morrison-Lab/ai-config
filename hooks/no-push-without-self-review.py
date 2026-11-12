@@ -2974,10 +2974,11 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
                 cause = (f"a later {_VERDICT_WORDS[found]} with no Reviewed-Commit line"
                          if not shas else f"a later {_VERDICT_WORDS[found]} naming a "
                          "commit that does not resolve here")
-                for c, (f, _) in latest.items():
-                    vetoed[c] = (f"{cause} vetoed its clean verdict" if f == "clean"
-                                 else f"its latest verdict was a {_VERDICT_WORDS[f]}")
-                latest.clear()  # an unbound report vetoes all before it
+                cause += " vetoed its clean verdict" + ("" if found == "clean" else
+                                                        "; address its findings")
+                vetoed.update({c: cause for c, (f, _) in latest.items() if f == "clean"})
+                # an unbound report vetoes every clean verdict before it
+                latest = {c: v for c, v in latest.items() if v[0] != "clean"}
             for hit in hits:
                 latest[hit] = (found, seq)
         for c in sorted(commits):
@@ -3023,8 +3024,9 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
 
 
 def verify_review(transcript_path: str, directory: str | None,
-                  argv: list[str], env: list[str]) -> tuple[bool, str]:
-    """(is_clean, reason) -- is there a clean verdict for what this push ships?"""
+                  argv: list[str], env: list[str], per_commit: bool = True) -> tuple[bool, str]:
+    """(is_clean, reason) -- is there a clean verdict for what this push ships?
+    `per_commit=False` skips the map, so a parent transcript cannot outvote a subagent."""
     saw_reviewer_call = False
     verdict: str | None = None
     reviewed_commits: list[str] = []
@@ -3120,7 +3122,7 @@ def verify_review(transcript_path: str, directory: str | None,
             f"which carries no verdict, and an errored result carries none either.{unparsed_hint}"
         )
 
-    if not saw_unparsed_later:
+    if not saw_unparsed_later and per_commit:
         mapped, map_block, *map_note = _verdict_map_covers(history, directory, argv, env)
         unparsed_hint += "".join(map_note)
         if mapped:
@@ -3455,7 +3457,7 @@ def main() -> int:
                 is_clean, reason = verify_review(sub_path, directory, argv, env)
                 if not is_clean:
                     parent_clean, _ = verify_review(
-                        transcript_path, directory, argv, env
+                        transcript_path, directory, argv, env, per_commit=False
                     )
                     if parent_clean:
                         is_clean = True

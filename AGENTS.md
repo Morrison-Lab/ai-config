@@ -68,35 +68,26 @@ What you say about the state you stop in must be true, and any work that remains
   answering with the corrected fact is not the pass ([`run-ums-proactively`](shared/workflow/run-ums-proactively.md)).
 - **Terminate superseded and abandoned background tasks** (commands, monitors, subagents dispatched to inspect, search, or diagnose) once their purpose is met, their findings are superseded, or the session moves on, and sweep them before declaring anything complete ([`terminate-superseded-tasks`](shared/workflow/terminate-superseded-tasks.md)).
 
-## Prefer optionality over removing functionality
+## Fix the cause, and look for what already exists
 
-Never remove existing functionality entirely when you can add optionality instead.
-When changing default behavior, fixing an issue, or refactoring a workflow, do not delete an existing capability or code path outright if it served a legitimate purpose;
-make the improved behavior the default and preserve the legacy or alternative behavior behind an explicit, documented opt-in parameter, environment variable, or configuration toggle.
-See [`prefer-optionality-over-removal`](shared/principles/prefer-optionality-over-removal.md).
+Meet the rule behind a finding at the mechanism that produced it, pair each algorithmic check with writer and reviewer instructions, look for an existing solution before building one, and keep a capability that still serves a purpose behind an option rather than deleting it ([#2889](https://github.com/Morrison-Lab/ai-config/issues/2889)).
 
-## Prefer systemic solutions over one-off fixes
+- **Prefer optionality over removing functionality:** never remove existing functionality entirely when you can add optionality instead.
+  When changing default behavior, fixing an issue, or refactoring a workflow, do not delete an existing capability or code path outright if it served a legitimate purpose;
+  make the improved behavior the default and preserve the legacy or alternative behavior behind an explicit, documented opt-in parameter, environment variable, or configuration toggle.
+  See [`prefer-optionality-over-removal`](shared/principles/prefer-optionality-over-removal.md).
+- **Prefer systemic solutions over one-off fixes:** when addressing a defect, failure, edge case, or recurring mistake, prefer systemic, structural solutions over one-off, ad-hoc patches.
+  Fix the underlying mechanism that allowed the error to occur, install an automated guard or architectural invariant preventing the defect class from recurring, and audit the repo for other instances in the same turn.
+  See [`prefer-systemic-solutions-over-one-off-fixes`](shared/principles/prefer-systemic-solutions-over-one-off-fixes.md).
+- **No cheap fixes:** a fix is done when the rule behind the finding is met, not when the finding stops matching.
+  Name that rule, check the fixed state against it, and when a reviewer offers several fixes, take the one that meets it.
+  See [`no-cheap-fixes`](shared/principles/no-cheap-fixes.md).
+- **Give every algorithmic check a writer and a reviewer instruction:** every algorithmic check (hook, script, `gha` workflow) also gets a writer instruction that prevents the defect and a reviewer instruction that looks for it (Ezra, 2026-11-09).
+  See [`checks-need-writer-and-reviewer-instructions`](shared/workflow/checks-need-writer-and-reviewer-instructions.md).
+- **Research existing solutions before implementing (DRW):** before writing custom code or helpers, check for an existing solution (DRW, don't reinvent the wheel) in our repos, standard libraries, and trusted upstream ecosystems (base R, tidyverse / r-lib, PyPI, npm).
+  Record what was searched and what was found.
+  See [`dont-reinvent-wheel`](shared/principles/dont-reinvent-wheel.md) and [`prefer-upstream`](skills/prefer-upstream/SKILL.md).
 
-When addressing a defect, failure, edge case, or recurring mistake, prefer systemic, structural solutions over one-off, ad-hoc patches.
-Fix the underlying mechanism that allowed the error to occur, install an automated guard or architectural invariant preventing the defect class from recurring, and audit the repo for other instances in the same turn.
-See [`prefer-systemic-solutions-over-one-off-fixes`](shared/principles/prefer-systemic-solutions-over-one-off-fixes.md).
-
-## No cheap fixes
-
-A fix is done when the rule behind the finding is met, not when the finding stops matching.
-Name that rule, check the fixed state against it, and when a reviewer offers several fixes, take the one that meets it.
-See [`no-cheap-fixes`](shared/principles/no-cheap-fixes.md).
-
-## Give every algorithmic check a writer and a reviewer instruction
-
-Every algorithmic check (hook, script, `gha` workflow) also gets a writer instruction that prevents the defect and a reviewer instruction that looks for it (Ezra, 2026-11-09).
-See [`checks-need-writer-and-reviewer-instructions`](shared/workflow/checks-need-writer-and-reviewer-instructions.md).
-
-## Research existing solutions before implementing (DRW)
-
-Before writing custom code or helpers, check for an existing solution (DRW, don't reinvent the wheel) in our repos, standard libraries, and trusted upstream ecosystems (base R, tidyverse / r-lib, PyPI, npm).
-Record what was searched and what was found.
-See [`dont-reinvent-wheel`](shared/principles/dont-reinvent-wheel.md) and [`prefer-upstream`](skills/prefer-upstream/SKILL.md).
 ## Don't take anyone's word for it: no sycophancy and independent verification
 
 Give users the whole truth and nothing but the truth, including your full honest opinions;

@@ -37,7 +37,7 @@ class RetireLeftoverPaths(unittest.TestCase):
             d.mkdir(parents=True)
         (self.checkout / "CLAUDE.md").write_text("", encoding="utf-8")
         (self.checkout / "hooks" / "hooks.json").write_text("{}", encoding="utf-8")
-        env = {"CLAUDE_HOME": str(self.home), "HOME": str(root), "CLAUDE_PROJECT_DIR": str(project)}
+        env = {"CLAUDE_HOME": str(self.home), "HOME": str(root), "USERPROFILE": str(root), "CLAUDE_PROJECT_DIR": str(project)}
         self.enterContext(patch.dict(os.environ, env))
 
     def write_settings(self, enabled=True, hooks=None):
@@ -110,7 +110,7 @@ class RetireLeftoverPaths(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn(f"keep   {self.home / 'shared'}: a copy", out)
         self.assertIn(f"keep   {self.home / 'hooks'}: not provably", out)
-        self.assertIn(f"keep   {self.home / 'memories'}: not provably", out)
+        self.assertIn(f"keep   {self.home / 'memories'}: memories/", out)
         self.assertTrue((self.home / "shared").is_dir())
         (self.home / "settings.json").write_text('// comment' + chr(10) + '{}', encoding="utf-8")
         code, out = self.run_main("--retire")
@@ -134,6 +134,13 @@ class RetireLeftoverPaths(unittest.TestCase):
         settings = {"hooks": {"Stop": [{"hooks": hooks}]}}
         self.assertEqual(len(retire.strip_leftover_hooks(settings, self.home / "hooks")[1]), 5)
         self.assertEqual(retire.strip_leftover_hooks(settings, Path("/elsewhere/hooks"))[1], [])
+
+    def test_empty_directory_is_named_as_such(self):
+        self.write_settings()
+        (self.home / "hooks").mkdir()
+        code, out = self.run_main()
+        self.assertEqual(code, 1)
+        self.assertIn(f"retire {self.home / 'hooks'}: an empty directory", out)
 
     def test_retiring_everything_exits_zero(self):
         self.write_settings()

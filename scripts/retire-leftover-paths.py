@@ -39,8 +39,12 @@ def provenance(path: Path) -> str | None:
     if path.is_symlink():
         return doctor.describe_path(path) if doctor.points_into_ai_config(path) else None
     ours = {p.name for p in (doctor.REPO_ROOT / path.name).iterdir()}
-    foreign = sorted(p.name for p in path.iterdir() if p.name not in ours) if path.is_dir() else ["?"]
-    return None if foreign else "a copy holding only names from this repo"
+    if not path.is_dir():
+        return None
+    names = [p.name for p in path.iterdir()]
+    if not names:
+        return "an empty directory"
+    return None if any(n not in ours for n in names) else "a copy holding only names from this repo"
 
 
 def path_items(home: Path) -> list[tuple[str, Path, str]]:
@@ -56,8 +60,12 @@ def path_items(home: Path) -> list[tuple[str, Path, str]]:
             items.append(("keep", path, "a copy: replace it with a symlink into a checkout (README.md)"))
             continue
         why = provenance(path)
-        items.append(("retire", path, why) if why else
-                     ("keep", path, "not provably ai-config's, or memories/, which a CLAUDE.md may import"))
+        if why:
+            items.append(("retire", path, why))
+        elif name == "memories":
+            items.append(("keep", path, "memories/, which a CLAUDE.md may import"))
+        else:
+            items.append(("keep", path, "not provably ai-config's"))
     linked, doubled = doctor.find_skill_leftovers(home)
     items += [("retire", s, doctor.describe_path(s)) for s in linked]
     return items + [("keep", s, "shares a name with an ai-config skill; it may be your own")

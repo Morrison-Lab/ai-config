@@ -36,6 +36,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: Compare recent and baseline durations
         id: judge
+        shell: bash  # bash -eo pipefail; the default bash -e has no pipefail
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -52,6 +53,7 @@ jobs:
           echo "code=$code" >> "$GITHUB_OUTPUT"
       - name: Open or update the tracking issue
         if: steps.judge.outputs.code == '1'
+        shell: bash  # with pipefail, a failed gh api stops the step before any create
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}

@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
-"""Run validate-duration.yml's issue step against a stub gh (ai-config#3384).
+"""Run validate-duration.yml's two steps against stub commands (ai-config#3384).
 
-The stub answers `gh api` from a fixture through the step's own --jq filter,
-run by the real jq, and records every other gh call, so the test covers the
-filter and each branch: no issue, open, accepted recently, accepted long ago,
-and fixed. The `run:` block comes from yaml.safe_load, which already dedents
-it (shared/coding/yaml-embedded-script-double-dedent.md).
+Each step runs under the shell GitHub gives it: `shell: bash` is
+`bash --noprofile --norc -eo pipefail`, which the test requires, since under
+the default `bash -e` a failed `gh api` would fall through to a new issue.
+The `gh` stub answers `gh api` from a fixture through the step's own --jq
+filter, run by the real jq, and records every call, so the tests cover the
+query, the filter and each branch. A `python3` stub stands in for the check,
+to test how the judge step maps its exit codes. The `run:` blocks come from
+yaml.safe_load, which already dedents them
+(shared/coding/yaml-embedded-script-double-dedent.md).
 """
 from __future__ import annotations
 
@@ -20,21 +24,52 @@ from pathlib import Path
 import yaml
 
 WORKFLOW = Path(__file__).resolve().parent.parent / ".github/workflows/validate-duration.yml"
-STEP = "Open or update the tracking issue"
 TITLE = "validate job on main has slowed down"
 MARKER = "<!-- validate-duration-tracking -->"
-STUB = """#!/bin/bash
+SHELLS = {"bash": ["bash", "--noprofile", "--norc", "-eo", "pipefail", "-c"]}
+GH = """#!/bin/bash
+echo "$*" | tr '\\n' ' ' >> "$LOG"
+echo >> "$LOG"
 if [ "$1" = api ]; then
+  [ -n "$API_FAILS" ] && exit 1
   while [ "$#" -gt 0 ] && [ "$1" != --jq ]; do shift; done
   jq -r "$2" "$FIXTURE"
-  exit
 fi
-echo "$*" >> "$LOG"
 """
+PYTHON = '#!/bin/bash\necho report\nexit "$CODE"\n'
 
-steps = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))["jobs"]["check"]["steps"]
-script = next(s["run"] for s in steps if s.get("name") == STEP)
+steps = {s.get("name"): s for s in yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))["jobs"]["check"]["steps"]}
 now = datetime.now(timezone.utc)
+failures = 0
+total = 0
+
+
+def check(name: str, ok: bool, detail: str = "") -> None:
+    global failures, total
+    total += 1
+    print(("PASS: " if ok else "FAIL: ") + name + ("" if ok else f" -- {detail}"))
+    failures += not ok
+
+
+def run(step: str, **env: str) -> tuple[int, list[str], str]:
+    """Run `step` with stubbed gh and python3; return exit code, gh calls, step outputs."""
+    shell = steps[step].get("shell")
+    if shell not in SHELLS:
+        raise SystemExit(f"step {step!r} has shell {shell!r}; the test needs one of {list(SHELLS)}")
+    with tempfile.TemporaryDirectory() as tmp:
+        d = Path(tmp)
+        for name, body in (("gh", GH), ("python3", PYTHON)):
+            (d / name).write_text(body)
+            (d / name).chmod(0o755)
+        (d / "report.txt").write_text("report\n")
+        (d / "out").write_text("")
+        full = {**os.environ, "PATH": f"{d}{os.pathsep}{os.environ['PATH']}", "LOG": str(d / "log"),
+                "GITHUB_OUTPUT": str(d / "out"), "GH_REPO": "o/r",
+                "RUN_URL": "https://example.invalid/run", "LAG_DAYS": "28", **env}
+        done = subprocess.run([*SHELLS[shell], steps[step]["run"]], cwd=d, env=full,
+                              capture_output=True, text=True)
+        log = (d / "log").read_text().splitlines() if (d / "log").exists() else []
+        return done.returncode, log, (d / "out").read_text()
 
 
 def ago(days: int) -> str:
@@ -47,23 +82,13 @@ def issue(number: int, state: str = "open", reason: str | None = None, closed: s
             "title": title, "body": body, **extra}
 
 
-def run(items: list[dict]) -> tuple[int, list[str]]:
-    with tempfile.TemporaryDirectory() as tmp:
-        d = Path(tmp)
-        (d / "gh").write_text(STUB)
-        (d / "gh").chmod(0o755)
-        (d / "report.txt").write_text("report\n")
-        (d / "fixture.json").write_text(json.dumps(items))
-        env = dict(os.environ, PATH=f"{d}{os.pathsep}{os.environ['PATH']}",
-                   FIXTURE=str(d / "fixture.json"), LOG=str(d / "log"),
-                   GH_REPO="o/r", RUN_URL="https://example.invalid/run", LAG_DAYS="28")
-        done = subprocess.run(["bash", "-eo", "pipefail", "-c", script], cwd=d, env=env,
-                              capture_output=True, text=True)
-        log = (d / "log").read_text().splitlines() if (d / "log").exists() else []
-        return done.returncode, log
+JUDGE = "Compare recent and baseline durations"
+for code, want_exit, want_out in (("0", 0, "code=0\n"), ("1", 0, "code=1\n"), ("3", 3, ""), ("4", 4, "")):
+    got, _, out = run(JUDGE, CODE=code)
+    check(f"judge step: check exit {code} gives step exit {want_exit}", got == want_exit and out == want_out,
+          f"exit {got}, output {out!r}")
 
-
-failures = 0
+ISSUE = "Open or update the tracking issue"
 cases = [
     ("no tracking issue opens one and fails", [issue(5, title="other", body=None),
                                                issue(4, pull_request={})], 1, "issue create"),
@@ -77,11 +102,25 @@ cases = [
     ("an issue without the marker is ignored", [issue(11, body="no marker")], 1, "issue create"),
 ]
 for name, items, want_code, want_call in cases:
-    code, log = run(items)
-    ok = code == want_code and (log == [] if want_call is None
-                                else len(log) == 1 and log[0].startswith(want_call))
-    print(("PASS: " if ok else "FAIL: ") + name + ("" if ok else f" -- exit {code}, calls {log}"))
-    failures += not ok
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+        json.dump(items, f)
+    try:
+        code, log, _ = run(ISSUE, FIXTURE=f.name)
+    finally:
+        os.unlink(f.name)
+    calls = [c for c in log if not c.startswith("api ")]
+    check(name, code == want_code and (calls == [] if want_call is None
+                                       else len(calls) == 1 and calls[0].startswith(want_call)),
+          f"exit {code}, calls {calls}")
 
-print(f"\n{len(cases) - failures} passed, {failures} failed")
+api = next((c for c in log if c.startswith("api ")), "")
+for part in ("--paginate", "repos/o/r/issues?", "state=all", "creator=github-actions%5Bbot%5D",
+             "sort=created", "direction=desc"):
+    check(f"the lookup asks for {part}", part in api, api)
+
+code, log, _ = run(ISSUE, FIXTURE="/nonexistent", API_FAILS="1")
+check("a failed lookup stops the step before any create",
+      code != 0 and not any(c.startswith("issue ") for c in log), f"exit {code}, calls {log}")
+
+print(f"\n{total - failures} passed, {failures} failed")
 sys.exit(1 if failures else 0)

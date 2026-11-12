@@ -41,7 +41,7 @@ Each case is `evals/<name>/prompt.md` (frontmatter plus prompt) and one or more 
 
 ### First measurement
 
-One run per arm, Sonnet, each row at the commit that added its case (all 2026-11-11):
+One run per arm, Sonnet, each row at the commit that added its case (2026-11-11 unless the row gives another date and run count):
 
 | Case | With plugin | Without | Note |
 |---|---|---|---|
@@ -52,7 +52,8 @@ One run per arm, Sonnet, each row at the commit that added its case (all 2026-11
 | `trigger-ardi` | 0 | 0 | [ai-config#5331](https://github.com/Morrison-Lab/ai-config/issues/5331) |
 | `trigger-memorize` | 0 | 0 | [ai-config#5331](https://github.com/Morrison-Lab/ai-config/issues/5331) |
 | `injection-*`, `no-trigger-*` | 1 | 1 | The base model already passes; these guard against regressions. |
-| `attach-missing-repo`, `no-attach-attached-repo` | 1 | 1 | Two runs per arm, 2026-11-12. The base model already passes, so these guard against regressions ([ai-config#5490](https://github.com/Morrison-Lab/ai-config/issues/5490)). |
+| `attach-missing-repo` | 1.00 | 0.25 | Two runs per arm, 2026-11-12. The rule changes behaviour: without it, the reply hands the fix to someone else ([ai-config#5490](https://github.com/Morrison-Lab/ai-config/issues/5490)). |
+| `no-attach-attached-repo` | 0.75 | 1.00 | Negative twin, same runs. One plugin-arm reply tripped `no-excuse`; three more plugin-arm runs scored 1.00. |
 
 One run is a smoke check, not a measurement of rates;
 use `--runs 3` or more before drawing conclusions from a difference.

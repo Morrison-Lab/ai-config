@@ -21,7 +21,7 @@ NEG = (rf"(?:isn{APOS}t|is\s+not|aren{APOS}t|are\s+not|wasn{APOS}t|was\s+not|"
 MODAL = rf"(?:can{APOS}t|cannot|can\s+not|couldn{APOS}t|unable\s+to|not\s+able\s+to)"
 PLACE = rf"(?:the\s+current|this|the|my|our|that|current)\s+(?:project\s+)?(?:thread|session)"
 # The place is the thread itself or its repo list: "lds is not in this thread's queue" passes.
-TARGET = (rf"\s+(?:{PLACE}(?:{APOS}s\s+(?:github\s+)?(?:repos|repositories|repo\s+scope|repo\s+list|scope))?"
+TARGET = (rf"\s+(?:{PLACE}(?:{APOS}s\s+(?:github\s+)?(?:repos|repositories|repo\s+scope|repo\s+list|list\s+of\s+repos|scope(?!\s+of\b)))?"
           rf"(?![\w'\u2019])|my\s+(?:repos|repositories)\b|the\s+(?:repos|repositories)\s+(?:attached|available|in|for)\b)")
 SUBJ_NEG = re.compile(
     rf"(?:\b{NEG}\s+(?:(?:yet|currently|actually|even|already|really|been)\s+){{0,2}}(?:in|on|within|part\s+of|among|one\s+of|"
@@ -53,13 +53,13 @@ OBJECT = re.compile(
 LIST_NEG = re.compile(
     rf"\b{NEG}\s+(?:\w+\s+){{0,2}}?(?:see|find)\s+{DET}{TOK}\s+(?:in|among|on)\s+(?:{REPO_LIST.pattern})"
     rf"|(?:{REPO_LIST.pattern})\s+(?:{NEG})\s+(?:include|includes|have|has|list)\s+{DET}{TOK}", re.I)
-# An attach or add_repo run in progress or done ("I added it", "ran add_repo") reports the fix; the adjective
-# ("the attached patch"), a request, a negation or a hypothetical ("it must be attached") does not.
+# "I attached it", "I added it" and "ran add_repo" report the fix; "the attached patch", a request, a negation does not.
 ATTACH_VERB = re.compile(
-    rf"(?<!the\s)(?<!\ba\s)(?<!an\s)(?<!repos\s)(?<!repositories\s)\battach(?:ed|ing)\b(?!\s+(?:is|was|would|will|should|needs?|requires?)\b)"
+    rf"(?<!the\s)(?<!\ba\s)(?<!an\s)(?<!repos\s)(?<!repositories\s)\battach(?:ed|ing)\b"
+    rf"(?=\s+(?:both\s+|the\s+)?(?:it|them|repo|repository|{NAMED.pattern})(?!\s+(?:is|was|would|will|should|needs?|requires?)\b)|\s*(?:[.,;]|$)|\s+now\b)"
     rf"|\badded\s+[\w/-]{{1,140}}\s+to\s+{PLACE}|\badded\s+(?:it|them)\b(?!\s+(?:to|in)\s+(?!{PLACE}))"
     r"|\b(?:ran|called|used|invoked|tried)\s+(?:the\s+)?add_repo\b|\badd_repo\s+(?:attached|added|cloned)\b", re.I)
-NOT_YET = re.compile(rf"\b(?:{NEG}|never|nobody|no\s+one|will|would|could|should|must|needs?|if|to|please|can|{APOS}ll)\s+(?:\w+\s+){{0,2}}$", re.I)
+NOT_YET = re.compile(rf"\b(?:{NEG}|never|nobody|nothing|no\s+one|once|when|until|unless|of|without|will|would|could|should|must|needs?|if|to|please|can|{APOS}ll)\s+(?:\w+\s+){{0,2}}$", re.I)
 FAIL = r"(?:refused|denied|declined|failed|rejected|errored|returned\s+(?:an?\s+)?(?:error|[45]\d\d))"
 TRIED = re.compile(
     r"\b(?:add_repo|attach|attaching)\b(?:\s+(?!has\b|had\b|would\b|will\b|may\b|might\b|could\b)\S+){0,2}?"
@@ -88,8 +88,8 @@ def names_repo(sentence: str) -> bool:
     for m in SUBJ_NEG.finditer(sentence):
         window = sentence[max(0, m.start() - 200):m.start()]
         subj = SUBJECT.search(window)
-        # "The fix for lds isn't in" names lds as an object, not the subject.
-        if subj and not re.search(r"\b(?:for|to|on|in|of|with|from|about|by)\s+$", window[:subj.start()], re.I):
+        # "The fix for lds isn't in" and "Updating lds is not in" name lds as an object, not the subject.
+        if subj and not re.search(r"\b(?:for|to|on|in|of|with|from|about|by|\w+ing)\s+(?:[\w-]+\s+){0,2}$", window[:subj.start()], re.I):
             return True
     for rx in (OBJECT, LIST_NEG):
         obj = rx.search(sentence)

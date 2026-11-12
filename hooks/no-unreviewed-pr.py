@@ -591,9 +591,13 @@ def _gh_api_post(argv):
     value is consumed and never read as a flag (`-q -f` is a jq filter of
     `-f`, not a field), a short-flag cluster such as `-iX GET` sets the
     method, and the last method flag wins (`-X POST -X GET` is a GET).
+    A body read with `--input` implies POST too: the help's own example
+    `gh api repos/{owner}/{repo}/rulesets --input file.json` creates a ruleset.
+    A value flag with nothing after it makes gh exit before sending anything
+    ("flag needs an argument"), so that is never a POST.
     """
     method = None
-    has_field = False
+    has_body = False
     i = 0
     while i < len(argv):
         a = argv[i]
@@ -602,31 +606,35 @@ def _gh_api_post(argv):
             break
         if a.startswith("--"):
             name, eq, val = a.partition("=")
-            if name in _API_VALUE_FLAGS and not eq and i < len(argv):
+            if name in _API_VALUE_FLAGS and not eq:
+                if i >= len(argv):
+                    return False
                 val = argv[i]
                 i += 1
             if name == "--method":
                 method = val.upper()
-            elif name in GH_API_FIELD_LONG:
-                has_field = True
+            elif name in GH_API_FIELD_LONG or name == "--input":
+                has_body = True
             continue
-        if not a.startswith("-") or len(a) < 2:
+        if not a.startswith("-"):
             continue
         for j, c in enumerate(a[1:], start=1):
             if c not in GH_API_SHORT_VALUE:
                 continue
             val = a[j + 1:]
-            if not val and i < len(argv):
+            if not val:
+                if i >= len(argv):
+                    return False
                 val = argv[i]
                 i += 1
             if c == "X":
                 method = val.upper()
             elif c in "fF":
-                has_field = True
+                has_body = True
             break
     if method is not None:
         return method == "POST"
-    return has_field
+    return has_body
 
 
 def _url_ident(url):

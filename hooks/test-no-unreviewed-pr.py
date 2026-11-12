@@ -205,8 +205,8 @@ REQUEST_METHOD_CORPUS = [
     (REQ_PATH, False),
     # A flag's value is not a flag: here `-f` is the jq filter of `-q`, so
     # no field is sent and gh issues a GET.
-    (REQ_PATH + " -q -f", False),
-    (REQ_PATH + " --jq -f", False),
+    (REQ_PATH + " -q -f x", False),
+    (REQ_PATH + " --jq -f x", False),
     # gh takes the last method flag.
     (REQ_PATH + " -X POST -X GET" + REQ_FIELDS, False),
     (REQ_PATH + " --method POST --method GET" + REQ_FIELDS, False),
@@ -226,9 +226,18 @@ REQUEST_METHOD_CORPUS = [
     (REQ_PATH + " -HX-GitHub-Api-Version:2022-11-28" + REQ_FIELDS, True),
     (REQ_PATH + " -Hf:1", False),
     # -H, -p and -t take a value, so a following `-f` is that value.
-    (REQ_PATH + " -H -f", False),
-    (REQ_PATH + " -p -f", False),
-    (REQ_PATH + " -t -f", False),
+    (REQ_PATH + " -H -f x", False),
+    (REQ_PATH + " -p -f x", False),
+    (REQ_PATH + " -t -f x", False),
+    # A request body from --input implies POST, like a field does.
+    (REQ_PATH + " --input body.json", True),
+    (REQ_PATH + " --input=body.json", True),
+    (REQ_PATH + " -X GET --input body.json", False),
+    # A value flag with nothing after it: gh exits without a request.
+    (REQ_PATH + REQ_FIELDS + " -X", False),
+    (REQ_PATH + REQ_FIELDS + " --method", False),
+    (REQ_PATH + " -X POST -f", False),
+    (REQ_PATH + " -X POST --field", False),
     ("curl -s https://api.github.com/repos/o/r/pulls/1038/requested_reviewers"
      " -f x", False),
 ]

@@ -1,17 +1,14 @@
 #!/usr/bin/env python3
 """Report the leftover ai-config delivery paths on this machine, and retire them on request.
 
-Step 3 of ai-config#5309; docs/delivery-paths.md lists the leftovers. A plain run
-only reports. `--retire` reports, then moves each `retire` path into
-~/.claude/ai-config-leftovers/<UTC time>/, and removes the settings.json hook
-entries that run catalog hooks from ~/.claude/hooks after copying the old file
-there; moving them back undoes it, even after a failed move. `keep` items need a person and are never
-touched. It reuses doctor.py's leftover tests and wire-user-config.py's hook-entry
-test. It sweeps nothing when no settings file enables the plugin (exit 0, or 2 with --retire), since
-a ~/.claude copy may then be the only install.
+Step 3 of ai-config#5309; docs/delivery-paths.md lists the leftovers. A plain run only reports.
+`--retire` then moves each `retire` path into ~/.claude/ai-config-leftovers/<UTC time>/ and removes
+the settings.json entries that run catalog hooks from ~/.claude/hooks, copying the old file there;
+moving them back undoes it. `keep` items need a person. Nothing is swept when no settings file
+enables the plugin (exit 0, or 2 with --retire), since ~/.claude may then hold the only install.
 
-Exit status: 0 when nothing is left, 1 when an item remains, 2 when a file could
-not be read or --retire was refused.
+Exit status: 0 when nothing is left, 1 when an item remains, 2 when a file could not be read
+or --retire was refused.
 """
 from __future__ import annotations
 
@@ -38,13 +35,13 @@ def provenance(path: Path) -> str | None:
         return None
     if path.is_symlink():
         return doctor.describe_path(path) if doctor.points_into_ai_config(path) else None
-    ours = {p.name for p in (doctor.REPO_ROOT / path.name).iterdir()}
     if not path.is_dir():
         return None
-    names = [p.name for p in path.iterdir()]
+    names = {p.name for p in path.iterdir()}
     if not names:
         return "an empty directory"
-    return None if any(n not in ours for n in names) else "a copy holding only names from this repo"
+    ours = {p.name for p in (doctor.REPO_ROOT / path.name).iterdir()}
+    return None if names - ours else "a copy holding only names from this repo"
 
 
 def path_items(home: Path) -> list[tuple[str, Path, str]]:
@@ -60,12 +57,8 @@ def path_items(home: Path) -> list[tuple[str, Path, str]]:
             items.append(("keep", path, "a copy: replace it with a symlink into a checkout (README.md)"))
             continue
         why = provenance(path)
-        if why:
-            items.append(("retire", path, why))
-        elif name == "memories":
-            items.append(("keep", path, "memories/, which a CLAUDE.md may import"))
-        else:
-            items.append(("keep", path, "not provably ai-config's"))
+        keep = "memories/, which a CLAUDE.md may import" if name == "memories" else "not provably ai-config's"
+        items.append(("retire", path, why) if why else ("keep", path, keep))
     linked, doubled = doctor.find_skill_leftovers(home)
     items += [("retire", s, doctor.describe_path(s)) for s in linked]
     return items + [("keep", s, "shares a name with an ai-config skill; it may be your own")

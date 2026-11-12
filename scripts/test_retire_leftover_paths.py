@@ -7,7 +7,6 @@ import importlib.util
 import io
 import json
 import os
-import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -135,19 +134,14 @@ class RetireLeftoverPaths(unittest.TestCase):
         self.assertEqual(len(retire.strip_leftover_hooks(settings, self.home / "hooks")[1]), 5)
         self.assertEqual(retire.strip_leftover_hooks(settings, Path("/elsewhere/hooks"))[1], [])
 
-    def test_empty_directory_is_named_as_such(self):
-        self.write_settings()
-        (self.home / "hooks").mkdir()
-        code, out = self.run_main()
-        self.assertEqual(code, 1)
-        self.assertIn(f"retire {self.home / 'hooks'}: an empty directory", out)
-
     def test_retiring_everything_exits_zero(self):
         self.write_settings()
         (self.home / "hooks").mkdir()
         (self.home / "hooks" / CATALOG_HOOK).write_text("old copy", encoding="utf-8")
         self.assertEqual(self.run_main("--retire")[0], 0)
         self.assertEqual(self.run_main(), (0, f"No leftover delivery paths under {self.home}." + chr(10)))
+        (self.home / "hooks").mkdir()
+        self.assertIn(f"retire {self.home / 'hooks'}: an empty directory", self.run_main()[1])
 
 
 if __name__ == "__main__":

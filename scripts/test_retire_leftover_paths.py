@@ -70,6 +70,29 @@ class RetireLeftoverPaths(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertTrue((self.home / "hooks").is_dir())
 
+    def test_plugin_installs_outside_user_scope_are_kept(self):
+        plugins_dir = self.home / "plugins"
+        plugins_dir.mkdir()
+        record_file = plugins_dir / "installed_plugins.json"
+        self.assertEqual(retire.plugin_items(self.home), [])
+        records = [{"scope": "user"}, {"scope": "project", "projectPath": "/old/work tree"}, {"scope": "local"},
+                   {"scope": "managed", "projectPath": "/managed"}, {"scope": "project", "projectPath": 42}]
+        installed = {"version": 2, "plugins": {"ai-config@Morrison-Lab": records, "other@x": [{"scope": "project"}]}}
+        record_file.write_text(json.dumps(installed), encoding="utf-8")
+        items = retire.plugin_items(self.home)
+        self.assertEqual([(a, p) for a, p, _ in items],
+                         [("keep", Path("/old/work tree"))] + [("keep", record_file)] * 3)
+        self.assertIn("cd '/old/work tree' && claude plugin uninstall ai-config@Morrison-Lab --scope project", items[0][2])
+        self.assertIn("by hand", items[2][2])
+        self.assertIn("by hand", items[3][2])  # a non-string projectPath never reaches shlex.quote
+        self.write_settings()
+        code, out = self.run_main("--retire")
+        self.assertEqual(code, 1)
+        self.assertIn("installed at local scope", out)
+        self.assertEqual(record_file.read_text(encoding="utf-8"), json.dumps(installed))
+        record_file.write_text("{", encoding="utf-8")
+        self.assertEqual(retire.plugin_items(self.home)[0][0:2], ("keep", record_file))
+
     def test_report_only_changes_nothing(self):
         self.plant_leftovers()
         before = (self.home / "settings.json").read_text(encoding="utf-8")

@@ -16,6 +16,7 @@ import argparse
 import datetime
 import importlib.util
 import re
+import shlex
 import shutil
 import sys
 from pathlib import Path
@@ -98,6 +99,34 @@ def strip_leftover_hooks(settings: dict, hooks_dir: Path) -> tuple[dict, list[st
     return {**settings, "hooks": kept_events}, removed
 
 
+def plugin_items(home: Path) -> list[tuple[str, Path, str]]:
+    """A `keep` item for each ai-config plugin install outside user scope (#3590)."""
+    path = home / "plugins" / "installed_plugins.json"
+    installed = wire.load_json(path)
+    if installed is None:
+        return [("keep", path, "not readable as JSON, so plugin installs were not checked")]
+    plugins = installed.get("plugins")
+    if not isinstance(plugins, dict):
+        return []
+    items = []
+    for name, records in plugins.items():
+        if not name.startswith("ai-config@"):
+            continue
+        for record in records if isinstance(records, list) else [records]:
+            scope = record.get("scope", "user") if isinstance(record, dict) else "user"
+            if scope == "user":
+                continue
+            project = record.get("projectPath")
+            # project and local are the only scopes `uninstall --scope` takes besides user
+            if isinstance(project, str) and project and scope in ("project", "local"):
+                fix = f"cd {shlex.quote(project)} && claude plugin uninstall {name} --scope {scope}"
+                items.append(("keep", Path(project), f"{name} installed at {scope} scope; {fix}"))
+            else:
+                items.append(("keep", path, f"{name} installed at {scope} scope; "
+                                            "the CLI cannot remove it here, so remove the record by hand"))
+    return items
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--retire", action="store_true", help="after reporting, retire the `retire` items")
@@ -114,7 +143,7 @@ def main(argv: list[str] | None = None) -> int:
         print("Not swept: no settings file enables the ai-config plugin, so ~/.claude may hold the only install.")
         return 2 if args.retire else 0
 
-    items = path_items(home)
+    items = path_items(home) + plugin_items(home)
     stripped, commands = strip_leftover_hooks(settings, home / "hooks")
     items += [("retire", settings_path, f"hook entry: {c}") for c in commands]
     for action, path, reason in items:

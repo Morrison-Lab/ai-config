@@ -4,15 +4,18 @@
 The first section pins `load_sibling` itself. The second loads each hook
 that uses it in a fresh process and checks that the sibling it names really
 loads, so a migration that broke the path would show here rather than as a
-hook that quietly runs without its sibling. The third copies each hook and
-its sibling to a tree whose scripts/lib lacks the loader, and checks that
-the hook still imports and says why on stderr.
+hook that quietly runs without its sibling. The third copies each hook to
+fresh trees. With scripts/lib present and the siblings missing, the hook
+must bind None for each and name each on stderr. With the siblings present
+and scripts/lib empty, a hook declared in GUARDED must still import and name
+the missing loader, and any other hook must fail to import.
 
 Run:  python3 scripts/test_sibling.py
 """
 import contextlib
 import io
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -97,6 +100,16 @@ USERS = (
     ("remind-learn-from-review.py", {"_ums": "remind-ums-after-error.py"}),
     ("no-user-correction-without-mechanism.py", {
         "_corr": "remind-encode-user-correction.py", "_mist": "no-mistake-without-a-hook.py"}),
+    ("remind-ums-on-scrutiny.py", {"_ums": "remind-ums-after-error.py"}),
+    ("no-unread-issue-claim.py", {"_claim": "warn-claim-without-comments-read.py"}),
+    ("flag-idea-without-issue.py", {"_unfiled": "no-unfiled-finding.py"}),
+    ("flag-unfiled-issue.py", {"_unfiled": "no-unfiled-finding.py"}),
+    ("flag-cop-out-offer.py", {
+        "_idea": "flag-idea-without-issue.py", "_unfiled": "no-unfiled-finding.py"}),
+    ("flag-blocker-without-retry.py", {
+        "_copout": "flag-cop-out-offer.py", "_retry": "remind-retry-before-declaring-blocked.py"}),
+    ("warn-title-only-issue-edit.py", {
+        "_stale": "warn-stale-issue-edit.py", "_disclosure": "require-agent-disclosure.py"}),
 )
 PROBE = ("import importlib.util as u, sys; "
          "s = u.spec_from_file_location('h', sys.argv[1]); "
@@ -116,24 +129,65 @@ for hook_name, sibs in USERS:
     check(f"{hook_name} loads {', '.join(sibs.values())}",
           (proc.returncode, proc.stdout.strip(), proc.stderr), (0, want, ""))
 
-# A broken install whose scripts/lib lacks the loader, siblings present: each
-# hook still imports, loads no sibling, and says why on stderr.
-for hook_name, sibs in USERS:
+
+def probe_copy(hook_name, sibs, with_lib, with_sibs):
+    """Probe a copy of the hook in a fresh tree, with or without scripts/lib
+    and the hook's siblings."""
     bare = tempfile.mkdtemp()
     try:
         hooks_dir = os.path.join(bare, "hooks")
+        lib_dir = os.path.join(bare, "scripts", "lib")
         os.makedirs(hooks_dir)
-        os.makedirs(os.path.join(bare, "scripts", "lib"))
-        for name in (hook_name, *sibs.values()):
+        if with_lib:
+            shutil.copytree(os.path.join(HERE, "lib"), lib_dir)
+        else:
+            os.makedirs(lib_dir)
+        for name in (hook_name, *(sibs.values() if with_sibs else ())):
             shutil.copy(os.path.join(HOOKS, name), hooks_dir)
-        proc = probe(os.path.join(hooks_dir, hook_name), sibs)
+        return probe(os.path.join(hooks_dir, hook_name), sibs)
     finally:
         shutil.rmtree(bare, ignore_errors=True)
-    want = " ".join(["True"] * (1 + len(sibs)))
-    check(f"broken install: {hook_name} imports, with no loader and no sibling",
+
+
+# The hooks that must import the loader in a try and survive a broken
+# install. Declared here, not read from the hooks, so deleting a guard fails;
+# GUARD_RE only cross-checks that each hook's source matches the declaration.
+GUARDED = {
+    "no-empty-promise.py", "no-mistake-without-a-hook.py", "remind-learn-from-review.py",
+    "no-user-correction-without-mechanism.py", "remind-ums-on-scrutiny.py",
+    "no-unread-issue-claim.py",
+}
+check("every GUARDED hook is in USERS", sorted(GUARDED - {h for h, _ in USERS}), [])
+GUARD_RE = re.compile(r"^try:\n    from sibling import load_sibling\n", re.M)
+for hook_name, sibs in USERS:
+    # Siblings missing, loader present: each sibling attribute is None, and
+    # the loader names each missing sibling on stderr.
+    proc = probe_copy(hook_name, sibs, with_lib=True, with_sibs=False)
+    want = " ".join(["False"] + ["True"] * len(sibs))
+    check(f"missing siblings: {hook_name} imports and binds None",
           (proc.returncode, proc.stdout.strip()), (0, want))
-    check(f"broken install: {hook_name} names the missing loader on stderr",
-          "scripts/lib/sibling.py" in proc.stderr, True)
+    check(f"missing siblings: {hook_name} names each one on stderr",
+          [f"cannot load sibling {s}" in proc.stderr for s in sibs.values()],
+          [True] * len(sibs))
+
+    # A broken install whose scripts/lib is empty, siblings present. A hook
+    # that imports the loader in a try still imports, loads no sibling, and
+    # names the missing loader. A hook that imports it bare (with the other
+    # scripts/lib modules it already needs) fails to import.
+    guarded = hook_name in GUARDED
+    with open(os.path.join(HOOKS, hook_name), encoding="utf-8") as fh:
+        check(f"{hook_name} source {'guards' if guarded else 'does not guard'} the import",
+              bool(GUARD_RE.search(fh.read())), guarded)
+    proc = probe_copy(hook_name, sibs, with_lib=False, with_sibs=True)
+    if guarded:
+        want = " ".join(["True"] * (1 + len(sibs)))
+        check(f"broken install: {hook_name} imports, and binds None for each sibling",
+              (proc.returncode, proc.stdout.strip()), (0, want))
+        check(f"broken install: {hook_name} names the missing loader on stderr",
+              "scripts/lib/sibling.py" in proc.stderr, True)
+    else:
+        check(f"broken install: unguarded {hook_name} fails to import",
+              (proc.returncode != 0, "ModuleNotFoundError" in proc.stderr), (True, True))
 
 if failures:
     print(f"\n{len(failures)} failure(s)")

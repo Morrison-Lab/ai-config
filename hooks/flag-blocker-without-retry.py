@@ -110,7 +110,6 @@ every hook's, per README's "A hook that misfires is worse than a missing
 one".
 """
 import hashlib
-import importlib.util
 import json
 import os
 import re
@@ -123,21 +122,14 @@ _AGENT_NOTICE_LIB = os.path.join(
 if _AGENT_NOTICE_LIB not in sys.path:
     sys.path.insert(0, _AGENT_NOTICE_LIB)
 from agent_notice import stop_notice  # noqa: E402 -- reaches the agent (ai-config#4796)
+from sibling import load_sibling  # noqa: E402 -- ai-config#2018
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 
 
 def _sibling(name):
-    """Import a hyphenated sibling module by path, or None. Fails open."""
-    try:
-        path = os.path.join(HERE, name)
-        spec = importlib.util.spec_from_file_location(
-            "_sib_" + re.sub(r"\W", "_", name), path)
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        return mod
-    except Exception:
-        return None
+    """Import a hyphenated sibling module, or None (scripts/lib/sibling.py)."""
+    return load_sibling(__file__, name)
 
 
 # ---------------------------------------------------------------------------

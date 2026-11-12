@@ -1906,7 +1906,7 @@
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-unapproved-announcement.py\"'",
             "timeout": 10,
             "script": "no-unapproved-announcement.py",
-            "why": "ai-config#4780. Ezra, 2026-10-27, said twice: never post a class announcement without his review and approval of its exact text. Denies a Canvas announcement create or edit (the CLI, `is_announcement`, a network command naming a discussion topic or announcement, other than a single `git`, `gh`, `grep`, `egrep` or `rg` command or a single `curl` command with no write option (`-X POST` or `PUT`, `-d`, `-F`, `-T`, `--data`, `--form`, `--json`, `--upload-file`), or an MCP announcement write) unless the user's last message is only an approval such as `post the announcement`; a relay note or another agent's message does not count. Fails closed when the transcript cannot be read."
+            "why": "ai-config#4780. Ezra, 2026-10-27, said twice: never post a class announcement without his review and approval of its exact text. Denies a Canvas announcement create or edit (the CLI, `is_announcement`, a network command naming a discussion topic or announcement other than a single `curl` command with no write option such as `-X POST`, `--request PUT`, `-d`, `-F` or `-T`, or an MCP announcement write; a single plain `git`, `gh`, `grep`, `egrep` or `rg` command is never checked) unless the user's last message is only an approval such as `post the announcement`; a relay note or another agent's message does not count. Fails closed when the transcript cannot be read."
           }
         ]
       },

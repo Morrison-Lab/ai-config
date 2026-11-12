@@ -22,3 +22,11 @@ Each change tightened or loosened a rule while the bullet still read as the same
 - **Do:** before committing a condensed rule, list every clause of the original and point to where the condensed text keeps it, or to the fragment that carries it, and grep the repo for every removed heading's name.
 - **Do:** place a composed section after every section whose terms it uses, and lead each folded rule's bullet with its name in bold, so the SessionStart index in `hooks/inject-core-rules.py` still lists it.
 - **Don't:** condense several rules in one pass and leave the reviewers to find which conditions went missing.
+
+**Moving a section out of `AGENTS.md` hides it from some agents.**
+Codex, Gemini CLI and opencode load only `AGENTS.md` (`scripts/measure-session-start.py`), so a rule moved to a fragment reaches them only if they follow the link.
+Measured 2026-11-12 on [#5310](https://github.com/Morrison-Lab/ai-config/issues/5310) step 2: reviewers caught never-rules leaving the file (no pay-per-use API, no PHI, reviewer independence, no bare `#NNN`), a partial-rule summary that dropped qualifiers, and a reworded reason that lost its "can".
+
+- **Do:** keep every never-rule inline when its section moves, and leave a pointer that names only the topics the fragment adds.
+- **Do:** copy a kept sentence's modal verbs ("can", "may") and scope phrases verbatim when rewording it.
+- **Don't:** summarize the moved rules in the pointer, since each summary drops a qualifier the cross-harness read then flags.

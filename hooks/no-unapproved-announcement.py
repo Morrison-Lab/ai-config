@@ -34,29 +34,42 @@ TAG = re.compile(r"<(/?)([a-z][\w-]*)([^>]*)>", re.I)
 ENVELOPE = {"wake", "project", "thread", "message", "relay", "cited", "note"}  # and every hyphenated tag
 
 
+SCRIPT = re.compile(r"(?:\b(?:python[\d.]*|Rscript|node|deno|bash|z?sh|ruby|perl|pwsh|source|uv run)\s+(?:-[^\smc]\S*\s+)*|"
+                    r"(?:^|[\s;&|(])(?=\./))([\w./~-]+\.(?:py|R|r|js|mjs|ts|sh|rb|pl|ps1))\b")
 INTERP = re.compile(r"(python[\d.]*|Rscript|node|deno|bash|z?sh|ruby|perl|pwsh|source|uv|\.)$")
 EXT = re.compile(r"[\w./~-]+\.(py|R|r|js|mjs|ts|sh|rb|pl|ps1)$")
 CODE_WRITE = re.compile(r"\b(post|put|edit|update|PUT|POST)\(|create_discussion_topic|['\"](POST|PUT|post|put)['\"]|"
-                        r"-X\s*(POST|PUT)|\bdata\s*=")
+                        r"-X\s*(POST|PUT)|\b(Request|urlopen)\([^)]*\bdata\s*=")
+SELF = ('"""' + __doc__[:40], '"""Regression tests for no-unapproved-announcement.py')  # this hook, a copy, its tests
 
 
 def script_names(cmd):
-    """Script files each command segment runs: those after an interpreter, or one at the segment's start."""
-    for seg in re.split(r"[;&|\n()]", cmd):
-        words = [w for w in (w.lstrip("<") for w in seg.split()) if w]
-        while words and ("=" in words[0] or words[0] in ("sudo", "env", "time", "nohup", "exec")):
-            words = words[1:]
-        if words and INTERP.match(words[0].rsplit("/", 1)[-1]):
-            yield from (w for w in words[1:] if EXT.match(w))
-        elif words and EXT.match(words[0]):
+    """Script files the command runs: SCRIPT's matches, plus words the segment tokenizer finds."""
+    yield from SCRIPT.findall(cmd)
+    for seg in re.split(r"[;&|\n(){}]", cmd):
+        words = [w for w in (w.strip("'\"").lstrip("<!") for w in seg.split()) if w]
+        if words and EXT.match(words[0]):  # a script run by its path
             yield words[0]
+        for i, w in enumerate(words):
+            if not INTERP.match(w.rsplit("/", 1)[-1]):
+                continue
+            rest = words[i + 1:]
+            if w.endswith(("uv", "deno")):  # `uv run x.py`: only the word after `run`, not a tool's argument
+                rest = rest[1:2] if rest[:1] == ["run"] else rest[:1]
+            for x in rest:  # the first script after the interpreter's options, unless -m or -c runs code instead
+                if x in ("-m", "-c"):
+                    break
+                if EXT.match(x):
+                    yield x
+                    break
 
 
 def script_writes(cmd, cwd):
     """A script file the command runs makes a network topic write, or cannot be read (#5453)."""
     cds = [os.path.expanduser(d) for d in re.findall(r"\bcd\s+([\w./~-]+)", cmd)]
     dirs = [cwd or "."] + [os.path.join(cwd or ".", d) for d in cds]
-    imported = {m + ".py" for m in re.findall(r"\b(?:import|from)\s+(\w+)", cmd)}  # a local module `-c` code loads
+    code_args = " ".join(a or b for a, b in re.findall(r"-c\s+(?:'([^']*)'|\"([^\"]*)\")", cmd))
+    imported = {m + ".py" for m in re.findall(r"\b(?:import|from)\s+(\w+)", code_args)}  # a local module `-c` code loads
     for name in [*script_names(cmd), *sorted(imported)]:
         paths = [p for p in (os.path.join(d, os.path.expanduser(name)) for d in dirs) if os.path.isfile(p)]
         try:
@@ -66,7 +79,7 @@ def script_writes(cmd, cwd):
             if TOPIC.search(cmd) and name not in imported:
                 return True
             continue
-        if "no-unapproved-announcement" in code:  # this hook, a copy of it, or its tests
+        if (code.split("\n", 1)[-1] if code.startswith("#!") else code).startswith(SELF):
             continue
         if (ANNOUNCE.search(code) or TOPIC.search(code)) and NET.search(code) and CODE_WRITE.search(code):
             return True

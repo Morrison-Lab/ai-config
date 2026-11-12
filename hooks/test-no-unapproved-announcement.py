@@ -115,14 +115,21 @@ for name, code in [("sub/post.py", "import canvasapi\nc.create_discussion_topic(
                    "httr::PUT(u_topic_announcement)"), ("read.py", "print(canvasapi.get_announcements())"),
                    ("notes.py", "# post the weekly summary\nprint('announcement')"), ("test-x.py", "is_announcement=True"), ("copy.py", open(SUBJECT, encoding="utf-8").read()),
                    ("test_post.py", "requests.post(u_announcement)"), ("rq.py", "from requests import post\npost(u_announcement)"),
-                   ("ul.py", "urllib.request.Request(u_discussion_topic, data=b)"), ("dn.ts", "fetch('https://x/api/v1/announcement', {method: 'POST'})")]:
+                   ("ul.py", "urllib.request.Request(u_discussion_topic, data=b)"), ("dn.ts", "fetch('https://x/api/v1/announcement', {method: 'POST'})"),
+                   ("rd.py", "data = requests.get(u_announcements).json()"), ("tcopy.py", open(__file__, encoding="utf-8").read()),
+                   ("cm.py", "# guarded by no-unapproved-announcement\nrequests.post(u_announcement)")]:
     with open(os.path.join(TMP, name), "w", encoding="utf-8") as fh:
         fh.write(code)
 SCRIPTS = {"python3 sub/post.py": "deny", "cd sub && python3 post.py": "deny", "python3.12 sub/post.py": "deny",
            "Rscript p.R": "deny", "python3 read.py": None, "python3 notes.py": None, "python3 test-x.py": None, "python3 copy.py": None,
            "python3 gone/announcement.py": "deny", "python3 -m pytest -k announcement": None, "python3 -c 'print(1)'": None,
            "python3 <sub/post.py": "deny", "sub/post.py": "deny", "python3 -W ignore sub/post.py": "deny", "deno run dn.ts": "deny",
-           "cd sub && python3 -c 'import post'": "deny", "python3 test_post.py": "deny", "python3 rq.py": "deny", "python3 ul.py": "deny"}
+           "cd sub && python3 -c 'import post'": "deny", "python3 test_post.py": "deny", "python3 rq.py": "deny", "python3 ul.py": "deny",
+           "timeout 60 python3 sub/post.py": "deny", "xargs python3 sub/post.py": "deny", "if python3 sub/post.py; then :; fi": "deny",
+           "{ python3 sub/post.py; }": "deny", "bash -c 'python3 sub/post.py'": "deny", "! python3 sub/post.py": "deny",
+           "bash -c \"python3 'sub/post.py'\"": "deny", "x=`python3 sub/post.py`": "deny",
+           "python3 cm.py": "deny", "python3 rd.py": None, "python3 tcopy.py": None, "cd sub && echo import post": None,
+           "python3 -m black sub/post.py": None, "uv run ruff check sub/post.py": None, "python3 -m py_compile sub/post.py": None}
 for c, want in SCRIPTS.items():
     assert run("Bash", {"command": c}, user("hello"), cwd=TMP) == want, c
 S = {"command": "python3 sub/post.py"}

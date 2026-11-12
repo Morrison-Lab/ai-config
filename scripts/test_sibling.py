@@ -70,56 +70,71 @@ try:
         check(f"required=True raises for {name}", got, exc)
 
     # A hook symlinked into another directory still finds its real siblings.
+    # Windows without Developer Mode or elevation cannot make symlinks: skip
+    # there, so the hook probes below still run. Anywhere else, fail.
     linked = os.path.join(tmp, "linked")
     os.mkdir(linked)
-    os.symlink(hook, os.path.join(linked, "my-hook.py"))
-    mod = load_sibling(os.path.join(linked, "my-hook.py"), "good-sibling.py")
-    check("resolves a symlinked hook to its real directory",
-          getattr(mod, "VALUE", None), 7)
+    try:
+        os.symlink(hook, os.path.join(linked, "my-hook.py"))
+    except OSError as e:
+        if os.name != "nt":
+            raise
+        print(f"  skip  symlinked hook: cannot make a symlink here ({e})")
+    else:
+        mod = load_sibling(os.path.join(linked, "my-hook.py"), "good-sibling.py")
+        check("resolves a symlinked hook to its real directory",
+              getattr(mod, "VALUE", None), 7)
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 
-# Each migrated hook and a sibling it names. Every probe runs in a fresh
-# `python3 -I` process, so the hook must find the loader through its own
-# sys.path setup, not through this test's.
+# Each migrated hook, and the module attribute it binds to each sibling it
+# loads. The probe reads that attribute, so a hook that stops loading a
+# sibling fails here. Every probe runs in a fresh `python3 -I` process, so
+# the hook must find the loader through its own sys.path setup, not through
+# this test's.
 HOOKS = os.path.join(os.path.dirname(HERE), "hooks")
 USERS = (
-    ("no-empty-promise.py", "remind-ums-after-error.py"),
-    ("no-mistake-without-a-hook.py", "remind-ums-after-error.py"),
-    ("remind-learn-from-review.py", "remind-ums-after-error.py"),
-    ("no-user-correction-without-mechanism.py", "no-mistake-without-a-hook.py"),
+    ("no-empty-promise.py", {"_ums": "remind-ums-after-error.py"}),
+    ("no-mistake-without-a-hook.py", {"_ums": "remind-ums-after-error.py"}),
+    ("remind-learn-from-review.py", {"_ums": "remind-ums-after-error.py"}),
+    ("no-user-correction-without-mechanism.py",
+     {"_corr": "remind-encode-user-correction.py",
+      "_mist": "no-mistake-without-a-hook.py"}),
 )
 PROBE = ("import importlib.util as u, sys; "
          "s = u.spec_from_file_location('h', sys.argv[1]); "
          "m = u.module_from_spec(s); s.loader.exec_module(m); "
-         "print(m.load_sibling is None, m._sibling(sys.argv[2]) is None)")
+         "print(m.load_sibling is None, "
+         "*(getattr(m, a) is None for a in sys.argv[2:]))")
 
 
-def probe(hook_path, sib):
-    return subprocess.run([sys.executable, "-I", "-c", PROBE, hook_path, sib],
+def probe(hook_path, attrs):
+    return subprocess.run([sys.executable, "-I", "-c", PROBE, hook_path, *attrs],
                           capture_output=True, text=True, timeout=30)
 
 
-for hook_name, sib in USERS:
-    proc = probe(os.path.join(HOOKS, hook_name), sib)
-    check(f"{hook_name} loads {sib}",
-          (proc.returncode, proc.stdout.strip(), proc.stderr), (0, "False False", ""))
+for hook_name, sibs in USERS:
+    proc = probe(os.path.join(HOOKS, hook_name), sibs)
+    want = " ".join(["False"] * (1 + len(sibs)))
+    check(f"{hook_name} loads {', '.join(sibs.values())}",
+          (proc.returncode, proc.stdout.strip(), proc.stderr), (0, want, ""))
 
-# A broken install whose scripts/lib lacks the loader, sibling present: each
+# A broken install whose scripts/lib lacks the loader, siblings present: each
 # hook still imports, loads no sibling, and says why on stderr.
-for hook_name, sib in USERS:
+for hook_name, sibs in USERS:
     bare = tempfile.mkdtemp()
     try:
         hooks_dir = os.path.join(bare, "hooks")
         os.makedirs(hooks_dir)
         os.makedirs(os.path.join(bare, "scripts", "lib"))
-        for name in (hook_name, sib):
+        for name in (hook_name, *sibs.values()):
             shutil.copy(os.path.join(HOOKS, name), hooks_dir)
-        proc = probe(os.path.join(hooks_dir, hook_name), sib)
+        proc = probe(os.path.join(hooks_dir, hook_name), sibs)
     finally:
         shutil.rmtree(bare, ignore_errors=True)
+    want = " ".join(["True"] * (1 + len(sibs)))
     check(f"broken install: {hook_name} imports, with no loader and no sibling",
-          (proc.returncode, proc.stdout.strip()), (0, "True True"))
+          (proc.returncode, proc.stdout.strip()), (0, want))
     check(f"broken install: {hook_name} names the missing loader on stderr",
           "scripts/lib/sibling.py" in proc.stderr, True)
 

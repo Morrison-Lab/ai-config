@@ -53,7 +53,6 @@ the last UMS index), so a babysitting loop that re-fetches review comments
 does not nag every turn.
 """
 import hashlib
-import importlib.util
 import json
 import os
 import re
@@ -77,16 +76,17 @@ except Exception as _exc:  # broken install: degrade, do not fail open silently
         return False
 
 
+try:
+    from sibling import load_sibling
+except ImportError as _exc:
+    print(f"{os.path.basename(__file__)}: cannot load scripts/lib/sibling.py "
+          f"({_exc}); running without its sibling hooks", file=sys.stderr)
+    load_sibling = None
+
+
 def _sibling(name):
-    """Import a hyphenated sibling module, or None if unavailable."""
-    path = os.path.join(HERE, name)
-    try:
-        spec = importlib.util.spec_from_file_location("_sib_ums_scrutiny", path)
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        return mod
-    except Exception:
-        return None
+    """Import a hyphenated sibling module, or None (scripts/lib/sibling.py)."""
+    return load_sibling(__file__, name) if load_sibling else None
 
 
 _ums = _sibling("remind-ums-after-error.py")

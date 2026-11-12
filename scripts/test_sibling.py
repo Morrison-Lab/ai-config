@@ -4,9 +4,10 @@
 The first section pins `load_sibling` itself. The second loads each hook
 that uses it in a fresh process and checks that the sibling it names really
 loads, so a migration that broke the path would show here rather than as a
-hook that quietly runs without its sibling. The third copies each hook and
-its sibling to a tree whose scripts/lib lacks the loader, and checks that
-the hook still imports and says why on stderr.
+hook that quietly runs without its sibling. The third copies each hook that
+guards its import of the loader, with its siblings, to a tree whose
+scripts/lib lacks the loader, and checks that the hook still imports and
+says why on stderr.
 
 Run:  python3 scripts/test_sibling.py
 """
@@ -97,7 +98,21 @@ USERS = (
     ("remind-learn-from-review.py", {"_ums": "remind-ums-after-error.py"}),
     ("no-user-correction-without-mechanism.py", {
         "_corr": "remind-encode-user-correction.py", "_mist": "no-mistake-without-a-hook.py"}),
+    ("remind-ums-on-scrutiny.py", {"_ums": "remind-ums-after-error.py"}),
+    ("no-unread-issue-claim.py", {"_claim": "warn-claim-without-comments-read.py"}),
+    ("flag-idea-without-issue.py", {"_unfiled": "no-unfiled-finding.py"}),
+    ("flag-unfiled-issue.py", {"_unfiled": "no-unfiled-finding.py"}),
+    ("flag-cop-out-offer.py", {
+        "_idea": "flag-idea-without-issue.py", "_unfiled": "no-unfiled-finding.py"}),
+    ("flag-blocker-without-retry.py", {
+        "_copout": "flag-cop-out-offer.py", "_retry": "remind-retry-before-declaring-blocked.py"}),
+    ("warn-title-only-issue-edit.py", {
+        "_stale": "warn-stale-issue-edit.py", "_disclosure": "require-agent-disclosure.py"}),
 )
+# The hooks that import the loader in a try, because nothing else they need
+# comes from scripts/lib. The rest already import agent_notice from there
+# unguarded, so a tree without scripts/lib breaks them before the loader.
+GUARDED = USERS[:6]
 PROBE = ("import importlib.util as u, sys; "
          "s = u.spec_from_file_location('h', sys.argv[1]); "
          "m = u.module_from_spec(s); s.loader.exec_module(m); "
@@ -117,8 +132,8 @@ for hook_name, sibs in USERS:
           (proc.returncode, proc.stdout.strip(), proc.stderr), (0, want, ""))
 
 # A broken install whose scripts/lib lacks the loader, siblings present: each
-# hook still imports, loads no sibling, and says why on stderr.
-for hook_name, sibs in USERS:
+# guarded hook still imports, loads no sibling, and says why on stderr.
+for hook_name, sibs in GUARDED:
     bare = tempfile.mkdtemp()
     try:
         hooks_dir = os.path.join(bare, "hooks")

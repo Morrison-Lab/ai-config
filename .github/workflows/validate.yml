@@ -385,6 +385,12 @@ jobs:
         # `batch-merge-and-resolve.md` warns about, and it is what the
         # hand-run prototype this script replaces actually had.
         run: python3 scripts/test_pr_overlap.py
+      - name: Run mwc-batch tests
+        # Same reasoning as pr-sweep above: mwc-batch.py queries the GitHub
+        # API via `gh` and runs the fully-clean checker, so only its pure
+        # parts run here, and its infra test is checked against the real
+        # merge-infra-pr and merge hook (ai-config#5578).
+        run: python3 -m pytest scripts/test_mwc_batch.py
       - name: Run upload-skills tests
         # Only the tests run here. upload_skills.sh itself requires a live
         # workspace API key, so the offline test suite exercises change

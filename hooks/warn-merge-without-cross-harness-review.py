@@ -24,9 +24,9 @@ before the gap was noticed.
     AND NOT  this session's transcript holds, after the last push, a
              non-sidechain Bash call whose result is not an error and in
              which a simple command's command word is one of the CLIs in
-             CROSS_HARNESS_CLIS, minus this session's own harness, with a
-             first argument that is not a housekeeping one (NON_REVIEW_ARGS:
-             `--version`, `--help`, `login`, `auth`, ...), or a `curl` call
+             CROSS_HARNESS_CLIS, minus this session's own harness, run as a
+             review (REVIEW_SUBCOMMANDS: `codex exec`, `opencode run`;
+             REVIEW_FLAGS: `claude -p`, `agy --print`, ...), or a `curl` call
              with a data payload to `https://opencode.ai/zen/go/v1/chat/completions`
              (the cloud-session route when `opencode` qualifies per AGENTS.md policy),
              or a `curl` call with a data payload to `https://api.ollama.com/api/chat`
@@ -74,6 +74,10 @@ tool calls, so a deny is decidable and costs at most the waiver's probe pass.
   script (`dtc`'s background `nohup bash "$WORK/run.sh" &`) is not: the
   command word is `bash`, and the script's contents are not in the
   transcript. The foreground `codex exec ...` form is credited.
+* Only the listed review forms count, so a review written another way is not
+  credited: an option with a value before the subcommand (`codex -m o3 exec`)
+  or a bare positional prompt (`gemini 'review'`). Each errs toward a false
+  deny, which the listed form clears (`codex exec -m o3`, `gemini -p`).
 * `gemini` and `cursor-agent` are credited although the gate fragment's
   ladder does not list them as active yet: a successful run of either in
   the transcript is itself the probe that ladder is waiting on.
@@ -96,12 +100,20 @@ HERE = os.path.dirname(os.path.realpath(__file__))
 CROSS_HARNESS_CLIS = frozenset({
     "codex", "opencode", "agy", "gemini", "cursor-agent", "claude",
 })
-# A first argument that makes the invocation housekeeping, not a review.
-NON_REVIEW_ARGS = frozenset({
-    "-v", "-V", "--version", "version", "-h", "--help", "help",
-    "login", "logout", "auth", "config", "mcp", "update", "upgrade",
-    "install", "models",
-})
+# What makes a reviewer CLI's call a review, listed rather than inferred, so
+# housekeeping (`opencode stats`, `codex apply`, `cursor-agent ls`) never
+# counts (ai-config#5383): the first word that is not an option, for a CLI
+# with subcommands, or a print or prompt flag anywhere before `--`.
+REVIEW_SUBCOMMANDS = {
+    "codex": frozenset({"exec", "e", "review"}),
+    "opencode": frozenset({"run"}),
+}
+REVIEW_FLAGS = {
+    "agy": frozenset({"-p", "--print"}),
+    "claude": frozenset({"-p", "--print"}),
+    "cursor-agent": frozenset({"-p", "--print"}),
+    "gemini": frozenset({"-p", "--prompt"}),
+}
 # `timeout` options that take a separate argument (`-s KILL`, `-k 5`).
 TIMEOUT_ARG_OPTS = frozenset({"-s", "--signal", "-k", "--kill-after"})
 # A help or version flag anywhere in the call (`codex exec --help`).
@@ -184,7 +196,9 @@ NOTE = (
     "AND harness both differ from this session's. An Agent subagent and the "
     "CI claude-review workflow are both Claude and do not qualify. Run one "
     "of {clis} (or in cloud sessions, curl to opencode.ai with candidate "
-    "model fallback per delegate-to-opencode) on the shipping head first. "
+    "model fallback per delegate-to-opencode) on the shipping head first, "
+    "in a review form: `codex exec`, `opencode run`, or `-p`/`--print` "
+    "(`claude -p`); a subcommand comes before any option with a value. "
     "If no qualifying reviewer can run here (host blocked, backend down, "
     "CLI or credential absent), probe every route once: attempt each of "
     "{clis} as a reviewer, or show it absent with `command -v <cli>` or `which <cli>` alone, unredirected (exit 1); "
@@ -324,6 +338,22 @@ def _curl_route(rest):
     return None
 
 
+def _is_review_call(base, args):
+    """True when *args* make reviewer CLI *base* run a review, not housekeeping."""
+    words = args[:args.index("--")] if "--" in args else args
+    if HELP_FLAGS.intersection(words):
+        return False
+    if base in REVIEW_SUBCOMMANDS:
+        first = next((a for a in words if not a.startswith("-")), None)
+        return first in REVIEW_SUBCOMMANDS[base]
+    flags = REVIEW_FLAGS.get(base, frozenset())
+    # A long flag may carry `=value`; a short one `=value` or an attached
+    # value (`agy -p="..."`, memories/antigravity.md).
+    return any(a.split("=", 1)[0] in flags if a.startswith("--")
+               else any(a.startswith(f) for f in flags if len(f) == 2)
+               for a in words)
+
+
 def _review_route(rest, clis):
     """The route a reviewer call in *rest* takes: a CLI name, a host, or None."""
     rest = _peel_wrappers(rest)
@@ -331,7 +361,7 @@ def _review_route(rest, clis):
         return None
     base = os.path.basename(rest[0])
     if len(rest) > 1 and base in clis:
-        return base if rest[1] not in NON_REVIEW_ARGS and not HELP_FLAGS.intersection(rest[1:]) else None
+        return base if _is_review_call(base, rest[1:]) else None
     if base == "curl":
         route = _curl_route(rest)
         if route and (route[2] is None or route[2] in clis):

@@ -128,7 +128,8 @@ This section is the exception that the other "required for merging" statements i
   A quota error reroutes to the next route first and counts as unrunnable only once every route has failed.
   After that single pass, do not retry in a loop or ask again: a retry loop is not a review.
   `hooks/warn-merge-without-cross-harness-review.py` denies a merge until the transcript shows, after the last push, a reviewer call or this pass:
-  each reviewer CLI attempted, with any result, or shown absent by `command -v <cli>` or `which <cli>` run alone and unredirected (exit 1), and `opencode` attempted through its CLI or the OpenCode Go `curl` ([ai-config#5290](https://github.com/Morrison-Lab/ai-config/issues/5290)).
+  each reviewer CLI attempted as a review, with any result, or shown absent by `command -v <cli>` or `which <cli>` run alone and unredirected (exit 1), and `opencode` attempted through its CLI or the OpenCode Go `curl` ([ai-config#5290](https://github.com/Morrison-Lab/ai-config/issues/5290)).
+  An attempt is a review form (`codex exec`, `opencode run`, or a `-p`/`--print` flag), never `--version` or a housekeeping subcommand ([ai-config#5383](https://github.com/Morrison-Lab/ai-config/issues/5383)).
 - **Unavailable is not "not-clean".**
   A reviewer that ran and returned Needs-more-work, or left an unresolved finding, still blocks until a re-dispatch returns all-clear.
   The waiver covers only a reviewer that could not produce any verdict.

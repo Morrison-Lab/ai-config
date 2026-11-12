@@ -135,6 +135,9 @@ USERS = (
     ("no-push-with-failing-notes-checks.py", {"_SIBLING": "no-push-without-self-review.py"}),
     ("warn-new-line-breaks-on-push.py", {"_SIBLING": "no-push-without-self-review.py"}),
     ("warn-new-line-breaks-on-edit.py", {"_PUSH_HOOK": "warn-new-line-breaks-on-push.py"}),
+    ("flag-clean-claim-over-findings.py", {
+        "_hrp": "no-handrolled-verdict-parse.py", "_rums": "remind-ums-on-scrutiny.py",
+        "_nsp": "no-stale-pr-status.py"}),
 )
 PROBE = ("import importlib.util as u, sys; "
          "s = u.spec_from_file_location('h', sys.argv[1]); "

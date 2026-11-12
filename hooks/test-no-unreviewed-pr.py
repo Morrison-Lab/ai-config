@@ -216,8 +216,28 @@ REQUEST_METHOD_CORPUS = [
     (REQ_PATH + " -if reviewers[]=x", True),
     # After `--` every token is positional, so this `-f` sends no field.
     (REQ_PATH + " -- -f x", False),
+    # A glued `--flag=value` consumes nothing after it.
+    (REQ_PATH + " --method=POST" + REQ_FIELDS, True),
+    # Methods are case-insensitive.
+    (REQ_PATH + " -X post" + REQ_FIELDS, True),
+    (REQ_PATH + " --method=post" + REQ_FIELDS, True),
+    (REQ_PATH + " --method=get" + REQ_FIELDS, False),
+    # A glued value ends the cluster: `-HX-...` is a header, not a method.
+    (REQ_PATH + " -HX-GitHub-Api-Version:2022-11-28" + REQ_FIELDS, True),
+    (REQ_PATH + " -Hf:1", False),
+    # -H, -p and -t take a value, so a following `-f` is that value.
+    (REQ_PATH + " -H -f", False),
+    (REQ_PATH + " -p -f", False),
+    (REQ_PATH + " -t -f", False),
     ("curl -s https://api.github.com/repos/o/r/pulls/1038/requested_reviewers"
      " -f x", False),
+]
+
+# _gh_api_post on argv directly, where the token after `api` need not be a
+# reviewer path: a positional is never read as a flag cluster.
+GH_API_POST_CORPUS = [
+    (["gh", "api", "xf"], False),
+    (["gh", "api", "xX", "-f", "a=b"], True),
 ]
 
 # The issue's reproduction and its operator controls, one level below the
@@ -2897,6 +2917,14 @@ def main():
         else:
             failures += 1
             print(f"FAIL: _argv_push({cmd!r}) is {got}, want {want}")
+    for argv, want in GH_API_POST_CORPUS:
+        got = hookmod._gh_api_post(argv)
+        if got is want:
+            passes += 1
+            print(f"PASS: _gh_api_post({argv!r}) is {want}")
+        else:
+            failures += 1
+            print(f"FAIL: _gh_api_post({argv!r}) is {got}, want {want}")
     for cmd, want in REQUEST_METHOD_CORPUS:
         got = hookmod._argv_request(shlex.split(cmd))[0]
         if got is want:

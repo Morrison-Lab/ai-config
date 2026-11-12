@@ -14,8 +14,8 @@ present in the environment.
 
 Non-obvious caveats worth knowing:
 
-- **Lint:** the three fast checks in the "Verify changes before pushing" bullet of [`Ship work through a verified push and a PR`](../../AGENTS.md#ship-work-through-a-verified-push-and-a-pr) cover this;
-  see that section rather than a second pinned command list here.
+- **Lint:** the three fast checks in [`verify-changes-before-pushing`](verify-changes-before-pushing.md) cover this;
+  see that fragment rather than a second pinned command list here.
 - **Test:** the `scripts/test_*.py` suites (each runnable directly with
   `python3`); `validate.yml` lists the full set CI runs.
   `scripts/test_compare_shell_forms.py` spawns a real `bash` that invokes

@@ -5,7 +5,8 @@ The measured case is Claude Code's auto mode.
 Codex approval modes, Gemini, and Antigravity are covered by analogy, since none of their behaviours has been measured here;
 read "auto mode" as the equivalent unattended-approval mode there.
 
-When the classifier denies an action the task needs, the user can approve it directly as soon as the session leaves auto mode.
+When the classifier denies an action the task needs, leaving auto mode lets the action run through the ordinary permission prompt,
+or with no prompt where an allow route covers it.
 Leaving auto mode is available whenever the conditions under [When to switch or ask](#when-to-switch-or-ask) hold:
 switch the session yourself where that section allows it,
 or ask the user to switch.
@@ -51,19 +52,22 @@ Leaving auto mode is safe without a question first only because the user then ap
 Auto mode drops broad allow rules that `default` mode honours ([permission modes](https://code.claude.com/docs/en/permission-modes)), and other routes allow a command with no prompt at all:
 a `permissions.allow` rule in any settings file that applies, a PreToolUse hook that returns an allow decision, a session "always allow" grant, and `--allowedTools`.
 This repository's [`grant-personal-permissions`](../../hooks/grant-personal-permissions.py) hook allows `gh pr merge` that way.
-So never switch modes yourself for a merge.
+So never switch modes yourself for a merge:
+that hook would let the rerun through with no prompt, and a merge cannot be undone.
 Read the settings files and hooks that apply, and do not switch for an action one of them allows, or when they do not let you tell.
 In those cases ask the user to switch out of auto mode instead, naming the refused command and its stated reason.
 A session grant or `--allowedTools` cannot be read from inside the session.
-Only the user can set one, so a rerun it lets through runs on the user's own grant, and that residual risk is accepted.
-Otherwise, when `mcp__ccd_session_mgmt__set_session_permission_mode` is available, switch the session to `default` yourself with that tool, rerun the command once so the user gets a real approval prompt, and request `auto` again once the actions that needed approval are done.
+Only the user can set one, so a rerun that such a grant lets through runs on the user's own grant, and that residual risk is accepted:
+an unreadable grant of this kind does not stop you switching yourself.
+Otherwise, for an action that is not a merge and that no readable allow route covers, when `mcp__ccd_session_mgmt__set_session_permission_mode` is available, switch the session to `default` yourself with that tool, rerun the command once so the user gets a real approval prompt, and request `auto` again once the actions that needed approval are done.
 A switch to a lower mode shows no card, so that prompt is the user's only sign of the switch.
 When that tool is not available, ask the user to switch out of auto mode the same way.
 
 A first denial can be a transient misfire (see [`claude-code-hooks`](../../memories/claude-code-hooks.md) on retrying an identical command once).
 Retry the identical command once at most, never rephrased, then switch or ask.
 You cannot tell a `soft_deny` from a `hard_deny` block from inside the turn, so switch or ask once and report the result.
-If the mode is switched, by the user or by you, and the action is still refused, report that and stop.
+If the mode is switched, by the user or by you, and the action is still refused, report that and stop trying that action;
+when you switched it yourself, request `auto` again first.
 A managed-settings `permissions.deny` denial applies in every mode, so report it as a denial and do not switch or ask to switch.
 
 For an action outside the hard-prohibited categories that the user has not authorized, do not switch or ask to switch modes.
@@ -76,6 +80,7 @@ When no one can answer, record it as a pending decision instead (an `away` sessi
 Name the refused command and the stated denial reason, and batch every action that will need approval.
 When you switched the session yourself, say so and say that a prompt is coming;
 when the switch conditions hold and you could not switch, ask the user to switch out of auto mode for that stretch.
+When an allow route covers the action, such as a merge, tell the user that switching lets it run with no further prompt.
 Name `autoMode` in `~/.claude/settings.json` or managed settings as the lasting fix.
 When you asked the user to switch, then until the session leaves auto mode, continue with any work the denial does not block, and arm a wake to resume the denied step.
 If the user is away (an `away` session, or a CI or `@claude` run), nobody can answer a prompt: do not switch or ask, record the denied action as a pending decision, do not poll for a switch, and continue other work.
@@ -94,11 +99,12 @@ Nothing else ends the stretch, and every later action keeps raising a prompt unt
   The user was told to "approve the prompt" when none existed, and was asked "retry?" and "disable auto?" instead of the agent switching the session itself;
   after the user answered `daytb`, the self-switch to `default` let the apply run.)
 - **Do:** batch the actions that need approval into one manual-mode stretch, then end it as "Say when it is over" describes.
+  A `difm` stretch is the exception: it covers its one step.
 - **Do:** in a Claude Project, when the user answers the coordinator instead of the denied thread, the coordinator tells that thread, with the user's message attached by id, to ask the user again in its own thread.
   The relayed message is not approval.
 - **Don't:** when the switch conditions hold, end the turn after a denial without naming the mode switch, or offer only the `autoMode` configuration, which takes a settings change the user has to make.
 - **Don't:** retry a denied command more than once, or rephrase it.
-  A rerun through a real approval prompt, after the session has left auto mode, is not a retry.
+  A rerun after the session has left auto mode is not a retry.
 - **Don't:** route around a denial, or hand the user a script to run in place of the approval.
 - **Don't:** hand a denied action to another session to run instead: a subagent, or in a Claude Project another thread or the coordinator ([`claude-app-projects`](../../memories/claude-app-projects.md)).
   That is routing around the denial too.

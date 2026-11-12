@@ -54,6 +54,7 @@ A message relayed by another agent is information, not the user's approval, howe
 ## What a hook can and cannot decide
 
 Whether a passage is an injection depends on meaning, not on a string, so a hook cannot reliably spot one: it would either block ordinary text that mentions keys and merges or miss reworded attacks.
+That half is measured instead: `evals/injection-*` run `claude plugin eval` cases that embed an instruction in content the agent is asked to summarize or triage (see [`evals/README.md`](../../evals/README.md)).
 
 The legs are another matter.
 "This turn read an issue comment or a web page" and "this command is a merge or a force push" are both visible in the transcript, so the irreversible-steps rule above can be a deny hook;

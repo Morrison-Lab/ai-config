@@ -44,15 +44,16 @@ EXT = re.compile(r"[\w./~-]+\.(py|R|r|js|mjs|ts|sh|rb|pl|ps1)$")
 CODE_WRITE = re.compile(r"\b(post|put|edit|update|PUT|POST)\(|create_discussion_topic|['\"](POST|PUT|post|put)['\"]|"
                         r"-X\s*(POST|PUT)|\b(Request|urlopen)\([^)]*\bdata\s*=")
 SELF = (os.path.basename(__file__), "test-no-unapproved-announcement.py")  # this hook and its tests
-COPY = re.compile(r"^def is_announcement_write\(|^SUBJECT, TMP = ", re.M)  # the hook's, or its tests', own lines
+COPY = re.compile(r"^def is_announcement_write\(|^SUBJECT\b[^=\n]*= sys\.argv\[1\]", re.M)  # the hook's, or its tests', own lines
 CLIENT = re.compile(r"[rbuRBU]*(['\"])(curl|wget|xh|https?|Invoke-WebRequest|Invoke-RestMethod|POST|PUT|post|put)\1$")
+HEREDOC = re.compile(r"(<<-?\s*(['\"]?)(\w+)\2[^\n]*)\n.*?\n[ \t]*\3[ \t]*(?=\n|$)", re.S)  # its body is text
 UV_VALUE = ("--with", "--python", "-p", "--from", "--env-file", "--config")  # uv or deno options that take a value
 
 
 def segments(cmd):
     """The command's simple commands as word lists: split on unquoted operators, with quoted text one word."""
     try:
-        lex = shlex.shlex(cmd.replace("\n", ";"), posix=True, punctuation_chars=";&|()")
+        lex = shlex.shlex(HEREDOC.sub(r"\1", cmd).replace("\n", ";"), posix=True, punctuation_chars=";&|()")
         lex.whitespace_split, lex.commenters = True, ""
         tokens = list(lex)
     except ValueError:  # an unclosed quote: split on whitespace

@@ -676,6 +676,8 @@ def test_bash_needs_a_shell_that_sees_this_checkout():
         finally:
             rlv.probe_bash = real_probe
         args = list(probes[0])
+        check("the probe is handed this checkout's own script path",
+              args[-1] == Path(rlv.__file__).resolve().as_posix())
         seen = subprocess.run([chosen, *args], capture_output=True).returncode
         args[-1] = "/mnt/x" + args[-1]
         moved = subprocess.run([chosen, *args], capture_output=True).returncode

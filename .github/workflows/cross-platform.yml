@@ -61,9 +61,11 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           title="cross-platform validation failed on the weekly run"
-          number=$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[0].number')
+          number=$(gh issue list --state open --search "in:title \"$title\"" --json number,title \
+            --jq "map(select(.title == \"$title\")) | .[0].number // empty")
           if [ -n "$number" ]; then
             gh issue comment "$number" --body "Failed again: $RUN_URL"
           else
-            gh issue create --title "$title" --body "The weekly macOS and Windows run of the validate steps failed: $RUN_URL (ai-config#1843)."
+            gh issue create --title "$title" --label P2 \
+              --body "The weekly macOS and Windows run of the validate steps failed: $RUN_URL (ai-config#1843)."
           fi

@@ -312,7 +312,7 @@ The section above covers the submodule-plus-symlink path.
 The other way a repo consumes ai-config is the **plugin marketplace** ---
 `.claude/settings.json`'s `extraKnownMarketplaces` / `enabledPlugins`,
 and gha's `use-ai-config` input for the bots.
-A web or cloud session does not install a plugin its settings declare (#4519);
+A web or cloud session does not install a plugin its settings declare ([#4519](https://github.com/Morrison-Lab/ai-config/issues/4519));
 there the environment's Setup script installs it
 ([`docs/delivery-paths.md`](../docs/delivery-paths.md)).
 The marketplace path has a failure mode the submodule path does not, and it is worth

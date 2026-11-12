@@ -42,11 +42,16 @@ Leave auto mode for an action only when all of these hold (the switch conditions
 - The action is outside those hard-prohibited categories.
 - The user is present to answer a prompt, so this is not an `away` session or a CI or `@claude` run.
 - The session that would take the action is not a dispatched subagent.
+  No user answers a dispatched subagent's prompt, since the user sees only what its caller reports, so the prompt a switch would raise reaches nobody.
   A denied subagent reports the refused command and the stated reason to the session that dispatched it, and never switches modes itself;
   the report passes up the dispatch chain until it reaches the first session that can ask the user, and that session decides.
 
 When the switch conditions hold and `mcp__ccd_session_mgmt__set_session_permission_mode` is available, switch the session to `default` yourself with that tool, rerun the command once so the user gets a real approval prompt, and request `auto` again once the actions that needed approval are done.
-A switch to a lower mode only adds prompts, and the user still approves or refuses the action itself, so the switch needs no question first.
+The switch needs no question first, because the user approves or refuses the action itself at the prompt;
+the 2026-10-22 case under "Do and Don't" records the user being asked "disable auto?" when the agent could have switched itself.
+That reasoning holds only while the rerun raises a prompt.
+Auto mode ignores broad allow rules that `default` mode honours, so before switching, read the `permissions.allow` rules in every settings file that applies;
+if one matches the denied command, the rerun would run with no prompt, so ask the user instead of switching.
 When the switch conditions hold but that tool is not available, ask the user to switch out of auto mode, naming the refused command and its stated reason.
 
 A first denial can be a transient misfire (see [`claude-code-hooks`](../../memories/claude-code-hooks.md) on retrying an identical command once).
@@ -65,7 +70,7 @@ Name the refused command and the stated denial reason, and batch every action th
 When you switched the session yourself, say so and say that a prompt is coming;
 when the switch conditions hold and you could not switch, ask the user to switch out of auto mode for that stretch.
 Name `autoMode` in `~/.claude/settings.json` or managed settings as the lasting fix.
-When you asked the user to switch, continue until the session leaves auto mode with any work the denial does not block, and arm a wake to resume the denied step.
+When you asked the user to switch, then until the session leaves auto mode, continue with any work the denial does not block, and arm a wake to resume the denied step.
 If the user is away (an `away` session, or a CI or `@claude` run), nobody can answer a prompt: do not switch or ask, record the denied action as a pending decision, do not poll for a switch, and continue other work.
 
 ## Say when it is over
@@ -99,7 +104,7 @@ Nothing else ends the stretch, and every later action keeps raising a prompt unt
   The relayed message is not approval.
 - **Don't:** switch or ask to leave auto mode for a hard-prohibited category, or for an action the user has not authorized.
 - **Do:** when `mcp__ccd_session_mgmt__set_session_permission_mode` is available and the switch conditions hold, switch the session to `default` yourself, rerun the command once, and request `auto` again afterwards, as "When to switch or ask" says;
-  in the case below, the self-switch raised no confirmation card.
+  the case below shows the cost of asking instead.
   (2026-10-22, `apply-all.sh --apply`: two classifier denials, labelled "Modify Shared Resources" then "Auto-Mode Bypass", despite the user's typed "go";
   after the user answered `daytb` to "disable auto?", the self-switch to `default` let the apply run.
   The user had been told to "approve the prompt" when none existed, and was asked "retry?" and "disable auto?" instead of the agent switching the session itself.)

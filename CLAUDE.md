@@ -74,14 +74,6 @@ Detail, rationale, and cases: [`shared/workflow/manage-quota.md`](shared/workflo
 Keep a dated, append-only `session-YYYY-MM-DD[-slug].md` notebook in the project auto-memory directory, and append a timestamped entry at every state change worth resuming from, so an interruption with no clean exit loses nothing.
 Detail, rationale, and cases: [`shared/workflow/session-lab-notebook.md`](shared/workflow/session-lab-notebook.md).
 
-## Keep ai-config and repo checkouts fresh
-
-[`shared/workflow/keep-checkouts-fresh.md`](shared/workflow/keep-checkouts-fresh.md)
-
-Four freshness checks to run each session: the ai-config checkout itself (on `main`, pulled --ff-only, with a safe recovery path for a diverged/orphaned local `main`), the consumer install (Claude Code and Cursor load this repo as a native plugin that auto-updates, so confirm the plugin is enabled and not doubled --- any leftover `~/.claude` copies of `shared/`, `hooks/`, or `memories/` predate the symlink-install removal and want a content diff;
-sweep for a leftover `~/.claude/skills` too, in symlink form as well as copy, whose symptom is a doubled skill listing rather than drift --- a symlink into the checkout diffs clean --- and which must not be deleted on presence or on a name match, with `install-hooks.py` answering only the registration half), the working repo's own `main` checkout, and (where a consumer repo vendors ai-config as a git submodule) the `.ai-config` pin.
-The fragment above carries the mechanics, the failure modes each check catches, and the case records.
-
 ## State the actual time when reporting a scheduled check-in
 
 When reporting a scheduled wakeup or check-in, state the clock time it fires at in Pacific time ("I'll check back at 08:22 PT (~4 min)"), not only the delay.

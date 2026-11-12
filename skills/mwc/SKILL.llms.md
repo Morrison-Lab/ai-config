@@ -274,7 +274,7 @@ Three rules follow, and they hold whatever the block turned out to be:
 
 ## Five properties of the guard worth knowing before you trust it
 
-**The denial you hit may not be this guard.** `no-unauthorized-merge.py` is a `PreToolUse` hook, and a hook only runs if it is **registered** — which is a separate question from whether its file exists. Claude Code’s own auto-mode permission classifier blocks merge commands too, and the two are independent mechanisms. They differ in exactly the way that matters here: the hook reads a **marker file**, so re-asking cannot move it, while the classifier reads the **conversation**, so re-stating intent can. So a denial that clears on a retry was, by that fact, probably not this guard. Check registration rather than assuming, per `CLAUDE.md`’s “Keep ai-config and repo checkouts fresh”:
+**The denial you hit may not be this guard.** `no-unauthorized-merge.py` is a `PreToolUse` hook, and a hook only runs if it is **registered** — which is a separate question from whether its file exists. Claude Code’s own auto-mode permission classifier blocks merge commands too, and the two are independent mechanisms. They differ in exactly the way that matters here: the hook reads a **marker file**, so re-asking cannot move it, while the classifier reads the **conversation**, so re-stating intent can. So a denial that clears on a retry was, by that fact, probably not this guard. Check registration rather than assuming, per [`keep-checkouts-fresh`](../../shared/workflow/keep-checkouts-fresh.md):
 
 ``` bash
 python3 <ai-config-checkout>/scripts/install-hooks.py   # report only; --fix binds

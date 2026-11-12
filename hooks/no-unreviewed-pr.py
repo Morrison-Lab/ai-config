@@ -631,8 +631,8 @@ def _gh_api_post(argv):
             if c not in GH_API_SHORT_VALUE:
                 continue
             val = a[j + 1:]
-            # pflag reads `-X=POST` as the value POST.
-            if val.startswith("="):
+            # pflag reads `-X=POST` as the value POST, but a bare `-X=` as `=`.
+            if val.startswith("=") and len(val) > 1:
                 val = val[1:]
             if not val:
                 if i >= len(argv):

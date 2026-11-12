@@ -218,13 +218,14 @@ REQUEST_METHOD_CORPUS = [
     (REQ_PATH + " -- -f x", False),
     # A glued `--flag=value` consumes nothing after it.
     (REQ_PATH + " --method=POST" + REQ_FIELDS, True),
-    # Methods are case-insensitive.
+    # Only the exact method POST counts; a lower-case one is not read as POST.
     (REQ_PATH + " -X post" + REQ_FIELDS, False),
     (REQ_PATH + " --method=post" + REQ_FIELDS, False),
     # pflag takes `-X=POST` as the value POST, in a cluster too.
     (REQ_PATH + " -X=POST" + REQ_FIELDS, True),
     (REQ_PATH + " -iX=POST" + REQ_FIELDS, True),
     (REQ_PATH + " -X=GET" + REQ_FIELDS, False),
+    (REQ_PATH + " -X= POST -f x", False),
     # Each gh long value flag consumes the word after it.
     (REQ_PATH + " --header -f x", False),
     (REQ_PATH + " --template -f x", False),

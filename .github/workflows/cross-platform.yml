@@ -1,0 +1,73 @@
+name: cross-platform
+
+# validate.yml runs on ubuntu-latest only, so defects that need macOS path
+# aliasing (/var -> /private/var), a case-insensitive filesystem, or Windows
+# Git Bash never show in CI (ai-config#1843). This runs the same derived step
+# list on macOS and Windows through the local runner that already derives it
+# from validate.yml. It runs weekly and on demand, not on pull requests: steps
+# known to fail on macOS (ai-config#5494) and on Windows (ai-config#5503) would
+# leave every PR that triggered it red. A scheduled run that fails or hits the
+# job's time limit opens or updates a tracking issue.
+
+on:
+  schedule:
+    - cron: "17 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cross-platform-${{ github.ref }}
+
+jobs:
+  validate:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          submodules: true
+          fetch-depth: 0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: python3 -m pip install pyyaml==6.0.2 pytest==8.3.5
+      - name: Run the validate.yml steps
+        run: python3 scripts/run-local-validation.py --no-other-workflows --base origin/main
+
+  report:
+    needs: validate
+    # A job that reaches timeout-minutes ends "cancelled", not "failure", so
+    # failure() alone would leave a hung run unreported. !cancelled(), not
+    # always(), so a run someone cancels by hand files nothing.
+    if: >-
+      !cancelled() && github.event_name == 'schedule' &&
+      (needs.validate.result == 'failure' || needs.validate.result == 'cancelled')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open or update the tracking issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="cross-platform validation failed on the weekly run"
+          number=$(gh issue list --state open --search "in:title \"$title\"" --json number,title \
+            --jq "map(select(.title == \"$title\")) | .[0].number // empty")
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --body "Failed again: $RUN_URL"
+          else
+            gh issue create --title "$title" --label P2 \
+              --body "The weekly macOS and Windows run of the validate steps failed: $RUN_URL (#1843)."
+          fi

@@ -8,6 +8,9 @@ do them in minimal batches", and "every PR should be as small and focused as it 
 - A PR solves its stated task completely and nothing else.
 - A PR changes at most 10 files and 300 lines (added plus deleted).
   Generated, lock, `_freeze/`, image and data paths are not counted.
+  A committed generator output counts until the repo's `.gitattributes` marks it `linguist-generated`;
+  then neither the push hook nor gha's `check-pr-size` counts it, and GitHub folds it in review
+  ([ai-config#5288](https://github.com/Morrison-Lab/ai-config/issues/5288)).
   The lines of a newly added `_fig-*` subfile are not counted either, but the file still counts toward the 10
   ([ai-config#4928](https://github.com/Morrison-Lab/ai-config/issues/4928), Ezra "daytb", 2026-11-04):
   figure code in two languages made one decision into three PRs.

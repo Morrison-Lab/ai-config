@@ -3,7 +3,6 @@ As soon as a learning worth saving shows up during a session --- a corrected mis
 
 **Noticing or admitting a mistake triggers the pass at once, without waiting for the user to correct it.**
 The moment I notice, or say, that I got something wrong ("that one's on me"), the pass runs in that same turn, before sending the reply that admits it.
-It makes the "corrected mistake" trigger above concrete, rather than adding a separate one.
 (Ezra, 2026-11-12, Machine Learning course project: the coordinator admitted that it had missed threads while moving every thread to another model, and ran no pass;
 Ezra: "you should have run UMS as soon as you realized this".)
 

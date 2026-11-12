@@ -437,8 +437,8 @@ def _takes_next_word(wrapper, tok, following):
 
 def _program(argv):
     """`(argv from the program on, override present)`, peeling wrappers,
-    with the program chown, chmod or chgrp; an empty argv for any other
-    program."""
+    with the program chown, chmod or chgrp; for any other program, the
+    pair `([], override present)`."""
     start, override = _peeled(argv)
     if start is None or os.path.basename(argv[start]) not in PROGRAMS:
         return [], override

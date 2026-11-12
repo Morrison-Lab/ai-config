@@ -45,7 +45,7 @@ NEG = (rf"(?:isn{APOS}t|is\s+not|aren{APOS}t|are\s+not|wasn{APOS}t|was\s+not|"
        rf"can{APOS}t|cannot|can\s+not|couldn{APOS}t|no\s+longer|not)")
 PRESENCE = (r"(?:in|part\s+of|attached|among|one\s+of|within|available|include|"
             r"includes|have|has|access|reach|checked\s+out|cloned|added|push|edit|"
-            r"write|commit|on)")
+            r"write|commit|see|on)")
 NEG_PRESENCE = re.compile(
     rf"\b{NEG}\s+(?:\w+\s+){{0,3}}?{PRESENCE}\b|\boutside\b"
     rf"|\b(?:has|have)\s+no\b|\bthere(?:{APOS}s|\s+is|\s+are)\s+no\b",
@@ -57,7 +57,7 @@ LOC = re.compile(
     re.I)
 REPO_LIST = re.compile(
     rf"\b{PLACE}{APOS}s\s+(?:github\s+)?(?:repos|repositories|repo\s+scope|scope)\b"
-    r"(?![\w'’])(?!\s+(?:checkout|clone|directory|tree|root|branch|files?|of)\b)"
+    r"(?![\w'’])(?!\s+(?:checkout|clone|directory|folder|tree|root|branch|files?|of)\b)"
     r"|\bmy\s+(?:repos|repositories)\b(?!['’])"
     r"|\bthe\s+(?:repos|repositories)\s+(?:attached|available|in|on|for)\b",
     re.I)
@@ -75,7 +75,7 @@ OBJECT = re.compile(
     # form ("we have no gha changes") is not an excuse, so a checkout or
     # access word must come with it.
     rf"|(?:\b(?:has|have)\s+no|\bthere(?:{APOS}s|\s+is|\s+are)\s+no)\s+"
-    r"(?:access\s+to\s+(?:the\s+)?(\S+)|(?:the\s+)?(\S+)\s+(?:checkout|clone|copy|access)\b)",
+    r"(?:access\s+to\s+(?:the\s+)?(\S+)|(?:the\s+)?(\S+)\s+(?:checkout|clone|copy|access|repo|repository)\b)",
     re.I)
 ATTACHED = re.compile(
     rf"\b(?:I|we)\s+(?:have\s+|{APOS}ve\s+|just\s+|then\s+)?(?:added|attached|cloned)\b", re.I)
@@ -106,7 +106,7 @@ def message_text(tool_input: dict) -> str:
 def names_repo(sentence: str, neg: re.Match) -> bool:
     if REPO_LIST.search(sentence):
         return True
-    if REPO_NAME.search(sentence[:neg.start()]):
+    if REPO_NAME.search(sentence[max(0, neg.start() - 200):neg.start()]):
         return True
     obj = OBJECT.search(sentence)
     if not obj:
@@ -126,7 +126,7 @@ def is_excuse(sentence: str) -> bool:
 def excuse(text: str):
     """The first sentence that calls a repo out of this thread's reach, or None."""
     for sentence in re.split(r"(?<=[.!?])\s+|\n+", text):
-        if is_excuse(sentence):
+        if is_excuse(sentence[:2000]):
             return " ".join(sentence.split())
     return None
 

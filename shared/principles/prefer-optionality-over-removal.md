@@ -2,9 +2,9 @@
 
 Never remove existing functionality entirely when you can add optionality instead.
 When changing default behavior, addressing an edge-case bug, or refactoring a workflow,
-do not delete an existing working capability or guard outright if it served a legitimate purpose.
+do not delete an existing working capability, code path or guard outright if it served a legitimate purpose.
 Instead, make the improved behavior the default
-and preserve the previous or alternative behavior behind an explicit, documented opt-in parameter,
+and preserve the previous (legacy) or alternative behavior behind an explicit, documented opt-in parameter,
 environment variable, or configuration toggle.
 
 ## Why

@@ -28,7 +28,12 @@ up to MAX_DEPTH nested shells; one fed through `xargs` or `eval` is not.
 A merge, rebase, cherry-pick, revert or pull run with `--abort` or
 `--quit` before any `--` resolves nothing and stays silent.
 Short options are read in clusters (`-qs ours`, `-fXours`),
-and a value such as the message of `-m` is never read as an option.
+and the value of an option in SHORT_VALUE_REQUIRED, SHORT_VALUE_OPTIONAL or
+LONG_WITH_VALUE (the message of `-m`, say) is never read as an option.
+A value of any other option (`--onto -X ours`) is, which can only add a
+warning on a command git would reject.
+Not covered: `git checkout-index --stage=2|3`, `git show :2:path > path`,
+and git aliases (`git co --ours`).
 
 Warns, never blocks: one side can be right, for example a generated file the
 repo's tooling regenerates afterwards. Quoted text, such as an `echo` of the

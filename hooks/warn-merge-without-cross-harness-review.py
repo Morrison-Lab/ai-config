@@ -143,7 +143,7 @@ CURL_VALUE_OPTS = frozenset({
     "--max-time", "--netrc-file", "--noproxy", "--oauth2-bearer",
     "--output", "--output-dir", "--parallel-max", "--pass",
     "--pinnedpubkey", "--preproxy", "--proto", "--proto-default",
-    "--proto-redir", "--proxy", "--proxy-cacert", "--proxy-capath",
+    "--proto-redir", "--proxy", "--proxy1.0", "--proxy-cacert", "--proxy-capath",
     "--proxy-cert", "--proxy-cert-type", "--proxy-ciphers",
     "--proxy-crlfile", "--proxy-header", "--proxy-key", "--proxy-key-type",
     "--proxy-pass", "--proxy-pinnedpubkey", "--proxy-service-name",
@@ -258,11 +258,18 @@ def _peel_wrappers(rest):
 def _takes_value(word):
     """True when curl reads the word after *word* as an option's value.
 
-    A bundle of short options (`-sw`) takes a value when its last letter does.
+    A cluster of short options (`-sw`, `-4o`) is read as curl reads it:
+    the first letter that takes a value takes the rest of the word when any
+    is left (`-XPOST`, `-oout`), and the next word only when it is last.
     """
     if word in CURL_VALUE_OPTS:
         return True
-    return bool(re.fullmatch(r"-[A-Za-z]{2,}", word)) and "-" + word[-1] in CURL_VALUE_OPTS
+    if not word.startswith("-") or word.startswith("--"):
+        return False
+    for pos, letter in enumerate(word[1:], start=2):
+        if "-" + letter in CURL_VALUE_OPTS:
+            return pos == len(word)
+    return False
 
 
 def _curl_route(rest):

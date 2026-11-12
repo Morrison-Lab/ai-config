@@ -439,6 +439,23 @@ def main():
     check("silent when --url names the Ollama chat API",
           not run(MERGE, [step("curl -sS -d @req.json"
                                " --url https://api.ollama.com/api/chat")])[0])
+    for opt in ("-4w", "-#o", "--proxy1.0"):
+        check("warns when the Ollama URL is the value of " + opt,
+              run(MERGE, [step("curl -d @x %s https://api.ollama.com/api/chat"
+                               " https://example.com" % opt)])[0])
+    # A value attached to its letter is self-contained, so the next word is the URL.
+    for opt in ("-XPOST", "-sXPOST", "-oout", "-uuser", "-fsSLoout", "-4", "-L1"):
+        check("silent after %s before the Ollama URL" % opt,
+              not run(MERGE, [step("curl -d @x %s"
+                                   " https://api.ollama.com/api/chat" % opt)])[0])
+    check("silent after -XPOST before the opencode.ai URL",
+          not run(MERGE, [step("curl -d @x -XPOST"
+                               " https://opencode.ai/zen/go/v1/chat/completions")])[0])
+    check("warns when the Ollama URL is only a --write-out= value",
+          run(MERGE, [step("curl -d @x --write-out=https://api.ollama.com/api/chat"
+                           " https://example.com")])[0])
+    check("silent when the Ollama URL follows --",
+          not run(MERGE, [step("curl -d @x -- https://api.ollama.com/api/chat")])[0])
     check("silent when a bundled flag takes no value before the URL",
           not run(MERGE, [step("curl -sS -d @req.json -sS"
                                " https://api.ollama.com/api/chat")])[0])

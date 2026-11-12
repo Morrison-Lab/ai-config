@@ -283,7 +283,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/require-ums-before-resolve.py\"",
             "timeout": 10,
             "script": "require-ums-before-resolve.py",
-            "why": "AGENTS.md 'Run UMS before every pause': a merged-PR event reminds the thread to run its wrap-up (post-merge, including UMS) before resolving. Injects, never blocks."
+            "why": "AGENTS.md 'Leave every pause honest and resumable' (Run UMS before every pause): a merged-PR event reminds the thread to run its wrap-up (post-merge, including UMS) before resolving. Injects, never blocks."
           },
           {
             "type": "command",
@@ -312,6 +312,13 @@
             "timeout": 10,
             "script": "warn-local-render-when-ci-built.py",
             "why": "ai-config#4724. Ezra, 2026-10-25: \"isn't it already rendered in mlg ... remember that going forward\". Warns (never blocks) when a Bash command runs quarto render in a repo with a gh-pages ref, because CI has probably built the output already; download the PDF or HTML from gh-pages or the published site instead. Canvas uploads always use the CI-built PDF. Fails open on any parse or git trouble."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-one-sided-conflict-resolution.py\"",
+            "timeout": 10,
+            "script": "warn-one-sided-conflict-resolution.py",
+            "why": "ai-config#5407, split from #4716. Ezra, 2026-10-23: agents should resolve merge conflicts carefully, deciding for each hunk what to keep from each side, what to drop, and what to modify. Warns (never blocks) on git checkout/restore --ours|--theirs, which take the whole file from one side; on merge-file --ours|--theirs and -X ours|theirs on merge, rebase, cherry-pick, revert or pull, which keep one side of every conflicting hunk; and on -s ours, which drops the other branch entirely. Checks inside bash -c; quoted text and --abort/--quit runs do not fire. Fails open on a parse error."
           },
           {
             "type": "command",
@@ -1899,6 +1906,18 @@
         ]
       },
       {
+        "matcher": "Bash|Monitor|PowerShell|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unapproved-announcement.py\"",
+            "timeout": 10,
+            "script": "no-unapproved-announcement.py",
+            "why": "ai-config#4780. Ezra, 2026-10-27, said twice: never post a class announcement without his review and approval of its exact text. Denies a Canvas announcement create or edit (the CLI, `is_announcement`, a network command naming a discussion topic or announcement other than a single `curl` command with no write option such as `-X POST`, `--request PUT`, `-d`, `-F` or `-T`, or an MCP announcement write; a single plain `git`, `gh`, `grep`, `egrep` or `rg` command is never checked) unless the user's last message is only an approval such as `post the announcement`; a relay note or another agent's message does not count. Fails closed when the transcript cannot be read."
+          }
+        ]
+      },
+      {
         "matcher": "mcp__github__update_pull_request_branch",
         "hooks": [
           {
@@ -2027,6 +2046,18 @@
             "timeout": 10,
             "script": "no-send-email.py",
             "why": "Denies sending email: a mail-sender command (sendmail, mail, mutt, msmtp, git send-email, smtp URLs) in Bash, or an MCP tool whose action is send/reply/forward on a mail account. Drafting stays allowed. User directive 2026-11-04: \"never send emails for me\". No override."
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|PowerShell|Monitor|Read|Write|Edit|MultiEdit|NotebookEdit|Grep|Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/run-cc-safety-net.py\"",
+            "timeout": 160,
+            "script": "run-cc-safety-net.py",
+            "why": "ai-config#5474 (part of #5317). Ezra, 2026-11-12, chose \"Adopt CC Safety Net, pinned\": the MIT-licensed CC Safety Net is the base guard for every agent, with ai-config hooks only for the gaps it leaves. Runs the release hooks/cc-safety-net.pin.json names (fetched once with npm pack --ignore-scripts, sha512-checked against the pin, cached under ~/.cache/ai-config) and passes its deny through unchanged. Fails open with a once-per-session notice when Node.js 22 or npm is missing or the download fails, since failing closed would stop every tool call on a machine without Node.js; a tarball that does not match the pin is never run. The timeout covers the first call's fetch."
           }
         ]
       }
@@ -2326,7 +2357,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-announced-start-without-starting.py\"",
             "timeout": 10,
             "script": "no-announced-start-without-starting.py",
-            "why": "CLAUDE.md 'no empty promises' and the dont-stop-keep-working directive -- blocks a reply that ends by announcing work in the present progressive or immediate future without having begun it. Distinct from no-empty-promise.py, which asks whether a mechanism shipped; a turn that filed an issue and then closed on 'I'll start on it' satisfies that and still never starts. ai-config#5050 -- also reads the text of mcp__hearthbot__post_message, reply and update_message calls (the reply channel in Projects threads, invisible to a text-block reader) and matches 'Next I'm/I'll <verb>' and 'I'm now <verb>ing'; a later non-hearthbot tool call clears the announcement, and a named blocker or wait exempts it."
+            "why": "AGENTS.md 'No empty promises' and the dont-stop-keep-working directive -- blocks a reply that ends by announcing work in the present progressive or immediate future without having begun it. Distinct from no-empty-promise.py, which asks whether a mechanism shipped; a turn that filed an issue and then closed on 'I'll start on it' satisfies that and still never starts. ai-config#5050 -- also reads the text of mcp__hearthbot__post_message, reply and update_message calls (the reply channel in Projects threads, invisible to a text-block reader) and matches 'Next I'm/I'll <verb>' and 'I'm now <verb>ing'; a later non-hearthbot tool call clears the announcement, and a named blocker or wait exempts it."
           },
           {
             "type": "command",

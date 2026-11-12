@@ -281,7 +281,7 @@ See [`run-ums-proactively.cases.md`](run-ums-proactively.cases.md), "Stale recor
 
 Resolving a project thread removes its message box, so a learning not banked before the call has no later turn in which to be banked.
 The same holds when a thread reports its work done.
-"Run UMS before every pause" already covers this, but nothing ran it: the `post-merge` and `wrap-up` skills include a UMS pass, and no event invoked them.
+`AGENTS.md`'s "Leave every pause honest and resumable" ("Run UMS before every pause") already covers this, but nothing ran it: the `post-merge` and `wrap-up` skills include a UMS pass, and no event invoked them.
 
 Two mechanisms now do, both in `hooks/require-ums-before-resolve.py` (ai-config#4480):
 
@@ -321,7 +321,7 @@ Each is recorded in its global home, and also in project memory where the sessio
    a revert made through the GitHub UI or by moving files by hand stays a rule.
 6. **The context is compacted, or the session ends.**
    After compaction the hook reminds the session to run the pass over what the summary still shows.
-   A session that ends has no later turn, so the pass belongs before the last reply, per "Run UMS before every pause".
+   A session that ends has no later turn, so the pass belongs before the last reply, per `AGENTS.md`'s "Leave every pause honest and resumable" ("Run UMS before every pause").
 
 - **Do:** treat each of these as the moment to run `ums`, in the turn it happens.
 - **Don't:** wait for a review or a merge to bank a learning that already has a name.

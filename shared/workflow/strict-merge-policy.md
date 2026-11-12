@@ -23,6 +23,14 @@ Merging a Pull Request or Merge Request is strictly controlled across all agents
 - **Revert premature or defective merges immediately.**
   If a PR is merged incorrectly, prematurely, or without clean external review approval,
   open a revert PR on `main` immediately and continue on the original PR branch per [`revert-premature-merge.md`](revert-premature-merge.md).
+- **Another session's PR needs a second condition: clean on its current head for more than twenty minutes, then warned.**
+  A peer may have further commits planned, so merging one that just went clean can destroy work it was about to push.
+  Start the clock at the clean verdict on the current head, which a push resets, not at the PR's `updatedAt`, which any comment bumps.
+  Message the owning session when `ListAgents` reaches it;
+  otherwise comment that you intend to merge and wait five more minutes for a hold-off.
+  It applies only to a peer PR that passes `memories/reviewing-prs.md`'s scope test (a peer session under your own login satisfies the author arm);
+  another lab member's PR that fails the test gets neither the comment nor the merge.
+  Derivation and cases: [`mwc`](../../skills/mwc/SKILL.md)'s "Another session's PR" section ([ai-config#2460](https://github.com/Morrison-Lab/ai-config/issues/2460)).
 - **When you revert a merge, reopen its issue.**
   GitHub does not automatically reopen the issue a reverted PR closed;
   explicitly and immediately reopen the corresponding issue(s) (`gh issue reopen <issue-number>`) per [`revert-merge.md`](revert-merge.md).
@@ -48,8 +56,10 @@ Figure, data and content generators stay out, and so do build steps that shape t
 Every other rule in this section still binds, including the clean automated review on the current head,
 so a quota-skipped review still holds the merge.
 The test is effect rather than file type: infrastructure is whatever does not directly change the repo's consumer's experience.
-Every PR in `Morrison-Lab/gha` or `Morrison-Lab/ai-config` counts as infrastructure, as both are infrastructure repos.
-Where `hooks/no-unauthorized-merge.py` is active, clear it with `ALLOW_MERGE=1` on that one merge command, and state in the reply why the PR qualified.
+Every PR in `Morrison-Lab/gha`, `Morrison-Lab/ai-config` or the macros repo (`d-morrison/macros` or `Morrison-Lab/macros`) counts as infrastructure, as all three are infrastructure repos.
+Their grant needs no per-session re-issue, no `enable-mwc` step and no `ALLOW_MERGE=1`: `hooks/no-unauthorized-merge.py` reads the merge's **target** repo off the command and allows these three by target.
+Because it is scoped to the target, a merge run from an ai-config checkout into another repo is unaffected.
+In any other repo, where `hooks/no-unauthorized-merge.py` is active, clear it with `ALLOW_MERGE=1` on that one merge command, and state in the reply why the PR qualified.
 Do not enable session-wide `/mwc` for it.
 
 - **Classify before asking.**

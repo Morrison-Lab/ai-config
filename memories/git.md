@@ -534,7 +534,8 @@ on the slash, not the colon. Fix: prefix just that one command with
 whether `Lacaedemon/sparta`'s vendored `.ai-config` submodule pin was actually
 stale on `origin/main`, vs. only stale on the current feature-branch worktree
 — see the `CLAUDE.md` "Keep ai-config and repo checkouts fresh" step 4 update
-this same session added, a step now in [`keep-checkouts-fresh`](../shared/workflow/keep-checkouts-fresh.md). `Lacaedemon/sparta`, 2026-07-04.)
+this same session added, a step now in [`keep-checkouts-fresh`](../shared/workflow/keep-checkouts-fresh.md).
+`Lacaedemon/sparta`, 2026-07-04.)
 
 ## `git checkout <name>` prefers an existing local branch over a same-named file, and does not refuse
 

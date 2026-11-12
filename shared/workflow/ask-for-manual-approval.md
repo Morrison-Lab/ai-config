@@ -64,6 +64,7 @@ A managed-settings `permissions.deny` denial applies in every mode, so report it
 
 For an action outside the hard-prohibited categories that the user has not authorized, do not switch or ask to switch modes.
 Ask the user whether to do it at all, and proceed only on a yes.
+A yes authorizes the action, so a denial after it follows the steps above.
 When no one can answer, record it as a pending decision instead (an `away` session, or a CI or `@claude` run), or report it up the dispatch chain (a dispatched subagent).
 
 ## What to say

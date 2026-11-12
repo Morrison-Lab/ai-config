@@ -3,7 +3,7 @@
 
 Ezra, 2026-10-27, said twice: never post a class announcement without his review and approval of its exact text
 (ai-config#4780). Denies the CLI, `is_announcement`, a network write naming a topic and an MCP announcement write
-unless the user's last message is only "post the announcement" ("yes, post it", ...); one write each. Gaps: #5453.
+unless the user's last message is only "post the announcement" ("yes, post it", ...); one write each. Known limits: #5453.
 """
 import io
 import json
@@ -49,6 +49,7 @@ SELF = (os.path.basename(__file__), "test-no-unapproved-announcement.py")  # thi
 COPY = ((r"^def is_announcement_write\(", r"^def main\("),  # lines every version of the hook, or of its tests, has
         (r"^SUBJECT\b[^=\n]*= sys\.argv\[1\]", r"^def run\(tool, inp"))
 HEREDOC = re.compile(r"(<<-?\s*(['\"]?)(\w+)\2[^\n]*)\n.*?\n[ \t]*\3[ \t]*(?=\n|$)", re.S)  # its body is text
+PY_OPT = re.compile(r"-[bBdEhiIOPqsSuvVx]*([cm])(.*)$")  # python's flags, then -c or -m and any attached value
 UV_VALUE = ("--with", "--python", "-p", "--from", "--env-file", "--config")  # uv or deno options that take a value
 
 
@@ -73,7 +74,7 @@ def segments(cmd):
 def inline_code(interp, x):
     """An option after which the interpreter runs code given inline, or a module, rather than a script file."""
     if interp.startswith("python"):
-        return re.match(r"-[a-zA-Z]{0,3}c$|-m", x)
+        return PY_OPT.match(x)
     return re.match(r"-[a-zA-Z]{0,3}[ceE]$|-p$|--(eval|print)\b|-Command$", x)  # perl -ne, Rscript -e
 
 
@@ -105,19 +106,17 @@ def script_names(cmd):
                     break
 
 
-def modules_run(cmd):
-    """Modules `python -m X` (or `-mX`) runs, read word by word so options and their values are skipped."""
+def python_value(cmd, opt):
+    """What `python` gets for `-c` or `-m` (opt "c" or "m"): after other options, in a cluster (-um), or attached (-mX)."""
     for words in segments(cmd):
         for i, w in enumerate(words):
             if not re.match(r"python[\d.]*$", w.rsplit("/", 1)[-1]):
                 continue
             for j, x in enumerate(words[i + 1:], i + 1):
-                if x == "-m" and j + 1 < len(words):
-                    yield words[j + 1]
-                if x == "-m" or x == "-c" or EXT.match(x):
-                    break
-                if x.startswith("-m") and len(x) > 2:
-                    yield x[2:]
+                hit = PY_OPT.match(x)
+                if hit and hit[1] == opt and (hit[2] or j + 1 < len(words)):
+                    yield hit[2] or words[j + 1]
+                if hit or EXT.match(x):
                     break
 
 
@@ -145,12 +144,11 @@ def script_writes(cmd, cwd):
     """A script file the command runs makes a network topic write, or cannot be read (#5453)."""
     cds = [os.path.expanduser(d) for d in re.findall(r"\b(?:cd|pushd)\s+['\"]?([\w./~-]+)", cmd)]
     dirs = [cwd or "."] + [os.path.join(cwd or ".", d) for d in cds]
-    code_args = " ".join(w[i + 2] for w in segments(cmd) for i in range(len(w) - 2)  # `python -c CODE`'s CODE
-                         if re.match(r"python[\d.]*$", w[i].rsplit("/", 1)[-1]) and w[i + 1] == "-c")
+    code_args = " ".join(python_value(cmd, "c"))
     names = [n.split() for found in re.findall(r"\bimport\s+([\w., ]+)", code_args) for n in found.split(",")]
     modules = [n[0] for n in names if n] + re.findall(r"\bfrom\s+([\w.]+)", code_args)  # `import a, b as c`
     modules += [f"{a}.{b}" for a, b in re.findall(r"\bfrom\s+([\w.]+)\s+import\s+(\w+)", code_args)]
-    modules += list(modules_run(cmd))
+    modules += list(python_value(cmd, "m"))
     imported = {m.replace(".", "/") + ".py" for m in modules}  # a local module `-c` code loads or `-m` runs
     for name in [*script_names(cmd), *sorted(imported)]:
         paths = [p for p in (os.path.join(d, os.path.expanduser(name)) for d in dirs) if os.path.isfile(p)]

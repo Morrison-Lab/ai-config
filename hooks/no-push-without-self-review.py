@@ -80,9 +80,10 @@ after the verdict counts, and a push is covered when what it ships matches
 ANY of them, not only the first (ai-config#3945). Each is still resolved and
 compared exactly as a single fingerprint always was; widening the count
 widens nothing about how strict one comparison is. With two or more verdicts,
-the per-commit map in `_verdict_map_covers` (ai-config#4006) decides first:
-there, a clean report with a fingerprint that does not resolve binds
-nothing, so an earlier clean verdict for the commit can still cover it.
+the per-commit map in `_verdict_map_covers` (ai-config#4006) decides first,
+except after a trailing unparsed report or for a subagent's parent fallback
+(ai-config#5498): there, a clean report with a fingerprint that does not
+resolve binds nothing, so an earlier clean verdict can still cover the commit.
 
 CONSEQUENCES FOR HOW THE REVIEWER IS DISPATCHED
 ------------------------------------------------
@@ -2927,7 +2928,7 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
     does not block its reviewed ancestor, although its diff included the
     ancestor's code: #4006 keys verdicts by exact commit and accepts that.
     A blocking verdict with ANY fingerprint that does not resolve here, or
-    with none, vetoes every verdict before it, since a foreign fingerprint
+    with none, vetoes every clean verdict before it, since a foreign fingerprint
     cannot be told from a fabricated one; so does a clean report with no
     fingerprint. A clean report with a fingerprint that does not resolve here
     binds nothing and is skipped, which is what lets a review of another

@@ -2414,10 +2414,8 @@ def verdict_map_cases() -> tuple[int, int]:
 
     clean, nmw = "Ready for merge", "Needs more work"
     both = verdicts((clean, HEAD), (clean, FEATURE))
-    check("branch A's clean verdict survives a later review of branch B",
-          PUSH, both, False)
-    check("branch B's own clean verdict still authorizes B",
-          push_feature, both, False)
+    check("branch A's clean verdict survives a later review of branch B", PUSH, both, False)
+    check("branch B's own clean verdict still authorizes B", push_feature, both, False)
     check("a later blocking verdict on a child does not veto its reviewed parent",
           PUSH, verdicts((clean, HEAD), (nmw, FEATURE)), False)
     check("a later blocking verdict for the same commit vetoes it",
@@ -2429,6 +2427,8 @@ def verdict_map_cases() -> tuple[int, int]:
     mixed = reviewed(body(commit=HEAD) + f"\nReviewed-Commit: {'d' * 40}")
     check("a clean report mixing a real and an invented fingerprint binds nothing",
           PUSH, verdicts((clean, FEATURE)) + mixed, True)
+    check("a voided clean report leaves an earlier clean verdict standing",
+          PUSH, verdicts((clean, HEAD)) + mixed, False)
     check("a later blocking verdict naming no commit here vetoes",
           PUSH, verdicts((clean, HEAD), (nmw, OTHER_HEAD)), True)
     nmw_bare = reviewed(body(verdict=nmw, fingerprint=False))

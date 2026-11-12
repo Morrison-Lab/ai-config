@@ -95,25 +95,19 @@ def fetch(count: int, created: str = "", api=gh_api,
     return out
 
 
-def count_arg(text: str) -> int:
-    value = int(text)
-    if not 1 <= value <= 100:  # the runs endpoint returns at most 100 per page
-        raise argparse.ArgumentTypeError("must be between 1 and 100")
-    return value
+def bounded(cast, ok, why: str):
+    """An argparse type that casts its text and rejects a value `ok` refuses."""
+    def parse(text: str):
+        value = cast(text)
+        if not ok(value):
+            raise argparse.ArgumentTypeError(why)
+        return value
+    return parse
 
 
-def lag_arg(text: str) -> int:
-    value = int(text)
-    if value < 1:  # a lag of 0 compares main with itself
-        raise argparse.ArgumentTypeError("must be at least 1")
-    return value
-
-
-def ratio_arg(text: str) -> float:
-    value = float(text)
-    if not value > 1:  # a limit of 1 or less flags ordinary noise
-        raise argparse.ArgumentTypeError("must be greater than 1")
-    return value
+count_arg = bounded(int, lambda v: 1 <= v <= 100, "must be 1 to 100, the runs endpoint's page limit")
+lag_arg = bounded(int, lambda v: v >= 1, "must be at least 1; a lag of 0 compares main with itself")
+ratio_arg = bounded(float, lambda v: v > 1, "must be greater than 1; a lower limit flags ordinary noise")
 
 
 def run(argv: list[str] | None = None, api=gh_api, now: datetime | None = None) -> int:

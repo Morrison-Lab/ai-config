@@ -116,20 +116,13 @@ def failing_api(path: str) -> dict:
 
 
 check("an API failure exits 3", mod.run([], api=failing_api) == 3)
-for bad in ("0", "101"):
+for name, bad in (("count_arg", "0"), ("count_arg", "101"), ("lag_arg", "0"), ("ratio_arg", "1"), ("ratio_arg", "0.9")):
     try:
-        mod.count_arg(bad)
+        getattr(mod, name)(bad)
         rejected = False
     except mod.argparse.ArgumentTypeError:
         rejected = True
-    check(f"count {bad} is rejected", rejected)
-for parse, bad in ((mod.lag_arg, "0"), (mod.ratio_arg, "1"), (mod.ratio_arg, "0.9")):
-    try:
-        parse(bad)
-        rejected = False
-    except mod.argparse.ArgumentTypeError:
-        rejected = True
-    check(f"{parse.__name__} rejects {bad}", rejected)
+    check(f"{name} rejects {bad}", rejected)
 
 
 def timed_api(recent_seconds: int):

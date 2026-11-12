@@ -190,6 +190,11 @@ rm -f "$PAYLOAD_FILE"
 - **Don’t:** send non-streaming requests for anything longer than a short prompt; the roughly 30-second gateway cutoff returns 502 or upstream request failure.
 - **Don’t:** rely on `glm-5.3` for large prompts; it can stream megabytes of empty deltas or fail upstream.
 
+Measured in a claude.ai cloud session on 2026-11-12, while merging [ai-config#5482](https://github.com/Morrison-Lab/ai-config/pull/5482): - `hooks/warn-merge-without-cross-harness-review.py` did not recognise an OpenCode Go review whose `curl` ran inside a Python wrapper script. The merge went through only after `curl -sS -N --max-time 1500 https://opencode.ai/zen/go/v1/chat/completions ... --data-binary @req.json -o out.sse` ran directly in a Bash call. - The same hook counts only a cross-harness review run in the merging session’s own transcript, so a Gemini Flash read that another session posted on the PR did not satisfy it. - The merge gate that requires a `check-pr-fully-clean.py` pass did not accept a run whose output was filtered through `grep`, and accepted it once the output was unpiped. - With every Go model at its weekly `GoUsageLimitError`, `iceman-contributor-free` returned a bare `VERDICT: CLEAN`, `beam-free` returned no text, and `longcat-2.5-free` spent all 30,000 `max_tokens` on reasoning with no text. Treat the bare verdict as weak evidence and the empty answers as no verdict.
+
+- **Do:** run the OpenCode `curl` directly in Bash, and run `check-pr-fully-clean.py` unpiped, before a merge.
+- **Don’t:** wrap the `curl` in a script, or count another session’s posted read, as the merge hook’s cross-harness review.
+
 Reuse one UUID across the turns of a conversation. Prefer Go models for bulk and mechanical work while Claude quota is low. The data rules above still apply: no student data (FERPA records) and no PHI to any hosted model. Review work must also meet the model-and-harness independence rule in [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md). When posting an OpenCode review result to a PR comment under a user login (e.g. from local or Remote Control sessions), wrap the output in a standardized envelope:
 
 ``` markdown

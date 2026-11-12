@@ -2450,15 +2450,18 @@ def verdict_map_cases() -> tuple[int, int]:
                                                    + half) + verdicts((clean, FEATURE)), True)
     check("an unparsed report naming another repository's commit vetoes",
           PUSH, verdicts((clean, HEAD), ("Looks bad", OTHER_HEAD), (clean, FEATURE)), True)
-    for label, pairs, text in (
-            ("the refusal names the blocking verdict", ((clean, HEAD), (nmw, HEAD), (clean, FEATURE)),
-             f"latest verdict naming {HEAD[:12]} is not clean"),
-            ("the refusal names the veto", ((clean, HEAD), (nmw, OTHER_HEAD), (clean, FEATURE)),
-             "vetoes every verdict before it")):
-        out = run_hook(PUSH, verdicts(*pairs))[1]
-        ok = text in (out.get("hookSpecificOutput") or {}).get("permissionDecisionReason", "")
-        ran, failures = ran + 1, failures + (not ok)
-        print(f"{'PASS' if ok else 'FAIL'}: {label}")
+    check("a later blocking verdict on the base vetoes a stacked branch",
+          push_feature, verdicts((clean, FEATURE), (nmw, HEAD)), True)
+    check("a later blocking verdict on a parent vetoes its child",
+          PUSH, verdicts((clean, HEAD), (nmw, PREV)), True)
+    check("a clean verdict on the fix clears an earlier blocking parent",
+          push_feature, verdicts((nmw, HEAD), (clean, FEATURE), (clean, OTHER_HEAD)), False)
+    check("a later clean report with no fingerprint vetoes",
+          PUSH, verdicts((clean, HEAD)) + reviewed(body(fingerprint=False)), True)
+    out = run_hook(PUSH, verdicts((clean, FEATURE), (nmw, OTHER_HEAD), (clean, FEATURE)))[1]
+    ok = "but this push" in (out.get("hookSpecificOutput") or {}).get("permissionDecisionReason", "")
+    ran, failures = ran + 1, failures + (not ok)
+    print(f"{'PASS' if ok else 'FAIL'}: an unreviewed commit keeps the existing message")
     check("a later unparsed report still fails closed",
           PUSH, verdicts((clean, HEAD), (clean, FEATURE), ("Looks fine", FEATURE)),
           True)

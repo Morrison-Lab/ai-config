@@ -24,6 +24,7 @@ import importlib.util
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -176,6 +177,92 @@ PUSH_CORPUS = [
     ("git push --dry origin x", False),
     ("git push --del origin x", False),
     ("gh pr comment 1 --body 'git push'", False),
+]
+
+# `_argv_request`'s method test (ai-config#1397): `gh api` sends POST when a
+# field is given and no method is set, so a bare `-f` request discharges. Any
+# explicit method other than POST does not: a GET checks who is requested,
+# and a DELETE removes a reviewer. curl keeps the explicit-POST rule.
+REQ_FIELDS = " -f 'reviewers[]=copilot-pull-request-reviewer[bot]'"
+REQ_PATH = "gh api repos/o/r/pulls/1038/requested_reviewers"
+REQUEST_METHOD_CORPUS = [
+    (REQ_PATH + REQ_FIELDS, True),
+    (REQ_PATH + " -F 'reviewers[]=x'", True),
+    (REQ_PATH + " --raw-field 'reviewers[]=x'", True),
+    (REQ_PATH + " --field=reviewers[]=x", True),
+    (REQ_PATH + " -X POST" + REQ_FIELDS, True),
+    (REQ_PATH + " -XPOST" + REQ_FIELDS, True),
+    (REQ_PATH + " --method GET" + REQ_FIELDS, False),
+    (REQ_PATH + " -X GET" + REQ_FIELDS, False),
+    (REQ_PATH + " --method=GET" + REQ_FIELDS, False),
+    (REQ_PATH + " -XGET" + REQ_FIELDS, False),
+    (REQ_PATH + " -X DELETE" + REQ_FIELDS, False),
+    (REQ_PATH + " --method DELETE" + REQ_FIELDS, False),
+    # Short-flag clusters (`-i` is --include) carry the method too.
+    (REQ_PATH + " -iX GET" + REQ_FIELDS, False),
+    (REQ_PATH + " -iXDELETE" + REQ_FIELDS, False),
+    (REQ_PATH + " -i" + REQ_FIELDS, True),
+    (REQ_PATH, False),
+    # A flag's value is not a flag: here `-f` is the jq filter of `-q`, so
+    # no field is sent and gh issues a GET.
+    (REQ_PATH + " -q -f x", False),
+    (REQ_PATH + " --jq -f x", False),
+    # gh takes the last method flag.
+    (REQ_PATH + " -X POST -X GET" + REQ_FIELDS, False),
+    (REQ_PATH + " --method POST --method GET" + REQ_FIELDS, False),
+    (REQ_PATH + " -X GET --method POST" + REQ_FIELDS, True),
+    # A glued field value still sends a field.
+    (REQ_PATH + " -freviewers[]=x", True),
+    (REQ_PATH + " -if reviewers[]=x", True),
+    # After `--` every token is positional, so this `-f` sends no field.
+    (REQ_PATH + " -- -f x", False),
+    # A glued `--flag=value` consumes nothing after it.
+    (REQ_PATH + " --method=POST" + REQ_FIELDS, True),
+    # Only the exact method POST counts; a lower-case one is not read as POST.
+    (REQ_PATH + " -X post" + REQ_FIELDS, False),
+    (REQ_PATH + " --method=post" + REQ_FIELDS, False),
+    # pflag takes `-X=POST` as the value POST, in a cluster too.
+    (REQ_PATH + " -X=POST" + REQ_FIELDS, True),
+    (REQ_PATH + " -iX=POST" + REQ_FIELDS, True),
+    (REQ_PATH + " -X=GET" + REQ_FIELDS, False),
+    (REQ_PATH + " -X= POST -f x", False),
+    # Each gh long value flag consumes the word after it.
+    (REQ_PATH + " --header -f x", False),
+    (REQ_PATH + " --template -f x", False),
+    (REQ_PATH + " --preview -f x", False),
+    (REQ_PATH + " --hostname -f x", False),
+    (REQ_PATH + " --cache -f x", False),
+    (REQ_PATH + " --input -f x", True),
+    (REQ_PATH + " --input -X GET", True),
+    (REQ_PATH + " --field -f x", True),
+    (REQ_PATH + " --raw-field -X GET", True),
+    (REQ_PATH + " --method -f x", False),
+    (REQ_PATH + " --method=get" + REQ_FIELDS, False),
+    # A glued value ends the cluster: `-HX-...` is a header, not a method.
+    (REQ_PATH + " -HX-GitHub-Api-Version:2022-11-28" + REQ_FIELDS, True),
+    (REQ_PATH + " -Hf:1", False),
+    # -H, -p and -t take a value, so a following `-f` is that value.
+    (REQ_PATH + " -H -f x", False),
+    (REQ_PATH + " -p -f x", False),
+    (REQ_PATH + " -t -f x", False),
+    # A request body from --input implies POST, like a field does.
+    (REQ_PATH + " --input body.json", True),
+    (REQ_PATH + " --input=body.json", True),
+    (REQ_PATH + " -X GET --input body.json", False),
+    # A value flag with nothing after it: gh exits without a request.
+    (REQ_PATH + REQ_FIELDS + " -X", False),
+    (REQ_PATH + REQ_FIELDS + " --method", False),
+    (REQ_PATH + " -X POST -f", False),
+    (REQ_PATH + " -X POST --field", False),
+    ("curl -s https://api.github.com/repos/o/r/pulls/1038/requested_reviewers"
+     " -f x", False),
+]
+
+# _gh_api_post on argv directly, where the token after `api` need not be a
+# reviewer path: a positional is never read as a flag cluster.
+GH_API_POST_CORPUS = [
+    (["gh", "api", "xf"], False),
+    (["gh", "api", "xX", "-f", "a=b"], True),
 ]
 
 # The issue's reproduction and its operator controls, one level below the
@@ -2855,6 +2942,22 @@ def main():
         else:
             failures += 1
             print(f"FAIL: _argv_push({cmd!r}) is {got}, want {want}")
+    for argv, want in GH_API_POST_CORPUS:
+        got = hookmod._gh_api_post(argv)
+        if got is want:
+            passes += 1
+            print(f"PASS: _gh_api_post({argv!r}) is {want}")
+        else:
+            failures += 1
+            print(f"FAIL: _gh_api_post({argv!r}) is {got}, want {want}")
+    for cmd, want in REQUEST_METHOD_CORPUS:
+        got = hookmod._argv_request(shlex.split(cmd))[0]
+        if got is want:
+            passes += 1
+            print(f"PASS: _argv_request({cmd!r}) is {want}")
+        else:
+            failures += 1
+            print(f"FAIL: _argv_request({cmd!r}) is {got}, want {want}")
     for cmd, want_last, want_flagged in OPERATOR_CORPUS:
         got_last = hookmod.request_ident(cmd)[3]
         got_flagged = bool(hookmod.undischargeable_requests(cmd))

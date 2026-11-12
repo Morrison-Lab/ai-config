@@ -96,7 +96,9 @@ def run_hook(hook_dir, name, payload):
 HOOKS = os.path.join(os.path.dirname(HERE), "hooks")
 tmp = tempfile.mkdtemp()
 try:
-    shutil.copy(os.path.join(HOOKS, "remind-record-standing-guidance.py"), tmp)
+    for name in ("remind-record-standing-guidance.py",
+                 "require-ums-before-resolve.py", "remind-ums-after-error.py"):
+        shutil.copy(os.path.join(HOOKS, name), tmp)
     transcript = os.path.join(tmp, "t.jsonl")
     with open(transcript, "w", encoding="utf-8") as fh:
         fh.write(json.dumps({"type": "user", "message": {"content": [
@@ -113,6 +115,32 @@ try:
           "tool_names.py" in err, True)
     check("broken install: remind-record still reminds (no call counts as recording)",
           "Standing-guidance reminder" in out, True)
+
+    # A transcript with no tool call, which a working install denies: only
+    # the hook's own guard, not a swallowed exception, keeps it from denying.
+    no_tools = os.path.join(tmp, "u.jsonl")
+    with open(no_tools, "w", encoding="utf-8") as fh:
+        fh.write(json.dumps({"type": "user", "message": {"content": [
+            {"type": "text", "text": "fix the bug"}]}}) + "\n")
+    rc, out, err = run_hook(tmp, "require-ums-before-resolve.py",
+                            {"tool_name": "mcp__hearthbot__set_thread_resolved",
+                             "tool_input": {"resolved": True, "thread_id": "x"},
+                             "transcript_path": no_tools})
+    check("broken install: require-ums exits 0 and does not deny",
+          (rc, "deny" in out), (0, False))
+    check("broken install: require-ums names the missing module",
+          "tool_names.py" in err, True)
+    said = json.loads(out or "{}")
+    check("broken install: the resolve call tells the user and the model",
+          ("did not load" in said.get("systemMessage", ""),
+           "did not load" in said.get("hookSpecificOutput", {}).get("additionalContext", "")),
+          (True, True))
+
+    rc, out, err = run_hook(tmp, "require-ums-before-resolve.py",
+                            {"prompt": '<event source="github" kind="pull_request.closed">'
+                                       '{"merged": true}</event>'})
+    check("broken install: the merge reminder says the resolve check is off",
+          "did not load" in out, True)
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 

@@ -85,6 +85,14 @@ for desc, rec in [
     ("Bash invoking update-memories-and-skills", tool("Bash", {"command": "echo update memories"})),
     ("Write under ai-config", tool("Write", {"file_path": "/h/ai-config/shared/x.md"})),
     ("invoke_subagent with Subagents list", tool("invoke_subagent", {"Subagents": [{"Prompt": "Run UMS"}]})),
+    # Spellings the shared scripts/lib/tool_names.py added (ai-config#3740).
+    ("invoke_subagent with a JSON-object Subagents string",
+     tool("invoke_subagent", {"Subagents": '{"Prompt": "Run UMS"}'})),
+    ("spawn_agent prompt naming UMS", tool("spawn_agent", {"prompt": "Run UMS"})),
+    ("PowerShell command", tool("PowerShell", {"command": "echo update memories"})),
+    ("NotebookEdit under ai-config",
+     tool("NotebookEdit", {"notebook_path": "/h/ai-config/shared/x.ipynb"})),
+    ("edit_file with Cursor's filePath", tool("edit_file", {"filePath": "/h/ai-config/memories/x.md"})),
     ("Antigravity PLANNER_RESPONSE invoke_subagent",
      {"source": "MODEL", "type": "PLANNER_RESPONSE", "tool_calls": [
          {"name": "invoke_subagent", "args": {"Subagents": [{"Prompt": "Run UMS"}]}}]}),

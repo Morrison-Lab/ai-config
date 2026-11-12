@@ -1202,4 +1202,20 @@ Leaving a companion function with a flat `for line in shell_c_expansions` scan p
 - **Do:** audit all helper functions in the hook and imported sibling modules that iterate `shell_c_expansions` when fixing expansion ordering defects.
 - **Don't:** assume `shell_c_expansions` returns strings in execution order.
 
+## A static shell guard's false-deny relaxation that needs discarded information fails open: revert it and fail closed
 
+A static guard that reads a Bash command before it runs (`hooks/no-recursive-chown-system-path.py`, ai-config#5333) has to choose, for a construct it cannot read exactly, between refusing too much and passing too much.
+Over 40 adversarial review rounds on that PR, each relaxation added to stop a false deny was the source of the next round's fail-open whenever it needed information the parser had already discarded.
+Examples are keying a rule on whether a `sh -c` text was single-quoted (the split had dropped the quoting), reading `~` only through a `HOME` the command assigned, and skipping a prefix `PWD=`.
+Each patch was correct for the case it fixed and opened a neighbouring one, so the rounds did not converge until those relaxations were removed and the hook read each construct both ways, refusing if either reading reached a system path (review rounds 38 and 39 on #5333).
+The false denies that remain are written into the hook's Limits paragraph with the remedy (write the path itself), which costs the user one rewrite rather than costing the guard its purpose.
+
+Two practices made the review loop converge rather than run forever.
+The first was briefing the adversarial reviewer with the guard's threat model (honest mistakes, not an adversary) and telling it that a clean verdict is right when every remaining item is exotic or fails closed.
+The second was checking each new finding with a test that fails when the fix is undone (a mutant copy of the hook), so a fix that only looks right is caught in the same round.
+
+- **Do:** when a relaxation in a static guard needs information the parser no longer has and a review finds it failing open, remove the relaxation, read the construct every plausible way, refuse if any reading is dangerous, and name the resulting false deny in the docstring's Limits with its workaround.
+- **Do:** give the reviewer of a heuristic guard its threat model and a severity-by-likelihood bar in the brief.
+- **Do:** check each fix with a test that fails on a mutant copy of the hook with the fix undone.
+- **Don't:** patch a failing-open relaxation with a narrower relaxation.
+  On #5333 that produced new fail-opens in rounds 38 and 39.

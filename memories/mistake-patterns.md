@@ -103,7 +103,7 @@ When a new entry lands after `main` has appended one of its own, take the next n
 - **Mistake**: Reporting intermediate status and ending a turn without leaving an active check timer or recurring cron schedule running, letting PR monitoring go dormant while awaiting CI or review outcomes.
 - **Example**: 2026-08-25 session (`Morrison-Lab/ai-config#2226`): after pushing fixes and verifying local status, ended turn without an armed background timer, requiring the user to explicitly remind the agent to keep a check timer running.
   - 2nd occurrence: 2026-08-30 session (Conductor setup in `Morrison-Lab/gha`): promised to "monitor their progress" for CI/review after pushing a PR, but ended the turn without using the schedule tool, prompting an "empty promise" correction.
-- **Canonical Rule**: [`AGENTS.md`](../AGENTS.md) ("No empty promises" --- "arm the next step, a scheduled wakeup or timer carrying it"), [`ardi.md`](../shared/workflow/ardi.md), and "Manage quota, including the structural kind".
+- **Canonical Rule**: [`AGENTS.md`](../AGENTS.md) ("Leave every pause honest and resumable", "No empty promises" bullet: "an armed timer, schedule, or PR watcher that reports its clock time for an owed action"), [`ardi.md`](../shared/workflow/ardi.md), and "Manage quota, including the structural kind".
 - **Fix**: Whenever PRs are open, in-flight, or awaiting review/CI, always arm a background timer before concluding any turn, and report what was armed and its firing time.
   When actively waiting on fast CI jobs, use short intervals (1--2 minutes);
   when waiting on human review or in a quiescent idle state, use progressive backoff (e.g. 5m -> 15m -> 30m -> 1h) to prevent wasteful token burn while keeping the wake-up armed.
@@ -248,7 +248,7 @@ A clean automated review from every available provider evaluating the current HE
   Re-hit 2026-10-07 (Antigravity session, working `Morrison-Lab/lds` [PR #454](https://github.com/Morrison-Lab/lds/pull/454) and `Morrison-Lab/mds` [PR #191](https://github.com/Morrison-Lab/mds/pull/191)):
   after autonomous merge was denied by safety hook, reported PR #454 as clean and yielded turn without setting a timer/schedule to watch PR #454 for base drift or merges on `origin/main`, remaining idle until prompted by user.
   Always arm a timer (`schedule`) or watcher whenever an open PR authored by the session remains unmerged.
-- **Canonical Rule**: `AGENTS.md` ("No empty promises"): "An owed action needs a mechanism that will fire, not only one that records."
+- **Canonical Rule**: `AGENTS.md` ("Leave every pause honest and resumable", "No empty promises" bullet): an action still to be done needs "an armed timer, schedule, or PR watcher", a mechanism that will fire, not only a record.
 - **Fix**: Whenever pausing execution, stopping for user input, or waiting for a condition, ALWAYS use the `schedule` tool to set a timer (one-shot or cron) so the agent automatically wakes up to check status, rather than waiting indefinitely.
 
 ## Pattern 15: Widening a Fail-Closed Instrument's Exemption Without a Base-Parity Proof
@@ -1166,7 +1166,7 @@ Pattern 34's `\u0061` example and this one's `\u0077` are the same trick.
 - **Example**: 2026-09-24 session: exploratory recursive `grep` commands across SQLite databases
   and large directories ran in the background for over an hour, accumulating >110MB log files each.
   When asked "session done?", the tasks were still running unmonitored.
-- **Canonical Rule**: `AGENTS.md` ("Terminate superseded and abandoned background tasks"), [`shared/workflow/terminate-superseded-tasks.md`](../shared/workflow/terminate-superseded-tasks.md).
+- **Canonical Rule**: `AGENTS.md` ("Leave every pause honest and resumable", "Terminate superseded and abandoned background tasks" bullet), [`shared/workflow/terminate-superseded-tasks.md`](../shared/workflow/terminate-superseded-tasks.md).
 - **Fix**: actively terminate diagnostic tasks and subagents (`manage_task(Action='kill')`)
   the moment their finding arrives or is superseded;
   sweep running tasks before declaring milestone or session completion.

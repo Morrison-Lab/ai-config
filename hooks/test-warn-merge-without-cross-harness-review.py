@@ -437,7 +437,9 @@ def main():
     check("warns after an Ollama Cloud curl forced to GET",
           run(MERGE, [step("curl -sS -X GET https://api.ollama.com/api/chat"
                            " -d @req.json")])[0])
-    for form in ("-XGET", "--request=GET", "-G", "-I"):
+    # ai-config#5363: a bundle holding X, G or I is not a POST either.
+    for form in ("-XGET", "--request=GET", "-G", "-I", "-sSXGET", "-sSX GET",
+                 "-sI", "-sG", "-LsI"):
         check("warns after an Ollama Cloud curl with " + form,
               run(MERGE, [step("curl -sS %s -d @req.json"
                                " https://api.ollama.com/api/chat" % form)])[0])
@@ -460,7 +462,9 @@ def main():
               run(MERGE, [step("curl -d @x %s https://api.ollama.com/api/chat"
                                " https://example.com" % opt)])[0])
     # A value attached to its letter is self-contained, so the next word is the URL.
-    for opt in ("-XPOST", "-sXPOST", "-oout", "-uuser", "-fsSLoout", "-4", "-L1"):
+    # `-oGI` writes to a file named GI, so its G and I set no method.
+    for opt in ("-XPOST", "-sXPOST", "-oout", "-uuser", "-fsSLoout", "-4", "-L1",
+                "-sSXPOST", "-oGI", "-sSuGI:x"):
         check("silent after %s before the Ollama URL" % opt,
               not run(MERGE, [step("curl -d @x %s"
                                    " https://api.ollama.com/api/chat" % opt)])[0])

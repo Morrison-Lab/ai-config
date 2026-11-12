@@ -97,6 +97,23 @@ import os
 import re
 import sys
 
+# The `-c` descent is shared (ai-config#3641). A broken install scans only the
+# outer command line, as before the descent existed, and says so.
+try:
+    _LIB = os.path.join(os.path.dirname(os.path.dirname(
+        os.path.realpath(__file__))), "scripts", "lib")
+    if _LIB not in sys.path:
+        sys.path.insert(0, _LIB)
+    from shellcmd import shell_c_expansions
+except Exception as _exc:  # broken install: degrade, never block
+    print(f"flag-unchained-branch-switch: cannot load scripts/lib/shellcmd.py "
+          f"({_exc}); a shell's -c argument will not be scanned",
+          file=sys.stderr)
+
+    def shell_c_expansions(command):
+        """No descent when the shared module is missing."""
+        return [command]
+
 # Subcommands that write to the repository: a wrong branch under any of these
 # leaves a commit, a merge, or a published ref behind.
 MUTATING = {
@@ -394,6 +411,17 @@ def unchained(payload):
     if not isinstance(command, str) or not command.strip():
         return None
 
+    # Each command line a shell's `-c` reaches is its own shell, so it is
+    # scanned on its own; the verdict reads only text, never a directory.
+    for piece in shell_c_expansions(command):
+        found = _unchained_in(piece)
+        if found:
+            return found
+    return None
+
+
+def _unchained_in(command):
+    """`unchained`'s verdict for one shell's command line, without descent."""
     records = _records(_segments(_strip_heredocs(command)))
 
     for j, record in enumerate(records):

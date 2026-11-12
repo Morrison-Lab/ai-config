@@ -79,6 +79,7 @@ Split out of [`github.md`](github.md) (ai-config#694 pattern) at the 1200-line g
   So this is not a quirk of the `gh` client, it is a property of the session's egress policy, and it confirms the mechanism in exactly the session class -- remote/web, no `gh` -- where `gh api graphql` was never available to test it with.
   Since `gh pr view --json` depends on GraphQL fields for several of them, it is unavailable here even indirectly, not merely absent as a binary.
   Don't assume plain REST shares its fate, since the REST call above succeeded in the same session.
+  In auto mode the call may not run at all: on 2026-09-02 the auto-mode classifier refused a `curl` passing `$GITHUB_TOKEN` in an `Authorization` header, so the GitHub MCP tools were the route.
   `scripts/build-pr-payload.py` (ai-config#2908) assembles a `check-pr-fully-clean.py` `--from-json` payload from REST alone for exactly this case -- run it instead of hand-transcribing MCP tool output into the payload JSON, which is slow and error-prone:
   ```
   python3 scripts/build-pr-payload.py OWNER/REPO N out.json

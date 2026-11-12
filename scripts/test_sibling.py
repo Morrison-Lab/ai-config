@@ -123,6 +123,13 @@ USERS = (
         "_dupe": "warn-pr-create-without-dupe-check.py", "_rebuttal": "flag-uncited-rebuttal.py"}),
     ("warn-unmeasured-capability-claim.py", {
         "_disclosure": "require-agent-disclosure.py", "_rebuttal": "flag-uncited-rebuttal.py"}),
+    ("block-redo-denied-write-via-other-tool.py", {
+        "_REMIND": "remind-retry-before-declaring-blocked.py",
+        "_MERGE": "block-merge-without-clean-checker.py"}),
+    ("no-redundant-push-pr-authorization.py", {"_offer": "no-offer-to-file.py"}),
+    ("flag-self-authored-verdict-echo.py", {
+        "_rebuttal": "flag-uncited-rebuttal.py", "_disclosure": "require-agent-disclosure.py",
+        "_clean_claim": "flag-clean-claim-over-findings.py"}),
 )
 PROBE = ("import importlib.util as u, sys; "
          "s = u.spec_from_file_location('h', sys.argv[1]); "
@@ -171,8 +178,12 @@ GUARDED = {
     "no-unread-issue-claim.py", "flag-uncounted-comment-claims.py", "flag-unmeasured-digest.py",
     "flag-unmeasured-timestamp.py", "flag-unread-commit-citation.py",
     "warn-claim-without-comments-read.py", "warn-unmeasured-capability-claim.py",
+    "block-redo-denied-write-via-other-tool.py", "no-redundant-push-pr-authorization.py",
+    "flag-self-authored-verdict-echo.py",
 }
 check("every GUARDED hook is in USERS", sorted(GUARDED - {h for h, _ in USERS}), [])
+# Deny hooks that stop gating when a sibling is missing, and must say so.
+NOT_GATING = {"block-redo-denied-write-via-other-tool.py"}
 GUARD_RE = re.compile(r"^try:\n    from sibling import load_sibling\n", re.M)
 for hook_name, sibs in USERS:
     # Siblings missing, loader present: each sibling attribute is None, and
@@ -184,6 +195,9 @@ for hook_name, sibs in USERS:
     check(f"missing siblings: {hook_name} names each one on stderr",
           [f"cannot load sibling {s}" in proc.stderr for s in sibs.values()],
           [True] * len(sibs))
+    if hook_name in NOT_GATING:
+        check(f"missing siblings: deny hook {hook_name} says it is not gating",
+              "not gating" in proc.stderr, True)
 
     # A broken install whose scripts/lib is empty, siblings present. A hook
     # that imports the loader in a try still imports, loads no sibling, and

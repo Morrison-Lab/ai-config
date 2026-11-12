@@ -137,6 +137,18 @@ _ums = _sibling("remind-ums-after-error.py")
 # instead of crashing when the sibling is missing.
 visible_prose = getattr(_ums, "visible_prose", None)
 
+# Projects threads reply through `mcp__hearthbot__post_message` tool calls, not
+# assistant text blocks, so a reader of text blocks alone never sees the reply
+# a promise is made in (ai-config#5050, #5075). Reuse the sibling that already
+# reads that reply shape rather than copying its regex, so the two cannot drift.
+_announce = _sibling("no-announced-start-without-starting.py")
+_post_message_text = getattr(_announce, "_post_message_text", None)
+_is_work_call = getattr(_announce, "_is_work_call", None)
+if _post_message_text is None or _is_work_call is None:
+    print("no-empty-promise: cannot load _post_message_text/_is_work_call from "
+          "no-announced-start-without-starting.py; post_message replies go "
+          "unscanned", file=sys.stderr)
+
 # A first-person commitment about a CLASS of future occasions. Each
 # alternative pairs a first-person modal with a generalizer, because "I'll
 # open the PR now" is a statement about the next action and carries no
@@ -639,6 +651,9 @@ def scan(path):
 
         tool_calls = []
         text_blocks = []
+        # Whether a call other than the reply itself followed: a post_message
+        # call is the announcement, not the work starting.
+        work_called = False
 
         if kind == "assistant" or m.get("role") == "assistant":
             if isinstance(blocks, list):
@@ -648,6 +663,11 @@ def scan(path):
                             text_blocks.append(b.get("text") or "")
                         elif b.get("type") == "tool_use":
                             tool_calls.append((b.get("name") or "", b.get("input") or {}, b.get("id")))
+                            posted = _post_message_text(b) if _post_message_text else None
+                            if posted:
+                                text_blocks.append(posted)
+                            if _is_work_call is None or _is_work_call(b):
+                                work_called = True
             elif isinstance(blocks, str):
                 text_blocks.append(blocks)
 
@@ -674,6 +694,7 @@ def scan(path):
                             targs = {"command": targs}
                     tid = tc.get("id") or str(id(tc))
                     tool_calls.append((tname, targs if isinstance(targs, dict) else {}, tid))
+                    work_called = True
 
         for raw in text_blocks:
             if not raw.strip():
@@ -692,7 +713,7 @@ def scan(path):
             if hit:
                 announce_txt = hit.group(0).strip()
 
-        if tool_calls:
+        if work_called:
             # Work followed the announcement, so it was not left unstarted.
             announce_txt = None
 

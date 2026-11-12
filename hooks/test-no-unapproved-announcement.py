@@ -51,6 +51,7 @@ BASH = [
     f"python3 -c \"requests.request('put', '{URL}/55')\"", f"curl -sd @a.json {URL}",
     "python3 -c \"c.get_course(1).create_discussion_topic(is_announcement=True)\"",
     f"node -e \"fetch('{URL}/55', {{method: 'PUT'}})\"", f"python3 -c \"aiohttp.ClientSession().post('{URL}')\"",
+    'curl -X POST -d @announcement.json "$URL"', f"Rscript -e 'httr::PUT(\"{URL}/55\")'", f"http {URL} < a.json",
 ]
 WRITES = [("Bash", {"command": c}) for c in BASH] + [
     ("Monitor", POST), ("PowerShell", {"command": f"Invoke-RestMethod -Method Put -Uri {URL}/55"}),
@@ -62,8 +63,8 @@ WRITES = [("Bash", {"command": c}) for c in BASH] + [
 ]
 OTHER = [("Bash", {"command": c}) for c in [
     f"curl -f {URL}?only_announcements=true", "canvas announcements list", "cat /tmp/announcement.md",
-    f"curl -s {URL} | jq .", f"wget -qO- {URL}", f"python3 -c \"requests.get('{URL}')\"",
-    "curl -d 'text=New announcement' https://hooks.slack.com/x", "git commit -m 'Gate canvas announcements create (#4780)'", "git commit -m \"x\n\nCloses #4780\"",
+    f"curl -s {URL} | jq .", f"wget -qO- {URL} > a.json", "curl -d 'text=New announcement' https://hooks.slack.com/x",
+    "git commit -m 'Gate canvas announcements create (#4780)'", "git commit -m \"x\n\nCloses #4780\"",
     "gh issue comment 1 --body 'gate POST discussion_topics, https://x'", "grep -nE 'is_announcement|topic' f",
     "echo 'Announcement: see https://x/syllabus' > a.md", "sed -n '/is_announcement/p' post.py",
     "gh api repos/x/y/issues/1/comments -f body='denies curl posts to discussion_topics'",

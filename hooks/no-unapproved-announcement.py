@@ -12,9 +12,7 @@ try:
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"))
     from transcript_meta import is_real_user_turn, strip_injected_text
 except Exception: is_real_user_turn = None  # noqa: E701 -- detection still runs; a detected write is denied
-CANVAS = re.compile(r"discussion|api/v1|instructure|canvas", re.I)  # "announcement" alone is not Canvas
-READ_BREAK = re.compile(r"--post|\.(post|put|patch|edit|update|request)\(|['\"](?i:post|put|patch)['\"]|\bmethod\b|"
-                        r"\b(https?|xh|api)\s+(?i:post|put|patch)\b")  # beyond WRITE, what makes a call not a read
+CANVAS = re.compile(r"discussion|api/v1|instructure|canvas", re.I)  # a literal URL without these is not Canvas
 CLI = re.compile(r"\bcanvas\s+announcements?\s+(create|post|update|edit|publish)\b", re.I)
 CODE = re.compile(r"\b(python3?|node|ruby|perl|Rscript)\b\s+(-c|-e|-\s)|<<")
 QUOTED = re.compile(r"'[^']*'|\"(\\.|[^\"\\$`])*\"")  # a double-quoted span with $ or ` stays
@@ -42,10 +40,11 @@ def is_announcement_write(tool, inp):
         if first in SAFE_FIRST and plain:  # one plain command
             return False
         net = NET.search(cmd) or first in ("http", "https", "xh")
-        read = not (WRITE.search(cmd) or READ_BREAK.search(cmd))
+        read = first in ("curl", "wget") and not (WRITE.search(cmd) or re.search(r"--post|--method|[;&`<]|\$\(", bare))
+        other_host = re.search(r"https?://", cmd) and not CANVAS.search(cmd)  # a Slack or GitHub URL, say
         cli = CLI.search(bare) or re.search(r"\b(ba|z)?sh\s+-c\b", cmd) and CLI.search(cmd)
         return bool(cli or ANNOUNCE.search(cmd) and (net or CODE.search(cmd))
-                    or TOPIC.search(cmd) and CANVAS.search(cmd) and net and not read)
+                    or TOPIC.search(cmd) and not other_host and net and not read)
     name = tool.lower()
     if not name.startswith("mcp__"):
         return False

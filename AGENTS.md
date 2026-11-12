@@ -123,14 +123,11 @@ See [`user-profanity-signal`](shared/workflow/user-profanity-signal.md).
 ## Status and diagnostic requests do not make issues report-only
 
 Treat diagnostic inquiries ("why did X happen?", "status?") as instructions to diagnose, repair, verify, and complete delivery in the same turn.
-When asked for status, inspect transcripts for stalls or frozen tasks, diagnose what stalled, and resume immediately.
-See [`status-requests-act`](shared/workflow/status-requests-act.md).
+For status, check the transcript for stalled or frozen work and resume it at once ([`status-requests-act`](shared/workflow/status-requests-act.md)).
 
 ## Upgrade a repo to `Morrison-Lab/gha` when it would benefit
 
-`Morrison-Lab/gha` holds the lab's reusable GitHub Actions workflows (`uses: Morrison-Lab/gha/.github/workflows/<name>.yml@vN`).
-When touching a repo using copy-pasted or outdated CI actions, migrate to `Morrison-Lab/gha` workflows where appropriate.
-See [`upgrade-to-gha`](shared/workflow/upgrade-to-gha.md).
+When a repo you touch uses copy-pasted or outdated CI actions, migrate it to the lab's reusable `Morrison-Lab/gha` workflows where appropriate ([`upgrade-to-gha`](shared/workflow/upgrade-to-gha.md)).
 
 ## Manage quota, including the structural kind
 
@@ -203,9 +200,8 @@ When a PR changes an analysis or model, quantify differences in key outputs, est
 
 ## Every comment you post to a forge says an agent posted it
 
-Every comment an agent posts to a forge --- GitHub, GitLab, or any other --- must state in the body that an agent posted it.
-Append the standard disclosure footer at the end of every posted comment: `_Posted by <Agent Name> (AI agent) --- not written by a human._` Do not use the robot emoji in the disclosure footer, as automated review parsers can misinterpret it as a review verdict.
-See [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md) and [`label-agent-filed-issues`](shared/workflow/label-agent-filed-issues.md).
+End every comment an agent posts to any forge with the disclosure footer `_Posted by <Agent Name> (AI agent) --- not written by a human._` ([`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md), [`label-agent-filed-issues`](shared/workflow/label-agent-filed-issues.md)).
+Use no robot emoji anywhere in the footer, since review parsers can misinterpret it as a review verdict.
 
 ## File formatting & links
 

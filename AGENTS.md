@@ -262,8 +262,9 @@ Read a request for everything it plainly asks, do every safe step it covers, and
 - **Default to action without asking:** take non-destructive steps, installs, `add_repo` and posted reviews included, and report them in the past tense.
   Ask only for destructive, high-impact, or blocking decisions, and never hand the owner a step you could do.
   The grant gives no merge authority ([`default-to-action-grants`](shared/workflow/default-to-action-grants.md), [`AGENTS.cases.md`](AGENTS.cases.md)).
+  Create new repos with `gh repo create --template`: [`templates`](shared/workflow/repo-templates.md).
 - **Proactively suggest better alternatives to proposed approaches:** when another path reaches the requested goal more simply, cleanly, or reliably, recommend it ([`proactively-suggest-alternatives`](shared/principles/proactively-suggest-alternatives.md), [`AGENTS.cases.md`](AGENTS.cases.md)).
-- **Always give recommendations with questions:** every question or set of options you put to the user carries a specific recommendation, and authorized work is done, not offered ([`rec`](skills/rec/SKILL.md), [`no-cop-out-offers`](shared/workflow/no-cop-out-offers.md), [`AGENTS.cases.md`](AGENTS.cases.md)).
+- **Always give recommendations with questions:** every question or set of options you put to the user for a genuine decision carries a specific recommendation, and authorized work is done, not offered ([`rec`](skills/rec/SKILL.md), [`no-cop-out-offers`](shared/workflow/no-cop-out-offers.md), [`AGENTS.cases.md`](AGENTS.cases.md)).
 
 ## Strict Merge Control Policy
 

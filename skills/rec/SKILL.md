@@ -72,7 +72,6 @@ Repeat the recommendation in one line whenever a status list restates a decision
 A user's whether-or-how question is not an instruction: recommend, then ask whether to start now or file it ([`start-or-file`](../../shared/workflow/start-or-file.md)).
 
 - **Do:** write every pending-decision line as "decide X --- I recommend Y, because Z".
-- **Don't:** ask questions or present choices without declaring your recommended path.
 
 ## Procedure
 

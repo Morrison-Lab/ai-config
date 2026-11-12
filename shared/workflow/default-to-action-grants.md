@@ -6,7 +6,6 @@ The owner grants standing permission for non-destructive steps: branch commits, 
 Proceed with them and report in the past tense;
 ask only for destructive, high-impact, or blocking decisions.
 The grant gives no merge authority.
-Create a new repository from a template with `gh repo create --template` ([`repo-templates`](repo-templates.md)).
 
 The grant also covers installing and updating software: R, R packages (including through `renv`), Quarto, and any other tool, on any machine where the owner has install access, directly or through conda, mamba, pyenv, Homebrew, or a similar manager.
 Do it whenever it helps, without asking (owner directive, 2026-10-02).

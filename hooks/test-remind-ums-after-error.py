@@ -660,7 +660,9 @@ print(f"  {'ok' if cp_ok else 'WRONG':<7} the curly quote reaches stdout as UTF-
 # Stop registration (AI_CONFIG_STOP=1): blocks once per turn so the agent runs
 # the pass before ending the turn, and never while stop_hook_active is set.
 print("\nStop registration:")
-stop_path = tempfile.mkstemp(suffix=".jsonl")[1]
+# Close the descriptor, or Windows refuses the unlink below (WinError 32).
+fd, stop_path = tempfile.mkstemp(suffix=".jsonl")
+os.close(fd)
 with open(stop_path, "w", encoding="utf-8") as fh:
     fh.write(json.dumps(tool("mcp__hearthbot__post_message",
                              {"text": "You're right, I was wrong on two counts."})) + "\n")

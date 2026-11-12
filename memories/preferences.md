@@ -10,7 +10,7 @@
 - WIP cap: with three open PRs in a repo, open no fourth there (ai-config#5213).
   The 3 is Ezra's daytb on the coordinator's recommendation, 2026-11-10.
   See [`wip-cap`](../shared/workflow/wip-cap.md).
-- A freeze stops work, never filing.
+- A freeze stops new work, not issue filing.
   Ezra, 2026-11-12: "a freeze shouldn't prevent you from filing issues" ([ai-config#5574](https://github.com/Morrison-Lab/ai-config/issues/5574)).
   File what you find during any freeze and leave it unclaimed.
   See [`freezes-allow-filing`](../shared/workflow/freezes-allow-filing.md).

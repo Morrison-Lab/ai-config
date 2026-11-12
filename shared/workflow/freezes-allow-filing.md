@@ -1,4 +1,4 @@
-# A freeze stops work, never filing
+# A freeze stops new work, not issue filing
 
 Ezra, 2026-11-12: "a freeze shouldn't prevent you from filing issues" ([ai-config#5574](https://github.com/Morrison-Lab/ai-config/issues/5574)).
 

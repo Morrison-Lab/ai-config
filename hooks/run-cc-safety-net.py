@@ -204,7 +204,7 @@ def recent_failure(failed: Path) -> None:
     try:
         record = json.loads(failed.read_text(encoding="utf-8"))
         age = time.time() - float(record["time"])
-        reason = str(record["reason"])
+        reason = str(record["error"])
     except (OSError, ValueError, KeyError, TypeError):
         return
     if 0 <= age < FETCH_BACKOFF:
@@ -215,7 +215,7 @@ def recent_failure(failed: Path) -> None:
 
 def record_failure(failed: Path, reason: str) -> None:
     try:
-        failed.write_text(json.dumps({"time": time.time(), "reason": reason}),
+        failed.write_text(json.dumps({"time": time.time(), "error": reason}),
                           encoding="utf-8")
     except OSError:
         pass

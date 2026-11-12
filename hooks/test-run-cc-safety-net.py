@@ -219,7 +219,7 @@ class FailsOpenVisibly(unittest.TestCase):
     def test_an_old_failure_is_retried_and_then_cleared(self):
         failed = self.box.cache / "1.0.0.fetch-failed"
         self.box.cache.mkdir()
-        old = {"time": time.time() - 2 * 3600, "reason": "old failure"}
+        old = {"time": time.time() - 2 * 3600, "error": "old failure"}
         failed.write_text(json.dumps(old), encoding="utf-8")
         proc = self.box.run("DENYME")
         self.assertIn("fake deny", proc.stdout)

@@ -958,8 +958,8 @@ names for an assignment's author.
 - **Do:** when prose quotes a specific line from a file (not just a claimed
   command's output), derive that quote from the file in the same command that
   writes it into the doc, rather than typing it from an earlier read --- the
-  same shape `CLAUDE.md`'s clock-timestamp rule uses for a time written into a
-  file.
+  same shape [`timestamp-local-recaps`](../workflow/timestamp-local-recaps.md)
+  uses for a time written into a file.
 - **Don't:** treat "I already read this file today" as license to retype a
   line from memory; the read and the transcription are separate acts, and
   only a fresh derivation in the writing command catches drift between them.

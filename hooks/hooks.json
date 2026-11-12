@@ -62,7 +62,7 @@
             "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/inject-local-time.sh\"",
             "timeout": 10,
             "script": "inject-local-time.sh",
-            "why": "CLAUDE.md 'Timestamp recaps in local time' -- supplies the real local time each turn, because a fabricated timestamp is indistinguishable from a remembered one."
+            "why": "AGENTS.md 'Timestamp recaps in local time' -- supplies the real local time each turn, because a fabricated timestamp is indistinguishable from a remembered one."
           },
           {
             "type": "command",
@@ -283,7 +283,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/require-ums-before-resolve.py\"",
             "timeout": 10,
             "script": "require-ums-before-resolve.py",
-            "why": "AGENTS.md 'Run UMS before every pause': a merged-PR event reminds the thread to run its wrap-up (post-merge, including UMS) before resolving. Injects, never blocks."
+            "why": "AGENTS.md 'Leave every pause honest and resumable' (Run UMS before every pause): a merged-PR event reminds the thread to run its wrap-up (post-merge, including UMS) before resolving. Injects, never blocks."
           },
           {
             "type": "command",
@@ -312,6 +312,13 @@
             "timeout": 10,
             "script": "warn-local-render-when-ci-built.py",
             "why": "ai-config#4724. Ezra, 2026-10-25: \"isn't it already rendered in mlg ... remember that going forward\". Warns (never blocks) when a Bash command runs quarto render in a repo with a gh-pages ref, because CI has probably built the output already; download the PDF or HTML from gh-pages or the published site instead. Canvas uploads always use the CI-built PDF. Fails open on any parse or git trouble."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-one-sided-conflict-resolution.py\"",
+            "timeout": 10,
+            "script": "warn-one-sided-conflict-resolution.py",
+            "why": "ai-config#5407, split from #4716. Ezra, 2026-10-23: agents should resolve merge conflicts carefully, deciding for each hunk what to keep from each side, what to drop, and what to modify. Warns (never blocks) on git checkout/restore --ours|--theirs, which take the whole file from one side; on merge-file --ours|--theirs and -X ours|theirs on merge, rebase, cherry-pick, revert or pull, which keep one side of every conflicting hunk; and on -s ours, which drops the other branch entirely. Checks inside bash -c; quoted text and --abort/--quit runs do not fire. Fails open on a parse error."
           },
           {
             "type": "command",
@@ -446,6 +453,13 @@
             "timeout": 10,
             "script": "no-rm-live-render-intermediate.py",
             "why": "2026-09-24, health-analytics-core/abridge: an agent deleted a gitignored paper-with-supplement.rmarkdown, reasoning it was a leftover from its own failed render -- it was not, the user was rendering that exact worktree from their own terminal, and Quarto recreates that intermediate at the START of every render. The render had already knitted all 251 chunks (~10 min, including a forced cache rebuild) before failing on the missing file. AGENTS.md's 'verify a dispatched agent's liveness before touching a worktree' rule already existed and did not fire at composition time. DENIES rm/trash/find -delete/git clean of *.rmarkdown, *.knit.md, *.knit.qmd, *_files/, *.quarto_ipynb, or .quarto/ ONLY when a live quarto render/preview or an Rscript/R process running knitr/rmarkdown/rmd_render is also found (pgrep -fl, injectable in tests). Clearable with ALLOW_RM_RENDER_INTERMEDIATE=1 on the same command. Fails open with no live-process check available, on any parse trouble, and when scripts/lib/shellcmd.py cannot be imported."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-recursive-chown-system-path.py\"",
+            "timeout": 10,
+            "script": "no-recursive-chown-system-path.py",
+            "why": "ai-config#5317, shared/workflow/destructive-actions-catalog.md: `sudo chown -R $USER:$(id -gn) /usr && sudo chmod -R u+w /usr` broke sudo (anthropics/claude-code#168), and an agent's `chown -R root:root /usr/` and `/etc/` repair cleared setuid bits on sudo and su (anthropics/claude-code#39283). DENIES chown, chmod or chgrp with -R/--recursive when a target resolves to /, a top-level directory, a path inside a system tree, or the home directory or a directory containing it, including a variable that an earlier Bash call set and is empty in this one. Clearable with ALLOW_RECURSIVE_SYSTEM_CHOWN=1 on the same command. Fails open on parse trouble."
           },
           {
             "type": "command",
@@ -799,7 +813,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unmeasured-timestamp.py\"",
             "timeout": 10,
             "script": "flag-unmeasured-timestamp.py",
-            "why": "CLAUDE.md 'Timestamp recaps in local time', forge-comment surface (ai-config#2900, #2903; measured 2026-09-01: claim comments stamped 12:15/12:40/12:58 PT off one 12:02 PDT reading, the next real reading 12:21 PDT). Warns, never blocks, when a `gh pr comment`/`gh issue comment`/`gh pr review`/`gh api .../comments` body about to post states a Pacific clock time (the Stop sibling's `RX_CLAIM` shape: HH:MM, optional seconds, optional AM/PM, then PDT, PST, or PT) and no clock read appears in the transcript since the current turn began -- or, when the harness's injected reading is in this turn, the stamp runs ahead of its value. The chat-recap half is `no-unmeasured-clock-claim.py` at Stop, whose `scan()`, `RX_CLAIM`, and context exemptions this hook imports so the two agree on what a turn, a clock read, and a stamp are; a comment body never reaches a Stop hook, which is the gap this fills. A post whose body the hook cannot read (a `--body-file` written by a heredoc in the same call, `--body-file -`) gets a cannot-read note rather than silence, after require-agent-disclosure.py's third verdict. Warns because a quoted or relayed time (a CI timestamp, a reviewer's own stamp) is legitimate and not distinguishable by the body alone."
+            "why": "AGENTS.md 'Timestamp recaps in local time', forge-comment surface (ai-config#2900, #2903; measured 2026-09-01: claim comments stamped 12:15/12:40/12:58 PT off one 12:02 PDT reading, the next real reading 12:21 PDT). Warns, never blocks, when a `gh pr comment`/`gh issue comment`/`gh pr review`/`gh api .../comments` body about to post states a Pacific clock time (the Stop sibling's `RX_CLAIM` shape: HH:MM, optional seconds, optional AM/PM, then PDT, PST, or PT) and no clock read appears in the transcript since the current turn began -- or, when the harness's injected reading is in this turn, the stamp runs ahead of its value. The chat-recap half is `no-unmeasured-clock-claim.py` at Stop, whose `scan()`, `RX_CLAIM`, and context exemptions this hook imports so the two agree on what a turn, a clock read, and a stamp are; a comment body never reaches a Stop hook, which is the gap this fills. A post whose body the hook cannot read (a `--body-file` written by a heredoc in the same call, `--body-file -`) gets a cannot-read note rather than silence, after require-agent-disclosure.py's third verdict. Warns because a quoted or relayed time (a CI timestamp, a reviewer's own stamp) is legitimate and not distinguishable by the body alone."
           },
           {
             "type": "command",
@@ -992,14 +1006,14 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-merge-without-cross-harness-review.py\"",
             "timeout": 20,
             "script": "warn-merge-without-cross-harness-review.py",
-            "why": "ai-config#3099: shared/workflow/adversarial-self-review.md requires a merge verdict from a reviewer whose model AND harness both differ from the authoring session's, and nothing enforced it -- no-unauthorized-merge.py checks authorization and warn-merge-without-fully-clean.py checks the instrument, so merges reviewed only by Claude (an Agent subagent, the CI claude-review workflow) passed both, on 2026-09-02 and again on 2026-10-08. Warns, never denies, on gh pr merge, a REST merge, the MCP merge tool or MCP auto-merge, unless the transcript holds, after the last push, a non-sidechain, non-error Bash call whose command word is a reviewer CLI of another harness (codex, opencode, agy, gemini, cursor-agent, claude; the session's own harness removed, read as Antigravity when ANTIGRAVITY_AGENT is set or when the transcript path or record types match Antigravity, excluding both agy and gemini, and Claude Code otherwise) with a first argument that is not housekeeping (--version, --help, login, auth, ...). Loading a skill such as dtc or dto credits nothing; the CLI call it makes does. Merge recognition reuses the sibling's _gh_merge and push recognition its _events, _push_before_merge and MCP_PUSH_TOOLS, but not its check-then-merge chain discharge. Warn because the invocation is decidable and the verdict and a multi-backend harness's configured model are not."
+            "why": "ai-config#3099: shared/workflow/adversarial-self-review.md requires a merge verdict from a reviewer whose model AND harness both differ from the authoring session's, and nothing enforced it -- no-unauthorized-merge.py checks authorization and warn-merge-without-fully-clean.py checks the instrument, so merges reviewed only by Claude (an Agent subagent, the CI claude-review workflow) passed both, on 2026-09-02 and again on 2026-10-08. DENIES (since ai-config#5290: as a warning it reached the agent only with the merge result, ai-config#4587) gh pr merge, a REST merge, the MCP merge tool or MCP auto-merge, unless the transcript holds, after the last push, either a non-sidechain, non-error Bash call whose command word is a reviewer CLI of another harness (codex, opencode, agy, gemini, cursor-agent, claude; the session's own harness removed, read as Antigravity when ANTIGRAVITY_AGENT is set or when the transcript path or record types match Antigravity, excluding both agy and gemini, and Claude Code otherwise) run as a review (a listed subcommand such as codex exec or opencode run, or a print or prompt flag such as claude -p; ai-config#5383), or a curl POST to the OpenCode Go or Ollama Cloud chat endpoint (ai-config#4849); or the waiver's probe pass: every such CLI attempted with any result, or shown absent by a lone, unredirected command -v or which that exited 1, with opencode attempted rather than probed. Loading a skill such as dtc or dto credits nothing; the CLI call it makes does. Merge recognition reuses the sibling's _gh_merge and push recognition its _events, _push_before_merge and MCP_PUSH_TOOLS, but not its check-then-merge chain discharge. The invocation and the probe pass are decidable; the verdict and a multi-backend harness's configured model are not, so check-pr-fully-clean.py owns the verdict."
           },
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unmeasured-digest.py\"",
             "timeout": 10,
             "script": "flag-unmeasured-digest.py",
-            "why": "CLAUDE.md 'Timestamp recaps in local time' / deterministic-tools, generalized from a clock time to a digest (ai-config#3779; measured 2026-09-18: an issue body cited `3e2b9e10...` as the md5 of two files, which no command in the session had produced). Warns, never blocks, when a body about to leave through `gh` (a comment, or an issue or PR being created or edited) or `glab` (whose body is `-d`/`--description`) carries a digest-shaped token -- 7 to 64 hex characters bounded on both sides with at least one a-f, that is a canonical length (32/40/64), or truncated with an ellipsis, or preceded within 48 characters by a boundary-anchored digest word -- and no prior `user` transcript record (message or toolUseResult) or non-error Antigravity tool result / user input / background task completion (`GENERIC`, `TOOL_RESPONSE`, `USER_INPUT`, `SYSTEM_MESSAGE`, `EPHEMERAL_MESSAGE`) contains a hex run having that token as a prefix. The prefix rule keeps a legitimate abbreviation quiet, so a short SHA quoted from `git log` discharges and one typed from memory does not. The body is read from `--body-file`, `-b`, `-F`, `-d`, or -- the case the first version missed -- a heredoc in the same command, which is this corpus's own convention for a backtick-safe body and leaves no file on disk at PreToolUse time. Because body extraction is imported from flag-unmeasured-timestamp.py, a `cat >>` append to a session notebook or memory file reaches its notebook branch and warns too. Warns because a digest quoted from an upstream advisory, a lockfile, or a vendor release page is legitimate and not distinguishable by the body alone."
+            "why": "AGENTS.md 'Timestamp recaps in local time' / deterministic-tools, generalized from a clock time to a digest (ai-config#3779; measured 2026-09-18: an issue body cited `3e2b9e10...` as the md5 of two files, which no command in the session had produced). Warns, never blocks, when a body about to leave through `gh` (a comment, or an issue or PR being created or edited) or `glab` (whose body is `-d`/`--description`) carries a digest-shaped token -- 7 to 64 hex characters bounded on both sides with at least one a-f, that is a canonical length (32/40/64), or truncated with an ellipsis, or preceded within 48 characters by a boundary-anchored digest word -- and no prior `user` transcript record (message or toolUseResult) or non-error Antigravity tool result / user input / background task completion (`GENERIC`, `TOOL_RESPONSE`, `USER_INPUT`, `SYSTEM_MESSAGE`, `EPHEMERAL_MESSAGE`) contains a hex run having that token as a prefix. The prefix rule keeps a legitimate abbreviation quiet, so a short SHA quoted from `git log` discharges and one typed from memory does not. The body is read from `--body-file`, `-b`, `-F`, `-d`, or -- the case the first version missed -- a heredoc in the same command, which is this corpus's own convention for a backtick-safe body and leaves no file on disk at PreToolUse time. Because body extraction is imported from flag-unmeasured-timestamp.py, a `cat >>` append to a session notebook or memory file reaches its notebook branch and warns too. Warns because a digest quoted from an upstream advisory, a lockfile, or a vendor release page is legitimate and not distinguishable by the body alone."
           },
           {
             "type": "command",
@@ -1199,7 +1213,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-merge-without-cross-harness-review.py\"",
             "timeout": 20,
             "script": "warn-merge-without-cross-harness-review.py",
-            "why": "ai-config#3099: shared/workflow/adversarial-self-review.md requires a merge verdict from a reviewer whose model AND harness both differ from the authoring session's, and nothing enforced it -- no-unauthorized-merge.py checks authorization and warn-merge-without-fully-clean.py checks the instrument, so merges reviewed only by Claude (an Agent subagent, the CI claude-review workflow) passed both, on 2026-09-02 and again on 2026-10-08. Warns, never denies, on gh pr merge, a REST merge, the MCP merge tool or MCP auto-merge, unless the transcript holds, after the last push, a non-sidechain, non-error Bash call whose command word is a reviewer CLI of another harness (codex, opencode, agy, gemini, cursor-agent, claude; the session's own harness removed, read as Antigravity when ANTIGRAVITY_AGENT is set or when the transcript path or record types match Antigravity, excluding both agy and gemini, and Claude Code otherwise) with a first argument that is not housekeeping (--version, --help, login, auth, ...). Loading a skill such as dtc or dto credits nothing; the CLI call it makes does. Merge recognition reuses the sibling's _gh_merge and push recognition its _events, _push_before_merge and MCP_PUSH_TOOLS, but not its check-then-merge chain discharge. Warn because the invocation is decidable and the verdict and a multi-backend harness's configured model are not."
+            "why": "ai-config#3099: shared/workflow/adversarial-self-review.md requires a merge verdict from a reviewer whose model AND harness both differ from the authoring session's, and nothing enforced it -- no-unauthorized-merge.py checks authorization and warn-merge-without-fully-clean.py checks the instrument, so merges reviewed only by Claude (an Agent subagent, the CI claude-review workflow) passed both, on 2026-09-02 and again on 2026-10-08. DENIES (since ai-config#5290: as a warning it reached the agent only with the merge result, ai-config#4587) gh pr merge, a REST merge, the MCP merge tool or MCP auto-merge, unless the transcript holds, after the last push, either a non-sidechain, non-error Bash call whose command word is a reviewer CLI of another harness (codex, opencode, agy, gemini, cursor-agent, claude; the session's own harness removed, read as Antigravity when ANTIGRAVITY_AGENT is set or when the transcript path or record types match Antigravity, excluding both agy and gemini, and Claude Code otherwise) run as a review (a listed subcommand such as codex exec or opencode run, or a print or prompt flag such as claude -p; ai-config#5383), or a curl POST to the OpenCode Go or Ollama Cloud chat endpoint (ai-config#4849); or the waiver's probe pass: every such CLI attempted with any result, or shown absent by a lone, unredirected command -v or which that exited 1, with opencode attempted rather than probed. Loading a skill such as dtc or dto credits nothing; the CLI call it makes does. Merge recognition reuses the sibling's _gh_merge and push recognition its _events, _push_before_merge and MCP_PUSH_TOOLS, but not its check-then-merge chain discharge. The invocation and the probe pass are decidable; the verdict and a multi-backend harness's configured model are not, so check-pr-fully-clean.py owns the verdict."
           },
           {
             "type": "command",
@@ -1375,7 +1389,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unmeasured-timestamp.py\"",
             "timeout": 10,
             "script": "flag-unmeasured-timestamp.py",
-            "why": "CLAUDE.md 'Timestamp recaps in local time', session notebook / memory file edit surface (ai-config#2900, #2947). Warns when writing to session notebooks or memory files stating a Pacific clock time without a date reading in the turn."
+            "why": "AGENTS.md 'Timestamp recaps in local time', session notebook / memory file edit surface (ai-config#2900, #2947). Warns when writing to session notebooks or memory files stating a Pacific clock time without a date reading in the turn."
           },
           {
             "type": "command",
@@ -1437,7 +1451,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unmeasured-timestamp.py\"",
             "timeout": 10,
             "script": "flag-unmeasured-timestamp.py",
-            "why": "CLAUDE.md 'Timestamp recaps in local time', session notebook / memory file edit surface (ai-config#2900, #2947). Warns when editing session notebooks or memory files stating a Pacific clock time without a date reading in the turn."
+            "why": "AGENTS.md 'Timestamp recaps in local time', session notebook / memory file edit surface (ai-config#2900, #2947). Warns when editing session notebooks or memory files stating a Pacific clock time without a date reading in the turn."
           },
           {
             "type": "command",
@@ -1499,7 +1513,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-unmeasured-timestamp.py\"",
             "timeout": 10,
             "script": "flag-unmeasured-timestamp.py",
-            "why": "CLAUDE.md 'Timestamp recaps in local time', session notebook / memory file edit surface (ai-config#2900, #2947). Warns when editing session notebooks or memory files stating a Pacific clock time without a date reading in the turn."
+            "why": "AGENTS.md 'Timestamp recaps in local time', session notebook / memory file edit surface (ai-config#2900, #2947). Warns when editing session notebooks or memory files stating a Pacific clock time without a date reading in the turn."
           },
           {
             "type": "command",
@@ -1699,6 +1713,18 @@
         ]
       },
       {
+        "matcher": "Bash|Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-credential-file-read.py\"",
+            "timeout": 10,
+            "script": "no-credential-file-read.py",
+            "why": "ai-config#4780. Ezra, 2026-10-27: never print a credential file. Denies the Read tool, and a Bash reader (`cat`, `sed`, `head`, `grep`, `base64`, ...), on a known credential path under the home directory (`~/.netrc`, `~/.config/canvas/*`, `~/.config/gh/hosts.yml`, `*token*` under `~/.config`, private SSH keys, ...). A reader inside `$( ... )` stays allowed, since its output is passed on rather than printed. Override for an approved read: prefix the Bash command with ALLOW_CREDENTIAL_READ=1."
+          }
+        ]
+      },
+      {
         "matcher": "mcp__claude-in-chrome__navigate|mcp__Claude_Browser__navigate|mcp__Claude_Browser__preview_start|mcp__computer-use__request_access|mcp__remote-devices__Claude_Browser__navigate|mcp__remote-devices__Claude_Browser__preview_start|mcp__remote-devices__.*request_access",
         "hooks": [
           {
@@ -1880,6 +1906,18 @@
         ]
       },
       {
+        "matcher": "Bash|Monitor|PowerShell|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unapproved-announcement.py\"",
+            "timeout": 10,
+            "script": "no-unapproved-announcement.py",
+            "why": "ai-config#4780. Ezra, 2026-10-27, said twice: never post a class announcement without his review and approval of its exact text. Denies a Canvas announcement create or edit (the CLI, `is_announcement`, a network command naming a discussion topic or announcement other than a single `curl` command with no write option such as `-X POST`, `--request PUT`, `-d`, `-F` or `-T`, or an MCP announcement write; a single plain `git`, `gh`, `grep`, `egrep` or `rg` command is never checked) unless the user's last message is only an approval such as `post the announcement`; a relay note or another agent's message does not count. Fails closed when the transcript cannot be read."
+          }
+        ]
+      },
+      {
         "matcher": "mcp__github__update_pull_request_branch",
         "hooks": [
           {
@@ -2008,6 +2046,18 @@
             "timeout": 10,
             "script": "no-send-email.py",
             "why": "Denies sending email: a mail-sender command (sendmail, mail, mutt, msmtp, git send-email, smtp URLs) in Bash, or an MCP tool whose action is send/reply/forward on a mail account. Drafting stays allowed. User directive 2026-11-04: \"never send emails for me\". No override."
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|PowerShell|Monitor|Read|Write|Edit|MultiEdit|NotebookEdit|Grep|Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/run-cc-safety-net.py\"",
+            "timeout": 160,
+            "script": "run-cc-safety-net.py",
+            "why": "ai-config#5474 (part of #5317). Ezra, 2026-11-12, chose \"Adopt CC Safety Net, pinned\": the MIT-licensed CC Safety Net is the base guard for every agent, with ai-config hooks only for the gaps it leaves. Runs the release hooks/cc-safety-net.pin.json names (fetched once with npm pack --ignore-scripts, sha512-checked against the pin, cached under ~/.cache/ai-config) and passes its deny through unchanged. Fails open with a once-per-session notice when Node.js 22 or npm is missing or the download fails, since failing closed would stop every tool call on a machine without Node.js; a tarball that does not match the pin is never run. The timeout covers the first call's fetch."
           }
         ]
       }
@@ -2153,7 +2203,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unmeasured-clock-claim.py\"",
             "timeout": 10,
             "script": "no-unmeasured-clock-claim.py",
-            "why": "CLAUDE.md 'Timestamp recaps in local time' -- warns when a reply states a Pacific clock time and no clock read appears since the previous message, so an extrapolated time is not reported as measured. A read whose output is only ever captured (`t=$(TZ=... date ...)` writing into a file) does not discharge it: the value never reaches the transcript, so the session could not have quoted it (ai-config#2991)."
+            "why": "AGENTS.md 'Timestamp recaps in local time' -- warns when a reply states a Pacific clock time and no clock read appears since the previous message, so an extrapolated time is not reported as measured. A read whose output is only ever captured (`t=$(TZ=... date ...)` writing into a file) does not discharge it: the value never reaches the transcript, so the session could not have quoted it (ai-config#2991)."
           },
           {
             "type": "command",
@@ -2307,7 +2357,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-announced-start-without-starting.py\"",
             "timeout": 10,
             "script": "no-announced-start-without-starting.py",
-            "why": "CLAUDE.md 'no empty promises' and the dont-stop-keep-working directive -- blocks a reply that ends by announcing work in the present progressive or immediate future without having begun it. Distinct from no-empty-promise.py, which asks whether a mechanism shipped; a turn that filed an issue and then closed on 'I'll start on it' satisfies that and still never starts. ai-config#5050 -- also reads the text of mcp__hearthbot__post_message, reply and update_message calls (the reply channel in Projects threads, invisible to a text-block reader) and matches 'Next I'm/I'll <verb>' and 'I'm now <verb>ing'; a later non-hearthbot tool call clears the announcement, and a named blocker or wait exempts it."
+            "why": "AGENTS.md 'No empty promises' and the dont-stop-keep-working directive -- blocks a reply that ends by announcing work in the present progressive or immediate future without having begun it. Distinct from no-empty-promise.py, which asks whether a mechanism shipped; a turn that filed an issue and then closed on 'I'll start on it' satisfies that and still never starts. ai-config#5050 -- also reads the text of mcp__hearthbot__post_message, reply and update_message calls (the reply channel in Projects threads, invisible to a text-block reader) and matches 'Next I'm/I'll <verb>' and 'I'm now <verb>ing'; a later non-hearthbot tool call clears the announcement, and a named blocker or wait exempts it."
           },
           {
             "type": "command",

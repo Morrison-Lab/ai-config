@@ -1,6 +1,14 @@
 Don't wait for `/clear` or the end of a task to run `ums` (Update Memories and Skills).
 As soon as a learning worth saving shows up during a session --- a corrected mistake, a new preference, a tool quirk, a workflow gap --- run UMS right then, interleaved with the main work, rather than batching it for a wrap-up step at the end.
 
+**Noticing or admitting a mistake triggers the pass at once, without waiting for the user to correct it.**
+The moment I notice, or say, that I got something wrong ("that one's on me"), the pass runs in that same turn, before sending the reply that admits it.
+(Ezra, 2026-11-12, Machine Learning course project: the coordinator admitted that it had missed threads while moving every thread to another model, and ran no pass;
+Ezra: "you should have run UMS as soon as you realized this".)
+
+- **Do:** run the pass in the turn that notices the mistake, and say in the reply what it recorded.
+- **Don't:** admit the mistake in a reply and leave the pass for the user to ask for.
+
 Still run UMS before `/clear` too, as a final catch-all for anything accumulated since the last proactive pass --- but treat that as a backstop, not the trigger to wait for.
 
 **In a multi-PR/multi-issue session (GII-style), treat each PR merge as a concrete proactive-UMS checkpoint, not just "whenever a learning happens to surface."**
@@ -281,7 +289,7 @@ See [`run-ums-proactively.cases.md`](run-ums-proactively.cases.md), "Stale recor
 
 Resolving a project thread removes its message box, so a learning not banked before the call has no later turn in which to be banked.
 The same holds when a thread reports its work done.
-"Run UMS before every pause" already covers this, but nothing ran it: the `post-merge` and `wrap-up` skills include a UMS pass, and no event invoked them.
+`AGENTS.md`'s "Leave every pause honest and resumable" ("Run UMS before every pause") already covers this, but nothing ran it: the `post-merge` and `wrap-up` skills include a UMS pass, and no event invoked them.
 
 Two mechanisms now do, both in `hooks/require-ums-before-resolve.py` (ai-config#4480):
 
@@ -321,7 +329,7 @@ Each is recorded in its global home, and also in project memory where the sessio
    a revert made through the GitHub UI or by moving files by hand stays a rule.
 6. **The context is compacted, or the session ends.**
    After compaction the hook reminds the session to run the pass over what the summary still shows.
-   A session that ends has no later turn, so the pass belongs before the last reply, per "Run UMS before every pause".
+   A session that ends has no later turn, so the pass belongs before the last reply, per `AGENTS.md`'s "Leave every pause honest and resumable" ("Run UMS before every pause").
 
 - **Do:** treat each of these as the moment to run `ums`, in the turn it happens.
 - **Don't:** wait for a review or a merge to bank a learning that already has a name.

@@ -534,7 +534,8 @@ on the slash, not the colon. Fix: prefix just that one command with
 whether `Lacaedemon/sparta`'s vendored `.ai-config` submodule pin was actually
 stale on `origin/main`, vs. only stale on the current feature-branch worktree
 — see the `CLAUDE.md` "Keep ai-config and repo checkouts fresh" step 4 update
-this same session added. `Lacaedemon/sparta`, 2026-07-04.)
+this same session added, a step now in [`keep-checkouts-fresh`](../shared/workflow/keep-checkouts-fresh.md).
+`Lacaedemon/sparta`, 2026-07-04.)
 
 ## `git checkout <name>` prefers an existing local branch over a same-named file, and does not refuse
 
@@ -912,7 +913,7 @@ the shape a committer-email check flags.
 
 The root cause is worth fixing rather than re-diagnosing: a non-working
 checkout should sit on `main`, not a leftover harness-named branch.
-`CLAUDE.md`'s "Keep ai-config and repo checkouts fresh" rule already asks
+[`keep-checkouts-fresh`](../shared/workflow/keep-checkouts-fresh.md) already asks
 for this for the ai-config clone specifically; the hook noise is a second
 reason it matters.
 

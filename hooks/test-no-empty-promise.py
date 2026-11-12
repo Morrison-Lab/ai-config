@@ -210,11 +210,13 @@ TOOL_RESULT = {"type": "user", "message": {"content": [
 
 
 # Running a negative control against another revision of the hook: copy that
-# revision AND `remind-ums-after-error.py` into one directory and point this
-# suite at the copy. `no-empty-promise.py` imports `visible_prose` from that
-# sibling and returns 0 unconditionally when the import fails, so a copy
-# placed on its own goes silent on EVERY case -- which reports as a suite-wide
-# failure rather than as the missing dependency it is.
+# revision AND `remind-ums-after-error.py` into one directory, copy
+# `scripts/lib/` (which holds the sibling loader, `sibling.py`) to
+# `../scripts/lib/` relative to that directory, and point this suite at the
+# copy. `no-empty-promise.py` imports `visible_prose` from that sibling and
+# returns 0 unconditionally when the import fails, so a copy missing either
+# one goes silent on EVERY case -- which reports as a suite-wide failure
+# rather than as the missing dependency it is (stderr names it).
 
 
 def say(text):

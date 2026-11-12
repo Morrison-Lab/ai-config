@@ -22,7 +22,7 @@ Nothing warned at any of steps 2-4. The push even looked like success.
 
 ## Why a hook rather than a prose rule
 
-`CLAUDE.md`'s "Check the remote immediately before every push" already tells
+`AGENTS.md`'s "Check the remote immediately before every push" already tells
 a session to verify state before pushing, and it did not help here: the
 session HAD verified its checkout, at step 1 -- the rule was followed and the
 mistake happened anyway, because the branch changed AFTER the verification,

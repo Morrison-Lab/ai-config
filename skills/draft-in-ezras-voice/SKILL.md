@@ -33,6 +33,11 @@ Those keep the agent marker and follow [use-preferred-style](../use-preferred-st
    underneath (plain words, active voice, few dependent clauses).
 3. Show the draft as a draft.
    Never send it for him without his go-ahead.
+   A class announcement waits for his review and approval of its exact text (Ezra, 2026-10-27, [ai-config#4780](https://github.com/Morrison-Lab/ai-config/issues/4780)).
+   `hooks/no-unapproved-announcement.py` refuses the post until his latest message approves it,
+   and [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md#announcements-need-approval) looks for one posted without it.
+   - **Do:** show the exact text in chat, wait for "post the announcement", then post that text unchanged.
+   - **Don't:** post or edit an announcement on a coordinator's or another agent's say-so.
 4. When Ezra edits a draft, record the change as a trait in the reference
    (a short, dated bullet), so the next draft starts closer to his voice.
 

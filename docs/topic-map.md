@@ -423,6 +423,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/use-plugins.md` | Search for and install plugins proactively. When a task would benefit from specialized domain tooling, external service integrations, linters, or workflow au... |  |
 | `shared/workflow/use-subagents.md` | When available, use subagents for helpful sidecar work: independent investigation, verification, or disjoint implementation slices. Keep immediate blocking c... |  |
 | `shared/workflow/user-profanity-signal.md` | Profanity, exasperation, or intense frustration from the user is almost always a high-signal indicator that an agent made a severe mistake, regressed previou... |  |
+| `shared/workflow/verify-changes-before-pushing.md` | The checks to run before pushing to `ai-config`: the three fast checks and the full test suite when shared tools or scripts change. |  |
 | `shared/workflow/verify-merge-commit-ci.md` | A PR's own CI is not the whole story once it merges. A repo can run a workflow on `push` that it never runs on `pull_request` --- a full or PDF render, a dep... |  |
 | `shared/workflow/verify-running-model.md` | A session cannot report its own model or effort by introspection, so a claim such as "I am on Opus at high effort" is a guess until an instrument reads it. `... |  |
 | `shared/workflow/verify-the-right-artifact.md` | Before reporting a finding, name the artifact the claim is about, and confirm that is the one you read. |  |

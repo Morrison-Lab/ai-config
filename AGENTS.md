@@ -139,7 +139,6 @@ Never use a pay-per-use API anywhere (Ezra, 2026-10-17).
 ## Keep ai-config and repo checkouts fresh
 
 Before starting work, update the current checkout and relevant submodules (`git pull --ff-only`, `git submodule update --init --recursive`).
-When working in a consumer repo, check if the `.ai-config` submodule is outdated relative to `origin/main` of `ai-config` and update it if appropriate.
 [`keep-checkouts-fresh`](shared/workflow/keep-checkouts-fresh.md) gives the four checks (the ai-config checkout, the consumer install, the working repo's `main`, the `.ai-config` pin), how to run each, how each fails, and the cases behind them.
 
 ## Remove redundant submodules when using native plugins
@@ -292,8 +291,7 @@ Verify every push first, and carry work worth keeping through to a PR ([#2889](h
 - **Deliver completed implementation work:** when asked to implement or write up changes on a feature branch, complete the full delivery cycle: tracking issue, scoped commits, adversarial self-review to a clean verdict, push, open or update the PR, request AI review, and drive to clean.
   This grants no merge authority: the Strict Merge Control Policy still applies.
 - **Verify changes before pushing:** always run relevant local linters, tests, and formatting checks before pushing commits to a remote branch.
-  At minimum for `ai-config`: `python3 scripts/validate-skills.py`, `python3 scripts/check-links.py`, `python3 scripts/check-ascii-punctuation.py`.
-  Run the full test suite (`python3 scripts/test_*.py`) when touching shared tools or scripts.
+  For `ai-config`, [`verify-changes-before-pushing`](shared/workflow/verify-changes-before-pushing.md) lists the minimum checks and when to run the full suite.
   Parse changed data files: [rule](shared/workflow/parse-data-files.md).
 - **Check the remote immediately before every push:** run `git ls-remote --heads origin <branch>` **immediately** before every `git push`, and reconcile what it shows.
   Never force-push without `--force-with-lease --force-if-includes` ([`check-before-pushing`](shared/workflow/check-before-pushing.md)).

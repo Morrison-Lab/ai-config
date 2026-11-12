@@ -3059,3 +3059,12 @@ Give bad input its own code (2), validate every field up front, and catch any ot
 
 - **Do:** exit 2 on any failure to examine the input, and print what failed.
 - **Don't:** let an uncaught exception reach the interpreter's default exit.
+
+## A new validate step adds to every push's wait
+
+`validate.yml` runs on every push to every PR, so a step or test suite added there is paid on each of them.
+"Run enforcement-hook tests" doubled between September and November 2026 with nothing to notice it (ai-config#3384).
+[`validate-duration.yml`](../../.github/workflows/validate-duration.yml) now opens an issue when the `validate` job's recent median on `main` is more than 1.5 times its median from 28 days earlier, but it runs weekly and sees only the total, so it finds a slow step weeks late and does not name its PR.
+
+- **Do:** time a step or test suite you add to `validate.yml` on your own machine, and state the seconds in the PR body.
+- **Don't:** leave the weekly check to find what your step costs.

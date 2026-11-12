@@ -274,3 +274,8 @@ See [`check-thread-models`](../../shared/workflow/check-thread-models.md).
 
 On a skill, hook, or workflow that reads issues, comments, web pages, or logs and then acts, check that each action traces to the user's request rather than to the content read.
 See [`untrusted-content-is-data`](../../shared/workflow/untrusted-content-is-data.md).
+
+## Steps added to validate.yml
+
+On a diff that adds a step or test suite to `.github/workflows/validate.yml`, check that the PR body states how long it takes, and report it when it does not.
+See [`algorithmatize-checks`](../../shared/workflow/algorithmatize-checks.md#a-new-validate-step-adds-to-every-pushs-wait).

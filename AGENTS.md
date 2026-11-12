@@ -292,21 +292,14 @@ Detail: [`pr-scope`](shared/workflow/pr-scope.md) and [`memories/reviewing-prs.m
 Have your work reviewed independently before it ships or reaches a person, and keep every PR you drive watched until it ends ([#2889](https://github.com/Morrison-Lab/ai-config/issues/2889)).
 
 - **Every self-review is an adversarial review by a separate subagent:** never push code blind, and never review your own diff in the context that wrote it.
-  Whenever reviewing your own work is called for (before `git push`, as the fallback when the external reviewer is down, or the project-conventions pass), dispatch it with an adversarial brief to a separate reviewer (the `adversarial-reviewer` subagent, or a separate CLI where no subagent tool exists) against `git diff origin/<default-branch>...HEAD`.
-  Address, rebut, or defer every finding, and push only on a `clean` verdict whose fingerprint prefix-matches HEAD ([`adversarial-self-review`](shared/workflow/adversarial-self-review.md)).
-- **Get a clean automated review before asking a person to review:** never ask a person to review a PR, GitLab MR, document, or other work product, on any forge, repo, or project, or report one as awaiting human review, until its automated review is clean or deadlocked.
-  Trigger the automated reviews yourself after the round's last push (or confirm a run on that head), and iterate (`ardi`) until clean.
-  A quota-skipped, stubbed, or never-started review is no review: re-trigger it, and if it still cannot give a verdict, a clean posted adversarial review stands in.
-  See [`automated-review-before-human`](shared/workflow/automated-review-before-human.md) for steps and exceptions.
-- **Put PRs in ready mode when they are ready for review**, since a draft hides a PR from reviewers and blocks review workflows;
-  the two exceptions are an up-front empty PR on claim (`pr-on-claim`), un-drafted once its implementation lands and checks pass, and a draft-gated dependent PR held until its prerequisites merge.
+  Dispatch the review with an adversarial brief to a separate reviewer, address, rebut, or defer every finding, and push only on a `clean` verdict for HEAD ([`adversarial-self-review`](shared/workflow/adversarial-self-review.md)).
+- **Get a clean automated review before asking a person to review:** never ask a person to review any work product, on any forge, or report it as awaiting human review, until its automated review is clean or deadlocked.
+  Trigger the automated reviews yourself after the round's last push, and iterate (`ardi`) until clean ([`automated-review-before-human`](shared/workflow/automated-review-before-human.md)).
+- **Put PRs in ready mode when they are ready for review**, except an empty PR opened on claim, until its implementation lands and checks pass, and a draft-gated dependent PR, until its prerequisites merge.
   Marking a PR ready grants no merge authority ([`put-prs-in-ready-mode`](shared/workflow/put-prs-in-ready-mode.md)).
-- **Always arm a persistent PR loop** when you open, push to, or take over a PR, if one is not already running, and keep it running until the PR merges, closes, or the user stops it.
-  A one-shot poll or webhook subscription is not a loop: re-arm periodic check-ins with the session's wake mechanism.
-  After every push, actively poll forge CI and review state with `gh` or `glab` until terminal.
-  Baking a self-merge directive into the loop prompt is allowed only under a standing `mwc` grant ([`persistent-pr-loop`](shared/workflow/persistent-pr-loop.md)).
-- **Monitor scoped open PRs and MRs:** continuously derive and monitor them in the repositories you are actively working in, not in every accessible repository, and within them only the items passing the [PR scope test](shared/workflow/pr-scope.md), including items you opened, pushed to, or were handed to drive.
-  Re-query that scoped set at every wake, inspecting mergeability, CI, and review state until each item merges, closes, or is released ([`monitor-scoped-open-prs`](shared/workflow/monitor-scoped-open-prs.md)).
+- **Always arm a persistent PR loop** when you open, push to, or take over a PR, if one is not already running, and keep it running until the PR merges or closes, or the user stops it.
+  A one-shot poll or webhook subscription is not a loop, so re-arm periodic wakes, and after every push poll CI and review until both are terminal ([`persistent-pr-loop`](shared/workflow/persistent-pr-loop.md)).
+- **Monitor scoped open PRs and MRs:** at every wake, re-query the open items that pass the [PR scope test](shared/workflow/pr-scope.md) in the repositories you are actively working in, not in every accessible repository, and follow each until it merges, closes, or is released ([`monitor-scoped-open-prs`](shared/workflow/monitor-scoped-open-prs.md)).
 
 ## Ship work through a verified push and a PR
 

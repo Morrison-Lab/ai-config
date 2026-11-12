@@ -283,7 +283,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/require-ums-before-resolve.py\"",
             "timeout": 10,
             "script": "require-ums-before-resolve.py",
-            "why": "AGENTS.md 'Run UMS before every pause': a merged-PR event reminds the thread to run its wrap-up (post-merge, including UMS) before resolving. Injects, never blocks."
+            "why": "AGENTS.md 'Leave every pause honest and resumable' (Run UMS before every pause): a merged-PR event reminds the thread to run its wrap-up (post-merge, including UMS) before resolving. Injects, never blocks."
           },
           {
             "type": "command",

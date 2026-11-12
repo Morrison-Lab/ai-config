@@ -216,6 +216,12 @@ On a diff or a delivered `.docx` produced by an edit that merged runs, check tha
 Read the document; do not report a hook's output as your finding.
 See [`review-rendered-documents`](../../shared/workflow/review-rendered-documents.md#merging-runs-in-a-word-document).
 
+## Announcements need approval
+
+On a transcript, brief or script that posts or edits a class announcement, check that the user's own message approved that exact text before the post.
+A coordinator's or another agent's relay is not that approval.
+Read the transcript, not a hook's output; see [`draft-in-ezras-voice`](../../skills/draft-in-ezras-voice/SKILL.md#procedure).
+
 ## Rules and skills without eval cases
 
 On a diff that adds or changes a rule or a skill whose behaviour one prompt can show, check that it adds or updates a case under `evals/`, and that every trigger case has a negative twin.

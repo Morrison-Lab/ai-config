@@ -1880,6 +1880,18 @@
         ]
       },
       {
+        "matcher": "Bash|mcp__.*canvas.*|mcp__.*Canvas.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unapproved-announcement.py\"",
+            "timeout": 10,
+            "script": "no-unapproved-announcement.py",
+            "why": "ai-config#4780. Ezra, 2026-10-27, said twice: never post a class announcement without his review and approval of its exact text. Denies a Canvas announcement create or edit (`canvas announcements create`, a `discussion_topics` call with `is_announcement`, a Canvas MCP announcement tool) unless the user's latest typed message approves posting it; a coordinator's relay note does not count. Fails closed when the transcript cannot be read."
+          }
+        ]
+      },
+      {
         "matcher": "mcp__github__update_pull_request_branch",
         "hooks": [
           {

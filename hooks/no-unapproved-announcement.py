@@ -24,7 +24,9 @@ except Exception:  # detection still runs; a detected write is then denied
 
 CLI = re.compile(r"\bcanvas\s+announcements?\s+(create|post|update|edit|publish)\b", re.I)
 TOPIC = re.compile(r"discussion_topic", re.I)
-WRITE = re.compile(r"(\b|-X\s*)(POST|PUT)\b|create_discussion_topic|\.(edit|update|post|put)\(|"
+ANNOUNCE = re.compile(r"is_announcement|announcement.*\.(edit|update|post|put)\(", re.I | re.S)
+DECLINE = re.compile(r"\b(no|not|wait|hold|stop|cancel|later|actually)\b|n't\b", re.I)
+WRITE = re.compile(r"(\b|-X\s*)(POST|PUT)\b|['\"](?i:post|put)['\"]|create_discussion_topic|\.(edit|update|post|put)\(|"
                    r"(^|\s)(-d|-F|-T|--data|--form|--json|--upload-file)")
 SAFE_FIRST = {"git", "gh", "grep", "egrep", "rg"}
 COMPOUND = re.compile(r"[;&|`\n<>]|\$\(|\bgh\s+api\b")
@@ -41,20 +43,19 @@ def is_announcement_write(tool, inp):
         first = (cmd.split() or [""])[0].rsplit("/", 1)[-1]
         if first in SAFE_FIRST and not COMPOUND.search(cmd):  # one plain command
             return False
-        return bool(CLI.search(cmd) or "is_announcement" in cmd
-                    or (TOPIC.search(cmd) and WRITE.search(cmd)))
+        return bool(CLI.search(cmd) or ANNOUNCE.search(cmd) or (TOPIC.search(cmd) and WRITE.search(cmd)))
     name = tool.lower()
-    if not name.startswith("mcp__") or "canvas" not in name:
+    if not name.startswith("mcp__") or "canvas" not in name and "announc" not in name:
         return False
     verb = name.split("__")[-1]
-    if ("announc" in verb or "discussion" in verb) and not MCP_READ.search(verb):
+    if any(w in verb for w in ("announc", "discussion", "topic")) and not MCP_READ.search(verb):
         return True
     flat = json.dumps(inp).replace('\\"', '"')
     return bool(TOPIC.search(flat) and re.search(r"is_announcement|\b(POST|PUT)\b", flat, re.I))
 
 
 def user_words(text):
-    """The user's own words: outside every tag, or in a principal message or
+    """The user's own messages: outside every tag, or in a principal message or
     a cited user entry that sits directly in its wake or relay."""
     out, stack, pos = [], [], 0
     for m in TAG.finditer(text):
@@ -72,7 +73,7 @@ def user_words(text):
                   else 'author="user"' in attrs if tag == "cited" else True)
             stack.append((tag, ok and (not stack or stack[-1][1])))
         pos = m.end()
-    return "\n".join(out + ([text[pos:]] if not stack else []))
+    return [p for p in out + ([text[pos:]] if not stack else []) if p.strip()]
 
 
 def _blocks(entry):
@@ -95,7 +96,8 @@ def verdict(path, tool, inp):
         if is_real_user_turn(entry) and entry.get("promptSource") != "sdk":
             text = "\n".join(strip_injected_text(b.get("text") or "")
                              for b in _blocks(entry) if b.get("type") == "text")
-            if not APPROVAL.search(user_words(text)):
+            last = (user_words(text) or [""])[-1]  # the user's last message only
+            if not APPROVAL.search(last) or DECLINE.search(last):
                 return "the user's latest message does not approve posting it"
             if [tool, inp] in writes:  # the call being judged, already logged
                 writes.remove([tool, inp])

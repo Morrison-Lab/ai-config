@@ -426,13 +426,6 @@ Whenever starting or working on a Pull Request:
 - **Don't:** Request human review when the PR is first opened empty or before code pushes are complete.
 
 
-## Check the remote immediately before every push
-
-Take a fresh `git ls-remote` reading of the branch immediately before every `git push`, and force only with `--force-with-lease --force-if-includes`, never bare `--force` and never as the answer to a `stale info` refusal.
-`hooks/no-clobbering-push.py` refuses a bare force push and warns on a divergence;
-its escape valve `ALLOW_FORCE_PUSH=1` means stating why.
-Detail, the `stale info` diagnosis, and cases: [`shared/workflow/check-before-pushing.md`](shared/workflow/check-before-pushing.md).
-
 ## Keep PR branches synced with main
 
 [`shared/workflow/sync-with-main.md`](shared/workflow/sync-with-main.md)

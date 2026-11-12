@@ -112,7 +112,7 @@ ls -laL "$transcript"; date "+%H:%M:%S"
 ```
 
 Two details, both measured rather than assumed.
-Take the clock reading in the **same command**, per `CLAUDE.md`'s timestamp rule, since "recent" is a comparison and the second half of it expires.
+Take the clock reading in the **same command**, per [`timestamp-local-recaps`](../shared/workflow/timestamp-local-recaps.md), since "recent" is a comparison and the second half of it expires.
 And pass `-L`, or resolve the path first: the harness's `tasks/<agentId>.output` entry is a **symlink** into the projects directory, and a bare `ls -la` on a symlink reports the link's own mtime rather than the transcript's.
 
 Never read the transcript's **contents** to check liveness.

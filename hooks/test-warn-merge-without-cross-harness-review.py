@@ -456,6 +456,9 @@ def main():
                            " https://example.com")])[0])
     check("silent when the Ollama URL follows --",
           not run(MERGE, [step("curl -d @x -- https://api.ollama.com/api/chat")])[0])
+    for cmd in ("-d -e", "--data -t", "-d x -H -x"):
+        check("silent when an option value looks like an option: " + cmd,
+              not run(MERGE, [step("curl %s https://api.ollama.com/api/chat" % cmd)])[0])
     check("silent when a bundled flag takes no value before the URL",
           not run(MERGE, [step("curl -sS -d @req.json -sS"
                                " https://api.ollama.com/api/chat")])[0])

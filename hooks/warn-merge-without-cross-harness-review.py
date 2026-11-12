@@ -294,9 +294,19 @@ def _curl_route(rest):
         if (verb is not None and verb.upper() != "POST") or arg in (
                 "-G", "--get", "-I", "--head"):
             return None
+    # Only a bare URL word is the target, never an option value (`-d URL`, `--form-string URL`).
+    # Walk from the left, so a value that looks like an option (`-d -e`) takes nothing.
+    values, takes = set(), False
     for i, arg in enumerate(args):
-        # Only a bare URL word is the target, never an option value (`-d URL`, `--form-string URL`).
-        if not arg.lower().startswith(("http://", "https://")) or (i and _takes_value(args[i - 1])):
+        if takes:
+            values.add(i)
+            takes = False
+        elif arg == "--":
+            break
+        else:
+            takes = _takes_value(arg)
+    for i, arg in enumerate(args):
+        if not arg.lower().startswith(("http://", "https://")) or i in values:
             continue
         try:
             parts = urllib.parse.urlsplit(arg)

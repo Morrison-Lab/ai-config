@@ -68,7 +68,7 @@ Recorded from the Machine Learning course project (2026-10-12 to 2026-10-16), wh
 - **Broadcast to every open thread, not a remembered subset.**
   When asked to tell "all relevant threads" something, list every non-resolved thread, read each one's latest status (including threads bucketed "completed", which can be stalled on a blocked merge), and then choose recipients.
   The same holds for a bulk action across threads, such as moving every thread to another model:
-  enumerate with `list_threads` (every page, every state), act on each, and re-list to confirm none was missed.
+  enumerate with `list_threads` (every page, every state, resolved threads included, since the action applies to all of them, not only open ones), act on each, and re-list to confirm none was missed.
   When the user says "all", do all of them, and never ask "do you want me to switch all of them?"
   (2nd occurrence, 2026-11-12: the coordinator messaged threads one at a time from memory, missed some, then asked;
   Ezra: "obviously yes; this shouldn't have been a question".)

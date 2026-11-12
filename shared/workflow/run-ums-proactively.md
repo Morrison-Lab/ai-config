@@ -2,7 +2,8 @@ Don't wait for `/clear` or the end of a task to run `ums` (Update Memories and S
 As soon as a learning worth saving shows up during a session --- a corrected mistake, a new preference, a tool quirk, a workflow gap --- run UMS right then, interleaved with the main work, rather than batching it for a wrap-up step at the end.
 
 **Noticing or admitting a mistake is the trigger, not the user's later correction.**
-The moment I notice, or say, that I got something wrong ("that one's on me"), the pass runs in that same turn, before the reply that admits it.
+The moment I notice, or say, that I got something wrong ("that one's on me"), the pass runs in that same turn, before sending the reply that admits it.
+It makes the "corrected mistake" trigger above concrete, rather than adding a separate one.
 (Ezra, 2026-11-12, Machine Learning course project: the coordinator admitted that it had missed threads while moving every thread to another model, and ran no pass;
 Ezra: "you should have run UMS as soon as you realized this".)
 

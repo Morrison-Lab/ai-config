@@ -187,8 +187,9 @@ GUARDED = {
     "flag-self-authored-verdict-echo.py", "flag-conflict-with-base.py",
     "no-commit-with-conflict-markers.py", "no-push-with-failing-notes-checks.py",
     "warn-new-line-breaks-on-push.py", "warn-new-line-breaks-on-edit.py",
+    "flag-unattributable-reviewer-request.py", "no-push-without-self-review.py",
+    "warn-merge-without-cross-harness-review.py",
 }
-check("every GUARDED hook is in USERS", sorted(GUARDED - {h for h, _ in USERS}), [])
 # Deny hooks that stop gating when a sibling is missing, and must say so.
 NOT_GATING = {"block-redo-denied-write-via-other-tool.py", "no-commit-with-conflict-markers.py",
               "no-push-with-failing-notes-checks.py"}
@@ -225,6 +226,67 @@ for hook_name, sibs in USERS:
     else:
         check(f"broken install: unguarded {hook_name} fails to import",
               (proc.returncode != 0, "ModuleNotFoundError" in proc.stderr), (True, True))
+
+# Hooks whose loader runs on demand with required=True: it returns the module
+# or raises, and each caller already handles the raise. The probe calls the
+# loader and prints the module's name or the exception's type.
+REQUIRED = (
+    ("flag-tool-gap-handling.py", "_sibling", "flag-cop-out-offer.py"),
+    ("flag-unattributable-reviewer-request.py", "_load_sibling", "no-unreviewed-pr.py"),
+    ("no-push-without-self-review.py", "_load_sibling", "no-unreviewed-pr.py"),
+    ("warn-merge-without-cross-harness-review.py", "_sibling",
+     "warn-merge-without-fully-clean.py"),
+)
+CALL_PROBE = ("import importlib.util as u, sys; "
+              "s = u.spec_from_file_location('h', sys.argv[1]); "
+              "m = u.module_from_spec(s); s.loader.exec_module(m)\n"
+              "try:\n"
+              "    print(type(getattr(m, sys.argv[2])()).__name__)\n"
+              "except Exception as e:\n"
+              "    print(type(e).__name__)")
+
+
+def call_probe(hooks_dir, hook_name, fn):
+    return subprocess.run([sys.executable, "-I", "-c", CALL_PROBE,
+                           os.path.join(hooks_dir, hook_name), fn],
+                          capture_output=True, text=True, timeout=60)
+
+
+def required_copy(hook_name, fn, sib, with_lib, with_sib):
+    bare = tempfile.mkdtemp()
+    try:
+        hooks_dir = os.path.join(bare, "hooks")
+        os.makedirs(hooks_dir)
+        if with_lib:
+            shutil.copytree(os.path.join(HERE, "lib"), os.path.join(bare, "scripts", "lib"))
+        else:
+            os.makedirs(os.path.join(bare, "scripts", "lib"))
+        for name in (hook_name, *((sib,) if with_sib else ())):
+            shutil.copy(os.path.join(HOOKS, name), hooks_dir)
+        return call_probe(hooks_dir, hook_name, fn)
+    finally:
+        shutil.rmtree(bare, ignore_errors=True)
+
+
+check("every GUARDED hook is in USERS or REQUIRED",
+      sorted(GUARDED - {h for h, _ in USERS} - {h for h, _, _ in REQUIRED}), [])
+for hook_name, fn, sib in REQUIRED:
+    proc = call_probe(HOOKS, hook_name, fn)
+    check(f"{hook_name} {fn}() loads {sib}", (proc.returncode, proc.stdout.strip()),
+          (0, "module"))
+    proc = required_copy(hook_name, fn, sib, with_lib=True, with_sib=False)
+    check(f"missing sibling: {hook_name} {fn}() raises", (proc.returncode, proc.stdout.strip()),
+          (0, "FileNotFoundError"))
+    proc = required_copy(hook_name, fn, sib, with_lib=False, with_sib=True)
+    if hook_name in GUARDED:
+        check(f"broken install: {hook_name} imports, and {fn}() raises ImportError",
+              (proc.returncode, proc.stdout.strip()), (0, "ImportError"))
+    else:
+        check(f"broken install: unguarded {hook_name} fails to import",
+              (proc.returncode != 0, "ModuleNotFoundError" in proc.stderr), (True, True))
+    with open(os.path.join(HOOKS, hook_name), encoding="utf-8") as fh:
+        check(f"{hook_name} source {'guards' if hook_name in GUARDED else 'does not guard'}"
+              " the import", bool(GUARD_RE.search(fh.read())), hook_name in GUARDED)
 
 if failures:
     print(f"\n{len(failures)} failure(s)")

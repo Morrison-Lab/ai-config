@@ -86,14 +86,11 @@ A false deny from the script case is discharged by running the reviewer in the
 foreground, or by the probe pass. There is no escape variable. The hook fails
 open on any internal error.
 """
-import importlib.util
 import json
 import os
 import re
 import sys
 import urllib.parse
-
-HERE = os.path.dirname(os.path.realpath(__file__))
 
 # Reviewer CLIs, one per harness. The session's own harness is removed at run
 # time, so `claude` counts only from a non-Claude session.
@@ -212,12 +209,23 @@ NOTE = (
 )
 
 
+_LIB = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+                    "scripts", "lib")
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+try:
+    from sibling import load_sibling
+except ImportError as _exc:
+    print(f"{os.path.basename(__file__)}: cannot load scripts/lib/sibling.py "
+          f"({_exc}); its sibling hook will not load", file=sys.stderr)
+    load_sibling = None
+
+
 def _sibling():
-    path = os.path.join(HERE, "warn-merge-without-fully-clean.py")
-    spec = importlib.util.spec_from_file_location("_sib_wmwfc", path)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+    """Import `warn-merge-without-fully-clean.py` (scripts/lib/sibling.py); raises if it cannot load."""
+    if load_sibling is None:
+        raise ImportError("scripts/lib/sibling.py is not importable")
+    return load_sibling(__file__, "warn-merge-without-fully-clean.py", "_sib_wmwfc", required=True)
 
 
 def own_harness(path="", recs=None):

@@ -42,7 +42,10 @@ CASES = [
     ("write access", POST, "I don't have write access to ai-config from this thread.", True),
     ("missing from", POST, "ai-config is missing from this thread's repos.", True),
     ("returned 200", POST, "add_repo returned 200 OK, but ai-config isn't in this thread's repos yet.", True),
+    ("reason is the excuse", POST, "I can't reach ai-config from this thread because it isn't attached.", True),
     # Passes.
+    ("thread nouns", POST, "lds is not in this thread's merge queue yet. mds is not in the plan for this session. I can't push to lds in this session.", False),
+    ("attach and other repo", POST, "I attached mlg to this thread, since it wasn't in this thread's repos, and fixed the lds link. mlg wasn't in this thread's repos, so I attached it and pushed the fix for the lds link.", False),
     ("not a repo", POST, "The merge-ready PR isn't in this thread yet. That file isn't in this thread. scripts/check.py isn't in this thread. `pytest` is not available in this session.", False),
     ("repo word as place", POST, "The bug is not in this thread's repo, it is in lds-site. Tests aren't in this session's repos folder. The issue is not in this thread's scope, so I left it.", False),
     ("status sentences", POST, "We have no gha changes in this thread. This session has no access to the network. The lds preview isn't in this thread yet. This thread does not edit lds; the change is in mds.", False),

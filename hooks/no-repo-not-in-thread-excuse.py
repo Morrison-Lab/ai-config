@@ -20,13 +20,14 @@ NEG = (rf"(?:isn{APOS}t|is\s+not|aren{APOS}t|are\s+not|wasn{APOS}t|was\s+not|"
        rf"don{APOS}t|doesn{APOS}t|didn{APOS}t|do\s+not|does\s+not|did\s+not|"
        rf"can{APOS}t|cannot|can\s+not|couldn{APOS}t|no\s+longer|not)")
 MODAL = rf"(?:can{APOS}t|cannot|can\s+not|couldn{APOS}t|unable\s+to|not\s+able\s+to)"
-# Every presence word must lead to a place: "lds is not available offline" passes.
-AHEAD = r"(?=\s+(?:this|the|my|our|that|current|any)\b)"
-SUBJ_NEG = re.compile(
-    rf"\b{NEG}\s+(?:(?:yet|currently|actually|even|already|really)\s+)?(?:in|within|part\s+of|among|"
-    rf"(?:attached|added|checked\s+out|cloned|available|accessible|reachable)(?:\s+(?:to|in|into|from|on|for))?){AHEAD}"
-    rf"|\b(?:outside|unavailable\s+(?:in|from|to)|missing\s+from){AHEAD}", re.I)
 PLACE = rf"(?:this|the|my|our|that|current)\s+(?:project\s+)?(?:thread|session)"
+# The place is the thread itself or its repo list: "lds is not in this thread's queue" passes.
+TARGET = (rf"\s+(?:{PLACE}(?:{APOS}s\s+(?:github\s+)?(?:repos|repositories|repo\s+scope|repo\s+list|scope))?"
+          rf"(?![\w'\u2019])|my\s+(?:repos|repositories)\b|the\s+(?:repos|repositories)\s+(?:attached|available|in|for)\b)")
+SUBJ_NEG = re.compile(
+    rf"(?:\b{NEG}\s+(?:(?:yet|currently|actually|even|already|really)\s+)?(?:in|within|part\s+of|among|"
+    rf"(?:attached|added|checked\s+out|cloned|available|accessible|reachable)(?:\s+(?:to|in|into|from|on|for))?)"
+    rf"|\b(?:outside|unavailable\s+(?:in|from|to)|missing\s+from)){TARGET}", re.I)
 LOC = re.compile(rf"\b{PLACE}\b|\bmy\s+(?:repos|repositories)\b", re.I)
 REPO_LIST = re.compile(
     rf"\b{PLACE}{APOS}s\s+(?:github\s+)?(?:repos|repositories|repo\s+scope|repo\s+list)\b"
@@ -50,7 +51,7 @@ END = r"(?=\s*(?:[.,;:!?)](?=\s|$)|$|(?:in|on|from|here|to|into|within|checked|c
 ACCESS = r"(?:(?:write|push|read)\s+)?access\s+to\s+"
 OBJECT = re.compile(
     rf"\b{NEG}\s+(?:\w+\s+){{0,2}}?(?:have|has|include|includes|see)\s+(?:{ACCESS})?{DET}{TOK}{END}"
-    rf"|\b{MODAL}\s+(?:\w+\s+)?(?:reach|access|push|edit|write|commit|clone|modify|open\s+a\s+PR\s+(?:on|in|against))"
+    rf"|\b{MODAL}\s+(?:\w+\s+)?(?:reach|access|clone|see)"
     rf"\s+(?:to\s+|into\s+)?{DET}{TOK}{END}"
     rf"|(?:\b(?:has|have)\s+no|\bthere(?:{APOS}s|\s+is|\s+are)\s+no)\s+"
     rf"(?:{ACCESS}{DET}{TOK}|(?:checkout|clone|copy)\s+of\s+{DET}{TOK}"
@@ -58,7 +59,6 @@ OBJECT = re.compile(
     rf"|\black\w*\s+{ACCESS}{DET}{TOK}",
     re.I)
 ATTACH_TOOL = re.compile(r"\b(?:ran|called|used|via)\s+add_repo\b|\badd_repo\s+(?:attached|added|cloned)\b", re.I)
-CAUSE = re.compile(r"\b(?:because|until|while|since|unless|denied|blocked|protected|flagged)\b|[:(]", re.I)
 ATTACHED = re.compile(
     rf"\b(?:I|we)(?:{APOS}ve|\s+have|\s+just|\s+then)?\s+(?:just\s+)?(?:added|attached|cloned)\s+(?:(?:the|a|an)\s+)?`?([\w/-]+)", re.I)
 FAIL = r"(?:refused|denied|declined|failed|rejected|errored|returned\s+(?:an?\s+)?(?:error|[45]\d\d))"
@@ -85,40 +85,35 @@ def message_text(tool_input: dict) -> str:
     return "\n".join(p for p in parts if isinstance(p, str))
 
 
-def names_repo(sentence: str) -> bool:
-    if LIST_NEG.search(sentence):
+def names_repo(sentence: str, attached: set) -> bool:
+    if not attached and LIST_NEG.search(sentence):
         return True
     for m in SUBJ_NEG.finditer(sentence):
         window = sentence[max(0, m.start() - 200):m.start()]
         subj = SUBJECT.search(window)
         # "The fix for lds isn't in" names lds as an object, not the subject.
-        if subj and not re.search(r"\b(?:for|to|on|in|of|with|from|about|by)\s+$", window[:subj.start()], re.I):
+        tok = subj and subj.group(0).strip(" `'\"\u2019").split()[0].lower()
+        if subj and tok not in attached and not (attached and tok in ("repo", "repository")) and not re.search(r"\b(?:for|to|on|in|of|with|from|about|by)\s+$", window[:subj.start()], re.I):
             return True
     obj = OBJECT.search(sentence)
     if not obj:
         return False
-    # "I can't push to lds from this session because the branch is protected" is a blocker.
-    if obj.group(2) and CAUSE.search(sentence, obj.end()):
-        return False
-    return any(g and REPO_NAME.search(g) for g in obj.groups())
+    return any(g and REPO_NAME.search(g) and g.lower() not in attached for g in obj.groups())
 
 
 def is_excuse(sentence: str) -> bool:
     sentence = re.sub(r"https?://[^\s)]*", "", sentence)
     if not LOC.search(sentence):
         return False
-    att = ATTACHED.search(sentence)
-    named = {m.group(0).lower() for m in NAMED.finditer(sentence)}
-    if ATTACH_TOOL.search(sentence) and len(named) <= 1:
+    if ATTACH_TOOL.search(sentence) or TRIED.search(sentence):
         return False
-    obj = att and att.group(1).lower()
-    if obj == "it" and len(named) == 1:
-        obj = next(iter(named))
-    if obj and REPO_NAME.search(obj) and named <= {obj}:
-        return False
-    if TRIED.search(sentence):
-        return False
-    return names_repo(sentence)
+    attached = set()
+    for m in ATTACHED.finditer(sentence):
+        obj = m.group(1).lower()
+        # "mlg wasn't in this thread's repos, so I attached it": it is the repo named before.
+        attached |= ({n.group(0).lower() for n in NAMED.finditer(sentence, 0, m.start())}
+                     if obj == "it" else {obj})
+    return names_repo(sentence, {a for a in attached if REPO_NAME.search(a)})
 
 
 def excuse(text: str):

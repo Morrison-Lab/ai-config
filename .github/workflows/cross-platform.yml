@@ -4,27 +4,21 @@ name: cross-platform
 # aliasing (/var -> /private/var), a case-insensitive filesystem, or Windows
 # Git Bash never show in CI (ai-config#1843). This runs the same derived step
 # list on macOS and Windows through the local runner that already derives it
-# from validate.yml. It runs weekly and on demand, and on a pull request only
-# when this file or the runner changes, so a checker change reaches these
-# platforms after it merges; a red scheduled run opens or updates a tracking
-# issue.
+# from validate.yml. It runs weekly and on demand, not on pull requests: steps
+# known to fail on macOS (ai-config#5494) and on Windows (ai-config#5503) would
+# leave every PR that triggered it red. A scheduled run that fails or hits the
+# job's time limit opens or updates a tracking issue.
 
 on:
   schedule:
     - cron: "17 9 * * 1"
   workflow_dispatch:
-  pull_request:
-    paths:
-      - .github/workflows/cross-platform.yml
-      - scripts/run-local-validation.py
-      - scripts/lib/findbash.py
 
 permissions:
   contents: read
 
 concurrency:
   group: cross-platform-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   validate:
@@ -52,7 +46,12 @@ jobs:
 
   report:
     needs: validate
-    if: failure() && github.event_name == 'schedule'
+    # A job that reaches timeout-minutes ends "cancelled", not "failure", so
+    # failure() alone would leave a hung run unreported. !cancelled(), not
+    # always(), so a run someone cancels by hand files nothing.
+    if: >-
+      !cancelled() && github.event_name == 'schedule' &&
+      (needs.validate.result == 'failure' || needs.validate.result == 'cancelled')
     runs-on: ubuntu-latest
     permissions:
       issues: write

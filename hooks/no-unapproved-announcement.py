@@ -40,7 +40,9 @@ INTERP = re.compile(r"(python[\d.]*|Rscript|node|deno|bash|z?sh|ruby|perl|pwsh|s
 EXT = re.compile(r"[\w./~-]+\.(py|R|r|js|mjs|ts|sh|rb|pl|ps1)$")
 CODE_WRITE = re.compile(r"\b(post|put|edit|update|PUT|POST)\(|create_discussion_topic|['\"](POST|PUT|post|put)['\"]|"
                         r"-X\s*(POST|PUT)|\b(Request|urlopen)\([^)]*\bdata\s*=")
-SELF = ('"""' + __doc__[:40], '"""Regression tests for no-unapproved-announcement.py')  # this hook, a copy, its tests
+SELF = [os.path.join(os.path.dirname(os.path.realpath(__file__)), f) for f in (
+    os.path.basename(__file__), "test-no-unapproved-announcement.py")]  # a copy of this hook or its tests is skipped
+UV_VALUE = ("--with", "--python", "-p", "--from", "--env-file", "--config")  # uv or deno options that take a value
 
 
 def script_names(cmd):
@@ -51,11 +53,14 @@ def script_names(cmd):
         if words and EXT.match(words[0]):  # a script run by its path
             yield words[0]
         for i, w in enumerate(words):
-            if not INTERP.match(w.rsplit("/", 1)[-1]):
+            if not INTERP.match(w.rsplit("/", 1)[-1]) or w in (".", "source") and i:  # `.` runs a file only first
                 continue
             rest = words[i + 1:]
-            if w.endswith(("uv", "deno")):  # `uv run x.py`: only the word after `run`, not a tool's argument
-                rest = rest[1:2] if rest[:1] == ["run"] else rest[:1]
+            if w.endswith(("uv", "deno")):  # `uv run x.py`: the word after `run` and its options, not a tool's argument
+                rest = rest[1:] if rest[:1] == ["run"] else rest
+                while rest and rest[0].startswith("-"):
+                    rest = rest[2:] if rest[0] in UV_VALUE else rest[1:]
+                rest = rest[:1]
             for x in rest:  # the first script after the interpreter's options, unless -m or -c runs code instead
                 if x in ("-m", "-c"):
                     break
@@ -64,12 +69,23 @@ def script_names(cmd):
                     break
 
 
+def is_self(code):
+    """The script is an exact copy of this hook or its tests, which name writes without making them."""
+    for path in SELF:
+        if os.path.isfile(path):
+            with open(path, encoding="utf-8", errors="ignore") as fh:
+                if fh.read(1 << 20) == code:
+                    return True
+    return False
+
+
 def script_writes(cmd, cwd):
     """A script file the command runs makes a network topic write, or cannot be read (#5453)."""
     cds = [os.path.expanduser(d) for d in re.findall(r"\bcd\s+([\w./~-]+)", cmd)]
     dirs = [cwd or "."] + [os.path.join(cwd or ".", d) for d in cds]
     code_args = " ".join(a or b for a, b in re.findall(r"-c\s+(?:'([^']*)'|\"([^\"]*)\")", cmd))
-    imported = {m + ".py" for m in re.findall(r"\b(?:import|from)\s+(\w+)", code_args)}  # a local module `-c` code loads
+    modules = re.findall(r"\b(?:import|from)\s+([\w.]+)", code_args) + re.findall(r"\bpython[\d.]*\s+-m\s+([\w.]+)", cmd)
+    imported = {m.replace(".", "/") + ".py" for m in modules}  # a local module `-c` code loads or `-m` runs
     for name in [*script_names(cmd), *sorted(imported)]:
         paths = [p for p in (os.path.join(d, os.path.expanduser(name)) for d in dirs) if os.path.isfile(p)]
         try:
@@ -79,7 +95,7 @@ def script_writes(cmd, cwd):
             if TOPIC.search(cmd) and name not in imported:
                 return True
             continue
-        if (code.split("\n", 1)[-1] if code.startswith("#!") else code).startswith(SELF):
+        if is_self(code):
             continue
         if (ANNOUNCE.search(code) or TOPIC.search(code)) and NET.search(code) and CODE_WRITE.search(code):
             return True

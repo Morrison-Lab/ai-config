@@ -29,11 +29,11 @@ def result(uid, error=False):
         {"type": "tool_result", "tool_use_id": uid, "content": "ok", "is_error": error}]}}
 
 
-def run(tool, inp, *entries):
+def run(tool, inp, *entries, **extra):
     path = os.path.join(TMP, f"t{len(os.listdir(TMP))}.jsonl")
     with open(path, "w", encoding="utf-8") as fh:
         fh.writelines(json.dumps(e) + "\n" for e in entries)
-    payload = json.dumps({"tool_name": tool, "tool_input": inp, "transcript_path": path})
+    payload = json.dumps(dict({"tool_name": tool, "tool_input": inp, "transcript_path": path}, **extra))
     proc = subprocess.run([sys.executable, SUBJECT], input=payload, capture_output=True, text=True)
     assert proc.returncode == 0, proc.stderr
     out = proc.stdout.strip() and json.loads(proc.stdout)
@@ -109,6 +109,15 @@ for tool, inp in WRITES:
     for entries, allowed in CASES:
         assert (run(tool, inp, *entries, now) is None) == allowed, (tool, entries)
     assert run(tool, inp, user(OK), call("now", tool, inp), result("now")) == "deny", (tool, "unlogged retry")
+    assert run(tool, inp, user(OK), now, agent_id="a1") == "deny", (tool, "subagent")
+for name, code in [("post.py", "c.create_discussion_topic(is_announcement=True)"), ("p.R", "httr::PUT(u_topic_announcement)"),
+                   ("read.py", "print(c.get_announcements())"), ("test-x.py", "is_announcement=True")]:
+    with open(os.path.join(TMP, name), "w", encoding="utf-8") as fh:
+        fh.write(code)
+SCRIPTS = {f"python3 {TMP}/post.py": "deny", f"Rscript {TMP}/p.R": "deny", f"cd x && python3 {TMP}/read.py": None,
+           f"python3 {TMP}/test-x.py": None, "python3 gone/announcement.py": "deny", "python3 -c 'print(1)'": None}
+for c, want in SCRIPTS.items():
+    assert run("Bash", {"command": c}, user("hello")) == want, c
 for tool, inp in OTHER:
     assert run(tool, inp, user("hello")) is None, (tool, inp)
 

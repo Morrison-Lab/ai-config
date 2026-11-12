@@ -34,7 +34,28 @@ TAG = re.compile(r"<(/?)([a-z][\w-]*)([^>]*)>", re.I)
 ENVELOPE = {"wake", "project", "thread", "message", "relay", "cited", "note"}  # and every hyphenated tag
 
 
-def is_announcement_write(tool, inp):
+SCRIPT = re.compile(r"(?:\b(?:python3?|Rscript|node|deno|bash|z?sh|ruby|perl|pwsh|source)\s+(?:-\S+\s+)*|"
+                    r"(?:^|[\s;&|(])(?=\./))([\w./~-]+)")
+
+
+def script_writes(cmd, cwd):
+    """A script file the command runs posts an announcement, or cannot be read (#5453). Tests are skipped."""
+    for name in SCRIPT.findall(cmd):
+        if name.startswith("-") or os.path.basename(name).startswith("test"):
+            continue
+        try:
+            with open(os.path.join(cwd or ".", os.path.expanduser(name)), encoding="utf-8", errors="ignore") as fh:
+                code = fh.read(1 << 20)
+        except OSError:
+            if TOPIC.search(cmd):
+                return True
+            continue
+        if ANNOUNCE.search(code) or TOPIC.search(code) and re.search(r"\b(post|put)\b", code, re.I):
+            return True
+    return False
+
+
+def is_announcement_write(tool, inp, cwd=""):
     if tool in ("Bash", "Monitor", "PowerShell"):
         cmd = inp.get("command") or ""
         first = (cmd.split() or [""])[0].rsplit("/", 1)[-1]
@@ -42,6 +63,8 @@ def is_announcement_write(tool, inp):
         plain = not COMPOUND.search(bare)
         if first in SAFE_FIRST and plain:  # one plain command
             return False
+        if script_writes(cmd, cwd):
+            return True
         net = NET.search(cmd) or first in ("http", "https", "xh")
         curl_read = first == "curl" and not WRITE.search(cmd) and plain
         cli = CLI.search(bare) or re.search(r"\b(ba|z)?sh\s+-c\b", cmd) and CLI.search(cmd)
@@ -134,13 +157,14 @@ def main() -> int:
         print(f"no-unapproved-announcement: unchecked ({exc})", file=sys.stderr)
         return 0
     try:
-        hit = isinstance(inp, dict) and is_announcement_write(tool, inp)
+        hit = isinstance(inp, dict) and is_announcement_write(tool, inp, payload.get("cwd") or "")
     except Exception:  # detection failed: fall back to a crude, closed check
         hit = bool(re.search(r"discussion_topic|announc", json.dumps(inp), re.I))
     if not hit:
         return 0
     try:
-        why = verdict(payload.get("transcript_path") or "", tool, inp)
+        why = ("it runs in a subagent, which the user's approval does not reach (#5453)" if payload.get("agent_id")
+               else verdict(payload.get("transcript_path") or "", tool, inp))
     except Exception as exc:  # a detected write: fail closed
         why = f"the check failed ({exc})"
     if why:

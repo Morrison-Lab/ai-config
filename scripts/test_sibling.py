@@ -110,6 +110,19 @@ USERS = (
         "_copout": "flag-cop-out-offer.py", "_retry": "remind-retry-before-declaring-blocked.py"}),
     ("warn-title-only-issue-edit.py", {
         "_stale": "warn-stale-issue-edit.py", "_disclosure": "require-agent-disclosure.py"}),
+    ("flag-uncounted-comment-claims.py", {
+        "_premises": "remind-brief-premises.py", "_rebuttal": "flag-uncited-rebuttal.py"}),
+    ("flag-unmeasured-digest.py", {
+        "_stamp": "flag-unmeasured-timestamp.py", "_rebuttal": "flag-uncited-rebuttal.py"}),
+    ("flag-unmeasured-timestamp.py", {
+        "_clock": "no-unmeasured-clock-claim.py", "_rebuttal": "flag-uncited-rebuttal.py",
+        "_disclosure": "require-agent-disclosure.py", "_stale": "warn-stale-issue-edit.py"}),
+    ("flag-unread-commit-citation.py", {
+        "_ts": "flag-unmeasured-timestamp.py", "_clock": "no-unmeasured-clock-claim.py"}),
+    ("warn-claim-without-comments-read.py", {
+        "_dupe": "warn-pr-create-without-dupe-check.py", "_rebuttal": "flag-uncited-rebuttal.py"}),
+    ("warn-unmeasured-capability-claim.py", {
+        "_disclosure": "require-agent-disclosure.py", "_rebuttal": "flag-uncited-rebuttal.py"}),
 )
 PROBE = ("import importlib.util as u, sys; "
          "s = u.spec_from_file_location('h', sys.argv[1]); "
@@ -155,7 +168,9 @@ def probe_copy(hook_name, sibs, with_lib, with_sibs):
 GUARDED = {
     "no-empty-promise.py", "no-mistake-without-a-hook.py", "remind-learn-from-review.py",
     "no-user-correction-without-mechanism.py", "remind-ums-on-scrutiny.py",
-    "no-unread-issue-claim.py",
+    "no-unread-issue-claim.py", "flag-uncounted-comment-claims.py", "flag-unmeasured-digest.py",
+    "flag-unmeasured-timestamp.py", "flag-unread-commit-citation.py",
+    "warn-claim-without-comments-read.py", "warn-unmeasured-capability-claim.py",
 }
 check("every GUARDED hook is in USERS", sorted(GUARDED - {h for h, _ in USERS}), [])
 GUARD_RE = re.compile(r"^try:\n    from sibling import load_sibling\n", re.M)

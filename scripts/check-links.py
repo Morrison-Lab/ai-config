@@ -4,6 +4,7 @@
 A fragment (`#slug`) on its own, or on a link to a Markdown file or to a
 directory's README, must also name a heading or an HTML `id`/`name` there:
 renaming a heading otherwise breaks every link to it silently (ai-config#3630).
+A fragment on a link to a directory with no README at all fails too.
 Files are parsed as CommonMark with markdown-it-py. A heading matches when its
 text and the fragment have the same letters, marks and digits. GitHub's slug
 keeps all of these except letters and marks added in Unicode 14 or later,
@@ -232,9 +233,17 @@ def check_target(target: str, md: Path, root: Path = ROOT) -> None:
     is_bare = "/" not in path_part and "." not in path_part
     resolved = resolve_target(md.parent, target)
     fragment = target.split("#", 1)[1] if "#" in target else ""
-    if resolved is not None and resolved.is_dir():  # GitHub shows the README
+    if resolved is not None and resolved.is_dir() and fragment:  # GitHub shows the README
         readme = resolved / "README.md"
-        resolved = readme if readme.is_file() and fragment else resolved
+        if readme.is_file():
+            resolved = readme
+        elif not any(p.name.lower().startswith("readme") for p in resolved.iterdir()):
+            # Only a file listing, so no heading for the fragment to name;
+            # another README format (readme.rst) is left unchecked.
+            checked += 1
+            rel = md.relative_to(root) if md.is_relative_to(root) else md
+            broken.append(f"{rel} -> {target} (no README for the heading)")
+            return
     if resolved is not None and fragment and resolved.suffix == ".md":
         check_fragment(fragment, resolved, target, md, root)
     elif resolved is not None:

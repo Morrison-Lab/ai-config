@@ -3601,11 +3601,20 @@ class TestMaintainerFeedback(unittest.TestCase):
         s["comments"].append(comment("Define this directly.", "d-morrison", self.LATER))
         d = self.decide(s)
         self.assertEqual(d["decision"], "deny")
-        self.assertIn("maintainer feedback newer than the last push", d["reason"])
+        self.assertIn("maintainer feedback no agent reply has answered", d["reason"])
 
-    def test_maintainer_comment_before_push_allows(self):
+    def test_maintainer_comment_before_push_still_denies(self):
+        # ai-config#5577: a push alone, such as a merge of main, answers nothing.
         s = self.state()
         s["comments"].append(comment("Define this directly.", "d-morrison", self.EARLIER))
+        self.assertEqual(self.decide(s)["decision"], "deny")
+
+    def test_agent_reply_after_maintainer_comment_allows(self):
+        s = self.state()
+        s["comments"].append(comment("Define this directly.", "d-morrison", self.EARLIER))
+        s["comments"].append(comment(
+            "Done.\n\n_Posted by Claude Code (AI agent) --- not written by a human._",
+            "d-morrison", self.LATER))
         self.assertEqual(self.decide(s)["decision"], "allow")
 
     def test_maintainer_inline_comment_after_push_denies(self):

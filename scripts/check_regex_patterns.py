@@ -50,6 +50,9 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+from regex_probe import search_in_child  # noqa: E402
+
 try:
     import re._parser as parser
 except ImportError:
@@ -549,8 +552,9 @@ def test_dynamic_probe(
 ) -> tuple[bool, float, str | None]:
     """Execute regex search on probe input with hard timeout.
 
-    Uses signal.setitimer on Unix for microsecond setup; falls back to
-    daemon thread on platforms without SIGALRM.
+    Uses signal.setitimer on Unix, on the main thread. Elsewhere (Windows, or
+    a non-main thread) it runs the search in a child process that is killed
+    on timeout: a thread cannot be stopped mid-match (ai-config#5503).
     Returns (passed, duration, error_or_timeout_msg).
     """
     try:
@@ -574,31 +578,8 @@ def test_dynamic_probe(
             signal.setitimer(signal.ITIMER_REAL, 0)
             signal.signal(signal.SIGALRM, old_handler)
 
-    # Fallback path: daemon thread with join
-    result_holder: list[tuple[bool, float, str | None]] = []
-
-    def _worker() -> None:
-        t0 = time.perf_counter()
-        try:
-            compiled.search(probe)
-            dur = time.perf_counter() - t0
-            result_holder.append((True, dur, None))
-        except Exception as exc:
-            result_holder.append((True, 0.0, str(exc)))
-
-    t = threading.Thread(target=_worker, daemon=True)
-    t0 = time.perf_counter()
-    t.start()
-    t.join(timeout)
-
-    if t.is_alive():
-        dur = time.perf_counter() - t0
-        return False, dur, f"Execution timed out (> {timeout:.2f}s)"
-
-    if result_holder:
-        return result_holder[0]
-
-    return True, time.perf_counter() - t0, None
+    # Fallback path: a killable child process (scripts/lib/regex_probe.py).
+    return search_in_child(pattern_str, flags, probe, timeout)
 
 
 def check_dynamic_probes(

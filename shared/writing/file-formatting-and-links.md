@@ -11,4 +11,4 @@ Formatting defaults for responses and documentation: GitHub-style markdown, libe
 
 - **Don't:** link a `#NNN` a passage is displaying rather than citing, or leave referenced tools, forge items or policies unlinked.
 
-These rules moved verbatim from `AGENTS.md`'s "File formatting & links" section (ai-config#5310), which keeps a one-sentence summary and links here.
+These rules moved verbatim from `AGENTS.md`'s "File formatting & links" section ([ai-config#5310](https://github.com/Morrison-Lab/ai-config/issues/5310)), which keeps its absolute rules inline and points here for the rest.

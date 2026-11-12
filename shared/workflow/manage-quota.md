@@ -78,7 +78,7 @@ When the tool refused a persisted script path as unreadable, a copy under the sc
 
 ## Delegation rules for every agent
 
-These rules moved verbatim from `AGENTS.md`'s "Manage quota, including the structural kind" section (ai-config#5310), which keeps a one-sentence summary and links here.
+These rules moved verbatim from `AGENTS.md`'s "Manage quota, including the structural kind" section ([ai-config#5310](https://github.com/Morrison-Lab/ai-config/issues/5310)), which keeps its absolute rules inline and points here for the rest.
 
 Treat token cost as a property of a workflow's **shape**: route bounded mechanical work to cheaper models, subagents, or separately-billed CLIs.
 See [`restructure-for-efficiency`](restructure-for-efficiency.md) and [`merge-queue`](merge-queue.md).

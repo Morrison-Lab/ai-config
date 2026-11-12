@@ -131,8 +131,10 @@ When a repo you touch uses copy-pasted or outdated CI actions, migrate it to the
 
 ## Manage quota, including the structural kind
 
-Follow [`manage-quota`](shared/workflow/manage-quota.md#delegation-rules-for-every-agent) for workflow shape and cost.
-It sets which work goes to cheaper models or OpenCode, who checks the results, reviewer independence, data that never leaves, and paid APIs.
+Follow [`manage-quota`](shared/workflow/manage-quota.md#delegation-rules-for-every-agent) for workflow shape and where to send delegated work.
+A reviewer must differ from the author in model and harness.
+Never send student or PHI data.
+Never use a pay-per-use API anywhere (Ezra, 2026-10-17).
 
 ## Keep ai-config and repo checkouts fresh
 
@@ -199,8 +201,8 @@ Use no robot emoji anywhere in the footer, since review parsers can misinterpret
 
 ## File formatting & links
 
-Follow [`file-formatting-and-links`](shared/writing/file-formatting-and-links.md) for responses and documentation.
-It sets the markdown flavour, when and how to link files, symbols, PRs and issues, and line breaks.
+When mentioning PRs or issues, format them as clickable hyperlinks to forge URLs, never bare `#NNN` (except `Closes #123`).
+Follow [`file-formatting-and-links`](shared/writing/file-formatting-and-links.md) for the rest: markdown flavour, links to files and symbols, the displayed-`#NNN` exception, and line breaks.
 
 ## Never dispatch a worker on Fable without explicit, specific permission
 

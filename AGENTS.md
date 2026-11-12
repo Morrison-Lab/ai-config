@@ -60,33 +60,18 @@ Write all LaTeX math, in any repo or format, with the shared semantic macros: [`
 
 Before filing a PR in an external repository, read and follow its `CONTRIBUTING.md` and `.github/pull_request_template.md`, never an internal template or memory.
 
-## No empty promises
+## Leave every pause honest and resumable
 
-A commitment about your own future behaviour --- "going forward, I will X", "from now on I won't Y", "I'll always Z", "I won't do that again", "that is owed by me" --- must ship an implemented accountability mechanism in the same turn, or not be made at all.
-A written rule or memory entry is the minimum;
-a hook is the right form when decidable;
-an owed action requires an armed timer, schedule, or PR watcher that will fire and report its clock time.
-Treat "the pipeline/reviewer will ..." as the same kind of future delivery claim: state current status or arm monitoring for the result.
-See [`no-empty-promises`](shared/workflow/no-empty-promises.md).
+What you say about the state you stop in must be true, and any work that remains needs something that will resume it ([#2889](https://github.com/Morrison-Lab/ai-config/issues/2889)).
 
-## Resume every non-clean pause
-
-Whenever work remains at a pause, arm a timer or equivalent wake mechanism that will resume the next concrete step, reporting what will fire and its clock time.
-A verified clean stopping point needs no timer because no work remains to resume.
-Do not substitute a promise to return for a mechanism that will actually fire.
-See [`flag-session-boundaries`](shared/workflow/flag-session-boundaries.md).
-
-## Say whether the session is done when reporting stopping point status
-
-When ending a turn and reporting stopping point status, explicitly state whether the session is done or not, confirming that UMS has run (or no new learnings accumulated) and that all follow-up items noticed during the turn or task have been filed.
-Never say a session is done when there are uncommitted, unpushed, or un-PRed changes, or open PRs authored by that session.
-See [`flag-session-boundaries`](shared/workflow/flag-session-boundaries.md).
-
-## Terminate superseded and abandoned background tasks
-
-When background tasks, asynchronous command executions, monitors, or subagents are dispatched to inspect, search, or diagnose an issue, actively terminate them as soon as their purpose is fulfilled, their findings are superseded, or the session moves on.
-Sweep active background tasks and subagents before declaring a task, milestone, or session complete.
-See [`terminate-superseded-tasks`](shared/workflow/terminate-superseded-tasks.md).
+- **No empty promises:** a commitment about your own future behaviour, or a claim that automation will finish later, ships an implemented mechanism in the same turn (a rule or memory entry at minimum, a hook when decidable, an armed timer or PR watcher for an owed action), or is not made ([`no-empty-promises`](shared/workflow/no-empty-promises.md)).
+- **Resume every non-clean pause:** whenever work remains, arm a timer or equivalent wake that will resume the next step, and report what fires and its clock time;
+  a promise to return is not a mechanism.
+- **Say whether the session is done when reporting stopping point status**, confirming UMS ran and noticed follow-ups are filed;
+  never say done with uncommitted, unpushed, or un-PRed changes, or open PRs the session authored ([`flag-session-boundaries`](shared/workflow/flag-session-boundaries.md)).
+- **Run UMS before every pause** if learnings have accumulated, and **run UMS when work is scrutinized** (a review, critical feedback, or a questioned claim that proves wrong), in that turn;
+  answering with the corrected fact is not the pass ([`run-ums-proactively`](shared/workflow/run-ums-proactively.md)).
+- **Terminate superseded and abandoned background tasks** once their purpose is met, and sweep them before declaring anything complete ([`terminate-superseded-tasks`](shared/workflow/terminate-superseded-tasks.md)).
 
 ## Prefer optionality over removing functionality
 
@@ -199,18 +184,6 @@ See [`AGENTS.cases.md`](AGENTS.cases.md).
 
 - **Do:** write every pending-decision line as "decide X --- I recommend Y, because Z".
 - **Don't:** ask questions or present choices without declaring your recommended path.
-## Run UMS when work is scrutinized
-
-When you read a review of your work, receive critical feedback on it, or a questioned claim ("are you sure about that?") turns out to be wrong, run `ums` in that turn.
-Do not wait for a clean verdict, an accepted finding, or a first-person admission;
-answering with the corrected fact is not the pass.
-See [`run-ums-proactively`](shared/workflow/run-ums-proactively.md).
-
-## Run UMS before every pause
-
-Before ending a turn to wait on anything --- CI, a review round, a subagent, or an answer from the user --- run `ums` first if learnings have accumulated.
-See [`run-ums-proactively`](shared/workflow/run-ums-proactively.md).
-
 ## Help your subagents improve over time
 
 Treat subagent failures as bugs in prompt, tools, or context: update definitions or instructions after diagnosing failures so future invocations avoid them.

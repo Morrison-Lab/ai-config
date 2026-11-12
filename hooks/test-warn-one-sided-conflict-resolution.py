@@ -125,6 +125,10 @@ SILENT = (
     "git rebase -Sours main",
     "git rebase -Ssours main",
     "git merge -mXours x",
+    "git cherry-pick -mXours c",
+    "git revert -mXours c",
+    "git merge --cleanup -X ours m",
+    "git merge --into-name -X ours m",
     # Each value-taking option in the tables consumes an option-like value.
     "git merge --file -X ours x",
     "git rebase --exec -X ours main",
@@ -202,9 +206,12 @@ def main() -> int:
         if label not in text or effect not in text:
             failures += 1
             print(f"FAIL: warning for {command!r} lacks {label} or {effect!r}")
-    # Non-Bash tools and unreadable input stay silent.
+    # Non-Bash tools, unreadable input and valid JSON of the wrong shape
+    # stay silent and exit 0.
     for raw in ('{"tool_name": "Edit", "tool_input": {"command": "git checkout --ours a"}}',
-                "not json"):
+                "not json", "[]", "null",
+                '{"tool_name": "Bash", "tool_input": "git checkout --ours a"}',
+                '{"tool_name": "Bash", "tool_input": {"command": 5}}'):
         total += 1
         proc = subprocess.run([sys.executable, HOOK], input=raw,
                               capture_output=True, text=True, encoding="utf-8")

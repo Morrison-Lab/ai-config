@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """PreToolUse (Bash): warn before a blanket one-side conflict resolution.
 
-ai-config#5407, split from #4716. Ezra, 2026-10-23: agents should resolve
-merge conflicts carefully, deciding for each hunk what to keep from each
-side, what to drop, and what to modify. `skills/resolve-conflicts/SKILL.md`
-lists these commands as anti-patterns:
+ai-config#5407, split from #4716.
+Ezra, 2026-10-23: agents should resolve merge conflicts carefully,
+deciding for each hunk what to keep from each side, what to drop,
+and what to modify.
+`skills/resolve-conflicts/SKILL.md` lists these commands as anti-patterns:
 
 - `git checkout|restore --ours|--theirs`, which take the whole file from one
   side, so the other side's changes in it are lost, conflicting or not.
@@ -87,7 +88,10 @@ SHORT_VALUE_REQUIRED = {
 SHORT_VALUE_OPTIONAL = {
     "merge": "S", "rebase": "Sr", "pull": "Srj", "cherry-pick": "S", "revert": "S",
 }
-LONG_WITH_VALUE = ("--message", "--file", "--exec", "--server-option", "--mainline")
+LONG_WITH_VALUE = (
+    "--message", "--file", "--exec", "--server-option", "--mainline",
+    "--cleanup", "--into-name",
+)
 MAX_DEPTH = 3
 
 

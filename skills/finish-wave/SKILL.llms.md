@@ -61,7 +61,7 @@ Four kinds of work are implied by the current wave rather than being a new one:
 
 - A **fix for a defect inside the wave’s own diff**, which stays yours to fix now ([`dont-incur-technical-debt`](../../shared/principles/dont-incur-technical-debt.md)).
 
-- A **tracking issue filed** for anything noticed or deferred, since filing is not grabbing ([`issue-first`](../../shared/workflow/issue-first.md)).
+- A **tracking issue filed** for anything noticed or deferred, since filing is not grabbing ([`issue-first`](../../shared/workflow/issue-first.md), [`freezes-allow-filing`](../../shared/workflow/freezes-allow-filing.md)).
 
 - **Syncing, conflict resolution, and re-review** on a wave branch whose base moved.
 

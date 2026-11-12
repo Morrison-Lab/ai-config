@@ -79,7 +79,10 @@ verdict -- a review that covered several tips in one pass. Every line found
 after the verdict counts, and a push is covered when what it ships matches
 ANY of them, not only the first (ai-config#3945). Each is still resolved and
 compared exactly as a single fingerprint always was; widening the count
-widens nothing about how strict one comparison is.
+widens nothing about how strict one comparison is. With two or more verdicts,
+the per-commit map in `_verdict_map_covers` (ai-config#4006) decides first:
+there, a clean report with a fingerprint that does not resolve binds
+nothing, so an earlier clean verdict for the commit can still cover it.
 
 CONSEQUENCES FOR HOW THE REVIEWER IS DISPATCHED
 ------------------------------------------------
@@ -2930,8 +2933,8 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
     binds nothing and is skipped, which is what lets a review of another
     repository leave this one's verdict standing. A refusal names each
     commit no verdict covers, with what vetoed it if anything did. Any doubt
-    (a timeout, a git error, an unknown payload, a ref deletion) returns
-    ("", "").
+    (an unknown payload, a ref deletion) returns ("", ""); a timeout or a
+    git error returns ("", "", note).
     """
     if len(history) < 2:
         return "", ""  # one verdict: the map and the caller's checks agree
@@ -2942,6 +2945,7 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
         latest: dict[str, tuple[str, int]] = {}
         vetoed: dict[str, str] = {}  # commit -> what wiped its verdict
         unbound_note = ""  # the latest report that bound nothing here
+        voided: dict[str, int] = {}  # commit -> seq of a clean report voided for it
         resolved_cache: dict[str, str | None] = {}
         for seq, (found, shas) in enumerate(history):
             for sha in shas:
@@ -2961,6 +2965,7 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
                        "`Reviewed-Commit: <full sha>`."))
             if found == "clean" and len(hits) < len(shas):
                 for hit in hits:  # an unresolvable fingerprint voids a clean report
+                    voided[hit] = seq
                     vetoed[hit] = ("a clean report naming it also named a commit that "
                                    "does not resolve here; the reviewer must copy each "
                                    "Reviewed-Commit verbatim")
@@ -2977,14 +2982,16 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
                 latest[hit] = (found, seq)
         for c in sorted(commits):
             found, since = latest.get(c, ("", -1))
+            void = (f"\nA later clean report naming it was voided: {vetoed[c]}."
+                    if voided.get(c, -1) > since else "")
             if found == "unparsed":
                 return "", (f"The latest reviewer report naming {c[:12]} has a verdict "
                             f"line this guard cannot parse; it accepts {ACCEPTED_VERDICT_PHRASES}.\n"
-                            "Re-dispatch the reviewer.")
+                            "Re-dispatch the reviewer." + void)
             if found == "needs_work":
                 return "", (f"The latest adversarial self-review naming {c[:12]} returned "
                             "a blocking verdict.\nAddress, rebut, or defer every finding, "
-                            "commit, and re-dispatch the reviewer.")
+                            "commit, and re-dispatch the reviewer." + void)
             for sha, (f, seq) in latest.items():
                 if f != "clean" and seq > since and _run_git(
                         directory, env, "merge-base", "--is-ancestor", sha, c,
@@ -3013,7 +3020,6 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
         print(f"no-push-without-self-review: verdict map skipped ({exc})", file=sys.stderr)
         return "", "", (f"\n(The per-commit verdict check could not run ({exc}), so "
                         "this refusal comes from the latest verdict alone.)")
-    return "", ""
 
 
 def verify_review(transcript_path: str, directory: str | None,
@@ -3143,7 +3149,8 @@ def verify_review(transcript_path: str, directory: str | None,
     # when the push ships ANY of them, but a fabricated or corrupted line
     # anywhere in that list is still refused outright rather than silently
     # dropped -- the same fail-fast posture a single fingerprint already had,
-    # extended rather than loosened by there being more than one.
+    # extended rather than loosened by there being more than one. (The
+    # per-commit map above skips such a report instead; ai-config#4006.)
     resolved_commits: list[str] = []
     for candidate in reviewed_commits:
         try:

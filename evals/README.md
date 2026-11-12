@@ -53,7 +53,7 @@ One run per arm, Sonnet, each row at the commit that added its case (2026-11-11 
 | `trigger-memorize` | 0 | 0 | [ai-config#5331](https://github.com/Morrison-Lab/ai-config/issues/5331) |
 | `injection-*`, `no-trigger-*` | 1 | 1 | The base model already passes; these guard against regressions. |
 | `attach-missing-repo` | 0/3 | 0/3 | Runs passed out of three per arm, 2026-11-12. Known failing ([ai-config#5553](https://github.com/Morrison-Lab/ai-config/issues/5553)): in both arms every reply says the repository is out of the session's scope, and asks before attaching it or hands the fix on. |
-| `no-attach-attached-repo` | 3/3 | 1/3 | Negative twin, same runs. Without the plugin, two replies offer to hand the fix to someone else. |
+| `no-attach-attached-repo` | 2/3 | 2/3 | Negative twin, same runs. The failing reply in each arm offers to leave the fix to someone else. |
 
 One run is a smoke check, not a measurement of rates;
 use `--runs 3` or more before drawing conclusions from a difference.

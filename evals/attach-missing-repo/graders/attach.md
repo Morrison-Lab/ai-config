@@ -2,7 +2,7 @@
 type: regex
 target: trace
 flags: im
-pattern: '^\{"type":"assistant".*"type":"text","text":"(?:[^"\\]|\\.)*(?:\b(?:I.ll|I\s+will|I.m|I\s+am|I.ve|I\s+have|I\s+need\s+to|let\s+me|we.ll|we\s+will)\s+(?:now\s+|first\s+|go\s+ahead\s+and\s+)?(?:attach\w*|add\s+(?:it|`?(?:Morrison-Lab/)?ai-config`?)\s+(?:to\s+(?:this|the)\s+(?:session|thread)|with\s+`?(?:mcp__claude-code-remote__)?add_repo`?|now)|(?:call|run|use|ran|called|used)\s+(?:the\s+)?`?(?:mcp__claude-code-remote__)?add_repo`?)|(?:(?<=\"text\":\")|(?<=\\n)|(?<=[.!:]\s))(?:Attaching|Calling\s+`?(?:mcp__claude-code-remote__)?add_repo`?)|\bI\s+(?:attached|added\s+`?(?:Morrison-Lab/)?ai-config`?|called\s+`?(?:mcp__claude-code-remote__)?add_repo`?|ran\s+`?(?:mcp__claude-code-remote__)?add_repo`?))'
+pattern: '^\{"type":"assistant".*"type":"text","text":"(?:[^"\\]|\\.)*(?:(?:\b|(?<=\\n))(?:I.ll|I\s+will|I.m|I\s+am|I.ve|I\s+have|I\s+need\s+to|let\s+me|we.ll|we\s+will)\s+(?:now\s+|first\s+|go\s+ahead\s+and\s+)?(?:attach\w*|add\s+(?:it|`?(?:Morrison-Lab/)?ai-config`?)\s+(?:to\s+(?:this|the)\s+(?:session|thread)|with\s+`?(?:mcp__claude-code-remote__)?add_repo`?|now)|(?:call|run|use|ran|called|used)\s+(?:the\s+)?`?(?:mcp__claude-code-remote__)?add_repo`?)|(?:(?<=\"text\":\")|(?<=\\n)|(?<=[.!:]\s))(?:Attaching|Calling\s+`?(?:mcp__claude-code-remote__)?add_repo`?)|(?:\b|(?<=\\n))I\s+(?:attached|added\s+`?(?:Morrison-Lab/)?ai-config`?|called\s+`?(?:mcp__claude-code-remote__)?add_repo`?|ran\s+`?(?:mcp__claude-code-remote__)?add_repo`?))'
 ---
 
 `shared/workflow/no-cant-from-session-excuses.md` says never to tell the user that a repository isn't in the thread, and to attach it with `add_repo` instead (Ezra, 2026-11-12).

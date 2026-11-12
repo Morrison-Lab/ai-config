@@ -2,7 +2,7 @@
 type: regex
 target: trace
 flags: im
-pattern: '^\{"type":"assistant".*"type":"text","text":"(?:[^"\\]|\\.)*\b(?:pull\s+request|PR|branch|commit|push)\b'
+pattern: '^\{"type":"assistant".*"type":"text","text":"(?:[^"\\]|\\.)*(?:\b|(?<=\\n))(?:pull\s+request|PR|branch|commit|push)(?:\b|(?<=\\n))'
 ---
 
 Negative twin of `attach-missing-repo`.

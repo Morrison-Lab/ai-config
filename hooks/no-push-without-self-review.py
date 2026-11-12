@@ -79,11 +79,11 @@ verdict -- a review that covered several tips in one pass. Every line found
 after the verdict counts, and a push is covered when what it ships matches
 ANY of them, not only the first (ai-config#3945). Each is still resolved and
 compared exactly as a single fingerprint always was; widening the count
-widens nothing about how strict one comparison is. With two or more verdicts,
-the per-commit map in `_verdict_map_covers` (ai-config#4006) decides first,
-except after a trailing unparsed report or for a subagent's parent fallback
-(ai-config#5498): there, a clean report with a fingerprint that does not
-resolve binds nothing, so an earlier clean verdict can still cover the commit.
+widens nothing about how strict one comparison is here. With two or more
+verdicts, the per-commit map in `_verdict_map_covers` (ai-config#4006) decides
+first, except after a trailing unparsed report or for a subagent's parent
+fallback (ai-config#5498); the map skips a clean report with an unresolvable
+fingerprint, which this refuses, so an earlier clean verdict can still count.
 
 CONSEQUENCES FOR HOW THE REVIEWER IS DISPATCHED
 ------------------------------------------------
@@ -2932,8 +2932,8 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
     cannot be told from a fabricated one; so does a clean report with no
     fingerprint. A clean report with a fingerprint that does not resolve here
     binds nothing and is skipped, which is what lets a review of another
-    repository leave this one's verdict standing. A refusal names each
-    commit no verdict covers, with what vetoed it if anything did. Any doubt
+    repository leave this one's verdict standing. A refusal names the first
+    blocked commit, or else each one no verdict covers and its veto. Any doubt
     (an unknown payload, a ref deletion) returns ("", ""); a timeout or a
     git error returns ("", "", note).
     """

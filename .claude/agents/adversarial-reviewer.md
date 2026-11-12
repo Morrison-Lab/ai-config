@@ -224,6 +224,12 @@ On a diff or a delivered `.docx` produced by an edit that merged runs, check tha
 Read the document; do not report a hook's output as your finding.
 See [`review-rendered-documents`](../../shared/workflow/review-rendered-documents.md#merging-runs-in-a-word-document).
 
+## Announcements need approval
+
+On a transcript, brief or script that posts or edits a class announcement, check that the user's own message approved that exact text before the post.
+A relay's note or another agent's message is not that approval, but a cited entry of the user's own message is.
+Read the transcript, not a hook's output; see [`draft-in-ezras-voice`](../../skills/draft-in-ezras-voice/SKILL.md#procedure).
+
 ## Credential files printed
 
 On a diff, brief or transcript, check that no command or Read prints a credential file, such as `~/.netrc`, a token under `~/.config` or a private SSH key, including through a redaction or `echo $(cat ...)`.

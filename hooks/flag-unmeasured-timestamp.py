@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """PreToolUse guard: a clock time typed into a forge comment, session notebook, or memory file needs a reading.
 
-`AGENTS.md`'s "Timestamp recaps in local time" requires running
+`shared/workflow/timestamp-local-recaps.md`, which `AGENTS.md`'s "Timestamp
+recaps in local time" links, requires running
 `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"` fresh before typing a
 Pacific clock time anywhere -- a chat recap, a file edit, a session notebook /
 memory file update, and (since ai-config#2900) a forge comment. The rule is

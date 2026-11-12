@@ -34,8 +34,8 @@ because a hash reads as evidence.
 
 WHY THE PROSE RULE DID NOT REACH IT
 ------------------------------------
-`shared/principles/deterministic-tools.md` and `AGENTS.md`'s
-"Timestamp recaps in local time" both say to derive a measured value from a
+`shared/principles/deterministic-tools.md` and
+`shared/workflow/timestamp-local-recaps.md` both say to derive a measured value from a
 reading taken in the moment, and the latter's hook covers clock times. Neither
 names a digest. The rule that *would* have caught it --
 `metacognitive-monitoring.md`'s "a claim about state gets re-queried" -- is

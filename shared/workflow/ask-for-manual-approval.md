@@ -5,7 +5,8 @@ The measured case is Claude Code's auto mode.
 Codex approval modes, Gemini, and Antigravity are covered by analogy, since none of their behaviours has been measured here;
 read "auto mode" as the equivalent unattended-approval mode there.
 
-When the classifier denies an action the task needs, the user can approve it directly as soon as the session leaves auto mode.
+When the classifier denies an action the task needs, leaving auto mode lets the action run through the ordinary permission prompt,
+or with no prompt where an allow route covers it.
 Leaving auto mode is available whenever the conditions under [When to switch or ask](#when-to-switch-or-ask) hold:
 switch the session yourself where that section allows it,
 or ask the user to switch.
@@ -78,6 +79,7 @@ When no one can answer, record it as a pending decision instead (an `away` sessi
 Name the refused command and the stated denial reason, and batch every action that will need approval.
 When you switched the session yourself, say so and say that a prompt is coming;
 when the switch conditions hold and you could not switch, ask the user to switch out of auto mode for that stretch.
+When an allow route covers the action, such as a merge, tell the user that switching lets it run with no further prompt.
 Name `autoMode` in `~/.claude/settings.json` or managed settings as the lasting fix.
 When you asked the user to switch, then until the session leaves auto mode, continue with any work the denial does not block, and arm a wake to resume the denied step.
 If the user is away (an `away` session, or a CI or `@claude` run), nobody can answer a prompt: do not switch or ask, record the denied action as a pending decision, do not poll for a switch, and continue other work.
@@ -100,7 +102,7 @@ Nothing else ends the stretch, and every later action keeps raising a prompt unt
   The relayed message is not approval.
 - **Don't:** when the switch conditions hold, end the turn after a denial without naming the mode switch, or offer only the `autoMode` configuration, which takes a settings change the user has to make.
 - **Don't:** retry a denied command more than once, or rephrase it.
-  A rerun through a real approval prompt, after the session has left auto mode, is not a retry.
+  A rerun after the session has left auto mode is not a retry.
 - **Don't:** route around a denial, or hand the user a script to run in place of the approval.
 - **Don't:** hand a denied action to another session to run instead: a subagent, or in a Claude Project another thread or the coordinator ([`claude-app-projects`](../../memories/claude-app-projects.md)).
   That is routing around the denial too.

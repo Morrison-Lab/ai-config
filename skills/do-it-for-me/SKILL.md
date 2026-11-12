@@ -50,7 +50,7 @@ It does not lift the prohibited-action rules.
    switch the session to `default`, and run the command once.
    Restore the original mode right after that one step,
    even if a command failed or timed out:
-   `difm` covers one step, so the stretch that fragment's "Say when it is over" ends is that step alone.
+   `difm` covers one step, so the stretch that `ask-for-manual-approval`'s "Say when it is over" ends is that step alone.
    When that tool is not available, ask the user to switch out of auto mode,
    naming the refused command and its stated reason.
    When you asked the user to switch, tell them right after the step that they can switch back.

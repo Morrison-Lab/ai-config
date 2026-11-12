@@ -157,6 +157,8 @@ Claude quota is scarce, so Claude plans and verifies, and other models do bulk w
 - **Do:** at present, let only the UCDH Codex account read identifiable restricted data.
 - **Do:** in a project where the UCDH Codex account may not run, have a person read the identifiable data.
   Ezra said on 2026-10-09 that Codex gets no exception to its UCDH-only limit for restricted data.
+- **Do:** share an anonymized student post, such as a discussion question with the name removed, with an agent when it holds no personally identifiable information, direct or indirect, as [34 CFR 99.3](https://www.ecfr.gov/current/title-34/subtitle-A/part-99/subpart-A/section-99.3) defines it.
+  Ezra asked "since the message is anonymized, can it be shared with the thread?" and answered "yes" (2026-11-12, [ai-config#5592](https://github.com/Morrison-Lab/ai-config/issues/5592)).
 - **Don't:** show identifiable restricted data to any other model, free or paid, by any route: pasting it into a brief, pointing the model at a file that holds it, or letting it reach the model through a command's or tool's output.
   Student data counts, because it is a FERPA education record.
   A command that prints raw rows is a reading route, so run it where the model cannot see its output.

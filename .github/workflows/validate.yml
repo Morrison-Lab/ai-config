@@ -287,6 +287,10 @@ jobs:
         # ai-config#2992: scripts/lib/shellcmd.py argv splitting, heredoc
         # blanking, and git-invocation classification.
         run: python3 scripts/test_shellcmd.py
+      - name: Run tool-name alias tests
+        # ai-config#4266: scripts/lib/tool_names.py, the shared spellings of
+        # the subagent, write and shell tools across harnesses.
+        run: python3 scripts/test_tool_names.py
       - name: Run check-rendered-references tests
         # ai-config#2879: verify broken rendered reference checking and footnote isolation.
         run: python3 scripts/test_check_rendered_references.py

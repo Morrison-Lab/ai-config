@@ -3019,7 +3019,6 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
             "against what you are actually pushing."
             + (f"\n{unbound_note}" if unbound_note else ""))
     except Exception as exc:  # the caller's stricter checks still decide, noting why
-        print(f"no-push-without-self-review: verdict map skipped ({exc})", file=sys.stderr)
         return "", "", (f"\n(The per-commit verdict check could not run ({exc}), so "
                         "this refusal comes from the latest verdict alone.)")
 

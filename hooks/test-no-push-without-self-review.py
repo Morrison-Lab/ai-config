@@ -2488,8 +2488,9 @@ def verdict_map_cases() -> tuple[int, int]:
             ("an unnamed commit is not blamed on a descendant's blocking verdict", PUSH,
              ((clean, FEATURE), (nmw, FEATURE)), f"No verdict covers {HEAD[:12]}, but", None),
             ("a voided clean report after a blocking one is named", PUSH,
-             verdicts((nmw, HEAD)) + reviewed(body(commit=HEAD) + f"\nReviewed-Commit: {'d' * 40}"),
-             "A later clean report naming it was voided", None),
+             verdicts((nmw, HEAD)) + mixed, "A later clean report naming it was voided", None),
+            ("a voided clean report before a blocking one is not called later", PUSH,
+             mixed + verdicts((nmw, HEAD)), "!A later clean report naming it was voided", None),
             ("an uncovered commit names a report with no fingerprint", PUSH,
              ((clean, FEATURE), (clean, None)), "the reviewer must state `Reviewed-Commit", None),
             ("an uncovered commit names a corrupted fingerprint", PUSH,
@@ -2498,8 +2499,8 @@ def verdict_map_cases() -> tuple[int, int]:
              ((clean, FEATURE), (nmw, HEAD)), "blocking verdict", {"NPWSR_BUDGET_SECONDS": "0"})):
         rc, out = run_hook(cmd, pairs if isinstance(pairs, list) else verdicts(*pairs), extra_env=env)
         spec = out.get("hookSpecificOutput") or {}
-        ok = rc == 0 and spec.get("permissionDecision") == "deny" and text in spec.get(
-            "permissionDecisionReason", "")
+        reason, absent = spec.get("permissionDecisionReason", ""), text.startswith("!")
+        ok = rc == 0 and spec.get("permissionDecision") == "deny" and (text.lstrip("!") in reason) != absent
         ran, failures = ran + 1, failures + (not ok)
         print(f"{'PASS' if ok else 'FAIL'}: {label}")
     check("a later unparsed report still fails closed",

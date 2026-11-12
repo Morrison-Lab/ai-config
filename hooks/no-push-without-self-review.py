@@ -2861,7 +2861,7 @@ def read_latest_review_with_unparsed(
 
     if unresolved_handback:
         if history is not None:
-            history.clear()  # the second pass re-reads every verdict
+            history.clear()  # the second pass re-reads every verdict; avoids duplicate entries
         return read_latest_review_with_unparsed(
             transcript_path, frozenset(reviewer_task_ids), history)
     return verdict, reviewed_commits, saw_reviewer_call, saw_unparsed_later, unparsed_later_shas
@@ -2904,29 +2904,31 @@ def _opencode_transcript_fallback(session_id) -> str:
 
 def _verdict_map_covers(history: list[tuple[str, list[str]]],
                         directory: str | None, argv: list[str],
-                        env: list[str]) -> str:
-    """A pass reason when every commit this push ships has a clean verdict
-    as the LATEST verdict naming it, else "" (ai-config#4006, #4237).
+                        env: list[str]) -> tuple[str, str]:
+    """(pass, block): a pass reason when every commit this push ships has a
+    clean verdict as the LATEST verdict naming it (ai-config#4006, #4237), or
+    a block reason naming why the map refuses; ("", "") defers to the caller.
 
     The map is keyed by commit, so a verdict for another branch or another
     repository no longer erases this one's. A later `needs_work` naming the
-    same commit still vetoes, and so does a later `needs_work` naming no
-    commit that resolves here: a foreign fingerprint cannot be told from a
-    fabricated one, so a blocking verdict that binds to nothing here binds
+    same commit still vetoes, and so does a later `needs_work` with ANY
+    fingerprint that does not resolve here: a foreign fingerprint cannot be told from a
+    fabricated one, so a blocking verdict that does not fully bind here binds
     to everything before it; an unparsed report counts as blocking. A clean
     report with ANY fingerprint that does not resolve here binds nothing (a
     multi-repository report is refused, as before), and is skipped, so its
     fabricated-fingerprint refusal is not raised when an earlier verdict
     covers the push. When nothing covers the push, the
     caller's latest-verdict checks run as before, with their messages. Any
-    doubt (a timeout, an unknown payload, a ref deletion) returns "".
+    doubt (a timeout, an unknown payload, a ref deletion) returns ("", "").
     """
     if len(history) < 2:
-        return ""  # one verdict: the latest-verdict path is the whole answer
+        return "", ""  # an optimisation: with one verdict the caller's checks decide alone
+    vetoed = False
     try:
         commits, _why = shipped_commits(directory, argv, env)
         if not commits:
-            return ""
+            return "", ""
         latest: dict[str, str] = {}
         resolved_cache: dict[str, str | None] = {}
         for found, shas in history:
@@ -2935,18 +2937,28 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
                     resolved_cache[sha] = _rev_parse(
                         directory, env, f"{sha}^{{commit}}")
             hits = [resolved_cache[s] for s in shas if resolved_cache[s]]
-            if found == "clean" and len(hits) < len(shas):
+            unbound = not hits or len(hits) < len(shas)
+            if found == "clean" and unbound:
                 continue  # any unresolvable fingerprint voids a clean report
+            if unbound:  # one unbound fingerprint makes a blocking verdict veto all before it
+                latest.clear()
+                vetoed = True
             for hit in hits:
                 latest[hit] = found
-            if found != "clean" and not hits:
-                latest.clear()  # an unbound blocking verdict vetoes all before it
     except TimeoutError:
-        return ""
+        return "", ""
     if all(latest.get(c) == "clean" for c in commits):
         return ("Clean adversarial self-review verified at "
-                f"{', '.join(sorted(commits))} (latest verdict naming each).")
-    return ""
+                f"{', '.join(sorted(commits))} (latest verdict naming each)."), ""
+    blocked = sorted(c[:12] for c in commits if latest.get(c, "clean") != "clean")
+    if blocked:
+        return "", (f"The latest verdict naming {', '.join(blocked)} is not clean.\n"
+                    "Address, rebut, or defer every finding, commit, and re-dispatch the reviewer.")
+    if vetoed:
+        return "", ("A later blocking or unparsed reviewer report names a commit that does "
+                    "not resolve here, so it vetoes every verdict before it.\n"
+                    "Re-dispatch the reviewer against what you are pushing.")
+    return "", ""
 
 
 def verify_review(transcript_path: str, directory: str | None,
@@ -3048,9 +3060,11 @@ def verify_review(transcript_path: str, directory: str | None,
         )
 
     if not saw_unparsed_later:
-        mapped = _verdict_map_covers(history, directory, argv, env)
+        mapped, map_block = _verdict_map_covers(history, directory, argv, env)
         if mapped:
             return True, mapped
+        if map_block:
+            return False, map_block + unparsed_hint
 
     if verdict == "needs_work":
         return False, (

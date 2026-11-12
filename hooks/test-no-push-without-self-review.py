@@ -2441,6 +2441,24 @@ def verdict_map_cases() -> tuple[int, int]:
     check("an unparsed report between clean ones still vetoes its commit",
           PUSH, verdicts((clean, HEAD), ("Looks bad, do not ship", HEAD),
                          (clean, FEATURE)), True)
+    half = f"\nReviewed-Commit: {'e' * 40}"
+    check("a blocking report with one unresolvable fingerprint vetoes all before it",
+          PUSH, verdicts((clean, HEAD)) + reviewed(body(verdict=nmw, commit=FEATURE) + half),
+          True)
+    check("an unparsed report with one unresolvable fingerprint vetoes all before it",
+          PUSH, verdicts((clean, HEAD)) + reviewed(body(verdict="Looks bad", commit=FEATURE)
+                                                   + half) + verdicts((clean, FEATURE)), True)
+    check("an unparsed report naming another repository's commit vetoes",
+          PUSH, verdicts((clean, HEAD), ("Looks bad", OTHER_HEAD), (clean, FEATURE)), True)
+    for label, pairs, text in (
+            ("the refusal names the blocking verdict", ((clean, HEAD), (nmw, HEAD), (clean, FEATURE)),
+             f"latest verdict naming {HEAD[:12]} is not clean"),
+            ("the refusal names the veto", ((clean, HEAD), (nmw, OTHER_HEAD), (clean, FEATURE)),
+             "vetoes every verdict before it")):
+        out = run_hook(PUSH, verdicts(*pairs))[1]
+        ok = text in (out.get("hookSpecificOutput") or {}).get("permissionDecisionReason", "")
+        ran, failures = ran + 1, failures + (not ok)
+        print(f"{'PASS' if ok else 'FAIL'}: {label}")
     check("a later unparsed report still fails closed",
           PUSH, verdicts((clean, HEAD), (clean, FEATURE), ("Looks fine", FEATURE)),
           True)

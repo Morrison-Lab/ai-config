@@ -32,9 +32,8 @@ OVERRIDE = "ALLOW_RM_UNSET_VARIABLE=1"
 ASSIGNMENT = re.compile(r"\A([A-Za-z_][A-Za-z0-9_]*)\+?=")
 RECURSIVE = re.compile(r"\A(--recursive|-[^-]*[rR].*)\Z")
 REFERENCE = re.compile(r"\$(?:\{([A-Za-z_][A-Za-z0-9_]*)([^}]*)\}|([A-Za-z_][A-Za-z0-9_]*))")
-SUBSTITUTION = re.compile(r"\$\((?:[^()]|\((?:[^()]|\([^()]*\))*\))*\)|`[^`]*`")
+SUBSTITUTION = re.compile(r"\$\([^()]*\)|`[^`]*`")  # innermost first, so applied until stable
 KEEPS_VALUE = (":-", "-", ":=", "=", ":?", "?")  # a default, or bash stops first
-ASSIGNING = (":=", "=")
 MASK = chr(0xE000)  # a `$` bash does not expand (single-quoted or escaped)
 DECLARE = {"export", "local", "declare", "readonly", "typeset"}
 READERS = {"read", "mapfile", "readarray", "getopts"}
@@ -71,7 +70,9 @@ def _mask(text):
 def _unset_reference(token, assigned):
     """`(reference, name)` for the first reference in TOKEN, outside a command
     substitution, that is empty here."""
-    for match in REFERENCE.finditer(SUBSTITUTION.sub("", token)):
+    while SUBSTITUTION.search(token):
+        token = SUBSTITUTION.sub("", token)
+    for match in REFERENCE.finditer(token):
         name, op = match.group(1) or match.group(3), match.group(2) or ""
         if not op.startswith(KEEPS_VALUE) and name not in assigned and not os.environ.get(name):
             return match.group(0), name
@@ -102,7 +103,7 @@ def _record_assignments(argv, assigned):
     """Add the names ARGV assigns; True when ARGV sources or evaluates text."""
     for tok in argv:
         for match in REFERENCE.finditer(tok):
-            if match.group(1) and (match.group(2) or "").startswith(ASSIGNING):
+            if match.group(1) and (match.group(2) or "").startswith((":=", "=")):
                 assigned.add(match.group(1))
     words = list(argv)
     while words and words[0] in SHELL_KEYWORDS - {"for"}:

@@ -5,10 +5,13 @@ Ezra, 2026-10-27, said twice: never post a class announcement without his review
 (ai-config#4780). Denies the CLI, `is_announcement`, a network write naming a topic and an MCP announcement write
 unless the user's last message is only "post the announcement" ("yes, post it", ...); one write each. Gaps: #5453.
 """
+import io
 import json
 import os
 import re
+import shlex
 import sys
+import tokenize
 
 try:
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"))
@@ -40,20 +43,45 @@ INTERP = re.compile(r"(python[\d.]*|Rscript|node|deno|bash|z?sh|ruby|perl|pwsh|s
 EXT = re.compile(r"[\w./~-]+\.(py|R|r|js|mjs|ts|sh|rb|pl|ps1)$")
 CODE_WRITE = re.compile(r"\b(post|put|edit|update|PUT|POST)\(|create_discussion_topic|['\"](POST|PUT|post|put)['\"]|"
                         r"-X\s*(POST|PUT)|\b(Request|urlopen)\([^)]*\bdata\s*=")
-SELF = [os.path.join(os.path.dirname(os.path.realpath(__file__)), f) for f in (
-    os.path.basename(__file__), "test-no-unapproved-announcement.py")]  # a copy of this hook or its tests is skipped
+SELF = (os.path.basename(__file__), "test-no-unapproved-announcement.py")  # this hook and its tests
+CLIENT = re.compile(r"[rbuRBU]*(['\"])(curl|wget|xh|https?|Invoke-WebRequest|Invoke-RestMethod|POST|PUT|post|put)\1$")
 UV_VALUE = ("--with", "--python", "-p", "--from", "--env-file", "--config")  # uv or deno options that take a value
+
+
+def segments(cmd):
+    """The command's simple commands as word lists: split on unquoted operators, with quoted text one word."""
+    try:
+        lex = shlex.shlex(cmd.replace("\n", ";"), posix=True, punctuation_chars=";&|()")
+        lex.whitespace_split, lex.commenters = True, ""
+        tokens = list(lex)
+    except ValueError:  # an unclosed quote: split on whitespace
+        tokens = re.sub(r"([;&|()\n])", r" \1 ", cmd).split()
+    words = []
+    for t in tokens:
+        if set(t) <= set(";&|()\n"):
+            yield words
+            words = []
+        elif t.strip("`").lstrip("<!"):
+            words.append(t.strip("`").lstrip("<!"))
+    yield words
+
+
+def inline_code(interp, x):
+    """An option after which the interpreter runs code given inline, or a module, rather than a script file."""
+    if interp.startswith("python"):
+        return re.match(r"-[a-zA-Z]{0,3}c$|-m", x)
+    return re.match(r"-[a-zA-Z]{0,3}[ceE]$|-p$|--(eval|print|check)\b|-Command$", x)  # perl -ne, Rscript -e
 
 
 def script_names(cmd):
     """Script files the command runs: SCRIPT's matches, plus words the segment tokenizer finds."""
     yield from SCRIPT.findall(cmd)
-    for seg in re.split(r"[;&|\n(){}]", cmd):
-        words = [w for w in (w.strip("'\"").lstrip("<!") for w in seg.split()) if w]
+    for words in segments(cmd):
         if words and EXT.match(words[0]):  # a script run by its path
             yield words[0]
         for i, w in enumerate(words):
-            if not INTERP.match(w.rsplit("/", 1)[-1]) or w in (".", "source") and i:  # `.` runs a file only first
+            interp = w.rsplit("/", 1)[-1]
+            if not INTERP.match(interp) or w in (".", "source") and i:  # `.` runs a file only first
                 continue
             rest = words[i + 1:]
             if w.endswith(("uv", "deno")):  # `uv run x.py`: the word after `run` and its options, not a tool's argument
@@ -61,8 +89,11 @@ def script_names(cmd):
                 while rest and rest[0].startswith("-"):
                     rest = rest[2:] if rest[0] in UV_VALUE else rest[1:]
                 rest = rest[:1]
-            for x in rest:  # the first script after the interpreter's options, unless -m or -c runs code instead
-                if x in ("-m", "-c"):
+            for j, x in enumerate(rest):  # the first script after the interpreter's options
+                if re.match(r"(ba|z)?sh$", interp) and re.match(r"-[a-zA-Z]{0,3}c$", x):
+                    yield from script_names(" ".join(rest[j + 1:j + 2]))  # `bash -c CODE`: the scripts CODE runs
+                    break
+                if inline_code(interp, x):
                     break
                 if EXT.match(x):
                     yield x
@@ -71,8 +102,7 @@ def script_names(cmd):
 
 def modules_run(cmd):
     """Modules `python -m X` (or `-mX`) runs, read word by word so options and their values are skipped."""
-    for seg in re.split(r"[;&|\n(){}]", cmd):
-        words = [w.strip("'\"") for w in seg.split()]
+    for words in segments(cmd):
         for i, w in enumerate(words):
             if not re.match(r"python[\d.]*$", w.rsplit("/", 1)[-1]):
                 continue
@@ -86,18 +116,24 @@ def modules_run(cmd):
                     break
 
 
-def is_self(script, code):
-    """The script is this hook or its tests in an ai-config checkout, or an exact copy: they name writes, making none."""
-    root = os.path.dirname(os.path.dirname(os.path.realpath(script)))
-    if os.path.basename(script) in [os.path.basename(p) for p in SELF] and os.path.isfile(
-            os.path.join(root, "scripts", "lib", "transcript_meta.py")):
-        return True
-    for path in SELF:
-        if os.path.isfile(path):
-            with open(path, encoding="utf-8", errors="ignore") as fh:
-                if fh.read(1 << 20) == code:
-                    return True
-    return False
+def code_only(code):
+    """Python code with its comments and string literals blanked, except a literal naming an HTTP client or method.
+
+    The hook and its tests hold write patterns only as literals; None when the code does not tokenize."""
+    starts = [0]
+    for line in io.StringIO(code).readlines():
+        starts.append(starts[-1] + len(line))
+    text = list(code)
+    blank = {tokenize.COMMENT, tokenize.STRING} | {getattr(tokenize, f"{k}STRING_{p}", -1)
+                                                   for k in "FT" for p in ("START", "MIDDLE", "END")}
+    try:
+        for t in tokenize.generate_tokens(io.StringIO(code).readline):
+            if t.type in blank and not CLIENT.match(t.string):
+                a, b = starts[t.start[0] - 1] + t.start[1], starts[t.end[0] - 1] + t.end[1]
+                text[a:b] = " " * (b - a)
+    except (tokenize.TokenError, SyntaxError):
+        return None
+    return "".join(text)
 
 
 def script_writes(cmd, cwd):
@@ -116,12 +152,12 @@ def script_writes(cmd, cwd):
             with open(paths[-1], encoding="utf-8", errors="ignore") as fh:
                 code = fh.read(1 << 20)
         except (IndexError, OSError):
-            own = os.path.basename(name) in [os.path.basename(p) for p in SELF]  # this hook or its tests, run elsewhere
+            own = os.path.basename(name) in SELF  # this hook or its tests, run elsewhere
             if TOPIC.search(cmd) and name not in imported and not own:
                 return True
             continue
-        if is_self(paths[-1], code):
-            continue
+        if "unapproved-announcement" in code:  # a copy of this hook or its tests: read only its code
+            code = code_only(code) or code
         if (ANNOUNCE.search(code) or TOPIC.search(code)) and NET.search(code) and CODE_WRITE.search(code):
             return True
     return False

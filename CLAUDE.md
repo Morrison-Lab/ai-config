@@ -108,6 +108,7 @@ See [`finish-wave`](skills/finish-wave/SKILL.md).
 
 - **Do:** read a bare "finish the current wave" as `fw`, hold every new grab, and drive the wave's open PRs to a terminal state.
 - **Don't:** read it as "open no more PRs" --- a UMS PR or a follow-up issue is not a grab from the backlog.
+  No freeze stops filing ([`freezes-allow-filing`](shared/workflow/freezes-allow-filing.md)).
 
 ## Link PRs in tables
 

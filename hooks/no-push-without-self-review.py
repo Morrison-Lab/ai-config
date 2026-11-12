@@ -2967,9 +2967,9 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
             if found == "clean" and len(hits) < len(shas):
                 for hit in hits:  # an unresolvable fingerprint voids a clean report
                     voided[hit] = seq
-                    vetoed[hit] = ("a clean report naming it also named a commit that "
-                                   "does not resolve here; the reviewer must copy each "
-                                   "Reviewed-Commit verbatim")
+                    vetoed[hit] = ("a clean report naming it also named a commit that does "
+                                   "not resolve here; review one repository per report, "
+                                   "and copy each Reviewed-Commit verbatim")
                 continue
             if not hits or len(hits) < len(shas):
                 cause = (f"a later {_VERDICT_WORDS[found]} with no Reviewed-Commit line"
@@ -3026,7 +3026,7 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
 def verify_review(transcript_path: str, directory: str | None,
                   argv: list[str], env: list[str], per_commit: bool = True) -> tuple[bool, str]:
     """(is_clean, reason) -- is there a clean verdict for what this push ships?
-    `per_commit=False` skips the map, so a parent transcript cannot outvote a subagent."""
+    `per_commit=False` skips the map, so a parent's older verdicts cannot outvote a subagent."""
     saw_reviewer_call = False
     verdict: str | None = None
     reviewed_commits: list[str] = []

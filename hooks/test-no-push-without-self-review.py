@@ -2418,8 +2418,8 @@ def verdict_map_cases() -> tuple[int, int]:
     check("branch B's own clean verdict still authorizes B", push_feature, both, False)
     check("a later blocking verdict on a child does not veto its reviewed parent",
           PUSH, verdicts((clean, HEAD), (nmw, FEATURE)), False)
-    check("a later blocking verdict for the same commit vetoes it",
-          PUSH, verdicts((clean, HEAD), (nmw, HEAD)), True)
+    check("a later blocking verdict for the same commit vetoes it", PUSH, verdicts((clean, HEAD), (nmw, HEAD)), True)
+    check("a clean review of its base spares a stacked branch", push_feature, verdicts((clean, FEATURE), (clean, HEAD)), False)
     check("a later clean verdict for the same commit clears it",
           PUSH, verdicts((nmw, HEAD), (clean, HEAD)), False)
     check("a later clean verdict naming another repository's commit is skipped",

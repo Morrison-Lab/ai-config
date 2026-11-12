@@ -296,9 +296,14 @@ The user then left auto mode, and the same merge went through the ordinary permi
 So under auto mode, `mwc` authorizes the merge but cannot carry it out.
 
 - **Do:** when auto mode refuses a merge the `mwc` gate passed, report the PR, its pinned SHA and the checker's verdict.
-  Say that leaving auto mode, or adding a permission rule for `gh pr merge`, lets the merge run.
-- **Do:** report a refused command and its stated reason to the user, and
-  stop.
+  Ask the user to switch out of auto mode, since [`ask-for-manual-approval`](../shared/workflow/ask-for-manual-approval.md) never lets you switch yourself for a merge, and name an `autoMode` setting as the lasting fix.
+  In a dispatched subagent, report it up the dispatch chain instead, and let the session that can ask the user do so.
+  In an `away` session, or a CI or `@claude` run, record it as a pending decision instead.
+- **Do:** when the action is still refused after leaving auto mode, or the
+  switch conditions in `ask-for-manual-approval` fail, follow that
+  fragment's "When to switch or ask" for the case: report the refused
+  command and its stated reason and stop, ask the user, record a pending
+  decision, or report up the dispatch chain.
 - **Do:** assert an exact match count per replacement, and read the result
   back, in any scripted edit.
 - **Don't:** look for a call shape the classifier does not match on after it

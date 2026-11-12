@@ -21,7 +21,7 @@ CODE = re.compile(r"\b(python3?|node|ruby|perl|Rscript)\b\s+(-c|-e|-\s)|<<")
 QUOTED = re.compile(r"'[^']*'|\"(\\.|[^\"\\$`])*\"")  # a double-quoted span with $ or ` stays
 TOPIC = re.compile(r"discussion(_|%5f)?topic|announcement", re.I)
 ANNOUNCE = re.compile(r"is_announcement|get_announcements.*\.(edit|update)\(", re.I | re.S)
-NET = re.compile(r"\b(curl|wget|requests\.\w+|urllib\.request|httpx\.\w+|httr::\w+|http\.client|aiohttp|canvasapi|canvas\s+api|Invoke-\w+)\b|"
+NET = re.compile(r"\b(curl|wget|requests(\.\w+|\s+import)|urllib\.request|httpx\.\w+|httr::\w+|http\.client|aiohttp|canvasapi|canvas\s+api|Invoke-\w+)\b|"
                  r"(https?://|/api/v1/).*(['\"](?i:put|post)['\"]|\.(put|post)\()", re.I | re.S)
 WRITE = re.compile(r"(-\w*X|--request|-Method)[\s=]*[\"']?(?i:POST|PUT)|(^|\s)(-[a-zA-Z]*[dFT]|--data|--form|--json|--upload-file)")
 SAFE_FIRST = {"git", "gh", "grep", "egrep", "rg"}
@@ -34,27 +34,39 @@ TAG = re.compile(r"<(/?)([a-z][\w-]*)([^>]*)>", re.I)
 ENVELOPE = {"wake", "project", "thread", "message", "relay", "cited", "note"}  # and every hyphenated tag
 
 
-SCRIPT = re.compile(r"(?:\b(?:python[\d.]*|Rscript|node|deno|bash|z?sh|ruby|perl|pwsh|source|uv run)\s+(?:-[^\smc]\S*\s+)*|"
-                    r"(?:^|[\s;&|(])(?=\./))([\w./~-]+\.(?:py|R|r|js|mjs|ts|sh|rb|pl|ps1))\b")
-CODE_WRITE = re.compile(r"\.(post|put|edit|update)\(|\b(PUT|POST)\(|create_discussion_topic|['\"](POST|PUT|post|put)['\"]|-X\s*(POST|PUT)")
+INTERP = re.compile(r"(python[\d.]*|Rscript|node|deno|bash|z?sh|ruby|perl|pwsh|source|uv|\.)$")
+EXT = re.compile(r"[\w./~-]+\.(py|R|r|js|mjs|ts|sh|rb|pl|ps1)$")
+CODE_WRITE = re.compile(r"\b(post|put|edit|update|PUT|POST)\(|create_discussion_topic|['\"](POST|PUT|post|put)['\"]|"
+                        r"-X\s*(POST|PUT)|\bdata\s*=")
+
+
+def script_names(cmd):
+    """Script files each command segment runs: those after an interpreter, or one at the segment's start."""
+    for seg in re.split(r"[;&|\n()]", cmd):
+        words = [w for w in (w.lstrip("<") for w in seg.split()) if w]
+        while words and ("=" in words[0] or words[0] in ("sudo", "env", "time", "nohup", "exec")):
+            words = words[1:]
+        if words and INTERP.match(words[0].rsplit("/", 1)[-1]):
+            yield from (w for w in words[1:] if EXT.match(w))
+        elif words and EXT.match(words[0]):
+            yield words[0]
 
 
 def script_writes(cmd, cwd):
-    """A script file the command runs makes a network topic write, or cannot be read (#5453). test_/test- skipped."""
+    """A script file the command runs makes a network topic write, or cannot be read (#5453)."""
     cds = [os.path.expanduser(d) for d in re.findall(r"\bcd\s+([\w./~-]+)", cmd)]
     dirs = [cwd or "."] + [os.path.join(cwd or ".", d) for d in cds]
-    for name in SCRIPT.findall(cmd):
+    imported = {m + ".py" for m in re.findall(r"\b(?:import|from)\s+(\w+)", cmd)}  # a local module `-c` code loads
+    for name in [*script_names(cmd), *sorted(imported)]:
         paths = [p for p in (os.path.join(d, os.path.expanduser(name)) for d in dirs) if os.path.isfile(p)]
-        if re.match(r"test[-_]", os.path.basename(name)):
-            continue
         try:
             with open(paths[-1], encoding="utf-8", errors="ignore") as fh:
                 code = fh.read(1 << 20)
         except (IndexError, OSError):
-            if TOPIC.search(cmd):
+            if TOPIC.search(cmd) and name not in imported:
                 return True
             continue
-        if code.startswith(__doc__[:40], code.find('"""') + 3):  # any copy of this hook
+        if "no-unapproved-announcement" in code:  # this hook, a copy of it, or its tests
             continue
         if (ANNOUNCE.search(code) or TOPIC.search(code)) and NET.search(code) and CODE_WRITE.search(code):
             return True
@@ -129,7 +141,7 @@ def _user_text(entry):
     return text if text.strip() or not real else "[a message with no text]", real
 
 
-def verdict(path, tool, inp):
+def verdict(path, tool, inp, cwd=""):
     if is_real_user_turn is None:
         return "scripts/lib/transcript_meta.py could not be loaded"
     try:
@@ -151,7 +163,7 @@ def verdict(path, tool, inp):
             return "an announcement was already posted after that approval" if writes else None
         if entry.get("type") == "assistant":
             writes += [[b.get("name"), b.get("input"), b.get("id")] for b in _blocks(entry) if b.get("type")
-                       == "tool_use" and is_announcement_write(b.get("name") or "", b.get("input") or {})]
+                       == "tool_use" and is_announcement_write(b.get("name") or "", b.get("input") or {}, cwd)]
     return "no message from the user approves posting it"
 
 
@@ -170,7 +182,7 @@ def main() -> int:
         return 0
     try:
         why = ("it runs in a subagent or teammate, which the user's approval does not reach (#5453)" if payload.get("agent_id")
-               else verdict(payload.get("transcript_path") or "", tool, inp))
+               else verdict(payload.get("transcript_path") or "", tool, inp, payload.get("cwd") or ""))
     except Exception as exc:  # a detected write: fail closed
         why = f"the check failed ({exc})"
     if why:

@@ -252,6 +252,12 @@ Compare the result against both parents' changes since the merge base;
 do not report the warning hook's output as your finding.
 See [`resolve-conflicts`](../../skills/resolve-conflicts/SKILL.md#anti-patterns).
 
+## Renamed headings
+
+On a diff that renames, rewords, removes or moves a Markdown heading to another file, search for links to the old anchor (`#old-slug` and `file.md#old-slug`, in every file) and report any the diff leaves pointing at nothing.
+Read the diff and the search results yourself rather than reporting the output of [`check-links.py`](../../scripts/check-links.py), which misses renames that change only punctuation or spacing, and a trailing -N on a fragment.
+See [`reorganize-prose`](../../shared/writing/reorganize-prose.md#do-and-dont).
+
 ## Rules and skills without eval cases
 
 On a diff that adds or changes a rule or a skill whose behaviour one prompt can show, check that it adds or updates a case under `evals/`, and that every trigger case has a negative twin.

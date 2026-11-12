@@ -1386,7 +1386,8 @@ changes nothing --- the `$?` was simply evaluated after something else.
 
 ### A proxy that answers a narrower question passes the same way
 
-`CLAUDE.md`'s "Keep ai-config and repo checkouts fresh" step for a diverged
+`CLAUDE.md`'s freshness step (now in
+[`keep-checkouts-fresh`](../workflow/keep-checkouts-fresh.md)) for a diverged
 local `main` **used to say** to spot-check a few divergent commit messages
 against `origin/main`, and to realign if they do not appear there.
 It no longer does: the same change that added this paragraph replaced that

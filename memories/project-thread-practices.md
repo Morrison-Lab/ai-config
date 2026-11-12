@@ -50,10 +50,11 @@ see [`red-main`](../shared/workflow/red-main.md)).
 
 ## Confirm which thread owns a PR before fixing a relayed finding
 
-On 2026-11-12 the coordinator relayed Flash verdicts on three PRs to one thread.
-That thread fixed all three, but gha#1930 belonged to another thread, which pushed its own answer minutes earlier.
+On 2026-11-11 (Pacific) the coordinator relayed Flash verdicts on three PRs to one thread.
+That thread fixed all three, but gha#1930 belonged to another thread, which had pushed its own answer minutes earlier.
 The first thread's fix was dropped.
 
-- **Do:** before editing for a relayed finding, run `git ls-remote` on the PR branch and read the PR's latest comments.
-- **Do:** if another session pushed or commented since the reviewed head, ask the coordinator which thread owns the PR.
+- **Do:** before editing for a relayed finding, run `git ls-remote origin <branch>` and read the PR's latest comments (`gh pr view <n> --comments`).
+- **Do:** if this thread did not open the PR, or another session pushed or commented since the reviewed head, ask the coordinator which thread owns the PR.
+  An owner still working locally leaves no trace on the remote, so a quiet branch does not prove the PR is yours.
 - **Don't:** treat every PR named in a relayed message as yours to fix.

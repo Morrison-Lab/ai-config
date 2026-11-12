@@ -294,6 +294,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/agent-teams.md` | Agent teams are a third way Claude Code parallelizes work, and the corpus's job is to know when to *recommend* one --- not to reach for it, because unlike th... |  |
 | `shared/workflow/algorithmatize-checks.md` | Never spend LLM reasoning on a check a deterministic algorithm can decide. Whenever a verification, measurement, or classification step is decidable by compu... |  |
 | `shared/workflow/always-reply.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |
+| `shared/workflow/answer-briefly-link-the-record.md` | Ezra, 2026-11-12 (#5591): "when I ask you a question that we have a recorded answer for, give me a brief direct answer and refer me to our recorded answer fo... |  |
 | `shared/workflow/ardi.md` | Whenever you are working a PR/MR, run the full **ARDI** loop by default, without being asked: **A**ddress every flagged item, **R**ebut findings that are wro... |  |
 | `shared/workflow/ask-for-manual-approval.md` | Applies to every agent that runs under a permission classifier or approval mode. The measured case is Claude Code's auto mode. Codex approval modes, Gemini,... |  |
 | `shared/workflow/assign-subagent-worktrees.md` | Moved whole from `CLAUDE.md` to keep it out of the always-loaded context; that section keeps the rule's one-sentence core and a link here. |  |

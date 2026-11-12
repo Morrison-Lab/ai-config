@@ -1,6 +1,7 @@
 Every self-review is an **adversarial review by a separate subagent**.
 Whenever this corpus calls for reviewing your own work --- before a push, as the fallback when the external reviewer is down, or the project-conventions pass a clean verdict does not discharge --- dispatch it to a reviewer with its own context and an adversarial brief, and take its findings as findings.
 The authoring session never reviews its own diff inline.
+`hooks/no-push-without-self-review.py` gates the pre-push case on Claude Code.
 
 [`self-review-fallback`](self-review-fallback.md) governs *when* a self-review is owed and to what standard.
 This governs *who performs it*, which that fragment left to the author by default.

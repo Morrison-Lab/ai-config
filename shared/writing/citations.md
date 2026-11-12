@@ -692,11 +692,12 @@ Fixed by naming the source repo, document and section rather than by dropping th
 
 The section above ends by prescribing the **name** in place of the number, because the name is the stable half.
 It is stabler, and it is not stable.
-A heading renamed in place leaves the file where it was, so the link still resolves, the target still exists, and only the title quoted beside the link now describes a section that no longer goes by that name.
+A heading renamed in place leaves the file where it was.
+A link that carries the old heading's anchor (`file.md#old-title`) now fails `check-links.py` with "(no such heading)" (ai-config#3630), but a link to the file alone still resolves, the target still exists, and only the title quoted beside the link now describes a section that no longer goes by that name.
 
-Nothing in this repo reports it, and that is a property of the instruments rather than an oversight.
+Nothing in this repo reports that second case, and that is a property of the instruments rather than an oversight.
 `scripts/check-links.py` captures only the link **target**: its `\[[^\]]*\]\(([^)]+)\)` never captures the link text, since `[^\]]*` is a character class rather than a group and the one capture group holds the target.
-It then splits any `#anchor` off the path before testing (`re.split(r"[#?]", target, maxsplit=1)[0]`), so its only assertion is `resolved.exists()`.
+It checks that the target exists and, for a fragment on its own or on a link to a Markdown file or a directory's README, that the fragment names a heading or id there, so every assertion it makes is about the target, never about the text beside the link.
 So the sweep that would plausibly catch a bad citation passes with the citation intact, which is worse than having no check at all: a green link run reads as having validated the reference.
 
 Two things follow about where to look.
@@ -706,7 +707,7 @@ Use a whitespace-tolerant search rather than `grep`, since a quoted title long e
 
 - **Do:** search the corpus for a section's old title whitespace-tolerantly (`grep -Pz` with a `\s+` pattern, or `rg -U`) in the same edit that renames it, rather than a literal `grep`.
 - **Do:** quote a title you are citing only if you have just read it, since a resolving link is no evidence about the text beside it.
-- **Don't:** read a green `check-links.py` as covering a quoted title --- it discards link text and strips anchors by construction.
+- **Don't:** read a green `check-links.py` as covering a quoted title --- it discards link text by construction.
 - **Don't:** expect the citing file's own review to catch this --- the edit that invalidated it happened somewhere else.
 
 ## A resolving DOI is not a correct DOI

@@ -24,7 +24,7 @@ Every one of them runs **after** the collision.
 
 The immediacy rule is what makes them rarely needed.
 A `git fetch` from earlier in the session is a reading of the remote *at that moment*, and it stopped being evidence the instant somebody else pushed.
-This is the same expiry [`CLAUDE.md`](../../CLAUDE.md)'s timestamp rule states for the clock, and it goes wrong the same way: having genuinely checked earlier is what licenses not checking now, because the memory of having consulted the remote obscures that the reading has lapsed.
+This is the same expiry [`timestamp-local-recaps`](timestamp-local-recaps.md) states for the clock, and it goes wrong the same way: having genuinely checked earlier is what licenses not checking now, because the memory of having consulted the remote obscures that the reading has lapsed.
 
 **A staleness reading licenses the action that immediately follows it, not a plan formed on its strength.**
 The rule above is usually read as being about *when* you check --- immediately before the push rather than earlier.

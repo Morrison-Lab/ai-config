@@ -33,20 +33,23 @@ def transcript(steps):
     """One assistant tool_use record + one user tool_result record per step."""
     fd, path = tempfile.mkstemp(suffix=".jsonl")
     with os.fdopen(fd, "w") as fh:
-        for i, s in enumerate(steps):
-            tid = f"toolu_{i}"
+        for i, entry in enumerate(steps):
+            # A list is parallel tool calls: one assistant record holds them all.
+            group = entry if isinstance(entry, list) else [entry]
+            tids = [f"toolu_{i}_{j}" for j in range(len(group))]
             fh.write(json.dumps({
-                "type": "assistant", "isSidechain": s["sidechain"],
-                "message": {"content": [{"type": "tool_use", "id": tid,
-                                         "name": s["tool"],
-                                         "input": s["input"]}]},
+                "type": "assistant", "isSidechain": group[0]["sidechain"],
+                "message": {"content": [
+                    {"type": "tool_use", "id": tid, "name": s["tool"],
+                     "input": s["input"]} for tid, s in zip(tids, group)]},
             }) + "\n")
             fh.write(json.dumps({
-                "type": "user", **s.get("rec", {}),
+                "type": "user", **group[0].get("rec", {}),
                 "message": {"content": [{
                     "type": "tool_result", "tool_use_id": tid,
                     "is_error": s["is_error"],
-                    "content": [{"type": "text", "text": s["out"]}]}]},
+                    "content": [{"type": "text", "text": s["out"]}]}
+                    for tid, s in zip(tids, group)]},
             }) + "\n")
     return path
 
@@ -102,6 +105,16 @@ def main():
           run(MERGE, [AGENT])[0])
     check("warns when the cross-harness run predates the last push",
           run(MERGE, [CODEX, PUSH])[0])
+    # ai-config#5382: parallel calls in one record run in no known order.
+    check("warns when the review ran in parallel with a Bash push",
+          run(MERGE, [[CODEX, PUSH]])[0] and run(MERGE, [[PUSH, CODEX]])[0])
+    check("warns when the review ran in parallel with an MCP push",
+          run(MERGE, [[CODEX, step("", tool="mcp__github__push_files",
+                                   tool_input={})]])[0])
+    check("silent when a later review follows a parallel push and review",
+          not run(MERGE, [[CODEX, PUSH], CODEX])[0])
+    check("silent when the review runs in parallel with an unrelated call",
+          not run(MERGE, [PUSH, [CODEX, step("git status")]])[0])
     check("warns when the last push was an MCP push tool",
           run(MERGE, [CODEX, step("", tool="mcp__github__push_files",
                                   tool_input={})])[0])
@@ -176,6 +189,12 @@ def main():
           run(MERGE, [step("curl -s https://opencode.ai/zen/go/v1/chat/completions")])[0])
 
     # --- silent -----------------------------------------------------------
+    # Cancelling an auto-merge or asking for help merges nothing, so it needs
+    # no review (ai-config#5406), as the MCP disable-auto-merge tool does not.
+    check("silent on `gh pr merge N --disable-auto` with no reviewer run",
+          not run("gh pr merge 12 --disable-auto", [])[0])
+    check("silent on `gh pr merge --help` with no reviewer run",
+          not run("gh pr merge --help", [])[0])
     check("silent after a codex run following the last push",
           not run(MERGE, [PUSH, CODEX])[0])
     check("silent after an opencode run",
@@ -211,6 +230,21 @@ def main():
               "CommandLine": "codex exec review"})])[0])
     check("silent after a timeout call with no duration",
           not run(MERGE, [step("timeout codex exec review")])[0])
+    # ai-config#5383: only a listed review form counts, never housekeeping.
+    for cmd in ("opencode stats", "opencode session list", "codex completion bash",
+                "codex apply", "gemini extensions list", "cursor-agent ls",
+                "agy models", "codex -m o3", "gemini 'review'"):
+        check("warns after housekeeping: " + cmd, run(MERGE, [step(cmd)])[0])
+    for cmd in ("codex e 'review'", "codex review", "codex exec -m o3 'review'",
+                "opencode run -m x 'review'", "agy --print 'review'", "agy -p 'review'",
+                "gemini -p 'review'", "gemini --prompt='review'",
+                "cursor-agent -p 'review'", "cursor-agent --print 'review'"):
+        check("silent after a review call: " + cmd,
+              not run(MERGE, [step(cmd)])[0])
+    for cmd in ("agy -p='review' --mode plan", "agy -preview", "codex exec -- --help"):
+        check("silent after a review call: " + cmd, not run(MERGE, [step(cmd)])[0])
+    check("warns when the print flag only follows --",
+          run(MERGE, [step("cursor-agent -- -p")])[0])
     check("silent on disabling auto-merge through MCP",
           not run("", [], tool_name="mcp__github__disable_pr_auto_merge",
                   tool_input=MCP_MERGE)[0])
@@ -416,7 +450,9 @@ def main():
     check("warns after an Ollama Cloud curl forced to GET",
           run(MERGE, [step("curl -sS -X GET https://api.ollama.com/api/chat"
                            " -d @req.json")])[0])
-    for form in ("-XGET", "--request=GET", "-G", "-I"):
+    # ai-config#5363: a bundle holding X, G or I is not a POST either.
+    for form in ("-XGET", "--request=GET", "-G", "-I", "-sSXGET", "-sSX GET",
+                 "-sI", "-sG", "-LsI"):
         check("warns after an Ollama Cloud curl with " + form,
               run(MERGE, [step("curl -sS %s -d @req.json"
                                " https://api.ollama.com/api/chat" % form)])[0])
@@ -424,6 +460,41 @@ def main():
           run(MERGE, [step("curl -sS https://example.com"
                            " -d https://api.ollama.com/api/chat")])[0] and run(MERGE, [step("curl --form-string https://api.ollama.com/api/chat https://example.com")])[0]
           and run(MERGE, [step("curl --data-ascii https://api.ollama.com/api/chat https://x.org")])[0])
+    # ai-config#5383: every curl option that takes a value, not a short list.
+    for opt in ("-w", "--write-out", "-o", "--output", "-e", "--referer",
+                "--trace", "-sw", "-so"):
+        check("warns when the Ollama URL is the value of " + opt,
+              run(MERGE, [step("curl -d @x %s https://api.ollama.com/api/chat"
+                               " https://example.com" % opt)])[0])
+    check("silent when --url names the Ollama chat API",
+          not run(MERGE, [step("curl -sS -d @req.json"
+                               " --url https://api.ollama.com/api/chat")])[0])
+    for opt in ("-4w", "-#o", "--proxy1.0", "--ech", "--haproxy-clientip",
+                "--expand-header", "--expand-data"):
+        check("warns when the Ollama URL is the value of " + opt,
+              run(MERGE, [step("curl -d @x %s https://api.ollama.com/api/chat"
+                               " https://example.com" % opt)])[0])
+    # A value attached to its letter is self-contained, so the next word is the URL.
+    # `-oGI` writes to a file named GI, so its G and I set no method.
+    for opt in ("-XPOST", "-sXPOST", "-oout", "-uuser", "-fsSLoout", "-4", "-L1",
+                "-sSXPOST", "-oGI", "-sSuGI:x"):
+        check("silent after %s before the Ollama URL" % opt,
+              not run(MERGE, [step("curl -d @x %s"
+                                   " https://api.ollama.com/api/chat" % opt)])[0])
+    check("silent after -XPOST before the opencode.ai URL",
+          not run(MERGE, [step("curl -d @x -XPOST"
+                               " https://opencode.ai/zen/go/v1/chat/completions")])[0])
+    check("warns when the Ollama URL is only a --write-out= value",
+          run(MERGE, [step("curl -d @x --write-out=https://api.ollama.com/api/chat"
+                           " https://example.com")])[0])
+    check("silent when the Ollama URL follows --",
+          not run(MERGE, [step("curl -d @x -- https://api.ollama.com/api/chat")])[0])
+    for cmd in ("-d -e", "--data -t", "-d x -H -x"):
+        check("silent when an option value looks like an option: " + cmd,
+              not run(MERGE, [step("curl %s https://api.ollama.com/api/chat" % cmd)])[0])
+    check("silent when a bundled flag takes no value before the URL",
+          not run(MERGE, [step("curl -sS -d @req.json -sS"
+                               " https://api.ollama.com/api/chat")])[0])
     check("silent after an explicit -X POST to Ollama Cloud",
           not run(MERGE, [step("curl -sS -X POST https://api.ollama.com/api/chat"
                                " -d @req.json")])[0])

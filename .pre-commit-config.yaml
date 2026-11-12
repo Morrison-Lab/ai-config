@@ -29,6 +29,7 @@ repos:
         name: check markdown links
         entry: python scripts/check-links.py
         language: python
+        additional_dependencies: [markdown-it-py==3.0.0]
         pass_filenames: false
         always_run: true
       - id: check-md056-table-columns

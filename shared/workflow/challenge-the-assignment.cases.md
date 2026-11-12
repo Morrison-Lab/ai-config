@@ -210,7 +210,7 @@ required checking it: the instruction was true and specific about the surface
 it was given on, and taking it as general felt like consistency rather than
 like an assumption.
 
-This is the exact inverse of `CLAUDE.md`'s "Generalize instructions to every
+This is the exact inverse of `AGENTS.md`'s "Generalize instructions to every
 AI agent by default" section, and the two read as contradictory unless the
 axis each governs is stated.
 That section generalizes across **agents/tools executing the same
@@ -235,7 +235,7 @@ directions.
 - **Don't:** treat a shared category word (comments, messages, notes) as
   proof that a rule scoped to one context applies to every context using that
   word.
-- **Don't:** read this as narrowing `CLAUDE.md`'s "Generalize instructions to
+- **Don't:** read this as narrowing `AGENTS.md`'s "Generalize instructions to
   every AI agent by default" -- that section still governs the agent axis in
   full; this governs the surface axis, which that section never addressed.
 

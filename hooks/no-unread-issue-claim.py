@@ -457,17 +457,17 @@ RX_CUE = re.compile("|".join(CUES), re.I)
 # the `--json` value on commas and tests for the exact token. Borrowing them
 # fixes both, keeps the two guards agreeing about what a read IS, and means a
 # fix to either reaches both.
+try:
+    from sibling import load_sibling
+except ImportError as _exc:
+    print(f"{os.path.basename(__file__)}: cannot load scripts/lib/sibling.py "
+          f"({_exc}); running without its sibling hooks", file=sys.stderr)
+    load_sibling = None
+
+
 def _sibling(name, key):
-    """Import a hyphenated sibling module, or None. Fails open, as ever."""
-    try:
-        import importlib.util
-        spec = importlib.util.spec_from_file_location(
-            key, os.path.join(_HERE, name))
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        return mod
-    except Exception:
-        return None
+    """Import a hyphenated sibling module, or None (scripts/lib/sibling.py)."""
+    return load_sibling(__file__, name, key) if load_sibling else None
 
 
 _claim = _sibling("warn-claim-without-comments-read.py", "_sib_unread_claim")

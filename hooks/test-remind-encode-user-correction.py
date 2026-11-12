@@ -178,6 +178,18 @@ for index, pattern in enumerate(compiled):
               f"{hook.PATTERNS[index]!r}")
         failures += 1
 
-total = len(FIRES) + len(SILENT) + 3 + len(compiled)
+# A cp1252 console used to drop a prompt holding curly quotes: the hook read
+# the UTF-8 payload as cp1252 and stayed silent (ai-config#5462).
+curly = f"I{chr(0x2019)}ve already told you this {chr(0x201C)}twice{chr(0x201D)}"
+proc = subprocess.run(
+    [sys.executable, HOOK], capture_output=True, timeout=30,
+    input=json.dumps({"hook_event_name": "UserPromptSubmit", "prompt": curly},
+                     ensure_ascii=False).encode("utf-8"),
+    env=dict(os.environ, PYTHONIOENCODING="cp1252"))
+if proc.returncode != 0 or b"remind-encode-user-correction" not in proc.stdout:
+    print(f"FAIL: did not fire under cp1252: {proc.stdout!r} {proc.stderr!r}")
+    failures += 1
+
+total = len(FIRES) + len(SILENT) + 3 + len(compiled) + 1
 print(f"{total - failures}/{total} passed")
 sys.exit(1 if failures else 0)

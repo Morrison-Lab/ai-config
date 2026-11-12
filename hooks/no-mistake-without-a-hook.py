@@ -64,7 +64,6 @@ also appears in the opposite claim ("no mechanism exists, unlike <url>").
 The guard cannot tell whether the cited item really is the mechanism.
 """
 import hashlib
-import importlib.util
 import json
 import os
 import re
@@ -73,17 +72,23 @@ import tempfile
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 
+_LIB = os.path.join(os.path.dirname(HERE), "scripts", "lib")
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+
+# The shared sibling loader (ai-config#2018). A broken install that lacks it
+# loads no sibling, and the hook runs without it; say so on stderr.
+try:
+    from sibling import load_sibling
+except ImportError as _exc:
+    print(f"{os.path.basename(__file__)}: cannot load scripts/lib/sibling.py "
+          f"({_exc}); running without its sibling hooks", file=sys.stderr)
+    load_sibling = None
+
 
 def _sibling(name):
     """Import a hyphenated sibling module, or None if unavailable."""
-    path = os.path.join(HERE, name)
-    try:
-        spec = importlib.util.spec_from_file_location("_sib", path)
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        return mod
-    except Exception:
-        return None
+    return load_sibling(__file__, name) if load_sibling else None
 
 
 _ums = _sibling("remind-ums-after-error.py")
@@ -94,6 +99,7 @@ _ums = _sibling("remind-ums-after-error.py")
 ADMISSION = getattr(_ums, "ADMISSION", None)
 visible_prose = getattr(_ums, "visible_prose", lambda t: t)
 _sentinel_gate = getattr(_ums, "_sentinel_gate", None)
+_reply_text = getattr(_ums, "reply_text", lambda name, inp: "")
 
 # Writing or registering a hook. `hooks.json` counts because registration is
 # the second half of the work, per README's activation gate.
@@ -188,6 +194,17 @@ def scan(path):
                             b.get("input") or {})
                         if HOOK_WORK.search(blob):
                             done_at = i
+                        # A project thread's reply is a tool input, not a
+                        # text block (remind-ums-after-error.py, 2026-11-12).
+                        said = _reply_text(b.get("name"), b.get("input"))
+                        if said.strip():
+                            prose = visible_prose(said)
+                            hit = ADMISSION.search(prose) if ADMISSION is not None else None
+                            hit = hit or REDUNDANT_PROSE.search(prose)
+                            if hit:
+                                admit_txt, admit_at = hit.group(0), i
+                            if discharges(prose):
+                                done_at = i
                     elif b.get("type") == "text" and (role == "assistant" or m.get("type") == "assistant"):
                         txt = b.get("text") or ""
                         if not txt.strip():

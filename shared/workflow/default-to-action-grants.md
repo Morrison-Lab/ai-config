@@ -2,7 +2,12 @@
 
 Detail for [`AGENTS.md`'s "Default to action without asking"](../../AGENTS.md), moved here to keep `AGENTS.md` under Codex's byte cap.
 
-The grant covers installing and updating software: R, R packages (including through `renv`), Quarto, and any other tool, on any machine where the owner has install access, directly or through conda, mamba, pyenv, Homebrew, or a similar manager.
+The owner grants standing permission for non-destructive steps: branch commits, pushes, opening and updating PRs, read commands, and editing memory.
+Proceed with them and report in the past tense;
+ask only for destructive, high-impact, or blocking decisions.
+The grant gives no merge authority.
+
+The grant also covers installing and updating software: R, R packages (including through `renv`), Quarto, and any other tool, on any machine where the owner has install access, directly or through conda, mamba, pyenv, Homebrew, or a similar manager.
 Do it whenever it helps, without asking (owner directive, 2026-10-02).
 A resulting lockfile change (`renv.lock`, `environment.yml`) is a repo change and goes through the normal PR flow.
 
@@ -23,7 +28,7 @@ A failing check or gate is not such a block: fix what it reports rather than goi
 
 A policy denial is not a technical block, and you never route around one.
 For a permission-classifier or approval-mode denial of an authorized action, follow [`ask-for-manual-approval`](ask-for-manual-approval.md).
-For a denial of an action nothing authorizes, ask the owner whether to do it at all, as `ask-for-manual-approval`'s "When to ask" says.
+For a denial of an action nothing authorizes, ask the owner whether to do it at all, as `ask-for-manual-approval`'s "When to switch or ask" says.
 For a proxy `403` on a push, follow [`use-existing-pr-branch`](use-existing-pr-branch.md), which says to report it to the owner rather than retry.
 
 Owner directive, 2026-10-22, given while moving mlg CI to the WWU GitLab.
@@ -74,8 +79,7 @@ In a repository where the owner's membership is not positively verified, posting
 A standing grant does not clear a permission-classifier denial.
 When the classifier or approval mode blocks the post, follow [`ask-for-manual-approval`](ask-for-manual-approval.md).
 Retry the identical command once.
-Then, when `mcp__ccd_session_mgmt__set_session_permission_mode` is available, switch the session to `default` yourself, rerun the command once, and request `auto` again.
-Without that tool, ask the owner to leave auto mode.
+Then switch or ask as `ask-for-manual-approval`'s "When to switch or ask" says.
 A managed-settings `permissions.deny` denial applies in every mode, so report that denial and do not ask to switch modes.
 Never ask whether to post the review, because the grant has answered that question.
 The durable fix is an `autoMode` `allow` entry that covers `gh pr comment` and MR notes.
@@ -90,7 +94,7 @@ On [Morrison-Lab/ids#26](https://github.com/Morrison-Lab/ids/pull/26), a finishe
 ## "Don't wait" and "decide it yourself"
 
 When a coordinator or the user says "don't wait" or "decide it yourself", act in the same turn.
-Hold a step for a person only when it is irreversible or needs their own word, such as a merge.
+Hold a step for a person only when it is [irreversible](irreversible.md), or needs their own word (such as a merge outside a standing grant).
 A rule learned from such a correction is global ([`global-by-default`](global-by-default.md)): record it the same turn, never as a later to-do.
 A sandbox denial of the step is a reason to report the denial, not to skip recording the rule.
 Case: [ai-config#4696](https://github.com/Morrison-Lab/ai-config/issues/4696).

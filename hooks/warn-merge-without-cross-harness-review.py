@@ -24,9 +24,9 @@ before the gap was noticed.
     AND NOT  this session's transcript holds, after the last push, a
              non-sidechain Bash call whose result is not an error and in
              which a simple command's command word is one of the CLIs in
-             CROSS_HARNESS_CLIS, minus this session's own harness, with a
-             first argument that is not a housekeeping one (NON_REVIEW_ARGS:
-             `--version`, `--help`, `login`, `auth`, ...), or a `curl` call
+             CROSS_HARNESS_CLIS, minus this session's own harness, run as a
+             review (REVIEW_SUBCOMMANDS: `codex exec`, `opencode run`;
+             REVIEW_FLAGS: `claude -p`, `agy --print`, ...), or a `curl` call
              with a data payload to `https://opencode.ai/zen/go/v1/chat/completions`
              (the cloud-session route when `opencode` qualifies per AGENTS.md policy),
              or a `curl` call with a data payload to `https://api.ollama.com/api/chat`
@@ -74,6 +74,10 @@ tool calls, so a deny is decidable and costs at most the waiver's probe pass.
   script (`dtc`'s background `nohup bash "$WORK/run.sh" &`) is not: the
   command word is `bash`, and the script's contents are not in the
   transcript. The foreground `codex exec ...` form is credited.
+* Only the listed review forms count, so a review written another way is not
+  credited: an option with a value before the subcommand (`codex -m o3 exec`)
+  or a bare positional prompt (`gemini 'review'`). Each errs toward a false
+  deny, which the listed form clears (`codex exec -m o3`, `gemini -p`).
 * `gemini` and `cursor-agent` are credited although the gate fragment's
   ladder does not list them as active yet: a successful run of either in
   the transcript is itself the probe that ladder is waiting on.
@@ -82,26 +86,31 @@ A false deny from the script case is discharged by running the reviewer in the
 foreground, or by the probe pass. There is no escape variable. The hook fails
 open on any internal error.
 """
-import importlib.util
 import json
 import os
 import re
 import sys
 import urllib.parse
 
-HERE = os.path.dirname(os.path.realpath(__file__))
-
 # Reviewer CLIs, one per harness. The session's own harness is removed at run
 # time, so `claude` counts only from a non-Claude session.
 CROSS_HARNESS_CLIS = frozenset({
     "codex", "opencode", "agy", "gemini", "cursor-agent", "claude",
 })
-# A first argument that makes the invocation housekeeping, not a review.
-NON_REVIEW_ARGS = frozenset({
-    "-v", "-V", "--version", "version", "-h", "--help", "help",
-    "login", "logout", "auth", "config", "mcp", "update", "upgrade",
-    "install", "models",
-})
+# What makes a reviewer CLI's call a review, listed rather than inferred, so
+# housekeeping (`opencode stats`, `codex apply`, `cursor-agent ls`) never
+# counts (ai-config#5383): the first word that is not an option, for a CLI
+# with subcommands, or a print or prompt flag anywhere before `--`.
+REVIEW_SUBCOMMANDS = {
+    "codex": frozenset({"exec", "e", "review"}),
+    "opencode": frozenset({"run"}),
+}
+REVIEW_FLAGS = {
+    "agy": frozenset({"-p", "--print"}),
+    "claude": frozenset({"-p", "--print"}),
+    "cursor-agent": frozenset({"-p", "--print"}),
+    "gemini": frozenset({"-p", "--prompt"}),
+}
 # `timeout` options that take a separate argument (`-s KILL`, `-k 5`).
 TIMEOUT_ARG_OPTS = frozenset({"-s", "--signal", "-k", "--kill-after"})
 # A help or version flag anywhere in the call (`codex exec --help`).
@@ -120,11 +129,49 @@ HTTP_ROUTES = (
 # Presence probes, and the routes a presence probe alone cannot clear.
 PROBE_WORDS = frozenset({"which", "command"})
 NEEDS_ATTEMPT = frozenset({"opencode"})
-# curl options whose next word is a value, never the request URL.
+# curl options whose next word is a value, never the request URL: every
+# option `curl --help all` (curl 8.5.0) shows taking an argument, plus
+# `--haproxy-clientip` (its help line omits the argument), `--ech` (curl 8.8)
+# and the bundled `-sd`/`-sF`. `--url` is left out, since its value is the
+# target (ai-config#5383).
 CURL_VALUE_OPTS = frozenset({
-    "-d", "-F", "-sd", "-sF", "--data", "--data-ascii", "--data-binary", "--data-raw",
-    "--data-urlencode", "--form", "--form-string", "--json", "-H", "--header", "-e",
-    "--referer", "-o", "--output", "-x", "--proxy", "-u", "--user",
+    "--abstract-unix-socket", "--alt-svc", "--aws-sigv4", "--cacert",
+    "--capath", "--cert", "--cert-type", "--ciphers", "--config",
+    "--connect-timeout", "--connect-to", "--continue-at", "--cookie",
+    "--cookie-jar", "--create-file-mode", "--crlfile", "--curves", "--data",
+    "--data-ascii", "--data-binary", "--data-raw", "--data-urlencode",
+    "--delegation", "--dns-interface", "--dns-ipv4-addr", "--dns-ipv6-addr",
+    "--dns-servers", "--doh-url", "--dump-header", "--ech", "--egd-file",
+    "--engine", "--haproxy-clientip",
+    "--etag-compare", "--etag-save", "--expect100-timeout", "--form",
+    "--form-string", "--ftp-account", "--ftp-alternative-to-user",
+    "--ftp-method", "--ftp-port", "--ftp-ssl-ccc-mode",
+    "--happy-eyeballs-timeout-ms", "--header", "--help", "--hostpubmd5",
+    "--hostpubsha256", "--hsts", "--interface", "--ipfs-gateway", "--json",
+    "--keepalive-time", "--key", "--key-type", "--krb", "--libcurl",
+    "--limit-rate", "--local-port", "--login-options", "--mail-auth",
+    "--mail-from", "--mail-rcpt", "--max-filesize", "--max-redirs",
+    "--max-time", "--netrc-file", "--noproxy", "--oauth2-bearer",
+    "--output", "--output-dir", "--parallel-max", "--pass",
+    "--pinnedpubkey", "--preproxy", "--proto", "--proto-default",
+    "--proto-redir", "--proxy", "--proxy1.0", "--proxy-cacert", "--proxy-capath",
+    "--proxy-cert", "--proxy-cert-type", "--proxy-ciphers",
+    "--proxy-crlfile", "--proxy-header", "--proxy-key", "--proxy-key-type",
+    "--proxy-pass", "--proxy-pinnedpubkey", "--proxy-service-name",
+    "--proxy-tls13-ciphers", "--proxy-tlsauthtype", "--proxy-tlspassword",
+    "--proxy-tlsuser", "--proxy-user", "--pubkey", "--quote",
+    "--random-file", "--range", "--rate", "--referer", "--request",
+    "--request-target", "--resolve", "--retry", "--retry-delay",
+    "--retry-max-time", "--sasl-authzid", "--service-name", "--socks4",
+    "--socks4a", "--socks5", "--socks5-gssapi-service", "--socks5-hostname",
+    "--speed-limit", "--speed-time", "--stderr", "--telnet-option",
+    "--tftp-blksize", "--time-cond", "--tls-max", "--tls13-ciphers",
+    "--tlsauthtype", "--tlspassword", "--tlsuser", "--trace",
+    "--trace-ascii", "--trace-config", "--unix-socket", "--upload-file",
+    "--url-query", "--user", "--user-agent", "--variable", "--write-out",
+    "-A", "-C", "-D", "-E", "-F", "-H", "-K", "-P", "-Q", "-T", "-U", "-X",
+    "-Y", "-b", "-c", "-d", "-e", "-h", "-m", "-o", "-r", "-sF", "-sd",
+    "-t", "-u", "-w", "-x", "-y", "-z",
 })
 # Claude Code's "Exit code N" or Antigravity's header, never a refusal: an attempt at any exit, a probe at 1 only.
 RX_RAN_FAILED = re.compile(r"^(?:\s|\\n)*(?:Exit code [1-9]|Command timed out)|^(?:\w+ At: .*\n)*(?:the )?command exited with code [1-9]", re.I)
@@ -146,7 +193,9 @@ NOTE = (
     "AND harness both differ from this session's. An Agent subagent and the "
     "CI claude-review workflow are both Claude and do not qualify. Run one "
     "of {clis} (or in cloud sessions, curl to opencode.ai with candidate "
-    "model fallback per delegate-to-opencode) on the shipping head first. "
+    "model fallback per delegate-to-opencode) on the shipping head first, "
+    "in a review form: `codex exec`, `opencode run`, or `-p`/`--print` "
+    "(`claude -p`); a subcommand comes before any option with a value. "
     "If no qualifying reviewer can run here (host blocked, backend down, "
     "CLI or credential absent), probe every route once: attempt each of "
     "{clis} as a reviewer, or show it absent with `command -v <cli>` or `which <cli>` alone, unredirected (exit 1); "
@@ -160,12 +209,23 @@ NOTE = (
 )
 
 
+_LIB = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+                    "scripts", "lib")
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+try:
+    from sibling import load_sibling
+except ImportError as _exc:
+    print(f"{os.path.basename(__file__)}: cannot load scripts/lib/sibling.py "
+          f"({_exc}); its sibling hook will not load", file=sys.stderr)
+    load_sibling = None
+
+
 def _sibling():
-    path = os.path.join(HERE, "warn-merge-without-fully-clean.py")
-    spec = importlib.util.spec_from_file_location("_sib_wmwfc", path)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+    """Import `warn-merge-without-fully-clean.py` (scripts/lib/sibling.py); raises if it cannot load."""
+    if load_sibling is None:
+        raise ImportError("scripts/lib/sibling.py is not importable")
+    return load_sibling(__file__, "warn-merge-without-fully-clean.py", "_sib_wmwfc", required=True)
 
 
 def own_harness(path="", recs=None):
@@ -219,6 +279,44 @@ def _peel_wrappers(rest):
     return rest
 
 
+def _takes_value(word):
+    """True when curl reads the word after *word* as an option's value.
+
+    A cluster of short options (`-sw`, `-4o`) is read as curl reads it:
+    the first letter that takes a value takes the rest of the word when any
+    is left (`-XPOST`, `-oout`), and the next word only when it is last.
+    """
+    if word in CURL_VALUE_OPTS:
+        return True
+    # curl 8.3+ takes `--expand-<option>` wherever `--<option>` takes a value.
+    if word.startswith("--expand-"):
+        return "--" + word[len("--expand-"):] in CURL_VALUE_OPTS
+    if not word.startswith("-") or word.startswith("--"):
+        return False
+    for pos, letter in enumerate(word[1:], start=2):
+        if "-" + letter in CURL_VALUE_OPTS:
+            return pos == len(word)
+    return False
+
+
+def _bundle_verb(word, nxt):
+    """The method a short-option bundle *word* sets, else None.
+
+    `G` and `I` give a non-POST method, and `X` takes the rest of the bundle,
+    or the next word *nxt* when it ends the bundle. A letter that takes a
+    value ends the scan, since the letters after it are that value
+    (ai-config#5363).
+    """
+    for pos, letter in enumerate(word[1:], start=2):
+        if letter in "GI":
+            return "GET" if letter == "G" else "HEAD"
+        if letter == "X":
+            return word[pos:] or nxt
+        if "-" + letter in CURL_VALUE_OPTS:
+            return None
+    return None
+
+
 def _curl_route(rest):
     """The HTTP_ROUTES entry a `curl` POST in *rest* reaches, else None."""
     if HELP_FLAGS.intersection(rest[1:]):
@@ -234,16 +332,29 @@ def _curl_route(rest):
     args = rest[1:]
     for i, arg in enumerate(args):
         prev = args[i - 1] if i else ""
-        # `-X GET`, `-XGET`, `--request=GET`, `-G` and `-I` are not a POST.
-        verb = arg if prev in ("-X", "--request") else None
-        if arg.startswith(("--request=", "-X")) and len(arg) > 2:
-            verb = arg.split("=", 1)[1] if arg.startswith("--request=") else arg[2:]
+        # `-X GET`, `-XGET`, `--request=GET`, `-G` and `-I` are not a POST,
+        # and neither is a bundle holding one of them (`-sSXGET`, `-sI`).
+        verb = arg if prev == "--request" else None
+        if arg.startswith("--request="):
+            verb = arg.split("=", 1)[1]
+        elif arg.startswith("-") and not arg.startswith("--"):
+            verb = _bundle_verb(arg, args[i + 1] if i + 1 < len(args) else "")
         if (verb is not None and verb.upper() != "POST") or arg in (
-                "-G", "--get", "-I", "--head"):
+                "--get", "--head"):
             return None
+    # Only a bare URL word is the target, never an option value (`-d URL`, `--form-string URL`).
+    # Walk from the left, so a value that looks like an option (`-d -e`) takes nothing.
+    values, takes = set(), False
     for i, arg in enumerate(args):
-        # Only a bare URL word is the target, never an option value (`-d URL`, `--form-string URL`).
-        if not arg.lower().startswith(("http://", "https://")) or (i and args[i - 1] in CURL_VALUE_OPTS):
+        if takes:
+            values.add(i)
+            takes = False
+        elif arg == "--":
+            break
+        else:
+            takes = _takes_value(arg)
+    for i, arg in enumerate(args):
+        if not arg.lower().startswith(("http://", "https://")) or i in values:
             continue
         try:
             parts = urllib.parse.urlsplit(arg)
@@ -256,6 +367,22 @@ def _curl_route(rest):
     return None
 
 
+def _is_review_call(base, args):
+    """True when *args* make reviewer CLI *base* run a review, not housekeeping."""
+    words = args[:args.index("--")] if "--" in args else args
+    if HELP_FLAGS.intersection(words):
+        return False
+    if base in REVIEW_SUBCOMMANDS:
+        first = next((a for a in words if not a.startswith("-")), None)
+        return first in REVIEW_SUBCOMMANDS[base]
+    flags = REVIEW_FLAGS.get(base, frozenset())
+    # A long flag may carry `=value`; a short one `=value` or an attached
+    # value (`agy -p="..."`, memories/antigravity.md).
+    return any(a.split("=", 1)[0] in flags if a.startswith("--")
+               else any(a.startswith(f) for f in flags if len(f) == 2)
+               for a in words)
+
+
 def _review_route(rest, clis):
     """The route a reviewer call in *rest* takes: a CLI name, a host, or None."""
     rest = _peel_wrappers(rest)
@@ -263,7 +390,7 @@ def _review_route(rest, clis):
         return None
     base = os.path.basename(rest[0])
     if len(rest) > 1 and base in clis:
-        return base if rest[1] not in NON_REVIEW_ARGS and not HELP_FLAGS.intersection(rest[1:]) else None
+        return base if _is_review_call(base, rest[1:]) else None
     if base == "curl":
         route = _curl_route(rest)
         if route and (route[2] is None or route[2] in clis):
@@ -355,11 +482,34 @@ def all_routes_probed(clis, cleared, last_push):
         "absent:" + c, -1) > last_push) for c in clis)
 
 
+def _push_block_ids(sib, rec, clis):
+    """The ids of the tool_use blocks in *rec* that push, by MCP or shell."""
+    ids = set()
+    for b in sib._blocks(rec):
+        if b.get("type") != "tool_use":
+            continue
+        name = b.get("name")
+        if name in sib.MCP_PUSH_TOOLS:
+            ids.add(b.get("id"))
+            continue
+        cmd = _shell_command(b.get("input") or {})
+        if name not in sib.SHELL_TOOLS or not isinstance(cmd, str):
+            continue
+        try:
+            if any(k == "push" for k, _p in _shell_events(sib, cmd, clis)):
+                ids.add(b.get("id"))
+        except Exception:
+            continue
+    return ids
+
+
 def scan(sib, path, clis, recs=None):
     """Return (last_push_seq, [seq of successful reviewer calls], cleared).
 
     A push and a review in one command count the push at seq - 0.5, a review
     that `_fresh` places after every push at seq, and any other at seq - 1.
+    A call in the same record as a separate push block (parallel tool calls,
+    run in no known order) also counts at seq - 1 (ai-config#5382).
     `cleared` maps each route to the seq of the last non-sidechain call that
     cleared it for the waiver: an attempt with any result (key: the route),
     or a presence probe that found a CLI absent (key: "absent:<cli>").
@@ -370,6 +520,7 @@ def scan(sib, path, clis, recs=None):
     cleared = {}
     stream = recs if recs is not None else sib.records(path)
     for seq, rec in enumerate(stream):
+        pushes = _push_block_ids(sib, rec, clis)
         for b in sib._blocks(rec):
             kind = b.get("type")
             if kind == "tool_use":
@@ -388,12 +539,16 @@ def scan(sib, path, clis, recs=None):
                     if rec.get("isSidechain"):
                         continue
                     attempts, probes = _route_calls(sib, cmd, clis)
+                    # A push in a parallel block of this record may have run
+                    # after this call, so the call counts as before it (ai-config#5382).
+                    parallel_push = bool(pushes - {b.get("id")})
                     review_seq = None
                     if "review" in kinds:
-                        review_seq = seq if _fresh(events) else seq - 1
+                        review_seq = (seq if _fresh(events) and not parallel_push
+                                      else seq - 1)
                     if review_seq is not None or attempts or probes:
                         # An attempt sharing a call with a push may precede it (a probe never shares one).
-                        seq_call = seq - 1 if "push" in kinds else seq
+                        seq_call = seq - 1 if "push" in kinds or parallel_push else seq
                         pending[b.get("id")] = (seq_call, review_seq,
                                                 attempts, probes)
                 except Exception:

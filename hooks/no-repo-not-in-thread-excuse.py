@@ -20,7 +20,7 @@ NEG = (rf"(?:isn{APOS}t|is\s+not|aren{APOS}t|are\s+not|wasn{APOS}t|was\s+not|"
        rf"don{APOS}t|doesn{APOS}t|didn{APOS}t|do\s+not|does\s+not|did\s+not|"
        rf"hasn{APOS}t|haven{APOS}t|has\s+not|have\s+not|can{APOS}t|cannot|can\s+not|couldn{APOS}t|no\s+longer|not)")
 MODAL = rf"(?:can{APOS}t|cannot|can\s+not|couldn{APOS}t|unable\s+to|not\s+able\s+to)"
-PLACE = rf"(?:this|the|my|our|that|current)\s+(?:project\s+)?(?:thread|session)"
+PLACE = rf"(?:the\s+current|this|the|my|our|that|current)\s+(?:project\s+)?(?:thread|session)"
 # The place is the thread itself or its repo list: "lds is not in this thread's queue" passes.
 TARGET = (rf"\s+(?:{PLACE}(?:{APOS}s\s+(?:github\s+)?(?:repos|repositories|repo\s+scope|repo\s+list|scope))?"
           rf"(?![\w'\u2019])|my\s+(?:repos|repositories)\b|the\s+(?:repos|repositories)\s+(?:attached|available|in|for)\b)")
@@ -42,7 +42,7 @@ SUBJECT = re.compile(rf"(?:{REPO_NAME.pattern})[\s`'\"\u2019]*(?:(?:is|are|was|w
 DET = r"(?:(?:the|a|an|that|this|any)\s+)?"
 TOK = r"`?([\w-]{1,39}(?:/[\w-]{1,100})?)`?"
 END = r"(?=\s*(?:[.,;:!?)](?=\s|$)|$|(?:in|on|from|here|to|into|within|checked|cloned|attached|repo|repository)\b))"
-ACCESS = r"(?:(?:write|push|read)\s+)?access\s+to\s+"
+ACCESS = r"(?:read\s+)?access\s+to\s+"
 OBJECT = re.compile(
     rf"\b{NEG}\s+(?:\w+\s+){{0,2}}?(?:have|has|include|includes|see)\s+(?:{ACCESS})?{DET}{TOK}{END}"
     rf"|\b{MODAL}\s+(?:\w+\s+)?(?:reach|access|clone|see)\s+(?:to\s+|into\s+)?{DET}{TOK}{END}"
@@ -56,13 +56,15 @@ LIST_NEG = re.compile(
     rf"|(?:{REPO_LIST.pattern})\s+(?:{NEG})\s+(?:include|includes|have|has|list)\s+{DET}{TOK}", re.I)
 # A sentence about running add_repo reports the attach, unless it is hypothetical.
 ADD_REPO = re.compile(r"\badd_repo\b(?!\s+(?:\w+\s+)?(?:would|will|could|might|may|has|had|returned\s+2\d\d)\b)", re.I)
-ATTACHED = re.compile(
-    rf"(?:\b(?:I|we)(?:{APOS}ve)?(?:\s+(?!not\b|never\b)\w+){{0,3}}?\s+|^\s*)(?:added|attached|cloned)\s+(?:(?:the|a|an)\s+)?([\w/-]{{1,140}})\b"
-    r"|(?<![\w/-])([\w/-]{1,140})\s+(?:is|was|has\s+been)\s+(?:now\s+)?(?:attached|added|cloned)\b", re.I)
+# An attach in progress or done ("I attached it", "attaching mlg", "added X to this thread") reports
+# the fix; the adjective ("the attached patch"), a negation or a hypothetical does not.
+ATTACH_VERB = re.compile(
+    rf"(?<!the\s)(?<!\ba\s)(?<!an\s)(?<!repos\s)(?<!repositories\s)\battach(?:ed|ing)\b|\badded\s+[\w/-]{{1,140}}\s+to\s+{PLACE}", re.I)
+NOT_YET = re.compile(rf"\b(?:{NEG}|will|would|could|should|if|to|please|can|{APOS}ll)\s+(?:\w+\s+)?$", re.I)
 FAIL = r"(?:refused|denied|declined|failed|rejected|errored|returned\s+(?:an?\s+)?(?:error|[45]\d\d))"
 TRIED = re.compile(
     r"\b(?:add_repo|attach|attaching)\b(?:\s+(?!has\b|had\b|would\b|will\b|may\b|might\b|could\b)\S+){0,2}?"
-    rf"\s+(?:was\s+|itself\s+)?{FAIL}\b", re.I)
+    rf"\s+(?:was\s+|itself\s+)?{FAIL}\b|\b(?:attach|add_repo)\b[^.;]{{0,80}}?\b(?:got|received)\s+[\"'\u2018\u201c]", re.I)
 
 REASON = (
     '[hook: no-repo-not-in-thread-excuse] "{sentence}" says a repository is not in this '
@@ -82,46 +84,41 @@ def message_text(tool_input: dict) -> str:
     return "\n".join(p for p in parts if isinstance(p, str))
 
 
-def norm(name: str) -> str:
-    return name.lower().rsplit("/", 1)[-1]
-
-
-def names_repo(sentence: str, attached: set) -> bool:
+def names_repo(sentence: str) -> bool:
     for m in SUBJ_NEG.finditer(sentence):
         window = sentence[max(0, m.start() - 200):m.start()]
         subj = SUBJECT.search(window)
         # "The fix for lds isn't in" names lds as an object, not the subject.
-        tok = subj and norm(subj.group(0).strip(" `'\"\u2019").split()[0])
-        if subj and tok not in attached and not (attached and tok in ("repo", "repository")) and not re.search(r"\b(?:for|to|on|in|of|with|from|about|by)\s+$", window[:subj.start()], re.I):
+        if subj and not re.search(r"\b(?:for|to|on|in|of|with|from|about|by)\s+$", window[:subj.start()], re.I):
             return True
     for rx in (OBJECT, LIST_NEG):
         obj = rx.search(sentence)
-        if obj and any(g and REPO_NAME.search(g) and norm(g) not in attached for g in obj.groups()):
+        if obj and any(g and REPO_NAME.search(g) for g in obj.groups()):
             return True
     return False
 
 
-def is_excuse(sentence: str) -> bool:
-    # Read [text](url), **bold** and `code` as their text.
+def plain(sentence: str) -> str:
+    """Read [text](url), **bold** and `code` as their text."""
     sentence = re.sub(r"\[([^\]\[]{0,300})\]\([^)\s]{0,500}\)", r"\1", sentence)
-    sentence = re.sub(r"https?://[^\s)]*|\*\*|`", "", sentence)
-    if not LOC.search(sentence) or ADD_REPO.search(sentence) or TRIED.search(sentence):
-        return False
-    attached, last_it = set(), -1
-    for m in ATTACHED.finditer(sentence):
-        obj = norm(m.group(1) or m.group(2))
-        if obj in ("it", "repo", "repository"):
-            last_it = m.start()
-        attached.add(obj)
-    # "mlg wasn't in this thread's repos, so I attached it": it is a repo named before.
-    attached |= {norm(n.group(0)) for n in NAMED.finditer(sentence, 0, max(last_it, 0))}
-    return names_repo(sentence, {a for a in attached if REPO_NAME.search(a)})
+    return re.sub(r"https?://[^\s)]*|\*\*|`", "", sentence)
+
+
+def attaches(sentence: str) -> bool:
+    return bool(ADD_REPO.search(sentence) or TRIED.search(sentence) or any(
+        not NOT_YET.search(sentence[max(0, m.start() - 40):m.start()]) for m in ATTACH_VERB.finditer(sentence)))
+
+
+def is_excuse(sentence: str) -> bool:
+    return bool(LOC.search(sentence)) and not attaches(sentence) and names_repo(sentence)
 
 
 def excuse(text: str):
     """The first sentence that calls a repo out of this thread's reach, or None."""
-    for sentence in re.split(r"(?<=[.!?])\s+|\n+", text):
-        if is_excuse(sentence):
+    sentences = [plain(x) for x in re.split(r"(?<=[.!?])\s+|\n+", text)]
+    for i, sentence in enumerate(sentences):
+        # "X wasn't in this thread's repos. I attached it." reports the fix in the next sentence.
+        if is_excuse(sentence) and not (i + 1 < len(sentences) and attaches(sentences[i + 1])):
             return " ".join(sentence.split())
     return None
 

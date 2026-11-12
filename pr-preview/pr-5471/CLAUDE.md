@@ -479,7 +479,7 @@ If you and the reviewer reach an impasse on a single item (your rebuttal didn't 
 
 ## Request review and drive every started PR to clean
 
-`AGENTS.md`'s "Get a clean automated review before asking a person to review" governs: no request for human review, on any forge, before a clean or deadlocked automated review that you triggered yourself ([`automated-review-before-human`](shared/workflow/automated-review-before-human.md)).
+The "Get a clean automated review before asking a person to review" bullet of `AGENTS.md`'s "Review your work before anyone sees it, and watch every PR you drive" governs: no request for human review, on any forge, before a clean or deadlocked automated review that you triggered yourself ([`automated-review-before-human`](shared/workflow/automated-review-before-human.md)).
 This section is the GitHub mechanics.
 
 Whenever starting or working on a Pull Request:

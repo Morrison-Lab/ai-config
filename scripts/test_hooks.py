@@ -42,8 +42,10 @@ import glob
 import importlib.util
 import math
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 from pathlib import Path
 
@@ -225,6 +227,25 @@ def run_one_suite(test_path, subject, timeout):
         PYTHONWARNINGS="error::SyntaxWarning,error:invalid escape sequence::",
     )
     env.pop("ANTIGRAVITY_AGENT", None)
+    # A fresh temp directory per suite (ai-config#4805). Several hooks keep
+    # once-per-turn sentinel files under the temp directory, so a sentinel
+    # left by an earlier LOCAL run made a suite skip the output it asserts on
+    # and pass, while CI, starting clean, failed on the same commit
+    # (1a835e69, 2026-10-28). TEMP and TMP are what Windows reads.
+    suite_tmp = tempfile.mkdtemp(prefix="hook-suite-")
+    env.update(TMPDIR=suite_tmp, TEMP=suite_tmp, TMP=suite_tmp)
+    try:
+        return _run_in_env(test_path, subject, timeout, rel_test, env)
+    finally:
+        # Best effort: a descendant still writing there (see the orphan note
+        # below) must not turn a verdict into a crash. The cost is that such
+        # a descendant, or a Windows file lock, can leave the directory
+        # behind unreported.
+        shutil.rmtree(suite_tmp, ignore_errors=True)
+
+
+def _run_in_env(test_path, subject, timeout, rel_test, env):
+    """Run the suite under env and print its verdict. 0 = pass, 1 = fail."""
     proc = subprocess.Popen(
         [sys.executable, test_path, subject],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)

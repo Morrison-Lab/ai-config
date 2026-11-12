@@ -479,5 +479,68 @@ with tempfile.TemporaryDirectory(prefix="hook-runner-") as tmp:
           code == 2 and stdout == "", repr((code, stdout)))
 
 
+# --- Each suite gets a fresh temp directory (ai-config#4805) --------------
+# A sentinel left in the shared temp directory by an earlier run made a
+# suite pass locally and fail in CI. This suite fails when that sentinel is
+# visible, so it passes only if the runner hides the shared directory.
+
+SENTINEL = f"hook-runner-sentinel-{os.getpid()}"
+STALE = f"""\
+import os, tempfile
+tmp = tempfile.gettempdir()
+if os.path.exists(os.path.join(tmp, {SENTINEL!r})):
+    print("saw a stale sentinel")
+    raise SystemExit(1)
+print("tmp=" + tmp)
+"""
+
+shared_sentinel = Path(tempfile.gettempdir()) / SENTINEL
+shared_sentinel.write_text("left by an earlier run\n", encoding="utf-8")
+try:
+    with tempfile.TemporaryDirectory(prefix="hook-runner-") as tmp:
+        hooks = Path(tmp)
+        stale_test, stale_subj = _write_pair(hooks, "stale", STALE)
+        bare = subprocess.run([sys.executable, stale_test, stale_subj],
+                              capture_output=True, text=True)
+        check("control: the suite fails when it sees the shared sentinel",
+              bare.returncode == 1, repr(bare.stdout))
+        rc, stdout, _ = _capture(
+            lambda: th.run_one_suite(stale_test, stale_subj, timeout=10))
+        check("under the runner the suite does not see the sentinel",
+              rc == 0 and "PASS:" in stdout, repr(stdout))
+        # To end of line, not \S+: a Windows temp path can hold a space.
+        used = re.search(r"-- tmp=(.+)$", stdout, re.M)
+        used_dir = used.group(1).strip() if used else ""
+        check("the suite ran in its own temp directory",
+              os.path.basename(used_dir).startswith("hook-suite-"),
+              repr(stdout))
+        check("the runner removes that directory afterwards",
+              bool(used_dir) and not os.path.exists(used_dir), repr(stdout))
+finally:
+    shared_sentinel.unlink(missing_ok=True)
+
+# TEMP and TMP are what Windows reads, so pin them too: on Linux and macOS
+# gettempdir() follows TMPDIR alone, and dropping the other two would pass.
+seen_env = {}
+real_run_in_env = th._run_in_env
+
+
+def spy_run_in_env(test_path, subject, timeout, rel_test, env):
+    seen_env.update(env)
+    return real_run_in_env(test_path, subject, timeout, rel_test, env)
+
+
+with tempfile.TemporaryDirectory(prefix="hook-runner-") as tmp:
+    ok_test, ok_subj = _write_pair(Path(tmp), "ok", OK)
+    with patch.object(th, "_run_in_env", spy_run_in_env):
+        _capture(lambda: th.run_one_suite(ok_test, ok_subj, timeout=10))
+    suite_dir = seen_env.get("TMPDIR", "")
+    check("TEMP and TMP name the same per-suite directory as TMPDIR",
+          os.path.basename(suite_dir).startswith("hook-suite-")
+          and seen_env.get("TEMP") == suite_dir
+          and seen_env.get("TMP") == suite_dir,
+          repr({k: seen_env.get(k) for k in ("TMPDIR", "TEMP", "TMP")}))
+
+
 print(f"\n{passes}/{passes + failures} checks passed")
 sys.exit(1 if failures else 0)

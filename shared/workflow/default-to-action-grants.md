@@ -23,7 +23,7 @@ A failing check or gate is not such a block: fix what it reports rather than goi
 
 A policy denial is not a technical block, and you never route around one.
 For a permission-classifier or approval-mode denial of an authorized action, follow [`ask-for-manual-approval`](ask-for-manual-approval.md).
-For a denial of an action nothing authorizes, ask the owner whether to do it at all, as `ask-for-manual-approval`'s "When to ask" says.
+For a denial of an action nothing authorizes, ask the owner whether to do it at all, as `ask-for-manual-approval`'s "When to switch or ask" says.
 For a proxy `403` on a push, follow [`use-existing-pr-branch`](use-existing-pr-branch.md), which says to report it to the owner rather than retry.
 
 Owner directive, 2026-10-22, given while moving mlg CI to the WWU GitLab.

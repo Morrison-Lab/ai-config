@@ -70,7 +70,7 @@ What you say about the state you stop in must be true, and any work that remains
   a promise to return is not a mechanism, and a verified clean stop needs no timer.
 - **Say whether the session is done when reporting stopping point status**, confirming UMS ran (or no new learnings accumulated) and noticed follow-ups are filed;
   never say done with uncommitted, unpushed, or un-PRed changes, or open PRs the session authored ([`flag-session-boundaries`](shared/workflow/flag-session-boundaries.md)).
-- **Run UMS before every pause** if learnings have accumulated, and **run UMS when work is scrutinized** (a review, critical feedback, or a questioned claim that proves wrong), in that turn, without waiting for a clean verdict, an accepted finding, or a first-person admission;
+- **Run UMS before every pause** if learnings have accumulated, first, before ending a turn to wait on CI, a review round, a subagent, or an answer from the user, and **run UMS when work is scrutinized** (a review, critical feedback, or a questioned claim that proves wrong), in that turn, without waiting for a clean verdict, an accepted finding, or a first-person admission;
   answering with the corrected fact is not the pass ([`run-ums-proactively`](shared/workflow/run-ums-proactively.md)).
 - **Terminate superseded and abandoned background tasks** (commands, monitors, subagents dispatched to inspect, search, or diagnose) once their purpose is met, their findings are superseded, or the session moves on, and sweep them before declaring anything complete ([`terminate-superseded-tasks`](shared/workflow/terminate-superseded-tasks.md)).
 

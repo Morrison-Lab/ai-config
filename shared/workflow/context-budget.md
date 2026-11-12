@@ -14,9 +14,10 @@ Only the adversarial reviewer caught it (the `main` figure is reproducible: `wc 
 - **Don't:** append a paragraph to `AGENTS.md` without measuring the cap, least of all when the last run reported tight headroom ([ai-config#4214](https://github.com/Morrison-Lab/ai-config/issues/4214)).
 
 **Condensing a rule drops its qualifiers.**
-Measured 2026-11-12 on the [#2889](https://github.com/Morrison-Lab/ai-config/issues/2889) composition: folding six `AGENTS.md` sections into one-sentence bullets dropped nine qualifiers, found over five review rounds.
-They were two exemptions, an alternative remedy, one of three listed mechanisms, a clock-time report, a do-not-wait clause, two of three triggers, and a scope limit.
+Measured 2026-11-12 on the [#2889](https://github.com/Morrison-Lab/ai-config/issues/2889) composition: folding six `AGENTS.md` sections into one-sentence bullets dropped eleven qualifiers, found over six review rounds.
+They were two exemptions, an alternative remedy, one of three listed mechanisms, a clock-time report, a do-not-wait clause, two of three triggers, a scope limit, a list of wait cases, and an ordering ("first").
+The removed headings also left ten citations by name in hooks, fragments, a skill and memories.
 Each change tightened or loosened a rule while the bullet still read as the same rule.
 
-- **Do:** before committing a condensed rule, list every clause of the original and point to where the condensed text keeps it, or to the fragment that carries it.
+- **Do:** before committing a condensed rule, list every clause of the original and point to where the condensed text keeps it, or to the fragment that carries it, and grep the repo for every removed heading's name.
 - **Don't:** condense several rules in one pass and leave the reviewers to find which conditions went missing.

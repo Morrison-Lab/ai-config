@@ -297,8 +297,9 @@ So under auto mode, `mwc` authorizes the merge but cannot carry it out.
 
 - **Do:** when auto mode refuses a merge the `mwc` gate passed, report the PR, its pinned SHA and the checker's verdict.
   Leave auto mode as [`ask-for-manual-approval`](../shared/workflow/ask-for-manual-approval.md) says, or name a permission rule for `gh pr merge` as the lasting fix.
-- **Do:** report a refused command and its stated reason to the user, and
-  stop.
+- **Do:** when the action is still refused after leaving auto mode, or the
+  switch conditions in `ask-for-manual-approval` fail, report the refused
+  command and its stated reason to the user, and stop.
 - **Do:** assert an exact match count per replacement, and read the result
   back, in any scripted edit.
 - **Don't:** look for a call shape the classifier does not match on after it

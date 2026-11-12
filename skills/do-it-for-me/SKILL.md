@@ -44,9 +44,11 @@ It does not lift the prohibited-action rules.
    a dispatched subagent reports up its dispatch chain instead,
    and in an `away` session, or a CI or `@claude` run, record a pending decision instead.
    Otherwise, when `mcp__ccd_session_mgmt__set_session_permission_mode` is available,
-   switch the session to `default`, run the command once, then restore the original mode
-   even if the command failed or timed out.
-   Read the original mode first with `mcp__ccd_session_mgmt__get_session`.
+   read the original mode with `mcp__ccd_session_mgmt__get_session`,
+   switch the session to `default`, and run the command once.
+   Batch any other actions that need approval into the same stretch,
+   then restore the original mode once they are done, even if a command failed or timed out,
+   as that fragment's "Say when it is over" says.
    When that tool is not available, ask the user to switch out of auto mode,
    naming the refused command and its stated reason.
    The self-switch, the stop conditions, and the managed-settings exception

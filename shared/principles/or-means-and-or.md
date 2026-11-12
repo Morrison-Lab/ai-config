@@ -1,6 +1,6 @@
 # "Or" always means "and/or", not xor, unless xor is explicitly specified
 
-In instructions, requirements, prompts, checklists, and specifications, treat "or" as inclusive ("and/or") unless exclusive choice is explicitly stated.
+In instructions, requirements, prompts, checklists, specifications, and issue descriptions, treat "or" as inclusive ("and/or") unless exclusive choice is explicitly stated.
 Never interpret an unadorned "or" as an exclusive disjunction (XOR) that excuses dropping, ignoring, or omitting one of the alternatives when both apply.
 
 ## Why
@@ -18,6 +18,7 @@ When multiple alternatives are relevant, applicable, and safe to execute, an age
 1. **Default to inclusive disjunction ("and/or").**
    Unless the context or author explicitly mandates choosing exactly one option, evaluate all alternatives in the disjunction.
    If both (or all) alternatives are applicable, execute or verify all of them.
+   When an instruction says "do X or Y", address both X and Y if both are applicable, relevant, or needed to achieve the objective.
 2. **Require explicit phrasing for exclusive disjunction (XOR).**
    Exclusivity must be stated unambiguously: "either A or B, but not both", "mutually exclusive", "choose exactly one of the following", or "XOR".
    Without such explicit wording, assume all listed alternatives may be combined or executed.

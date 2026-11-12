@@ -11,10 +11,11 @@ import sys
 try:
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"))
     from transcript_meta import is_real_user_turn, strip_injected_text
-except Exception: is_real_user_turn = None  # noqa: E701 -- detection still runs; a detected write is denied
+except Exception:  # detection still runs; a detected write is then denied
+    is_real_user_turn = None
+
 CANVAS = re.compile(r"discussion|api/(v1|graphql)|instructure|canvas", re.I)
 OTHER_HOST = re.compile(r"https://(hooks\.slack\.com|slack\.com|api\.github\.com|discord(app)?\.com)/")  # not Canvas
-SINK = {"jq", "head", "tail", "grep", "wc", "less", "sort", "cat"}  # read-only programs a curl read may pipe into
 CLI = re.compile(r"\bcanvas\s+announcements?\s+(create|post|update|edit|publish)\b", re.I)
 CODE = re.compile(r"\b(python3?|node|ruby|perl|Rscript)\b\s+(-c|-e|-\s)|<<")
 QUOTED = re.compile(r"'[^']*'|\"(\\.|[^\"\\$`])*\"")  # a double-quoted span with $ or ` stays
@@ -42,10 +43,8 @@ def is_announcement_write(tool, inp):
         if first in SAFE_FIRST and plain:  # one plain command
             return False
         net = NET.search(cmd) or first in ("http", "https", "xh")
-        read = first in ("curl", "wget") and all((s.split() or ["|"])[0] in SINK for s in bare.split("|")[1:]) and not (
-            WRITE.search(cmd) or re.search(r"--(post|method|body|execute|config)|\s-e\b", cmd) or COMPOUND.search(
-                re.sub(r"\|", "", re.sub(r">\s*[\w./-]+\s*$", "", bare))))  # a pipe into SINK or one > file is fine
-        other_host = OTHER_HOST.search(cmd) and not (CANVAS.search(cmd) or "$" in bare)  # a Slack post, say
+        read = first == "curl" and not WRITE.search(cmd) and plain  # other reads deny: widening this failed open (#5453)
+        other_host = first == "curl" and OTHER_HOST.search(cmd) and not (CANVAS.search(cmd) or "$" in bare)  # Slack
         cli = CLI.search(bare) or re.search(r"\b(ba|z)?sh\s+-c\b", cmd) and CLI.search(cmd)
         return bool(cli or ANNOUNCE.search(cmd) and (net or CODE.search(cmd))
                     or TOPIC.search(cmd) and not other_host and net and not read)

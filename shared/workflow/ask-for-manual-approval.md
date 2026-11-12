@@ -57,15 +57,16 @@ that hook would let the rerun through with no prompt, and a merge cannot be undo
 Read the settings files and hooks that apply, and do not switch for an action one of them allows, or when they do not let you tell.
 In those cases ask the user to switch out of auto mode instead, naming the refused command and its stated reason.
 A session grant or `--allowedTools` cannot be read from inside the session.
-Only the user can set one, so a rerun that such a grant lets through runs on the user's own grant, and that residual risk is accepted.
-Otherwise, when `mcp__ccd_session_mgmt__set_session_permission_mode` is available, switch the session to `default` yourself with that tool, rerun the command once so the user gets a real approval prompt, and request `auto` again once the actions that needed approval are done.
+Only the user can set one, so a rerun that such a grant lets through runs on the user's own grant, and that residual risk is accepted:
+an unreadable grant of this kind does not stop you switching yourself.
+Otherwise, for an action that is not a merge and that no readable allow route covers, when `mcp__ccd_session_mgmt__set_session_permission_mode` is available, switch the session to `default` yourself with that tool, rerun the command once so the user gets a real approval prompt, and request `auto` again once the actions that needed approval are done.
 A switch to a lower mode shows no card, so that prompt is the user's only sign of the switch.
 When that tool is not available, ask the user to switch out of auto mode the same way.
 
 A first denial can be a transient misfire (see [`claude-code-hooks`](../../memories/claude-code-hooks.md) on retrying an identical command once).
 Retry the identical command once at most, never rephrased, then switch or ask.
 You cannot tell a `soft_deny` from a `hard_deny` block from inside the turn, so switch or ask once and report the result.
-If the mode is switched, by the user or by you, and the action is still refused, report that and stop;
+If the mode is switched, by the user or by you, and the action is still refused, report that and stop trying that action;
 when you switched it yourself, request `auto` again first.
 A managed-settings `permissions.deny` denial applies in every mode, so report it as a denial and do not switch or ask to switch.
 
@@ -98,6 +99,7 @@ Nothing else ends the stretch, and every later action keeps raising a prompt unt
   The user was told to "approve the prompt" when none existed, and was asked "retry?" and "disable auto?" instead of the agent switching the session itself;
   after the user answered `daytb`, the self-switch to `default` let the apply run.)
 - **Do:** batch the actions that need approval into one manual-mode stretch, then end it as "Say when it is over" describes.
+  A `difm` stretch is the exception: it covers its one step.
 - **Do:** in a Claude Project, when the user answers the coordinator instead of the denied thread, the coordinator tells that thread, with the user's message attached by id, to ask the user again in its own thread.
   The relayed message is not approval.
 - **Don't:** when the switch conditions hold, end the turn after a denial without naming the mode switch, or offer only the `autoMode` configuration, which takes a settings change the user has to make.

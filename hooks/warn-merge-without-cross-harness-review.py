@@ -196,7 +196,9 @@ NOTE = (
     "AND harness both differ from this session's. An Agent subagent and the "
     "CI claude-review workflow are both Claude and do not qualify. Run one "
     "of {clis} (or in cloud sessions, curl to opencode.ai with candidate "
-    "model fallback per delegate-to-opencode) on the shipping head first. "
+    "model fallback per delegate-to-opencode) on the shipping head first, "
+    "in a review form: `codex exec`, `opencode run`, or `-p`/`--print` "
+    "(`claude -p`); a subcommand comes before any option with a value. "
     "If no qualifying reviewer can run here (host blocked, backend down, "
     "CLI or credential absent), probe every route once: attempt each of "
     "{clis} as a reviewer, or show it absent with `command -v <cli>` or `which <cli>` alone, unredirected (exit 1); "
@@ -338,14 +340,17 @@ def _curl_route(rest):
 
 def _is_review_call(base, args):
     """True when *args* make reviewer CLI *base* run a review, not housekeeping."""
-    if HELP_FLAGS.intersection(args):
-        return False
     words = args[:args.index("--")] if "--" in args else args
+    if HELP_FLAGS.intersection(words):
+        return False
     if base in REVIEW_SUBCOMMANDS:
         first = next((a for a in words if not a.startswith("-")), None)
         return first in REVIEW_SUBCOMMANDS[base]
     flags = REVIEW_FLAGS.get(base, frozenset())
-    return any(a in flags or (a.startswith("--") and a.split("=", 1)[0] in flags)
+    # A long flag may carry `=value`; a short one `=value` or an attached
+    # value (`agy -p="..."`, memories/antigravity.md).
+    return any(a.split("=", 1)[0] in flags if a.startswith("--")
+               else any(a.startswith(f) for f in flags if len(f) == 2)
                for a in words)
 
 

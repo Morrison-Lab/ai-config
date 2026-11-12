@@ -228,6 +228,8 @@ def main():
                 "cursor-agent -p 'review'", "cursor-agent --print 'review'"):
         check("silent after a review call: " + cmd,
               not run(MERGE, [step(cmd)])[0])
+    for cmd in ("agy -p='review' --mode plan", "agy -preview", "codex exec -- --help"):
+        check("silent after a review call: " + cmd, not run(MERGE, [step(cmd)])[0])
     check("warns when the print flag only follows --",
           run(MERGE, [step("cursor-agent -- -p")])[0])
     check("silent on disabling auto-merge through MCP",

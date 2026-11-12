@@ -5,8 +5,9 @@ name: cross-platform
 # Git Bash never show in CI (ai-config#1843). This runs the same derived step
 # list on macOS and Windows through the local runner that already derives it
 # from validate.yml. It runs weekly and on demand, and on a pull request only
-# when this file changes, so a checker change reaches these platforms after
-# it merges; a red scheduled run opens or updates a tracking issue.
+# when this file or the runner changes, so a checker change reaches these
+# platforms after it merges; a red scheduled run opens or updates a tracking
+# issue.
 
 on:
   schedule:
@@ -15,6 +16,8 @@ on:
   pull_request:
     paths:
       - .github/workflows/cross-platform.yml
+      - scripts/run-local-validation.py
+      - scripts/lib/findbash.py
 
 permissions:
   contents: read

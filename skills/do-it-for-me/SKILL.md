@@ -43,6 +43,8 @@ It does not lift the prohibited-action rules.
    Check the switch conditions in `ask-for-manual-approval`'s "When to switch or ask" first:
    a dispatched subagent reports up its dispatch chain instead,
    and in an `away` session, or a CI or `@claude` run, record a pending decision instead.
+   For a merge, or an action an allow rule or hook covers, never switch yourself:
+   ask the user to switch out of auto mode.
    Otherwise, when `mcp__ccd_session_mgmt__set_session_permission_mode` is available,
    read the original mode with `mcp__ccd_session_mgmt__get_session`,
    switch the session to `default`, and run the command once.

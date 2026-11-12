@@ -117,7 +117,8 @@ def plugin_items(home: Path) -> list[tuple[str, Path, str]]:
             if scope == "user":
                 continue
             project = record.get("projectPath")
-            if isinstance(project, str) and project and scope in ("project", "local"):  # the only scopes `uninstall --scope` takes besides user
+            # project and local are the only scopes `uninstall --scope` takes besides user
+            if isinstance(project, str) and project and scope in ("project", "local"):
                 fix = f"cd {shlex.quote(project)} && claude plugin uninstall {name} --scope {scope}"
                 items.append(("keep", Path(project), f"{name} installed at {scope} scope; {fix}"))
             else:

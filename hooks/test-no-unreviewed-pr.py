@@ -367,6 +367,53 @@ case([use("update_pull_request", tid="u", owner="o", repo="r",
       res("u", '{"number":1038,"requested_reviewers":[{"login":"Copilot"}]}'),
       say("Marked ready and added the reviewer.")], False,
      "a ready+reviewers edit whose reviewer-add succeeds discharges")
+# ai-config#1095, gap 2: a bare mark-ready (no reviewers) whose whole call
+# failed. github-mcp-server's UpdatePullRequest returns these messages at or
+# before the markPullRequestReadyForReview mutation, so the PR is still a draft
+# and the obligation must not nag.
+for _msg in ("Failed to mark pull request ready for review: Resource not accessible",
+             "Failed to find pull request: Could not resolve to a PullRequest",
+             "failed to update pull request: 422 Validation Failed"):
+    case([use("update_pull_request", tid="u", owner="o", repo="r",
+              pull_number=1038, draft=False),
+          res("u", _msg, err=True),
+          say("Tried to mark it ready; that failed.")], False,
+         f"a mark-ready that failed before the PR left draft drops ({_msg[:30]})")
+# With reviewers in the same call: the mutation failed, so the reviewer request
+# never ran and the PR is still a draft.
+case([use("update_pull_request", tid="u", owner="o", repo="r",
+          pull_number=1038, draft=False,
+          reviewers=["copilot-pull-request-reviewer"]),
+      res("u", "Failed to mark pull request ready for review: forbidden",
+          err=True),
+      say("Tried to mark it ready with a reviewer; the mark-ready failed.")],
+     False, "a ready+reviewers edit whose mark-ready itself failed drops")
+# The dangerous mirror: an error AFTER the mutation (the final Get) comes back
+# with is_error on a PR that IS ready, so it must stay tracked.
+case([use("update_pull_request", tid="u", owner="o", repo="r",
+          pull_number=1038, draft=False),
+      res("u", "Failed to get pull request: 502 Bad Gateway", err=True),
+      say("Marked ready; the final fetch failed.")], True,
+     "a mark-ready whose post-mutation fetch fails stays tracked")
+# A pre-mutation message WITHOUT is_error is not evidence of failure.
+case([use("update_pull_request", tid="u", owner="o", repo="r",
+          pull_number=1038, draft=False),
+      res("u", '{"note":"Failed to mark pull request ready for review"}',
+          err=False),
+      say("Marked ready.")], True,
+     "a mark-ready with failure text but no is_error stays tracked")
+# An unrecognised error message keeps the obligation (fail toward over-warn).
+case([use("update_pull_request", tid="u", owner="o", repo="r",
+          pull_number=1038, draft=False),
+      res("u", "something unexpected went wrong", err=True),
+      say("Tried to mark it ready.")], True,
+     "a mark-ready failing with an unrecognised message stays tracked")
+# And the plain success: a bare mark-ready that succeeds is tracked.
+case([use("update_pull_request", tid="u", owner="o", repo="r",
+          pull_number=1038, draft=False),
+      res("u", '{"id":"1","url":"https://github.com/o/r/pull/1038"}'),
+      say("Marked ready.")], True,
+     "a successful bare mark-ready is tracked")
 # The RESERVED case: a pure reviewer-add via update_pull_request with NO draft
 # transition is a genuine request that discharges an ALREADY-tracked PR. The
 # pending path must still fire here (it is withheld ONLY for draft:false), so a

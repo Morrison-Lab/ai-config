@@ -43,16 +43,18 @@ It does not lift the prohibited-action rules.
    Check the switch conditions in `ask-for-manual-approval`'s "When to switch or ask" first:
    a dispatched subagent reports up its dispatch chain instead,
    and in an `away` session, or a CI or `@claude` run, record a pending decision instead.
-   Otherwise switch the session to `default` with `mcp__ccd_session_mgmt__set_session_permission_mode`,
-   run the command once, then restore the original mode
+   Otherwise, when `mcp__ccd_session_mgmt__set_session_permission_mode` is available,
+   switch the session to `default`, run the command once, then restore the original mode
    even if the command failed or timed out.
    Read the original mode first with `mcp__ccd_session_mgmt__get_session`.
+   When that tool is not available, ask the user to switch out of auto mode,
+   naming the refused command and its stated reason.
    The self-switch, the stop conditions, and the managed-settings exception
    are in `ask-for-manual-approval`.
    How a standing grant interacts with a denial is in
    [`default-to-action-grants`](../../shared/workflow/default-to-action-grants.md).
 4. **Verify and report in the past tense**:
-   what ran, the read-back or exit status, and that auto mode was restored.
+   what ran, the read-back or exit status, and, when you switched modes yourself, that auto mode was restored.
    Count attempts honestly: "denied N times, succeeded on run N+1", never "cannot".
 
 ## What it does not grant

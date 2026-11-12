@@ -76,6 +76,7 @@ The rest are prose because no condition in the transcript can decide them.
 
 - A denied push or tool call: retry once unchanged.
   Never route the change through another session.
+  On a classifier denial, report the refused command and its stated reason to your caller, and never switch permission modes yourself.
   Device consent cards are a security boundary, so use environments already approved.
   Not hookable: a denial is not visible to a hook after the fact.
 

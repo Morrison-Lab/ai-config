@@ -74,8 +74,7 @@ In a repository where the owner's membership is not positively verified, posting
 A standing grant does not clear a permission-classifier denial.
 When the classifier or approval mode blocks the post, follow [`ask-for-manual-approval`](ask-for-manual-approval.md).
 Retry the identical command once.
-Then, when `mcp__ccd_session_mgmt__set_session_permission_mode` is available, switch the session to `default` yourself, rerun the command once, and request `auto` again.
-Without that tool, ask the owner to leave auto mode.
+Then switch or ask as `ask-for-manual-approval`'s "When to switch or ask" says.
 A managed-settings `permissions.deny` denial applies in every mode, so report that denial and do not ask to switch modes.
 Never ask whether to post the review, because the grant has answered that question.
 The durable fix is an `autoMode` `allow` entry that covers `gh pr comment` and MR notes.

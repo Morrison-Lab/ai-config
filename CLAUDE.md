@@ -31,36 +31,6 @@ The fragment walks through the specific moments this gets skipped even by someon
 When a `cai` or `ums` entry records a correction, write both sides as a labelled pair: the behaviour to adopt (**Do**) and the specific near-miss to stop (**Don't**), each an action a later reader could observe.
 Detail, rationale, and cases: [`shared/writing/record-pattern-and-anti-pattern.md`](shared/writing/record-pattern-and-anti-pattern.md).
 
-## No empty promises
-
-A commitment about your own future behaviour ships an implemented mechanism in the same turn (a memory entry at minimum, a hook, a filed issue, or an armed wake for an owed action), or is not made;
-`hooks/no-empty-promise.py` guards it.
-Detail, rationale, and cases: [`shared/workflow/no-empty-promises.md`](shared/workflow/no-empty-promises.md).
-
-## Generalize instructions to every AI agent by default
-
-Unless the user explicitly scopes an instruction to one agent, project, or
-session, apply it to every available AI-agent configuration and shared
-automation surface. A Claude-only implementation is incomplete when Codex,
-Gemini, Antigravity, or another installed agent can encounter the same rule.
-
-- **Do:** update the shared source and every applicable agent-specific entry
-  point; prefer an agent-independent service for operational behavior.
-- **Don't:** treat the name of the agent currently speaking as an implicit
-  scope restriction.
-
-## Interpret instructions broadly and maximize safe progress
-
-Unless the user narrows a request, take the broad reading that advances its
-obvious objective and complete every safe, authorized, relevant step. Do not
-reduce an instruction to the smallest literal action when its context makes a
-larger in-scope outcome clear.
-
-- **Do:** inspect for adjacent actionable work, resolve it, verify it, and
-  carry it through the normal PR/review/monitoring lifecycle.
-- **Don't:** stop at a narrow literal reading that leaves the requested outcome
-  only partially achieved.
-
 ## Status requests do not make issues report-only
 
 A request for status means examine the transcript to check if the agent got stuck, frozen, or dropped the ball, inspect live state, finish every safe, in-scope fix it reveals before reporting, resume stalled work immediately, and file every noticed issue, however small, in its owning tracker.
@@ -111,16 +81,6 @@ Detail, rationale, and cases: [`shared/workflow/session-lab-notebook.md`](shared
 Four freshness checks to run each session: the ai-config checkout itself (on `main`, pulled --ff-only, with a safe recovery path for a diverged/orphaned local `main`), the consumer install (Claude Code and Cursor load this repo as a native plugin that auto-updates, so confirm the plugin is enabled and not doubled --- any leftover `~/.claude` copies of `shared/`, `hooks/`, or `memories/` predate the symlink-install removal and want a content diff;
 sweep for a leftover `~/.claude/skills` too, in symlink form as well as copy, whose symptom is a doubled skill listing rather than drift --- a symlink into the checkout diffs clean --- and which must not be deleted on presence or on a name match, with `install-hooks.py` answering only the registration half), the working repo's own `main` checkout, and (where a consumer repo vendors ai-config as a git submodule) the `.ai-config` pin.
 The fragment above carries the mechanics, the failure modes each check catches, and the case records.
-
-## Timestamp recaps in local time
-
-A status recap carries a timestamp in the user's local zone, and every clock time you write anywhere (a recap, a file, a forge comment, a notebook heading) comes from a reading taken in that moment and printed to the transcript: `TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z"`.
-
-- **Do:** run the clock command on its own, immediately before typing a time anywhere, and quote what it returned.
-- **Don't:** infer a clock time from elapsed tool calls, or treat an earlier reading as still valid.
-
-`hooks/no-unmeasured-clock-claim.py` and `hooks/flag-unmeasured-timestamp.py` warn on an unmeasured Pacific time (ai-config#2903).
-Detail, platform mechanics, and cases: [`shared/workflow/timestamp-local-recaps.md`](shared/workflow/timestamp-local-recaps.md).
 
 ## State the actual time when reporting a scheduled check-in
 
@@ -260,23 +220,6 @@ Detail, rationale, and cases: [`shared/workflow/monitor-pushed-heads.md`](shared
 
 The `claim-pr` skill operationalizes this (the exact claim wording, when it applies, and the closing/unclaim comment).
 
-## Every comment you post to a forge says an agent posted it
-
-[shared/workflow/disclose-agent-authorship.md](shared/workflow/disclose-agent-authorship.md)
-
-A comment posted through `gh`/`glab` under the account holder's credentials carries **their** login and reads as `type: User`, so nothing in the API distinguishes it from a comment they typed --- `memories/gh-cli.md` records auditors mistaking exactly that.
-The forge cannot say it, so the body must: end every agent-posted comment with
-
-```
-_Posted by Claude Code (AI agent) --- not written by a human._
-```
-
-The marker deliberately avoids the robot emoji, which `scripts/check-pr-fully-clean.py` matches as a `REVIEW_BODY_MARKERS` entry --- a disclosed claim comment would otherwise scan as a finding-free **review**.
-The fragment carries the rest: the two exemptions, the comment-bodies-only scope, and the queries that verify a marker or a bot identity.
-
-- **Do:** append the marker to every claim, release, status, reply, and self-review comment, including ones whose prose already names the session.
-- **Don't:** use the robot emoji in it, or put it in a commit message, a title, an issue body, or a PR body.
-
 ## Read a repo's canonical contributor doc before starting work, not just before pushing
 
 [shared/workflow/read-canonical-doc-before-starting.md](shared/workflow/read-canonical-doc-before-starting.md)
@@ -290,16 +233,6 @@ When a short `CLAUDE.md` names a fuller document as the actual authority --- `.g
 The strong form of the claim: after claiming an issue you're about to work, open the PR right away — before implementing — from an empty commit, kept as a draft until the implementation lands.
 An open PR is the visible in-flight signal other sessions check, so opening it up front stops parallel duplicates.
 The `gi`, `gii`, `gip`, and `st` skills operationalize this.
-
-## Every self-review is an adversarial review by a separate subagent
-
-[shared/workflow/adversarial-self-review.md](shared/workflow/adversarial-self-review.md)
-
-Whenever reviewing your own work is called for --- before a push, as the fallback when the external reviewer is down, or the project-conventions pass --- dispatch it to the [`adversarial-reviewer`](.claude/agents/adversarial-reviewer.md) subagent (foreground, read-only) against `git diff origin/<default-branch>...HEAD`, and treat its findings as findings.
-The authoring session cannot do it inline: it knows what the change was *meant* to say, so it reads the diff and recovers the intent, which is confirmation rather than review.
-Brief the reviewer with the diff and the standards, never with the rationale for the change --- handing over your account of it is what makes the reviewer agree with you.
-`hooks/no-push-without-self-review.py` gates the pre-push case on Claude Code.
-The fragment covers the rest, including why a same-vendor subagent buys independence of *intent* and not of blind spot.
 
 ## Open a PR for every pushed feature branch
 
@@ -479,7 +412,7 @@ If you and the reviewer reach an impasse on a single item (your rebuttal didn't 
 
 ## Request review and drive every started PR to clean
 
-`AGENTS.md`'s "Get a clean automated review before asking a person to review" governs: no request for human review, on any forge, before a clean or deadlocked automated review that you triggered yourself ([`automated-review-before-human`](shared/workflow/automated-review-before-human.md)).
+The "Get a clean automated review before asking a person to review" bullet of `AGENTS.md`'s "Review your work before anyone sees it, and watch every PR you drive" governs: no request for human review, on any forge, before a clean or deadlocked automated review that you triggered yourself ([`automated-review-before-human`](shared/workflow/automated-review-before-human.md)).
 This section is the GitHub mechanics.
 
 Whenever starting or working on a Pull Request:
@@ -585,14 +518,6 @@ Every agent does its job correctly on the list it was given, so the items that a
 `scripts/pr-sweep.py` is the deterministic half for open PRs, and reports what it examined rather than only what it found.
 
 [`shared/workflow/derive-dont-enumerate.md`](shared/workflow/derive-dont-enumerate.md)
-
-## Help your subagents improve over time
-
-[`shared/workflow/improve-your-subagents.md`](shared/workflow/improve-your-subagents.md)
-
-The brief, the memory a dispatched agent can read, and the loop that feeds findings back to it are the orchestrator's, so the agent's mistake rate is too.
-`AGENTS.md` carries the rule;
-the fragment carries the mechanisms (a per-agent mistake ledger prepended to every brief, a loop change after every fix round, rounds-to-clean as the measure, promotion into skills and hooks).
 
 ## Subagent worktrees are assigned, and an incident never silently repeals a decision
 
@@ -1423,32 +1348,3 @@ where a heredoc is unavoidable, build the character with `chr(92)` and print `re
 The collapse is a property of the environment, so measure yours rather than assuming either answer.
 `hooks/warn-heredoc-doubled-backslash.py` names an offending line (ai-config#1923, #3362).
 Detail, environment measurements, and cases: [`shared/coding/heredoc-backslash-collapse.md`](shared/coding/heredoc-backslash-collapse.md).
-
-## Strict Merge Control Policy
-
-- **NEVER merge any Pull Request or Merge Request without explicit user permission.**
-  Creating, opening, updating, or driving a PR to clean CI/review does NOT grant permission to merge it.
-  Merging a PR is strictly forbidden unless the user explicitly grants session permission (e.g. via `/mwc` or `/maw`) or explicitly issues a merge instruction for that specific PR (e.g. `/merge-it` or "merge this PR").
-- **Never merge over open review findings or treat skip notices as approval.**
-  Under `mwc`, a PR must be fully clean across CI and all review findings.
-  A reviewer skip notice (e.g. for workflow edits or quota limits) never clears or supersedes prior review findings.
-  All findings across the PR history must be fully Addressed, Rebutted, or Deferred before merge.
-  A disagreement among reviews is not fully clean: any standing not-clean
-  --- nits included --- vetoes merge even with `mwc` active
-  (ai-config#2274).
-- **Another session's PR needs a second condition: clean, and clean for more than twenty minutes --- then warned.**
-  Every other rule here settles *when* a PR may be merged;
-  this one settles *whose*.
-  A peer may have further commits planned, so merging one that just went clean can destroy work it was about to push --- and that is exactly the case where the peer's PR unblocks yours and the temptation is strongest.
-  Start the clock at the clean verdict on the current head, which a push resets, rather than at the PR's `updatedAt`, which any comment bumps.
-  The threshold is an inference, so confirm it: message the owning session directly when `ListAgents` reaches it, and otherwise post a comment saying you intend to merge and wait a further five minutes for a hold-off.
-  The path applies only to a peer PR that passes `memories/reviewing-prs.md`'s scope test (a peer session under your own login satisfies the author arm).
-  Another lab member's PR that fails the test gets neither the comment nor the merge.
-  [`mwc`](skills/mwc/SKILL.md)'s "Another session's PR" section carries the derivation and the pattern/anti-pattern pair (ai-config#2460).
-
-**One standing exception: PRs targeting `Morrison-Lab/ai-config`, `Morrison-Lab/gha` or the macros repo `d-morrison/macros` carry a standing `mwc` grant**, with no per-session re-issue and no `enable-mwc` step --- `hooks/no-unauthorized-merge.py` reads the merge's target repo off the command.
-[`mwc`](skills/mwc/SKILL.md)'s Scope Limit binds in full, so it covers a **fully clean** PR (see [`fully-clean`](shared/workflow/fully-clean.md)) and nothing else.
-It is scoped to the **target**, so a merge from an ai-config checkout into another repo is unaffected.
-
-- **Do:** merge a fully-clean ai-config PR without asking, and say in the same reply that you did and why it qualified.
-- **Don't:** read it as covering a PR that is not fully clean, or another repo's PR merged from an ai-config checkout.

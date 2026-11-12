@@ -17,6 +17,9 @@ import sys
 from pathlib import Path
 
 CAP = 9_000
+# The rules file's own budget, held well under CAP so the cut never fires;
+# hooks/test-inject-subagent-rules.py fails over it.
+RULES_BUDGET = 4_000
 RULES = Path(__file__).resolve().parent.parent / "shared" / "workflow" / "subagent-core-rules.md"
 
 

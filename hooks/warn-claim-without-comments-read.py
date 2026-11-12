@@ -147,7 +147,6 @@ incident and the task that requested this hook both named the two Bash
 shapes specifically. Widening the trigger to MCP posting is a natural
 follow-up, not folded in here to keep the matcher exactly as specified.
 """
-import importlib.util
 import json
 import os
 import re
@@ -156,21 +155,20 @@ import sys
 HERE = os.path.dirname(os.path.realpath(__file__))
 
 
-def _sibling(name, key):
-    """Import a hyphenated sibling module, or None if unavailable.
+_LIB = os.path.join(os.path.dirname(HERE), "scripts", "lib")
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+try:
+    from sibling import load_sibling
+except ImportError as _exc:
+    print(f"{os.path.basename(__file__)}: cannot load scripts/lib/sibling.py "
+          f"({_exc}); running without its sibling hooks", file=sys.stderr)
+    load_sibling = None
 
-    Same pattern `flag-unmeasured-timestamp.py` and
-    `warn-unmeasured-capability-claim.py` use. Fails open, per the file-wide
-    contract: this hook must not crash merely because a sibling moved.
-    """
-    try:
-        spec = importlib.util.spec_from_file_location(
-            key, os.path.join(HERE, name))
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        return mod
-    except Exception:
-        return None
+
+def _sibling(name, key):
+    """Import a hyphenated sibling module, or None (scripts/lib/sibling.py)."""
+    return load_sibling(__file__, name, key) if load_sibling else None
 
 
 _dupe = _sibling("warn-pr-create-without-dupe-check.py", "_sib_claim_dupe")

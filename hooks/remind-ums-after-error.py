@@ -440,6 +440,13 @@ def scan(path):
 
 
 def main() -> int:
+    # The reminder quotes the admission from the transcript, so a curly quote
+    # there made a cp1252 console write byte 0x92, which a UTF-8 reader cannot
+    # decode (ai-config#1288). Read stdin and write stdout as UTF-8 whatever
+    # the console says; nothing here writes quoted text to stderr.
+    for stream in (sys.stdin, sys.stdout):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     try:
         payload = json.load(sys.stdin)
     except Exception:

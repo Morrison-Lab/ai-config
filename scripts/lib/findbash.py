@@ -30,6 +30,11 @@ def find_bash(script, probe_args=("list",), cwd=None, timeout=60):
 
     `probe_args` must name a read-only subcommand: the probe really runs it.
     """
+    return probe_bash((str(script), *probe_args), cwd=cwd, timeout=timeout)
+
+
+def probe_bash(args, cwd=None, timeout=60):
+    """Return the first candidate bash for which `bash *args` exits 0, or None."""
     tried = []
     for cand in (os.environ.get("AI_SESSION_BASH"), shutil.which("bash"), *CANDIDATES):
         if not cand or cand in tried:
@@ -37,7 +42,7 @@ def find_bash(script, probe_args=("list",), cwd=None, timeout=60):
         tried.append(cand)
         try:
             proc = subprocess.run(
-                [cand, str(script), *probe_args],
+                [cand, *args],
                 capture_output=True, cwd=cwd, timeout=timeout)
         except (OSError, subprocess.SubprocessError):
             continue

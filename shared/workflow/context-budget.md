@@ -22,3 +22,14 @@ Each change tightened or loosened a rule while the bullet still read as the same
 - **Do:** before committing a condensed rule, list every clause of the original and point to where the condensed text keeps it, or to the fragment that carries it, and grep the repo for every removed heading's name.
 - **Do:** place a composed section after every section whose terms it uses, and lead each folded rule's bullet with its name in bold, so the SessionStart index in `hooks/inject-core-rules.py` still lists it.
 - **Don't:** condense several rules in one pass and leave the reviewers to find which conditions went missing.
+
+**A rule moved out of `AGENTS.md` reaches an agent only through a link.**
+No harness inlines fragments: opencode loads `AGENTS.md` alone, Codex and Gemini CLI load it plus a skill listing (`scripts/measure-session-start.py`), and `hooks/inject-core-rules.py` gives Claude Code an index of `AGENTS.md`'s headings.
+Slimming `AGENTS.md` for [#5310](https://github.com/Morrison-Lab/ai-config/issues/5310) step 2 on 2026-11-12 hit two variants of this, plus one rewording loss of the kind the section above describes.
+An adversarial self-review on [#5554](https://github.com/Morrison-Lab/ai-config/pull/5554) caught the four rules worded with must or never in the "Manage quota" and "File formatting & links" sections leaving the file.
+A cross-harness read on [#5548](https://github.com/Morrison-Lab/ai-config/pull/5548) flagged a partial summary in the pointer that dropped a qualifier from each item it named.
+An adversarial self-review on [#5551](https://github.com/Morrison-Lab/ai-config/pull/5551) caught a reworded reason that had lost its "can".
+
+- **Do:** keep every rule worded with must or never inline, with any exception it names, when its section moves, and leave a pointer that names only the topics the fragment adds.
+- **Do:** copy a kept sentence's modal verbs ("can", "may") and scope phrases verbatim when rewording it.
+- **Don't:** summarize the moved rules in the pointer, as the [#5548](https://github.com/Morrison-Lab/ai-config/pull/5548) pointer did before its [cross-harness read](adversarial-self-review.md#cross-model-and-cross-harness-reviews-are-required-for-merging-and-the-harness-list-is-concrete) flagged it.

@@ -711,14 +711,23 @@ CONFIG_LIKE_INDETERMINATE_FLAGS = (
 # to decide whether to report the broken installation and deny a command
 # whose text looks like a push (ai-config#2981).
 
+_LIB = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+                    "scripts", "lib")
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+try:
+    from sibling import load_sibling
+except ImportError as _exc:
+    print(f"{os.path.basename(__file__)}: cannot load scripts/lib/sibling.py "
+          f"({_exc}); its sibling hook will not load", file=sys.stderr)
+    load_sibling = None
+
+
 def _load_sibling():
-    path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "no-unreviewed-pr.py")
-    spec = importlib.util.spec_from_file_location("no_unreviewed_pr", path)
-    if spec is None or spec.loader is None:
-        raise ImportError(f"cannot load {path}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    """Import `no-unreviewed-pr.py` (scripts/lib/sibling.py); raises if it cannot load."""
+    if load_sibling is None:
+        raise ImportError("scripts/lib/sibling.py is not importable")
+    return load_sibling(__file__, "no-unreviewed-pr.py", "no_unreviewed_pr", required=True)
 
 
 try:

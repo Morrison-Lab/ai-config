@@ -44,15 +44,10 @@ already delivered when Stop runs, so blocking the stop suppresses nothing. It
 blocks once per turn, never while `stop_hook_active` is set, and a Stop with
 that flag exits before the sentinel, so it does not use up the one block.
 
-A project thread usually runs the pass and THEN reports the mistake in its
-reply, so UMS work earlier in the same turn (after the last real user turn,
-per scripts/lib/transcript_meta.py) discharges an admission too, but only one
-whose own text names a file that turn wrote ("recorded in claude-app-projects.md").
-A keyword such as "UMS" is not enough: "I have not run UMS yet" names it too. A
-second, different mistake admitted after the pass still owes one. A Bash redirect or `tee`
-into a memory, skill or shared path, and a GitHub MCP file write to one,
-count as UMS work, since those are how a cloud session records a learning.
-`sed -i`, `cp` and `mv` into such a path are not recognized.
+A thread often runs the pass, then reports the mistake: UMS work earlier in the
+same turn discharges an admission that names a file the turn wrote (a keyword
+does not: "I have not run UMS yet" has one). Shell redirects, `tee` and GitHub
+MCP writes into a UMS path count; `sed -i`, `cp` and `mv` do not.
 
 It stays silent when the pass already happened: a memory/skills/shared write, a
 UMS-mentioning subagent dispatch, or a `ums` invocation recorded LATER in the
@@ -365,12 +360,8 @@ def visible_prose(text):
     return TICKED.sub(" ", text)
 
 
-# A shell write into a memory, skill or shared path: a redirect or `tee`
-# whose target names one. A bare read (`cat memories/x.md`) is not a write,
-# and neither is an arrow in quoted text (`echo "a -> shared/x"`): quoted
-# strings are blanked first unless they are the redirect's own target, and a
-# `>` after `-`, `=`, `<` or `>` is not a redirect. Other writes (`sed -i`,
-# `cp`, `mv`) are not recognized.
+# A redirect or `tee` into a UMS path. Quoted strings other than the target
+# are blanked first, and `->`, `=>`, `<>`, `>>` arrows are not redirects.
 SHELL_UMS_WRITE = re.compile(
     r"(?:(?<![-=<>])>>?|\btee\b(?:\s+(?:-a|--append))?)\s*[\"']?[^\s\"'|;&<>]*"
     r"(?:memories?/|MEMORY\.md|CLAUDE\.md|skills/|shared/)",

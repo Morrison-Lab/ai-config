@@ -17,10 +17,11 @@ A freeze is when findings pile up fastest, because nobody is clearing them.
   Say in the reply that it is filed and waits for the freeze to lift.
   The one exception is an urgent issue of your own, below.
 - **Don't:** hold a finding back, keep it only in project memory, or list it as an "open item" in a reply because a freeze is on.
-- **Do:** work an urgent issue you filed yourself, or one you just added a fresh failure to, even under a freeze.
+- **Do:** work an urgent issue you filed yourself, even under a freeze.
   Ezra, 2026-11-12: "you can handle urgent issues that you file yourself, even under the freeze".
-  Urgent means the defect is hurting work in progress now, such as a merge gate that takes an agent's word (the case was [ai-config#4893](https://github.com/Morrison-Lab/ai-config/issues/4893)).
-  Say in the reply that you are working it, and why it is urgent.
+  Urgent means the defect is making the work you already own go wrong now, such as a merge gate that lets a PR you are merging through unchecked (the case was [ai-config#4893](https://github.com/Morrison-Lab/ai-config/issues/4893)).
+  Say in the reply that you are working it, and why it is urgent, so Ezra can stop it.
+  An issue someone else filed stays unclaimed until he says otherwise.
 - **Don't:** treat filing as permission to start anything else: [`/defer-issue`](../../skills/defer-issue/SKILL.md) is the shape, file and stop.
 
 This is prose because no hook can see an issue that was not filed.

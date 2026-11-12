@@ -243,3 +243,11 @@ See [`resolve-conflicts`](../../skills/resolve-conflicts/SKILL.md#anti-patterns)
 On a diff that adds or changes a rule or a skill whose behaviour one prompt can show, check that it adds or updates a case under `evals/`, and that every trigger case has a negative twin.
 Check each new grader for a reply that would pass it without the behaviour it names.
 See [`evals/README.md`](../../evals/README.md#adding-a-case).
+
+## A repository called out of the thread's reach
+
+On a message, PR comment or brief an agent wrote, check that it does not say a repository is not in, not attached to, or outside the thread's or session's repos or scope, and then hand the work to someone else.
+The agent should have attached it with `add_repo` and done the work.
+The only acceptable form reports that `add_repo` was tried and quotes its refusal.
+Read the text; do not report the output of `hooks/no-repo-not-in-thread-excuse.py` as your finding.
+See [`no-cant-from-session-excuses`](../../shared/workflow/no-cant-from-session-excuses.md).

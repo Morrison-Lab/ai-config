@@ -23,6 +23,7 @@ An mds thread had asked the coordinator to file in ai-config because "ai-config 
 
 If `add_repo` itself refuses, say so and quote its reason.
 `hooks/no-repo-not-in-thread-excuse.py` denies a message that calls a repository out of the thread's reach, unless the same sentence reports a refused or failed attach.
+[`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md#a-repository-called-out-of-the-threads-reach) looks for the same excuse in what it reviews.
 
 The other excuses stay prose: whether another route exists cannot be decided from a transcript.
 The existing guards cover the decidable parts: `flag-blocker-without-retry.py` flags a denial handed to the user with no retry, and `flag-book-unavailable-without-library-search.py` flags a book called unavailable without a library search.

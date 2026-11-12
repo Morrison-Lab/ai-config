@@ -202,6 +202,12 @@ Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402 
   One HTTP 502 from it cleared on retry.
   The PR comments recording those merges ([#5472](https://github.com/Morrison-Lab/ai-config/pull/5472#issuecomment-6812712234), [#5486](https://github.com/Morrison-Lab/ai-config/pull/5486#issuecomment-6813363070)) relied on it only beside a reasoned Flash read and a clean Claude review.
 
+  On 2026-11-12 the diff size decided whether `beam-free` answered ([gha#1944](https://github.com/Morrison-Lab/gha/pull/1944)).
+  A streamed review of the whole 611-line diff spent the 32768 reasoning-token cap and returned no verdict twice.
+  A review of only the newest commit's diff returned a reasoned verdict ([comment](https://github.com/Morrison-Lab/gha/pull/1944#issuecomment-6818796677)).
+  Without a system message saying the reviewer has no tools, it tried to call tools and stopped with no verdict.
+  So send the newest commit's diff when the whole diff is large, and say in the system message that no tools exist.
+
   Check `/models` for the current free ids and try them before relying on this route.
 - **Make the request with `curl` itself if it is to satisfy the merge gate.**
   `hooks/warn-merge-without-cross-harness-review.py` counts a Bash command whose command word is `curl`, with a data flag (`-d`, `--data-binary`, `--json` and the like) and a literal `https://opencode.ai/zen/go/v1/chat/completions` URL, that exits without error after the last push.

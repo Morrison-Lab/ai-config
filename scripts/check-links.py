@@ -68,8 +68,8 @@ MARKDOWN = MarkdownIt("commonmark")
 FRONT_MATTER = re.compile(r"\A---\r?\n.*?\r?\n---[ \t]*\r?\n", re.DOTALL)
 TAG = re.compile(r"<[A-Za-z][^<>]*>")
 ID_ATTR = re.compile(r"""(?<![\w-])(?:id|name)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))""")
-LINE_ANCHOR = re.compile(r"L\d+(?:C\d+)?(?:-L\d+(?:C\d+)?)?")
-NUMBERED = re.compile(r"-\d+$")  # github-slugger's suffix on a repeated heading
+LINE_ANCHOR = re.compile(r"L[0-9]+(?:C[0-9]+)?(?:-L[0-9]+(?:C[0-9]+)?)?")
+NUMBERED = re.compile(r"-[0-9]+$")  # github-slugger's suffix on a repeated heading
 NUMBERS = {"Nd", "Nl"}  # digits and letter-numbers (U+216B, Roman XII), which GitHub's slug keeps
 
 broken: list[str] = []
@@ -230,12 +230,11 @@ def check_target(target: str, md: Path, root: Path = ROOT) -> None:
     resolved = resolve_target(md.parent, target)
     fragment = target.split("#", 1)[1] if "#" in target else ""
     if resolved is not None and resolved.is_dir() and fragment:  # GitHub shows the README
-        readme = resolved / "README.md"
-        if readme.is_file():
-            resolved = readme
-        elif not any(p.name.lower().startswith("readme") for p in resolved.iterdir()):
-            # Only a file listing, so no heading for the fragment to name;
-            # another README format (readme.rst) is left unchecked.
+        readmes = [p for p in resolved.iterdir()
+                   if p.is_file() and p.name.lower().startswith("readme")]
+        if md_readme := [p for p in readmes if p.name.lower() == "readme.md"]:
+            resolved = md_readme[0]  # GitHub matches the name in any case
+        elif not readmes:  # a file listing has no heading; readme.rst is left unchecked
             checked += 1
             return report(md, root, target, "no README for the heading")
     if resolved is not None and fragment and resolved.suffix == ".md":

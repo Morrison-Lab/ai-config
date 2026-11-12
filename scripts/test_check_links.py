@@ -13,7 +13,7 @@ Verifies that:
    collapsed reference links ([label][]), and shortcut reference links ([label]) resolve correctly.
 7. Non-link brackets (checkboxes `[x]`, alerts `[NOTE]`, footnote numbers `[1]`) produce no false positives.
 8. Angle-bracket destinations with internal whitespace (`[ref]: <path/to file.md>`) are preserved without truncation.
-9. A fragment, in-page or on a link to a Markdown file, must name a heading or HTML anchor there (ai-config#3630).
+9. A fragment, in-page or on a link to a Markdown file or a directory's README, must name a heading or HTML anchor there (ai-config#3630).
 """
 from __future__ import annotations
 
@@ -352,15 +352,17 @@ class TestFragments(unittest.TestCase):
             "[a](#Mixed-Case) [b](#caf%C3%A9) [c](other.md?x=1#present) [d](other.md?plain=1#L3)"
             " [e](other.md#L3) [f](other.md?plain=1#absent) [g](sub/#inner) [h](sub/#nope)"
             " [i](idx/#anything) [j](x.py#L3) [k](#) [m](#<slug>) [l][ref]"
-            " [n](rst/#anything) [o](idx/)\n\n"
+            " [n](rst/#anything) [o](idx/) [p](low/#lower) [q](assets/#x)\n\n"
             "[ref]: other.md#gone\n",
-            files={"idx/index.md": "# From index\n", "x.py": "", "rst/readme.rst": ""},
+            files={"idx/index.md": "# From index\n", "x.py": "", "rst/readme.rst": "",
+                   "low/readme.md": "# Lower\n", "assets/readme_assets/a.png": ""},
             other="# Present\n")
         self.assertEqual(broken, ["doc.md -> other.md#L3 (no such heading)",
                                   "doc.md -> other.md?plain=1#absent (no such heading)",
                                   "doc.md -> sub/#nope (no such heading)",
                                   "doc.md -> idx/#anything (no README for the heading)",
-                                  "doc.md -> other.md#gone (no such heading)"])
+                                  "doc.md -> other.md#gone (no such heading)",
+                                  "doc.md -> assets/#x (no README for the heading)"])
 
     def test_pathological_scanner_input_stays_fast(self):
         # Not emphasis-delimiter runs, on which markdown-it-py is quadratic.

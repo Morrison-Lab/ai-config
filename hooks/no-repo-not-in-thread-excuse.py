@@ -26,7 +26,7 @@ TARGET = (rf"\s+(?:{PLACE}(?:{APOS}s\s+(?:github\s+)?(?:repos|repositories|repo\
           r"right|today|currently|either|even|i|we|it|you|is|was)\b)[a-z])|my\s+(?:repos|repositories)\b|the\s+(?:repos|repositories)\s+(?:attached|available|in|for)\b)")
 SUBJ_NEG = re.compile(
     rf"(?:\b{NEG}\s+(?:(?:yet|currently|actually|even|already|really|been)\s+){{0,2}}(?:in|on|within|part\s+of|among|one\s+of|"
-    rf"(?:attached|added|checked\s+out|cloned|set\s+up|available|accessible|reachable)(?:\s+(?:to|in|into|from|on|for))?)"
+    rf"(?:attached|added|available|accessible|reachable)(?:\s+(?:to|in|into|from|on|for))?)"
     rf"|\b(?:outside|unavailable\s+(?:in|from|to)|missing\s+from)){TARGET}", re.I)
 LOC = re.compile(rf"\b{PLACE}\b|\bmy\s+(?:repos|repositories)\b", re.I)
 REPO_LIST = re.compile(
@@ -38,8 +38,7 @@ LAB_REPOS = r"ai-config|gha|lds|mlg|mlr|mds|mcs|pds|sds|rme|psw|psc|qwt|qnp|dds|
 NAMED = re.compile(rf"\b(?:Morrison-Lab|d-morrison|UCD-SERG|ucdavis)/[\w-]{{1,100}}\b(?![/.]\w)|\b(?:{LAB_REPOS})\b", re.I)
 REPO_NAME = re.compile(rf"\b(?:repo|repos|repository|repositories)\b|{NAMED.pattern}", re.I)
 SUBJECT = re.compile(rf"(?:{REPO_NAME.pattern})[\s`'\"\u2019]*(?:(?:is|are|was|were)\s+)?$", re.I)
-DET = r"(?:(?:the|a|an|that|this|any)\s+)?"
-TOK = r"`?([\w-]{1,39}(?:/[\w-]{1,100})?)`?"
+DET, TOK = r"(?:(?:the|a|an|that|this|any)\s+)?", r"`?([\w-]{1,39}(?:/[\w-]{1,100})?)`?"
 # The object ends its phrase or a thread place: "I didn't see lds in this thread's PR list" passes.
 END = (r"(?=(?:\s+(?:repo|repository|checkout|clone|copy|access|checked\s+out|cloned|attached))?"
        rf"(?:\s*[.,;:!?)](?=\s|$)|\s*$|\s+here\b|\s+(?:in|on|from|to|into|within){TARGET}))")
@@ -58,8 +57,9 @@ LIST_NEG = re.compile(
 ATTACH_VERB = re.compile(
     rf"(?<!the\s)(?<!\ba\s)(?<!an\s)(?<!repos\s)(?<!repositories\s)\battach(?:ed|ing)\b"
     rf"(?=\s+(?:both\s+|the\s+)?(?:it|them|repo|repository|{NAMED.pattern})(?!\s+(?:is|was|would|will|should|needs?|requires?)\b)|\s*(?:[.,;]|$)|\s+now\b)"
-    rf"|\badded\s+[\w/-]{{1,140}}\s+to\s+{PLACE}|\badded\s+(?:it|them)\b(?!\s+(?:to|in)\s+(?!{PLACE}))"
+    rf"|\badded\s+[\w/-]{{1,140}}\s+to\s+{PLACE}|\b(?:added|cloned|cloning)\s+(?:it|them|the\s+repo(?:sitory)?|{NAMED.pattern})\b(?!\s+(?:to|in)\s+(?!{PLACE}|/))"
     r"|\b(?:ran|called|used|invoked|tried)\s+(?:the\s+)?add_repo\b|\badd_repo\s+(?:attached|added|cloned)\b", re.I)
+OTHER_CAUSE = re.compile(r"[^.;]{0,200}?\b(?:because|since|due\s+to)\b(?![^.;]{0,300}\b(?:attach\w*|add_repo|repos?|scope|thread|session)\b)", re.I)
 NOT_YET = re.compile(rf"\b(?:{NEG}|never|nobody|nothing|no\s+one|once|when|until|unless|of|without|will|would|could|should|must|needs?|if|to|please|can|{APOS}ll)\s+(?:\w+\s+){{0,2}}$", re.I)
 FAIL = r"(?:refused|denied|declined|failed|rejected|errored|returned\s+(?:an?\s+)?(?:error|[45]\d\d))"
 TRIED = re.compile(
@@ -93,7 +93,7 @@ def names_repo(sentence: str) -> bool:
             return True
     for rx in (OBJECT, LIST_NEG):
         obj = rx.search(sentence)
-        if obj and any(g and REPO_NAME.search(g) for g in obj.groups()):
+        if obj and any(g and REPO_NAME.search(g) for g in obj.groups()) and not OTHER_CAUSE.match(sentence, obj.end()):
             return True
     return False
 

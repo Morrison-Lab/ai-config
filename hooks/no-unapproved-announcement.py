@@ -37,8 +37,10 @@ TAG = re.compile(r"<(/?)([a-z][\w-]*)([^>]*)>", re.I)
 ENVELOPE = {"wake", "project", "thread", "message", "relay", "cited", "note"}  # and every hyphenated tag
 
 
-SCRIPT = re.compile(r"(?:\b(?:python[\d.]*|Rscript|node|deno|bash|z?sh|ruby|perl|pwsh|source|uv run)\s+(?:-[^\smc]\S*\s+)*|"
-                    r"(?:^|[\s;&|(])(?=\./))([\w./~-]+\.(?:py|R|r|js|mjs|ts|sh|rb|pl|ps1))\b")
+SCRIPT = re.compile(r"\b(?:python[\d.]*|Rscript|node|deno|bash|z?sh|ruby|perl|pwsh|source|uv run)\s+(?:-[^\smc]\S*\s+)*"
+                    r"([\w./~-]+\.(?:py|R|r|js|mjs|ts|sh|rb|pl|ps1))\b")
+LEAD = re.compile(r"[{!]|if|then|do|else|elif|while|until|time|exec|command|nohup|xargs|sudo|env|nice|timeout|"
+                  r"stdbuf|ionice|strace|watch|-\S*|\d\S*|\w+=\S*")  # words before the command a segment runs
 INTERP = re.compile(r"(python[\d.]*|Rscript|node|deno|bash|z?sh|ruby|perl|pwsh|source|uv|\.)$")
 EXT = re.compile(r"[\w./~-]+\.(py|R|r|js|mjs|ts|sh|rb|pl|ps1)$")
 CODE_WRITE = re.compile(r"\b(post|put|edit|update|PUT|POST)\(|create_discussion_topic|['\"](POST|PUT|post|put)['\"]|"
@@ -79,8 +81,9 @@ def script_names(cmd):
     """Script files the command runs: SCRIPT's matches, plus words the segment tokenizer finds."""
     yield from SCRIPT.findall(cmd)
     for words in segments(cmd):
-        if words and EXT.match(words[0]):  # a script run by its path
-            yield words[0]
+        run = next((w for w in words if not LEAD.fullmatch(w)), "")
+        if EXT.match(run):  # a script run by its path, after any keyword, wrapper or assignment
+            yield run
         for i, w in enumerate(words):
             interp = w.rsplit("/", 1)[-1]
             if not INTERP.match(interp) or w in (".", "source") and i:  # `.` runs a file only first

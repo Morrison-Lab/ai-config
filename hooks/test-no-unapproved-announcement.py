@@ -126,7 +126,9 @@ for name, code in [("sub/post.py", "import canvasapi\nc.create_discussion_topic(
                    ("hcopy.py", open(SUBJECT, encoding="utf-8").read() + "X = {}\nX.update(a=1)\n"),
                    ("subj.py", "SUBJECT = sys.argv[1]\nrequests.post('https://x/api/v1/discussion_topics', data=SUBJECT)"),
                    ("sp.py", "def is_announcement_write():\n    pass\nsubprocess.run(['curl', '-X', 'POST', u_announcement])"),
-                   ("otest.py", "SUBJECT = sys.argv[1]\ndef run(tool, inp):\n    pass\nrun('curl -X POST u_announcement')\n"),
+                   ("otest.py", "SUBJECT = sys.argv[1]\ndef run(tool, inp):\n    return subprocess.run([sys.executable, SUBJECT], input=inp)\n"
+                    "assert run('Bash', 'curl -X POST u_announcement')\n"),
+                   ("ocopy.py", "SUBJECT = sys.argv[1]\ndef run(tool, inp):\n    pass\nrequests.post(u_announcement)\n"),
                    ("repo/hooks/post2.py", "requests.post(u_announcement)"),
                    ("sub/test-no-unapproved-announcement.py", "# edited\nrequests.post(u_announcement)")]:
     with open(os.path.join(TMP, name), "w", encoding="utf-8") as fh:
@@ -152,7 +154,9 @@ SCRIPTS = {"python3 sub/post.py": "deny", "cd sub && python3 post.py": "deny", "
            "cd \"$WT\" && python3 hooks/test-no-unapproved-announcement.py": None, "python3 hcopy.py": None, "python3 sp.py": "deny", "python3 cs.py": "deny",
            ". sub/x.sh": "deny", "pushd sub && python3 post.py": "deny", "cd sub && grep -c 'import post' *.py": None,
            "cat > n.md <<'X'\nsub/post.py posts\nX": None, "sub/post.py 'oops": "deny", "python3 read.py -m sub.post": None,
-           "python3 otest.py x": None, "python3 subj.py x": "deny",
+           "python3 otest.py x": None, "python3 ocopy.py x": "deny",
+           "cat ./sub/post.py": None, "ruff check ./sub/post.py": None, "./sub/post.py": "deny",
+           "timeout 60 ./sub/post.py": "deny", "X=1 ./sub/post.py": "deny", "{ ./sub/post.py; }": "deny", "python3 subj.py x": "deny",
            "cd \"$WT\" && python3 hooks/no-unapproved-announcement.py": None,
            "awk '{print $1}' sub/post.py": None, "sed -n '/post/{p}' sub/post.py": None, "bash -c 'sub/post.py'": "deny",
            "python3 -c \"print(open('sub/post.py').read())\"": None, "Rscript -e 'lintr::lint(\"p.R\")'": None,

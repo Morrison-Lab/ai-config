@@ -36,7 +36,7 @@ Each case is `evals/<name>/prompt.md` (frontmatter plus prompt) and one or more 
 | `trigger` | `trigger-ardi`, `trigger-find-ai-tells`, `trigger-memorize` | The request loads the skill it should. |
 | `negative` | `no-trigger-ardi`, `no-trigger-find-ai-tells` | A nearby but out-of-scope request does not load the skill, and still gets answered. |
 | `injection` | `injection-readme-summary`, `injection-issue-triage` | An instruction embedded in third-party content is reported and not followed ([`untrusted-content-is-data`](../shared/workflow/untrusted-content-is-data.md)). |
-| `rule` | `authorship-marker` plus the injection cases | An `AGENTS.md` rule shows up in the output. |
+| `rule` | `authorship-marker` and `validate-step-timing`, plus the injection cases | An `AGENTS.md` rule shows up in the output. |
 | `skill-output` | `agent-builder-omit-claudemd`, `agent-builder-keep-claudemd` | `agent-builder` sets `omitClaudeMd: true` on a brief-only worker and leaves it off an agent that applies a repository's conventions. |
 
 ### First measurement

@@ -30,6 +30,13 @@ SHELLS = {"bash": ["bash", "--noprofile", "--norc", "-eo", "pipefail", "-c"]}
 GH = """#!/bin/bash
 echo "$*" | tr '\\n' ' ' >> "$LOG"
 echo >> "$LOG"
+for ((i = 1; i < $#; i++)); do
+  j=$((i + 1))
+  case "${!i}" in
+    --title) printf '%s' "${!j}" > title ;;
+    --body-file) cp "${!j}" body ;;
+  esac
+done
 if [ "$1" = api ]; then
   [ -n "$API_FAILS" ] && exit 1
   while [ "$#" -gt 0 ] && [ "$1" != --jq ]; do shift; done
@@ -51,8 +58,12 @@ def check(name: str, ok: bool, detail: str = "") -> None:
     failures += not ok
 
 
-def run(step: str, **env: str) -> tuple[int, list[str], str]:
-    """Run `step` with stubbed gh and python3; return exit code, gh calls, step outputs."""
+def run(step: str, **env: str) -> tuple[int, list[str], str, dict[str, str]]:
+    """Run `step` with stubbed gh and python3.
+
+    Returns the exit code, the gh calls, the step outputs, and the title and
+    body that gh was last given.
+    """
     shell = steps[step].get("shell")
     if shell not in SHELLS:
         raise SystemExit(f"step {step!r} has shell {shell!r}; the test needs one of {list(SHELLS)}")
@@ -69,7 +80,8 @@ def run(step: str, **env: str) -> tuple[int, list[str], str]:
         done = subprocess.run([*SHELLS[shell], steps[step]["run"]], cwd=d, env=full,
                               capture_output=True, text=True)
         log = (d / "log").read_text().splitlines() if (d / "log").exists() else []
-        return done.returncode, log, (d / "out").read_text()
+        sent = {k: (d / k).read_text() for k in ("title", "body") if (d / k).exists()}
+        return done.returncode, log, (d / "out").read_text(), sent
 
 
 def ago(days: int) -> str:
@@ -84,7 +96,7 @@ def issue(number: int, state: str = "open", reason: str | None = None, closed: s
 
 JUDGE = "Compare recent and baseline durations"
 for code, want_exit, want_out in (("0", 0, "code=0\n"), ("1", 0, "code=1\n"), ("3", 3, ""), ("4", 4, "")):
-    got, _, out = run(JUDGE, CODE=code)
+    got, _, out, _ = run(JUDGE, CODE=code)
     check(f"judge step: check exit {code} gives step exit {want_exit}", got == want_exit and out == want_out,
           f"exit {got}, output {out!r}")
 
@@ -101,24 +113,38 @@ cases = [
      1, "issue create"),
     ("an issue without the marker is ignored", [issue(11, body="no marker")], 1, "issue create"),
 ]
-for name, items, want_code, want_call in cases:
+
+
+def run_issue(items: list[dict], **env: str) -> tuple[int, list[str], list[str], dict[str, str]]:
     with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
         json.dump(items, f)
     try:
-        code, log, _ = run(ISSUE, FIXTURE=f.name)
+        code, log, _, sent = run(ISSUE, FIXTURE=f.name, **env)
     finally:
         os.unlink(f.name)
-    calls = [c for c in log if not c.startswith("api ")]
+    return code, log, [c for c in log if not c.startswith("api ")], sent
+
+
+for name, items, want_code, want_call in cases:
+    code, log, calls, sent = run_issue(items)
     check(name, code == want_code and (calls == [] if want_call is None
                                        else len(calls) == 1 and calls[0].startswith(want_call)),
           f"exit {code}, calls {calls}")
+    if want_call:
+        check(f"{name}: the body carries the marker and the report",
+              MARKER in sent.get("body", "") and "report" in sent.get("body", ""), str(sent))
+    if want_call == "issue create":
+        check(f"{name}: the issue is labelled P2", "--label P2" in calls[0], calls[0])
+        again = run_issue([issue(99, title=sent.get("title", ""), body=sent.get("body"))])[2]
+        check(f"{name}: the next run finds the issue it opened", bool(again)
+              and again[0].startswith("issue comment 99"), str(again))
 
 api = next((c for c in log if c.startswith("api ")), "")
 for part in ("--paginate", "repos/o/r/issues?", "state=all", "creator=github-actions%5Bbot%5D",
              "sort=created", "direction=desc"):
     check(f"the lookup asks for {part}", part in api, api)
 
-code, log, _ = run(ISSUE, FIXTURE="/nonexistent", API_FAILS="1")
+code, log, _, _ = run(ISSUE, FIXTURE="/nonexistent", API_FAILS="1")
 check("a failed lookup stops the step before any create",
       code != 0 and not any(c.startswith("issue ") for c in log), f"exit {code}, calls {log}")
 

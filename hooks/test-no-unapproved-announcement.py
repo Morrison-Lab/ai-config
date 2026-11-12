@@ -1,18 +1,13 @@
 #!/usr/bin/env python3
 """Regression tests for no-unapproved-announcement.py (ai-config#4780)."""
-import json
-import os
-import subprocess
-import sys
-import tempfile
+import json, os, subprocess, sys, tempfile
 
 SUBJECT, TMP = sys.argv[1], tempfile.mkdtemp()
 WAKE = ('<wake reason="mention"><project id="p"><thread ts="t"><message from="human" '
         'trust="principal" id="c1">{}</message></thread></project></wake>')
 RELAY = '<relay from="coordinator" session="s"><cited author="user">{}</cited><note>{}</note></relay>'
 POST = {"command": "canvas announcements create --course 1 --title Hi"}
-URL = "https://x/api/v1/courses/1/discussion_topics"
-OK = "post the announcement"
+URL, OK = "https://x/api/v1/courses/1/discussion_topics", "post the announcement"
 
 
 def user(text, **extra):
@@ -52,7 +47,8 @@ BASH = [
     "python3 -c \"c.get_course(1).create_discussion_topic(is_announcement=True)\"",
     f"node -e \"fetch('{URL}/55', {{method: 'PUT'}})\"", f"python3 -c \"aiohttp.ClientSession().post('{URL}')\"",
     'curl -X POST -d @announcement.json "$URL"', f"Rscript -e 'httr::PUT(\"{URL}/55\")'", f"http {URL} < a.json",
-]
+    f"curl -s {URL} | http PUT {URL}/5 m=x", f"curl -s {URL}\npython3 -c 'requests.put(1)'", f"wget -e post_data=x {URL}",
+    "curl -X PUT \"$U\" -F 'm=announcement https://hooks.slack.com/x'", "curl -X POST https://l.edu/api/graphql -d @announcement.json"]
 WRITES = [("Bash", {"command": c}) for c in BASH] + [
     ("Monitor", POST), ("PowerShell", {"command": f"Invoke-RestMethod -Method Put -Uri {URL}/55"}),
     ("mcp__canvas__create_announcement", {"id": 1}), ("mcp__CANVAS__publish_announcement", {}),
@@ -63,7 +59,7 @@ WRITES = [("Bash", {"command": c}) for c in BASH] + [
 ]
 OTHER = [("Bash", {"command": c}) for c in [
     f"curl -f {URL}?only_announcements=true", "canvas announcements list", "cat /tmp/announcement.md",
-    f"curl -s {URL} | jq .", f"wget -qO- {URL} > a.json", "curl -d 'text=New announcement' https://hooks.slack.com/x",
+    f"curl -s {URL} | jq . > a.json", f"wget -qO- {URL} > a.json", "curl -d 'text=New announcement' https://hooks.slack.com/x",
     "git commit -m 'Gate canvas announcements create (#4780)'", "git commit -m \"x\n\nCloses #4780\"",
     "gh issue comment 1 --body 'gate POST discussion_topics, https://x'", "grep -nE 'is_announcement|topic' f",
     "echo 'Announcement: see https://x/syllabus' > a.md", "sed -n '/is_announcement/p' post.py",

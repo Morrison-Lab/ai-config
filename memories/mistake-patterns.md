@@ -552,7 +552,7 @@ A clean automated review from every available provider evaluating the current HE
 - **Do**: When executing implementation work on a branch, complete the full delivery cycle automatically: run tests, commit scoped changes, run adversarial self-review, check remote branch, push, open/update PR, and request AI review.
 - **Don't**: Stop after writing files or tests and report "done" or wait for a follow-up prompt to commit and open a PR.
 - **Example**: 2026-08-30 session (`Morrison-Lab/ai-config` on branch `structured_review_bot_output`): implemented structured review JSON parsing in `check-pr-fully-clean.py` and updated reviewer prompts, verified all tests pass, wrote walkthrough artifact, but stopped without committing, pushing, or opening a PR until the user prompted "where's my PR? ums".
-- **Canonical Rule**: `AGENTS.md` ("Ship work through a verified push and a PR", "Deliver completed implementation work" bullet): on a feature branch, complete the full delivery cycle rather than stopping at an uncommitted worktree: tracking issue, scoped commits, adversarial self-review to a clean verdict, push, open or update the PR, request AI review, and drive to clean.
+- **Canonical Rule**: `AGENTS.md` ("Ship work through a verified push and a PR", "Deliver completed implementation work" bullet): when asked to implement or write up changes on a feature branch, complete the full delivery cycle: tracking issue, scoped commits, adversarial self-review to a clean verdict, push, open or update the PR, request AI review, and drive to clean.
 - **Fix**: Never terminate an implementation turn at uncommitted files or a local-only commit.
   Complete the full chain (commit -> self-review -> push -> PR -> review request) in that same turn.
 

@@ -248,6 +248,6 @@ See [`evals/README.md`](../../evals/README.md#adding-a-case).
 
 On a message, PR comment or brief an agent wrote, check that it does not say a repository is not in, not attached to, or outside the thread's or session's repos or scope, and then hand the work to someone else.
 The agent should have attached it with `add_repo` and done the work.
-The only acceptable form reports that `add_repo` was tried and quotes its refusal.
+The only acceptable form reports that `add_repo` was tried and gives its refusal reason, quoted where it returned text.
 Read the text; do not report the output of `hooks/no-repo-not-in-thread-excuse.py` as your finding.
 See [`no-cant-from-session-excuses`](../../shared/workflow/no-cant-from-session-excuses.md).

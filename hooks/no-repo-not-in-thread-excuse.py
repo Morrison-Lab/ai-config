@@ -62,9 +62,9 @@ DONE = re.compile(r"\b(?:I|[Ww]e)\s+(?:(?:just|then|also|finally|now)\s+)?$")  #
 # The repo starts its clause: "The PR against lds isn't in this thread" and "Updating lds is not in" name lds as an object.
 CLAUSE_START = re.compile(rf"(?:^|[,;(]\s*|\b(?:but|so|because|since|yet|while|although|though)\s+"
                           r"|(?<!for\s)(?<!in\s)(?<!on\s)(?<!of\s)(?<!to\s)(?<!by\s)(?<!about\s)(?<!against\s)(?<!with\s)(?<!from\s)\bthat\s+)"
-                          rf"(?:(?:the|our|my|this|that|both|and|either)\s+|(?:{REPO_NAME.pattern})[`'\"\s,]*(?:and\s+|or\s+)?)*$", re.I)
+                          rf"(?:(?:the|our|my|this|that|both|and|either)\s+|(?:{REPO_NAME.pattern})[`'\"\s,]*(?:or\s+)?)*$", re.I)
 NOT_YET = re.compile(rf"\b(?:{NEG}|never|nobody|nothing|no\s+one|once|when|until|unless|of|without|will|would|could|should|must|needs?|if|to|please|can|{APOS}ll)\s+(?:\w+\s+){{0,2}}$", re.I)
-FAIL = r"(?:refused|denied|declined|failed|rejected|errored|(?:returned|responded\s+with|came\s+back\s+with)\s+(?:an?\s+)?(?:error|[45]\d\d))"
+FAIL = r"(?:refused|denied|declined|failed|rejected|errored|blocked|(?:needs|awaits|waiting\s+(?:on|for))\s+(?:your\s+)?approval|waiting\s+for\s+you|(?:returned|responded\s+with|came\s+back\s+with)\s+(?:an?\s+)?(?:error|[45]\d\d))"
 TRIED = re.compile(
     r"\b(?:add_repo|attach|attaching)\b(?:\(\S{0,100}\))?(?:\s+(?!has\b|had\b|would\b|will\b|may\b|might\b|could\b)\S+){0,4}?"
     rf"\s+(?:was\s+|itself\s+)?{FAIL}\b|\b(?:attach|add_repo)\b[^.;]{{0,80}}?\b(?:(?:got|received)\s+[\"'\u2018\u201c]|(?:returned|responded|answered|said|replied)\b[^.;\"]{{0,40}}?[\"\u201c])"
@@ -74,8 +74,8 @@ REASON = (
     '[hook: no-repo-not-in-thread-excuse] "{sentence}" says a repository is not in this '
     "thread or session. Ezra, 2026-11-12: \"never say a repo isn't in a thread; add it\". Call "
     'mcp__claude-code-remote__add_repo (ToolSearch "select:mcp__claude-code-remote__add_repo"), clone it, '
-    "do the work, and report it in the past tense. If add_repo itself refuses, say so in the same sentence "
-    "and quote its reason. shared/workflow/no-cant-from-session-excuses.md. Set ALLOW_REPO_NOT_IN_THREAD=1 only when the user asked for this wording."
+    "do the work, and report it in the past tense. If add_repo refuses or is blocked, say so in that sentence or "
+    "the next and give its reason, quoted where it returned text. shared/workflow/no-cant-from-session-excuses.md. Set ALLOW_REPO_NOT_IN_THREAD=1 only when the user asked for this wording."
 )
 
 

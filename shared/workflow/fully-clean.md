@@ -1191,7 +1191,7 @@ Per the rule above, the payload wins and the PR is not clean --- confirmed by
 `scripts/check-pr-fully-clean.py`, which consumed the structured payload
 directly and refused, rather than by reading either line by eye.
 The reviewer's own "suggestions/nits, not blockers" classification is not
-this corpus's bar: `CLAUDE.md`'s Strict Merge Control Policy vetoes a merge
+this corpus's bar: `strict-merge-policy.md`'s Strict Merge Control Policy vetoes a merge
 over any standing not-clean, nits included, regardless of how the reviewer
 itself prioritized its findings.
 A second failure stacked on the first here: the driving session had cached

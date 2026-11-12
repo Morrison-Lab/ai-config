@@ -1458,6 +1458,6 @@ merge with zero findings," so the new round's prose/payload disagreement read
 as consistent with what was already believed, and stayed invisible until the
 checker was run fresh against the current head.
 The reviewer's own "suggestions/nits, not blockers" framing was also not the
-bar to apply: `CLAUDE.md`'s Strict Merge Control Policy vetoes a merge over
+bar to apply: `strict-merge-policy.md`'s Strict Merge Control Policy vetoes a merge over
 any standing not-clean, nits included, regardless of the reviewer's own
 blocking/non-blocking classification of its findings.)

@@ -23,6 +23,11 @@ Act on the clarification, and record the general lesson per [`encode-reusable-fe
 - **Do:** when the user has to add a clarification, fix the case and record the general inference you missed.
 - **Don't:** confine a correction to the case it mentioned, or drop a qualifier or "etc." when restating a request.
 - **Don't:** ask whether to do what a request plainly implies ("want the link?") instead of doing it.
+
+Read broadly as well as fully: unless the user narrows a request, take the reading that advances its obvious objective (`AGENTS.md`'s "Interpret instructions broadly and maximize safe progress").
+
+- **Do:** inspect for adjacent actionable work, resolve it, verify it, and carry it through the normal PR, review, and monitoring lifecycle.
+- **Don't:** stop at a narrow literal reading that leaves the requested outcome only partially achieved.
   A whether-or-how question is not a request; it gets a start-or-file ask ([`start-or-file`](start-or-file.md)).
 
 (Directives from the user, 2026-10-02: "assume that nothing I write is filler";

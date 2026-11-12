@@ -26,7 +26,11 @@ contract:
      since Cursor reads that AGENTS.md itself; elsewhere it still injects.
  10. This repository's real AGENTS.md under a long plugin-cache path stays
      within Claude Code's 10,000-character cap, so all of it reaches the
-     model rather than a 2,000-character preview.
+     model rather than a 2,000-character preview, and its index lists a
+     composed section's rule names as bullet leads.
+ 11. On a made-up AGENTS.md, the index lists each top-level bold bullet lead
+     under its heading, and leaves out a bullet before the first heading,
+     Do/Don't bullets (straight or curly apostrophe), and nested bullets.
 """
 import json
 import os

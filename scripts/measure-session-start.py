@@ -135,7 +135,9 @@ def main(argv=None) -> int:
     sizes = {name: spec[0]() for name, spec in COMPONENTS.items()}
     over = []
     for kind, names in SESSION_KINDS.items():
-        print(f"\n{kind}: about {sum(sizes[n] for n in names):,} characters at start")
+        units = sorted({COMPONENTS[n][1] for n in names})
+        total = sum(sizes[n] for n in names)
+        print(f"\n{kind}: {total:,} {' and '.join(units)} at start")
         for name in names:
             _, unit, cap, where = COMPONENTS[name]
             if cap is None:

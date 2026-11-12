@@ -43,6 +43,9 @@ if code != 0:
     fails.append(f"default run exited {code}")
 if "component(s) measured" not in out:
     fails.append("default run printed no summary")
+# A kind mixing bytes and characters must say so in its total.
+if "Codex: " not in out or "bytes and chars at start" not in out.split("Codex: ")[1].splitlines()[0]:
+    fails.append("Codex total does not name both of its units")
 
 # Negative control: with no headroom allowed, --strict must fail.
 saved = mss.TARGET_FRACTION

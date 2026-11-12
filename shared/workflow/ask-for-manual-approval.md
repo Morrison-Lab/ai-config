@@ -62,6 +62,13 @@ an unreadable grant of this kind does not stop you switching yourself.
 Otherwise, for an action that is not a merge and that no readable allow route covers, when `mcp__ccd_session_mgmt__set_session_permission_mode` is available, switch the session to `default` yourself with that tool, rerun the command once so the user gets a real approval prompt, and request `auto` again once the actions that needed approval are done.
 A switch to a lower mode shows no card, so that prompt is the user's only sign of the switch.
 When that tool is not available, ask the user to switch out of auto mode the same way.
+A cloud project thread that runs work on the user's computer through a Remote Control session does not have that tool, but the Claude Code session on the computer does.
+So when that session's command is refused, tell that session to switch itself as above, rather than asking the user to switch (2026-11-12, course-repo publishing: the thread said "I don't have a control that changes the permission mode on your PC", and Ezra answered "yes you do;
+never make factual claims like this without providing evidence").
+Before saying any session lacks a tool, cite the ToolSearch query you ran and its result, and name which session you searched from.
+
+- **Do:** on a refusal in a Remote Control session, instruct that session to load `mcp__ccd_session_mgmt__get_session` and `mcp__ccd_session_mgmt__set_session_permission_mode`, switch itself to `default`, rerun once, and request `auto` again.
+- **Don't:** conclude from a failed ToolSearch in the cloud thread that no session can switch modes, or tell the user only they can switch.
 
 A first denial can be a transient misfire (see [`claude-code-hooks`](../../memories/claude-code-hooks.md) on retrying an identical command once).
 Retry the identical command once at most, never rephrased, then switch or ask.

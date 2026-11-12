@@ -69,5 +69,5 @@ jobs:
             gh issue comment "$number" --body "Failed again: $RUN_URL"
           else
             gh issue create --title "$title" --label P2 \
-              --body "The weekly macOS and Windows run of the validate steps failed: $RUN_URL (ai-config#1843)."
+              --body "The weekly macOS and Windows run of the validate steps failed: $RUN_URL (#1843)."
           fi

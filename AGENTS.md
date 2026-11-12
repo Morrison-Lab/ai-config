@@ -65,7 +65,7 @@ What you say about the state you stop in must be true, and any work that remains
   never say done with uncommitted, unpushed, or un-PRed changes, or open PRs the session authored ([`flag-session-boundaries`](shared/workflow/flag-session-boundaries.md)).
 - **Run UMS before every pause**, first, before ending a turn to wait on anything (CI, a review round, a subagent, or an answer from the user), if learnings have accumulated ([`run-ums-proactively`](shared/workflow/run-ums-proactively.md)).
 - **Run UMS when work is scrutinized** (a review, critical feedback, or a questioned claim that proves wrong), in that turn, without waiting for a clean verdict, an accepted finding, or a first-person admission;
-  answering with the corrected fact is not the pass.
+  answering with the corrected fact is not the pass ([`run-ums-proactively`](shared/workflow/run-ums-proactively.md)).
 - **Terminate superseded and abandoned background tasks** (commands, monitors, subagents dispatched to inspect, search, or diagnose) once their purpose is met, their findings are superseded, or the session moves on, and sweep them before declaring anything complete ([`terminate-superseded-tasks`](shared/workflow/terminate-superseded-tasks.md)).
 
 ## Prefer optionality over removing functionality

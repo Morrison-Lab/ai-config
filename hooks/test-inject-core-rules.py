@@ -154,4 +154,16 @@ with tempfile.TemporaryDirectory() as tmp:
     assert "  - Put PRs in ready mode when they are ready for review\n" in ctx, ctx
     assert "  - Do\n" not in ctx and "  - Don't\n" not in ctx, ctx
 
-print("ok: inject-core-rules.py, 10 cases")
+    # 11. Index leads: a bullet before the first heading and Do/Don't
+    #     bullets stay out; a lead that only starts with "Don't" stays in.
+    curly = "Don" + chr(0x2019) + "t:"
+    leads = make_root(tmp / "leads", agents=(
+        "# AGENTS.md\n\n- **Preamble bullet** text\n\n"
+        "## Composed\n\n- **Rule A:** text\n- **Do:** x\n- **Don't:** y\n"
+        f"- **{curly}** z\n- **Don't call X** w\n  - **Nested** v\n"))
+    ctx = context(run(leads, consumer))
+    assert "- Composed\n  - Rule A\n  - Don't call X\n" in ctx, ctx
+    for absent in ("Preamble", "Nested", "  - Do\n", "  - Don't\n", curly):
+        assert absent not in ctx, (absent, ctx)
+
+print("ok: inject-core-rules.py, 11 cases")

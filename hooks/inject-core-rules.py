@@ -103,7 +103,7 @@ def project_dir(payload: dict) -> Path:
 
 
 RULE_LEAD = re.compile(r"^- \*\*(.+?)\*\*")
-NOT_A_RULE_NAME = ("Do:", "Don't:", "Don’t:")
+NOT_A_RULE_NAME = ("Do:", "Don't:", "Don\u2019t:")
 
 
 def index_lines(agents_text: str) -> list[str]:

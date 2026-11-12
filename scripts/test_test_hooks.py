@@ -479,5 +479,45 @@ with tempfile.TemporaryDirectory(prefix="hook-runner-") as tmp:
           code == 2 and stdout == "", repr((code, stdout)))
 
 
+# --- Each suite gets a fresh temp directory (ai-config#4805) --------------
+# A sentinel left in the shared temp directory by an earlier run made a
+# suite pass locally and fail in CI. This suite fails when that sentinel is
+# visible, so it passes only if the runner hides the shared directory.
+
+SENTINEL = f"hook-runner-sentinel-{os.getpid()}"
+STALE = f"""\
+import os, tempfile
+tmp = tempfile.gettempdir()
+if os.path.exists(os.path.join(tmp, {SENTINEL!r})):
+    print("saw a stale sentinel")
+    raise SystemExit(1)
+print("tmp=" + tmp)
+"""
+
+shared_sentinel = Path(tempfile.gettempdir()) / SENTINEL
+shared_sentinel.write_text("left by an earlier run\n", encoding="utf-8")
+try:
+    with tempfile.TemporaryDirectory(prefix="hook-runner-") as tmp:
+        hooks = Path(tmp)
+        stale_test, stale_subj = _write_pair(hooks, "stale", STALE)
+        bare = subprocess.run([sys.executable, stale_test, stale_subj],
+                              capture_output=True, text=True)
+        check("control: the suite fails when it sees the shared sentinel",
+              bare.returncode == 1, repr(bare.stdout))
+        rc, stdout, _ = _capture(
+            lambda: th.run_one_suite(stale_test, stale_subj, timeout=10))
+        check("under the runner the suite does not see the sentinel",
+              rc == 0 and "PASS:" in stdout, repr(stdout))
+        used = re.search(r"tmp=(\S+)", stdout)
+        check("the suite ran in its own temp directory",
+              bool(used) and os.path.basename(used.group(1))
+              .startswith("hook-suite-"), repr(stdout))
+        check("the runner removes that directory afterwards",
+              bool(used) and not os.path.exists(used.group(1)),
+              repr(stdout))
+finally:
+    shared_sentinel.unlink()
+
+
 print(f"\n{passes}/{passes + failures} checks passed")
 sys.exit(1 if failures else 0)

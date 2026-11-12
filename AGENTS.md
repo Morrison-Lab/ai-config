@@ -112,8 +112,8 @@ When we do or see something that would be a good example for general practice, a
 See [`use-real-world-examples`](shared/principles/use-real-world-examples.md) (pairing, critique and provenance rules) and [`AGENTS.cases.md`](AGENTS.cases.md).
 ## Search the tracker and AGENTS.md before building or denying a policy
 
-Before answering that a permission or policy does not exist, and before implementing a new policy or capability, search the full policy corpus (`AGENTS.md`, `CLAUDE.md`, `memories/`, `shared/`) and the issue tracker.
-See [`grep-is-not-coverage`](shared/workflow/grep-is-not-coverage.md), [`issue-first`](shared/workflow/issue-first.md) for the all-state search, and [`AGENTS.cases.md`](AGENTS.cases.md).
+Before answering that a permission, policy or tool does not exist, for you or for another session, and before implementing a new policy or capability, search the full policy corpus (`AGENTS.md`, `CLAUDE.md`, `memories/`, `shared/`) and the issue tracker.
+See [`check-tools-before-saying-cant`](shared/workflow/check-tools-before-saying-cant.md), [`grep-is-not-coverage`](shared/workflow/grep-is-not-coverage.md), [`issue-first`](shared/workflow/issue-first.md) for the all-state search, and [`AGENTS.cases.md`](AGENTS.cases.md).
 
 ## Track each useful resource in each notes repo whose topic it covers
 

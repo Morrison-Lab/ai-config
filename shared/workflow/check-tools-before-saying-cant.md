@@ -14,6 +14,26 @@ Do this before any such claim:
   A stricter mode needs no approval card, and a looser one shows Ezra a card.
 - If none does, say what you searched, so the claim is checkable.
 
+The same check applies before you say that another session can't do something,
+such as a coordinator telling Ezra that a thread has no tool for a step.
+Your own tool list does not show another session's tools.
+
+Ezra, 2026-11-12 (Data 571): the project coordinator told him that no tool let a thread switch its own auto mode.
+Threads have one, and this file and two others already documented it.
+Ezra: "remember this and record it in ai-config".
+
+Before any claim about another session's abilities:
+
+- Search ai-config for the action (`AGENTS.md`, `CLAUDE.md`, `shared/`, `skills/` and `memories/`), not only your own tool list.
+- Or ask the session that would act, such as the runner, whose tools and local docs you cannot see.
+- Then say what you checked.
+
+Example, switching auto mode in a thread:
+load `mcp__ccd_session_mgmt__get_session` and `mcp__ccd_session_mgmt__set_session_permission_mode` with `ToolSearch`,
+read the current mode with `get_session`,
+then switch with `set_session_permission_mode`.
+The procedure is in [ask-for-manual-approval.md](ask-for-manual-approval.md) and [`do-it-for-me`](../../skills/do-it-for-me/SKILL.md).
+
 Never tell a user, or relay to a thread, that someone did something unless that person said so.
 The coordinator misrelayed that Ezra had switched the mode himself.
 Quote the message or say you do not know.

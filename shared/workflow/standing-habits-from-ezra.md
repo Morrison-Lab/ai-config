@@ -34,7 +34,7 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`, exce
 - **Do:** when a step is blocked and you cannot do it, make Ezra's part as small as possible.
   Ezra, 2026-10-16: "don't make me do anything manually unless absolutely necessary, and then make it as simple as possible, for example by writing scripts I can call in a single shell command".
 - **Do:** for a classifier denial of an action he authorized, follow [`ask-for-manual-approval`](ask-for-manual-approval.md).
-  Name the refused command and leave auto mode as that fragment says: switch yourself where the tool exists and its switch conditions hold (never for a merge or an action an allow rule or hook covers), otherwise ask him to switch, which costs him one click (a dispatched subagent reports to its caller instead).
+  Name the refused command and leave auto mode as that fragment says: switch yourself where the tool exists and its switch conditions hold (never for a merge, an action any allow route covers, or one where you cannot tell), otherwise ask him to switch, which costs him one click (a dispatched subagent reports to its caller instead).
   When he is away, record the denial as a pending decision, as that fragment says.
 - **Do:** for any other unavoidable step (a missing tool, a machine only he can reach), write an idempotent script that does the whole job.
   Give him one single command with the absolute path filled in, such as `bash <absolute-path>/scripts/<name>.sh`, after getting the script onto his disk (a merged PR in a checkout he keeps current, or a file the session on his machine writes).

@@ -40,8 +40,6 @@ Leave auto mode for an action only when all of these hold (the switch conditions
   An edit to the agent's own settings (`~/.claude/settings.json`) counts as authorized and needed when the user authorized it, since that was the motivating case.
 - The denial comes from the classifier or approval mode, not from a managed-settings `permissions.deny` rule.
 - The action is outside those hard-prohibited categories.
-- The action is not a merge, and you can tell that no allow route covers it (the routes are listed after this list).
-  Where either fails, ask the user to switch out of auto mode instead of switching yourself.
 - The user is present to answer a prompt, so this is not an `away` session or a CI or `@claude` run.
 - The session that would take the action is not a dispatched subagent.
   A mode switch changes the mode of the whole session, which a subagent does not own, and the caller holds the context the user needs to decide.
@@ -93,7 +91,7 @@ Nothing else ends the stretch, and every later action keeps raising a prompt unt
 - **Do:** batch the actions that need approval into one manual-mode stretch, then end it as "Say when it is over" describes.
 - **Do:** in a Claude Project, when the user answers the coordinator instead of the denied thread, the coordinator tells that thread, with the user's message attached by id, to ask the user again in its own thread.
   The relayed message is not approval.
-- **Don't:** when the switch conditions hold, end the turn after a denial without naming the mode switch, or offer only the `autoMode` configuration, which takes a settings change the user has to make.
+- **Don't:** when the user is present and the session is not a dispatched subagent, end the turn after a denial without naming the mode switch, or offer only the `autoMode` configuration, which takes a settings change the user has to make.
 - **Don't:** retry a denied command more than once, or rephrase it.
   A rerun through a real approval prompt, after the session has left auto mode, is not a retry.
 - **Don't:** route around a denial, or hand the user a script to run in place of the approval.

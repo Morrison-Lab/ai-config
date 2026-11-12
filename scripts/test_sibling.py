@@ -148,6 +148,15 @@ def probe_copy(hook_name, sibs, with_lib, with_sibs):
         shutil.rmtree(bare, ignore_errors=True)
 
 
+# The hooks that must import the loader in a try and survive a broken
+# install. Declared here, not read from the hooks, so deleting a guard fails;
+# GUARD_RE only cross-checks that each hook's source matches the declaration.
+GUARDED = {
+    "no-empty-promise.py", "no-mistake-without-a-hook.py", "remind-learn-from-review.py",
+    "no-user-correction-without-mechanism.py", "remind-ums-on-scrutiny.py",
+    "no-unread-issue-claim.py",
+}
+check("every GUARDED hook is in USERS", sorted(GUARDED - {h for h, _ in USERS}), [])
 GUARD_RE = re.compile(r"^try:\n    from sibling import load_sibling\n", re.M)
 for hook_name, sibs in USERS:
     # Siblings missing, loader present: each sibling attribute is None, and
@@ -164,8 +173,10 @@ for hook_name, sibs in USERS:
     # that imports the loader in a try still imports, loads no sibling, and
     # names the missing loader. A hook that imports it bare (with the other
     # scripts/lib modules it already needs) fails to import.
+    guarded = hook_name in GUARDED
     with open(os.path.join(HOOKS, hook_name), encoding="utf-8") as fh:
-        guarded = bool(GUARD_RE.search(fh.read()))
+        check(f"{hook_name} source {'guards' if guarded else 'does not guard'} the import",
+              bool(GUARD_RE.search(fh.read())), guarded)
     proc = probe_copy(hook_name, sibs, with_lib=False, with_sibs=True)
     if guarded:
         want = " ".join(["True"] * (1 + len(sibs)))

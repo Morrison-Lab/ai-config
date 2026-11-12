@@ -566,7 +566,7 @@
   always format them as clickable markdown hyperlinks to their forge URLs
   (e.g. `[PR #123](https://github.com/<owner>/<repo>/pull/123)`),
   never as bare unlinked `#123` text
-  (see [AGENTS.md](../AGENTS.md)'s "File formatting & links" rule for the exceptions).
+  (see the [`file-formatting-and-links`](../shared/writing/file-formatting-and-links.md) rule for the exceptions).
   (User directive / CAI, 2026-08-30.)
   Don't leave a bare SHA, review id, or GitHub review-event name (`COMMENT`) as the only pointer --- wrap it in a markdown link.
   See [`hyperlink-liberally`](../shared/writing/hyperlink-liberally.md) for the broader principle covering tools, internal rules, and technical terms.

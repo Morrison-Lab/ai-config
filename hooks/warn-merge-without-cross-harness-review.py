@@ -291,6 +291,24 @@ def _takes_value(word):
     return False
 
 
+def _bundle_verb(word, nxt):
+    """The method a short-option bundle *word* sets, else None.
+
+    `G` and `I` give a non-POST method, and `X` takes the rest of the bundle,
+    or the next word *nxt* when it ends the bundle. A letter that takes a
+    value ends the scan, since the letters after it are that value
+    (ai-config#5363).
+    """
+    for pos, letter in enumerate(word[1:], start=2):
+        if letter in "GI":
+            return "GET" if letter == "G" else "HEAD"
+        if letter == "X":
+            return word[pos:] or nxt
+        if "-" + letter in CURL_VALUE_OPTS:
+            return None
+    return None
+
+
 def _curl_route(rest):
     """The HTTP_ROUTES entry a `curl` POST in *rest* reaches, else None."""
     if HELP_FLAGS.intersection(rest[1:]):
@@ -306,12 +324,15 @@ def _curl_route(rest):
     args = rest[1:]
     for i, arg in enumerate(args):
         prev = args[i - 1] if i else ""
-        # `-X GET`, `-XGET`, `--request=GET`, `-G` and `-I` are not a POST.
-        verb = arg if prev in ("-X", "--request") else None
-        if arg.startswith(("--request=", "-X")) and len(arg) > 2:
-            verb = arg.split("=", 1)[1] if arg.startswith("--request=") else arg[2:]
+        # `-X GET`, `-XGET`, `--request=GET`, `-G` and `-I` are not a POST,
+        # and neither is a bundle holding one of them (`-sSXGET`, `-sI`).
+        verb = arg if prev == "--request" else None
+        if arg.startswith("--request="):
+            verb = arg.split("=", 1)[1]
+        elif arg.startswith("-") and not arg.startswith("--"):
+            verb = _bundle_verb(arg, args[i + 1] if i + 1 < len(args) else "")
         if (verb is not None and verb.upper() != "POST") or arg in (
-                "-G", "--get", "-I", "--head"):
+                "--get", "--head"):
             return None
     # Only a bare URL word is the target, never an option value (`-d URL`, `--form-string URL`).
     # Walk from the left, so a value that looks like an option (`-d -e`) takes nothing.

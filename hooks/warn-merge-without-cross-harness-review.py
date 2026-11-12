@@ -121,9 +121,10 @@ HTTP_ROUTES = (
 PROBE_WORDS = frozenset({"which", "command"})
 NEEDS_ATTEMPT = frozenset({"opencode"})
 # curl options whose next word is a value, never the request URL: every
-# option `curl --help all` (curl 8.5.0) shows taking an argument, plus the
-# bundled `-sd`/`-sF`. `--url` is left out, since its value is the target
-# (ai-config#5383).
+# option `curl --help all` (curl 8.5.0) shows taking an argument, plus
+# `--haproxy-clientip` (its help line omits the argument), `--ech` (curl 8.8)
+# and the bundled `-sd`/`-sF`. `--url` is left out, since its value is the
+# target (ai-config#5383).
 CURL_VALUE_OPTS = frozenset({
     "--abstract-unix-socket", "--alt-svc", "--aws-sigv4", "--cacert",
     "--capath", "--cert", "--cert-type", "--ciphers", "--config",
@@ -131,7 +132,8 @@ CURL_VALUE_OPTS = frozenset({
     "--cookie-jar", "--create-file-mode", "--crlfile", "--curves", "--data",
     "--data-ascii", "--data-binary", "--data-raw", "--data-urlencode",
     "--delegation", "--dns-interface", "--dns-ipv4-addr", "--dns-ipv6-addr",
-    "--dns-servers", "--doh-url", "--dump-header", "--egd-file", "--engine",
+    "--dns-servers", "--doh-url", "--dump-header", "--ech", "--egd-file",
+    "--engine", "--haproxy-clientip",
     "--etag-compare", "--etag-save", "--expect100-timeout", "--form",
     "--form-string", "--ftp-account", "--ftp-alternative-to-user",
     "--ftp-method", "--ftp-port", "--ftp-ssl-ccc-mode",
@@ -264,6 +266,9 @@ def _takes_value(word):
     """
     if word in CURL_VALUE_OPTS:
         return True
+    # curl 8.3+ takes `--expand-<option>` wherever `--<option>` takes a value.
+    if word.startswith("--expand-"):
+        return "--" + word[len("--expand-"):] in CURL_VALUE_OPTS
     if not word.startswith("-") or word.startswith("--"):
         return False
     for pos, letter in enumerate(word[1:], start=2):

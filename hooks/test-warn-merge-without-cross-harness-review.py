@@ -439,7 +439,8 @@ def main():
     check("silent when --url names the Ollama chat API",
           not run(MERGE, [step("curl -sS -d @req.json"
                                " --url https://api.ollama.com/api/chat")])[0])
-    for opt in ("-4w", "-#o", "--proxy1.0"):
+    for opt in ("-4w", "-#o", "--proxy1.0", "--ech", "--haproxy-clientip",
+                "--expand-header", "--expand-data"):
         check("warns when the Ollama URL is the value of " + opt,
               run(MERGE, [step("curl -d @x %s https://api.ollama.com/api/chat"
                                " https://example.com" % opt)])[0])

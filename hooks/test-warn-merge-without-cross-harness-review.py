@@ -176,6 +176,12 @@ def main():
           run(MERGE, [step("curl -s https://opencode.ai/zen/go/v1/chat/completions")])[0])
 
     # --- silent -----------------------------------------------------------
+    # Cancelling an auto-merge or asking for help merges nothing, so it needs
+    # no review (ai-config#5406), as the MCP disable-auto-merge tool does not.
+    check("silent on `gh pr merge N --disable-auto` with no reviewer run",
+          not run("gh pr merge 12 --disable-auto", [])[0])
+    check("silent on `gh pr merge --help` with no reviewer run",
+          not run("gh pr merge --help", [])[0])
     check("silent after a codex run following the last push",
           not run(MERGE, [PUSH, CODEX])[0])
     check("silent after an opencode run",

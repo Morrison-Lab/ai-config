@@ -68,9 +68,9 @@ What you say about the state you stop in must be true, and any work that remains
   answering with the corrected fact is not the pass ([`run-ums-proactively`](shared/workflow/run-ums-proactively.md)).
 - **Terminate superseded and abandoned background tasks** (commands, monitors, subagents dispatched to inspect, search, or diagnose) once their purpose is met, their findings are superseded, or the session moves on, and sweep them before declaring anything complete ([`terminate-superseded-tasks`](shared/workflow/terminate-superseded-tasks.md)).
 
-## Fix the cause, and build on what exists
+## Fix the cause, and look for what already exists
 
-Meet the rule behind a finding at the mechanism that produced it, reuse what already exists, and keep what already works ([#2889](https://github.com/Morrison-Lab/ai-config/issues/2889)).
+Meet the rule behind a finding at the mechanism that produced it, pair each check with writer and reviewer instructions, look for an existing solution before building one, and keep a capability that still serves a purpose behind an option rather than deleting it ([#2889](https://github.com/Morrison-Lab/ai-config/issues/2889)).
 
 - **Prefer optionality over removing functionality:** never remove existing functionality entirely when you can add optionality instead.
   When changing default behavior, fixing an issue, or refactoring a workflow, do not delete an existing capability or code path outright if it served a legitimate purpose;

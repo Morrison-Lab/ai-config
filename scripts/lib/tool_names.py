@@ -123,12 +123,8 @@ def subagent_brief(inp) -> str:
     return " ".join(parts)
 
 
-# Tools whose input carries a reply the user reads, keyed by the input field
-# that holds the text. A Claude project thread or coordinator answers only
-# through these, so its assistant `text` blocks are empty of what the user
-# saw, and a hook that reads only those blocks never sees an admission there
-# (2026-11-12, Machine Learning course project: "I was wrong on two counts"
-# went out through post_message and no UMS hook fired).
+# Reply tools, keyed by the input field holding the text the user reads. A
+# Claude project thread replies only through these, not in `text` blocks.
 REPLY_TOOLS = {
     "mcp__hearthbot__post_message": "text",
     "mcp__hearthbot__edit_message": "text",
@@ -137,11 +133,6 @@ REPLY_TOOLS = {
     "mcp__hearthbot__message_coordinator": "text",
     "mcp__hearthbot__message_thread": "text",
 }
-
-
-def is_reply_tool(name) -> bool:
-    """True when `name` sends a reply the user (or the coordinator) reads."""
-    return isinstance(name, str) and name in REPLY_TOOLS
 
 
 def reply_text(name, inp) -> str:

@@ -36,20 +36,13 @@ for `Stop`, and was not verified here.
 
 A SECOND, STOP-TIME REGISTRATION (2026-11-12)
 --------------------------------------------
-Measured in a Claude project: the coordinator told the user "I was wrong on
-two counts" and ran no pass, and the user's next message asked why. Two holes
-let that through. The scan read only assistant `text` blocks, while a project
-thread or coordinator replies only through a reply tool (`post_message` and
-its siblings in scripts/lib/tool_names.py), so the admission was invisible.
-And the reminder fires on the NEXT prompt, which in a project is the user
-noticing the missing pass. So reply-tool text is now scanned too, and the hook
-is also registered on Stop with AI_CONFIG_STOP=1. By the time Stop runs the
-admission has already been delivered, so blocking the stop suppresses nothing
--- the objection above is to blocking the MESSAGE, which this never does. It
-blocks at most once per turn and never while `stop_hook_active` is set
-(scripts/lib/agent_notice.py), so it cannot hold a session in a loop. A Stop
-that arrives with `stop_hook_active` set exits before the sentinel, so it does
-not use up the admission's one block.
+A project coordinator said "I was wrong on two counts" through `post_message`
+and ran no pass; the user's next message asked why. The scan read only `text`
+blocks, so reply-tool text (scripts/lib/tool_names.py) is now scanned too, and
+the hook is also registered on Stop (AI_CONFIG_STOP=1). The admission is
+already delivered when Stop runs, so blocking the stop suppresses nothing. It
+blocks once per turn, never while `stop_hook_active` is set, and a Stop with
+that flag exits before the sentinel, so it does not use up the one block.
 
 A project thread usually runs the pass and THEN reports the mistake in its
 reply, so UMS work earlier in the same turn (after the last real user turn,

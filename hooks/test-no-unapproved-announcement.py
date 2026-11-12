@@ -28,11 +28,11 @@ def result(uid, error=False):
         {"type": "tool_result", "tool_use_id": uid, "content": "ok", "is_error": error}]}}
 
 
-def run(tool, inp, *entries):
+def run(tool, inp, *entries, **extra):
     path = os.path.join(TMP, f"t{len(os.listdir(TMP))}.jsonl")
     with open(path, "w", encoding="utf-8") as fh:
         fh.writelines(json.dumps(e) + "\n" for e in entries)
-    payload = json.dumps({"tool_name": tool, "tool_input": inp, "transcript_path": path})
+    payload = json.dumps(dict({"tool_name": tool, "tool_input": inp, "transcript_path": path}, **extra))
     proc = subprocess.run([sys.executable, SUBJECT], input=payload, capture_output=True, text=True)
     assert proc.returncode == 0, proc.stderr
     return proc.stdout.strip() and json.loads(proc.stdout)["hookSpecificOutput"]["permissionDecision"] or None
@@ -109,6 +109,65 @@ for tool, inp in WRITES:
     for entries, allowed in CASES:
         assert (run(tool, inp, *entries, now) is None) == allowed, (tool, entries)
     assert run(tool, inp, user(OK), call("now", tool, inp), result("now")) == "deny", (tool, "unlogged retry")
+    assert run(tool, inp, user(OK), now, agent_id="a1") == "deny", (tool, "subagent")
+os.mkdir(os.path.join(TMP, "sub"))
+os.makedirs(os.path.join(TMP, "repo", "hooks"))
+for name, code in [("sub/post.py", "import canvasapi\nc.create_discussion_topic(is_announcement=True)"), ("p.R",
+                   "httr::PUT(u_topic_announcement)"), ("read.py", "print(canvasapi.get_announcements())"),
+                   ("notes.py", "# post the weekly summary\nprint('announcement')"), ("test-x.py", "is_announcement=True"), ("copy.py", open(SUBJECT, encoding="utf-8").read()),
+                   ("test_post.py", "requests.post(u_announcement)"), ("rq.py", "from requests import post\npost(u_announcement)"),
+                   ("ul.py", "urllib.request.Request(u_discussion_topic, data=b)"), ("dn.ts", "fetch('https://x/api/v1/announcement', {method: 'POST'})"),
+                   ("rd.py", "data = requests.get(u_announcements).json()"), ("tcopy.py", open(__file__, encoding="utf-8").read()),
+                   ("cm.py", "# guarded by no-unapproved-announcement\nrequests.post(u_announcement)"),
+                   ("cs.py", "# guarded by no-unapproved-announcement\nrequests.post('https://x/api/v1/discussion_topics')"),
+                   ("sub/x.sh", "curl -X POST u_announcement"),
+                   ("fake.py", open(__file__, encoding="utf-8").read()[:200] + "\nrequests.post(u_announcement)"),
+                   ("repo/hooks/test-no-unapproved-announcement.py", open(__file__, encoding="utf-8").read() + "# edited\n"),
+                   ("hcopy.py", open(SUBJECT, encoding="utf-8").read() + "X = {}\nX.update(a=1)\n"),
+                   ("subj.py", "SUBJECT = sys.argv[1]\nrequests.post('https://x/api/v1/discussion_topics', data=SUBJECT)"),
+                   ("sp.py", "def is_announcement_write():\n    pass\nsubprocess.run(['curl', '-X', 'POST', u_announcement])"),
+                   ("otest.py", "SUBJECT = sys.argv[1]\ndef run(tool, inp):\n    return subprocess.run([sys.executable, SUBJECT], input=inp)\n"
+                    "assert run('Bash', 'curl -X POST u_announcement')\n"),
+                   ("ocopy.py", "SUBJECT = sys.argv[1]\ndef run(tool, inp):\n    pass\nrequests.post(u_announcement)\n"),
+                   ("repo/hooks/post2.py", "requests.post(u_announcement)"),
+                   ("sub/test-no-unapproved-announcement.py", "# edited\nrequests.post(u_announcement)")]:
+    with open(os.path.join(TMP, name), "w", encoding="utf-8") as fh:
+        fh.write(code)
+SCRIPTS = {"python3 sub/post.py": "deny", "cd sub && python3 post.py": "deny", "python3.12 sub/post.py": "deny",
+           "Rscript p.R": "deny", "python3 read.py": None, "python3 notes.py": None, "python3 test-x.py": None, "python3 copy.py": None,
+           "python3 gone/announcement.py": "deny", "python3 -m pytest -k announcement": None, "python3 -c 'print(1)'": None,
+           "python3 <sub/post.py": "deny", "sub/post.py": "deny", "python3 -W ignore sub/post.py": "deny", "deno run dn.ts": "deny",
+           "cd sub && python3 -c 'import post'": "deny", "python3 test_post.py": "deny", "python3 rq.py": "deny", "python3 ul.py": "deny",
+           "timeout 60 python3 sub/post.py": "deny", "xargs python3 sub/post.py": "deny", "if python3 sub/post.py; then :; fi": "deny",
+           "{ python3 sub/post.py; }": "deny", "bash -c 'python3 sub/post.py'": "deny", "! python3 sub/post.py": "deny",
+           "bash -c \"python3 'sub/post.py'\"": "deny", "x=`python3 sub/post.py`": "deny",
+           "python3 cm.py": "deny", "python3 rd.py": None, "python3 tcopy.py": None, "cd sub && echo import post": None,
+           "python3 -m black sub/post.py": None, "uv run ruff check sub/post.py": None, "python3 -m py_compile sub/post.py": None,
+           "python3 fake.py": "deny", "find . -name new_announcement.py": None, "python3 -m black . sub/post.py": None,
+           "deno run --allow-net dn.ts": "deny", "uv run --with requests sub/post.py": "deny", "python3 -m sub.post": "deny",
+           "python3 -c 'import sub.post'": "deny",
+           "python3 repo/hooks/test-no-unapproved-announcement.py": None, "python3 sub/test-no-unapproved-announcement.py": "deny",
+           "python3 repo/hooks/post2.py": "deny",
+           "python3 -c 'from sub import post'": "deny", "python3 -u -m sub.post": "deny",
+           "python3 -c 'import json, sub.post'": "deny", "python3 -W ignore -m sub.post": "deny", "python3 -msub.post": "deny",
+           "cd 'repo' && python3 hooks/test-no-unapproved-announcement.py": None, "cd 'sub' && python3 post.py": "deny",
+           "cd \"$WT\" && python3 hooks/test-no-unapproved-announcement.py": None, "python3 hcopy.py": None, "python3 sp.py": "deny", "python3 cs.py": "deny",
+           ". sub/x.sh": "deny", "pushd sub && python3 post.py": "deny", "cd sub && grep -c 'import post' *.py": None,
+           "cat > n.md <<'X'\nsub/post.py posts\nX": None, "sub/post.py 'oops": "deny", "python3 read.py -m sub.post": None,
+           "python3 otest.py x": None, "python3 ocopy.py x": "deny", "python3 -u -c 'import sub.post'": "deny",
+           "python3 -W ignore -c 'import sub.post'": "deny", "python3 -um sub.post": "deny", "python3 -uc 'import sub.post'": "deny",
+           "cat ./sub/post.py": None, "ruff check ./sub/post.py": None, "./sub/post.py": "deny",
+           "timeout 60 ./sub/post.py": "deny", "X=1 ./sub/post.py": "deny", "{ ./sub/post.py; }": "deny", "python3 subj.py x": "deny",
+           "cd \"$WT\" && python3 hooks/no-unapproved-announcement.py": None,
+           "awk '{print $1}' sub/post.py": None, "sed -n '/post/{p}' sub/post.py": None, "bash -c 'sub/post.py'": "deny",
+           "python3 -c \"print(open('sub/post.py').read())\"": None, "Rscript -e 'lintr::lint(\"p.R\")'": None,
+           "git add sub/post.py && git commit -m 'Fix (sub/post.py)'": None, "perl -ne 'print if /post/' sub/post.py": None,
+           "echo x#y; sub/post.py": "deny"}
+for c, want in SCRIPTS.items():
+    assert run("Bash", {"command": c}, user("hello"), cwd=TMP) == want, c
+S = {"command": "python3 sub/post.py"}
+assert run("Bash", S, user(OK), call("now", "Bash", S), cwd=TMP) is None, "approved script"
+assert run("Bash", S, user(OK), call("a", "Bash", S), result("a"), call("now", "Bash", S), cwd=TMP) == "deny", "second script"
 for tool, inp in OTHER:
     assert run(tool, inp, user("hello")) is None, (tool, inp)
 

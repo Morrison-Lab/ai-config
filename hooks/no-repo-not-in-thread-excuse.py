@@ -56,8 +56,8 @@ ATTACH_VERB = re.compile(rf"(?<!the\s)(?<!\ba\s)(?<!an\s)(?<!repos\s)(?<!reposit
     r"|\b(?:ran|called|used|invoked|tried)\s+(?:the\s+)?add_repo\b|\badd_repo\s+(?:attached|added|cloned|fixed)\b"
     r"|\b(?:fixed|attached|added)\s+(?:\w+\s+){0,3}?(?:with|via|using)\s+add_repo\b", re.I)
 OUTAGE = re.compile(r"\b(?:down|outage|offline|proxy|network|disk|quota|rate.limit\w*|timed?\s*out|DNS|SSL|TLS|[45]\d\d|[45]\d\ds)\b", re.I)
-OTHER_CAUSE = re.compile(rf"[^.;]{{0,200}}?\b(?:because|since|due\s+to|until|while)\b(?![^.;]{{0,300}}(?:\b(?:attach\w*|add_repo|scope)\b"
-                         rf"|\b{NEG}\s+(?:\w+\s+)?(?:in|on|part\s+of|among|one\s+of|available)\b))", re.I)
+OTHER_CAUSE = re.compile(rf"[^.;]{{0,200}}?\b(?:because|since|due\s+to|until|while)\b(?![^.;]{{0,300}}(?:\b(?:attach\w*|add_repo)\b"
+                         rf"|\b{PLACE}\b))", re.I)  # "because it isn't in this thread's repos" is the excuse again
 DONE = re.compile(r"\b(?:I|[Ww]e)\s+(?:(?:just|then|also|finally|now)\s+)?$")  # "until I attached it" is done
 # The repo starts its clause: "The PR against lds isn't in this thread" and "Updating lds is not in" name lds as an object.
 CLAUSE_START = re.compile(rf"(?:^|[,;(]\s*|\b(?:but|so|because|since|yet|while|although|though)\s+"
@@ -100,9 +100,10 @@ def names_repo(sentence: str) -> bool:
 
 
 def plain(sentence: str) -> str:
-    """Read [text](url), **bold** and `code` as their text."""
+    """Read [text](url), **bold** and a one-word `code` as their text; drop a quoted `code phrase`."""
     sentence = re.sub(r"\[([^\]\[]{0,300})\]\([^)\s]{0,500}\)", r"\1", sentence)
-    return re.sub(r"https?://[^\s)]*|\*\*|`", "", sentence)
+    sentence = re.sub(r"`[^`\s]{1,200}`(?!`)", lambda m: m.group()[1:-1], sentence)
+    return re.sub(r"https?://[^\s)]*|\*\*|`", "", re.sub(r"`[^`]{0,500}`", "a quote", sentence))
 
 
 def attaches(sentence: str) -> bool:

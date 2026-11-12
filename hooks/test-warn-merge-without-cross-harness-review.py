@@ -217,6 +217,19 @@ def main():
               "CommandLine": "codex exec review"})])[0])
     check("silent after a timeout call with no duration",
           not run(MERGE, [step("timeout codex exec review")])[0])
+    # ai-config#5383: only a listed review form counts, never housekeeping.
+    for cmd in ("opencode stats", "opencode session list", "codex completion bash",
+                "codex apply", "gemini extensions list", "cursor-agent ls",
+                "agy models", "codex -m o3", "gemini 'review'"):
+        check("warns after housekeeping: " + cmd, run(MERGE, [step(cmd)])[0])
+    for cmd in ("codex e 'review'", "codex review", "codex exec -m o3 'review'",
+                "opencode run -m x 'review'", "agy --print 'review'", "agy -p 'review'",
+                "gemini -p 'review'", "gemini --prompt='review'",
+                "cursor-agent -p 'review'", "cursor-agent --print 'review'"):
+        check("silent after a review call: " + cmd,
+              not run(MERGE, [step(cmd)])[0])
+    check("warns when the print flag only follows --",
+          run(MERGE, [step("cursor-agent -- -p")])[0])
     check("silent on disabling auto-merge through MCP",
           not run("", [], tool_name="mcp__github__disable_pr_auto_merge",
                   tool_input=MCP_MERGE)[0])

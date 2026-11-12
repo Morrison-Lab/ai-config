@@ -70,18 +70,18 @@ def run(step: str, **env: str) -> tuple[int, list[str], str, dict[str, str]]:
     with tempfile.TemporaryDirectory() as tmp:
         d = Path(tmp)
         for name, body in (("gh", GH), ("python3", PYTHON)):
-            (d / name).write_text(body)
+            (d / name).write_text(body, encoding="utf-8")
             (d / name).chmod(0o755)
-        (d / "report.txt").write_text("report\n")
-        (d / "out").write_text("")
+        (d / "report.txt").write_text("report\n", encoding="utf-8")
+        (d / "out").write_text("", encoding="utf-8")
         full = {**os.environ, "PATH": f"{d}{os.pathsep}{os.environ['PATH']}", "LOG": str(d / "log"),
                 "GITHUB_OUTPUT": str(d / "out"), "GH_REPO": "o/r",
                 "RUN_URL": "https://example.invalid/run", "LAG_DAYS": "28", **env}
         done = subprocess.run([*SHELLS[shell], steps[step]["run"]], cwd=d, env=full,
                               capture_output=True, text=True)
-        log = (d / "log").read_text().splitlines() if (d / "log").exists() else []
-        sent = {k: (d / k).read_text() for k in ("title", "body") if (d / k).exists()}
-        return done.returncode, log, (d / "out").read_text(), sent
+        log = (d / "log").read_text(encoding="utf-8").splitlines() if (d / "log").exists() else []
+        sent = {k: (d / k).read_text(encoding="utf-8") for k in ("title", "body") if (d / k).exists()}
+        return done.returncode, log, (d / "out").read_text(encoding="utf-8"), sent
 
 
 def ago(days: int) -> str:
@@ -116,7 +116,7 @@ cases = [
 
 
 def run_issue(items: list[dict], **env: str) -> tuple[int, list[str], list[str], dict[str, str]]:
-    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as f:
         json.dump(items, f)
     try:
         code, log, _, sent = run(ISSUE, FIXTURE=f.name, **env)

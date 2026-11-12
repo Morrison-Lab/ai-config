@@ -237,8 +237,10 @@ def run_one_suite(test_path, subject, timeout):
     try:
         return _run_in_env(test_path, subject, timeout, rel_test, env)
     finally:
-        # Best effort and bounded: a descendant still writing there (see the
-        # orphan note below) must not turn a verdict into a crash.
+        # Best effort: a descendant still writing there (see the orphan note
+        # below) must not turn a verdict into a crash. The cost is that such
+        # a descendant, or a Windows file lock, can leave the directory
+        # behind unreported.
         shutil.rmtree(suite_tmp, ignore_errors=True)
 
 

@@ -46,10 +46,11 @@ jobs:
         # earlier equation is added. This replays that assignment.
         run: python3 scripts/test_resolve_equation_anchors.py
       - name: Check ASCII punctuation in source files
-        # ai-config#2550. The rule covers every tracked source file, .md included
-        # (ai-config#3284), but this whole-tree scan stays on .py and .R until the
-        # .md backlog is cleared (ai-config#735). "Check lines the PR adds for
-        # non-ASCII punctuation" in the new-line-breaks job covers the rest per PR.
+        # ai-config#2550. The rule covers .md too (ai-config#3284), but this
+        # whole-tree scan stays on .py and .R until the .md backlog is cleared
+        # (ai-config#735). Meanwhile "Check lines the PR adds for non-ASCII
+        # punctuation" in the new-line-breaks job checks the lines each PR adds
+        # in .py, .R, .qmd, .md, .sh, .yml and .yaml (DIFF_DEFAULT_EXTENSIONS).
         run: python3 scripts/check-ascii-punctuation.py
       - name: Run check-ascii-punctuation tests
         run: python3 scripts/test_check_ascii_punctuation.py

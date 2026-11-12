@@ -23,7 +23,7 @@ SUBAGENT_TOOLS = frozenset({
     "spawn_agent", "collaboration.spawn_agent",
 })
 
-# Tools that write a file (`write_file`, `Path`: Antigravity, unmeasured).
+# Tools that write a file (`write_file` is unmeasured).
 WRITE_TOOLS = frozenset({
     "write", "edit", "multiedit", "notebookedit", "write_to_file", "write_file",
     "replace_file_content", "apply_diff", "strreplace", "editnotebook",
@@ -35,7 +35,7 @@ SHELL_TOOLS = frozenset({
     "bash", "powershell", "run_command", "execute_command", "terminal", "shell",
 })
 
-# Input keys that name a write tool's target file, in lookup order.
+# Keys naming a write tool's target file, in lookup order (`Path` unmeasured).
 WRITE_TARGET_KEYS = (
     "file_path", "notebook_path", "path", "Path", "TargetFile", "target_file",
     "filePath", "target_notebook",

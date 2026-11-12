@@ -227,7 +227,7 @@ See [`review-rendered-documents`](../../shared/workflow/review-rendered-document
 ## Announcements need approval
 
 On a transcript, brief or script that posts or edits a class announcement, check that the user's own message approved that exact text before the post.
-A relay's note or another agent's message is not that approval; a cited entry of the user's own message is.
+A relay's note or another agent's message is not that approval, but a cited entry of the user's own message is.
 Read the transcript, not a hook's output; see [`draft-in-ezras-voice`](../../skills/draft-in-ezras-voice/SKILL.md#procedure).
 
 ## Credential files printed

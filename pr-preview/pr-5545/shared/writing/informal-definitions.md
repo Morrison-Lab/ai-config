@@ -1,0 +1,453 @@
+An **informal definition** is prose that does the work of defining a
+concept --- naming it, giving it a precise meaning, often an equation or an
+`\eqdef` --- without using the project's formal definition construct. In a
+Quarto book or site, that construct is the theorem-like crossref div
+(`{#def-...}`, and its siblings `{#thm-...}`, `{#lem-...}`, `{#cor-...}`);
+in other repo types the equivalent might be a docstring, a glossary entry,
+or a spec's defined-terms list. Either way, a concept defined only in
+running prose never gets a stable id, so nothing downstream can cite it,
+and [`definition-crossrefs.md`](definition-crossrefs.md)'s
+hyperlink-on-first-mention check has nothing to link to.
+
+This is a **different gap** from what `definition-crossrefs.md` catches.
+That check assumes a defining div exists somewhere and verifies mentions
+link to it in the right order, flagging a term as "undefined" only when no
+div defines it *anywhere*. This check catches the case in between: the
+concept **was** defined --- with definition-grade precision --- just not
+inside the formal construct, so `definition-crossrefs.md`'s div-position
+comparison never sees it as a definition to track in the first place.
+
+## The detection heuristic
+
+Three independent patterns, each catching phrasing the others miss --- run all three:
+
+1. **A bolded or otherwise emphasized term, immediately followed by
+   language that states a precise meaning** --- "is", "is defined as",
+   `\eqdef`, an equation:
+
+   ```bash
+   rg -n '\*\*[A-Za-z][a-zA-Z .-]{2,60}\*\*[^.]*(\\eqdef|is (defined|the)\b|=)' <file>
+   ```
+
+2. **A naming sentence ending "is:"/"are:" immediately before a display
+   equation** --- catches a concept named in plain prose with no bold at
+   all, which pattern 1 misses entirely:
+
+   ```bash
+   rg -n '\bis:\s*$|\bare:\s*$' <file>
+   ```
+
+   Treat a hit as a real candidate only when the very next non-blank line
+   opens a display-math block (`$$`) or contains `\eqdef` --- a line
+   ending "is:" that instead introduces a list or a code block isn't a
+   definitional naming sentence.
+
+3. **A clause that gives a symbol or term its meaning** --- "let $X$ be", "write $X$ for", "$X$ denotes", "call this" --- which patterns 1 and 2 both miss because nothing is bolded and no line ends in "is:":
+
+   ```bash
+   rg -n '\b([Ll]et|[Ww]rite|[Ww]riting) \$|\bdenotes?\b|\b[Cc]all (this|these|it)\b' <file>
+   ```
+
+   A hit inside a definition div is a candidate when the symbol it introduces is not the one that div's id and heading name.
+
+Formatting is not the test.
+A sentence that tells the reader what a term or symbol means is a definition however it is typeset, so a term with its bold removed is still a candidate.
+
+For each hit from any pattern, find its enclosing div (search backward for the nearest `:::{#...}` opener and forward for the matching closer).
+Treat it as a **candidate** if:
+
+- it is **not** inside any `{#def-...}`/`{#thm-...}`/`{#lem-...}`/
+  `{#cor-...}` div at all (plain prose), **or**
+- it **is** inside such a div, but that div's id and heading name a *different* concept than the one this sentence defines (a second concept riding along inside another's definition).
+
+## Confirming a candidate
+
+Not every bolded, precise-sounding sentence is a missing definition. Check
+each candidate against these before flagging it:
+
+1. **Is this introducing something new, or just reusing an
+   already-defined concept?** Bolding for emphasis when restating a term
+   that already has its own `{#def-...}` div elsewhere is fine --- only
+   flag a term that has **no** formal div anywhere in the document.
+2. **Is this a practical/tool-usage explanation, not a theoretical
+   concept?** Describing what a function argument or CLI flag does (e.g.
+   "the percentile method (`type = "perc"`)") is instructional prose, not
+   a concept this document is building theory on --- don't flag it.
+3. **Is this a deliberately informal list, not a formal-definition
+   context?** A numbered "practical considerations" or "gotchas" list is
+   allowed to state things precisely without a div for each item --- the
+   surrounding content already signals "this is not the formal-definitions
+   section."
+4. **Is it actually used downstream?** A concept that gets cited by name
+   elsewhere in the document (in a proof, another definition, an example)
+   is a strong signal it needed a stable, cross-referenceable id --- and a
+   strong signal you're looking at a real finding, not just informal color
+   that happens to sound precise.
+
+Only a candidate that introduces a genuinely new concept, isn't a
+practical aside, isn't part of a deliberately informal list, and would
+benefit from being citable, is a confirmed finding.
+
+## This is KISS applied to definitions, not a separate rule
+
+The shapes below are the prose/math counterpart of
+[`avoid-nesting`](../coding/avoid-nesting.md)'s "avoid ... nested function
+definitions": a definition, like a function, should do one job and stand on
+its own, and defining it inside another definition's scope is the same
+complexity cost the coding rule already prices --- it hides a reusable unit
+inside a container that wasn't built to hold it.
+The general principle is
+[KISS](../principles/README.md#kiss--keep-it-simple-stupid); this file is
+its definitions-specific operationalization.
+
+**Shape 1: a new concept defined inside a div that names something else.**
+Already covered above --- the div's id and heading name concept A, and the
+body's own naming sentence or bolded term precisely defines concept B, with
+B getting no id of its own.
+A reader who wants to cite B has nothing to link to except A's div,
+which is about a different thing.
+
+**Shape 2: a div's own heading names two concepts, and only one gets an
+id.**
+A heading like "Likelihood and log-likelihood" under a single
+`{#def-likelihood}` div is not shape 1's case of a concept smuggled in
+unnamed --- both concepts are named, right there in the heading --- but the
+second one (log-likelihood) still has no citable id of its own, because a
+div can only have one.
+The heading itself is the tell:
+
+```bash
+rg -n '^#### .+ and .+$' <file>
+```
+
+For each hit, check whether the body gives *each* named concept its own
+precise definition (its own `\eqdef`, its own "is defined as ...") rather
+than defining one and merely mentioning the other in passing.
+Two full definitions sharing one heading and one id is the finding; one
+definition whose statement happens to use the word "and" is not.
+
+**Shape 3: a definition div carries motivation, justification, or
+"why this matters" commentary that isn't part of the definition itself.**
+A definition div's job is to state what something *is*, precisely and
+citably.
+A sentence explaining why the definition is useful, reassuring the
+reader that a property is expected rather than a bug, or motivating the
+next section is a different kind of content --- true, often valuable,
+and not part of the thing being defined.
+Left inside the div, it does the same damage nesting does: a reader who
+wants to cite "what X is" gets X's precise statement bundled with
+opinion about X, and the div grows past the one job it exists to do.
+
+The tell is a sentence inside a `{#def-...}`/`{#thm-...}` div that could
+be deleted without changing what the defined quantity or claim *is* ---
+only how well-motivated it feels.
+"It is maximized at the same $\lambda$, and is easier to work with
+because the logarithm turns products into sums" explains why a
+log-likelihood definition is convenient; it adds nothing to what the
+definition states.
+"This is a documented property ... not a bug" reassures rather than
+specifies.
+Both are candidates for extraction.
+
+Not everything inside a definition div is commentary, though.
+A worked-out detail needed to state the definition precisely --- a
+finite-difference approximation's step size, a fallback's exact
+condition --- is part of the specification, not motivation for it.
+The test is whether removing the sentence changes what a reader would
+need to *compute* or *cite*, not just how *persuaded* they would be.
+
+The same test applies to examples and usage rules, not only to motivation,
+and to the div's collapsed "Source" callout
+([`visible-attributions.md`](visible-attributions.md)) as much as to its body.
+"such as the degree of a polynomial fit" is an example;
+"scored once, after the choice is made" is a rule for using a test set;
+"given a name here because this page compares several such rules" is rationale,
+and a Source callout holds only the credit.
+Fix step 5 below says which box each one moves to.
+
+- **Do:** move an example into an example div after the definition,
+  and other material into the box
+  [`quarto-remarks-vs-callouts`](quarto-remarks-vs-callouts.md)'s test picks:
+  a remark for commentary on the math, such as rationale,
+  and a callout for guidance to the reader,
+  such as a `.callout-warning` for a usage rule that guards against a trap.
+- **Don't:** leave a "such as ..." clause, a "used only once ..." rule,
+  or a "named here because ..." aside in the definition or in its Source callout.
+
+## The display must define the term, and only the term
+
+A definition div's display equation is where a reader looks for what the term *is*,
+so check the display against the div's id and heading,
+not only the prose around it.
+Two shapes slip past the three detection patterns above,
+because those patterns read the prose,
+and here the prose names the right term while the display is well-formed.
+
+**Shape 4: two quantities in one definition div.**
+A display carrying two defining operators, or one followed by a "where $X = \ldots$" clause,
+defines a second quantity inside another term's div,
+which is shape 1 written in math rather than in prose.
+A "cross-validation choice procedure" div whose display also defines
+the chosen index $\hat l(T) \eqdef \argmin_l \ldots$ is this shape.
+Count the defining operators in each definition div,
+wherever it is nested and with any number of colons in its fence.
+Lines inside any div nested within a definition div are skipped,
+callout or not, such as the Source callout;
+a nested definition div is counted on its own.
+`OPS` is the operator set, a regular expression:
+extend it to whatever the project writes for "is defined as".
+
+```bash
+OPS='\\eqdef|\\triangleq|:=|\\coloneqq' awk '
+  FNR == 1 { d = 0; split("", id); split("", n); split("", at) }
+  /^:::+ *$/ { if (d > 0 && id[d] != "" && n[d] > 1) print FILENAME ":" at[d] ": " id[d] ": " n[d] " definitions"; if (d > 0) d--; next }
+  /^:::+/ { d++; id[d] = ""; n[d] = 0; if (match($0, /#def-[A-Za-z0-9_-]+/)) { id[d] = substr($0, RSTART + 1, RLENGTH - 1); at[d] = FNR }; next }
+  d > 0 && id[d] != "" { t = $0; n[d] += gsub(ENVIRON["OPS"], "", t) }
+' <files>
+```
+
+It is plain POSIX awk, tested under mawk.
+It counts an operator anywhere in the div's own lines,
+so `:=` in a code chunk inside a definition div is a false hit.
+Then read each definition div's "where" clauses by hand,
+since a "where" that only names a symbol already defined is fine.
+
+- **Do:** give the second quantity its own div, and cite it from the first.
+- **Don't:** leave a second defining operator, or a defining "where" clause, in a definition div.
+
+**Shape 5: the display shows a use or a consequence, not the defined object.**
+Read the display's left-hand side as the term the heading names,
+and check that the right-hand side depends on everything the heading says it does.
+Four ways it fails:
+
+- the display defines a different quantity,
+  such as a "validation set" div whose only display is $\hat l \eqdef \argmin \ldots$,
+  the choice made with the set rather than the set;
+- the display is a quantity *computed from* the term,
+  such as a "test set" div that displays the test mean squared error rather than the set;
+- an index in the heading is missing from the right-hand side,
+  such as a "fold-based standard error of procedure $g$" whose right-hand side has no $g$,
+  so it is identical to the unindexed definition and the dependence exists only in prose;
+- the display repeats an earlier display,
+  such as a "nested cross-validation" div whose display matches the plain cross-validation one,
+  so the thing that makes it nested appears nowhere in the math.
+
+The last is mechanical: list display bodies that occur more than once on a page.
+Run it over the rendered HTML (`_site/<page>.html` after `quarto render <page>.qmd --to html`),
+not the source:
+a page is often assembled from one-div include files,
+so a source file cannot see a repeat across includes,
+and the render has already separated math from code, so a `$$` in a code chunk cannot pair wrongly.
+
+```bash
+python3 -c '
+import collections, html, re, sys
+for path in sys.argv[1:]:
+    page = open(path, encoding="utf-8").read()
+    seen = collections.Counter()
+    for m in re.finditer(r"<span class=.math display.>(.*?)</span>", page, re.S):
+        body = re.sub(r"\\tag\{[^}]*\}", "", html.unescape(m.group(1)))
+        seen[re.sub(r"\s+", "", body)] += 1
+    for body, count in seen.items():
+        if count > 1:
+            print(f"{path}: {count}x {body[:70]}")
+' _site/<page>.html
+```
+
+Quarto appends `\tag{N}` to every labelled display,
+so the lister strips tags before comparing;
+otherwise two identical labelled displays would never match.
+
+A hit is a candidate, not a finding:
+a proof may legitimately restate an earlier display.
+A display that collapses to its own left-hand side only after macro expansion
+is the sibling case in
+[`fact-check-prose.md`](fact-check-prose.md#a-definition-can-resolve-render-and-still-say-nothing).
+
+- **Do:** display the defined object itself, with every index the heading names on the right-hand side.
+- **Don't:** display a different quantity, a statistic computed from the term,
+  or a formula already displayed for a different term.
+
+## Fixing a confirmed finding
+
+1. **Wrap it in its own formal-definition div**, with its own id and
+   heading, following the same convention every other definition in the
+   document already uses.
+2. **Give it its own worked example**, immediately after the new
+   definition and before any new theoretical claim builds on it --- the
+   same "definition, then example, then theorem" ordering this project's
+   other content-writing checks already expect.
+3. **Update anything that already depended on it informally** to cite the
+   new id explicitly (`(@def-<new-id>)`), instead of just reusing the bare
+   symbol or term with no traceable source.
+4. If the concept was crammed inside a *different* definition's div (the
+   "riding along" case above), **split it out** rather than leaving both
+   concepts sharing one id --- each gets its own div, its own id, and its
+   own example.
+   Removing the bold or italics from the term instead is not a fix: the definition is still inside the other div, and it is now harder to find (see [`no-cheap-fixes`](../principles/no-cheap-fixes.md)).
+5. If it's shape 3's commentary rather than a second concept,
+   **move it out of the div** rather than deleting it,
+   so the fix is relocation, not loss.
+   Choose the box by
+   [`quarto-remarks-vs-callouts`](quarto-remarks-vs-callouts.md)'s test,
+   as [`quarto-divs-for-typed-content`](quarto-divs-for-typed-content.md) requires:
+   - an example goes into an example div;
+   - commentary on the math (motivation, rationale, naming, scope)
+     goes into a remark after the definition div
+     (`::: {.remark .notes}` to keep it off the slides);
+   - guidance to the reader, such as a usage rule or a trap to avoid,
+     goes into the matching callout (`.callout-warning` for a trap).
+6. If a definition div defines a second quantity in its display (shape 4),
+   **give that quantity its own div** before the first,
+   and have the first cite it, as step 4 does for a term in the prose.
+7. If the display shows something other than the defined object (shape 5),
+   **correct the math, not the placement**:
+   display the defined object itself,
+   with every index or argument the heading names on its right-hand side.
+   When the displaced formula defines a quantity of its own,
+   such as a choice made with the term or a statistic computed from it,
+   keep that quantity: give it its own div per step 6 and cite it,
+   since the fix is relocation, not loss.
+   A display that repeats another term's display means the two terms
+   are not yet told apart in the math,
+   so add the index or argument that tells them apart
+   rather than rewording the prose around the same formula.
+
+## A bolded keyword is one signal; every defined term gets its own div
+
+PSW's [Guidelines for defining terms](https://morrison-lab.github.io/psw/chapters/defining-terms.html#guidelines-for-defining-terms)
+is the canonical statement: one `#def-` div per term, commentary after the div,
+and a bolded term in running prose treated as an inline definition to convert.
+The same guidelines ask a definition to name the term's synonyms and near-synonyms
+(*learning*, *training*, *fitting*), in the div or a callout beside it.
+In lecture material, a definition or theorem div follows an exercise that asks for it,
+placed after that exercise's informal solution rather than inside it;
+Morrison-Lab/mln's [`AUTHORING.md`](https://github.com/Morrison-Lab/mln/blob/main/AUTHORING.md#lectures-are-built-from-exercise-and-solution-pairs)
+is the canonical statement.
+This skill is how that rule is checked.
+
+## Worked before-and-after example: tightening definitions and extracting formal theorems
+
+A definition should be as clear, explicit, structured, and concise as possible:
+state what the concept is without redundant phrasing,
+and elevate mathematical consequences or equivalences into formal, citable theorems.
+The refactor in
+[`Morrison-Lab/pds#22`](https://github.com/Morrison-Lab/pds/pull/22)
+demonstrates both techniques:
+
+### Tightening `def-probability` by eliminating redundant conditions
+
+The probability measure definition was originally written with an unnecessary
+preamble and redundant bulleted conditions:
+
+**Before (redundant and cluttered):**
+
+```markdown
+A **probability measure** on a [sample space](#def-sample-space) $\Omega$,
+often denoted $\Pr()$ or $\P()$,
+is a function that assigns a number $\Pr(A)$ to each [event](#def-event) $A$
+and satisfies:
+
+- $\Pr$ is a [measure](#def-measure) on the events of $\Omega$.
+- The whole sample space has probability 1: $\Pr(\Omega) = 1$.
+```
+
+*Critique*:
+"is a function that assigns a number $\Pr(A)$ to each event $A$" is redundant
+because being a measure on events already means assigning a value to each event.
+Furthermore, having only a single condition left beyond being a measure
+($\Pr(\Omega) = 1$) makes a bulleted list unnecessary scaffolding.
+
+**After (concise and explicit):**
+
+```markdown
+A **probability measure** on a [sample space](#def-sample-space) $\Omega$,
+often denoted $\Pr()$ or $\P()$,
+is a [measure](#def-measure) on the [events](#def-event) of $\Omega$
+that gives the whole sample space probability 1:
+
+$$\Pr(\Omega) = 1$$
+```
+
+*Improvement*:
+The definition states the concept in one direct sentence,
+embeds the condition as a prominent display equation,
+and eliminates the redundant clause and bullet list.
+
+### Elevating informal equivalence notes into a citable theorem
+
+In the same file, the notes after the definition previously made an informal,
+un-citable claim:
+
+**Before (informal equivalence in notes):**
+
+```markdown
+::: notes
+
+Many sources state this definition as three axioms instead
+(the Kolmogorov axioms):
+
+1. For any event $A$, $\Pr(A) \ge 0$.
+2. The probability of the whole sample space is 1:
+   $$\Pr(\Omega) = 1$$
+3. $\Pr$ is [countably additive](#def-countable-additivity):
+   for any [mutually exclusive](#def-mutually-exclusive) events $A_1, A_2, \ldots$,
+   $$\Pr\!\left(\bigcup_{i=1}^{\infty} A_i\right) = \sum_{i=1}^{\infty} \Pr(A_i)$$
+
+The two forms are equivalent.
+The axioms do not list $\Pr(\emptyset) = 0$, but they imply it...
+:::
+```
+
+*Critique*:
+Claiming "the two forms are equivalent" in informal running notes gives
+downstream proofs and notes no stable id to cite,
+leaves the equivalence unproven,
+and clutters the definition notes with a major mathematical result.
+
+**After (formal theorem with two-direction proof):**
+
+```markdown
+:::{#thm-kolmogorov-axioms}
+#### Kolmogorov axioms
+
+A function $\Pr$ that assigns a real number $\Pr(A)$ to each [event](#def-event) $A$
+of a sample space $\Omega$
+is a [probability measure](#def-probability) if and only if it satisfies:
+
+1. For any event $A$, $\Pr(A) \ge 0$.
+2. The probability of the whole sample space is 1:
+   $$\Pr(\Omega) = 1$$
+3. $\Pr$ is [countably additive](#def-countable-additivity):
+   for any [mutually exclusive](#def-mutually-exclusive) events $A_1, A_2, \ldots$,
+   $$\Pr\!\left(\bigcup_{i=1}^{\infty} A_i\right) = \sum_{i=1}^{\infty} \Pr(A_i)$$
+
+:::
+
+::: proof
+Suppose $\Pr$ is a probability measure...
+Conversely, suppose $\Pr$ satisfies the three axioms...
+:::
+```
+
+*Improvement*:
+The equivalence becomes a formal, citable theorem with a complete proof,
+and downstream references (such as in `rme` or course notes) can cite
+`@thm-kolmogorov-axioms` directly.
+
+## Relationship to other checks
+
+- **[`definition-crossrefs.md`](definition-crossrefs.md)** --- assumes the
+  defining div exists and checks that mentions link to it, in the right
+  order. This check runs first, conceptually: it catches the case where
+  prose reads like a definition but never became a div at all, so there's
+  nothing yet for `definition-crossrefs.md` to track.
+- **[`forward-references.md`](forward-references.md)** --- a concept
+  without its own div can't be crossref'd, which is exactly what forces an
+  author into a forward-pointing phrase ("the definition below") instead
+  of a working link. Fixing this check's findings often removes a forward
+  reference for free.
+- **[`fact-check-prose.md`](fact-check-prose.md)** /
+  **[`check-info-quality`](../../skills/check-info-quality/SKILL.md)** ---
+  sibling prose-rigor checks; run this alongside them on a diff that
+  introduces new technical content.

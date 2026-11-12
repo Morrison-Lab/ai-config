@@ -289,6 +289,10 @@ jobs:
         # ai-config#2992: scripts/lib/shellcmd.py argv splitting, heredoc
         # blanking, and git-invocation classification.
         run: python3 scripts/test_shellcmd.py
+      - name: Run tool-name alias tests
+        # ai-config#4266: scripts/lib/tool_names.py, the shared spellings of
+        # the subagent, write and shell tools across harnesses.
+        run: python3 scripts/test_tool_names.py
       - name: Run check-rendered-references tests
         # ai-config#2879: verify broken rendered reference checking and footnote isolation.
         run: python3 scripts/test_check_rendered_references.py
@@ -297,6 +301,9 @@ jobs:
         # pre-push check list from THIS file; its dogfood case asserts the
         # derived plan names every scripts/test_*.py suite.
         run: python3 scripts/test_run_local_validation.py
+      - name: Run changed-path test selection tests
+        # ai-config#5087: the selector that decides which hook suites a change can affect.
+        run: python3 scripts/test_changed_selection.py
       - name: Run validate-workflow guard tests
         # ai-config#1730: the new-line-breaks job's pull_request gate and base-ref.
         run: python3 scripts/test_validate_workflow.py
@@ -541,6 +548,13 @@ jobs:
         # An unresolved INLINE @token is reported but does not fail, since
         # most are prose -- see the script's docstring.
         run: python3 scripts/check-context-closure.py --strict
+      - name: Report what each session kind loads at start
+        # ai-config#1138, #5310 step 1. Report-only: the gates above and in
+        # validate-skills.py fail at each cap; this shows every component
+        # against a target of 75% of its cap, so the headroom is visible.
+        run: |
+          python3 scripts/test_measure_session_start.py
+          python3 scripts/measure-session-start.py
       - name: Report this PR's context-closure delta; gate root-file growth near the cap
         # ai-config#1373. The step above reports the closure's LEVEL against a
         # budget; this reports what THIS branch did to it. Those are different

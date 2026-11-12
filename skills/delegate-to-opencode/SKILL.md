@@ -190,9 +190,15 @@ Do not use the pay-as-you-go path `/zen/v1`, which has no funds and returns 402 
   On 2026-11-09 both returned "Upstream request failed: Model is unavailable".
   Those two ids were free for a limited time and reasoning models (a 16-token request returned only reasoning).
   Give any free reasoning id a generous `max_tokens`.
-  On 2026-11-09 `/models` listed the free ids `beam-free`, `iceman-contributor-free` and `longcat-2.5-free` instead, which were not tried.
+  On 2026-11-09 `/models` listed the free ids `beam-free`, `iceman-contributor-free` and `longcat-2.5-free` instead.
+  On 2026-11-11 every paid Go model returned the weekly `GoUsageLimitError`, and all three free ids answered a one-word probe.
+  On PR-diff reviews that day ([ai-config#5397](https://github.com/Morrison-Lab/ai-config/pull/5397), [#5423](https://github.com/Morrison-Lab/ai-config/pull/5423), [#5426](https://github.com/Morrison-Lab/ai-config/pull/5426)), their record was mixed:
+  - `beam-free` usually gave verdicts with quoted findings.
+  - `iceman-contributor-free` gave a bare verdict on one review, and a reasoned one on another whose brief asked for reasons.
+  - `longcat-2.5-free`'s one streamed review produced only reasoning and no answer.
+
   Check `/models` for the current free ids and try them before relying on this route.
-- **A review through these two ids worked on 2026-10-16, while every Go model returned the weekly `GoUsageLimitError`** ([ai-config#4581](https://github.com/Morrison-Lab/ai-config/issues/4581)).
+- **A review through `cat-jam-free` and `longcat-2.5-preview-free` worked on 2026-10-16, while every Go model returned the weekly `GoUsageLimitError`** ([ai-config#4581](https://github.com/Morrison-Lab/ai-config/issues/4581)).
   Stream with `"stream": true` and `max_tokens` 30000, and assemble `delta.content`;
   the text comes only after 40,000 to 70,000 characters of `reasoning_content`, about five minutes.
   On [ai-config#4572](https://github.com/Morrison-Lab/ai-config/pull/4572), `longcat-2.5-preview-free` found three real defects in the first push and then returned no text on the fix commit in two attempts, while `cat-jam-free` returned a clean verdict on both heads.
@@ -359,8 +365,7 @@ Each fact below was measured in a claude.ai cloud session on the date given, so 
 - The reviewer differs from Claude in model and harness, so it meets the independence rule in [`adversarial-self-review`](../../shared/workflow/adversarial-self-review.md).
   The data rules apply here as to any hosted model, so use it only for work no data trigger covers.
 - When posting the result, use the envelope above with `(Ollama Cloud <model>)` in the heading.
-- `hooks/warn-merge-without-cross-harness-review.py` does not yet count a call to `api.ollama.com`, so it warns on a merge after this review ([ai-config#4849](https://github.com/Morrison-Lab/ai-config/issues/4849)).
-  The warning is a false positive when the transcript shows the review.
+- `hooks/warn-merge-without-cross-harness-review.py` counts a `curl` POST to `https://api.ollama.com/api/chat` as a cross-harness review call ([ai-config#4849](https://github.com/Morrison-Lab/ai-config/issues/4849)).
 
 Write the brief and the diff to files in the scratchpad first, and set `BRIEF` and `DIFF` to their paths.
 The brief must ask the model to end with one line, `VERDICT: CLEAN` or `VERDICT: NOT_CLEAN`.

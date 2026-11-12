@@ -283,7 +283,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/require-ums-before-resolve.py\"",
             "timeout": 10,
             "script": "require-ums-before-resolve.py",
-            "why": "AGENTS.md 'Run UMS before every pause': a merged-PR event reminds the thread to run its wrap-up (post-merge, including UMS) before resolving. Injects, never blocks."
+            "why": "AGENTS.md 'Leave every pause honest and resumable' (Run UMS before every pause): a merged-PR event reminds the thread to run its wrap-up (post-merge, including UMS) before resolving. Injects, never blocks."
           },
           {
             "type": "command",
@@ -312,6 +312,13 @@
             "timeout": 10,
             "script": "warn-local-render-when-ci-built.py",
             "why": "ai-config#4724. Ezra, 2026-10-25: \"isn't it already rendered in mlg ... remember that going forward\". Warns (never blocks) when a Bash command runs quarto render in a repo with a gh-pages ref, because CI has probably built the output already; download the PDF or HTML from gh-pages or the published site instead. Canvas uploads always use the CI-built PDF. Fails open on any parse or git trouble."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-one-sided-conflict-resolution.py\"",
+            "timeout": 10,
+            "script": "warn-one-sided-conflict-resolution.py",
+            "why": "ai-config#5407, split from #4716. Ezra, 2026-10-23: agents should resolve merge conflicts carefully, deciding for each hunk what to keep from each side, what to drop, and what to modify. Warns (never blocks) on git checkout/restore --ours|--theirs, which take the whole file from one side; on merge-file --ours|--theirs and -X ours|theirs on merge, rebase, cherry-pick, revert or pull, which keep one side of every conflicting hunk; and on -s ours, which drops the other branch entirely. Checks inside bash -c; quoted text and --abort/--quit runs do not fire. Fails open on a parse error."
           },
           {
             "type": "command",
@@ -446,6 +453,13 @@
             "timeout": 10,
             "script": "no-rm-live-render-intermediate.py",
             "why": "2026-09-24, health-analytics-core/abridge: an agent deleted a gitignored paper-with-supplement.rmarkdown, reasoning it was a leftover from its own failed render -- it was not, the user was rendering that exact worktree from their own terminal, and Quarto recreates that intermediate at the START of every render. The render had already knitted all 251 chunks (~10 min, including a forced cache rebuild) before failing on the missing file. AGENTS.md's 'verify a dispatched agent's liveness before touching a worktree' rule already existed and did not fire at composition time. DENIES rm/trash/find -delete/git clean of *.rmarkdown, *.knit.md, *.knit.qmd, *_files/, *.quarto_ipynb, or .quarto/ ONLY when a live quarto render/preview or an Rscript/R process running knitr/rmarkdown/rmd_render is also found (pgrep -fl, injectable in tests). Clearable with ALLOW_RM_RENDER_INTERMEDIATE=1 on the same command. Fails open with no live-process check available, on any parse trouble, and when scripts/lib/shellcmd.py cannot be imported."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-recursive-chown-system-path.py\"",
+            "timeout": 10,
+            "script": "no-recursive-chown-system-path.py",
+            "why": "ai-config#5317, shared/workflow/destructive-actions-catalog.md: `sudo chown -R $USER:$(id -gn) /usr && sudo chmod -R u+w /usr` broke sudo (anthropics/claude-code#168), and an agent's `chown -R root:root /usr/` and `/etc/` repair cleared setuid bits on sudo and su (anthropics/claude-code#39283). DENIES chown, chmod or chgrp with -R/--recursive when a target resolves to /, a top-level directory, a path inside a system tree, or the home directory or a directory containing it, including a variable that an earlier Bash call set and is empty in this one. Clearable with ALLOW_RECURSIVE_SYSTEM_CHOWN=1 on the same command. Fails open on parse trouble."
           },
           {
             "type": "command",
@@ -992,7 +1006,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-merge-without-cross-harness-review.py\"",
             "timeout": 20,
             "script": "warn-merge-without-cross-harness-review.py",
-            "why": "ai-config#3099: shared/workflow/adversarial-self-review.md requires a merge verdict from a reviewer whose model AND harness both differ from the authoring session's, and nothing enforced it -- no-unauthorized-merge.py checks authorization and warn-merge-without-fully-clean.py checks the instrument, so merges reviewed only by Claude (an Agent subagent, the CI claude-review workflow) passed both, on 2026-09-02 and again on 2026-10-08. Warns, never denies, on gh pr merge, a REST merge, the MCP merge tool or MCP auto-merge, unless the transcript holds, after the last push, a non-sidechain, non-error Bash call whose command word is a reviewer CLI of another harness (codex, opencode, agy, gemini, cursor-agent, claude; the session's own harness removed, read as Antigravity when ANTIGRAVITY_AGENT is set or when the transcript path or record types match Antigravity, excluding both agy and gemini, and Claude Code otherwise) with a first argument that is not housekeeping (--version, --help, login, auth, ...). Loading a skill such as dtc or dto credits nothing; the CLI call it makes does. Merge recognition reuses the sibling's _gh_merge and push recognition its _events, _push_before_merge and MCP_PUSH_TOOLS, but not its check-then-merge chain discharge. Warn because the invocation is decidable and the verdict and a multi-backend harness's configured model are not."
+            "why": "ai-config#3099: shared/workflow/adversarial-self-review.md requires a merge verdict from a reviewer whose model AND harness both differ from the authoring session's, and nothing enforced it -- no-unauthorized-merge.py checks authorization and warn-merge-without-fully-clean.py checks the instrument, so merges reviewed only by Claude (an Agent subagent, the CI claude-review workflow) passed both, on 2026-09-02 and again on 2026-10-08. DENIES (since ai-config#5290: as a warning it reached the agent only with the merge result, ai-config#4587) gh pr merge, a REST merge, the MCP merge tool or MCP auto-merge, unless the transcript holds, after the last push, either a non-sidechain, non-error Bash call whose command word is a reviewer CLI of another harness (codex, opencode, agy, gemini, cursor-agent, claude; the session's own harness removed, read as Antigravity when ANTIGRAVITY_AGENT is set or when the transcript path or record types match Antigravity, excluding both agy and gemini, and Claude Code otherwise) with a first argument that is not housekeeping (--version, --help, login, auth, ...), or a curl POST to the OpenCode Go or Ollama Cloud chat endpoint (ai-config#4849); or the waiver's probe pass: every such CLI attempted with any result, or shown absent by a lone, unredirected command -v or which that exited 1, with opencode attempted rather than probed. Loading a skill such as dtc or dto credits nothing; the CLI call it makes does. Merge recognition reuses the sibling's _gh_merge and push recognition its _events, _push_before_merge and MCP_PUSH_TOOLS, but not its check-then-merge chain discharge. The invocation and the probe pass are decidable; the verdict and a multi-backend harness's configured model are not, so check-pr-fully-clean.py owns the verdict."
           },
           {
             "type": "command",
@@ -1199,7 +1213,7 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/warn-merge-without-cross-harness-review.py\"",
             "timeout": 20,
             "script": "warn-merge-without-cross-harness-review.py",
-            "why": "ai-config#3099: shared/workflow/adversarial-self-review.md requires a merge verdict from a reviewer whose model AND harness both differ from the authoring session's, and nothing enforced it -- no-unauthorized-merge.py checks authorization and warn-merge-without-fully-clean.py checks the instrument, so merges reviewed only by Claude (an Agent subagent, the CI claude-review workflow) passed both, on 2026-09-02 and again on 2026-10-08. Warns, never denies, on gh pr merge, a REST merge, the MCP merge tool or MCP auto-merge, unless the transcript holds, after the last push, a non-sidechain, non-error Bash call whose command word is a reviewer CLI of another harness (codex, opencode, agy, gemini, cursor-agent, claude; the session's own harness removed, read as Antigravity when ANTIGRAVITY_AGENT is set or when the transcript path or record types match Antigravity, excluding both agy and gemini, and Claude Code otherwise) with a first argument that is not housekeeping (--version, --help, login, auth, ...). Loading a skill such as dtc or dto credits nothing; the CLI call it makes does. Merge recognition reuses the sibling's _gh_merge and push recognition its _events, _push_before_merge and MCP_PUSH_TOOLS, but not its check-then-merge chain discharge. Warn because the invocation is decidable and the verdict and a multi-backend harness's configured model are not."
+            "why": "ai-config#3099: shared/workflow/adversarial-self-review.md requires a merge verdict from a reviewer whose model AND harness both differ from the authoring session's, and nothing enforced it -- no-unauthorized-merge.py checks authorization and warn-merge-without-fully-clean.py checks the instrument, so merges reviewed only by Claude (an Agent subagent, the CI claude-review workflow) passed both, on 2026-09-02 and again on 2026-10-08. DENIES (since ai-config#5290: as a warning it reached the agent only with the merge result, ai-config#4587) gh pr merge, a REST merge, the MCP merge tool or MCP auto-merge, unless the transcript holds, after the last push, either a non-sidechain, non-error Bash call whose command word is a reviewer CLI of another harness (codex, opencode, agy, gemini, cursor-agent, claude; the session's own harness removed, read as Antigravity when ANTIGRAVITY_AGENT is set or when the transcript path or record types match Antigravity, excluding both agy and gemini, and Claude Code otherwise) with a first argument that is not housekeeping (--version, --help, login, auth, ...), or a curl POST to the OpenCode Go or Ollama Cloud chat endpoint (ai-config#4849); or the waiver's probe pass: every such CLI attempted with any result, or shown absent by a lone, unredirected command -v or which that exited 1, with opencode attempted rather than probed. Loading a skill such as dtc or dto credits nothing; the CLI call it makes does. Merge recognition reuses the sibling's _gh_merge and push recognition its _events, _push_before_merge and MCP_PUSH_TOOLS, but not its check-then-merge chain discharge. The invocation and the probe pass are decidable; the verdict and a multi-backend harness's configured model are not, so check-pr-fully-clean.py owns the verdict."
           },
           {
             "type": "command",
@@ -1695,6 +1709,18 @@
             "timeout": 10,
             "script": "no-binary-file-read.py",
             "why": "Warns when `cat`/`head`/`tail`/`less`/`more` is applied to a path that exists on disk and whose first ~8KB contain a NUL byte -- a whole-file read of a binary file, which dumps raw bytes into the conversation for no benefit (ai-config#3771). `strings` is deliberately not flagged, and `head -c N`/`tail -c N` are exempt as an already-bounded read."
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-credential-file-read.py\"",
+            "timeout": 10,
+            "script": "no-credential-file-read.py",
+            "why": "ai-config#4780. Ezra, 2026-10-27: never print a credential file. Denies the Read tool, and a Bash reader (`cat`, `sed`, `head`, `grep`, `base64`, ...), on a known credential path under the home directory (`~/.netrc`, `~/.config/canvas/*`, `~/.config/gh/hosts.yml`, `*token*` under `~/.config`, private SSH keys, ...). A reader inside `$( ... )` stays allowed, since its output is passed on rather than printed. Override for an approved read: prefix the Bash command with ALLOW_CREDENTIAL_READ=1."
           }
         ]
       },

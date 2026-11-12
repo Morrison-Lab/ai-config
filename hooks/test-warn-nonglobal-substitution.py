@@ -75,6 +75,9 @@ SHOULD_WARN = [
      "a numeric line address before the `s`; a word boundary never fires "
      "between a digit and `s`, so this was missed while the equivalent "
      "regex-addressed form warned"),
+    ("W14", "bash -c \"sed -i 's/a/b/' file.txt\"",
+     "wrapped in a shell's -c, which shlex hands over as one opaque token "
+     "(ai-config#3641)"),
     ("W11", "sed -i 's/a#b/c/' file.txt",
      "a pattern containing ANOTHER delimiter character still matches -- the "
      "lookahead is keyed to the delimiter actually in use, so excluding "
@@ -110,6 +113,9 @@ SHOULD_STAY_SILENT = [
      "three delimiter-shaped characters (a genuine `s<delim>..<delim>.."
      "<delim>flags` shape once the `s`-prefix requirement is ignored) with "
      "no leading `s` anywhere nearby -- not a substitution"),
+    ("S12", "bash -c \"sed -i 's/a/b/g' file.txt\"",
+     "a global substitution inside a shell's -c: the descent adds no "
+     "false positive (ai-config#3641)"),
 ]
 
 # Two non-command payload shapes that must fail open silently, tested
@@ -273,7 +279,7 @@ MUTATIONS = {
         [('        if "g" not in flags and not any(c.isdigit() for c in '
           'flags):\n            out.append((m.group(0), flags))',
           "        out.append((m.group(0), flags))")],
-        {"S1", "S5", "S10"},
+        {"S1", "S5", "S10", "S12"},
     ),
     "M6_lead_skip": (
         "a leading env-assignment (or lead word) is skipped before "
@@ -302,6 +308,12 @@ MUTATIONS = {
         "digit, so a numeric sed line address still reads as a substitution",
         [(r'r"(?<![A-Za-z_])s(?P<delim>["', r'r"\bs(?P<delim>["')],
         {"W13"},
+    ),
+    "M11_shell_c_descent": (
+        "a command line reached through a shell's -c is scanned too",
+        [("    for piece in shell_c_expansions(command):",
+          "    for piece in [command]:")],
+        {"W14"},
     ),
     "M9_perl_octal_zero_flag": (
         "perl's -0 takes an optional octal argument, so -0777 must still "

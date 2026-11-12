@@ -117,7 +117,8 @@ They apply in every project, per the global-by-default rule in `AGENTS.md`, exce
 - **Don't:** merge while the local validation run is still going, or while a step it skipped is unexplained.
 - **Reason:** ai-config#4853 and ai-config#4854 (2026-10-30) were both merged before their Flash read.
   The coordinator's rule also requires local validation to finish first.
-  `hooks/warn-merge-without-cross-harness-review.py` cannot stop the merge, and the agent sees its note only with the merge result.
+  `hooks/warn-merge-without-cross-harness-review.py` only warned then, and the agent saw its note only with the merge result;
+  that hook has denied such a merge since ai-config#5290.
   The project coordinator set this rule on 2026-10-30, in Ezra's DATA 571 project, after those two merges.
   Ezra has not restated it.
 

@@ -210,11 +210,33 @@ Read the linked issue or quoted request.
 Do not report the reminder hook's output as your finding.
 See [`start-or-file`](../../shared/workflow/start-or-file.md).
 
+## Recursive ownership and mode changes
+
+On a diff, script or command that runs `chown`, `chmod` or `chgrp` recursively, check that no target can reach `/`, a system directory such as `/usr`, `/etc` or `/var/lib`, or the home directory or a directory containing it, such as `/home`.
+Expand each variable as empty as well as set, since a variable from an earlier shell is empty in a new one, and `"$d/"` is then `/`.
+A fix for one permission error changes the one path that raised it.
+Read the diff; do not report `hooks/no-recursive-chown-system-path.py`'s verdict as your finding.
+See [`destructive-actions-catalog`](../../shared/workflow/destructive-actions-catalog.md#recursive-ownership-and-mode-changes).
+
 ## Word field codes
 
 On a diff or a delivered `.docx` produced by an edit that merged runs, check that each field code (a citation, cross-reference or HYPERLINK) still has its own `begin`, `instrText`, `separate` and `end` runs and that the field's text is where it was.
 Read the document; do not report a hook's output as your finding.
 See [`review-rendered-documents`](../../shared/workflow/review-rendered-documents.md#merging-runs-in-a-word-document).
+
+## Credential files printed
+
+On a diff, brief or transcript, check that no command or Read prints a credential file, such as `~/.netrc`, a token under `~/.config` or a private SSH key, including through a redaction or `echo $(cat ...)`.
+A substitution passed as another program's argument is fine.
+Read the diff, not a hook's output; see [`improve-your-subagents`](../../shared/workflow/improve-your-subagents.md#credential-files-printed).
+
+## One-sided conflict resolution
+
+On a merge commit or a PR whose history resolved conflicts, check whether a hunk was resolved by keeping one side whole (`checkout --ours`/`--theirs`, `-X ours`/`theirs`) when the other side added lines that belong in the result.
+Check too whether a `-s ours` merge dropped the other branch's changes entirely when some of them belong in the result.
+Compare the result against both parents' changes since the merge base;
+do not report the warning hook's output as your finding.
+See [`resolve-conflicts`](../../skills/resolve-conflicts/SKILL.md#anti-patterns).
 
 ## Rules and skills without eval cases
 

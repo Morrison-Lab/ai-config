@@ -113,6 +113,12 @@ class TestLibrary(unittest.TestCase):
         self.assertEqual(lib.unread_maintainer_feedback(data),
                          [f"comment by d-morrison at {LATER}"])
 
+    def test_a_reply_at_the_same_second_does_not_answer(self):
+        # Order within one second is unknown, so the item stays unread.
+        data = pr_data([comment("Why?", when=LATER), comment(REPLY, when=LATER)])
+        self.assertEqual(lib.unread_maintainer_feedback(data),
+                         [f"comment by d-morrison at {LATER}"])
+
     def test_automated_output_and_head_reviews_do_not_answer(self):
         # The robot emoji and "Claude finished" mark CI review output, and a
         # head review evaluates the code; neither answers the maintainer.

@@ -1,7 +1,7 @@
 """Maintainer feedback that no agent reply has answered yet (ai-config#4611, #5577).
 
 A maintainer's comment, review or inline comment is feedback until a later
-push answers it. `check-pr-fully-clean.py` calls this; the merge hook
+agent reply answers it; a push alone does not. `check-pr-fully-clean.py` calls this; the merge hook
 `hooks/enforce-mwc-review-gate.py` keeps its own copy because a hook runs
 without `scripts/lib` on its path, and
 `scripts/test_maintainer_feedback.py` pins the two copies to the same verdicts,

@@ -88,7 +88,7 @@ class RetireLeftoverPaths(unittest.TestCase):
         code, out = self.run_main("--retire")
         self.assertEqual(code, 1)
         self.assertIn("installed at local scope", out)
-        self.assertTrue(record_file.is_file())
+        self.assertEqual(record_file.read_text(encoding="utf-8"), json.dumps(installed))
         record_file.write_text("{", encoding="utf-8")
         self.assertEqual(retire.plugin_items(self.home)[0][0:2], ("keep", record_file))
 

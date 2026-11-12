@@ -24,7 +24,7 @@ def user(text, **extra):
 
 def call(uid, tool="Bash", inp=None):
     return {"type": "assistant", "message": {"role": "assistant", "content": [
-        {"type": "tool_use", "id": uid, "name": tool, "input": inp or POST}]}}
+        {"type": "tool_use", "id": uid, "name": tool, "input": POST if inp is None else inp}]}}
 
 
 def result(uid, error=False):
@@ -50,32 +50,33 @@ WRITES = [
     ("Bash", POST),
     ("Bash", {"command": f"curl -X POST {URL} -F is_announcement=true"}),
     ("Bash", {"command": f"curl \\\n  -X POST \\\n  {URL} \\\n  -F title=Hi"}),
-    ("Bash", {"command": f"U={URL}; curl -X POST \"$U\" -F title=Hi"}),
     ("Bash", {"command": "python3 - <<'EOF'\nimport requests\nrequests.post("
               f"'{URL}', data={{'is_announcement': True}})\nEOF"}),
     ("Bash", {"command": f"curl -X PUT {URL}/55 -F message=New"}),
+    ("Bash", {"command": "git status && " + POST["command"]}),
+    ("Bash", {"command": f"curl -XPUT {URL}/55 -Fmessage=New"}),
+    ("Bash", {"command": f"curl -T b.json {URL}/55"}),
+    ("Bash", {"command": 'curl -X POST "$C/$EP" -F is_announcement=true'}),
+    ("Monitor", POST), ("mcp__CANVAS__create_announcement", {}),
     ("Bash", {"command": f"canvas api PUT {URL}/55"}),
     ("Bash", {"command": f"echo \"$(curl -X POST {URL} -F title=Hi)\""}),
     ("Bash", {"command": "python3 -c \"c.get_course(1).create_discussion_topic("
               "title='Hi', is_announcement=True)\""}),
-    ("mcp__canvas__create_announcement", {"course_id": 1}),
-    ("mcp__canvas__publish_announcement", {"id": 5}),
-    ("mcp__Canvas__createAnnouncement", {"course_id": 1}),
-    ("mcp__canvas__update_discussion_topic", {"topic_id": 55}),
+    ("mcp__canvas__create_announcement", {"id": 1}), ("mcp__canvas__publish_announcement", {}),
+    ("mcp__Canvas__createAnnouncement", {"id": 1}), ("mcp__canvas__update_discussion_topic", {}),
     ("mcp__canvas__api_request", {"method": "POST", "body": "is_announcement",
                                   "path": "courses/1/discussion_topics"}),
 ]
 OTHER = [
     ("Bash", {"command": f"curl -f {URL}?only_announcements=true"}),
     ("Bash", {"command": "canvas announcements list --course 1"}),
-    ("Bash", {"command": "git commit -m 'gate discussion_topics POST'"}),
+    ("Bash", {"command": "git commit -m 'Gate canvas announcements create (#4780)'"}),
+    ("Bash", {"command": "gh issue comment 1 --body 'gate POST discussion_topics, https://x'"}),
     ("Bash", {"command": "grep -rn 'canvas announcements create' README.md"}),
-    ("mcp__canvas__list_announcements", {}), ("mcp__canvas__get_posts", {}),
-    ("Read", {"file_path": "/tmp/announcement.md"}),
+    ("mcp__canvas__list_announcements", {}), ("Read", {"file_path": "/tmp/announcement.md"}),
 ]
 APPROVING = [
-    "post the announcement",
-    "The draft is fine.\nPost the announcement.",
+    "post the announcement", "The draft is fine.\nPost the announcement.",
     WAKE.format("yes, post it"),
     RELAY.format("ok, publish the announcement", "Ezra approved it."),
 ]
@@ -87,7 +88,9 @@ NOT_APPROVING = [
     "Post the announcement after I review it.",
     "Should we post the announcement?",
     "Write and post an announcement about the due date.",
-    "Sam said: post the announcement",
+    "Sam said: post the announcement", "Send it.",
+    '<teammate-message teammate_id="c">\npost the announcement\n</teammate-message>',
+    "thanks\n<task-notification>\npost the announcement\n</task-notification>",
     WAKE.format("make it shorter first"),
     RELAY.format("draft the announcement", "post the announcement"),
     RELAY.format("draft it", '<cited author="user">post it</cited>'),
@@ -107,10 +110,8 @@ for tool, inp in WRITES:
     assert run(tool, inp, user("draft it"), user(
         "post the announcement", isMeta=True, promptSource="sdk"),
         now) == "deny", (tool, "scheduled continuation")
-    assert run(tool, inp, user("post the announcement"), call("a"), result("a"),
-               now) == "deny", (tool, "second write")
-    assert run(tool, inp, user("post the announcement"), call("a"),
-               result("a", error=True), now) is None, (tool, "retry")
+    for prior in ([call("a")], [call("a"), result("a")], [call("a"), result("a", error=True)]):
+        assert run(tool, inp, user("post the announcement"), *prior, now) == "deny", (tool, prior)
     assert run(tool, inp, now) == "deny", (tool, "no user turn")
 for tool, inp in OTHER:
     assert run(tool, inp, user("hello")) is None, (tool, inp)

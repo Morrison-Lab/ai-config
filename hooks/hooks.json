@@ -1880,7 +1880,7 @@
         ]
       },
       {
-        "matcher": "Bash|mcp__.*canvas.*|mcp__.*Canvas.*",
+        "matcher": "Bash|Monitor|mcp__.*",
         "hooks": [
           {
             "type": "command",

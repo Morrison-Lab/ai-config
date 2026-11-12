@@ -29,7 +29,7 @@ COMPOUND = re.compile(r"[;&|`\n<>]|\$\(")
 MCP_READ = re.compile(r"^(get|list|search|read|find|fetch|show|count)", re.I)
 APPROVAL = re.compile(r"\s*((yes|ok|okay|approved|looks good|lgtm)[,.!]*\s*)?(please\s+)?(go ahead and\s+)?"
                       r"((post|publish)\s+(it|the announcement|this announcement|that announcement)"
-                      r"|send\s+(the|this|that)\s+announcement)(\s+(now|as written|please))*[\s.!]*", re.I)
+                      r"|send\s+(the|this|that)\s+announcement)( (now|as written|please))*[ .!]*", re.I)  # matched against single-spaced words
 TAG = re.compile(r"<(/?)([a-z][\w-]*)([^>]*)>", re.I)
 ENVELOPE = {"wake", "project", "thread", "message", "relay", "cited", "note"}  # and every hyphenated tag
 
@@ -140,7 +140,7 @@ def verdict(path, tool, inp):
         text, top = _user_text(entry)
         words = "\n".join(user_words(text, top)) if text is not None else ""
         if words.strip():  # a harness note with no user words is skipped
-            if not APPROVAL.fullmatch(words):
+            if not APPROVAL.fullmatch(" ".join(words.split())):
                 return "the user's latest message is not only an approval of posting it"
             now = [w for w in writes if w[:2] == [tool, inp] and w[2] not in answered]
             if now:  # the call being judged, logged with no result yet

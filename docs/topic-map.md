@@ -312,6 +312,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/check-purpose-before-reusing.md` | Never take shortcuts, and never copy-paste or pattern-match blindly. Before reusing a structure --- a template, a working script, a neighbouring file's shape... |  |
 | `shared/workflow/check-sources-over-recall.md` | When a source can be checked, check it before answering. Sources include books, repositories, documentation, APIs and files. Cite what you read (file and pag... |  |
 | `shared/workflow/check-the-renders.md` | In a repo that publishes a website or a book, the deliverable is the rendered page. A `.qmd` or `.md` diff can be entirely correct while the published page i... |  |
+| `shared/workflow/check-thread-models.md` | Two rules from one exchange in a Claude project (Machine Learning course, 2026-11-12). The coordinator told Ezra that every thread had been moved off Fable,... |  |
 | `shared/workflow/check-tools-before-saying-cant.md` | Before a reply says "I can't", "I'm unable to" or "only you can", check the tools you have, deferred ones included. |  |
 | `shared/workflow/checks-need-writer-and-reviewer-instructions.md` | Every algorithmic check has two companions: an instruction to the writer that prevents the defect, and an instruction to the reviewer agent that looks for it... |  |
 | `shared/workflow/choose-issue-or-discussion.md` | `issue-first` governs *whether* something is tracked before work starts. It does not settle *where*, and defaulting everything to the issue tracker misfiles... |  |

@@ -73,6 +73,11 @@ Recorded from the Machine Learning course project (2026-10-12 to 2026-10-16, wit
   When the user says "all", do all of them, and never ask "do you want me to switch all of them?"
   (2nd occurrence of the broadcast rule's remembered-subset miss, 2026-11-12: the coordinator messaged threads one at a time from memory, missed some, then asked;
   Ezra: "obviously yes; this shouldn't have been a question".)
+- **Read a thread's model with `get_session`; never report it from memory.**
+  Before saying which model any thread runs, or that threads were switched, call `get_session` on every thread and report its model fields,
+  and check for a capability before saying it is missing
+  ([`check-thread-models`](../shared/workflow/check-thread-models.md)).
+  On 2026-11-12 "every thread is off Fable" was false, and so was "I can't see each thread's live model".
 - **Know ai-config's skills and commands by name.**
   A coordinator or thread may not have the plugin's skill list in context, so read the `skills/*/SKILL.md` and `commands/*.md` frontmatter in ai-config (or the project's memory index of them) before saying what a named skill or command does.
   Run a skill the user names, such as `ums`, without asking what it is

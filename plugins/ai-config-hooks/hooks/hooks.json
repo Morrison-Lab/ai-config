@@ -1758,6 +1758,13 @@
         "hooks": [
           {
             "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/no-thread-model-claim-without-get-session.py\"'",
+            "timeout": 10,
+            "script": "no-thread-model-claim-without-get-session.py",
+            "why": "2026-11-12, Machine Learning course project: the coordinator told the user every thread was off Fable while one was still on claude-fable-5-2, then said it could not see a thread's live model, which get_session returns. Denies the first reply in a turn (post_message and the other reply tools in scripts/lib/tool_names.py) whose paragraph names a thread or session together with a Claude model when no get_session call follows the last user message. A mention cannot be told from a claim, so the retry is allowed. Fails open."
+          },
+          {
+            "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/run-hook.sh 'python3 \"${CLAUDE_PLUGIN_ROOT}/../../hooks/warn-bare-forge-reference.py\"'",
             "timeout": 10,
             "script": "warn-bare-forge-reference.py",

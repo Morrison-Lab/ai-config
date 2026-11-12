@@ -25,7 +25,10 @@ A prefix of `--strategy` itself also starts `--strategy-option`,
 so git rejects it as ambiguous (`--strat=ours`).
 A command inside `bash -c '...'` (and `sh`, `zsh` and similar) is checked,
 up to MAX_DEPTH nested shells; one fed through `xargs` or `eval` is not.
-A run with `--abort` or `--quit` resolves nothing and stays silent.
+A merge, rebase, cherry-pick, revert or pull run with `--abort` or
+`--quit` before any `--` resolves nothing and stays silent.
+Short options are read in clusters (`-qs ours`, `-fXours`),
+and a value such as the message of `-m` is never read as an option.
 
 Warns, never blocks: one side can be right, for example a generated file the
 repo's tooling regenerates afterwards. Quoted text, such as an `echo` of the
@@ -69,6 +72,17 @@ SIDE_SHORT = {"2": "--ours", "3": "--theirs"}
 SHORT_WITH_VALUE = {"checkout": "bB", "restore": "s"}
 # `--strategy-` already excludes `--strategy`, the only other `--strategy...`.
 LONG_PREFIX_MIN = {"--strategy-option": "--strategy-"}
+# Short options that take a value, per `git <sub> -h`. A required value is
+# the rest of the cluster or else the next word (`-m -X` is a message `-X`);
+# an optional one (`-S`, `-r`, `-j`) is only the rest of the cluster.
+SHORT_VALUE_REQUIRED = {
+    "merge": "sXmF", "rebase": "sXx", "pull": "sXo",
+    "cherry-pick": "Xm", "revert": "Xm",
+}
+SHORT_VALUE_OPTIONAL = {
+    "merge": "S", "rebase": "Sr", "pull": "Srj", "cherry-pick": "S", "revert": "S",
+}
+LONG_WITH_VALUE = ("--message", "--file", "--exec", "--server-option", "--mainline")
 MAX_DEPTH = 3
 
 
@@ -89,25 +103,48 @@ def _side_flag(sub: str, arg: str) -> str | None:
     return None
 
 
-def _option_values(rest: list[str], short: str, long: str) -> list[str]:
-    """Values given to `short` (`-X v` or `-Xv`) or `long` (`--long v` or `--long=v`).
+def _option_values(sub: str, rest: list[str], letter: str | None,
+                   long: str) -> list[str]:
+    """Values SUB's argv REST gives to `-LETTER` or to `long`.
 
-    `long` also matches a unique prefix of itself at least LONG_PREFIX_MIN long.
+    Walks the words the way git's option parser does: a short option may sit
+    in a cluster (`-qs ours`, `-fXours`), a value is never read as an option,
+    and `long` also matches a unique prefix of itself at least
+    LONG_PREFIX_MIN long. LETTER is None where the short form means
+    something else (`-s` is --signoff on cherry-pick and revert).
     """
     shortest = LONG_PREFIX_MIN.get(long, long)
+    required = SHORT_VALUE_REQUIRED[sub]
+    optional = SHORT_VALUE_OPTIONAL[sub]
     values = []
-    for i, arg in enumerate(rest):
+    i = 0
+    while i < len(rest):
+        arg = rest[i]
+        i += 1
         if arg == "--":
             break
-        nxt = rest[i + 1] if i + 1 < len(rest) else ""
-        name, eq, value = arg.partition("=")
-        is_long = name.startswith(shortest) and long.startswith(name)
-        if arg == short or (is_long and not eq):
-            values.append(nxt)
-        elif is_long:
-            values.append(value)
-        elif arg.startswith(short) and len(arg) > len(short):
-            values.append(arg[len(short):])
+        if arg.startswith("--"):
+            name, eq, value = arg.partition("=")
+            if name.startswith(shortest) and long.startswith(name):
+                if not eq:
+                    value = rest[i] if i < len(rest) else ""
+                    i += 1
+                values.append(value)
+            elif name in LONG_WITH_VALUE and not eq:
+                i += 1
+            continue
+        if not arg.startswith("-"):
+            continue
+        for j, c in enumerate(arg[1:], start=1):
+            if c not in required and c not in optional:
+                continue
+            value = arg[j + 1:]
+            if c in required and not value:
+                value = rest[i] if i < len(rest) else ""
+                i += 1
+            if c == letter:
+                values.append(value)
+            break
     return values
 
 
@@ -117,8 +154,6 @@ def one_sided(argv: list[str]) -> tuple[str, str] | None:
     if parsed is None:
         return None
     sub, rest, _env = parsed
-    if any(arg in NO_RESOLUTION for arg in rest):
-        return None
     hunks = "keeps one side of every conflicting hunk without a per-hunk decision"
     if sub in PATH_SIDE_SUBCOMMANDS:
         # merge-file still merges the clean hunks; checkout and restore take
@@ -134,15 +169,18 @@ def one_sided(argv: list[str]) -> tuple[str, str] | None:
                 return f"git {sub} {flag}", effect
         return None
     if sub in MERGING_SUBCOMMANDS:
-        for value in _option_values(rest, "-X", "--strategy-option"):
+        options = rest[:rest.index("--")] if "--" in rest else rest
+        if any(arg in NO_RESOLUTION for arg in options):
+            return None
+        for value in _option_values(sub, rest, "X", "--strategy-option"):
             if value in SIDES:
                 return f"git {sub} -X {value}", hunks
         # On cherry-pick and revert, `-s` is --signoff, so only the long form
         # names a strategy there.
-        short = "-s" if sub in STRATEGY_SHORT_SUBCOMMANDS else "--strategy"
-        for value in _option_values(rest, short, "--strategy"):
+        letter = "s" if sub in STRATEGY_SHORT_SUBCOMMANDS else None
+        for value in _option_values(sub, rest, letter, "--strategy"):
             if value == "ours":
-                label = "-s ours" if short == "-s" else "--strategy ours"
+                label = "-s ours" if letter else "--strategy ours"
                 return (f"git {sub} {label}",
                         "drops the other side's changes entirely, "
                         "conflicting or not")

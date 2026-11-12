@@ -46,7 +46,7 @@ MODEL = re.compile(
     r"\b(?:fable|opus|sonnet|haiku)\b|\bclaude-(?:fable|opus|sonnet|haiku)[\w.-]*",
     re.I,
 )
-CODE = re.compile(r"```.*?```|`[^`\n]*`", re.S)
+FENCE = re.compile(r"```.*?```", re.S)  # inline code stays: model ids are written in it
 CHECK_TOOL = "get_session"
 
 DENY = (
@@ -65,7 +65,7 @@ DENY = (
 
 
 def claims_thread_model(text):
-    prose = CODE.sub(" ", text)
+    prose = FENCE.sub(" ", text).replace("`", "")
     for para in re.split(r"\n\s*\n", prose):
         if THREAD.search(para) and MODEL.search(para):
             return True
@@ -98,7 +98,7 @@ def scan(path):
             if _is_user_text(rec):
                 last_user = i
                 continue
-            blocks = (rec.get("message") or {}).get("content") or []
+            blocks = (rec.get("message") or {}).get("content", rec.get("content")) or []
             for b in blocks if isinstance(blocks, list) else []:
                 if (isinstance(b, dict) and b.get("type") == "tool_use"
                         and str(b.get("name") or "").endswith(CHECK_TOOL)):
@@ -112,8 +112,7 @@ def first_time(key_text):
     if os.path.exists(sentinel):
         return False
     try:
-        with open(sentinel, "w", encoding="utf-8") as fh:
-            fh.write("1")
+        open(sentinel, "w", encoding="utf-8").close()
     except OSError:
         return False  # cannot record the refusal, so do not risk repeating it
     return True

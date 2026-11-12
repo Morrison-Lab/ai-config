@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for hooks/no-thread-model-claim-without-get-session.py.
-
-Run: python3 hooks/test-no-thread-model-claim-without-get-session.py [path-to-hook]
-"""
+"""Tests for hooks/no-thread-model-claim-without-get-session.py (arg: path to hook)."""
 import json
 import os
 import shutil
@@ -69,8 +66,12 @@ CASES = [
      "thread and model in different paragraphs pass"),
     (run(ASK, POST, "Merged the PR; the thread is resolved."), [False],
      "a thread with no model named passes"),
-    (run(ASK, POST, "Ran `get_session` on the `opus` thread."), [False],
-     "names inside inline code are ignored"),
+    (run(ASK, POST, "All threads were moved to `claude-opus-5-5`."), [True],
+     "a model id in inline code is still a claim"),
+    (run(ASK, POST, "The thread ran:\n\n```\nmodel: opus\n```"), [False],
+     "names inside a fenced block are ignored"),
+    (run(ASK + [{"type": "assistant", "content": [{"type": "tool_use", "name": "get_session"}]}],
+         POST, CLAIM), [False], "a get_session call in top-level content counts"),
     (run(ASK, "mcp__github__add_issue_comment", CLAIM), [False],
      "a non-reply tool is out of scope"),
 ]

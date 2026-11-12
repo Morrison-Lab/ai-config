@@ -1,10 +1,9 @@
 # Check a thread's model, and any capability, before claiming it
 
-Two rules from one exchange in a Claude project (Machine Learning course, 2026-11-12).
+Three rules from one exchange in a Claude project (Machine Learning course, 2026-11-12).
 The coordinator told Ezra that every thread had been moved off Fable,
 and one thread, "Plan development for each lab repo", was still on `claude-fable-5-2`.
-Corrected, the coordinator then said it could not see each thread's live model.
-It could.
+Corrected, the coordinator then said it could not see each thread's live model, which it could.
 
 ## Read every thread's model with `get_session` before saying anything about it
 
@@ -40,7 +39,8 @@ and no hook covers it in chat, because a missing-capability claim has too many p
 
 ## Run UMS the moment either mistake is noticed
 
-Both mistakes were admitted in a reply, and no UMS pass ran until Ezra asked why
-([`run-ums-proactively`](run-ums-proactively.md), from ai-config#5481, already required it).
-The admission went out through `post_message`, and the two admission hooks read only assistant text blocks, so neither fired.
-Both now read reply-tool text too, and `hooks/remind-ums-after-error.py` also blocks the turn's end, once, until the pass runs.
+Both mistakes were admitted through `post_message`, and no UMS pass ran until Ezra asked why ([`run-ums-proactively`](run-ums-proactively.md)).
+`hooks/remind-ums-after-error.py` now reads reply-tool text and blocks the turn's end, once, until the pass runs.
+
+- **Do:** run the pass in the turn that admits the mistake, and report it in the past tense.
+- **Don't:** reply "you're right, I was wrong" and end the turn.

@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""PreToolUse guard: no class announcement without the user's approval.
+"""PreToolUse guard: no class announcement without the user's approval (Ezra, 2026-10-27, ai-config#4780).
 
-Ezra, 2026-10-27, said twice: never post a class announcement without his review and approval of its exact text
-(ai-config#4780). Denies the CLI, `is_announcement`, a network write naming a topic and an MCP announcement write
-unless the user's last message is only "post the announcement" ("yes, post it", ...); one write each. Gaps: #5453.
-"""
+Denies the CLI, `is_announcement`, a Canvas network write naming a topic and an MCP announcement write unless
+the user's last message is only "post the announcement" ("yes, post it", ...); one write each. Gaps: #5453."""
 import json
 import os
 import re
@@ -13,15 +11,16 @@ import sys
 try:
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib"))
     from transcript_meta import is_real_user_turn, strip_injected_text
-except Exception:  # detection still runs; a detected write is then denied
-    is_real_user_turn = None
-
+except Exception: is_real_user_turn = None  # noqa: E701 -- detection still runs; a detected write is denied
+CANVAS = re.compile(r"discussion|api/v1|instructure|canvas", re.I)  # "announcement" alone is not Canvas
+READ_BREAK = re.compile(r"--post|\.(post|put|patch|edit|update|request)\(|['\"](?i:post|put|patch)['\"]|\bmethod\b|"
+                        r"\b(https?|xh|api)\s+(?i:post|put|patch)\b")  # beyond WRITE, what makes a call not a read
 CLI = re.compile(r"\bcanvas\s+announcements?\s+(create|post|update|edit|publish)\b", re.I)
 CODE = re.compile(r"\b(python3?|node|ruby|perl|Rscript)\b\s+(-c|-e|-\s)|<<")
 QUOTED = re.compile(r"'[^']*'|\"(\\.|[^\"\\$`])*\"")  # a double-quoted span with $ or ` stays
 TOPIC = re.compile(r"discussion(_|%5f)?topic|announcement", re.I)
 ANNOUNCE = re.compile(r"is_announcement|get_announcements.*\.(edit|update)\(", re.I | re.S)
-NET = re.compile(r"\b(curl|wget|requests\.\w+|urllib\.request|httpx\.\w+|httr::\w+|canvasapi|canvas\s+api|Invoke-\w+)\b|"
+NET = re.compile(r"\b(curl|wget|requests\.\w+|urllib\.request|httpx\.\w+|httr::\w+|http\.client|aiohttp|canvasapi|canvas\s+api|Invoke-\w+)\b|"
                  r"(https?://|/api/v1/).*(['\"](?i:put|post)['\"]|\.(put|post)\()", re.I | re.S)
 WRITE = re.compile(r"(-\w*X|--request|-Method)[\s=]*[\"']?(?i:POST|PUT)|(^|\s)(-[a-zA-Z]*[dFT]|--data|--form|--json|--upload-file)")
 SAFE_FIRST = {"git", "gh", "grep", "egrep", "rg"}
@@ -29,7 +28,7 @@ COMPOUND = re.compile(r"[;&|`\n<>]|\$\(")
 MCP_READ = re.compile(r"^(get|list|search|read|find|fetch|show|count)", re.I)
 APPROVAL = re.compile(r"\s*((yes|ok|okay|approved|looks good|lgtm)[,.!]*\s*)?(please\s+)?(go ahead and\s+)?"
                       r"((post|publish)\s+(it|the announcement|this announcement|that announcement)"
-                      r"|send\s+(the|this|that)\s+announcement)( (now|as written|please))*[ .!]*", re.I)  # matched against single-spaced words
+                      r"|send\s+(the|this|that)\s+announcement)( (now|as written|please))*[ .!]*", re.I)  # single-spaced
 TAG = re.compile(r"<(/?)([a-z][\w-]*)([^>]*)>", re.I)
 ENVELOPE = {"wake", "project", "thread", "message", "relay", "cited", "note"}  # and every hyphenated tag
 
@@ -43,10 +42,10 @@ def is_announcement_write(tool, inp):
         if first in SAFE_FIRST and plain:  # one plain command
             return False
         net = NET.search(cmd) or first in ("http", "https", "xh")
-        curl_read = first == "curl" and not WRITE.search(cmd) and plain
+        read = not (WRITE.search(cmd) or READ_BREAK.search(cmd))
         cli = CLI.search(bare) or re.search(r"\b(ba|z)?sh\s+-c\b", cmd) and CLI.search(cmd)
         return bool(cli or ANNOUNCE.search(cmd) and (net or CODE.search(cmd))
-                    or TOPIC.search(cmd) and net and not curl_read)
+                    or TOPIC.search(cmd) and CANVAS.search(cmd) and net and not read)
     name = tool.lower()
     if not name.startswith("mcp__"):
         return False

@@ -43,6 +43,7 @@ Without verified membership, get explicit approval naming the repo and communica
 drafting locally while approval is pending is allowed.
 The user's own push access authorizes non-force pushes and PRs only, per [`use-existing-pr-branch`](shared/workflow/use-existing-pr-branch.md).
 See [`gate-external-communication`](shared/workflow/gate-external-communication.md).
+Never send email for the user; draft it ([`never-send-email`](shared/workflow/never-send-email.md)).
 
 ## Graph and display equation defaults
 

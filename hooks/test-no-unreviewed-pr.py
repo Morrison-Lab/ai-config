@@ -219,8 +219,23 @@ REQUEST_METHOD_CORPUS = [
     # A glued `--flag=value` consumes nothing after it.
     (REQ_PATH + " --method=POST" + REQ_FIELDS, True),
     # Methods are case-insensitive.
-    (REQ_PATH + " -X post" + REQ_FIELDS, True),
-    (REQ_PATH + " --method=post" + REQ_FIELDS, True),
+    (REQ_PATH + " -X post" + REQ_FIELDS, False),
+    (REQ_PATH + " --method=post" + REQ_FIELDS, False),
+    # pflag takes `-X=POST` as the value POST, in a cluster too.
+    (REQ_PATH + " -X=POST" + REQ_FIELDS, True),
+    (REQ_PATH + " -iX=POST" + REQ_FIELDS, True),
+    (REQ_PATH + " -X=GET" + REQ_FIELDS, False),
+    # Each gh long value flag consumes the word after it.
+    (REQ_PATH + " --header -f x", False),
+    (REQ_PATH + " --template -f x", False),
+    (REQ_PATH + " --preview -f x", False),
+    (REQ_PATH + " --hostname -f x", False),
+    (REQ_PATH + " --cache -f x", False),
+    (REQ_PATH + " --input -f x", True),
+    (REQ_PATH + " --input -X GET", True),
+    (REQ_PATH + " --field -f x", True),
+    (REQ_PATH + " --raw-field -X GET", True),
+    (REQ_PATH + " --method -f x", False),
     (REQ_PATH + " --method=get" + REQ_FIELDS, False),
     # A glued value ends the cluster: `-HX-...` is a header, not a method.
     (REQ_PATH + " -HX-GitHub-Api-Version:2022-11-28" + REQ_FIELDS, True),

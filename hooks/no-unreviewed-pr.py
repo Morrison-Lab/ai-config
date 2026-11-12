@@ -576,6 +576,12 @@ def _post_method(argv):
 # -f/-F fields, -H header, -p preview, -q jq, -t template. `-i` is boolean.
 GH_API_SHORT_VALUE = "XfFHpqt"
 GH_API_FIELD_LONG = ("--field", "--raw-field")
+# `gh api` long flags that take a value (`gh api --help`). Kept apart from
+# _API_VALUE_FLAGS, which also holds curl and wget flags gh rejects.
+GH_API_LONG_VALUE = (
+    "--field", "--raw-field", "--header", "--method", "--jq", "--template",
+    "--input", "--preview", "--hostname", "--cache",
+)
 
 
 def _gh_api_post(argv):
@@ -594,7 +600,10 @@ def _gh_api_post(argv):
     A body read with `--input` implies POST too: the help's own example
     `gh api repos/{owner}/{repo}/rulesets --input file.json` creates a ruleset.
     A value flag with nothing after it makes gh exit before sending anything
-    ("flag needs an argument"), so that is never a POST.
+    ("flag needs an argument"), so that is never a POST. Only the exact
+    method `POST` counts: nothing here shows gh upper-cases `-X post`, so
+    a lower-case method is read as not a POST, which can only leave a
+    request undischarged.
     """
     method = None
     has_body = False
@@ -606,13 +615,13 @@ def _gh_api_post(argv):
             break
         if a.startswith("--"):
             name, eq, val = a.partition("=")
-            if name in _API_VALUE_FLAGS and not eq:
+            if name in GH_API_LONG_VALUE and not eq:
                 if i >= len(argv):
                     return False
                 val = argv[i]
                 i += 1
             if name == "--method":
-                method = val.upper()
+                method = val
             elif name in GH_API_FIELD_LONG or name == "--input":
                 has_body = True
             continue
@@ -622,13 +631,16 @@ def _gh_api_post(argv):
             if c not in GH_API_SHORT_VALUE:
                 continue
             val = a[j + 1:]
+            # pflag reads `-X=POST` as the value POST.
+            if val.startswith("="):
+                val = val[1:]
             if not val:
                 if i >= len(argv):
                     return False
                 val = argv[i]
                 i += 1
             if c == "X":
-                method = val.upper()
+                method = val
             elif c in "fF":
                 has_body = True
             break

@@ -61,6 +61,13 @@ REMIND = [
     # match (SILENT below) or losing a real admission (these). A suite carrying
     # only one side cannot tell a correct anchor from an over-tightened one.
     ([txt("I was wrong about this.")], "first person: was wrong"),
+    # A project thread replies only through a reply tool (2026-11-12).
+    ([tool("mcp__hearthbot__post_message",
+           {"text": "You're right, I was wrong on two counts."})],
+     "admission sent through post_message"),
+    ([tool("mcp__hearthbot__message_coordinator",
+           {"text": "My mistake: I missed a thread."})],
+     "admission sent through message_coordinator"),
     ([{"source": "MODEL", "type": "PLANNER_RESPONSE", "content": "I was wrong about this."}],
      "Antigravity PLANNER_RESPONSE with admission reminds"),
     ([txt("I got that wrong.")], "first person: got that wrong"),
@@ -205,6 +212,12 @@ IRREALIS_2997 = [
 
 SILENT = [
     ([txt("All checks are green; nothing to correct.")], "no admission at all"),
+    ([tool("mcp__hearthbot__post_message",
+           {"text": "You're right, I was wrong on two counts."}),
+      tool("Write", {"file_path": "/x/ai-config/memories/claude-app-projects.md"})],
+     "post_message admission followed by a memory write"),
+    ([tool("mcp__github__add_issue_comment", {"body": "I was wrong about this."})],
+     "a GitHub comment is not a reply-tool admission"),
     # A word ending in "i" followed by an admission verb. Without a `\b` before
     # each bare `i` alternative, the regex matched that trailing letter as the
     # first-person subject, so every one of these fired on a THIRD-person
@@ -602,7 +615,48 @@ cp_ok = cp.returncode == 0 and chr(0x2019).encode("utf-8") in cp.stdout
 wrong += not cp_ok
 print(f"  {'ok' if cp_ok else 'WRONG':<7} the curly quote reaches stdout as UTF-8")
 
+# Stop registration (AI_CONFIG_STOP=1): blocks once per turn so the agent runs
+# the pass before ending the turn, and never while stop_hook_active is set.
+print("\nStop registration:")
+stop_path = tempfile.mkstemp(suffix=".jsonl")[1]
+with open(stop_path, "w", encoding="utf-8") as fh:
+    fh.write(json.dumps(tool("mcp__hearthbot__post_message",
+                             {"text": "You're right, I was wrong on two counts."})) + "\n")
+
+
+def stop_run(payload_extra, tmp):
+    payload = dict({"transcript_path": stop_path, "session_id": "s1"}, **payload_extra)
+    p = subprocess.run(
+        [sys.executable, HOOK], input=json.dumps(payload), capture_output=True,
+        text=True, env=dict(os.environ, TMPDIR=tmp, AI_CONFIG_STOP="1"),
+    )
+    try:
+        parsed = json.loads(p.stdout) if p.stdout.strip() else {}
+    except ValueError:
+        parsed = {}
+    return p.returncode, parsed
+
+
+stop_checks = []
+tmp_a = tempfile.mkdtemp()
+tmp_b = tempfile.mkdtemp()
+try:
+    rc, out = stop_run({}, tmp_a)
+    stop_checks.append((rc == 0 and out.get("decision") == "block"
+                        and "UMS reminder" in str(out.get("reason")),
+                        "blocks the stop after an unrecorded admission"))
+    rc, out = stop_run({"stop_hook_active": True}, tmp_b)
+    stop_checks.append((rc == 0 and "decision" not in out,
+                        "never blocks while stop_hook_active is set"))
+finally:
+    os.unlink(stop_path)
+    shutil.rmtree(tmp_a, ignore_errors=True)
+    shutil.rmtree(tmp_b, ignore_errors=True)
+for ok, desc in stop_checks:
+    wrong += not ok
+    print(f"  {'ok' if ok else 'WRONG':<7} {desc}")
+
 total = (len(REMIND) + len(SILENT) + len(seq) + len(mutation)
-         + len(mutation_2997) + 1)
+         + len(mutation_2997) + 1 + len(stop_checks))
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
 sys.exit(1 if wrong else 0)

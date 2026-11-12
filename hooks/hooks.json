@@ -2200,6 +2200,13 @@
           },
           {
             "type": "command",
+            "command": "AI_CONFIG_STOP=1 python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/remind-ums-after-error.py\"",
+            "timeout": 10,
+            "script": "remind-ums-after-error.py",
+            "why": "2026-11-12, Machine Learning course project: the coordinator replied 'I was wrong on two counts' through post_message, ran no UMS pass, and the user's next message asked why. The UserPromptSubmit registration fires only on that next prompt, which in a project is the user noticing. This Stop registration blocks the turn's end, once per turn and never while stop_hook_active is set, when an admission (in assistant text or a reply tool's text) has no memory, skill or UMS work after it. The admission is already delivered when Stop runs, so nothing is suppressed."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-unmeasured-clock-claim.py\"",
             "timeout": 10,
             "script": "no-unmeasured-clock-claim.py",

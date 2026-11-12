@@ -33,6 +33,21 @@ proves that path works in this harness. Deliberately NOT using a `Stop` hook's
 `additionalContext`, which is documented for `UserPromptSubmit` rather than
 for `Stop`, and was not verified here.
 
+A SECOND, STOP-TIME REGISTRATION (2026-11-12)
+--------------------------------------------
+Measured in a Claude project: the coordinator told the user "I was wrong on
+two counts" and ran no pass, and the user's next message asked why. Two holes
+let that through. The scan read only assistant `text` blocks, while a project
+thread or coordinator replies only through a reply tool (`post_message` and
+its siblings in scripts/lib/tool_names.py), so the admission was invisible.
+And the reminder fires on the NEXT prompt, which in a project is the user
+noticing the missing pass. So reply-tool text is now scanned too, and the hook
+is also registered on Stop with AI_CONFIG_STOP=1. By the time Stop runs the
+admission has already been delivered, so blocking the stop suppresses nothing
+-- the objection above is to blocking the MESSAGE, which this never does. It
+blocks at most once per turn and never while `stop_hook_active` is set
+(scripts/lib/agent_notice.py), so it cannot hold a session in a loop.
+
 It stays silent when the pass already happened: a memory/skills/shared write, a
 UMS-mentioning subagent dispatch, or a `ums` invocation recorded LATER in the
 transcript than the admission clears the obligation. So a turn that admits an
@@ -62,6 +77,19 @@ import os
 import re
 import sys
 import tempfile
+
+_LIB = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "scripts", "lib")
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+try:
+    from tool_names import reply_text
+except Exception:  # broken install: read assistant text blocks only
+    def reply_text(name, inp):  # noqa: D103
+        return ""
+try:
+    from agent_notice import stop_notice
+except Exception:
+    stop_notice = None
 
 # Typographic apostrophe, spelled as an escape rather than embedding the
 # glyph, so this file stays pure ASCII per
@@ -364,6 +392,11 @@ def scan(path):
                 if isinstance(b, dict):
                     if b.get("type") == "tool_use":
                         tool_calls.append((b.get("name") or "", b.get("input") or {}))
+                        # A project thread replies only through a reply tool,
+                        # so its admission lives in the tool input.
+                        said = reply_text(b.get("name"), b.get("input"))
+                        if said:
+                            text_blocks.append(said)
                     elif b.get("type") == "text" and is_assistant:
                         text_blocks.append(b.get("text") or "")
         elif isinstance(blocks, str) and is_assistant:
@@ -470,12 +503,15 @@ def main() -> int:
     # it, two sessions producing the same admission share one sentinel in
     # /tmp, and the second session's reminder is suppressed for as long as
     # that /tmp survives.
-    key = hashlib.sha256(f"{path}:{admit_txt}".encode()).hexdigest()[:16]
+    # The mode is in the key: the UserPromptSubmit and Stop registrations each
+    # owe their own firing, as in no-mistake-without-a-hook.py.
+    mode = os.getenv("AI_CONFIG_STOP") or ""
+    key = hashlib.sha256(f"{path}:{admit_txt}:{mode}".encode()).hexdigest()[:16]
     sentinel = os.path.join(tempfile.gettempdir(), f".claude-ums-after-error-{key}")
     if not _sentinel_gate(sentinel, admit_at):
         return 0
 
-    print(
+    message = (
         "UMS reminder: an earlier turn in this session admitted an error "
         f'("{admit_txt}"), and no memory, skill, or shared-fragment write has '
         "been recorded since.\n"
@@ -492,6 +528,17 @@ def main() -> int:
         "misfire will not re-fire it: this fires once per distinct phrase per "
         "session, and a phrase wrapped in backticks is not matched at all."
     )
+    if mode == "1":
+        # Stop: the admission has already been delivered, so blocking the
+        # stop suppresses nothing; it only keeps the turn open for the pass.
+        # Without this the reminder waited for the user's NEXT prompt, which
+        # in a project thread is the user asking why no pass ran.
+        if stop_notice is not None:
+            print(stop_notice(payload, message, "remind-ums-after-error"))
+        else:
+            print(json.dumps({"decision": "block", "reason": message}))
+    else:
+        print(message)
     return 0
 
 

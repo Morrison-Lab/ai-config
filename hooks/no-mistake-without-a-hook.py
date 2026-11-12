@@ -99,6 +99,7 @@ _ums = _sibling("remind-ums-after-error.py")
 ADMISSION = getattr(_ums, "ADMISSION", None)
 visible_prose = getattr(_ums, "visible_prose", lambda t: t)
 _sentinel_gate = getattr(_ums, "_sentinel_gate", None)
+_reply_text = getattr(_ums, "reply_text", lambda name, inp: "")
 
 # Writing or registering a hook. `hooks.json` counts because registration is
 # the second half of the work, per README's activation gate.
@@ -193,6 +194,17 @@ def scan(path):
                             b.get("input") or {})
                         if HOOK_WORK.search(blob):
                             done_at = i
+                        # A project thread's reply is a tool input, not a
+                        # text block (remind-ums-after-error.py, 2026-11-12).
+                        said = _reply_text(b.get("name"), b.get("input"))
+                        if said.strip():
+                            prose = visible_prose(said)
+                            hit = ADMISSION.search(prose) if ADMISSION is not None else None
+                            hit = hit or REDUNDANT_PROSE.search(prose)
+                            if hit:
+                                admit_txt, admit_at = hit.group(0), i
+                            if discharges(prose):
+                                done_at = i
                     elif b.get("type") == "text" and (role == "assistant" or m.get("type") == "assistant"):
                         txt = b.get("text") or ""
                         if not txt.strip():

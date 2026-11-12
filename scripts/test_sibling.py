@@ -4,10 +4,11 @@
 The first section pins `load_sibling` itself. The second loads each hook
 that uses it in a fresh process and checks that the sibling it names really
 loads, so a migration that broke the path would show here rather than as a
-hook that quietly runs without its sibling. The third copies each hook that
-guards its import of the loader, with its siblings, to a tree whose
-scripts/lib lacks the loader, and checks that the hook still imports and
-says why on stderr.
+hook that quietly runs without its sibling. The third copies each hook to
+fresh trees. With scripts/lib present and the siblings missing, the hook
+must bind None for each and name each on stderr. With the siblings present
+and scripts/lib empty, a hook declared in GUARDED must still import and name
+the missing loader, and any other hook must fail to import.
 
 Run:  python3 scripts/test_sibling.py
 """
@@ -180,7 +181,7 @@ for hook_name, sibs in USERS:
     proc = probe_copy(hook_name, sibs, with_lib=False, with_sibs=True)
     if guarded:
         want = " ".join(["True"] * (1 + len(sibs)))
-        check(f"broken install: {hook_name} imports, with no loader and no sibling",
+        check(f"broken install: {hook_name} imports, and binds None for each sibling",
               (proc.returncode, proc.stdout.strip()), (0, want))
         check(f"broken install: {hook_name} names the missing loader on stderr",
               "scripts/lib/sibling.py" in proc.stderr, True)

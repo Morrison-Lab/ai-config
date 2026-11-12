@@ -113,7 +113,7 @@ for tool, inp in WRITES:
 os.mkdir(os.path.join(TMP, "sub"))
 for name, code in [("sub/post.py", "import canvasapi\nc.create_discussion_topic(is_announcement=True)"), ("p.R",
                    "httr::PUT(u_topic_announcement)"), ("read.py", "print(canvasapi.get_announcements())"),
-                   ("notes.py", "# post the weekly summary\nprint('announcement')"), ("test-x.py", "is_announcement=True"), ("copy.py", open(SUBJECT).read())]:
+                   ("notes.py", "# post the weekly summary\nprint('announcement')"), ("test-x.py", "is_announcement=True"), ("copy.py", open(SUBJECT, encoding="utf-8").read())]:
     with open(os.path.join(TMP, name), "w", encoding="utf-8") as fh:
         fh.write(code)
 SCRIPTS = {"python3 sub/post.py": "deny", "cd sub && python3 post.py": "deny", "python3.12 sub/post.py": "deny",

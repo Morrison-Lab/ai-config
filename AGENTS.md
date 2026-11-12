@@ -20,9 +20,6 @@ Trigger the automated reviews yourself after the round's last push (or confirm a
 A quota-skipped, stubbed, or never-started review is no review: re-trigger it, and if it still cannot give a verdict, a clean posted adversarial review stands in.
 See [`automated-review-before-human`](shared/workflow/automated-review-before-human.md) for steps and exceptions.
 
-- **Do:** drive the automated review to clean or deadlock, and link that verdict.
-- **Don't:** say "ready for your review" on a draft or a head with no clean automated verdict.
-
 ## Instruction layering
 
 `AGENTS.md` is the compact, unconditional cross-agent contract.
@@ -47,9 +44,6 @@ drafting locally while approval is pending is allowed.
 The user's own push access authorizes non-force pushes and PRs only, per [`use-existing-pr-branch`](shared/workflow/use-existing-pr-branch.md).
 See [`gate-external-communication`](shared/workflow/gate-external-communication.md).
 
-- **Do:** verify membership in the specific target repository before posting outward communication.
-- **Don't:** infer membership from a public repository, write access, a fork, or org membership.
-- **Don't:** send email for the user ("never send emails for me"); draft it.
 ## Graph and display equation defaults
 
 When authoring analysis figures, prefer `ggplot2` over base graphics wherever the dependency is available or appropriate to add.
@@ -87,17 +81,12 @@ When ending a turn and reporting stopping point status, explicitly state whether
 Never say a session is done when there are uncommitted, unpushed, or un-PRed changes, or open PRs authored by that session.
 See [`flag-session-boundaries`](shared/workflow/flag-session-boundaries.md).
 
-- **Do:** explicitly state "session is done" or "session is not done" with concrete remaining queued steps at every stopping point report.
-- **Don't:** say a session is done when there are uncommitted, unpushed, or un-PRed changes, or open PRs authored by that session.
-
 ## Terminate superseded and abandoned background tasks
 
 When background tasks, asynchronous command executions, monitors, or subagents are dispatched to inspect, search, or diagnose an issue, actively terminate them as soon as their purpose is fulfilled, their findings are superseded, or the session moves on.
 Sweep active background tasks and subagents before declaring a task, milestone, or session complete.
 See [`terminate-superseded-tasks`](shared/workflow/terminate-superseded-tasks.md).
 
-- **Do:** kill diagnostic searches, greps, and test processes the moment their question is answered or superseded.
-- **Don't:** conclude a session while transient background tasks are still running.
 ## Prefer optionality over removing functionality
 
 Never remove existing functionality entirely when you can add optionality instead.
@@ -173,11 +162,7 @@ See [`use-real-world-examples`](shared/principles/use-real-world-examples.md) (p
 ## Search the tracker and AGENTS.md before building or denying a policy
 
 Before answering that a permission or policy does not exist, and before implementing a new policy or capability, search the full policy corpus (`AGENTS.md`, `CLAUDE.md`, `memories/`, `shared/`) and the issue tracker.
-See [`grep-is-not-coverage`](shared/workflow/grep-is-not-coverage.md) and [`AGENTS.cases.md`](AGENTS.cases.md).
-
-- **Do:** search `AGENTS.md`, `CLAUDE.md`, `memories/`, `shared/`, and open issues before answering "no" to whether a policy exists.
-- **Do:** run an all-state tracker search before implementing a capability request.
-- **Don't:** assert that a standing grant or rule does not exist based only on searching `skills/` or `memories/`.
+See [`grep-is-not-coverage`](shared/workflow/grep-is-not-coverage.md), [`issue-first`](shared/workflow/issue-first.md) for the all-state search, and [`AGENTS.cases.md`](AGENTS.cases.md).
 
 ## Track each useful resource in each notes repo whose topic it covers
 
@@ -224,9 +209,6 @@ See [`run-ums-proactively`](shared/workflow/run-ums-proactively.md).
 
 Before ending a turn to wait on anything --- CI, a review round, a subagent, or an answer from the user --- run `ums` first if learnings have accumulated.
 See [`run-ums-proactively`](shared/workflow/run-ums-proactively.md).
-
-- **Do:** arm a wake mechanism alongside the pass, so the pause resumes.
-- **Don't:** leave an accumulated learning in conversation memory across a turn boundary.
 
 ## Help your subagents improve over time
 
@@ -313,8 +295,7 @@ See [`no-sweeps-by-default`](shared/workflow/no-sweeps-by-default.md).
 
 ## Check the remote immediately before every push
 
-Take a fresh reading of the remote branch **immediately** before every `git push`, and reconcile what it shows rather than overwriting it.
-Run `git ls-remote --heads origin <branch>` immediately before every `git push`.
+Run `git ls-remote --heads origin <branch>` **immediately** before every `git push`, and reconcile what it shows rather than overwriting it.
 Never bare `git push --force`; always use `--force-with-lease --force-if-includes`.
 See [`check-before-pushing`](shared/workflow/check-before-pushing.md).
 
@@ -344,8 +325,6 @@ Every comment an agent posts to a forge --- GitHub, GitLab, or any other --- mus
 Append the standard disclosure footer at the end of every posted comment: `_Posted by <Agent Name> (AI agent) --- not written by a human._` Do not use the robot emoji in the disclosure footer, as automated review parsers can misinterpret it as a review verdict.
 See [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md) and [`label-agent-filed-issues`](shared/workflow/label-agent-filed-issues.md).
 
-- **Do:** append the disclosure footer to every issue comment, PR comment, thread reply, and status update posted to a forge.
-- **Don't:** use the robot emoji in the disclosure line.
 ## File formatting & links
 
 - Use GitHub-style markdown for all responses and documentation.
@@ -369,10 +348,7 @@ Commit it when reproducing it costs more than a moment **and** something durable
 re-check the committed form before publishing.
 See [`commit-reusable-work`](shared/workflow/commit-reusable-work.md) and [`AGENTS.cases.md`](AGENTS.cases.md).
 
-- **Do:** commit and PR reusable incidental work in the owning repository in the same session.
-- **Do:** re-check the committed form against published claims, stating so in the commit message.
-- **Do:** [port content by script](shared/workflow/port-by-script.md).
-- **Don't:** leave incidental math, code, or derivations in scratchpads or chat logs.
+[Port content by script](shared/workflow/port-by-script.md).
 ## Never dispatch a worker on Fable without explicit, specific permission
 
 Workers without an explicit model inherit the conductor's: never dispatch a worker on Fable without explicit, specific permission.
@@ -392,8 +368,6 @@ Address, rebut, or defer every finding, and obtain a clean verdict before pushin
 Do not push unless the verdict is `clean` and the fingerprint prefix-matches HEAD.
 See [`adversarial-self-review`](shared/workflow/adversarial-self-review.md).
 
-- **Do:** dispatch self-review to a separate subagent with an adversarial brief.
-- **Don't:** review your own diff in the authoring context.
 ## Put PRs in ready mode when they are ready for review
 
 A Pull Request that is ready for review must be in ready mode, not left in draft.
@@ -443,9 +417,6 @@ Create new repos with `gh repo create --template`: [`templates`](shared/workflow
 
 Detail, cases, cross-model waiver: [`strict-merge-policy`](shared/workflow/strict-merge-policy.md).
 
-- **Do:** merge a fully clean infrastructure PR without asking, stating why it qualified.
-- **Don't:** extend the grant to a PR that mixes infrastructure with content, or merge one whose review was skipped.
-
 ## Only work PRs scoped to the user or Actions app
 
 Before pushing to, editing, commenting on, resolving threads on, reviewing, dispatching a paid review of, or merging any PR, read its author and assignees.
@@ -454,9 +425,6 @@ an explicit "do not touch" vetoes the PR first, and a missing identity check fai
 A review-only run dispatched naming the target PR reviews and stops there.
 Every review you post or produce, including a local report or one composed in-transcript, carries both the Markdown report and the `review-data` JSON payload.
 Detail: [`pr-scope`](shared/workflow/pr-scope.md) and [`memories/reviewing-prs.md`](memories/reviewing-prs.md).
-
-- **Do:** verify author, assignees, or explicit user requests before interacting with any PR.
-- **Don't:** interact with out-of-scope PRs or infer scope from claim comments.
 
 ## Always arm a persistent PR loop
 
@@ -474,10 +442,6 @@ do not sweep every accessible repository.
 Within an active repository, monitor only items passing the PR scope test, including items opened, pushed to, or handed to drive.
 Re-query the scoped open set at every wake, inspecting mergeability, CI, and review state until the item merges, closes, or is released.
 See [`monitor-scoped-open-prs`](shared/workflow/monitor-scoped-open-prs.md).
-
-- **Do:** derive the scoped open PR/MR set in each active repository at every monitoring pass, and arm a persistent loop.
-- **Do:** act on terminal CI failures, merge conflicts, and review findings without waiting for a prompt.
-- **Don't:** sweep every accessible repository or stop monitoring because an item was opened by someone else.
 
 ## Cursor Cloud specific instructions
 

@@ -18,9 +18,11 @@ lists these commands as anti-patterns:
 
 Git accepts a unique prefix of a long option. `--our`, `--thei` and
 `--strategy-opt=ours` count, and so does `--t` on `restore` and
-`merge-file`, where nothing else starts with it. `checkout -2|-3` and
-`restore -2|-3` are the short forms of `--ours|--theirs`. A prefix of `--strategy` itself also starts
-`--strategy-option`, so git rejects it as ambiguous (`--strat=ours`).
+`merge-file`, where nothing else starts with it.
+`checkout -2|-3` and `restore -2|-3` are the short forms of `--ours|--theirs`,
+also inside a short-option cluster such as `-W3`.
+A prefix of `--strategy` itself also starts `--strategy-option`,
+so git rejects it as ambiguous (`--strat=ours`).
 A command inside `bash -c '...'` (and `sh`, `zsh` and similar) is checked,
 up to MAX_DEPTH nested shells; one fed through `xargs` or `eval` is not.
 A run with `--abort` or `--quit` resolves nothing and stays silent.
@@ -61,8 +63,10 @@ SIDE_PREFIX_MIN = {
     "restore": {"--ours": "--ou", "--theirs": "--t"},
     "merge-file": {"--ours": "--ou", "--theirs": "--t"},
 }
-# checkout and restore also spell the sides as stage numbers.
-SIDE_SHORT = {"-2": "--ours", "-3": "--theirs"}
+# checkout and restore also spell the sides as stage numbers, and a short
+# option that takes a value ends a cluster: `-b3` names a branch `3`.
+SIDE_SHORT = {"2": "--ours", "3": "--theirs"}
+SHORT_WITH_VALUE = {"checkout": "bB", "restore": "s"}
 # `--strategy-` already excludes `--strategy`, the only other `--strategy...`.
 LONG_PREFIX_MIN = {"--strategy-option": "--strategy-"}
 MAX_DEPTH = 3
@@ -70,9 +74,15 @@ MAX_DEPTH = 3
 
 def _side_flag(sub: str, arg: str) -> str | None:
     """`--ours` or `--theirs` when ARG is that flag, a unique prefix of it on
-    SUB, or (checkout and restore) its `-2`/`-3` short form."""
-    if sub != "merge-file" and arg in SIDE_SHORT:
-        return SIDE_SHORT[arg]
+    SUB, or (checkout and restore) its `-2`/`-3` short form, alone or in a
+    cluster."""
+    if sub in SHORT_WITH_VALUE and arg[:1] == "-" and arg[:2] != "--":
+        for c in arg[1:]:
+            if c in SHORT_WITH_VALUE[sub]:
+                return None
+            if c in SIDE_SHORT:
+                return SIDE_SHORT[c]
+        return None
     for flag, shortest in SIDE_PREFIX_MIN[sub].items():
         if arg.startswith(shortest) and flag.startswith(arg):
             return flag

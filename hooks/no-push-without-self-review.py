@@ -2942,8 +2942,10 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
         for seq, (found, shas) in enumerate(history):
             for sha in shas:
                 if sha not in resolved_cache:
-                    resolved_cache[sha] = _rev_parse(
-                        directory, env, f"{sha}^{{commit}}")
+                    # exit 1 is "no such commit"; any other git failure defers
+                    resolved_cache[sha] = (_run_git(
+                        directory, env, "rev-parse", "--verify", "--quiet",
+                        f"{sha}^{{commit}}", unreadable_raises=True) or "").lower() or None
             hits = [resolved_cache[s] for s in shas if resolved_cache[s]]
             if found == "clean" and len(hits) < len(shas):
                 continue  # an unresolvable fingerprint voids a clean report
@@ -2975,7 +2977,7 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
                             "code whose review this guard cannot read (it accepts "
                             f"{ACCEPTED_VERDICT_PHRASES})")
                     own = (f"No verdict names {c[:12]}, and a" if since < 0
-                           else f"A later")
+                           else "A later")
                     return "", (f"{own} {_VERDICT_WORDS[f]} names {sha[:12]}, an ancestor of "
                                 f"{c[:12]}, so this push ships {what}.\n"
                                 "Address it, then re-dispatch the reviewer against what you push.")
@@ -2984,8 +2986,9 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
             return ("Clean adversarial self-review verified at "
                     f"{', '.join(sorted(commits))} (latest verdict naming each)."), ""
         return "", ("No verdict covers " + "; ".join(
-            f"{c[:12]} ({vetoed.get(c, 'no verdict names it')})" for c in missing)
-            + ", but this push would ship it.\nA push ships commits, so whatever no "
+            c[:12] + (f" ({vetoed[c]})" if c in vetoed else "") for c in missing)
+            + f", but this push would ship {'them' if len(missing) > 1 else 'it'}."
+            "\nA push ships commits, so whatever no "
             "verdict covers -- a later commit, a `main` merge, a rebase, or a branch "
             "other than the reviewed one -- is unreviewed. Re-dispatch the reviewer "
             "against what you are actually pushing.")

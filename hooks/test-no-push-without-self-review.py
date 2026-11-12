@@ -2460,8 +2460,9 @@ def verdict_map_cases() -> tuple[int, int]:
     check("a later clean report with no fingerprint vetoes",
           PUSH, verdicts((clean, HEAD)) + reviewed(body(fingerprint=False)), True)
     for label, cmd, pairs, text, env in (
-            ("an unreviewed commit keeps the existing message", PUSH,
-             ((clean, FEATURE), (nmw, OTHER_HEAD), (clean, FEATURE)), "but this push", None),
+            ("an unreviewed commit is named as uncovered", PUSH,
+             ((clean, FEATURE), (nmw, OTHER_HEAD), (clean, FEATURE)),
+             f"No verdict covers {HEAD[:12]}, but this push would ship it.", None),
             ("the refusal names a blocking verdict on the base", push_feature,
              ((clean, FEATURE), (nmw, HEAD), (clean, OTHER_HEAD)), f"names {HEAD[:12]}, an ancestor", None),
             ("the refusal names the blocking verdict on the commit", PUSH,
@@ -2486,9 +2487,9 @@ def verdict_map_cases() -> tuple[int, int]:
             ("a commit with no verdict still gets the ancestor refusal", push_feature,
              ((nmw, HEAD), (clean, OTHER_HEAD)), f"No verdict names {FEATURE[:12]}, and a", None),
             ("an unnamed commit is not blamed on another repository's review", PUSH,
-             ((clean, FEATURE), (clean, OTHER_HEAD)), f"{HEAD[:12]} (no verdict names it)", None),
+             ((clean, FEATURE), (clean, OTHER_HEAD)), f"No verdict covers {HEAD[:12]}, but", None),
             ("an unnamed commit is not blamed on a descendant's blocking verdict", PUSH,
-             ((clean, FEATURE), (nmw, FEATURE)), f"{HEAD[:12]} (no verdict names it)", None),
+             ((clean, FEATURE), (nmw, FEATURE)), f"No verdict covers {HEAD[:12]}, but", None),
             ("a map that runs out of time still refuses", PUSH,
              ((clean, FEATURE), (nmw, HEAD)), "blocking verdict", {"NPWSR_BUDGET_SECONDS": "0"})):
         rc, out = run_hook(cmd, verdicts(*pairs), extra_env=env)

@@ -1,0 +1,85 @@
+name: validate-duration
+
+# Once a week, compare the `validate` job's recent wall time on main with a
+# baseline from LAG_DAYS earlier (scripts/check-validate-duration.py).
+# "Run enforcement-hook tests" doubled between September and November 2026
+# with nothing to notice it (ai-config#3384).
+# A slowdown with no tracking issue opens one and fails the run. While that
+# issue is open, each weekly run that still finds a slowdown comments on it,
+# which notifies its subscribers and shows a later slowdown on top of the
+# first. Close it as "completed" once fixed. Close it as "not planned" to
+# accept the slowdown: for LAG_DAYS after closing, until the slow runs fill
+# the baseline, the check then only warns, about this or any other slowdown.
+
+on:
+  schedule:
+    - cron: "41 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-duration
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      LAG_DAYS: 28
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Compare recent and baseline durations
+        id: judge
+        shell: bash  # bash -eo pipefail; the default bash -e has no pipefail
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          python3 scripts/check-validate-duration.py --lag-days "$LAG_DAYS" > report.txt
+          code=$?
+          set -e
+          cat report.txt
+          # Main always has enough history, so too few runs (4) means the
+          # check found no `validate` job, for example after a rename: fail.
+          if [ "$code" -ne 0 ] && [ "$code" -ne 1 ]; then
+            exit "$code"
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+      - name: Open or update the tracking issue
+        if: steps.judge.outputs.code == '1'
+        shell: bash  # with pipefail, a failed gh api stops the step before any create
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="validate job on main has slowed down"
+          marker="<!-- validate-duration-tracking -->"
+          { echo "$marker"; echo "Measured by $RUN_URL (#3384):"; echo
+            echo '```'; cat report.txt; echo '```'; } > body.md
+          # The list endpoint, not search, so an issue opened minutes ago by a
+          # manual run is found. The newest tracking issue decides.
+          # scripts/test_validate_duration_workflow.py runs this step.
+          found=$(gh api --paginate \
+            "repos/$GH_REPO/issues?state=all&creator=github-actions%5Bbot%5D&sort=created&direction=desc&per_page=100" \
+            --jq ".[] | select(.pull_request == null and .title == \"$title\"
+                               and (.body // \"\" | contains(\"$marker\")))
+                  | \"\(.number) \(.state) \(.state_reason) \(.closed_at)\"" | sed -n 1p)
+          read -r number state reason closed <<< "$found"
+          since=$(jq -nr --argjson days "$LAG_DAYS" 'now - $days * 86400 | todate')  # not GNU date -d
+          if [ "$state" = "open" ]; then
+            gh issue comment "$number" --body-file body.md
+            echo "::warning::validate is still slower than the baseline; see #$number"
+          elif [ "$reason" = "not_planned" ] && [[ "$closed" > "$since" ]]; then
+            echo "::warning::validate is slower than the baseline; #$number accepted a slowdown"
+          else
+            gh issue create --title "$title" --label P2 --body-file body.md
+            echo "::error::validate job on main has slowed down; see the new tracking issue"
+            exit 1
+          fi

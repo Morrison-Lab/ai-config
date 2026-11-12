@@ -123,30 +123,22 @@ See [`user-profanity-signal`](shared/workflow/user-profanity-signal.md).
 ## Status and diagnostic requests do not make issues report-only
 
 Treat diagnostic inquiries ("why did X happen?", "status?") as instructions to diagnose, repair, verify, and complete delivery in the same turn.
-When asked for status, inspect transcripts for stalls or frozen tasks, diagnose what stalled, and resume immediately.
-See [`status-requests-act`](shared/workflow/status-requests-act.md).
+For status, check the transcript for stalled or frozen work and resume it at once ([`status-requests-act`](shared/workflow/status-requests-act.md)).
 
 ## Upgrade a repo to `Morrison-Lab/gha` when it would benefit
 
-`Morrison-Lab/gha` holds the lab's reusable GitHub Actions workflows (`uses: Morrison-Lab/gha/.github/workflows/<name>.yml@vN`).
-When touching a repo using copy-pasted or outdated CI actions, migrate to `Morrison-Lab/gha` workflows where appropriate.
-See [`upgrade-to-gha`](shared/workflow/upgrade-to-gha.md).
+When a repo you touch uses copy-pasted or outdated CI actions, migrate it to the lab's reusable `Morrison-Lab/gha` workflows where appropriate ([`upgrade-to-gha`](shared/workflow/upgrade-to-gha.md)).
 
 ## Manage quota, including the structural kind
 
-Treat token cost as a property of a workflow's **shape**: route bounded mechanical work to cheaper models, subagents, or separately-billed CLIs.
-See [`restructure-for-efficiency`](shared/workflow/restructure-for-efficiency.md) and [`merge-queue`](shared/workflow/merge-queue.md).
-In a cloud session (no `agy` or Codex), send bulk, mechanical, and review work to OpenCode Go (`delegate-to-opencode`) while Claude quota is low.
-Claude checks every result.
+Follow [`manage-quota`](shared/workflow/manage-quota.md#delegation-rules-for-every-agent) for workflow shape and where to send delegated work.
 A reviewer must differ from the author in model and harness.
 Never send student or PHI data.
-Elsewhere follow `memories/delegation.md`.
-Never use a pay-per-use API anywhere (Ezra, 2026-10-17); see that file.
+Never use a pay-per-use API anywhere (Ezra, 2026-10-17).
 
 ## Keep ai-config and repo checkouts fresh
 
 Before starting work, update the current checkout and relevant submodules (`git pull --ff-only`, `git submodule update --init --recursive`).
-When working in a consumer repo, check if the `.ai-config` submodule is outdated relative to `origin/main` of `ai-config` and update it if appropriate.
 [`keep-checkouts-fresh`](shared/workflow/keep-checkouts-fresh.md) gives the four checks (the ai-config checkout, the consumer install, the working repo's `main`, the `.ai-config` pin), how to run each, how each fails, and the cases behind them.
 
 ## Remove redundant submodules when using native plugins
@@ -203,20 +195,13 @@ When a PR changes an analysis or model, quantify differences in key outputs, est
 
 ## Every comment you post to a forge says an agent posted it
 
-Every comment an agent posts to a forge --- GitHub, GitLab, or any other --- must state in the body that an agent posted it.
-Append the standard disclosure footer at the end of every posted comment: `_Posted by <Agent Name> (AI agent) --- not written by a human._` Do not use the robot emoji in the disclosure footer, as automated review parsers can misinterpret it as a review verdict.
-See [`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md) and [`label-agent-filed-issues`](shared/workflow/label-agent-filed-issues.md).
+End every comment an agent posts to any forge with the disclosure footer `_Posted by <Agent Name> (AI agent) --- not written by a human._` ([`disclose-agent-authorship`](shared/workflow/disclose-agent-authorship.md), [`label-agent-filed-issues`](shared/workflow/label-agent-filed-issues.md)).
+Use no robot emoji anywhere in the footer, since review parsers can misinterpret it as a review verdict.
 
 ## File formatting & links
 
-- Use GitHub-style markdown for all responses and documentation.
-- Hyperlink liberally to make it easy for readers to find more information;
-  see [`hyperlink-liberally`](shared/writing/hyperlink-liberally.md).
-- When referencing files or symbols, use relative markdown links or inline code backticks.
-- When mentioning PRs or issues, format them as clickable hyperlinks to forge URLs, never bare `#NNN` (except `Closes #123`).
-- Semantic line breaks everywhere, enforced by CI ([rule](shared/writing/semantic-line-breaks.md)).
-
-- **Don't:** link a `#NNN` a passage is displaying rather than citing, or leave referenced tools, forge items or policies unlinked.
+When mentioning PRs or issues, format them as clickable hyperlinks to forge URLs, never bare `#NNN` (except `Closes #123`).
+Follow [`file-formatting-and-links`](shared/writing/file-formatting-and-links.md) for the rest: markdown flavour, liberal hyperlinking of tools, forge items and policies, links to files and symbols, the displayed-`#NNN` exception, and line breaks.
 
 ## Never dispatch a worker on Fable without explicit, specific permission
 
@@ -306,8 +291,7 @@ Verify every push first, and carry work worth keeping through to a PR ([#2889](h
 - **Deliver completed implementation work:** when asked to implement or write up changes on a feature branch, complete the full delivery cycle: tracking issue, scoped commits, adversarial self-review to a clean verdict, push, open or update the PR, request AI review, and drive to clean.
   This grants no merge authority: the Strict Merge Control Policy still applies.
 - **Verify changes before pushing:** always run relevant local linters, tests, and formatting checks before pushing commits to a remote branch.
-  At minimum for `ai-config`: `python3 scripts/validate-skills.py`, `python3 scripts/check-links.py`, `python3 scripts/check-ascii-punctuation.py`.
-  Run the full test suite (`python3 scripts/test_*.py`) when touching shared tools or scripts.
+  For `ai-config`, [`verify-changes-before-pushing`](shared/workflow/verify-changes-before-pushing.md) lists the minimum checks and when to run the full suite.
   Parse changed data files: [rule](shared/workflow/parse-data-files.md).
 - **Check the remote immediately before every push:** run `git ls-remote --heads origin <branch>` **immediately** before every `git push`, and reconcile what it shows.
   Never force-push without `--force-with-lease --force-if-includes` ([`check-before-pushing`](shared/workflow/check-before-pushing.md)).

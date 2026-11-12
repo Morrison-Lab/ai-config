@@ -423,6 +423,7 @@ its description does not use (ai-config#949).
 | `shared/workflow/use-plugins.md` | Search for and install plugins proactively. When a task would benefit from specialized domain tooling, external service integrations, linters, or workflow au... |  |
 | `shared/workflow/use-subagents.md` | When available, use subagents for helpful sidecar work: independent investigation, verification, or disjoint implementation slices. Keep immediate blocking c... |  |
 | `shared/workflow/user-profanity-signal.md` | Profanity, exasperation, or intense frustration from the user is almost always a high-signal indicator that an agent made a severe mistake, regressed previou... |  |
+| `shared/workflow/verify-changes-before-pushing.md` | The checks to run before pushing to `ai-config`: the three fast checks and the full test suite when shared tools or scripts change. |  |
 | `shared/workflow/verify-merge-commit-ci.md` | A PR's own CI is not the whole story once it merges. A repo can run a workflow on `push` that it never runs on `pull_request` --- a full or PDF render, a dep... |  |
 | `shared/workflow/verify-running-model.md` | A session cannot report its own model or effort by introspection, so a claim such as "I am on Opus at high effort" is a guess until an instrument reads it. `... |  |
 | `shared/workflow/verify-the-right-artifact.md` | Before reporting a finding, name the artifact the claim is about, and confirm that is the one you read. |  |
@@ -441,6 +442,7 @@ its description does not use (ai-config#949).
 | `shared/writing/examples-are-scanned.md` | An illustrative example sits inside the document, so a mechanical check that scans the document may scan the example too. When the document's subject *is* a... |  |
 | `shared/writing/explain-analysis-choices.md` | Ezra's rule (2026-11-03, ai-config#4905): every time you make an arbitrary analysis choice, explain the decision in detail in the prose next to it. |  |
 | `shared/writing/fact-check-prose.md` | When reviewing prose in a PR/MR --- documentation, lecture notes, a README, any non-code narrative content --- assess it for **accuracy and clarity**, not ju... |  |
+| `shared/writing/file-formatting-and-links.md` | Formatting defaults for responses and documentation: GitHub-style markdown, liberal hyperlinks, links or backticks for files and symbols, linked PRs and issu... |  |
 | `shared/writing/forward-references.md` | A **forward reference** is any mention that points a reader ahead to content they haven't reached yet --- a phrase like "as discussed below", "in the followi... |  |
 | `shared/writing/graph-and-equation-defaults.md` | Defaults for analysis figures, visuals and display math: `ggplot2`, worded axes and plain-number ticks, a visual wherever one helps, one equation per display... |  |
 | `shared/writing/grouping-levels.md` | A grouping level must earn its place: introducing one costs the reader a level of nesting, and that cost is only repaid when the level actually separates som... |  |

@@ -46,7 +46,11 @@ jobs:
         # earlier equation is added. This replays that assignment.
         run: python3 scripts/test_resolve_equation_anchors.py
       - name: Check ASCII punctuation in source files
-        # ai-config#2550: ensure .py and .R source files obey the ASCII punctuation policy.
+        # ai-config#2550. The rule covers .md too (ai-config#3284), but this
+        # whole-tree scan stays on .py and .R until the .md backlog is cleared
+        # (ai-config#735). Meanwhile "Check lines the PR adds for non-ASCII
+        # punctuation" in the new-line-breaks job checks the lines each PR adds
+        # in .py, .R, .qmd, .md, .sh, .yml and .yaml (DIFF_DEFAULT_EXTENSIONS).
         run: python3 scripts/check-ascii-punctuation.py
       - name: Run check-ascii-punctuation tests
         run: python3 scripts/test_check_ascii_punctuation.py
@@ -108,6 +112,12 @@ jobs:
         run: python3 scripts/test_check_unpinned_git_fixtures.py
       - name: Run check-pr-fully-clean tests
         run: python3 scripts/test_check_pr_fully_clean.py
+      - name: Run check-validate-duration tests
+        # ai-config#3384: the judge that flags a slower validate job on main.
+        run: python3 scripts/test_check_validate_duration.py
+      - name: Run validate-duration workflow tests
+        # ai-config#3384: both steps of validate-duration.yml.
+        run: python3 scripts/test_validate_duration_workflow.py
       - name: Run diff-annotations-vs-base tests
         # ai-config#5281: per-name annotation diff over every page.
         run: python3 scripts/test_diff_annotations_vs_base.py

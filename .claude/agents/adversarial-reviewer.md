@@ -218,6 +218,13 @@ A fix for one permission error changes the one path that raised it.
 Read the diff; do not report `hooks/no-recursive-chown-system-path.py`'s verdict as your finding.
 See [`destructive-actions-catalog`](../../shared/workflow/destructive-actions-catalog.md#recursive-ownership-and-mode-changes).
 
+## Recursive deletes through a variable
+
+On a diff, script or command that runs `rm -r` or `find ... -delete`, check that every variable in a target is set in the same shell before the delete, or guarded with `${VAR:?}`.
+A variable set by an earlier Bash call is empty in a new one, so `"$d/"` is then `/`.
+Read the diff; do not report `hooks/no-recursive-rm-unset-variable.py`'s verdict as your finding.
+See [`destructive-actions-catalog`](../../shared/workflow/destructive-actions-catalog.md#rules-for-the-patterns-no-hook-decides-yet).
+
 ## Commands that discard work or data
 
 On a diff, script or command, look for a step that discards work or data with no way back: `rm -rf` of `/`, the home directory or the current tree, `git reset --hard`, `git checkout -- .`, `git restore`, `git clean -f`, `git stash drop` or `git stash clear`, `git branch -D`, a push with `--delete` or a bare `--force`, `git worktree remove --force`, a download piped into a shell, or a read of an SSH key or `.env` file.
@@ -282,3 +289,8 @@ See [`check-thread-models`](../../shared/workflow/check-thread-models.md).
 
 On a skill, hook, or workflow that reads issues, comments, web pages, or logs and then acts, check that each action traces to the user's request rather than to the content read.
 See [`untrusted-content-is-data`](../../shared/workflow/untrusted-content-is-data.md).
+
+## Steps added to validate.yml
+
+On a diff that adds a step or test suite to `.github/workflows/validate.yml`, check that the PR body states how long it takes, and report it when it does not.
+See [`algorithmatize-checks`](../../shared/workflow/algorithmatize-checks.md#a-new-validate-step-adds-to-every-pushs-wait).

@@ -19,12 +19,18 @@ def git(cwd, *args):
     subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, env=ENV)
 
 
-def make_repo(files):
-    """A repo with origin/main at a base commit and a branch adding `files` ({path: lines})."""
+def make_repo(files, attrs=None):
+    """A repo with origin/main at a base commit and a branch adding `files` ({path: lines}).
+
+    `attrs`, when given, is the base commit's `.gitattributes`.
+    """
     d = tempfile.mkdtemp()
     git(d, "init", "-q", "-b", "main")
     with open(os.path.join(d, "base.txt"), "w", encoding="utf-8") as f:
         f.write("base\n")
+    if attrs is not None:
+        with open(os.path.join(d, ".gitattributes"), "w", encoding="utf-8") as f:
+            f.write(attrs)
     git(d, "add", "-A")
     git(d, "commit", "-q", "-m", "base")
     git(d, "update-ref", "refs/remotes/origin/main", "HEAD")
@@ -79,6 +85,14 @@ def main():
     figs = make_repo({"c/_fig-a-3d.qmd": 250, "c/_fig-b-3d.qmd": 250, "c/x.qmd": 10})
     many_figs = make_repo({f"c/_fig-{i}.qmd": 5 for i in range(11)})
 
+    # lds#2355 shape: two committed generator outputs plus a small hand edit.
+    by_module = {"c/_sub/definitions/_by-module.qmd": 270,
+                 "c/_sub/results/_by-module.qmd": 270, "c/x.qmd": 10}
+    gen_marked = make_repo(by_module, attrs="**/_by-module.qmd linguist-generated\n")
+    gen_true = make_repo(by_module, attrs="**/_by-module.qmd linguist-generated=true\n")
+    gen_false = make_repo(by_module, attrs="**/_by-module.qmd linguist-generated=false\n")
+    gen_unmarked = make_repo(by_module)
+
     renames = make_repo({f"old/r{i}.qmd": 5 for i in range(12)})
     git(renames, "update-ref", "refs/remotes/origin/main", "HEAD")
     git(renames, "mv", "old", "new")
@@ -94,6 +108,10 @@ def main():
         ("exactly at the cap passes", run("git push", edge), False),
         ("one file over the cap is denied", run("git push", over), True),
         ("frozen and lock files are not counted", run("git push", ignored), False),
+        ("linguist-generated paths are not counted", run("git push", gen_marked), False),
+        ("linguist-generated=true paths are not counted", run("git push", gen_true), False),
+        ("linguist-generated=false paths still count", run("git push", gen_false), True),
+        ("unmarked generator output still counts", run("git push", gen_unmarked), True),
         ("ALLOW_LARGE_PR=1 prefix passes", run("ALLOW_LARGE_PR=1 git push", sweep), False),
         ("chained push is still measured", run("git fetch && git push origin feature", sweep), True),
         ("git -C path push is measured at that path", run(f"git -C {sweep} push", small), True),

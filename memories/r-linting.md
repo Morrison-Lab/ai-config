@@ -7,8 +7,8 @@ The tools here answer one question --- what shape must R source be in before CI 
 It also keeps two `lintr::object_usage_linter` bullets, which sit in a section organized by what only fails in CI rather than by which tool reports it.
 So `lintr` is findable in both files, and this one is not its sole home.
 
-Every pull request and issue cited below is a clickable link, per
-[AGENTS.md](../AGENTS.md)'s "File formatting & links" rule, whose
+Every pull request and issue cited below is a clickable link, per the
+[`file-formatting-and-links`](../shared/writing/file-formatting-and-links.md) rule, whose
 illustrative-token exception is what leaves `#629` in the
 `commented_code_linter` entry bare.
 

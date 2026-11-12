@@ -23,7 +23,7 @@ a row says so where its source was not.
 | Pattern | Reported incident | ai-config guard (2026-11-12) |
 | --- | --- | --- |
 | `rm -rf` with a stray home target | `rm -rf tests/ patches/ plan/ ~/` wiped a Mac home directory ([Docker, 2026-06-01](https://www.docker.com/blog/coding-agent-horror-stories-the-rm-rf-incident/)) | CC Safety Net (denies) |
-| `rm -rf "$VAR"` where the variable was set in an earlier Bash call | `rm -rf "$HOME"` ran against the real home directory after a temporary `$HOME` did not persist between tool calls ([#75859](https://github.com/anthropics/claude-code/issues/75859)) | none: CC Safety Net denies `rm -rf "$HOME"` but passes `rm -rf "$D/"` with `D` unset ([ai-config#5476](https://github.com/Morrison-Lab/ai-config/issues/5476)) |
+| `rm -rf "$VAR"` where the variable was set in an earlier Bash call | `rm -rf "$HOME"` ran against the real home directory after a temporary `$HOME` did not persist between tool calls ([#75859](https://github.com/anthropics/claude-code/issues/75859)) | CC Safety Net denies `rm -rf "$HOME"`; `no-recursive-rm-unset-variable.py` denies `rm -rf "$D/"` and `find "$D/" -delete` with `D` unset and not assigned earlier in the command ([ai-config#5476](https://github.com/Morrison-Lab/ai-config/issues/5476)) |
 | `git reset --hard` over uncommitted work | [#7232](https://github.com/anthropics/claude-code/issues/7232), [#17190](https://github.com/anthropics/claude-code/issues/17190), [#33850](https://github.com/anthropics/claude-code/issues/33850), and twice at session start in [#34327](https://github.com/anthropics/claude-code/issues/34327) | CC Safety Net (denies); `flag-reset-hard-uncommitted-work.py` (warns) |
 | `git checkout -- .` or `git restore <path>` over uncommitted work | `git checkout HEAD -- .` ([#11821](https://github.com/anthropics/claude-code/issues/11821)); `git restore lib/` across 40 files ([#43591](https://github.com/anthropics/claude-code/issues/43591)) | CC Safety Net (denies); `flag-reset-hard-uncommitted-work.py` (warns) |
 | `git clean -fd` deleting untracked or ignored files | [#45974](https://github.com/anthropics/claude-code/issues/45974); after `git rm -rf .` on a new orphan branch ([#29179](https://github.com/anthropics/claude-code/issues/29179)) | CC Safety Net denies `git clean -fd` and `git rm -rf .`; `no-rm-live-render-intermediate.py` denies deleting render intermediates |
@@ -72,6 +72,7 @@ It runs at the standard level, not strict, because replaying the 797 distinct Ba
   `$HOME` in a fresh shell is the real home directory ([#75859](https://github.com/anthropics/claude-code/issues/75859)).
 - **Don't:** use a variable in a deletion path that an earlier Bash call set.
   Each call starts a fresh shell.
+  `no-recursive-rm-unset-variable.py` denies a recursive delete through one, and [`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md#recursive-deletes-through-a-variable) looks for it.
 - **Do:** check that a directory exists after creating it, before moving anything into it.
 - **Don't:** answer a refused `--force-with-lease` with a plain `--force`.
   Read the remote branch first ([`check-before-pushing`](check-before-pushing.md)).

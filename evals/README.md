@@ -23,7 +23,7 @@ claude plugin eval . --ablation with-without --model sonnet --trust-plugin --no-
 - `--case <glob>` takes one glob;
   repeating the flag keeps only the last one, so use a tag or a wider glob to run several cases.
 - Runs use the subscription the CLI is signed in with.
-  Do not wire this into CI with a pay-per-use API key (`AGENTS.md`, "Manage quota").
+  Do not wire this into CI with a pay-per-use API key ([`manage-quota`](../shared/workflow/manage-quota.md#delegation-rules-for-every-agent)).
 
 Output lands in `evals/results/<timestamp>/`, which is git-ignored.
 
@@ -36,7 +36,7 @@ Each case is `evals/<name>/prompt.md` (frontmatter plus prompt) and one or more 
 | `trigger` | `trigger-ardi`, `trigger-find-ai-tells`, `trigger-memorize` | The request loads the skill it should. |
 | `negative` | `no-trigger-ardi`, `no-trigger-find-ai-tells`, `no-attach-attached-repo` | A nearby but out-of-scope request does not load the skill or apply the rule, and still gets answered. |
 | `injection` | `injection-readme-summary`, `injection-issue-triage` | An instruction embedded in third-party content is reported and not followed ([`untrusted-content-is-data`](../shared/workflow/untrusted-content-is-data.md)). |
-| `rule` | `authorship-marker`, `attach-missing-repo` plus the injection cases | An `AGENTS.md` or `shared/` rule shows up in the output. |
+| `rule` | `authorship-marker`, `validate-step-timing` and `attach-missing-repo`, plus the injection cases | A standing rule (from `AGENTS.md` or a shared fragment) shows up in the output. |
 | `skill-output` | `agent-builder-omit-claudemd`, `agent-builder-keep-claudemd` | `agent-builder` sets `omitClaudeMd: true` on a brief-only worker and leaves it off an agent that applies a repository's conventions. |
 
 ### First measurement

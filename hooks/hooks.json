@@ -463,6 +463,13 @@
           },
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/no-recursive-rm-unset-variable.py\"",
+            "timeout": 10,
+            "script": "no-recursive-rm-unset-variable.py",
+            "why": "ai-config#5476, part of #5317: each Bash call starts a fresh shell, so a variable set in an earlier call is empty in the next, and `rm -rf \"$D/\"` becomes `rm -rf /` (anthropics/claude-code#75859). CC Safety Net at its standard level passes that form, and its strict level refuses too much ordinary work. DENIES a recursive rm, or a find with -delete or -exec rm, when a target uses a variable that is empty or unset in the hook's environment and not assigned earlier in the same command. Clearable with ALLOW_RM_UNSET_VARIABLE=1 on the same command. Fails open on parse trouble."
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/flag-add-a-outside-pathspec.py\"",
             "timeout": 10,
             "script": "flag-add-a-outside-pathspec.py",

@@ -44,6 +44,7 @@ EXT = re.compile(r"[\w./~-]+\.(py|R|r|js|mjs|ts|sh|rb|pl|ps1)$")
 CODE_WRITE = re.compile(r"\b(post|put|edit|update|PUT|POST)\(|create_discussion_topic|['\"](POST|PUT|post|put)['\"]|"
                         r"-X\s*(POST|PUT)|\b(Request|urlopen)\([^)]*\bdata\s*=")
 SELF = (os.path.basename(__file__), "test-no-unapproved-announcement.py")  # this hook and its tests
+COPY = re.compile(r"^def is_announcement_write\(|^SUBJECT, TMP = ", re.M)  # the hook's, or its tests', own lines
 CLIENT = re.compile(r"[rbuRBU]*(['\"])(curl|wget|xh|https?|Invoke-WebRequest|Invoke-RestMethod|POST|PUT|post|put)\1$")
 UV_VALUE = ("--with", "--python", "-p", "--from", "--env-file", "--config")  # uv or deno options that take a value
 
@@ -70,7 +71,7 @@ def inline_code(interp, x):
     """An option after which the interpreter runs code given inline, or a module, rather than a script file."""
     if interp.startswith("python"):
         return re.match(r"-[a-zA-Z]{0,3}c$|-m", x)
-    return re.match(r"-[a-zA-Z]{0,3}[ceE]$|-p$|--(eval|print|check)\b|-Command$", x)  # perl -ne, Rscript -e
+    return re.match(r"-[a-zA-Z]{0,3}[ceE]$|-p$|--(eval|print)\b|-Command$", x)  # perl -ne, Rscript -e
 
 
 def script_names(cmd):
@@ -140,7 +141,8 @@ def script_writes(cmd, cwd):
     """A script file the command runs makes a network topic write, or cannot be read (#5453)."""
     cds = [os.path.expanduser(d) for d in re.findall(r"\b(?:cd|pushd)\s+['\"]?([\w./~-]+)", cmd)]
     dirs = [cwd or "."] + [os.path.join(cwd or ".", d) for d in cds]
-    code_args = " ".join(a or b for a, b in re.findall(r"-c\s+(?:'([^']*)'|\"([^\"]*)\")", cmd))
+    code_args = " ".join(w[i + 2] for w in segments(cmd) for i in range(len(w) - 2)  # `python -c CODE`'s CODE
+                         if re.match(r"python[\d.]*$", w[i].rsplit("/", 1)[-1]) and w[i + 1] == "-c")
     names = [n.split() for found in re.findall(r"\bimport\s+([\w., ]+)", code_args) for n in found.split(",")]
     modules = [n[0] for n in names if n] + re.findall(r"\bfrom\s+([\w.]+)", code_args)  # `import a, b as c`
     modules += [f"{a}.{b}" for a, b in re.findall(r"\bfrom\s+([\w.]+)\s+import\s+(\w+)", code_args)]
@@ -156,7 +158,7 @@ def script_writes(cmd, cwd):
             if TOPIC.search(cmd) and name not in imported and not own:
                 return True
             continue
-        if "unapproved-announcement" in code:  # a copy of this hook or its tests: read only its code
+        if COPY.search(code):  # a copy of this hook or its tests: read only its code
             code = code_only(code) or code
         if (ANNOUNCE.search(code) or TOPIC.search(code)) and NET.search(code) and CODE_WRITE.search(code):
             return True

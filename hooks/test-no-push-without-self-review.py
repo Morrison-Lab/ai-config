@@ -2496,6 +2496,10 @@ def verdict_map_cases() -> tuple[int, int]:
              ((clean, FEATURE), (clean, OTHER_HEAD)), f"No verdict covers {HEAD[:12]}, but", None),
             ("an unnamed commit is not blamed on a descendant's blocking verdict", PUSH,
              ((clean, FEATURE), (nmw, FEATURE)), f"No verdict covers {HEAD[:12]}, but", None),
+            ("an uncovered commit names a report with no fingerprint", PUSH,
+             ((clean, FEATURE), (clean, None)), "the reviewer must state `Reviewed-Commit", None),
+            ("an uncovered commit names a corrupted fingerprint", PUSH,
+             ((clean, FEATURE), (clean, "d" * 40)), "run `git rev-parse HEAD`", None),
             ("a map that runs out of time still refuses", PUSH,
              ((clean, FEATURE), (nmw, HEAD)), "blocking verdict", {"NPWSR_BUDGET_SECONDS": "0"})):
         rc, out = run_hook(cmd, pairs if isinstance(pairs, list) else verdicts(*pairs), extra_env=env)
@@ -2507,6 +2511,16 @@ def verdict_map_cases() -> tuple[int, int]:
     check("a later unparsed report still fails closed",
           PUSH, verdicts((clean, HEAD), (clean, FEATURE), ("Looks fine", FEATURE)),
           True)
+    wrap = tempfile.mkdtemp(prefix="npwsr-git-")
+    with open(os.path.join(wrap, "git"), "w", encoding="utf-8") as f:
+        f.write(f'#!/bin/sh\ncase " $* " in *" merge-base "*) exit 128;; esac\n'
+                f'exec {shutil.which("git")} "$@"\n')
+    os.chmod(os.path.join(wrap, "git"), 0o755)
+    if os.name != "nt":  # a shell-script git stands in for a failing merge-base
+        check("a git failure in the ancestor check defers rather than passing",
+              f"PATH={wrap}:{os.environ['PATH']} git -C {REPO} push origin feature",
+              verdicts((clean, FEATURE), (nmw, HEAD), (clean, OTHER_HEAD)), True)
+    shutil.rmtree(wrap, ignore_errors=True)
     return failures, ran
 
 

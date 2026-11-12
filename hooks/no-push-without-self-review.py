@@ -2919,7 +2919,8 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
     report counts as one) blocks every shipped commit it names or is an
     ancestor of, unless a clean verdict for that commit came later: a stacked
     branch ships its base's flagged code. A blocking verdict on a descendant
-    does not block its reviewed ancestor, whose shipped code it did not judge.
+    does not block its reviewed ancestor, although its diff included the
+    ancestor's code: #4006 keys verdicts by exact commit and accepts that.
     A blocking verdict with ANY fingerprint that does not resolve here, or
     with none, vetoes every verdict before it, since a foreign fingerprint
     cannot be told from a fabricated one; so does a clean report with no
@@ -2938,6 +2939,7 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
             return "", ""
         latest: dict[str, tuple[str, int]] = {}
         vetoed: dict[str, str] = {}  # commit -> what wiped its verdict
+        unbound_note = ""  # the latest report that bound nothing here
         resolved_cache: dict[str, str | None] = {}
         for seq, (found, shas) in enumerate(history):
             for sha in shas:
@@ -2947,6 +2949,14 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
                         directory, env, "rev-parse", "--verify", "--quiet",
                         f"{sha}^{{commit}}", unreadable_raises=True) or "").lower() or None
             hits = [resolved_cache[s] for s in shas if resolved_cache[s]]
+            if not hits:
+                unbound_note = (
+                    f"The latest report binding no commit here was a {_VERDICT_WORDS[found]} "
+                    + (f"naming {shas[0][:12]}, which does not resolve here; if it reviewed "
+                       "this repository, the reviewer must run `git rev-parse HEAD` and "
+                       "copy the 40-character output verbatim." if shas else
+                       "with no Reviewed-Commit line; the reviewer must state "
+                       "`Reviewed-Commit: <full sha>`."))
             if found == "clean" and len(hits) < len(shas):
                 for hit in hits:  # an unresolvable fingerprint voids a clean report
                     vetoed[hit] = ("a clean report naming it also named a commit that "
@@ -2995,7 +3005,8 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
             "\nA push ships commits, so whatever no "
             "verdict covers -- a later commit, a `main` merge, a rebase, or a branch "
             "other than the reviewed one -- is unreviewed. Re-dispatch the reviewer "
-            "against what you are actually pushing.")
+            "against what you are actually pushing."
+            + (f"\n{unbound_note}" if unbound_note else ""))
     except Exception as exc:  # the caller's stricter checks still decide
         print(f"no-push-without-self-review: verdict map skipped ({exc})", file=sys.stderr)
     return "", ""

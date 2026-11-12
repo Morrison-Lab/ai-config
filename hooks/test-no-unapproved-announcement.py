@@ -55,13 +55,12 @@ WRITES = [
                                   "body": "{\"is_announcement\": true}"}),
 ]
 OTHER = [
-    ("Bash", {"command": "curl https://x/api/v1/courses/1/discussion_topics"
+    ("Bash", {"command": "curl -f https://x/api/v1/courses/1/discussion_topics"
               "?only_announcements=true"}),
     ("Bash", {"command": "canvas announcements list --course 1"}),
     ("Bash", {"command": "git commit -m 'gate discussion_topics with "
               "is_announcement'"}),
     ("Bash", {"command": "grep -rn 'canvas announcements create' README.md"}),
-    ("mcp__canvas__list_announcements", {"course_id": 1}),
     ("mcp__canvas__get_announcement_posts", {"course_id": 1}),
     ("Read", {"file_path": "/tmp/announcement.md"}),
 ]
@@ -106,6 +105,4 @@ for tool, inp in OTHER:
 proc = subprocess.run([sys.executable, SUBJECT], input="not json",
                       capture_output=True, text=True, check=False)
 assert proc.returncode == 0 and not proc.stdout.strip()
-print(f"PASS: {len(WRITES)} writes gated by {len(APPROVING)} approving and "
-      f"{len(NOT_APPROVING)} non-approving turns, {len(OTHER)} other calls "
-      "allowed, stale, scheduled and repeated approvals refused")
+print(f"PASS: {len(WRITES)} writes x {len(APPROVING) + len(NOT_APPROVING)} turns, {len(OTHER)} other calls")

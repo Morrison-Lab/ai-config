@@ -5,21 +5,13 @@ Ezra, 2026-10-27, said twice: never post a class announcement without his
 review and approval of its exact text (ai-config#4780, from mlg#228). A post
 reaches every student at once and cannot be unsent, so this denies.
 
-It fires on a Bash command that writes a Canvas discussion topic (the
-`canvas announcements` CLI, `canvasapi`'s `create_discussion_topic`, or a
-POST or PUT to `discussion_topics`), and on a Canvas MCP tool that creates or
-updates an announcement or discussion topic. It allows one such write after
-the latest message the user typed approves posting the announcement ("post
-the announcement"), and denies a second one in that turn. A negated,
-conditional or questioning sentence does not approve, nor does one that also
-asks for a draft, since the user has not yet seen the text. Agent-written
-turns (scheduled continuations, a coordinator's relay note) never count.
-A script file that posts is not seen; the writer layer (step 3 of
-skills/draft-in-ezras-voice) and the reviewer layer (adversarial-reviewer.md)
-cover it.
-
-Detection needs nothing outside this file. Once a write is detected, any
-trouble reading the transcript denies, since the post is the harm.
+It fires on a Canvas discussion-topic write (the `canvas announcements` CLI,
+`canvasapi`, a POST or PUT to `discussion_topics`, a Canvas MCP tool) and
+allows one per turn whose latest typed user message approves it ("post the
+announcement"). Negated, conditional, questioning or draft-requesting
+sentences do not approve; agent-written turns never count. A posting script
+file is not seen; draft-in-ezras-voice and adversarial-reviewer cover it.
+Once a write is detected, any trouble reading the transcript denies.
 """
 from __future__ import annotations
 
@@ -35,27 +27,22 @@ try:
 except Exception:  # detection still runs; a detected write is then denied
     is_real_user_turn = None
 
-NOT_WRITERS = {"git", "grep", "egrep", "rg", "gh", "echo", "printf", "cat",
-               "less", "head", "tail", "sed", "awk", "diff"}
-CLI = re.compile(r"\bcanvas\s+announcements?\s+(create|post|update|edit)\b")
-TOPIC = re.compile(r"discussion_topic")
-WRITE = re.compile(r"is_announcement|create_discussion_topic|\.edit\(|"
-                   r"-x\s*['\"]?(post|put)|--request[ =]['\"]?(post|put)|"
-                   r"requests\.(post|put)|method['\"]?\s*[:=]\s*['\"]?(post|put)"
-                   r"|(^|\s)(-d|--data\S*|-f|--form)[\s=@]")
+NOT_WRITERS = {"git", "grep", "egrep", "rg", "gh", "echo", "printf", "cat", "less", "head", "tail", "sed", "awk", "diff"}
+CLI = re.compile(r"\bcanvas\s+announcements?\s+(create|post|update|edit)\b", re.I)
+TOPIC = re.compile(r"discussion_topic", re.I)
+WRITE = re.compile(r"is_announcement|create_discussion_topic|\.edit\(|-x\s*['\"]?(post|put)|--request[ =]['\"]?(post|put)|"
+                   r"requests\.(post|put)|method['\"]?\s*[:=]\s*['\"]?(post|put)|(^|\s)(?-i:-d|--data\S*|-F|--form)[\s=@]", re.I)
 MCP_WRITE = re.compile(r"(^|_)(create|post|update|edit|put)(_|$)")
 APPROVE = re.compile(r"\b(post|publish|send)\b[^.!?\n]{0,30}\bannouncements?\b"
-                     r"|\bannouncements?\b[^.!?\n]{0,30}\b(approved|post it|"
-                     r"send it|ok to post|okay to post)\b", re.I)
-SPOILER = re.compile(r"\b(don'?t|do not|never|not|before|until|unless|wait|"
-                     r"if|should|i'?ll|myself)\b|\?", re.I)
+                     r"|\bannouncements?\b[^.!?\n]{0,30}\b(approved|post it|send it|ok to post|okay to post)\b", re.I)
+SPOILER = re.compile(r"\b(don'?t|do not|never|not|before|until|unless|wait|if|should|i'?ll|myself)\b|\?", re.I)
 DRAFTING = re.compile(r"\b(draft|write|compose)\b", re.I)
 TAG = re.compile(r"<(/?)([a-z][\w-]*)([^>]*)>")
 
 
 def is_announcement_write(tool, inp):
     if tool == "Bash":
-        for seg in re.split(r"&&|\|\||[|;&\n]", (inp.get("command") or "").lower()):
+        for seg in re.split(r"&&|\|\||[|;&\n]", inp.get("command") or ""):
             words = seg.split()
             if words and words[0].rsplit("/", 1)[-1] not in NOT_WRITERS and (
                     CLI.search(seg) or (TOPIC.search(seg) and WRITE.search(seg))):
@@ -67,7 +54,7 @@ def is_announcement_write(tool, inp):
     verb = name.split("__")[-1]
     if MCP_WRITE.search(verb) and ("announcement" in verb or "discussion" in verb):
         return True
-    flat = json.dumps(inp).lower().replace('\\"', '"')
+    flat = json.dumps(inp).replace('\\"', '"')
     return bool(TOPIC.search(flat) and WRITE.search(flat))
 
 
@@ -144,8 +131,7 @@ def main() -> int:
         if not isinstance(inp, dict) or not is_announcement_write(tool, inp):
             return 0
     except Exception as exc:  # nothing detected: fail open, saying so
-        print(f"no-unapproved-announcement: could not check call ({exc})",
-              file=sys.stderr)
+        print(f"no-unapproved-announcement: unchecked ({exc})", file=sys.stderr)
         return 0
     try:
         why = verdict(payload.get("transcript_path") or "")
@@ -158,10 +144,9 @@ def main() -> int:
             "permissionDecisionReason": (
                 f"Refused: this posts or edits a class announcement, and {why} "
                 "(Ezra, 2026-10-27, ai-config#4780: never post an announcement "
-                "without his review and approval of its exact text).\n\n"
-                "Show the exact text in chat and wait for a message that "
-                "approves it, such as \"post the announcement\"; then post "
-                "that text once."),
+                "without his review and approval of its exact text).\n\nShow "
+                "the exact text in chat, wait for \"post the announcement\", "
+                "then post that text once."),
         }}))
     return 0
 

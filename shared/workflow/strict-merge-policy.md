@@ -30,7 +30,7 @@ Merging a Pull Request or Merge Request is strictly controlled across all agents
   otherwise comment that you intend to merge and wait five more minutes for a hold-off.
   It applies only to a peer PR that passes `memories/reviewing-prs.md`'s scope test (a peer session under your own login satisfies the author arm);
   another lab member's PR that fails the test gets neither the comment nor the merge.
-  Derivation and cases: [`mwc`](../../skills/mwc/SKILL.md)'s "Another session's PR" section (ai-config#2460).
+  Derivation and cases: [`mwc`](../../skills/mwc/SKILL.md)'s "Another session's PR" section ([ai-config#2460](https://github.com/Morrison-Lab/ai-config/issues/2460)).
 - **When you revert a merge, reopen its issue.**
   GitHub does not automatically reopen the issue a reverted PR closed;
   explicitly and immediately reopen the corresponding issue(s) (`gh issue reopen <issue-number>`) per [`revert-merge.md`](revert-merge.md).

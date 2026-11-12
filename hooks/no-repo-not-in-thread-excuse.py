@@ -1,32 +1,19 @@
 #!/usr/bin/env python3
 """PreToolUse: never say a repository isn't in this thread; attach it.
 
-Ezra, 2026-11-12 02:27 UTC (mds optimization thread): "cai: never say a repo
-isn't in a thread; add it". The thread had told the coordinator "ai-config
-isn't in this thread's repos, so could you route that as an issue?" when
-`mcp__claude-code-remote__add_repo` would have attached it in one call. This
-repeats the 2026-11-04 excuse ("not in this session's repo scope") that
-shared/workflow/no-cant-from-session-excuses.md already forbids in prose.
+Ezra, 2026-11-12: "cai: never say a repo isn't in a thread; add it". An mds
+thread told the coordinator "ai-config isn't in this thread's repos" when
+add_repo would have attached it (see no-cant-from-session-excuses.md).
 
-Scope: every message a session sends to a person or another session
-(hearthbot post_message, reply, update_message, edit_message,
-request_decision, message_coordinator, message_thread), in every session.
+Scope: hearthbot messages to a person or session, in every session. Denies a
+sentence with a negated presence or access ("isn't in", "doesn't have",
+"can't reach", "outside", "has no X checkout"), a thread or session as the
+place, and a repository: the thread's repo list, or a repo word, owner/name,
+code span or lab repo name as subject or object. A bare hyphenated word does
+not count ("merge-ready"). A report of an attach by I or we passes, as does
+one saying add_repo or the attach was refused or failed.
 
-A sentence is denied when it holds all three of:
-  * a negated presence or access ("isn't in", "not one of", "doesn't have",
-    "can't reach", "can't push to", "don't include", "outside", "has no X
-    checkout");
-  * a thread or session as the place ("this thread", "the session's repos",
-    "my repos", "attached here");
-  * a repository: a list of the thread's repos ("this thread's repos"), or a
-    repo word or repo-like name (owner/name, a code span or a lab repo name)
-    before the negation or as the object of have, include, access, reach,
-    push, edit, write or commit. A bare hyphenated word does not count, since
-    "merge-ready" and "pre-commit" are not repos.
-A sentence that reports an attach by I or we passes, and so does
-one that says add_repo or the attach was refused, denied, declined or failed.
-
-A deny, not a reminder, because the failing shape is lexical (ai-config#4741).
+A deny because the shape is lexical (ai-config#4741).
 `ALLOW_REPO_NOT_IN_THREAD=1` overrides. Fails open on any parse trouble.
 """
 import json

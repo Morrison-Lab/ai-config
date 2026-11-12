@@ -11,8 +11,8 @@ HOME = tempfile.mkdtemp()
 ENV = dict(os.environ, HOME=HOME)
 
 
-def run(tool, inp):
-    payload = json.dumps({"tool_name": tool, "tool_input": inp, "cwd": HOME})
+def run(tool, inp, cwd=HOME):
+    payload = json.dumps({"tool_name": tool, "tool_input": inp, "cwd": cwd})
     proc = subprocess.run([sys.executable, SUBJECT], input=payload,
                           capture_output=True, text=True, env=ENV, check=False)
     assert proc.returncode == 0, proc.stderr
@@ -23,9 +23,9 @@ def run(tool, inp):
 DENIED = [
     "cat ~/.config/canvas/token",
     "sed 's/token: .*/token: REDACTED/' ~/.config/canvas/token",
-    "cat $HOME/.netrc",
+    "cat $HOME/.netrc", 'cat "$HOME/.netrc"', "cat < ~/.netrc",
     "head -n 3 ~/.config/gh/hosts.yml | tail -1",
-    "cd /tmp && grep login ~/.netrc",
+    "cd /tmp && grep login ~/.netrc", "grep -v x ~/.netrc", "grep -e x ~/.netrc",
     "cat .netrc",  # relative to cwd, which is HOME here
     "base64 ~/.ssh/id_ed25519",
     "FOO=1 cat ~/.aws/credentials",
@@ -48,7 +48,7 @@ ALLOWED = [
     "echo 'cat ~/.netrc is forbidden'",
     "cat ~/.config/nvim/tokenize.lua",
     "cat ~/.config/myapp/secret.py",
-    "grep .netrc notes.md",  # a search pattern, not a path
+    "grep .netrc notes.md", "grep -e .netrc notes.md", "grep -m 1 .netrc a",
 ]
 
 for c in DENIED:
@@ -56,13 +56,13 @@ for c in DENIED:
 for c in ALLOWED:
     assert run("Bash", {"command": c}) is None, f"wrongly denied: {c}"
 
+assert run("Bash", {"command": "grep -e token f.js"}, os.path.join(HOME, ".config", "a")) is None
 home_token = os.path.join(HOME, ".config", "canvas", "token")
 assert run("Read", {"file_path": home_token}) == "deny"
 assert run("Read", {"file_path": os.path.join(HOME, "notes.md")}) is None
 assert run("Write", {"file_path": home_token, "content": "x"}) is None
 
-proc = subprocess.run([sys.executable, SUBJECT], input="not json",
-                      capture_output=True, text=True, env=ENV, check=False)
+proc = subprocess.run([sys.executable, SUBJECT], input="not json", capture_output=True, text=True, env=ENV, check=False)
 assert proc.returncode == 0 and not proc.stdout.strip()
 
 print(f"PASS: {len(DENIED)} denied, {len(ALLOWED)} allowed, Read, bad input")

@@ -8,10 +8,8 @@ It fires on the Read tool, and on a Bash simple command whose program is a
 reader (`cat`, `sed`, `base64`, ...) naming a credential path. A reader inside
 `$(...)` is allowed, since its output feeds another program, unless the
 enclosing command is `echo` or `printf`. Wrappers (`bash -c`, `xargs`), `cd`
-and more stores are not yet covered (ai-config#5443).
-
-Fails open on stderr. Override: ALLOW_CREDENTIAL_READ=1. "Credential files
-printed" in improve-your-subagents.md and adversarial-reviewer.md: the layers.
+and more stores are not yet covered (ai-config#5443). Fails open on stderr.
+Override in Bash: ALLOW_CREDENTIAL_READ=1. Layers: "Credential files printed".
 """
 
 from __future__ import annotations
@@ -53,6 +51,7 @@ PRINTERS = {"echo", "printf", "print"}
 SUBSTITUTION = re.compile(r"\$\(([^()]*)\)")
 LEAD_WORDS = {"sudo", "command", "exec", "nohup", "time", "doas", "env"}
 PATTERN_FIRST = {"grep", "egrep", "fgrep", "rg", "sed", "awk"}
+VALUE_OPTS = {"-e", "-f", "-m", "-A", "-B", "-C", "-g"}  # options taking a value
 
 
 def is_credential_path(raw, cwd):
@@ -125,9 +124,12 @@ def offending_bash_path(command, cwd):
     tokens = shell_tokens(command) if shell_tokens else None
     for argv in _printed_commands(tokens or []):
         name, args = _program(argv)
-        pos = [k for k, a in enumerate(args) if not a.startswith("-")]
-        if name in PATTERN_FIRST and pos and not {"-e", "-f"} & set(args):
-            args = args[:pos[0]] + args[pos[0] + 1:]  # skip the search pattern
+        if name in PATTERN_FIRST:  # drop option values and the search pattern
+            vals = {k + 1 for k, a in enumerate(args) if a in VALUE_OPTS}
+            keep = [a for k, a in enumerate(args) if k not in vals]
+            pos = [k for k, a in enumerate(keep) if not a.startswith("-")]
+            args = keep[:pos[0]] + keep[pos[0] + 1:] if pos and not {
+                "-e", "-f"} & set(args) else keep
         if name in PRINTERS:  # a quoted "$(cat token)" stays one token
             for inner in SUBSTITUTION.findall(" ".join(args)):
                 hit = offending_bash_path(inner, cwd)
@@ -145,8 +147,7 @@ def evaluate(payload):
     """Deny reason for `payload`, or None."""
     tool = payload.get("tool_name")
     inp = payload.get("tool_input")
-    if not isinstance(inp, dict):
-        return None
+    if not isinstance(inp, dict): return None  # noqa: E701
     cwd = str(payload.get("cwd") or os.getcwd())
     if tool == "Read":
         path = inp.get("file_path") or ""

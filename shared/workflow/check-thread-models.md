@@ -22,7 +22,8 @@ a switch can fail, miss a thread, or be undone by a fallback.
 - **Don't:** write "every thread is off Fable" from the list of switches you sent.
 
 `hooks/no-thread-model-claim-without-get-session.py` denies the first reply in a turn that names a thread or session together with a model when no `get_session` call follows the last user message.
-It cannot tell a claim from a mention, so the retry is allowed.
+It cannot tell a claim from a mention, so the retry is allowed;
+[`adversarial-reviewer`](../../.claude/agents/adversarial-reviewer.md#thread-model-claims) checks the same claim in review.
 
 ## Check for a capability before saying it is missing
 
@@ -32,7 +33,7 @@ the deferred-tool list (ToolSearch), the tool's own description, and one trial c
 This is the chat-side case of [`verify-the-right-artifact`](verify-the-right-artifact.md) and of AGENTS.md's "Don't take anyone's word for it";
 `hooks/warn-unmeasured-capability-claim.py` covers the same claim in a forge write,
 and no hook covers it in chat, because a missing-capability claim has too many phrasings to match
-(widening that hook to reply tools is tracked separately).
+(widening that hook to reply tools is [ai-config#5526](https://github.com/Morrison-Lab/ai-config/issues/5526)).
 
 - **Do:** search the tools, make the call, and report what it returned, or say "I have not checked".
 - **Don't:** state that a capability is missing because you do not remember having it.

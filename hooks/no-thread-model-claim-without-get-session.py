@@ -6,8 +6,7 @@ every thread had been moved off Fable. One thread was still on
 claude-fable-5-2. Asked about it, the coordinator then said it could not see a
 thread's live model. It could: `mcp__claude-code-remote__get_session` on a
 thread's session returns `configured_model`, `session_context.model` and
-`external_metadata.last_served_model`. Both statements were made from memory,
-with no call that reads the state they described.
+`external_metadata.last_served_model`.
 
 The written rule (shared/workflow/check-thread-models.md) is read at read time
 and broken at composition time, so this hook fires at the composition: a reply

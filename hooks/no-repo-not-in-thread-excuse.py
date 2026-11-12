@@ -112,7 +112,8 @@ def attaches(sentence: str) -> bool:
 
 
 def is_excuse(sentence: str) -> bool:
-    return bool(LOC.search(sentence)) and not attaches(sentence) and names_repo(sentence)
+    return (bool(LOC.search(sentence)) and not attaches(sentence) and names_repo(sentence)  # R's "attached" package:
+            and not re.search(r"\b(?:library|require)\(|\bR\s+session\b|\b(?:chunk|render\w*|knit\w*|package)\b", sentence, re.I))
 
 
 def excuse(text: str):
@@ -128,12 +129,9 @@ def excuse(text: str):
 def denial(payload: dict):
     if os.environ.get(OVERRIDE) or not isinstance(payload, dict):
         return None
-    if not TOOL.search(str(payload.get("tool_name") or "")):
+    if not TOOL.search(str(payload.get("tool_name") or "")) or not isinstance(payload.get("tool_input"), dict):
         return None
-    tool_input = payload.get("tool_input")
-    if not isinstance(tool_input, dict):
-        return None
-    sentence = excuse(message_text(tool_input))
+    sentence = excuse(message_text(payload["tool_input"]))
     return REASON.format(sentence=sentence[:160]) if sentence else None
 
 

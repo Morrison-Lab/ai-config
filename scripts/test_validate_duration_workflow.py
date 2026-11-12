@@ -23,10 +23,18 @@ from pathlib import Path
 
 import yaml
 
+sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+from findbash import probe_bash  # noqa: E402
+
 WORKFLOW = Path(__file__).resolve().parent.parent / ".github/workflows/validate-duration.yml"
 TITLE = "validate job on main has slowed down"
 MARKER = "<!-- validate-duration-tracking -->"
-SHELLS = {"bash": ["bash", "--noprofile", "--norc", "-eo", "pipefail", "-c"]}
+# On Windows the first bash on PATH can be the WSL launcher, which cannot see
+# this PATH or jq, so probe for a bash that runs jq (scripts/lib/findbash.py).
+BASH = probe_bash(("-c", "jq -n 1"))
+if BASH is None:
+    raise SystemExit("no bash that can run jq was found; the steps need both")
+SHELLS = {"bash": [BASH, "--noprofile", "--norc", "-eo", "pipefail", "-c"]}
 GH = """#!/bin/bash
 echo "$*" | tr '\\n' ' ' >> "$LOG"
 echo >> "$LOG"

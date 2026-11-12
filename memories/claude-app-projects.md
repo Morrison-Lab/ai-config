@@ -73,7 +73,7 @@ Recorded from the Machine Learning course project (2026-10-12 to 2026-10-16), wh
   (2nd occurrence, 2026-11-12: the coordinator messaged threads one at a time from memory, missed some, then asked;
   Ezra: "obviously yes; this shouldn't have been a question".)
 - **Know ai-config's skills and commands by name.**
-  A coordinator or thread may not have the plugin's skill list in context, so read the `skills/*/SKILL.md` frontmatter (or the project's memory index of them) before saying what a named skill does.
+  A coordinator or thread may not have the plugin's skill list in context, so read the `skills/*/SKILL.md` frontmatter in this repo (or the project's memory index of them) before saying what a named skill does.
   Run a skill the user names, such as `ums`, without asking what it is
   (Ezra, 2026-11-12: "UMS is a skill in ai-config;
   you should know the names of all the skills and commands in ai-config").

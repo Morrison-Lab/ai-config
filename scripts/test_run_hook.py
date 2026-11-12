@@ -53,7 +53,10 @@ def run(home: Path, project: Path, *args: str, stdin: str = "") -> subprocess.Co
     )
 
 
-ECHO = 'cat; echo "root=${CLAUDE_PLUGIN_ROOT}"'
+# Git Bash on Windows exports a POSIX path (/c/..., /tmp/...); cygpath -w turns
+# it back into the native form RUNNER.parent.resolve() gives (ai-config#5516).
+ECHO = ('cat; r="${CLAUDE_PLUGIN_ROOT}"; '
+        'if command -v cygpath >/dev/null; then r="$(cygpath -w "$r")"; fi; echo "root=$r"')
 
 with tempfile.TemporaryDirectory() as td:
     tmp = Path(td)
@@ -66,7 +69,7 @@ with tempfile.TemporaryDirectory() as td:
     check("no settings anywhere: the hook runs", r.returncode == 0 and "root=" in r.stdout)
     check("stdin payload reaches the hook", '{"prompt":"x"}' in r.stdout)
     check("CLAUDE_PLUGIN_ROOT is exported when the harness did not set it",
-          f"root={RUNNER.parent.resolve()}" in r.stdout)
+          os.path.normcase(f"root={RUNNER.parent.resolve()}") in os.path.normcase(r.stdout))
 
     r = run(home, project)
     check("no argument: exit 2", r.returncode == 2)

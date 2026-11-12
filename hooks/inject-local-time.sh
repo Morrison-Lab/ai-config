@@ -21,8 +21,8 @@
 # recap should quote verbatim. That left the three requirements mutually
 # unsatisfiable: quote it verbatim and the recap is not Pacific; convert it
 # and the timestamp is derived. So the zone is now checked rather than merely
-# printed, and this walks the exact ladder CLAUDE.md's "Timestamp recaps in
-# local time" prescribes:
+# printed, and this walks the exact ladder
+# shared/workflow/timestamp-local-recaps.md prescribes:
 #
 #   1. TZ=America/Los_Angeles date  -- correct where the TZ database is present
 #   2. plain `date`                 -- correct where the SYSTEM zone is Pacific,

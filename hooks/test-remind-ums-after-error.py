@@ -61,6 +61,13 @@ REMIND = [
     # match (SILENT below) or losing a real admission (these). A suite carrying
     # only one side cannot tell a correct anchor from an over-tightened one.
     ([txt("I was wrong about this.")], "first person: was wrong"),
+    # A project thread replies only through a reply tool (2026-11-12).
+    ([tool("mcp__hearthbot__post_message",
+           {"text": "You're right, I was wrong on two counts."})],
+     "admission sent through post_message"),
+    ([tool("mcp__hearthbot__message_coordinator",
+           {"text": "My mistake: I missed a thread."})],
+     "admission sent through message_coordinator"),
     ([{"source": "MODEL", "type": "PLANNER_RESPONSE", "content": "I was wrong about this."}],
      "Antigravity PLANNER_RESPONSE with admission reminds"),
     ([txt("I got that wrong.")], "first person: got that wrong"),
@@ -89,8 +96,26 @@ REMIND = [
     ([txt("Correcting my earlier count of the fragments.")], "correcting my"),
     ([ADMIT, tool("Edit", {"file_path": "R/foo.R"})],
      "a write that is NOT to a memory/skill path does not clear it"),
-    ([tool("Edit", {"file_path": "memories/tools.md"}), ADMIT],
-     "a recording BEFORE the admission does not clear it"),
+    ([tool("Edit", {"file_path": "memories/tools.md"}), user("next task"), ADMIT],
+     "a recording in an EARLIER turn does not clear it"),
+    ([ADMIT, tool("Bash", {"command": "cat /x/ai-config/memories/tools.md"})],
+     "a Bash READ of a memory file does not clear it"),
+    ([user("go"), tool("Write", {"file_path": "/x/ai-config/memories/a.md"}),
+      tool("mcp__hearthbot__post_message",
+           {"text": "Separately, I was wrong about the deadline too."})],
+     "a pass earlier in the turn does not clear a DIFFERENT, uncited admission"),
+    ([user("go"), tool("Write", {"file_path": "/x/ai-config/memories/a.md"}),
+      tool("mcp__hearthbot__post_message",
+           {"text": "I was wrong about the deadline, and I have not run UMS for it yet."})],
+     "an admission saying UMS has NOT run is not discharged by unrelated earlier work"),
+    ([user("go"), tool("Write", {"file_path": "/x/ai-config/memories/a.md"}),
+      tool("mcp__hearthbot__post_message",
+           {"text": "I was wrong about the deadline; nothing recorded in memory yet."})],
+     "a negated record mention is not a citation"),
+    ([ADMIT, tool("Bash", {"command": 'echo "a -> shared/x"'})],
+     "an arrow inside quoted text is not a write"),
+    ([ADMIT, tool("Bash", {"command": "echo 'a > shared/x' | wc -c"})],
+     "a quoted greater-than sign is not a redirect"),
     # Omission self-critique (ai-config#1751). "should have" + past
     # participle is retrospective, distinct from every pattern above, which
     # all catch a FACTUAL retraction rather than a behavioral gap.
@@ -205,6 +230,36 @@ IRREALIS_2997 = [
 
 SILENT = [
     ([txt("All checks are green; nothing to correct.")], "no admission at all"),
+    ([tool("mcp__hearthbot__post_message",
+           {"text": "You're right, I was wrong on two counts."}),
+      tool("Write", {"file_path": "/x/ai-config/memories/claude-app-projects.md"})],
+     "post_message admission followed by a memory write"),
+    # A project thread runs the pass, then reports the mistake in its reply.
+    ([user("why?"),
+      tool("Write", {"file_path": "/x/ai-config/memories/claude-app-projects.md"}),
+      tool("mcp__hearthbot__post_message",
+           {"text": "I was wrong about the threads; recorded it in claude-app-projects.md."})],
+     "a pass EARLIER in the same turn clears a reply-tool admission that names its file"),
+    ([user("go"), tool("Write", {"file_path": "/x/ai-config/memories/a.md"}),
+      {"type": "user", "isMeta": True, "message": {"content": [
+          {"type": "text", "text": "[SYSTEM NOTIFICATION - NOT USER INPUT] task done"}]}},
+      tool("mcp__hearthbot__post_message",
+           {"text": "I was wrong about the threads; recorded it in a.md."})],
+     "a harness notification between the pass and the reply is not a new turn"),
+    ([ADMIT, tool("Bash", {"command": "cat /tmp/l >> /x/ai-config/memories/tools.md"})],
+     "a Bash append into a memory file clears it"),
+    ([ADMIT, tool("Bash", {"command": "printf x | tee -a shared/workflow/a.md"})],
+     "a tee into a shared fragment clears it"),
+    ([ADMIT, tool("Bash", {"command": 'printf x >> "/x/ai-config/memories/t.md"'})],
+     "a redirect into a quoted memory path clears it"),
+    ([ADMIT, tool("Bash", {"command": "printf x | tee --append memories/t.md"})],
+     "tee --append into a memory file clears it"),
+    ([ADMIT, tool("mcp__github__create_or_update_file", {"path": "memories/tools.md"})],
+     "a GitHub MCP file write to a memory path clears it"),
+    ([ADMIT, tool("mcp__github__push_files", {"files": [{"path": "skills/ums/SKILL.md"}]})],
+     "a GitHub MCP push_files to a skill path clears it"),
+    ([tool("mcp__github__add_issue_comment", {"body": "I was wrong about this."})],
+     "a GitHub comment is not a reply-tool admission"),
     # A word ending in "i" followed by an admission verb. Without a `\b` before
     # each bare `i` alternative, the regex matched that trailing letter as the
     # first-person subject, so every one of these fired on a THIRD-person
@@ -580,6 +635,75 @@ for got, desc in mutation_2997:
     wrong += got != "REMIND"
     print(f"  {got:<7} {desc}")
 
-total = len(REMIND) + len(SILENT) + len(seq) + len(mutation) + len(mutation_2997)
+# A cp1252 console must not change the bytes the hook writes (ai-config#1288):
+# the reminder quotes a curly-quoted admission, which cp1252 wrote as 0x92.
+print("\ncp1252 console:")
+fd, cp_path = tempfile.mkstemp(suffix=".jsonl")
+# ensure_ascii=False, so the transcript holds the real character, not an escape.
+with os.fdopen(fd, "w", encoding="utf-8") as fh:
+    fh.write(json.dumps(txt("I should" + chr(0x2019) + "ve verified that first."),
+                        ensure_ascii=False) + "\n")
+cp_dir = tempfile.mkdtemp()
+try:
+    cp = subprocess.run(
+        [sys.executable, HOOK], input=json.dumps({"transcript_path": cp_path}).encode(),
+        capture_output=True, timeout=60,
+        env=dict(os.environ, TMPDIR=cp_dir, PYTHONIOENCODING="cp1252"),
+    )
+finally:
+    os.unlink(cp_path)
+    shutil.rmtree(cp_dir, ignore_errors=True)
+cp_ok = cp.returncode == 0 and chr(0x2019).encode("utf-8") in cp.stdout
+wrong += not cp_ok
+print(f"  {'ok' if cp_ok else 'WRONG':<7} the curly quote reaches stdout as UTF-8")
+
+# Stop registration (AI_CONFIG_STOP=1): blocks once per turn so the agent runs
+# the pass before ending the turn, and never while stop_hook_active is set.
+print("\nStop registration:")
+# Close the descriptor, or Windows refuses the unlink below (WinError 32).
+fd, stop_path = tempfile.mkstemp(suffix=".jsonl")
+os.close(fd)
+with open(stop_path, "w", encoding="utf-8") as fh:
+    fh.write(json.dumps(tool("mcp__hearthbot__post_message",
+                             {"text": "You're right, I was wrong on two counts."})) + "\n")
+
+
+def stop_run(payload_extra, tmp):
+    payload = dict({"transcript_path": stop_path, "session_id": "s1"}, **payload_extra)
+    p = subprocess.run(
+        [sys.executable, HOOK], input=json.dumps(payload), capture_output=True,
+        text=True, env=dict(os.environ, TMPDIR=tmp, AI_CONFIG_STOP="1"),
+    )
+    try:
+        parsed = json.loads(p.stdout) if p.stdout.strip() else {}
+    except ValueError:
+        parsed = {}
+    return p.returncode, parsed
+
+
+stop_checks = []
+tmp_a = tempfile.mkdtemp()
+tmp_b = tempfile.mkdtemp()
+try:
+    rc, out = stop_run({}, tmp_a)
+    stop_checks.append((rc == 0 and out.get("decision") == "block"
+                        and "UMS reminder" in str(out.get("reason")),
+                        "blocks the stop after an unrecorded admission"))
+    rc, out = stop_run({"stop_hook_active": True}, tmp_b)
+    stop_checks.append((rc == 0 and "decision" not in out,
+                        "never blocks while stop_hook_active is set"))
+    rc, out = stop_run({}, tmp_b)
+    stop_checks.append((rc == 0 and out.get("decision") == "block",
+                        "a stop_hook_active Stop does not use up the one block"))
+finally:
+    os.unlink(stop_path)
+    shutil.rmtree(tmp_a, ignore_errors=True)
+    shutil.rmtree(tmp_b, ignore_errors=True)
+for ok, desc in stop_checks:
+    wrong += not ok
+    print(f"  {'ok' if ok else 'WRONG':<7} {desc}")
+
+total = (len(REMIND) + len(SILENT) + len(seq) + len(mutation)
+         + len(mutation_2997) + 1 + len(stop_checks))
 print(f"\n{total - wrong}/{total} correct" + ("" if wrong == 0 else f"  ({wrong} WRONG)"))
 sys.exit(1 if wrong else 0)

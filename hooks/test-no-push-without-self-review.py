@@ -1549,7 +1549,11 @@ def msys_path_cases() -> tuple[int, int]:
     # the hint merge both ran on the raw `/c/...` form, and on Python 3.13
     # `isabs` calls it relative, so `cd /c/Users/x && git push` resolved to a
     # drive-less `\\c\\Users\\x` that `_run_git` could no longer repair.
+    # `cd` resolves inside shellcmd (ai-config#3177), so patch it there too.
+    shellcmd = sys.modules["shellcmd"]
+    lib_native = shellcmd.native_path
     mod._native_path = lambda path, is_windows=None: real_native(path, True)
+    shellcmd.native_path = lambda path, is_windows=None: lib_native(path, True)
     try:
         def directory_of(command):
             pushes = list(mod.iter_pushes(command))
@@ -1561,6 +1565,7 @@ def msys_path_cases() -> tuple[int, int]:
         both = directory_of("cd /c/Users/x && git -C sub push origin main")
     finally:
         mod._native_path = real_native
+        shellcmd.native_path = lib_native
     check(f"`cd /c/...` resolves to a native directory (got {by_cd!r})",
           by_cd == "C:/Users/x")
     check(f"`-C /c/...` resolves to a native directory (got {by_c!r})",
@@ -2382,6 +2387,140 @@ def fingerprint_resolution_cases() -> tuple[int, int]:
     return failures, ran
 
 
+def verdict_map_cases() -> tuple[int, int]:
+    """Verdicts are keyed by commit, not one slot (ai-config#4006, #4237)."""
+    failures = 0
+    ran = 0
+    push_feature = f"git -C {REPO} push origin feature"
+
+    def verdicts(*pairs):
+        events = []
+        for verdict, commit in pairs:
+            events += reviewed(body(verdict=verdict, commit=commit) if commit
+                               else body(verdict=verdict, fingerprint=False))
+        return events
+
+    def check(label, cmd, events, want_block):
+        nonlocal failures, ran
+        ran += 1
+        rc, out = run_hook(cmd, events)
+        spec = out.get("hookSpecificOutput") or {}
+        blocked = spec.get("permissionDecision") == "deny"
+        if rc == 0 and blocked == want_block:
+            print(f"PASS: {label}")
+        else:
+            print(f"FAIL: {label} - {spec.get('permissionDecisionReason', '')[:160]}")
+            failures += 1
+
+    clean, nmw = "Ready for merge", "Needs more work"
+    both = verdicts((clean, HEAD), (clean, FEATURE))
+    check("branch A's clean verdict survives a later review of branch B", PUSH, both, False)
+    check("branch B's own clean verdict still authorizes B", push_feature, both, False)
+    check("a later blocking verdict on a child does not veto its reviewed parent",
+          PUSH, verdicts((clean, HEAD), (nmw, FEATURE)), False)
+    check("a later blocking verdict for the same commit vetoes it", PUSH, verdicts((clean, HEAD), (nmw, HEAD)), True)
+    check("a clean review of its base spares a stacked branch", push_feature, verdicts((clean, FEATURE), (clean, HEAD)), False)
+    check("a later clean verdict for the same commit clears it", PUSH, verdicts((nmw, HEAD), (clean, HEAD)), False)
+    check("a later clean verdict naming another repository's commit is skipped",
+          PUSH, verdicts((clean, HEAD), (clean, OTHER_HEAD)), False)
+    mixed = reviewed(body(commit=HEAD) + f"\nReviewed-Commit: {'d' * 40}")
+    check("a clean report mixing a real and an invented fingerprint binds nothing",
+          PUSH, verdicts((clean, FEATURE)) + mixed, True)
+    check("a voided clean report leaves an earlier clean verdict standing", PUSH, verdicts((clean, HEAD)) + mixed, False)
+    check("a later blocking verdict naming no commit here vetoes",
+          PUSH, verdicts((clean, HEAD), (nmw, OTHER_HEAD)), True)
+    nmw_bare = reviewed(body(verdict=nmw, fingerprint=False))
+    check("a later blocking verdict with no fingerprint vetoes",
+          PUSH, verdicts((clean, HEAD), (clean, FEATURE)) + nmw_bare, True)
+    check("a clean verdict after the unbound blocker clears its commit",
+          PUSH, verdicts((clean, FEATURE)) + nmw_bare
+          + verdicts((clean, HEAD), (clean, FEATURE)), False)
+    half = f"\nReviewed-Commit: {'e' * 40}"
+    check("a blocking report with one unresolvable fingerprint vetoes all before it",
+          PUSH, verdicts((clean, HEAD)) + reviewed(body(verdict=nmw, commit=FEATURE) + half),
+          True)
+    check("an unparsed report with one unresolvable fingerprint vetoes all before it",
+          PUSH, verdicts((clean, HEAD)) + reviewed(body(verdict="Looks bad", commit=FEATURE)
+                                                   + half) + verdicts((clean, FEATURE)), True)
+    check("an unparsed report naming another repository's commit vetoes",
+          PUSH, verdicts((clean, HEAD), ("Looks bad", OTHER_HEAD), (clean, FEATURE)), True)
+    check("a later blocking verdict on the base vetoes a stacked branch",
+          push_feature, verdicts((clean, FEATURE), (nmw, HEAD)), True)
+    check("a later blocking verdict on a parent vetoes its child", PUSH, verdicts((clean, HEAD), (nmw, PREV)), True)
+    check("a clean verdict on the fix clears an earlier blocking parent",
+          push_feature, verdicts((nmw, HEAD), (clean, FEATURE), (clean, OTHER_HEAD)), False)
+    for label, cmd, pairs, text, env in (
+            ("an unreviewed commit is named as uncovered", PUSH,
+             ((clean, FEATURE), (nmw, OTHER_HEAD), (clean, FEATURE)),
+             f"No verdict covers {HEAD[:12]}, but this push would ship it.", None),
+            ("the refusal names a blocking verdict on the base", push_feature,
+             ((clean, FEATURE), (nmw, HEAD), (clean, OTHER_HEAD)), f"names {HEAD[:12]}, an ancestor", None),
+            ("the refusal names the blocking verdict on the commit", PUSH,
+             ((clean, HEAD), (nmw, HEAD), (clean, FEATURE)), f"naming {HEAD[:12]} returned a blocking", None),
+            ("an unparsed report between clean ones vetoes its commit", PUSH,
+             ((clean, HEAD), ("Looks bad", HEAD), (clean, FEATURE)), "cannot parse", None),
+            ("the refusal names the veto", PUSH,
+             ((clean, HEAD), (nmw, OTHER_HEAD), (clean, FEATURE)),
+             f"{HEAD[:12]} (a later blocking verdict naming a commit that does not resolve", None),
+            ("an unparsed report on the base is named as unparsed", push_feature,
+             ((clean, FEATURE), ("Looks bad", HEAD), (clean, OTHER_HEAD)), "report with an unparsed verdict line names", None),
+            ("a later clean report with no fingerprint is named", PUSH,
+             ((clean, HEAD), (clean, None)), "clean report with no Reviewed-Commit", None),
+            ("a blocking report with no fingerprint is named, not the latest verdict", PUSH,
+             ((clean, HEAD), (nmw, None), (clean, FEATURE)),
+             "Reviewed-Commit line vetoed its clean verdict; address its findings", None),
+            ("an unbound veto keeps the commit's own blocking verdict", PUSH,
+             ((clean, HEAD), (nmw, OTHER_HEAD), (nmw, HEAD), (nmw, None)),
+             f"naming {HEAD[:12]} returned a blocking verdict", None),
+            ("a commit with no verdict still gets the ancestor refusal", push_feature,
+             ((nmw, HEAD), (clean, OTHER_HEAD)), f"No verdict covers {FEATURE[:12]}, and a", None),
+            ("an ancestor refusal names the veto on the commit", push_feature,
+             ((clean, FEATURE), (nmw, OTHER_HEAD), (nmw, HEAD)),
+             f"No verdict covers {FEATURE[:12]} (a later blocking verdict naming", None),
+            ("a skipped clean report with a bad fingerprint is named", PUSH,
+             verdicts((clean, FEATURE)) + reviewed(body(commit=HEAD) + f"\nReviewed-Commit: {'d' * 40}"),
+             "copy each Reviewed-Commit verbatim", None),
+            ("an unnamed commit is not blamed on another repository's review", PUSH,
+             ((clean, FEATURE), (clean, OTHER_HEAD)), f"No verdict covers {HEAD[:12]}, but", None),
+            ("an unnamed commit is not blamed on a descendant's blocking verdict", PUSH,
+             ((clean, FEATURE), (nmw, FEATURE)), f"No verdict covers {HEAD[:12]}, but", None),
+            ("a voided clean report after a blocking one is named", PUSH,
+             verdicts((nmw, HEAD)) + mixed, "A later clean report naming it was voided", None),
+            ("a voided clean report before a blocking one is not called later", PUSH,
+             mixed + verdicts((nmw, HEAD)), "!A later clean report naming it was voided", None),
+            ("an uncovered commit names a report with no fingerprint", PUSH,
+             ((clean, FEATURE), (clean, None)), "the reviewer must state `Reviewed-Commit", None),
+            ("an uncovered commit names a corrupted fingerprint", PUSH,
+             ((clean, FEATURE), (clean, "d" * 40)), "run `git rev-parse HEAD`", None),
+            ("a ref deletion defers to the latest blocking verdict", f"git -C {REPO} push origin :feature",
+             ((clean, FEATURE), (nmw, HEAD)), "blocking verdict", None),
+            ("a map that runs out of time still refuses", PUSH,
+             ((clean, FEATURE), (nmw, HEAD)), "blocking verdict", {"NPWSR_BUDGET_SECONDS": "0"})):
+        rc, out = run_hook(cmd, pairs if isinstance(pairs, list) else verdicts(*pairs), extra_env=env)
+        spec = out.get("hookSpecificOutput") or {}
+        reason, absent = spec.get("permissionDecisionReason", ""), text.startswith("!")
+        ok = rc == 0 and spec.get("permissionDecision") == "deny" and (text.lstrip("!") in reason) != absent
+        ran, failures = ran + 1, failures + (not ok)
+        print(f"{'PASS' if ok else 'FAIL'}: {label}")
+    check("a later unparsed report still fails closed",
+          PUSH, verdicts((clean, HEAD), (clean, FEATURE), ("Looks fine", FEATURE)),
+          True)
+    wrap = tempfile.mkdtemp(prefix="npwsr-git-")
+    with open(os.path.join(wrap, "git"), "w", encoding="utf-8") as f:
+        f.write(f'#!/bin/sh\ncase " $* " in *" merge-base "*|*eeeeeeee*) exit 128;; esac\n'
+                f'exec {shutil.which("git")} "$@"\n')
+    os.chmod(os.path.join(wrap, "git"), 0o755)
+    if os.name != "nt":  # a shell-script git stands in for a failing merge-base or rev-parse
+        for step, events in (("ancestor", verdicts((clean, FEATURE), (nmw, HEAD), (clean, OTHER_HEAD))),
+                             ("fingerprint", verdicts((clean, FEATURE), (nmw, "e" * 40)))):
+            out = run_hook(f"PATH={wrap}:{os.environ['PATH']} git -C {REPO} push origin feature", events)[1]
+            ok = "verdict check could not run" in str(out.get("hookSpecificOutput"))  # only refusals say it
+            ran, failures = ran + 1, failures + (not ok)
+            print(f"{'PASS' if ok else 'FAIL'}: a git failure in the {step} check defers, and says so")
+    shutil.rmtree(wrap, ignore_errors=True)
+    return failures, ran
+
+
 def fingerprint_guidance_cases() -> tuple[int, int]:
     """The refusal that asks for a fingerprint must not contradict the settled
     tail contract (ai-config#3050).
@@ -2906,6 +3045,11 @@ def subagent_push_cases() -> tuple[int, int]:
     check("a subagent's own blocking verdict refuses its push",
           rc == 0 and blocked_of(out)
           and "returned a blocking verdict" in reason_of(out), reason_of(out)[:200])
+
+    rc, out = run_hook_in_subagent(PUSH, reviewed(body()) + reviewed(body(commit=FEATURE)),
+                                   reviewed(body("Needs more work")))
+    check("a parent's older clean verdicts do not outvote the subagent's blocking one",
+          rc == 0 and blocked_of(out), reason_of(out)[:200])
 
     # 4. The coordinator's review of this exact head still counts.
     rc, out = run_hook_in_subagent(PUSH, reviewed(body()), [])
@@ -4450,7 +4594,7 @@ def main():
                    structured_payload_cases, transcript_scoping_cases,
                    cd_tracking_cases, fallback_cases,
                    fingerprint_guidance_cases, fingerprint_resolution_cases,
-                   omo_cases, handback_cases, subagent_push_cases,
+                   verdict_map_cases, omo_cases, handback_cases, subagent_push_cases,
                    codex_cases, external_reviewer_cases,
                    symlinked_plugin_root_cases, exempt_repo_cases,
                    alias_cases, deny_resilience_cases):

@@ -27,6 +27,11 @@ When matched, it:
      reusable workflow (`workflow_call:` in its `on:` block), structurally parses
      permissions between <tag> and origin/<default>. Scans for added or escalated
      permissions matching `(read|write|none)` at either workflow root or job level.
+     A key is not an addition when the tag's version of the same workflow
+     already requests it at that level or higher in some job, since every
+     caller already grants the union of its jobs' requests. A reusable workflow
+     absent at the tag is skipped, since no caller pins it to the tag, unless
+     another workflow on the default branch names it (ai-config#5414).
   5. Denies when found, naming the file, permission line, and the remedy: land caller
      grants in every consumer first (suggesting `gh search code "uses: <owner>/<repo>/.github/workflows/<file>@"`),
      then slide.
@@ -45,7 +50,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import shlex
 import subprocess
 import sys
 
@@ -54,8 +58,20 @@ try:
 except ImportError:
     yaml = None
 
-RX_HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1.*?\n[ \t]*\2\b", re.S)
-_SHELL_OPS = set("();|&")
+# The shared splitter (ai-config#3178). A broken install fails open, saying so.
+try:
+    _LIB = os.path.join(os.path.dirname(os.path.dirname(
+        os.path.realpath(__file__))), "scripts", "lib")
+    if _LIB not in sys.path:
+        sys.path.insert(0, _LIB)
+    from shellcmd import simple_commands as _simple_commands
+except Exception as _exc:  # broken install: degrade, never block
+    print(f"guard-slide-major-tag: cannot load scripts/lib/shellcmd.py ({_exc}); "
+          "no command will be checked", file=sys.stderr)
+
+    def _simple_commands(_cmd):
+        """Parse nothing when the shared splitter is missing."""
+        return None
 ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 LEAD_WORDS = {
     "then", "do", "else", "elif", "!", "time", "sudo", "command",
@@ -172,6 +188,33 @@ def _extract_permissions(content: str) -> dict[str, dict[str, str] | str]:
     return _extract_permissions_from_data(data)
 
 
+def _base_union(old_perms: dict[str, dict[str, str] | str]) -> dict[str, int]:
+    """Rank, per key, the highest level any job of the baseline requests.
+
+    GitHub checks every job of a called workflow against the caller's grant
+    when the run starts, so a caller that runs at the baseline already grants
+    the union of what its jobs request. A key at or below that union cannot
+    break such a caller, whichever job requests it (ai-config#5414; gha's
+    audit_callee_permissions.py applies the same rule, gha#1877).
+
+    The workflow root is left out. Its `permissions:` reaches only the jobs
+    that set none of their own, and when every job sets its own, no caller
+    has to grant the root's keys at all.
+    """
+    union: dict[str, int] = {}
+    for scope, scope_perms in old_perms.items():
+        if scope == "workflow":
+            continue
+        if isinstance(scope_perms, dict):
+            pairs = [(k, PERM_RANK.get(v.strip(), 0)) for k, v in scope_perms.items()]
+        else:
+            rank = SHORTHAND_RANK.get(scope_perms.strip(), 0)
+            pairs = [(k, rank) for k in SHORTHAND_COVERED_KEYS]
+        for key, rank in pairs:
+            union[key] = max(union.get(key, 0), rank)
+    return union
+
+
 def _find_added_permissions(
     old_perms: dict[str, dict[str, str] | str],
     new_perms: dict[str, dict[str, str] | str],
@@ -183,8 +226,10 @@ def _find_added_permissions(
     addition. A shorthand grants its level on the permission keys it covers,
     so for those it acts as a floor when it is the baseline and always widens
     when it replaces a dict. Scopes outside SHORTHAND_COVERED_KEYS keep a zero
-    floor and so stay reportable.
+    floor and so stay reportable. An explicit key is also not reported when
+    it stays within the baseline's union across scopes (_base_union).
     """
+    union = _base_union(old_perms)
     added: list[tuple[str, str]] = []
     for scope, perms in new_perms.items():
         old_scope = old_perms.get(scope)
@@ -212,7 +257,9 @@ def _find_added_permissions(
                 clean_old = old_val.strip() if isinstance(old_val, str) else old_val
                 clean_new = val.strip() if isinstance(val, str) else val
                 old_rank = max(
-                    PERM_RANK[clean_old], _shorthand_floor(old_scope, key)
+                    PERM_RANK[clean_old],
+                    _shorthand_floor(old_scope, key),
+                    union.get(key, 0),
                 )
                 if PERM_RANK[clean_new] > old_rank:
                     added.append((scope, f"{key}: {val}"))
@@ -236,28 +283,33 @@ def _git(args: list[str], cwd: str | None = None, timeout: int = 8) -> str | Non
     return res.stdout
 
 
-def _simple_commands(cmd: str) -> list[list[str]] | None:
-    """Split a shell command into simple command argv lists; None on parse error."""
-    cmd = re.sub(r"\\\r?\n", " ", cmd)
-    cmd = RX_HEREDOC.sub("<<", cmd)
-    cmd = cmd.replace("\n", ";")
+def _referenced_elsewhere(filepath: str, ref: str, cwd: str) -> bool:
+    """True unless no workflow at REF other than FILEPATH names its file.
+
+    `git grep` exits 1 for no match and above 1 for an error. Only the clean
+    no-match answer returns False; an error counts as referenced, so the
+    caller does not skip the file and the guard keeps its deny.
+    """
+    name = os.path.basename(filepath)
     try:
-        lex = shlex.shlex(cmd, posix=True, punctuation_chars=True)
-        lex.whitespace_split = True
-        toks = list(lex)
-    except ValueError:
-        return None
-    cmds, cur = [], []
-    for t in toks:
-        if t and set(t) <= _SHELL_OPS:
-            if cur:
-                cmds.append(cur)
-                cur = []
-        else:
-            cur.append(t)
-    if cur:
-        cmds.append(cur)
-    return cmds
+        res = subprocess.run(
+            ["git", "grep", "-l", "-F", "-e", name, ref, "--",
+             ".github/workflows/"],
+            capture_output=True, text=True, cwd=cwd, timeout=8,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return True
+    if res.returncode == 1:
+        return False
+    if res.returncode != 0:
+        return True
+    # Each line is `<ref>:<path>`, the path from the repository root, since
+    # evaluate() passes the root as CWD. A substring match on the name can
+    # only over-report, which keeps the deny.
+    for line in res.stdout.splitlines():
+        if line.strip().split(":", 1)[-1] != filepath:
+            return True
+    return False
 
 
 def _is_slide_dispatch(argv: list[str]) -> tuple[bool, bool]:
@@ -378,6 +430,13 @@ def evaluate(command: str, base_cwd: str | None = None) -> tuple[str, str] | Non
     if not inside_git:
         print("guard-slide-major-tag: not a git repository or git unavailable; failing open", file=sys.stderr)
         return None
+    # Run every later git call from the repository root. Pathspecs and the
+    # paths git prints are otherwise relative to the cwd (and, with
+    # diff.relative set, so are diff paths), and from a subdirectory the
+    # workflow diff matched nothing, so the guard allowed every slide there.
+    top = _git(["rev-parse", "--show-toplevel"], cwd=cwd)
+    if top and top.strip():
+        cwd = top.strip()
 
     tag = _floating_tag(cwd)
     tag_sha = _git(["rev-parse", "--verify", "--quiet", f"{tag}^{{commit}}"], cwd=cwd)
@@ -392,7 +451,11 @@ def evaluate(command: str, base_cwd: str | None = None) -> tuple[str, str] | Non
         print(f"guard-slide-major-tag: remote branch {remote_ref} does not resolve; failing open", file=sys.stderr)
         return None
 
-    diff_out = _git(["diff", f"{tag}..{remote_ref}", "--", ".github/workflows/"], cwd=cwd)
+    # Fixed prefixes, so a user's diff.noprefix or diff.mnemonicPrefix
+    # cannot hide the `+++ b/` lines this parses.
+    diff_out = _git(
+        ["diff", "--src-prefix=a/", "--dst-prefix=b/", f"{tag}..{remote_ref}",
+         "--", ".github/workflows/"], cwd=cwd)
     if diff_out is None:
         print("guard-slide-major-tag: git diff failed; failing open", file=sys.stderr)
         return None
@@ -483,6 +546,16 @@ def evaluate(command: str, base_cwd: str | None = None) -> tuple[str, str] | Non
             continue
 
         new_perms = _extract_permissions_from_data(new_data)
+
+        # A reusable workflow absent at the tag has no caller pinned to the
+        # tag, so no permission it requests can break one (ai-config#5414).
+        # An empty listing means absent; a failed listing (None) falls through
+        # to the normal comparison. The skip also needs no other workflow on
+        # the default branch to name the new file: an existing workflow that
+        # calls it passes its keys on to that workflow's own tag-pinned callers.
+        listing = _git(["ls-tree", "--name-only", tag, "--", filepath], cwd=cwd)
+        if listing == "" and not _referenced_elsewhere(filepath, remote_ref, cwd):
+            continue
 
         old_content = _git(["show", f"{tag}:{filepath}"], cwd=cwd)
         old_perms: dict[str, dict[str, str] | str] = {}

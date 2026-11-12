@@ -28,6 +28,10 @@ Verifies:
   - All rank downward pairs (write->read, write->none, read->none, key removed) allow.
   - Permission value outside rank (e.g. admin) filtered upstream by RX_PERM_VAL and does not deny.
   - Mutation check: making none and read compare equal fails the deny test.
+  - A key inside the tag's union across jobs allows; one above it denies (#5414).
+  - A reusable workflow absent at the tag allows; a failed tag listing still denies (#5414).
+  - A new workflow that another workflow names denies; both answers hold from
+    a subdirectory and under diff.relative or diff.noprefix (#5414).
 
 
 Run:
@@ -369,7 +373,9 @@ def main() -> int:
         # 8f. Fail closed when PyYAML is unavailable: denies with explanation and PyYAML note.
         with open(HOOK, encoding="utf-8") as f:
             hook_src_no_yaml = f.read().replace("import yaml", "yaml = None # import yaml")
-        no_yaml_fd, no_yaml_path = tempfile.mkstemp(suffix=".py")
+        # beside the real hook, so it still finds scripts/lib (ai-config#3178)
+        no_yaml_fd, no_yaml_path = tempfile.mkstemp(
+            suffix=".py", dir=os.path.dirname(os.path.realpath(HOOK)))
         os.close(no_yaml_fd)
         _write_file(no_yaml_path, hook_src_no_yaml)
         try:
@@ -861,6 +867,175 @@ def main() -> int:
             v12c == "allow",
             "allow downward permission transition (checks: write -> checks: read)",
             f"got verdict={v12c}, reason={r12c}",
+        )
+
+        # 14. ai-config#5414: a key inside the tag's union across jobs allows.
+        # At the tag, job `post` requests pull-requests: write; on main, job
+        # `review` gains pull-requests: read, which every caller already grants.
+        def _two_jobs(review_perms: str) -> str:
+            return (
+                "name: Workflow\n"
+                "on:\n  workflow_call:\n"
+                "jobs:\n"
+                "  post:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    permissions:\n"
+                "      pull-requests: write\n"
+                "    steps:\n"
+                "      - run: echo ok\n"
+                "  review:\n"
+                "    runs-on: ubuntu-latest\n"
+                f"    permissions:{review_perms}\n"
+                "    steps:\n"
+                "      - run: echo ok\n"
+            )
+
+        repo14 = _make_repo(permissions_block="")
+        _advance_commit(repo14, "reusable.yml", _two_jobs(" {}"))
+        _run(repo14, "tag", "-f", "v2")
+        _advance_commit(repo14, "reusable.yml", _two_jobs("\n      pull-requests: read"))
+        v14, r14, _ = run_hook(HOOK, "gh workflow run slide-major-tag.yml", repo14)
+        check(
+            v14 == "allow",
+            "allow a job key already inside the tag's union across jobs (#5414)",
+            f"got verdict={v14}, reason={r14}",
+        )
+
+        # 14b. A key above the union still denies (checks is in no job at the tag).
+        _advance_commit(
+            repo14, "reusable.yml",
+            _two_jobs("\n      pull-requests: read\n      checks: read"),
+        )
+        v14b, r14b, _ = run_hook(HOOK, "gh workflow run slide-major-tag.yml", repo14)
+        check(
+            v14b == "deny" and "checks: read" in r14b,
+            "deny a job key outside the tag's union",
+            f"got verdict={v14b}, reason={r14b}",
+        )
+
+        # 14c. Unit: the union is a floor per key, not a blanket allow.
+        res14c = guard_mod._find_added_permissions(
+            {"job:a": {"issues": "read"}, "job:b": {}},
+            {"job:a": {"issues": "read"}, "job:b": {"issues": "write"}},
+        )
+        check(
+            res14c == [("job:b", "issues: write")],
+            "union floor: write above a read union is reported",
+            f"expected [('job:b', 'issues: write')], got {res14c}",
+        )
+        res14d = guard_mod._find_added_permissions(
+            {"job:a": "read-all", "job:b": {}},
+            {"job:a": "read-all", "job:b": {"contents": "read"}},
+        )
+        check(
+            res14d == [],
+            "union floor: a read-all job covers another job's read key",
+            f"expected [], got {res14d}",
+        )
+        # 14e. The root is not in the union: when every job sets its own
+        # permissions, no caller has to grant the root's keys.
+        res14e = guard_mod._find_added_permissions(
+            {"workflow": {"contents": "write"}, "job:a": {}},
+            {"workflow": {"contents": "write"}, "job:a": {"contents": "write"}},
+        )
+        check(
+            res14e == [("job:a", "contents: write")],
+            "union floor: a root-only key is not in the union",
+            f"expected [('job:a', 'contents: write')], got {res14e}",
+        )
+        res14f = guard_mod._find_added_permissions(
+            {"workflow": "write-all", "job:a": {}},
+            {"workflow": "write-all", "job:a": {"contents": "read"}},
+        )
+        check(
+            res14f == [("job:a", "contents: read")],
+            "union floor: a write-all root is not in the union",
+            f"expected [('job:a', 'contents: read')], got {res14f}",
+        )
+
+        # 15. ai-config#5414: a reusable workflow added since the tag allows,
+        # since no caller can pin it to the tag.
+        # Its own text names its file, which must not count as a caller.
+        repo15 = _make_repo()
+        _advance_commit(repo15, "new-reusable.yml",
+                        new_content1 + "# see new-reusable.yml\n")
+        v15, r15, _ = run_hook(HOOK, "gh workflow run slide-major-tag.yml", repo15)
+        check(
+            v15 == "allow",
+            "allow a reusable workflow absent at the tag (#5414)",
+            f"got verdict={v15}, reason={r15}",
+        )
+
+        # 15c. The same, run from a subdirectory: the listing is read from the
+        # root, so the existing workflow's added key still denies there.
+        sub1 = os.path.join(repo1, "sub")
+        os.makedirs(sub1, exist_ok=True)
+        v15c, r15c, _ = run_hook(HOOK, "gh workflow run slide-major-tag.yml", sub1)
+        check(
+            v15c == "deny" and "checks: read" in r15c,
+            "a cwd below the root does not make an existing workflow absent",
+            f"got verdict={v15c}, reason={r15c}",
+        )
+
+        # 15d. A new workflow that an existing one calls is not skipped: its
+        # keys reach the existing workflow's tag-pinned callers.
+        repo15d = _make_repo()
+        _advance_commit(repo15d, "new-reusable.yml", new_content1)
+        _advance_commit(
+            repo15d, "caller.yml",
+            "name: Caller\non:\n  workflow_call:\njobs:\n  call:\n"
+            "    uses: ./.github/workflows/new-reusable.yml\n",
+        )
+        v15d, r15d, _ = run_hook(HOOK, "gh workflow run slide-major-tag.yml", repo15d)
+        check(
+            v15d == "deny" and "new-reusable.yml" in r15d,
+            "deny a new reusable workflow that an existing workflow calls",
+            f"got verdict={v15d}, reason={r15d}",
+        )
+
+        # 15e. Both new-workflow cases give the same answer from a subdirectory.
+        for repo, want, label in ((repo15, "allow", "self-mentioning new workflow"),
+                                  (repo15d, "deny", "new workflow with a caller")):
+            for sub in ("sub", os.path.join(".github", "workflows")):
+                d = os.path.join(repo, sub)
+                os.makedirs(d, exist_ok=True)
+                v15e, r15e, _ = run_hook(HOOK, "gh workflow run slide-major-tag.yml", d)
+                check(v15e == want, f"{label} from {sub}/ gives {want}",
+                      f"got verdict={v15e}, reason={r15e}")
+
+        # 15f. diff.relative and diff.noprefix settings cannot hide a change.
+        for key in ("diff.relative", "diff.noprefix"):
+            _run(repo1, "config", key, "true")
+            v15f, r15f, _ = run_hook(HOOK, "gh workflow run slide-major-tag.yml", sub1)
+            _run(repo1, "config", "--unset", key)
+            check(v15f == "deny", f"{key}=true from a subdirectory still denies",
+                  f"got verdict={v15f}, reason={r15f}")
+
+        # 15g. A git grep error counts as referenced, which keeps the deny.
+        check(
+            guard_mod._referenced_elsewhere(
+                ".github/workflows/x.yml", "no-such-ref", repo1) is True,
+            "a failed reference search counts as referenced",
+        )
+
+        # 15b. A failed tag listing (None) is not read as "absent": the
+        # comparison still runs, so repo1's added checks: read still denies.
+        orig_git = guard_mod._git
+
+        def _git_ls_tree_fails(args, cwd=None, timeout=8):
+            if args[:1] == ["ls-tree"]:
+                return None
+            return orig_git(args, cwd=cwd, timeout=timeout)
+
+        guard_mod._git = _git_ls_tree_fails
+        try:
+            res15b = guard_mod.evaluate("gh workflow run slide-major-tag.yml", repo1)
+        finally:
+            guard_mod._git = orig_git
+        check(
+            res15b is not None and res15b[0] == "deny",
+            "a failed tag listing still compares and denies",
+            f"got {res15b}",
         )
 
         # 13. Mutation check: make two distinct rank levels compare equal (none == read)

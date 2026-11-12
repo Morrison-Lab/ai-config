@@ -25,7 +25,6 @@ once per turn through agent_notice.stop_notice, so a session that truly
 cannot run the pass (no tools) is not trapped. Fails open on any parse
 trouble.
 """
-import importlib.util
 import json
 import os
 import re
@@ -35,6 +34,13 @@ _HERE = os.path.dirname(os.path.realpath(__file__))
 _LIB = os.path.join(os.path.dirname(_HERE), "scripts", "lib")
 if _LIB not in sys.path:
     sys.path.insert(0, _LIB)
+
+try:
+    from sibling import load_sibling
+except ImportError as _exc:
+    print(f"no-ums-deferral-in-stopping-point: cannot load scripts/lib/sibling.py "
+          f"({_exc}); not checking", file=sys.stderr)
+    load_sibling = None
 
 try:
     from agent_notice import stop_notice
@@ -71,15 +77,11 @@ RX_DEFER = re.compile(
 )
 
 
-def _load_turn_outputs():
-    try:
-        spec = importlib.util.spec_from_file_location(
-            "no_park_turn", os.path.join(_HERE, "no-park-on-tracked-blocker.py"))
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        return mod.turn_outputs
-    except Exception:
-        return None
+# `turn_outputs` comes from no-park-on-tracked-blocker.py; without it the
+# hook does not check (scripts/lib/sibling.py).
+_PARK = None
+if load_sibling is not None:
+    _PARK = load_sibling(__file__, "no-park-on-tracked-blocker.py", "no_park_turn")
 
 
 def find_deferral(text):
@@ -109,7 +111,7 @@ def main():
     if not isinstance(payload, dict):
         return 0
     path = payload.get("transcript_path")
-    turn_outputs = _load_turn_outputs()
+    turn_outputs = getattr(_PARK, "turn_outputs", None)
     if not isinstance(path, str) or turn_outputs is None:
         return 0
     text = "\n\n".join(turn_outputs(path))

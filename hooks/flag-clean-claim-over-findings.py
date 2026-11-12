@@ -183,13 +183,18 @@ _AGENT_NOTICE_LIB = os.path.join(
 if _AGENT_NOTICE_LIB not in sys.path:
     sys.path.insert(0, _AGENT_NOTICE_LIB)
 from agent_notice import stop_notice  # noqa: E402 -- reaches the agent (ai-config#4796)
+from sibling import load_sibling  # noqa: E402
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 REPO_ROOT = os.path.dirname(HERE)
 
 
 def _load(name, path):
-    """Import a module from an absolute path, or None if unavailable."""
+    """Import a module from an absolute path, or None if unavailable.
+
+    Used only for `scripts/check-pr-fully-clean.py`, which is not a sibling
+    hook; sibling hooks load through `load_sibling` (ai-config#2018).
+    """
     try:
         spec = importlib.util.spec_from_file_location(name, path)
         mod = importlib.util.module_from_spec(spec)
@@ -211,19 +216,15 @@ _cpfc = _load(
 
 # The per-PR "has the real instrument already run" discharge, reused from
 # the sibling hook that solved this exact question for the same instrument.
-_hrp = _load(
-    "_hrp_verdict_findings",
-    os.path.join(HERE, "no-handrolled-verdict-parse.py"),
-)
+_hrp = load_sibling(__file__, "no-handrolled-verdict-parse.py",
+                    "_hrp_verdict_findings")
 
 # Transcript-record helpers (Claude Code + Antigravity format handling) and
 # the review-fetch/review-paste vocabulary, shared with the hook that
 # already walks a transcript for the identical "was a review body read"
 # question.
-_rums = _load(
-    "_rums_verdict_findings",
-    os.path.join(HERE, "remind-ums-on-scrutiny.py"),
-)
+_rums = load_sibling(__file__, "remind-ums-on-scrutiny.py",
+                     "_rums_verdict_findings")
 
 # Sentence-boundary detection, reused so the hedge/negation prefix scan
 # below never crosses into a PRIOR, unrelated sentence -- a blind character
@@ -231,10 +232,8 @@ _rums = _load(
 # PR #42 first.\nPR #42: Ready for merge." disqualified the second
 # sentence's genuine, unhedged claim because "should" from the FIRST
 # sentence fell inside a 50-character window.
-_nsp = _load(
-    "_nsp_verdict_findings",
-    os.path.join(HERE, "no-stale-pr-status.py"),
-)
+_nsp = load_sibling(__file__, "no-stale-pr-status.py",
+                    "_nsp_verdict_findings")
 
 # Code-span/fence stripping, so a backtick-quoted verdict phrase in the
 # reply cannot count as the reply STATING it.

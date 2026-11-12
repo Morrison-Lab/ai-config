@@ -424,6 +424,8 @@ Round 6's brief was the only one that named the remit above, and it returned 0 f
 **Pause point: after committing, before `git push`.**
 
 Run `python3 scripts/run-local-validation.py --changed` to execute the local checks derived from CI.
+Under `--changed`, `scripts/test_hooks.py` runs only the hook suites the change can affect.
+A plain run, like CI, runs all of them.
 Run `python3 scripts/run-local-validation.py --changed --list` to see them without execution.
 
 - [ ] **A separate `adversarial-reviewer` subagent reviewed this diff and returned a clean verdict** --- dispatched in the foreground against `git diff origin/<default-branch>...HEAD`, briefed with the standards rather than with your rationale for the change, with every finding Addressed, Rebutted, or Deferred to a tracked issue, and re-dispatched after the last commit so its `Reviewed-Commit:` fingerprint names the commits the push would ship ([`adversarial-self-review`](adversarial-self-review.md)).

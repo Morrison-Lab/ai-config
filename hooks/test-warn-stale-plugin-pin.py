@@ -20,6 +20,11 @@ Builds a fake `~/.claude/plugins` (a three-commit marketplace clone plus an
   8. Malformed installed_plugins.json: exit 0, nothing on stdout, stderr
      names the file.
   9. No marketplace clone: exit 0, nothing on stdout, stderr says so.
+
+With a bare repository as the clone's `origin` (ai-config#5309 step 2),
+cases 10 to 23 cover the pin, clone and origin relations, the opt-outs,
+the cloud carve-outs, the time budget and an unreachable origin. Each
+check's name states its case.
 """
 import json
 import os
@@ -66,12 +71,16 @@ def make_root(tmp):
     return root, shas
 
 
-def run(root, record, cwd):
+def run(root, record, cwd, **extra):
     if record is not None:
         path = root / "installed_plugins.json"
         path.write_text(record if isinstance(record, str) else json.dumps(record), encoding="utf-8")
     env = {**os.environ, "AI_CONFIG_PLUGINS_DIR": str(root)}
-    env.pop("CLAUDE_PROJECT_DIR", None)
+    for name in ("CLAUDE_PROJECT_DIR", "CLAUDE_CODE_REMOTE",
+                 "AI_CONFIG_NO_REMOTE_CHECK", "AI_CONFIG_NO_AUTO_REFRESH",
+                 "AI_CONFIG_REMOTE_BUDGET"):
+        env.pop(name, None)
+    env.update(extra)
     out = subprocess.run(
         [sys.executable, str(HOOK)], input=json.dumps({"cwd": str(cwd)}),
         capture_output=True, text=True, env=env,
@@ -137,6 +146,107 @@ def main():
         rc, ctx, err = run(root, "{not json", project)
         check("8 malformed record reports on stderr",
               rc == 0 and ctx == "" and "installed_plugins.json" in err, err)
+
+        mkt = root / "marketplaces" / "Morrison-Lab"
+        origin = tmp / "origin.git"
+        subprocess.run(["git", "clone", "-q", "--bare", "-b", "main", str(mkt), str(origin)],
+                       check=True, capture_output=True)
+        git(mkt, "remote", "add", "origin", str(origin))
+        work = tmp / "work"
+        subprocess.run(["git", "clone", "-q", "-b", "main", str(origin), str(work)],
+                       check=True, capture_output=True)
+        (work / "f").write_text("3", encoding="utf-8")
+        git(work, "commit", "-q", "-am", "c3")
+        git(work, "push", "-q", "origin", "HEAD:main")
+        tip = git(work, "rev-parse", "HEAD")
+
+        rc, ctx, err = run(root, record({"scope": "user", "gitCommitSha": shas[2]}), project)
+        check("10 clone behind origin warns",
+              rc == 0 and "has not been updated" in ctx and tip[:12] in ctx, ctx)
+        check("10 a tip missing from the clone prints no git error", err == "", err)
+
+        rc, ctx, _ = run(root, record({"scope": "user", "gitCommitSha": tip}), project)
+        check("11 pin at origin's tip is silent", rc == 0 and ctx == "", ctx)
+
+        rc, ctx, _ = run(root, record({"scope": "user", "gitCommitSha": shas[0]}), project)
+        check("12 pin and clone both behind",
+              "2 commit(s)" in ctx and "itself lags origin" in ctx, ctx)
+
+        rc, ctx, err = run(root, record({"scope": "user", "gitCommitSha": shas[2]}), project,
+                           AI_CONFIG_NO_REMOTE_CHECK="1")
+        check("13 opt-out skips the remote read", rc == 0 and ctx == "" and err == "",
+              ctx + err)
+
+        rc, ctx, err = run(root, record({"scope": "user", "gitCommitSha": shas[2]}), project,
+                           CLAUDE_CODE_REMOTE="true")
+        check("14 cloud session skips the remote read", rc == 0 and ctx == "" and err == "",
+              ctx + err)
+
+        rc, ctx, err = run(root, record({"scope": "user", "gitCommitSha": shas[2]}), project,
+                           AI_CONFIG_REMOTE_BUDGET="0")
+        check("23 spent budget skips the remote read",
+              rc == 0 and ctx == "" and "no time left to read origin" in err, err)
+
+        rc, ctx, _ = run(root, record({"scope": "user", "gitCommitSha": shas[2]}), project,
+                         CLAUDE_CODE_REMOTE="true", AI_CONFIG_NO_AUTO_REFRESH="1")
+        check("14b cloud without refresh reads origin", "has not been updated" in ctx, ctx)
+
+        rc, ctx, _ = run(root, record({"scope": "project", "projectPath": str(project),
+                                       "gitCommitSha": shas[2]}), project / "sub",
+                         CLAUDE_CODE_REMOTE="true")
+        check("14c cloud still reads origin for a project pin",
+              "--scope project" in ctx and "has not been updated" in ctx, ctx)
+
+        rc, ctx, _ = run(root, record({"scope": "project", "projectPath": str(project),
+                                       "gitCommitSha": shas[2]}), project / "sub")
+        check("16 lagging clone warns a project pin",
+              "--scope project" in ctx and "has not been updated" in ctx, ctx)
+
+        rc, ctx, _ = run(root, record({"scope": "user"}), project)
+        check("17 no recorded commit warns", "no recorded commit" in ctx, ctx)
+
+        git(mkt, "reset", "-q", "--hard", shas[1])
+        rc, ctx, _ = run(root, record({"scope": "user", "gitCommitSha": shas[2]}), project)
+        check("18 pin ahead of a lagging clone says so",
+              "ahead of the marketplace clone" in ctx and "matching" not in ctx, ctx)
+        git(mkt, "reset", "-q", "--hard", shas[2])
+
+        git(mkt, "fetch", "-q", "origin")
+        git(mkt, "reset", "-q", "--hard", tip)
+        (mkt / "f").write_text("4", encoding="utf-8")
+        git(mkt, "commit", "-q", "-am", "c4")
+        ahead = git(mkt, "rev-parse", "HEAD")
+        rc, ctx, _ = run(root, record({"scope": "user", "gitCommitSha": ahead}), project)
+        check("19 clone ahead of origin is silent", rc == 0 and ctx == "", ctx)
+
+        rc, ctx, _ = run(root, record({"scope": "user", "gitCommitSha": tip}), project)
+        check("19b pin at origin's tip, behind a clone ahead of origin, warns",
+              "1 commit(s) behind the marketplace clone" in ctx, ctx)
+
+        git(mkt, "reset", "-q", "--hard", tip)
+        rc, ctx, err = run(root, record({"scope": "user", "gitCommitSha": shas[2]}), project)
+        check("20 clone at origin's tip, pin behind",
+              "1 commit(s)" in ctx and "lags origin" not in ctx and err == "", ctx + err)
+
+        git(mkt, "reset", "-q", "--hard", shas[2])
+        rc, ctx, _ = run(root, record({"scope": "user", "gitCommitSha": ahead}), project)
+        check("22 pin descending from origin's tip is silent", rc == 0 and ctx == "", ctx)
+
+        (mkt / "f").write_text("5", encoding="utf-8")
+        git(mkt, "commit", "-q", "-am", "c5")
+        rc, ctx, _ = run(root, record({"scope": "user", "gitCommitSha": ahead}), project)
+        check("22b pin diverged from the clone warns", "STALE PLUGIN PIN" in ctx, ctx)
+        git(mkt, "reset", "-q", "--hard", shas[2])
+
+        shutil.rmtree(origin)
+        rc, ctx, err = run(root, record({"scope": "user", "gitCommitSha": shas[2]}), project)
+        check("15 unreachable origin falls back to the clone",
+              rc == 0 and ctx == "" and "compared with the local clone only" in err, err)
+        check("15 passes git's error through", "git ls-remote origin HEAD" in err, err)
+
+        rc, ctx, err = run(root, record({"scope": "project", "projectPath": str(other),
+                                       "gitCommitSha": shas[0]}), project)
+        check("21 no applicable entry reads no origin", rc == 0 and ctx == "" and err == "", err)
 
         shutil.rmtree(root / "marketplaces")
         rc, ctx, err = run(root, record({"scope": "user", "gitCommitSha": shas[0]}), project)

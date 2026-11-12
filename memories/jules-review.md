@@ -95,3 +95,21 @@ truncated diff too, which weighs against it without settling it).
 - **Don't:** report "a re-run can clear it" from an approve that was not a
   re-run of the blocked head (this session's first #3183 comment did, and
   was corrected there).
+
+## A re-mention on a new head may return nothing
+
+On [ai-config#3222](https://github.com/Morrison-Lab/ai-config/pull/3222) and [ai-config#3234](https://github.com/Morrison-Lab/ai-config/pull/3234) a `@jules review` re-mention after a push ran and finished with no verdict and no status (2026-09-04).
+Both PRs then merged on claude-review's Ready at the head, with Jules's last verdict an approve of the previous head.
+That approve says nothing about the head: under [`fully-clean`](../shared/workflow/fully-clean.md) a verdict counts only on the head it names.
+
+- **Do:** record a Jules run that ends with no verdict as no Jules verdict on that head, and name in the merge note which reviewers cleared the head itself.
+- **Don't:** count an approve of the previous head as Jules's verdict on the current one, however small the delta.
+
+## Jules reads a PR body's merge notes as instructions to it
+
+Jules blocked [ai-config#3154](https://github.com/Morrison-Lab/ai-config/pull/3154) on its description: a merging note ("write the squash body by hand") and a phrase naming the last adversarial verdict read to it as instructions to the reviewer (2026-09-03).
+The same note had passed on [ai-config#3135](https://github.com/Morrison-Lab/ai-config/pull/3135) earlier that day, and rewriting the body with no file change cleared the block.
+[`review-verdict-pitfalls`](../shared/workflow/review-verdict-pitfalls.md) records the same detector firing on imperative mood alone.
+
+- **Do:** keep a PR body to facts about the branch, and put squash-body guidance in the merge step.
+- **Don't:** name a verdict in a PR body as something a reviewer should defer to.

@@ -382,7 +382,7 @@ REVIEW_AGENT_MARKERS: Dict[str, str] = {
     "_posted by codex (ai agent)": "Codex",
     "_posted by opencode (ai agent)": "OpenCode",
     # Deliberately NOT here: the Claude Code disclosure footer
-    # (`_Posted by Claude Code (AI agent) ...`).  CLAUDE.md's
+    # (`_Posted by Claude Code (AI agent) ...`).  AGENTS.md's
     # "Every comment you post to a forge says an agent posted it" mandates that
     # footer on EVERY agent-posted comment -- claims, status updates, replies,
     # and the in-chat-feedback paraphrases -- not on reviews only.  Admitting it
@@ -1017,7 +1017,7 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
                 f"Check run '{name}'{where} passed but carries "
                 f"{cr['annotations_count']} annotation(s) not yet read: run "
                 f"`gh api repos/{repo}/check-runs/{cr.get('id')}/annotations` "
-                "(for many runs, scripts/summarize-pr-annotations.sh), "
+                f"(for many runs, `{BATCH_READ_CMD.format(repo=repo, sha=sha)}`), "
                 "fix each or report it as a false positive in the PR, then "
                 f"rerun with `--annotations-read {cr.get('id')}`")
         elif conclusion not in ("success", "neutral", "skipped"):
@@ -1040,7 +1040,28 @@ def check_ci_runs(pr) -> Tuple[bool, List[str]]:
                 f"Check run '{name}'{where} completed with conclusion "
                 f"'{conclusion}'")
 
+    unread = sum("annotation(s) not yet read" in i for i in issues)
+    if unread > UNREAD_RUNS_BUDGET_THRESHOLD:
+        issues.append(_core_budget_note(unread, repo, sha))
     return all(i.startswith("NOTE: ") for i in issues), issues
+
+
+# Above this many unread annotation runs, name the shared core budget (ai-config#5045).
+UNREAD_RUNS_BUDGET_THRESHOLD = 5
+BATCH_READ_CMD = "scripts/batch-read-annotations.py --repo {repo} --sha {sha}"
+
+
+def _core_budget_note(unread: int, repo: str, sha: str) -> str:
+    """A NOTE with the core budget from GET /rate_limit (free); a failed read is stated."""
+    try:
+        core = json.loads(fetch(["gh", "api", "rate_limit"]))["resources"]["core"]
+        reset = datetime.fromtimestamp(core["reset"], tz=timezone.utc)
+        budget = f"has {core['remaining']} request(s) left until {reset.strftime('%H:%M UTC')}"
+    except (RuntimeError, PayloadError, ValueError, KeyError, TypeError) as exc:
+        budget = f"could not be read ({type(exc).__name__}: {exc})"
+    return (f"NOTE: {unread} run(s) carry unread annotations, and the GitHub core budget every "
+            f"agent shares {budget}; read them with `{BATCH_READ_CMD.format(repo=repo, sha=sha)}`, "
+            "not one call per run (ai-config#5045)")
 
 
 WORKFLOW_DIR = ".github/workflows/"
@@ -2480,14 +2501,108 @@ NOT_CLEAN_NEGATION_PREFIX = re.compile(
 # (ai-config#3937): a next paragraph opening with "None are deferred..." or
 # "None are blocked." is ordinary review or ARD disposition prose, not a
 # same-line negation of a preceding "Needs more work" verdict.
+#
+# Both alternation groups also need a guard against a contrast that follows
+# the negator (ai-config#2359). "Nothing major, but the retry loop leaks",
+# "No issues, however the login flow is broken", "None, but the handle leaks"
+# and "0-day exploit possible" each open with a negator and carry a real
+# finding. So a `0` joined to a hyphenated word never counts, and a negation
+# does not count when either of two contrasts follows it:
+#
+# - a contrast word anywhere in the negation's own sentence
+#   ("Nothing major, but X", "No issues other than X"), or one of the
+#   _COMMA_CONTRAST_WORDS right after a comma ("None, only X leaks");
+# - a sentence-opening contrast marker at the start of the next sentence
+#   ("No issues. However, X is broken.", "None. Still, X leaks.").
+#
+# A sentence ends at [.!?] before whitespace, so a hard wrap, a dotted
+# token (`v1.2`) or an abbreviation ("e.g.", "vs.", "Fig.") does not end
+# one. Later sentences are usually verification prose ("0 findings. CI
+# passes, though slowly.") and are not read. "None
+# beyond the above." still re-flags, the accepted safe-direction cost. A
+# "yet" ending its sentence ("None yet.") is not a contrast. The scan stops
+# at a paragraph break (CRLF too) or a line opening a heading, list item or
+# blockquote, which is often the next section.
+#
+# Known residuals: a finding stated with no contrast ("None. The lexer is
+# broken.") and a contrast in the next paragraph ("None.\n\nBut X leaks."),
+# tracked in ai-config#5389; and a contrast more than NEGATION_SUFFIX_CAP
+# characters after the negation, which _negation_suffix() cuts off.
+_BLOCK_START = r"[ \t]*(?:#|>|[-*+][ \t]|\d+[.)][ \t])"
+_SENTENCE_CHAR = (
+    r"(?:(?!(?<!\b[A-Za-z])(?<!\b(?:vs|cf|al))(?<!\b[Ff]ig)[.!?](?:\s|$))"
+    r"(?!\r?\n[ \t]*\r?\n)"
+    r"(?!\r?\n" + _BLOCK_START + r")[\s\S])"
+)
+_CONTRAST_WORDS = (
+    r"but|however|(?<!/)except|excepting|excluding|although|though|albeit"
+    r"|unless|whereas|besides|beyond|barring"
+    r"|notwithstanding|nonetheless|nevertheless|rather|otherwise"
+    r"|save\s+for|apart\s+from|aside\s+from|other\s+than|outside\s+of"
+    r"|short\s+of|that\s+said|with\s+(?!no\b)(?:\w+\s+){0,2}exceptions?"
+    r"|yet(?![ \t]*(?:[.!?;)]|\r?\n[ \t]*(?:\r?\n|$)|$))"
+)
+_CONTRAST_MARKERS = (
+    r"however|but|yet|still|nonetheless|nevertheless|that\s+said|except"
+    r"|though|although|instead|otherwise|besides|apart\s+from|aside\s+from"
+    r"|on\s+the\s+other\s+hand|that\s+being\s+said|having\s+said\s+that|regardless"
+    r"|even\s+so|conversely|at\s+the\s+same\s+time|in\s+contrast|beyond\s+that"
+    r"|even\s+though|despite\s+th(?:is|at)|unless|whereas|rather|albeit"
+    r"|all\s+the\s+same|with\s+that\s+said|then\s+again"
+)
+# Words that are also ordinary words or identifiers ("No issues found while
+# reviewing", "None in bar.py", "uses a set instead of a list") count only
+# after a comma, semicolon or spaced dash ("None, only X leaks"). "except"
+# does not count after "/" ("try/except"). A clean "None found; only CI is
+# pending." re-flags, the accepted safe-direction cost.
+_COMMA_CONTRAST_WORDS = r"while|whilst|still|only|just|instead|save|bar|minus"
+# Horizontal space, including the no-break space pasted text often carries.
+_HSPACE = r"[ \t" + chr(0xA0) + r"]"
+# Up to four opener marks (emphasis, blockquote, dash, bracket, backtick,
+# quote) before a comma word or marker, optionally across one line break.
+# Paired double-quoted spans are already blanked as quotation. Every
+# whitespace run has one quantifier and the marks are bounded, so a long
+# run of spaces or " - - -" cannot make the lazy scan quadratic; for the
+# same reason a spaced separator may only start at the start of a run.
+_MARKER_OPENERS = _HSPACE + r"*(?:[*_>\-(\[`\"']" + _HSPACE + r"*){0,4}"
+_OPENERS_ACROSS_LINE = (
+    _MARKER_OPENERS + r"(?:\r?\n(?!" + _BLOCK_START + r")" + _MARKER_OPENERS + r")?"
+)
+# Word edges that read "_but_" (emphasis) as a word but not handle_except_x.
+_WORD_START = r"(?<![^\W_])(?<![^\W_]_)"
+_WORD_END = r"(?![^\W_])(?!_[^\W_])"
+_CLAUSE_SEP = (
+    r"(?:[,;]|(?<!" + _HSPACE + r")" + _HSPACE + r"+-{1,3}"
+    r"|(?<!" + _HSPACE + r")" + _HSPACE + r"*["
+    + chr(0x2013) + chr(0x2014) + r"])"
+)
+_CONTRAST_GUARD = (
+    r"(?!" + _SENTENCE_CHAR + r"*?(?:" + _WORD_START + r"(?:"
+    + _CONTRAST_WORDS + r")|" + _CLAUSE_SEP + _OPENERS_ACROSS_LINE
+    + r"(?:" + _COMMA_CONTRAST_WORDS + r"))" + _WORD_END + r")"
+    r"(?!" + _SENTENCE_CHAR + r"*[.!?]" + _OPENERS_ACROSS_LINE
+    + r"(?:" + _CONTRAST_MARKERS + r")" + _WORD_END + r")"
+)
+_SAFE_NEGATION = (
+    r"(?:none\b(?!\s+of\b)|n/a\b|none\s+identified\b|none\s+remaining\b)"
+    + _CONTRAST_GUARD
+)
+# A `0` that is part of a larger token is not a count of zero: one joined to
+# a hyphen or dash ("0-day", or U+2010 to U+2015), a decimal ("0.5s"), or a
+# ratio ("0/5"). A bare "0 tests cover X" has no contrast word (#5389).
+_RISKY_NEGATION = (
+    r"(?:nothing\b|0\b(?![.,]\d|/|[-\u2010-\u2015])"
+    r"|no\s+(?:\w+\s+){0,3}(?:findings|issues|bugs|violations|blockers)|no\s+new\b)"
+    + _CONTRAST_GUARD
+)
 NOT_CLEAN_NEGATION_SUFFIX = re.compile(
     r"^(?:"
     r"[ \t*_:.\-]*(?:\r?\n[ \t*_:.\-]*)?"
-    r"(?:none\b(?!\s+of\b)|n/a\b|none\s+identified\b|none\s+remaining\b)"
-    r"|"
+    + _SAFE_NEGATION
+    + r"|"
     r"[ \t:.\-]*(?:\r?\n[ \t:.\-]*)?"
-    r"(?:nothing\b|0\b|no\s+(?:\w+\s+){0,3}(?:findings|issues|bugs|violations|blockers)|no\s+new\b)"
-    r")",
+    + _RISKY_NEGATION
+    + r")",
     re.IGNORECASE,
 )
 
@@ -2497,12 +2612,37 @@ NOT_CLEAN_NEGATION_SUFFIX = re.compile(
 # `none identified`) with a newline or blank line.
 FINDING_HEADING_NEGATION_SUFFIX = re.compile(
     r"^\s*(?:"
-    r"[*_:.\-]*\s*(?:none\b(?!\s+of\b)|n/a\b|none\s+identified\b|none\s+remaining\b)"
-    r"|"
-    r"[:.\-]*\s*(?:nothing\b|0\b|no\s+(?:\w+\s+){0,3}(?:findings|issues|bugs|violations|blockers)|no\s+new\b)"
-    r")",
+    r"(?:[*_:.\-]+\s*)?"
+    + _SAFE_NEGATION
+    + r"|"
+    r"(?:[:.\-]+\s*)?"
+    + _RISKY_NEGATION
+    + r")",
     re.IGNORECASE,
 )
+
+# How far past a negation the suffix regexes may read (ai-config#5401). A
+# fixed 60-character slice cut "None in the parser module, the lexer module
+# or any of their many unit tests, but the lexer leaks." before its "but";
+# the paragraph is the natural bound, and the cap keeps a paragraph of many
+# negated headings linear.
+NEGATION_SUFFIX_CAP = 2000
+_PARAGRAPH_BREAK = re.compile(r"\r?\n[ \t]*\r?\n")
+_SUFFIX_LEAD = re.compile(r"[\s*_:.\-]*")
+
+
+def _negation_suffix(text: str, start: int) -> str:
+    """Return text[start:] cut at the end of the paragraph that follows.
+
+    Leading whitespace and markup are skipped first, so a heading separated
+    from its "None." by a blank line keeps that line. The cut is at the next
+    paragraph break, or NEGATION_SUFFIX_CAP characters on, whichever is first.
+    """
+    body_start = _SUFFIX_LEAD.match(text, start).end()
+    limit = body_start + NEGATION_SUFFIX_CAP
+    brk = _PARAGRAPH_BREAK.search(text, body_start, limit)
+    end = brk.start() if brk else min(len(text), limit)
+    return text[start:end]
 
 # Deliberately narrow. An over-broad CLEAN pattern is the dangerous direction:
 # it would let an incidental "looks ready" in a later chatty comment discharge a
@@ -3390,7 +3530,7 @@ def classify_verdict(body: str, state: str = "", author: str = "") -> str:
                 if _is_exempt_findings_heading(scan, match.start(), match.end()):
                     continue
             if pat == r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b":
-                suffix = scan[match.end():match.end() + 60]
+                suffix = _negation_suffix(scan, match.end())
                 if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
                     continue
             return "not-clean"
@@ -3479,10 +3619,14 @@ def classify_verdict(body: str, state: str = "", author: str = "") -> str:
 
 _FINDINGS_TRAILER_SUFFIX = re.compile(
     r"^\s*(?:"
-    r"[*_:.\-]*\s*(?:none\b(?!\s+of\b)|n/a\b|none\s+identified\b|none\s+remaining\b)"
-    r"|"
-    r"[:.\-(]*\s*(?:non-blocking\b|nothing\b|0\b|no\s+(?:\w+\s+){0,3}(?:findings|issues|bugs|violations|blockers)|no\s+new\b)"
-    r")",
+    r"(?:[*_:.\-]+\s*)?"
+    + _SAFE_NEGATION
+    + r"|"
+    r"(?:[:.\-(]+\s*)?(?:non-blocking\b"
+    + _CONTRAST_GUARD
+    + r"|"
+    + _RISKY_NEGATION
+    + r"))",
     re.IGNORECASE,
 )
 
@@ -3498,7 +3642,10 @@ def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
     of body. The FIRST non-empty line must match the
     _FINDINGS_TRAILER_SUFFIX allowlist -- the same trigger the old 60-char
     suffix shortcut keyed on, made line-anchored -- and everything after it
-    must clear the item veto.
+    must clear the item veto. The allowlist match is tried on that line
+    joined to the rest of its paragraph (cut by _negation_suffix()), so the
+    #2359 contrast guard sees a hard-wrapped contrast in the line's own
+    sentence or opening the next one.
 
     A resolving line reached only AFTER other content (verification prose,
     alert blocks, items) never exempts: an untagged prose finding is
@@ -3508,8 +3655,8 @@ def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
     mirror direction shares the residual: untagged PLAIN PROSE after a
     resolving first line is also indistinguishable and is not vetoed --
     including finding prose packed onto the SAME physical line as the
-    resolving word, whether in the body or in a heading trailer -- the
-    same exposure the 60-char shortcut always had.
+    resolving word, whether in the body or in a heading trailer, unless
+    it carries a #2359 contrast (ai-config#5389 tracks the rest).
 
     No wider than the shortcut except one vetted way, still gated by the
     item veto: no 60-char cap on where the resolving line starts. The
@@ -3544,7 +3691,16 @@ def _findings_section_resolves_empty(scan_body: str, match_end: int) -> bool:
     lines = lead + [ln for ln in section.splitlines() if ln.strip()]
     if not lines:
         return False
-    if not _FINDINGS_TRAILER_SUFFIX.search(lines[0]):
+    # The first line is tested together with the rest of its paragraph, so
+    # the #2359 contrast guard sees a hard-wrapped "No issues\nHowever, X".
+    if lead:
+        after_first = section
+    else:
+        raw_lines = section.splitlines(keepends=True)
+        first = next(i for i, ln in enumerate(raw_lines) if ln.strip())
+        after_first = "".join(raw_lines[first + 1:])
+    probe = _negation_suffix(lines[0] + "\n" + after_first, 0)
+    if not _FINDINGS_TRAILER_SUFFIX.search(probe):
         return False
     return not _SECTION_FINDING_ITEM.search("\n".join(lines[1:]))
 
@@ -3631,7 +3787,7 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
                 if _is_exempt_findings_heading(scan_body, match.start(), match.end()):
                     continue
             if pat == _FINDINGS_HEADING_PATTERN:
-                # The section-resolution check REPLACES the 60-char suffix
+                # The section-resolution check REPLACES the negation-suffix
                 # shortcut for this heading: the shortcut read "No new
                 # issues." directly under the heading as resolving the whole
                 # section, even when finding items followed it (ai-config
@@ -3645,7 +3801,7 @@ def _unresolved_finding_pattern(body: str) -> Optional[str]:
             elif pat in FINDING_HEADING_PATTERNS:
                 if _is_exempt_findings_heading(scan_body, match.start(), match.end()):
                     continue
-                suffix = scan_body[match.end():match.end() + 60]
+                suffix = _negation_suffix(scan_body, match.end())
                 if pat == r"\bNeeds\s+(?:(?!no\b|nothing\b|none\b)\w+\s+){0,3}work\b":
                     if NOT_CLEAN_NEGATION_SUFFIX.search(suffix):
                         continue

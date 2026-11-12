@@ -112,7 +112,7 @@ ls -laL "$transcript"; date "+%H:%M:%S"
 ```
 
 Two details, both measured rather than assumed.
-Take the clock reading in the **same command**, per `CLAUDE.md`'s timestamp rule, since "recent" is a comparison and the second half of it expires.
+Take the clock reading in the **same command**, per [`timestamp-local-recaps`](../shared/workflow/timestamp-local-recaps.md), since "recent" is a comparison and the second half of it expires.
 And pass `-L`, or resolve the path first: the harness's `tasks/<agentId>.output` entry is a **symlink** into the projects directory, and a bare `ls -la` on a symlink reports the link's own mtime rather than the transcript's.
 
 Never read the transcript's **contents** to check liveness.
@@ -871,3 +871,10 @@ The aliasing is invisible to the agent doing the copying --- `cp`'s own message 
 
 (Filed as [ai-config#3753](https://github.com/Morrison-Lab/ai-config/issues/3753).
 This is the same `mktemp -d`-per-run discipline `memories/claude-code-hooks.md` prescribes for mutation-testing a guard, arrived at from the opposite direction: there the hazard is two batteries corrupting one copy, here it is two agents sharing one path.)
+
+## A fixer's "done" can leave its edits uncommitted
+
+On [ai-config#3257](https://github.com/Morrison-Lab/ai-config/pull/3257) a sonnet fixer subagent reported done after a Monitor call with its edits still uncommitted in its worktree, so the parent ran the suite and committed them itself (2026-09-04).
+
+- **Do:** run `git -C <worktree> status --short` and `git -C <worktree> log origin/<branch>..HEAD` before trusting a fixer's report.
+- **Don't:** push or re-review a fixer's branch on the strength of its summary alone.

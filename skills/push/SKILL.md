@@ -111,7 +111,7 @@ The prefix has to be on the pushing command, not merely somewhere on the line: a
 **Then run the CI validators locally, and read the denominator line.**
 
 ```bash
-python3 scripts/run-local-validation.py --base origin/<default-branch>
+python3 scripts/run-local-validation.py --changed --base origin/<default-branch>
 ```
 
 It derives its step list from `.github/workflows/validate.yml` (so it cannot
@@ -127,8 +127,13 @@ table of them) runs here too; `new-line-breaks`, for one, runs the vendored
 Running only the `validate` job's `run:` steps by hand skips those
 ([`derive-dont-enumerate`](../../shared/workflow/derive-dont-enumerate.md#which-local-checks-predict-ci-is-itself-a-derivable-set-not-a-remembered-one),
 the ninth occurrence); `--only new-line-breaks` runs that one check alone.
-`--only REGEX` runs a slice while iterating; the full run is the one that
-counts before the push.
+`--changed` narrows the hook test suites, the slowest `validate` step, to those whose inputs the branch touched,
+and runs every suite when the branch touches a shared input such as `scripts/lib/`.
+It also skips a path-filtered job, such as `new-line-breaks`, when the branch touches none of its files.
+`--only REGEX` runs a slice while iterating.
+A hand-picked slice is not a pre-push run, so run the full `--changed` set before the push.
+`hooks/warn-partial-validation-before-push.py` notes a push made with no run of `run-local-validation.py` this session (ai-config#3533).
+It does not yet tell a slice from a full run (ai-config#5428).
 Any non-zero row is a red CI job waiting to happen: fix it before pushing,
 per [`fully-clean`](../../shared/workflow/fully-clean.md).
 (ai-config#1940, #1262.)

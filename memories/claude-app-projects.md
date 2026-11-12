@@ -62,13 +62,35 @@ The user chatting from their Mac also does not mean Remote Control is serving th
 
 ## Claude Projects: practices the coordinator and threads follow
 
-Recorded from the Machine Learning course project (2026-10-12 to 2026-10-16), where the user asked for each.
+Recorded from the Machine Learning course project (2026-10-12 to 2026-10-16, with later dated additions), where the user asked for each.
 
 - **Link both the PR and its thread** whenever a message names a PR: the full PR URL, and the thread as `[title](#cmsg_...)`.
 - **Broadcast to every open thread, not a remembered subset.**
   When asked to tell "all relevant threads" something, list every non-resolved thread, read each one's latest status (including threads bucketed "completed", which can be stalled on a blocked merge), and then choose recipients.
+- **Apply a bulk action to every thread, resolved ones included.**
+  This is wider than the broadcast rule above.
+  For an action such as moving every thread to another model, enumerate with `list_threads` (every page, every state, resolved threads included, since the action applies to all of them, not only open ones), act on each, and re-list to confirm none was missed.
+  When the user says "all", do all of them, and never ask "do you want me to switch all of them?"
+  (2nd occurrence of the broadcast rule's remembered-subset miss, 2026-11-12: the coordinator messaged threads one at a time from memory, missed some, then asked;
+  Ezra: "obviously yes; this shouldn't have been a question".)
+- **Know ai-config's skills and commands by name.**
+  A coordinator or thread may not have the plugin's skill list in context, so read the `skills/*/SKILL.md` and `commands/*.md` frontmatter in ai-config (or the project's memory index of them) before saying what a named skill or command does.
+  Run a skill the user names, such as `ums`, without asking what it is
+  (Ezra, 2026-11-12: "UMS is a skill in ai-config;
+  you should know the names of all the skills and commands in ai-config").
 - **A thread starts its own Remote Control sessions.**
   Where the user has granted a device, call `start_rc_session` yourself and never ask the user to start a session or run a terminal command.
+  The call takes only a message the user typed in the same thread
+  (seen 2026-11-11 on Morrison-Lab/rme#1460).
+  It refuses a decision-card tap, a message the coordinator relayed, and a project-chat message.
+  When a thread will need the device after the user approves, ask for a typed reply in the thread instead of a decision card,
+  so the approval also serves as the message the session starts from.
+- **Transfer GitHub issues from a device session.**
+  GitHub has no REST endpoint for an issue transfer: it needs the GraphQL `transferIssue` mutation,
+  and cloud sessions are refused GraphQL.
+  Run `gh issue transfer` on the user's device instead.
+  On the user's device, the auto-mode check blocked it as an "External System Write" until the user typed approval in the thread.
+  A transferred issue keeps its sub-issue link to a parent in the original repository (rme#1460, 69 issues, 2026-11-11).
 - **Check a PR preview yourself.**
   Open the deployed preview in Playwright Chromium and confirm the change, rather than handing the check to the user.
   A local `file://` render can differ from the `https` preview.

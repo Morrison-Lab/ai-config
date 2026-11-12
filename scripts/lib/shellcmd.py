@@ -10,10 +10,11 @@ This splitter was copied into EIGHT hooks before the module was written:
     hooks/flag-stale-adjacent-comment.py       hooks/no-unreviewed-pr.py
     hooks/remind-ci-crosscheck-sim-verdict.py  hooks/warn-nonglobal-substitution.py
 
-Derive that set from the CONSTANT, not from the function name:
+That set was derived from the CONSTANT, not from the function name; before
+the migration the two queries gave 8 files and 7:
 
-    grep -rlF '_SHELL_OPS = set("();|&")' hooks/   ->  8 files
-    grep -rl  "def _simple_commands"      hooks/   ->  7 files
+    grep -rlF '_SHELL_OPS = set("();|&")' hooks/
+    grep -rl  "def _simple_commands"      hooks/
 
 `remind-ci-crosscheck-sim-verdict.py` spells its copy `simple_commands`, so an
 identifier search misses it and a migration keyed on that search would leave
@@ -25,11 +26,11 @@ fixes below -- which is the argument for a module rather than a ninth copy.
 The six that only add context now import `simple_commands` from here
 (ai-config#3178). The two that can REFUSE (`no-clobbering-push.py` denies,
 `no-unreviewed-pr.py` blocks) need the operators between commands as well as
-the argv, so they walk `shell_tokens` themselves. The same grep also finds later
-copies outside the original eight (`guard-slide-major-tag.py`,
-`no-binary-file-read.py`, `no-interpreter-heredoc.py`), which belong to the
-same migration. This module is where the fix landed and where new callers
-import from.
+the argv, so they walk `shell_tokens` themselves. Three later copies
+(`guard-slide-major-tag.py`, `no-binary-file-read.py`,
+`no-interpreter-heredoc.py`) moved here too, so the first grep now finds only
+this file. This module is where the fix landed and where new callers import
+from.
 
 WHY AN ARGV SPLIT RATHER THAN A REGEX
 -------------------------------------
@@ -180,9 +181,15 @@ _SHELL_OPS = set("();|&")
 # `git`'s own global options that consume the FOLLOWING token, skipped before
 # the subcommand is read so `git -C /repo commit` classifies as `commit`. The
 # `--opt=value` inline spellings need no entry: they are one token, and the
-# generic single-step branch handles them.
-GIT_VALUE_OPTS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace",
-                  "--exec-path"}
+# generic single-step branch handles them. `--exec-path` is NOT here: its
+# value is optional and only ever attached, and a bare `--exec-path` prints
+# the path and exits, so `git --exec-path /x push` pushes nothing.
+# `--config-env k=ENV` and `--attr-source <tree-ish>` do take a separated
+# value. `--exec-path`, `--config-env` and `--attr-source` were measured on
+# git 2.43 (ai-config#5391, #5392), where `--super-prefix` is an unknown
+# option.
+GIT_VALUE_OPTS = frozenset({"-C", "-c", "--git-dir", "--work-tree",
+                            "--namespace", "--config-env", "--attr-source"})
 
 
 def _heredoc_free(command):
@@ -284,8 +291,10 @@ def _comment_free(command):
     `simple_commands` turns a newline into `;` so a script's second line is
     seen as its own command. A `#` comment must therefore be removed BEFORE
     that rewrite: afterwards the comment's terminating newline is a `;`, and
-    `shlex` -- whose `commenters` is `#` -- discards everything from the `#`
-    to the end of the WHOLE input rather than to the end of its line.
+    `shlex` with its default `commenters` of `#` discarded everything from the
+    `#` to the end of the WHOLE input rather than to the end of its line.
+    (`shell_tokens` now turns shlex's comments off, so a `#`
+    this leaves in place stays part of its word.)
     Measured: `git commit -m x # note` followed by `git push` returned no
     commands past the comment, so the guard went silent on exactly the chain
     it exists to refuse.
@@ -309,9 +318,20 @@ def _comment_free(command):
     Backslash escapes the following character outside single quotes, so it
     consumes that character rather than only itself. Skipping just the
     backslash let `\"` toggle quote state, and an odd number of them before a
-    `#` corrupted the balance into the same fail-open deletion.
+    `#` corrupted the balance into the same fail-open deletion. An escaped
+    blank (`a\\ #b`) is part of its word, so a `#` after it starts nothing.
+
+    The `)` that closes a `$(` ends a substitution inside a word, not the
+    word: `$(git rev-parse HEAD)#L10` is one word, and reading its `#` as a
+    comment hid every command after it. Unquoted parentheses are tracked to
+    tell that `)` from a subshell's; a `(` after `$`, `<`, `>` or `=` (a
+    substitution, a process substitution, an array) opens one inside a word.
+    A `case` pattern's `)` inside `$(...)` is read as closing it, so a `#`
+    right after that substitution is still taken as a comment.
     """
     single = double = False
+    parens = []  # one entry per open unquoted `(`: True when it is `$(`
+    word_end = True  # whether a token may start at the next character
     out = []
     i = 0
     n = len(command)
@@ -321,14 +341,25 @@ def _comment_free(command):
             out.append(ch)
             out.append(command[i + 1])
             i += 2
+            word_end = False
             continue
+        starts = word_end
+        word_end = False
         if ch == "'" and not double:
             single = not single
         elif ch == '"' and not single:
             double = not double
-        elif ch == "#" and not single and not double:
-            prev = command[i - 1] if i else ""
-            if not prev or prev.isspace() or prev in _SHELL_OPS:
+        elif single or double:
+            pass
+        elif ch == "(":
+            parens.append(i > 0 and command[i - 1] in "$<>=")
+            word_end = True
+        elif ch == ")":
+            word_end = not (parens and parens.pop())
+        elif ch.isspace() or ch in _SHELL_OPS:
+            word_end = True
+        elif ch == "#":
+            if starts:
                 j = command.find("\n", i)
                 if j == -1:
                     break
@@ -366,6 +397,10 @@ def shell_tokens(command):
     try:
         lex = shlex.shlex(command, posix=True, punctuation_chars=True)
         lex.whitespace_split = True
+        # `_comment_free` removed every comment above; left to shlex, a `#`
+        # inside a word (`i.sh#v2`, `s#a#b#`, `$#`, `${#A}`) would end the
+        # command there and hide everything after it.
+        lex.commenters = ""
         return list(lex)
     except ValueError:
         return None
@@ -565,14 +600,9 @@ def resolve_cd_target(rest: list[str], cur_dir: str | None) -> str | None:
     simulate, and a `$VAR` target expands at runtime -- so a caller must
     treat `None` as "somewhere I cannot name", never as "unchanged".
 
-    Adapted verbatim from `hooks/no-push-without-self-review.py`'s
-    `_resolve_cd_target`, which is the tested in-repo implementation. This is
-    a COPY and not a move: that guard still holds its own, because it can
-    refuse a push and migrating a deny-capable guard is its own change with
-    its own review --- as the refusing `_simple_commands` copies did under
-    ai-config#3178. The duplication that leaves is tracked as ai-config#3177,
-    not by the closed ai-config#2993, whose scope is `_simple_commands` and
-    `_strip_env`. New callers import from here.
+    Moved here from `hooks/no-push-without-self-review.py`, which now
+    imports it, so one implementation serves every caller
+    (ai-config#3177).
     """
     cmd_name = rest[0]
     if cmd_name == "popd":

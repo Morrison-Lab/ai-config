@@ -32,7 +32,7 @@ only fires when the TARGET repo vendors a local copy of the checker
 (`scripts/vendor/gha-check-new-line-breaks.py` or
 `scripts/check-new-line-breaks.py`). A repo that consumes
 `Morrison-Lab/gha`'s `check-new-line-breaks` reusable workflow directly
-(`uses: Morrison-Lab/gha/.github/workflows/check-new-line-breaks.yml@v2`,
+(`uses: Morrison-Lab/gha/.github/workflows/check-new-line-breaks.yml@v3`,
 which is what `Morrison-Lab/qbt` calls, from a job named `check`, with no
 `scripts/` directory at all) without vendoring a local copy of the script
 gets NO local warning from either hook -- the incident above happened in
@@ -81,22 +81,20 @@ import sys
 HERE = os.path.dirname(os.path.realpath(__file__))
 
 
-def _sibling(name, key):
-    """Import a hyphenated sibling module, or None if unavailable.
+_LIB = os.path.join(os.path.dirname(HERE), "scripts", "lib")
+if _LIB not in sys.path:
+    sys.path.insert(0, _LIB)
+try:
+    from sibling import load_sibling
+except ImportError as _exc:
+    print(f"{os.path.basename(__file__)}: cannot load scripts/lib/sibling.py "
+          f"({_exc}); running without its sibling hooks", file=sys.stderr)
+    load_sibling = None
 
-    Same pattern used throughout this directory (see
-    `flag-unmeasured-timestamp.py`'s own `_sibling`). Fails open.
-    """
-    path = os.path.join(HERE, name)
-    try:
-        spec = importlib.util.spec_from_file_location(key, path)
-        if spec is None or spec.loader is None:
-            return None
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        return mod
-    except Exception:
-        return None
+
+def _sibling(name, key):
+    """Import a hyphenated sibling module, or None (scripts/lib/sibling.py)."""
+    return load_sibling(__file__, name, key) if load_sibling else None
 
 
 _PUSH_HOOK = _sibling(

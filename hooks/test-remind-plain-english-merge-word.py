@@ -59,7 +59,16 @@ def main():
     ok = p.returncode == 0 and not p.stdout
     print(("  ok      " if ok else "  FAIL    ") + "fails open on garbage stdin")
     fails += 0 if ok else 1
-    total = len(CASES) + 1
+    # A cp1252 console used to drop a prompt in curly quotes: the hook read the
+    # UTF-8 payload as cp1252 and stayed silent (ai-config#5462).
+    curly = f"{chr(0x201C)}merge them all{chr(0x201D)}"
+    p = subprocess.run([sys.executable, HOOK], capture_output=True, timeout=30,
+                       input=json.dumps({"prompt": curly}, ensure_ascii=False).encode("utf-8"),
+                       env=dict(os.environ, PYTHONIOENCODING="cp1252"))
+    ok = p.returncode == 0 and curly.encode("utf-8") in p.stdout
+    print(("  ok      " if ok else "  FAIL    ") + "quotes a curly-quoted prompt under cp1252")
+    fails += 0 if ok else 1
+    total = len(CASES) + 2
     print(f"\n{total - fails}/{total} correct")
     return 1 if fails else 0
 

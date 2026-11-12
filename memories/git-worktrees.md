@@ -106,8 +106,8 @@ there.
 - **The same suppression bites outside worktrees, on ref manipulation
   generally: never `2>/dev/null` a git command that moves a branch ref.**
   `git branch -f main origin/main` is the right way to realign `main` when
-  it is *not* checked out (per `CLAUDE.md`'s "Keep ai-config and repo
-  checkouts fresh"), but git refuses it outright when `main` **is** the
+  it is *not* checked out (per
+  [`keep-checkouts-fresh`](../shared/workflow/keep-checkouts-fresh.md)), but git refuses it outright when `main` **is** the
   current branch ("cannot force update the branch checked out at ...").
   That refusal is the signal; a `2>/dev/null` on it, or burying it mid-chain
   in a `;`-separated compound whose later commands still succeed, throws the
@@ -130,7 +130,7 @@ there.
   (`git switch -c <branch> origin/main`) and leave `main` itself to the
   primary checkout.
   To advance the local `main` ref without checking it out
-  (CLAUDE.md § "Keep ai-config and repo checkouts fresh" recommends this when
+  ([`keep-checkouts-fresh`](../shared/workflow/keep-checkouts-fresh.md) recommends this when
   a single checkout sits on a feature branch), `git branch -f main
   origin/main` is the safe form to *attempt* --- not because the guard never
   fires, but because it **fails closed**: when any worktree holds `main` it
@@ -220,7 +220,7 @@ the ref-mutation risk.)
 
 **On Windows, `~/.claude`'s real-copy consumer directories can drift far more
 than a quick glance suggests --- check the whole corpus, not just `CLAUDE.md`.**
-CLAUDE.md's own "Keep ai-config and repo checkouts fresh" step 2 already says a
+[`keep-checkouts-fresh`](../shared/workflow/keep-checkouts-fresh.md)'s step 2 already says a
 `git pull` on the ai-config checkout doesn't propagate to
 `~/.claude/{skills,shared,commands,memories}` on Windows (real copies, not
 symlinks).

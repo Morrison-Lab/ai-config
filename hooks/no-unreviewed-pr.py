@@ -109,12 +109,13 @@ try:
         os.path.realpath(__file__))), "scripts", "lib")
     if _LIB not in sys.path:
         sys.path.insert(0, _LIB)
-    from shellcmd import shell_tokens, is_operator_token
+    from shellcmd import shell_tokens, is_operator_token, GIT_VALUE_OPTS
     SHELLCMD_ERROR = None
 except Exception as _exc:  # broken install: degrade, never block
     print(f"no-unreviewed-pr: cannot load scripts/lib/shellcmd.py ({_exc}); "
           "no command will be parsed", file=sys.stderr)
     shell_tokens = is_operator_token = None
+    GIT_VALUE_OPTS = frozenset()
     # `no-push-without-self-review.py` then treats this detector as missing.
     SHELLCMD_ERROR = f"cannot load scripts/lib/shellcmd.py ({_exc})"
 
@@ -571,6 +572,83 @@ def _post_method(argv):
     return False
 
 
+# `gh api` shorthands that take a value (`gh api --help`): -X method,
+# -f/-F fields, -H header, -p preview, -q jq, -t template. `-i` is boolean.
+GH_API_SHORT_VALUE = "XfFHpqt"
+GH_API_FIELD_LONG = ("--field", "--raw-field")
+# `gh api` long flags that take a value (`gh api --help`). Kept apart from
+# _API_VALUE_FLAGS, which also holds curl and wget flags gh rejects.
+GH_API_LONG_VALUE = (
+    "--field", "--raw-field", "--header", "--method", "--jq", "--template",
+    "--input", "--preview", "--hostname", "--cache",
+)
+
+
+def _gh_api_post(argv):
+    """True if a `gh api` argv sends a POST, explicitly or by implication.
+
+    `gh api --help`: the method "is `GET` normally and `POST` if any
+    parameters were added", so `-f`/`-F` with no method set is a POST
+    (ai-config#1397). Any explicit method other than POST (a GET that checks
+    who is requested, a DELETE that removes a reviewer) is not, which is why
+    this does not reuse _mutating_api: that one counts a DELETE as a write.
+
+    gh parses flags with pflag, so this walks argv the same way: a flag's
+    value is consumed and never read as a flag (`-q -f` is a jq filter of
+    `-f`, not a field), a short-flag cluster such as `-iX GET` sets the
+    method, and the last method flag wins (`-X POST -X GET` is a GET).
+    A body read with `--input` implies POST too: the help's own example
+    `gh api repos/{owner}/{repo}/rulesets --input file.json` creates a ruleset.
+    A value flag with nothing after it makes gh exit before sending anything
+    ("flag needs an argument"), so that is never a POST. Only the exact
+    method `POST` counts: nothing here shows gh upper-cases `-X post`, so
+    a lower-case method is read as not a POST, which can only leave a
+    request undischarged.
+    """
+    method = None
+    has_body = False
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        i += 1
+        if a == "--":
+            break
+        if a.startswith("--"):
+            name, eq, val = a.partition("=")
+            if name in GH_API_LONG_VALUE and not eq:
+                if i >= len(argv):
+                    return False
+                val = argv[i]
+                i += 1
+            if name == "--method":
+                method = val
+            elif name in GH_API_FIELD_LONG or name == "--input":
+                has_body = True
+            continue
+        if not a.startswith("-"):
+            continue
+        for j, c in enumerate(a[1:], start=1):
+            if c not in GH_API_SHORT_VALUE:
+                continue
+            val = a[j + 1:]
+            # pflag reads `-X=POST` as the value POST, but a bare `-X=` as `=`.
+            if val.startswith("=") and len(val) > 1:
+                val = val[1:]
+            if not val:
+                if i >= len(argv):
+                    return False
+                val = argv[i]
+                i += 1
+            if c == "X":
+                method = val
+            elif c in "fF":
+                has_body = True
+            break
+    if method is not None:
+        return method == "POST"
+    return has_body
+
+
 def _url_ident(url):
     """(num, repo) from a `repos/o/r/pulls/N/...` token; RX_CMD_API is below."""
     m = RX_CMD_API.search(url)
@@ -622,9 +700,9 @@ def _argv_request(argv):
     # prose quoted, discharging that PR without a reviewer ever being added
     # (ai-config#3086 review). So the candidates come from _api_path_tokens
     # and the pattern is `.match()`-anchored to the token start.
-    api = (a0 == "gh" and len(argv) >= 2 and argv[1] == "api") \
-        or a0 in ("curl", "wget")
-    if api and _post_method(argv):
+    gh_api = a0 == "gh" and len(argv) >= 2 and argv[1] == "api"
+    if (gh_api and _gh_api_post(argv)) \
+            or (a0 in ("curl", "wget") and _post_method(argv)):
         for t in _api_path_tokens(argv):
             m = RX_CMD_REVIEWERS.match(t)
             if m:
@@ -984,7 +1062,7 @@ def _argv_push(argv):
     i = 1
     while i < len(argv):                 # skip git's own global options
         a = argv[i]
-        if a in ("-C", "-c", "--git-dir", "--work-tree", "--namespace"):
+        if a in GIT_VALUE_OPTS:          # shared with no-clobbering-push
             i += 2
             continue
         if a.startswith("-"):
@@ -1032,7 +1110,7 @@ def _git_subcommand_index(argv):
     i = 1
     while i < len(argv):
         a = argv[i]
-        if a in ("-C", "-c", "--git-dir", "--work-tree", "--namespace"):
+        if a in GIT_VALUE_OPTS:          # shared with no-clobbering-push
             i += 2
             continue
         if a.startswith("-"):

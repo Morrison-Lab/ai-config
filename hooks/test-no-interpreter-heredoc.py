@@ -262,8 +262,8 @@ MUTATIONS = {
         {"D18"},
     ),
     "M13_unbalanced_quote_fallback": (
-        "a ValueError from shlex falls back instead of failing open",
-        [("    except ValueError:", "    except ZeroDivisionError:")],
+        "an unparseable line falls back instead of failing open",
+        [("    if tokens is None:", "    if False:")],
         {"D16"},
     ),
     "M4_leading_assignment_override": (
@@ -285,7 +285,7 @@ MUTATIONS = {
     "M7_pipe_is_a_command_boundary": (
         "`|` separates commands on the opener line, so `cat <<EOF | python3 -` "
         "finds the interpreter",
-        [('_SHELL_OPS = set("();|&")', '_SHELL_OPS = set("();&")')],
+        [("if is_operator_token(token):", 'if token in (";", "&&"):')],
         {"D4"},
     ),
     "M8_override_value_must_be_1": (

@@ -15,6 +15,17 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 RUNNER = ROOT / "plugins" / "ai-config-hooks" / "run-hook.sh"
 
+sys.path.insert(0, str(Path(__file__).resolve().parent / "lib"))
+from findbash import find_bash  # noqa: E402
+
+# A bare "bash" on Windows is the WSL launcher, which cannot run this
+# checkout's script (ai-config#5503), so probe for one that can.
+BASH = find_bash(RUNNER, probe_args=("true",))
+if BASH is None:
+    sys.exit("error: no bash tried (AI_SESSION_BASH if set, bash on PATH, Git for Windows, "
+             "/bin/bash) can run plugins/ai-config-hooks/run-hook.sh; "
+             "set AI_SESSION_BASH to one that can")
+
 passes = 0
 failures = 0
 
@@ -38,12 +49,17 @@ def run(home: Path, project: Path, *args: str, stdin: str = "") -> subprocess.Co
     env = {**os.environ, "HOME": str(home), "CLAUDE_PROJECT_DIR": str(project)}
     env.pop("CLAUDE_PLUGIN_ROOT", None)
     return subprocess.run(
-        ["bash", str(RUNNER), *args], input=stdin, capture_output=True,
+        [BASH, str(RUNNER), *args], input=stdin, capture_output=True,
         text=True, env=env, cwd=str(project),
     )
 
 
-ECHO = 'cat; echo "root=${CLAUDE_PLUGIN_ROOT}"'
+# Git Bash on Windows exports a POSIX path (/c/..., /tmp/...); there, and only
+# there (an unrelated cygpath elsewhere is left alone), cygpath -wl turns
+# it back into the native form RUNNER.parent.resolve() gives (ai-config#5516).
+ECHO = ('cat; r="${CLAUDE_PLUGIN_ROOT}"; '
+        'case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) r="$(cygpath -wl "$r")";; esac; '
+        'echo "root=$r"')
 
 with tempfile.TemporaryDirectory() as td:
     tmp = Path(td)
@@ -56,7 +72,7 @@ with tempfile.TemporaryDirectory() as td:
     check("no settings anywhere: the hook runs", r.returncode == 0 and "root=" in r.stdout)
     check("stdin payload reaches the hook", '{"prompt":"x"}' in r.stdout)
     check("CLAUDE_PLUGIN_ROOT is exported when the harness did not set it",
-          f"root={RUNNER.parent.resolve()}" in r.stdout)
+          os.path.normcase(f"root={RUNNER.parent.resolve()}") in os.path.normcase(r.stdout))
 
     r = run(home, project)
     check("no argument: exit 2", r.returncode == 2)

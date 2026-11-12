@@ -40,7 +40,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install dependencies
-        run: python3 -m pip install pyyaml==6.0.2 pytest==8.3.5
+        run: python3 -m pip install pyyaml==6.0.2 pytest==8.3.5 markdown-it-py==3.0.0
       - name: Run the validate.yml steps
         run: python3 scripts/run-local-validation.py --no-other-workflows --base origin/main
 

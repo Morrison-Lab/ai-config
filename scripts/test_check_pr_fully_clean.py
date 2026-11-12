@@ -89,12 +89,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from scripts.lib.pull_request import PullRequest, Review
 
 original_check_ci_runs = checker.check_ci_runs
-def wrapped_check_ci_runs(sha, repo, *args, **kwargs):
+def wrapped_check_ci_runs(sha, repo, *args, comments=None, commit_date="", **kwargs):
     pr = PullRequest.__new__(PullRequest)
     pr.pr_num = "123"
     pr.repo = repo
     pr._fetcher = checker.run_cmd
-    pr._data = {"headRefOid": sha}
+    pr._data = {"headRefOid": sha, "comments": comments or [],
+                "commits": [{"committedDate": commit_date}] if commit_date else []}
     pr._check_runs = None
     return original_check_ci_runs(pr)
 
@@ -10553,15 +10554,38 @@ Reviewed-Commit: 3a7b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b
         check("passing run with annotations fails check_ci_runs and names the read command",
               not ann_ok and len(ann_issues) == 1
               and "check-runs/77/annotations" in ann_issues[0])
+        # ai-config#4893: marking runs read is not enough; a PR comment newer
+        # than the head commit must record the dispositions.
+        head_date = "2026-11-12T22:00:00Z"
+        dispo = [{"body": "Annotation dispositions for head sha1234:\n- lint: false positive",
+                  "createdAt": "2026-11-12T22:05:00Z", "author": {"login": "a"}}]
         checker._ANNOTATIONS_READ.add(77)
-        read_ok, read_issues = checker.check_ci_runs("sha123", TEST_REPO)
-        checker._ANNOTATIONS_READ.discard(77)
-        check("--annotations-read ids clear the annotation finding",
+        bare_ok, bare_issues = checker.check_ci_runs("sha1234abc", TEST_REPO)
+        check("--annotations-read without a disposition comment still fails (ai-config#4893)",
+              not bare_ok and len(bare_issues) == 1
+              and "Annotation dispositions for head sha1234" in bare_issues[0])
+        read_ok, read_issues = checker.check_ci_runs(
+            "sha1234abc", TEST_REPO, comments=dispo, commit_date=head_date)
+        check("--annotations-read ids plus a disposition comment clear the finding",
               read_ok and read_issues == [])
+        stale = [dict(dispo[0], createdAt="2026-11-12T21:00:00Z")]
+        stale_ok, _ = checker.check_ci_runs(
+            "sha1234abc", TEST_REPO, comments=stale, commit_date=head_date)
+        check("a disposition comment older than the head commit does not count", not stale_ok)
+        other = [dict(dispo[0], body="Annotation dispositions for head 0000000: ok")]
+        other_ok, _ = checker.check_ci_runs(
+            "sha1234abc", TEST_REPO, comments=other, commit_date=head_date)
+        check("a disposition comment for another head does not count", not other_ok)
+        checker._ANNOTATIONS_READ.discard(77)
         checker._ANNOTATIONS_READ.add("all")
-        all_ok, _ = checker.check_ci_runs("sha123", TEST_REPO)
+        all_ok, _ = checker.check_ci_runs(
+            "sha1234abc", TEST_REPO, comments=dispo, commit_date=head_date)
         checker._ANNOTATIONS_READ.discard("all")
-        check("--annotations-read all clears every annotation finding", all_ok)
+        check("--annotations-read all plus a disposition comment clears every annotation finding",
+              all_ok)
+        none_ok, none_issues = checker.check_ci_runs("sha1234abc", TEST_REPO)
+        check("with nothing marked read, no disposition finding is added",
+              not none_ok and not any("ai-config#4893" in i for i in none_issues))
 
     # ai-config#5045: above the threshold, name the shared core budget and the
     # batched read, from GET /rate_limit (free).

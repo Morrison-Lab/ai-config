@@ -69,8 +69,12 @@ def script_names(cmd):
                     break
 
 
-def is_self(code):
-    """The script is an exact copy of this hook or its tests, which name writes without making them."""
+def is_self(script, code):
+    """The script is this hook or its tests in an ai-config checkout, or an exact copy: they name writes, making none."""
+    root = os.path.dirname(os.path.dirname(os.path.realpath(script)))
+    if os.path.basename(script) in [os.path.basename(p) for p in SELF] and os.path.isfile(
+            os.path.join(root, "scripts", "lib", "transcript_meta.py")):
+        return True
     for path in SELF:
         if os.path.isfile(path):
             with open(path, encoding="utf-8", errors="ignore") as fh:
@@ -84,7 +88,9 @@ def script_writes(cmd, cwd):
     cds = [os.path.expanduser(d) for d in re.findall(r"\bcd\s+([\w./~-]+)", cmd)]
     dirs = [cwd or "."] + [os.path.join(cwd or ".", d) for d in cds]
     code_args = " ".join(a or b for a, b in re.findall(r"-c\s+(?:'([^']*)'|\"([^\"]*)\")", cmd))
-    modules = re.findall(r"\b(?:import|from)\s+([\w.]+)", code_args) + re.findall(r"\bpython[\d.]*\s+-m\s+([\w.]+)", cmd)
+    modules = re.findall(r"\b(?:import|from)\s+([\w.]+)", code_args)
+    modules += re.findall(r"\bpython[\d.]*\s+(?:-\w+\s+)*-m\s+([\w.]+)", cmd)
+    modules += [f"{a}.{b}" for a, b in re.findall(r"\bfrom\s+([\w.]+)\s+import\s+(\w+)", code_args)]
     imported = {m.replace(".", "/") + ".py" for m in modules}  # a local module `-c` code loads or `-m` runs
     for name in [*script_names(cmd), *sorted(imported)]:
         paths = [p for p in (os.path.join(d, os.path.expanduser(name)) for d in dirs) if os.path.isfile(p)]
@@ -95,7 +101,7 @@ def script_writes(cmd, cwd):
             if TOPIC.search(cmd) and name not in imported:
                 return True
             continue
-        if is_self(code):
+        if is_self(paths[-1], code):
             continue
         if (ANNOUNCE.search(code) or TOPIC.search(code)) and NET.search(code) and CODE_WRITE.search(code):
             return True

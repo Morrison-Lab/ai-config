@@ -2517,9 +2517,13 @@ def verdict_map_cases() -> tuple[int, int]:
                 f'exec {shutil.which("git")} "$@"\n')
     os.chmod(os.path.join(wrap, "git"), 0o755)
     if os.name != "nt":  # a shell-script git stands in for a failing merge-base
-        check("a git failure in the ancestor check defers rather than passing",
-              f"PATH={wrap}:{os.environ['PATH']} git -C {REPO} push origin feature",
-              verdicts((clean, FEATURE), (nmw, HEAD), (clean, OTHER_HEAD)), True)
+        out = run_hook(f"PATH={wrap}:{os.environ['PATH']} git -C {REPO} push origin feature",
+                       verdicts((clean, FEATURE), (nmw, HEAD), (clean, OTHER_HEAD)))[1]
+        spec = out.get("hookSpecificOutput") or {}
+        ok = spec.get("permissionDecision") == "deny" and "verdict check could not run" in spec.get(
+            "permissionDecisionReason", "")
+        ran, failures = ran + 1, failures + (not ok)
+        print(f"{'PASS' if ok else 'FAIL'}: a git failure in the ancestor check defers, and says so")
     shutil.rmtree(wrap, ignore_errors=True)
     return failures, ran
 

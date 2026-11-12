@@ -2607,7 +2607,8 @@ def read_latest_review_with_unparsed(
     transcript order, so a caller can key verdicts by commit (ai-config#4006).
     An unparsed report enters it as `"unparsed"`, which blocks like
     `needs_work` the commits it names; as the LAST report it blocks every
-    push, since it may supersede any earlier verdict (`saw_unparsed_later`).
+    push that ships a commit, since it may supersede any earlier verdict
+    (`saw_unparsed_later`).
     """
     reviewer_call_ids: set[str] = set()
     reviewer_task_ids: set[str] = set()
@@ -2909,10 +2910,11 @@ _VERDICT_WORDS = {"clean": "clean report", "needs_work": "blocking verdict",
 
 def _verdict_map_covers(history: list[tuple[str, list[str]]],
                         directory: str | None, argv: list[str],
-                        env: list[str]) -> tuple[str, str]:
+                        env: list[str]) -> tuple[str, ...]:
     """(pass, block) from the LATEST verdict naming each shipped commit
     (ai-config#4006, #4237); ("", "") leaves the decision, and its message,
-    to the caller's latest-verdict checks.
+    to the caller's latest-verdict checks; after an error, a third string
+    says why, for the caller to add to its refusal.
 
     The map is keyed by commit, so a verdict for another branch or another
     repository no longer erases this one's. A blocking verdict (an unparsed
@@ -3007,8 +3009,10 @@ def _verdict_map_covers(history: list[tuple[str, list[str]]],
             "other than the reviewed one -- is unreviewed. Re-dispatch the reviewer "
             "against what you are actually pushing."
             + (f"\n{unbound_note}" if unbound_note else ""))
-    except Exception as exc:  # the caller's stricter checks still decide
+    except Exception as exc:  # the caller's stricter checks still decide, noting why
         print(f"no-push-without-self-review: verdict map skipped ({exc})", file=sys.stderr)
+        return "", "", (f"\n(The per-commit verdict check could not run ({exc}), so "
+                        "this refusal comes from the latest verdict alone.)")
     return "", ""
 
 
@@ -3111,7 +3115,8 @@ def verify_review(transcript_path: str, directory: str | None,
         )
 
     if not saw_unparsed_later:
-        mapped, map_block = _verdict_map_covers(history, directory, argv, env)
+        mapped, map_block, *map_note = _verdict_map_covers(history, directory, argv, env)
+        unparsed_hint += "".join(map_note)
         if mapped:
             return True, mapped
         if map_block:

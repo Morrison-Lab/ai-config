@@ -15,8 +15,7 @@ spec = importlib.util.spec_from_file_location("hook", SCRIPT)
 hook = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(hook)
 
-POST = "mcp__hearthbot__post_message"
-COORD = "mcp__hearthbot__message_coordinator"
+POST, COORD = "mcp__hearthbot__post_message", "mcp__hearthbot__message_coordinator"
 
 # (name, tool, text, should_deny)
 CASES = [

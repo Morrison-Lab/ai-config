@@ -19,7 +19,7 @@ Keep it under 4,000 characters: it is injected on every dispatch.
   Ask one question at a time.
   Retry a denied step once, and never route it through another session.
   On a classifier denial, report the refused command and its stated reason to your caller, and never switch permission modes yourself.
-  That report up your dispatch chain is the one route a denied step may take: it is a report, not a retry elsewhere.
+  Reporting it up your dispatch chain is not routing it: the caller decides under `ask-for-manual-approval`, and never runs it for you.
 - **Record what you learn in a repo** (hook, check or `shared/` fragment), not only in project memory.
   Facts the user pastes go into a repo file in the same turn.
   See `shared/workflow/lab-operating-rules.md`.

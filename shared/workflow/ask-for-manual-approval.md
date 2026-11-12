@@ -7,7 +7,7 @@ read "auto mode" as the equivalent unattended-approval mode there.
 
 When the classifier denies an action the task needs, the user can approve it directly as soon as the session leaves auto mode.
 Leaving auto mode is available whenever the conditions under [When to switch or ask](#when-to-switch-or-ask) hold:
-switch the session yourself where the tool allows,
+switch the session yourself where the tool allows (never for a merge or an action an allow route covers),
 or ask the user to switch.
 Do that before improvising anything else.
 
@@ -51,9 +51,11 @@ Leaving auto mode is safe without a question first only because the user then ap
 Auto mode drops broad allow rules that `default` mode honours ([permission modes](https://code.claude.com/docs/en/permission-modes)), and other routes allow a command with no prompt at all:
 a `permissions.allow` rule in any settings file that applies, a PreToolUse hook that returns an allow decision, a session "always allow" grant, and `--allowedTools`.
 This repository's [`grant-personal-permissions`](../../hooks/grant-personal-permissions.py) hook allows `gh pr merge` that way.
-So never switch modes yourself for a merge, and do not switch for any action one of those routes covers, or where you cannot tell;
+So never switch modes yourself for a merge, and do not switch for any action one of those routes covers, or where the settings files and hooks that apply do not let you tell;
+a session grant or `--allowedTools` you cannot see is a grant the user already made, not a reason to ask;
 ask the user to switch out of auto mode instead, naming the refused command and its stated reason.
 Otherwise, when `mcp__ccd_session_mgmt__set_session_permission_mode` is available, switch the session to `default` yourself with that tool, rerun the command once so the user gets a real approval prompt, and request `auto` again once the actions that needed approval are done.
+A switch to a lower mode shows no card, so that prompt is the user's only sign of the switch.
 When that tool is not available, ask the user to switch out of auto mode the same way.
 
 A first denial can be a transient misfire (see [`claude-code-hooks`](../../memories/claude-code-hooks.md) on retrying an identical command once).

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Stop-hook guard: catch stating a local clock time nobody measured.
 
-`CLAUDE.md`'s "Timestamp recaps in local time" already requires running the
-clock fresh for every recap, and says why: "Each reading expires immediately:
+`shared/workflow/timestamp-local-recaps.md`, which `AGENTS.md`'s "Timestamp
+recaps in local time" links, already requires running the clock fresh for
+every recap, and says why: "Each reading expires immediately:
 run the command fresh for every recap rather than extrapolating elapsed time
 from a prior reading."
 

@@ -4,6 +4,7 @@ The reason is that the forge cannot say it for you.
 An agent driving `gh` under the account holder's credentials posts as **that person**: the comment carries their avatar, their login, and a `MEMBER` or `OWNER` association, and nothing in the API response distinguishes it from a comment they typed.
 `type` reads `User`, not `Bot`, because the token belongs to a user.
 So a reader deciding how much weight to give a claim, a status report, or a review has no way to tell which of the two they are reading, and the default reading is the wrong one.
+`memories/gh-cli.md` records auditors mistaking exactly that.
 
 The marker is one line, on its own, at the end of the body:
 

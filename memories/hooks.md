@@ -1181,4 +1181,23 @@ What ended the oscillation was a structural rule, not a sharper pattern.
 - **Don't:** widen or narrow one pattern per review round.
   The third round on the same pattern is the signal to restructure.
 
+## A hook that parses git or shell commands must follow git's grammar and the user's git config
+
+Three hook PRs in one wave surfaced gaps where a hook read a command differently from git or `gh`, through the issue it fixed or through review rounds before merge.
+
+- **Working directory** (`hooks/guard-slide-major-tag.py`, fixed in [ai-config#5445](https://github.com/Morrison-Lab/ai-config/pull/5445)): `git ls-tree` paths and `git diff` pathspecs are relative to the current directory, so a run from a subdirectory compared no files and allowed the slide.
+- **User git config** (the same hook and PR): `diff.noprefix` removes the `a/` and `b/` prefixes and `diff.mnemonicPrefix` replaces them, so a parser keyed on them found no files.
+  `diff.relative` makes diff paths relative to the current directory and drops changes outside it, which running from the toplevel cures.
+- **Short-flag clusters** (`hooks/no-unreviewed-pr.py`, fixed in [ai-config#5459](https://github.com/Morrison-Lab/ai-config/pull/5459) for [ai-config#1397](https://github.com/Morrison-Lab/ai-config/issues/1397)): the issue was a request that omitted `-X POST`, since `gh` sends POST once a field is given.
+  Rewriting the parser also showed that `gh api -iX POST` and `-iXPOST` set the method inside a cluster, which the old exact `-X` and `-XPOST` token check missed.
+- **Long-option prefixes** (`hooks/warn-one-sided-conflict-resolution.py`, added in [ai-config#5461](https://github.com/Morrison-Lab/ai-config/pull/5461) for [ai-config#5407](https://github.com/Morrison-Lab/ai-config/issues/5407)): git accepts any unique prefix of a long option, and uniqueness depends on the subcommand.
+  `--t` abbreviates `--theirs` on `git restore` but is ambiguous on `git checkout`, which also has `--track`.
+
+- **Do:** resolve the working directory from the hook payload, then run every git call from its `git rev-parse --show-toplevel`, and decide explicitly whether the hook fails open when that call fails.
+- **Do:** pass `--src-prefix=a/ --dst-prefix=b/` to any `git diff` whose output the hook parses.
+- **Do:** read short-flag clusters and unique long-option prefixes per subcommand, from `git <sub> -h` or `gh <cmd> --help`.
+- **Do:** add each spelling (cluster, prefix, subdirectory run, non-default config) to the hook's suite as a must-catch case.
+- **Don't:** test a hook only from the repo root under a default git config, with every flag spelled out in full.
+- **Don't:** match a flag as a separate exact token, such as `-X`, when git or `gh` also accepts it inside a cluster or as a prefix.
+
 See also `scripts/check-text-encoding.py`, which flags bare `write_text` (give `encoding=`), and `skills/mwc/SKILL.md`, which names the `expectedHeadSha` pin the GitHub MCP `merge_pull_request` takes.

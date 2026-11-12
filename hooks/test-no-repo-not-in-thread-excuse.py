@@ -27,7 +27,7 @@ CASES = [
     ("repos attached to", POST, "ai-config is not in the repos attached to this thread.", True),
     ("repos don't include", POST, "The thread's repos don't include ai-config.", True),
     ("can't reach", POST, "I can't reach ai-config from this thread.", True),
-    ("newline split", POST, "Done.\n- ai-config isn't in this thread's repos. I recommend adding it. Tests pass. I attached it.", True),
+    ("newline split", POST, "Done.\n- ai-config isn't in this thread's repos. I recommend adding it. Tests pass. I attached it.\nmlg isn't in this thread. I'd advise running add_repo.", True),
     ("has no checkout", COORD, "This session has no ai-config checkout, so route it as an issue.", True),
     ("don't see", POST, "I don't see ai-config in this thread's repos.", True),
     ("there is no repo", POST, "There is no ai-config repo in this thread.", True),
